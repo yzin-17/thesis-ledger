@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useColorScheme,
   View,
 } from 'react-native';
 import {
@@ -16,6 +17,13 @@ import {
   type MobileDashboardState,
   type MobileLoadState,
 } from './index';
+import {
+  getMobileTheme,
+  mobileThemeLabels,
+  type MobileResolvedTheme,
+  type MobileThemeColors,
+  type MobileThemePreference,
+} from './theme';
 
 const apiBaseUrl = resolveMobileApiBaseUrl({
   explicitBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
@@ -31,20 +39,39 @@ const money = new Intl.NumberFormat('zh-CN', {
 const formatNumber = (value: number | null | undefined) =>
   value === null || value === undefined ? '不可用' : money.format(value);
 
-const stateTone: Record<MobileLoadState, string> = {
-  loading: '#475569',
-  ready: '#166534',
-  empty: '#92400e',
-  error: '#b91c1c',
-  stale: '#9a3412',
-};
+const themePreferences: MobileThemePreference[] = ['system', 'light', 'dark'];
 
-function StatusBanner({ state }: { state: MobileDashboardState }) {
+function stateTone(theme: MobileThemeColors, state: MobileLoadState) {
+  switch (state) {
+    case 'ready':
+      return theme.positive;
+    case 'error':
+      return theme.error;
+    case 'empty':
+      return theme.borderStrong;
+    case 'stale':
+      return theme.warning;
+    case 'loading':
+      return theme.brand;
+  }
+}
+
+type MobileStyles = ReturnType<typeof createStyles>;
+
+function StatusBanner({
+  state,
+  theme,
+  styles,
+}: {
+  state: MobileDashboardState;
+  theme: MobileThemeColors;
+  styles: MobileStyles;
+}) {
   const copy = mobileStateCopy[state.status];
   return (
     <View
       accessibilityRole="alert"
-      style={[styles.statusBanner, { borderLeftColor: stateTone[state.status] }]}
+      style={[styles.statusBanner, { borderLeftColor: stateTone(theme, state.status) }]}
     >
       <Text style={styles.statusTitle}>{copy.title}</Text>
       <Text style={styles.statusDescription}>{state.error || copy.description}</Text>
@@ -52,9 +79,19 @@ function StatusBanner({ state }: { state: MobileDashboardState }) {
   );
 }
 
-function PortfolioScreen({ state }: { state: MobileDashboardState }) {
+function PortfolioScreen({
+  state,
+  theme,
+  styles,
+}: {
+  state: MobileDashboardState;
+  theme: MobileThemeColors;
+  styles: MobileStyles;
+}) {
   if (state.status === 'loading' && state.portfolio === null) {
-    return <ActivityIndicator accessibilityLabel="正在加载投资组合" size="large" color="#0f766e" />;
+    return (
+      <ActivityIndicator accessibilityLabel="正在加载投资组合" size="large" color={theme.brand} />
+    );
   }
   if (state.status === 'empty' || state.portfolio === null) {
     return <Text style={styles.emptyText}>暂无持仓，请先在 Desktop 创建账户或导入持仓。</Text>;
@@ -62,9 +99,13 @@ function PortfolioScreen({ state }: { state: MobileDashboardState }) {
   return (
     <View>
       <View style={styles.metricsRow}>
-        <Metric label="总市值" value={formatNumber(state.portfolio.totalMarketValue)} />
-        <Metric label="总成本" value={formatNumber(state.portfolio.totalCost)} />
-        <Metric label="累计盈亏" value={formatNumber(state.portfolio.totalPnl)} />
+        <Metric
+          label="总市值"
+          value={formatNumber(state.portfolio.totalMarketValue)}
+          styles={styles}
+        />
+        <Metric label="总成本" value={formatNumber(state.portfolio.totalCost)} styles={styles} />
+        <Metric label="累计盈亏" value={formatNumber(state.portfolio.totalPnl)} styles={styles} />
       </View>
       <Text style={styles.sectionTitle}>持仓</Text>
       {state.portfolio.positions.map((position) => (
@@ -87,7 +128,7 @@ function PortfolioScreen({ state }: { state: MobileDashboardState }) {
   );
 }
 
-function RiskScreen({ state }: { state: MobileDashboardState }) {
+function RiskScreen({ state, styles }: { state: MobileDashboardState; styles: MobileStyles }) {
   if (state.riskEvents.length === 0) {
     return <Text style={styles.emptyText}>暂无风险事件。</Text>;
   }
@@ -107,7 +148,7 @@ function RiskScreen({ state }: { state: MobileDashboardState }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, styles }: { label: string; value: string; styles: MobileStyles }) {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -118,8 +159,15 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 export function MobileApp() {
   const bootstrap = useMemo(() => createMobileBootstrap({ apiBaseUrl }), []);
+  const systemTheme = useColorScheme();
   const [state, setState] = useState(bootstrap.store.getState());
   const [screen, setScreen] = useState<'portfolio' | 'risk'>('portfolio');
+  const [themePreference, setThemePreference] = useState<MobileThemePreference>('system');
+  const [focusedControl, setFocusedControl] = useState<string | null>(null);
+  const resolvedTheme: MobileResolvedTheme =
+    themePreference === 'system' ? (systemTheme === 'dark' ? 'dark' : 'light') : themePreference;
+  const theme = useMemo(() => getMobileTheme(resolvedTheme), [resolvedTheme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     const unsubscribe = bootstrap.store.subscribe(() => setState(bootstrap.store.getState()));
@@ -129,19 +177,54 @@ export function MobileApp() {
     };
   }, [bootstrap]);
 
+  const cycleTheme = () => {
+    const currentIndex = themePreferences.indexOf(themePreference);
+    const nextPreference =
+      themePreferences[(currentIndex + 1) % themePreferences.length] ?? 'system';
+    setThemePreference(nextPreference);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.eyebrow}>INVESTMENT OS MOBILE</Text>
-        <Text style={styles.title}>只读投资组合</Text>
-        <Text style={styles.apiHint}>数据源：Investment OS API · {apiBaseUrl}</Text>
-        <StatusBanner state={state} />
+        <View style={styles.headerRow}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>INVESTMENT OS MOBILE</Text>
+            <Text style={styles.title}>只读投资组合</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`切换主题，当前为${mobileThemeLabels[themePreference]}`}
+            onPress={cycleTheme}
+            onFocus={() => setFocusedControl('theme')}
+            onBlur={() => setFocusedControl(null)}
+            style={({ pressed }) => [
+              styles.themeButton,
+              focusedControl === 'theme' && styles.focusRing,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.themeButtonText}>主题：{mobileThemeLabels[themePreference]}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.apiHint}>
+          数据源：Investment OS API ·{`\n`}
+          {apiBaseUrl}
+        </Text>
+        <StatusBanner state={state} theme={theme} styles={styles} />
         <View style={styles.tabs} accessibilityRole="tablist">
           <Pressable
             accessibilityRole="tab"
             accessibilityState={{ selected: screen === 'portfolio' }}
             onPress={() => setScreen('portfolio')}
-            style={[styles.tab, screen === 'portfolio' && styles.activeTab]}
+            onFocus={() => setFocusedControl('portfolio')}
+            onBlur={() => setFocusedControl(null)}
+            style={({ pressed }) => [
+              styles.tab,
+              screen === 'portfolio' && styles.activeTab,
+              focusedControl === 'portfolio' && styles.focusRing,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={screen === 'portfolio' ? styles.activeTabText : styles.tabText}>
               投资组合
@@ -151,17 +234,34 @@ export function MobileApp() {
             accessibilityRole="tab"
             accessibilityState={{ selected: screen === 'risk' }}
             onPress={() => setScreen('risk')}
-            style={[styles.tab, screen === 'risk' && styles.activeTab]}
+            onFocus={() => setFocusedControl('risk')}
+            onBlur={() => setFocusedControl(null)}
+            style={({ pressed }) => [
+              styles.tab,
+              screen === 'risk' && styles.activeTab,
+              focusedControl === 'risk' && styles.focusRing,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={screen === 'risk' ? styles.activeTabText : styles.tabText}>风险事件</Text>
           </Pressable>
         </View>
-        {screen === 'portfolio' ? <PortfolioScreen state={state} /> : <RiskScreen state={state} />}
+        {screen === 'portfolio' ? (
+          <PortfolioScreen state={state} theme={theme} styles={styles} />
+        ) : (
+          <RiskScreen state={state} styles={styles} />
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="刷新 Investment OS 数据"
           onPress={() => void bootstrap.store.refresh()}
-          style={styles.refreshButton}
+          onFocus={() => setFocusedControl('refresh')}
+          onBlur={() => setFocusedControl(null)}
+          style={({ pressed }) => [
+            styles.refreshButton,
+            focusedControl === 'refresh' && styles.focusRing,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.refreshText}>重新读取</Text>
         </Pressable>
@@ -170,49 +270,106 @@ export function MobileApp() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { gap: 16, padding: 20 },
-  eyebrow: { color: '#0f766e', fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
-  title: { color: '#0f172a', fontSize: 30, fontWeight: '800' },
-  apiHint: { color: '#64748b', fontSize: 12 },
-  statusBanner: {
-    backgroundColor: '#ffffff',
-    borderLeftWidth: 4,
-    borderRadius: 10,
-    gap: 4,
-    padding: 12,
-  },
-  statusTitle: { color: '#0f172a', fontSize: 15, fontWeight: '700' },
-  statusDescription: { color: '#475569', fontSize: 13, lineHeight: 19 },
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: {
-    borderColor: '#cbd5e1',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  activeTab: { backgroundColor: '#0f766e', borderColor: '#0f766e' },
-  tabText: { color: '#475569', fontWeight: '600' },
-  activeTabText: { color: '#ffffff', fontWeight: '700' },
-  metricsRow: { flexDirection: 'row', gap: 8 },
-  metric: { backgroundColor: '#ffffff', borderRadius: 10, flex: 1, gap: 4, padding: 12 },
-  metricLabel: { color: '#64748b', fontSize: 12 },
-  metricValue: { color: '#0f172a', fontSize: 14, fontWeight: '700' },
-  sectionTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800', marginTop: 4 },
-  card: { backgroundColor: '#ffffff', borderRadius: 12, gap: 6, padding: 14 },
-  cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  symbol: { color: '#0f172a', fontSize: 16, fontWeight: '800' },
-  cardText: { color: '#334155', fontSize: 13, lineHeight: 19 },
-  mutedText: { color: '#64748b', fontSize: 12 },
-  staleText: { color: '#c2410c', fontSize: 12, fontWeight: '700' },
-  emptyText: { color: '#64748b', fontSize: 14, lineHeight: 21, paddingVertical: 20 },
-  refreshButton: {
-    alignItems: 'center',
-    backgroundColor: '#0f766e',
-    borderRadius: 10,
-    padding: 13,
-  },
-  refreshText: { color: '#ffffff', fontWeight: '700' },
-});
+function createStyles(theme: MobileThemeColors) {
+  return StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: theme.pageBackground },
+    container: { gap: 16, padding: 20, paddingBottom: 32, width: '100%' },
+    headerRow: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      justifyContent: 'space-between',
+      width: '100%',
+    },
+    headerCopy: { flex: 1, gap: 5, minWidth: 0 },
+    eyebrow: { color: theme.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 1.4 },
+    title: { color: theme.textPrimary, fontSize: 28, fontWeight: '700', letterSpacing: -0.4 },
+    apiHint: {
+      color: theme.textMuted,
+      flexShrink: 1,
+      fontSize: 12,
+      lineHeight: 18,
+      width: '100%',
+    },
+    themeButton: {
+      backgroundColor: theme.surface2,
+      borderColor: theme.borderStrong,
+      borderRadius: 7,
+      borderWidth: 1,
+      flexShrink: 0,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    themeButtonText: { color: theme.textSecondary, fontSize: 12, fontWeight: '600' },
+    pressed: { opacity: 0.72 },
+    focusRing: {
+      borderColor: theme.brand,
+      borderWidth: 2,
+      outlineColor: theme.brand,
+      outlineOffset: 2,
+      outlineStyle: 'solid',
+      outlineWidth: 2,
+    },
+    statusBanner: {
+      backgroundColor: theme.surface1,
+      borderColor: theme.border,
+      borderLeftWidth: 3,
+      borderRadius: 8,
+      borderWidth: 1,
+      gap: 4,
+      padding: 12,
+    },
+    statusTitle: { color: theme.textPrimary, fontSize: 15, fontWeight: '600' },
+    statusDescription: { color: theme.textSecondary, fontSize: 13, lineHeight: 19 },
+    tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    tab: {
+      backgroundColor: theme.surface1,
+      borderColor: theme.border,
+      borderRadius: 7,
+      borderWidth: 1,
+      paddingHorizontal: 15,
+      paddingVertical: 9,
+    },
+    activeTab: { backgroundColor: theme.surfaceSelected, borderColor: theme.brand },
+    tabText: { color: theme.textSecondary, fontSize: 13, fontWeight: '600' },
+    activeTabText: { color: theme.brand, fontSize: 13, fontWeight: '700' },
+    metricsRow: {
+      backgroundColor: theme.border,
+      borderColor: theme.border,
+      borderRadius: 8,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 1,
+      overflow: 'hidden',
+    },
+    metric: { backgroundColor: theme.surface1, flex: 1, gap: 5, padding: 12 },
+    metricLabel: { color: theme.textMuted, fontSize: 12 },
+    metricValue: { color: theme.textPrimary, fontSize: 14, fontWeight: '600' },
+    sectionTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 4 },
+    card: {
+      backgroundColor: theme.surface1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      borderWidth: 1,
+      gap: 6,
+      padding: 14,
+    },
+    cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+    symbol: { color: theme.textPrimary, fontSize: 16, fontWeight: '700' },
+    cardText: { color: theme.textSecondary, fontSize: 13, lineHeight: 19 },
+    mutedText: { color: theme.textMuted, fontSize: 12 },
+    staleText: { color: theme.warning, fontSize: 12, fontWeight: '700' },
+    emptyText: { color: theme.textMuted, fontSize: 14, lineHeight: 21, paddingVertical: 20 },
+    refreshButton: {
+      alignItems: 'center',
+      backgroundColor: theme.brand,
+      borderRadius: 7,
+      minHeight: 40,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      width: '100%',
+    },
+    refreshText: { color: theme.brandContrast, fontWeight: '700' },
+  });
+}

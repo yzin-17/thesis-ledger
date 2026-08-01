@@ -26,6 +26,11 @@ const contrastRatio = (foreground, background) => {
   );
 };
 
+const semanticColor = (name) => {
+  const match = styles.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6})`, 'u'));
+  return match?.[1] ?? null;
+};
+
 const checks = [
   ['Desktop 导航有 aria-label', /aria-label=\{label\}/u.test(app)],
   ['Desktop 当前导航有 aria-current', /aria-current=\{view === item/u.test(app)],
@@ -45,10 +50,13 @@ const checks = [
   [
     'Desktop 主要辅助文字达到 WCAG AA 对比度',
     [
-      ['#7e8983', '#171b1a'],
-      ['#8c9691', '#171b1a'],
-      ['#b6beb9', '#171b1a'],
-    ].every(([foreground, background]) => contrastRatio(foreground, background) >= 4.5),
+      [semanticColor('text-muted'), semanticColor('surface-1')],
+      [semanticColor('text-secondary'), semanticColor('surface-1')],
+      [semanticColor('text-primary'), semanticColor('surface-1')],
+    ].every(
+      ([foreground, background]) =>
+        foreground !== null && background !== null && contrastRatio(foreground, background) >= 4.5,
+    ),
   ],
 ];
 

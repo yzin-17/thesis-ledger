@@ -1,5 +1,27 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- Phosphor 的条件导出在 ESLint project service 中被识别为 error type，tsc 已独立校验。 */
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/ArrowClockwise';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { FlaskIcon } from '@phosphor-icons/react/Flask';
@@ -192,7 +214,7 @@ export function App() {
         </div>
         <nav aria-label="主导航">
           {nav.map(({ view: item, label, icon: Icon }) => (
-            <button
+            <Button
               key={item}
               className={view === item ? 'nav-item active' : 'nav-item'}
               type="button"
@@ -202,15 +224,21 @@ export function App() {
             >
               <Icon size={19} weight={view === item ? 'fill' : 'regular'} />
               <span>{label}</span>
-            </button>
+            </Button>
           ))}
         </nav>
         <div className="sidebar-foot">
-          <span className="status-dot" />
-          系统已连接
+          <span className="connection-status">
+            <span className="status-dot" />
+            系统已连接
+          </span>
+          <ThemeToggle />
         </div>
       </aside>
       <main className="content">
+        <div className="content-theme-toggle">
+          <ThemeToggle />
+        </div>
         {view === 'portfolio' ? (
           <PortfolioDashboard
             state={state}
@@ -399,27 +427,27 @@ function StrategyDashboard() {
       <p className="page-description">
         策略使用版本化 Schema 与可替换 Worker；回测结果保留数据时点、引擎版本、成本和已知偏差提示。
       </p>
-      <button className="secondary" type="button" onClick={() => void load()}>
+      <Button className="secondary" type="button" variant="outline" onClick={() => void load()}>
         刷新策略任务
-      </button>
+      </Button>
       <DataStateBanner state={loadState} onRetry={() => void load()} />
       <form className="form-card" onSubmit={(event) => void createStrategy(event)}>
         <h3>新建策略</h3>
         <label>
           名称
-          <input value={name} onChange={(event) => setName(event.target.value)} required />
+          <Input value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
         <label>
           Strategy Schema JSON
-          <textarea
+          <Textarea
             value={schemaText}
             onChange={(event) => setSchemaText(event.target.value)}
             rows={12}
           />
         </label>
-        <button className="primary" type="submit">
+        <Button type="submit" variant="default">
           保存新版本
-        </button>
+        </Button>
       </form>
       {message && (
         <p className="form-message" role="status">
@@ -439,9 +467,14 @@ function StrategyDashboard() {
                   {strategy.versions.map((version) => `v${version.version}`).join(' · ')}
                 </small>
               </span>
-              <button className="text-button" onClick={() => void queue(strategy)}>
+              <Button
+                className="text-button"
+                size="sm"
+                variant="link"
+                onClick={() => void queue(strategy)}
+              >
                 排队回测
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -464,23 +497,38 @@ function StrategyDashboard() {
               {jobs.map((job) => (
                 <tr key={job.id}>
                   <td>
-                    <button className="text-button" onClick={() => setSelectedJobId(job.id)}>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => setSelectedJobId(job.id)}
+                    >
                       {job.id.slice(0, 8)}
-                    </button>
+                    </Button>
                     <span>{job.strategyVersionId.slice(0, 8)}</span>
                   </td>
                   <td>{job.status}</td>
                   <td>{job.progress}%</td>
                   <td>
                     {job.status === 'queued' && (
-                      <button className="text-button" onClick={() => void run(job.id)}>
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        variant="link"
+                        onClick={() => void run(job.id)}
+                      >
                         运行
-                      </button>
+                      </Button>
                     )}
                     {!['succeeded', 'failed', 'cancelled'].includes(job.status) && (
-                      <button className="text-button danger" onClick={() => void cancel(job.id)}>
+                      <Button
+                        className="text-button danger"
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => void cancel(job.id)}
+                      >
                         取消
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -687,36 +735,54 @@ function AiChat() {
         先选择研究上下文，再由只读 Tool 提供行情、财务、新闻、风险和回测事实；助手不会写入 Ledger
         或生成订单。
       </p>
-      <button className="secondary" type="button" onClick={() => void loadHistory()}>
+      <Button
+        className="secondary"
+        type="button"
+        variant="outline"
+        onClick={() => void loadHistory()}
+      >
         刷新研究历史
-      </button>
+      </Button>
       <form className="panel form-card" onSubmit={(event) => void startResearch(event)}>
         <label>
           上下文
-          <select value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
-            <option value="portfolio">全组合</option>
-            <option value="account">账户</option>
-            <option value="position">单个持仓</option>
-            <option value="strategy">策略版本</option>
-          </select>
+          <Select value={scope} onValueChange={(value) => value && setScope(value)}>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {scope === 'portfolio'
+                  ? '全组合'
+                  : scope === 'account'
+                    ? '账户'
+                    : scope === 'position'
+                      ? '单个持仓'
+                      : '策略版本'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="portfolio">全组合</SelectItem>
+              <SelectItem value="account">账户</SelectItem>
+              <SelectItem value="position">单个持仓</SelectItem>
+              <SelectItem value="strategy">策略版本</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         {scope === 'position' && (
           <label>
             标的
-            <input value={symbol} onChange={(event) => setSymbol(event.target.value)} />
+            <Input value={symbol} onChange={(event) => setSymbol(event.target.value)} />
           </label>
         )}
         <label>
           研究问题
-          <textarea
+          <Textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             rows={3}
           />
         </label>
-        <button className="primary" type="submit">
+        <Button type="submit" variant="default">
           创建研究任务
-        </button>
+        </Button>
         {message && <p className="form-message">{message}</p>}
       </form>
       <DataStateBanner state={loadState} onRetry={() => void loadHistory()} />
@@ -982,16 +1048,16 @@ function JournalDashboard() {
         </div>
         <label>
           CompletedTrade JSON
-          <textarea
+          <Textarea
             value={tradeText}
             onChange={(event) => setTradeText(event.target.value)}
             rows={12}
             spellCheck={false}
           />
         </label>
-        <button className="primary" type="submit" disabled={busy !== null}>
+        <Button type="submit" variant="default" disabled={busy !== null}>
           {busy === 'single' ? '计算中…' : '分析单笔交易'}
-        </button>
+        </Button>
       </form>
       {singleReview && (
         <section className="panel">
@@ -1027,16 +1093,16 @@ function JournalDashboard() {
         </div>
         <label>
           CompletedTrade[] JSON
-          <textarea
+          <Textarea
             value={tradesText}
             onChange={(event) => setTradesText(event.target.value)}
             rows={14}
             spellCheck={false}
           />
         </label>
-        <button className="primary" type="submit" disabled={busy !== null}>
+        <Button type="submit" variant="default" disabled={busy !== null}>
           {busy === 'behavior' ? '计算中…' : '生成行为复盘'}
-        </button>
+        </Button>
       </form>
       {behaviorReview && (
         <section className="panel">
@@ -1248,9 +1314,9 @@ export function ProviderSettings() {
       <p className="page-description">
         按能力查看 Provider、优先级、健康和额度；凭证只显示配置状态，不回显密钥。
       </p>
-      <button className="secondary" type="button" onClick={() => void load()}>
+      <Button className="secondary" type="button" variant="outline" onClick={() => void load()}>
         刷新 Provider 与自动化
-      </button>
+      </Button>
       {message && <p className="form-message">{message}</p>}
       <form className="form-card provider-form" onSubmit={(event) => void saveProviderDraft(event)}>
         <h3>新增或更新 Provider</h3>
@@ -1260,7 +1326,7 @@ export function ProviderSettings() {
         <div className="provider-form-grid">
           <label>
             名称
-            <input
+            <Input
               value={providerDraft.name}
               onChange={(event) =>
                 setProviderDraft((current) => ({ ...current, name: event.target.value }))
@@ -1271,21 +1337,34 @@ export function ProviderSettings() {
           </label>
           <label>
             类型
-            <select
+            <Select
               value={providerDraft.type}
-              onChange={(event) =>
-                setProviderDraft((current) => ({ ...current, type: event.target.value }))
+              onValueChange={(value) =>
+                value && setProviderDraft((current) => ({ ...current, type: value }))
               }
             >
-              <option value="notification">通知</option>
-              <option value="market">行情</option>
-              <option value="ai">AI</option>
-              <option value="vision">图像</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {providerDraft.type === 'notification'
+                    ? '通知'
+                    : providerDraft.type === 'market'
+                      ? '行情'
+                      : providerDraft.type === 'ai'
+                        ? 'AI'
+                        : '图像'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="notification">通知</SelectItem>
+                <SelectItem value="market">行情</SelectItem>
+                <SelectItem value="ai">AI</SelectItem>
+                <SelectItem value="vision">图像</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <label>
             能力（逗号分隔）
-            <input
+            <Input
               value={providerDraft.capabilities}
               onChange={(event) =>
                 setProviderDraft((current) => ({ ...current, capabilities: event.target.value }))
@@ -1296,7 +1375,7 @@ export function ProviderSettings() {
           </label>
           <label>
             凭证引用
-            <input
+            <Input
               type="password"
               autoComplete="off"
               value={providerDraft.credentialsRef}
@@ -1310,9 +1389,9 @@ export function ProviderSettings() {
             />
           </label>
         </div>
-        <button className="primary" type="submit">
+        <Button type="submit" variant="default">
           保存 Provider
-        </button>
+        </Button>
       </form>
       <DataStateBanner state={loadState} onRetry={() => void load()} />
       <section className="panel">
@@ -1337,7 +1416,7 @@ export function ProviderSettings() {
                   </td>
                   <td>{provider.capabilities.join(' · ')}</td>
                   <td>
-                    <input
+                    <Input
                       aria-label={`${provider.name} 优先级`}
                       type="number"
                       min={0}
@@ -1357,15 +1436,22 @@ export function ProviderSettings() {
                   <td>{provider.health}</td>
                   <td>{provider.credentialConfigured ? '已配置' : '未配置'}</td>
                   <td>
-                    <button className="text-button" onClick={() => void test(provider.name)}>
-                      连通性测试
-                    </button>
-                    <button
+                    <Button
                       className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => void test(provider.name)}
+                    >
+                      连通性测试
+                    </Button>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
                       onClick={() => void saveProvider(provider, !provider.enabled)}
                     >
                       {provider.enabled ? '停用' : '启用'}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -1399,9 +1485,14 @@ export function ProviderSettings() {
                   </td>
                   <td>{job.enabled ? '启用' : '停用'}</td>
                   <td>
-                    <button className="text-button" onClick={() => void toggleJob(job)}>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => void toggleJob(job)}
+                    >
                       {job.enabled ? '停用' : '启用'}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -1642,14 +1733,22 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
       <DataStateBanner state={loadState} onRetry={() => void load()} />
       <label className="inline-control">
         账户
-        <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-          <option value="">全组合</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
+        <Select value={accountId || null} onValueChange={(value) => setAccountId(value ?? '')}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="全组合">
+              {accountId
+                ? (accounts.find((account) => account.id === accountId)?.name ?? '全组合')
+                : '全组合'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.map((account) => (
+              <SelectItem key={account.id} value={account.id}>
+                {account.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </label>
       <div className="metrics">
         <Metric
@@ -1781,16 +1880,16 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
         <h3>目标配置</h3>
         <label>
           分类权重 JSON
-          <input
+          <Input
             value={targetText}
             onChange={(event) => setTargetText(event.target.value)}
             aria-describedby="target-help"
           />
         </label>
         <small id="target-help">例如 {`{"股票":0.6,"ETF":0.4}`}，总和必须为 1。</small>
-        <button className="primary" type="submit">
+        <Button type="submit" variant="default">
           保存目标
-        </button>
+        </Button>
       </form>
       {message && (
         <p className="form-message" role="status">
@@ -1953,9 +2052,9 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
       <p className="page-description">
         规则负责确定性判断；提醒仅用于辅助研究，不代表交易执行保证。事件保留规则版本、数据时间和触发上下文。
       </p>
-      <button className="secondary" type="button" onClick={() => void loadRisk()}>
+      <Button className="secondary" type="button" variant="outline" onClick={() => void loadRisk()}>
         刷新风险数据
-      </button>
+      </Button>
       <div className="metrics">
         <Metric label="启用规则" value={String(rules.filter((rule) => rule.enabled).length)} />
         <Metric
@@ -1973,56 +2072,110 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
         <h3>新建规则</h3>
         <label>
           类型
-          <select name="kind" defaultValue="price-below">
-            <option value="price-below">价格低于</option>
-            <option value="price-above">价格高于</option>
-            <option value="cost-stop">成本止损</option>
-            <option value="take-profit">止盈</option>
-            <option value="position-concentration">持仓集中度</option>
-          </select>
+          <Select name="kind" defaultValue="price-below">
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) =>
+                  value === 'price-above'
+                    ? '价格高于'
+                    : value === 'cost-stop'
+                      ? '成本止损'
+                      : value === 'take-profit'
+                        ? '止盈'
+                        : value === 'position-concentration'
+                          ? '持仓集中度'
+                          : '价格低于'
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="price-below">价格低于</SelectItem>
+              <SelectItem value="price-above">价格高于</SelectItem>
+              <SelectItem value="cost-stop">成本止损</SelectItem>
+              <SelectItem value="take-profit">止盈</SelectItem>
+              <SelectItem value="position-concentration">持仓集中度</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label>
           范围
-          <select name="scope" defaultValue="security">
-            <option value="security">证券</option>
-            <option value="account">账户</option>
-            <option value="portfolio">组合</option>
-          </select>
+          <Select name="scope" defaultValue="security">
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) =>
+                  value === 'account' ? '账户' : value === 'portfolio' ? '组合' : '证券'
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="security">证券</SelectItem>
+              <SelectItem value="account">账户</SelectItem>
+              <SelectItem value="portfolio">组合</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label>
           阈值
-          <input name="threshold" type="number" step="any" required />
+          <Input name="threshold" type="number" step="any" required />
         </label>
         <label>
           严重级别
-          <select name="severity" defaultValue="warning">
-            <option value="info">提示</option>
-            <option value="warning">警告</option>
-            <option value="error">错误</option>
-            <option value="critical">严重</option>
-          </select>
+          <Select name="severity" defaultValue="warning">
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) =>
+                  value === 'info'
+                    ? '提示'
+                    : value === 'error'
+                      ? '错误'
+                      : value === 'critical'
+                        ? '严重'
+                        : '警告'
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="info">提示</SelectItem>
+              <SelectItem value="warning">警告</SelectItem>
+              <SelectItem value="error">错误</SelectItem>
+              <SelectItem value="critical">严重</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label>
           证券代码
-          <input name="symbol" placeholder="security 时填写" />
+          <Input name="symbol" placeholder="security 时填写" />
         </label>
         <label>
           账户
-          <select name="accountId" defaultValue="">
-            <option value="">account 时选择</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
+          <Select name="accountId" defaultValue={null}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="account 时选择">
+                {(value: string | null) =>
+                  accounts.find((account) => account.id === value)?.name ?? 'account 时选择'
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
-        <button className="primary" type="submit">
+        <Button type="submit" variant="default">
           创建规则
-        </button>
-        <button className="secondary" type="button" onClick={() => void scanRisk()}>
+        </Button>
+        <Button
+          className="secondary"
+          type="button"
+          variant="outline"
+          onClick={() => void scanRisk()}
+        >
           扫描当前组合
-        </button>
+        </Button>
       </form>
       {message && (
         <p className="form-message" role="status">
@@ -2057,18 +2210,30 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
                   <td>{rule.threshold}</td>
                   <td>v{rule.version}</td>
                   <td>
-                    <button
+                    <Button
                       className="text-button"
+                      size="sm"
+                      variant="link"
                       onClick={() => void patchRule(rule, { enabled: !rule.enabled })}
                     >
                       {rule.enabled ? '停用' : '启用'}
-                    </button>
-                    <button className="text-button" onClick={() => void testRule(rule)}>
+                    </Button>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => void testRule(rule)}
+                    >
                       测试
-                    </button>
-                    <button className="text-button" onClick={() => void showAudit(rule)}>
+                    </Button>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => void showAudit(rule)}
+                    >
                       审计
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -2272,49 +2437,67 @@ function ImportReview({
       <p className="page-description">
         上传不会直接修改持仓。代码歧义、低置信度或数值不一致必须先人工修正。
       </p>
-      <button
+      <Button
         className="secondary"
         type="button"
+        variant="outline"
         onClick={() => {
           if (accountId) void loadDrafts(accountId);
           else setLoadState('empty');
         }}
       >
         刷新导入历史
-      </button>
+      </Button>
       {accounts.length === 0 ? (
         <div className="notice">请先在投资组合页创建账户。</div>
       ) : (
         <form className="upload-bar" onSubmit={(event) => void upload(event)}>
           <label>
             账户
-            <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
+            <Select value={accountId || null} onValueChange={(value) => setAccountId(value ?? '')}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择账户">
+                  {accounts.find((account) => account.id === accountId)?.name ?? '选择账户'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             截图来源
-            <select
-              value={source}
-              onChange={(event) => setSource(event.target.value as ImportDraftRecord['source'])}
-            >
-              <option value="unknown">待识别</option>
-              <option value="alipay">支付宝</option>
-              <option value="ths">同花顺</option>
-              <option value="broker">券商</option>
-            </select>
+            <Select value={source} onValueChange={(value) => value && setSource(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {source === 'unknown'
+                    ? '待识别'
+                    : source === 'alipay'
+                      ? '支付宝'
+                      : source === 'ths'
+                        ? '同花顺'
+                        : '券商'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">待识别</SelectItem>
+                <SelectItem value="alipay">支付宝</SelectItem>
+                <SelectItem value="ths">同花顺</SelectItem>
+                <SelectItem value="broker">券商</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <label>
             持仓截图
-            <input name="file" type="file" required accept="image/png,image/jpeg,image/webp" />
+            <Input name="file" type="file" required accept="image/png,image/jpeg,image/webp" />
           </label>
-          <button className="primary" type="submit">
+          <Button type="submit" variant="default">
             创建草稿
-          </button>
+          </Button>
         </form>
       )}
       {message && (
@@ -2332,16 +2515,19 @@ function ImportReview({
             <p>暂无导入记录</p>
           ) : (
             drafts.map((draft) => (
-              <button
+              <Button
                 key={draft.id}
                 className={selected?.id === draft.id ? 'draft active' : 'draft'}
+                size="sm"
+                type="button"
+                variant="ghost"
                 onClick={() => choose(draft)}
               >
                 <strong>{new Date(draft.createdAt).toLocaleString('zh-CN')}</strong>
                 <span>
                   {draft.source} · {draft.status}
                 </span>
-              </button>
+              </Button>
             ))
           )}
         </aside>
@@ -2356,8 +2542,10 @@ function ImportReview({
                     {Math.round(Number(selected.sourceConfidence) * 100)}%
                   </p>
                 </div>
-                <button
+                <Button
                   className="secondary"
+                  type="button"
+                  variant="outline"
                   onClick={() =>
                     setRows((current) => [
                       ...current,
@@ -2374,20 +2562,20 @@ function ImportReview({
                   }
                 >
                   添加一行
-                </button>
+                </Button>
               </div>
               {rows.map((row, index) => (
                 <div className="review-row" key={`${index}-${row.rawSymbol}`}>
                   <label>
                     名称
-                    <input
+                    <Input
                       value={row.rawName ?? ''}
                       onChange={(event) => updateRow(index, { rawName: event.target.value })}
                     />
                   </label>
                   <label>
                     代码
-                    <input
+                    <Input
                       value={row.symbol ?? ''}
                       onChange={(event) =>
                         updateRow(index, { symbol: event.target.value.toUpperCase() })
@@ -2396,7 +2584,7 @@ function ImportReview({
                   </label>
                   <label>
                     数量
-                    <input
+                    <Input
                       type="number"
                       min="0"
                       step="any"
@@ -2408,7 +2596,7 @@ function ImportReview({
                   </label>
                   <label>
                     成本价
-                    <input
+                    <Input
                       type="number"
                       min="0"
                       step="any"
@@ -2419,35 +2607,48 @@ function ImportReview({
                     />
                   </label>
                   <div className="row-status">
-                    <span className={row.confidence < 0.75 ? 'tag warning' : 'tag'}>
+                    <Badge
+                      className={row.confidence < 0.75 ? 'tag warning' : 'tag'}
+                      variant="secondary"
+                    >
                       {Math.round(row.confidence * 100)}%
-                    </span>
+                    </Badge>
                     {row.issues.map((issue) => (
                       <small key={issue}>{issue}</small>
                     ))}
                   </div>
-                  <button
+                  <Button
                     className="text-button danger"
+                    size="sm"
+                    type="button"
+                    variant="destructive"
                     onClick={() =>
                       setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))
                     }
                   >
                     删除
-                  </button>
+                  </Button>
                 </div>
               ))}
               <div className="form-actions">
-                <button
+                <Button
                   className="primary"
                   disabled={selected.status === 'committed'}
+                  type="button"
+                  variant="default"
                   onClick={() => void commit()}
                 >
                   确认并提交
-                </button>
+                </Button>
                 {selected.status === 'committed' && (
-                  <button className="secondary" onClick={() => void rollback(selected)}>
+                  <Button
+                    className="secondary"
+                    type="button"
+                    variant="outline"
+                    onClick={() => void rollback(selected)}
+                  >
                     回滚本次导入
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
@@ -2488,10 +2689,10 @@ function PortfolioDashboard({
         title="暂时无法读取投资组合"
         description="请确认 Investment OS Server 与数据服务正在运行。"
       >
-        <button className="primary" onClick={onRetry}>
+        <Button type="button" variant="default" onClick={onRetry}>
           <ArrowClockwiseIcon />
           重新加载
-        </button>
+        </Button>
       </StatePanel>
     );
   if (state === 'empty')
@@ -2515,10 +2716,10 @@ function PortfolioDashboard({
           <h1>{money.format(portfolio!.totalMarketValue)}</h1>
           <p className="as-of">数据时点 {new Date(portfolio!.valuedAt).toLocaleString('zh-CN')}</p>
         </div>
-        <button className="secondary" onClick={onRetry}>
+        <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
           <ArrowClockwiseIcon />
           刷新
-        </button>
+        </Button>
       </header>
       <DataStateBanner state={state} onRetry={onRetry} />
       <section className="metrics" aria-label="组合关键指标">
@@ -2564,9 +2765,15 @@ function PortfolioDashboard({
                       <span>{position.symbol}</span>
                     </td>
                     <td>
-                      <button className="text-button" onClick={() => setDetailPosition(position)}>
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        type="button"
+                        variant="link"
+                        onClick={() => setDetailPosition(position)}
+                      >
                         查看
-                      </button>
+                      </Button>
                     </td>
                     <td>{position.quantity}</td>
                     <td>{money.format(position.costPrice)}</td>
@@ -2577,9 +2784,9 @@ function PortfolioDashboard({
                       {position.pnl === null ? '—' : money.format(position.pnl)}
                     </td>
                     <td>
-                      <span className={position.stale ? 'tag warning' : 'tag'}>
+                      <Badge className={position.stale ? 'tag warning' : 'tag'} variant="secondary">
                         {position.stale ? '陈旧' : '最新'}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -2645,25 +2852,26 @@ function PositionDetail({ position, onClose }: { position: Position; onClose: ()
           ? 'stale'
           : 'ready';
   return (
-    <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
-      <section
-        className="detail-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="position-detail-title"
-        onMouseDown={(event) => event.stopPropagation()}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        aria-describedby="position-detail-description"
+        className="detail-panel max-h-[calc(100dvh-64px)] max-w-[980px] overflow-auto"
+        showCloseButton={false}
       >
         <div className="review-heading">
           <div>
             <p className="kicker">Position Detail</p>
-            <h2 id="position-detail-title">
+            <DialogTitle id="position-detail-title">
               {position.asset.name} · {position.symbol}
-            </h2>
+            </DialogTitle>
           </div>
-          <button className="secondary" onClick={onClose}>
+          <DialogClose render={<Button className="secondary" type="button" variant="outline" />}>
             关闭
-          </button>
+          </DialogClose>
         </div>
+        <DialogDescription id="position-detail-description" className="sr-only">
+          查看该持仓的行情、最近 K 线、技术指标和筹码数据。
+        </DialogDescription>
         <DataStateBanner state={detailState} onRetry={loadDetail} />
         {error && <div className="notice">{error}</div>}
         {!data && !error ? (
@@ -2720,8 +2928,8 @@ function PositionDetail({ position, onClose }: { position: Position; onClose: ()
             </>
           )
         )}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2821,37 +3029,76 @@ function PortfolioManagement({
           <h3>创建账户</h3>
           <label>
             账户名称
-            <input name="name" required maxLength={80} />
+            <Input name="name" required maxLength={80} />
           </label>
           <label>
             来源
-            <select name="source" defaultValue="manual">
-              <option value="manual">手动</option>
-              <option value="alipay">支付宝</option>
-              <option value="ths">同花顺</option>
-              <option value="broker">券商</option>
-            </select>
+            <Select name="source" defaultValue="manual">
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {(value: string | null) =>
+                    value === 'alipay'
+                      ? '支付宝'
+                      : value === 'ths'
+                        ? '同花顺'
+                        : value === 'broker'
+                          ? '券商'
+                          : '手动'
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">手动</SelectItem>
+                <SelectItem value="alipay">支付宝</SelectItem>
+                <SelectItem value="ths">同花顺</SelectItem>
+                <SelectItem value="broker">券商</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <label>
             账户类型
-            <select name="type" defaultValue="securities">
-              <option value="securities">证券</option>
-              <option value="fund">基金</option>
-              <option value="cash">现金</option>
-              <option value="shadow">影子账户</option>
-            </select>
+            <Select name="type" defaultValue="securities">
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {(value: string | null) =>
+                    value === 'fund'
+                      ? '基金'
+                      : value === 'cash'
+                        ? '现金'
+                        : value === 'shadow'
+                          ? '影子账户'
+                          : '证券'
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="securities">证券</SelectItem>
+                <SelectItem value="fund">基金</SelectItem>
+                <SelectItem value="cash">现金</SelectItem>
+                <SelectItem value="shadow">影子账户</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <label>
             币种
-            <select name="currency" defaultValue="CNY">
-              <option value="CNY">人民币</option>
-              <option value="HKD">港币</option>
-              <option value="USD">美元</option>
-            </select>
+            <Select name="currency" defaultValue="CNY">
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {(value: string | null) =>
+                    value === 'HKD' ? '港币' : value === 'USD' ? '美元' : '人民币'
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CNY">人民币</SelectItem>
+                <SelectItem value="HKD">港币</SelectItem>
+                <SelectItem value="USD">美元</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
-          <button className="primary" type="submit">
+          <Button type="submit" variant="default">
             创建账户
-          </button>
+          </Button>
           {accounts.length > 0 && (
             <div className="account-list">
               {accounts.map((account) => (
@@ -2862,13 +3109,15 @@ function PortfolioManagement({
                       {account.source} · {account.currency}
                     </small>
                   </span>
-                  <button
+                  <Button
                     className="text-button danger"
+                    size="sm"
                     type="button"
+                    variant="destructive"
                     onClick={() => void deactivateAccount(account)}
                   >
                     停用
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -2882,20 +3131,26 @@ function PortfolioManagement({
           <h3>{editing ? `编辑 ${editing.asset.name}` : '录入持仓'}</h3>
           <label>
             账户
-            <select name="accountId" required defaultValue={editing?.accountId ?? ''}>
-              <option value="" disabled>
-                选择账户
-              </option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
+            <Select name="accountId" required defaultValue={editing?.accountId ?? null}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择账户">
+                  {(value: string | null) =>
+                    accounts.find((account) => account.id === value)?.name ?? '选择账户'
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             证券代码
-            <input
+            <Input
               name="symbol"
               required
               placeholder="600519.SH"
@@ -2905,7 +3160,7 @@ function PortfolioManagement({
           </label>
           <label>
             数量
-            <input
+            <Input
               name="quantity"
               required
               type="number"
@@ -2916,7 +3171,7 @@ function PortfolioManagement({
           </label>
           <label>
             成本价
-            <input
+            <Input
               name="costPrice"
               required
               type="number"
@@ -2926,13 +3181,18 @@ function PortfolioManagement({
             />
           </label>
           <div className="form-actions">
-            <button className="primary" type="submit">
+            <Button type="submit" variant="default">
               {editing ? '保存修改' : '添加持仓'}
-            </button>
+            </Button>
             {editing && (
-              <button className="secondary" type="button" onClick={() => setEditing(null)}>
+              <Button
+                className="secondary"
+                type="button"
+                variant="outline"
+                onClick={() => setEditing(null)}
+              >
                 取消
-              </button>
+              </Button>
             )}
           </div>
         </form>
@@ -2945,12 +3205,24 @@ function PortfolioManagement({
                 {position.asset.name} · {position.symbol}
               </span>
               <span>
-                <button className="text-button" onClick={() => setEditing(position)}>
+                <Button
+                  className="text-button"
+                  size="sm"
+                  type="button"
+                  variant="link"
+                  onClick={() => setEditing(position)}
+                >
                   编辑
-                </button>
-                <button className="text-button danger" onClick={() => void remove(position)}>
+                </Button>
+                <Button
+                  className="text-button danger"
+                  size="sm"
+                  type="button"
+                  variant="destructive"
+                  onClick={() => void remove(position)}
+                >
                   删除
-                </button>
+                </Button>
               </span>
             </div>
           ))}
@@ -2999,13 +3271,14 @@ export function FirstRunOnboarding({
               <a className="secondary" href="#portfolio-management">
                 手动录入
               </a>
-              <button
+              <Button
                 className="secondary"
                 type="button"
+                variant="outline"
                 onClick={() => onNavigate('import-review')}
               >
                 截图导入
-              </button>
+              </Button>
             </div>
           </div>
         </li>
@@ -3016,9 +3289,15 @@ export function FirstRunOnboarding({
           <div>
             <strong>配置数据源与通知</strong>
             <p>查看数据源与通知是否可用；敏感凭证由服务端管理，页面不会回显密钥。</p>
-            <button className="text-button" type="button" onClick={() => onNavigate('providers')}>
+            <Button
+              className="text-button"
+              size="sm"
+              type="button"
+              variant="link"
+              onClick={() => onNavigate('providers')}
+            >
               打开数据与自动化
-            </button>
+            </Button>
           </div>
         </li>
         <li>
@@ -3028,9 +3307,15 @@ export function FirstRunOnboarding({
           <div>
             <strong>设置风险规则</strong>
             <p>风险提醒用于研究辅助，不代表交易执行保证；通知失败会保留在历史中。</p>
-            <button className="text-button" type="button" onClick={() => onNavigate('risk-center')}>
+            <Button
+              className="text-button"
+              size="sm"
+              type="button"
+              variant="link"
+              onClick={() => onNavigate('risk-center')}
+            >
               打开风险中心
-            </button>
+            </Button>
           </div>
         </li>
       </ol>
@@ -3049,11 +3334,13 @@ const Metric = ({
   detail?: string;
   tone?: 'positive' | 'negative';
 }) => (
-  <article className="metric">
-    <p>{label}</p>
-    <strong className={tone}>{value}</strong>
-    {detail && <span>{detail}</span>}
-  </article>
+  <Card className="metric metric-card shadow-none ring-0">
+    <CardContent className="metric-content">
+      <p>{label}</p>
+      <strong className={tone}>{value}</strong>
+      {detail && <span>{detail}</span>}
+    </CardContent>
+  </Card>
 );
 
 const StatePanel = ({
@@ -3063,7 +3350,7 @@ const StatePanel = ({
 }: {
   title: string;
   description: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) => (
   <section className="state-panel">
     <div className="state-graphic" aria-hidden="true">
@@ -3091,32 +3378,34 @@ export const DataStateBanner = ({
   };
   const content = copy[state];
   return (
-    <div
+    <Alert
       className={`data-state-banner ${state}`}
       role="status"
       aria-live="polite"
       aria-busy={state === 'loading'}
     >
-      <strong>{content.title}</strong>
-      <span>{content.description}</span>
+      <AlertTitle>{content.title}</AlertTitle>
+      <AlertDescription>
+        <span>{content.description}</span>
+      </AlertDescription>
       {onRetry && (state === 'error' || state === 'stale') && (
-        <button className="text-button" type="button" onClick={onRetry}>
+        <Button className="text-button" size="sm" type="button" variant="link" onClick={onRetry}>
           重新加载
-        </button>
+        </Button>
       )}
-    </div>
+    </Alert>
   );
 };
 
 const DashboardSkeleton = () => (
   <div aria-label="正在加载" aria-busy="true">
-    <div className="skeleton hero" />
+    <Skeleton className="skeleton hero" />
     <div className="metrics">
-      <div className="skeleton card" />
-      <div className="skeleton card" />
-      <div className="skeleton card" />
+      <Skeleton className="skeleton card" />
+      <Skeleton className="skeleton card" />
+      <Skeleton className="skeleton card" />
     </div>
-    <div className="skeleton table" />
+    <Skeleton className="skeleton table" />
   </div>
 );
 
