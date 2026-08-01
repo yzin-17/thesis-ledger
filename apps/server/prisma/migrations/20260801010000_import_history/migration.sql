@@ -1,0 +1,3 @@
+ALTER TABLE "ImportDraft"
+ADD COLUMN "beforeState" JSONB,
+ADD COLUMN "rolledBackAt" TIMESTAMPTZ;

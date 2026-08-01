@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "a-share-cost-and-t1-01",
+  "strategyVersion": "fixture-v1",
+  "bars": [
+    {
+      "date": "2025-01-02",
+      "symbol": "600519.SH",
+      "open": 100,
+      "high": 100,
+      "low": 100,
+      "close": 100
+    },
+    {
+      "date": "2025-01-03",
+      "symbol": "600519.SH",
+      "open": 105,
+      "high": 105,
+      "low": 105,
+      "close": 105
+    },
+    { "date": "2025-01-06", "symbol": "600519.SH", "open": 95, "high": 95, "low": 95, "close": 95 }
+  ],
+  "expected": {
+    "tradeCount": 1,
+    "tPlusOneRejected": true,
+    "costsIncluded": true
+  }
+}

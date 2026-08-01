@@ -1,0 +1,486 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  source    String
+  type      String
+  broker    String?
+  currency  String   @default("CNY")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  positions Position[]
+  ledger    LedgerEvent[]
+  snapshots PortfolioSnapshot[]
+
+  @@unique([name, source])
+  @@index([active])
+}
+
+model Asset {
+  symbol       String   @id
+  name         String
+  market       String
+  assetType    String
+  currency     String
+  sector       String?
+  metadata     Json?
+  updatedAt    DateTime @updatedAt
+  positions    Position[]
+  ledgerEvents LedgerEvent[]
+  bars         MarketBar[]
+}
+
+model Position {
+  id        String   @id @default(uuid()) @db.Uuid
+  accountId String   @db.Uuid
+  symbol    String
+  quantity  Decimal  @db.Decimal(24, 8)
+  costPrice Decimal  @db.Decimal(24, 8)
+  source    String
+  updatedAt DateTime @updatedAt
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset     Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@unique([accountId, symbol])
+  @@index([symbol])
+}
+
+model ImportDraft {
+  id             String   @id @default(uuid()) @db.Uuid
+  accountId      String   @db.Uuid
+  source         String
+  sourceConfidence Decimal @default(0) @db.Decimal(5, 4)
+  status         String
+  idempotencyKey String   @unique
+  imageHash      String
+  rows           Json
+  beforeState    Json?
+  createdAt      DateTime @default(now())
+  committedAt    DateTime?
+  rolledBackAt   DateTime?
+
+  @@index([accountId, status])
+}
+
+model LedgerEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  accountId    String   @db.Uuid
+  type         String
+  occurredAt   DateTime
+  symbol       String?
+  quantity     Decimal? @db.Decimal(24, 8)
+  price        Decimal? @db.Decimal(24, 8)
+  amount       Decimal? @db.Decimal(24, 8)
+  fee          Decimal? @db.Decimal(24, 8)
+  tax          Decimal? @db.Decimal(24, 8)
+  externalId   String?
+  source       String   @default("manual")
+  currency     String   @default("CNY")
+  note         String?
+  correctionOf String?  @db.Uuid
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  account      Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset        Asset?   @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@unique([accountId, externalId])
+  @@index([accountId, occurredAt])
+  @@index([symbol, occurredAt])
+}
+
+model PortfolioSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  accountId   String?  @db.Uuid
+  capturedAt  DateTime
+  marketValue Decimal  @db.Decimal(24, 8)
+  costValue   Decimal  @db.Decimal(24, 8)
+  cashValue   Decimal  @db.Decimal(24, 8)
+  payload     Json
+  account     Account? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([accountId, capturedAt])
+  @@index([capturedAt])
+}
+
+model TargetAllocation {
+  id        String   @id @default(uuid()) @db.Uuid
+  scope     String
+  accountId String?  @db.Uuid
+  version   Int      @default(1)
+  targets   Json
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([scope, accountId, active])
+}
+
+model MarketBar {
+  id        BigInt   @id @default(autoincrement())
+  symbol    String
+  timeframe String
+  timestamp DateTime
+  open      Decimal  @db.Decimal(24, 8)
+  high      Decimal  @db.Decimal(24, 8)
+  low       Decimal  @db.Decimal(24, 8)
+  close     Decimal  @db.Decimal(24, 8)
+  volume    Decimal  @db.Decimal(30, 8)
+  amount    Decimal  @db.Decimal(30, 8)
+  provider  String
+  asset     Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@unique([symbol, timeframe, timestamp, provider])
+  @@index([symbol, timeframe, timestamp])
+}
+
+model DataQualityIssue {
+  id         String   @id @default(uuid()) @db.Uuid
+  capability String
+  symbol     String?
+  provider   String
+  severity   String
+  code       String
+  details    Json
+  status     String   @default("open")
+  detectedAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([status, detectedAt])
+}
+
+model BackfillJob {
+  id         String   @id @default(uuid()) @db.Uuid
+  symbol     String
+  timeframe  String
+  start      DateTime
+  end        DateTime
+  cursor     DateTime?
+  status     String   @default("queued")
+  progress   Int      @default(0)
+  attempts   Int      @default(0)
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([symbol, timeframe, status])
+}
+
+model ProviderHealth {
+  id                  String   @id @default(uuid()) @db.Uuid
+  provider            String   @unique
+  state               String
+  consecutiveFailures Int      @default(0)
+  latencyMs           Int?
+  errorCode           String?
+  checkedAt           DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([state, checkedAt])
+}
+
+model ProviderHealthCheck {
+  id          String   @id @default(uuid()) @db.Uuid
+  provider    String
+  state       String
+  latencyMs   Int?
+  errorCode   String?
+  checkedAt   DateTime
+
+  @@index([provider, checkedAt])
+  @@index([state, checkedAt])
+}
+
+model RiskRule {
+  id        String   @id @default(uuid()) @db.Uuid
+  version   Int      @default(1)
+  kind      String
+  scope     String
+  severity  String
+  threshold Decimal  @db.Decimal(24, 8)
+  enabled   Boolean  @default(true)
+  symbol    String?
+  accountId String?  @db.Uuid
+  sourcePlanId String? @db.Uuid
+  condition Json?
+  parameters Json?
+  config    Json?
+  effectiveAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events    RiskEvent[]
+}
+
+model RiskEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  ruleId      String   @db.Uuid
+  ruleVersion Int
+  triggered   Boolean
+  severity    String
+  message     String
+  accountId   String?  @db.Uuid
+  symbol      String?
+  triggerValue Decimal? @db.Decimal(24, 8)
+  threshold   Decimal? @db.Decimal(24, 8)
+  marketTime  DateTime?
+  context     Json
+  evaluatedAt DateTime @default(now())
+  rule        RiskRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+
+  @@index([ruleId, evaluatedAt])
+  @@index([triggered, severity])
+  @@index([accountId, symbol, evaluatedAt])
+}
+
+model RiskRuleAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  ruleId      String   @db.Uuid
+  ruleVersion Int
+  action      String
+  actor       String
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  @@index([ruleId, createdAt])
+}
+
+model NotificationDelivery {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String
+  channel      String
+  provider     String
+  severity     String
+  status       String
+  attemptCount Int      @default(0)
+  dedupKey     String
+  scheduledAt  DateTime
+  deliveredAt  DateTime?
+  lastError    String?
+  errorCode    String?
+  responseSummary String?
+
+  @@unique([dedupKey, channel])
+  @@index([status, scheduledAt])
+}
+
+model Strategy {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  description String?
+  status    String   @default("draft")
+  schemaVersion Int   @default(1)
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  versions  StrategyVersion[]
+}
+
+model StrategyVersion {
+  id         String   @id @default(uuid()) @db.Uuid
+  strategyId String   @db.Uuid
+  version    Int
+  schemaVersion Int      @default(1)
+  schema     Json
+  createdAt  DateTime @default(now())
+  strategy   Strategy @relation(fields: [strategyId], references: [id], onDelete: Restrict)
+  jobs       BacktestJob[]
+
+  @@unique([strategyId, version])
+}
+
+model BacktestJob {
+  id                String          @id @default(uuid()) @db.Uuid
+  strategyVersionId String          @db.Uuid
+  status            String
+  progress          Int             @default(0)
+  periodStart       DateTime
+  periodEnd         DateTime
+  dataAsOf          DateTime
+  input              Json
+  result             Json?
+  warnings           Json?
+  cancelRequestedAt  DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  engineVersion      String?
+  resultChecksum     String?
+  strategyVersion    StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+}
+
+model JournalEntry {
+  id               String   @id @default(uuid()) @db.Uuid
+  entryType        String   @default("note")
+  accountId        String?  @db.Uuid
+  ledgerEventId    String?  @db.Uuid
+  tradePlanId      String?  @db.Uuid
+  riskEventId      String?  @db.Uuid
+  strategyVersionId String? @db.Uuid
+  symbol           String?
+  side             String?
+  reason           String
+  content          String?
+  tags             Json?
+  thesis           String?
+  catalyst         String?
+  risk             String?
+  exitReason       String?
+  emotion          String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([symbol, createdAt])
+  @@index([accountId, createdAt])
+  @@index([tradePlanId, createdAt])
+}
+
+model TradePlan {
+  id                  String   @id @default(uuid()) @db.Uuid
+  accountId           String?  @db.Uuid
+  symbol              String
+  side                String?
+  plannedEntry        Decimal? @db.Decimal(24, 8)
+  plannedExit         Decimal? @db.Decimal(24, 8)
+  stopLoss            Decimal? @db.Decimal(24, 8)
+  takeProfit          Decimal? @db.Decimal(24, 8)
+  targetWeight        Decimal? @db.Decimal(12, 8)
+  expectedHoldingDays Int?
+  plannedEntryAt      DateTime?
+  plannedExitAt       DateTime?
+  reason              String?
+  thesis              String?
+  status              String   @default("active")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([symbol, status])
+  @@index([accountId, status])
+}
+
+model ProviderConfig {
+  id                   String   @id @default(uuid()) @db.Uuid
+  name                 String   @unique
+  type                 String
+  enabled              Boolean  @default(true)
+  priority             Int
+  capabilities         Json
+  settings             Json?
+  encryptedCredentials Bytes?
+  quota                Json?
+  cost                 Json?
+  health               String   @default("unknown")
+  updatedAt             DateTime @updatedAt
+}
+
+model AutomationJob {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  type        String
+  cron        String
+  timezone    String   @default("Asia/Shanghai")
+  enabled     Boolean  @default(true)
+  retryPolicy Json
+  lockTtlMs   Int
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  runs        AutomationRun[]
+}
+
+model AutomationRun {
+  id         String        @id @default(uuid()) @db.Uuid
+  jobId      String        @db.Uuid
+  status     String
+  startedAt  DateTime      @default(now())
+  finishedAt DateTime?
+  attempt    Int           @default(1)
+  traceId    String
+  output     Json?
+  error      String?
+  job        AutomationJob @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@index([jobId, startedAt])
+  @@index([status])
+}
+
+model AiRun {
+  id            String   @id @default(uuid()) @db.Uuid
+  provider      String
+  model         String
+  promptVersion String
+  status        String
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  cost          Decimal  @default(0) @db.Decimal(18, 8)
+  checkpoint    Json?
+  result        Json?
+  context       Json?
+  modelMetadata Json?
+  durationMs    Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  toolCalls     AiToolCall[]
+
+  @@index([status, createdAt])
+}
+
+model AiToolCall {
+  id            String   @id @default(uuid()) @db.Uuid
+  aiRunId       String   @db.Uuid
+  tool          String
+  permission    String
+  status        String
+  inputSummary  String
+  outputSummary String?
+  provider      String?
+  durationMs    Int?
+  marketTime    DateTime?
+  availableAt   DateTime?
+  fetchedAt     DateTime?
+  createdAt     DateTime @default(now())
+  aiRun         AiRun    @relation(fields: [aiRunId], references: [id], onDelete: Restrict)
+
+  @@index([aiRunId, createdAt])
+  @@index([tool, status, createdAt])
+}
+
+model AiDecisionLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  symbol      String?
+  accountId   String?  @db.Uuid
+  question    String
+  assumptions Json
+  conclusion  Json
+  context     Json?
+  provenance  Json?
+  createdAt   DateTime @default(now())
+
+  @@index([symbol, createdAt])
+  @@index([accountId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actor      String
+  action     String
+  resource   String
+  resourceId String?
+  traceId    String
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([resource, resourceId, createdAt])
+}

@@ -1,0 +1,26 @@
+packages:
+  - apps/*
+  - packages/*
+  - services/*
+
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  electron-winstaller: true
+  esbuild: true
+  prisma: true
+  unrs-resolver: true
+
+overrides:
+  '@electron/get': 5.1.0
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma
+  - unrs-resolver
+
+patchedDependencies:
+  expo-modules-core@57.0.8: patches/expo-modules-core@57.0.8.patch
+  expo-modules-jsi@57.0.4: patches/expo-modules-jsi@57.0.4.patch

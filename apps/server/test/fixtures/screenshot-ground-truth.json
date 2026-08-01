@@ -1,0 +1,47 @@
+[
+  {
+    "id": "alipay-01",
+    "source": "alipay",
+    "symbol": "600519.SH",
+    "quantity": 100,
+    "costPrice": 1000
+  },
+  {
+    "id": "alipay-02",
+    "source": "alipay",
+    "symbol": "000001.SZ",
+    "quantity": 200,
+    "costPrice": 10
+  },
+  { "id": "alipay-03", "source": "alipay", "symbol": "510300.SH", "quantity": 300, "costPrice": 4 },
+  { "id": "alipay-04", "source": "alipay", "symbol": "159919.SZ", "quantity": 400, "costPrice": 2 },
+  {
+    "id": "alipay-05",
+    "source": "alipay",
+    "symbol": "601318.SH",
+    "quantity": 100,
+    "costPrice": 50
+  },
+  { "id": "ths-01", "source": "ths", "symbol": "600519.SH", "quantity": 100, "costPrice": 1000 },
+  { "id": "ths-02", "source": "ths", "symbol": "000001.SZ", "quantity": 200, "costPrice": 10 },
+  { "id": "ths-03", "source": "ths", "symbol": "510300.SH", "quantity": 300, "costPrice": 4 },
+  { "id": "ths-04", "source": "ths", "symbol": "159919.SZ", "quantity": 400, "costPrice": 2 },
+  { "id": "ths-05", "source": "ths", "symbol": "601318.SH", "quantity": 100, "costPrice": 50 },
+  {
+    "id": "broker-01",
+    "source": "broker",
+    "symbol": "600519.SH",
+    "quantity": 100,
+    "costPrice": 1000
+  },
+  {
+    "id": "broker-02",
+    "source": "broker",
+    "symbol": "000001.SZ",
+    "quantity": 200,
+    "costPrice": 10
+  },
+  { "id": "broker-03", "source": "broker", "symbol": "510300.SH", "quantity": 300, "costPrice": 4 },
+  { "id": "broker-04", "source": "broker", "symbol": "159919.SZ", "quantity": 400, "costPrice": 2 },
+  { "id": "broker-05", "source": "broker", "symbol": "601318.SH", "quantity": 100, "costPrice": 50 }
+]

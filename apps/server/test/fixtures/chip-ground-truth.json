@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "symbol": "600519.SH",
+  "marketTime": "2025-01-02T00:00:00Z",
+  "input": {
+    "buckets": [
+      { "price": 1000, "weight": 0.2 },
+      { "price": 1050, "weight": 0.5 },
+      { "price": 1100, "weight": 0.3 }
+    ]
+  },
+  "expected": {
+    "mainPeak": 1050,
+    "profitRatio": 0.8,
+    "range70": [1000, 1100]
+  }
+}

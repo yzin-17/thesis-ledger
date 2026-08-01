@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-07-31T20:53:37.387Z",
+  "method": "PortfolioService.value + evaluateCompleteRule + allocation aggregation",
+  "environment": "local Node.js 24.18.0; synthetic quotes; no database/network",
+  "thresholdsMs": { "valuation": 500, "risk": 500, "dashboard": 500 },
+  "results": [
+    { "positions": 10, "valuationMs": 0.26, "riskMs": 0.283, "dashboardMs": 0.022 },
+    { "positions": 50, "valuationMs": 0.065, "riskMs": 0.032, "dashboardMs": 0.009 },
+    { "positions": 200, "valuationMs": 0.645, "riskMs": 0.113, "dashboardMs": 0.018 },
+    { "positions": 1000, "valuationMs": 0.572, "riskMs": 0.283, "dashboardMs": 0.085 }
+  ],
+  "limitations": [
+    "这是服务纯逻辑和合成行情的基准，不代表 PostgreSQL、Redis、DSA 或浏览器端到端延迟。",
+    "发布前仍需在目标硬件、真实数据库和 release build 上补测并保留对比报告。"
+  ]
+}

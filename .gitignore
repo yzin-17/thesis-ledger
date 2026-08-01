@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+apps/server/prisma/dev.db
+third_party/daily_stock_analysis/
+apps/desktop/release/
+apps/mobile/android/keystore.properties
+apps/mobile/android/*.keystore

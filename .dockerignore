@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+apps/desktop/release
+apps/mobile/android
+apps/mobile/ios
+third_party
+coverage
+.git
+.env
+*.log
+.DS_Store

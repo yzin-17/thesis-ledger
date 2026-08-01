@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "description": "固定回归基准集清单；新增字段必须同步更新版本并保留旧样本。",
+  "fixtures": [
+    { "kind": "screenshot", "path": "screenshot-ground-truth.json", "minimumCases": 15 },
+    { "kind": "chip", "path": "chip-ground-truth.json", "minimumCases": 1 },
+    { "kind": "backtest", "path": "backtest-ground-truth.json", "minimumCases": 1 },
+    { "kind": "risk", "path": "risk-ground-truth.json", "minimumCases": 1 }
+  ]
+}

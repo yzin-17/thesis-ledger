@@ -1,0 +1,39 @@
+{
+  "name": "investment-os",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "build": "pnpm db:generate && pnpm -r build",
+    "typecheck": "pnpm build && pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm build && node scripts/check-boundaries.mjs && eslint . --max-warnings=0",
+    "security:secrets": "node scripts/check-secrets.mjs",
+    "accessibility:check": "node scripts/check-accessibility.mjs",
+    "release:artifacts": "node scripts/check-release-artifacts.mjs",
+    "licenses:scan": "node scripts/check-licenses.mjs",
+    "benchmarks:check": "node scripts/check-benchmarks.mjs",
+    "benchmarks:portfolio": "pnpm --filter @investment-os/server build && node scripts/portfolio-benchmark.mjs",
+    "migration:matrix": "node scripts/check-migration-matrix.mjs",
+    "db:integration": "node scripts/db-integration-smoke.mjs",
+    "provider:failover": "node scripts/provider-failover-smoke.mjs",
+    "v1:e2e": "node scripts/v1-core-e2e-smoke.mjs",
+    "disaster:recovery": "node scripts/disaster-recovery-smoke.mjs",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "db:generate": "pnpm --filter @investment-os/server prisma generate",
+    "db:migrate": "pnpm --filter @investment-os/server prisma migrate deploy",
+    "db:seed": "pnpm --filter @investment-os/server prisma db seed"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.32.0",
+    "eslint": "^9.32.0",
+    "eslint-plugin-import-x": "^4.16.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^3.2.4"
+  }
+}

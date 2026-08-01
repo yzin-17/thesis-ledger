@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+docs/specs
+docs/tasks
+.vscode
+apps/mobile/android
+apps/mobile/ios
+apps/desktop/release
+third_party

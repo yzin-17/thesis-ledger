@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "risk-price-below-01",
+  "context": {
+    "symbol": "600519.SH",
+    "price": 95,
+    "marketTime": "2025-01-06T01:30:00Z",
+    "dataQuality": { "quote": "fresh" }
+  },
+  "rule": { "kind": "price-below", "threshold": 100, "severity": "warning" },
+  "expected": { "triggered": true, "ruleVersion": 1 }
+}

@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Investment OS",
+    "slug": "investment-os",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "investment-os",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android", "web"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.investmentos.mobile"
+    },
+    "android": {
+      "package": "com.investmentos.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

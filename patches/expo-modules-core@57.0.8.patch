@@ -1,0 +1,62 @@
+diff --git a/ios/Core/Events/EventEmitter.swift b/ios/Core/Events/EventEmitter.swift
+index 3046568451ed58bdc7076d6d739dea37f2285859..75f4266cef630b985c9ce8cd95b648d708f1c9bf 100644
+--- a/ios/Core/Events/EventEmitter.swift
++++ b/ios/Core/Events/EventEmitter.swift
+@@ -2,6 +2,21 @@
+ 
+ import ExpoModulesJSI
+ 
++/// A weak reference that can cross the `JavaScriptActor` scheduling boundary.
++///
++/// Event emitters are module instances and therefore are not generally
++/// `Sendable`. The scheduled closure only needs their identity and the
++/// actor-isolated `withEventTarget` method, so the weak box is the smallest
++/// boundary that keeps the lifetime semantics while making that intent
++/// explicit to Swift 6's concurrency checker.
++private final class WeakEventEmitterReference<T: AnyObject>: @unchecked Sendable {
++  weak var value: T?
++
++  init(_ value: T) {
++    self.value = value
++  }
++}
++
+ /**
+  A protocol for native objects that have an associated JavaScript object capable of receiving events.
+  Conformers only need to provide the JavaScript object to send events to - the `emit` overloads that
+@@ -41,15 +56,12 @@ public extension EventEmitter {
+       log.warn("Trying to send event '\(event)' to \(type(of: self)), but the JS runtime has been lost")
+       return
+     }
+-    // The emitter is not necessarily `Sendable` - some modules hold non-sendable state — so we can't let
+-    // the compiler send `self` into the `@JavaScriptActor` region. Capturing it as `nonisolated(unsafe)` is
+-    // safe here because the scheduled closure only calls `withEventTarget`, which touches `@JavaScriptActor`-
+-    // isolated or `Sendable` state (the JS object, the registry, `appContext`) and the emitter's identity -
+-    // never the module's own mutable state.
+-    nonisolated(unsafe) weak let emitter = self
++    // Keep the module weak while passing only an explicit Sendable box into
++    // the actor-isolated scheduled closure.
++    let emitter = WeakEventEmitterReference(self)
+ 
+     runtime.schedule {
+-      guard let emitter else {
++      guard let emitter = emitter.value else {
+         return
+       }
+       let dispatched = emitter.withEventTarget { target in
+@@ -70,13 +82,10 @@ public extension EventEmitter {
+       log.warn("Trying to send event '\(event)' to \(type(of: self)), but the JS runtime has been lost")
+       return
+     }
+-    // See the note in `emit(event:payload:)` above - the emitter is captured as `nonisolated(unsafe)`
+-    // because it isn't necessarily `Sendable`, and the scheduled closure only reaches `@JavaScriptActor`-
+-    // isolated or `Sendable` state through it.
+-    nonisolated(unsafe) weak let emitter = self
++    let emitter = WeakEventEmitterReference(self)
+ 
+     runtime.schedule { [weak appContext] in
+-      guard let emitter, let appContext else {
++      guard let emitter = emitter.value, let appContext else {
+         return
+       }
+       let jsPayload: JavaScriptValue

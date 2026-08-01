@@ -1,0 +1,4 @@
+ALTER TABLE "LedgerEvent"
+ADD COLUMN "source" TEXT NOT NULL DEFAULT 'manual',
+ADD COLUMN "currency" TEXT NOT NULL DEFAULT 'CNY',
+ADD COLUMN "note" TEXT;
