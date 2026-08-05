@@ -1622,8 +1622,13 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
   const [rebalanceRows, setRebalanceRows] = useState<RebalanceGapRecord[]>([]);
   const [targetText, setTargetText] = useState('{"股票":0.6,"ETF":0.4}');
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<'error' | 'success'>('success');
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const loadSequence = useRef(0);
+  const showMessage = (nextMessage: string, tone: 'error' | 'success') => {
+    setMessage(nextMessage);
+    setMessageTone(tone);
+  };
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
   }, [accountId, accounts]);
@@ -1694,7 +1699,7 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
       void load().catch(() => {
         if (sequence !== loadSequence.current) return;
         setLoadState(snapshots.length > 0 ? 'stale' : 'error');
-        setMessage('收益历史读取失败。');
+        showMessage('收益历史读取失败。', 'error');
       });
     }
   }, [accountId]);
@@ -1712,13 +1717,13 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
         }),
       });
       if (!response.ok) {
-        setMessage('目标权重必须合计 100%。');
+        showMessage('目标权重必须合计 100%。', 'error');
         return;
       }
-      setMessage('目标配置已保存并生成新版本。');
+      showMessage('目标配置已保存并生成新版本。', 'success');
       await load();
     } catch {
-      setMessage('目标配置必须是 JSON 对象。');
+      showMessage('目标配置必须是 JSON 对象。', 'error');
     }
   };
   const latest = snapshots.at(-1);
@@ -1892,7 +1897,11 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
         </Button>
       </form>
       {message && (
-        <p className="form-message" role="status">
+        <p
+          className="form-message"
+          data-tone={messageTone}
+          role={messageTone === 'error' ? 'alert' : 'status'}
+        >
           {message}
         </p>
       )}
