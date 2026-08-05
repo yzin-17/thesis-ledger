@@ -7,6 +7,7 @@ COPY apps/server/package.json apps/server/package.json
 COPY packages/domain/package.json packages/domain/package.json
 COPY packages/schemas/package.json packages/schemas/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @investment-os/server prisma generate

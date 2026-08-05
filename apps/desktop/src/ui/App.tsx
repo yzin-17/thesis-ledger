@@ -2641,7 +2641,6 @@ function ImportReview({
               ))}
               <div className="form-actions">
                 <Button
-                  className="primary"
                   disabled={selected.status === 'committed'}
                   type="button"
                   variant="default"
@@ -3277,9 +3276,14 @@ export function FirstRunOnboarding({
             <strong>录入或导入持仓</strong>
             <p>可以手动录入，也可以前往截图审核；草稿确认前不会修改 Ledger。</p>
             <div className="form-actions">
-              <a className="secondary" href="#portfolio-management">
+              <Button
+                className="secondary"
+                nativeButton={false}
+                render={<a href="#portfolio-management" />}
+                variant="outline"
+              >
                 手动录入
-              </a>
+              </Button>
               <Button
                 className="secondary"
                 type="button"
@@ -3299,10 +3303,9 @@ export function FirstRunOnboarding({
             <strong>配置数据源与通知</strong>
             <p>查看数据源与通知是否可用；敏感凭证由服务端管理，页面不会回显密钥。</p>
             <Button
-              className="text-button"
-              size="sm"
+              className="secondary"
               type="button"
-              variant="link"
+              variant="outline"
               onClick={() => onNavigate('providers')}
             >
               打开数据与自动化
@@ -3317,10 +3320,9 @@ export function FirstRunOnboarding({
             <strong>设置风险规则</strong>
             <p>风险提醒用于研究辅助，不代表交易执行保证；通知失败会保留在历史中。</p>
             <Button
-              className="text-button"
-              size="sm"
+              className="secondary"
               type="button"
-              variant="link"
+              variant="outline"
               onClick={() => onNavigate('risk-center')}
             >
               打开风险中心

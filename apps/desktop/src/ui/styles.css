@@ -69,8 +69,8 @@
   --radius: 0.4375rem;
   --sidebar: var(--color-sidebar-bg);
   --sidebar-foreground: var(--color-text-primary);
-  --sidebar-primary: var(--color-brand);
-  --sidebar-primary-foreground: var(--color-brand-contrast);
+  --sidebar-primary: var(--color-text-primary);
+  --sidebar-primary-foreground: var(--color-surface-1);
   --sidebar-accent: var(--color-surface-hover);
   --sidebar-accent-foreground: var(--color-text-primary);
   --sidebar-border: var(--color-border);
@@ -196,7 +196,7 @@ button:disabled {
 }
 
 a {
-  color: var(--color-brand);
+  color: var(--color-text-primary);
 }
 
 button:focus-visible,
@@ -302,7 +302,6 @@ textarea:focus-visible {
 }
 
 .nav-item:active,
-.primary:active,
 .secondary:active,
 .text-button:active {
   transform: translateY(1px);
@@ -320,7 +319,7 @@ textarea:focus-visible {
   inset: 8px auto 8px 0;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--color-brand);
+  background: var(--color-border-strong);
   content: '';
 }
 
@@ -425,7 +424,6 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.primary,
 .secondary {
   display: inline-flex;
   align-items: center;
@@ -440,22 +438,11 @@ h3 {
   white-space: nowrap;
 }
 
-.primary {
-  border: 1px solid var(--color-action);
-  color: var(--color-action-contrast);
-  background: var(--color-action);
-  font-weight: 620;
-}
-
-.primary:hover {
-  border-color: var(--color-action-hover);
-  background: var(--color-action-hover);
-}
-
 .secondary {
   border: 1px solid var(--color-border-strong);
   color: var(--color-text-secondary);
   background: var(--color-surface-1);
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -704,7 +691,7 @@ td span {
 }
 
 .data-state-banner.loading {
-  border-left-color: var(--color-brand);
+  border-left-color: var(--color-border-strong);
 }
 
 .data-state-banner.empty {
@@ -1089,7 +1076,7 @@ textarea::placeholder {
 }
 
 .onboarding-steps li.current {
-  box-shadow: inset 0 2px var(--color-brand);
+  box-shadow: inset 0 2px var(--color-border-strong);
 }
 
 .onboarding-steps li > div {
@@ -1124,9 +1111,9 @@ textarea::placeholder {
 }
 
 .onboarding-steps li.current .onboarding-index {
-  border-color: var(--color-brand);
-  color: var(--color-brand);
-  background: var(--color-brand-soft);
+  border-color: var(--color-text-primary);
+  color: var(--color-text-primary);
+  background: var(--color-surface-2);
 }
 
 .onboarding .form-actions {
@@ -1215,7 +1202,7 @@ textarea::placeholder {
   padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: var(--color-brand);
+  color: var(--color-text-secondary);
   background: transparent;
   cursor: pointer;
   font-size: 12px;
@@ -1224,6 +1211,7 @@ textarea::placeholder {
 
 .text-button:hover {
   border-color: var(--color-border);
+  color: var(--color-text-primary);
   background: var(--color-surface-hover);
   text-decoration: none;
 }
@@ -1431,7 +1419,6 @@ textarea::placeholder {
   }
 
   .nav-item,
-  .primary,
   .secondary,
   .text-button {
     color: ButtonText;
@@ -1705,8 +1692,8 @@ html.dark {
   --chart-5: var(--color-text-secondary);
   --sidebar: var(--color-sidebar-bg);
   --sidebar-foreground: var(--color-text-primary);
-  --sidebar-primary: var(--color-brand);
-  --sidebar-primary-foreground: var(--color-brand-contrast);
+  --sidebar-primary: var(--color-text-primary);
+  --sidebar-primary-foreground: var(--color-surface-1);
   --sidebar-accent: var(--color-surface-hover);
   --sidebar-accent-foreground: var(--color-text-primary);
   --sidebar-border: var(--color-border);
