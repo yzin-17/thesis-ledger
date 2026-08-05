@@ -1,5 +1,5 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Moon, Sun } from 'lucide-react';
+import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { useTheme, type ThemePreference } from '@/ui/theme';
 
 const labels: Record<ThemePreference, string> = {
@@ -8,28 +8,24 @@ const labels: Record<ThemePreference, string> = {
   dark: '深色',
 };
 
-const icons = {
-  system: Monitor,
-  light: Sun,
-  dark: Moon,
-} satisfies Record<ThemePreference, typeof Monitor>;
-
 export function ThemeToggle() {
-  const { preference, cyclePreference } = useTheme();
-  const Icon = icons[preference];
+  const { preference, resolvedTheme, setPreference } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const currentLabel =
+    preference === 'system' ? `系统（${isDark ? labels.dark : labels.light}）` : labels[preference];
+  const nextLabel = isDark ? labels.light : labels.dark;
 
   return (
-    <Button
-      aria-label={`切换主题，当前为${labels[preference]}`}
-      className="theme-toggle"
-      size="sm"
-      title={`主题：${labels[preference]}`}
-      type="button"
-      variant="ghost"
-      onClick={cyclePreference}
+    <Switch
+      aria-label={`切换到${nextLabel}主题，当前为${currentLabel}`}
+      checked={isDark}
+      className="theme-switch"
+      title={`当前为${currentLabel}，切换到${nextLabel}`}
+      onCheckedChange={(checked) => setPreference(checked ? 'dark' : 'light')}
     >
-      <Icon aria-hidden="true" size={15} />
-      <span>主题：{labels[preference]}</span>
-    </Button>
+      <SwitchThumb className="theme-switch-thumb">
+        {isDark ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
+      </SwitchThumb>
+    </Switch>
   );
 }

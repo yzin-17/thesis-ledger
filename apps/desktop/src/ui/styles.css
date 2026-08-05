@@ -345,16 +345,75 @@ textarea:focus-visible {
   min-width: 0;
 }
 
-.sidebar-foot .theme-toggle {
-  min-height: 30px;
-  margin-left: auto;
-  padding: 5px 7px;
+.theme-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 11px;
+  background: var(--color-surface-2);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
 }
 
-.sidebar-foot .theme-toggle:hover {
+.theme-switch:hover {
+  border-color: var(--color-text-muted);
+  background: var(--color-surface-hover);
+}
+
+.theme-switch[data-checked] {
+  background: var(--color-surface-selected);
+}
+
+.theme-switch:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+.theme-switch[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.theme-switch-thumb {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-1);
+  box-shadow: 0 1px 3px rgb(22 29 38 / 0.14);
+  transform: translateX(0);
+  transition:
+    transform 150ms ease,
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.theme-switch[data-checked] .theme-switch-thumb {
   color: var(--color-text-primary);
+  transform: translateX(16px);
+}
+
+.theme-switch-thumb svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sidebar-foot .theme-switch {
+  margin-left: auto;
 }
 
 .status-dot {
@@ -1427,6 +1486,16 @@ textarea::placeholder {
     forced-color-adjust: auto;
   }
 
+  .theme-switch,
+  .theme-switch[data-checked],
+  .theme-switch-thumb,
+  .theme-switch[data-checked] .theme-switch-thumb {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+    forced-color-adjust: auto;
+  }
+
   .nav-item.active {
     color: HighlightText;
     background: Highlight;
@@ -1555,10 +1624,7 @@ textarea::placeholder {
     display: block;
   }
 
-  .content-theme-toggle .theme-toggle {
-    min-height: 34px;
-    border: 1px solid var(--color-border-strong);
-    background: var(--color-surface-1);
+  .content-theme-toggle .theme-switch {
     box-shadow: 0 2px 8px var(--color-overlay);
   }
 

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- Phosphor 的条件导出在 ESLint project service 中被识别为 error type，tsc 已独立校验。 */
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ import { RobotIcon } from '@phosphor-icons/react/Robot';
 import { ShieldCheckIcon } from '@phosphor-icons/react/ShieldCheck';
 import { StrategyIcon } from '@phosphor-icons/react/Strategy';
 import { UploadSimpleIcon } from '@phosphor-icons/react/UploadSimple';
-import type { DesktopView } from '../views.js';
+import { desktopPathForView, desktopRoutes, type DesktopNavigationView } from '../views.js';
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
 interface Position {
@@ -147,16 +148,18 @@ interface PerformanceLayerRecord {
   unrealizedPnl: number | null;
 }
 
-const nav: Array<{ view: DesktopView; label: string; icon: typeof HouseIcon }> = [
-  { view: 'portfolio', label: '投资组合', icon: HouseIcon },
-  { view: 'import-review', label: '导入持仓', icon: UploadSimpleIcon },
-  { view: 'risk-center', label: '风险中心', icon: ShieldCheckIcon },
-  { view: 'performance', label: '收益分析', icon: ChartLineUpIcon },
-  { view: 'strategy', label: '策略实验', icon: StrategyIcon },
-  { view: 'journal', label: '投资复盘', icon: FlaskIcon },
-  { view: 'ai-chat', label: '研究助手', icon: RobotIcon },
-  { view: 'providers', label: '数据与自动化', icon: GearSixIcon },
-];
+const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
+  portfolio: HouseIcon,
+  'import-review': UploadSimpleIcon,
+  'risk-center': ShieldCheckIcon,
+  performance: ChartLineUpIcon,
+  strategy: StrategyIcon,
+  journal: FlaskIcon,
+  'ai-chat': RobotIcon,
+  providers: GearSixIcon,
+};
+
+const nav = desktopRoutes.map((route) => ({ ...route, icon: navIcons[route.view] }));
 
 const money = new Intl.NumberFormat('zh-CN', {
   style: 'currency',
@@ -175,11 +178,17 @@ const displayValue = (value: unknown) =>
     : '不可用';
 
 export function App() {
-  const [view, setView] = useState<DesktopView>('portfolio');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [state, setState] = useState<LoadState>('loading');
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const loadSequence = useRef(0);
+
+  const navigateTo = (nextView: DesktopNavigationView) => {
+    const path = desktopPathForView(nextView);
+    if (path) navigate({ pathname: path, search: location.search });
+  };
 
   const load = async () => {
     const sequence = ++loadSequence.current;
@@ -213,18 +222,20 @@ export function App() {
           <span>Investment OS</span>
         </div>
         <nav aria-label="主导航">
-          {nav.map(({ view: item, label, icon: Icon }) => (
-            <Button
+          {nav.map(({ view: item, path, label, icon: Icon }) => (
+            <NavLink
               key={item}
-              className={view === item ? 'nav-item active' : 'nav-item'}
-              type="button"
+              to={{ pathname: path, search: location.search }}
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
               aria-label={label}
-              aria-current={view === item ? 'page' : undefined}
-              onClick={() => setView(item)}
             >
-              <Icon size={19} weight={view === item ? 'fill' : 'regular'} />
-              <span>{label}</span>
-            </Button>
+              {({ isActive }) => (
+                <>
+                  <Icon size={19} weight={isActive ? 'fill' : 'regular'} />
+                  <span>{label}</span>
+                </>
+              )}
+            </NavLink>
           ))}
         </nav>
         <div className="sidebar-foot">
@@ -239,31 +250,35 @@ export function App() {
         <div className="content-theme-toggle">
           <ThemeToggle />
         </div>
-        {view === 'portfolio' ? (
-          <PortfolioDashboard
-            state={state}
-            portfolio={portfolio}
-            accounts={accounts}
-            onRetry={() => void load()}
-            onNavigate={setView}
+        <Routes>
+          <Route path="/" element={<Navigate to="/portfolio" replace />} />
+          <Route
+            path="/portfolio"
+            element={
+              <PortfolioDashboard
+                state={state}
+                portfolio={portfolio}
+                accounts={accounts}
+                onRetry={() => void load()}
+                onNavigate={navigateTo}
+              />
+            }
           />
-        ) : view === 'import-review' ? (
-          <ImportReview accounts={accounts} onPortfolioChanged={() => void load()} />
-        ) : view === 'risk-center' ? (
-          <RiskCenter accounts={accounts} portfolio={portfolio} />
-        ) : view === 'performance' ? (
-          <PerformanceDashboard accounts={accounts} />
-        ) : view === 'strategy' ? (
-          <StrategyDashboard />
-        ) : view === 'journal' ? (
-          <JournalDashboard />
-        ) : view === 'ai-chat' ? (
-          <AiChat />
-        ) : view === 'providers' ? (
-          <ProviderSettings />
-        ) : (
-          <ModulePlaceholder view={view} />
-        )}
+          <Route
+            path="/import-review"
+            element={<ImportReview accounts={accounts} onPortfolioChanged={() => void load()} />}
+          />
+          <Route
+            path="/risk-center"
+            element={<RiskCenter accounts={accounts} portfolio={portfolio} />}
+          />
+          <Route path="/performance" element={<PerformanceDashboard accounts={accounts} />} />
+          <Route path="/strategy" element={<StrategyDashboard />} />
+          <Route path="/journal" element={<JournalDashboard />} />
+          <Route path="/ai-chat" element={<AiChat />} />
+          <Route path="/providers" element={<ProviderSettings />} />
+          <Route path="*" element={<Navigate to="/portfolio" replace />} />
+        </Routes>
       </main>
     </div>
   );
@@ -2680,7 +2695,7 @@ function PortfolioDashboard({
   portfolio: Portfolio | null;
   accounts: Account[];
   onRetry: () => void;
-  onNavigate: (view: DesktopView) => void;
+  onNavigate: (view: DesktopNavigationView) => void;
 }) {
   const largest = useMemo(
     () =>
@@ -3245,7 +3260,7 @@ export function FirstRunOnboarding({
   onNavigate,
 }: {
   hasAccount: boolean;
-  onNavigate: (view: DesktopView) => void;
+  onNavigate: (view: DesktopNavigationView) => void;
 }) {
   return (
     <section className="onboarding" aria-labelledby="onboarding-title">
@@ -3419,37 +3434,3 @@ const DashboardSkeleton = () => (
     <Skeleton className="skeleton table" />
   </div>
 );
-
-function ModulePlaceholder({ view }: { view: DesktopView }) {
-  const labels: Partial<Record<DesktopView, [string, string]>> = {
-    'import-review': ['审核导入', '逐项确认识别结果、资产匹配和数值警告后再提交。'],
-    'risk-center': ['风险中心', '集中查看规则、触发事件、通知状态和当前风险敞口。'],
-    performance: ['收益分析', '使用 Ledger 与组合快照解释收益、回撤和资产配置。'],
-    strategy: ['策略实验', '版本化策略定义，并在包含 A 股交易约束的数据上回测。'],
-    journal: ['投资复盘', '连接交易计划、实际执行、行为偏差和周期复盘。'],
-    'ai-chat': ['研究助手', '所有关键结论都引用 Investment OS Tool 提供的事实。'],
-    providers: ['数据与自动化', '管理 Provider 路由、健康、任务调度和失败历史。'],
-  };
-  const [title, description] = labels[view] ?? ['模块', '该模块正在加载。'];
-  return (
-    <section className="module-intro">
-      <p className="kicker">Investment OS</p>
-      <h1>{title}</h1>
-      <p>{description}</p>
-      <div className="module-grid">
-        <div>
-          <span>数据来源</span>
-          <strong>可追溯</strong>
-        </div>
-        <div>
-          <span>运行边界</span>
-          <strong>仅分析，不交易</strong>
-        </div>
-        <div>
-          <span>当前状态</span>
-          <strong>已连接</strong>
-        </div>
-      </div>
-    </section>
-  );
-}
