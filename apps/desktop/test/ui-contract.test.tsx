@@ -1,18 +1,163 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { DataStateBanner, FirstRunOnboarding, ProviderSettings } from '../src/ui/App.js';
+import {
+  DataStateBanner,
+  FirstRunOnboarding,
+  ImportReview,
+  PortfolioManagement,
+  ProviderSettings,
+} from '../src/ui/App.js';
 
 describe('Desktop UI contract', () => {
-  it('first-run onboarding covers the four basic setup steps and safety boundary', () => {
-    const markup = renderToStaticMarkup(
+  it('first-run onboarding keeps the four-step overview visible', () => {
+    const firstStep = renderToStaticMarkup(
       <FirstRunOnboarding hasAccount={false} onNavigate={vi.fn()} />,
     );
+    expect(firstStep).toContain('data-onboarding-step="1"');
+    expect(firstStep).toContain('创建账户');
+    expect(firstStep).toContain('录入或导入持仓');
+    expect(firstStep).toContain('配置数据源与通知');
+    expect(firstStep).toContain('设置风险规则');
+    expect(firstStep).toContain('截图导入');
+    expect(firstStep.match(/<li/g)).toHaveLength(4);
 
-    expect(markup).toContain('四步完成第一次闭环');
-    expect(markup).toContain('创建账户');
-    expect(markup).toContain('截图导入');
-    expect(markup).toContain('敏感凭证由服务端安全保存');
-    expect(markup).toContain('不代表交易执行保证');
+    const secondStep = renderToStaticMarkup(
+      <FirstRunOnboarding hasAccount hasPosition={false} onNavigate={vi.fn()} />,
+    );
+    expect(secondStep).toContain('data-onboarding-step="2"');
+    expect(secondStep).toContain('截图导入');
+    expect(secondStep.match(/<li/g)).toHaveLength(4);
+
+    const thirdStep = renderToStaticMarkup(
+      <FirstRunOnboarding hasAccount hasPosition hasProviderSetup={false} onNavigate={vi.fn()} />,
+    );
+    expect(thirdStep).toContain('data-onboarding-step="3"');
+    expect(thirdStep).toContain('打开数据与自动化');
+    expect(thirdStep).toContain('打开风险中心');
+    expect(thirdStep.match(/<li/g)).toHaveLength(4);
+
+    const fourthStep = renderToStaticMarkup(
+      <FirstRunOnboarding
+        hasAccount
+        hasPosition
+        hasProviderSetup
+        hasRiskRule={false}
+        onNavigate={vi.fn()}
+      />,
+    );
+    expect(fourthStep).toContain('data-onboarding-step="4"');
+    expect(fourthStep).toContain('不代表交易执行保证');
+    expect(fourthStep).toContain('截图导入');
+    expect(fourthStep.match(/<li/g)).toHaveLength(4);
+
+    const complete = renderToStaticMarkup(
+      <FirstRunOnboarding
+        hasAccount
+        hasPosition
+        hasProviderSetup
+        hasRiskRule
+        onNavigate={vi.fn()}
+      />,
+    );
+    expect(complete).toContain('data-onboarding-step="complete"');
+    expect(complete).toContain('四步已完成');
+    expect(complete.match(/<li/g)).toHaveLength(4);
+  });
+
+  it('shows only the current first-run form content', () => {
+    const accountStep = renderToStaticMarkup(
+      <PortfolioManagement accounts={[]} positions={[]} step="account" onSaved={vi.fn()} />,
+    );
+    expect(accountStep).toContain('data-management-step="account"');
+    expect(accountStep).toContain('<h3>创建账户</h3>');
+    expect(accountStep).not.toContain('<h3>录入持仓</h3>');
+
+    const positionStep = renderToStaticMarkup(
+      <PortfolioManagement
+        accounts={[
+          {
+            id: 'account-1',
+            name: '示例账户',
+            source: 'manual',
+            type: 'securities',
+            currency: 'CNY',
+          },
+        ]}
+        positions={[]}
+        step="position"
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(positionStep).toContain('data-management-step="position"');
+    expect(positionStep).not.toContain('<h3>创建账户</h3>');
+    expect(positionStep).toContain('<h3>录入持仓</h3>');
+  });
+
+  it('keeps account, manual position, and screenshot content on separate import steps', () => {
+    const accountStep = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/import-review?step=account']}>
+        <ImportReview accounts={[]} positions={[]} onPortfolioChanged={vi.fn()} />
+      </MemoryRouter>,
+    );
+    expect(accountStep).toContain('data-import-step="account"');
+    expect(accountStep).toContain('<h3>创建账户</h3>');
+    expect(accountStep).not.toContain('<h3>录入持仓</h3>');
+
+    const positionStep = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/import-review?step=position']}>
+        <ImportReview
+          accounts={[
+            {
+              id: 'account-1',
+              name: '示例账户',
+              source: 'manual',
+              type: 'securities',
+              currency: 'CNY',
+            },
+          ]}
+          positions={[]}
+          onPortfolioChanged={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(positionStep).toContain('data-import-step="position"');
+    expect(positionStep).toContain('<h3>录入持仓</h3>');
+    expect(positionStep).not.toContain('<h3>创建账户</h3>');
+
+    const screenshotStep = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/import-review?step=screenshot']}>
+        <ImportReview
+          accounts={[
+            {
+              id: 'account-1',
+              name: '示例账户',
+              source: 'manual',
+              type: 'securities',
+              currency: 'CNY',
+            },
+          ]}
+          positions={[
+            {
+              id: 'position-1',
+              accountId: 'account-1',
+              symbol: '600519.SH',
+              quantity: 100,
+              costPrice: 1,
+              marketValue: null,
+              pnl: null,
+              stale: true,
+              asset: { name: '贵州茅台' },
+            },
+          ]}
+          onPortfolioChanged={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screenshotStep).toContain('data-import-step="screenshot"');
+    expect(screenshotStep).toContain('<h2>截图导入</h2>');
+    expect(screenshotStep).not.toContain('<h3>创建账户</h3>');
+    expect(screenshotStep).not.toContain('<h3>录入持仓</h3>');
   });
 
   it('renders every shared data state with an accessible status region', () => {
