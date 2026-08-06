@@ -36,7 +36,7 @@ export const renderStructuredLog = (record: StructuredLogRecord) =>
   JSON.stringify(
     redactSecrets({
       timestamp: new Date().toISOString(),
-      service: 'investment-os-server',
+      service: 'thesis-ledger-server',
       traceId: currentTraceId() ?? 'unknown',
       ...record,
     }),
@@ -45,7 +45,7 @@ export const renderStructuredLog = (record: StructuredLogRecord) =>
 export class StructuredLogger {
   private readonly logger: Logger;
 
-  constructor(context = 'investment-os') {
+  constructor(context = 'thesis-ledger') {
     this.logger = new Logger(context);
   }
 

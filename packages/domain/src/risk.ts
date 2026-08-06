@@ -87,7 +87,7 @@ export interface CompleteRiskContext extends V01RiskContext {
   portfolioValues?: readonly number[];
   indicators?: Readonly<Record<string, number>>;
   chip?: {
-    mainPeak: number;
+    mainPeak?: number;
     profitRatio: number;
     concentration: number;
     previousMainPeaks?: readonly number[];
@@ -256,7 +256,12 @@ export const evaluateCompleteRule = (
         });
   }
   if (rule.kind === 'chip-peak') {
-    if (context.price === undefined || context.chip === undefined) return null;
+    if (
+      context.price === undefined ||
+      context.chip === undefined ||
+      context.chip.mainPeak === undefined
+    )
+      return null;
     const value = context.price / context.chip.mainPeak - 1;
     const targetDirection = direction(rule, 'below');
     const triggered =
@@ -296,7 +301,7 @@ export const evaluateCompleteRule = (
   }
   if (rule.kind === 'chip-migration') {
     const history = context.chip?.previousMainPeaks;
-    if (!context.chip || !history?.length) return null;
+    if (!context.chip || context.chip.mainPeak === undefined || !history?.length) return null;
     const previousPeak = history.at(-1)!;
     if (previousPeak <= 0) return null;
     const value = context.chip.mainPeak / previousPeak - 1;

@@ -1,4 +1,4 @@
-import { roundMoney } from '@investment-os/shared';
+import { roundMoney } from '@thesis-ledger/shared';
 
 export interface CashFlow {
   date: string;

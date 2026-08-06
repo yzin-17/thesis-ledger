@@ -1,8 +1,8 @@
-# Investment OS V1.0 产品范围
+# ThesisLedger V1.0 产品范围
 
 ## 产品目标
 
-Investment OS 为个人投资者提供一套以交易流水为事实源的研究、组合、风险和复盘系统。V1.0 的核心链路是：持仓导入或交易记账 → 行情估值 → 收益与风险计算 → 通知 → 有来源约束的 AI 解释。
+ThesisLedger 为个人投资者提供一套以交易流水为事实源的研究、组合、风险和复盘系统。V1.0 的核心链路是：持仓导入或交易记账 → 行情估值 → 收益与风险计算 → 通知 → 有来源约束的 AI 解释。
 
 ## 版本边界
 
@@ -29,7 +29,7 @@ Investment OS 为个人投资者提供一套以交易流水为事实源的研究
 
 ## 数据与责任边界
 
-PostgreSQL 中的 Ledger 是 V0.3 起唯一资产事实源；Position、Portfolio、Snapshot 和 Performance 均可重建。TypeScript 服务拥有产品领域，Python 服务只提供行情、指标、筹码、回测和 AI 等可替换计算能力。客户端只访问 Investment OS API。
+PostgreSQL 中的 Ledger 是 V0.3 起唯一资产事实源；Position、Portfolio、Snapshot 和 Performance 均可重建。TypeScript 服务拥有产品领域，Python 服务只提供行情、指标、筹码、回测和 AI 等可替换计算能力。客户端只访问 ThesisLedger API；DSA 通过独立的 `/api/v1/thesis-ledger` Contract V1 接入。
 
 ## 需求映射
 

@@ -10,8 +10,8 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm --filter @investment-os/server prisma generate
-RUN pnpm --filter @investment-os/server... build
+RUN pnpm --filter @thesis-ledger/server prisma generate
+RUN pnpm --filter @thesis-ledger/server... build
 
 FROM node:24-alpine
 WORKDIR /app

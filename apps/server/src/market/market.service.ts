@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeSymbol } from '@investment-os/domain';
+import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
   barsSchemaV1,
   chipDistributionSchemaV1,
@@ -9,7 +9,7 @@ import {
   type ChipDistributionV1,
   type IndicatorV1,
   type QuoteV1,
-} from '@investment-os/schemas';
+} from '@thesis-ledger/schemas';
 import { DsaClient } from './dsa-client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 
@@ -28,14 +28,14 @@ export class MarketService {
     if (cached) return quoteSchemaV1.parse(JSON.parse(cached));
     try {
       const raw = await this.dsa.get<Record<string, unknown>>(
-        `/api/quote?symbol=${encodeURIComponent(symbol)}`,
+        `/api/v1/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}`,
       );
       const quote = quoteSchemaV1.parse({
+        ...raw,
         version: 1,
         symbol,
-        ...raw,
-        provider: 'dsa',
-        fetchedAt: new Date().toISOString(),
+        provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+        fetchedAt: typeof raw.fetchedAt === 'string' ? raw.fetchedAt : new Date().toISOString(),
       });
       const serialized = JSON.stringify(quote);
       await this.redis.client
@@ -65,25 +65,47 @@ export class MarketService {
     const query = new URLSearchParams({ symbol, timeframe });
     if (range?.start) query.set('start', range.start);
     if (range?.end) query.set('end', range.end);
-    const raw = await this.dsa.get<unknown[]>(`/api/bars?${query.toString()}`);
+    const raw = await this.dsa.get<unknown[]>(
+      `/api/v1/thesis-ledger/market/bars?${query.toString()}`,
+    );
     return barsSchemaV1.parse(
-      raw.map((bar) => ({ version: 1, symbol, timeframe, provider: 'dsa', ...(bar as object) })),
+      raw.map((bar) => ({
+        ...(bar as object),
+        version: 1,
+        symbol,
+        timeframe,
+        provider:
+          typeof (bar as Record<string, unknown>).provider === 'string'
+            ? (bar as Record<string, unknown>).provider
+            : 'dsa-fork',
+      })),
     );
   }
 
   async getIndicator(input: string, name: 'MA' | 'MACD' | 'RSI' | 'ATR'): Promise<IndicatorV1> {
     const { symbol } = normalizeSymbol(input);
     const raw = await this.dsa.get<Record<string, unknown>>(
-      `/api/indicators/${name.toLowerCase()}?symbol=${encodeURIComponent(symbol)}`,
+      `/api/v1/thesis-ledger/market/indicators/${name.toLowerCase()}?symbol=${encodeURIComponent(symbol)}&timeframe=1d`,
     );
-    return indicatorSchemaV1.parse({ version: 1, symbol, name, provider: 'dsa', ...raw });
+    return indicatorSchemaV1.parse({
+      ...raw,
+      version: 1,
+      symbol,
+      name,
+      provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+    });
   }
 
   async getChip(input: string): Promise<ChipDistributionV1> {
     const { symbol } = normalizeSymbol(input);
     const raw = await this.dsa.get<Record<string, unknown>>(
-      `/api/chip?symbol=${encodeURIComponent(symbol)}`,
+      `/api/v1/thesis-ledger/market/chip?symbol=${encodeURIComponent(symbol)}`,
     );
-    return chipDistributionSchemaV1.parse({ version: 1, symbol, provider: 'dsa', ...raw });
+    return chipDistributionSchemaV1.parse({
+      ...raw,
+      version: 1,
+      symbol,
+      provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+    });
   }
 }

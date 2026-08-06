@@ -1,5 +1,5 @@
 {
-  "name": "@investment-os/domain",
+  "name": "@thesis-ledger/domain",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@investment-os/shared": "workspace:*"
+    "@thesis-ledger/shared": "workspace:*"
   }
 }

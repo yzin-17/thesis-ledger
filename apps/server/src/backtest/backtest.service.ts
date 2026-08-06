@@ -6,8 +6,8 @@ import {
   runBacktest,
   type BacktestBar,
   type BacktestStrategy,
-} from '@investment-os/domain';
-import { backtestJobSchema, strategySchemaV1 } from '@investment-os/schemas';
+} from '@thesis-ledger/domain';
+import { backtestJobSchema, strategySchemaV1 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 
 export interface BacktestWorker {
@@ -39,7 +39,7 @@ const localAnalyticsWorker: BacktestAnalyticsWorker = {
 };
 
 const localWorker: BacktestWorker = {
-  id: 'investment-os-engine-v1',
+  id: 'thesis-ledger-engine-v1',
   run(input, signal) {
     if (signal.aborted) throw new Error('回测已取消');
     const result = runBacktest({
@@ -50,7 +50,7 @@ const localWorker: BacktestWorker = {
       dataAsOf: input.dataAsOf,
       initialCash: input.initialCash,
       ...(input.inSampleEnd === undefined ? {} : { inSampleEnd: input.inSampleEnd }),
-      engineVersion: 'investment-os-engine-v1',
+      engineVersion: 'thesis-ledger-engine-v1',
     });
     if (signal.aborted) throw new Error('回测已取消');
     return Promise.resolve(result);

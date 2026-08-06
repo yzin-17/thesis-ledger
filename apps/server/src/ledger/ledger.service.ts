@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { projectAverageCost, projectFifo, type LedgerEvent } from '@investment-os/domain';
+import { projectAverageCost, projectFifo, type LedgerEvent } from '@thesis-ledger/domain';
 import type { Prisma } from '@prisma/client';
-import { ledgerEventSchemaV1 } from '@investment-os/schemas';
+import { ledgerEventSchemaV1 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 
 const monetaryTypes = new Set([

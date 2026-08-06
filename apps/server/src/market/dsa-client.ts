@@ -5,7 +5,12 @@ import { currentTraceId } from '../platform/structured-logger.js';
 export class DsaError extends Error {
   constructor(
     message: string,
-    readonly code: 'timeout' | 'unavailable' | 'invalid-response',
+    readonly code:
+      | 'timeout'
+      | 'unavailable'
+      | 'invalid-response'
+      | 'unauthorized'
+      | 'unsupported-capability',
     readonly status?: number,
   ) {
     super(message);
@@ -22,10 +27,28 @@ export class DsaClient {
       try {
         const response = await fetch(new URL(path, this.config.dsaBaseUrl), {
           signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
-          headers: { 'x-trace-id': currentTraceId() ?? crypto.randomUUID() },
+          headers: {
+            authorization: `Bearer ${this.config.dsaToken}`,
+            'x-trace-id': currentTraceId() ?? crypto.randomUUID(),
+          },
         });
-        if (!response.ok)
-          throw new DsaError(`DSA 返回 ${response.status}`, 'unavailable', response.status);
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as {
+            detail?: { code?: string; message?: string };
+          } | null;
+          const detail = body?.detail;
+          const code =
+            detail?.code === 'unauthorized'
+              ? 'unauthorized'
+              : detail?.code === 'unsupported_capability'
+                ? 'unsupported-capability'
+                : 'unavailable';
+          throw new DsaError(
+            detail?.message ?? `DSA 返回 ${response.status}`,
+            code,
+            response.status,
+          );
+        }
         return (await response.json()) as T;
       } catch (error) {
         lastError = error;

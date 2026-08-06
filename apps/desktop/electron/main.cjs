@@ -4,7 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const apiBaseUrl = (process.env.INVESTMENT_OS_API_URL || 'http://127.0.0.1:3000').replace(
+const apiBaseUrl = (process.env.THESIS_LEDGER_API_URL || 'http://127.0.0.1:3000').replace(
   /\/$/u,
   '',
 );
@@ -41,7 +41,7 @@ const startAppServer = async () => {
         response.writeHead(upstream.status, Object.fromEntries(upstream.headers.entries()));
         response.end(Buffer.from(await upstream.arrayBuffer()));
       } catch (error) {
-        writeError(response, 502, `Investment OS API unavailable: ${error.message}`);
+        writeError(response, 502, `ThesisLedger API unavailable: ${error.message}`);
       }
       return;
     }

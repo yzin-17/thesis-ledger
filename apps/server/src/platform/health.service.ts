@@ -27,7 +27,7 @@ export class HealthService {
     const status: Status = failed === 0 ? 'healthy' : failed === 3 ? 'down' : 'degraded';
     return {
       status,
-      service: 'investment-os',
+      service: 'thesis-ledger',
       version: '0.1.0',
       dependencies,
       checkedAt: new Date().toISOString(),

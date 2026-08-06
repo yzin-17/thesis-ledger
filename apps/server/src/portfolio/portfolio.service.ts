@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { positionInputSchema } from '@investment-os/schemas';
-import { roundMoney } from '@investment-os/shared';
+import { positionInputSchema } from '@thesis-ledger/schemas';
+import { roundMoney } from '@thesis-ledger/shared';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';

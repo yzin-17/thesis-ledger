@@ -11,7 +11,7 @@ import {
   RateLimiter,
   type MarketDataProvider,
 } from '../src/provider.js';
-import type { QuoteV1 } from '@investment-os/schemas';
+import type { QuoteV1 } from '@thesis-ledger/schemas';
 import {
   credentialStatus,
   createJqDataProvider,

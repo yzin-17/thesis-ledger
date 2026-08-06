@@ -7,10 +7,10 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 const artifacts = [
-  resolve(root, 'apps/desktop/release/Investment OS-0.1.0-arm64.dmg'),
-  resolve(root, 'apps/desktop/release/Investment OS Setup 0.1.0.exe'),
-  resolve(root, 'apps/mobile/release/investment-os-0.1.0-arm64.apk'),
-  resolve(root, 'apps/mobile/release/investment-os-0.1.0.aab'),
+  resolve(root, 'apps/desktop/release/ThesisLedger-0.1.0-arm64.dmg'),
+  resolve(root, 'apps/desktop/release/ThesisLedger Setup 0.1.0.exe'),
+  resolve(root, 'apps/mobile/release/thesis-ledger-0.1.0-arm64.apk'),
+  resolve(root, 'apps/mobile/release/thesis-ledger-0.1.0.aab'),
 ];
 
 const sha256 = async (path) => {

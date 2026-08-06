@@ -13,7 +13,7 @@ const bootstrap = async () => {
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
   app.enableCors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false });
   app.use(createApiRateLimitMiddleware());
-  const requestLogger = new StructuredLogger('investment-os.http');
+  const requestLogger = new StructuredLogger('thesis-ledger.http');
   app.use((request: Request, response: Response, next: NextFunction) => {
     const traceId = request.header('x-trace-id') ?? crypto.randomUUID();
     response.setHeader('x-trace-id', traceId);

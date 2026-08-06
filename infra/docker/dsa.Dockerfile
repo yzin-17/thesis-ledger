@@ -1,6 +1,6 @@
 ARG DSA_VERSION=unconfigured
 FROM python:3.12-slim
-LABEL org.opencontainers.image.title="investment-os-dsa" \
+LABEL org.opencontainers.image.title="thesis-ledger-dsa" \
       org.opencontainers.image.version="${DSA_VERSION}" \
       org.opencontainers.image.revision="${DSA_VERSION}"
 WORKDIR /app

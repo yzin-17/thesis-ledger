@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { accountInputSchema } from '@investment-os/schemas';
+import { accountInputSchema } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 

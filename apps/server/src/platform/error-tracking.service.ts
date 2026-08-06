@@ -14,7 +14,7 @@ export class ErrorTrackingService {
     const endpoint = process.env.ERROR_TRACKING_URL?.trim();
     if (!endpoint) return { sent: false, reason: 'disabled' as const };
     const payload = redactSecrets({
-      event: 'investment-os.error',
+      event: 'thesis-ledger.error',
       release: process.env.APP_VERSION ?? 'dev',
       environment: process.env.NODE_ENV ?? 'development',
       ...input,

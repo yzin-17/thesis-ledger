@@ -1,4 +1,4 @@
-import { groupBy, roundMoney } from '@investment-os/shared';
+import { groupBy, roundMoney } from '@thesis-ledger/shared';
 
 export type LedgerEventType =
   | 'BUY'

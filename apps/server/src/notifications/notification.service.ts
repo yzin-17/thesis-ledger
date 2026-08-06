@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Severity } from '@investment-os/domain';
+import type { Severity } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 

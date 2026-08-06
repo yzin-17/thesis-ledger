@@ -1,4 +1,4 @@
-import type { BarV1, QuoteV1 } from '@investment-os/schemas';
+import type { BarV1, QuoteV1 } from '@thesis-ledger/schemas';
 import type { MarketDataProvider, MarketCapability, ProviderPluginConfig } from './provider.js';
 
 export interface ProfessionalTransport {

@@ -6,7 +6,7 @@ import { App } from './ui/App.js';
 import './ui/styles.css';
 
 const requestedTheme = new URLSearchParams(window.location.search).get('theme');
-const storedTheme = window.localStorage.getItem('investment-os-theme');
+const storedTheme = window.localStorage.getItem('thesis-ledger-theme');
 const initialTheme =
   requestedTheme === 'light' || requestedTheme === 'dark' || requestedTheme === 'system'
     ? requestedTheme

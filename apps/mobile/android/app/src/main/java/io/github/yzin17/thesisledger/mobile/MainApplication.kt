@@ -1,4 +1,4 @@
-package com.investmentos.mobile
+package io.github.yzin17.thesisledger.mobile
 
 import android.app.Application
 import android.content.res.Configuration

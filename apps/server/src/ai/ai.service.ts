@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { aiAnalysisSchema, aiContextSchema } from '@investment-os/schemas';
+import { aiAnalysisSchema, aiContextSchema } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 
@@ -307,7 +307,7 @@ const evidenceCitation = (tool: string, data: unknown) => {
   return {
     tool,
     sourceId: value.sourceId ?? `${tool}:result`,
-    provider: value.provider ?? 'investment-os-tool',
+    provider: value.provider ?? 'thesis-ledger-tool',
     observedAt,
     ...(value.marketTime ? { marketTime: value.marketTime } : {}),
     ...(value.availableAt ? { availableAt: value.availableAt } : {}),
@@ -357,7 +357,7 @@ export const runRiskExplanation = async (
         citations: [
           evidenceCitation('risk-event', {
             sourceId: input.ruleId,
-            provider: 'investment-os-risk',
+            provider: 'thesis-ledger-risk',
             marketTime: new Date().toISOString(),
           }),
         ],

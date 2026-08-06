@@ -1,5 +1,5 @@
 {
-  "name": "@investment-os/server",
+  "name": "@thesis-ledger/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,9 +13,9 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@investment-os/domain": "workspace:*",
-    "@investment-os/schemas": "workspace:*",
-    "@investment-os/shared": "workspace:*",
+    "@thesis-ledger/domain": "workspace:*",
+    "@thesis-ledger/schemas": "workspace:*",
+    "@thesis-ledger/shared": "workspace:*",
     "@nestjs/common": "^11.1.5",
     "@nestjs/core": "^11.1.5",
     "@nestjs/platform-express": "^11.1.5",

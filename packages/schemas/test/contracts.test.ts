@@ -169,6 +169,24 @@ describe('行情契约', () => {
         calculatedAt: time,
       }),
     ).toThrow());
+
+  it('允许只返回筹码摘要而不伪造完整分布', () => {
+    const result = chipDistributionSchemaV1.parse({
+      version: 1,
+      symbol: '600519.SH',
+      averageCost: 10,
+      profitRatio: 0.5,
+      range70: [9, 11],
+      range90: [8, 12],
+      concentration: 0.5,
+      provider: 'dsa-fork',
+      engineVersion: 'dsa-thesis-ledger-v1',
+      calculatedAt: time,
+    });
+    expect(result.symbol).toBe('600519.SH');
+    expect(result).not.toHaveProperty('buckets');
+    expect(result).not.toHaveProperty('mainPeak');
+  });
 });
 
 describe('Ledger 契约', () => {

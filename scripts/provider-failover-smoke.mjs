@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 
 const root = new URL('..', import.meta.url).pathname;
-const baseUrl = process.env.INVESTMENT_OS_BASE_URL ?? 'http://localhost:3000/api/v1';
+const baseUrl = process.env.THESIS_LEDGER_BASE_URL ?? 'http://localhost:3000/api/v1';
 const symbol = process.env.FAILOVER_SYMBOL ?? '600519.SH';
 const allowStop = process.argv.includes('--allow-service-stop');
 
@@ -42,7 +42,7 @@ compose([
   'redis',
   'redis-cli',
   'DEL',
-  `investment-os:cache:v1:quote:${symbol}:fresh`,
+  `thesis-ledger:cache:v1:quote:${symbol}:fresh`,
 ]);
 
 let stopped = false;

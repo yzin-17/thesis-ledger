@@ -99,9 +99,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.investmentos.mobile'
+    namespace 'io.github.yzin17.thesisledger.mobile'
     defaultConfig {
-        applicationId 'com.investmentos.mobile'
+        applicationId 'io.github.yzin17.thesisledger.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -5,7 +5,7 @@ import { createConnection } from 'node:net';
 
 const root = new URL('..', import.meta.url).pathname;
 const apiPort = Number(process.env.V1_E2E_PORT ?? 3110);
-const databaseName = `investment_os_e2e_${Date.now()}`;
+const databaseName = `thesis_ledger_e2e_${Date.now()}`;
 const apiBaseUrl = `http://127.0.0.1:${apiPort}/api/v1`;
 const symbol = process.env.V1_E2E_SYMBOL ?? '600519.SH';
 
@@ -84,7 +84,7 @@ const webhookUrl = `http://host.docker.internal:${webhookAddress.port}`;
 let databaseCreated = false;
 let serverContainerId = '';
 try {
-  compose(['exec', '-T', 'postgres', 'createdb', '-U', 'investment_os', databaseName]);
+  compose(['exec', '-T', 'postgres', 'createdb', '-U', 'thesis_ledger', databaseName]);
   databaseCreated = true;
 
   serverContainerId = compose([
@@ -94,7 +94,7 @@ try {
     '-p',
     `${serverPort}:3000`,
     '-e',
-    `DATABASE_URL=postgresql://investment_os:investment_os@postgres:5432/${databaseName}`,
+    `DATABASE_URL=postgresql://thesis_ledger:thesis_ledger@postgres:5432/${databaseName}`,
     '-e',
     'REDIS_URL=redis://redis:6379',
     '-e',
@@ -442,7 +442,7 @@ try {
   }
   if (databaseCreated) {
     try {
-      compose(['exec', '-T', 'postgres', 'dropdb', '-U', 'investment_os', databaseName]);
+      compose(['exec', '-T', 'postgres', 'dropdb', '-U', 'thesis_ledger', databaseName]);
     } catch {
       // Keep cleanup best-effort so the original E2E failure is not masked.
     }

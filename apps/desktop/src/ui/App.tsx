@@ -243,7 +243,7 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark">IO</span>
-          <span>Investment OS</span>
+          <span>ThesisLedger</span>
         </div>
         <nav aria-label="主导航">
           {nav.map(({ view: item, path, label, icon: Icon }) => (
@@ -2883,7 +2883,7 @@ function PortfolioDashboard({
     return (
       <StatePanel
         title="暂时无法读取投资组合"
-        description="请确认 Investment OS Server 与数据服务正在运行。"
+        description="请确认 ThesisLedger Server 与数据服务正在运行。"
       >
         <Button type="button" variant="default" onClick={onRetry}>
           <ArrowClockwiseIcon />
@@ -3023,23 +3023,39 @@ function PositionDetail({ position, onClose }: { position: Position; onClose: ()
     setData(null);
     setError('');
     const symbol = encodeURIComponent(position.symbol);
+    const indicatorNames = ['MA', 'MACD', 'RSI', 'ATR'] as const;
     void Promise.all([
       fetch(`/api/v1/market/${symbol}/quote`),
       fetch(`/api/v1/market/${symbol}/bars?timeframe=1d`),
-      ...(['MA', 'MACD', 'RSI', 'ATR'] as const).map((name) =>
-        fetch(`/api/v1/market/${symbol}/indicators/${name}`),
-      ),
+      ...indicatorNames.map((name) => fetch(`/api/v1/market/${symbol}/indicators/${name}`)),
       fetch(`/api/v1/market/${symbol}/chip`),
     ])
       .then(async (responses) => {
-        if (responses.some((response) => !response.ok)) throw new Error('detail');
-        const values = await Promise.all(responses.map((response) => response.json()));
+        const quoteResponse = responses[0];
+        const barsResponse = responses[1];
+        const chipResponse = responses[6]!;
+        if (!quoteResponse.ok || !barsResponse.ok || !chipResponse.ok) throw new Error('detail');
+        const [quote, bars, chip, ...indicatorValues] = await Promise.all([
+          quoteResponse.json(),
+          barsResponse.json(),
+          chipResponse.json(),
+          ...responses.slice(2, 6).map(async (response, index) =>
+            response.ok
+              ? ((await response.json()) as Record<string, unknown>)
+              : {
+                  name: indicatorNames[index],
+                  values: { status: 'unavailable' },
+                  provider: 'dsa-fork',
+                  marketTime: new Date().toISOString(),
+                },
+          ),
+        ]);
         if (sequence !== requestSequence.current) return;
         setData({
-          quote: values[0] as Record<string, unknown>,
-          bars: values[1] as Array<Record<string, unknown>>,
-          indicators: values.slice(2, 6) as Array<Record<string, unknown>>,
-          chip: values[6] as Record<string, unknown>,
+          quote: quote as Record<string, unknown>,
+          bars: bars as Array<Record<string, unknown>>,
+          indicators: indicatorValues,
+          chip: chip as Record<string, unknown>,
         });
       })
       .catch(() => {
@@ -3101,8 +3117,12 @@ function PositionDetail({ position, onClose }: { position: Position; onClose: ()
                 />
                 <Metric
                   label="筹码主峰"
-                  value={money.format(Number(data.chip.mainPeak))}
-                  detail={`${String(data.chip.provider)} · ${String(data.chip.engineVersion)}`}
+                  value={
+                    data.chip.mainPeak === undefined
+                      ? '未提供'
+                      : money.format(Number(data.chip.mainPeak))
+                  }
+                  detail={`${String(data.chip.provider)} · ${String(data.chip.engineVersion)}${data.chip.mainPeak === undefined ? ' · 仅摘要' : ''}`}
                 />
               </div>
               <h3>最近 K 线</h3>
@@ -3633,7 +3653,7 @@ export const DataStateBanner = ({
 }) => {
   if (state === 'ready') return null;
   const copy: Record<Exclude<LoadState, 'ready'>, { title: string; description: string }> = {
-    loading: { title: '正在加载', description: '正在读取 Investment OS 数据，请稍候。' },
+    loading: { title: '正在加载', description: '正在读取 ThesisLedger 数据，请稍候。' },
     empty: { title: '暂无数据', description: '完成配置或导入后，这里会显示可追溯的数据。' },
     error: { title: '数据读取失败', description: '当前内容未更新为正常值，请检查服务后重试。' },
     stale: { title: '数据可能陈旧', description: '部分来源不可用，当前结果会保留陈旧标记。' },

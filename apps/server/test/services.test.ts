@@ -830,6 +830,7 @@ describe('环境配置', () => {
     DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
     REDIS_URL: 'redis://localhost:6379',
     DSA_BASE_URL: 'http://localhost:8000',
+    THESIS_LEDGER_DSA_TOKEN: 'test-token',
   };
   it('解析完整必需配置', () =>
     expect(parseConfig(base)).toMatchObject({ port: 3000, aiProvider: 'mock' }));
@@ -886,7 +887,7 @@ describe('Error Tracking', () => {
     ).resolves.toMatchObject({ sent: true, status: 202 });
     const requestInit = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
     const body = JSON.parse(requestInit.body as string) as Record<string, unknown>;
-    expect(body).toMatchObject({ event: 'investment-os.error', traceId: 'trace-e2e' });
+    expect(body).toMatchObject({ event: 'thesis-ledger.error', traceId: 'trace-e2e' });
     expect(JSON.stringify(body)).not.toContain('portfolio');
     vi.unstubAllGlobals();
     if (previous === undefined) delete process.env.ERROR_TRACKING_URL;
@@ -974,15 +975,15 @@ describe('行情缓存', () => {
     };
     const service = new MarketService(dsa as never, {} as never);
     await expect(service.getBars('600519', '1d')).resolves.toMatchObject([
-      { symbol: '600519.SH', timeframe: '1d', provider: 'dsa' },
+      { symbol: '600519.SH', timeframe: '1d', provider: 'dsa-fork' },
     ]);
     await expect(service.getIndicator('600519', 'RSI')).resolves.toMatchObject({
       name: 'RSI',
-      provider: 'dsa',
+      provider: 'dsa-fork',
     });
     await expect(service.getChip('600519')).resolves.toMatchObject({
       symbol: '600519.SH',
-      provider: 'dsa',
+      provider: 'dsa-fork',
       engineVersion: 'fixture',
     });
   });

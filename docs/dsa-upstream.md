@@ -1,45 +1,57 @@
 # DSA Fork 与上游同步
 
-## 当前审计基线
+## 仓库边界
+
+主仓与 DSA 现在位于同级目录：
+
+```text
+thesis-ledger-workspace/
+├── thesis-ledger/
+├── daily-stock-analysis/
+└── thesis-ledger-infra/
+```
+
+`daily-stock-analysis` 是独立 Git 仓库，不再位于主仓 `third_party/` 下，也不通过主仓 `.gitignore` 形成隐式依赖。主仓只保留 DSA client、Schema、Stub 和 Contract Test；DSA 原生 API 继续由 Fork 自己维护。
+
+## 远程与审计基线
 
 - 上游：`https://github.com/ZhuLinsen/daily_stock_analysis.git`
 - 自有 Fork：`https://github.com/yzin-17/daily_stock_analysis`
-- 审计提交：`831ada5370123551e5cb4fc099208dd70e892e22`
-- 获取日期：2026-08-01
+- 当前共同基线：`831ada5370123551e5cb4fc099208dd70e892e22`
+- 上游版本基线：`v3.28.0`
 
-已创建用户 Fork，并在本地 `third_party/daily_stock_analysis` 建立工作副本；该目录被根仓库忽略，避免把上游完整历史复制进主仓。工作副本的 `origin` 指向用户 Fork，`upstream` 指向官方仓库，二者 `main` 均为审计提交 `831ada5370123551e5cb4fc099208dd70e892e22`。主仓的 `services/dsa-adapter` 和 `infra/docker/dsa_stub.py` 仍只负责 Investment OS Contract；正式 DSA 代码在 Fork 中独立维护。
+同步时在 DSA 仓库内执行：
 
-首次同步验证（2026-08-01）：
-
-```text
-git -C third_party/daily_stock_analysis fetch upstream --tags --prune
-origin/main   = 831ada5370123551e5cb4fc099208dd70e892e22
-upstream/main = 831ada5370123551e5cb4fc099208dd70e892e22
-git merge-tree --write-tree main upstream/main
-7935178970a3ecc74b7137f2866bcf5ec58de827
+```bash
+git fetch upstream --tags --prune
+git status --short --branch
 git merge --no-commit --no-ff upstream/main
-Already up to date.
 ```
 
-上述 dry-run 没有产生冲突，也没有修改工作树。
+正式合并前必须保留临时同步分支，并运行 DSA 原有测试、ThesisLedger Contract Test 和固定行情/筹码回归。禁止直接覆盖无法解释的行为变化。
 
-镜像验证（2026-08-01）：
+## ThesisLedger Contract V1
 
-- 构建标签：`investment-os-dsa:831ada537012`
-- 镜像 digest：`sha256:33fdeaf23e59b8cd90830d16853a6b17badb5e8eca7f26dea46fef9a232d7cf1`
-- 镜像 label：`org.openai.investment-os.dsa.commit=831ada5370123551e5cb4fc099208dd70e892e22`
-- 隔离容器 `GET /api/health` 返回 `status=ok`；`GET /api/v1/stocks/600519/quote` 返回行情结构和实时价格字段。
+DSA Fork 新增以下兼容层：
 
-## 正式 Fork 约定
+```text
+GET /api/v1/thesis-ledger/capabilities
+GET /api/v1/thesis-ledger/market/quote
+GET /api/v1/thesis-ledger/market/bars
+GET /api/v1/thesis-ledger/market/indicators/{name}
+GET /api/v1/thesis-ledger/market/chip
+```
 
-自有 Fork 创建后，`origin` 指向自有仓库，`upstream` 指向上述官方仓库。当前 `origin/main` 与 `upstream/main` 零差异，逐项结果见 `docs/reviews/dsa-fork-delta-audit.md`。扩展优先放入 `investment_os/`、`adapters/` 或 `extensions/`，避免无业务价值的目录重排；Investment OS 的事实源与 Adapter 不回写到 Fork。每月或安全修复发布后同步一次：
+接口使用 `THESIS_LEDGER_DSA_TOKEN` Bearer Token，不复用 DSA 管理员 session。Contract V1 只声明日线 `1d` bars、MA/MACD/RSI 和筹码摘要；分钟线、ATR 和完整筹码分布通过 capability 与结构化错误表达。缺失的 `buckets` 或 `mainPeak` 不得由适配层猜测。
 
-1. `git fetch upstream --tags --prune`
-2. 从已发布分支建立临时同步分支。
-3. 合并 `upstream/main`，不在主分支直接 rebase。
-4. 运行 DSA 原有测试、Investment OS Contract Test 和固定筹码/行情回归。
-5. 构建带上游提交和本地提交标签的 `investment-os-dsa:<version>`。
+确定性集成使用 `THESIS_LEDGER_FIXTURE_MODE=true`；在线 Provider smoke test 只作为定时或手工非阻断检查。
 
-同步冲突处理：先保留临时同步分支和上游提交，按文件分类确认是否属于 DSA 原样、必要 patch 或主仓 extension；禁止直接覆盖主仓事实源/Contract。解决冲突后依次执行 `git diff --check`、DSA 原有测试、主仓 Adapter Contract Test、固定行情/筹码 fixture，再重建带 commit label 的镜像。任何无法解释的行为变化先停止合并并由 DSA/Adapter owner 复核。
+## 镜像版本策略
 
-首次 Fork、upstream dry-run 和镜像构建证据已经补录；T009 与 T010 已完成。镜像尚未配置签名发布链，生产签名仍属于 V1 Release Checklist 的发布门禁，不影响本地 Fork/镜像审计结论。
+DSA Fork 的版本格式为上游版本加 Fork 修订号，例如：
+
+```text
+v3.28.0-thesisledger.1
+```
+
+每个发布镜像必须同时记录：DSA Fork commit、上游 commit、Contract major version 和 GHCR digest。生产环境只使用 digest；tag 仅用于发布说明和兼容矩阵。发布前需确认 DSA 的 Docker workflow 已接受该 prerelease 版本格式。

@@ -3,12 +3,12 @@ import {
   evaluateCompleteRule,
   type CompleteRiskContext,
   type RiskRule,
-} from '@investment-os/domain';
+} from '@thesis-ledger/domain';
 import {
   riskRuleInputSchema,
   riskRuleUpdateSchema,
   riskScanContextSchema,
-} from '@investment-os/schemas';
+} from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -264,11 +264,13 @@ export class RiskService {
             ? {}
             : {
                 chip: {
-                  mainPeak: candidate.chip.mainPeak,
                   profitRatio: candidate.chip.profitRatio,
                   concentration: candidate.chip.concentration,
                   engineVersion: candidate.chip.engineVersion,
                   calculatedAt: candidate.chip.calculatedAt,
+                  ...(candidate.chip.mainPeak === undefined
+                    ? {}
+                    : { mainPeak: candidate.chip.mainPeak }),
                   ...(candidate.chip.previousMainPeaks === undefined
                     ? {}
                     : { previousMainPeaks: candidate.chip.previousMainPeaks }),

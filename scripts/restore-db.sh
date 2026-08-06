@@ -14,5 +14,5 @@ if [[ -f "$backup_file.sha256" ]]; then
   shasum -a 256 -c "$backup_file.sha256"
 fi
 pg_restore --clean --if-exists --no-owner --dbname "$DATABASE_URL" "$backup_file"
-pnpm --filter @investment-os/server prisma migrate deploy
+pnpm --filter @thesis-ledger/server prisma migrate deploy
 echo "恢复完成，请运行 integrity check 和核心 E2E。"

@@ -1,5 +1,5 @@
 {
-  "name": "@investment-os/dsa-adapter",
+  "name": "@thesis-ledger/dsa-adapter",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@investment-os/domain": "workspace:*",
-    "@investment-os/schemas": "workspace:*"
+    "@thesis-ledger/domain": "workspace:*",
+    "@thesis-ledger/schemas": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.1.0"

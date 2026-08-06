@@ -4,7 +4,7 @@
 
 | 组件                 | 用途                   | 许可证核对要求                               |
 | -------------------- | ---------------------- | -------------------------------------------- |
-| daily_stock_analysis | DSA 行情与研究能力上游 | 正式 fork 前核对上游仓库许可证与 attribution |
+| daily_stock_analysis | 同级 DSA Fork 的行情与研究能力 | 记录上游许可证、Fork commit、镜像 digest 与 attribution |
 | NestJS               | Server 框架            | 保留其 MIT 许可证声明                        |
 | React / Vite         | Desktop UI 与构建      | 保留其 MIT 许可证声明                        |
 | Prisma               | ORM 与迁移             | 保留其 Apache-2.0 许可证声明                 |
@@ -16,4 +16,4 @@
 
 当前仓库未声明已移植 InStock 或 QuantStats 源码。若后续引入，必须在本文件记录版本、来源 URL、许可证、修改范围和对应文件。
 
-DSA Fork 尚未纳入本仓库依赖树；完成正式 Fork 后，必须把上游许可证、NOTICE 和本地修改文件逐项追加到本文件，并重新运行扫描。
+DSA Fork 不纳入本仓库依赖树，而是作为同级独立仓库和 HTTP 服务发布；正式镜像发布后，必须把上游许可证、NOTICE、本地修改文件、Fork commit 与 GHCR digest 逐项追加到本文件，并重新运行扫描。

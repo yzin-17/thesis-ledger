@@ -3,7 +3,7 @@ import { Redis } from 'ioredis';
 import { loadConfig } from './config.js';
 
 export const redisKey = (area: 'cache' | 'queue' | 'lock' | 'pubsub', key: string) =>
-  `investment-os:${area}:v1:${key}`;
+  `thesis-ledger:${area}:v1:${key}`;
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {

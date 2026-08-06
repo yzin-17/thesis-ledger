@@ -24,12 +24,12 @@ describe('Mobile read-only dashboard', () => {
     expect(
       resolveMobileApiBaseUrl({
         platform: 'android',
-        explicitBaseUrl: ' https://investment-os.example/api/v1 ',
+        explicitBaseUrl: ' https://thesis-ledger.example/api/v1 ',
       }),
-    ).toBe('https://investment-os.example/api/v1');
+    ).toBe('https://thesis-ledger.example/api/v1');
   });
 
-  it('uses the Investment OS API and exposes portfolio/risk navigation', async () => {
+  it('uses the ThesisLedger API and exposes portfolio/risk navigation', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -55,7 +55,7 @@ describe('Mobile read-only dashboard', () => {
       )
       .mockResolvedValueOnce(response([{ id: 'event-1', severity: 'warning' }]));
     const bootstrap = createMobileBootstrap({
-      apiBaseUrl: 'https://investment-os.test/api/v1',
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
     });
     const listener = vi.fn();
@@ -105,7 +105,7 @@ describe('Mobile read-only dashboard', () => {
       )
       .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
-      apiBaseUrl: 'https://investment-os.test/api/v1',
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
     }).store;
 
@@ -130,7 +130,7 @@ describe('Mobile read-only dashboard', () => {
       )
       .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
-      apiBaseUrl: 'https://investment-os.test/api/v1',
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
     }).store;
 
@@ -143,13 +143,13 @@ describe('Mobile read-only dashboard', () => {
   it('surfaces API failures as an error state', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ message: 'offline' }, 503));
     const store = createMobileBootstrap({
-      apiBaseUrl: 'https://investment-os.test/api/v1',
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
     }).store;
 
     await store.refresh();
 
-    expect(store.getState()).toMatchObject({ status: 'error', error: 'Investment OS API 503' });
+    expect(store.getState()).toMatchObject({ status: 'error', error: 'ThesisLedger API 503' });
   });
 
   it('does not let an older refresh overwrite a newer response', async () => {
@@ -182,7 +182,7 @@ describe('Mobile read-only dashboard', () => {
       )
       .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
-      apiBaseUrl: 'https://investment-os.test/api/v1',
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
     }).store;
 

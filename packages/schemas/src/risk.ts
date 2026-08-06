@@ -74,7 +74,7 @@ export const riskScanContextSchema = z.object({
   indicators: z.record(z.string(), z.number()).optional(),
   chip: z
     .object({
-      mainPeak: z.number(),
+      mainPeak: z.number().positive().optional(),
       profitRatio: z.number().min(0).max(1),
       concentration: z.number().min(0).max(1),
       previousMainPeaks: z.array(z.number()).optional(),

@@ -1,4 +1,4 @@
-package com.investmentos.mobile
+package io.github.yzin17.thesisledger.mobile
 
 import android.os.Build
 import android.os.Bundle

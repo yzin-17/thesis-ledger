@@ -4,7 +4,7 @@ Redis 只保存可重建状态，不是资产事实源。
 
 ## Key 命名
 
-统一格式为 `investment-os:<area>:v1:<key>`：
+统一格式为 `thesis-ledger:<area>:v1:<key>`：
 
 - `cache`：行情和计算缓存，必须设置 TTL；Quote 默认 30 秒，日线默认 24 小时。
 - `queue`：任务队列内部键，由队列适配器维护。

@@ -6,7 +6,7 @@ import {
   ttwror,
   xirr,
   type LedgerEvent,
-} from '@investment-os/domain';
+} from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 

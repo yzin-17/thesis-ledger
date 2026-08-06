@@ -4,7 +4,7 @@ import type {
   JournalEntry,
   RiskTriggerFact,
   TradePlan,
-} from '@investment-os/domain';
+} from '@thesis-ledger/domain';
 import { JournalService } from './journal.service.js';
 
 @Controller('journal')

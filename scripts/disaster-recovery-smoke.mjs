@@ -4,7 +4,7 @@ import { unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;
-const databaseName = `investment_os_restore_${Date.now()}`;
+const databaseName = `thesis_ledger_restore_${Date.now()}`;
 const dumpPath = resolve('/private/tmp', `${databaseName}.dump`);
 let databaseCreated = false;
 
@@ -24,16 +24,16 @@ try {
     'postgres',
     'pg_dump',
     '-U',
-    'investment_os',
+    'thesis_ledger',
     '-d',
-    'investment_os',
+    'thesis_ledger',
     '--format=custom',
     '--no-owner',
   ]);
   writeFileSync(dumpPath, dump);
   const checksum = createHash('sha256').update(dump).digest('hex');
 
-  compose(['exec', '-T', 'postgres', 'createdb', '-U', 'investment_os', databaseName]);
+  compose(['exec', '-T', 'postgres', 'createdb', '-U', 'thesis_ledger', databaseName]);
   databaseCreated = true;
   compose(
     [
@@ -42,7 +42,7 @@ try {
       'postgres',
       'pg_restore',
       '-U',
-      'investment_os',
+      'thesis_ledger',
       '--clean',
       '--if-exists',
       '--no-owner',
@@ -59,7 +59,7 @@ try {
       'postgres',
       'psql',
       '-U',
-      'investment_os',
+      'thesis_ledger',
       '-d',
       databaseName,
       '-tAc',
@@ -77,7 +77,7 @@ try {
   console.log(
     JSON.stringify(
       {
-        source: 'investment_os',
+        source: 'thesis_ledger',
         restoredDatabase: databaseName,
         backupFormat: 'custom',
         checksum,
@@ -91,7 +91,7 @@ try {
 } finally {
   if (databaseCreated) {
     try {
-      compose(['exec', '-T', 'postgres', 'dropdb', '-U', 'investment_os', databaseName]);
+      compose(['exec', '-T', 'postgres', 'dropdb', '-U', 'thesis_ledger', databaseName]);
     } catch {
       // Keep the original recovery error visible; cleanup is best effort.
     }

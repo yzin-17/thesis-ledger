@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { projectAverageCost, type LedgerEvent } from '@investment-os/domain';
+import { projectAverageCost, type LedgerEvent } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
 
 export interface IntegrityIssue {

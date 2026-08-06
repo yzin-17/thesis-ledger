@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeSymbol } from '@investment-os/domain';
-import { barsSchemaV1, type BarV1 } from '@investment-os/schemas';
+import { normalizeSymbol } from '@thesis-ledger/domain';
+import { barsSchemaV1, type BarV1 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { DataQualityService } from '../quality/data-quality.service.js';
 import { MarketService } from './market.service.js';

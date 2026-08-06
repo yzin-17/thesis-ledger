@@ -1,4 +1,4 @@
-import type { BarV1, QuoteV1 } from '@investment-os/schemas';
+import type { BarV1, QuoteV1 } from '@thesis-ledger/schemas';
 
 export type MarketCapability =
   'quote' | 'bars-1d' | 'bars-1m' | 'indicator' | 'chip' | 'financials' | 'news' | 'announcements';

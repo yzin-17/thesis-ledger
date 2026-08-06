@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { automationJobSchema } from '@investment-os/schemas';
+import { automationJobSchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { isTradingDay } from './workflows.service.js';

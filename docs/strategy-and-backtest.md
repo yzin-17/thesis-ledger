@@ -4,7 +4,7 @@
 
 策略以 `Strategy` 和不可变的 `StrategyVersion` 保存。每次修改都创建新版本，回测任务只引用版本 ID；因此历史结果不会被后续编辑覆盖。`strategySchemaV1` 包含固定 universe、有效期、入场/出场信号、止损止盈、仓位、成交与成本、风险约束和基准。组合条件使用 `all`、`any`、`not` 表达，不绑定某个 Python 函数名。
 
-回测任务的状态为 `queued`、`running`、`succeeded`、`failed` 或 `cancelled`，并记录进度、时间、引擎版本和结果 checksum。Worker 只依赖 `BacktestWorker` 的 `run/cancel/status/result` 边界，内置实现的引擎标识为 `investment-os-engine-v1`。
+回测任务的状态为 `queued`、`running`、`succeeded`、`failed` 或 `cancelled`，并记录进度、时间、引擎版本和结果 checksum。Worker 只依赖 `BacktestWorker` 的 `run/cancel/status/result` 边界，内置实现的引擎标识为 `thesis-ledger-engine-v1`。
 
 ## A 股交易规则
 

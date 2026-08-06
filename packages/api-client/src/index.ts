@@ -1,4 +1,4 @@
-export class InvestmentOsApiClient {
+export class ThesisLedgerApiClient {
   private readonly baseUrl: string;
 
   constructor(
@@ -13,7 +13,7 @@ export class InvestmentOsApiClient {
       ...init,
       headers: { 'content-type': 'application/json', ...init?.headers },
     });
-    if (!response.ok) throw new Error(`Investment OS API ${response.status}`);
+    if (!response.ok) throw new Error(`ThesisLedger API ${response.status}`);
     return (await response.json()) as T;
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@investment-os/mobile",
+  "name": "@thesis-ledger/mobile",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@investment-os/api-client": "workspace:*",
-    "@investment-os/domain": "workspace:*",
+    "@thesis-ledger/api-client": "workspace:*",
+    "@thesis-ledger/domain": "workspace:*",
     "expo": "57.0.9",
     "react": "19.2.3",
     "react-dom": "19.2.3",

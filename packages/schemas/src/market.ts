@@ -79,9 +79,12 @@ export const indicatorSchemaV1 = z.object({
 export const chipDistributionSchemaV1 = z.object({
   version: z.literal(1),
   symbol: z.string().min(1),
-  buckets: z.array(z.object({ price: finite.nonnegative(), weight: finite.min(0).max(1) })).min(1),
+  buckets: z
+    .array(z.object({ price: finite.nonnegative(), weight: finite.min(0).max(1) }))
+    .min(1)
+    .optional(),
   averageCost: finite.nonnegative(),
-  mainPeak: finite.nonnegative(),
+  mainPeak: finite.nonnegative().optional(),
   profitRatio: finite.min(0).max(1),
   range70: z.tuple([finite.nonnegative(), finite.nonnegative()]),
   range90: z.tuple([finite.nonnegative(), finite.nonnegative()]),

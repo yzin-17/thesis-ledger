@@ -1,5 +1,5 @@
 {
-  "name": "investment-os",
+  "name": "thesis-ledger",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@11.9.0",
@@ -13,17 +13,19 @@
     "release:artifacts": "node scripts/check-release-artifacts.mjs",
     "licenses:scan": "node scripts/check-licenses.mjs",
     "benchmarks:check": "node scripts/check-benchmarks.mjs",
-    "benchmarks:portfolio": "pnpm --filter @investment-os/server build && node scripts/portfolio-benchmark.mjs",
+    "benchmarks:portfolio": "pnpm --filter @thesis-ledger/server build && node scripts/portfolio-benchmark.mjs",
     "migration:matrix": "node scripts/check-migration-matrix.mjs",
+    "migration:thesis-ledger": "bash scripts/migrate-to-thesis-ledger.sh",
     "db:integration": "node scripts/db-integration-smoke.mjs",
     "provider:failover": "node scripts/provider-failover-smoke.mjs",
     "v1:e2e": "node scripts/v1-core-e2e-smoke.mjs",
+    "contract:test": "node scripts/thesis-ledger-contract-smoke.mjs",
     "disaster:recovery": "node scripts/disaster-recovery-smoke.mjs",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
-    "db:generate": "pnpm --filter @investment-os/server prisma generate",
-    "db:migrate": "pnpm --filter @investment-os/server prisma migrate deploy",
-    "db:seed": "pnpm --filter @investment-os/server prisma db seed"
+    "db:generate": "pnpm --filter @thesis-ledger/server prisma generate",
+    "db:migrate": "pnpm --filter @thesis-ledger/server prisma migrate deploy",
+    "db:seed": "pnpm --filter @thesis-ledger/server prisma db seed"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

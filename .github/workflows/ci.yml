@@ -52,7 +52,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build Desktop installer
-        run: pnpm --filter @investment-os/desktop ${{ matrix.package_script }}
+        run: pnpm --filter @thesis-ledger/desktop ${{ matrix.package_script }}
         env:
           CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
@@ -62,7 +62,7 @@ jobs:
       - name: Verify macOS DMG
         if: runner.os == 'macOS'
         run: |
-          hdiutil verify "apps/desktop/release/Investment OS-0.1.0-arm64.dmg"
+          hdiutil verify "apps/desktop/release/ThesisLedger-0.1.0-arm64.dmg"
           shasum -a 256 apps/desktop/release/*.dmg
       - name: Verify Windows NSIS installer
         if: runner.os == 'Windows'

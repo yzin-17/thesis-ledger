@@ -51,13 +51,13 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.3.0
         version: 5.3.0
-      '@investment-os/api-client':
+      '@thesis-ledger/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
-      '@investment-os/domain':
+      '@thesis-ledger/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@investment-os/schemas':
+      '@thesis-ledger/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
       '@phosphor-icons/react':
@@ -118,10 +118,10 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@investment-os/api-client':
+      '@thesis-ledger/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
-      '@investment-os/domain':
+      '@thesis-ledger/domain':
         specifier: workspace:*
         version: link:../../packages/domain
       expo:
@@ -149,13 +149,13 @@ importers:
 
   apps/server:
     dependencies:
-      '@investment-os/domain':
+      '@thesis-ledger/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@investment-os/schemas':
+      '@thesis-ledger/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
-      '@investment-os/shared':
+      '@thesis-ledger/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@nestjs/common':
@@ -206,7 +206,7 @@ importers:
 
   packages/domain:
     dependencies:
-      '@investment-os/shared':
+      '@thesis-ledger/shared':
         specifier: workspace:*
         version: link:../shared
 
@@ -216,7 +216,7 @@ importers:
         specifier: ^4.0.14
         version: 4.4.3
     devDependencies:
-      '@investment-os/domain':
+      '@thesis-ledger/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -224,10 +224,10 @@ importers:
 
   services/dsa-adapter:
     dependencies:
-      '@investment-os/domain':
+      '@thesis-ledger/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@investment-os/schemas':
+      '@thesis-ledger/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
     devDependencies:

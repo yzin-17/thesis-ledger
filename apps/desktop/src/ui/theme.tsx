@@ -11,7 +11,7 @@ import {
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
-const themeStorageKey = 'investment-os-theme';
+const themeStorageKey = 'thesis-ledger-theme';
 const themePreferences: ThemePreference[] = ['system', 'light', 'dark'];
 
 const isThemePreference = (value: string | null): value is ThemePreference =>

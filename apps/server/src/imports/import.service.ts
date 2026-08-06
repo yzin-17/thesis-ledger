@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { normalizeSymbol } from '@investment-os/domain';
-import { importDraftSchema, type ImportDraft } from '@investment-os/schemas';
+import { normalizeSymbol } from '@thesis-ledger/domain';
+import { importDraftSchema, type ImportDraft } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { appendLedgerEvent, LedgerService } from '../ledger/ledger.service.js';
 

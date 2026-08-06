@@ -9,10 +9,11 @@ import type { Response } from 'express';
 import { ZodError } from 'zod';
 import { currentTraceId, StructuredLogger } from './structured-logger.js';
 import { ErrorTrackingService } from './error-tracking.service.js';
+import { DsaError } from '../market/dsa-client.js';
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
-  private readonly logger = new StructuredLogger('investment-os.errors');
+  private readonly logger = new StructuredLogger('thesis-ledger.errors');
 
   constructor(private readonly tracker?: ErrorTrackingService) {}
 
@@ -38,6 +39,19 @@ export class ApiExceptionFilter implements ExceptionFilter {
           path: issue.path.join('.'),
           message: issue.message,
         })),
+      });
+      return;
+    }
+    if (exception instanceof DsaError) {
+      this.logger.warn({
+        operation: 'dsa.contract_error',
+        traceId: currentTraceId() ?? 'unknown',
+        status: exception.status ?? HttpStatus.SERVICE_UNAVAILABLE,
+        errorCode: exception.code,
+      });
+      response.status(exception.status ?? HttpStatus.SERVICE_UNAVAILABLE).json({
+        error: exception.code,
+        message: exception.message,
       });
       return;
     }

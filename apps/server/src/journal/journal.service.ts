@@ -9,7 +9,7 @@ import {
   type JournalEntry,
   type RiskTriggerFact,
   type TradePlan,
-} from '@investment-os/domain';
+} from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
 
 @Injectable()

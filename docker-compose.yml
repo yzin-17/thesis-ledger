@@ -1,16 +1,16 @@
-name: investment-os
+name: thesis-ledger
 
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: investment_os
-      POSTGRES_PASSWORD: investment_os
-      POSTGRES_DB: investment_os
+      POSTGRES_USER: thesis_ledger
+      POSTGRES_PASSWORD: thesis_ledger
+      POSTGRES_DB: thesis_ledger
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - thesis-ledger-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U investment_os]
+      test: [CMD-SHELL, pg_isready -U thesis_ledger]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -19,7 +19,7 @@ services:
     image: redis:8-alpine
     command: [redis-server, --appendonly, 'yes']
     volumes:
-      - redis-data:/data
+      - thesis-ledger-redis-data:/data
     healthcheck:
       test: [CMD, redis-cli, ping]
       interval: 5s
@@ -52,9 +52,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://investment_os:investment_os@postgres:5432/investment_os
+      DATABASE_URL: postgresql://thesis_ledger:thesis_ledger@postgres:5432/thesis_ledger
       REDIS_URL: redis://redis:6379
       DSA_BASE_URL: http://dsa:8000
+      THESIS_LEDGER_DSA_TOKEN: ${THESIS_LEDGER_DSA_TOKEN:-thesis-ledger-local-token}
       FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       AI_API_KEY: ${AI_API_KEY:-}
@@ -65,7 +66,7 @@ services:
       [
         sh,
         -c,
-        'pnpm --filter @investment-os/server prisma migrate deploy && node apps/server/dist/src/main.js',
+        'pnpm --filter @thesis-ledger/server prisma migrate deploy && node apps/server/dist/src/main.js',
       ]
     healthcheck:
       test: [CMD, wget, -qO-, http://127.0.0.1:3000/api/v1/health]
@@ -78,5 +79,7 @@ services:
       dsa: { condition: service_healthy }
 
 volumes:
-  postgres-data:
-  redis-data:
+  thesis-ledger-postgres-data:
+    name: thesis-ledger-postgres-data
+  thesis-ledger-redis-data:
+    name: thesis-ledger-redis-data

@@ -407,7 +407,7 @@ export const runBacktest = (input: {
     ),
   };
   const result: BacktestResult = {
-    engineVersion: input.engineVersion ?? 'investment-os-engine-v1',
+    engineVersion: input.engineVersion ?? 'thesis-ledger-engine-v1',
     dataAsOf: input.dataAsOf,
     initialCash: input.initialCash,
     finalValue: previousValue,
@@ -421,7 +421,7 @@ export const runBacktest = (input: {
     rejectedOrders,
     completeness,
     metadata: {
-      engineVersion: input.engineVersion ?? 'investment-os-engine-v1',
+      engineVersion: input.engineVersion ?? 'thesis-ledger-engine-v1',
       ...(input.metadata ?? {}),
       costModel: input.metadata?.costModel ?? strategy.cost,
     },

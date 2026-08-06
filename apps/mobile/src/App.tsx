@@ -189,7 +189,7 @@ export function MobileApp() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>INVESTMENT OS MOBILE</Text>
+            <Text style={styles.eyebrow}>THESISLEDGER MOBILE</Text>
             <Text style={styles.title}>只读投资组合</Text>
           </View>
           <Pressable
@@ -208,7 +208,7 @@ export function MobileApp() {
           </Pressable>
         </View>
         <Text style={styles.apiHint}>
-          数据源：Investment OS API ·{`\n`}
+          数据源：ThesisLedger API ·{`\n`}
           {apiBaseUrl}
         </Text>
         <StatusBanner state={state} theme={theme} styles={styles} />
@@ -253,7 +253,7 @@ export function MobileApp() {
         )}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="刷新 Investment OS 数据"
+          accessibilityLabel="刷新 ThesisLedger 数据"
           onPress={() => void bootstrap.store.refresh()}
           onFocus={() => setFocusedControl('refresh')}
           onBlur={() => setFocusedControl(null)}

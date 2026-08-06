@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "Investment OS",
-    "slug": "investment-os",
+    "name": "ThesisLedger",
+    "slug": "thesis-ledger",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "investment-os",
+    "scheme": "thesis-ledger",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios", "android", "web"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.investmentos.mobile"
+      "bundleIdentifier": "io.github.yzin17.thesisledger.mobile"
     },
     "android": {
-      "package": "com.investmentos.mobile"
+      "package": "io.github.yzin17.thesisledger.mobile"
     },
     "web": {
       "bundler": "metro",

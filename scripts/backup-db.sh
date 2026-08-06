@@ -5,7 +5,7 @@ output_dir="${1:-backups}"
 mkdir -p "$output_dir"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 version="$(node -p "require('./package.json').version")"
-file="$output_dir/investment-os-${version}-${timestamp}.dump"
+file="$output_dir/thesis-ledger-${version}-${timestamp}.dump"
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL 未配置" >&2

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 
 const root = new URL('..', import.meta.url).pathname;
-const baseUrl = process.env.INVESTMENT_OS_BASE_URL ?? 'http://localhost:3000/api/v1';
+const baseUrl = process.env.THESIS_LEDGER_BASE_URL ?? 'http://localhost:3000/api/v1';
 
 const request = async (path, init = {}) => {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -24,7 +24,7 @@ const request = async (path, init = {}) => {
 const health = await request(`/health?t=${Date.now()}`);
 if (health.status !== 'healthy') throw new Error(`依赖未就绪: ${JSON.stringify(health)}`);
 
-const lockKey = `investment-os:lock:v1:integration:${Date.now()}`;
+const lockKey = `thesis-ledger:lock:v1:integration:${Date.now()}`;
 const compose = (args) =>
   execFileSync('docker', ['compose', ...args], { cwd: root, encoding: 'utf8' }).trim();
 const firstLock = compose([
