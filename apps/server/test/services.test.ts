@@ -552,6 +552,47 @@ describe('风险事件与通知解耦', () => {
       }),
     ]);
   });
+  it('影子风险事件保留审计但默认不发送通知', async () => {
+    const prisma = {
+      riskRule: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'shadow-rule',
+            version: 1,
+            kind: 'price-below',
+            scope: 'security',
+            severity: 'warning',
+            threshold: 10,
+            enabled: true,
+            symbol: '600519.SH',
+            accountId: null,
+          },
+        ]),
+      },
+      riskEvent: {
+        create: vi.fn(async () => ({ id: 'shadow-event' })),
+      },
+    };
+    const notifications = { enqueue: vi.fn(async () => []) };
+    const result = await new RiskService(prisma as never, notifications as never).scan([
+      {
+        symbol: '600519.SH',
+        price: 9,
+        mode: 'shadow',
+        marketTime: '2025-01-01T01:00:00Z',
+        dataQuality: { quote: 'fresh' },
+      },
+    ]);
+    expect(prisma.riskEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          context: expect.objectContaining({ mode: 'shadow' }),
+        }),
+      }),
+    );
+    expect(notifications.enqueue).not.toHaveBeenCalled();
+    expect(result.results).toEqual([{ ruleId: 'shadow-rule', eventId: 'shadow-event' }]);
+  });
 });
 
 describe('AI 安全边界', () => {
@@ -1596,23 +1637,23 @@ describe('Strategy 与 Backtest Worker', () => {
 });
 
 describe('账户与组合', () => {
-  it('拒绝重复账户、非法币种和有持仓账户停用', async () => {
+  it('允许同名账户、拒绝非法币种和有持仓账户停用', async () => {
     const prisma = {
       account: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValueOnce({ id: 'duplicate' })
-          .mockResolvedValueOnce({ id: 'with-position', positions: [{}] }),
-        create: vi.fn(),
+        findUnique: vi.fn(async () => ({ id: 'with-position', positions: [{}] })),
+        create: vi.fn(async ({ data }: { data: object }) => data),
         update: vi.fn(),
       },
     };
     const service = new AccountsService(prisma as never);
     await expect(
-      service.create({ name: '证券', source: 'manual', type: 'securities', currency: 'CNY' }),
-    ).rejects.toThrow('已存在');
+      service.create({ name: '证券', type: 'securities', mode: 'actual', currency: 'CNY' }),
+    ).resolves.toMatchObject({ name: '证券' });
     await expect(
-      service.create({ name: '非法', source: 'manual', type: 'securities', currency: 'EUR' }),
+      service.create({ name: '证券', type: 'securities', mode: 'actual', currency: 'CNY' }),
+    ).resolves.toMatchObject({ name: '证券' });
+    await expect(
+      service.create({ name: '非法', type: 'securities', mode: 'actual', currency: 'EUR' }),
     ).rejects.toThrow();
     await expect(service.deactivate('with-position')).rejects.toThrow('仍有持仓');
   });

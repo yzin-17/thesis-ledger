@@ -66,6 +66,7 @@ export const riskRuleUpdateSchema = riskRuleFields
 export const riskScanContextSchema = z.object({
   symbol: z.string(),
   accountId: z.uuid().optional(),
+  mode: z.enum(['actual', 'shadow']).default('actual'),
   price: z.number().nonnegative().optional(),
   costPrice: z.number().nonnegative().optional(),
   weight: z.number().min(0).max(1).optional(),

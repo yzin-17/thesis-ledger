@@ -5,7 +5,7 @@ describe('Desktop routes', () => {
   it('keeps the eight primary navigation entries in URL order', () => {
     expect(desktopRoutes.map(({ view, path }) => [view, path])).toEqual([
       ['portfolio', '/portfolio'],
-      ['import-review', '/import-review'],
+      ['position-entry', '/position-entry'],
       ['risk-center', '/risk-center'],
       ['performance', '/performance'],
       ['strategy', '/strategy'],
@@ -15,7 +15,7 @@ describe('Desktop routes', () => {
     ]);
     expect(desktopNavigation).toEqual([
       'portfolio',
-      'import-review',
+      'position-entry',
       'risk-center',
       'performance',
       'strategy',

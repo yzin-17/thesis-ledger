@@ -818,6 +818,122 @@ td span {
   font-size: clamp(28px, 3vw, 34px);
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portfolio-mode-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-1);
+}
+
+.mode-note {
+  margin: -8px 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.entry-page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.entry-page-heading .page-description {
+  margin-bottom: 0;
+}
+
+.entry-context {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
+  align-items: end;
+  gap: 16px;
+  margin: 18px 0 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-surface-1);
+}
+
+.entry-context label {
+  display: grid;
+  gap: 7px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.entry-context [data-slot='select-trigger'] {
+  min-height: 42px;
+}
+
+.entry-account-meta {
+  display: grid;
+  gap: 4px;
+  align-self: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.entry-account-meta strong {
+  color: var(--color-text-primary);
+  font-size: 15px;
+}
+
+.entry-method-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.account-sheet {
+  top: 0;
+  right: 0;
+  left: auto;
+  width: min(620px, calc(100% - 16px));
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+  transform: none;
+  align-content: start;
+}
+
+.account-sheet .management {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.account-sheet .form-card {
+  border: 0;
+  padding: 0;
+}
+
+@media (max-width: 720px) {
+  .entry-page-heading,
+  .entry-context,
+  .page-header-actions {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .entry-page-heading {
+    gap: 12px;
+  }
+
+  .entry-context {
+    align-items: stretch;
+  }
+}
+
 .import-step-nav {
   display: flex;
   flex-wrap: wrap;
@@ -887,6 +1003,17 @@ td span {
 .form-help {
   margin: 0;
   font-size: 13px;
+}
+
+.field-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cash-secondary {
+  align-self: start;
 }
 
 .form-card label,

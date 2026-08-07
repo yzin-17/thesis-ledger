@@ -1,7 +1,7 @@
 export type DesktopView =
   | 'portfolio'
   | 'position-detail'
-  | 'import-review'
+  | 'position-entry'
   | 'risk-center'
   | 'performance'
   | 'strategy'
@@ -14,7 +14,7 @@ export type DesktopNavigationView = Exclude<DesktopView, 'position-detail' | 'au
 
 export const desktopRoutes = [
   { view: 'portfolio', path: '/portfolio', label: '投资组合' },
-  { view: 'import-review', path: '/import-review', label: '导入持仓' },
+  { view: 'position-entry', path: '/position-entry', label: '录入持仓' },
   { view: 'risk-center', path: '/risk-center', label: '风险中心' },
   { view: 'performance', path: '/performance', label: '收益分析' },
   { view: 'strategy', path: '/strategy', label: '策略实验' },

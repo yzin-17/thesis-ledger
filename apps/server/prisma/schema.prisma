@@ -10,9 +10,9 @@ datasource db {
 model Account {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
-  source    String
+  institution String?
   type      String
-  broker    String?
+  mode      String   @default("actual")
   currency  String   @default("CNY")
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -21,7 +21,6 @@ model Account {
   ledger    LedgerEvent[]
   snapshots PortfolioSnapshot[]
 
-  @@unique([name, source])
   @@index([active])
 }
 
@@ -32,6 +31,8 @@ model Asset {
   assetType    String
   currency     String
   sector       String?
+  identityStatus String   @default("provider")
+  identitySource String?
   metadata     Json?
   updatedAt    DateTime @updatedAt
   positions    Position[]
@@ -63,6 +64,7 @@ model ImportDraft {
   idempotencyKey String   @unique
   imageHash      String
   rows           Json
+  baselineHash   String?
   beforeState    Json?
   createdAt      DateTime @default(now())
   committedAt    DateTime?

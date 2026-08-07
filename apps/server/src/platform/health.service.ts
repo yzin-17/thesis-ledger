@@ -17,18 +17,31 @@ export class HealthService {
       this.prisma.$queryRaw`SELECT 1`,
       this.redis.ping(),
       this.dsa.health(),
+      this.dsa.capabilities(),
     ]);
+    const dsaCapabilities =
+      checks[3].status === 'fulfilled' ? checks[3].value.capabilities : undefined;
+    const fundNavAvailable =
+      dsaCapabilities !== undefined &&
+      Object.prototype.hasOwnProperty.call(dsaCapabilities, 'fund-nav');
     const dependencies = {
       database: state(checks[0]),
       redis: state(checks[1]),
-      dsa: state(checks[2]),
-    };
+      dsa: state(checks[2]) === 'healthy' && fundNavAvailable ? 'healthy' : 'down',
+    } as const;
     const failed = Object.values(dependencies).filter((value) => value === 'down').length;
     const status: Status = failed === 0 ? 'healthy' : failed === 3 ? 'down' : 'degraded';
     return {
       status,
       service: 'thesis-ledger',
       version: '0.1.0',
+      contractVersion: 1,
+      schemaVersion: '20260807100000_account_entry_model',
+      capabilities: {
+        accountModel: 'container-v1',
+        fundNav: fundNavAvailable,
+        modes: ['actual', 'shadow'],
+      },
       dependencies,
       checkedAt: new Date().toISOString(),
     };

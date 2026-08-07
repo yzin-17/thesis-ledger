@@ -59,6 +59,11 @@ export class ImportController {
     return this.imports.commit(id, body.rows ?? [], body.source);
   }
 
+  @Post(':id/rebaseline')
+  rebaseline(@Param('id') id: string) {
+    return this.imports.rebaseline(id);
+  }
+
   @Post(':id/rollback')
   rollback(@Param('id') id: string) {
     return this.imports.rollback(id);

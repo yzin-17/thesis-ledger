@@ -1,5 +1,7 @@
 # ThesisLedger 工作区与 DSA 集成迁移规格
 
+> 状态说明：本文记录迁移前的约束与已完成的迁移验收；当前三仓边界以 [ADR-014](../adr/ADR-014-thesis-ledger-workspace-boundary.md) 为准。本文不回写历史审计证据。
+
 ## 背景与问题
 
 当前主仓库目录内存在一个被主仓库忽略的 `third_party/daily_stock_analysis` 独立 Git 仓库。运行时虽然通过 HTTP API 解耦，但源码目录的嵌套关系会造成依赖来源、版本锁定、构建入口和开发环境边界不清晰。
@@ -23,12 +25,12 @@
 - 本任务不重写历史 review、审计证据、旧 ADR 或已发布的历史说明。
 - 本任务不在主系统内引入第二个 DSA adapter 容器；兼容层直接实现于 DSA Fork。
 
-## 当前状态与约束
+## 迁移前状态与约束
 
-- 当前主仓库为 `/Users/yzin/code/stock`，DSA 为其下的独立 Git 仓库。
+- 编写本文时主仓库为 `/Users/yzin/code/stock`，DSA 为其下的独立 Git 仓库；迁移后实际工作区为 `/Users/yzin/code/thesis-ledger-workspace/`，三个子仓库同级且相互独立。
 - 主系统通过 `DSA_BASE_URL` 调用 Quote、Bars、Indicator、Chip 能力；现有根级 Compose 同时包含主系统依赖和 DSA stub。
 - 当前 DSA 原生公开能力以日线 quote/history 和筹码摘要为主；分钟线、ATR、完整分布必须以 capability 声明和结构化错误表达。
-- 当前主仓库存在未提交的 `README.md`、`CONTEXT.md` 和 `docs/adr/ADR-009` 至 `ADR-013`；迁移不得丢失或覆盖这些改动。
+- 编写本文时主仓库存在未提交的 `README.md`、`CONTEXT.md` 和 `docs/adr/ADR-009` 至 `ADR-013`；迁移不得丢失或覆盖这些改动。
 - 目标工作区父目录不纳入 Git；三个子目录分别是独立 Git 仓库。
 - 首次运行时使用安全迁移流程：先备份 PostgreSQL，再恢复到 `thesis_ledger`；Redis 不复制旧缓存，迁移后重建。
 

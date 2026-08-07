@@ -1,11 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { AccountsService } from './accounts.service.js';
 
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}
-  @Get() list() {
-    return this.accounts.list();
+  @Get() list(@Query('includeInactive') includeInactive?: string) {
+    return this.accounts.list(includeInactive === 'true');
   }
   @Post() create(@Body() body: unknown) {
     return this.accounts.create(body);
@@ -15,5 +15,8 @@ export class AccountsController {
   }
   @Delete(':id') deactivate(@Param('id') id: string) {
     return this.accounts.deactivate(id);
+  }
+  @Post(':id/reactivate') reactivate(@Param('id') id: string) {
+    return this.accounts.reactivate(id);
   }
 }

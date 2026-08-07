@@ -10,6 +10,8 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 
+type PortfolioMode = 'actual' | 'shadow';
+
 @Injectable()
 export class PerformanceService {
   constructor(
@@ -17,20 +19,34 @@ export class PerformanceService {
     private readonly market: MarketService,
   ) {}
 
-  async capture(accountId?: string, capturedAt = new Date()) {
+  async capture(accountId?: string, capturedAt = new Date(), mode: PortfolioMode = 'actual') {
+    const accountWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
     const [positions, ledger] = await Promise.all([
       this.prisma.position.findMany({
-        ...(accountId ? { where: { accountId } } : {}),
+        where: accountWhere,
         include: { asset: true },
       }),
       this.prisma.ledgerEvent.findMany({
-        ...(accountId ? { where: { accountId } } : {}),
+        where: accountWhere,
         orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
       }),
     ]);
     const valued = await Promise.all(
       positions.map(async (position) => {
         try {
+          if (position.asset.assetType === 'fund' || /\.OF$/.test(position.symbol)) {
+            const nav = await this.market.getFundNav(position.symbol);
+            return {
+              symbol: position.symbol,
+              quantity: Number(position.quantity),
+              costPrice: Number(position.costPrice),
+              assetType: position.asset.assetType,
+              marketValue: Number(position.quantity) * nav.unitNav,
+              provider: nav.provider,
+              stale: nav.freshness === 'stale',
+              freshness: nav.freshness,
+            };
+          }
           const quote = await this.market.getQuote(position.symbol);
           return {
             symbol: position.symbol,
@@ -40,6 +56,7 @@ export class PerformanceService {
             marketValue: Number(position.quantity) * quote.price,
             provider: quote.provider,
             stale: quote.stale,
+            freshness: quote.freshness,
           };
         } catch (error) {
           return {
@@ -79,6 +96,7 @@ export class PerformanceService {
       : [...cash.values()].reduce((sum, value) => sum + value, 0);
     const payload = {
       positions: valued,
+      mode,
       dataQuality: {
         partial: valued.some((position) => position.marketValue === null),
         missingSymbols: valued
@@ -86,8 +104,28 @@ export class PerformanceService {
           .map((position) => position.symbol),
       },
     };
-    const existing = await this.prisma.portfolioSnapshot.findFirst({
-      where: { accountId: accountId ?? null, capturedAt },
+    const snapshotDelegate = this.prisma.portfolioSnapshot as unknown as {
+      findMany?: (args: unknown) => Promise<Array<{ payload: unknown }>>;
+      findFirst?: (args: unknown) => Promise<{ payload: unknown } | null>;
+    };
+    const existingSnapshots =
+      typeof snapshotDelegate.findMany === 'function'
+        ? await snapshotDelegate.findMany({
+            where: { accountId: accountId ?? null, capturedAt },
+          })
+        : [
+            await snapshotDelegate.findFirst?.({
+              where: { accountId: accountId ?? null, capturedAt },
+            }),
+          ].filter(
+            (snapshot): snapshot is { payload: unknown } =>
+              snapshot !== null && snapshot !== undefined,
+          );
+    const existing = existingSnapshots.find((snapshot) => {
+      const payload = snapshot.payload;
+      return typeof payload !== 'object' || payload === null || !('mode' in payload)
+        ? mode === 'actual'
+        : (payload as { mode?: unknown }).mode === mode;
     });
     if (existing) return existing;
     return this.prisma.portfolioSnapshot.create({
@@ -102,8 +140,8 @@ export class PerformanceService {
     });
   }
 
-  async summary(accountId?: string, start?: string, end?: string) {
-    const snapshots = await this.history(accountId, start, end);
+  async summary(accountId?: string, start?: string, end?: string, mode: PortfolioMode = 'actual') {
+    const snapshots = await this.history(accountId, start, end, mode);
     if (snapshots.length < 2)
       return { accountId: accountId ?? null, snapshots, ttwror: 0, xirr: null };
     const valuations = snapshots.map((snapshot, index) => ({
@@ -158,10 +196,11 @@ export class PerformanceService {
     });
   }
 
-  async history(accountId?: string, start?: string, end?: string) {
-    return this.prisma.portfolioSnapshot.findMany({
+  async history(accountId?: string, start?: string, end?: string, mode: PortfolioMode = 'actual') {
+    const snapshots = await this.prisma.portfolioSnapshot.findMany({
       where: {
         accountId: accountId ?? null,
+        ...(accountId ? { account: { mode } } : {}),
         ...(start || end
           ? {
               capturedAt: {
@@ -172,6 +211,13 @@ export class PerformanceService {
           : {}),
       },
       orderBy: { capturedAt: 'asc' },
+    });
+    if (accountId) return snapshots;
+    return snapshots.filter((snapshot) => {
+      const payload = snapshot.payload;
+      if (typeof payload !== 'object' || payload === null || !('mode' in payload))
+        return mode === 'actual';
+      return (payload as { mode?: unknown }).mode === mode;
     });
   }
 
@@ -200,11 +246,13 @@ export class PerformanceService {
     };
   }
 
-  async layers(accountId?: string, symbol?: string) {
+  async layers(accountId?: string, symbol?: string, mode: PortfolioMode = 'actual') {
     const positions = await this.prisma.position.findMany({
-      ...(accountId || symbol
-        ? { where: { ...(accountId ? { accountId } : {}), ...(symbol ? { symbol } : {}) } }
-        : {}),
+      where: {
+        ...(accountId ? { accountId } : {}),
+        ...(symbol ? { symbol } : {}),
+        ...(accountId ? {} : { account: { mode } }),
+      },
       include: { asset: true },
     });
     const security = await Promise.all(
@@ -212,7 +260,9 @@ export class PerformanceService {
         let marketValue: number | null = null;
         try {
           marketValue =
-            Number(position.quantity) * (await this.market.getQuote(position.symbol)).price;
+            position.asset.assetType === 'fund' || /\.OF$/.test(position.symbol)
+              ? Number(position.quantity) * (await this.market.getFundNav(position.symbol)).unitNav
+              : Number(position.quantity) * (await this.market.getQuote(position.symbol)).price;
         } catch {
           // 保留 null，调用方可以区分缺行情和零市值。
         }

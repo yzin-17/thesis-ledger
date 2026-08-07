@@ -1,4 +1,4 @@
-export type Market = 'SH' | 'SZ' | 'BJ' | 'HK' | 'US' | 'CASH';
+export type Market = 'SH' | 'SZ' | 'BJ' | 'HK' | 'US' | 'OF' | 'CASH';
 export type AssetType = 'stock' | 'etf' | 'fund' | 'index' | 'cash';
 export type Currency = 'CNY' | 'HKD' | 'USD';
 
@@ -11,15 +11,15 @@ export interface Asset {
   sector?: string;
 }
 
-export type AccountSource = 'manual' | 'alipay' | 'ths' | 'broker';
-export type AccountType = 'securities' | 'fund' | 'cash' | 'shadow';
+export type AccountType = 'securities' | 'fund' | 'cash';
+export type AccountMode = 'actual' | 'shadow';
 
 export interface Account {
   id: string;
   name: string;
-  source: AccountSource;
+  institution?: string;
   type: AccountType;
-  broker?: string;
+  mode: AccountMode;
   currency: Currency;
   active: boolean;
   createdAt: string;

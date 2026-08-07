@@ -14,6 +14,7 @@ import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
 type ScanContext = ReturnType<typeof riskScanContextSchema.parse>;
+type PortfolioMode = 'actual' | 'shadow';
 type StoredRule = {
   id: string;
   version: number;
@@ -163,11 +164,16 @@ export class RiskService {
               marketTime: new Date(candidate.marketTime),
               context: {
                 ...event.context,
+                mode: candidate.mode,
                 traceId,
                 dataQuality: candidate.dataQuality,
               },
             },
           });
+          if (candidate.mode === 'shadow') {
+            results.push({ ruleId: stored.id, eventId: saved.id });
+            continue;
+          }
           try {
             await this.notifications.enqueue(saved.id, event.severity, {
               channels: {
@@ -198,8 +204,17 @@ export class RiskService {
     return { traceId, results };
   }
 
-  history() {
-    return this.prisma.riskEvent.findMany({ orderBy: { evaluatedAt: 'desc' }, take: 200 });
+  async history(mode: PortfolioMode = 'actual') {
+    const events = await this.prisma.riskEvent.findMany({
+      orderBy: { evaluatedAt: 'desc' },
+      take: 200,
+    });
+    return events.filter((event) => {
+      const context = event.context;
+      if (typeof context !== 'object' || context === null || !('mode' in context))
+        return mode === 'actual';
+      return (context as { mode?: unknown }).mode === mode;
+    });
   }
 
   private ruleData(rule: ReturnType<typeof riskRuleInputSchema.parse>) {

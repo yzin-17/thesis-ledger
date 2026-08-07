@@ -11,6 +11,9 @@ export class MarketController {
   @Get(':symbol/quote') quote(@Param('symbol') symbol: string) {
     return this.market.getQuote(symbol);
   }
+  @Get(':symbol/fund-nav') fundNav(@Param('symbol') symbol: string) {
+    return this.market.getFundNav(symbol);
+  }
   @Get(':symbol/bars') bars(
     @Param('symbol') symbol: string,
     @Query('timeframe') timeframe: '1m' | '1d' = '1d',

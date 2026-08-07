@@ -1,6 +1,7 @@
 import { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 
 export type MobileLoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
+export type MobilePortfolioMode = 'actual' | 'shadow';
 
 export const mobileStateCopy: Record<MobileLoadState, { title: string; description: string }> = {
   loading: { title: '正在加载', description: '正在读取 ThesisLedger 数据。' },
@@ -53,8 +54,10 @@ export interface MobileRiskEvent {
 
 export interface MobileDashboardState {
   status: MobileLoadState;
+  mode: MobilePortfolioMode;
   portfolio: {
     totalMarketValue: number;
+    cashValue?: number;
     totalCost: number;
     totalPnl: number;
     valuedAt: string;
@@ -71,6 +74,7 @@ export const mobileNavigation = [
 
 const initialState: MobileDashboardState = {
   status: 'loading',
+  mode: 'actual',
   portfolio: null,
   riskEvents: [],
   error: null,
@@ -117,6 +121,7 @@ export class MobileReadOnlyStore {
   private state: MobileDashboardState = initialState;
   private readonly listeners = new Set<() => void>();
   private refreshSequence = 0;
+  private mode: MobilePortfolioMode = 'actual';
 
   constructor(private readonly api: ThesisLedgerApiClient) {}
 
@@ -127,6 +132,17 @@ export class MobileReadOnlyStore {
   subscribe(listener: () => void) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  getMode() {
+    return this.mode;
+  }
+
+  setMode(mode: MobilePortfolioMode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.setState({ ...this.state, mode, status: 'loading', error: null });
+    void this.refresh();
   }
 
   private setState(next: MobileDashboardState) {
@@ -141,8 +157,8 @@ export class MobileReadOnlyStore {
     try {
       const cacheBust = `t=${Date.now()}`;
       const [portfolioRaw, riskEvents] = await Promise.all([
-        this.api.request<unknown>(`/portfolio/valuation?${cacheBust}`),
-        this.api.request<MobileRiskEvent[]>(`/risk/events?${cacheBust}`),
+        this.api.request<unknown>(`/portfolio/valuation?mode=${this.mode}&${cacheBust}`),
+        this.api.request<MobileRiskEvent[]>(`/risk/events?mode=${this.mode}&${cacheBust}`),
       ]);
       if (sequence !== this.refreshSequence) return this.state;
       const portfolio = normalizePortfolio(portfolioRaw);
@@ -153,6 +169,7 @@ export class MobileReadOnlyStore {
           : false),
       );
       this.setState({
+        mode: this.mode,
         status:
           portfolio === null || portfolio.positions.length === 0
             ? 'empty'

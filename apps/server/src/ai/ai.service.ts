@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { aiAnalysisSchema, aiContextSchema } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
+
 import { PrismaService } from '../platform/prisma.service.js';
+
+type PortfolioMode = 'actual' | 'shadow';
 
 export type ToolPermission =
   | 'market:read'
@@ -165,20 +168,23 @@ export interface ResearchSource {
 
 export interface ResearchToolAdapters {
   financials?: (
-    input: { symbol: string; accountId?: string },
+    input: { symbol: string; accountId?: string; mode?: PortfolioMode },
     signal: AbortSignal,
   ) => Promise<unknown>;
-  news?: (input: { symbol: string; accountId?: string }, signal: AbortSignal) => Promise<unknown>;
+  news?: (
+    input: { symbol: string; accountId?: string; mode?: PortfolioMode },
+    signal: AbortSignal,
+  ) => Promise<unknown>;
   announcements?: (
-    input: { symbol: string; accountId?: string },
+    input: { symbol: string; accountId?: string; mode?: PortfolioMode },
     signal: AbortSignal,
   ) => Promise<unknown>;
   journal?: (
-    input: { symbol?: string; accountId?: string },
+    input: { symbol?: string; accountId?: string; mode?: PortfolioMode },
     signal: AbortSignal,
   ) => Promise<unknown>;
   riskHistory?: (
-    input: { symbol?: string; accountId?: string },
+    input: { symbol?: string; accountId?: string; mode?: PortfolioMode },
     signal: AbortSignal,
   ) => Promise<unknown>;
   runBacktest?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
@@ -193,6 +199,15 @@ export interface CoreToolAdapters {
   getChipDistribution?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
   getRisk?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
 }
+
+const scopeToolInput = (input: unknown) => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const value = input as Record<string, unknown>;
+  return {
+    ...value,
+    mode: value.mode === 'shadow' ? 'shadow' : 'actual',
+  };
+};
 
 const adapterTool = (
   name: string,
@@ -212,17 +227,26 @@ export const createCoreTools = (adapters: CoreToolAdapters): AiTool[] => {
   ];
   return definitions.flatMap(([key, name, permission]) => {
     const execute = adapters[key];
-    return execute ? [adapterTool(name, permission, execute)] : [];
+    return execute
+      ? [adapterTool(name, permission, (input, signal) => execute(scopeToolInput(input), signal))]
+      : [];
   });
 };
 
 export const createResearchTools = (adapters: ResearchToolAdapters): AiTool[] => {
   const tools: AiTool[] = [];
-  const scopedInput = (input: unknown) => {
-    const value = input as { symbol?: string; accountId?: string };
+  const scopedInput = (
+    input: unknown,
+  ): {
+    symbol?: string;
+    accountId?: string;
+    mode: PortfolioMode;
+  } => {
+    const value = input as { symbol?: string; accountId?: string; mode?: PortfolioMode };
     return {
       ...(value.symbol ? { symbol: value.symbol } : {}),
       ...(value.accountId ? { accountId: value.accountId } : {}),
+      mode: value.mode === 'shadow' ? 'shadow' : 'actual',
     };
   };
   if (adapters.financials)
@@ -279,7 +303,7 @@ export const buildPortfolioContext = (input: {
 
 export const runResearchAgent = async (
   tools: readonly AiTool[],
-  input: { symbol: string; accountId?: string },
+  input: { symbol: string; accountId?: string; mode?: PortfolioMode },
   allowed: ReadonlySet<ToolPermission>,
 ) => {
   const evidence: Array<{ tool: string; data: unknown; status: string; error?: string }> = [];

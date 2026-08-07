@@ -60,8 +60,8 @@ export const ledgerEventSchemaV1 = z
       context.addIssue({ code: 'custom', message: '现金事件需要 amount' });
     if (actionTypes.has(event.type) && (!event.symbol || !event.quantity))
       context.addIssue({ code: 'custom', message: '公司行动需要 symbol 和 quantity' });
-    if (event.type === 'ADJUSTMENT' && (!event.correctionOf || !event.note?.trim()))
-      context.addIssue({ code: 'custom', message: '受控修正需要 correctionOf 和 note' });
+    if (event.type === 'ADJUSTMENT' && !event.note?.trim())
+      context.addIssue({ code: 'custom', message: '受控修正 Adjustment 必须填写 note' });
   });
 
 export type LedgerEventV1 = z.infer<typeof ledgerEventSchemaV1>;

@@ -26,9 +26,9 @@ await prisma.asset.upsert({
   },
 });
 await prisma.account.upsert({
-  where: { name_source: { name: '演示账户', source: 'manual' } },
+  where: { id: "00000000-0000-4000-8000-000000000099" },
   update: {},
-  create: { name: '演示账户', source: 'manual', type: 'securities', currency: 'CNY' },
+  create: { id: "00000000-0000-4000-8000-000000000099", name: "演示账户", institution: "演示", type: "securities", mode: "actual", currency: "CNY" },
 });
 
 await prisma.$disconnect();

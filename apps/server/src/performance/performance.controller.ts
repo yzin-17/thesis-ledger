@@ -6,10 +6,11 @@ export class PerformanceController {
   constructor(private readonly performance: PerformanceService) {}
 
   @Post('snapshots')
-  capture(@Body() body: { accountId?: string; capturedAt?: string }) {
+  capture(@Body() body: { accountId?: string; capturedAt?: string; mode?: 'actual' | 'shadow' }) {
     return this.performance.capture(
       body.accountId,
       body.capturedAt ? new Date(body.capturedAt) : undefined,
+      body.mode ?? 'actual',
     );
   }
 
@@ -18,8 +19,9 @@ export class PerformanceController {
     @Query('accountId') accountId?: string,
     @Query('start') start?: string,
     @Query('end') end?: string,
+    @Query('mode') mode: 'actual' | 'shadow' = 'actual',
   ) {
-    return this.performance.history(accountId, start, end);
+    return this.performance.history(accountId, start, end, mode);
   }
 
   @Get('summary')
@@ -27,8 +29,9 @@ export class PerformanceController {
     @Query('accountId') accountId?: string,
     @Query('start') start?: string,
     @Query('end') end?: string,
+    @Query('mode') mode: 'actual' | 'shadow' = 'actual',
   ) {
-    return this.performance.summary(accountId, start, end);
+    return this.performance.summary(accountId, start, end, mode);
   }
 
   @Post('calculate')
@@ -74,7 +77,11 @@ export class PerformanceController {
   }
 
   @Get('layers')
-  layers(@Query('accountId') accountId?: string, @Query('symbol') symbol?: string) {
-    return this.performance.layers(accountId, symbol);
+  layers(
+    @Query('accountId') accountId?: string,
+    @Query('symbol') symbol?: string,
+    @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+  ) {
+    return this.performance.layers(accountId, symbol, mode);
   }
 }

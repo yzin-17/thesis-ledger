@@ -40,7 +40,18 @@ if (checkCapabilities) {
     JSON.stringify(capabilities.capabilities?.bars?.timeframes) === JSON.stringify(['1d']),
     'DSA V1 must declare only 1d bars',
   );
+  assert(
+    capabilities.capabilities?.['fund-nav']?.assetSuffix === '.OF',
+    'DSA V1 must declare fund NAV',
+  );
 }
+
+const fundNavPath = checkCapabilities
+  ? '/market/fund-nav?symbol=000001.OF'
+  : '/market/000001.OF/fund-nav';
+const fundNav = await request(fundNavPath);
+assert(fundNav.version === 1 && fundNav.symbol === '000001.OF', 'Fund NAV identity is invalid');
+assert(typeof fundNav.unitNav === 'number' && fundNav.freshness, 'Fund NAV provenance is missing');
 
 const quote = await request('/market/quote?symbol=600519.SH');
 assert(quote.version === 1 && quote.symbol === '600519.SH', 'Quote identity is invalid');
@@ -88,6 +99,7 @@ console.log(
       baseUrl,
       contractVersion: 1,
       quoteProvider: quote.provider,
+      fundNavProvider: fundNav.provider,
       bars: bars.length,
       chipDistribution: chip.buckets !== undefined,
       status: 'passed',

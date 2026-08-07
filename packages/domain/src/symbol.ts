@@ -1,6 +1,7 @@
 import type { AssetType, Market } from './models.js';
 
 const SYMBOL_PATTERN = /^(\d{6})\.(SH|SZ|BJ)$/;
+const FUND_SYMBOL_PATTERN = /^(\d{6})\.OF$/;
 
 export class SymbolNormalizationError extends Error {}
 
@@ -27,6 +28,10 @@ export const normalizeSymbol = (input: string): NormalizedSymbol => {
   const raw = input.trim().toUpperCase();
   const shorthand = raw.match(/^(SH|SZ|BJ)?(\d{6})$/);
   const canonical = raw.match(SYMBOL_PATTERN);
+  const fund = raw.match(FUND_SYMBOL_PATTERN);
+  const fundCode = fund?.[1];
+  if (fundCode)
+    return { symbol: fundCode + '.OF', code: fundCode, market: 'OF', assetType: 'fund' };
   const code = canonical?.[1] ?? shorthand?.[2];
   const market = (canonical?.[2] ?? shorthand?.[1] ?? (code ? inferMarket(code) : undefined)) as
     Market | undefined;

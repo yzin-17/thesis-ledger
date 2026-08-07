@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { RiskService } from './risk.service.js';
 
 @Controller('risk')
@@ -46,7 +46,7 @@ export class RiskController {
   }
 
   @Get('events')
-  events() {
-    return this.risk.history();
+  events(@Query('mode') mode: 'actual' | 'shadow' = 'actual') {
+    return this.risk.history(mode);
   }
 }

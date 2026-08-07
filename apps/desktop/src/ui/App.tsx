@@ -35,6 +35,7 @@ import { UploadSimpleIcon } from '@phosphor-icons/react/UploadSimple';
 import { desktopPathForView, desktopRoutes, type DesktopNavigationView } from '../views.js';
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
+type PortfolioMode = 'actual' | 'shadow';
 interface Position {
   id: string;
   accountId: string;
@@ -44,12 +45,15 @@ interface Position {
   marketValue: number | null;
   pnl: number | null;
   stale: boolean;
+  source?: string;
   asset: { name: string };
 }
 interface Portfolio {
   totalMarketValue: number;
   totalCost: number;
   totalPnl: number;
+  cashValue?: number;
+  mode?: 'actual' | 'shadow';
   partial: boolean;
   valuedAt: string;
   positions: Position[];
@@ -57,13 +61,16 @@ interface Portfolio {
 interface Account {
   id: string;
   name: string;
-  source: 'manual' | 'alipay' | 'ths' | 'broker';
-  type: 'securities' | 'fund' | 'cash' | 'shadow';
+  institution?: string | null;
+  type: 'securities' | 'fund' | 'cash';
+  mode: 'actual' | 'shadow';
   currency: 'CNY' | 'HKD' | 'USD';
+  active?: boolean;
 }
 interface ImportRow {
   rawSymbol: string;
   rawName?: string;
+  assetType?: 'stock' | 'etf' | 'fund';
   symbol?: string;
   matchStatus: 'matched' | 'ambiguous' | 'unmatched';
   matchCandidates: string[];
@@ -80,7 +87,7 @@ interface ImportRow {
 interface ImportDraftRecord {
   id: string;
   accountId: string;
-  source: 'alipay' | 'ths' | 'broker' | 'unknown';
+  source: 'alipay' | 'ths' | 'broker' | 'bank' | 'fund-platform' | 'unknown';
   sourceConfidence: number;
   status: 'pending' | 'reviewed' | 'committed' | 'cancelled';
   rows: ImportRow[];
@@ -166,7 +173,7 @@ interface OnboardingRiskRuleRecord {
 
 const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
   portfolio: HouseIcon,
-  'import-review': UploadSimpleIcon,
+  'position-entry': UploadSimpleIcon,
   'risk-center': ShieldCheckIcon,
   performance: ChartLineUpIcon,
   strategy: StrategyIcon,
@@ -193,10 +200,26 @@ const displayValue = (value: unknown) =>
     ? String(value)
     : '不可用';
 
+function LegacyImportReviewRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const step = params.get('step');
+  if (step === 'position') params.set('method', 'manual');
+  if (step === 'screenshot') params.set('method', 'screenshot');
+  const search = params.toString();
+  return (
+    <Navigate
+      to={{ pathname: '/position-entry', ...(search ? { search: `?${search}` } : {}) }}
+      replace
+    />
+  );
+}
+
 export function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const [state, setState] = useState<LoadState>('loading');
+  const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const loadSequence = useRef(0);
@@ -205,8 +228,8 @@ export function App() {
     const path = desktopPathForView(nextView);
     if (!path) return;
     const params = new URLSearchParams(location.search);
-    if (nextView === 'import-review' && options?.step) params.set('step', options.step);
-    if (nextView !== 'import-review') {
+    if (nextView === 'position-entry' && options?.step) params.set('step', options.step);
+    if (nextView !== 'position-entry') {
       params.delete('step');
       params.delete('accountId');
     }
@@ -214,12 +237,12 @@ export function App() {
     void navigate({ pathname: path, ...(search ? { search: `?${search}` } : {}) });
   };
 
-  const load = async () => {
+  const load = async (requestedMode: PortfolioMode = portfolioMode) => {
     const sequence = ++loadSequence.current;
     setState('loading');
     try {
       const [portfolioResponse, accountsResponse] = await Promise.all([
-        fetch('/api/v1/portfolio/valuation'),
+        fetch('/api/v1/portfolio/valuation?mode=' + requestedMode),
         fetch('/api/v1/accounts'),
       ]);
       if (!portfolioResponse.ok || !accountsResponse.ok)
@@ -235,8 +258,8 @@ export function App() {
     }
   };
   useEffect(() => {
-    void load();
-  }, []);
+    void load(portfolioMode);
+  }, [portfolioMode]);
 
   return (
     <div className="app-shell">
@@ -283,17 +306,21 @@ export function App() {
                 state={state}
                 portfolio={portfolio}
                 accounts={accounts}
+                mode={portfolioMode}
+                onModeChange={setPortfolioMode}
                 onRetry={() => void load()}
                 onNavigate={navigateTo}
               />
             }
           />
+          <Route path="/import-review" element={<LegacyImportReviewRedirect />} />
           <Route
-            path="/import-review"
+            path="/position-entry"
             element={
               <ImportReview
                 accounts={accounts}
                 positions={portfolio?.positions ?? []}
+                cashValue={portfolio?.cashValue ?? 0}
                 onPortfolioChanged={() => void load()}
               />
             }
@@ -1661,6 +1688,7 @@ export function ProviderSettings() {
 
 function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
   const [accountId, setAccountId] = useState('');
+  const [mode, setMode] = useState<PortfolioMode>('actual');
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [summary, setSummary] = useState<{ ttwror: number; xirr: number | null } | null>(null);
   const [allocationRows, setAllocationRows] = useState<PerformanceAllocationRecord[]>([]);
@@ -1680,10 +1708,9 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
   const load = async () => {
     const sequence = ++loadSequence.current;
     setLoadState('loading');
-    const cacheBust = `t=${Date.now()}`;
-    const query = accountId
-      ? `?accountId=${encodeURIComponent(accountId)}&${cacheBust}`
-      : `?${cacheBust}`;
+    const queryParams = new URLSearchParams({ mode, t: String(Date.now()) });
+    if (accountId) queryParams.set('accountId', accountId);
+    const query = '?' + queryParams.toString();
     const [historyResponse, summaryResponse, layersResponse, targetsResponse] = await Promise.all([
       fetch(`/api/v1/performance/history${query}`, { cache: 'no-store' }),
       fetch(`/api/v1/performance/summary${query}`, { cache: 'no-store' }),
@@ -1691,7 +1718,7 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
       fetch(
         `/api/v1/performance/targets?scope=${accountId ? 'account' : 'portfolio'}${
           accountId ? `&accountId=${encodeURIComponent(accountId)}` : ''
-        }&${cacheBust}`,
+        }&t=${Date.now()}`,
         { cache: 'no-store' },
       ),
     ]);
@@ -1747,7 +1774,7 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
         showMessage('收益历史读取失败。', 'error');
       });
     }
-  }, [accountId]);
+  }, [accountId, mode]);
   const saveTargets = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -1781,6 +1808,24 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
         计算；指标仅解释历史，不自动下单。
       </p>
       <DataStateBanner state={loadState} onRetry={() => void load()} />
+      <div className="portfolio-mode-tabs" role="tablist" aria-label="收益范围">
+        {(['actual', 'shadow'] as const).map((nextMode) => (
+          <Button
+            key={nextMode}
+            type="button"
+            size="sm"
+            variant={mode === nextMode ? 'default' : 'outline'}
+            role="tab"
+            aria-selected={mode === nextMode}
+            onClick={() => setMode(nextMode)}
+          >
+            {nextMode === 'actual' ? '实际收益' : '影子收益'}
+          </Button>
+        ))}
+      </div>
+      {mode === 'shadow' ? (
+        <p className="mode-note">当前收益只计算影子账户，结果标记为模拟。</p>
+      ) : null}
       <label className="inline-control">
         账户
         <Select value={accountId || null} onValueChange={(value) => setAccountId(value ?? '')}>
@@ -1956,6 +2001,7 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
 
 function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: Portfolio | null }) {
   const [rules, setRules] = useState<RiskRuleRecord[]>([]);
+  const [mode, setMode] = useState<PortfolioMode>('actual');
   const [events, setEvents] = useState<RiskEventRecord[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationRecord[]>([]);
   const [message, setMessage] = useState('');
@@ -1970,9 +2016,10 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
     setLoadState('loading');
     try {
       const cacheBust = `?t=${Date.now()}`;
+      const eventQuery = '?mode=' + mode + '&t=' + Date.now();
       const [ruleResponse, eventResponse, deliveryResponse] = await Promise.all([
         fetch(`/api/v1/risk/rules${cacheBust}`),
-        fetch(`/api/v1/risk/events${cacheBust}`),
+        fetch('/api/v1/risk/events' + eventQuery),
         fetch(`/api/v1/notifications${cacheBust}`),
       ]);
       if (!ruleResponse.ok || !eventResponse.ok || !deliveryResponse.ok) throw new Error('risk');
@@ -1998,7 +2045,7 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
   };
   useEffect(() => {
     void loadRisk();
-  }, []);
+  }, [mode]);
 
   const createRule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2041,6 +2088,7 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
     const contexts = (portfolio?.positions ?? []).map((position) => ({
       symbol: position.symbol,
       accountId: position.accountId,
+      mode,
       costPrice: position.costPrice,
       ...(position.marketValue === null || position.quantity <= 0
         ? {}
@@ -2068,6 +2116,7 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
     const contexts = (portfolio?.positions ?? []).map((position) => ({
       symbol: position.symbol,
       accountId: position.accountId,
+      mode,
       costPrice: position.costPrice,
       ...(position.marketValue === null || position.quantity <= 0
         ? {}
@@ -2106,9 +2155,34 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
       <p className="page-description">
         规则负责确定性判断；提醒仅用于辅助研究，不代表交易执行保证。事件保留规则版本、数据时间和触发上下文。
       </p>
-      <Button className="secondary" type="button" variant="outline" onClick={() => void loadRisk()}>
-        刷新风险数据
-      </Button>
+      <div className="page-header-actions">
+        <div className="portfolio-mode-tabs" role="tablist" aria-label="风险范围">
+          {(['actual', 'shadow'] as const).map((nextMode) => (
+            <Button
+              key={nextMode}
+              type="button"
+              size="sm"
+              variant={mode === nextMode ? 'default' : 'outline'}
+              role="tab"
+              aria-selected={mode === nextMode}
+              onClick={() => setMode(nextMode)}
+            >
+              {nextMode === 'actual' ? '实际风险' : '影子风险'}
+            </Button>
+          ))}
+        </div>
+        <Button
+          className="secondary"
+          type="button"
+          variant="outline"
+          onClick={() => void loadRisk()}
+        >
+          刷新风险数据
+        </Button>
+      </div>
+      {mode === 'shadow' ? (
+        <p className="mode-note">当前只显示影子风险事件，通知默认不代表实际资产风险。</p>
+      ) : null}
       <div className="metrics">
         <Metric label="启用规则" value={String(rules.filter((rule) => rule.enabled).length)} />
         <Metric
@@ -2381,22 +2455,33 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
 
 function ScreenshotImportReview({
   accounts,
+  initialAccountId,
   onPortfolioChanged,
+  onDirtyChange,
 }: {
   accounts: Account[];
+  initialAccountId?: string;
   onPortfolioChanged: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const [accountId, setAccountId] = useState('');
+  const [accountId, setAccountId] = useState(initialAccountId ?? '');
   const [source, setSource] = useState<ImportDraftRecord['source']>('unknown');
   const [drafts, setDrafts] = useState<ImportDraftRecord[]>([]);
   const [selected, setSelected] = useState<ImportDraftRecord | null>(null);
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [message, setMessage] = useState('');
   const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [dirty, setDirty] = useState(false);
   const loadSequence = useRef(0);
+  const markDirty = (nextDirty = true) => {
+    setDirty(nextDirty);
+    onDirtyChange?.(nextDirty);
+  };
+  const confirmDiscard = () =>
+    !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
-  }, [accountId, accounts]);
+  }, [accountId, accounts, initialAccountId]);
   const loadDrafts = async (nextAccountId: string) => {
     const sequence = ++loadSequence.current;
     setLoadState('loading');
@@ -2443,14 +2528,18 @@ function ScreenshotImportReview({
     setDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)]);
     setSelected(draft);
     setRows(draft.rows);
+    markDirty(false);
     setMessage('草稿已创建；请逐项确认后提交。');
   };
   const choose = (draft: ImportDraftRecord) => {
+    if (!confirmDiscard()) return;
     setSelected(draft);
     setRows(draft.rows);
     setSource(draft.source);
+    markDirty(false);
   };
-  const updateRow = (index: number, patch: Partial<ImportRow>) =>
+  const updateRow = (index: number, patch: Partial<ImportRow>) => {
+    markDirty();
     setRows((current) =>
       current.map((row, rowIndex) =>
         rowIndex === index
@@ -2464,6 +2553,7 @@ function ScreenshotImportReview({
           : row,
       ),
     );
+  };
   const commit = async () => {
     if (!selected) return;
     const response = await fetch(`/api/v1/imports/${selected.id}/commit`, {
@@ -2477,12 +2567,16 @@ function ScreenshotImportReview({
     }
     setMessage('导入已提交，组合已重新估值。');
     setSelected({ ...selected, status: 'committed', rows });
+    markDirty(false);
     onPortfolioChanged();
   };
   const rollback = async (draft: ImportDraftRecord) => {
     const response = await fetch(`/api/v1/imports/${draft.id}/rollback`, { method: 'POST' });
     setMessage(response.ok ? '已恢复到本次导入前的持仓。' : '该记录无法回滚。');
-    if (response.ok) onPortfolioChanged();
+    if (response.ok) {
+      markDirty(false);
+      onPortfolioChanged();
+    }
   };
   return (
     <div className="import-screenshot-content">
@@ -2502,12 +2596,19 @@ function ScreenshotImportReview({
         刷新导入历史
       </Button>
       {accounts.length === 0 ? (
-        <div className="notice">请先在投资组合页创建账户。</div>
+        <div className="notice">请先在“录入持仓”的账户管理中创建账户。</div>
       ) : (
         <form className="upload-bar" onSubmit={(event) => void upload(event)}>
           <label>
             账户
-            <Select value={accountId || null} onValueChange={(value) => setAccountId(value ?? '')}>
+            <Select
+              value={accountId || null}
+              onValueChange={(value) => {
+                if (!value || !confirmDiscard()) return;
+                markDirty(false);
+                setAccountId(value);
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="选择账户">
                   {accounts.find((account) => account.id === accountId)?.name ?? '选择账户'}
@@ -2516,7 +2617,8 @@ function ScreenshotImportReview({
               <SelectContent>
                 {accounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
-                    {account.name}
+                    {account.name} · {account.institution || '未填写机构'} ·{' '}
+                    {account.currency} · {account.type === 'fund' ? '基金' : account.type === 'cash' ? '现金' : '证券'}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2524,7 +2626,14 @@ function ScreenshotImportReview({
           </label>
           <label>
             截图来源
-            <Select value={source} onValueChange={(value) => value && setSource(value)}>
+            <Select
+              value={source}
+              onValueChange={(value) => {
+                if (!value) return;
+                markDirty();
+                setSource(value);
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue>
                   {source === 'unknown'
@@ -2533,7 +2642,13 @@ function ScreenshotImportReview({
                       ? '支付宝'
                       : source === 'ths'
                         ? '同花顺'
-                        : '券商'}
+                        : source === 'broker'
+                          ? '券商'
+                          : source === 'bank'
+                            ? '银行'
+                            : source === 'fund-platform'
+                              ? '基金平台'
+                              : '待识别'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -2541,6 +2656,8 @@ function ScreenshotImportReview({
                 <SelectItem value="alipay">支付宝</SelectItem>
                 <SelectItem value="ths">同花顺</SelectItem>
                 <SelectItem value="broker">券商</SelectItem>
+                <SelectItem value="bank">银行</SelectItem>
+                <SelectItem value="fund-platform">基金平台</SelectItem>
               </SelectContent>
             </Select>
           </label>
@@ -2599,7 +2716,8 @@ function ScreenshotImportReview({
                   className="secondary"
                   type="button"
                   variant="outline"
-                  onClick={() =>
+                  onClick={() => {
+                    markDirty();
                     setRows((current) => [
                       ...current,
                       {
@@ -2611,8 +2729,8 @@ function ScreenshotImportReview({
                         rawText: {},
                         issues: [],
                       },
-                    ])
-                  }
+                    ]);
+                  }}
                 >
                   添加一行
                 </Button>
@@ -2675,9 +2793,10 @@ function ScreenshotImportReview({
                     size="sm"
                     type="button"
                     variant="destructive"
-                    onClick={() =>
-                      setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))
-                    }
+                    onClick={() => {
+                      markDirty();
+                      setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
+                    }}
                   >
                     删除
                   </Button>
@@ -2716,82 +2835,269 @@ function ScreenshotImportReview({
 export function ImportReview({
   accounts,
   positions,
+  cashValue,
   onPortfolioChanged,
 }: {
   accounts: Account[];
   positions: Position[];
+  cashValue?: number;
   onPortfolioChanged: () => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const queryStep = new URLSearchParams(location.search).get('step');
-  const requestedStep: ImportStep | null =
-    queryStep === 'account' || queryStep === 'position' || queryStep === 'screenshot'
-      ? queryStep
-      : null;
-  const [accountId, setAccountId] = useState('');
-  const activeStep: ImportStep =
-    accounts.length === 0
-      ? 'account'
-      : (requestedStep ?? (positions.length === 0 ? 'position' : 'screenshot'));
+  const params = new URLSearchParams(location.search);
+  const queryStep = params.get('step');
+  const queryMethod = params.get('method');
+  const requestedAccountId = params.get('accountId') ?? '';
+  const [accountId, setAccountId] = useState(() => {
+    if (requestedAccountId) return requestedAccountId;
+    try {
+      return window.sessionStorage.getItem('thesis-ledger-last-account') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [method, setMethod] = useState<'manual' | 'screenshot'>(() => {
+    if (queryMethod === 'screenshot' || queryStep === 'screenshot') return 'screenshot';
+    if (queryMethod === 'manual' || queryStep === 'position') return 'manual';
+    try {
+      return window.sessionStorage.getItem('thesis-ledger-entry-method') === 'screenshot'
+        ? 'screenshot'
+        : 'manual';
+    } catch {
+      return 'manual';
+    }
+  });
+  const [accountSheetOpen, setAccountSheetOpen] = useState(queryStep === 'account');
+  const [dirty, setDirty] = useState(false);
+  const [entryPositions, setEntryPositions] = useState<Position[]>(positions);
+  const [entryCashValue, setEntryCashValue] = useState(cashValue ?? 0);
+
   useEffect(() => {
-    if (!accountId && accounts[0]) setAccountId(accounts[0].id);
-  }, [accountId, accounts]);
-  const navigateToStep = (step: ImportStep) => {
-    const params = new URLSearchParams(location.search);
-    params.set('step', step);
-    if (accountId) params.set('accountId', accountId);
-    void navigate({ pathname: location.pathname, search: `?${params.toString()}` });
+    if (requestedAccountId && accounts.some((account) => account.id === requestedAccountId)) {
+      setAccountId(requestedAccountId);
+      return;
+    }
+    if (accountId && accounts.some((account) => account.id === accountId)) return;
+    if (accounts[0]) {
+      setAccountId(accounts[0].id);
+      try {
+        window.sessionStorage.setItem('thesis-ledger-last-account', accounts[0].id);
+      } catch {
+        /* storage is optional */
+      }
+    }
+  }, [accountId, accounts, requestedAccountId]);
+
+  useEffect(() => {
+    if (queryMethod === 'manual' || queryMethod === 'screenshot') {
+      setMethod(queryMethod);
+      return;
+    }
+    if (queryStep === 'position' || queryStep === 'screenshot') {
+      setMethod(queryStep === 'screenshot' ? 'screenshot' : 'manual');
+    }
+  }, [queryMethod, queryStep]);
+
+  const selectedAccount = accounts.find((account) => account.id === accountId);
+  useEffect(() => {
+    if (!selectedAccount) return;
+    let active = true;
+    const fallbackPositions = positions.filter((position) => position.accountId === accountId);
+    setEntryPositions(fallbackPositions);
+    setEntryCashValue(cashValue ?? 0);
+    void fetch(
+      `/api/v1/portfolio/valuation?accountId=${encodeURIComponent(accountId)}&mode=${selectedAccount.mode}`,
+      { cache: 'no-store' },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error('entry-valuation');
+        return (await response.json()) as Portfolio;
+      })
+      .then((nextPortfolio) => {
+        if (!active) return;
+        setEntryPositions(nextPortfolio.positions);
+        setEntryCashValue(nextPortfolio.cashValue ?? 0);
+      })
+      .catch(() => {
+        /* 入口仍可使用已加载的账户范围数据；下次保存会触发刷新。 */
+      });
+    return () => {
+      active = false;
+    };
+  }, [accountId, cashValue, positions, selectedAccount?.mode]);
+  const accountPositions = entryPositions.filter((position) => position.accountId === accountId);
+  const activeMethod = selectedAccount?.type === 'cash' ? 'manual' : method;
+  const confirmDiscard = () =>
+    !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const navigateEntry = (nextMethod: 'manual' | 'screenshot') => {
+    if (nextMethod !== method && !confirmDiscard()) return;
+    setDirty(false);
+    setMethod(nextMethod);
+    try {
+      window.sessionStorage.setItem('thesis-ledger-entry-method', nextMethod);
+    } catch {
+      /* storage is optional */
+    }
+    const next = new URLSearchParams(location.search);
+    next.set('method', nextMethod);
+    next.set('step', nextMethod === 'manual' ? 'position' : 'screenshot');
+    if (accountId) next.set('accountId', accountId);
+    void navigate({ pathname: '/position-entry', search: '?' + next.toString() });
   };
-  const stepOptions: Array<{ step: ImportStep; label: string; requiresAccount?: boolean }> = [
-    { step: 'account', label: '1 创建账户' },
-    { step: 'position', label: '2 手动录入', requiresAccount: true },
-    { step: 'screenshot', label: '2 截图导入', requiresAccount: true },
-  ];
+  const selectAccount = (nextAccountId: string) => {
+    if (nextAccountId === accountId) return;
+    if (!confirmDiscard()) return;
+    setDirty(false);
+    setAccountId(nextAccountId);
+    try {
+      window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
+    } catch {
+      /* storage is optional */
+    }
+    const next = new URLSearchParams(location.search);
+    next.set('accountId', nextAccountId);
+    next.delete('step');
+    next.set('method', method);
+    void navigate({ pathname: '/position-entry', search: '?' + next.toString() });
+  };
+  const accountForm = (
+    <PortfolioManagement
+      accounts={accounts}
+      positions={[]}
+      step="account"
+      onAccountSaved={() => {
+        setAccountSheetOpen(false);
+        onPortfolioChanged();
+      }}
+      onSaved={onPortfolioChanged}
+    />
+  );
+
+  if (accounts.length === 0) {
+    return (
+      <section className="module-page import-page" data-import-step="account">
+        <p className="kicker">Portfolio Input</p>
+        <h1>录入持仓</h1>
+        <p className="page-description">
+          首次使用需要先建立一个账户；账户建立后，手动录入和截图导入会成为两种并列方式。
+        </p>
+        {accountForm}
+      </section>
+    );
+  }
+
   return (
-    <section className="module-page import-page" data-import-step={activeStep}>
+    <section
+      className="module-page import-page"
+      data-import-step={activeMethod === 'manual' ? 'position' : 'screenshot'}
+    >
       <p className="kicker">Portfolio Input</p>
-      <h1>导入持仓</h1>
-      <p className="page-description">
-        创建账户、手动录入持仓，或审核截图草稿。每次只处理一个录入步骤。
-      </p>
-      <nav className="import-step-nav" aria-label="持仓录入步骤">
-        {stepOptions.map((option) => (
-          <Button
-            key={option.step}
-            className={activeStep === option.step ? '' : 'secondary'}
-            type="button"
-            variant={activeStep === option.step ? 'default' : 'outline'}
-            disabled={option.requiresAccount && accounts.length === 0}
-            onClick={() => navigateToStep(option.step)}
+      <div className="entry-page-heading">
+        <div>
+          <h1>录入持仓</h1>
+          <p className="page-description">
+            先选择账户，再选择一种录入方式；来源只记录在本次持仓事件或截图草稿中。
+          </p>
+        </div>
+        <Button
+          className="secondary"
+          type="button"
+          variant="outline"
+          onClick={() => setAccountSheetOpen(true)}
+        >
+          账户管理
+        </Button>
+      </div>
+      <div className="entry-context">
+        <label>
+          当前账户
+          <Select
+            value={accountId || null}
+            onValueChange={(value) => value && selectAccount(value)}
           >
-            {option.label}
-          </Button>
-        ))}
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="选择账户">
+                {selectedAccount?.name ?? '选择账户'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
+                  {account.type === 'fund' ? '基金' : account.type === 'cash' ? '现金' : '证券'} ·{' '}
+                  {account.mode === 'shadow' ? '影子' : '实际'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+        <div className="entry-account-meta">
+          <strong>{selectedAccount?.name}</strong>
+          <span>
+            {selectedAccount?.institution || '未填写机构'} · {selectedAccount?.currency} ·{' '}
+            {selectedAccount?.mode === 'shadow' ? '影子账户' : '实际账户'}
+          </span>
+        </div>
+      </div>
+      {selectedAccount?.type === 'cash' && method === 'screenshot' && (
+        <div className="notice" role="status">
+          现金账户只支持手动现金余额，已临时切换；原截图导入偏好会保留，切换回证券或基金账户后恢复。
+        </div>
+      )}
+      <nav className="entry-method-nav" aria-label="持仓录入方式">
+        <Button
+          type="button"
+          variant={method === 'manual' ? 'default' : 'outline'}
+          className={method === 'manual' ? '' : 'secondary'}
+          onClick={() => navigateEntry('manual')}
+        >
+          手动录入
+        </Button>
+        <Button
+          type="button"
+          variant={method === 'screenshot' ? 'default' : 'outline'}
+          className={method === 'screenshot' ? '' : 'secondary'}
+          onClick={() => navigateEntry('screenshot')}
+        >
+          截图导入
+        </Button>
       </nav>
-      {activeStep === 'account' && (
+      {activeMethod === 'manual' ? (
         <PortfolioManagement
           accounts={accounts}
-          positions={[]}
-          step="account"
-          onAccountSaved={() => {
-            onPortfolioChanged();
-            navigateToStep('position');
-          }}
-          onSaved={onPortfolioChanged}
-        />
-      )}
-      {activeStep === 'position' && (
-        <PortfolioManagement
-          accounts={accounts}
-          positions={positions}
+          positions={accountPositions}
+          cashValue={entryCashValue}
           step="position"
-          onSaved={onPortfolioChanged}
+          defaultAccountId={accountId}
+          onDirtyChange={setDirty}
+          onSaved={() => {
+            setDirty(false);
+            onPortfolioChanged();
+          }}
+        />
+      ) : (
+        <ScreenshotImportReview
+          accounts={accounts}
+          initialAccountId={accountId}
+          onDirtyChange={setDirty}
+          onPortfolioChanged={onPortfolioChanged}
         />
       )}
-      {activeStep === 'screenshot' && (
-        <ScreenshotImportReview accounts={accounts} onPortfolioChanged={onPortfolioChanged} />
-      )}
+      <Dialog open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
+        <DialogContent
+          aria-describedby="account-management-description"
+          className="account-sheet max-h-[calc(100dvh-32px)] max-w-[620px] overflow-auto"
+        >
+          <div className="panel-heading">
+            <DialogTitle>账户管理</DialogTitle>
+            <DialogDescription id="account-management-description">
+              账户是持仓的容器；录入来源不属于账户属性。类型、模式和币种在出现 Ledger 事件后锁定。
+            </DialogDescription>
+          </div>
+          {accountForm}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -2800,12 +3106,16 @@ function PortfolioDashboard({
   state,
   portfolio,
   accounts,
+  mode,
+  onModeChange,
   onRetry,
   onNavigate,
 }: {
   state: LoadState;
   portfolio: Portfolio | null;
   accounts: Account[];
+  mode: PortfolioMode;
+  onModeChange: (mode: PortfolioMode) => void;
   onRetry: () => void;
   onNavigate: (view: DesktopNavigationView, options?: OnboardingNavigationOptions) => void;
 }) {
@@ -2896,7 +3206,7 @@ function PortfolioDashboard({
       <>
         <StatePanel
           title="从第一笔持仓开始"
-          description="创建账户后手动录入持仓，或上传一张已脱敏的持仓截图。"
+          description="选择账户后手动录入持仓，或上传一张已脱敏的持仓截图；没有账户时再创建账户。"
         >
           <span className="muted">下方表单会先校验账户、证券代码、数量和成本价。</span>
         </StatePanel>
@@ -2917,11 +3227,29 @@ function PortfolioDashboard({
           <h1>{money.format(portfolio!.totalMarketValue)}</h1>
           <p className="as-of">数据时点 {new Date(portfolio!.valuedAt).toLocaleString('zh-CN')}</p>
         </div>
-        <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
-          <ArrowClockwiseIcon />
-          刷新
-        </Button>
+        <div className="page-header-actions">
+          <div className="portfolio-mode-tabs" role="tablist" aria-label="估值范围">
+            {(['actual', 'shadow'] as const).map((nextMode) => (
+              <Button
+                key={nextMode}
+                type="button"
+                size="sm"
+                variant={mode === nextMode ? 'default' : 'outline'}
+                aria-selected={mode === nextMode}
+                role="tab"
+                onClick={() => onModeChange(nextMode)}
+              >
+                {nextMode === 'actual' ? '实际' : '影子'}
+              </Button>
+            ))}
+          </div>
+          <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
+            <ArrowClockwiseIcon />
+            刷新
+          </Button>
+        </div>
       </header>
+      {mode === 'shadow' ? <p className="mode-note">当前为影子账户范围，数据仅用于模拟。</p> : null}
       <DataStateBanner state={state} onRetry={onRetry} />
       <FirstRunOnboarding
         hasAccount={accounts.length > 0}
@@ -3163,83 +3491,206 @@ function PositionDetail({ position, onClose }: { position: Position; onClose: ()
 export function PortfolioManagement({
   accounts,
   positions,
+  cashValue,
   step,
+  defaultAccountId,
   onAccountSaved,
+  onDirtyChange,
   onSaved,
 }: {
   accounts: Account[];
   positions: Position[];
+  cashValue?: number;
   step: 'account' | 'position';
+  defaultAccountId?: string;
   onAccountSaved?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState<Position | null>(null);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [managedAccounts, setManagedAccounts] = useState<Account[]>(accounts);
+  const [entryAccountId, setEntryAccountId] = useState(defaultAccountId ?? accounts[0]?.id ?? '');
   const [message, setMessage] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const markDirty = (nextDirty = true) => {
+    setDirty(nextDirty);
+    onDirtyChange?.(nextDirty);
+  };
+  const confirmDiscard = () =>
+    !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  useEffect(() => {
+    if (defaultAccountId) setEntryAccountId(defaultAccountId);
+    else if (!entryAccountId && accounts[0]) setEntryAccountId(accounts[0].id);
+  }, [accounts, defaultAccountId, entryAccountId]);
+
+  const loadManagedAccounts = async () => {
+    if (step !== 'account') return;
+    try {
+      const response = await fetch('/api/v1/accounts?includeInactive=true', { cache: 'no-store' });
+      if (response.ok) setManagedAccounts((await response.json()) as Account[]);
+    } catch {
+      setManagedAccounts(accounts);
+    }
+  };
+  useEffect(() => {
+    setManagedAccounts(accounts);
+    void loadManagedAccounts();
+  }, [accounts, step]);
+
   const submitAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage('');
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch('/api/v1/accounts', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        name: formText(form, 'name'),
-        source: formText(form, 'source'),
-        type: formText(form, 'type'),
-        currency: formText(form, 'currency'),
-      }),
-    });
+    const response = await fetch(
+      editingAccount ? '/api/v1/accounts/' + editingAccount.id : '/api/v1/accounts',
+      {
+        method: editingAccount ? 'PATCH' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: formText(form, 'name'),
+          institution: formText(form, 'institution') || undefined,
+          type: formText(form, 'type'),
+          mode: formText(form, 'mode') || 'actual',
+          currency: 'CNY',
+        }),
+      },
+    );
     if (!response.ok) {
-      setMessage('账户创建失败，请检查名称、来源和币种。');
+      setMessage(
+        editingAccount
+          ? '账户更新失败；有 Ledger 历史时类型、模式和币种不可修改。'
+          : '账户创建失败，请检查名称、机构和账户类型。',
+      );
       return;
     }
     formElement.reset();
-    setMessage('账户已创建。');
+    setEditingAccount(null);
+    markDirty(false);
+    setMessage(editingAccount ? '账户已更新。' : '账户已创建。');
+    await loadManagedAccounts();
     (onAccountSaved ?? onSaved)();
   };
+
+  const toggleAccount = async (account: Account) => {
+    const active = account.active !== false;
+    if (active && !window.confirm('确认停用账户“' + account.name + '”？')) return;
+    const response = await fetch(
+      active ? '/api/v1/accounts/' + account.id : '/api/v1/accounts/' + account.id + '/reactivate',
+      { method: active ? 'DELETE' : 'POST' },
+    );
+    if (!response.ok) {
+      setMessage(active ? '账户仍有余额，需先清空持仓和现金。' : '账户重新启用失败。');
+      return;
+    }
+    markDirty(false);
+    setMessage(active ? '账户已停用。' : '账户已重新启用。');
+    await loadManagedAccounts();
+    onSaved();
+  };
+
   const submitPosition = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage('');
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch(
-      editing ? `/api/v1/portfolio/positions/${editing.id}` : '/api/v1/portfolio/positions',
-      {
-        method: editing ? 'PATCH' : 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          accountId: formText(form, 'accountId'),
-          symbol: formText(form, 'symbol').trim().toUpperCase(),
-          quantity: Number(formText(form, 'quantity')),
-          costPrice: Number(formText(form, 'costPrice')),
-          source: 'manual',
-        }),
-      },
-    );
+    const accountId = formText(form, 'accountId') || entryAccountId;
+    const account = accounts.find((item) => item.id === accountId);
+    const isCash = account?.type === 'cash';
+    const response = isCash
+      ? await fetch('/api/v1/portfolio/cash', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            accountId,
+            amount: Number(formText(form, 'cashAmount')),
+            source: 'manual',
+          }),
+        })
+      : await fetch(
+          editing ? '/api/v1/portfolio/positions/' + editing.id : '/api/v1/portfolio/positions',
+          {
+            method: editing ? 'PATCH' : 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              accountId,
+              symbol: formText(form, 'symbol').trim().toUpperCase(),
+              quantity: Number(formText(form, 'quantity')),
+              costPrice: Number(formText(form, 'costPrice')),
+              source: 'manual',
+              assetName: formText(form, 'assetName') || undefined,
+              assetType: formText(form, 'assetType') || undefined,
+            }),
+          },
+        );
     if (!response.ok) {
-      setMessage('持仓保存失败，请检查证券代码、数量和成本价。');
+      setMessage(
+        isCash ? '现金余额保存失败，请检查金额。' : '持仓保存失败，请检查代码、数量和成本价。',
+      );
       return;
     }
     formElement.reset();
     setEditing(null);
-    setMessage('持仓已保存并重新估值。');
+    markDirty(false);
+    setMessage(isCash ? '现金余额已保存。' : '持仓已保存并重新估值。');
     onSaved();
   };
+
+  const submitCashBalance = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage('');
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const response = await fetch('/api/v1/portfolio/cash', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        accountId: entryAccountId,
+        amount: Number(formText(form, 'cashAmount')),
+        source: 'manual',
+      }),
+    });
+    if (!response.ok) {
+      setMessage('现金余额保存失败，请检查金额。');
+      return;
+    }
+    formElement.reset();
+    markDirty(false);
+    setMessage('现金余额已保存。');
+    onSaved();
+  };
+
+  const clearPositions = async () => {
+    if (!entryAccountId || positions.length === 0) return;
+    if (!window.confirm('确认清空当前账户的全部持仓？该操作会写入归零 Adjustment，现金余额不受影响。'))
+      return;
+    const response = await fetch('/api/v1/portfolio/positions/clear', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: entryAccountId }),
+    });
+    setMessage(response.ok ? '已清空当前账户持仓。' : '清空持仓失败。');
+    if (response.ok) {
+      markDirty(false);
+      onSaved();
+    }
+  };
+
   const remove = async (position: Position) => {
-    if (!window.confirm(`确认删除 ${position.asset.name}（${position.symbol}）？`)) return;
-    const response = await fetch(`/api/v1/portfolio/positions/${position.id}`, {
+    if (!window.confirm('确认删除 ' + position.asset.name + '（' + position.symbol + '）？'))
+      return;
+    const response = await fetch('/api/v1/portfolio/positions/' + position.id, {
       method: 'DELETE',
     });
     setMessage(response.ok ? '持仓已删除。' : '持仓删除失败。');
-    if (response.ok) onSaved();
+    if (response.ok) {
+      markDirty(false);
+      onSaved();
+    }
   };
-  const deactivateAccount = async (account: Account) => {
-    if (!window.confirm(`确认停用账户“${account.name}”？`)) return;
-    const response = await fetch(`/api/v1/accounts/${account.id}`, { method: 'DELETE' });
-    setMessage(response.ok ? '账户已停用。' : '账户仍有持仓，需先清空持仓。');
-    if (response.ok) onSaved();
-  };
+
+  const selectedAccount = accounts.find((account) => account.id === entryAccountId);
   return (
     <section
       className="management"
@@ -3248,8 +3699,12 @@ export function PortfolioManagement({
       data-management-step={step}
     >
       <div className="panel-heading">
-        <h2 id="portfolio-management-title">账户与持仓录入</h2>
-        <p>保存后立即参与组合估值；编辑会覆盖同一账户、同一标的的数量和成本。</p>
+        <h2 id="portfolio-management-title">{step === 'account' ? '账户管理' : '当前账户持仓'}</h2>
+        <p>
+          {step === 'account'
+            ? '账户只描述容器属性；本次手动或截图来源不会写入账户。'
+            : '手动录入保存的是当前余额，系统会生成可重放的 Ledger Adjustment。'}
+        </p>
       </div>
       {message && (
         <div className="form-message" role="status">
@@ -3258,99 +3713,110 @@ export function PortfolioManagement({
       )}
       <div className="management-grid single-step">
         {step === 'account' && (
-          <form className="form-card" onSubmit={(event) => void submitAccount(event)}>
-            <h3>创建账户</h3>
+          <form
+            className="form-card"
+            onChange={() => markDirty()}
+            onSubmit={(event) => void submitAccount(event)}
+          >
+            <h3>{editingAccount ? '编辑账户' : '创建账户'}</h3>
             <label>
               账户名称
-              <Input name="name" required maxLength={80} />
+              <Input name="name" required maxLength={80} defaultValue={editingAccount?.name} />
             </label>
             <label>
-              来源
-              <Select name="source" defaultValue="manual">
+              机构（可选）
+              <Input
+                name="institution"
+                maxLength={80}
+                defaultValue={editingAccount?.institution ?? undefined}
+                placeholder="例如：支付宝、某某证券"
+              />
+            </label>
+            <label>
+              账户类型
+              <Select name="type" defaultValue={editingAccount?.type ?? 'securities'}>
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {(value: string | null) =>
-                      value === 'alipay'
-                        ? '支付宝'
-                        : value === 'ths'
-                          ? '同花顺'
-                          : value === 'broker'
-                            ? '券商'
-                            : '手动'
+                      value === 'fund' ? '基金' : value === 'cash' ? '现金' : '证券'
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">手动</SelectItem>
-                  <SelectItem value="alipay">支付宝</SelectItem>
-                  <SelectItem value="ths">同花顺</SelectItem>
-                  <SelectItem value="broker">券商</SelectItem>
+                  <SelectItem value="securities">证券（股票 / 交易所 ETF）</SelectItem>
+                  <SelectItem value="fund">基金（场外基金）</SelectItem>
+                  <SelectItem value="cash">现金</SelectItem>
                 </SelectContent>
               </Select>
             </label>
             <label>
-              账户类型
-              <Select name="type" defaultValue="securities">
+              账户模式
+              <Select name="mode" defaultValue={editingAccount?.mode ?? 'actual'}>
                 <SelectTrigger className="w-full">
                   <SelectValue>
-                    {(value: string | null) =>
-                      value === 'fund'
-                        ? '基金'
-                        : value === 'cash'
-                          ? '现金'
-                          : value === 'shadow'
-                            ? '影子账户'
-                            : '证券'
-                    }
+                    {(value: string | null) => (value === 'shadow' ? '影子账户' : '实际账户')}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="securities">证券</SelectItem>
-                  <SelectItem value="fund">基金</SelectItem>
-                  <SelectItem value="cash">现金</SelectItem>
+                  <SelectItem value="actual">实际账户</SelectItem>
                   <SelectItem value="shadow">影子账户</SelectItem>
                 </SelectContent>
               </Select>
             </label>
             <label>
               币种
-              <Select name="currency" defaultValue="CNY">
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {(value: string | null) =>
-                      value === 'HKD' ? '港币' : value === 'USD' ? '美元' : '人民币'
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CNY">人民币</SelectItem>
-                  <SelectItem value="HKD">港币</SelectItem>
-                  <SelectItem value="USD">美元</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input value="人民币（CNY）" readOnly aria-label="币种" />
             </label>
-            <Button type="submit" variant="default">
-              创建账户
-            </Button>
-            {accounts.length > 0 && (
+            <div className="form-actions">
+              <Button type="submit" variant="default">
+                {editingAccount ? '保存账户' : '创建账户'}
+              </Button>
+              {editingAccount && (
+                <Button
+                  className="secondary"
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingAccount(null)}
+                >
+                  取消
+                </Button>
+              )}
+            </div>
+            {managedAccounts.length > 0 && (
               <div className="account-list">
-                {accounts.map((account) => (
+                {managedAccounts.map((account) => (
                   <div key={account.id}>
                     <span>
                       {account.name}
                       <small>
-                        {account.source} · {account.currency}
+                        {(account.institution || '未填写机构') +
+                          ' · ' +
+                          (account.mode === 'shadow' ? '影子' : '实际') +
+                          ' · ' +
+                          account.currency +
+                          (account.active === false ? ' · 已停用' : '')}
                       </small>
                     </span>
-                    <Button
-                      className="text-button danger"
-                      size="sm"
-                      type="button"
-                      variant="destructive"
-                      onClick={() => void deactivateAccount(account)}
-                    >
-                      停用
-                    </Button>
+                    <div className="form-actions">
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        type="button"
+                        variant="link"
+                        onClick={() => setEditingAccount(account)}
+                      >
+                        编辑
+                      </Button>
+                      <Button
+                        className={account.active === false ? 'text-button' : 'text-button danger'}
+                        size="sm"
+                        type="button"
+                        variant={account.active === false ? 'outline' : 'destructive'}
+                        onClick={() => void toggleAccount(account)}
+                      >
+                        {account.active === false ? '重新启用' : '停用'}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -3358,66 +3824,129 @@ export function PortfolioManagement({
           </form>
         )}
         {step === 'position' && (
-          <form
-            className="form-card"
-            onSubmit={(event) => void submitPosition(event)}
-            key={editing?.id ?? 'new'}
-          >
-            <h3>{editing ? `编辑 ${editing.asset.name}` : '录入持仓'}</h3>
+          <>
+            <form
+              className="form-card"
+              onChange={() => markDirty()}
+              onSubmit={(event) => void submitPosition(event)}
+              key={editing?.id ?? 'new'}
+            >
+            <h3>
+              {editing
+                ? '编辑 ' + editing.asset.name
+                : selectedAccount?.type === 'cash'
+                  ? '录入现金余额'
+                  : '录入持仓'}
+            </h3>
             <label>
               账户
-              <Select name="accountId" required defaultValue={editing?.accountId ?? null}>
+              <Select
+                name="accountId"
+                required
+                value={entryAccountId || null}
+                onValueChange={(value) => {
+                  if (!value || !confirmDiscard()) return;
+                  markDirty(false);
+                  setEntryAccountId(value);
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="选择账户">
-                    {(value: string | null) =>
-                      accounts.find((account) => account.id === value)?.name ?? '选择账户'
-                    }
+                    {selectedAccount?.name ?? '选择账户'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name}
+                      {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
+                      {account.type === 'fund' ? '基金' : account.type === 'cash' ? '现金' : '证券'} ·{' '}
+                      {account.mode === 'shadow' ? '影子' : '实际'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </label>
-            <label>
-              证券代码
-              <Input
-                name="symbol"
-                required
-                placeholder="600519.SH"
-                defaultValue={editing?.symbol}
-                readOnly={Boolean(editing)}
-              />
-            </label>
-            <label>
-              数量
-              <Input
-                name="quantity"
-                required
-                type="number"
-                min="0.00000001"
-                step="any"
-                defaultValue={editing?.quantity}
-              />
-            </label>
-            <label>
-              成本价
-              <Input
-                name="costPrice"
-                required
-                type="number"
-                min="0"
-                step="any"
-                defaultValue={editing?.costPrice}
-              />
-            </label>
+            {selectedAccount?.type === 'cash' ? (
+              <label>
+                当前现金余额（CNY）
+                <Input
+                  name="cashAmount"
+                  required
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={cashValue ?? 0}
+                />
+              </label>
+            ) : (
+              <>
+                <label>
+                  证券代码
+                  <Input
+                    name="symbol"
+                    required
+                    placeholder={selectedAccount?.type === 'fund' ? '000001.OF' : '600519.SH'}
+                    defaultValue={editing?.symbol}
+                    readOnly={Boolean(editing)}
+                  />
+                </label>
+                <label>
+                  名称（可选）
+                  <Input name="assetName" defaultValue={editing?.asset.name} />
+                </label>
+                <label>
+                  类型（可选）
+                  <Select
+                    name="assetType"
+                    defaultValue={editing?.symbol.endsWith('.OF') ? 'fund' : undefined}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(value: string | null) =>
+                          value === 'fund'
+                            ? '场外基金'
+                            : value === 'etf'
+                              ? '交易所 ETF'
+                              : value === 'stock'
+                                ? 'A 股股票'
+                                : '自动识别'
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stock">A 股股票</SelectItem>
+                      <SelectItem value="etf">交易所 ETF</SelectItem>
+                      <SelectItem value="fund">场外基金</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+                <label>
+                  当前数量
+                  <Input
+                    name="quantity"
+                    required
+                    type="number"
+                    min="0"
+                    step="any"
+                    defaultValue={editing?.quantity}
+                  />
+                </label>
+                <label>
+                  成本价
+                  <Input
+                    name="costPrice"
+                    required
+                    type="number"
+                    min="0"
+                    step="any"
+                    defaultValue={editing?.costPrice}
+                  />
+                </label>
+              </>
+            )}
             <div className="form-actions">
               <Button type="submit" variant="default">
-                {editing ? '保存修改' : '添加持仓'}
+                {editing ? '保存修改' : '保存当前持仓'}
               </Button>
               {editing && (
                 <Button
@@ -3430,15 +3959,59 @@ export function PortfolioManagement({
                 </Button>
               )}
             </div>
-          </form>
+            </form>
+            {selectedAccount?.type !== 'cash' && (
+              <form
+                className="form-card cash-secondary"
+                onChange={() => markDirty()}
+                onSubmit={(event) => void submitCashBalance(event)}
+              >
+                <h3>现金余额（可选）</h3>
+                <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
+                <label>
+                  当前现金余额（CNY）
+                  <Input
+                    name="cashAmount"
+                    required
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={cashValue ?? 0}
+                  />
+                </label>
+                <div className="form-actions">
+                  <Button type="submit" variant="outline">保存当前现金</Button>
+                </div>
+              </form>
+            )}
+          </>
         )}
       </div>
       {positions.length > 0 && (
         <div className="edit-list" aria-label="持仓操作">
+          <div className="form-actions">
+            <Button
+              className="text-button danger"
+              type="button"
+              variant="destructive"
+              onClick={() => void clearPositions()}
+            >
+              清空持仓
+            </Button>
+          </div>
           {positions.map((position) => (
             <div key={position.id}>
               <span>
                 {position.asset.name} · {position.symbol}
+                <small>
+                  {position.source?.startsWith('screenshot:')
+                    ? `截图导入（${position.source.slice('screenshot:'.length)}）`
+                    : position.source === 'manual'
+                      ? '手动设置'
+                      : position.source === 'migration'
+                        ? '迁移导入'
+                        : 'Ledger Adjustment'}
+                </small>
               </span>
               <span>
                 <Button
@@ -3446,7 +4019,10 @@ export function PortfolioManagement({
                   size="sm"
                   type="button"
                   variant="link"
-                  onClick={() => setEditing(position)}
+                  onClick={() => {
+                    setEditing(position);
+                    setEntryAccountId(position.accountId);
+                  }}
                 >
                   编辑
                 </Button>
@@ -3515,15 +4091,15 @@ export function FirstRunOnboarding({
             <p>
               {hasAccount
                 ? '已创建账户，可以继续录入持仓。'
-                : '先填写下方账户表单，选择来源和币种。'}
+                : '先填写下方账户表单，选择账户类型、模式和币种。'}
             </p>
             <Button
               className="secondary"
               type="button"
               variant="outline"
-              onClick={() => onNavigate('import-review', { step: 'account' })}
+              onClick={() => onNavigate('position-entry', { step: 'account' })}
             >
-              去创建账户
+              {hasAccount ? '管理账户' : '去创建账户'}
             </Button>
           </div>
         </li>
@@ -3543,7 +4119,7 @@ export function FirstRunOnboarding({
                 className="secondary"
                 type="button"
                 variant="outline"
-                onClick={() => onNavigate('import-review', { step: 'position' })}
+                onClick={() => onNavigate('position-entry', { step: 'position' })}
               >
                 手动录入
               </Button>
@@ -3551,7 +4127,7 @@ export function FirstRunOnboarding({
                 className="secondary"
                 type="button"
                 variant="outline"
-                onClick={() => onNavigate('import-review', { step: 'screenshot' })}
+                onClick={() => onNavigate('position-entry', { step: 'screenshot' })}
               >
                 截图导入
               </Button>

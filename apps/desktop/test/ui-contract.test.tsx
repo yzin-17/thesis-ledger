@@ -79,8 +79,9 @@ describe('Desktop UI contract', () => {
           {
             id: 'account-1',
             name: '示例账户',
-            source: 'manual',
+            institution: '测试机构',
             type: 'securities',
+            mode: 'actual',
             currency: 'CNY',
           },
         ]}
@@ -94,7 +95,7 @@ describe('Desktop UI contract', () => {
     expect(positionStep).toContain('<h3>录入持仓</h3>');
   });
 
-  it('keeps account, manual position, and screenshot content on separate import steps', () => {
+  it('keeps account creation separate and presents manual/screenshot as parallel modes', () => {
     const accountStep = renderToStaticMarkup(
       <MemoryRouter initialEntries={['/import-review?step=account']}>
         <ImportReview accounts={[]} positions={[]} onPortfolioChanged={vi.fn()} />
@@ -111,8 +112,9 @@ describe('Desktop UI contract', () => {
             {
               id: 'account-1',
               name: '示例账户',
-              source: 'manual',
+              institution: '测试机构',
               type: 'securities',
+              mode: 'actual',
               currency: 'CNY',
             },
           ]}
@@ -123,6 +125,9 @@ describe('Desktop UI contract', () => {
     );
     expect(positionStep).toContain('data-import-step="position"');
     expect(positionStep).toContain('<h3>录入持仓</h3>');
+    expect(positionStep).toContain('手动录入');
+    expect(positionStep).toContain('截图导入');
+    expect(positionStep).toContain('账户管理');
     expect(positionStep).not.toContain('<h3>创建账户</h3>');
 
     const screenshotStep = renderToStaticMarkup(
@@ -132,8 +137,9 @@ describe('Desktop UI contract', () => {
             {
               id: 'account-1',
               name: '示例账户',
-              source: 'manual',
+              institution: '测试机构',
               type: 'securities',
+              mode: 'actual',
               currency: 'CNY',
             },
           ]}

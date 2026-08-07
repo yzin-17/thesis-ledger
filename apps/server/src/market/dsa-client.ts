@@ -6,11 +6,7 @@ export class DsaError extends Error {
   constructor(
     message: string,
     readonly code:
-      | 'timeout'
-      | 'unavailable'
-      | 'invalid-response'
-      | 'unauthorized'
-      | 'unsupported-capability',
+      'timeout' | 'unavailable' | 'invalid-response' | 'unauthorized' | 'unsupported-capability',
     readonly status?: number,
   ) {
     super(message);
@@ -64,5 +60,12 @@ export class DsaClient {
 
   health() {
     return this.get<unknown>('/health', 1);
+  }
+
+  capabilities() {
+    return this.get<{
+      contractVersion?: number;
+      capabilities?: Record<string, unknown>;
+    }>('/api/v1/thesis-ledger/capabilities', 1);
   }
 }

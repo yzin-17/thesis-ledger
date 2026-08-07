@@ -28,6 +28,7 @@ export interface LedgerEvent {
   fee?: number;
   tax?: number;
   externalId?: string;
+  source?: string;
   correctionOf?: string;
   metadata?: Record<string, unknown>;
 }
@@ -39,7 +40,9 @@ const isPositionAdjustment = (event: LedgerEvent) => {
   const metadata = adjustmentMetadata(event);
   return (
     event.type === 'ADJUSTMENT' &&
-    (metadata.kind === 'opening-balance' || metadata.kind === 'rollback')
+    (metadata.kind === 'opening-balance' ||
+      metadata.kind === 'position-balance' ||
+      metadata.kind === 'rollback')
   );
 };
 
@@ -196,6 +199,12 @@ export const projectFifo = (events: readonly LedgerEvent[]): ProjectedPosition[]
 export const projectCashBalance = (events: readonly LedgerEvent[]) => {
   const balances = new Map<string, number>();
   for (const event of [...events].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
+    const metadata = adjustmentMetadata(event);
+    if (event.type === 'ADJUSTMENT' && metadata.kind === 'cash-balance') {
+      const balance = typeof metadata.amount === 'number' ? metadata.amount : (event.amount ?? 0);
+      balances.set(event.accountId, roundMoney(balance));
+      continue;
+    }
     let delta = 0;
     const quantity = event.quantity ?? 0;
     const price = event.price ?? 0;

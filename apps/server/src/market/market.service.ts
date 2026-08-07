@@ -3,15 +3,19 @@ import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
   barsSchemaV1,
   chipDistributionSchemaV1,
+  fundNavSchemaV1,
   indicatorSchemaV1,
   quoteSchemaV1,
   type BarV1,
   type ChipDistributionV1,
+  type FundNavV1,
   type IndicatorV1,
   type QuoteV1,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from './dsa-client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
+
+const fundSymbolPattern = /^\d{6}\.OF$/;
 
 @Injectable()
 export class MarketService {
@@ -50,6 +54,43 @@ export class MarketService {
         return quoteSchemaV1.parse({
           ...JSON.parse(lastValid),
           stale: true,
+          freshness: 'stale',
+        });
+      throw error;
+    }
+  }
+
+  async getFundNav(input: string): Promise<FundNavV1> {
+    const symbol = input.trim().toUpperCase();
+    if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
+    const freshKey = redisKey('cache', `fund-nav:${symbol}:fresh`);
+    const lastValidKey = redisKey('cache', `fund-nav:${symbol}:last-valid`);
+    const cached = await this.redis.client.get(freshKey);
+    if (cached) return fundNavSchemaV1.parse(JSON.parse(cached));
+    try {
+      const raw = await this.dsa.get<Record<string, unknown>>(
+        `/api/v1/thesis-ledger/market/fund-nav?symbol=${encodeURIComponent(symbol)}`,
+      );
+      const nav = fundNavSchemaV1.parse({
+        ...raw,
+        version: 1,
+        symbol,
+        provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+        fetchedAt: typeof raw.fetchedAt === 'string' ? raw.fetchedAt : new Date().toISOString(),
+      });
+      if (nav.freshness === 'unavailable') throw new Error('基金净值不可用');
+      const serialized = JSON.stringify(nav);
+      await this.redis.client
+        .multi()
+        .set(freshKey, serialized, 'EX', 300)
+        .set(lastValidKey, serialized, 'EX', 7 * 86_400)
+        .exec();
+      return nav;
+    } catch (error) {
+      const lastValid = await this.redis.client.get(lastValidKey);
+      if (lastValid)
+        return fundNavSchemaV1.parse({
+          ...JSON.parse(lastValid),
           freshness: 'stale',
         });
       throw error;

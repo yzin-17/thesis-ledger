@@ -106,6 +106,7 @@ function PortfolioScreen({
         />
         <Metric label="总成本" value={formatNumber(state.portfolio.totalCost)} styles={styles} />
         <Metric label="累计盈亏" value={formatNumber(state.portfolio.totalPnl)} styles={styles} />
+        <Metric label="现金" value={formatNumber(state.portfolio.cashValue)} styles={styles} />
       </View>
       <Text style={styles.sectionTitle}>持仓</Text>
       {state.portfolio.positions.map((position) => (
@@ -212,6 +213,33 @@ export function MobileApp() {
           {apiBaseUrl}
         </Text>
         <StatusBanner state={state} theme={theme} styles={styles} />
+        <View style={styles.modeTabs} accessibilityRole="tablist" accessibilityLabel="估值范围">
+          {(['actual', 'shadow'] as const).map((mode) => (
+            <Pressable
+              key={mode}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: state.mode === mode }}
+              onPress={() => bootstrap.store.setMode(mode)}
+              onFocus={() => setFocusedControl('mode-' + mode)}
+              onBlur={() => setFocusedControl(null)}
+              style={({ pressed }) => [
+                styles.modeTab,
+                state.mode === mode && styles.activeModeTab,
+                focusedControl === 'mode-' + mode && styles.focusRing,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={state.mode === mode ? styles.activeTabText : styles.tabText}>
+                {mode === 'actual' ? '实际' : '影子'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {state.mode === 'shadow' && (
+          <Text style={styles.shadowNotice} accessibilityRole="text">
+            当前为影子账户；以下组合与风险事件均为模拟数据，不代表实际账户。
+          </Text>
+        )}
         <View style={styles.tabs} accessibilityRole="tablist">
           <Pressable
             accessibilityRole="tab"
@@ -292,6 +320,18 @@ function createStyles(theme: MobileThemeColors) {
       lineHeight: 18,
       width: '100%',
     },
+    shadowNotice: {
+      backgroundColor: theme.surface2,
+      borderColor: theme.border,
+      borderRadius: 6,
+      borderWidth: 1,
+      color: theme.textSecondary,
+      fontSize: 12,
+      lineHeight: 18,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      width: '100%',
+    },
     themeButton: {
       backgroundColor: theme.surface2,
       borderColor: theme.borderStrong,
@@ -322,6 +362,24 @@ function createStyles(theme: MobileThemeColors) {
     },
     statusTitle: { color: theme.textPrimary, fontSize: 15, fontWeight: '600' },
     statusDescription: { color: theme.textSecondary, fontSize: 13, lineHeight: 19 },
+    modeTabs: {
+      alignSelf: 'flex-start',
+      backgroundColor: theme.surface2,
+      borderColor: theme.border,
+      borderRadius: 8,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 4,
+      padding: 4,
+    },
+    modeTab: {
+      borderRadius: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    activeModeTab: {
+      backgroundColor: theme.surface1,
+    },
     tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     tab: {
       backgroundColor: theme.surface1,

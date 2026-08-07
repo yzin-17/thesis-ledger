@@ -94,7 +94,17 @@ export const chipDistributionSchemaV1 = z.object({
   calculatedAt: isoDate,
 });
 
+export const fundNavSchemaV1 = z.object({
+  version: z.literal(1),
+  symbol: z.string().regex(/^\d{6}\.OF$/),
+  unitNav: finite.nonnegative(),
+  navDate: isoDate,
+  provider: z.string().min(1),
+  fetchedAt: isoDate,
+  freshness: z.enum(['delayed', 'stale', 'unavailable']),
+});
 export type QuoteV1 = z.infer<typeof quoteSchemaV1>;
 export type BarV1 = z.infer<typeof barSchemaV1>;
 export type IndicatorV1 = z.infer<typeof indicatorSchemaV1>;
 export type ChipDistributionV1 = z.infer<typeof chipDistributionSchemaV1>;
+export type FundNavV1 = z.infer<typeof fundNavSchemaV1>;
