@@ -23,6 +23,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { cn } from '@/lib/utils';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/ArrowClockwise';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { FlaskIcon } from '@phosphor-icons/react/Flask';
@@ -2966,6 +2967,7 @@ export function ImportReview({
       accounts={accounts}
       positions={[]}
       step="account"
+      formClassName="w-full max-w-[760px]"
       onAccountSaved={() => {
         setAccountSheetOpen(false);
         onPortfolioChanged();
@@ -3045,7 +3047,7 @@ export function ImportReview({
           现金账户只支持手动现金余额，已临时切换；原截图导入偏好会保留，切换回证券或基金账户后恢复。
         </div>
       )}
-      <nav className="entry-method-nav" aria-label="持仓录入方式">
+      <nav className="mt-3 mb-1 flex flex-wrap gap-2 pb-4" aria-label="持仓录入方式">
         <Button
           type="button"
           variant={method === 'manual' ? 'default' : 'outline'}
@@ -3087,7 +3089,7 @@ export function ImportReview({
       <Dialog open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
         <DialogContent
           aria-describedby="account-management-description"
-          className="account-sheet max-h-[calc(100dvh-32px)] max-w-[620px] overflow-auto"
+          className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 rounded-none overflow-auto"
         >
           <div className="panel-heading">
             <DialogTitle>账户管理</DialogTitle>
@@ -3494,6 +3496,7 @@ export function PortfolioManagement({
   cashValue,
   step,
   defaultAccountId,
+  formClassName,
   onAccountSaved,
   onDirtyChange,
   onSaved,
@@ -3503,6 +3506,7 @@ export function PortfolioManagement({
   cashValue?: number;
   step: 'account' | 'position';
   defaultAccountId?: string;
+  formClassName?: string;
   onAccountSaved?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved: () => void;
@@ -3714,7 +3718,7 @@ export function PortfolioManagement({
       <div className="management-grid single-step">
         {step === 'account' && (
           <form
-            className="form-card"
+            className={cn('form-card', formClassName)}
             onChange={() => markDirty()}
             onSubmit={(event) => void submitAccount(event)}
           >
