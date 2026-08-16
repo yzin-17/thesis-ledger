@@ -33,7 +33,7 @@ function ToastViewport() {
     <ToastPrimitive.Portal>
       <ToastPrimitive.Viewport
         aria-label="通知"
-        className="fixed top-4 right-4 flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2 outline-none"
+        className="fixed top-4 right-4 layer-toast flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2 outline-none"
       >
         {toasts.map((toast) => {
           const tone = toastTone(toast.type);

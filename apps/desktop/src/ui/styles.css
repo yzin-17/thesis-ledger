@@ -43,6 +43,15 @@
   --radius-control: 6px;
   --radius-container: 6px;
   --sidebar-width: 248px;
+  /* 全局层级只在此处维护，组件使用语义化 layer-* 类名。 */
+  --z-sidebar: 2;
+  --z-mobile-navigation: 10;
+  --z-mobile-theme-toggle: 11;
+  --z-popover-control: var(--z-mobile-navigation);
+  --z-detail-overlay: 20;
+  --z-dialog: 50;
+  --z-popover: var(--z-dialog);
+  --z-toast: 100;
   --background: var(--color-page-bg);
   --foreground: var(--color-text-primary);
   --card: var(--color-surface-1);
@@ -75,6 +84,22 @@
   --sidebar-accent-foreground: var(--color-text-primary);
   --sidebar-border: var(--color-border);
   --sidebar-ring: var(--color-brand);
+}
+
+.layer-dialog {
+  z-index: var(--z-dialog);
+}
+
+.layer-popover {
+  z-index: var(--z-popover);
+}
+
+.layer-popover-control {
+  z-index: var(--z-popover-control);
+}
+
+.layer-toast {
+  z-index: var(--z-toast);
 }
 
 :root[data-theme='dark'] {
@@ -241,7 +266,7 @@ textarea:focus-visible {
 .sidebar {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-sidebar);
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -1421,7 +1446,7 @@ textarea::placeholder {
 .detail-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: var(--z-detail-overlay);
   display: grid;
   place-items: center;
   padding: 32px;
@@ -1734,7 +1759,7 @@ textarea::placeholder {
   .sidebar {
     position: fixed;
     inset: auto 0 0;
-    z-index: 10;
+    z-index: var(--z-mobile-navigation);
     width: auto;
     height: 66px;
     padding: 8px;
@@ -1750,7 +1775,7 @@ textarea::placeholder {
     position: fixed;
     right: 16px;
     bottom: 78px;
-    z-index: 11;
+    z-index: var(--z-mobile-theme-toggle);
     display: block;
   }
 
