@@ -15,6 +15,11 @@ export class ProviderConfigController {
     return this.providers.save(body);
   }
 
+  @Post('test')
+  testDraft(@Body() body: ProviderConfigInput) {
+    return this.providers.testDraft(body);
+  }
+
   @Post(':name/test')
   test(@Param('name') name: string) {
     return this.providers.test(name);

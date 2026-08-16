@@ -244,8 +244,22 @@ const responseFor = (pathname, method) => {
         ];
   if (pathname === '/api/v1/providers/health/history')
     return mode === 'empty'
-      ? []
-      : [{ provider: 'mock', state: 'healthy', latencyMs: 12, checkedAt: now }];
+      ? { items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 }
+      : {
+          items: [
+            {
+              provider: 'mock',
+              state: 'healthy',
+              latencyMs: 12,
+              checkedAt: now,
+              source: 'scheduled',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          total: 1,
+          totalPages: 1,
+        };
   if (pathname === '/api/v1/automations/history') return [];
   if (pathname.includes('/market/') && pathname.endsWith('/quote'))
     return {

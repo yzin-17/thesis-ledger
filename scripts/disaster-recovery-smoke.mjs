@@ -72,7 +72,7 @@ try {
     ]),
   );
   const restored = JSON.parse(counts);
-  if (restored.migrations !== 15) throw new Error(`恢复库迁移数量异常: ${counts}`);
+  if (restored.migrations !== 17) throw new Error(`恢复库迁移数量异常: ${counts}`);
 
   console.log(
     JSON.stringify(

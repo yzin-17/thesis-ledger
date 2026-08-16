@@ -79,8 +79,8 @@ Chip 响应区分摘要和可选完整分布：缺少完整分布时仍可返回
 
 ### Compose 与发布
 
-- 主仓根级 Compose 保留 Stub Contract Test 栈，确保无外网、无 DSA 源码时仍能验证主系统。
-- `thesis-ledger-infra` 默认使用固定版本镜像；`compose.dev.yml` 通过 override 切换为同级源码构建。
+- Docker 编排统一由 `thesis-ledger-infra` 管理，Compose 项目名固定为 `thesis-ledger-dev`；`compose.yml` 是基础配置，`compose.dev.yml` 通过 override 切换为同级源码构建。
+- 主仓不再提供独立的根级 Compose；Desktop 前端在本地运行，通过 API 端口访问开发栈。
 - DSA Fork 镜像使用上游版本加 Fork 修订号，例如 `v3.28.0-thesisledger.1`，并记录上游 commit。
 - 生产配置使用 GHCR 镜像 digest；tag 仅用于人类识别和发布说明。
 - 确定性 fixture 模式的 DSA 集成测试为阻断门槛；在线数据源 smoke test 只作为定时或手工非阻断检查。

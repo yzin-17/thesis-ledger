@@ -11,6 +11,7 @@ import {
   channelsForSeverity,
   classifyDeliveryError,
   isQuietTime,
+  NotificationService,
 } from '../src/notifications/notification.service.js';
 import {
   AiProviderRegistry,
@@ -39,6 +40,7 @@ import { nextCronOccurrence, runWithRetry } from '../src/automation/automation.s
 import { IntegrityService } from '../src/integrity/integrity.service.js';
 import { RiskService } from '../src/risk/risk.service.js';
 import { ProviderHealthService } from '../src/providers/provider-health.service.js';
+import { ProviderHealthScheduler } from '../src/providers/provider-health.scheduler.js';
 import { MarketStorageService } from '../src/market/market-storage.service.js';
 import { DataQualityService } from '../src/quality/data-quality.service.js';
 import { PerformanceService } from '../src/performance/performance.service.js';
@@ -468,6 +470,37 @@ describe('通知策略', () => {
         { title: 'B', body: 'b', severity: 'warning', traceId: '2' },
       ]),
     ).toMatchObject({ title: '风险摘要（2 条）', severity: 'info' }));
+
+  it('实际通知投递结果写入 delivery 健康来源', async () => {
+    const record = vi.fn(async () => undefined);
+    const service = new NotificationService(
+      {
+        notificationDelivery: {
+          update: vi.fn(async () => ({ status: 'delivered' })),
+        },
+      } as never,
+      {} as never,
+      { record } as never,
+    );
+
+    await service.deliver(
+      'delivery-1',
+      { title: '测试', body: '内容', severity: 'warning', traceId: 'trace-1' },
+      {
+        id: 'feishu-webhook',
+        send: async () => ({ summary: 'ok' }),
+      },
+    );
+
+    expect(record).toHaveBeenCalledWith(
+      'feishu-webhook',
+      true,
+      expect.any(Number),
+      undefined,
+      expect.any(Date),
+      'delivery',
+    );
+  });
 });
 
 describe('风险事件与通知解耦', () => {
@@ -874,7 +907,11 @@ describe('环境配置', () => {
     THESIS_LEDGER_DSA_TOKEN: 'test-token',
   };
   it('解析完整必需配置', () =>
-    expect(parseConfig(base)).toMatchObject({ port: 3000, aiProvider: 'mock' }));
+    expect(parseConfig(base)).toMatchObject({
+      port: 3000,
+      aiProvider: 'mock',
+      providerHealthCheckIntervalMs: 3_600_000,
+    }));
   it('缺失数据库配置时明确失败字段', () =>
     expect(() => parseConfig({ ...base, DATABASE_URL: undefined })).toThrow('DATABASE_URL'));
   it('输出中不包含 AI Key', () =>
@@ -1060,6 +1097,86 @@ describe('Provider 健康状态', () => {
       state: 'healthy',
       consecutiveFailures: 0,
     });
+  });
+
+  it('统一 Provider 名称并记录健康检查来源', async () => {
+    const createHistory = vi.fn(async ({ data }: { data: object }) => data);
+    const prisma = {
+      providerHealth: {
+        findUnique: vi.fn(async () => null),
+        upsert: vi.fn(async ({ create }: { create: object }) => create),
+      },
+      providerHealthCheck: { create: createHistory },
+    };
+    const service = new ProviderHealthService(prisma as never, {} as never);
+    const checkedAt = new Date('2026-08-12T00:00:00.000Z');
+
+    await service.record('feishu-webhook', true, 12, undefined, checkedAt, 'scheduled');
+
+    expect(createHistory).toHaveBeenCalledWith({
+      data: {
+        provider: 'feishu',
+        state: 'healthy',
+        latencyMs: 12,
+        errorCode: null,
+        source: 'scheduled',
+        checkedAt,
+      },
+    });
+  });
+
+  it('按页读取健康历史并限制每页数量', async () => {
+    const count = vi.fn(async () => 45);
+    const findMany = vi.fn(async () => [
+      {
+        id: 'health-check-21',
+        provider: 'feishu',
+        state: 'healthy',
+        latencyMs: 12,
+        errorCode: null,
+        source: 'scheduled',
+        checkedAt: new Date('2026-08-12T00:00:00.000Z'),
+      },
+    ]);
+    const service = new ProviderHealthService(
+      { providerHealthCheck: { count, findMany } } as never,
+      {} as never,
+    );
+
+    await expect(service.history('feishu-webhook', 2, 20)).resolves.toMatchObject({
+      page: 2,
+      pageSize: 20,
+      total: 45,
+      totalPages: 3,
+      items: [{ id: 'health-check-21' }],
+    });
+    expect(count).toHaveBeenCalledWith({ where: { provider: 'feishu' } });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { provider: 'feishu' },
+      orderBy: [{ checkedAt: 'desc' }, { id: 'desc' }],
+      skip: 20,
+      take: 20,
+    });
+  });
+
+  it('定时调度器使用 scheduled 来源并避免并发探测', async () => {
+    let release: (() => void) | undefined;
+    const checkAll = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve([{ state: 'healthy' }]);
+        }),
+    );
+    const scheduler = new ProviderHealthScheduler({ checkAll } as never);
+
+    const first = scheduler.runNow();
+    await expect(scheduler.runNow()).resolves.toMatchObject({
+      skipped: true,
+      reason: '健康检查已有实例运行',
+    });
+    release?.();
+    await expect(first).resolves.toMatchObject({ skipped: false });
+    expect(checkAll).toHaveBeenCalledWith('scheduled');
   });
 });
 
@@ -1372,6 +1489,23 @@ describe('Journal 与行为复盘', () => {
 });
 
 describe('专业 Provider 配置', () => {
+  const createProviderHealthStub = () => ({
+    record: vi.fn(
+      async (
+        provider: string,
+        success: boolean,
+        latencyMs: number,
+        _errorCode?: string,
+        checkedAt = new Date(),
+      ) => ({
+        provider,
+        state: success ? 'healthy' : 'degraded',
+        latencyMs,
+        checkedAt,
+      }),
+    ),
+  });
+
   it('保存配置时不回显密钥，连通性与额度状态可查询', async () => {
     const prisma = {
       providerConfig: {
@@ -1385,7 +1519,7 @@ describe('专业 Provider 配置', () => {
         findMany: vi.fn(async () => []),
       },
     };
-    const service = new ProviderConfigService(prisma as never);
+    const service = new ProviderConfigService(prisma as never, createProviderHealthStub() as never);
     const saved = await service.save({
       name: 'tushare',
       type: 'tushare',
@@ -1394,12 +1528,181 @@ describe('专业 Provider 配置', () => {
       credentialsRef: 'secret-ref',
       quota: { limit: 100, used: 95 },
     });
+    expect(saved).toMatchObject({ credentialConfigured: true });
     expect(saved).not.toHaveProperty('credentialsRef');
+    expect(saved).not.toHaveProperty('encryptedCredentials');
     await expect(service.test('tushare')).resolves.toMatchObject({ credentialConfigured: true });
     await expect(service.usage('tushare')).resolves.toMatchObject({
       state: 'warning',
       remaining: 5,
     });
+  });
+
+  it('可在保存前测试飞书草稿，并在随后保存时保留成功状态', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ code: 0, msg: 'success' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const prisma = {
+        providerConfig: {
+          upsert: vi.fn(async ({ create }: { create: object }) => ({ name: 'feishu', ...create })),
+          findUnique: vi.fn(async () => null),
+          findMany: vi.fn(async () => []),
+          update: vi.fn(async ({ data }: { data: object }) => ({ name: 'feishu', ...data })),
+        },
+      };
+      const service = new ProviderConfigService(
+        prisma as never,
+        createProviderHealthStub() as never,
+      );
+      const draft = {
+        name: 'feishu',
+        type: 'notification',
+        priority: 1,
+        capabilities: ['notification'],
+        credentialsRef: 'https://open.feishu.cn/open-apis/bot/v2/hook/test',
+      };
+      const result = await service.testDraft(draft);
+      expect(result).toMatchObject({ status: 'healthy', message: '测试成功' });
+      expect(result.testToken).toEqual(expect.any(String));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      if (!result.testToken) throw new Error('测试成功但没有返回测试令牌');
+
+      await expect(
+        service.save({ ...draft, connectionTestToken: result.testToken }),
+      ).resolves.toMatchObject({
+        health: 'healthy',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('编辑已配置的飞书 Provider 时复用 Uint8Array 凭证', async () => {
+    const webhook = 'https://open.feishu.cn/open-apis/bot/v2/hook/test';
+    const fetchMock = vi.fn(async (url: URL) => {
+      expect(url.toString()).toBe(webhook);
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ code: 0, msg: 'success' }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const prisma = {
+        providerConfig: {
+          upsert: vi.fn(async ({ update }: { update: object }) => ({ name: 'feishu', ...update })),
+          findUnique: vi.fn(async () => ({
+            name: 'feishu',
+            type: 'notification',
+            enabled: true,
+            encryptedCredentials: Uint8Array.from(Buffer.from(webhook)),
+          })),
+          findMany: vi.fn(async () => []),
+          update: vi.fn(async ({ data }: { data: object }) => ({ name: 'feishu', ...data })),
+        },
+      };
+      const service = new ProviderConfigService(
+        prisma as never,
+        createProviderHealthStub() as never,
+      );
+      const draft = {
+        name: 'feishu',
+        type: 'notification',
+        priority: 1,
+        capabilities: ['notification'],
+      };
+
+      const result = await service.testDraft(draft);
+      expect(result).toMatchObject({ status: 'healthy', message: '测试成功' });
+      expect(result.testToken).toEqual(expect.any(String));
+      if (!result.testToken) throw new Error('测试成功但没有返回测试令牌');
+      await expect(service.testDraft({ ...draft, credentialsRef: '' })).resolves.toMatchObject({
+        status: 'healthy',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      await expect(
+        service.save({ ...draft, connectionTestToken: result.testToken }),
+      ).resolves.toMatchObject({ health: 'healthy' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('保存通过草稿测试的新 Webhook 后仍可从 Provider 列表再次测试', async () => {
+    const webhook = 'https://open.feishu.cn/open-apis/bot/v2/hook/replaced';
+    const fetchMock = vi.fn(async (url: URL) => {
+      expect(url.toString()).toBe(webhook);
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ code: 0, msg: 'success' }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      let stored: Record<string, unknown> = {
+        name: 'feishu',
+        type: 'notification',
+        enabled: true,
+        priority: 1,
+        capabilities: ['notification'],
+        encryptedCredentials: Buffer.from('old-webhook'),
+        health: 'down',
+      };
+      const prisma = {
+        providerConfig: {
+          findUnique: vi.fn(async () => stored),
+          findMany: vi.fn(async () => [stored]),
+          upsert: vi.fn(async ({ update }: { update: Record<string, unknown> }) => {
+            stored = { ...stored, ...update };
+            return stored;
+          }),
+          update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+            stored = { ...stored, ...data };
+            return stored;
+          }),
+        },
+      };
+      const providerHealth = createProviderHealthStub();
+      const service = new ProviderConfigService(prisma as never, providerHealth as never);
+      const draft = {
+        name: 'feishu',
+        type: 'notification',
+        priority: 1,
+        capabilities: ['notification'],
+        credentialsRef: webhook,
+      };
+
+      const result = await service.testDraft(draft);
+      if (!result.testToken) throw new Error('测试成功但没有返回测试令牌');
+      const saved = await service.save({
+        name: draft.name,
+        type: draft.type,
+        priority: draft.priority,
+        capabilities: draft.capabilities,
+        connectionTestToken: result.testToken,
+      });
+
+      expect(Buffer.from(stored.encryptedCredentials as Uint8Array).toString('utf8')).toBe(webhook);
+      expect(stored.health).toBe('healthy');
+      expect(saved).toMatchObject({ credentialConfigured: true, health: 'healthy' });
+      expect(saved).not.toHaveProperty('encryptedCredentials');
+      await expect(service.test('feishu')).resolves.toMatchObject({ status: 'healthy' });
+      expect(providerHealth.record).toHaveBeenCalledWith(
+        'feishu',
+        true,
+        expect.any(Number),
+        undefined,
+        expect.any(Date),
+        'manual',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

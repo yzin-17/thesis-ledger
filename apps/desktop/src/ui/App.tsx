@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { useToastManager } from '@/components/ui/toast';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/ArrowClockwise';
@@ -33,6 +35,7 @@ import { RobotIcon } from '@phosphor-icons/react/Robot';
 import { ShieldCheckIcon } from '@phosphor-icons/react/ShieldCheck';
 import { StrategyIcon } from '@phosphor-icons/react/Strategy';
 import { UploadSimpleIcon } from '@phosphor-icons/react/UploadSimple';
+import { LoaderCircle } from 'lucide-react';
 import { desktopPathForView, desktopRoutes, type DesktopNavigationView } from '../views.js';
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
@@ -158,19 +161,32 @@ interface PerformanceLayerRecord {
   unrealizedPnl: number | null;
 }
 
-interface OnboardingProviderRecord {
+export interface OnboardingProviderRecord {
   enabled?: boolean;
   health?: string;
+  credentialConfigured?: boolean;
   capabilities?: unknown;
-}
-
-interface OnboardingAutomationRecord {
-  enabled?: boolean;
 }
 
 interface OnboardingRiskRuleRecord {
   enabled?: boolean;
 }
+
+export const hasConfiguredProviderSetup = (providers: readonly OnboardingProviderRecord[]) => {
+  const configuredProviders = providers.filter(
+    (provider) =>
+      provider.enabled !== false &&
+      provider.health !== 'down' &&
+      provider.credentialConfigured === true,
+  );
+  const hasCapability = (provider: OnboardingProviderRecord, capability: string) =>
+    Array.isArray(provider.capabilities) &&
+    provider.capabilities.some((item) => String(item) === capability);
+  return (
+    configuredProviders.some((provider) => hasCapability(provider, 'quote')) &&
+    configuredProviders.some((provider) => hasCapability(provider, 'notification'))
+  );
+};
 
 const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
   portfolio: HouseIcon,
@@ -205,6 +221,9 @@ function LegacyImportReviewRedirect() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const step = params.get('step');
+  if (step === 'account') {
+    return <Navigate to="/accounts" replace />;
+  }
   if (step === 'position') params.set('method', 'manual');
   if (step === 'screenshot') params.set('method', 'screenshot');
   const search = params.toString();
@@ -226,6 +245,10 @@ export function App() {
   const loadSequence = useRef(0);
 
   const navigateTo = (nextView: DesktopNavigationView, options?: OnboardingNavigationOptions) => {
+    if (nextView === 'position-entry' && options?.step === 'account') {
+      void navigate('/accounts');
+      return;
+    }
     const path = desktopPathForView(nextView);
     if (!path) return;
     const params = new URLSearchParams(location.search);
@@ -322,7 +345,28 @@ export function App() {
                 accounts={accounts}
                 positions={portfolio?.positions ?? []}
                 cashValue={portfolio?.cashValue ?? 0}
+                accountsReady={state !== 'loading' && state !== 'error'}
                 onPortfolioChanged={() => void load()}
+              />
+            }
+          />
+          <Route
+            path="/accounts"
+            element={
+              <PortfolioManagement
+                accounts={accounts}
+                positions={[]}
+                step="account"
+                accountsReady={state !== 'loading' && state !== 'error'}
+                onAccountEntry={(accountId) => {
+                  const params = new URLSearchParams({
+                    accountId,
+                    method: 'manual',
+                    step: 'position',
+                  });
+                  void navigate({ pathname: '/position-entry', search: `?${params.toString()}` });
+                }}
+                onSaved={() => void load()}
               />
             }
           />
@@ -358,9 +402,10 @@ function StrategyDashboard() {
   >([]);
   const [name, setName] = useState('我的第一条策略');
   const [schemaText, setSchemaText] = useState('');
-  const [message, setMessage] = useState('');
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const toastManager = useToastManager();
   const loadSequence = useRef(0);
   const defaultSchema = {
     version: 1,
@@ -403,17 +448,15 @@ function StrategyDashboard() {
     } catch {
       if (sequence !== loadSequence.current) return;
       setLoadState(strategies.length || jobs.length ? 'stale' : 'error');
-      setMessage('策略或任务读取失败。');
     }
   };
   useEffect(() => {
-    void load().catch(() => {
-      setLoadState(strategies.length || jobs.length ? 'stale' : 'error');
-      setMessage('策略或任务读取失败。');
-    });
+    void load();
   }, []);
   const createStrategy = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busyAction) return;
+    setBusyAction('create-strategy');
     try {
       const response = await fetch('/api/v1/backtests/strategies', {
         method: 'POST',
@@ -421,62 +464,129 @@ function StrategyDashboard() {
         body: JSON.stringify({ name, schema: JSON.parse(schemaText) }),
       });
       if (!response.ok) throw new Error('create');
-      setMessage('策略已创建，旧版本不会被覆盖。');
+      toastManager.add({
+        title: '策略已创建',
+        description: '旧版本不会被覆盖。',
+        type: 'success',
+        timeout: 2800,
+      });
       await load();
     } catch {
-      setMessage('策略 JSON 或 Schema 不合法。');
+      toastManager.add({
+        title: '策略创建失败',
+        description: '请检查策略 JSON 或 Schema。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
   };
   const queue = async (strategy: (typeof strategies)[number]) => {
+    if (busyAction) return;
     const version = strategy.versions.at(-1);
     if (!version) return;
+    setBusyAction(`queue:${strategy.id}`);
     let schema: Record<string, unknown>;
     try {
       schema = JSON.parse(schemaText) as Record<string, unknown>;
     } catch {
-      setMessage('策略 JSON 或 Schema 不合法。');
+      setBusyAction(null);
+      toastManager.add({
+        title: '回测排队失败',
+        description: '请检查策略 JSON 或 Schema。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
       return;
     }
-    const universe = schema.universe;
-    const symbol =
-      universe &&
-      typeof universe === 'object' &&
-      Array.isArray((universe as { symbols?: unknown }).symbols)
-        ? (universe as { symbols: unknown[] }).symbols[0]
-        : null;
-    let bars: unknown[] = [];
-    if (typeof symbol === 'string') {
-      const barsResponse = await fetch(
-        `/api/v1/market/${encodeURIComponent(symbol)}/bars?timeframe=1d&t=${Date.now()}`,
-        { cache: 'no-store' },
-      );
-      if (barsResponse.ok) bars = (await barsResponse.json()) as unknown[];
+    try {
+      const universe = schema.universe;
+      const symbol =
+        universe &&
+        typeof universe === 'object' &&
+        Array.isArray((universe as { symbols?: unknown }).symbols)
+          ? (universe as { symbols: unknown[] }).symbols[0]
+          : null;
+      let bars: unknown[] = [];
+      if (typeof symbol === 'string') {
+        const barsResponse = await fetch(
+          `/api/v1/market/${encodeURIComponent(symbol)}/bars?timeframe=1d&t=${Date.now()}`,
+          { cache: 'no-store' },
+        );
+        if (barsResponse.ok) bars = (await barsResponse.json()) as unknown[];
+      }
+      const response = await fetch('/api/v1/backtests/jobs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          strategyVersionId: version.id,
+          status: 'queued',
+          period: { start: '2025-01-01', end: '2025-01-31' },
+          dataAsOf: new Date().toISOString(),
+          warnings: [],
+          strategy: schema,
+          bars,
+          initialCash: 100000,
+        }),
+      });
+      if (!response.ok) throw new Error('queue');
+      toastManager.add({ title: '回测已排队', type: 'success', timeout: 2800 });
+      await load();
+    } catch {
+      toastManager.add({
+        title: '回测排队失败',
+        description: '请检查策略配置和服务连接。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    const response = await fetch('/api/v1/backtests/jobs', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        id: crypto.randomUUID(),
-        strategyVersionId: version.id,
-        status: 'queued',
-        period: { start: '2025-01-01', end: '2025-01-31' },
-        dataAsOf: new Date().toISOString(),
-        warnings: [],
-        strategy: schema,
-        bars,
-        initialCash: 100000,
-      }),
-    });
-    setMessage(response.ok ? '回测已排队。' : '回测排队失败。');
-    await load();
   };
   const run = async (jobId: string) => {
-    await fetch(`/api/v1/backtests/jobs/${jobId}/run`, { method: 'POST' });
-    await load();
+    if (busyAction) return;
+    setBusyAction(`run:${jobId}`);
+    try {
+      const response = await fetch(`/api/v1/backtests/jobs/${jobId}/run`, { method: 'POST' });
+      if (!response.ok) throw new Error('run');
+      toastManager.add({ title: '回测已启动', type: 'success', timeout: 2800 });
+      await load();
+    } catch {
+      toastManager.add({
+        title: '回测启动失败',
+        description: '请检查任务状态和服务连接。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
+    }
   };
   const cancel = async (jobId: string) => {
-    await fetch(`/api/v1/backtests/jobs/${jobId}/cancel`, { method: 'POST' });
-    await load();
+    if (busyAction) return;
+    setBusyAction(`cancel:${jobId}`);
+    try {
+      const response = await fetch(`/api/v1/backtests/jobs/${jobId}/cancel`, { method: 'POST' });
+      if (!response.ok) throw new Error('cancel');
+      toastManager.add({ title: '回测已取消', type: 'success', timeout: 2800 });
+      await load();
+    } catch {
+      toastManager.add({
+        title: '回测取消失败',
+        description: '请检查任务状态和服务连接。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
+    }
   };
   const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? null;
   const selectedResult =
@@ -518,38 +628,49 @@ function StrategyDashboard() {
             rows={12}
           />
         </label>
-        <Button type="submit" variant="default">
-          保存新版本
+        <Button disabled={busyAction !== null} type="submit" variant="default">
+          {busyAction === 'create-strategy' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {busyAction === 'create-strategy' ? '保存中…' : '保存新版本'}
         </Button>
       </form>
-      {message && (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      )}
       <section className="panel">
         <div className="panel-heading">
           <h2>策略版本</h2>
         </div>
         <div className="edit-list">
-          {strategies.map((strategy) => (
-            <div key={strategy.id}>
-              <span>
-                <strong>{strategy.name}</strong>
-                <small>
-                  {strategy.versions.map((version) => `v${version.version}`).join(' · ')}
-                </small>
-              </span>
-              <Button
-                className="text-button"
-                size="sm"
-                variant="link"
-                onClick={() => void queue(strategy)}
-              >
-                排队回测
-              </Button>
-            </div>
-          ))}
+          {isDataLoaded(loadState) && strategies.length === 0 ? (
+            <EmptyListState className="justify-center border-b-0" />
+          ) : (
+            strategies.map((strategy) => (
+              <div key={strategy.id}>
+                <span>
+                  <strong>{strategy.name}</strong>
+                  <small>
+                    {strategy.versions.map((version) => `v${version.version}`).join(' · ')}
+                  </small>
+                </span>
+                <Button
+                  className="text-button"
+                  size="sm"
+                  variant="link"
+                  disabled={busyAction !== null}
+                  aria-busy={busyAction === `queue:${strategy.id}`}
+                  onClick={() => void queue(strategy)}
+                >
+                  {busyAction === `queue:${strategy.id}` && (
+                    <LoaderCircle
+                      data-icon="inline-start"
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {busyAction === `queue:${strategy.id}` ? '排队中…' : '排队回测'}
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </section>
       <section className="panel">
@@ -567,45 +688,67 @@ function StrategyDashboard() {
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job) => (
-                <tr key={job.id}>
-                  <td>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => setSelectedJobId(job.id)}
-                    >
-                      {job.id.slice(0, 8)}
-                    </Button>
-                    <span>{job.strategyVersionId.slice(0, 8)}</span>
-                  </td>
-                  <td>{job.status}</td>
-                  <td>{job.progress}%</td>
-                  <td>
-                    {job.status === 'queued' && (
+              {isDataLoaded(loadState) && jobs.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
+              ) : (
+                jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td>
                       <Button
                         className="text-button"
                         size="sm"
                         variant="link"
-                        onClick={() => void run(job.id)}
+                        onClick={() => setSelectedJobId(job.id)}
                       >
-                        运行
+                        {job.id.slice(0, 8)}
                       </Button>
-                    )}
-                    {!['succeeded', 'failed', 'cancelled'].includes(job.status) && (
-                      <Button
-                        className="text-button danger"
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => void cancel(job.id)}
-                      >
-                        取消
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      <span>{job.strategyVersionId.slice(0, 8)}</span>
+                    </td>
+                    <td>{job.status}</td>
+                    <td>{job.progress}%</td>
+                    <td>
+                      {job.status === 'queued' && (
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          variant="link"
+                          disabled={busyAction !== null}
+                          aria-busy={busyAction === `run:${job.id}`}
+                          onClick={() => void run(job.id)}
+                        >
+                          {busyAction === `run:${job.id}` && (
+                            <LoaderCircle
+                              data-icon="inline-start"
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {busyAction === `run:${job.id}` ? '运行中…' : '运行'}
+                        </Button>
+                      )}
+                      {!['succeeded', 'failed', 'cancelled'].includes(job.status) && (
+                        <Button
+                          className="text-button danger"
+                          size="sm"
+                          variant="destructive"
+                          disabled={busyAction !== null}
+                          aria-busy={busyAction === `cancel:${job.id}`}
+                          onClick={() => void cancel(job.id)}
+                        >
+                          {busyAction === `cancel:${job.id}` && (
+                            <LoaderCircle
+                              data-icon="inline-start"
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {busyAction === `cancel:${job.id}` ? '取消中…' : '取消'}
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -683,9 +826,7 @@ function StrategyDashboard() {
                   </thead>
                   <tbody>
                     {equityCurve.length === 0 ? (
-                      <tr>
-                        <td colSpan={2}>当前回测没有权益曲线数据</td>
-                      </tr>
+                      <EmptyTableRow colSpan={2} />
                     ) : (
                       equityCurve.slice(-20).map((point) => (
                         <tr key={point.date}>
@@ -710,9 +851,7 @@ function StrategyDashboard() {
                   </thead>
                   <tbody>
                     {trades.length === 0 ? (
-                      <tr>
-                        <td colSpan={5}>暂无交易明细</td>
-                      </tr>
+                      <EmptyTableRow colSpan={5} />
                     ) : (
                       trades.map((trade, index) => (
                         <tr key={`${displayValue(trade.date ?? '')}-${index}`}>
@@ -758,9 +897,10 @@ function AiChat() {
       createdAt: string;
     }>
   >([]);
-  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const loadSequence = useRef(0);
+  const toastManager = useToastManager();
   const loadHistory = async () => {
     const sequence = ++loadSequence.current;
     setLoadState('loading');
@@ -774,7 +914,6 @@ function AiChat() {
     } catch {
       if (sequence !== loadSequence.current) return;
       setLoadState(history.length ? 'stale' : 'error');
-      setMessage('研究历史读取失败。');
     }
   };
   useEffect(() => {
@@ -782,23 +921,39 @@ function AiChat() {
   }, []);
   const startResearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const response = await fetch('/api/v1/ai/runs', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        provider: 'mock',
-        model: 'research-default',
-        promptVersion: 'research-v1',
-        context: { scope, ...(scope === 'position' ? { symbol } : {}) },
-      }),
-    });
-    if (!response.ok) {
-      setMessage('研究任务创建失败，请检查 Provider 状态。');
-      return;
+    if (busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/v1/ai/runs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'mock',
+          model: 'research-default',
+          promptVersion: 'research-v1',
+          context: { scope, ...(scope === 'position' ? { symbol } : {}) },
+        }),
+      });
+      if (!response.ok) throw new Error('research');
+      setRun((await response.json()) as typeof run);
+      toastManager.add({
+        title: '研究任务已创建',
+        description: `已记录研究问题：${question}`,
+        type: 'success',
+        timeout: 2800,
+      });
+      await loadHistory().catch(() => undefined);
+    } catch {
+      toastManager.add({
+        title: '研究任务创建失败',
+        description: '请检查 Provider 状态和服务连接。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusy(false);
     }
-    setRun((await response.json()) as typeof run);
-    setMessage(`已记录研究问题：${question}`);
-    await loadHistory().catch(() => undefined);
   };
   return (
     <section className="module-page">
@@ -853,10 +1008,12 @@ function AiChat() {
             rows={3}
           />
         </label>
-        <Button type="submit" variant="default">
-          创建研究任务
+        <Button disabled={busy} type="submit" variant="default">
+          {busy && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {busy ? '创建中…' : '创建研究任务'}
         </Button>
-        {message && <p className="form-message">{message}</p>}
       </form>
       <DataStateBanner state={loadState} onRetry={() => void loadHistory()} />
       {run && (
@@ -900,23 +1057,27 @@ function AiChat() {
               </tr>
             </thead>
             <tbody>
-              {history.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <strong>{item.id.slice(0, 8)}</strong>
-                    <span>{item.promptVersion}</span>
-                  </td>
-                  <td>
-                    {item.context?.scope ?? '未知'}
-                    {item.context?.symbol ? ` · ${item.context.symbol}` : ''}
-                  </td>
-                  <td>
-                    {item.provider} / {item.model}
-                  </td>
-                  <td>{item.status}</td>
-                  <td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && history.length === 0 ? (
+                <EmptyTableRow colSpan={5} />
+              ) : (
+                history.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>{item.id.slice(0, 8)}</strong>
+                      <span>{item.promptVersion}</span>
+                    </td>
+                    <td>
+                      {item.context?.scope ?? '未知'}
+                      {item.context?.symbol ? ` · ${item.context.symbol}` : ''}
+                    </td>
+                    <td>
+                      {item.provider} / {item.model}
+                    </td>
+                    <td>{item.status}</td>
+                    <td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -994,8 +1155,8 @@ function JournalDashboard() {
     window: unknown;
     aiRun: JournalReviewResult['aiRun'];
   } | null>(null);
-  const [message, setMessage] = useState('');
   const [busy, setBusy] = useState<'single' | 'behavior' | null>(null);
+  const toastManager = useToastManager();
 
   const requestJson = async (url: string, body: unknown) => {
     const response = await fetch(url, {
@@ -1033,7 +1194,6 @@ function JournalDashboard() {
   const reviewSingleTrade = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy('single');
-    setMessage('');
     try {
       const trade = JSON.parse(tradeText) as ReviewTrade;
       const [plannedVsActual, behavior, counterfactual] = await Promise.all([
@@ -1053,13 +1213,22 @@ function JournalDashboard() {
         counterfactual,
       });
       setSingleReview({ plannedVsActual, behavior, counterfactual, aiRun });
-      setMessage(
-        aiRun
-          ? '单笔复盘完成；AI 解释任务只接收已计算的事实。'
+      toastManager.add({
+        title: '单笔复盘完成',
+        description: aiRun
+          ? 'AI 解释任务只接收已计算的事实。'
           : '确定性复盘完成；AI Provider 当前不可用。',
-      );
+        type: aiRun ? 'success' : 'warning',
+        timeout: aiRun ? 2800 : 7000,
+      });
     } catch {
-      setMessage('复盘失败：请检查交易 JSON 和服务状态。');
+      toastManager.add({
+        title: '单笔复盘失败',
+        description: '请检查交易 JSON 和服务状态。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
     } finally {
       setBusy(null);
     }
@@ -1068,7 +1237,6 @@ function JournalDashboard() {
   const reviewBehavior = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy('behavior');
-    setMessage('');
     try {
       const trades = JSON.parse(tradesText) as ReviewTrade[];
       if (!Array.isArray(trades) || trades.length === 0) throw new Error('trades');
@@ -1089,13 +1257,22 @@ function JournalDashboard() {
         review: window,
       });
       setBehaviorReview({ metrics, window, aiRun });
-      setMessage(
-        aiRun
-          ? '行为复盘完成；报告引用 Journal/Behavior 的确定性结果。'
+      toastManager.add({
+        title: '行为复盘完成',
+        description: aiRun
+          ? '报告引用 Journal/Behavior 的确定性结果。'
           : '确定性行为指标完成；AI Provider 当前不可用。',
-      );
+        type: aiRun ? 'success' : 'warning',
+        timeout: aiRun ? 2800 : 7000,
+      });
     } catch {
-      setMessage('行为复盘失败：请检查交易数组 JSON 和服务状态。');
+      toastManager.add({
+        title: '行为复盘失败',
+        description: '请检查交易数组 JSON 和服务状态。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
     } finally {
       setBusy(null);
     }
@@ -1109,11 +1286,6 @@ function JournalDashboard() {
         先计算计划、执行和行为事实，再交给 AI 做有证据边界的解释；反事实结果会明确假设，不会写入
         Ledger 或生成订单。
       </p>
-      {message && (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      )}
       <form className="panel form-card" onSubmit={(event) => void reviewSingleTrade(event)}>
         <div className="panel-heading">
           <h2>Single Trade Review</h2>
@@ -1129,6 +1301,9 @@ function JournalDashboard() {
           />
         </label>
         <Button type="submit" variant="default" disabled={busy !== null}>
+          {busy === 'single' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
           {busy === 'single' ? '计算中…' : '分析单笔交易'}
         </Button>
       </form>
@@ -1152,7 +1327,7 @@ function JournalDashboard() {
               <pre>{prettyJson(singleReview.counterfactual)}</pre>
             </div>
           </div>
-          <p className="form-message">
+          <p className="form-help">
             {singleReview.aiRun
               ? `AI 解释任务 ${singleReview.aiRun.id.slice(0, 8)} 已记录（${singleReview.aiRun.promptVersion}）。`
               : 'AI 解释未启动：当前 Provider 不可用。'}
@@ -1174,6 +1349,9 @@ function JournalDashboard() {
           />
         </label>
         <Button type="submit" variant="default" disabled={busy !== null}>
+          {busy === 'behavior' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
           {busy === 'behavior' ? '计算中…' : '生成行为复盘'}
         </Button>
       </form>
@@ -1208,6 +1386,191 @@ function JournalDashboard() {
   );
 }
 
+const providerCapabilityOptions = [
+  { value: 'notification', label: '通知' },
+  { value: 'quote', label: '报价' },
+  { value: 'bars-1d', label: '日线' },
+  { value: 'bars-1m', label: '分钟线' },
+  { value: 'indicator', label: '指标' },
+  { value: 'chip', label: '筹码' },
+  { value: 'financials', label: '财务' },
+  { value: 'news', label: '新闻' },
+  { value: 'announcements', label: '公告' },
+  { value: 'chat', label: '对话' },
+  { value: 'vision', label: '图像理解' },
+] as const;
+const providerTypeLabels: Record<string, string> = {
+  notification: '通知',
+  market: '行情',
+  ai: 'AI',
+  vision: '图像',
+};
+const providerTypeLabel = (type: string) => providerTypeLabels[type] ?? `其他（${type}）`;
+const providerCapabilityLabel = (capability: string) =>
+  providerCapabilityOptions.find((item) => item.value === capability)?.label ??
+  `其他（${capability}）`;
+type ProviderStatusTone = 'normal' | 'error' | 'warning' | 'neutral';
+export interface ProviderStatusInput {
+  enabled: boolean;
+  health: string;
+  credentialConfigured?: boolean;
+}
+export const providerDisplayStatus = (
+  provider: ProviderStatusInput,
+): { label: string; tone: ProviderStatusTone } => {
+  if (!provider.enabled) return { label: '已停用', tone: 'neutral' };
+  if (!provider.credentialConfigured) return { label: '未配置', tone: 'warning' };
+  if (provider.health === 'healthy') return { label: '正常', tone: 'normal' };
+  if (provider.health === 'degraded' || provider.health === 'down') {
+    return { label: '异常', tone: 'error' };
+  }
+  return { label: '未测试', tone: 'neutral' };
+};
+const providerHealthSourceLabel = (source?: string) =>
+  ({
+    manual: '手动测试',
+    scheduled: '定时检查',
+    delivery: '实际投递',
+  })[source ?? ''] ?? '其他检查';
+const providerCredentialTypeLabels: Record<string, string> = {
+  notification: 'Webhook / Token',
+  market: '行情 API Key / Token',
+  ai: 'AI API Key / Token',
+  vision: '图像 API Key / Token',
+};
+export const providerCredentialLabel = (name: string, type: string) => {
+  const normalizedName = name
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-');
+  if (
+    type === 'notification' &&
+    ['feishu', 'feishu-webhook', 'lark', 'lark-webhook'].includes(normalizedName)
+  ) {
+    return '飞书 Webhook';
+  }
+  return providerCredentialTypeLabels[type] ?? 'API Key / Token';
+};
+const providerCredentialPlaceholder = (label: string) =>
+  label.includes('Webhook') ? '输入 Webhook 地址' : '输入 API Key 或 Token';
+type ProviderTestState = 'idle' | 'testing' | 'success' | 'warning' | 'error';
+export interface ProviderTestEvidence {
+  token: string;
+  credentialsRef?: string;
+}
+export const providerCredentialForSave = (
+  draftCredential: string,
+  testEvidence: ProviderTestEvidence | null,
+) => testEvidence?.credentialsRef ?? draftCredential.trim();
+export const replaceProviderRecord = <T extends { name: string }>(
+  current: readonly T[],
+  saved: T,
+) =>
+  current.some((provider) => provider.name === saved.name)
+    ? current.map((provider) => (provider.name === saved.name ? saved : provider))
+    : [...current, saved];
+export const sortProviderRecords = <T extends { name: string; priority: number }>(
+  providers: readonly T[],
+) =>
+  [...providers].sort(
+    (left, right) => left.priority - right.priority || left.name.localeCompare(right.name),
+  );
+export const providerCredentialConfiguredAfterSave = (
+  responseValue: boolean | undefined,
+  submittedCredential: string,
+  currentValue: boolean | undefined,
+) => responseValue ?? (Boolean(submittedCredential) || currentValue === true);
+const newProviderDraft = () => ({
+  name: 'feishu',
+  type: 'notification',
+  capabilities: ['notification'],
+  credentialsRef: '',
+  priority: 1,
+  enabled: true,
+});
+
+const EmptyTableRow = ({ colSpan }: { colSpan: number }) => (
+  <tr>
+    <td className="p-0 text-center hover:bg-transparent" colSpan={colSpan}>
+      <Empty className="min-h-16 rounded-none border-0 px-3 py-[18px]" aria-live="polite">
+        <EmptyDescription>暂无记录</EmptyDescription>
+      </Empty>
+    </td>
+  </tr>
+);
+
+const EmptyListState = ({ className }: { className?: string }) => (
+  <Empty className={cn('min-h-16 rounded-none border-0 p-5', className)} aria-live="polite">
+    <EmptyDescription>暂无记录</EmptyDescription>
+  </Empty>
+);
+
+const isDataLoaded = (state: LoadState) => state === 'ready' || state === 'empty';
+
+type ProviderHealthHistoryRecord = {
+  provider: string;
+  state: string;
+  latencyMs: number | null;
+  checkedAt: string;
+  source?: string;
+};
+
+type ProviderHealthHistoryPage = {
+  items: ProviderHealthHistoryRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+const PROVIDER_HEALTH_HISTORY_PAGE_SIZE = 20;
+
+export const normalizeProviderHealthHistory = (
+  value: unknown,
+  requestedPage: number,
+  pageSize: number,
+): ProviderHealthHistoryPage => {
+  const safePage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  if (Array.isArray(value)) {
+    const total = value.length;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+    const page = totalPages === 0 ? 1 : Math.min(safePage, totalPages);
+    const start = (page - 1) * pageSize;
+    return {
+      items: value.slice(start, start + pageSize) as ProviderHealthHistoryRecord[],
+      page,
+      pageSize,
+      total,
+      totalPages,
+    };
+  }
+
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('items' in value) ||
+    !Array.isArray(value.items)
+  ) {
+    throw new Error('Provider 健康历史响应格式无效');
+  }
+
+  const response = value as Partial<ProviderHealthHistoryPage>;
+  const items = value.items as ProviderHealthHistoryRecord[];
+  const responsePageSize =
+    typeof response.pageSize === 'number' && response.pageSize > 0 ? response.pageSize : pageSize;
+  const total = typeof response.total === 'number' && response.total >= 0 ? response.total : items.length;
+  const totalPages =
+    typeof response.totalPages === 'number' && response.totalPages >= 0
+      ? response.totalPages
+      : total === 0
+        ? 0
+        : Math.ceil(total / responsePageSize);
+  const page =
+    typeof response.page === 'number' && response.page > 0 ? response.page : safePage;
+
+  return { items, page, pageSize: responsePageSize, total, totalPages };
+};
+
 export function ProviderSettings() {
   const [providers, setProviders] = useState<
     Array<{
@@ -1233,26 +1596,80 @@ export function ProviderSettings() {
   const [jobs, setJobs] = useState<
     Array<{ id: string; name: string; type: string; enabled: boolean; nextRunAt: string | null }>
   >([]);
-  const [healthHistory, setHealthHistory] = useState<
-    Array<{ provider: string; state: string; latencyMs: number | null; checkedAt: string }>
-  >([]);
+  const [healthHistory, setHealthHistory] = useState<ProviderHealthHistoryRecord[]>([]);
+  const [healthHistoryPagination, setHealthHistoryPagination] =
+    useState<ProviderHealthHistoryPage>({
+      items: [],
+      page: 1,
+      pageSize: PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
+      total: 0,
+      totalPages: 0,
+    });
+  const [healthHistoryLoading, setHealthHistoryLoading] = useState(false);
   const [jobHistory, setJobHistory] = useState<
     Array<{ id: string; jobId: string; status: string; startedAt: string; error: string | null }>
   >([]);
   const [notificationFailures, setNotificationFailures] = useState<
     Array<{ id: string; provider: string; status: string; lastError: string | null }>
   >([]);
-  const [providerDraft, setProviderDraft] = useState({
-    name: 'feishu',
-    type: 'notification',
-    capabilities: 'notification',
-    credentialsRef: '',
-  });
-  const [message, setMessage] = useState('');
+  const [providerDraft, setProviderDraft] = useState(newProviderDraft);
+  const [providerSheetOpen, setProviderSheetOpen] = useState(false);
+  const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
+  const [credentialInputOpen, setCredentialInputOpen] = useState(true);
+  const [providerTestState, setProviderTestState] = useState<ProviderTestState>('idle');
+  const [providerTestEvidence, setProviderTestEvidence] = useState<ProviderTestEvidence | null>(
+    null,
+  );
+  const [testingProviderName, setTestingProviderName] = useState<string | null>(null);
+  const [savingProviderName, setSavingProviderName] = useState<string | null>(null);
+  const [savingProviderDraft, setSavingProviderDraft] = useState(false);
+  const [togglingJobId, setTogglingJobId] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
+  const toastManager = useToastManager();
   const loadSequence = useRef(0);
-  const load = async () => {
+  const healthHistoryLoadSequence = useRef(0);
+  const healthHistoryUrl = (requestedHealthHistoryPage: number) => {
+    const healthHistoryParams = new URLSearchParams({
+      page: String(requestedHealthHistoryPage),
+      pageSize: String(PROVIDER_HEALTH_HISTORY_PAGE_SIZE),
+    });
+    return `/api/v1/providers/health/history?${healthHistoryParams.toString()}`;
+  };
+  const loadProviderHealthHistory = async (
+    requestedHealthHistoryPage = healthHistoryPagination.page,
+  ) => {
+    const sequence = ++healthHistoryLoadSequence.current;
+    setHealthHistoryLoading(true);
+    try {
+      const healthResponse = await fetch(healthHistoryUrl(requestedHealthHistoryPage));
+      if (!healthResponse.ok) throw new Error('provider-health-history');
+      const nextHealthHistory = normalizeProviderHealthHistory(
+        (await healthResponse.json()) as unknown,
+        requestedHealthHistoryPage,
+        PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
+      );
+      if (sequence !== healthHistoryLoadSequence.current) return;
+      setHealthHistory(nextHealthHistory.items);
+      setHealthHistoryPagination(nextHealthHistory);
+    } catch {
+      if (sequence !== healthHistoryLoadSequence.current) return;
+      setLoadState(
+        providers.length ||
+          issues.length ||
+          jobs.length ||
+          healthHistory.length ||
+          jobHistory.length
+          ? 'stale'
+          : 'error',
+      );
+    } finally {
+      if (sequence === healthHistoryLoadSequence.current) setHealthHistoryLoading(false);
+    }
+  };
+  const load = async (requestedHealthHistoryPage = healthHistoryPagination.page) => {
     const sequence = ++loadSequence.current;
+    healthHistoryLoadSequence.current += 1;
+    setHealthHistoryLoading(false);
     setLoadState('loading');
     try {
       const [
@@ -1266,7 +1683,7 @@ export function ProviderSettings() {
         fetch('/api/v1/providers/config'),
         fetch('/api/v1/data-quality/issues?status=open'),
         fetch('/api/v1/automations'),
-        fetch('/api/v1/providers/health/history'),
+        fetch(healthHistoryUrl(requestedHealthHistoryPage)),
         fetch('/api/v1/automations/history'),
         fetch('/api/v1/notifications?status=failed'),
       ]);
@@ -1283,28 +1700,37 @@ export function ProviderSettings() {
         nextProviders,
         nextIssues,
         nextJobs,
-        nextHealthHistory,
+        nextHealthHistoryPayload,
         nextJobHistory,
         nextNotificationFailures,
       ] = await Promise.all([
         response.json() as Promise<typeof providers>,
         issueResponse.json() as Promise<typeof issues>,
         jobsResponse.json() as Promise<typeof jobs>,
-        healthResponse.json() as Promise<typeof healthHistory>,
+        healthResponse.json() as Promise<unknown>,
         historyResponse.json() as Promise<typeof jobHistory>,
         notificationResponse.json() as Promise<typeof notificationFailures>,
       ]);
+      const nextHealthHistory = normalizeProviderHealthHistory(
+        nextHealthHistoryPayload,
+        requestedHealthHistoryPage,
+        PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
+      );
       if (sequence !== loadSequence.current) return;
+      healthHistoryLoadSequence.current += 1;
+      setHealthHistoryLoading(false);
       setProviders(nextProviders);
       setIssues(nextIssues);
       setJobs(nextJobs);
-      setHealthHistory(nextHealthHistory);
+      setHealthHistory(nextHealthHistory.items);
+      setHealthHistoryPagination(nextHealthHistory);
       setJobHistory(nextJobHistory);
       setNotificationFailures(nextNotificationFailures);
       setLoadState('ready');
-      setMessage((current) => (current === 'Provider 配置读取失败。' ? '' : current));
     } catch {
       if (sequence !== loadSequence.current) return;
+      healthHistoryLoadSequence.current += 1;
+      setHealthHistoryLoading(false);
       setLoadState(
         providers.length ||
           issues.length ||
@@ -1314,220 +1740,739 @@ export function ProviderSettings() {
           ? 'stale'
           : 'error',
       );
-      setMessage('Provider 配置读取失败。');
     }
   };
   useEffect(() => {
     void load();
   }, []);
-  const test = async (name: string) => {
-    const response = await fetch(`/api/v1/providers/config/${encodeURIComponent(name)}/test`, {
-      method: 'POST',
-    });
-    setMessage(response.ok ? `${name} 连通性测试已排队。` : `${name} 测试失败。`);
+  const resetProviderTest = () => {
+    setProviderTestState('idle');
+    setProviderTestEvidence(null);
   };
-  const saveProvider = async (provider: (typeof providers)[number], enabled = provider.enabled) => {
-    const response = await fetch('/api/v1/providers/config', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
+  const updateProviderDraft = (
+    updater: (current: typeof providerDraft) => typeof providerDraft,
+  ) => {
+    setProviderDraft(updater);
+    resetProviderTest();
+  };
+  const test = async (name: string) => {
+    setTestingProviderName(name);
+    try {
+      const response = await fetch(`/api/v1/providers/config/${encodeURIComponent(name)}/test`, {
+        method: 'POST',
+      });
+      const result = (await response.json().catch(() => null)) as {
+        status?: string;
+        message?: string;
+        credentialConfigured?: boolean;
+        healthCheck?: (typeof healthHistory)[number];
+      } | null;
+      if (!response.ok) {
+        toastManager.add({
+          title: `${name} 连通性测试失败`,
+          description: result?.message ?? 'Provider 返回了错误响应。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+          actionProps: {
+            type: 'button',
+            children: '重新测试',
+            onClick: () => void test(name),
+          },
+        });
+        return;
+      }
+      setProviders((current) =>
+        current.map((provider) =>
+          provider.name === name
+            ? {
+                ...provider,
+                ...(result?.healthCheck?.state ||
+                result?.status === 'healthy' ||
+                result?.status === 'degraded' ||
+                result?.status === 'down'
+                  ? { health: result?.healthCheck?.state ?? result?.status }
+                  : {}),
+                ...(typeof result?.credentialConfigured === 'boolean'
+                  ? { credentialConfigured: result.credentialConfigured }
+                  : {}),
+              }
+            : provider,
+        ),
+      );
+      if (result?.healthCheck) {
+        void load();
+      }
+      if (result?.status === 'healthy') {
+        toastManager.add({
+          title: `${name} 连通性测试成功`,
+          type: 'success',
+          timeout: 2800,
+        });
+      } else {
+        toastManager.add({
+          title: `${name} 连通性测试失败`,
+          description: result?.message ?? 'Provider 尚未通过连通性测试。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+          actionProps: {
+            type: 'button',
+            children: '重新测试',
+            onClick: () => void test(name),
+          },
+        });
+      }
+    } catch (error) {
+      toastManager.add({
+        title: `${name} 连通性测试失败`,
+        description: error instanceof Error ? error.message : '请检查服务连接。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+        actionProps: {
+          type: 'button',
+          children: '重新测试',
+          onClick: () => void test(name),
+        },
+      });
+    } finally {
+      setTestingProviderName((current) => (current === name ? null : current));
+    }
+  };
+  const testProviderDraft = async () => {
+    const name = providerDraft.name.trim();
+    const capabilities = providerDraft.capabilities;
+    const priority = Number(providerDraft.priority);
+    if (!name || capabilities.length === 0 || !Number.isInteger(priority) || priority < 0) {
+      setProviderTestState('error');
+      toastManager.add({
+        title: '无法测试 Provider 连接',
+        description: '请先填写 Provider 名称、至少一项能力和非负整数优先级。',
+        type: 'error',
+        timeout: 7000,
+        priority: 'high',
+      });
+      return;
+    }
+    setProviderTestState('testing');
+    setProviderTestEvidence(null);
+    const credentialsRef = credentialInputOpen ? providerDraft.credentialsRef.trim() : undefined;
+    try {
+      const response = await fetch('/api/v1/providers/config/test', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          type: providerDraft.type,
+          enabled: providerDraft.enabled,
+          priority,
+          capabilities,
+          ...(credentialInputOpen ? { credentialsRef } : {}),
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        status?: string;
+        message?: string;
+        testToken?: string;
+      } | null;
+      if (!response.ok) throw new Error(result?.message ?? '连接测试失败');
+      setProviderTestEvidence(
+        result?.testToken
+          ? {
+              token: result.testToken,
+              ...(credentialsRef ? { credentialsRef } : {}),
+            }
+          : null,
+      );
+      if (result?.status === 'healthy') {
+        setProviderTestState('success');
+        toastManager.add({
+          title: `${name} 连通性测试成功`,
+          description: result.message,
+          type: 'success',
+          timeout: 2800,
+        });
+      } else if (
+        result?.status === 'unconfigured' ||
+        result?.status === 'untested' ||
+        result?.status === 'disabled'
+      ) {
+        setProviderTestState('warning');
+        toastManager.add({
+          title: `${name} 连通性测试失败`,
+          description: result.message ?? '当前配置尚未完成连接测试。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+      } else {
+        setProviderTestState('error');
+        toastManager.add({
+          title: `${name} 连通性测试失败`,
+          description: result?.message ?? '连接异常。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+      }
+    } catch (error) {
+      setProviderTestState('error');
+      toastManager.add({
+        title: `${name} 连通性测试失败`,
+        description: error instanceof Error ? error.message : '连接测试失败。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    }
+  };
+  const saveProvider = async (
+    provider: (typeof providers)[number],
+    enabled = provider.enabled,
+    successTitle = `${provider.name} 配置已保存`,
+  ) => {
+    setSavingProviderName(provider.name);
+    try {
+      const response = await fetch('/api/v1/providers/config', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: provider.name,
+          type: provider.type,
+          enabled,
+          priority: provider.priority,
+          capabilities: provider.capabilities,
+        }),
+      });
+      if (!response.ok) {
+        toastManager.add({
+          title: `${provider.name} 配置保存失败`,
+          description: '请检查 Provider 配置后重试。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+        return;
+      }
+      const savedResponse = (await response.json().catch(() => null)) as
+        | ((typeof providers)[number] & {
+            healthCheck?: (typeof healthHistory)[number];
+          })
+        | null;
+      setProviders((current) => {
+        const existing = current.find((item) => item.name === provider.name);
+        if (!existing) return current;
+        return sortProviderRecords(
+          replaceProviderRecord(current, {
+            ...existing,
+            enabled: savedResponse?.enabled ?? enabled,
+            type: savedResponse?.type ?? existing.type,
+            priority: savedResponse?.priority ?? provider.priority,
+            capabilities: savedResponse?.capabilities ?? existing.capabilities,
+            health: savedResponse?.health ?? (enabled ? existing.health : 'unknown'),
+            ...(savedResponse?.credentialConfigured === undefined
+              ? {}
+              : { credentialConfigured: savedResponse.credentialConfigured }),
+          }),
+        );
+      });
+      if (savedResponse?.healthCheck) {
+        void load();
+      }
+      toastManager.add({ title: successTitle, type: 'success', timeout: 2800 });
+    } catch {
+      toastManager.add({
+        title: `${provider.name} 配置保存失败`,
+        description: '请检查服务连接后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setSavingProviderName((current) => (current === provider.name ? null : current));
+    }
+  };
+  const openProviderSheet = (provider?: (typeof providers)[number]) => {
+    if (provider) {
+      setEditingProviderName(provider.name);
+      setCredentialInputOpen(!provider.credentialConfigured);
+      setProviderDraft({
         name: provider.name,
         type: provider.type,
-        enabled,
+        capabilities: [...provider.capabilities],
+        credentialsRef: '',
         priority: provider.priority,
-        capabilities: provider.capabilities,
-      }),
-    });
-    setMessage(response.ok ? `${provider.name} 配置已保存。` : `${provider.name} 配置保存失败。`);
-    if (response.ok) await load();
+        enabled: provider.enabled,
+      });
+    } else {
+      setEditingProviderName(null);
+      setCredentialInputOpen(true);
+      setProviderDraft(newProviderDraft());
+    }
+    resetProviderTest();
+    setProviderSheetOpen(true);
   };
   const saveProviderDraft = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (savingProviderDraft) return;
     const name = providerDraft.name.trim();
-    const capabilities = providerDraft.capabilities
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (!name || capabilities.length === 0) {
-      setMessage('请填写 Provider 名称和至少一项能力。');
+    const capabilities = providerDraft.capabilities;
+    const priority = Number(providerDraft.priority);
+    if (!name || capabilities.length === 0 || !Number.isInteger(priority) || priority < 0) {
+      toastManager.add({
+        title: 'Provider 配置不完整',
+        description: '请填写 Provider 名称、至少一项能力和非负整数优先级。',
+        type: 'error',
+        timeout: 7000,
+        priority: 'high',
+      });
       return;
     }
-    const response = await fetch('/api/v1/providers/config', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        type: providerDraft.type,
-        enabled: true,
-        priority: 1,
-        capabilities,
-        ...(providerDraft.credentialsRef ? { credentialsRef: providerDraft.credentialsRef } : {}),
-      }),
-    });
-    if (!response.ok) {
-      setMessage('Provider 配置保存失败，请检查名称、能力和凭证引用。');
+    const credentialsRef = providerCredentialForSave(
+      providerDraft.credentialsRef,
+      providerTestEvidence,
+    );
+    setSavingProviderDraft(true);
+    let response: Response;
+    try {
+      response = await fetch('/api/v1/providers/config', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          type: providerDraft.type,
+          enabled: providerDraft.enabled,
+          priority,
+          capabilities,
+          ...(credentialsRef ? { credentialsRef } : {}),
+          ...(providerTestEvidence ? { connectionTestToken: providerTestEvidence.token } : {}),
+        }),
+      });
+    } catch {
+      setSavingProviderDraft(false);
+      toastManager.add({
+        title: 'Provider 配置保存失败',
+        description: '请检查服务连接后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
       return;
+    }
+    if (!response.ok) {
+      setSavingProviderDraft(false);
+      toastManager.add({
+        title: 'Provider 配置保存失败',
+        description: '请检查名称、能力和凭证后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+      return;
+    }
+    const savedResponse = (await response.json().catch(() => null)) as
+      | ((typeof providers)[number] & {
+          healthCheck?: (typeof healthHistory)[number];
+        })
+      | null;
+    setProviders((current) => {
+      const existing = current.find((provider) => provider.name === name);
+      const savedProvider: (typeof providers)[number] = {
+        name,
+        type: savedResponse?.type ?? providerDraft.type,
+        enabled: savedResponse?.enabled ?? providerDraft.enabled,
+        priority: savedResponse?.priority ?? priority,
+        capabilities: savedResponse?.capabilities ?? [...capabilities],
+        health:
+          savedResponse?.health ??
+          (providerTestEvidence ? 'healthy' : (existing?.health ?? 'unknown')),
+        credentialConfigured: providerCredentialConfiguredAfterSave(
+          savedResponse?.credentialConfigured,
+          credentialsRef,
+          existing?.credentialConfigured,
+        ),
+      };
+      return sortProviderRecords(replaceProviderRecord(current, savedProvider));
+    });
+    if (savedResponse?.healthCheck) {
+      void load();
     }
     setProviderDraft((current) => ({ ...current, credentialsRef: '' }));
-    setMessage(`${name} 配置已保存；页面不会回显凭证。`);
-    await load();
+    setEditingProviderName(null);
+    setProviderSheetOpen(false);
+    setCredentialInputOpen(true);
+    resetProviderTest();
+    setSavingProviderDraft(false);
+    toastManager.add({
+      title: `${name} 配置已保存`,
+      description: '页面不会回显凭证。',
+      type: 'success',
+      timeout: 2800,
+    });
   };
   const toggleJob = async (job: (typeof jobs)[number]) => {
-    await fetch(`/api/v1/automations/${job.id}/enabled`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ enabled: !job.enabled }),
-    });
-    await load();
+    if (togglingJobId) return;
+    setTogglingJobId(job.id);
+    try {
+      const response = await fetch(`/api/v1/automations/${job.id}/enabled`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: !job.enabled }),
+      });
+      if (!response.ok) throw new Error('automation-toggle');
+      const updatedJob = (await response.json().catch(() => null)) as Partial<
+        (typeof jobs)[number]
+      > | null;
+      setJobs((current) =>
+        current.map((item) =>
+          item.id === job.id
+            ? { ...item, ...updatedJob, enabled: updatedJob?.enabled ?? !job.enabled }
+            : item,
+        ),
+      );
+      toastManager.add({
+        title: `${job.name} 已${job.enabled ? '停用' : '启用'}`,
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: `${job.name} ${job.enabled ? '停用' : '启用'}失败`,
+        description: '请检查服务连接后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setTogglingJobId((current) => (current === job.id ? null : current));
+    }
   };
+  const closeProviderSheet = () => {
+    setProviderSheetOpen(false);
+    setEditingProviderName(null);
+    setCredentialInputOpen(true);
+    resetProviderTest();
+    setProviderDraft((current) => ({ ...current, credentialsRef: '' }));
+  };
+  const credentialLabel = providerCredentialLabel(providerDraft.name, providerDraft.type);
   return (
-    <section className="module-page">
-      <p className="kicker">Providers</p>
-      <h1>数据与自动化</h1>
-      <p className="page-description">
-        按能力查看 Provider、优先级、健康和额度；凭证只显示配置状态，不回显密钥。
-      </p>
+    <section className="module-page" data-provider-sheet-open={String(providerSheetOpen)}>
+      <div className="entry-page-heading">
+        <div>
+          <p className="kicker">Providers</p>
+          <h1>数据与自动化</h1>
+          <p className="page-description">
+            按能力查看 Provider、优先级、健康和额度；凭证只显示配置状态，不回显密钥。
+          </p>
+        </div>
+        <Button type="button" variant="default" onClick={() => openProviderSheet()}>
+          新增或更新 Provider
+        </Button>
+      </div>
       <Button className="secondary" type="button" variant="outline" onClick={() => void load()}>
         刷新 Provider 与自动化
       </Button>
-      {message && <p className="form-message">{message}</p>}
-      <form className="form-card provider-form" onSubmit={(event) => void saveProviderDraft(event)}>
-        <h3>新增或更新 Provider</h3>
-        <p className="form-help">
-          只保存凭证引用；输入框提交后会清空，已保存的凭证只显示配置状态，不会回显密钥。
-        </p>
-        <div className="provider-form-grid">
-          <label>
-            名称
-            <Input
-              value={providerDraft.name}
-              onChange={(event) =>
-                setProviderDraft((current) => ({ ...current, name: event.target.value }))
-              }
-              required
-              maxLength={80}
-            />
-          </label>
-          <label>
-            类型
-            <Select
-              value={providerDraft.type}
-              onValueChange={(value) =>
-                value && setProviderDraft((current) => ({ ...current, type: value }))
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {providerDraft.type === 'notification'
-                    ? '通知'
-                    : providerDraft.type === 'market'
-                      ? '行情'
-                      : providerDraft.type === 'ai'
-                        ? 'AI'
-                        : '图像'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="notification">通知</SelectItem>
-                <SelectItem value="market">行情</SelectItem>
-                <SelectItem value="ai">AI</SelectItem>
-                <SelectItem value="vision">图像</SelectItem>
-              </SelectContent>
-            </Select>
-          </label>
-          <label>
-            能力（逗号分隔）
-            <Input
-              value={providerDraft.capabilities}
-              onChange={(event) =>
-                setProviderDraft((current) => ({ ...current, capabilities: event.target.value }))
-              }
-              placeholder="notification"
-              required
-            />
-          </label>
-          <label>
-            凭证引用
-            <Input
-              type="password"
-              autoComplete="off"
-              value={providerDraft.credentialsRef}
-              onChange={(event) =>
-                setProviderDraft((current) => ({
-                  ...current,
-                  credentialsRef: event.target.value,
-                }))
-              }
-              placeholder="可选；提交后不再显示"
-            />
-          </label>
-        </div>
-        <Button type="submit" variant="default">
-          保存 Provider
-        </Button>
-      </form>
+      <Dialog
+        open={providerSheetOpen}
+        onOpenChange={(open) => (open ? setProviderSheetOpen(true) : closeProviderSheet())}
+      >
+        <DialogContent
+          aria-describedby="provider-form-description"
+          className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 grid-rows-[max-content_minmax(0,1fr)] content-start rounded-none overflow-auto"
+        >
+          <div className="panel-heading">
+            <DialogTitle>
+              {editingProviderName ? '更新 Provider' : '新增或更新 Provider'}
+            </DialogTitle>
+            <DialogDescription id="provider-form-description">
+              凭证用于连接 Provider；已配置凭证不会回显，编辑时留空保存不会删除当前凭证。
+            </DialogDescription>
+          </div>
+          <form
+            key={editingProviderName ?? 'new-provider'}
+            className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+            onSubmit={(event) => void saveProviderDraft(event)}
+          >
+            <label>
+              名称
+              <Input
+                value={providerDraft.name}
+                onChange={(event) =>
+                  updateProviderDraft((current) => ({ ...current, name: event.target.value }))
+                }
+                readOnly={Boolean(editingProviderName)}
+                required
+                maxLength={80}
+              />
+            </label>
+            <label>
+              类型
+              <Select
+                value={providerDraft.type}
+                onValueChange={(value) =>
+                  value && updateProviderDraft((current) => ({ ...current, type: value }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>{providerTypeLabel(providerDraft.type)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="notification">通知</SelectItem>
+                  <SelectItem value="market">行情</SelectItem>
+                  <SelectItem value="ai">AI</SelectItem>
+                  <SelectItem value="vision">图像</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label>
+              能力（可多选）
+              <Select
+                multiple
+                items={providerCapabilityOptions}
+                value={providerDraft.capabilities}
+                onValueChange={(value) =>
+                  updateProviderDraft((current) => ({ ...current, capabilities: value }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择能力" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerCapabilityOptions.map((capability) => (
+                    <SelectItem key={capability.value} value={capability.value}>
+                      {capability.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+            <label>
+              优先级
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                value={providerDraft.priority}
+                onChange={(event) =>
+                  updateProviderDraft((current) => ({
+                    ...current,
+                    priority: Number(event.target.value),
+                  }))
+                }
+                required
+              />
+            </label>
+            {credentialInputOpen ? (
+              <label>
+                {credentialLabel}
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  value={providerDraft.credentialsRef}
+                  onChange={(event) =>
+                    updateProviderDraft((current) => ({
+                      ...current,
+                      credentialsRef: event.target.value,
+                    }))
+                  }
+                  placeholder={providerCredentialPlaceholder(credentialLabel)}
+                />
+              </label>
+            ) : (
+              <div className="provider-credential-field">
+                <span className="provider-credential-label">凭证</span>
+                <div className="provider-credential-summary">
+                  <span className="provider-credential-state" role="status">
+                    <span aria-hidden="true">✓</span>
+                    已配置
+                  </span>
+                  <Button
+                    className="text-button"
+                    type="button"
+                    variant="link"
+                    onClick={() => {
+                      resetProviderTest();
+                      setCredentialInputOpen(true);
+                    }}
+                  >
+                    更换凭证
+                  </Button>
+                </div>
+              </div>
+            )}
+            {credentialLabel === '飞书 Webhook' && (
+              <p className="form-help">测试连接会发送一条“ThesisLedger 连接测试”通知。</p>
+            )}
+            <div className="form-actions">
+              <Button
+                className="secondary"
+                type="button"
+                variant="outline"
+                disabled={savingProviderDraft}
+                onClick={closeProviderSheet}
+              >
+                取消
+              </Button>
+              <Button
+                className="secondary"
+                disabled={providerTestState === 'testing' || savingProviderDraft}
+                aria-busy={providerTestState === 'testing'}
+                type="button"
+                variant="outline"
+                onClick={() => void testProviderDraft()}
+              >
+                {providerTestState === 'testing' && (
+                  <LoaderCircle
+                    data-icon="inline-start"
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                )}
+                {providerTestState === 'testing' ? '测试中…' : '测试连接'}
+              </Button>
+              <Button
+                disabled={providerTestState === 'testing' || savingProviderDraft}
+                type="submit"
+                variant="default"
+              >
+                {savingProviderDraft && (
+                  <LoaderCircle
+                    data-icon="inline-start"
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                )}
+                {savingProviderDraft
+                  ? '保存中…'
+                  : editingProviderName
+                    ? '保存修改'
+                    : '保存 Provider'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       <DataStateBanner state={loadState} onRetry={() => void load()} />
       <section className="panel">
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Provider</th>
-                <th>能力</th>
-                <th>优先级</th>
-                <th>状态</th>
-                <th>凭证</th>
-                <th>操作</th>
+                <th className="text-center first:text-center">提供方</th>
+                <th className="text-center">能力</th>
+                <th className="text-center">优先级</th>
+                <th className="text-center">状态</th>
+                <th className="text-center">凭证</th>
+                <th className="text-center">操作</th>
               </tr>
             </thead>
             <tbody>
-              {providers.map((provider) => (
-                <tr key={provider.name}>
-                  <td>
-                    <strong>{provider.name}</strong>
-                    <span>{provider.type}</span>
-                  </td>
-                  <td>{provider.capabilities.join(' · ')}</td>
-                  <td>
-                    <Input
-                      aria-label={`${provider.name} 优先级`}
-                      type="number"
-                      min={0}
-                      value={provider.priority}
-                      onChange={(event) =>
-                        setProviders((current) =>
-                          current.map((item) =>
-                            item.name === provider.name
-                              ? { ...item, priority: Number(event.target.value) }
-                              : item,
-                          ),
-                        )
-                      }
-                      onBlur={() => void saveProvider(provider)}
-                    />
-                  </td>
-                  <td>{provider.health}</td>
-                  <td>{provider.credentialConfigured ? '已配置' : '未配置'}</td>
-                  <td>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => void test(provider.name)}
-                    >
-                      连通性测试
-                    </Button>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => void saveProvider(provider, !provider.enabled)}
-                    >
-                      {provider.enabled ? '停用' : '启用'}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && providers.length === 0 ? (
+                <EmptyTableRow colSpan={6} />
+              ) : (
+                providers.map((provider) => {
+                  const status = providerDisplayStatus(provider);
+                  return (
+                    <tr key={provider.name}>
+                      <td className="text-left first:text-left">
+                        <strong>{provider.name}</strong>
+                        <span>{providerTypeLabel(provider.type)}</span>
+                      </td>
+                      <td className="text-left">
+                        {provider.capabilities.map(providerCapabilityLabel).join(' · ')}
+                      </td>
+                      <td className="text-left">
+                        <Input
+                          className="w-20"
+                          aria-label={`${provider.name} 优先级`}
+                          type="number"
+                          min={0}
+                          value={provider.priority}
+                          onChange={(event) =>
+                            setProviders((current) =>
+                              current.map((item) =>
+                                item.name === provider.name
+                                  ? { ...item, priority: Number(event.target.value) }
+                                  : item,
+                              ),
+                            )
+                          }
+                          onBlur={() => void saveProvider(provider)}
+                        />
+                      </td>
+                      <td className="text-left">
+                        <span className={`provider-status ${status.tone}`}>
+                          <span className="status-dot" aria-hidden="true" />
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="text-left">
+                        {provider.credentialConfigured ? '已配置' : '未配置'}
+                      </td>
+                      <td className="text-left">
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          onClick={() => openProviderSheet(provider)}
+                        >
+                          编辑
+                        </Button>
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          disabled={testingProviderName !== null || savingProviderName !== null}
+                          aria-busy={testingProviderName === provider.name}
+                          onClick={() => void test(provider.name)}
+                        >
+                          {testingProviderName === provider.name && (
+                            <LoaderCircle
+                              data-icon="inline-start"
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {testingProviderName === provider.name ? '测试中…' : '连通性测试'}
+                        </Button>
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          disabled={testingProviderName !== null || savingProviderName !== null}
+                          aria-busy={savingProviderName === provider.name}
+                          onClick={() =>
+                            void saveProvider(
+                              provider,
+                              !provider.enabled,
+                              `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
+                            )
+                          }
+                        >
+                          {savingProviderName === provider.name && (
+                            <LoaderCircle
+                              data-icon="inline-start"
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {savingProviderName === provider.name
+                            ? provider.enabled
+                              ? '停用中…'
+                              : '启用中…'
+                            : provider.enabled
+                              ? '停用'
+                              : '启用'}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -1549,26 +2494,45 @@ export function ProviderSettings() {
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job) => (
-                <tr key={job.id}>
-                  <td>{job.name}</td>
-                  <td>{job.type}</td>
-                  <td>
-                    {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString('zh-CN') : '未安排'}
-                  </td>
-                  <td>{job.enabled ? '启用' : '停用'}</td>
-                  <td>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => void toggleJob(job)}
-                    >
-                      {job.enabled ? '停用' : '启用'}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && jobs.length === 0 ? (
+                <EmptyTableRow colSpan={5} />
+              ) : (
+                jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td>{job.name}</td>
+                    <td>{job.type}</td>
+                    <td>
+                      {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString('zh-CN') : '未安排'}
+                    </td>
+                    <td>{job.enabled ? '启用' : '停用'}</td>
+                    <td>
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        variant="link"
+                        disabled={togglingJobId !== null}
+                        aria-busy={togglingJobId === job.id}
+                        onClick={() => void toggleJob(job)}
+                      >
+                        {togglingJobId === job.id && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {togglingJobId === job.id
+                          ? job.enabled
+                            ? '停用中…'
+                            : '启用中…'
+                          : job.enabled
+                            ? '停用'
+                            : '启用'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1576,7 +2540,7 @@ export function ProviderSettings() {
       <section className="panel">
         <div className="panel-heading">
           <h2>Provider 健康历史</h2>
-          <p>显示最近状态、延迟和检查时间，便于判断主备切换原因。</p>
+          <p>显示状态、延迟、检查来源和时间，便于判断主备切换原因。</p>
         </div>
         <div className="table-wrap">
           <table>
@@ -1586,20 +2550,65 @@ export function ProviderSettings() {
                 <th>状态</th>
                 <th>延迟</th>
                 <th>检查时间</th>
+                <th>来源</th>
               </tr>
             </thead>
             <tbody>
-              {healthHistory.map((item, index) => (
-                <tr key={`${item.provider}-${item.checkedAt}-${index}`}>
-                  <td>{item.provider}</td>
-                  <td>{item.state}</td>
-                  <td>{item.latencyMs === null ? '不可用' : `${item.latencyMs} ms`}</td>
-                  <td>{new Date(item.checkedAt).toLocaleString('zh-CN')}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && healthHistory.length === 0 ? (
+                <EmptyTableRow colSpan={5} />
+              ) : (
+                healthHistory.map((item, index) => (
+                  <tr key={`${item.provider}-${item.checkedAt}-${index}`}>
+                    <td>{item.provider}</td>
+                    <td>{item.state}</td>
+                    <td>{item.latencyMs === null ? '不可用' : `${item.latencyMs} ms`}</td>
+                    <td>{new Date(item.checkedAt).toLocaleString('zh-CN')}</td>
+                    <td>{providerHealthSourceLabel(item.source)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        {healthHistoryPagination.total > 0 ? (
+          <nav
+            className="mt-3 flex flex-wrap items-center justify-between gap-3"
+            aria-label="Provider 健康历史分页"
+          >
+            <p className="m-0 text-sm text-muted-foreground">
+              第 {healthHistoryPagination.page} / {healthHistoryPagination.totalPages} 页，共{' '}
+              {healthHistoryPagination.total} 条
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                disabled={
+                  loadState === 'loading' ||
+                  healthHistoryLoading ||
+                  healthHistoryPagination.page <= 1
+                }
+                onClick={() => void loadProviderHealthHistory(healthHistoryPagination.page - 1)}
+              >
+                上一页
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                disabled={
+                  loadState === 'loading' ||
+                  healthHistoryLoading ||
+                  healthHistoryPagination.page >= healthHistoryPagination.totalPages
+                }
+                onClick={() => void loadProviderHealthHistory(healthHistoryPagination.page + 1)}
+              >
+                下一页
+              </Button>
+            </div>
+          </nav>
+        ) : null}
       </section>
       <section className="panel">
         <div className="panel-heading">
@@ -1617,14 +2626,18 @@ export function ProviderSettings() {
               </tr>
             </thead>
             <tbody>
-              {jobHistory.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.jobId}</td>
-                  <td>{item.status}</td>
-                  <td>{new Date(item.startedAt).toLocaleString('zh-CN')}</td>
-                  <td>{item.error ?? '—'}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && jobHistory.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
+              ) : (
+                jobHistory.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.jobId}</td>
+                    <td>{item.status}</td>
+                    <td>{new Date(item.startedAt).toLocaleString('zh-CN')}</td>
+                    <td>{item.error ?? '—'}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1644,13 +2657,17 @@ export function ProviderSettings() {
               </tr>
             </thead>
             <tbody>
-              {notificationFailures.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.provider}</td>
-                  <td>{item.status}</td>
-                  <td>{item.lastError ?? '—'}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && notificationFailures.length === 0 ? (
+                <EmptyTableRow colSpan={3} />
+              ) : (
+                notificationFailures.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.provider}</td>
+                    <td>{item.status}</td>
+                    <td>{item.lastError ?? '—'}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1671,14 +2688,18 @@ export function ProviderSettings() {
               </tr>
             </thead>
             <tbody>
-              {issues.map((issue) => (
-                <tr key={issue.id}>
-                  <td>{issue.provider}</td>
-                  <td>{issue.symbol ?? '全局'}</td>
-                  <td>{issue.severity}</td>
-                  <td>{issue.code}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && issues.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
+              ) : (
+                issues.map((issue) => (
+                  <tr key={issue.id}>
+                    <td>{issue.provider}</td>
+                    <td>{issue.symbol ?? '全局'}</td>
+                    <td>{issue.severity}</td>
+                    <td>{issue.code}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1695,14 +2716,10 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
   const [allocationRows, setAllocationRows] = useState<PerformanceAllocationRecord[]>([]);
   const [rebalanceRows, setRebalanceRows] = useState<RebalanceGapRecord[]>([]);
   const [targetText, setTargetText] = useState('{"股票":0.6,"ETF":0.4}');
-  const [message, setMessage] = useState('');
-  const [messageTone, setMessageTone] = useState<'error' | 'success'>('success');
+  const [savingTargets, setSavingTargets] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const loadSequence = useRef(0);
-  const showMessage = (nextMessage: string, tone: 'error' | 'success') => {
-    setMessage(nextMessage);
-    setMessageTone(tone);
-  };
+  const toastManager = useToastManager();
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
   }, [accountId, accounts]);
@@ -1772,12 +2789,13 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
       void load().catch(() => {
         if (sequence !== loadSequence.current) return;
         setLoadState(snapshots.length > 0 ? 'stale' : 'error');
-        showMessage('收益历史读取失败。', 'error');
       });
     }
   }, [accountId, mode]);
   const saveTargets = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (savingTargets) return;
+    setSavingTargets(true);
     try {
       const targets = JSON.parse(targetText) as Record<string, number>;
       const response = await fetch('/api/v1/performance/targets', {
@@ -1790,13 +2808,32 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
         }),
       });
       if (!response.ok) {
-        showMessage('目标权重必须合计 100%。', 'error');
+        toastManager.add({
+          title: '目标配置保存失败',
+          description: '目标权重必须合计 100%。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
         return;
       }
-      showMessage('目标配置已保存并生成新版本。', 'success');
+      toastManager.add({
+        title: '目标配置已保存',
+        description: '已生成新版本。',
+        type: 'success',
+        timeout: 2800,
+      });
       await load();
     } catch {
-      showMessage('目标配置必须是 JSON 对象。', 'error');
+      toastManager.add({
+        title: '目标配置保存失败',
+        description: '目标配置必须是 JSON 对象。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setSavingTargets(false);
     }
   };
   const latest = snapshots.at(-1);
@@ -1885,14 +2922,18 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
               </tr>
             </thead>
             <tbody>
-              {snapshots.map((snapshot) => (
-                <tr key={snapshot.id}>
-                  <td>{new Date(snapshot.capturedAt).toLocaleString('zh-CN')}</td>
-                  <td>{money.format(snapshot.marketValue)}</td>
-                  <td>{money.format(snapshot.costValue)}</td>
-                  <td>{money.format(snapshot.cashValue)}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && snapshots.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
+              ) : (
+                snapshots.map((snapshot) => (
+                  <tr key={snapshot.id}>
+                    <td>{new Date(snapshot.capturedAt).toLocaleString('zh-CN')}</td>
+                    <td>{money.format(snapshot.marketValue)}</td>
+                    <td>{money.format(snapshot.costValue)}</td>
+                    <td>{money.format(snapshot.cashValue)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1912,10 +2953,8 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
               </tr>
             </thead>
             <tbody>
-              {allocationRows.length === 0 ? (
-                <tr>
-                  <td colSpan={3}>暂无可用市值</td>
-                </tr>
+              {isDataLoaded(loadState) && allocationRows.length === 0 ? (
+                <EmptyTableRow colSpan={3} />
               ) : (
                 allocationRows.map((row) => (
                   <tr key={row.category}>
@@ -1945,10 +2984,8 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
               </tr>
             </thead>
             <tbody>
-              {rebalanceRows.length === 0 ? (
-                <tr>
-                  <td colSpan={4}>保存目标配置后显示缺口</td>
-                </tr>
+              {isDataLoaded(loadState) && rebalanceRows.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
               ) : (
                 rebalanceRows.map((row) => (
                   <tr key={row.category}>
@@ -1983,19 +3020,13 @@ function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
           />
         </label>
         <small id="target-help">例如 {`{"股票":0.6,"ETF":0.4}`}，总和必须为 1。</small>
-        <Button type="submit" variant="default">
-          保存目标
+        <Button disabled={savingTargets} type="submit" variant="default">
+          {savingTargets && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {savingTargets ? '保存中…' : '保存目标'}
         </Button>
       </form>
-      {message && (
-        <p
-          className="form-message"
-          data-tone={messageTone}
-          role={messageTone === 'error' ? 'alert' : 'status'}
-        >
-          {message}
-        </p>
-      )}
     </section>
   );
 }
@@ -2005,12 +3036,14 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
   const [mode, setMode] = useState<PortfolioMode>('actual');
   const [events, setEvents] = useState<RiskEventRecord[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationRecord[]>([]);
-  const [message, setMessage] = useState('');
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [audit, setAudit] = useState<
     Array<{ id: string; action: string; ruleVersion: number; createdAt: string }>
   >([]);
+  const [auditVisible, setAuditVisible] = useState(false);
   const loadSequence = useRef(0);
+  const toastManager = useToastManager();
 
   const loadRisk = async () => {
     const sequence = ++loadSequence.current;
@@ -2041,7 +3074,6 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
     } catch {
       if (sequence !== loadSequence.current) return;
       setLoadState(rules.length || events.length || deliveries.length ? 'stale' : 'error');
-      setMessage('风险数据读取失败，请稍后重试。');
     }
   };
   useEffect(() => {
@@ -2050,42 +3082,80 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
 
   const createRule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const scope = formText(form, 'scope') as RiskRuleRecord['scope'];
-    const response = await fetch('/api/v1/risk/rules', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        kind: formText(form, 'kind'),
-        scope,
-        severity: formText(form, 'severity'),
-        threshold: Number(formText(form, 'threshold')),
-        enabled: true,
-        ...(scope === 'security' ? { symbol: formText(form, 'symbol') } : {}),
-        ...(scope === 'account' ? { accountId: formText(form, 'accountId') } : {}),
-      }),
-    });
-    if (!response.ok) {
-      setMessage('规则创建失败，请检查 scope 与目标。');
-      return;
+    if (busyAction) return;
+    setBusyAction('create-rule');
+    try {
+      const formElement = event.currentTarget;
+      const form = new FormData(formElement);
+      const scope = formText(form, 'scope') as RiskRuleRecord['scope'];
+      const response = await fetch('/api/v1/risk/rules', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: formText(form, 'kind'),
+          scope,
+          severity: formText(form, 'severity'),
+          threshold: Number(formText(form, 'threshold')),
+          enabled: true,
+          ...(scope === 'security' ? { symbol: formText(form, 'symbol') } : {}),
+          ...(scope === 'account' ? { accountId: formText(form, 'accountId') } : {}),
+        }),
+      });
+      if (!response.ok) throw new Error('risk-rule-create');
+      formElement.reset();
+      toastManager.add({
+        title: '规则已创建',
+        description: '已记录审计。',
+        type: 'success',
+        timeout: 2800,
+      });
+      await loadRisk();
+    } catch {
+      toastManager.add({
+        title: '规则创建失败',
+        description: '请检查 scope 与目标。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    formElement.reset();
-    setMessage('规则已创建并记录审计。');
-    await loadRisk();
   };
 
   const patchRule = async (rule: RiskRuleRecord, patch: object) => {
-    const response = await fetch(`/api/v1/risk/rules/${rule.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    setMessage(response.ok ? '规则已生成新版本。' : '规则更新失败。');
-    if (response.ok) await loadRisk();
+    if (busyAction) return;
+    setBusyAction(`patch:${rule.id}`);
+    try {
+      const response = await fetch(`/api/v1/risk/rules/${rule.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) throw new Error('risk-rule-patch');
+      toastManager.add({
+        title: '规则已更新',
+        description: '已生成新版本。',
+        type: 'success',
+        timeout: 2800,
+      });
+      await loadRisk();
+    } catch {
+      toastManager.add({
+        title: '规则更新失败',
+        description: '请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const testRule = async (rule: RiskRuleRecord) => {
+    if (busyAction) return;
+    setBusyAction(`test:${rule.id}`);
     const contexts = (portfolio?.positions ?? []).map((position) => ({
       symbol: position.symbol,
       accountId: position.accountId,
@@ -2100,20 +3170,36 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
       marketTime: portfolio?.valuedAt ?? new Date().toISOString(),
       dataQuality: { portfolio: portfolio?.partial ? 'partial' : 'fresh' },
     }));
-    const response = await fetch(`/api/v1/risk/rules/${rule.id}/test`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(contexts),
-    });
-    if (!response.ok) {
-      setMessage('人工测试失败，请确认组合中有可用数据。');
-      return;
+    try {
+      const response = await fetch(`/api/v1/risk/rules/${rule.id}/test`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(contexts),
+      });
+      if (!response.ok) throw new Error('risk-rule-test');
+      const result = (await response.json()) as Array<{ triggered: boolean }>;
+      toastManager.add({
+        title: '人工测试完成',
+        description: `${result.filter((item) => item.triggered).length} 个上下文触发。`,
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: '人工测试失败',
+        description: '请确认组合中有可用数据。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    const result = (await response.json()) as Array<{ triggered: boolean }>;
-    setMessage(`人工测试完成：${result.filter((item) => item.triggered).length} 个上下文触发。`);
   };
 
   const scanRisk = async () => {
+    if (busyAction) return;
+    setBusyAction('scan-risk');
     const contexts = (portfolio?.positions ?? []).map((position) => ({
       symbol: position.symbol,
       accountId: position.accountId,
@@ -2128,23 +3214,52 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
       marketTime: portfolio?.valuedAt ?? new Date().toISOString(),
       dataQuality: { portfolio: portfolio?.partial ? 'partial' : 'fresh' },
     }));
-    const response = await fetch('/api/v1/risk/scan', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(contexts),
-    });
-    if (!response.ok) {
-      setMessage('风险扫描失败，请确认当前组合有可用数据。');
-      return;
+    try {
+      const response = await fetch('/api/v1/risk/scan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(contexts),
+      });
+      if (!response.ok) throw new Error('risk-scan');
+      toastManager.add({
+        title: '风险扫描已完成',
+        description: '触发事件已写入历史。',
+        type: 'success',
+        timeout: 2800,
+      });
+      await loadRisk();
+    } catch {
+      toastManager.add({
+        title: '风险扫描失败',
+        description: '请确认当前组合有可用数据。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    setMessage('风险扫描已完成，触发事件已写入历史。');
-    await loadRisk();
   };
 
   const showAudit = async (rule: RiskRuleRecord) => {
-    const response = await fetch(`/api/v1/risk/rules/${rule.id}/audit`);
-    if (!response.ok) return setMessage('审计记录读取失败。');
-    setAudit((await response.json()) as typeof audit);
+    if (busyAction) return;
+    setBusyAction(`audit:${rule.id}`);
+    try {
+      const response = await fetch(`/api/v1/risk/rules/${rule.id}/audit`);
+      if (!response.ok) throw new Error('risk-audit');
+      setAudit((await response.json()) as typeof audit);
+      setAuditVisible(true);
+    } catch {
+      toastManager.add({
+        title: '审计记录读取失败',
+        description: '请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const criticalCount = events.filter((event) => event.severity === 'critical').length;
@@ -2294,23 +3409,26 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
             </SelectContent>
           </Select>
         </label>
-        <Button type="submit" variant="default">
-          创建规则
+        <Button disabled={busyAction !== null} type="submit" variant="default">
+          {busyAction === 'create-rule' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {busyAction === 'create-rule' ? '创建中…' : '创建规则'}
         </Button>
         <Button
           className="secondary"
           type="button"
           variant="outline"
+          disabled={busyAction !== null}
+          aria-busy={busyAction === 'scan-risk'}
           onClick={() => void scanRisk()}
         >
-          扫描当前组合
+          {busyAction === 'scan-risk' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {busyAction === 'scan-risk' ? '扫描中…' : '扫描当前组合'}
         </Button>
       </form>
-      {message && (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      )}
       <DataStateBanner state={loadState} onRetry={() => void loadRisk()} />
       <section className="panel">
         <div className="panel-heading">
@@ -2329,62 +3447,103 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
               </tr>
             </thead>
             <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.id}>
-                  <td>
-                    <strong>{rule.kind}</strong>
-                    <span>{rule.symbol ?? rule.accountId ?? '全组合'}</span>
-                  </td>
-                  <td>{rule.scope}</td>
-                  <td>{rule.threshold}</td>
-                  <td>v{rule.version}</td>
-                  <td>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => void patchRule(rule, { enabled: !rule.enabled })}
-                    >
-                      {rule.enabled ? '停用' : '启用'}
-                    </Button>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => void testRule(rule)}
-                    >
-                      测试
-                    </Button>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => void showAudit(rule)}
-                    >
-                      审计
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && rules.length === 0 ? (
+                <EmptyTableRow colSpan={5} />
+              ) : (
+                rules.map((rule) => (
+                  <tr key={rule.id}>
+                    <td>
+                      <strong>{rule.kind}</strong>
+                      <span>{rule.symbol ?? rule.accountId ?? '全组合'}</span>
+                    </td>
+                    <td>{rule.scope}</td>
+                    <td>{rule.threshold}</td>
+                    <td>v{rule.version}</td>
+                    <td>
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        variant="link"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === `patch:${rule.id}`}
+                        onClick={() => void patchRule(rule, { enabled: !rule.enabled })}
+                      >
+                        {busyAction === `patch:${rule.id}` && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === `patch:${rule.id}`
+                          ? rule.enabled
+                            ? '停用中…'
+                            : '启用中…'
+                          : rule.enabled
+                            ? '停用'
+                            : '启用'}
+                      </Button>
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        variant="link"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === `test:${rule.id}`}
+                        onClick={() => void testRule(rule)}
+                      >
+                        {busyAction === `test:${rule.id}` && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === `test:${rule.id}` ? '测试中…' : '测试'}
+                      </Button>
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        variant="link"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === `audit:${rule.id}`}
+                        onClick={() => void showAudit(rule)}
+                      >
+                        {busyAction === `audit:${rule.id}` && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === `audit:${rule.id}` ? '读取中…' : '审计'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </section>
-      {audit.length > 0 && (
+      {auditVisible && (
         <section className="panel">
           <div className="panel-heading">
             <h2>规则审计</h2>
           </div>
-          <div className="edit-list">
-            {audit.map((item) => (
-              <div key={item.id}>
-                <span>
-                  {item.action} · v{item.ruleVersion}
-                </span>
-                <small>{new Date(item.createdAt).toLocaleString('zh-CN')}</small>
-              </div>
-            ))}
-          </div>
+          {audit.length === 0 ? (
+            <EmptyListState />
+          ) : (
+            <div className="edit-list">
+              {audit.map((item) => (
+                <div key={item.id}>
+                  <span>
+                    {item.action} · v{item.ruleVersion}
+                  </span>
+                  <small>{new Date(item.createdAt).toLocaleString('zh-CN')}</small>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
       <section className="panel">
@@ -2403,19 +3562,25 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
               </tr>
             </thead>
             <tbody>
-              {events.map((event) => (
-                <tr key={event.id}>
-                  <td>
-                    <strong>{event.message}</strong>
-                    <span>
-                      {event.symbol ?? '组合'} · value={displayValue(event.context.value)}
-                    </span>
-                  </td>
-                  <td>{event.severity}</td>
-                  <td>v{event.ruleVersion}</td>
-                  <td>{new Date(event.marketTime ?? event.evaluatedAt).toLocaleString('zh-CN')}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && events.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
+              ) : (
+                events.map((event) => (
+                  <tr key={event.id}>
+                    <td>
+                      <strong>{event.message}</strong>
+                      <span>
+                        {event.symbol ?? '组合'} · value={displayValue(event.context.value)}
+                      </span>
+                    </td>
+                    <td>{event.severity}</td>
+                    <td>v{event.ruleVersion}</td>
+                    <td>
+                      {new Date(event.marketTime ?? event.evaluatedAt).toLocaleString('zh-CN')}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -2435,17 +3600,21 @@ function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portfolio: P
               </tr>
             </thead>
             <tbody>
-              {deliveries.map((delivery) => (
-                <tr key={delivery.id}>
-                  <td>
-                    <strong>{delivery.channel}</strong>
-                    <span>{delivery.lastError ?? delivery.eventId}</span>
-                  </td>
-                  <td>{delivery.severity}</td>
-                  <td>{delivery.status}</td>
-                  <td>{delivery.attemptCount}</td>
-                </tr>
-              ))}
+              {isDataLoaded(loadState) && deliveries.length === 0 ? (
+                <EmptyTableRow colSpan={4} />
+              ) : (
+                deliveries.map((delivery) => (
+                  <tr key={delivery.id}>
+                    <td>
+                      <strong>{delivery.channel}</strong>
+                      <span>{delivery.lastError ?? delivery.eventId}</span>
+                    </td>
+                    <td>{delivery.severity}</td>
+                    <td>{delivery.status}</td>
+                    <td>{delivery.attemptCount}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -2459,30 +3628,38 @@ function ScreenshotImportReview({
   initialAccountId,
   onPortfolioChanged,
   onDirtyChange,
+  embedded = false,
+  accountLocked = false,
 }: {
   accounts: Account[];
   initialAccountId?: string;
   onPortfolioChanged: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  embedded?: boolean;
+  accountLocked?: boolean;
 }) {
   const [accountId, setAccountId] = useState(initialAccountId ?? '');
   const [source, setSource] = useState<ImportDraftRecord['source']>('unknown');
   const [drafts, setDrafts] = useState<ImportDraftRecord[]>([]);
   const [selected, setSelected] = useState<ImportDraftRecord | null>(null);
   const [rows, setRows] = useState<ImportRow[]>([]);
-  const [message, setMessage] = useState('');
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [dirty, setDirty] = useState(false);
+  const toastManager = useToastManager();
   const loadSequence = useRef(0);
   const markDirty = (nextDirty = true) => {
     setDirty(nextDirty);
     onDirtyChange?.(nextDirty);
   };
-  const confirmDiscard = () =>
-    !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
   useEffect(() => {
+    if (accountLocked && initialAccountId && initialAccountId !== accountId) {
+      setAccountId(initialAccountId);
+      return;
+    }
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
-  }, [accountId, accounts, initialAccountId]);
+  }, [accountId, accountLocked, accounts, initialAccountId]);
   const loadDrafts = async (nextAccountId: string) => {
     const sequence = ++loadSequence.current;
     setLoadState('loading');
@@ -2498,7 +3675,6 @@ function ScreenshotImportReview({
     } catch {
       if (sequence !== loadSequence.current) return;
       setLoadState(drafts.length ? 'stale' : 'error');
-      setMessage('导入历史读取失败。');
     }
   };
   useEffect(() => {
@@ -2511,26 +3687,42 @@ function ScreenshotImportReview({
   }, [accountId]);
   const upload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busyAction) return;
     const fileInput = event.currentTarget.elements.namedItem('file') as HTMLInputElement;
     const file = fileInput.files?.[0];
     if (!file || !accountId) return;
+    setBusyAction('upload');
     const body = new FormData();
     body.set('file', file);
     body.set('accountId', accountId);
     body.set('source', source);
     body.set('sourceConfidence', source === 'unknown' ? '0' : '1');
     body.set('extracted', '[]');
-    const response = await fetch('/api/v1/imports/screenshot', { method: 'POST', body });
-    if (!response.ok) {
-      setMessage('截图上传失败，请确认格式和大小不超过 10MB。');
-      return;
+    try {
+      const response = await fetch('/api/v1/imports/screenshot', { method: 'POST', body });
+      if (!response.ok) throw new Error('upload');
+      const draft = (await response.json()) as ImportDraftRecord;
+      setDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)]);
+      setSelected(draft);
+      setRows(draft.rows);
+      markDirty(false);
+      toastManager.add({
+        title: '截图草稿已创建',
+        description: '请逐项确认后提交。',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: '截图上传失败',
+        description: '请确认格式和大小不超过 10MB。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    const draft = (await response.json()) as ImportDraftRecord;
-    setDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)]);
-    setSelected(draft);
-    setRows(draft.rows);
-    markDirty(false);
-    setMessage('草稿已创建；请逐项确认后提交。');
   };
   const choose = (draft: ImportDraftRecord) => {
     if (!confirmDiscard()) return;
@@ -2556,37 +3748,78 @@ function ScreenshotImportReview({
     );
   };
   const commit = async () => {
-    if (!selected) return;
-    const response = await fetch(`/api/v1/imports/${selected.id}/commit`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ rows, source }),
-    });
-    if (!response.ok) {
-      setMessage('仍有未解决字段，请检查代码、数量、成本价和数值关系。');
-      return;
-    }
-    setMessage('导入已提交，组合已重新估值。');
-    setSelected({ ...selected, status: 'committed', rows });
-    markDirty(false);
-    onPortfolioChanged();
-  };
-  const rollback = async (draft: ImportDraftRecord) => {
-    const response = await fetch(`/api/v1/imports/${draft.id}/rollback`, { method: 'POST' });
-    setMessage(response.ok ? '已恢复到本次导入前的持仓。' : '该记录无法回滚。');
-    if (response.ok) {
+    if (!selected || busyAction) return;
+    setBusyAction('commit');
+    try {
+      const response = await fetch(`/api/v1/imports/${selected.id}/commit`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ rows, source }),
+      });
+      if (!response.ok) throw new Error('commit');
+      setSelected({ ...selected, status: 'committed', rows });
       markDirty(false);
       onPortfolioChanged();
+      toastManager.add({
+        title: '导入已提交',
+        description: '组合已重新估值。',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: '导入提交失败',
+        description: '仍有未解决字段，请检查代码、数量、成本价和数值关系。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+  const rollback = async (draft: ImportDraftRecord) => {
+    if (busyAction) return;
+    setBusyAction(`rollback:${draft.id}`);
+    try {
+      const response = await fetch(`/api/v1/imports/${draft.id}/rollback`, { method: 'POST' });
+      if (!response.ok) throw new Error('rollback');
+      markDirty(false);
+      onPortfolioChanged();
+      toastManager.add({
+        title: '导入已回滚',
+        description: '已恢复到本次导入前的持仓。',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: '导入回滚失败',
+        description: '该记录无法回滚，请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
   };
   return (
-    <div className="import-screenshot-content">
-      <div className="panel-heading">
-        <h2>截图导入</h2>
-        <p>上传不会直接修改持仓。代码歧义、低置信度或数值不一致必须先人工修正。</p>
-      </div>
+    <div
+      className={
+        embedded
+          ? 'import-screenshot-content embedded min-h-0 content-start overflow-auto'
+          : 'import-screenshot-content'
+      }
+    >
+      {!embedded && (
+        <div className="panel-heading">
+          <h2>截图导入</h2>
+          <p>上传不会直接修改持仓。代码歧义、低置信度或数值不一致必须先人工修正。</p>
+        </div>
+      )}
       <Button
-        className="secondary"
+        className="secondary mb-[18px]"
         type="button"
         variant="outline"
         onClick={() => {
@@ -2603,6 +3836,7 @@ function ScreenshotImportReview({
           <label>
             账户
             <Select
+              disabled={accountLocked}
               value={accountId || null}
               onValueChange={(value) => {
                 if (!value || !confirmDiscard()) return;
@@ -2618,8 +3852,8 @@ function ScreenshotImportReview({
               <SelectContent>
                 {accounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
-                    {account.name} · {account.institution || '未填写机构'} ·{' '}
-                    {account.currency} · {account.type === 'fund' ? '基金' : account.type === 'cash' ? '现金' : '证券'}
+                    {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
+                    {account.type === 'fund' ? '基金' : account.type === 'cash' ? '现金' : '证券'}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2666,15 +3900,13 @@ function ScreenshotImportReview({
             持仓截图
             <Input name="file" type="file" required accept="image/png,image/jpeg,image/webp" />
           </label>
-          <Button type="submit" variant="default">
-            创建草稿
+          <Button type="submit" variant="default" disabled={busyAction !== null}>
+            {busyAction === 'upload' && (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+            )}
+            {busyAction === 'upload' ? '创建中…' : '创建草稿'}
           </Button>
         </form>
-      )}
-      {message && (
-        <div className="form-message" role="status">
-          {message}
-        </div>
       )}
       <DataStateBanner
         state={loadState}
@@ -2682,8 +3914,8 @@ function ScreenshotImportReview({
       />
       <div className="review-layout">
         <aside className="draft-list" aria-label="导入历史">
-          {drafts.length === 0 ? (
-            <p>暂无导入记录</p>
+          {isDataLoaded(loadState) && drafts.length === 0 ? (
+            <EmptyListState className="min-h-0 items-start px-0 py-6 text-left" />
           ) : (
             drafts.map((draft) => (
               <Button
@@ -2736,90 +3968,111 @@ function ScreenshotImportReview({
                   添加一行
                 </Button>
               </div>
-              {rows.map((row, index) => (
-                <div className="review-row" key={`${index}-${row.rawSymbol}`}>
-                  <label>
-                    名称
-                    <Input
-                      value={row.rawName ?? ''}
-                      onChange={(event) => updateRow(index, { rawName: event.target.value })}
-                    />
-                  </label>
-                  <label>
-                    代码
-                    <Input
-                      value={row.symbol ?? ''}
-                      onChange={(event) =>
-                        updateRow(index, { symbol: event.target.value.toUpperCase() })
-                      }
-                    />
-                  </label>
-                  <label>
-                    数量
-                    <Input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={row.quantity ?? ''}
-                      onChange={(event) =>
-                        updateRow(index, { quantity: Number(event.target.value) })
-                      }
-                    />
-                  </label>
-                  <label>
-                    成本价
-                    <Input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={row.costPrice ?? ''}
-                      onChange={(event) =>
-                        updateRow(index, { costPrice: Number(event.target.value) })
-                      }
-                    />
-                  </label>
-                  <div className="row-status">
-                    <Badge
-                      className={row.confidence < 0.75 ? 'tag warning' : 'tag'}
-                      variant="secondary"
+              {rows.length === 0 ? (
+                <EmptyListState />
+              ) : (
+                rows.map((row, index) => (
+                  <div className="review-row" key={`${index}-${row.rawSymbol}`}>
+                    <label>
+                      名称
+                      <Input
+                        value={row.rawName ?? ''}
+                        onChange={(event) => updateRow(index, { rawName: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      代码
+                      <Input
+                        value={row.symbol ?? ''}
+                        onChange={(event) =>
+                          updateRow(index, { symbol: event.target.value.toUpperCase() })
+                        }
+                      />
+                    </label>
+                    <label>
+                      数量
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={row.quantity ?? ''}
+                        onChange={(event) =>
+                          updateRow(index, { quantity: Number(event.target.value) })
+                        }
+                      />
+                    </label>
+                    <label>
+                      成本价
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={row.costPrice ?? ''}
+                        onChange={(event) =>
+                          updateRow(index, { costPrice: Number(event.target.value) })
+                        }
+                      />
+                    </label>
+                    <div className="row-status">
+                      <Badge
+                        className={row.confidence < 0.75 ? 'tag warning' : 'tag'}
+                        variant="secondary"
+                      >
+                        {Math.round(row.confidence * 100)}%
+                      </Badge>
+                      {row.issues.map((issue) => (
+                        <small key={issue}>{issue}</small>
+                      ))}
+                    </div>
+                    <Button
+                      className="text-button danger"
+                      size="sm"
+                      type="button"
+                      variant="destructive"
+                      onClick={() => {
+                        markDirty();
+                        setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
+                      }}
                     >
-                      {Math.round(row.confidence * 100)}%
-                    </Badge>
-                    {row.issues.map((issue) => (
-                      <small key={issue}>{issue}</small>
-                    ))}
+                      删除
+                    </Button>
                   </div>
-                  <Button
-                    className="text-button danger"
-                    size="sm"
-                    type="button"
-                    variant="destructive"
-                    onClick={() => {
-                      markDirty();
-                      setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
-                    }}
-                  >
-                    删除
-                  </Button>
-                </div>
-              ))}
+                ))
+              )}
               <div className="form-actions">
                 <Button
-                  disabled={selected.status === 'committed'}
+                  disabled={selected.status === 'committed' || busyAction !== null}
+                  aria-busy={busyAction === 'commit'}
                   type="button"
                   variant="default"
                   onClick={() => void commit()}
                 >
-                  确认并提交
+                  {busyAction === 'commit' && (
+                    <LoaderCircle
+                      data-icon="inline-start"
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {busyAction === 'commit' ? '提交中…' : '确认并提交'}
                 </Button>
                 {selected.status === 'committed' && (
                   <Button
                     className="secondary"
                     type="button"
                     variant="outline"
+                    disabled={busyAction !== null}
+                    aria-busy={busyAction === `rollback:${selected.id}`}
                     onClick={() => void rollback(selected)}
                   >
-                    回滚本次导入
+                    {busyAction === `rollback:${selected.id}` && (
+                      <LoaderCircle
+                        data-icon="inline-start"
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {busyAction === `rollback:${selected.id}` ? '回滚中…' : '回滚本次导入'}
                   </Button>
                 )}
               </div>
@@ -2837,11 +4090,13 @@ export function ImportReview({
   accounts,
   positions,
   cashValue,
+  accountsReady = true,
   onPortfolioChanged,
 }: {
   accounts: Account[];
   positions: Position[];
   cashValue?: number;
+  accountsReady?: boolean;
   onPortfolioChanged: () => void;
 }) {
   const location = useLocation();
@@ -2850,6 +4105,10 @@ export function ImportReview({
   const queryStep = params.get('step');
   const queryMethod = params.get('method');
   const requestedAccountId = params.get('accountId') ?? '';
+  const screenshotQueryRequested =
+    params.get('entry') === 'screenshot' ||
+    queryMethod === 'screenshot' ||
+    queryStep === 'screenshot';
   const [accountId, setAccountId] = useState(() => {
     if (requestedAccountId) return requestedAccountId;
     try {
@@ -2858,21 +4117,16 @@ export function ImportReview({
       return '';
     }
   });
-  const [method, setMethod] = useState<'manual' | 'screenshot'>(() => {
-    if (queryMethod === 'screenshot' || queryStep === 'screenshot') return 'screenshot';
-    if (queryMethod === 'manual' || queryStep === 'position') return 'manual';
-    try {
-      return window.sessionStorage.getItem('thesis-ledger-entry-method') === 'screenshot'
-        ? 'screenshot'
-        : 'manual';
-    } catch {
-      return 'manual';
-    }
-  });
-  const [accountSheetOpen, setAccountSheetOpen] = useState(queryStep === 'account');
   const [dirty, setDirty] = useState(false);
   const [entryPositions, setEntryPositions] = useState<Position[]>(positions);
   const [entryCashValue, setEntryCashValue] = useState(cashValue ?? 0);
+  const [positionSheetOpen, setPositionSheetOpen] = useState(false);
+  const [screenshotSheetOpen, setScreenshotSheetOpen] = useState(() => {
+    if (!screenshotQueryRequested) return false;
+    const initialAccount =
+      accounts.find((account) => account.id === requestedAccountId) ?? accounts[0];
+    return Boolean(initialAccount && initialAccount.type !== 'cash');
+  });
 
   useEffect(() => {
     if (requestedAccountId && accounts.some((account) => account.id === requestedAccountId)) {
@@ -2890,17 +4144,12 @@ export function ImportReview({
     }
   }, [accountId, accounts, requestedAccountId]);
 
-  useEffect(() => {
-    if (queryMethod === 'manual' || queryMethod === 'screenshot') {
-      setMethod(queryMethod);
-      return;
-    }
-    if (queryStep === 'position' || queryStep === 'screenshot') {
-      setMethod(queryStep === 'screenshot' ? 'screenshot' : 'manual');
-    }
-  }, [queryMethod, queryStep]);
-
   const selectedAccount = accounts.find((account) => account.id === accountId);
+  useEffect(() => {
+    if (screenshotQueryRequested && selectedAccount?.type !== 'cash') {
+      setScreenshotSheetOpen(true);
+    }
+  }, [screenshotQueryRequested, selectedAccount?.type]);
   useEffect(() => {
     if (!selectedAccount) return;
     let active = true;
@@ -2928,28 +4177,47 @@ export function ImportReview({
     };
   }, [accountId, cashValue, positions, selectedAccount?.mode]);
   const accountPositions = entryPositions.filter((position) => position.accountId === accountId);
-  const activeMethod = selectedAccount?.type === 'cash' ? 'manual' : method;
-  const confirmDiscard = () =>
-    !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
-  const navigateEntry = (nextMethod: 'manual' | 'screenshot') => {
-    if (nextMethod !== method && !confirmDiscard()) return;
-    setDirty(false);
-    setMethod(nextMethod);
-    try {
-      window.sessionStorage.setItem('thesis-ledger-entry-method', nextMethod);
-    } catch {
-      /* storage is optional */
-    }
+  const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+
+  const setScreenshotEntryUrl = (open: boolean) => {
     const next = new URLSearchParams(location.search);
-    next.set('method', nextMethod);
-    next.set('step', nextMethod === 'manual' ? 'position' : 'screenshot');
+    next.set('method', open ? 'screenshot' : 'manual');
+    next.set('step', open ? 'screenshot' : 'position');
+    if (open) next.set('entry', 'screenshot');
+    else next.delete('entry');
     if (accountId) next.set('accountId', accountId);
     void navigate({ pathname: '/position-entry', search: '?' + next.toString() });
   };
+
+  const openScreenshotSheet = () => {
+    if (selectedAccount?.type === 'cash' || !confirmDiscard()) return;
+    setDirty(false);
+    setPositionSheetOpen(false);
+    setScreenshotSheetOpen(true);
+    setScreenshotEntryUrl(true);
+  };
+
+  const closeScreenshotSheet = (open: boolean) => {
+    if (open) {
+      setScreenshotSheetOpen(true);
+      return;
+    }
+    if (!confirmDiscard()) return;
+    setDirty(false);
+    setScreenshotSheetOpen(false);
+    setScreenshotEntryUrl(false);
+  };
+
+  const showManualEntry = () => {
+    if (screenshotSheetOpen) closeScreenshotSheet(false);
+  };
+
   const selectAccount = (nextAccountId: string) => {
     if (nextAccountId === accountId) return;
     if (!confirmDiscard()) return;
     setDirty(false);
+    setPositionSheetOpen(false);
+    setScreenshotSheetOpen(false);
     setAccountId(nextAccountId);
     try {
       window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
@@ -2958,55 +4226,40 @@ export function ImportReview({
     }
     const next = new URLSearchParams(location.search);
     next.set('accountId', nextAccountId);
-    next.delete('step');
-    next.set('method', method);
+    next.set('method', 'manual');
+    next.set('step', 'position');
+    next.delete('entry');
     void navigate({ pathname: '/position-entry', search: '?' + next.toString() });
   };
-  const accountForm = (
-    <PortfolioManagement
-      accounts={accounts}
-      positions={[]}
-      step="account"
-      formClassName="w-full max-w-[760px]"
-      onAccountSaved={() => {
-        setAccountSheetOpen(false);
-        onPortfolioChanged();
-      }}
-      onSaved={onPortfolioChanged}
-    />
-  );
-
   if (accounts.length === 0) {
     return (
-      <section className="module-page import-page" data-import-step="account">
-        <p className="kicker">Portfolio Input</p>
-        <h1>录入持仓</h1>
-        <p className="page-description">
-          首次使用需要先建立一个账户；账户建立后，手动录入和截图导入会成为两种并列方式。
-        </p>
-        {accountForm}
-      </section>
+      <PortfolioManagement
+        accounts={accounts}
+        positions={[]}
+        step="account"
+        accountsReady={accountsReady}
+        onSaved={onPortfolioChanged}
+      />
     );
   }
 
   return (
     <section
       className="module-page import-page"
-      data-import-step={activeMethod === 'manual' ? 'position' : 'screenshot'}
+      data-import-step="position"
+      data-screenshot-sheet-open={String(screenshotSheetOpen)}
     >
       <p className="kicker">Portfolio Input</p>
       <div className="entry-page-heading">
         <div>
           <h1>录入持仓</h1>
-          <p className="page-description">
-            先选择账户，再选择一种录入方式；来源只记录在本次持仓事件或截图草稿中。
-          </p>
+          <p className="page-description">更新账户当前持仓与现金余额。</p>
         </div>
         <Button
-          className="secondary"
+          className="text-button"
           type="button"
-          variant="outline"
-          onClick={() => setAccountSheetOpen(true)}
+          variant="link"
+          onClick={() => void navigate('/accounts')}
         >
           账户管理
         </Button>
@@ -3035,69 +4288,77 @@ export function ImportReview({
           </Select>
         </label>
         <div className="entry-account-meta">
-          <strong>{selectedAccount?.name}</strong>
           <span>
             {selectedAccount?.institution || '未填写机构'} · {selectedAccount?.currency} ·{' '}
             {selectedAccount?.mode === 'shadow' ? '影子账户' : '实际账户'}
           </span>
         </div>
       </div>
-      {selectedAccount?.type === 'cash' && method === 'screenshot' && (
+      {selectedAccount?.type === 'cash' && screenshotSheetOpen && (
         <div className="notice" role="status">
-          现金账户只支持手动现金余额，已临时切换；原截图导入偏好会保留，切换回证券或基金账户后恢复。
+          现金账户只支持手动现金余额。
         </div>
       )}
-      <nav className="mt-3 mb-1 flex flex-wrap gap-2 pb-4" aria-label="持仓录入方式">
+      <nav className="mt-3 mb-1 flex flex-wrap gap-2 pb-4" aria-label="持仓录入操作">
         <Button
           type="button"
-          variant={method === 'manual' ? 'default' : 'outline'}
-          className={method === 'manual' ? '' : 'secondary'}
-          onClick={() => navigateEntry('manual')}
+          variant={screenshotSheetOpen ? 'outline' : 'default'}
+          className={screenshotSheetOpen ? 'secondary' : ''}
+          onClick={showManualEntry}
         >
           手动录入
         </Button>
         <Button
           type="button"
-          variant={method === 'screenshot' ? 'default' : 'outline'}
-          className={method === 'screenshot' ? '' : 'secondary'}
-          onClick={() => navigateEntry('screenshot')}
+          disabled={selectedAccount?.type === 'cash'}
+          variant={screenshotSheetOpen ? 'default' : 'outline'}
+          className={screenshotSheetOpen ? '' : 'secondary'}
+          onClick={openScreenshotSheet}
         >
           截图导入
         </Button>
       </nav>
-      {activeMethod === 'manual' ? (
-        <PortfolioManagement
-          accounts={accounts}
-          positions={accountPositions}
-          cashValue={entryCashValue}
-          step="position"
-          defaultAccountId={accountId}
-          onDirtyChange={setDirty}
-          onSaved={() => {
-            setDirty(false);
-            onPortfolioChanged();
-          }}
-        />
-      ) : (
-        <ScreenshotImportReview
-          accounts={accounts}
-          initialAccountId={accountId}
-          onDirtyChange={setDirty}
-          onPortfolioChanged={onPortfolioChanged}
-        />
-      )}
-      <Dialog open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
+      <PortfolioManagement
+        accounts={accounts}
+        positions={accountPositions}
+        cashValue={entryCashValue}
+        step="position"
+        defaultAccountId={accountId}
+        entryAccountLocked
+        entrySheetOpen={positionSheetOpen}
+        onEntrySheetOpenChange={(open) => {
+          setPositionSheetOpen(open);
+          if (!open) {
+            const next = new URLSearchParams(location.search);
+            next.delete('entry');
+            void navigate({ pathname: '/position-entry', search: '?' + next.toString() });
+          }
+        }}
+        onDirtyChange={setDirty}
+        onSaved={() => {
+          setDirty(false);
+          onPortfolioChanged();
+        }}
+      />
+      <Dialog open={screenshotSheetOpen} onOpenChange={closeScreenshotSheet}>
         <DialogContent
-          aria-describedby="account-management-description"
-          className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 rounded-none overflow-auto"
+          aria-describedby="screenshot-import-description"
+          className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 grid-rows-[max-content_minmax(0,1fr)] content-start rounded-none overflow-auto gap-0"
         >
           <div className="panel-heading">
-            <DialogTitle>账户管理</DialogTitle>
-            <DialogDescription id="account-management-description">
-              账户是持仓的容器；录入来源不属于账户属性。类型、模式和币种在出现 Ledger 事件后锁定。
+            <DialogTitle>截图导入</DialogTitle>
+            <DialogDescription id="screenshot-import-description">
+              上传不会直接修改持仓；请在提交前完成代码、数量和成本价审核。
             </DialogDescription>
           </div>
-          {accountForm}
+          <ScreenshotImportReview
+            accounts={accounts}
+            initialAccountId={accountId}
+            accountLocked
+            embedded
+            onDirtyChange={setDirty}
+            onPortfolioChanged={onPortfolioChanged}
+          />
         </DialogContent>
       </Dialog>
     </section>
@@ -3144,39 +4405,21 @@ function PortfolioDashboard({
     let active = true;
     const loadOnboardingStatus = async () => {
       try {
-        const [providerResponse, automationResponse, riskResponse] = await Promise.all([
+        const [providerResponse, riskResponse] = await Promise.all([
           fetch('/api/v1/providers/config'),
-          fetch('/api/v1/automations'),
           fetch('/api/v1/risk/rules'),
         ]);
-        if (!providerResponse.ok || !automationResponse.ok || !riskResponse.ok) {
+        if (!providerResponse.ok || !riskResponse.ok) {
           throw new Error('onboarding status');
         }
-        const [providers, automations, rules] = await Promise.all([
+        const [providers, rules] = await Promise.all([
           providerResponse.json() as Promise<OnboardingProviderRecord[]>,
-          automationResponse.json() as Promise<OnboardingAutomationRecord[]>,
           riskResponse.json() as Promise<OnboardingRiskRuleRecord[]>,
         ]);
         if (!active) return;
 
-        const enabledProviders = providers.filter(
-          (provider) => provider.enabled !== false && provider.health !== 'down',
-        );
-        const hasCapability = (provider: OnboardingProviderRecord, capability: string) =>
-          Array.isArray(provider.capabilities) &&
-          provider.capabilities.some((item) => String(item) === capability);
-        const hasQuoteProvider = enabledProviders.some((provider) =>
-          hasCapability(provider, 'quote'),
-        );
-        const hasNotificationProvider = enabledProviders.some((provider) =>
-          hasCapability(provider, 'notification'),
-        );
-
         setOnboardingStatus({
-          hasProviderSetup:
-            hasQuoteProvider &&
-            hasNotificationProvider &&
-            automations.some((automation) => automation.enabled !== false),
+          hasProviderSetup: hasConfiguredProviderSetup(providers),
           hasRiskRule: rules.some((rule) => rule.enabled === true),
         });
       } catch {
@@ -3294,40 +4537,47 @@ function PortfolioDashboard({
               </tr>
             </thead>
             <tbody>
-              {[...portfolio!.positions]
-                .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
-                .map((position) => (
-                  <tr key={position.id}>
-                    <td>
-                      <strong>{position.asset.name}</strong>
-                      <span>{position.symbol}</span>
-                    </td>
-                    <td>
-                      <Button
-                        className="text-button"
-                        size="sm"
-                        type="button"
-                        variant="link"
-                        onClick={() => setDetailPosition(position)}
-                      >
-                        查看
-                      </Button>
-                    </td>
-                    <td>{position.quantity}</td>
-                    <td>{money.format(position.costPrice)}</td>
-                    <td>
-                      {position.marketValue === null ? '—' : money.format(position.marketValue)}
-                    </td>
-                    <td className={(position.pnl ?? 0) >= 0 ? 'positive' : 'negative'}>
-                      {position.pnl === null ? '—' : money.format(position.pnl)}
-                    </td>
-                    <td>
-                      <Badge className={position.stale ? 'tag warning' : 'tag'} variant="secondary">
-                        {position.stale ? '陈旧' : '最新'}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
+              {portfolio!.positions.length === 0 ? (
+                <EmptyTableRow colSpan={7} />
+              ) : (
+                [...portfolio!.positions]
+                  .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
+                  .map((position) => (
+                    <tr key={position.id}>
+                      <td>
+                        <strong>{position.asset.name}</strong>
+                        <span>{position.symbol}</span>
+                      </td>
+                      <td>
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          onClick={() => setDetailPosition(position)}
+                        >
+                          查看
+                        </Button>
+                      </td>
+                      <td>{position.quantity}</td>
+                      <td>{money.format(position.costPrice)}</td>
+                      <td>
+                        {position.marketValue === null ? '—' : money.format(position.marketValue)}
+                      </td>
+                      <td className={(position.pnl ?? 0) >= 0 ? 'positive' : 'negative'}>
+                        {position.pnl === null ? '—' : money.format(position.pnl)}
+                      </td>
+                      <td>
+                        <Badge
+                          className={position.stale ? 'tag warning' : 'tag'}
+                          variant="secondary"
+                        >
+                          {position.stale ? '陈旧' : '最新'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
+              )}
             </tbody>
           </table>
         </div>
@@ -3425,8 +4675,11 @@ function PositionDetail({ position, onClose }: { position: Position; onClose: ()
         <DialogDescription id="position-detail-description" className="sr-only">
           查看该持仓的行情、最近 K 线、技术指标和筹码数据。
         </DialogDescription>
-        <DataStateBanner state={detailState} onRetry={loadDetail} />
-        {error && <div className="notice">{error}</div>}
+        <DataStateBanner
+          state={detailState}
+          description={error || undefined}
+          onRetry={loadDetail}
+        />
         {!data && !error ? (
           <div className="skeleton table" aria-label="正在加载详情" />
         ) : data?.quote.empty === true ? (
@@ -3496,8 +4749,11 @@ export function PortfolioManagement({
   cashValue,
   step,
   defaultAccountId,
-  formClassName,
-  onAccountSaved,
+  accountsReady = true,
+  onAccountEntry,
+  entryAccountLocked = false,
+  entrySheetOpen,
+  onEntrySheetOpenChange,
   onDirtyChange,
   onSaved,
 }: {
@@ -3506,23 +4762,45 @@ export function PortfolioManagement({
   cashValue?: number;
   step: 'account' | 'position';
   defaultAccountId?: string;
-  formClassName?: string;
-  onAccountSaved?: () => void;
+  accountsReady?: boolean;
+  onAccountEntry?: (accountId: string) => void;
+  entryAccountLocked?: boolean;
+  entrySheetOpen?: boolean;
+  onEntrySheetOpenChange?: (open: boolean) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState<Position | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+  const [uncontrolledEntrySheetOpen, setUncontrolledEntrySheetOpen] = useState(false);
+  const initialEntryAccountId = defaultAccountId ?? accounts[0]?.id ?? '';
+  const [entrySheetMode, setEntrySheetMode] = useState<'position' | 'cash'>(() =>
+    entrySheetOpen &&
+    accounts.find((account) => account.id === initialEntryAccountId)?.type === 'cash'
+      ? 'cash'
+      : 'position',
+  );
   const [managedAccounts, setManagedAccounts] = useState<Account[]>(accounts);
-  const [entryAccountId, setEntryAccountId] = useState(defaultAccountId ?? accounts[0]?.id ?? '');
-  const [message, setMessage] = useState('');
+  const [managedAccountsLoaded, setManagedAccountsLoaded] = useState(step !== 'account');
+  const [entryAccountId, setEntryAccountId] = useState(initialEntryAccountId);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const toastManager = useToastManager();
   const markDirty = (nextDirty = true) => {
     setDirty(nextDirty);
     onDirtyChange?.(nextDirty);
   };
-  const confirmDiscard = () =>
-    !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const positionSheetOpen = entrySheetOpen ?? uncontrolledEntrySheetOpen;
+  const setPositionSheetOpen = (open: boolean) => {
+    if (entrySheetOpen === undefined) setUncontrolledEntrySheetOpen(open);
+    onEntrySheetOpenChange?.(open);
+  };
+  const openEntrySheet = (mode: 'position' | 'cash' = 'position') => {
+    setEntrySheetMode(mode);
+    setPositionSheetOpen(true);
+  };
+  const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
   useEffect(() => {
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
     else if (!entryAccountId && accounts[0]) setEntryAccountId(accounts[0].id);
@@ -3530,264 +4808,318 @@ export function PortfolioManagement({
 
   const loadManagedAccounts = async () => {
     if (step !== 'account') return;
+    setManagedAccountsLoaded(false);
     try {
       const response = await fetch('/api/v1/accounts?includeInactive=true', { cache: 'no-store' });
-      if (response.ok) setManagedAccounts((await response.json()) as Account[]);
+      if (!response.ok) {
+        setManagedAccounts(accounts);
+        return;
+      }
+      setManagedAccounts((await response.json()) as Account[]);
+      setManagedAccountsLoaded(true);
     } catch {
       setManagedAccounts(accounts);
     }
   };
   useEffect(() => {
     setManagedAccounts(accounts);
-    void loadManagedAccounts();
-  }, [accounts, step]);
+    if (step === 'account' && accountsReady) {
+      void loadManagedAccounts();
+      return;
+    }
+    setManagedAccountsLoaded(step !== 'account');
+  }, [accounts, accountsReady, step]);
+
+  useEffect(() => {
+    if (
+      step === 'account' &&
+      accountsReady &&
+      managedAccountsLoaded &&
+      managedAccounts.length === 0
+    ) {
+      setAccountSheetOpen(true);
+    }
+  }, [accountsReady, managedAccounts.length, managedAccountsLoaded, step]);
 
   const submitAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage('');
+    if (busyAction) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch(
-      editingAccount ? '/api/v1/accounts/' + editingAccount.id : '/api/v1/accounts',
-      {
-        method: editingAccount ? 'PATCH' : 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name: formText(form, 'name'),
-          institution: formText(form, 'institution') || undefined,
-          type: formText(form, 'type'),
-          mode: formText(form, 'mode') || 'actual',
-          currency: 'CNY',
-        }),
-      },
-    );
-    if (!response.ok) {
-      setMessage(
-        editingAccount
-          ? '账户更新失败；有 Ledger 历史时类型、模式和币种不可修改。'
-          : '账户创建失败，请检查名称、机构和账户类型。',
+    const isEditing = Boolean(editingAccount);
+    setBusyAction('account-save');
+    try {
+      const response = await fetch(
+        editingAccount ? '/api/v1/accounts/' + editingAccount.id : '/api/v1/accounts',
+        {
+          method: editingAccount ? 'PATCH' : 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            name: formText(form, 'name'),
+            institution: formText(form, 'institution') || undefined,
+            type: formText(form, 'type'),
+            mode: formText(form, 'mode') || 'actual',
+            currency: 'CNY',
+          }),
+        },
       );
-      return;
+      if (!response.ok) throw new Error('account');
+      formElement.reset();
+      setEditingAccount(null);
+      markDirty(false);
+      await loadManagedAccounts();
+      setAccountSheetOpen(false);
+      onSaved();
+      toastManager.add({
+        title: isEditing ? '账户已更新' : '账户已创建',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: isEditing ? '账户更新失败' : '账户创建失败',
+        description: isEditing
+          ? '有 Ledger 历史时类型、模式和币种不可修改。'
+          : '请检查名称、机构和账户类型。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    formElement.reset();
-    setEditingAccount(null);
-    markDirty(false);
-    setMessage(editingAccount ? '账户已更新。' : '账户已创建。');
-    await loadManagedAccounts();
-    (onAccountSaved ?? onSaved)();
   };
 
   const toggleAccount = async (account: Account) => {
+    if (busyAction) return;
     const active = account.active !== false;
     if (active && !window.confirm('确认停用账户“' + account.name + '”？')) return;
-    const response = await fetch(
-      active ? '/api/v1/accounts/' + account.id : '/api/v1/accounts/' + account.id + '/reactivate',
-      { method: active ? 'DELETE' : 'POST' },
-    );
-    if (!response.ok) {
-      setMessage(active ? '账户仍有余额，需先清空持仓和现金。' : '账户重新启用失败。');
-      return;
+    setBusyAction(`account-toggle:${account.id}`);
+    try {
+      const response = await fetch(
+        active
+          ? '/api/v1/accounts/' + account.id
+          : '/api/v1/accounts/' + account.id + '/reactivate',
+        { method: active ? 'DELETE' : 'POST' },
+      );
+      if (!response.ok) throw new Error('account-toggle');
+      markDirty(false);
+      await loadManagedAccounts();
+      onSaved();
+      toastManager.add({
+        title: active ? '账户已停用' : '账户已重新启用',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: active ? '账户停用失败' : '账户重新启用失败',
+        description: active ? '账户仍有余额，需先清空持仓和现金。' : '请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    markDirty(false);
-    setMessage(active ? '账户已停用。' : '账户已重新启用。');
-    await loadManagedAccounts();
-    onSaved();
   };
 
   const submitPosition = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage('');
+    if (busyAction) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const accountId = formText(form, 'accountId') || entryAccountId;
     const account = accounts.find((item) => item.id === accountId);
     const isCash = account?.type === 'cash';
-    const response = isCash
-      ? await fetch('/api/v1/portfolio/cash', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            accountId,
-            amount: Number(formText(form, 'cashAmount')),
-            source: 'manual',
-          }),
-        })
-      : await fetch(
-          editing ? '/api/v1/portfolio/positions/' + editing.id : '/api/v1/portfolio/positions',
-          {
-            method: editing ? 'PATCH' : 'POST',
+    const isEditing = Boolean(editing);
+    setBusyAction(isCash ? 'cash-save' : 'position-save');
+    try {
+      const response = isCash
+        ? await fetch('/api/v1/portfolio/cash', {
+            method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               accountId,
-              symbol: formText(form, 'symbol').trim().toUpperCase(),
-              quantity: Number(formText(form, 'quantity')),
-              costPrice: Number(formText(form, 'costPrice')),
+              amount: Number(formText(form, 'cashAmount')),
               source: 'manual',
-              assetName: formText(form, 'assetName') || undefined,
-              assetType: formText(form, 'assetType') || undefined,
             }),
-          },
-        );
-    if (!response.ok) {
-      setMessage(
-        isCash ? '现金余额保存失败，请检查金额。' : '持仓保存失败，请检查代码、数量和成本价。',
-      );
-      return;
+          })
+        : await fetch(
+            editing ? '/api/v1/portfolio/positions/' + editing.id : '/api/v1/portfolio/positions',
+            {
+              method: editing ? 'PATCH' : 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                accountId,
+                symbol: formText(form, 'symbol').trim().toUpperCase(),
+                quantity: Number(formText(form, 'quantity')),
+                costPrice: Number(formText(form, 'costPrice')),
+                source: 'manual',
+                assetName: formText(form, 'assetName') || undefined,
+                assetType: formText(form, 'assetType') || undefined,
+              }),
+            },
+          );
+      if (!response.ok) throw new Error('position');
+      formElement.reset();
+      setEditing(null);
+      markDirty(false);
+      setPositionSheetOpen(false);
+      onSaved();
+      toastManager.add({
+        title: isCash ? '现金余额已保存' : isEditing ? '持仓已更新' : '持仓已保存',
+        description: isCash ? undefined : '组合将重新估值。',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: isCash ? '现金余额保存失败' : isEditing ? '持仓更新失败' : '持仓保存失败',
+        description: isCash ? '请检查金额。' : '请检查代码、数量和成本价。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    formElement.reset();
-    setEditing(null);
-    markDirty(false);
-    setMessage(isCash ? '现金余额已保存。' : '持仓已保存并重新估值。');
-    onSaved();
   };
 
   const submitCashBalance = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage('');
+    if (busyAction) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch('/api/v1/portfolio/cash', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        accountId: entryAccountId,
-        amount: Number(formText(form, 'cashAmount')),
-        source: 'manual',
-      }),
-    });
-    if (!response.ok) {
-      setMessage('现金余额保存失败，请检查金额。');
-      return;
+    setBusyAction('cash-save');
+    try {
+      const response = await fetch('/api/v1/portfolio/cash', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          accountId: entryAccountId,
+          amount: Number(formText(form, 'cashAmount')),
+          source: 'manual',
+        }),
+      });
+      if (!response.ok) throw new Error('cash');
+      formElement.reset();
+      markDirty(false);
+      setPositionSheetOpen(false);
+      onSaved();
+      toastManager.add({ title: '现金余额已保存', type: 'success', timeout: 2800 });
+    } catch {
+      toastManager.add({
+        title: '现金余额保存失败',
+        description: '请检查金额。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
-    formElement.reset();
-    markDirty(false);
-    setMessage('现金余额已保存。');
-    onSaved();
   };
 
   const clearPositions = async () => {
-    if (!entryAccountId || positions.length === 0) return;
-    if (!window.confirm('确认清空当前账户的全部持仓？该操作会写入归零 Adjustment，现金余额不受影响。'))
+    if (!entryAccountId || positions.length === 0 || busyAction) return;
+    if (
+      !window.confirm('确认清空当前账户的全部持仓？该操作会写入归零 Adjustment，现金余额不受影响。')
+    )
       return;
-    const response = await fetch('/api/v1/portfolio/positions/clear', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accountId: entryAccountId }),
-    });
-    setMessage(response.ok ? '已清空当前账户持仓。' : '清空持仓失败。');
-    if (response.ok) {
+    setBusyAction('clear-positions');
+    try {
+      const response = await fetch('/api/v1/portfolio/positions/clear', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ accountId: entryAccountId }),
+      });
+      if (!response.ok) throw new Error('clear');
       markDirty(false);
       onSaved();
+      toastManager.add({ title: '持仓已清空', type: 'success', timeout: 2800 });
+    } catch {
+      toastManager.add({
+        title: '清空持仓失败',
+        description: '请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
   };
 
   const remove = async (position: Position) => {
+    if (busyAction) return;
     if (!window.confirm('确认删除 ' + position.asset.name + '（' + position.symbol + '）？'))
       return;
-    const response = await fetch('/api/v1/portfolio/positions/' + position.id, {
-      method: 'DELETE',
-    });
-    setMessage(response.ok ? '持仓已删除。' : '持仓删除失败。');
-    if (response.ok) {
+    setBusyAction(`remove:${position.id}`);
+    try {
+      const response = await fetch('/api/v1/portfolio/positions/' + position.id, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('remove');
       markDirty(false);
       onSaved();
+      toastManager.add({ title: '持仓已删除', type: 'success', timeout: 2800 });
+    } catch {
+      toastManager.add({
+        title: '持仓删除失败',
+        description: '请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
     }
   };
 
   const selectedAccount = accounts.find((account) => account.id === entryAccountId);
   return (
     <section
-      className="management"
+      className={step === 'account' ? 'module-page' : 'management'}
       id="portfolio-management"
       aria-labelledby="portfolio-management-title"
       data-management-step={step}
+      data-import-step={step === 'account' ? 'account' : undefined}
+      data-account-sheet-open={step === 'account' ? String(accountSheetOpen) : undefined}
+      data-entry-sheet-open={step === 'position' ? String(positionSheetOpen) : undefined}
     >
-      <div className="panel-heading">
-        <h2 id="portfolio-management-title">{step === 'account' ? '账户管理' : '当前账户持仓'}</h2>
-        <p>
-          {step === 'account'
-            ? '账户只描述容器属性；本次手动或截图来源不会写入账户。'
-            : '手动录入保存的是当前余额，系统会生成可重放的 Ledger Adjustment。'}
-        </p>
-      </div>
-      {message && (
-        <div className="form-message" role="status">
-          {message}
+      {step === 'account' && (
+        <div className="panel-heading">
+          <p className="kicker">Account Management</p>
+          <div className="entry-page-heading">
+            <div>
+              <h1 id="portfolio-management-title">账户管理</h1>
+              <p className="page-description">
+                管理已有账户；账户只描述容器属性，不记录本次持仓录入来源。
+              </p>
+            </div>
+          </div>
         </div>
       )}
       <div className="management-grid single-step">
         {step === 'account' && (
-          <form
-            className={cn('form-card', formClassName)}
-            onChange={() => markDirty()}
-            onSubmit={(event) => void submitAccount(event)}
-          >
-            <h3>{editingAccount ? '编辑账户' : '创建账户'}</h3>
-            <label>
-              账户名称
-              <Input name="name" required maxLength={80} defaultValue={editingAccount?.name} />
-            </label>
-            <label>
-              机构（可选）
-              <Input
-                name="institution"
-                maxLength={80}
-                defaultValue={editingAccount?.institution ?? undefined}
-                placeholder="例如：支付宝、某某证券"
-              />
-            </label>
-            <label>
-              账户类型
-              <Select name="type" defaultValue={editingAccount?.type ?? 'securities'}>
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {(value: string | null) =>
-                      value === 'fund' ? '基金' : value === 'cash' ? '现金' : '证券'
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="securities">证券（股票 / 交易所 ETF）</SelectItem>
-                  <SelectItem value="fund">基金（场外基金）</SelectItem>
-                  <SelectItem value="cash">现金</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            <label>
-              账户模式
-              <Select name="mode" defaultValue={editingAccount?.mode ?? 'actual'}>
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {(value: string | null) => (value === 'shadow' ? '影子账户' : '实际账户')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="actual">实际账户</SelectItem>
-                  <SelectItem value="shadow">影子账户</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            <label>
-              币种
-              <Input value="人民币（CNY）" readOnly aria-label="币种" />
-            </label>
-            <div className="form-actions">
-              <Button type="submit" variant="default">
-                {editingAccount ? '保存账户' : '创建账户'}
+          <>
+            <div className="mt-6 flex items-center justify-between gap-4">
+              <h2 className="m-0 text-xl font-semibold">已有账户</h2>
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => {
+                  setEditingAccount(null);
+                  markDirty(false);
+                  setAccountSheetOpen(true);
+                }}
+              >
+                创建账户
               </Button>
-              {editingAccount && (
-                <Button
-                  className="secondary"
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditingAccount(null)}
-                >
-                  取消
-                </Button>
-              )}
             </div>
-            {managedAccounts.length > 0 && (
-              <div className="account-list">
+            {managedAccounts.length > 0 ? (
+              <div className="account-list" aria-label="已有账户">
                 {managedAccounts.map((account) => (
                   <div key={account.id}>
                     <span>
@@ -3802,12 +5134,27 @@ export function PortfolioManagement({
                       </small>
                     </span>
                     <div className="form-actions">
+                      {account.active !== false && onAccountEntry && (
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          onClick={() => onAccountEntry(account.id)}
+                        >
+                          录入持仓
+                        </Button>
+                      )}
                       <Button
                         className="text-button"
                         size="sm"
                         type="button"
                         variant="link"
-                        onClick={() => setEditingAccount(account)}
+                        onClick={() => {
+                          setEditingAccount(account);
+                          markDirty(false);
+                          setAccountSheetOpen(true);
+                        }}
                       >
                         编辑
                       </Button>
@@ -3816,234 +5163,484 @@ export function PortfolioManagement({
                         size="sm"
                         type="button"
                         variant={account.active === false ? 'outline' : 'destructive'}
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === `account-toggle:${account.id}`}
                         onClick={() => void toggleAccount(account)}
                       >
-                        {account.active === false ? '重新启用' : '停用'}
+                        {busyAction === `account-toggle:${account.id}` && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === `account-toggle:${account.id}`
+                          ? account.active === false
+                            ? '启用中…'
+                            : '停用中…'
+                          : account.active === false
+                            ? '重新启用'
+                            : '停用'}
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </form>
-        )}
-        {step === 'position' && (
-          <>
-            <form
-              className="form-card"
-              onChange={() => markDirty()}
-              onSubmit={(event) => void submitPosition(event)}
-              key={editing?.id ?? 'new'}
-            >
-            <h3>
-              {editing
-                ? '编辑 ' + editing.asset.name
-                : selectedAccount?.type === 'cash'
-                  ? '录入现金余额'
-                  : '录入持仓'}
-            </h3>
-            <label>
-              账户
-              <Select
-                name="accountId"
-                required
-                value={entryAccountId || null}
-                onValueChange={(value) => {
-                  if (!value || !confirmDiscard()) return;
-                  markDirty(false);
-                  setEntryAccountId(value);
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="选择账户">
-                    {selectedAccount?.name ?? '选择账户'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                      {account.type === 'fund' ? '基金' : account.type === 'cash' ? '现金' : '证券'} ·{' '}
-                      {account.mode === 'shadow' ? '影子' : '实际'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            {selectedAccount?.type === 'cash' ? (
-              <label>
-                当前现金余额（CNY）
-                <Input
-                  name="cashAmount"
-                  required
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue={cashValue ?? 0}
-                />
-              </label>
             ) : (
-              <>
-                <label>
-                  证券代码
-                  <Input
-                    name="symbol"
-                    required
-                    placeholder={selectedAccount?.type === 'fund' ? '000001.OF' : '600519.SH'}
-                    defaultValue={editing?.symbol}
-                    readOnly={Boolean(editing)}
-                  />
-                </label>
-                <label>
-                  名称（可选）
-                  <Input name="assetName" defaultValue={editing?.asset.name} />
-                </label>
-                <label>
-                  类型（可选）
-                  <Select
-                    name="assetType"
-                    defaultValue={editing?.symbol.endsWith('.OF') ? 'fund' : undefined}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        {(value: string | null) =>
-                          value === 'fund'
-                            ? '场外基金'
-                            : value === 'etf'
-                              ? '交易所 ETF'
-                              : value === 'stock'
-                                ? 'A 股股票'
-                                : '自动识别'
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="stock">A 股股票</SelectItem>
-                      <SelectItem value="etf">交易所 ETF</SelectItem>
-                      <SelectItem value="fund">场外基金</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
-                <label>
-                  当前数量
-                  <Input
-                    name="quantity"
-                    required
-                    type="number"
-                    min="0"
-                    step="any"
-                    defaultValue={editing?.quantity}
-                  />
-                </label>
-                <label>
-                  成本价
-                  <Input
-                    name="costPrice"
-                    required
-                    type="number"
-                    min="0"
-                    step="any"
-                    defaultValue={editing?.costPrice}
-                  />
-                </label>
-              </>
+              <div className="empty-state" role="status">
+                暂无账户，点击右上角“创建账户”开始。
+              </div>
             )}
-            <div className="form-actions">
-              <Button type="submit" variant="default">
-                {editing ? '保存修改' : '保存当前持仓'}
-              </Button>
-              {editing && (
-                <Button
-                  className="secondary"
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditing(null)}
-                >
-                  取消
-                </Button>
-              )}
-            </div>
-            </form>
-            {selectedAccount?.type !== 'cash' && (
-              <form
-                className="form-card cash-secondary"
-                onChange={() => markDirty()}
-                onSubmit={(event) => void submitCashBalance(event)}
+            <Dialog open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
+              <DialogContent
+                aria-describedby="account-form-description"
+                className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 grid-rows-[max-content_minmax(0,1fr)] content-start rounded-none overflow-auto"
               >
-                <h3>现金余额（可选）</h3>
-                <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
-                <label>
-                  当前现金余额（CNY）
-                  <Input
-                    name="cashAmount"
-                    required
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    defaultValue={cashValue ?? 0}
-                  />
-                </label>
-                <div className="form-actions">
-                  <Button type="submit" variant="outline">保存当前现金</Button>
+                <div className="panel-heading">
+                  <DialogTitle>{editingAccount ? '编辑账户' : '创建账户'}</DialogTitle>
+                  <DialogDescription id="account-form-description">
+                    账户是持仓的容器；类型、模式和币种在出现 Ledger 事件后锁定。
+                  </DialogDescription>
                 </div>
-              </form>
-            )}
+                <form
+                  key={editingAccount?.id ?? 'new-account'}
+                  className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+                  onChange={() => markDirty()}
+                  onSubmit={(event) => void submitAccount(event)}
+                >
+                  <label>
+                    账户名称
+                    <Input
+                      name="name"
+                      required
+                      maxLength={80}
+                      defaultValue={editingAccount?.name}
+                    />
+                  </label>
+                  <label>
+                    机构（可选）
+                    <Input
+                      name="institution"
+                      maxLength={80}
+                      defaultValue={editingAccount?.institution ?? undefined}
+                      placeholder="例如：支付宝、某某证券"
+                    />
+                  </label>
+                  <label>
+                    账户类型
+                    <Select name="type" defaultValue={editingAccount?.type ?? 'securities'}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {(value: string | null) =>
+                            value === 'fund' ? '基金' : value === 'cash' ? '现金' : '证券'
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="securities">证券（股票 / 交易所 ETF）</SelectItem>
+                        <SelectItem value="fund">基金（场外基金）</SelectItem>
+                        <SelectItem value="cash">现金</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label>
+                    账户模式
+                    <Select name="mode" defaultValue={editingAccount?.mode ?? 'actual'}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {(value: string | null) => (value === 'shadow' ? '影子账户' : '实际账户')}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="actual">实际账户</SelectItem>
+                        <SelectItem value="shadow">影子账户</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label>
+                    币种
+                    <Input value="人民币（CNY）" readOnly aria-label="币种" />
+                  </label>
+                  <div className="form-actions">
+                    <Button type="submit" variant="default" disabled={busyAction !== null}>
+                      {busyAction === 'account-save' && (
+                        <LoaderCircle
+                          data-icon="inline-start"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {busyAction === 'account-save'
+                        ? editingAccount
+                          ? '保存中…'
+                          : '创建中…'
+                        : editingAccount
+                          ? '保存账户'
+                          : '创建账户'}
+                    </Button>
+                    {editingAccount && (
+                      <Button
+                        className="secondary"
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditingAccount(null)}
+                      >
+                        取消
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </>
         )}
-      </div>
-      {positions.length > 0 && (
-        <div className="edit-list" aria-label="持仓操作">
-          <div className="form-actions">
-            <Button
-              className="text-button danger"
-              type="button"
-              variant="destructive"
-              onClick={() => void clearPositions()}
-            >
-              清空持仓
-            </Button>
-          </div>
-          {positions.map((position) => (
-            <div key={position.id}>
-              <span>
-                {position.asset.name} · {position.symbol}
-                <small>
-                  {position.source?.startsWith('screenshot:')
-                    ? `截图导入（${position.source.slice('screenshot:'.length)}）`
-                    : position.source === 'manual'
-                      ? '手动设置'
-                      : position.source === 'migration'
-                        ? '迁移导入'
-                        : 'Ledger Adjustment'}
-                </small>
-              </span>
-              <span>
+        {step === 'position' && (
+          <div className="mt-6">
+            {selectedAccount?.type !== 'cash' && (
+              <>
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="m-0 text-xl font-semibold">持仓</h2>
+                  <div className="flex items-center gap-2">
+                    {positions.length > 0 && (
+                      <Button
+                        className="text-button danger"
+                        size="sm"
+                        type="button"
+                        variant="destructive"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === 'clear-positions'}
+                        onClick={() => void clearPositions()}
+                      >
+                        {busyAction === 'clear-positions' && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === 'clear-positions' ? '清空中…' : '清空持仓'}
+                      </Button>
+                    )}
+                    <Button
+                      className="text-button"
+                      type="button"
+                      variant="link"
+                      onClick={() => {
+                        setEditing(null);
+                        openEntrySheet('position');
+                      }}
+                    >
+                      + 添加持仓
+                    </Button>
+                  </div>
+                </div>
+                {positions.length > 0 ? (
+                  <div className="mt-2 divide-y border-y border-border" aria-label="持仓操作">
+                    {positions.map((position) => (
+                      <div
+                        key={position.id}
+                        className="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(72px,0.8fr)_minmax(120px,1fr)_auto] sm:items-center"
+                      >
+                        <div className="min-w-0">
+                          <strong className="block truncate text-sm font-medium text-foreground">
+                            {position.asset.name || position.symbol}
+                          </strong>
+                          <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                            {position.symbol}
+                          </span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {position.quantity.toLocaleString('zh-CN', { maximumFractionDigits: 4 })}
+                          股
+                        </span>
+                        <span className="font-mono text-sm text-foreground sm:text-right">
+                          {money.format(
+                            position.marketValue ?? position.costPrice * position.quantity,
+                          )}
+                        </span>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            className="text-button"
+                            size="sm"
+                            type="button"
+                            variant="link"
+                            onClick={() => {
+                              setEditing(position);
+                              setEntryAccountId(position.accountId);
+                              openEntrySheet('position');
+                            }}
+                          >
+                            编辑
+                          </Button>
+                          <Button
+                            className="text-button danger"
+                            size="sm"
+                            type="button"
+                            variant="destructive"
+                            disabled={busyAction !== null}
+                            aria-busy={busyAction === `remove:${position.id}`}
+                            onClick={() => void remove(position)}
+                          >
+                            {busyAction === `remove:${position.id}` && (
+                              <LoaderCircle
+                                data-icon="inline-start"
+                                className="animate-spin"
+                                aria-hidden="true"
+                              />
+                            )}
+                            {busyAction === `remove:${position.id}` ? '删除中…' : '删除'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state" role="status">
+                    暂无持仓，点击右上角“添加持仓”开始。
+                  </div>
+                )}
+              </>
+            )}
+            <div className="mt-8">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="m-0 text-xl font-semibold">现金余额</h2>
                 <Button
                   className="text-button"
                   size="sm"
                   type="button"
                   variant="link"
                   onClick={() => {
-                    setEditing(position);
-                    setEntryAccountId(position.accountId);
+                    setEditing(null);
+                    openEntrySheet('cash');
                   }}
                 >
                   编辑
                 </Button>
-                <Button
-                  className="text-button danger"
-                  size="sm"
-                  type="button"
-                  variant="destructive"
-                  onClick={() => void remove(position)}
-                >
-                  删除
-                </Button>
-              </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-4 border-y border-border px-1 py-4">
+                <span className="text-sm text-muted-foreground">当前余额</span>
+                <strong className="font-mono text-base font-medium text-foreground">
+                  {money.format(cashValue ?? 0)}
+                </strong>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+            <Dialog open={positionSheetOpen} onOpenChange={setPositionSheetOpen}>
+              <DialogContent
+                aria-describedby="position-form-description"
+                className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 content-start rounded-none overflow-auto"
+              >
+                <div className="panel-heading">
+                  <DialogTitle>
+                    {entrySheetMode === 'cash' ? '编辑现金余额' : editing ? '编辑持仓' : '添加持仓'}
+                  </DialogTitle>
+                  <DialogDescription id="position-form-description">
+                    手动保存当前账户余额，系统会生成可重放的 Ledger Adjustment。
+                  </DialogDescription>
+                </div>
+                {entrySheetMode === 'cash' && selectedAccount?.type !== 'cash' ? (
+                  <form
+                    key="cash-entry"
+                    className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+                    onChange={() => markDirty()}
+                    onSubmit={(event) => void submitCashBalance(event)}
+                  >
+                    <h3>现金余额</h3>
+                    <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
+                    <label>
+                      当前现金余额（CNY）
+                      <Input
+                        name="cashAmount"
+                        required
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={cashValue ?? 0}
+                      />
+                    </label>
+                    <div className="form-actions">
+                      <Button
+                        type="submit"
+                        variant="default"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === 'position-save' || busyAction === 'cash-save'}
+                      >
+                        {busyAction === 'cash-save' && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === 'cash-save' ? '保存中…' : '保存当前现金'}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <form
+                    className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+                    onChange={() => markDirty()}
+                    onSubmit={(event) => void submitPosition(event)}
+                    key={editing?.id ?? 'new'}
+                  >
+                    <label>
+                      账户
+                      <Select
+                        name="accountId"
+                        required
+                        disabled={entryAccountLocked}
+                        value={entryAccountId || null}
+                        onValueChange={(value) => {
+                          if (!value || !confirmDiscard()) return;
+                          markDirty(false);
+                          setEntryAccountId(value);
+                          if (accounts.find((account) => account.id === value)?.type === 'cash') {
+                            setEntrySheetMode('cash');
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="选择账户">
+                            {selectedAccount?.name ?? '选择账户'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name} · {account.institution || '未填写机构'} ·{' '}
+                              {account.currency} ·{' '}
+                              {account.type === 'fund'
+                                ? '基金'
+                                : account.type === 'cash'
+                                  ? '现金'
+                                  : '证券'}{' '}
+                              · {account.mode === 'shadow' ? '影子' : '实际'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    {selectedAccount?.type === 'cash' ? (
+                      <label>
+                        当前现金余额（CNY）
+                        <Input
+                          name="cashAmount"
+                          required
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          defaultValue={cashValue ?? 0}
+                        />
+                      </label>
+                    ) : (
+                      <>
+                        <label>
+                          证券代码
+                          <Input
+                            name="symbol"
+                            required
+                            placeholder={
+                              selectedAccount?.type === 'fund' ? '000001.OF' : '600519.SH'
+                            }
+                            defaultValue={editing?.symbol}
+                            readOnly={Boolean(editing)}
+                          />
+                        </label>
+                        <label>
+                          名称（可选）
+                          <Input name="assetName" defaultValue={editing?.asset.name} />
+                        </label>
+                        <label>
+                          类型（可选）
+                          <Select
+                            name="assetType"
+                            defaultValue={editing?.symbol.endsWith('.OF') ? 'fund' : undefined}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue>
+                                {(value: string | null) =>
+                                  value === 'fund'
+                                    ? '场外基金'
+                                    : value === 'etf'
+                                      ? '交易所 ETF'
+                                      : value === 'stock'
+                                        ? 'A 股股票'
+                                        : '自动识别'
+                                }
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="stock">A 股股票</SelectItem>
+                              <SelectItem value="etf">交易所 ETF</SelectItem>
+                              <SelectItem value="fund">场外基金</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </label>
+                        <label>
+                          当前数量
+                          <Input
+                            name="quantity"
+                            required
+                            type="number"
+                            min="0"
+                            step="any"
+                            defaultValue={editing?.quantity}
+                          />
+                        </label>
+                        <label>
+                          成本价
+                          <Input
+                            name="costPrice"
+                            required
+                            type="number"
+                            min="0"
+                            step="any"
+                            defaultValue={editing?.costPrice}
+                          />
+                        </label>
+                      </>
+                    )}
+                    <div className="form-actions">
+                      <Button
+                        type="submit"
+                        variant="default"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === 'position-save' || busyAction === 'cash-save'}
+                      >
+                        {(busyAction === 'position-save' || busyAction === 'cash-save') && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === 'position-save' || busyAction === 'cash-save'
+                          ? '保存中…'
+                          : editing
+                            ? '保存修改'
+                            : selectedAccount?.type === 'cash'
+                              ? '保存当前现金'
+                              : '保存当前持仓'}
+                      </Button>
+                      <Button
+                        className="secondary"
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditing(null);
+                          markDirty(false);
+                          setPositionSheetOpen(false);
+                        }}
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -4080,7 +5677,9 @@ export function FirstRunOnboarding({
       <div className="panel-heading">
         <p className="kicker">First Run</p>
         <h2 id="onboarding-title">四步完成第一次闭环</h2>
-        <p>按顺序完成账户、持仓、数据源和风险提醒配置。敏感凭证由服务端安全保存，页面不会显示。</p>
+        <p>
+          按顺序完成账户、持仓、数据源与通知、风险提醒配置。自动化任务可以稍后单独设置；敏感凭证由服务端安全保存，页面不会显示。
+        </p>
         <p className="onboarding-progress">
           {currentStep === null ? '四步已完成' : `当前步骤 ${currentStep} / 4`}
         </p>
@@ -4146,8 +5745,8 @@ export function FirstRunOnboarding({
             <strong>配置数据源与通知</strong>
             <p>
               {hasProviderSetup
-                ? '数据源、通知和自动化已配置。'
-                : '配置数据源、通知和自动化；敏感凭证由服务端管理，页面不会回显密钥。'}
+                ? '数据源和通知已配置；自动化任务可以继续设置。'
+                : '至少配置一个行情数据源和一个通知 Provider；自动化任务可以稍后设置。'}
             </p>
             <Button
               className="secondary"
@@ -4226,9 +5825,11 @@ const StatePanel = ({
 
 export const DataStateBanner = ({
   state,
+  description,
   onRetry,
 }: {
   state: LoadState;
+  description?: string | undefined;
   onRetry?: (() => void) | undefined;
 }) => {
   if (state === 'ready') return null;
@@ -4248,7 +5849,7 @@ export const DataStateBanner = ({
     >
       <AlertTitle>{content.title}</AlertTitle>
       <AlertDescription>
-        <span>{content.description}</span>
+        <span>{description ?? content.description}</span>
       </AlertDescription>
       {onRetry && (state === 'error' || state === 'stale') && (
         <Button className="text-button" size="sm" type="button" variant="link" onClick={onRetry}>

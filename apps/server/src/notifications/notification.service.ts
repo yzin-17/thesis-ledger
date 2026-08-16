@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Severity } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
+import { ProviderHealthService } from '../providers/provider-health.service.js';
 
 export interface NotificationPolicy {
   channels: Partial<Record<Severity, string[]>>;
@@ -86,6 +87,7 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly providerHealth: ProviderHealthService,
   ) {}
 
   async enqueue(eventId: string, severity: Severity, policy: NotificationPolicy, now = new Date()) {
@@ -128,9 +130,10 @@ export class NotificationService {
     provider: NotificationProvider,
     maxAttempts = 3,
   ) {
+    const started = Date.now();
     try {
       const result = await provider.send(message, AbortSignal.timeout(5000));
-      return this.prisma.notificationDelivery.update({
+      const delivery = await this.prisma.notificationDelivery.update({
         where: { id },
         data: {
           provider: provider.id,
@@ -140,11 +143,13 @@ export class NotificationService {
           responseSummary: result.summary,
         },
       });
+      await this.recordDeliveryHealth(provider.id, true, Date.now() - started);
+      return delivery;
     } catch (error) {
       const detail = error instanceof Error ? error.message : '通知失败';
       const delivery = await this.prisma.notificationDelivery.findUniqueOrThrow({ where: { id } });
       const failure = classifyDeliveryError(detail, delivery.attemptCount + 1, maxAttempts);
-      return this.prisma.notificationDelivery.update({
+      const updated = await this.prisma.notificationDelivery.update({
         where: { id },
         data: {
           provider: provider.id,
@@ -157,6 +162,28 @@ export class NotificationService {
             : { scheduledAt: new Date(Date.now() + failure.retryAfterMs) }),
         },
       });
+      await this.recordDeliveryHealth(provider.id, false, Date.now() - started, failure.errorCode);
+      return updated;
+    }
+  }
+
+  private async recordDeliveryHealth(
+    provider: string,
+    success: boolean,
+    latencyMs: number,
+    errorCode?: string,
+  ) {
+    try {
+      await this.providerHealth.record(
+        provider,
+        success,
+        latencyMs,
+        errorCode,
+        new Date(),
+        'delivery',
+      );
+    } catch {
+      // Delivery state remains authoritative if health history persistence is unavailable.
     }
   }
 

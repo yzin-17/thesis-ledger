@@ -21,7 +21,11 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 ```bash
 cp .env.example .env
 pnpm install --frozen-lockfile
-docker compose up --build -d
+
+cd ../thesis-ledger-infra
+test -f .env || cp .env.example .env
+docker compose --env-file .env -f compose.yml -f compose.dev.yml up --build -d
+cd ../thesis-ledger
 ```
 
 服务启动后访问：
@@ -32,12 +36,14 @@ docker compose up --build -d
 首次启动后，可以在另一个终端初始化演示账户和示例标的：
 
 ```bash
-docker compose exec server pnpm --filter @thesis-ledger/server prisma db seed
+cd ../thesis-ledger-infra
+docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-ledger sh -c 'cd apps/server && ./node_modules/.bin/tsx prisma/seed.ts'
+cd ../thesis-ledger
 ```
 
-然后打开 `http://localhost:5173`。如果不使用演示数据，也可以直接在 Desktop 的“投资组合”页面创建自己的账户。停止服务时使用 `docker compose down`；不要随意添加 `-v`，否则会删除 PostgreSQL 和 Redis 的持久化卷。
+然后打开 `http://localhost:5173`。如果不使用演示数据，也可以直接在 Desktop 的“投资组合”页面创建自己的账户。停止服务时进入 `../thesis-ledger-infra` 执行同样的 Compose 命令并追加 `down`；不要添加 `-v`，否则会删除 PostgreSQL 和 Redis 的持久化卷。
 
-需要启动真实 DSA Fork 时，进入同级 `../thesis-ledger-infra`，按其文档使用固定 digest 镜像或 `compose.dev.yml` 源码覆盖；主仓根级 Compose 始终使用 Contract Stub。
+`compose.yml` 和 `compose.dev.yml` 共同启动唯一的 `thesis-ledger-dev` 后端栈。前端不是 Docker 服务，继续通过 `pnpm --filter @thesis-ledger/desktop dev` 在本地运行，并访问 `http://localhost:3000` 的 API。
 
 常用质量命令：
 
@@ -56,8 +62,8 @@ ThesisLedger 的主流程是：选择账户 → 选择手动录入或截图导�
 ### 第一次使用
 
 1. 打开 Desktop，在左侧进入“投资组合”。
-2. 进入“录入持仓”。已有账户直接选择账户和“手动录入”或“截图导入”；没有账户时，在“账户管理”中创建账户。账户填写名称、机构、类型、实际/影子模式和币种。
-3. 手动录入使用“保存当前持仓”设置绝对余额；证券代码使用带市场后缀的格式，例如 `600519.SH`，场外基金使用 `000001.OF`。截图导入先选择来源，再审核并提交需要更新的行。
+2. 进入“录入持仓”。已有账户直接选择账户，主页面展示当前持仓和现金余额；点击“截图导入”后在右侧 Sheet 中上传并审核截图。点击“账户管理”可进入独立账户管理页，点击右上角“创建账户”后在右侧 Sheet 中填写账户，空列表进入该页时会自动打开 Sheet。账户填写名称、机构、类型、实际/影子模式和币种。
+3. 手动录入页先查看持仓和现金余额，进入页面时录入 Sheet 默认关闭；点击“+ 添加持仓”或行内“编辑”后在右侧录入 Sheet 中保存绝对余额。证券代码使用带市场后缀的格式，例如 `600519.SH`，场外基金使用 `000001.OF`。截图导入先选择来源，再审核并提交需要更新的行。
 4. 保存后点击页面刷新，组合会重新估值。现金在独立区域维护，不计入持仓成本和持仓盈亏；停用账户前需要先清空持仓和现金余额。
 5. 接着进入“数据与自动化”检查 Provider 和通知状态，再进入“风险中心”创建第一条风险规则。
 
@@ -218,7 +224,9 @@ JSON 必须合法，且应包含可识别的 `universe.symbols`。点击“保�
 
 #### Provider 配置
 
-在“新增或更新 Provider”中填写名称、类型、能力和可选的凭证引用。类型支持通知、行情、AI 和图像；能力用逗号分隔，例如 `quote,bars,indicator`。提交后凭证输入框会清空，页面只显示“已配置/未配置”，不会回显密钥。
+在“新增或更新 Provider”中填写名称、类型、能力和可选的凭证引用。名称是唯一标识：使用相同名称保存会更新配置，换名称会创建新配置。类型支持通知、行情、AI 和图像；能力通过下拉框多选，必须使用实际 Provider Plugin 声明的能力名。提交后凭证输入框会清空，页面只显示“已配置/未配置”，不会回显密钥。
+
+填写时注意：Provider 表单只管理 Registry 配置，不会替换服务端环境变量，也不会自动安装 Provider Plugin。当前真实连接信息仍按部署方式配置：行情使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`，飞书使用 `FEISHU_WEBHOOK_URL`，AI 使用 `AI_PROVIDER`、`AI_MODEL` 与 `AI_API_KEY`。新增、更新、优先级、凭证引用和连通性测试的完整步骤见 [`docs/user-guide.md`](docs/user-guide.md) 的“Provider 填写教程”。
 
 在 Provider 列表中可以：
 
@@ -227,7 +235,7 @@ JSON 必须合法，且应包含可识别的 `universe.symbols`。点击“保�
 - 点击“连通性测试”排队执行测试。
 - 点击“启用/停用”切换 Provider 是否参与路由。
 
-Provider 按能力和优先级路由请求，主源不可用时可以走 fallback。`stale` 表示数据陈旧，`partial` 表示结果不完整；在回测、收益和风控中都应保留这些标记。
+接入 Provider Registry 的请求按能力和优先级路由，主源不可用时可以走 fallback；当前主行情链路仍通过 DSA Contract 取数，Provider 页面配置不会自动替换 DSA 环境配置。`stale` 表示数据陈旧，`partial` 表示结果不完整；在回测、收益和风控中都应保留这些标记。
 
 #### 自动化与故障排查
 

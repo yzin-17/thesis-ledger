@@ -32,6 +32,7 @@ import { IntegrityService } from './integrity/integrity.service.js';
 import { NotificationController } from './notifications/notification.controller.js';
 import { ProviderHealthController } from './providers/provider-health.controller.js';
 import { ProviderHealthService } from './providers/provider-health.service.js';
+import { ProviderHealthScheduler } from './providers/provider-health.scheduler.js';
 import { ProviderConfigController } from './providers/provider-config.controller.js';
 import { ProviderConfigService } from './providers/provider-config.service.js';
 import { DataQualityController } from './quality/data-quality.controller.js';
@@ -85,6 +86,7 @@ import { ErrorTrackingService } from './platform/error-tracking.service.js';
     JournalService,
     IntegrityService,
     ProviderHealthService,
+    ProviderHealthScheduler,
     ProviderConfigService,
     DataQualityService,
     MarketStorageService,

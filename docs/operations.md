@@ -3,7 +3,9 @@
 ## 启动与健康检查
 
 ```bash
-docker compose up --build -d
+cd ../thesis-ledger-infra
+test -f .env || cp .env.example .env
+docker compose --env-file .env -f compose.yml -f compose.dev.yml up --build -d
 curl http://localhost:3000/api/v1/health
 ```
 
@@ -12,8 +14,8 @@ curl http://localhost:3000/api/v1/health
 ## 数据库迁移
 
 ```bash
-pnpm --filter @thesis-ledger/server prisma migrate deploy
-pnpm --filter @thesis-ledger/server prisma db seed
+docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-ledger sh -c 'cd apps/server && ./node_modules/.bin/prisma migrate deploy'
+docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-ledger sh -c 'cd apps/server && ./node_modules/.bin/tsx prisma/seed.ts'
 ```
 
 发布前先备份并在副本演练迁移。账户模型迁移 `20260807100000_account_entry_model` 会先检查账户类型与持仓资产冲突，预检失败必须停止。迁移失败时恢复上一兼容应用和备份；禁止对生产库执行 `migrate reset`。
@@ -22,8 +24,11 @@ pnpm --filter @thesis-ledger/server prisma db seed
 
 1. 查看 `/api/v1/health` 和 Provider 健康状态。
 2. 确认能力、优先级、限额和 credential 状态。
-3. 检查数据是否为 `partial` 或 `stale`，不得把旧缓存解释为实时行情。
-4. 主源失败时确认 fallback chain；所有来源都失败时保留最后有效值并明确标记陈旧。
+3. 在 Provider 健康历史中区分 `manual`、`scheduled` 和 `delivery` 来源。
+4. 检查数据是否为 `partial` 或 `stale`，不得把旧缓存解释为实时行情。
+5. 主源失败时确认 fallback chain；所有来源都失败时保留最后有效值并明确标记陈旧。
+
+DSA 定时检查间隔由 `PROVIDER_HEALTH_CHECK_INTERVAL_MS` 控制，默认 1 小时。健康历史接口支持 `page` 和 `pageSize` 分页参数，桌面端默认每页显示 20 条。Feishu Webhook 不进行无副作用的定时探测，优先查看手动测试和实际通知投递结果。
 
 ## 自动化故障
 

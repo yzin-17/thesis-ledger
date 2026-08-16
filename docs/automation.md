@@ -6,6 +6,14 @@
 
 市场任务（行情同步、组合快照、风险扫描和日报）在交易日感知检查后执行；周末或休市日返回“休市日跳过市场任务”，普通维护任务仍可运行。失败按 retryPolicy 指数退避，永久错误进入 failed，不会伪造成功数据。
 
+## Provider 健康检查
+
+Provider 健康历史统一记录三类事实：用户发起的连通性测试、服务端定时健康检查和实际通知投递结果。历史记录带有 `manual`（手动测试）、`scheduled`（定时检查）或 `delivery`（实际投递）来源，页面刷新、修改优先级和启用/停用不会触发探测。
+
+服务启动后由内置调度器按 `PROVIDER_HEALTH_CHECK_INTERVAL_MS`（默认 1 小时）执行安全探测，目前 DSA 使用自身健康接口。Feishu Webhook 的主动探测会产生真实通知，因此不参与定时探测；它的健康状态由手动测试和实际投递结果更新。`POST /api/v1/providers/health/check` 用于管理员手动触发同一批安全探测。
+
+`GET /api/v1/providers/health/history?page=1&pageSize=20` 按页返回健康历史，响应包含 `items`、`page`、`pageSize`、`total` 和 `totalPages`；`pageSize` 最大为 100。桌面端默认每页显示 20 条。
+
 ## 工作流
 
 盘前流程只筛选当前持仓/自选相关公告、财报、分红和停复牌事件，并以昨日收盘或最新可用时点运行风险预览。开盘扫描只使用可用 Quote，明确无 L2 限制；盘中风险扫描批量处理持仓，复用 Market、Portfolio、Risk 服务和 Provider 限流。数据健康任务检查 Provider 状态、陈旧行情和未解决质量问题，严重问题生成 system alert。

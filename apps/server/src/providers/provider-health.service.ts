@@ -3,6 +3,20 @@ import { DsaClient } from '../market/dsa-client.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
 export type ProviderState = 'healthy' | 'degraded' | 'down';
+export type ProviderHealthSource = 'manual' | 'scheduled' | 'delivery';
+
+const DEFAULT_HISTORY_PAGE_SIZE = 20;
+const MAX_HISTORY_PAGE_SIZE = 100;
+
+const providerAliases = new Set(['feishu', 'feishu-webhook', 'lark', 'lark-webhook']);
+
+export const normalizeProviderName = (provider: string) => {
+  const normalized = provider
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-');
+  return providerAliases.has(normalized) ? 'feishu' : normalized;
+};
 
 @Injectable()
 export class ProviderHealthService {
@@ -17,8 +31,12 @@ export class ProviderHealthService {
     latencyMs: number,
     errorCode?: string,
     checkedAt = new Date(),
+    source: ProviderHealthSource = 'manual',
   ) {
-    const previous = await this.prisma.providerHealth.findUnique({ where: { provider } });
+    const providerKey = normalizeProviderName(provider);
+    const previous = await this.prisma.providerHealth.findUnique({
+      where: { provider: providerKey },
+    });
     const consecutiveFailures = success ? 0 : (previous?.consecutiveFailures ?? 0) + 1;
     const state: ProviderState = success
       ? latencyMs > 3_000
@@ -28,7 +46,7 @@ export class ProviderHealthService {
         ? 'down'
         : 'degraded';
     const result = await this.prisma.providerHealth.upsert({
-      where: { provider },
+      where: { provider: providerKey },
       update: {
         state,
         consecutiveFailures,
@@ -37,7 +55,7 @@ export class ProviderHealthService {
         checkedAt,
       },
       create: {
-        provider,
+        provider: providerKey,
         state,
         consecutiveFailures,
         latencyMs,
@@ -47,7 +65,14 @@ export class ProviderHealthService {
     });
     if (this.prisma.providerHealthCheck) {
       await this.prisma.providerHealthCheck.create({
-        data: { provider, state, latencyMs, errorCode: errorCode ?? null, checkedAt },
+        data: {
+          provider: providerKey,
+          state,
+          latencyMs,
+          errorCode: errorCode ?? null,
+          source,
+          checkedAt,
+        },
       });
     }
     return result;
@@ -57,26 +82,46 @@ export class ProviderHealthService {
     return this.prisma.providerHealth.findMany({ orderBy: { provider: 'asc' } });
   }
 
-  async checkDsa() {
+  async checkDsa(source: ProviderHealthSource = 'manual') {
     const started = Date.now();
     try {
       await this.dsa.health();
-      return this.record('dsa', true, Date.now() - started);
+      return this.record('dsa', true, Date.now() - started, undefined, new Date(), source);
     } catch (error) {
       const errorCode = error instanceof Error ? error.name : 'provider_error';
-      return this.record('dsa', false, Date.now() - started, errorCode);
+      return this.record('dsa', false, Date.now() - started, errorCode, new Date(), source);
     }
   }
 
-  async checkAll() {
-    return [await this.checkDsa()];
+  async checkAll(source: ProviderHealthSource = 'manual') {
+    // DSA exposes a safe health endpoint. Notification webhooks are intentionally
+    // excluded because probing them would send a real user-visible message.
+    return [await this.checkDsa(source)];
   }
 
-  history(provider?: string) {
-    return this.prisma.providerHealthCheck.findMany({
-      ...(provider ? { where: { provider } } : {}),
-      orderBy: { checkedAt: 'desc' },
-      take: 200,
+  async history(provider?: string, page?: number, pageSize?: number) {
+    const providerKey = provider ? normalizeProviderName(provider) : undefined;
+    const requestedPage = Number.isInteger(page) && page && page > 0 ? page : 1;
+    const requestedPageSize =
+      Number.isInteger(pageSize) && pageSize && pageSize > 0
+        ? Math.min(pageSize, MAX_HISTORY_PAGE_SIZE)
+        : DEFAULT_HISTORY_PAGE_SIZE;
+    const where = providerKey ? { provider: providerKey } : {};
+    const total = await this.prisma.providerHealthCheck.count({ where });
+    const totalPages = Math.ceil(total / requestedPageSize);
+    const currentPage = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);
+    const items = await this.prisma.providerHealthCheck.findMany({
+      where,
+      orderBy: [{ checkedAt: 'desc' }, { id: 'desc' }],
+      skip: (currentPage - 1) * requestedPageSize,
+      take: requestedPageSize,
     });
+    return {
+      items,
+      page: currentPage,
+      pageSize: requestedPageSize,
+      total,
+      totalPages,
+    };
   }
 }
