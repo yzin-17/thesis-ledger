@@ -16,10 +16,9 @@ import {
   ProviderSettings,
   replaceProviderRecord,
 } from '../src/ui/App.js';
-import { ToastProvider } from '../src/components/ui/toast.js';
+import { Toaster } from '../src/components/ui/toast.js';
 
-const renderWithToast = (node: ReactNode) =>
-  renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
+const renderWithToast = (node: ReactNode) => renderToStaticMarkup(<Toaster>{node}</Toaster>);
 
 describe('Desktop UI contract', () => {
   it('normalizes legacy health history arrays while supporting paginated responses', () => {
@@ -329,9 +328,9 @@ describe('Desktop UI contract', () => {
 
   it('keeps provider configuration in a closed drawer on the list view', () => {
     const markup = renderToStaticMarkup(
-      <ToastProvider>
+      <Toaster>
         <ProviderSettings />
-      </ToastProvider>,
+      </Toaster>,
     );
     expect(markup).toContain('data-provider-sheet-open="false"');
     expect(markup).toContain('新增或更新 Provider');

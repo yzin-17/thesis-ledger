@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
-import { ToastProvider } from './components/ui/toast.js';
+import { Toaster } from './components/ui/toast.js';
 import { ThemeProvider } from './ui/theme.js';
 import { App } from './ui/App.js';
 import './ui/styles.css';
@@ -28,9 +28,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <ToastProvider>
+        <Toaster>
           <App />
-        </ToastProvider>
+        </Toaster>
       </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,

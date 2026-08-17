@@ -52,6 +52,7 @@
   --z-dialog: 50;
   --z-popover: var(--z-dialog);
   --z-toast: 100;
+  --z-toast-item: calc(var(--z-toast) - var(--toast-index, 0));
   --background: var(--color-page-bg);
   --foreground: var(--color-text-primary);
   --card: var(--color-surface-1);
@@ -100,6 +101,10 @@
 
 .layer-toast {
   z-index: var(--z-toast);
+}
+
+.layer-toast-item {
+  z-index: var(--z-toast-item);
 }
 
 :root[data-theme='dark'] {
@@ -742,7 +747,6 @@ h3 {
   tbody tr:last-child td {
     border-bottom: 0;
   }
-
 }
 
 td strong,
