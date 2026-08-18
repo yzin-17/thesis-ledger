@@ -14,6 +14,8 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 - `../thesis-ledger-infra`：固定镜像和同级源码开发编排，不纳入主仓。
 - PostgreSQL 保存事实；Redis 只保存缓存、锁和可重建状态。
 
+文档入口：[docs/README.md](docs/README.md)。
+
 ## 快速开始
 
 要求 Node.js 22、pnpm 10 和 Docker Desktop。
@@ -226,7 +228,7 @@ JSON 必须合法，且应包含可识别的 `universe.symbols`。点击“保�
 
 在“新增或更新 Provider”中填写名称、类型、能力和可选的凭证引用。名称是唯一标识：使用相同名称保存会更新配置，换名称会创建新配置。类型支持通知、行情、AI 和图像；能力通过下拉框多选，必须使用实际 Provider Plugin 声明的能力名。提交后凭证输入框会清空，页面只显示“已配置/未配置”，不会回显密钥。
 
-填写时注意：Provider 表单只管理 Registry 配置，不会替换服务端环境变量，也不会自动安装 Provider Plugin。当前真实连接信息仍按部署方式配置：行情使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`，飞书使用 `FEISHU_WEBHOOK_URL`，AI 使用 `AI_PROVIDER`、`AI_MODEL` 与 `AI_API_KEY`。新增、更新、优先级、凭证引用和连通性测试的完整步骤见 [`docs/user-guide.md`](docs/user-guide.md) 的“Provider 填写教程”。
+填写时注意：Provider 表单只管理 Registry 配置，不会替换服务端环境变量，也不会自动安装 Provider Plugin。当前真实连接信息仍按部署方式配置：行情使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`，飞书使用 `FEISHU_WEBHOOK_URL`，AI 使用 `AI_PROVIDER`、`AI_MODEL` 与 `AI_API_KEY`。新增、更新、优先级、凭证引用和连通性测试的完整步骤见 [`docs/guides/2026-08-18-user-guide.md`](docs/guides/2026-08-18-user-guide.md) 的“Provider 填写教程”。
 
 在 Provider 列表中可以：
 
@@ -241,7 +243,7 @@ JSON 必须合法，且应包含可识别的 `universe.symbols`。点击“保�
 
 自动化任务列表显示任务类型、启停状态和下一次运行时间。可以在页面启用或停用任务，并查看自动化运行历史中的状态、开始时间和错误摘要。服务端会按 cron、timezone、交易日条件、重试策略和 Redis 锁运行任务，避免同一窗口重复执行。
 
-页面还会集中展示通知失败和开放的数据质量问题。遇到异常时，先刷新页面并按顺序检查：Provider 健康历史 → 数据质量问题 → 自动化运行历史 → 通知失败记录。详细排查步骤见 [`docs/operations.md`](docs/operations.md)、[`docs/provider-reliability.md`](docs/provider-reliability.md) 和 [`docs/automation.md`](docs/automation.md)。
+页面还会集中展示通知失败和开放的数据质量问题。遇到异常时，先刷新页面并按顺序检查：Provider 健康历史 → 数据质量问题 → 自动化运行历史 → 通知失败记录。详细排查步骤见 [`docs/operations/2026-08-18-operations.md`](docs/operations/2026-08-18-operations.md)、[`docs/domain/2026-08-18-provider-reliability.md`](docs/domain/2026-08-18-provider-reliability.md) 和 [`docs/domain/2026-08-18-automation.md`](docs/domain/2026-08-18-automation.md)。
 
 ### 9. 界面主题与数据状态
 
@@ -295,7 +297,7 @@ pnpm --filter @thesis-ledger/mobile start
 - 盘前事件、风险预览、开盘扫描、收盘同步、快照、风险扫描、日报和周报等自动化工作流。
 - 账户数据导出、数据库备份/恢复、完整性检查和发布门禁。
 
-这些能力不代表开放了交易执行；相关运维流程见 [`docs/release-and-recovery.md`](docs/release-and-recovery.md)，领域边界见 [`docs/spec.md`](docs/spec.md) 和 [`docs/domain-model.md`](docs/domain-model.md)。
+这些能力不代表开放了交易执行；相关运维流程见 [`docs/operations/2026-08-18-release-and-recovery.md`](docs/operations/2026-08-18-release-and-recovery.md)，领域边界见 [`docs/specs/2026-08-18-thesis-ledger-product-v1.md`](docs/specs/2026-08-18-thesis-ledger-product-v1.md) 和 [`docs/domain/2026-08-18-domain-model.md`](docs/domain/2026-08-18-domain-model.md)。
 
 ## 当前限制
 
@@ -304,4 +306,4 @@ pnpm --filter @thesis-ledger/mobile start
 - 真实飞书 Webhook、专业 Provider 和跨平台签名仍需要仓库所有者提供外部资源。
 - 所有收益、风险、回测和 AI 输出仅供研究，不构成投资建议。
 
-更详细的运行和模块说明见 [`docs/operations.md`](docs/operations.md) 与 [`docs/user-guide.md`](docs/user-guide.md)。
+更详细的运行和模块说明见 [`docs/operations/2026-08-18-operations.md`](docs/operations/2026-08-18-operations.md) 与 [`docs/guides/2026-08-18-user-guide.md`](docs/guides/2026-08-18-user-guide.md)。

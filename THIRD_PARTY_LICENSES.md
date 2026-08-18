@@ -1,6 +1,6 @@
 # 第三方许可证与 NOTICE
 
-本项目依赖的完整许可证以各依赖包随附的 `LICENSE` 文件和锁文件解析版本为准。`pnpm licenses:scan` 会读取当前安装的锁定依赖，生成 [third-party-license-inventory.md](docs/engineering/third-party-license-inventory.md)，并在 package metadata 缺少许可证字段时失败。本次扫描覆盖 671 个唯一依赖版本，未发现缺失许可证字段；发布前仍需人工确认以下重点组件。
+本项目依赖的完整许可证以各依赖包随附的 `LICENSE` 文件和锁文件解析版本为准。`pnpm licenses:scan` 会读取当前安装的锁定依赖，生成 [third-party-license-inventory.md](docs/engineering/2026-08-18-third-party-license-inventory.md)，并在 package metadata 缺少许可证字段时失败。本次扫描覆盖 671 个唯一依赖版本，未发现缺失许可证字段；发布前仍需人工确认以下重点组件。
 
 | 组件                 | 用途                   | 许可证核对要求                               |
 | -------------------- | ---------------------- | -------------------------------------------- |
