@@ -44,6 +44,7 @@
 - 让 DSA 独立持有 Provider 适配器、配置、凭证、能力声明、健康和 Effective Policy。
 - 通过独立的 Control Contract 管理 Desired 到 Effective 的版本化同步。
 - 在 Quote、Daily Bar、Fund NAV 及历史 Fund NAV 上实现有边界、可观测、可测试的 fallback。
+- 将 `CHIP_SUMMARY` 纳入显式 Provider Capability；Indicator 只从已路由的 `DAILY_BAR` 派生，不再触发 DSA native Provider manager。
 - 提供 Desktop 的完整市场数据管理能力，Mobile 只读消费结果。
 - 让旧客户端、旧 DSA Data Contract V1 和既有 DSA native analysis 在增量发布期间继续工作。
 
@@ -68,7 +69,7 @@
 | `InstrumentAssetAssociation` | `Instrument` 与 `Asset` 的独立关联，记录状态、来源和时间 | ThesisLedger domain |
 | `ProviderConfig` | 现有主系统 Provider 配置，继续服务通知/AI 等既有职责 | ThesisLedger；不得加入市场路由 |
 | DSA `ProviderConfig` | DSA 适配器配置、凭证引用、Provider-specific 参数和运行配置 | DSA；与主系统 `ProviderConfig` 不是同一模型 |
-| `Capability` | 数据或 Provider 控制能力，例如 `REALTIME_QUOTE`、`DAILY_BAR` | Contract / DSA manifest |
+| `Capability` | 数据或 Provider 控制能力，例如 `REALTIME_QUOTE`、`DAILY_BAR`、`CHIP_SUMMARY` | Contract / DSA manifest |
 | `InstrumentType` | `STOCK`、`ETF`、`MUTUAL_FUND` 等目录类型 | Shared Schema / Catalog |
 | `DesiredProviderPolicy` | 用户在 ThesisLedger 中持久化的路由意图和全局启停状态 | ThesisLedger |
 | `EffectiveProviderPolicy` | DSA 基于 Desired Policy、manifest、配置和运行条件生成的可执行投影 | DSA |
@@ -250,6 +251,7 @@ Effective Policy 是 DSA 的运行投影，不是用户编辑模型。DSA 不得
 现有 Data Contract V1 继续作为数据消费契约，必须保持向后兼容：
 
 - 现有 capabilities、Quote、Daily Bar、Fund NAV、指标和 chip 等路径继续可用；
+- 现有 Indicator 与 chip 的 Data Contract V1 wire shape 继续可用：MA/MACD/RSI 从统一 gateway 取得 `DAILY_BAR` 输入，`/market/chip` 仍返回摘要而不伪造 distribution；新增 `CHIP_SUMMARY` 只用于控制面路由和 provenance，不改变旧客户端必需字段；
 - 旧客户端不认识 Control Contract 时，仍可消费已有 Data Contract；
 - Catalog snapshot/delta 是 Data Contract 的兼容扩展，不改变既有行情字段的含义；
 - DSA 不可用或未升级时，主系统不得因此破坏旧的 V1 数据路径，只能进入降级/不可管理状态。
@@ -267,7 +269,7 @@ Control Contract 与 Data Contract V1 独立版本化，至少覆盖以下操作
 | Save/test ProviderConfig | ThesisLedger Server → DSA | 原子保存、hot reload 或 ephemeral read-only Smoke Test |
 | Apply Desired Policy | ThesisLedger Server → DSA | 传递完整 revision，校验并原子生成 Effective Policy |
 | Effective Policy/health | DSA → ThesisLedger | 返回 source revision、eligible 状态、health、circuit 和原因 |
-| Trigger/catalog job status | ThesisLedger Server ↔ DSA | 使用同一个 Job Manager 触发或读取目录同步，不重复并发任务 |
+| Trigger/catalog job status | ThesisLedger Server ↔ DSA | 使用同一个 Job Manager 触发或读取目录同步，不重复并发任务；触发快速返回 Job，状态可观察 |
 | Control diagnostics | DSA → ThesisLedger | 返回稳定错误码、request/diagnostic ID 和可展示诊断 |
 
 Control Contract 的请求 envelope 必须带 `contractVersion`、`consumer`、`requestId`；Policy 操作还必须带 `revision`。只有 ThesisLedger Server 持有独立 Control Token。Desktop、Mobile 和其他客户端不得知道 Control Token，也不得直连 DSA。
@@ -283,7 +285,7 @@ DSA 负责从源 Provider 抓取、合并和归一化目录，并向 ThesisLedge
 - ThesisLedger 只在完整 snapshot/delta 链成功并校验 checksum 后原子切换 generation；
 - 未完成的 generation 不得软停用旧目录；只有完整 snapshot 成功后，缺失条目才可软停用；
 - 不使用 DSA push，不共享主系统数据库；
-- 定时同步和手工触发均进入同一个 DSA Job Manager，必须去重并发任务。ThesisLedger 只发起触发请求并观察状态。
+- 定时同步和手工触发均进入同一个 DSA Job Manager，必须去重并发任务。Trigger 只创建或复用 `pending`/`running` Job 并快速返回；ThesisLedger 通过 status 查询观察 `pending`、`running`、`succeeded`、`failed`、`timeout`，只有 `succeeded` 且 checksum 校验通过后才 ACK。
 
 DSA Catalog Contract 的输出只包括稳定 identity、`displayName`、`InstrumentType`、market 等跨 Provider 字段。ThesisLedger 负责生成 pinyin、pinyin initials 和搜索 aliases。
 
@@ -306,7 +308,12 @@ MVP 的可执行数据能力为：
 - `REALTIME_QUOTE`；
 - `DAILY_BAR`；
 - `FUND_NAV`；
-- `FUND_NAV_HISTORY`。
+- `FUND_NAV_HISTORY`；
+- `CHIP_SUMMARY`（MVP 仅对 Provider manifest 声明支持的 `STOCK` 路由开放）。
+
+`INDICATOR` 不是独立的 Provider route。Contract V1 的 MA、MACD、RSI 必须通过统一 ThesisLedger data gateway 请求 `DAILY_BAR`（`1d`）后在 DSA 内计算，并沿用该 Bar 序列的实际 Provider 与 fallback provenance；不得再次调用 DSA native `DataFetcherManager`。`CHIP_SUMMARY` 是独立的 Provider route，结果按摘要记录整体选择一个 Provider，不得字段级混源。
+
+MVP 的 Provider manifest 显式声明：`akshare` 支持 `CHIP_SUMMARY + STOCK`，`efinance` 当前不声明该组合；因此 `CHIP_SUMMARY` 的初始 seed route 为 `akshare`，任何未由 manifest 声明的 Provider/InstrumentType 组合都必须在 Policy apply 时原子拒绝，不能通过运行时隐藏 fallback 绕过校验。
 
 `INSTRUMENT_SEARCH` 是 ThesisLedger 本地目录能力，不进入 Provider Policy route matrix。`MINUTE_BAR`、`FUNDAMENTALS` 可以保留在枚举或 Contract 能力表中，但在 MVP manifest 中标记 unsupported，不生成可执行 route。
 
@@ -369,6 +376,7 @@ DSA 使用每 Provider/Capability 的 bounded 参数；基线为最多 1 次 tra
 
 - Quote 和 Fund NAV 批量请求采用 record-level fallback；每条记录的完整结果来自一个 Provider，批量响应可以包含多个 Provider 的记录。
 - Daily Bar 和 Fund NAV history 采用 sequence-level fallback；同一条序列一次只选择一个 Provider，不在序列内部混合来源。
+- `CHIP_SUMMARY` 采用 summary-level fallback；每次摘要完整来自一个 Effective Policy eligible Provider，并返回实际 `provider`、`fallbackUsed` 与尝试顺序；Indicator 则继承其 `DAILY_BAR` 输入的同一组 provenance。
 - 结果必须严格归一化；无效结果视为 Provider failure 并触发既定 fallback，禁止用默认值填充。
 - MVP 不做 live cross-source reconciliation。发现来源差异只进入 diagnostics，不改变用户可见的单源结果。
 
@@ -479,7 +487,7 @@ Desired revision 单调、latest-wins、幂等；旧 revision 拒绝；非法/�
 
 ### AC-04 Provider fallback
 
-只使用 Effective Policy 顺序；无隐藏 fallback；Quote/NAV 可按记录 fallback，Bars/NAV history 按序列 fallback；无字段混合、无限 retry 或 `provider=CACHE`。
+只使用 Effective Policy 顺序；无隐藏 fallback；Quote/NAV 可按记录 fallback，Bars/NAV history 按序列 fallback，`CHIP_SUMMARY` 按摘要整体 fallback，Indicator 只能继承已路由 Bar 的实际来源；无字段混合、无限 retry 或 `provider=CACHE`。
 
 ### AC-05 目录同步
 

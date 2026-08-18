@@ -24,6 +24,7 @@ DSA 控制面当前提供以下边界：
 - `POST /api/v1/thesis-ledger/control/policies/apply`
 - `GET /api/v1/thesis-ledger/control/policies/effective`
 - `POST /api/v1/thesis-ledger/control/catalog/jobs`
+- `GET /api/v1/thesis-ledger/control/catalog/jobs/{jobId}`
 - `POST /api/v1/thesis-ledger/control/catalog/ack`
 - `GET /api/v1/thesis-ledger/catalog/snapshot`
 - `GET /api/v1/thesis-ledger/catalog/delta`
@@ -33,10 +34,10 @@ ThesisLedger 对产品侧暴露 `/api/v1/market-data/*`：Policy 读取、Apply/
 ## Policy、Provider 和目录语义
 
 - `DesiredProviderPolicy` 由 ThesisLedger PostgreSQL 持久化，revision 单调递增；相同 revision 的同内容请求幂等，不同内容冲突；DSA 不可用时保持 `pending`，旧 Effective Projection 继续可读。
-- DSA 只按 Effective Policy 顺序选择 Provider。MVP Provider ID 固定为 `akshare` 和 `efinance`，未配置、禁用或 circuit open 的 Provider 不进入 eligible 列表。
+- DSA 只按 Effective Policy 顺序选择 Provider。MVP Provider ID 固定为 `akshare` 和 `efinance`，未配置、禁用或 circuit open 的 Provider 不进入 eligible 列表；`CHIP_SUMMARY + STOCK` 当前仅由 `akshare` manifest 声明，Indicator 通过 `DAILY_BAR` gateway 派生。
 - DSA Provider 凭证只写入 DSA SQLite 的加密字段；API 和控制客户端不返回原始凭证。空 credential 表示保留已有值，只有显式 `clearCredentials` 才清除。
 - Provider removal 会移除主系统 Desired routes、清理 DSA 配置、保留 DSA/ThesisLedger tombstone，并留下 route diff。
-- Catalog 使用 generation、checksum、cursor 和 ACK；ThesisLedger 只在完整快照 checksum 校验成功后原子切换当前目录，并对旧 generation 做软停用。
+- Catalog 使用 generation、checksum、cursor 和 ACK；DSA trigger 只创建或复用异步 Job，worker 负责 Provider 抓取，ThesisLedger 通过 Job status 观察生命周期并只在完整快照 checksum 校验成功后原子切换当前目录，对旧 generation 做软停用。
 - `STOCK`、`ETF`、`MUTUAL_FUND` 可以建立 Asset 关联；`LOF`、`INDEX`、`BOND`、`CONVERTIBLE_BOND` 当前只进入目录，不允许通过确认接口建立新的 Asset 关联。场外基金保持 `.OF` 语义。
 
 ## 数据读取、缓存和新持仓入口
@@ -49,12 +50,12 @@ Desktop 新增手工持仓时先调用目录搜索，再调用 `/api/v1/market-d
 
 ## 配置与迁移
 
-infra 通过 `THESIS_LEDGER_CONTROL_TOKEN`、`THESIS_LEDGER_DSA_SECRET_KEY`、`THESIS_LEDGER_DSA_SECRET_KEY_VERSION` 和独立的 `thesis-ledger-dsa-data` 卷为 DSA 提供控制面持久化。主系统迁移为 `20260818000000_market_data_provider_v12`，包含目录、Asset 关联、Desired Policy/history、Provider tombstone，以及确定性的 `.SH/.SZ/.BJ/.OF` Asset backfill。
+infra 通过 `THESIS_LEDGER_CONTROL_TOKEN`、`THESIS_LEDGER_DSA_SECRET_KEY`、`THESIS_LEDGER_DSA_SECRET_KEY_VERSION`，以及轮换期间临时保留的 `THESIS_LEDGER_DSA_SECRET_KEY_PREVIOUS`/`THESIS_LEDGER_DSA_SECRET_KEY_PREVIOUS_VERSION` 和独立的 `thesis-ledger-dsa-data` 卷为 DSA 提供控制面持久化。DSA 启动时仅在全部已有凭证可用旧 key 验证后原子重加密；主系统迁移为 `20260818000000_market_data_provider_v12`，包含目录、Asset 关联、Desired Policy/history、Provider tombstone，以及确定性的 `.SH/.SZ/.BJ/.OF` Asset backfill。
 
 不得使用 `docker compose down -v` 清理 PostgreSQL 或 Redis 数据卷。发布顺序应保持 DSA/Control Contract 兼容后，再发布 ThesisLedger，最后发布 Desktop/infra 配置；回滚时先恢复使用旧 Data Contract V1 的数据读取路径，不删除已有数据卷。
 
 ## 当前验证状态
 
-已完成：Schema build、Prisma generate、ThesisLedger Server typecheck、Server 81 项测试、Desktop typecheck/15 项测试/build、Mobile 6 项测试、DSA Python AST 检查、DSA ControlStore/ProviderRuntime 定向 smoke、infra Compose config 和三仓 `git diff --check`。
+已完成：Schema build、Prisma generate、ThesisLedger Server typecheck、Server 89 项测试、Desktop typecheck/build/15 项测试、Mobile 6 项测试、DSA Python AST/65 项定向回归、DSA ControlStore/ProviderRuntime/Catalog Job/Provider timeout isolation smoke、DSA 跨层黑盒 Contract Test、infra Compose config/build、四服务健康检查、revision 3→4→5→6→7→8→9→10→11 的非破坏回滚链路、efinance-only 四项在线 smoke 和三仓 `git diff --check`。Desktop 浏览器与 Mobile Web 的只读/失败态视觉证据也已记录；原生 Mobile 证据单独保留为未完成。
 
-尚未完成：DSA pytest（本地缺少 `fastapi`/`pytest`）、Docker 实际迁移与启动、跨仓黑盒 Contract Test、在线 AKShare/efinance smoke、Desktop/Mobile 浏览器视觉验收和完整发布/回滚演练。当前 DSA Catalog job/目录仍是确定性 fixture 管线，真实源目录抓取/合并尚未接入；`pinyin`/aliases 字段已建模但生成逻辑尚未接通。上述缺口不能由静态检查或 fixture 结果替代。
+尚未完成：原生 Mobile 仍需要 Android `adb` 或 iOS Simulator。efinance `DAILY_BAR` 已在 `ENABLE_EASTMONEY_PATCH=true` 下恢复，四项 efinance-only 在线 smoke 均由 `efinance` 成功返回；后续若 Eastmoney 再要求登录态，可使用 write-only Cookie 配置。完整的非破坏回滚演练已执行并保留历史/数据卷；原生缺口不能由静态检查、fixture 结果或 Mobile Web 证据替代。

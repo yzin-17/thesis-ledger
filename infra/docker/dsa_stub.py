@@ -28,6 +28,7 @@ CONTROL_PROVIDERS = {
             "DAILY_BAR": ["STOCK", "ETF"],
             "FUND_NAV": ["MUTUAL_FUND"],
             "FUND_NAV_HISTORY": ["MUTUAL_FUND"],
+            "CHIP_SUMMARY": ["STOCK"],
         },
     },
     "efinance": {
@@ -55,6 +56,7 @@ CONTROL_POLICY: dict[str, object] = {
         "DAILY_BAR": {"STOCK": ["akshare", "efinance"], "ETF": ["akshare", "efinance"]},
         "FUND_NAV": {"MUTUAL_FUND": ["akshare", "efinance"]},
         "FUND_NAV_HISTORY": {"MUTUAL_FUND": ["akshare", "efinance"]},
+        "CHIP_SUMMARY": {"STOCK": ["akshare"]},
     },
     "routeStatus": {},
     "appliedAt": "2025-01-10T07:00:00+00:00",
@@ -134,10 +136,14 @@ def capabilities() -> dict[str, object]:
             "fund-nav": {"assetSuffix": ".OF", "freshness": ["delayed", "stale"]},
             "fund-nav-history": {"assetSuffix": ".OF", "maxLimit": 3650},
             "bars": {"timeframes": ["1d"]},
-            "indicators": {"names": ["MA", "MACD", "RSI"], "timeframes": ["1d"]},
-            "chip": {"summary": True, "distribution": True},
+            "indicators": {
+                "names": ["MA", "MACD", "RSI"],
+                "timeframes": ["1d"],
+                "inputCapability": "DAILY_BAR",
+            },
+            "chip": {"summary": True, "capability": "CHIP_SUMMARY", "distribution": False},
         },
-        "unsupported": ["bars:1m", "indicator:ATR"],
+        "unsupported": ["bars:1m", "indicator:ATR", "chip:distribution"],
     }
 
 

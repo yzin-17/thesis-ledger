@@ -1,4 +1,9 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { desiredProviderPolicySchema, type DesiredProviderPolicy } from '@thesis-ledger/schemas';
@@ -16,6 +21,7 @@ const defaultRoutes = {
   },
   FUND_NAV: { MUTUAL_FUND: ['akshare', 'efinance'] },
   FUND_NAV_HISTORY: { MUTUAL_FUND: ['akshare', 'efinance'] },
+  CHIP_SUMMARY: { STOCK: ['akshare'] },
 } as const;
 
 const safeError = (error: unknown) => ({
@@ -145,7 +151,7 @@ export class MarketControlService {
     await this.ensureSeededPolicy();
     const revision = Number(raw.revision);
     if (!Number.isInteger(revision) || revision <= 0)
-      throw new Error('Policy revision 必须是正整数');
+      throw new BadRequestException('Policy revision 必须是正整数');
     const policy = this.policyPayload(input, revision);
     const result = await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw(Prisma.sql`
@@ -165,8 +171,6 @@ export class MarketControlService {
           throw new ConflictException('相同 revision 的 Policy 内容不能冲突');
         return { current, shouldPush: current.syncState === 'pending' };
       }
-      if (revision !== current.revision + 1)
-        throw new ConflictException(`下一版 Policy revision 必须是 ${current.revision + 1}`);
       const next = await transaction.desiredProviderPolicy.update({
         where: { consumer: 'thesis-ledger' },
         data: {
@@ -211,12 +215,13 @@ export class MarketControlService {
   async rollback(targetRevision: number) {
     const current = await this.ensureSeededPolicy();
     if (!Number.isInteger(targetRevision) || targetRevision <= 0)
-      throw new Error('回滚目标 revision 必须是正整数');
-    if (targetRevision >= current.revision) throw new Error('回滚目标必须早于当前 revision');
+      throw new BadRequestException('回滚目标 revision 必须是正整数');
+    if (targetRevision >= current.revision)
+      throw new ConflictException('回滚目标必须早于当前 revision');
     const target = await this.prisma.desiredProviderPolicyRevision.findUnique({
       where: { consumer_revision: { consumer: 'thesis-ledger', revision: targetRevision } },
     });
-    if (!target) throw new Error(`找不到 revision ${targetRevision}`);
+    if (!target) throw new NotFoundException(`找不到 revision ${targetRevision}`);
     return {
       rolledBackFrom: current.revision,
       rolledBackTo: targetRevision,

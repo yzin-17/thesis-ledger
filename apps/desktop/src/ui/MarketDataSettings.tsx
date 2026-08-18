@@ -49,6 +49,9 @@ interface CatalogStatus {
   generation: number;
   checksum?: string;
   instrumentCount?: number;
+  status?: 'pending' | 'running' | 'succeeded' | 'failed' | 'timeout';
+  id?: string;
+  acknowledged?: boolean;
 }
 
 const routeDefinitions = [
@@ -58,6 +61,7 @@ const routeDefinitions = [
   ['DAILY_BAR', 'ETF', 'ETF 日线 Bar'],
   ['FUND_NAV', 'MUTUAL_FUND', '基金单位净值'],
   ['FUND_NAV_HISTORY', 'MUTUAL_FUND', '基金净值历史'],
+  ['CHIP_SUMMARY', 'STOCK', '筹码摘要'],
 ] as const;
 
 const providerDisplay = (provider: ProviderManifest) =>
@@ -370,13 +374,20 @@ export function MarketDataSettings() {
     setBusyAction('catalog-sync');
     setMessage(null);
     try {
-      const result = await requestJson<CatalogStatus & { acknowledged?: boolean }>(
+      const result = await requestJson<CatalogStatus>(
         '/api/v1/market-data/catalog/sync',
         {
           method: 'POST',
         },
       );
       setCatalog(result);
+      if (result.acknowledged === false) {
+        setMessage({
+          type: 'error',
+          text: `标的目录同步任务已${result.status === 'running' ? '开始执行' : '排队'}（${result.id ?? '无任务 ID'}），请稍后查询状态。`,
+        });
+        return;
+      }
       setMessage({ type: 'success', text: `标的目录已同步至 generation ${result.generation}。` });
     } catch (error) {
       setMessage({

@@ -10,10 +10,16 @@ import { currentTraceId } from '../platform/structured-logger.js';
 
 type CatalogJob = {
   id: string;
-  status: 'running' | 'succeeded' | 'failed';
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'timeout';
   generation: number;
   checksum: string;
   error?: unknown;
+  owner?: string | null;
+  leaseExpiresAt?: string | null;
+  leaseValid?: boolean;
+  retryable?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export class DsaError extends Error {
@@ -231,6 +237,12 @@ export class DsaClient {
         requestId,
       }),
     });
+  }
+
+  catalogJob(jobId: string) {
+    return this.control<CatalogJob>(
+      `/api/v1/thesis-ledger/control/catalog/jobs/${encodeURIComponent(jobId)}`,
+    );
   }
 
   acknowledgeCatalog(generation: number, checksum: string, requestId = crypto.randomUUID()) {

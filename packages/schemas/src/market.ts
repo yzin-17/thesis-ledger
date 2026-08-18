@@ -76,6 +76,7 @@ export const indicatorSchemaV1 = z.object({
   calculatedAt: isoDate,
   values: z.record(z.string(), z.union([z.number(), z.array(z.number())])),
   provider: z.string().min(1),
+  fallbackUsed: z.boolean().optional(),
   engineVersion: z.string().min(1),
 });
 
@@ -93,6 +94,7 @@ export const chipDistributionSchemaV1 = z.object({
   range90: z.tuple([finite.nonnegative(), finite.nonnegative()]),
   concentration: finite.min(0).max(1),
   provider: z.string().min(1),
+  fallbackUsed: z.boolean().optional(),
   engineVersion: z.string().min(1),
   calculatedAt: isoDate,
 });

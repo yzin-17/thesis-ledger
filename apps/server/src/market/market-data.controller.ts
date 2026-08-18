@@ -65,6 +65,10 @@ export class MarketDataController {
     return this.instruments.latestGeneration();
   }
 
+  @Get('catalog/jobs/:jobId') catalogJob(@Param('jobId') jobId: string) {
+    return this.dsa.catalogJob(jobId);
+  }
+
   @Post('catalog/sync') async syncCatalog() {
     const job = await this.dsa.triggerCatalogJob();
     if (job.status !== 'succeeded') return { ...job, acknowledged: false };
