@@ -67,8 +67,8 @@ export class PortfolioService {
 
   async upsertPosition(input: unknown) {
     const data = positionInputSchema.parse(input);
-    if (data.source === 'manual' && !data.instrumentId)
-      throw new BadRequestException('新增手工持仓必须先从标的目录确认标的');
+    if (data.source === 'manual' && !data.instrumentId && (!data.assetName || !data.assetType))
+      throw new BadRequestException('未找到目录标的时需要补充名称和类型');
     const confirmedInstrument = data.instrumentId
       ? await this.instruments?.requireConfirmed(data.instrumentId)
       : undefined;

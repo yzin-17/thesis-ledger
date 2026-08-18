@@ -6,6 +6,7 @@ import {
   DataStateBanner,
   FirstRunOnboarding,
   hasConfiguredProviderSetup,
+  InstrumentCombobox,
   ImportReview,
   normalizeProviderHealthHistory,
   PortfolioManagement,
@@ -181,6 +182,82 @@ describe('Desktop UI contract', () => {
     expect(positionStep).toContain('+ 添加持仓');
     expect(positionStep).toContain('现金余额');
     expect(positionStep).not.toContain('<form');
+  });
+
+  it('把手动持仓 Sheet 收敛为标的搜索和持仓信息', () => {
+    const initial = renderToStaticMarkup(
+      <InstrumentCombobox
+        manualEntry={false}
+        open={false}
+        query=""
+        results={[]}
+        searchState="idle"
+        selectedInstrument={null}
+        busy={false}
+        onClearSelection={vi.fn()}
+        onManualEntry={vi.fn()}
+        onOpenChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        onSelect={vi.fn()}
+        onStartSearch={vi.fn()}
+      />,
+    );
+
+    expect(initial).toContain('搜索代码或名称');
+    expect(initial).not.toContain('搜索目录');
+    expect(initial).not.toContain('已确认：');
+    expect(initial).not.toContain('名称（可选）');
+    expect(initial).not.toContain('类型（可选）');
+
+    const selected = renderToStaticMarkup(
+      <InstrumentCombobox
+        manualEntry={false}
+        open={false}
+        query="510300.SH"
+        results={[]}
+        searchState="selected"
+        selectedInstrument={{
+          id: 'instrument-1',
+          symbol: '510300.SH',
+          canonicalCode: '510300',
+          instrumentType: 'ETF',
+          market: 'SH',
+          displayName: '沪深300ETF',
+          confirmable: true,
+        }}
+        busy={false}
+        onClearSelection={vi.fn()}
+        onManualEntry={vi.fn()}
+        onOpenChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        onSelect={vi.fn()}
+        onStartSearch={vi.fn()}
+      />,
+    );
+    expect(selected).toContain('沪深300ETF');
+    expect(selected).toContain('510300.SH');
+    expect(selected).toContain('ETF · 上海证券交易所');
+
+    const manual = renderToStaticMarkup(
+      <InstrumentCombobox
+        manualEntry
+        open={false}
+        query="600519.SH"
+        results={[]}
+        searchState="idle"
+        selectedInstrument={null}
+        busy={false}
+        onClearSelection={vi.fn()}
+        onManualEntry={vi.fn()}
+        onOpenChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        onSelect={vi.fn()}
+        onStartSearch={vi.fn()}
+      />,
+    );
+    expect(manual).toContain('未找到目录标的，请补充信息');
+    expect(manual).toContain('重新搜索');
+    expect(manual).toContain('name="symbol"');
   });
 
   it('keeps account creation separate and presents screenshot import in a sheet', () => {

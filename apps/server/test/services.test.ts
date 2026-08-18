@@ -2119,6 +2119,51 @@ describe('账户与组合', () => {
     );
     await expect(service.updatePosition('position', { quantity: 0 })).rejects.toThrow();
   });
+  it('目录未命中时允许使用名称和类型手动录入持仓', async () => {
+    const setPosition = vi.fn(async () => ({}));
+    const findUniqueOrThrow = vi.fn(async () => ({
+      id: 'position',
+      accountId: '11111111-1111-4111-8111-111111111111',
+      symbol: '600519.SH',
+      quantity: 20,
+      costPrice: 100,
+      asset: { name: '自定义标的', assetType: 'stock' },
+    }));
+    const service = new PortfolioService(
+      { position: { findUniqueOrThrow } } as never,
+      {} as never,
+      { setPosition } as never,
+    );
+
+    await service.upsertPosition({
+      accountId: '11111111-1111-4111-8111-111111111111',
+      symbol: '600519.SH',
+      quantity: 20,
+      costPrice: 100,
+      source: 'manual',
+      assetName: '自定义标的',
+      assetType: 'stock',
+    });
+
+    expect(setPosition).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      '600519.SH',
+      20,
+      100,
+      'manual',
+      '保存当前持仓',
+      { assetName: '自定义标的', assetType: 'stock' },
+    );
+    await expect(
+      service.upsertPosition({
+        accountId: '11111111-1111-4111-8111-111111111111',
+        symbol: '600519.SH',
+        quantity: 20,
+        costPrice: 100,
+        source: 'manual',
+      }),
+    ).rejects.toThrow('未找到目录标的时需要补充名称和类型');
+  });
 });
 
 describe('自动化基础', () => {

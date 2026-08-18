@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- Phosphor 的条件导出在 ESLint project service 中被识别为 error type，tsc 已独立校验。 */
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Combobox } from '@base-ui/react/combobox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,12 @@ import {
 } from '@/components/ui/dialog';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -32,8 +39,10 @@ import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { FlaskIcon } from '@phosphor-icons/react/Flask';
 import { GearSixIcon } from '@phosphor-icons/react/GearSix';
 import { HouseIcon } from '@phosphor-icons/react/House';
+import { MagnifyingGlassIcon } from '@phosphor-icons/react/MagnifyingGlass';
 import { RobotIcon } from '@phosphor-icons/react/Robot';
 import { ShieldCheckIcon } from '@phosphor-icons/react/ShieldCheck';
+import { SpinnerGapIcon } from '@phosphor-icons/react/SpinnerGap';
 import { StrategyIcon } from '@phosphor-icons/react/Strategy';
 import { UploadSimpleIcon } from '@phosphor-icons/react/UploadSimple';
 import { LoaderCircle } from 'lucide-react';
@@ -51,7 +60,7 @@ interface Position {
   pnl: number | null;
   stale: boolean;
   source?: string;
-  asset: { name: string };
+  asset: { name: string; assetType?: HeldAssetType };
 }
 interface InstrumentLookup {
   id: string;
@@ -62,6 +71,235 @@ interface InstrumentLookup {
   displayName: string;
   confirmable: boolean;
   disabledReason?: string | null;
+}
+type HeldAssetType = 'stock' | 'etf' | 'fund';
+type InstrumentSearchState = 'idle' | 'loading' | 'results' | 'empty' | 'error' | 'selected';
+
+const instrumentTypeLabel = (instrumentType: string) => {
+  if (instrumentType === 'ETF') return 'ETF';
+  if (instrumentType === 'MUTUAL_FUND') return '基金';
+  return '股票';
+};
+
+const instrumentMarketLabel = (market: string) => {
+  if (market === 'SH') return '上海证券交易所';
+  if (market === 'SZ') return '深圳证券交易所';
+  if (market === 'BJ') return '北京证券交易所';
+  if (market === 'HK') return '香港交易所';
+  if (market === 'OF') return '场外基金';
+  return market;
+};
+
+const instrumentAssetType = (instrumentType: string): HeldAssetType => {
+  if (instrumentType === 'ETF') return 'etf';
+  if (instrumentType === 'MUTUAL_FUND') return 'fund';
+  return 'stock';
+};
+
+const assetTypeLabel = (assetType?: HeldAssetType) => {
+  if (assetType === 'etf') return 'ETF';
+  if (assetType === 'fund') return '基金';
+  return '股票';
+};
+
+const assetQuantityUnit = (assetType?: HeldAssetType, symbol?: string) =>
+  assetType === 'stock' || (!assetType && !symbol?.endsWith('.OF')) ? '股' : '份';
+
+export function InstrumentCombobox({
+  editing,
+  manualEntry,
+  open,
+  query,
+  results,
+  searchState,
+  selectedInstrument,
+  busy,
+  onClearSelection,
+  onManualEntry,
+  onOpenChange,
+  onQueryChange,
+  onSelect,
+  onStartSearch,
+}: {
+  editing?: Position | null;
+  manualEntry: boolean;
+  open: boolean;
+  query: string;
+  results: InstrumentLookup[];
+  searchState: InstrumentSearchState;
+  selectedInstrument: InstrumentLookup | null;
+  busy: boolean;
+  onClearSelection: () => void;
+  onManualEntry: () => void;
+  onOpenChange: (open: boolean) => void;
+  onQueryChange: (value: string) => void;
+  onSelect: (instrument: InstrumentLookup) => void;
+  onStartSearch: () => void;
+}) {
+  if (editing) {
+    const market = editing.symbol.split('.').at(-1) ?? '';
+    return (
+      <div className="grid gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5">
+          <span className="min-w-0">
+            <strong className="block truncate text-sm font-medium text-foreground">
+              {editing.asset.name || editing.symbol}
+            </strong>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {assetTypeLabel(editing.asset.assetType)} · {instrumentMarketLabel(market)}
+            </span>
+          </span>
+          <code className="self-start pt-0.5 font-mono text-xs text-muted-foreground">
+            {editing.symbol}
+          </code>
+        </div>
+        <input type="hidden" name="symbol" value={editing.symbol} />
+      </div>
+    );
+  }
+
+  if (selectedInstrument) {
+    return (
+      <div className="grid gap-2">
+        <button
+          type="button"
+          className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-brand-soft-border bg-brand-soft px-3 py-2.5 text-left transition-colors hover:bg-brand-soft/80"
+          aria-label={`更换标的，当前为${selectedInstrument.displayName}`}
+          onClick={onClearSelection}
+        >
+          <span className="min-w-0">
+            <strong className="block truncate text-sm font-medium text-foreground">
+              {selectedInstrument.displayName}
+            </strong>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {instrumentTypeLabel(selectedInstrument.instrumentType)} ·{' '}
+              {instrumentMarketLabel(selectedInstrument.market)}
+            </span>
+          </span>
+          <code className="self-start pt-0.5 font-mono text-xs text-muted-foreground">
+            {selectedInstrument.symbol}
+          </code>
+        </button>
+        <input type="hidden" name="symbol" value={selectedInstrument.symbol} />
+      </div>
+    );
+  }
+
+  if (manualEntry) {
+    return (
+      <div className="grid gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">未找到目录标的，请补充信息</span>
+          <Button
+            className="text-button"
+            type="button"
+            size="sm"
+            variant="link"
+            onClick={onClearSelection}
+          >
+            重新搜索
+          </Button>
+        </div>
+        <Input
+          name="symbol"
+          required
+          pattern="\\d{6}\\.(SH|SZ|BJ|OF)"
+          value={query}
+          placeholder="例如：600519.SH"
+          onChange={(event) => onQueryChange(event.target.value)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <Combobox.Root
+      open={open}
+      items={results}
+      filter={null}
+      inputValue={query}
+      autoHighlight
+      onOpenChange={onOpenChange}
+      onInputValueChange={onQueryChange}
+      onValueChange={(instrument) => {
+        if (instrument) onSelect(instrument);
+      }}
+      itemToStringLabel={(instrument: InstrumentLookup) => instrument.displayName}
+      itemToStringValue={(instrument: InstrumentLookup) => instrument.symbol}
+    >
+      <div className="relative">
+        <MagnifyingGlassIcon
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Combobox.Input
+          className="h-10 w-full rounded-md border border-input bg-transparent py-2 pr-10 pl-9 text-base text-foreground shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+          placeholder="搜索代码或名称"
+          aria-label="搜索代码或名称"
+          disabled={busy}
+          onFocus={onStartSearch}
+        />
+        {searchState === 'loading' && (
+          <SpinnerGapIcon
+            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      <Combobox.Portal>
+        <Combobox.Positioner className="layer-popover" side="bottom" align="start" sideOffset={4}>
+          <Combobox.Popup
+            aria-label="标的搜索结果"
+            className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+          >
+            <Combobox.List className="max-h-72 overflow-auto p-1">
+              <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
+                {searchState === 'loading'
+                  ? '正在搜索...'
+                  : searchState === 'error'
+                    ? '搜索暂时不可用，请稍后重试。'
+                    : ''}
+              </Combobox.Status>
+              {searchState === 'results' &&
+                results.map((instrument, index) => (
+                  <Combobox.Item
+                    key={instrument.id}
+                    value={instrument}
+                    index={index}
+                    className="flex w-full cursor-default items-start gap-3 rounded-sm px-3 py-2 text-left outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <code className="block font-mono text-xs text-muted-foreground">
+                        {instrument.symbol}
+                      </code>
+                      <strong className="mt-0.5 block truncate text-sm font-medium">
+                        {instrument.displayName}
+                      </strong>
+                      <small className="mt-0.5 block text-xs text-muted-foreground">
+                        {instrumentTypeLabel(instrument.instrumentType)} ·{' '}
+                        {instrumentMarketLabel(instrument.market)}
+                      </small>
+                    </span>
+                  </Combobox.Item>
+                ))}
+              <Combobox.Empty className="px-3 py-2">
+                {searchState === 'empty' && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-sm text-muted-foreground">
+                      未找到“{query}”
+                    </span>
+                    <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
+                      手动录入标的
+                    </Button>
+                  </div>
+                )}
+              </Combobox.Empty>
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Positioner>
+      </Combobox.Portal>
+    </Combobox.Root>
+  );
 }
 interface Portfolio {
   totalMarketValue: number;
@@ -2187,25 +2425,26 @@ export function ProviderSettings() {
       <Button className="secondary" type="button" variant="outline" onClick={() => void load()}>
         刷新 Provider 与自动化
       </Button>
-      <Dialog
+      <Sheet
         open={providerSheetOpen}
         onOpenChange={(open) => (open ? setProviderSheetOpen(true) : closeProviderSheet())}
       >
-        <DialogContent
+        <SheetContent
+          side="right"
           aria-describedby="provider-form-description"
-          className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 grid-rows-[max-content_minmax(0,1fr)] content-start rounded-none overflow-auto"
+          className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
         >
           <div className="panel-heading">
-            <DialogTitle>
+            <SheetTitle>
               {editingProviderName ? '更新 Provider' : '新增或更新 Provider'}
-            </DialogTitle>
-            <DialogDescription id="provider-form-description">
+            </SheetTitle>
+            <SheetDescription id="provider-form-description">
               凭证用于连接 Provider；已配置凭证不会回显，编辑时留空保存不会删除当前凭证。
-            </DialogDescription>
+            </SheetDescription>
           </div>
           <form
             key={editingProviderName ?? 'new-provider'}
-            className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+            className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
             onSubmit={(event) => void saveProviderDraft(event)}
           >
             <label>
@@ -2365,8 +2604,8 @@ export function ProviderSettings() {
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
       <DataStateBanner state={loadState} onRetry={() => void load()} />
       <section className="panel">
         <div className="table-wrap">
@@ -4338,7 +4577,7 @@ export function ImportReview({
         cashValue={entryCashValue}
         step="position"
         defaultAccountId={accountId}
-        entryAccountLocked
+        entryAccountLocked={Boolean(requestedAccountId)}
         entrySheetOpen={positionSheetOpen}
         onEntrySheetOpenChange={(open) => {
           setPositionSheetOpen(open);
@@ -4354,16 +4593,17 @@ export function ImportReview({
           onPortfolioChanged();
         }}
       />
-      <Dialog open={screenshotSheetOpen} onOpenChange={closeScreenshotSheet}>
-        <DialogContent
+      <Sheet open={screenshotSheetOpen} onOpenChange={closeScreenshotSheet}>
+        <SheetContent
+          side="right"
           aria-describedby="screenshot-import-description"
-          className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 grid-rows-[max-content_minmax(0,1fr)] content-start rounded-none overflow-auto gap-0"
+          className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] gap-0 overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
         >
           <div className="panel-heading">
-            <DialogTitle>截图导入</DialogTitle>
-            <DialogDescription id="screenshot-import-description">
+            <SheetTitle>截图导入</SheetTitle>
+            <SheetDescription id="screenshot-import-description">
               上传不会直接修改持仓；请在提交前完成代码、数量和成本价审核。
-            </DialogDescription>
+            </SheetDescription>
           </div>
           <ScreenshotImportReview
             accounts={accounts}
@@ -4373,8 +4613,8 @@ export function ImportReview({
             onDirtyChange={setDirty}
             onPortfolioChanged={onPortfolioChanged}
           />
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }
@@ -4804,6 +5044,18 @@ export function PortfolioManagement({
   const [instrumentResults, setInstrumentResults] = useState<InstrumentLookup[]>([]);
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentLookup | null>(null);
   const [instrumentSearchBusy, setInstrumentSearchBusy] = useState(false);
+  const [instrumentSearchOpen, setInstrumentSearchOpen] = useState(false);
+  const [instrumentSearchState, setInstrumentSearchState] =
+    useState<InstrumentSearchState>('idle');
+  const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
+  const [manualAssetType, setManualAssetType] = useState<HeldAssetType>(
+    accounts.find((account) => account.id === initialEntryAccountId)?.type === 'fund'
+      ? 'fund'
+      : 'stock',
+  );
+  const instrumentSearchQuery = useRef('');
+  const instrumentSearchDebounce = useRef<number | null>(null);
+  const instrumentSelectionInProgress = useRef(false);
   const toastManager = useToastManager();
   const markDirty = (nextDirty = true) => {
     setDirty(nextDirty);
@@ -4819,22 +5071,44 @@ export function PortfolioManagement({
     setPositionSheetOpen(true);
   };
   const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const selectedAccount = accounts.find((account) => account.id === entryAccountId);
   useEffect(() => {
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
     else if (!entryAccountId && accounts[0]) setEntryAccountId(accounts[0].id);
   }, [accounts, defaultAccountId, entryAccountId]);
 
   useEffect(() => {
+    if (instrumentSearchDebounce.current !== null) {
+      window.clearTimeout(instrumentSearchDebounce.current);
+      instrumentSearchDebounce.current = null;
+    }
+    setInstrumentSearchBusy(false);
     if (editing) {
+      instrumentSearchQuery.current = editing.symbol;
       setInstrumentQuery(editing.symbol);
       setSelectedInstrument(null);
       setInstrumentResults([]);
+      setInstrumentSearchOpen(false);
+      setInstrumentSearchState('idle');
+      setManualInstrumentEntry(false);
     } else if (!positionSheetOpen) {
+      instrumentSearchQuery.current = '';
       setInstrumentQuery('');
       setSelectedInstrument(null);
       setInstrumentResults([]);
+      setInstrumentSearchOpen(false);
+      setInstrumentSearchState('idle');
+      setManualInstrumentEntry(false);
     }
   }, [editing, positionSheetOpen]);
+  useEffect(
+    () => () => {
+      if (instrumentSearchDebounce.current !== null) {
+        window.clearTimeout(instrumentSearchDebounce.current);
+      }
+    },
+    [],
+  );
 
   const loadManagedAccounts = async () => {
     if (step !== 'account') return;
@@ -4954,19 +5228,31 @@ export function PortfolioManagement({
     }
   };
 
-  const searchInstruments = async () => {
-    const query = instrumentQuery.trim();
-    if (!query || editing) return;
+  const searchInstruments = async (nextQuery: string) => {
+    const query = nextQuery.trim();
+    if (!query || editing || instrumentSelectionInProgress.current) return;
     setInstrumentSearchBusy(true);
+    setInstrumentSearchState('loading');
     try {
       const response = await fetch(
         '/api/v1/market-data/instruments/search?q=' + encodeURIComponent(query),
         { cache: 'no-store' },
       );
       if (!response.ok) throw new Error('instrument-search');
-      setInstrumentResults((await response.json()) as InstrumentLookup[]);
+      const results = ((await response.json()) as InstrumentLookup[]).filter((instrument) =>
+        selectedAccount?.type === 'fund'
+          ? instrument.instrumentType === 'MUTUAL_FUND'
+          : ['STOCK', 'ETF'].includes(instrument.instrumentType),
+      );
+      if (instrumentSearchQuery.current !== query) return;
+      setInstrumentResults(results);
+      setInstrumentSearchState(results.length > 0 ? 'results' : 'empty');
+      setInstrumentSearchOpen(true);
     } catch {
+      if (instrumentSearchQuery.current !== query) return;
       setInstrumentResults([]);
+      setInstrumentSearchState('error');
+      setInstrumentSearchOpen(true);
       toastManager.add({
         title: '标的搜索失败',
         description: '请确认市场数据与标的中心已完成目录同步。',
@@ -4975,13 +5261,57 @@ export function PortfolioManagement({
         priority: 'high',
       });
     } finally {
-      setInstrumentSearchBusy(false);
+      if (instrumentSearchQuery.current === query) setInstrumentSearchBusy(false);
     }
+  };
+
+  const handleInstrumentQueryChange = (value: string) => {
+    if (editing || instrumentSelectionInProgress.current) return;
+    const nextQuery = value.toUpperCase();
+    if (manualInstrumentEntry) {
+      instrumentSearchQuery.current = nextQuery;
+      setInstrumentQuery(nextQuery);
+      return;
+    }
+    if (nextQuery === instrumentSearchQuery.current) {
+      if (nextQuery.trim()) setInstrumentSearchOpen(true);
+      return;
+    }
+    instrumentSearchQuery.current = nextQuery;
+    if (instrumentSearchDebounce.current !== null) {
+      window.clearTimeout(instrumentSearchDebounce.current);
+      instrumentSearchDebounce.current = null;
+    }
+    setInstrumentQuery(nextQuery);
+    setSelectedInstrument(null);
+    setManualInstrumentEntry(false);
+    setInstrumentResults([]);
+    if (!nextQuery.trim()) {
+      setInstrumentSearchBusy(false);
+      setInstrumentSearchState('idle');
+      setInstrumentSearchOpen(false);
+      return;
+    }
+    setInstrumentSearchState('loading');
+    setInstrumentSearchOpen(true);
+    instrumentSearchDebounce.current = window.setTimeout(() => {
+      instrumentSearchDebounce.current = null;
+      void searchInstruments(nextQuery);
+    }, 260);
   };
 
   const confirmInstrument = async (instrument: InstrumentLookup) => {
     if (!instrument.confirmable || editing) return;
+    instrumentSelectionInProgress.current = true;
+    if (instrumentSearchDebounce.current !== null) {
+      window.clearTimeout(instrumentSearchDebounce.current);
+      instrumentSearchDebounce.current = null;
+    }
     setInstrumentSearchBusy(true);
+    setInstrumentSearchState('loading');
+    setInstrumentSearchOpen(false);
+    instrumentSearchQuery.current = instrument.symbol;
+    setInstrumentQuery(instrument.symbol);
     try {
       const response = await fetch(
         '/api/v1/market-data/instruments/' + encodeURIComponent(instrument.id) + '/confirm',
@@ -4989,10 +5319,12 @@ export function PortfolioManagement({
       );
       if (!response.ok) throw new Error('instrument-confirm');
       setSelectedInstrument(instrument);
-      setInstrumentQuery(instrument.symbol);
       setInstrumentResults([]);
+      setInstrumentSearchState('selected');
+      setManualInstrumentEntry(false);
       markDirty(true);
     } catch {
+      setInstrumentSearchState('idle');
       toastManager.add({
         title: '标的确认失败',
         description: '请先同步目录，或检查服务端数据库迁移状态。',
@@ -5001,8 +5333,37 @@ export function PortfolioManagement({
         priority: 'high',
       });
     } finally {
+      instrumentSelectionInProgress.current = false;
       setInstrumentSearchBusy(false);
     }
+  };
+
+  const clearInstrumentSelection = () => {
+    if (instrumentSearchDebounce.current !== null) {
+      window.clearTimeout(instrumentSearchDebounce.current);
+      instrumentSearchDebounce.current = null;
+    }
+    instrumentSearchQuery.current = '';
+    setInstrumentSearchBusy(false);
+    setSelectedInstrument(null);
+    setManualInstrumentEntry(false);
+    setInstrumentQuery('');
+    setInstrumentResults([]);
+    setInstrumentSearchState('idle');
+    setInstrumentSearchOpen(false);
+  };
+
+  const startManualInstrumentEntry = () => {
+    if (instrumentSearchDebounce.current !== null) {
+      window.clearTimeout(instrumentSearchDebounce.current);
+      instrumentSearchDebounce.current = null;
+    }
+    setInstrumentSearchBusy(false);
+    setManualInstrumentEntry(true);
+    setInstrumentSearchOpen(false);
+    setInstrumentSearchState('idle');
+    setManualAssetType(selectedAccount?.type === 'fund' ? 'fund' : 'stock');
+    markDirty(true);
   };
 
   const submitPosition = async (event: FormEvent<HTMLFormElement>) => {
@@ -5015,14 +5376,26 @@ export function PortfolioManagement({
     const isCash = account?.type === 'cash';
     const isEditing = Boolean(editing);
     if (!isCash && !isEditing && !selectedInstrument) {
-      toastManager.add({
-        title: '请先确认标的',
-        description: '新增持仓必须从本地标的目录搜索并确认，不能只填写代码。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
-      return;
+      if (!manualInstrumentEntry) {
+        toastManager.add({
+          title: '请选择标的',
+          description: '请从搜索结果中选择标的，或在未找到时手动录入。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+        return;
+      }
+      if (!formText(form, 'assetName').trim() || !formText(form, 'assetType')) {
+        toastManager.add({
+          title: '请补充标的信息',
+          description: '手动录入需要填写名称和类型。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+        return;
+      }
     }
     setBusyAction(isCash ? 'cash-save' : 'position-save');
     try {
@@ -5069,15 +5442,15 @@ export function PortfolioManagement({
       setPositionSheetOpen(false);
       onSaved();
       toastManager.add({
-        title: isCash ? '现金余额已保存' : isEditing ? '持仓已更新' : '持仓已保存',
+        title: isCash ? '现金余额已保存' : isEditing ? '持仓已更新' : '持仓已添加',
         description: isCash ? undefined : '组合将重新估值。',
         type: 'success',
         timeout: 2800,
       });
     } catch {
       toastManager.add({
-        title: isCash ? '现金余额保存失败' : isEditing ? '持仓更新失败' : '持仓保存失败',
-        description: isCash ? '请检查金额。' : '请检查代码、数量和成本价。',
+        title: isCash ? '现金余额保存失败' : isEditing ? '持仓更新失败' : '持仓添加失败',
+        description: isCash ? '请检查金额。' : '请检查标的、数量和平均成本。',
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -5178,7 +5551,6 @@ export function PortfolioManagement({
     }
   };
 
-  const selectedAccount = accounts.find((account) => account.id === entryAccountId);
   return (
     <section
       className={step === 'account' ? 'module-page' : 'management'}
@@ -5292,20 +5664,21 @@ export function PortfolioManagement({
                 暂无账户，点击右上角“创建账户”开始。
               </div>
             )}
-            <Dialog open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
-              <DialogContent
+            <Sheet open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
+              <SheetContent
+                side="right"
                 aria-describedby="account-form-description"
-                className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 grid-rows-[max-content_minmax(0,1fr)] content-start rounded-none overflow-auto"
+                className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
               >
                 <div className="panel-heading">
-                  <DialogTitle>{editingAccount ? '编辑账户' : '创建账户'}</DialogTitle>
-                  <DialogDescription id="account-form-description">
+                  <SheetTitle>{editingAccount ? '编辑账户' : '创建账户'}</SheetTitle>
+                  <SheetDescription id="account-form-description">
                     账户是持仓的容器；类型、模式和币种在出现 Ledger 事件后锁定。
-                  </DialogDescription>
+                  </SheetDescription>
                 </div>
                 <form
                   key={editingAccount?.id ?? 'new-account'}
-                  className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+                  className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
                   onChange={() => markDirty()}
                   onSubmit={(event) => void submitAccount(event)}
                 >
@@ -5391,8 +5764,8 @@ export function PortfolioManagement({
                     )}
                   </div>
                 </form>
-              </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
           </>
         )}
         {step === 'position' && (
@@ -5452,7 +5825,7 @@ export function PortfolioManagement({
                         </div>
                         <span className="text-sm text-muted-foreground">
                           {position.quantity.toLocaleString('zh-CN', { maximumFractionDigits: 4 })}
-                          股
+                          {assetQuantityUnit(position.asset.assetType, position.symbol)}
                         </span>
                         <span className="font-mono text-sm text-foreground sm:text-right">
                           {money.format(
@@ -5525,23 +5898,24 @@ export function PortfolioManagement({
                 </strong>
               </div>
             </div>
-            <Dialog open={positionSheetOpen} onOpenChange={setPositionSheetOpen}>
-              <DialogContent
+            <Sheet open={positionSheetOpen} onOpenChange={setPositionSheetOpen}>
+              <SheetContent
+                side="right"
                 aria-describedby="position-form-description"
-                className="top-0 right-0 left-auto h-[100dvh] w-[620px] max-h-none max-w-[calc(100%-16px)] sm:max-w-[calc(100%-16px)] translate-x-0 translate-y-0 content-start rounded-none overflow-auto"
+                className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
               >
                 <div className="panel-heading">
-                  <DialogTitle>
+                  <SheetTitle>
                     {entrySheetMode === 'cash' ? '编辑现金余额' : editing ? '编辑持仓' : '添加持仓'}
-                  </DialogTitle>
-                  <DialogDescription id="position-form-description">
-                    手动保存当前账户余额，系统会生成可重放的 Ledger Adjustment。
-                  </DialogDescription>
+                  </SheetTitle>
+                  <SheetDescription id="position-form-description">
+                    录入账户当前实际持仓，用于初始化或校准持仓数据。
+                  </SheetDescription>
                 </div>
                 {entrySheetMode === 'cash' && selectedAccount?.type !== 'cash' ? (
                   <form
                     key="cash-entry"
-                    className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+                    className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
                     onChange={() => markDirty()}
                     onSubmit={(event) => void submitCashBalance(event)}
                   >
@@ -5578,48 +5952,80 @@ export function PortfolioManagement({
                   </form>
                 ) : (
                   <form
-                    className="form-card min-h-0 w-full max-w-[760px] content-start overflow-auto"
+                    className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
                     onChange={() => markDirty()}
                     onSubmit={(event) => void submitPosition(event)}
                     key={editing?.id ?? 'new'}
                   >
-                    <label>
-                      账户
-                      <Select
-                        name="accountId"
-                        required
-                        disabled={entryAccountLocked}
-                        value={entryAccountId || null}
-                        onValueChange={(value) => {
-                          if (!value || !confirmDiscard()) return;
-                          markDirty(false);
-                          setEntryAccountId(value);
-                          if (accounts.find((account) => account.id === value)?.type === 'cash') {
-                            setEntrySheetMode('cash');
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="选择账户">
-                            {selectedAccount?.name ?? '选择账户'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.name} · {account.institution || '未填写机构'} ·{' '}
-                              {account.currency} ·{' '}
-                              {account.type === 'fund'
-                                ? '基金'
-                                : account.type === 'cash'
-                                  ? '现金'
-                                  : '证券'}{' '}
-                              · {account.mode === 'shadow' ? '影子' : '实际'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </label>
+                    {entryAccountLocked ? (
+                      <div className="grid gap-1.5">
+                        <span className="text-xs text-muted-foreground">账户</span>
+                        <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+                          <strong className="truncate text-sm font-medium text-foreground">
+                            {selectedAccount?.name ?? '未选择账户'}
+                          </strong>
+                          {selectedAccount && (
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {selectedAccount.type === 'fund'
+                                ? '基金账户'
+                                : selectedAccount.type === 'cash'
+                                  ? '现金账户'
+                                  : '证券账户'}
+                            </span>
+                          )}
+                        </div>
+                        <input type="hidden" name="accountId" value={entryAccountId} />
+                      </div>
+                    ) : (
+                      <label>
+                        账户
+                        <Select
+                          name="accountId"
+                          required
+                          value={entryAccountId || null}
+                          onValueChange={(value) => {
+                            if (!value || !confirmDiscard()) return;
+                            const nextAccount = accounts.find((account) => account.id === value);
+                            markDirty(false);
+                            setEntryAccountId(value);
+                            setSelectedInstrument(null);
+                            if (instrumentSearchDebounce.current !== null) {
+                              window.clearTimeout(instrumentSearchDebounce.current);
+                              instrumentSearchDebounce.current = null;
+                            }
+                            setInstrumentSearchBusy(false);
+                            instrumentSearchQuery.current = '';
+                            setInstrumentQuery('');
+                            setInstrumentResults([]);
+                            setInstrumentSearchOpen(false);
+                            setInstrumentSearchState('idle');
+                            setManualInstrumentEntry(false);
+                            setManualAssetType(nextAccount?.type === 'fund' ? 'fund' : 'stock');
+                            setEntrySheetMode(nextAccount?.type === 'cash' ? 'cash' : 'position');
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="选择账户">
+                              {selectedAccount?.name ?? '选择账户'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.name} · {account.institution || '未填写机构'} ·{' '}
+                                {account.currency} ·{' '}
+                                {account.type === 'fund'
+                                  ? '基金'
+                                  : account.type === 'cash'
+                                    ? '现金'
+                                    : '证券'}{' '}
+                                · {account.mode === 'shadow' ? '影子' : '实际'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    )}
                     {selectedAccount?.type === 'cash' ? (
                       <label>
                         当前现金余额（CNY）
@@ -5634,137 +6040,137 @@ export function PortfolioManagement({
                       </label>
                     ) : (
                       <>
-                        <label>
-                          证券代码
-                          <div className="flex gap-2">
-                            <Input
-                              name="symbol"
-                              required
-                              placeholder={
-                                selectedAccount?.type === 'fund' ? '000001.OF' : '600519.SH'
-                              }
-                              value={editing?.symbol ?? instrumentQuery}
-                              readOnly={Boolean(editing)}
-                              onChange={(event) => {
-                                if (editing) return;
-                                setInstrumentQuery(event.target.value.toUpperCase());
-                                if (
-                                  selectedInstrument &&
-                                  event.target.value !== selectedInstrument.symbol
-                                )
-                                  setSelectedInstrument(null);
-                              }}
-                            />
-                            {!editing && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                disabled={instrumentSearchBusy || !instrumentQuery.trim()}
-                                onClick={() => void searchInstruments()}
+                        <div className="grid gap-1.5">
+                          <span className="text-xs text-muted-foreground">标的</span>
+                          <InstrumentCombobox
+                            editing={editing}
+                            manualEntry={manualInstrumentEntry}
+                            open={instrumentSearchOpen}
+                            query={instrumentQuery}
+                            results={instrumentResults}
+                            searchState={instrumentSearchState}
+                            selectedInstrument={selectedInstrument}
+                            busy={instrumentSearchBusy}
+                            onClearSelection={clearInstrumentSelection}
+                            onManualEntry={startManualInstrumentEntry}
+                            onOpenChange={(open) =>
+                              setInstrumentSearchOpen(open && Boolean(instrumentQuery.trim()))
+                            }
+                            onQueryChange={handleInstrumentQueryChange}
+                            onSelect={(instrument) => void confirmInstrument(instrument)}
+                            onStartSearch={() => {
+                              if (instrumentQuery.trim()) setInstrumentSearchOpen(true);
+                            }}
+                          />
+                        </div>
+                        {manualInstrumentEntry && (
+                          <div className="grid gap-4 rounded-md border border-border bg-muted/20 p-3">
+                            <label>
+                              名称
+                              <Input name="assetName" required maxLength={120} />
+                            </label>
+                            <label>
+                              类型
+                              <Select
+                                name="assetType"
+                                required
+                                value={manualAssetType}
+                                onValueChange={(value) => {
+                                  if (
+                                    value === 'stock' ||
+                                    value === 'etf' ||
+                                    value === 'fund'
+                                  )
+                                    setManualAssetType(value);
+                                }}
                               >
-                                {instrumentSearchBusy ? '处理中…' : '搜索目录'}
-                              </Button>
-                            )}
+                                <SelectTrigger className="w-full">
+                                  <SelectValue>
+                                    {(value: string | null) => assetTypeLabel(value as HeldAssetType)}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {selectedAccount?.type !== 'fund' && (
+                                    <>
+                                      <SelectItem value="stock">股票</SelectItem>
+                                      <SelectItem value="etf">ETF</SelectItem>
+                                    </>
+                                  )}
+                                  {selectedAccount?.type === 'fund' && (
+                                    <SelectItem value="fund">基金</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </label>
                           </div>
-                          {!editing && selectedInstrument && (
-                            <span className="field-hint">
-                              已确认：{selectedInstrument.displayName} ·{' '}
-                              {selectedInstrument.instrumentType}
-                            </span>
-                          )}
-                          {!editing && instrumentResults.length > 0 && (
-                            <div
-                              className="mt-2 divide-y border-y border-border"
-                              aria-label="标的搜索结果"
-                            >
-                              {instrumentResults
-                                .filter((instrument) =>
-                                  selectedAccount?.type === 'fund'
-                                    ? instrument.instrumentType === 'MUTUAL_FUND'
-                                    : ['STOCK', 'ETF'].includes(instrument.instrumentType),
-                                )
-                                .map((instrument) => (
-                                  <div
-                                    key={instrument.id}
-                                    className="flex items-center justify-between gap-3 py-2"
-                                  >
-                                    <span className="min-w-0">
-                                      <strong className="block truncate text-sm font-medium">
-                                        {instrument.displayName}
-                                      </strong>
-                                      <small className="font-mono text-xs text-muted-foreground">
-                                        {instrument.symbol} · {instrument.instrumentType}
-                                      </small>
-                                    </span>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={!instrument.confirmable || instrumentSearchBusy}
-                                      onClick={() => void confirmInstrument(instrument)}
-                                    >
-                                      确认
-                                    </Button>
-                                  </div>
-                                ))}
+                        )}
+                        <div className="grid gap-4 border-t border-border pt-4">
+                          <div className="text-sm font-semibold text-foreground">持仓信息</div>
+                          <label>
+                            当前数量
+                            <div className="relative">
+                              <Input
+                                className="pr-12"
+                                name="quantity"
+                                required
+                                type="number"
+                                min="0"
+                                step="any"
+                                defaultValue={editing?.quantity}
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                                {assetQuantityUnit(
+                                  selectedInstrument
+                                    ? instrumentAssetType(selectedInstrument.instrumentType)
+                                    : manualInstrumentEntry
+                                      ? manualAssetType
+                                      : editing?.asset.assetType,
+                                  editing?.symbol,
+                                )}
+                              </span>
                             </div>
-                          )}
-                        </label>
-                        <label>
-                          名称（可选）
-                          <Input name="assetName" defaultValue={editing?.asset.name} />
-                        </label>
-                        <label>
-                          类型（可选）
-                          <Select
-                            name="assetType"
-                            defaultValue={editing?.symbol.endsWith('.OF') ? 'fund' : undefined}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue>
-                                {(value: string | null) =>
-                                  value === 'fund'
-                                    ? '场外基金'
-                                    : value === 'etf'
-                                      ? '交易所 ETF'
-                                      : value === 'stock'
-                                        ? 'A 股股票'
-                                        : '自动识别'
-                                }
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="stock">A 股股票</SelectItem>
-                              <SelectItem value="etf">交易所 ETF</SelectItem>
-                              <SelectItem value="fund">场外基金</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </label>
-                        <label>
-                          当前数量
-                          <Input
-                            name="quantity"
-                            required
-                            type="number"
-                            min="0"
-                            step="any"
-                            defaultValue={editing?.quantity}
-                          />
-                        </label>
-                        <label>
-                          成本价
-                          <Input
-                            name="costPrice"
-                            required
-                            type="number"
-                            min="0"
-                            step="any"
-                            defaultValue={editing?.costPrice}
-                          />
-                        </label>
+                          </label>
+                          <label>
+                            平均成本
+                            <div className="relative">
+                              <Input
+                                className="pr-16"
+                                name="costPrice"
+                                required
+                                type="number"
+                                min="0"
+                                step="any"
+                                defaultValue={editing?.costPrice}
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                                元/
+                                {assetQuantityUnit(
+                                  selectedInstrument
+                                    ? instrumentAssetType(selectedInstrument.instrumentType)
+                                    : manualInstrumentEntry
+                                      ? manualAssetType
+                                      : editing?.asset.assetType,
+                                  editing?.symbol,
+                                )}
+                              </span>
+                            </div>
+                          </label>
+                        </div>
                       </>
                     )}
-                    <div className="form-actions">
+                    <div className="form-actions justify-end border-t border-border pt-4">
+                      <Button
+                        className="secondary"
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditing(null);
+                          markDirty(false);
+                          setPositionSheetOpen(false);
+                        }}
+                      >
+                        取消
+                      </Button>
                       <Button
                         type="submit"
                         variant="default"
@@ -5784,25 +6190,13 @@ export function PortfolioManagement({
                             ? '保存修改'
                             : selectedAccount?.type === 'cash'
                               ? '保存当前现金'
-                              : '保存当前持仓'}
-                      </Button>
-                      <Button
-                        className="secondary"
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setEditing(null);
-                          markDirty(false);
-                          setPositionSheetOpen(false);
-                        }}
-                      >
-                        取消
+                              : '添加持仓'}
                       </Button>
                     </div>
                   </form>
                 )}
-              </DialogContent>
-            </Dialog>
+              </SheetContent>
+            </Sheet>
           </div>
         )}
       </div>
