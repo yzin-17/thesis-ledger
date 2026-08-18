@@ -146,14 +146,20 @@ assert(
   'Fund NAV history must be strictly ordered',
 );
 
-const quote = await request('/market/quote?symbol=600519.SH');
+const quotePath = checkCapabilities
+  ? '/market/quote?symbol=600519.SH'
+  : '/market/600519.SH/quote';
+const quote = await request(quotePath);
 assert(quote.version === 1 && quote.symbol === '600519.SH', 'Quote identity is invalid');
 assert(
   typeof quote.marketTime === 'string' && typeof quote.fetchedAt === 'string',
   'Quote provenance is missing',
 );
 
-const bars = await request('/market/bars?symbol=600519.SH&timeframe=1d');
+const barsPath = checkCapabilities
+  ? '/market/bars?symbol=600519.SH&timeframe=1d'
+  : '/market/600519.SH/bars?timeframe=1d';
+const bars = await request(barsPath);
 assert(Array.isArray(bars) && bars.length > 0, 'Bars must be non-empty');
 for (let index = 1; index < bars.length; index += 1) {
   assert(bars[index - 1].timestamp < bars[index].timestamp, 'Bars must be ascending');
@@ -161,7 +167,10 @@ for (let index = 1; index < bars.length; index += 1) {
 }
 
 for (const name of ['MA', 'MACD', 'RSI']) {
-  const indicator = await request(`/market/indicators/${name}?symbol=600519.SH&timeframe=1d`);
+  const indicatorPath = checkCapabilities
+    ? `/market/indicators/${name}?symbol=600519.SH&timeframe=1d`
+    : `/market/600519.SH/indicators/${name}`;
+  const indicator = await request(indicatorPath);
   assert(
     indicator.version === 1 && indicator.name === name,
     `${name} indicator identity is invalid`,
@@ -169,7 +178,8 @@ for (const name of ['MA', 'MACD', 'RSI']) {
   assert(indicator.engineVersion, `${name} engineVersion is missing`);
 }
 
-const chip = await request('/market/chip?symbol=600519.SH');
+const chipPath = checkCapabilities ? '/market/chip?symbol=600519.SH' : '/market/600519.SH/chip';
+const chip = await request(chipPath);
 for (const field of ['averageCost', 'profitRatio', 'range70', 'range90', 'concentration']) {
   assert(chip[field] !== undefined, `Chip summary field is missing: ${field}`);
 }
@@ -183,6 +193,14 @@ if (checkCapabilities) {
   assert(
     unsupported.detail?.code === 'unsupported_capability',
     'Unsupported capability error is unstable',
+  );
+} else {
+  const unsupported = await request('/market/600519.SH/bars?timeframe=1m', 422);
+  assert(
+    unsupported.code === 'unsupported_capability' ||
+      unsupported.error === 'unsupported_capability' ||
+      unsupported.message?.includes('1d'),
+    'Facade unsupported capability error is unstable',
   );
 }
 

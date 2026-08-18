@@ -179,85 +179,90 @@ export class MarketService {
     const symbol = input.trim().toUpperCase();
     if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
     const limit = Math.min(Math.max(range.limit ?? 365, 1), 3650);
-    const query = new URLSearchParams({ symbol, limit: String(limit) });
-    if (range.start) query.set('start', range.start);
-    if (range.end) query.set('end', range.end);
-    try {
-      const raw = await this.dsa.get<unknown[]>(
-        `/api/v1/thesis-ledger/market/fund-nav/history?${query.toString()}`,
-      );
-      const points = fundNavHistorySchemaV1.parse(raw);
-      if (this.prisma && points.length > 0) {
-        await this.prisma.$transaction([
-          this.prisma.asset.upsert({
-            where: { symbol },
-            update: {},
-            create: {
-              symbol,
-              name: symbol,
-              market: 'OF',
-              assetType: 'fund',
-              currency: 'CNY',
-              identityStatus: 'provider',
-              identitySource: 'dsa-fund-nav',
-            },
-          }),
-          ...points.map((point) =>
-            this.prisma!.fundNavPoint.upsert({
-              where: { symbol_navDate: { symbol, navDate: new Date(point.navDate) } },
-              update: {
-                unitNav: point.unitNav,
-                provider: point.provider,
-                fetchedAt: new Date(point.fetchedAt),
-                freshness: point.freshness,
-                fallbackUsed: point.fallbackUsed ?? false,
-              },
-              create: {
-                symbol,
-                navDate: new Date(point.navDate),
-                unitNav: point.unitNav,
-                provider: point.provider,
-                fetchedAt: new Date(point.fetchedAt),
-                freshness: point.freshness,
-                fallbackUsed: point.fallbackUsed ?? false,
-              },
-            }),
-          ),
-        ]);
-      }
-      return points;
-    } catch (error) {
-      if (!this.prisma) throw error;
-      const stored = await this.prisma.fundNavPoint.findMany({
-        where: {
-          symbol,
-          ...(range.start || range.end
-            ? {
-                navDate: {
-                  ...(range.start ? { gte: new Date(range.start) } : {}),
-                  ...(range.end ? { lte: new Date(range.end) } : {}),
+    const flightKey = `fund-nav-history:${symbol}:${range.start ?? ''}:${range.end ?? ''}:${limit}`;
+    return this.singleFlight(flightKey, () =>
+      this.withDistributedLock(flightKey, async () => {
+        const query = new URLSearchParams({ symbol, limit: String(limit) });
+        if (range.start) query.set('start', range.start);
+        if (range.end) query.set('end', range.end);
+        try {
+          const raw = await this.dsa.get<unknown[]>(
+            `/api/v1/thesis-ledger/market/fund-nav/history?${query.toString()}`,
+          );
+          const points = fundNavHistorySchemaV1.parse(raw);
+          if (this.prisma && points.length > 0) {
+            await this.prisma.$transaction([
+              this.prisma.asset.upsert({
+                where: { symbol },
+                update: {},
+                create: {
+                  symbol,
+                  name: symbol,
+                  market: 'OF',
+                  assetType: 'fund',
+                  currency: 'CNY',
+                  identityStatus: 'provider',
+                  identitySource: 'dsa-fund-nav',
                 },
-              }
-            : {}),
-        },
-        orderBy: { navDate: 'desc' },
-        take: limit,
-      });
-      if (stored.length === 0) throw error;
-      return fundNavHistorySchemaV1.parse(
-        stored.reverse().map((point) => ({
-          version: 1,
-          symbol: point.symbol,
-          unitNav: Number(point.unitNav),
-          navDate: point.navDate.toISOString(),
-          provider: point.provider,
-          fetchedAt: point.fetchedAt.toISOString(),
-          freshness: 'stale',
-          fallbackUsed: point.fallbackUsed,
-          servedFromCache: true,
-        })),
-      );
-    }
+              }),
+              ...points.map((point) =>
+                this.prisma!.fundNavPoint.upsert({
+                  where: { symbol_navDate: { symbol, navDate: new Date(point.navDate) } },
+                  update: {
+                    unitNav: point.unitNav,
+                    provider: point.provider,
+                    fetchedAt: new Date(point.fetchedAt),
+                    freshness: point.freshness,
+                    fallbackUsed: point.fallbackUsed ?? false,
+                  },
+                  create: {
+                    symbol,
+                    navDate: new Date(point.navDate),
+                    unitNav: point.unitNav,
+                    provider: point.provider,
+                    fetchedAt: new Date(point.fetchedAt),
+                    freshness: point.freshness,
+                    fallbackUsed: point.fallbackUsed ?? false,
+                  },
+                }),
+              ),
+            ]);
+          }
+          return points;
+        } catch (error) {
+          if (!this.prisma) throw error;
+          const stored = await this.prisma.fundNavPoint.findMany({
+            where: {
+              symbol,
+              ...(range.start || range.end
+                ? {
+                    navDate: {
+                      ...(range.start ? { gte: new Date(range.start) } : {}),
+                      ...(range.end ? { lte: new Date(range.end) } : {}),
+                    },
+                  }
+                : {}),
+            },
+            orderBy: { navDate: 'desc' },
+            take: limit,
+          });
+          if (stored.length === 0) throw error;
+          return fundNavHistorySchemaV1.parse(
+            stored.reverse().map((point) => ({
+              version: 1,
+              symbol: point.symbol,
+              unitNav: Number(point.unitNav),
+              navDate: point.navDate.toISOString(),
+              provider: point.provider,
+              fetchedAt: point.fetchedAt.toISOString(),
+              freshness: 'stale',
+              fallbackUsed: point.fallbackUsed,
+              servedFromCache: true,
+            })),
+          );
+        }
+      }),
+    );
   }
 
   async getBars(

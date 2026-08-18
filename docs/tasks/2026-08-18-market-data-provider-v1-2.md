@@ -85,7 +85,7 @@
 
 ## 当前阶段
 
-本轮已获得用户授权并开始实施。当前已落地 Control Contract、DSA SQLite 控制投影和运行时路由、ThesisLedger Policy/目录/缓存/API、Desktop 市场数据管理页、infra 配置与 fixture；并完成第一轮 defect 收敛。T1-T10 仍需补齐对应的完整验收证据，T11 尚未完成。DSA 源码定向测试已在本地 Python 3.12 虚拟环境执行，Mobile typecheck/测试已执行；当前 Compose 仍复用旧 DSA/ThesisLedger 镜像，最新镜像构建分别受 Debian mirror 和 pnpm registry 外部网络阻塞，真实 Provider smoke、浏览器视觉验收和 Desktop/Mobile 运行时视觉验收仍待执行。
+本轮已获得用户授权并开始实施。当前已落地 Control Contract、DSA SQLite 控制投影和运行时路由、ThesisLedger Policy/目录/缓存/API、Desktop 市场数据管理页、infra 配置与 fixture；并完成两轮 defect 收敛。T1-T10 仍需补齐对应的完整验收证据，T11 尚未完成。revision 2 完整策略已通过 Control API 持久化并在 DSA 重启后保持生效；最新 DSA/ThesisLedger 镜像均已成功构建并应用，ThesisLedger migration 与 facade Contract smoke 已通过；真实 Provider 与 Data Contract smoke 已完成并收敛出 efinance 日线的外部上游遗留；Desktop 浏览器视觉验收和 Mobile Web 只读/失败态视觉验收已完成，原生 Mobile 联网验收仍待执行。
 
 ## 本轮已实施内容
 
@@ -99,16 +99,23 @@
 
 ## 当前验证证据
 
-- `apps/server`：TypeScript typecheck 通过；Vitest 81/81 通过。
+- `apps/server`：TypeScript typecheck 通过；Vitest 87/87 通过。
 - `apps/desktop`：TypeScript typecheck、Vitest 15/15 和 Vite production build 通过；仅有既有的大 chunk 警告。
 - `packages/schemas`：typecheck/build 通过；Prisma schema format 和 client generate 通过。
-- DSA 源码：Python 3.12 虚拟环境中的 Control/Data Contract、Provider runtime、Bars facade、Fund NAV history sequence fallback 和 SQLite 文件重开回归共 18 项通过；受影响 Python 文件 `py_compile` 通过。测试仅使用 fixture/fake Provider，不等同于在线 Provider 或 Docker 镜像验收。
-- 本轮缺陷修复：归回 Fund NAV fixture 函数体、修正 Bars runtime 的 frame 返回形状，并将 fixture history limit 对齐 Contract 的 3650 上限；新增 `docs/CHANGELOG.md` 的 `[Unreleased]` 修复条目。
-- Compose：使用 `.env.example` render 通过；PostgreSQL、Redis、DSA、ThesisLedger 四服务在本地旧镜像下均 healthy，三个 `thesis-ledger-*` 外部卷均存在。旧 DSA 镜像没有 Control 路由和 `FUND_NAV_HISTORY` capability，旧 ThesisLedger 镜像的 history facade 返回 404，因此不能作为当前源码的完整跨仓 smoke 证据。
-- Mobile：typecheck 通过，Vitest 6/6 通过；当前未启动可用的 Web 服务，浏览器访问 `localhost:5173/market-data` 被拒绝，因此 Desktop/Mobile 视觉与运行时验收仍未完成。
-- 当前差异 Review：Standards review 未发现硬性违规，Spec review 未发现契约问题；测试文件内少量重复 fake 构造和跨相邻边界测试共置属于非阻断的组织性遗留。
-- 构建/运行遗留：DSA 镜像构建在 Debian `bookworm InRelease` HTTP 500/EOF 失败；ThesisLedger 镜像构建在 pnpm React Native/Expo tarball timeout 失败。AKShare/efinance 在线 smoke、当前源码镜像 migration 仍未完成。
+- DSA 源码：Python 3.12 虚拟环境中的 Control/Data Contract、Provider runtime、Bars facade、Fund NAV history 严格 sequence fallback、efinance 实时行情统一归一化、SQLite 文件重开和全局 Contract 错误处理回归共 29 项通过；受影响 Python 文件 `py_compile` 通过。测试仅使用 fixture/fake Provider，不等同于在线 Provider 或 Docker 镜像验收。
+- 本轮缺陷修复：归回 Fund NAV fixture 函数体、修正 Bars runtime 的 frame 返回形状、将 real Bars facade 的 `limit` 截断与 fixture 语义对齐、将 fixture history limit 对齐 Contract 的 3650 上限，并保持全局异常处理器下 Contract 错误的结构化 `detail.code`；Provider runtime 现将 `.SH/.SZ/.BJ` Contract 标的归一化为适配器裸代码，AKShare 真实 Quote 使用单标的 Sina 通道，efinance 真实 Quote 优先使用 `get_quote_snapshot`；新增 `docs/CHANGELOG.md` 的 `[Unreleased]` 修复条目。
+- Compose：使用 `.env.example` render 通过；PostgreSQL、Redis、DSA、ThesisLedger 四服务均 healthy，三个 `thesis-ledger-*` 外部卷均存在；DSA 与 ThesisLedger 均已切换到最新镜像。
+- 最新 DSA 镜像：使用 `--env-file .env.example` 构建并应用成功，image digest 为 `sha256:17f3c4d0048c9a94137abe55b7a339d1bda50e096fb7ed0c3fd2fc926481c5ee`；容器状态为 `running/healthy`，`THESIS_LEDGER_FIXTURE_MODE=true`，`/api/health` 返回 `status=ok`。
+- 当前 DSA 直连 Contract smoke：恢复 fixture mode 后，Capabilities、Control handshake/provider registry/effective policy、Catalog job/ACK、Fund NAV/history、Quote、60 条 1d Bars、MA/MACD/RSI、Chip 和 1m unsupported error 全部通过；结果为 `status=passed`，Quote/Fund NAV provider 为 `akshare`。
+- revision 2 策略验收：通过 Control API 应用完整路由 `REALTIME_QUOTE`、`DAILY_BAR`、`FUND_NAV`、`FUND_NAV_HISTORY`，各适用资产类型均为 `akshare -> efinance`；DSA 重启后 `projection.status=applied`、`revision=2`、`sourceDesiredRevision=2`，未回退到旧的 Quote-only revision 1。真实 smoke 后 routeStatus 保持 Provider eligible、circuit `closed`，仅 efinance Stock Daily Bar 为 `degraded`。
+- 最新 ThesisLedger 镜像：image digest 为 `sha256:ef821f06635b2aeb636f84a8b6b4eec559973258e06f7c740cd4526ef233fd2e`；启动 migration `20260818000000_market_data_provider_v12` 已应用，重启后无 pending migrations，health 的 `schemaVersion` 与 migration 一致，数据库、Redis、DSA 均 healthy。
+- 跨仓 facade Contract smoke：修正 smoke 脚本的 facade 路径分支后，Quote、Fund NAV/history、Bars、MA/MACD/RSI、Chip 和 unsupported capability 全部通过，结果为 `status=passed`。
+- Desktop/Mobile 视觉：Desktop Vite `/market-data` 在 1440×900 与 390×844 下完成浏览器验收，关键管理区可滚动访问、无横向溢出，控制台无 error/warn；Mobile Expo Web 在 390×844 下完成只读界面与失败态验收，无 Provider/Policy 管理入口且无横向溢出。当前 Compose 中 `CORS_ORIGINS` 为空，Mobile Web 跨域读取 API 显示 `Failed to fetch`，但两个 API 端点宿主机直连均为 HTTP 200；因此该证据不等同于原生 Mobile 联网验收。
+- 当前差异 Review：第二轮 Standards/Spec 双轴 Review 共发现 6 项遗留，包括测试 docstring、efinance 重复映射、目录拼音/别名、generation 单调性、Fund NAV history single-flight/Redis lock 和 sequence smoke；Luna 已按完整契约修复并补充回归，随后通过 DSA 29/29、Server 87/87、Schemas 32/32、migration matrix 18/18 和三仓 `git diff --check`。当前未发现新的确定性代码阻断项。
+- 真实 Provider smoke：临时关闭 fixture mode 后，最新镜像下 AKShare 的 REALTIME_QUOTE、DAILY_BAR、FUND_NAV、FUND_NAV_HISTORY 全部 `healthy`；efinance 的 REALTIME_QUOTE、FUND_NAV、FUND_NAV_HISTORY `healthy`，但 DAILY_BAR 为 `unavailable`、`errorCode=upstream_failure`，原因仍是 `push2his.eastmoney.com` 的远端连接中止；同一版本此前曾成功返回 7 行，判定为外部上游间歇性遗留而非 Runtime 返回形状问题。宿主机探测结果为历史 K 线 `curl rc=52`、行情端点 HTTP 200；DSA 容器内探测结果为历史 K 线 HTTP 200、行情端点 `RemoteDisconnected`，当前没有第三个可配置网络出口，因此未将其伪装成 Provider 代码修复。验收后已恢复 `THESIS_LEDGER_FIXTURE_MODE=true`。ThesisLedger 镜像构建中的 `node-pty` 因镜像内缺少 Python 未生成可选原生模块，但 Prisma generate、server build、migration、health 和 facade smoke 均已通过。
+- 真实 Data Contract API：在新 DSA 镜像、fixture mode=false、revision 2 策略下，Quote、Daily Bar、Fund NAV、Fund NAV History 均成功返回；四类响应均由 `akshare` 提供且 `fallbackUsed=false`，Bars `limit=5` 返回 5 条，Fund NAV freshness 为 `delayed`。这证明当前主路由可用、fallback/provenance 字段真实可追溯，同时没有因 efinance degraded 引入隐藏跨 Provider 或字段级混源。
 - 三仓 `git diff --check` 通过。
+- 本轮 ThesisLedger 批次 B/C 确定性验证：`pnpm --filter @thesis-ledger/server typecheck` 无错误，`pnpm --filter @thesis-ledger/server test` 87/87（目录拼音/别名、generation 单调性/Serializable 事务、基金 NAV history single-flight/Redis lock）；`pnpm --filter @thesis-ledger/schemas test` 32/32；`pnpm migration:matrix` 18/18 migrations；`pnpm install --offline --frozen-lockfile --ignore-scripts` 成功，`pinyin-pro` 已写入 `apps/server/package.json` 与 lockfile。未因此勾选仍缺视觉或外部 Provider 验收的任务。
 
 ## 实施前检查清单
 

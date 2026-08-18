@@ -1,6 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { pinyin } from 'pinyin-pro';
 import {
   catalogDeltaSchema,
   catalogSnapshotSchema,
@@ -52,6 +58,33 @@ const stableChecksum = (items: CatalogItem[]) =>
 
 const normalizedQuery = (value: string) => value.trim().toLocaleLowerCase('zh-CN');
 
+const searchFieldsFor = (item: Pick<CatalogItem, 'canonicalCode' | 'market' | 'displayName'>) => {
+  const fullPinyin = pinyin(item.displayName, { toneType: 'none' }).replace(/\s+/g, '');
+  const pinyinSyllables = pinyin(item.displayName, {
+    toneType: 'none',
+    type: 'array',
+  }).join(' ');
+  const initials = pinyin(item.displayName, {
+    toneType: 'none',
+    type: 'array',
+  })
+    .map((syllable) => syllable.slice(0, 1))
+    .join('');
+  const searchAliases = [
+    item.displayName,
+    fullPinyin,
+    pinyinSyllables,
+    initials,
+    item.canonicalCode,
+    `${item.canonicalCode}.${item.market}`,
+  ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+  return {
+    pinyin: fullPinyin,
+    pinyinInitials: initials,
+    searchAliases,
+  };
+};
+
 export const instrumentMatchRank = (
   instrument: {
     canonicalCode: string;
@@ -100,56 +133,79 @@ export class InstrumentService {
     if (!snapshot.complete || stableChecksum(snapshot.items) !== snapshot.checksum) {
       throw new BadRequestException('目录快照不完整或 checksum 校验失败');
     }
-    await this.prisma.$transaction(async (transaction) => {
-      for (const item of snapshot.items) {
-        await transaction.instrument.upsert({
-          where: {
-            canonicalCode_instrumentType_market: {
-              canonicalCode: item.canonicalCode,
+    const result = await this.prisma.$transaction(
+      async (transaction) => {
+        const state = await transaction.catalogSyncState.findUnique({
+          where: { consumer: 'thesis-ledger' },
+        });
+        if (state && snapshot.generation < state.generation) {
+          throw new BadRequestException('目录快照 generation 不得倒退');
+        }
+        if (
+          state &&
+          snapshot.generation === state.generation &&
+          snapshot.checksum !== state.checksum
+        ) {
+          throw new ConflictException('目录快照同 generation 但 checksum 冲突');
+        }
+        for (const item of snapshot.items) {
+          const searchFields = searchFieldsFor(item);
+          await transaction.instrument.upsert({
+            where: {
+              canonicalCode_instrumentType_market: {
+                canonicalCode: item.canonicalCode,
+                instrumentType: item.instrumentType,
+                market: item.market,
+              },
+            },
+            update: {
+              displayName: item.displayName,
+              ...searchFields,
+              generation: snapshot.generation,
+              active: true,
+            },
+            create: {
               instrumentType: item.instrumentType,
               market: item.market,
+              canonicalCode: item.canonicalCode,
+              displayName: item.displayName,
+              ...searchFields,
+              generation: snapshot.generation,
+              active: true,
             },
-          },
-          update: {
-            displayName: item.displayName,
-            generation: snapshot.generation,
-            active: true,
-          },
-          create: {
-            instrumentType: item.instrumentType,
-            market: item.market,
-            canonicalCode: item.canonicalCode,
-            displayName: item.displayName,
-            generation: snapshot.generation,
-            active: true,
-          },
-        });
-      }
-      await transaction.instrument.updateMany({
-        where: { generation: { lt: snapshot.generation } },
-        data: { active: false },
-      });
-      await transaction.catalogSyncState.upsert({
-        where: { consumer: 'thesis-ledger' },
-        update: {
-          generation: snapshot.generation,
-          checksum: snapshot.checksum,
-          cursor: snapshot.cursor,
-          syncedAt: new Date(),
-        },
-        create: {
-          consumer: 'thesis-ledger',
-          generation: snapshot.generation,
-          checksum: snapshot.checksum,
-          cursor: snapshot.cursor,
-        },
-      });
-    });
+          });
+        }
+        if (!state || snapshot.generation > state.generation) {
+          await transaction.instrument.updateMany({
+            where: { generation: { lt: snapshot.generation } },
+            data: { active: false },
+          });
+          await transaction.catalogSyncState.upsert({
+            where: { consumer: 'thesis-ledger' },
+            update: {
+              generation: snapshot.generation,
+              checksum: snapshot.checksum,
+              cursor: snapshot.cursor,
+              syncedAt: new Date(),
+            },
+            create: {
+              consumer: 'thesis-ledger',
+              generation: snapshot.generation,
+              checksum: snapshot.checksum,
+              cursor: snapshot.cursor,
+            },
+          });
+        }
+        return { idempotent: Boolean(state && snapshot.generation === state.generation) };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return {
       generation: snapshot.generation,
       checksum: snapshot.checksum,
       count: snapshot.items.length,
       cursor: snapshot.cursor,
+      idempotent: result.idempotent,
     };
   }
 
@@ -158,54 +214,66 @@ export class InstrumentService {
     if (!delta.complete || delta.requiresFullSnapshot) {
       throw new BadRequestException('目录增量不可用，需要完整快照');
     }
-    await this.prisma.$transaction(async (transaction) => {
-      const state = await transaction.catalogSyncState.findUnique({
-        where: { consumer: 'thesis-ledger' },
-      });
-      if (!state || state.cursor !== delta.fromCursor) {
-        throw new BadRequestException('目录游标与本地同步状态不一致');
-      }
-      for (const item of delta.items) {
-        await transaction.instrument.upsert({
-          where: {
-            canonicalCode_instrumentType_market: {
-              canonicalCode: item.canonicalCode,
-              instrumentType: item.instrumentType,
-              market: item.market,
+    await this.prisma.$transaction(
+      async (transaction) => {
+        const state = await transaction.catalogSyncState.findUnique({
+          where: { consumer: 'thesis-ledger' },
+        });
+        if (!state || state.cursor !== delta.fromCursor) {
+          throw new BadRequestException('目录游标与本地同步状态不一致');
+        }
+        if (delta.generation <= state.generation) {
+          throw new BadRequestException('目录增量 generation 必须严格前进');
+        }
+        for (const item of delta.items) {
+          const searchFields = searchFieldsFor(item);
+          await transaction.instrument.upsert({
+            where: {
+              canonicalCode_instrumentType_market: {
+                canonicalCode: item.canonicalCode,
+                instrumentType: item.instrumentType,
+                market: item.market,
+              },
             },
+            update: {
+              displayName: item.displayName,
+              ...searchFields,
+              generation: delta.generation,
+              active: true,
+            },
+            create: { ...item, ...searchFields, generation: delta.generation, active: true },
+          });
+        }
+        for (const item of delta.deleted) {
+          await transaction.instrument.updateMany({
+            where: item,
+            data: { generation: delta.generation, active: false },
+          });
+        }
+        const active = await transaction.instrument.findMany({
+          where: { active: true },
+          select: {
+            canonicalCode: true,
+            instrumentType: true,
+            market: true,
+            displayName: true,
           },
-          update: { displayName: item.displayName, generation: delta.generation, active: true },
-          create: { ...item, generation: delta.generation, active: true },
         });
-      }
-      for (const item of delta.deleted) {
-        await transaction.instrument.updateMany({
-          where: item,
-          data: { generation: delta.generation, active: false },
+        if (stableChecksum(active) !== delta.checksum) {
+          throw new BadRequestException('目录增量应用后的 checksum 校验失败');
+        }
+        await transaction.catalogSyncState.update({
+          where: { consumer: 'thesis-ledger' },
+          data: {
+            generation: delta.generation,
+            checksum: delta.checksum,
+            cursor: delta.cursor,
+            syncedAt: new Date(),
+          },
         });
-      }
-      const active = await transaction.instrument.findMany({
-        where: { active: true },
-        select: {
-          canonicalCode: true,
-          instrumentType: true,
-          market: true,
-          displayName: true,
-        },
-      });
-      if (stableChecksum(active) !== delta.checksum) {
-        throw new BadRequestException('目录增量应用后的 checksum 校验失败');
-      }
-      await transaction.catalogSyncState.update({
-        where: { consumer: 'thesis-ledger' },
-        data: {
-          generation: delta.generation,
-          checksum: delta.checksum,
-          cursor: delta.cursor,
-          syncedAt: new Date(),
-        },
-      });
-    });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return {
       generation: delta.generation,
       checksum: delta.checksum,

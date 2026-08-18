@@ -1027,6 +1027,79 @@ describe('行情缓存', () => {
     await service.getQuote('600519');
     expect(dsa.get).toHaveBeenCalledTimes(1);
   });
+  it('基金净值历史相同范围并发请求只调用一次 DSA 并使用完整锁 key', async () => {
+    const points = [
+      {
+        version: 1,
+        symbol: '000001.OF',
+        unitNav: 1.1,
+        navDate: '2025-01-01T00:00:00Z',
+        provider: 'dsa-fork',
+        fetchedAt: '2025-01-01T00:00:01Z',
+        freshness: 'delayed',
+      },
+    ];
+    const dsa = {
+      get: vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return points;
+      }),
+    };
+    const lockKeys: string[] = [];
+    const redis = {
+      client: {
+        set: vi.fn(async (key: string) => {
+          lockKeys.push(key);
+          return 'OK';
+        }),
+        eval: vi.fn(async () => 0),
+      },
+    };
+    const service = new MarketService(dsa as never, redis as never);
+    const range = { start: '2025-01-01', end: '2025-01-31', limit: 5 };
+
+    await Promise.all([
+      service.getFundNavHistory('000001.OF', range),
+      service.getFundNavHistory('000001.OF', range),
+    ]);
+
+    expect(dsa.get).toHaveBeenCalledTimes(1);
+    expect(lockKeys).toHaveLength(1);
+    expect(lockKeys[0]).toContain('000001.OF');
+    expect(lockKeys[0]).toContain('2025-01-01');
+    expect(lockKeys[0]).toContain('2025-01-31');
+    expect(lockKeys[0]).toContain(':5');
+  });
+  it('基金净值历史不同范围不会合并 single-flight', async () => {
+    const points = [
+      {
+        version: 1,
+        symbol: '000001.OF',
+        unitNav: 1.1,
+        navDate: '2025-01-01T00:00:00Z',
+        provider: 'dsa-fork',
+        fetchedAt: '2025-01-01T00:00:01Z',
+        freshness: 'delayed',
+      },
+    ];
+    const paths: string[] = [];
+    const dsa = {
+      get: vi.fn(async (path: string) => {
+        paths.push(path);
+        return points;
+      }),
+    };
+    const service = new MarketService(dsa as never, {} as never);
+
+    await Promise.all([
+      service.getFundNavHistory('000001.OF', { start: '2025-01-01', limit: 5 }),
+      service.getFundNavHistory('000001.OF', { start: '2025-02-01', limit: 5 }),
+    ]);
+
+    expect(dsa.get).toHaveBeenCalledTimes(2);
+    expect(paths[0]).toContain('start=2025-01-01');
+    expect(paths[1]).toContain('start=2025-02-01');
+  });
   it('把 DSA Bar、Indicator 和 Chip 映射为统一契约', async () => {
     const timestamp = '2025-01-01T00:00:00Z';
     const dsa = {

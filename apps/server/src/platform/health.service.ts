@@ -36,7 +36,7 @@ export class HealthService {
       service: 'thesis-ledger',
       version: '0.1.0',
       contractVersion: 1,
-      schemaVersion: '20260807100000_account_entry_model',
+      schemaVersion: '20260818000000_market_data_provider_v12',
       capabilities: {
         accountModel: 'container-v1',
         fundNav: fundNavAvailable,
