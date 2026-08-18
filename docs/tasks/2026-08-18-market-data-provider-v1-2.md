@@ -85,7 +85,7 @@
 
 ## 当前阶段
 
-本轮已获得用户授权并开始实施。当前已落地 Control Contract、DSA SQLite 控制投影和运行时路由、ThesisLedger Policy/目录/缓存/API、Desktop 市场数据管理页、infra 配置与 fixture；并完成第一轮 defect 收敛。T1-T10 仍需补齐对应的完整验收证据，T11 尚未完成。DSA pytest 受本地缺少 `fastapi`/`pytest` 阻塞，Docker 迁移与启动、真实 Provider smoke、浏览器视觉验收和 Mobile 运行时验收仍待执行。
+本轮已获得用户授权并开始实施。当前已落地 Control Contract、DSA SQLite 控制投影和运行时路由、ThesisLedger Policy/目录/缓存/API、Desktop 市场数据管理页、infra 配置与 fixture；并完成第一轮 defect 收敛。T1-T10 仍需补齐对应的完整验收证据，T11 尚未完成。DSA 源码定向测试已在本地 Python 3.12 虚拟环境执行，Mobile typecheck/测试已执行；当前 Compose 仍复用旧 DSA/ThesisLedger 镜像，最新镜像构建分别受 Debian mirror 和 pnpm registry 外部网络阻塞，真实 Provider smoke、浏览器视觉验收和 Desktop/Mobile 运行时视觉验收仍待执行。
 
 ## 本轮已实施内容
 
@@ -102,7 +102,12 @@
 - `apps/server`：TypeScript typecheck 通过；Vitest 81/81 通过。
 - `apps/desktop`：TypeScript typecheck、Vitest 15/15 和 Vite production build 通过；仅有既有的大 chunk 警告。
 - `packages/schemas`：typecheck/build 通过；Prisma schema format 和 client generate 通过。
-- DSA 与 stub：受影响 Python 文件 `py_compile` 通过；因本机缺少 `fastapi` 与 `pytest`，新增 Contract 测试尚未实际执行。
+- DSA 源码：Python 3.12 虚拟环境中的 Control/Data Contract、Provider runtime、Bars facade、Fund NAV history sequence fallback 和 SQLite 文件重开回归共 18 项通过；受影响 Python 文件 `py_compile` 通过。测试仅使用 fixture/fake Provider，不等同于在线 Provider 或 Docker 镜像验收。
+- 本轮缺陷修复：归回 Fund NAV fixture 函数体、修正 Bars runtime 的 frame 返回形状，并将 fixture history limit 对齐 Contract 的 3650 上限；新增 `docs/CHANGELOG.md` 的 `[Unreleased]` 修复条目。
+- Compose：使用 `.env.example` render 通过；PostgreSQL、Redis、DSA、ThesisLedger 四服务在本地旧镜像下均 healthy，三个 `thesis-ledger-*` 外部卷均存在。旧 DSA 镜像没有 Control 路由和 `FUND_NAV_HISTORY` capability，旧 ThesisLedger 镜像的 history facade 返回 404，因此不能作为当前源码的完整跨仓 smoke 证据。
+- Mobile：typecheck 通过，Vitest 6/6 通过；当前未启动可用的 Web 服务，浏览器访问 `localhost:5173/market-data` 被拒绝，因此 Desktop/Mobile 视觉与运行时验收仍未完成。
+- 当前差异 Review：Standards review 未发现硬性违规，Spec review 未发现契约问题；测试文件内少量重复 fake 构造和跨相邻边界测试共置属于非阻断的组织性遗留。
+- 构建/运行遗留：DSA 镜像构建在 Debian `bookworm InRelease` HTTP 500/EOF 失败；ThesisLedger 镜像构建在 pnpm React Native/Expo tarball timeout 失败。AKShare/efinance 在线 smoke、当前源码镜像 migration 仍未完成。
 - 三仓 `git diff --check` 通过。
 
 ## 实施前检查清单
