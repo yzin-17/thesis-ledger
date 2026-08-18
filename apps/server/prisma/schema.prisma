@@ -25,19 +25,82 @@ model Account {
 }
 
 model Asset {
-  symbol         String        @id
-  name           String
+  symbol                      String                       @id
+  name                        String
+  market                      String
+  assetType                   String
+  currency                    String
+  sector                      String?
+  identityStatus              String                       @default("provider")
+  identitySource              String?
+  metadata                    Json?
+  updatedAt                   DateTime                     @updatedAt
+  positions                   Position[]
+  ledgerEvents                LedgerEvent[]
+  bars                        MarketBar[]
+  fundNavPoints               FundNavPoint[]
+  instrumentAssetAssociations InstrumentAssetAssociation[]
+}
+
+model FundNavPoint {
+  symbol       String
+  navDate      DateTime
+  unitNav      Decimal  @db.Decimal(24, 8)
+  provider     String
+  fetchedAt    DateTime
+  freshness    String
+  fallbackUsed Boolean  @default(false)
+  asset        Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@id([symbol, navDate])
+  @@index([navDate])
+}
+
+model Instrument {
+  id             String                       @id @default(uuid()) @db.Uuid
+  instrumentType String
   market         String
-  assetType      String
-  currency       String
-  sector         String?
-  identityStatus String        @default("provider")
-  identitySource String?
-  metadata       Json?
-  updatedAt      DateTime      @updatedAt
-  positions      Position[]
-  ledgerEvents   LedgerEvent[]
-  bars           MarketBar[]
+  canonicalCode  String
+  displayName    String
+  pinyin         String                       @default("")
+  pinyinInitials String                       @default("")
+  searchAliases  Json?
+  generation     Int
+  active         Boolean                      @default(true)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  associations   InstrumentAssetAssociation[]
+
+  @@unique([canonicalCode, instrumentType, market])
+  @@index([canonicalCode])
+  @@index([displayName])
+  @@index([generation, active])
+}
+
+model InstrumentAssetAssociation {
+  id           String     @id @default(uuid()) @db.Uuid
+  instrumentId String     @db.Uuid
+  symbol       String
+  status       String     @default("active")
+  source       String
+  confirmedAt  DateTime?
+  firstSeenAt  DateTime   @default(now())
+  lastSeenAt   DateTime   @default(now())
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  asset        Asset      @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@unique([symbol])
+  @@unique([instrumentId, symbol])
+  @@index([instrumentId, status])
+}
+
+model CatalogSyncState {
+  consumer   String   @id
+  generation Int
+  checksum   String
+  cursor     String
+  syncedAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Position {
@@ -200,6 +263,54 @@ model ProviderHealthCheck {
 
   @@index([provider, checkedAt])
   @@index([state, checkedAt])
+}
+
+model DesiredProviderPolicy {
+  consumer            String                          @id
+  revision            Int
+  enabled             Boolean
+  routes              Json
+  syncState           String
+  dsaRevision         Int?
+  syncedAt            DateTime?
+  lastError           Json?
+  effectiveProjection Json?
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+  history             DesiredProviderPolicyRevision[]
+
+  @@index([syncState, updatedAt])
+}
+
+model DesiredProviderPolicyRevision {
+  id                  String                @id @default(uuid()) @db.Uuid
+  consumer            String
+  revision            Int
+  enabled             Boolean
+  routes              Json
+  syncState           String
+  dsaRevision         Int?
+  syncedAt            DateTime?
+  lastError           Json?
+  effectiveProjection Json?
+  createdAt           DateTime              @default(now())
+  policy              DesiredProviderPolicy @relation(fields: [consumer], references: [consumer], onDelete: Restrict)
+
+  @@unique([consumer, revision])
+  @@index([consumer, createdAt])
+}
+
+model ProviderTombstone {
+  id          String   @id @default(uuid()) @db.Uuid
+  providerId  String   @unique
+  displayName String
+  reason      String?
+  metadata    Json?
+  removedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([removedAt])
 }
 
 model RiskRule {

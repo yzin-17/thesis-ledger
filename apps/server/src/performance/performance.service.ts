@@ -35,7 +35,7 @@ export class PerformanceService {
       positions.map(async (position) => {
         try {
           if (position.asset.assetType === 'fund' || /\.OF$/.test(position.symbol)) {
-            const nav = await this.market.getFundNav(position.symbol);
+            const nav = await this.market.getFundNav(position.symbol, { allowStale: false });
             return {
               symbol: position.symbol,
               quantity: Number(position.quantity),
@@ -47,7 +47,7 @@ export class PerformanceService {
               freshness: nav.freshness,
             };
           }
-          const quote = await this.market.getQuote(position.symbol);
+          const quote = await this.market.getQuote(position.symbol, { allowStale: false });
           return {
             symbol: position.symbol,
             quantity: Number(position.quantity),
@@ -261,8 +261,10 @@ export class PerformanceService {
         try {
           marketValue =
             position.asset.assetType === 'fund' || /\.OF$/.test(position.symbol)
-              ? Number(position.quantity) * (await this.market.getFundNav(position.symbol)).unitNav
-              : Number(position.quantity) * (await this.market.getQuote(position.symbol)).price;
+              ? Number(position.quantity) *
+                (await this.market.getFundNav(position.symbol, { allowStale: false })).unitNav
+              : Number(position.quantity) *
+                (await this.market.getQuote(position.symbol, { allowStale: false })).price;
         } catch {
           // 保留 null，调用方可以区分缺行情和零市值。
         }

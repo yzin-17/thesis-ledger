@@ -44,6 +44,9 @@ import { DataExportService } from './platform/data-export.service.js';
 import { MetricsController } from './platform/metrics.controller.js';
 import { MetricsService } from './platform/metrics.service.js';
 import { ErrorTrackingService } from './platform/error-tracking.service.js';
+import { MarketDataController } from './market/market-data.controller.js';
+import { InstrumentService } from './market/instrument.service.js';
+import { MarketControlService } from './market/market-control.service.js';
 
 @Module({
   controllers: [
@@ -66,6 +69,7 @@ import { ErrorTrackingService } from './platform/error-tracking.service.js';
     DataExportController,
     MetricsController,
     DataQualityController,
+    MarketDataController,
   ],
   providers: [
     PrismaService,
@@ -94,6 +98,8 @@ import { ErrorTrackingService } from './platform/error-tracking.service.js';
     DataExportService,
     MetricsService,
     ErrorTrackingService,
+    InstrumentService,
+    MarketControlService,
   ],
 })
 export class AppModule {}

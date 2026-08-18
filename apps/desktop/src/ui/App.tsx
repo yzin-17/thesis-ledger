@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToastManager } from '@/components/ui/toast';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
+import { MarketDataSettings } from './MarketDataSettings.js';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/ArrowClockwise';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { FlaskIcon } from '@phosphor-icons/react/Flask';
@@ -51,6 +52,16 @@ interface Position {
   stale: boolean;
   source?: string;
   asset: { name: string };
+}
+interface InstrumentLookup {
+  id: string;
+  symbol: string;
+  canonicalCode: string;
+  instrumentType: string;
+  market: string;
+  displayName: string;
+  confirmable: boolean;
+  disabledReason?: string | null;
 }
 interface Portfolio {
   totalMarketValue: number;
@@ -197,6 +208,7 @@ const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
   journal: FlaskIcon,
   'ai-chat': RobotIcon,
   providers: GearSixIcon,
+  'market-data': ChartLineUpIcon,
 };
 
 const nav = desktopRoutes.map((route) => ({ ...route, icon: navIcons[route.view] }));
@@ -379,6 +391,7 @@ export function App() {
           <Route path="/journal" element={<JournalDashboard />} />
           <Route path="/ai-chat" element={<AiChat />} />
           <Route path="/providers" element={<ProviderSettings />} />
+          <Route path="/market-data" element={<MarketDataSettings />} />
           <Route path="*" element={<Navigate to="/portfolio" replace />} />
         </Routes>
       </main>
@@ -1558,15 +1571,15 @@ export const normalizeProviderHealthHistory = (
   const items = value.items as ProviderHealthHistoryRecord[];
   const responsePageSize =
     typeof response.pageSize === 'number' && response.pageSize > 0 ? response.pageSize : pageSize;
-  const total = typeof response.total === 'number' && response.total >= 0 ? response.total : items.length;
+  const total =
+    typeof response.total === 'number' && response.total >= 0 ? response.total : items.length;
   const totalPages =
     typeof response.totalPages === 'number' && response.totalPages >= 0
       ? response.totalPages
       : total === 0
         ? 0
         : Math.ceil(total / responsePageSize);
-  const page =
-    typeof response.page === 'number' && response.page > 0 ? response.page : safePage;
+  const page = typeof response.page === 'number' && response.page > 0 ? response.page : safePage;
 
   return { items, page, pageSize: responsePageSize, total, totalPages };
 };
@@ -1597,14 +1610,15 @@ export function ProviderSettings() {
     Array<{ id: string; name: string; type: string; enabled: boolean; nextRunAt: string | null }>
   >([]);
   const [healthHistory, setHealthHistory] = useState<ProviderHealthHistoryRecord[]>([]);
-  const [healthHistoryPagination, setHealthHistoryPagination] =
-    useState<ProviderHealthHistoryPage>({
+  const [healthHistoryPagination, setHealthHistoryPagination] = useState<ProviderHealthHistoryPage>(
+    {
       items: [],
       page: 1,
       pageSize: PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
       total: 0,
       totalPages: 0,
-    });
+    },
+  );
   const [healthHistoryLoading, setHealthHistoryLoading] = useState(false);
   const [jobHistory, setJobHistory] = useState<
     Array<{ id: string; jobId: string; status: string; startedAt: string; error: string | null }>
@@ -4786,6 +4800,10 @@ export function PortfolioManagement({
   const [entryAccountId, setEntryAccountId] = useState(initialEntryAccountId);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [instrumentQuery, setInstrumentQuery] = useState('');
+  const [instrumentResults, setInstrumentResults] = useState<InstrumentLookup[]>([]);
+  const [selectedInstrument, setSelectedInstrument] = useState<InstrumentLookup | null>(null);
+  const [instrumentSearchBusy, setInstrumentSearchBusy] = useState(false);
   const toastManager = useToastManager();
   const markDirty = (nextDirty = true) => {
     setDirty(nextDirty);
@@ -4805,6 +4823,18 @@ export function PortfolioManagement({
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
     else if (!entryAccountId && accounts[0]) setEntryAccountId(accounts[0].id);
   }, [accounts, defaultAccountId, entryAccountId]);
+
+  useEffect(() => {
+    if (editing) {
+      setInstrumentQuery(editing.symbol);
+      setSelectedInstrument(null);
+      setInstrumentResults([]);
+    } else if (!positionSheetOpen) {
+      setInstrumentQuery('');
+      setSelectedInstrument(null);
+      setInstrumentResults([]);
+    }
+  }, [editing, positionSheetOpen]);
 
   const loadManagedAccounts = async () => {
     if (step !== 'account') return;
@@ -4924,6 +4954,57 @@ export function PortfolioManagement({
     }
   };
 
+  const searchInstruments = async () => {
+    const query = instrumentQuery.trim();
+    if (!query || editing) return;
+    setInstrumentSearchBusy(true);
+    try {
+      const response = await fetch(
+        '/api/v1/market-data/instruments/search?q=' + encodeURIComponent(query),
+        { cache: 'no-store' },
+      );
+      if (!response.ok) throw new Error('instrument-search');
+      setInstrumentResults((await response.json()) as InstrumentLookup[]);
+    } catch {
+      setInstrumentResults([]);
+      toastManager.add({
+        title: '标的搜索失败',
+        description: '请确认市场数据与标的中心已完成目录同步。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setInstrumentSearchBusy(false);
+    }
+  };
+
+  const confirmInstrument = async (instrument: InstrumentLookup) => {
+    if (!instrument.confirmable || editing) return;
+    setInstrumentSearchBusy(true);
+    try {
+      const response = await fetch(
+        '/api/v1/market-data/instruments/' + encodeURIComponent(instrument.id) + '/confirm',
+        { method: 'POST' },
+      );
+      if (!response.ok) throw new Error('instrument-confirm');
+      setSelectedInstrument(instrument);
+      setInstrumentQuery(instrument.symbol);
+      setInstrumentResults([]);
+      markDirty(true);
+    } catch {
+      toastManager.add({
+        title: '标的确认失败',
+        description: '请先同步目录，或检查服务端数据库迁移状态。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setInstrumentSearchBusy(false);
+    }
+  };
+
   const submitPosition = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busyAction) return;
@@ -4933,6 +5014,16 @@ export function PortfolioManagement({
     const account = accounts.find((item) => item.id === accountId);
     const isCash = account?.type === 'cash';
     const isEditing = Boolean(editing);
+    if (!isCash && !isEditing && !selectedInstrument) {
+      toastManager.add({
+        title: '请先确认标的',
+        description: '新增持仓必须从本地标的目录搜索并确认，不能只填写代码。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+      return;
+    }
     setBusyAction(isCash ? 'cash-save' : 'position-save');
     try {
       const response = isCash
@@ -4956,8 +5047,18 @@ export function PortfolioManagement({
                 quantity: Number(formText(form, 'quantity')),
                 costPrice: Number(formText(form, 'costPrice')),
                 source: 'manual',
-                assetName: formText(form, 'assetName') || undefined,
-                assetType: formText(form, 'assetType') || undefined,
+                ...(selectedInstrument ? { instrumentId: selectedInstrument.id } : {}),
+                assetName:
+                  formText(form, 'assetName') || selectedInstrument?.displayName || undefined,
+                assetType:
+                  formText(form, 'assetType') ||
+                  (selectedInstrument?.instrumentType === 'MUTUAL_FUND'
+                    ? 'fund'
+                    : selectedInstrument?.instrumentType === 'ETF'
+                      ? 'etf'
+                      : selectedInstrument
+                        ? 'stock'
+                        : undefined),
               }),
             },
           );
@@ -5535,15 +5636,79 @@ export function PortfolioManagement({
                       <>
                         <label>
                           证券代码
-                          <Input
-                            name="symbol"
-                            required
-                            placeholder={
-                              selectedAccount?.type === 'fund' ? '000001.OF' : '600519.SH'
-                            }
-                            defaultValue={editing?.symbol}
-                            readOnly={Boolean(editing)}
-                          />
+                          <div className="flex gap-2">
+                            <Input
+                              name="symbol"
+                              required
+                              placeholder={
+                                selectedAccount?.type === 'fund' ? '000001.OF' : '600519.SH'
+                              }
+                              value={editing?.symbol ?? instrumentQuery}
+                              readOnly={Boolean(editing)}
+                              onChange={(event) => {
+                                if (editing) return;
+                                setInstrumentQuery(event.target.value.toUpperCase());
+                                if (
+                                  selectedInstrument &&
+                                  event.target.value !== selectedInstrument.symbol
+                                )
+                                  setSelectedInstrument(null);
+                              }}
+                            />
+                            {!editing && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={instrumentSearchBusy || !instrumentQuery.trim()}
+                                onClick={() => void searchInstruments()}
+                              >
+                                {instrumentSearchBusy ? '处理中…' : '搜索目录'}
+                              </Button>
+                            )}
+                          </div>
+                          {!editing && selectedInstrument && (
+                            <span className="field-hint">
+                              已确认：{selectedInstrument.displayName} ·{' '}
+                              {selectedInstrument.instrumentType}
+                            </span>
+                          )}
+                          {!editing && instrumentResults.length > 0 && (
+                            <div
+                              className="mt-2 divide-y border-y border-border"
+                              aria-label="标的搜索结果"
+                            >
+                              {instrumentResults
+                                .filter((instrument) =>
+                                  selectedAccount?.type === 'fund'
+                                    ? instrument.instrumentType === 'MUTUAL_FUND'
+                                    : ['STOCK', 'ETF'].includes(instrument.instrumentType),
+                                )
+                                .map((instrument) => (
+                                  <div
+                                    key={instrument.id}
+                                    className="flex items-center justify-between gap-3 py-2"
+                                  >
+                                    <span className="min-w-0">
+                                      <strong className="block truncate text-sm font-medium">
+                                        {instrument.displayName}
+                                      </strong>
+                                      <small className="font-mono text-xs text-muted-foreground">
+                                        {instrument.symbol} · {instrument.instrumentType}
+                                      </small>
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={!instrument.confirmable || instrumentSearchBusy}
+                                      onClick={() => void confirmInstrument(instrument)}
+                                    >
+                                      确认
+                                    </Button>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
                         </label>
                         <label>
                           名称（可选）

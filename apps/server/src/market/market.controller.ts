@@ -14,11 +14,28 @@ export class MarketController {
   @Get(':symbol/fund-nav') fundNav(@Param('symbol') symbol: string) {
     return this.market.getFundNav(symbol);
   }
+  @Get(':symbol/fund-nav/history') fundNavHistory(
+    @Param('symbol') symbol: string,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.market.getFundNavHistory(symbol, {
+      ...(start ? { start } : {}),
+      ...(end ? { end } : {}),
+      ...(limit ? { limit: Number(limit) } : {}),
+    });
+  }
   @Get(':symbol/bars') bars(
     @Param('symbol') symbol: string,
     @Query('timeframe') timeframe: '1m' | '1d' = '1d',
+    @Query('start') start?: string,
+    @Query('end') end?: string,
   ) {
-    return this.market.getBars(symbol, timeframe);
+    return this.market.getBars(symbol, timeframe, {
+      ...(start ? { start } : {}),
+      ...(end ? { end } : {}),
+    });
   }
   @Get(':symbol/indicators/:name') indicator(
     @Param('symbol') symbol: string,

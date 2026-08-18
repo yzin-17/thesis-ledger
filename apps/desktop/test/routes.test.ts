@@ -12,6 +12,7 @@ describe('Desktop routes', () => {
       ['journal', '/journal'],
       ['ai-chat', '/ai-chat'],
       ['providers', '/providers'],
+      ['market-data', '/market-data'],
     ]);
     expect(desktopNavigation).toEqual([
       'portfolio',
@@ -22,12 +23,14 @@ describe('Desktop routes', () => {
       'journal',
       'ai-chat',
       'providers',
+      'market-data',
     ]);
   });
 
   it('resolves navigable views and leaves internal view state unrouted', () => {
     expect(desktopPathForView('portfolio')).toBe('/portfolio');
     expect(desktopPathForView('providers')).toBe('/providers');
+    expect(desktopPathForView('market-data')).toBe('/market-data');
     expect(desktopPathForView('position-detail')).toBeNull();
     expect(desktopPathForView('automation')).toBeNull();
   });

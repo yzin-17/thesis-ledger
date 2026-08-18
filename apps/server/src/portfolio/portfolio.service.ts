@@ -5,6 +5,7 @@ import { roundMoney } from '@thesis-ledger/shared';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { InstrumentService } from '../market/instrument.service.js';
 
 const isFundSymbol = (symbol: string) => /^\d{6}\.OF$/.test(symbol);
 
@@ -49,6 +50,7 @@ export class PortfolioService {
     private readonly prisma: PrismaService,
     private readonly market: MarketService,
     @Optional() private readonly ledger?: LedgerService,
+    @Optional() private readonly instruments?: InstrumentService,
   ) {}
 
   private requireLedger() {
@@ -65,12 +67,29 @@ export class PortfolioService {
 
   async upsertPosition(input: unknown) {
     const data = positionInputSchema.parse(input);
+    if (data.source === 'manual' && !data.instrumentId)
+      throw new BadRequestException('新增手工持仓必须先从标的目录确认标的');
+    const confirmedInstrument = data.instrumentId
+      ? await this.instruments?.requireConfirmed(data.instrumentId)
+      : undefined;
+    if (data.instrumentId && !confirmedInstrument)
+      throw new BadRequestException('标的目录服务未配置，不能确认新增持仓');
+    if (confirmedInstrument && confirmedInstrument.symbol !== data.symbol)
+      throw new BadRequestException('持仓代码与已确认标的不一致');
     const options =
-      data.assetName === undefined && data.assetType === undefined
+      data.assetName === undefined && data.assetType === undefined && !confirmedInstrument
         ? undefined
         : {
-            ...(data.assetName === undefined ? {} : { assetName: data.assetName }),
-            ...(data.assetType === undefined ? {} : { assetType: data.assetType }),
+            ...(data.assetName === undefined
+              ? confirmedInstrument
+                ? { assetName: confirmedInstrument.displayName }
+                : {}
+              : { assetName: data.assetName }),
+            ...(data.assetType === undefined
+              ? confirmedInstrument
+                ? { assetType: confirmedInstrument.assetType as 'stock' | 'etf' | 'fund' }
+                : {}
+              : { assetType: data.assetType }),
           };
     if (options) {
       await this.requireLedger().setPosition(

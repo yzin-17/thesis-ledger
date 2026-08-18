@@ -3,13 +3,17 @@ const baseUrl = (process.env.CONTRACT_API_BASE ?? 'http://localhost:3000/api/v1'
   '',
 );
 const token = process.env.THESIS_LEDGER_DSA_TOKEN?.trim();
+const controlToken = process.env.THESIS_LEDGER_CONTROL_TOKEN?.trim();
 const checkCapabilities = process.env.CONTRACT_CHECK_CAPABILITIES === 'true';
+const checkControl = process.env.CONTRACT_CHECK_CONTROL === 'true';
 
-const request = async (path, expectedStatus = 200) => {
+const request = async (path, expectedStatus = 200, init = {}) => {
   const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
     headers: {
       accept: 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
     },
   });
   const text = await response.text();
@@ -29,11 +33,22 @@ const request = async (path, expectedStatus = 200) => {
   return body;
 };
 
+const controlRequest = (path, expectedStatus = 200, init = {}) =>
+  request(path, expectedStatus, {
+    ...init,
+    headers: { authorization: `Bearer ${controlToken ?? ''}`, ...init.headers },
+  });
+
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
 if (checkCapabilities) {
+  if (token) {
+    await request('/capabilities', 401, {
+      headers: { authorization: 'Bearer invalid-contract-token' },
+    });
+  }
   const capabilities = await request('/capabilities');
   assert(capabilities.contractVersion === 1, 'Contract version must be 1');
   assert(
@@ -44,6 +59,68 @@ if (checkCapabilities) {
     capabilities.capabilities?.['fund-nav']?.assetSuffix === '.OF',
     'DSA V1 must declare fund NAV',
   );
+  assert(
+    capabilities.capabilities?.['fund-nav-history']?.assetSuffix === '.OF',
+    'DSA V1 must declare fund NAV history',
+  );
+}
+
+if (checkControl) {
+  assert(Boolean(controlToken), 'Control Contract check requires THESIS_LEDGER_CONTROL_TOKEN');
+  const handshake = await controlRequest('/control/handshake', 200, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contractVersion: 1,
+      consumer: 'thesis-ledger',
+      requestId: `contract-smoke-${Date.now()}`,
+      supportedVersions: [1],
+    }),
+  });
+  assert(
+    handshake.accepted === true && handshake.contractVersion === 1,
+    'Control handshake failed',
+  );
+  const providers = await controlRequest('/control/providers');
+  assert(
+    providers.providers?.some((provider) => provider.providerId === 'akshare') &&
+      providers.providers?.some((provider) => provider.providerId === 'efinance'),
+    'Control provider registry is incomplete',
+  );
+  const effective = await controlRequest('/control/policies/effective');
+  assert(effective.projection || effective.effective, 'Effective Policy projection is missing');
+  const catalogJob = await controlRequest('/control/catalog/jobs', 200, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contractVersion: 1,
+      consumer: 'thesis-ledger',
+      requestId: `catalog-job-${Date.now()}`,
+    }),
+  });
+  assert(['running', 'succeeded'].includes(catalogJob.status), 'Catalog job status is invalid');
+  const catalog = await request('/catalog/snapshot');
+  assert(
+    catalog.complete === true && catalog.checksum && catalog.cursor,
+    'Catalog snapshot is invalid',
+  );
+  if (catalogJob.status === 'succeeded') {
+    const acknowledged = await controlRequest('/control/catalog/ack', 200, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        contractVersion: 1,
+        consumer: 'thesis-ledger',
+        requestId: `catalog-ack-${Date.now()}`,
+        generation: catalog.generation,
+        checksum: catalog.checksum,
+      }),
+    });
+    assert(
+      acknowledged.acknowledged === true || acknowledged.accepted === true,
+      'Catalog ACK failed',
+    );
+  }
 }
 
 const fundNavPath = checkCapabilities
@@ -52,6 +129,22 @@ const fundNavPath = checkCapabilities
 const fundNav = await request(fundNavPath);
 assert(fundNav.version === 1 && fundNav.symbol === '000001.OF', 'Fund NAV identity is invalid');
 assert(typeof fundNav.unitNav === 'number' && fundNav.freshness, 'Fund NAV provenance is missing');
+
+const fundNavHistoryPath = checkCapabilities
+  ? '/market/fund-nav/history?symbol=000001.OF&limit=5'
+  : '/market/000001.OF/fund-nav/history?limit=5';
+const fundNavHistory = await request(fundNavHistoryPath);
+assert(Array.isArray(fundNavHistory) && fundNavHistory.length > 0, 'Fund NAV history is empty');
+assert(
+  fundNavHistory.every((point) => point.symbol === '000001.OF' && point.version === 1),
+  'Fund NAV history identity is invalid',
+);
+assert(
+  fundNavHistory.every(
+    (point, index) => index === 0 || fundNavHistory[index - 1].navDate < point.navDate,
+  ),
+  'Fund NAV history must be strictly ordered',
+);
 
 const quote = await request('/market/quote?symbol=600519.SH');
 assert(quote.version === 1 && quote.symbol === '600519.SH', 'Quote identity is invalid');

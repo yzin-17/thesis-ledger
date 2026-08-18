@@ -10,6 +10,7 @@ export const accountInputSchema = z.object({
 
 export const positionInputSchema = z.object({
   accountId: z.uuid(),
+  instrumentId: z.uuid().optional(),
   symbol: z.string().regex(/^\d{6}\.(SH|SZ|BJ|OF)$/),
   quantity: z.number().finite().nonnegative(),
   costPrice: z.number().finite().nonnegative(),

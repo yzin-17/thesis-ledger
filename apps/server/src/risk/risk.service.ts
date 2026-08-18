@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   evaluateCompleteRule,
   type CompleteRiskContext,
@@ -117,7 +117,8 @@ export class RiskService {
   }
 
   async testRule(id: string, input: unknown) {
-    const contexts = riskScanContextSchema.array().parse(input);
+    const { contexts, allowStale } = this.parseScanInput(input);
+    this.rejectStaleContexts(contexts, allowStale);
     const stored = await this.prisma.riskRule.findUniqueOrThrow({ where: { id } });
     const events = this.evaluateStoredRule(stored, contexts).map(({ event }) => event);
     await this.prisma.riskRuleAudit.create({
@@ -140,7 +141,8 @@ export class RiskService {
   }
 
   async scan(input: unknown) {
-    const contexts = riskScanContextSchema.array().parse(input);
+    const { contexts, allowStale } = this.parseScanInput(input);
+    this.rejectStaleContexts(contexts, allowStale);
     const rules = await this.prisma.riskRule.findMany({
       where: { enabled: true, effectiveAt: { lte: new Date() } },
     });
@@ -236,6 +238,30 @@ export class RiskService {
       ...(rule.config === undefined ? {} : { config: rule.config as Prisma.InputJsonValue }),
       ...(rule.effectiveAt === undefined ? {} : { effectiveAt: new Date(rule.effectiveAt) }),
     };
+  }
+
+  private parseScanInput(input: unknown) {
+    if (Array.isArray(input)) {
+      return { contexts: riskScanContextSchema.array().parse(input), allowStale: false };
+    }
+    const envelope = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+    return {
+      contexts: riskScanContextSchema.array().parse(envelope.contexts),
+      allowStale: envelope.allowStale === true,
+    };
+  }
+
+  private rejectStaleContexts(contexts: ScanContext[], allowStale: boolean) {
+    if (allowStale) return;
+    if (
+      contexts.some(
+        (context) =>
+          context.dataQuality.freshness === 'stale' ||
+          context.dataQuality.marketData === 'stale' ||
+          context.dataQuality.status === 'stale',
+      )
+    )
+      throw new BadRequestException('行情陈旧，Risk 默认拒绝评估；请在允许陈旧数据后重试');
   }
 
   private snapshot(value: object): Prisma.InputJsonValue {

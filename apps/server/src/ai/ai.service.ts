@@ -3,6 +3,7 @@ import { aiAnalysisSchema, aiContextSchema } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../platform/prisma.service.js';
+import { explicitlyAllowsStale, hasStaleMarketData } from '../market/freshness.js';
 
 type PortfolioMode = 'actual' | 'shadow';
 
@@ -142,6 +143,8 @@ export const executeToolSafely = async (
   try {
     const startedAt = Date.now();
     const data = await tool.execute(input, AbortSignal.timeout(timeoutMs));
+    if (hasStaleMarketData(data) && !explicitlyAllowsStale(input))
+      throw new Error('AI 默认拒绝陈旧或部分市场数据');
     return {
       status: 'ok' as const,
       data,

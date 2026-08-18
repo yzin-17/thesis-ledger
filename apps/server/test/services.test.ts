@@ -683,6 +683,18 @@ describe('AI 安全边界', () => {
         new Set(['market:read']),
       ),
     ).toMatchObject({ status: 'unavailable', data: null, error: 'timeout' }));
+  it('AI 默认拒绝带 stale 或 partial 标记的市场数据', async () => {
+    const result = await executeToolSafely(
+      {
+        name: 'quote',
+        permission: 'market:read',
+        execute: async () => ({ price: 10, stale: true }),
+      },
+      {},
+      new Set(['market:read']),
+    );
+    expect(result).toMatchObject({ status: 'unavailable', data: null });
+  });
   it('Provider 元数据与 Prompt 版本可查询', () => {
     const registry = new AiProviderRegistry();
     registry.register({
@@ -983,8 +995,10 @@ describe('行情缓存', () => {
     volume: 1,
     amount: 10,
     marketTime: '2025-01-01T00:00:00Z',
+    fetchedAt: '2025-01-01T00:00:01Z',
     freshness: 'live',
     stale: false,
+    provider: 'dsa-fork',
   };
 
   it('重复请求命中新鲜缓存且不重复调用 Provider', async () => {
@@ -1027,6 +1041,7 @@ describe('行情缓存', () => {
               close: 10,
               volume: 1,
               amount: 10,
+              provider: 'dsa-fork',
             },
           ];
         if (path.includes('/indicators/'))
@@ -1037,6 +1052,7 @@ describe('行情缓存', () => {
             calculatedAt: timestamp,
             values: { rsi14: 50 },
             engineVersion: 'fixture',
+            provider: 'dsa-fork',
           };
         return {
           buckets: [{ price: 10, weight: 1 }],
@@ -1047,6 +1063,7 @@ describe('行情缓存', () => {
           range90: [8, 12],
           concentration: 0.4,
           engineVersion: 'fixture',
+          provider: 'dsa-fork',
           calculatedAt: timestamp,
         };
       }),
@@ -1853,6 +1870,20 @@ describe('Strategy 与 Backtest Worker', () => {
     expect(createVersion).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ version: 2 }) }),
     );
+  });
+  it('回测默认拒绝带 partial 市场数据的输入', async () => {
+    const service = new BacktestService({ backtestJob: { create: vi.fn() } } as never);
+    await expect(
+      service.queue({
+        id: '11111111-1111-4111-8111-111111111119',
+        strategyVersionId: '11111111-1111-4111-8111-111111111116',
+        status: 'queued',
+        period: { start: '2025-01-01', end: '2025-01-02' },
+        dataAsOf: '2025-01-03T00:00:00Z',
+        warnings: [],
+        dataQuality: { partial: true },
+      }),
+    ).rejects.toThrow('默认拒绝');
   });
   it('Worker 运行任务并保存 checksum、进度和结果', async () => {
     const job = {

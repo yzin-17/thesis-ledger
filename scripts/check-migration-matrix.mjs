@@ -8,7 +8,7 @@ const entries = (await readdir(migrationsRoot, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (entries.length !== 17) throw new Error(`迁移数量发生变化，请更新矩阵: ${entries.length}`);
+if (entries.length !== 18) throw new Error(`迁移数量发生变化，请更新矩阵: ${entries.length}`);
 for (let index = 0; index < entries.length; index += 1) {
   const name = entries[index];
   if (!/^\d{14}_[a-z0-9_-]+$/u.test(name)) throw new Error(`迁移目录命名无效: ${name}`);

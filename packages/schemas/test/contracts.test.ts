@@ -4,6 +4,8 @@ import {
   chipDistributionSchemaV1,
   indicatorSchemaV1,
   quoteSchemaV1,
+  fundNavHistorySchemaV1,
+  catalogDeltaSchema,
   strategySchemaV1,
   ledgerEventSchemaV1,
   riskRuleInputSchema,
@@ -186,6 +188,39 @@ describe('行情契约', () => {
     expect(result.symbol).toBe('600519.SH');
     expect(result).not.toHaveProperty('buckets');
     expect(result).not.toHaveProperty('mainPeak');
+  });
+
+  it('基金净值历史要求严格升序且保留真实 Provider', () => {
+    const point = (navDate: string) => ({
+      version: 1,
+      symbol: '000001.OF',
+      unitNav: 1.2,
+      navDate,
+      provider: 'akshare',
+      fetchedAt: time,
+      freshness: 'delayed',
+    });
+    expect(
+      fundNavHistorySchemaV1.parse([point('2025-01-01T00:00:00Z'), point('2025-01-02T00:00:00Z')]),
+    ).toHaveLength(2);
+    expect(() =>
+      fundNavHistorySchemaV1.parse([point('2025-01-02T00:00:00Z'), point('2025-01-01T00:00:00Z')]),
+    ).toThrow('升序');
+  });
+
+  it('目录增量必须携带 fromCursor 与删除身份', () => {
+    expect(
+      catalogDeltaSchema.parse({
+        contractVersion: 1,
+        generation: 2,
+        checksum: 'checksum',
+        cursor: 'generation:2',
+        fromCursor: 'generation:1',
+        complete: true,
+        items: [],
+        deleted: [{ canonicalCode: '000001', instrumentType: 'STOCK', market: 'SZ' }],
+      }),
+    ).toMatchObject({ fromCursor: 'generation:1', deleted: [{ canonicalCode: '000001' }] });
   });
 });
 

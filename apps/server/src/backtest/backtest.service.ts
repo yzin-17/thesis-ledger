@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   quantStatsAnalytics,
@@ -9,6 +9,7 @@ import {
 } from '@thesis-ledger/domain';
 import { backtestJobSchema, strategySchemaV1 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { explicitlyAllowsStale, hasStaleMarketData } from '../market/freshness.js';
 
 export interface BacktestWorker {
   readonly id: string;
@@ -108,6 +109,8 @@ export class BacktestService {
 
   async queue(input: unknown) {
     const job = backtestJobSchema.parse(input);
+    if (hasStaleMarketData(job) && !explicitlyAllowsStale(input))
+      throw new BadRequestException('回测默认拒绝陈旧或部分市场数据，请显式允许后重试');
     return this.prisma.backtestJob.create({
       data: {
         id: job.id,

@@ -23,6 +23,8 @@ export const quoteSchemaV1 = z
     volume: finite.nonnegative(),
     amount: finite.nonnegative(),
     stale: z.boolean(),
+    fallbackUsed: z.boolean().optional(),
+    servedFromCache: z.boolean().optional(),
   })
   .merge(provenanceSchema)
   .refine(
@@ -47,6 +49,7 @@ export const barSchemaV1 = z
     volume: finite.nonnegative(),
     amount: finite.nonnegative(),
     provider: z.string().min(1),
+    fallbackUsed: z.boolean().optional(),
   })
   .refine((bar) => bar.high >= Math.max(bar.open, bar.close, bar.low), 'OHLC 最高价非法')
   .refine((bar) => bar.low <= Math.min(bar.open, bar.close, bar.high), 'OHLC 最低价非法');
@@ -102,9 +105,94 @@ export const fundNavSchemaV1 = z.object({
   provider: z.string().min(1),
   fetchedAt: isoDate,
   freshness: z.enum(['delayed', 'stale', 'unavailable']),
+  fallbackUsed: z.boolean().optional(),
+  servedFromCache: z.boolean().optional(),
+});
+
+export const fundNavHistorySchemaV1 = z.array(fundNavSchemaV1).superRefine((points, context) => {
+  for (let index = 1; index < points.length; index += 1) {
+    if (points[index - 1]!.navDate >= points[index]!.navDate) {
+      context.addIssue({
+        code: 'custom',
+        message: '基金净值历史必须按时间升序且日期唯一',
+        path: [index, 'navDate'],
+      });
+    }
+  }
+});
+
+export const controlEnvelopeSchema = z.object({
+  contractVersion: z.literal(1),
+  consumer: z.literal('thesis-ledger'),
+  requestId: z.string().min(1),
+});
+
+export const providerRouteMatrixSchema = z.record(
+  z.string(),
+  z.record(z.string(), z.array(z.string())),
+);
+
+export const desiredProviderPolicySchema = controlEnvelopeSchema.extend({
+  revision: z.number().int().positive(),
+  enabled: z.boolean(),
+  routes: providerRouteMatrixSchema,
+});
+
+export const providerManifestSchema = z.object({
+  providerId: z.string().min(1),
+  displayName: z.string().min(1),
+  version: z.number().int().positive(),
+  capabilities: z.record(z.string(), z.array(z.string())),
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  credentialConfigured: z.boolean(),
+  requiresCredential: z.boolean().optional(),
+  updatedAt: isoDate.nullable().optional(),
+});
+
+export const effectiveProviderPolicySchema = z.object({
+  contractVersion: z.literal(1),
+  consumer: z.literal('thesis-ledger'),
+  revision: z.number().int().nonnegative(),
+  sourceDesiredRevision: z.number().int().nonnegative(),
+  enabled: z.boolean(),
+  routes: providerRouteMatrixSchema,
+  routeStatus: z.record(z.string(), z.record(z.string(), z.unknown())),
+  appliedAt: isoDate,
+});
+
+export const catalogItemSchema = z.object({
+  canonicalCode: z.string().min(1),
+  instrumentType: z.string().min(1),
+  market: z.string().min(1),
+  displayName: z.string().min(1),
+});
+
+export const catalogSnapshotSchema = z.object({
+  contractVersion: z.literal(1),
+  generation: z.number().int().positive(),
+  checksum: z.string().min(1),
+  cursor: z.string().min(1),
+  complete: z.boolean(),
+  items: z.array(catalogItemSchema),
+});
+export const catalogDeltaSchema = catalogSnapshotSchema.extend({
+  fromCursor: z.string().min(1),
+  deleted: z.array(
+    catalogItemSchema.pick({ canonicalCode: true, instrumentType: true, market: true }),
+  ),
+  requiresFullSnapshot: z.boolean().optional(),
 });
 export type QuoteV1 = z.infer<typeof quoteSchemaV1>;
 export type BarV1 = z.infer<typeof barSchemaV1>;
 export type IndicatorV1 = z.infer<typeof indicatorSchemaV1>;
 export type ChipDistributionV1 = z.infer<typeof chipDistributionSchemaV1>;
 export type FundNavV1 = z.infer<typeof fundNavSchemaV1>;
+export type FundNavHistoryV1 = z.infer<typeof fundNavHistorySchemaV1>;
+export type ControlEnvelope = z.infer<typeof controlEnvelopeSchema>;
+export type DesiredProviderPolicy = z.infer<typeof desiredProviderPolicySchema>;
+export type ProviderManifest = z.infer<typeof providerManifestSchema>;
+export type EffectiveProviderPolicy = z.infer<typeof effectiveProviderPolicySchema>;
+export type CatalogItem = z.infer<typeof catalogItemSchema>;
+export type CatalogSnapshot = z.infer<typeof catalogSnapshotSchema>;
+export type CatalogDelta = z.infer<typeof catalogDeltaSchema>;

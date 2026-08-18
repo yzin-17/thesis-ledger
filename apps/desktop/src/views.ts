@@ -7,6 +7,7 @@ export type DesktopView =
   | 'strategy'
   | 'journal'
   | 'providers'
+  | 'market-data'
   | 'automation'
   | 'ai-chat';
 
@@ -21,6 +22,7 @@ export const desktopRoutes = [
   { view: 'journal', path: '/journal', label: '投资复盘' },
   { view: 'ai-chat', path: '/ai-chat', label: '研究助手' },
   { view: 'providers', path: '/providers', label: '数据与自动化' },
+  { view: 'market-data', path: '/market-data', label: '市场数据' },
 ] as const satisfies ReadonlyArray<{
   view: DesktopNavigationView;
   path: `/${string}`;

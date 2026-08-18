@@ -85,14 +85,25 @@
 
 ## 当前阶段
 
-本轮已获得用户授权并开始实施。当前已落地 Control Contract、DSA SQLite 控制投影和运行时路由、ThesisLedger Policy/目录/缓存/API、Desktop 市场数据管理页、infra 配置与 fixture；T1-T10 仍需补齐对应的完整验收证据，T11 尚未完成。DSA pytest 受本地缺少 `fastapi`/`pytest` 阻塞，Docker 迁移与启动、真实 Provider smoke、浏览器视觉验收和 Mobile 运行时验收仍待执行。
+本轮已获得用户授权并开始实施。当前已落地 Control Contract、DSA SQLite 控制投影和运行时路由、ThesisLedger Policy/目录/缓存/API、Desktop 市场数据管理页、infra 配置与 fixture；并完成第一轮 defect 收敛。T1-T10 仍需补齐对应的完整验收证据，T11 尚未完成。DSA pytest 受本地缺少 `fastapi`/`pytest` 阻塞，Docker 迁移与启动、真实 Provider smoke、浏览器视觉验收和 Mobile 运行时验收仍待执行。
 
 ## 本轮已实施内容
 
-- DSA：新增独立 Control Contract、`akshare`/`efinance` manifest、SQLite ProviderConfig/Effective Policy/health/catalog/job/tombstone、write-only 凭证、Policy 原子校验、Provider smoke、scoped circuit 和 Quote/NAV/Bar fallback runtime。
-- ThesisLedger：新增 `Instrument`、`InstrumentAssetAssociation`、`DesiredProviderPolicy` revision history、`ProviderTombstone`、目录同步/搜索/确认 API、DSA Control Client、Redis single-flight/lock 和 Quote/NAV/历史 Bar cache 边界。
+- DSA：新增独立 Control Contract、`akshare`/`efinance` manifest、SQLite ProviderConfig/Effective Policy/health/catalog/job/tombstone、write-only 凭证、Policy 原子校验、Provider smoke、scoped circuit 和 Quote/NAV/Bar fallback runtime；凭证可选 Provider 不再被错误判定为未配置，移除 Provider 会写 disabled 配置以阻止隐式复活。
+- DSA Catalog：fixture 只在显式 fixture mode 下生成；生产路径改为抓取并合并 AKShare/efinance 目录，保留有限 generation、真实 delta、cursor 过期和持久化 ACK。
+- ThesisLedger：新增 `Instrument`、`InstrumentAssetAssociation`、`DesiredProviderPolicy` revision history、`ProviderTombstone`、`CatalogSyncState`、目录 snapshot/delta 原子同步/搜索/确认 API、DSA Control Client、Redis single-flight/lock 和 Quote/NAV/历史 Bar cache 边界。
+- Fund NAV history：补齐 DSA `FUND_NAV_HISTORY` sequence-level runtime、Data Contract 路由、跨仓 Schema、`FundNavPoint` PostgreSQL 持久化和 DSA 不可用时的历史降级读取；contract smoke 校验权限、身份和严格时序。
+- Policy 与移除：主系统使用数据库行锁和连续 revision 约束收敛并发 apply；rollback 生成新 revision；只有 DSA 确认 Policy 生效且完成 Provider removal 后才写本地 tombstone，Desktop 不再把 pending 响应显示为成功。
 - 客户端与 infra：新增 Desktop `/market-data` 管理页和新持仓目录确认入口；Mobile 保持只读；补充 DSA 独立 SQLite 卷、Control Token/Secret Key 配置、fixture stub、Contract smoke 和实施架构文档。
 - freshness 门禁：Performance 使用 fresh-only；Risk、Backtest、AI 默认拒绝 stale/partial 数据，只有显式 `allowStale` 才可放行。
+
+## 当前验证证据
+
+- `apps/server`：TypeScript typecheck 通过；Vitest 81/81 通过。
+- `apps/desktop`：TypeScript typecheck、Vitest 15/15 和 Vite production build 通过；仅有既有的大 chunk 警告。
+- `packages/schemas`：typecheck/build 通过；Prisma schema format 和 client generate 通过。
+- DSA 与 stub：受影响 Python 文件 `py_compile` 通过；因本机缺少 `fastapi` 与 `pytest`，新增 Contract 测试尚未实际执行。
+- 三仓 `git diff --check` 通过。
 
 ## 实施前检查清单
 
