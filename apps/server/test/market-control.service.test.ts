@@ -23,7 +23,7 @@ const historyCreateFrom = (data: Record<string, unknown>) => {
 describe('MarketControlService', () => {
   it('accepts a monotonic revision jump and pushes the latest policy', async () => {
     const routes: Routes = { REALTIME_QUOTE: { STOCK: ['akshare'] } };
-    let state: PolicyState = {
+    const state: PolicyState = {
       consumer: 'thesis-ledger',
       revision: 1,
       enabled: true,
