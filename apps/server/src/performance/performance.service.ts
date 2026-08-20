@@ -12,6 +12,51 @@ import { MarketService } from '../market/market.service.js';
 
 type PortfolioMode = 'actual' | 'shadow';
 
+type PerformanceSnapshot = {
+  id?: string;
+  capturedAt: Date;
+  marketValue: unknown;
+  cashValue: unknown;
+  payload: unknown;
+};
+
+type PerformanceLedgerEvent = {
+  type: string;
+  occurredAt: Date;
+  amount: unknown;
+};
+
+const EXTERNAL_FLOW_TYPES = ['CASH_DEPOSIT', 'CASH_WITHDRAW', 'TRANSFER_IN', 'TRANSFER_OUT'] as const;
+
+const snapshotPayload = (payload: unknown) =>
+  payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+
+const partialSnapshot = (snapshot: Pick<PerformanceSnapshot, 'payload'>) => {
+  const payload = snapshotPayload(snapshot.payload);
+  if (payload.partial === true) return true;
+  const dataQuality = snapshotPayload(payload.dataQuality);
+  return dataQuality.partial === true;
+};
+
+const snapshotMissingSymbols = (snapshot: Pick<PerformanceSnapshot, 'payload'>) => {
+  const payload = snapshotPayload(snapshot.payload);
+  const direct = payload.missingSymbols;
+  if (Array.isArray(direct)) return direct.map(String);
+  const dataQuality = snapshotPayload(payload.dataQuality);
+  return Array.isArray(dataQuality.missingSymbols) ? dataQuality.missingSymbols.map(String) : [];
+};
+
+const snapshotValue = (snapshot: Pick<PerformanceSnapshot, 'marketValue' | 'cashValue'>) =>
+  Number(snapshot.marketValue) + Number(snapshot.cashValue);
+
+const externalPortfolioFlow = (event: Pick<PerformanceLedgerEvent, 'type' | 'amount'>) => {
+  const amount = Number(event.amount ?? 0);
+  if (!Number.isFinite(amount) || amount === 0) return 0;
+  if (event.type === 'CASH_DEPOSIT' || event.type === 'TRANSFER_IN') return amount;
+  if (event.type === 'CASH_WITHDRAW' || event.type === 'TRANSFER_OUT') return -amount;
+  return 0;
+};
+
 @Injectable()
 export class PerformanceService {
   constructor(
@@ -72,7 +117,10 @@ export class PerformanceService {
         }
       }),
     );
-    const marketValue = valued.reduce((sum, position) => sum + (position.marketValue ?? 0), 0);
+    const knownMarketValue = valued.reduce(
+      (sum, position) => sum + (position.marketValue ?? 0),
+      0,
+    );
     const costValue = valued.reduce(
       (sum, position) => sum + position.quantity * position.costPrice,
       0,
@@ -94,14 +142,20 @@ export class PerformanceService {
     const cashValue = accountId
       ? (cash.get(accountId) ?? 0)
       : [...cash.values()].reduce((sum, value) => sum + value, 0);
+    const missingSymbols = valued
+      .filter((position) => position.marketValue === null)
+      .map((position) => position.symbol);
+    const partial = missingSymbols.length > 0;
     const payload = {
       positions: valued,
       mode,
+      knownMarketValue,
+      totalMarketValue: partial ? null : knownMarketValue,
+      partial,
+      missingSymbols,
       dataQuality: {
-        partial: valued.some((position) => position.marketValue === null),
-        missingSymbols: valued
-          .filter((position) => position.marketValue === null)
-          .map((position) => position.symbol),
+        partial,
+        missingSymbols,
       },
     };
     const snapshotDelegate = this.prisma.portfolioSnapshot as unknown as {
@@ -132,7 +186,7 @@ export class PerformanceService {
       data: {
         ...(accountId ? { accountId } : {}),
         capturedAt,
-        marketValue,
+        marketValue: knownMarketValue,
         costValue,
         cashValue,
         payload,
@@ -141,18 +195,71 @@ export class PerformanceService {
   }
 
   async summary(accountId?: string, start?: string, end?: string, mode: PortfolioMode = 'actual') {
-    const snapshots = await this.history(accountId, start, end, mode);
-    if (snapshots.length < 2)
-      return { accountId: accountId ?? null, snapshots, ttwror: 0, xirr: null };
-    const valuations = snapshots.map((snapshot, index) => ({
-      date: snapshot.capturedAt.toISOString(),
-      value: Number(snapshot.marketValue) + Number(snapshot.cashValue),
-      ...(index === 0 ? {} : { externalFlow: 0 }),
-    }));
-    const cashFlows = snapshots.map((snapshot) => ({
-      date: snapshot.capturedAt.toISOString(),
-      amount: Number(snapshot.cashValue),
-    }));
+    const snapshots = (await this.history(accountId, start, end, mode)) as PerformanceSnapshot[];
+    const partialSnapshots = snapshots.filter(partialSnapshot);
+    if (partialSnapshots.length > 0) {
+      throw new BadRequestException({
+        code: 'PARTIAL_PORTFOLIO_SNAPSHOT',
+        message: '收益分析包含行情缺失的 partial snapshot，请补齐行情后重试',
+        snapshotIds: partialSnapshots.flatMap((snapshot) => (snapshot.id ? [snapshot.id] : [])),
+        missingSymbols: [...new Set(partialSnapshots.flatMap(snapshotMissingSymbols))],
+      });
+    }
+    if (snapshots.length < 2) {
+      return {
+        accountId: accountId ?? null,
+        snapshots,
+        ttwror: 0,
+        xirr: null,
+        xirrReason: '至少需要两个完整快照',
+      };
+    }
+
+    const firstSnapshot = snapshots[0]!;
+    const lastSnapshot = snapshots[snapshots.length - 1]!;
+    const accountWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
+    const externalEvents = (await this.prisma.ledgerEvent.findMany({
+      where: {
+        ...accountWhere,
+        type: { in: [...EXTERNAL_FLOW_TYPES] },
+        occurredAt: { gt: firstSnapshot.capturedAt, lte: lastSnapshot.capturedAt },
+      },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+    })) as PerformanceLedgerEvent[];
+
+    const valuations = snapshots.map((snapshot, index) => {
+      const previous = index === 0 ? undefined : snapshots[index - 1];
+      const externalFlow = previous
+        ? externalEvents.reduce((sum, event) => {
+            if (event.occurredAt <= previous.capturedAt || event.occurredAt > snapshot.capturedAt)
+              return sum;
+            return sum + externalPortfolioFlow(event);
+          }, 0)
+        : 0;
+      return {
+        date: snapshot.capturedAt.toISOString(),
+        value: snapshotValue(snapshot),
+        ...(index === 0 ? {} : { externalFlow }),
+      };
+    });
+
+    const cashFlows = [
+      {
+        date: firstSnapshot.capturedAt.toISOString(),
+        amount: -snapshotValue(firstSnapshot),
+      },
+      ...externalEvents.flatMap((event) => {
+        const portfolioFlow = externalPortfolioFlow(event);
+        return portfolioFlow === 0
+          ? []
+          : [{ date: event.occurredAt.toISOString(), amount: -portfolioFlow }];
+      }),
+      {
+        date: lastSnapshot.capturedAt.toISOString(),
+        amount: snapshotValue(lastSnapshot),
+      },
+    ];
+
     return {
       accountId: accountId ?? null,
       snapshots,
@@ -226,12 +333,13 @@ export class PerformanceService {
     cashFlows: { date: string; amount: number }[];
   }) {
     let moneyWeightedReturn: number | null = null;
+    let xirrReason: string | null = null;
     try {
       moneyWeightedReturn = xirr(input.cashFlows);
-    } catch {
-      // XIRR 无解时返回 null，调用方可向用户说明原因。
+    } catch (error) {
+      xirrReason = error instanceof Error ? error.message : 'XIRR 无法计算';
     }
-    return { ttwror: ttwror(input.valuations), xirr: moneyWeightedReturn };
+    return { ttwror: ttwror(input.valuations), xirr: moneyWeightedReturn, xirrReason };
   }
 
   allocate(input: {
