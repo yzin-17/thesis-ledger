@@ -6,7 +6,7 @@ export interface TradingCalendarEntry {
 }
 
 export const defaultCnTradingDay = (date: string): TradingCalendarEntry => {
-  const day = new Date(`${date}T00:00:00+08:00`).getDay();
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
   return {
     date,
     market: 'CN',
