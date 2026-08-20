@@ -111,6 +111,9 @@ export class BacktestService {
     const job = backtestJobSchema.parse(input);
     if (hasStaleMarketData(job) && !explicitlyAllowsStale(input))
       throw new BadRequestException('回测默认拒绝陈旧或部分市场数据，请显式允许后重试');
+    const { strategy: _ignoredStrategy, ...persistedInput } = job as typeof job & {
+      strategy?: unknown;
+    };
     return this.prisma.backtestJob.create({
       data: {
         id: job.id,
@@ -119,7 +122,7 @@ export class BacktestService {
         periodStart: new Date(job.period.start),
         periodEnd: new Date(job.period.end),
         dataAsOf: new Date(job.dataAsOf),
-        input: job as Prisma.InputJsonValue,
+        input: persistedInput as Prisma.InputJsonValue,
         warnings: job.warnings,
       },
     });
@@ -140,27 +143,42 @@ export class BacktestService {
     });
     if (!job) throw new NotFoundException('回测任务不存在');
     if (['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;
-    const controller = new AbortController();
-    this.activeControllers.set(id, controller);
+    if (job.status !== 'queued') return job;
+
     const input = (job.input ?? {}) as {
-      strategy?: unknown;
       bars?: BacktestBar[];
       initialCash?: number;
       inSampleEnd?: string;
       dataVersion?: string;
       provider?: string;
       parameters?: Record<string, unknown>;
-      costModel?: Record<string, unknown>;
     };
-    await this.prisma.backtestJob.update({
-      where: { id },
-      data: { status: 'running', progress: 5, startedAt: new Date(), engineVersion: worker.id },
-    });
+    const versionedStrategy =
+      job.strategyVersion && 'schema' in job.strategyVersion
+        ? strategySchemaV1.parse(job.strategyVersion.schema)
+        : undefined;
+    if (!versionedStrategy && worker === localWorker) {
+      throw new BadRequestException('策略版本缺少可执行 schema');
+    }
+
+    try {
+      await this.prisma.backtestJob.update({
+        where: { id, status: 'queued' },
+        data: { status: 'running', progress: 5, startedAt: new Date(), engineVersion: worker.id },
+      });
+    } catch (error) {
+      const current = await this.prisma.backtestJob.findUnique({ where: { id } });
+      if (current && current.status !== 'queued') return current;
+      throw error;
+    }
+
+    const controller = new AbortController();
+    this.activeControllers.set(id, controller);
     try {
       const result = await worker.run(
         {
           jobId: id,
-          strategy: input.strategy,
+          strategy: versionedStrategy,
           bars: input.bars ?? [],
           initialCash: input.initialCash ?? 100_000,
           period: {
@@ -195,7 +213,7 @@ export class BacktestService {
                 dataVersion: input.dataVersion,
                 provider: input.provider,
                 parameters: input.parameters,
-                costModel: input.costModel,
+                ...(versionedStrategy ? { costModel: versionedStrategy.cost } : {}),
               },
             }
           : result;

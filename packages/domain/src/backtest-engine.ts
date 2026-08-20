@@ -116,6 +116,20 @@ export interface BacktestResult {
   metadata: BacktestMetadata;
 }
 
+type Signal = BacktestStrategy['entrySignals'][number];
+type Holding = {
+  quantity: number;
+  entryPrice: number;
+  entryFees: number;
+  boughtAt: string;
+};
+type PendingOrder = {
+  symbol: string;
+  side: 'buy' | 'sell';
+  reason: BacktestTrade['reason'];
+};
+type TradeMetricRecord = { pnl: number; holdingDays: number; turnover: number };
+
 const signalValue = (bar: BacktestBar, indicator: string) => {
   if (indicator === 'close' || indicator === 'price') return bar.close;
   if (indicator === 'open') return bar.open;
@@ -125,10 +139,7 @@ const signalValue = (bar: BacktestBar, indicator: string) => {
   return undefined;
 };
 
-const matchesSignal = (
-  bar: BacktestBar,
-  signal: { indicator: string; operator: string; value: number | string },
-) => {
+const matchesSignal = (bar: BacktestBar, previousBar: BacktestBar | undefined, signal: Signal) => {
   const left = signalValue(bar, signal.indicator);
   const right = typeof signal.value === 'number' ? signal.value : signalValue(bar, signal.value);
   if (left === undefined || right === undefined) return false;
@@ -136,17 +147,31 @@ const matchesSignal = (
   if (signal.operator === 'gte') return left >= right;
   if (signal.operator === 'lt') return left < right;
   if (signal.operator === 'lte') return left <= right;
-  if (signal.operator === 'crossesAbove') return left > right;
-  if (signal.operator === 'crossesBelow') return left < right;
+  if (signal.operator === 'crossesAbove' || signal.operator === 'crossesBelow') {
+    if (!previousBar) return false;
+    const previousLeft = signalValue(previousBar, signal.indicator);
+    const previousRight =
+      typeof signal.value === 'number' ? signal.value : signalValue(previousBar, signal.value);
+    if (previousLeft === undefined || previousRight === undefined) return false;
+    return signal.operator === 'crossesAbove'
+      ? previousLeft <= previousRight && left > right
+      : previousLeft >= previousRight && left < right;
+  }
   return false;
 };
 
-const matchesExpression = (bar: BacktestBar, expression: SignalExpression): boolean => {
-  if (expression.all) return expression.all.every((item) => matchesExpression(bar, item));
-  if (expression.any) return expression.any.some((item) => matchesExpression(bar, item));
-  if (expression.not) return !matchesExpression(bar, expression.not);
+const matchesExpression = (
+  bar: BacktestBar,
+  previousBar: BacktestBar | undefined,
+  expression: SignalExpression,
+): boolean => {
+  if (expression.all)
+    return expression.all.every((item) => matchesExpression(bar, previousBar, item));
+  if (expression.any)
+    return expression.any.some((item) => matchesExpression(bar, previousBar, item));
+  if (expression.not) return !matchesExpression(bar, previousBar, expression.not);
   if (expression.indicator && expression.operator && expression.value !== undefined) {
-    return matchesSignal(bar, {
+    return matchesSignal(bar, previousBar, {
       indicator: expression.indicator,
       operator: expression.operator,
       value: expression.value,
@@ -157,12 +182,13 @@ const matchesExpression = (bar: BacktestBar, expression: SignalExpression): bool
 
 const matchesSignals = (
   bar: BacktestBar,
+  previousBar: BacktestBar | undefined,
   signals: BacktestStrategy['entrySignals'],
   expression?: SignalExpression,
 ) =>
   expression
-    ? matchesExpression(bar, expression)
-    : signals.every((signal) => matchesSignal(bar, signal));
+    ? matchesExpression(bar, previousBar, expression)
+    : signals.every((signal) => matchesSignal(bar, previousBar, signal));
 
 const constraintFor = (strategy: BacktestStrategy): ExecutionConstraint => ({
   tPlusOne: strategy.execution.tPlusOne,
@@ -172,6 +198,14 @@ const constraintFor = (strategy: BacktestStrategy): ExecutionConstraint => ({
   stampDutyRate: strategy.cost.stampDutyRate,
   slippageRate: strategy.cost.slippageRate,
 });
+
+const calendarDaysBetween = (start: string, end: string) => {
+  const startMs = Date.parse(`${start}T00:00:00Z`);
+  const endMs = Date.parse(`${end}T00:00:00Z`);
+  return Number.isFinite(startMs) && Number.isFinite(endMs)
+    ? Math.max(0, Math.round((endMs - startMs) / 86_400_000))
+    : 0;
+};
 
 export const checkUniverseCompleteness = (
   bars: readonly BacktestBar[],
@@ -242,153 +276,234 @@ export const runBacktest = (input: {
   const limitations = ['survivorship_coverage_unknown'];
   const rejectedOrders: RejectedOrder[] = [];
   const constraint = constraintFor(strategy);
-  const holdings = new Map<string, { quantity: number; entryPrice: number; boughtAt: string }>();
+  const holdings = new Map<string, Holding>();
   const trades: BacktestTrade[] = [];
+  const completedTrades: TradeMetricRecord[] = [];
   const equityCurve: ReturnPoint[] = [];
+  const previousBarBySymbol = new Map<string, BacktestBar>();
+  const latestCloseBySymbol = new Map<string, number>();
+  const pendingOrders = new Map<string, PendingOrder>();
+  const barsByDate = new Map<string, BacktestBar[]>();
+  for (const bar of bars) {
+    const dailyBars = barsByDate.get(bar.date) ?? [];
+    dailyBars.push(bar);
+    barsByDate.set(bar.date, dailyBars);
+  }
+
   let cash = input.initialCash;
   let previousValue = input.initialCash;
-  for (const bar of bars) {
+
+  const portfolioValue = (prices: ReadonlyMap<string, number>) =>
+    cash +
+    [...holdings.entries()].reduce(
+      (sum, [symbol, holding]) =>
+        sum + holding.quantity * (prices.get(symbol) ?? latestCloseBySymbol.get(symbol) ?? holding.entryPrice),
+      0,
+    );
+
+  const buy = (bar: BacktestBar, price: number, valuationPrices: ReadonlyMap<string, number>) => {
+    if (holdings.has(bar.symbol)) return;
+    const currentValue = portfolioValue(valuationPrices);
+    const budget =
+      strategy.sizing.type === 'fixed'
+        ? strategy.sizing.value
+        : strategy.sizing.type === 'weight'
+          ? cash * strategy.sizing.value
+          : cash * Math.min(strategy.sizing.value, 1);
+    const decision = simulateAStockExecution(
+      {
+        side: 'buy',
+        quantity: budget / Math.max(price, 0.000001),
+        price,
+        previousClose: bar.previousClose ?? price,
+        tradingDate: bar.date,
+        ...(bar.suspended === undefined ? {} : { suspended: bar.suspended }),
+      },
+      constraint,
+    );
+    const required = decision.quantity * decision.fillPrice + decision.fees;
+    const maxPositionWeight = strategy.riskConstraints?.find(
+      (item) => item.kind === 'maxPositionWeight',
+    )?.threshold;
+    const cashFloor = strategy.riskConstraints?.find((item) => item.kind === 'cashFloor')?.threshold;
+    const positionValue = decision.quantity * decision.fillPrice;
+    const violatesWeight =
+      maxPositionWeight !== undefined &&
+      currentValue > 0 &&
+      positionValue / currentValue > maxPositionWeight;
+    const violatesCashFloor =
+      cashFloor !== undefined &&
+      cash - required < (cashFloor <= 1 ? input.initialCash * cashFloor : cashFloor);
+    if (decision.accepted && required <= cash && !violatesWeight && !violatesCashFloor) {
+      cash -= required;
+      holdings.set(bar.symbol, {
+        quantity: decision.quantity,
+        entryPrice: decision.fillPrice,
+        entryFees: decision.fees,
+        boughtAt: bar.date,
+      });
+      trades.push({
+        symbol: bar.symbol,
+        side: 'buy',
+        quantity: decision.quantity,
+        price: decision.fillPrice,
+        fees: decision.fees,
+        ...(decision.commission === undefined ? {} : { commission: decision.commission }),
+        ...(decision.stampDuty === undefined ? {} : { stampDuty: decision.stampDuty }),
+        ...(decision.slippageCost === undefined ? {} : { slippageCost: decision.slippageCost }),
+        date: bar.date,
+        reason: 'signal',
+      });
+      return;
+    }
+    rejectedOrders.push({
+      symbol: bar.symbol,
+      side: 'buy',
+      quantity: decision.quantity,
+      price,
+      date: bar.date,
+      reason: violatesWeight
+        ? '超过单标的仓位上限'
+        : violatesCashFloor
+          ? '低于现金下限'
+          : (decision.reason ?? (required > cash ? '资金不足' : '订单被拒绝')),
+    });
+  };
+
+  const sell = (bar: BacktestBar, price: number, reason: BacktestTrade['reason']) => {
     const holding = holdings.get(bar.symbol);
-    const price = strategy.execution.price === 'open' ? bar.open : bar.close;
-    if (holding) {
+    if (!holding) return;
+    const decision = simulateAStockExecution(
+      {
+        side: 'sell',
+        quantity: holding.quantity,
+        price,
+        previousClose: bar.previousClose ?? price,
+        boughtAt: holding.boughtAt,
+        tradingDate: bar.date,
+        ...(bar.suspended === undefined ? {} : { suspended: bar.suspended }),
+      },
+      constraint,
+    );
+    if (!decision.accepted) {
+      rejectedOrders.push({
+        symbol: bar.symbol,
+        side: 'sell',
+        quantity: holding.quantity,
+        price,
+        date: bar.date,
+        reason: decision.reason ?? '订单被拒绝',
+      });
+      return;
+    }
+    cash += decision.quantity * decision.fillPrice - decision.fees;
+    const soldFraction = decision.quantity / holding.quantity;
+    const allocatedEntryFees = holding.entryFees * soldFraction;
+    completedTrades.push({
+      pnl:
+        decision.quantity * decision.fillPrice -
+        decision.fees -
+        decision.quantity * holding.entryPrice -
+        allocatedEntryFees,
+      holdingDays: calendarDaysBetween(holding.boughtAt, bar.date),
+      turnover: decision.quantity * decision.fillPrice,
+    });
+    trades.push({
+      symbol: bar.symbol,
+      side: 'sell',
+      quantity: decision.quantity,
+      price: decision.fillPrice,
+      fees: decision.fees,
+      ...(decision.commission === undefined ? {} : { commission: decision.commission }),
+      ...(decision.stampDuty === undefined ? {} : { stampDuty: decision.stampDuty }),
+      ...(decision.slippageCost === undefined ? {} : { slippageCost: decision.slippageCost }),
+      date: bar.date,
+      reason,
+    });
+    const remaining = holding.quantity - decision.quantity;
+    if (remaining <= 1e-8) holdings.delete(bar.symbol);
+    else {
+      holding.quantity = remaining;
+      holding.entryFees -= allocatedEntryFees;
+    }
+  };
+
+  for (const [date, dailyBars] of barsByDate) {
+    const valuationPrices = new Map(latestCloseBySymbol);
+    for (const bar of dailyBars) {
+      valuationPrices.set(
+        bar.symbol,
+        strategy.execution.price === 'close' ? bar.close : bar.open,
+      );
+    }
+
+    for (const bar of dailyBars) {
+      const holding = holdings.get(bar.symbol);
+      if (!holding) continue;
       if (bar.splitFactor && bar.splitFactor > 0 && bar.splitFactor !== 1) {
         holding.quantity *= bar.splitFactor;
         holding.entryPrice /= bar.splitFactor;
       }
       if (bar.dividend && bar.dividend > 0) cash += holding.quantity * bar.dividend;
-      let reason: BacktestTrade['reason'] | null = null;
-      if (
-        strategy.stopLoss.type === 'fixed' &&
-        price <= holding.entryPrice * (1 - strategy.stopLoss.value)
-      )
-        reason = 'stop';
-      if (
-        strategy.takeProfit?.type === 'fixed' &&
-        price >= holding.entryPrice * (1 + strategy.takeProfit.value)
-      )
-        reason = 'takeprofit';
-      if (matchesSignals(bar, strategy.exitSignals, strategy.exitCondition)) reason = 'signal';
-      if (bar.date === input.end && reason === null) reason = 'end';
-      if (reason) {
-        const decision = simulateAStockExecution(
-          {
-            side: 'sell',
-            quantity: holding.quantity,
-            price,
-            previousClose: bar.previousClose ?? price,
-            boughtAt: holding.boughtAt,
-            tradingDate: bar.date,
-            ...(bar.suspended === undefined ? {} : { suspended: bar.suspended }),
-          },
-          constraint,
-        );
-        if (decision.accepted) {
-          cash += decision.quantity * decision.fillPrice - decision.fees;
-          trades.push({
-            symbol: bar.symbol,
-            side: 'sell',
-            quantity: decision.quantity,
-            price: decision.fillPrice,
-            fees: decision.fees,
-            ...(decision.commission === undefined ? {} : { commission: decision.commission }),
-            ...(decision.stampDuty === undefined ? {} : { stampDuty: decision.stampDuty }),
-            ...(decision.slippageCost === undefined ? {} : { slippageCost: decision.slippageCost }),
-            date: bar.date,
-            reason,
-          });
-          holdings.delete(bar.symbol);
-        } else {
-          rejectedOrders.push({
-            symbol: bar.symbol,
-            side: 'sell',
-            quantity: holding.quantity,
-            price,
-            date: bar.date,
-            reason: decision.reason ?? '订单被拒绝',
-          });
-        }
-      }
-    } else if (
-      matchesSignals(bar, strategy.entrySignals, strategy.entryCondition) &&
-      !bar.suspended
-    ) {
-      const budget =
-        strategy.sizing.type === 'fixed'
-          ? strategy.sizing.value
-          : strategy.sizing.type === 'weight'
-            ? cash * strategy.sizing.value
-            : cash * Math.min(strategy.sizing.value, 1);
-      const decision = simulateAStockExecution(
-        {
-          side: 'buy',
-          quantity: budget / Math.max(price, 0.000001),
-          price,
-          previousClose: bar.previousClose ?? price,
-          tradingDate: bar.date,
-          ...(bar.suspended === undefined ? {} : { suspended: bar.suspended }),
-        },
-        constraint,
-      );
-      const required = decision.quantity * decision.fillPrice + decision.fees;
-      const maxPositionWeight = strategy.riskConstraints?.find(
-        (constraint) => constraint.kind === 'maxPositionWeight',
-      )?.threshold;
-      const cashFloor = strategy.riskConstraints?.find(
-        (constraint) => constraint.kind === 'cashFloor',
-      )?.threshold;
-      const currentValue =
-        cash + [...holdings.values()].reduce((sum, item) => sum + item.quantity * price, 0);
-      const violatesWeight =
-        maxPositionWeight !== undefined &&
-        currentValue > 0 &&
-        required / currentValue > maxPositionWeight;
-      const violatesCashFloor =
-        cashFloor !== undefined &&
-        cash - required < (cashFloor <= 1 ? input.initialCash * cashFloor : cashFloor);
-      if (decision.accepted && required <= cash && !violatesWeight && !violatesCashFloor) {
-        cash -= required;
-        holdings.set(bar.symbol, {
-          quantity: decision.quantity,
-          entryPrice: decision.fillPrice,
-          boughtAt: bar.date,
-        });
-        trades.push({
-          symbol: bar.symbol,
-          side: 'buy',
-          quantity: decision.quantity,
-          price: decision.fillPrice,
-          fees: decision.fees,
-          ...(decision.commission === undefined ? {} : { commission: decision.commission }),
-          ...(decision.stampDuty === undefined ? {} : { stampDuty: decision.stampDuty }),
-          ...(decision.slippageCost === undefined ? {} : { slippageCost: decision.slippageCost }),
-          date: bar.date,
-          reason: 'signal',
-        });
-      } else {
-        rejectedOrders.push({
-          symbol: bar.symbol,
-          side: 'buy',
-          quantity: decision.quantity,
-          price,
-          date: bar.date,
-          reason: violatesWeight
-            ? '超过单标的仓位上限'
-            : violatesCashFloor
-              ? '低于现金下限'
-              : (decision.reason ?? (required > cash ? '资金不足' : '订单被拒绝')),
-        });
+    }
+
+    if (strategy.execution.price === 'nextOpen') {
+      for (const bar of dailyBars) {
+        const pending = pendingOrders.get(bar.symbol);
+        if (!pending || bar.suspended) continue;
+        if (pending.side === 'buy') buy(bar, bar.open, valuationPrices);
+        else sell(bar, bar.open, pending.reason);
+        pendingOrders.delete(bar.symbol);
       }
     }
-    const holdingsValue = [...holdings.entries()].reduce((sum, [symbol, position]) => {
-      const current = bars.find(
-        (candidate) => candidate.symbol === symbol && candidate.date === bar.date,
-      );
-      return sum + (current?.close ?? position.entryPrice) * position.quantity;
-    }, 0);
-    const value = cash + holdingsValue;
-    equityCurve.push({ date: bar.date, value });
+
+    for (const bar of dailyBars) {
+      const previousBar = previousBarBySymbol.get(bar.symbol);
+      const holding = holdings.get(bar.symbol);
+      const decisionPrice = strategy.execution.price === 'open' ? bar.open : bar.close;
+      if (holding) {
+        let reason: BacktestTrade['reason'] | null = null;
+        if (
+          strategy.stopLoss.type === 'fixed' &&
+          decisionPrice <= holding.entryPrice * (1 - strategy.stopLoss.value)
+        )
+          reason = 'stop';
+        if (
+          strategy.takeProfit?.type === 'fixed' &&
+          decisionPrice >= holding.entryPrice * (1 + strategy.takeProfit.value)
+        )
+          reason = 'takeprofit';
+        if (matchesSignals(bar, previousBar, strategy.exitSignals, strategy.exitCondition))
+          reason = 'signal';
+        if (bar.date === input.end && reason === null) reason = 'end';
+        if (reason) {
+          if (strategy.execution.price === 'nextOpen') {
+            if (!pendingOrders.has(bar.symbol))
+              pendingOrders.set(bar.symbol, { symbol: bar.symbol, side: 'sell', reason });
+          } else {
+            sell(bar, decisionPrice, reason);
+          }
+        }
+      } else if (
+        matchesSignals(bar, previousBar, strategy.entrySignals, strategy.entryCondition) &&
+        !bar.suspended
+      ) {
+        if (strategy.execution.price === 'nextOpen') {
+          if (!pendingOrders.has(bar.symbol))
+            pendingOrders.set(bar.symbol, { symbol: bar.symbol, side: 'buy', reason: 'signal' });
+        } else {
+          buy(bar, decisionPrice, valuationPrices);
+        }
+      }
+      previousBarBySymbol.set(bar.symbol, bar);
+    }
+
+    for (const bar of dailyBars) latestCloseBySymbol.set(bar.symbol, bar.close);
+    const value = portfolioValue(latestCloseBySymbol);
+    equityCurve.push({ date, value });
     previousValue = value;
   }
+
   const returns = equityCurve.map((point, index) =>
     index === 0
       ? point.value / input.initialCash - 1
@@ -396,15 +511,7 @@ export const runBacktest = (input: {
   );
   const metrics = {
     ...periodMetrics(returns),
-    ...tradeMetrics(
-      trades
-        .filter((trade) => trade.side === 'sell')
-        .map((sell) => ({
-          pnl: sell.price * sell.quantity - sell.fees,
-          holdingDays: 0,
-          turnover: sell.price * sell.quantity,
-        })),
-    ),
+    ...tradeMetrics(completedTrades),
   };
   const result: BacktestResult = {
     engineVersion: input.engineVersion ?? 'thesis-ledger-engine-v1',
@@ -428,9 +535,9 @@ export const runBacktest = (input: {
   };
   if (input.inSampleEnd) {
     const split = equityCurve.reduce<{ inSample: ReturnPoint[]; outOfSample: ReturnPoint[] }>(
-      (result, point) => {
-        (point.date <= input.inSampleEnd! ? result.inSample : result.outOfSample).push(point);
-        return result;
+      (sample, point) => {
+        (point.date <= input.inSampleEnd! ? sample.inSample : sample.outOfSample).push(point);
+        return sample;
       },
       { inSample: [], outOfSample: [] },
     );
