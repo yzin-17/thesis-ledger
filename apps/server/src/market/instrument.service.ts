@@ -8,6 +8,8 @@ import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { pinyin } from 'pinyin-pro';
 import {
+  assetIdentitySourceSchema,
+  assetIdentityStatusSchema,
   catalogDeltaSchema,
   catalogSnapshotSchema,
   type CatalogItem,
@@ -15,6 +17,8 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 
 const CONFIRMABLE_TYPES = new Set(['STOCK', 'ETF', 'MUTUAL_FUND']);
+const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
+const CATALOG_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.catalog;
 
 const symbolFor = (item: Pick<CatalogItem, 'canonicalCode' | 'market'>) =>
   `${item.canonicalCode}.${item.market}`;
@@ -402,7 +406,7 @@ export class InstrumentService {
         existingAssociation &&
         existingAssociation.instrumentId !== instrument.id &&
         existingAssociation.status === 'active' &&
-        existingAssociation.source === 'user-confirmed'
+        existingAssociation.confirmedAt !== null
       ) {
         throw new BadRequestException('该 Asset 已由用户确认关联到其他 Instrument');
       }
@@ -411,8 +415,8 @@ export class InstrumentService {
         ? await transaction.asset.update({
             where: { symbol },
             data: {
-              identityStatus: 'confirmed',
-              identitySource: 'user-confirmed',
+              identityStatus: CONFIRMED_IDENTITY_STATUS,
+              identitySource: CATALOG_IDENTITY_SOURCE,
             },
           })
         : await transaction.asset.create({
@@ -422,8 +426,8 @@ export class InstrumentService {
               market: instrument.market,
               assetType,
               currency: marketCurrencyFor(instrument.market),
-              identityStatus: 'confirmed',
-              identitySource: 'user-confirmed',
+              identityStatus: CONFIRMED_IDENTITY_STATUS,
+              identitySource: CATALOG_IDENTITY_SOURCE,
             },
           });
       await transaction.instrumentAssetAssociation.upsert({
@@ -431,7 +435,7 @@ export class InstrumentService {
         update: {
           instrumentId: instrument.id,
           status: 'active',
-          source: 'user-confirmed',
+          source: CATALOG_IDENTITY_SOURCE,
           confirmedAt: new Date(),
           lastSeenAt: new Date(),
         },
@@ -439,13 +443,13 @@ export class InstrumentService {
           instrumentId: instrument.id,
           symbol,
           status: 'active',
-          source: 'user-confirmed',
+          source: CATALOG_IDENTITY_SOURCE,
           confirmedAt: new Date(),
         },
       });
       return savedAsset;
     });
-    return { instrument, asset, associationSource: 'user-confirmed' as const };
+    return { instrument, asset, associationSource: CATALOG_IDENTITY_SOURCE };
   }
 
   async requireConfirmed(instrumentId: string) {
