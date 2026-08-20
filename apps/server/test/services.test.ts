@@ -1607,6 +1607,12 @@ describe('专业 Provider 配置', () => {
           quota: { limit: 100, used: 95 },
         })),
         findMany: vi.fn(async () => []),
+        update: vi.fn(async ({ data }: { data: object }) => ({
+          name: 'tushare',
+          enabled: true,
+          quota: { limit: 100, used: 95 },
+          ...data,
+        })),
       },
     };
     const service = new ProviderConfigService(prisma as never, createProviderHealthStub() as never);
@@ -1776,7 +1782,11 @@ describe('专业 Provider 配置', () => {
         connectionTestToken: result.testToken,
       });
 
-      expect(Buffer.from(stored.encryptedCredentials as Uint8Array).toString('utf8')).toBe(webhook);
+      const encryptedCredential = Buffer.from(stored.encryptedCredentials as Uint8Array).toString(
+        'utf8',
+      );
+      expect(encryptedCredential).not.toContain(webhook);
+      expect(encryptedCredential).toContain('"algorithm":"aes-256-gcm"');
       expect(stored.health).toBe('healthy');
       expect(saved).toMatchObject({ credentialConfigured: true, health: 'healthy' });
       expect(saved).not.toHaveProperty('encryptedCredentials');
@@ -1877,24 +1887,25 @@ describe('Ledger Service', () => {
   });
   it('rebuild 先清空旧投影再写入 Ledger 投影', async () => {
     const create = vi.fn(async ({ data }: { data: object }) => data);
-    const transaction = { position: { deleteMany: vi.fn(), create } };
+    const ledgerEvent = {
+      findMany: vi.fn(async () => [
+        {
+          id: 'buy',
+          accountId: '11111111-1111-4111-8111-111111111111',
+          type: 'BUY',
+          occurredAt: new Date('2025-01-01'),
+          symbol: '600519.SH',
+          quantity: 100,
+          price: 10,
+          amount: null,
+          fee: 0,
+          tax: 0,
+        },
+      ]),
+    };
+    const transaction = { ledgerEvent, position: { deleteMany: vi.fn(), create } };
     const prisma = {
-      ledgerEvent: {
-        findMany: vi.fn(async () => [
-          {
-            id: 'buy',
-            accountId: '11111111-1111-4111-8111-111111111111',
-            type: 'BUY',
-            occurredAt: new Date('2025-01-01'),
-            symbol: '600519.SH',
-            quantity: 100,
-            price: 10,
-            amount: null,
-            fee: 0,
-            tax: 0,
-          },
-        ]),
-      },
+      ledgerEvent,
       $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
     };
     const result = await new LedgerService(prisma as never).rebuild(
