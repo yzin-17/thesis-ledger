@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DataStateBanner,
@@ -19,7 +20,16 @@ import {
 } from '../src/ui/App.js';
 import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
 
-const renderWithToast = (node: ReactNode) => renderToStaticMarkup(<Toaster>{node}</Toaster>);
+const renderWithToast = (node: ReactNode) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return renderToStaticMarkup(
+    <QueryClientProvider client={queryClient}>
+      <Toaster>{node}</Toaster>
+    </QueryClientProvider>,
+  );
+};
 
 describe('Desktop UI contract', () => {
   it('normalizes legacy health history arrays while supporting paginated responses', () => {

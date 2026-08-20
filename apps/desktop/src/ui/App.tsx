@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Combobox } from '@base-ui/react/combobox';
+import { useQuery } from '@tanstack/react-query';
+import { debounce } from 'es-toolkit';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -5049,23 +5051,18 @@ export function PortfolioManagement({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [instrumentQuery, setInstrumentQuery] = useState('');
-  const [instrumentResults, setInstrumentResults] = useState<InstrumentLookup[]>([]);
+  const [debouncedInstrumentQuery, setDebouncedInstrumentQuery] = useState('');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentLookup | null>(null);
-  const [instrumentSearchBusy, setInstrumentSearchBusy] = useState(false);
+  const [instrumentConfirmationBusy, setInstrumentConfirmationBusy] = useState(false);
   const [instrumentSearchOpen, setInstrumentSearchOpen] = useState(false);
-  const [instrumentSearchState, setInstrumentSearchState] =
-    useState<InstrumentSearchState>('idle');
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [manualAssetType, setManualAssetType] = useState<HeldAssetType>(
     accounts.find((account) => account.id === initialEntryAccountId)?.type === 'fund'
       ? 'fund'
       : 'stock',
   );
-  const instrumentSearchQuery = useRef('');
-  const instrumentSearchDebounce = useRef<number | null>(null);
-  const instrumentSearchAbortController = useRef<AbortController | null>(null);
-  const instrumentSearchRequestId = useRef(0);
   const instrumentSelectionInProgress = useRef(false);
+  const instrumentSearchErrorNotified = useRef<string | null>(null);
   const toastManager = useToastManager();
   const markDirty = (nextDirty = true) => {
     setDirty(nextDirty);
@@ -5082,51 +5079,120 @@ export function PortfolioManagement({
   };
   const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
   const selectedAccount = accounts.find((account) => account.id === entryAccountId);
-  const cancelInstrumentSearch = (resetState = true) => {
-    instrumentSearchRequestId.current += 1;
-    if (instrumentSearchDebounce.current !== null) {
-      window.clearTimeout(instrumentSearchDebounce.current);
-      instrumentSearchDebounce.current = null;
-    }
-    instrumentSearchAbortController.current?.abort();
-    instrumentSearchAbortController.current = null;
-    if (resetState) {
-      setInstrumentSearchBusy(false);
-      setInstrumentSearchState('idle');
-    }
-  };
+  const normalizedInstrumentQuery = instrumentQuery.trim().toUpperCase();
+  useEffect(() => {
+    const updateDebouncedInstrumentQuery = debounce(
+      () => setDebouncedInstrumentQuery(normalizedInstrumentQuery),
+      500,
+    );
+    updateDebouncedInstrumentQuery();
+    return () => updateDebouncedInstrumentQuery.cancel();
+  }, [normalizedInstrumentQuery]);
+
+  const selectedAccountType = selectedAccount?.type;
+  const instrumentSearchQueryResult = useQuery<InstrumentLookup[]>({
+    queryKey: [
+      'market-data',
+      'instruments',
+      'search',
+      selectedAccountType ?? 'all',
+      debouncedInstrumentQuery,
+    ],
+    enabled:
+      positionSheetOpen &&
+      !editing &&
+      !selectedInstrument &&
+      !manualInstrumentEntry &&
+      !instrumentConfirmationBusy &&
+      Boolean(debouncedInstrumentQuery) &&
+      debouncedInstrumentQuery === normalizedInstrumentQuery,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(
+        '/api/v1/market-data/instruments/search?q=' + encodeURIComponent(debouncedInstrumentQuery),
+        { cache: 'no-store', signal },
+      );
+      if (!response.ok) throw new Error('instrument-search');
+      const results = (await response.json()) as InstrumentLookup[];
+      return results.filter((instrument) =>
+        selectedAccountType === 'fund'
+          ? instrument.instrumentType === 'MUTUAL_FUND'
+          : ['STOCK', 'ETF'].includes(instrument.instrumentType),
+      );
+    },
+    placeholderData: [] as InstrumentLookup[],
+    retry: false,
+    staleTime: 30_000,
+  });
+  const instrumentResults = instrumentSearchQueryResult.data ?? [];
+  const instrumentSearchDebouncing =
+    Boolean(normalizedInstrumentQuery) &&
+    debouncedInstrumentQuery !== normalizedInstrumentQuery;
+  const instrumentSearchBusy =
+    instrumentConfirmationBusy ||
+    (Boolean(normalizedInstrumentQuery) &&
+      (instrumentSearchDebouncing || instrumentSearchQueryResult.isFetching));
+  let instrumentSearchState: InstrumentSearchState = 'idle';
+  if (selectedInstrument) {
+    instrumentSearchState = 'selected';
+  } else if (instrumentConfirmationBusy) {
+    instrumentSearchState = 'loading';
+  } else if (!normalizedInstrumentQuery) {
+    instrumentSearchState = 'idle';
+  } else if (instrumentSearchBusy) {
+    instrumentSearchState = 'loading';
+  } else if (instrumentSearchQueryResult.isError) {
+    instrumentSearchState = 'error';
+  } else if (instrumentSearchQueryResult.isSuccess && instrumentResults.length > 0) {
+    instrumentSearchState = 'results';
+  } else if (instrumentSearchQueryResult.isSuccess) {
+    instrumentSearchState = 'empty';
+  }
+
+  useEffect(() => {
+    if (
+      !instrumentSearchQueryResult.isError ||
+      !normalizedInstrumentQuery ||
+      instrumentSearchBusy ||
+      debouncedInstrumentQuery !== normalizedInstrumentQuery
+    )
+      return;
+    const errorKey = `${selectedAccountType ?? 'all'}:${debouncedInstrumentQuery}`;
+    if (instrumentSearchErrorNotified.current === errorKey) return;
+    instrumentSearchErrorNotified.current = errorKey;
+    toastManager.add({
+      title: '标的搜索失败',
+      description: '请确认市场数据与标的中心已完成目录同步。',
+      type: 'error',
+      timeout: 0,
+      priority: 'high',
+    });
+  }, [
+    debouncedInstrumentQuery,
+    instrumentSearchBusy,
+    instrumentSearchQueryResult.isError,
+    normalizedInstrumentQuery,
+    selectedAccountType,
+    toastManager,
+  ]);
+
   useEffect(() => {
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
     else if (!entryAccountId && accounts[0]) setEntryAccountId(accounts[0].id);
   }, [accounts, defaultAccountId, entryAccountId]);
 
   useEffect(() => {
-    cancelInstrumentSearch();
-    setInstrumentSearchBusy(false);
     if (editing) {
-      instrumentSearchQuery.current = editing.symbol;
       setInstrumentQuery(editing.symbol);
       setSelectedInstrument(null);
-      setInstrumentResults([]);
       setInstrumentSearchOpen(false);
-      setInstrumentSearchState('idle');
       setManualInstrumentEntry(false);
     } else if (!positionSheetOpen) {
-      instrumentSearchQuery.current = '';
       setInstrumentQuery('');
       setSelectedInstrument(null);
-      setInstrumentResults([]);
       setInstrumentSearchOpen(false);
-      setInstrumentSearchState('idle');
       setManualInstrumentEntry(false);
     }
   }, [editing, positionSheetOpen]);
-  useEffect(
-    () => () => {
-      cancelInstrumentSearch(false);
-    },
-    [],
-  );
 
   const loadManagedAccounts = async () => {
     if (step !== 'account') return;
@@ -5246,104 +5312,32 @@ export function PortfolioManagement({
     }
   };
 
-  const searchInstruments = async (nextQuery: string, requestId: number) => {
-    const query = nextQuery.trim();
-    if (
-      !query ||
-      editing ||
-      instrumentSelectionInProgress.current ||
-      requestId !== instrumentSearchRequestId.current
-    )
-      return;
-    const controller = new AbortController();
-    instrumentSearchAbortController.current = controller;
-    const isCurrentRequest = () =>
-      requestId === instrumentSearchRequestId.current &&
-      instrumentSearchQuery.current.trim() === query &&
-      instrumentSearchAbortController.current === controller &&
-      !controller.signal.aborted;
-    setInstrumentSearchBusy(true);
-    setInstrumentSearchState('loading');
-    try {
-      const response = await fetch(
-        '/api/v1/market-data/instruments/search?q=' + encodeURIComponent(query),
-        { cache: 'no-store', signal: controller.signal },
-      );
-      if (!response.ok) throw new Error('instrument-search');
-      const results = ((await response.json()) as InstrumentLookup[]).filter((instrument) =>
-        selectedAccount?.type === 'fund'
-          ? instrument.instrumentType === 'MUTUAL_FUND'
-          : ['STOCK', 'ETF'].includes(instrument.instrumentType),
-      );
-      if (!isCurrentRequest()) return;
-      setInstrumentResults(results);
-      setInstrumentSearchState(results.length > 0 ? 'results' : 'empty');
-      setInstrumentSearchOpen(true);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      if (!isCurrentRequest()) return;
-      setInstrumentResults([]);
-      setInstrumentSearchState('error');
-      setInstrumentSearchOpen(true);
-      toastManager.add({
-        title: '标的搜索失败',
-        description: '请确认市场数据与标的中心已完成目录同步。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
-    } finally {
-      if (isCurrentRequest()) {
-        setInstrumentSearchBusy(false);
-        setInstrumentSearchState((state) => (state === 'loading' ? 'idle' : state));
-        instrumentSearchAbortController.current = null;
-      }
-    }
-  };
-
   const handleInstrumentQueryChange = (value: string) => {
     if (editing || instrumentSelectionInProgress.current) return;
     const nextQuery = value.toUpperCase();
     if (manualInstrumentEntry) {
-      instrumentSearchQuery.current = nextQuery;
       setInstrumentQuery(nextQuery);
       return;
     }
-    if (nextQuery === instrumentSearchQuery.current) {
+    if (nextQuery === instrumentQuery) {
       if (nextQuery.trim()) setInstrumentSearchOpen(true);
       return;
     }
-    cancelInstrumentSearch();
-    instrumentSearchQuery.current = nextQuery;
     setInstrumentQuery(nextQuery);
     setSelectedInstrument(null);
     setManualInstrumentEntry(false);
-    setInstrumentSearchBusy(false);
-    setInstrumentResults([]);
     if (!nextQuery.trim()) {
-      setInstrumentSearchBusy(false);
-      setInstrumentSearchState('idle');
       setInstrumentSearchOpen(false);
       return;
     }
-    setInstrumentSearchState('loading');
     setInstrumentSearchOpen(true);
-    setInstrumentSearchBusy(true);
-    const requestId = instrumentSearchRequestId.current;
-    instrumentSearchDebounce.current = window.setTimeout(() => {
-      instrumentSearchDebounce.current = null;
-      void searchInstruments(nextQuery, requestId);
-    }, 500);
   };
 
   const confirmInstrument = async (instrument: InstrumentLookup) => {
     if (!instrument.confirmable || editing) return;
     instrumentSelectionInProgress.current = true;
-    cancelInstrumentSearch();
-    setInstrumentSearchBusy(true);
-    setInstrumentSearchState('loading');
+    setInstrumentConfirmationBusy(true);
     setInstrumentSearchOpen(false);
-    instrumentSearchQuery.current = instrument.symbol;
     setInstrumentQuery(instrument.symbol);
     try {
       const response = await fetch(
@@ -5352,12 +5346,9 @@ export function PortfolioManagement({
       );
       if (!response.ok) throw new Error('instrument-confirm');
       setSelectedInstrument(instrument);
-      setInstrumentResults([]);
-      setInstrumentSearchState('selected');
       setManualInstrumentEntry(false);
       markDirty(true);
     } catch {
-      setInstrumentSearchState('idle');
       toastManager.add({
         title: '标的确认失败',
         description: '请先同步目录，或检查服务端数据库迁移状态。',
@@ -5367,28 +5358,20 @@ export function PortfolioManagement({
       });
     } finally {
       instrumentSelectionInProgress.current = false;
-      setInstrumentSearchBusy(false);
+      setInstrumentConfirmationBusy(false);
     }
   };
 
   const clearInstrumentSelection = () => {
-    cancelInstrumentSearch();
-    instrumentSearchQuery.current = '';
-    setInstrumentSearchBusy(false);
     setSelectedInstrument(null);
     setManualInstrumentEntry(false);
     setInstrumentQuery('');
-    setInstrumentResults([]);
-    setInstrumentSearchState('idle');
     setInstrumentSearchOpen(false);
   };
 
   const startManualInstrumentEntry = () => {
-    cancelInstrumentSearch();
-    setInstrumentSearchBusy(false);
     setManualInstrumentEntry(true);
     setInstrumentSearchOpen(false);
-    setInstrumentSearchState('idle');
     setManualAssetType(selectedAccount?.type === 'fund' ? 'fund' : 'stock');
     markDirty(true);
   };
@@ -6016,11 +5999,8 @@ export function PortfolioManagement({
                             markDirty(false);
                             setEntryAccountId(value);
                             setSelectedInstrument(null);
-                            cancelInstrumentSearch();
                             setInstrumentQuery('');
-                            setInstrumentResults([]);
                             setInstrumentSearchOpen(false);
-                            setInstrumentSearchState('idle');
                             setManualInstrumentEntry(false);
                             setManualAssetType(nextAccount?.type === 'fund' ? 'fund' : 'stock');
                             setEntrySheetMode(nextAccount?.type === 'cash' ? 'cash' : 'position');
