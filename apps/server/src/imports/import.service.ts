@@ -7,7 +7,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import { normalizeSymbol } from '@thesis-ledger/domain';
-import { importDraftSchema, type ImportDraft } from '@thesis-ledger/schemas';
+import {
+  assetIdentitySourceSchema,
+  assetIdentityStatusSchema,
+  importDraftSchema,
+  type ImportDraft,
+} from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
   appendLedgerEvent,
@@ -35,6 +40,9 @@ export interface PositionVisionProvider {
   readonly id: string;
   extract(image: Uint8Array, source: ScreenshotSource): Promise<VisionPosition[]>;
 }
+
+const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
+const SCREENSHOT_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.screenshot;
 
 export const detectScreenshotSource = (text: string): ScreenshotSource => {
   const normalized = text.toLowerCase();
@@ -383,26 +391,29 @@ export class ImportService {
             : null;
         if (
           existing &&
-          existing.identityStatus === 'user-confirmed' &&
+          existing.identityStatus === CONFIRMED_IDENTITY_STATUS &&
           existing.assetType !== assetType
         )
           throw new ConflictException('已确认的资产类型不能被截图导入覆盖');
         await transaction.asset.upsert({
           where: { symbol },
-          update: {
-            ...(row.rawName ? { name: row.rawName } : {}),
-            ...(existing?.identityStatus === 'user-confirmed'
+          update:
+            existing?.identityStatus === CONFIRMED_IDENTITY_STATUS
               ? {}
-              : { assetType, identityStatus: 'user-confirmed', identitySource: 'screenshot' }),
-          },
+              : {
+                  ...(row.rawName ? { name: row.rawName } : {}),
+                  assetType,
+                  identityStatus: CONFIRMED_IDENTITY_STATUS,
+                  identitySource: SCREENSHOT_IDENTITY_SOURCE,
+                },
           create: {
             symbol,
             name: row.rawName ?? symbol,
             market: symbol.endsWith('.HK') ? 'HK' : 'CN',
             assetType,
             currency: 'CNY',
-            identityStatus: 'user-confirmed',
-            identitySource: 'screenshot',
+            identityStatus: CONFIRMED_IDENTITY_STATUS,
+            identitySource: SCREENSHOT_IDENTITY_SOURCE,
           },
         });
         await appendLedgerEvent(transaction, {
@@ -474,6 +485,20 @@ export class ImportService {
           .map((row) => (typeof row.symbol === 'string' ? row.symbol : ''))
           .filter(Boolean),
       );
+      if (submittedSymbols.size > 0 && draft.committedAt) {
+        const laterEvent = await transaction.ledgerEvent.findFirst({
+          where: {
+            accountId: draft.accountId,
+            symbol: { in: [...submittedSymbols] },
+            createdAt: { gt: draft.committedAt },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (laterEvent)
+          throw new ConflictException(
+            `导入提交后 ${laterEvent.symbol ?? '相关标的'} 已有新的 Ledger 事件，不能自动回滚`,
+          );
+      }
       for (const symbol of submittedSymbols) {
         await appendLedgerEvent(transaction, {
           version: 1,
