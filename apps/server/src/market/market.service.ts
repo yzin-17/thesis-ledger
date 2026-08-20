@@ -1,12 +1,13 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
-  barsSchemaV1,
+  barSchemaV1,
   chipDistributionSchemaV1,
   fundNavSchemaV1,
   fundNavHistorySchemaV1,
   indicatorSchemaV1,
   quoteSchemaV1,
+  type BarInputV1,
   type BarV1,
   type ChipDistributionV1,
   type FundNavV1,
@@ -19,6 +20,42 @@ import { RedisService, redisKey } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
 const fundSymbolPattern = /^\d{6}\.OF$/;
+const freshnessRank: Record<BarV1['freshness'], number> = {
+  live: 0,
+  delayed: 1,
+  unknown: 2,
+  stale: 3,
+};
+
+export const resolveEffectiveBars = (rawBars: readonly BarInputV1[]): BarV1[] => {
+  const selected = new Map<string, { bar: BarV1; index: number }>();
+  rawBars.forEach((raw, index) => {
+    const bar = barSchemaV1.parse(raw);
+    const existing = selected.get(bar.timestamp);
+    if (!existing) {
+      selected.set(bar.timestamp, { bar, index });
+      return;
+    }
+    const fallbackDelta = Number(bar.fallbackUsed) - Number(existing.bar.fallbackUsed);
+    const freshnessDelta = freshnessRank[bar.freshness] - freshnessRank[existing.bar.freshness];
+    const fetchedDelta =
+      new Date(existing.bar.fetchedAt).getTime() - new Date(bar.fetchedAt).getTime();
+    const providerDelta = bar.provider.localeCompare(existing.bar.provider);
+    if (
+      fallbackDelta < 0 ||
+      (fallbackDelta === 0 && freshnessDelta < 0) ||
+      (fallbackDelta === 0 && freshnessDelta === 0 && fetchedDelta < 0) ||
+      (fallbackDelta === 0 &&
+        freshnessDelta === 0 &&
+        fetchedDelta === 0 &&
+        (index < existing.index || (index === existing.index && providerDelta < 0)))
+    )
+      selected.set(bar.timestamp, { bar, index });
+  });
+  return [...selected.values()]
+    .map(({ bar }) => bar)
+    .sort((left, right) => left.timestamp.localeCompare(right.timestamp));
+};
 
 @Injectable()
 export class MarketService {
@@ -269,9 +306,10 @@ export class MarketService {
     input: string,
     timeframe: '1m' | '1d',
     range?: { start?: string; end?: string },
+    options: { allowStale?: boolean } = {},
   ): Promise<BarV1[]> {
     const { symbol } = normalizeSymbol(input);
-    return this.singleFlight(
+    const bars = await this.singleFlight(
       `bars:${symbol}:${timeframe}:${range?.start ?? ''}:${range?.end ?? ''}`,
       () =>
         this.withDistributedLock(
@@ -284,13 +322,23 @@ export class MarketService {
               const raw = await this.dsa.get<unknown[]>(
                 `/api/v1/thesis-ledger/market/bars?${query.toString()}`,
               );
-              return barsSchemaV1.parse(
+              const fetchedAt = new Date().toISOString();
+              return resolveEffectiveBars(
                 raw.map((bar) => ({
-                  ...(bar as object),
+                  ...(bar as Record<string, unknown>),
                   version: 1,
                   symbol,
                   timeframe,
-                })),
+                  fetchedAt:
+                    typeof (bar as Record<string, unknown>).fetchedAt === 'string'
+                      ? (bar as Record<string, unknown>).fetchedAt
+                      : fetchedAt,
+                  freshness:
+                    typeof (bar as Record<string, unknown>).freshness === 'string'
+                      ? (bar as Record<string, unknown>).freshness
+                      : 'unknown',
+                  servedFromCache: false,
+                })) as BarInputV1[],
               );
             } catch (error) {
               const stored = await this.readStoredBars(symbol, timeframe, range);
@@ -300,6 +348,9 @@ export class MarketService {
           },
         ),
     );
+    if (options.allowStale === false && bars.some((bar) => bar.freshness === 'stale'))
+      throw new Error('Bar 行情陈旧，当前操作要求新鲜行情');
+    return bars;
   }
 
   private async readStoredBars(
@@ -321,13 +372,18 @@ export class MarketService {
             }
           : {}),
       },
-      orderBy: { timestamp: 'asc' },
+      orderBy: [
+        { timestamp: 'asc' },
+        { fallbackUsed: 'asc' },
+        { fetchedAt: 'desc' },
+        { provider: 'asc' },
+      ],
     });
-    return barsSchemaV1.parse(
+    return resolveEffectiveBars(
       stored.map((bar) => ({
         version: 1,
         symbol: bar.symbol,
-        timeframe: bar.timeframe,
+        timeframe: bar.timeframe as '1m' | '1d',
         timestamp: bar.timestamp.toISOString(),
         open: Number(bar.open),
         high: Number(bar.high),
@@ -336,6 +392,10 @@ export class MarketService {
         volume: Number(bar.volume),
         amount: Number(bar.amount),
         provider: bar.provider,
+        fetchedAt: bar.fetchedAt.toISOString(),
+        freshness: 'stale',
+        fallbackUsed: bar.fallbackUsed,
+        servedFromCache: true,
       })),
     );
   }
