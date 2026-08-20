@@ -1,8 +1,12 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import {
-  NotificationService,
-  type NotificationMessage,
-} from './notification.service.js';
+import { notificationMessageSchema } from '@thesis-ledger/schemas';
+import { z } from 'zod';
+import { NotificationService } from './notification.service.js';
+
+const notificationDeliveryMessageSchema = notificationMessageSchema.extend({
+  severity: z.enum(['info', 'warning', 'error', 'critical']),
+  traceId: z.string().trim().min(1),
+});
 
 @Controller('notifications')
 export class NotificationController {
@@ -14,7 +18,7 @@ export class NotificationController {
   }
 
   @Post(':id/deliver/feishu')
-  deliver(@Param('id') id: string, @Body() message: NotificationMessage) {
-    return this.notifications.dispatchOne(id, new Date(), message);
+  deliver(@Param('id') id: string, @Body() input: unknown) {
+    return this.notifications.dispatchOne(id, new Date(), notificationDeliveryMessageSchema.parse(input));
   }
 }
