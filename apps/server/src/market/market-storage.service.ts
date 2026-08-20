@@ -102,15 +102,13 @@ export class MarketStorageService {
             })
           : null;
       const start = latest?.timestamp.toISOString() ?? input.start;
-      const bars = await this.market.getBars(
-        symbol,
-        input.timeframe,
-        {
-          ...(start ? { start } : {}),
-          ...(input.end ? { end: input.end } : {}),
-        },
-        { allowStale: false },
-      );
+      const bars = await this.market.getBars(symbol, input.timeframe, {
+        ...(start ? { start } : {}),
+        ...(input.end ? { end: input.end } : {}),
+      });
+      if (bars.some((bar) => bar.freshness === 'stale' || bar.servedFromCache)) {
+        throw new Error('行情同步拒绝使用陈旧缓存 Bar');
+      }
       const filtered = latest
         ? bars.filter((bar) => new Date(bar.timestamp) > latest.timestamp)
         : bars;
