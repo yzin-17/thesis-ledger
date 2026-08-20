@@ -10,6 +10,8 @@ export interface IntegrityIssue {
   suggestion: string;
 }
 
+const POSITION_EPSILON = 1e-8;
+
 @Injectable()
 export class IntegrityService {
   constructor(private readonly prisma: PrismaService) {}
@@ -61,19 +63,37 @@ export class IntegrityService {
         continue;
       }
       const actual = new Map(account.positions.map((position) => [position.symbol, position]));
-      for (const expected of projected) {
-        const position = actual.get(expected.symbol);
+      const expected = new Map(
+        projected
+          .filter((position) => Math.abs(position.quantity) > POSITION_EPSILON)
+          .map((position) => [position.symbol, position]),
+      );
+      for (const position of expected.values()) {
+        const stored = actual.get(position.symbol);
         if (
-          !position ||
-          Math.abs(Number(position.quantity) - expected.quantity) > 1e-6 ||
-          Math.abs(Number(position.costPrice) - expected.averageCost) > 1e-4
+          !stored ||
+          Math.abs(Number(stored.quantity) - position.quantity) > 1e-6 ||
+          Math.abs(Number(stored.costPrice) - position.averageCost) > 1e-4
         )
           issues.push({
             code: 'position_projection_mismatch',
             severity: 'error',
-            entity: `${account.id}:${expected.symbol}`,
+            entity: `${account.id}:${position.symbol}`,
             message: 'Position 与 Ledger AVG 投影不一致',
             suggestion: '在确认 Ledger 正确后执行只读预览，再运行 Position rebuild',
+          });
+      }
+      for (const position of account.positions) {
+        if (
+          Math.abs(Number(position.quantity)) > POSITION_EPSILON &&
+          !expected.has(position.symbol)
+        )
+          issues.push({
+            code: 'position_without_ledger_projection',
+            severity: 'error',
+            entity: `${account.id}:${position.symbol}`,
+            message: 'DB Position 存在，但 Ledger 没有对应的非零投影',
+            suggestion: '检查遗留 Position 或缺失 Ledger 事件，再执行 Position rebuild',
           });
       }
       for (const snapshot of account.snapshots)
