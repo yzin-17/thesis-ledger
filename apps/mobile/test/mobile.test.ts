@@ -17,6 +17,53 @@ const deferred = <T>() => {
   return { promise, resolve, reject };
 };
 
+const accountId = '00000000-0000-4000-8000-000000000001';
+const positionId = '00000000-0000-4000-8000-000000000002';
+const ruleId = '00000000-0000-4000-8000-000000000003';
+const eventId = '00000000-0000-4000-8000-000000000004';
+
+const portfolio = (overrides: Record<string, unknown> = {}) => ({
+  positions: [
+    {
+      id: positionId,
+      accountId,
+      symbol: '600519.SH',
+      quantity: 10,
+      costPrice: 1450,
+      marketPrice: 1488,
+      marketValue: 14880,
+      costValue: 14500,
+      pnl: 380,
+      pnlRatio: 380 / 14500,
+      stale: false,
+    },
+  ],
+  cashValue: 500,
+  cashByAccount: [{ accountId, amount: 500 }],
+  totalCost: 14500,
+  totalMarketValue: 15380,
+  totalPnl: 380,
+  partial: false,
+  mode: 'actual',
+  valuedAt: '2026-08-01T00:00:00.000Z',
+  ...overrides,
+});
+
+const riskEvent = {
+  id: eventId,
+  ruleId,
+  ruleVersion: 1,
+  triggered: true,
+  severity: 'warning',
+  message: '风险事件',
+  mode: 'actual',
+  accountId,
+  symbol: '600519.SH',
+  marketTime: '2026-08-01T00:00:00.000Z',
+  evaluatedAt: '2026-08-01T00:00:01.000Z',
+  context: {},
+};
+
 describe('Mobile read-only dashboard', () => {
   it('resolves safe development API defaults without overriding explicit environments', () => {
     expect(resolveMobileApiBaseUrl({ platform: 'android' })).toBe('http://10.0.2.2:3000/api/v1');
@@ -29,31 +76,11 @@ describe('Mobile read-only dashboard', () => {
     ).toBe('https://thesis-ledger.example/api/v1');
   });
 
-  it('uses the ThesisLedger API and exposes portfolio/risk navigation', async () => {
+  it('uses typed API responses and preserves server cashValue in mobile state', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        response({
-          totalMarketValue: '14880',
-          totalCost: '14500',
-          totalPnl: '380',
-          valuedAt: '2026-08-01T00:00:00.000Z',
-          partial: false,
-          positions: [
-            {
-              id: 'position-1',
-              accountId: 'account-1',
-              symbol: '600519.SH',
-              quantity: '10',
-              costPrice: '1450',
-              marketValue: '14880',
-              pnl: '380',
-              stale: false,
-            },
-          ],
-        }),
-      )
-      .mockResolvedValueOnce(response([{ id: 'event-1', severity: 'warning' }]));
+      .mockResolvedValueOnce(response(portfolio()))
+      .mockResolvedValueOnce(response([riskEvent]));
     const bootstrap = createMobileBootstrap({
       apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
@@ -68,8 +95,12 @@ describe('Mobile read-only dashboard', () => {
     expect(bootstrap.navigation.map((item) => item.key)).toEqual(['portfolio', 'risk']);
     expect(bootstrap.store.getState()).toMatchObject({
       status: 'ready',
-      portfolio: { totalMarketValue: 14880, positions: [{ symbol: '600519.SH', quantity: 10 }] },
-      riskEvents: [{ id: 'event-1' }],
+      portfolio: {
+        totalMarketValue: 15380,
+        cashValue: 500,
+        positions: [{ symbol: '600519.SH', quantity: 10 }],
+      },
+      riskEvents: [{ id: eventId }],
     });
     expect(fetcher).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/api/v1/portfolio/valuation' }),
@@ -80,29 +111,18 @@ describe('Mobile read-only dashboard', () => {
   });
 
   it('keeps stale data visible and marks the state when a quote is stale', async () => {
+    const stalePortfolio = portfolio({
+      partial: true,
+      positions: [
+        {
+          ...(portfolio().positions[0] as object),
+          stale: true,
+        },
+      ],
+    });
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        response({
-          totalMarketValue: 1,
-          totalCost: 1,
-          totalPnl: 0,
-          valuedAt: '2026-08-01T00:00:00.000Z',
-          partial: true,
-          positions: [
-            {
-              id: 'position-1',
-              accountId: 'account-1',
-              symbol: '600519.SH',
-              quantity: 1,
-              costPrice: 1,
-              marketValue: 1,
-              pnl: 0,
-              stale: true,
-            },
-          ],
-        }),
-      )
+      .mockResolvedValueOnce(response(stalePortfolio))
       .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
       apiBaseUrl: 'https://thesis-ledger.test/api/v1',
@@ -118,16 +138,7 @@ describe('Mobile read-only dashboard', () => {
   it('starts in loading and exposes the empty state when no positions exist', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        response({
-          totalMarketValue: 0,
-          totalCost: 0,
-          totalPnl: 0,
-          valuedAt: '2026-08-01T00:00:00.000Z',
-          partial: false,
-          positions: [],
-        }),
-      )
+      .mockResolvedValueOnce(response(portfolio({ positions: [], totalCost: 0, totalPnl: 0 })))
       .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
       apiBaseUrl: 'https://thesis-ledger.test/api/v1',
@@ -140,8 +151,13 @@ describe('Mobile read-only dashboard', () => {
     expect(store.getState()).toMatchObject({ status: 'empty', portfolio: { positions: [] } });
   });
 
-  it('surfaces API failures as an error state', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ message: 'offline' }, 503));
+  it('treats missing or invalid numeric fields as a contract error instead of zero', async () => {
+    const invalid = portfolio();
+    delete (invalid as { cashValue?: unknown }).cashValue;
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response(invalid))
+      .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
       apiBaseUrl: 'https://thesis-ledger.test/api/v1',
       fetcher,
@@ -149,7 +165,24 @@ describe('Mobile read-only dashboard', () => {
 
     await store.refresh();
 
-    expect(store.getState()).toMatchObject({ status: 'error', error: 'ThesisLedger API 503' });
+    expect(store.getState().status).toBe('error');
+    expect(store.getState().portfolio).toBeNull();
+    expect(store.getState().error).toContain('响应契约不匹配');
+  });
+
+  it('surfaces API failures as an error state', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(response({ error: 'offline', message: 'offline' }, 503));
+    const store = createMobileBootstrap({
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
+      fetcher,
+    }).store;
+
+    await store.refresh();
+
+    expect(store.getState()).toMatchObject({ status: 'error' });
+    expect(store.getState().error).toContain('ThesisLedger API 503');
   });
 
   it('does not let an older refresh overwrite a newer response', async () => {
@@ -160,25 +193,18 @@ describe('Mobile read-only dashboard', () => {
       .mockImplementationOnce(() => firstPortfolio.promise)
       .mockImplementationOnce(() => firstRisk.promise)
       .mockResolvedValueOnce(
-        response({
-          totalMarketValue: 2,
-          totalCost: 2,
-          totalPnl: 0,
-          valuedAt: '2026-08-01T00:00:00.000Z',
-          partial: false,
-          positions: [
-            {
-              id: 'new-position',
-              accountId: 'account-1',
-              symbol: '000001.SZ',
-              quantity: 2,
-              costPrice: 1,
-              marketValue: 2,
-              pnl: 0,
-              stale: false,
-            },
-          ],
-        }),
+        response(
+          portfolio({
+            positions: [
+              {
+                ...(portfolio().positions[0] as object),
+                id: '00000000-0000-4000-8000-000000000005',
+                symbol: '000001.SZ',
+                quantity: 2,
+              },
+            ],
+          }),
+        ),
       )
       .mockResolvedValueOnce(response([]));
     const store = createMobileBootstrap({
@@ -189,27 +215,7 @@ describe('Mobile read-only dashboard', () => {
     const olderRefresh = store.refresh();
     const newerRefresh = store.refresh();
     await newerRefresh;
-    firstPortfolio.resolve(
-      response({
-        totalMarketValue: 1,
-        totalCost: 1,
-        totalPnl: 0,
-        valuedAt: '2026-08-01T00:00:00.000Z',
-        partial: false,
-        positions: [
-          {
-            id: 'old-position',
-            accountId: 'account-1',
-            symbol: '600519.SH',
-            quantity: 1,
-            costPrice: 1,
-            marketValue: 1,
-            pnl: 0,
-            stale: false,
-          },
-        ],
-      }),
-    );
+    firstPortfolio.resolve(response(portfolio()));
     firstRisk.resolve(response([]));
     await olderRefresh;
 
