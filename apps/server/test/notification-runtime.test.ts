@@ -6,6 +6,9 @@ import {
   type NotificationMessage,
   type NotificationPolicy,
 } from '../src/notifications/notification.service.js';
+import { encryptProviderCredential } from '../src/platform/credential-security.js';
+
+const providerWebhook = 'https://open.feishu.cn/open-apis/bot/v2/hook/provider-test';
 
 const message: NotificationMessage = {
   title: '风险提醒',
@@ -76,7 +79,9 @@ describe('Feishu provider', () => {
         new Response(JSON.stringify({ code: 19002, msg: 'invalid webhook' }), { status: 200 }),
       ),
     );
-    const provider = new FeishuWebhookProvider('https://example.com/webhook');
+    const provider = new FeishuWebhookProvider(
+      'https://open.feishu.cn/open-apis/bot/v2/hook/business-error',
+    );
     await expect(provider.send(message, AbortSignal.timeout(1000))).rejects.toThrow(
       'feishu_business_19002:invalid webhook',
     );
@@ -93,10 +98,24 @@ describe('Notification cooldown', () => {
       },
       notificationDelivery: { upsert },
     };
-    const service = new NotificationService(prisma as never, redis as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
 
-    const first = await service.enqueue('event-a', 'warning', policy, new Date('2026-08-20T10:00:00Z'));
-    const second = await service.enqueue('event-b', 'warning', policy, new Date('2026-08-20T10:01:00Z'));
+    const first = await service.enqueue(
+      'event-a',
+      'warning',
+      policy,
+      new Date('2026-08-20T10:00:00Z'),
+    );
+    const second = await service.enqueue(
+      'event-b',
+      'warning',
+      policy,
+      new Date('2026-08-20T10:01:00Z'),
+    );
 
     expect(first[0]).not.toBeNull();
     expect(second).toEqual([null]);
@@ -116,7 +135,11 @@ describe('Notification cooldown', () => {
       },
       notificationDelivery: { upsert },
     };
-    const service = new NotificationService(prisma as never, redis as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
 
     await service.enqueue('event-a', 'warning', policy);
     await service.enqueue('event-b', 'warning', policy);
@@ -133,7 +156,11 @@ describe('Notification cooldown', () => {
       },
       notificationDelivery: { upsert },
     };
-    const service = new NotificationService(prisma as never, redis as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
 
     await service.enqueue('critical-a', 'critical', policy);
     await service.enqueue('critical-b', 'critical', policy);
@@ -145,7 +172,8 @@ describe('Notification cooldown', () => {
 
 describe('Notification dispatch', () => {
   it('实际发送优先使用 ProviderConfig，而不是环境变量', async () => {
-    process.env.FEISHU_WEBHOOK_URL = 'https://env.example/webhook';
+    process.env.FEISHU_WEBHOOK_URL =
+      'https://open.feishu.cn/open-apis/bot/v2/hook/bootstrap-fallback';
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',
@@ -173,22 +201,23 @@ describe('Notification dispatch', () => {
             type: 'notification',
             enabled: true,
             priority: 1,
-            encryptedCredentials: Buffer.from('https://provider.example/webhook'),
+            encryptedCredentials: encryptProviderCredential(providerWebhook),
           },
         ]),
       },
     };
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    const service = new NotificationService(prisma as never, redis as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
 
     await expect(
       service.dispatchOne('delivery-1', new Date('2026-08-20T10:01:00Z'), message),
     ).resolves.toMatchObject({ skipped: false, delivery: { status: 'delivered' } });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://provider.example/webhook',
-      expect.any(Object),
-    );
+    expect(fetchMock).toHaveBeenCalledWith(new URL(providerWebhook), expect.any(Object));
   });
 
   it('业务错误进入 retrying，而不是 delivered', async () => {
@@ -220,16 +249,22 @@ describe('Notification dispatch', () => {
             type: 'notification',
             enabled: true,
             priority: 1,
-            encryptedCredentials: Buffer.from('https://provider.example/webhook'),
+            encryptedCredentials: encryptProviderCredential(providerWebhook),
           },
         ]),
       },
     };
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 })),
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 }),
+      ),
     );
-    const service = new NotificationService(prisma as never, redis as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
 
     await expect(
       service.dispatchOne('delivery-1', new Date('2026-08-20T10:01:00Z'), message),
@@ -276,7 +311,7 @@ describe('Notification dispatch', () => {
             type: 'notification',
             enabled: true,
             priority: 1,
-            encryptedCredentials: Buffer.from('https://provider.example/webhook'),
+            encryptedCredentials: encryptProviderCredential(providerWebhook),
           },
         ]),
       },
@@ -289,7 +324,11 @@ describe('Notification dispatch', () => {
         }),
     );
     vi.stubGlobal('fetch', fetchMock);
-    const service = new NotificationService(prisma as never, redis as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
     const now = new Date('2026-08-20T10:01:00Z');
 
     const first = service.dispatchOne('delivery-1', now, message);
@@ -305,16 +344,17 @@ describe('Notification dispatch', () => {
 
   it('只消费 pending/retrying 且 scheduledAt 已到期的 delivery', async () => {
     const now = new Date('2026-08-20T10:01:00Z');
-    const due = [
-      { id: 'pending-1' },
-      { id: 'retrying-1' },
-    ];
+    const due = [{ id: 'pending-1' }, { id: 'retrying-1' }];
     const prisma = {
       notificationDelivery: {
         findMany: vi.fn(async () => due),
       },
     };
-    const service = new NotificationService(prisma as never, redisFixture() as never, { record: vi.fn() } as never);
+    const service = new NotificationService(
+      prisma as never,
+      redisFixture() as never,
+      { record: vi.fn() } as never,
+    );
     const dispatchOne = vi
       .spyOn(service, 'dispatchOne')
       .mockResolvedValue({ skipped: false, delivery: { status: 'delivered' } } as never);
