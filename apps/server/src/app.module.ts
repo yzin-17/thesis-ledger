@@ -13,6 +13,7 @@ import { PortfolioService } from './portfolio/portfolio.service.js';
 import { ImportService } from './imports/import.service.js';
 import { ImportController } from './imports/import.controller.js';
 import { NotificationService } from './notifications/notification.service.js';
+import { NotificationDispatcher } from './notifications/notification.dispatcher.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { BacktestService } from './backtest/backtest.service.js';
 import { AiRunService } from './ai/ai.service.js';
@@ -83,6 +84,7 @@ import { MarketControlService } from './market/market-control.service.js';
     PortfolioService,
     ImportService,
     NotificationService,
+    NotificationDispatcher,
     LedgerService,
     BacktestService,
     AiRunService,

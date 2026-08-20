@@ -186,6 +186,7 @@ export class RiskService {
               },
               cooldownMinutes: 30,
               maxAttempts: 3,
+              criticalBypassCooldown: true,
             });
             results.push({ ruleId: stored.id, eventId: saved.id });
           } catch (notificationError) {
