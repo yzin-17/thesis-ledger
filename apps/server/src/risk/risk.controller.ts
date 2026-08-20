@@ -1,5 +1,14 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { portfolioModeSchema } from '@thesis-ledger/schemas';
+import { z } from 'zod';
 import { RiskService } from './risk.service.js';
+
+const createFromPlanSchema = z.object({ sourcePlanId: z.uuid(), rule: z.record(z.string(), z.unknown()) });
+const riskEventQueryHttpSchema = z.object({
+  mode: portfolioModeSchema.default('actual'),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
 
 @Controller('risk')
 export class RiskController {
@@ -16,8 +25,9 @@ export class RiskController {
   }
 
   @Post('rules/from-plan')
-  createFromPlan(@Body() body: { sourcePlanId: string; rule: unknown }) {
-    return this.risk.createRule({ ...(body.rule as object), sourcePlanId: body.sourcePlanId });
+  createFromPlan(@Body() input: unknown) {
+    const body = createFromPlanSchema.parse(input);
+    return this.risk.createRule({ ...body.rule, sourcePlanId: body.sourcePlanId });
   }
 
   @Patch('rules/:id')
@@ -47,13 +57,14 @@ export class RiskController {
 
   @Get('events')
   events(
-    @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('mode') mode?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.risk.history(mode, {
-      ...(cursor ? { cursor } : {}),
-      ...(limit ? { limit: Number(limit) } : {}),
+    const query = riskEventQueryHttpSchema.parse({ mode, cursor, limit });
+    return this.risk.history(query.mode, {
+      ...(query.cursor ? { cursor: query.cursor } : {}),
+      ...(query.limit ? { limit: query.limit } : {}),
     });
   }
 }
