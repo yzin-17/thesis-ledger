@@ -53,8 +53,11 @@ type PositionContext = NonNullable<SecurityContext['positions']>[number];
 const latestByMarketTime = <T extends { marketTime: string }>(values: readonly T[]) =>
   [...values].sort((left, right) => right.marketTime.localeCompare(left.marketTime))[0];
 
-const aggregateDataQuality = (contexts: readonly SecurityContext[]) =>
-  Object.assign({}, ...contexts.map((context) => context.dataQuality));
+const aggregateDataQuality = (contexts: readonly SecurityContext[]): Record<string, string> =>
+  contexts.reduce<Record<string, string>>(
+    (combined, context) => ({ ...combined, ...context.dataQuality }),
+    {},
+  );
 
 const aggregatePositions = (contexts: readonly SecurityContext[]) => {
   const explicit = latestByMarketTime(contexts.filter((context) => context.positions !== undefined));
