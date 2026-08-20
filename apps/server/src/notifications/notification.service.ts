@@ -49,7 +49,7 @@ export const classifyDeliveryError = (detail: string, attempt: number, maxAttemp
 
 const stableSerialize = (value: unknown): string => {
   if (value === undefined) return 'undefined';
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? String(value);
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
   return `{${Object.entries(value as Record<string, unknown>)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -289,7 +289,8 @@ export class NotificationService {
   }
 
   private async cooldownFingerprint(eventId: string, severity: Severity) {
-    if (typeof this.prisma.riskEvent.findUnique !== 'function') return `event:${eventId}:${severity}`;
+    if (typeof this.prisma.riskEvent?.findUnique !== 'function')
+      return `event:${eventId}:${severity}`;
     const event = await this.prisma.riskEvent.findUnique({
       where: { id: eventId },
       include: { rule: true },
