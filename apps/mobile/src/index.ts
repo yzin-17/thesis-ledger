@@ -1,4 +1,8 @@
-import { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
+import {
+  ThesisLedgerApiClient,
+  type PortfolioValuationResponse,
+  type RiskEventResponse,
+} from '@thesis-ledger/api-client';
 
 export type MobileLoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
 export type MobilePortfolioMode = 'actual' | 'shadow';
@@ -28,41 +32,13 @@ export const resolveMobileApiBaseUrl = ({
   return platform === 'android' ? 'http://10.0.2.2:3000/api/v1' : 'http://127.0.0.1:3000/api/v1';
 };
 
-export interface MobilePosition {
-  id: string;
-  accountId: string;
-  symbol: string;
-  quantity: number;
-  costPrice: number;
-  marketValue: number | null;
-  pnl: number | null;
-  stale: boolean;
-  asset?: { name?: string; assetType?: string };
-}
-
-export interface MobileRiskEvent {
-  id: string;
-  ruleId: string;
-  ruleVersion: number;
-  severity: string;
-  message: string;
-  symbol: string | null;
-  marketTime: string | null;
-  evaluatedAt: string;
-  context: Record<string, unknown>;
-}
+export type MobilePosition = PortfolioValuationResponse['positions'][number];
+export type MobileRiskEvent = RiskEventResponse;
 
 export interface MobileDashboardState {
   status: MobileLoadState;
   mode: MobilePortfolioMode;
-  portfolio: {
-    totalMarketValue: number;
-    cashValue?: number;
-    totalCost: number;
-    totalPnl: number;
-    valuedAt: string;
-    positions: MobilePosition[];
-  } | null;
+  portfolio: PortfolioValuationResponse | null;
   riskEvents: MobileRiskEvent[];
   error: string | null;
 }
@@ -78,43 +54,6 @@ const initialState: MobileDashboardState = {
   portfolio: null,
   riskEvents: [],
   error: null,
-};
-
-const asNumber = (value: unknown) => {
-  const result = Number(value);
-  return Number.isFinite(result) ? result : 0;
-};
-
-const normalizePortfolio = (value: unknown): MobileDashboardState['portfolio'] => {
-  if (!value || typeof value !== 'object') return null;
-  const raw = value as Record<string, unknown>;
-  const positions = Array.isArray(raw.positions)
-    ? raw.positions.filter((position): position is Record<string, unknown> => {
-        return Boolean(position && typeof position === 'object');
-      })
-    : [];
-  return {
-    totalMarketValue: asNumber(raw.totalMarketValue),
-    totalCost: asNumber(raw.totalCost),
-    totalPnl: asNumber(raw.totalPnl),
-    valuedAt: typeof raw.valuedAt === 'string' ? raw.valuedAt : new Date(0).toISOString(),
-    positions: positions.map((position) => {
-      const normalized: MobilePosition = {
-        id: typeof position.id === 'string' ? position.id : '',
-        accountId: typeof position.accountId === 'string' ? position.accountId : '',
-        symbol: typeof position.symbol === 'string' ? position.symbol : '',
-        quantity: asNumber(position.quantity),
-        costPrice: asNumber(position.costPrice),
-        marketValue: position.marketValue === null ? null : asNumber(position.marketValue),
-        pnl: position.pnl === null ? null : asNumber(position.pnl),
-        stale: position.stale === true,
-      };
-      if (position.asset && typeof position.asset === 'object') {
-        normalized.asset = position.asset;
-      }
-      return normalized;
-    }),
-  };
 };
 
 export class MobileReadOnlyStore {
@@ -155,29 +94,18 @@ export class MobileReadOnlyStore {
     const previous = this.state;
     this.setState({ ...previous, status: 'loading', error: null });
     try {
-      const cacheBust = `t=${Date.now()}`;
-      const [portfolioRaw, riskEvents] = await Promise.all([
-        this.api.request<unknown>(`/portfolio/valuation?mode=${this.mode}&${cacheBust}`),
-        this.api.request<MobileRiskEvent[]>(`/risk/events?mode=${this.mode}&${cacheBust}`),
+      const cacheBust = Date.now();
+      const [portfolio, riskEvents] = await Promise.all([
+        this.api.portfolio.getValuation({ mode: this.mode, t: cacheBust }),
+        this.api.risk.getEvents({ mode: this.mode, t: cacheBust }),
       ]);
       if (sequence !== this.refreshSequence) return this.state;
-      const portfolio = normalizePortfolio(portfolioRaw);
-      const stale = Boolean(
-        portfolio?.positions.some((position) => position.stale) ||
-        (portfolioRaw && typeof portfolioRaw === 'object' && 'partial' in portfolioRaw
-          ? (portfolioRaw as { partial?: unknown }).partial === true
-          : false),
-      );
+      const stale = portfolio.partial || portfolio.positions.some((position) => position.stale);
       this.setState({
         mode: this.mode,
-        status:
-          portfolio === null || portfolio.positions.length === 0
-            ? 'empty'
-            : stale
-              ? 'stale'
-              : 'ready',
+        status: portfolio.positions.length === 0 ? 'empty' : stale ? 'stale' : 'ready',
         portfolio,
-        riskEvents: Array.isArray(riskEvents) ? riskEvents : [],
+        riskEvents,
         error: null,
       });
     } catch (error) {
