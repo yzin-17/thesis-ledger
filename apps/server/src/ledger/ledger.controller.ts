@@ -1,5 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { z } from 'zod';
 import { LedgerService } from './ledger.service.js';
+
+const migratePositionsHttpSchema = z.object({ accountId: z.uuid().optional() });
+const rebuildMethodSchema = z.enum(['AVG', 'FIFO']).optional();
 
 @Controller('ledger')
 export class LedgerController {
@@ -11,13 +15,13 @@ export class LedgerController {
   }
 
   @Post(':accountId/rebuild')
-  rebuild(@Param('accountId') accountId: string, @Query('method') method?: 'AVG' | 'FIFO') {
-    return this.ledger.rebuild(accountId, method);
+  rebuild(@Param('accountId') accountId: string, @Query('method') method?: string) {
+    return this.ledger.rebuild(accountId, rebuildMethodSchema.parse(method));
   }
 
   @Post('migrate-positions')
-  migratePositions(@Body() body: { accountId?: string }) {
-    return this.ledger.migratePositions(body.accountId);
+  migratePositions(@Body() input: unknown) {
+    return this.ledger.migratePositions(migratePositionsHttpSchema.parse(input).accountId);
   }
 
   @Get(':accountId/events')
