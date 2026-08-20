@@ -5,5 +5,5 @@ export * from './automation.js';
 export * from './ai.js';
 export * from './risk.js';
 export * from './ledger.js';
-export * from './ai.js';
 export * from './asset-identity.js';
+export * from './api.js';
