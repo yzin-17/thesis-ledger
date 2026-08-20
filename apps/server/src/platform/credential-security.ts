@@ -5,6 +5,8 @@ export interface CredentialKeyRing {
   keys: ReadonlyMap<string, Buffer>;
 }
 
+export type CredentialPayload = Buffer<ArrayBuffer>;
+
 interface CredentialEnvelopeV1 {
   version: 1;
   algorithm: 'aes-256-gcm';
@@ -25,6 +27,12 @@ const decodeKey = (encoded: string, label: string) => {
   const key = Buffer.from(encoded, 'base64');
   if (key.length !== 32) throw new Error(`${label} 必须是 32 字节 Base64 密钥`);
   return key;
+};
+
+const copyCredentialPayload = (payload: Uint8Array): CredentialPayload => {
+  const copy = Buffer.alloc(payload.byteLength);
+  copy.set(payload);
+  return copy;
 };
 
 export const credentialKeyRingFromEnv = (
@@ -76,7 +84,7 @@ const envelopeFromPayload = (payload: Uint8Array): CredentialEnvelopeV1 | null =
 export const encryptProviderCredential = (
   credential: string,
   keyRing: CredentialKeyRing = credentialKeyRingFromEnv(),
-): Buffer => {
+): CredentialPayload => {
   const key = keyRing.keys.get(keyRing.activeVersion);
   if (!key) throw new Error(`找不到 active credential key ${keyRing.activeVersion}`);
   const iv = randomBytes(12);
@@ -90,7 +98,7 @@ export const encryptProviderCredential = (
     authTag: cipher.getAuthTag().toString('base64'),
     ciphertext: ciphertext.toString('base64'),
   };
-  return Buffer.from(JSON.stringify(envelope), 'utf8');
+  return copyCredentialPayload(Buffer.from(JSON.stringify(envelope), 'utf8'));
 };
 
 export const decryptProviderCredential = (
@@ -126,12 +134,12 @@ export const decryptProviderCredential = (
 export const normalizeProviderCredential = (
   payload: Uint8Array,
   keyRing: CredentialKeyRing = credentialKeyRingFromEnv(),
-) => {
+): DecodedCredential & { payload: CredentialPayload } => {
   const decoded = decryptProviderCredential(payload, keyRing);
   return {
     ...decoded,
     payload: decoded.needsRotation
       ? encryptProviderCredential(decoded.credential, keyRing)
-      : Buffer.from(payload),
+      : copyCredentialPayload(payload),
   };
 };
