@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { dataQualityIssueInputSchema } from '@thesis-ledger/schemas';
 import { DataQualityService } from './data-quality.service.js';
 
 @Controller('data-quality')
@@ -11,18 +12,8 @@ export class DataQualityController {
   }
 
   @Post('issues')
-  record(
-    @Body()
-    body: {
-      capability: string;
-      provider: string;
-      symbol?: string;
-      severity: 'info' | 'warning' | 'error';
-      code: string;
-      details: Record<string, unknown>;
-    },
-  ) {
-    return this.quality.record(body);
+  record(@Body() input: unknown) {
+    return this.quality.record(dataQualityIssueInputSchema.parse(input));
   }
 
   @Patch('issues/:id/resolve')
