@@ -127,6 +127,7 @@ describe('Provider credential security', () => {
       credentialsRef: 'https://open.feishu.cn/open-apis/bot/v2/hook/test-token',
     });
     expect(draft.testToken).toEqual(expect.any(String));
+    if (!draft.testToken) throw new Error('测试成功但没有返回 draft token');
 
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
     await service.save({
