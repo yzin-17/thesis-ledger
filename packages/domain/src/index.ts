@@ -7,3 +7,4 @@ export * from './backtest.js';
 export * from './behavior.js';
 export * from './backtest-analytics.js';
 export * from './backtest-engine.js';
+export * from './trading-calendar.js';
