@@ -259,10 +259,14 @@ export class RiskService {
         (context) =>
           context.dataQuality.freshness === 'stale' ||
           context.dataQuality.marketData === 'stale' ||
-          context.dataQuality.financials === 'stale',
+          context.dataQuality.status === 'stale',
       )
     )
-      throw new BadRequestException('风险扫描上下文包含 stale 数据，请刷新后重试');
+      throw new BadRequestException('行情陈旧，Risk 默认拒绝评估；请在允许陈旧数据后重试');
+  }
+
+  private snapshot(value: object): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
   }
 
   private evaluateStoredRule(stored: StoredRule, contexts: ScanContext[]) {
@@ -276,30 +280,67 @@ export class RiskService {
       enabled: stored.enabled,
       ...(stored.symbol === null ? {} : { symbol: stored.symbol }),
       ...(stored.accountId === null ? {} : { accountId: stored.accountId }),
-      ...(stored.parameters === undefined || stored.parameters === null
-        ? {}
-        : { parameters: stored.parameters as RiskRule['parameters'] }),
+      ...(stored.parameters && typeof stored.parameters === 'object'
+        ? { parameters: stored.parameters as Record<string, unknown> }
+        : {}),
     };
-    const candidates = this.contextsForRule(rule, contexts);
-    if (candidates.length === 0)
-      throw new Error(
-        `规则 ${stored.id}（${stored.scope}）未找到匹配上下文，请检查 accountId/symbol/scope`,
+    return contexts
+      .filter(
+        (context) =>
+          (!rule.symbol || rule.symbol === context.symbol) &&
+          (!rule.accountId || rule.accountId === context.accountId),
+      )
+      .map((candidate) => {
+        const context: CompleteRiskContext = {
+          symbol: candidate.symbol,
+          marketTime: candidate.marketTime,
+          ...(candidate.price === undefined ? {} : { price: candidate.price }),
+          ...(candidate.costPrice === undefined ? {} : { costPrice: candidate.costPrice }),
+          ...(candidate.weight === undefined ? {} : { weight: candidate.weight }),
+          ...(candidate.holdingPeak === undefined ? {} : { holdingPeak: candidate.holdingPeak }),
+          ...(candidate.portfolioValues === undefined
+            ? {}
+            : { portfolioValues: candidate.portfolioValues }),
+          ...(candidate.indicators === undefined ? {} : { indicators: candidate.indicators }),
+          ...(candidate.chip === undefined
+            ? {}
+            : {
+                chip: {
+                  profitRatio: candidate.chip.profitRatio,
+                  concentration: candidate.chip.concentration,
+                  engineVersion: candidate.chip.engineVersion,
+                  calculatedAt: candidate.chip.calculatedAt,
+                  ...(candidate.chip.mainPeak === undefined
+                    ? {}
+                    : { mainPeak: candidate.chip.mainPeak }),
+                  ...(candidate.chip.previousMainPeaks === undefined
+                    ? {}
+                    : { previousMainPeaks: candidate.chip.previousMainPeaks }),
+                },
+              }),
+          ...(candidate.positions === undefined
+            ? {}
+            : {
+                positions: candidate.positions.map((position) => ({
+                  symbol: position.symbol,
+                  weight: position.weight,
+                  ...(position.sector === undefined ? {} : { sector: position.sector }),
+                  ...(position.assetType === undefined ? {} : { assetType: position.assetType }),
+                  ...(position.volatility === undefined ? {} : { volatility: position.volatility }),
+                })),
+              }),
+          ...(candidate.returns === undefined ? {} : { returns: candidate.returns }),
+          dataQuality: candidate.dataQuality,
+        };
+        return { candidate, event: evaluateCompleteRule(rule, context) };
+      })
+      .filter(
+        (
+          result,
+        ): result is {
+          candidate: ScanContext;
+          event: NonNullable<typeof result.event>;
+        } => result.event !== null,
       );
-    return candidates.map((candidate) => ({
-      candidate,
-      event: evaluateCompleteRule(rule, candidate as CompleteRiskContext),
-    }));
-  }
-
-  private contextsForRule(rule: RiskRule, contexts: ScanContext[]) {
-    if (rule.scope === 'security')
-      return contexts.filter((context) => context.symbol === rule.symbol);
-    if (rule.scope === 'account')
-      return contexts.filter((context) => context.accountId === rule.accountId);
-    return contexts;
-  }
-
-  private snapshot(value: StoredRule | Record<string, unknown>) {
-    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
   }
 }
