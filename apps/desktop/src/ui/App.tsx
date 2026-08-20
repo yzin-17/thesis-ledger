@@ -16,6 +16,12 @@ import {
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -136,6 +142,8 @@ export function InstrumentCombobox({
   onSelect: (instrument: InstrumentLookup) => void;
   onStartSearch: () => void;
 }) {
+  const isLoading = busy;
+
   if (editing) {
     const market = editing.symbol.split('.').at(-1) ?? '';
     return (
@@ -227,25 +235,24 @@ export function InstrumentCombobox({
       itemToStringLabel={(instrument: InstrumentLookup) => instrument.displayName}
       itemToStringValue={(instrument: InstrumentLookup) => instrument.symbol}
     >
-      <div className="relative">
-        <MagnifyingGlassIcon
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
+      <InputGroup className="h-10">
         <Combobox.Input
-          className="h-10 w-full rounded-md border border-input bg-transparent py-2 pr-10 pl-9 text-base text-foreground shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+          data-slot="input-group-control"
+          className="h-10 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 text-base text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
           placeholder="搜索代码或名称"
           aria-label="搜索代码或名称"
-          disabled={busy}
+          aria-busy={busy}
           onFocus={onStartSearch}
         />
-        {searchState === 'loading' && (
-          <SpinnerGapIcon
-            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
-            aria-hidden="true"
-          />
+        <InputGroupAddon align="inline-start">
+          <MagnifyingGlassIcon aria-hidden="true" />
+        </InputGroupAddon>
+        {isLoading && (
+          <InputGroupAddon align="inline-end">
+            <SpinnerGapIcon className="animate-spin" aria-hidden="true" />
+          </InputGroupAddon>
         )}
-      </div>
+      </InputGroup>
       <Combobox.Portal>
         <Combobox.Positioner className="layer-popover" side="bottom" align="start" sideOffset={4}>
           <Combobox.Popup
@@ -254,13 +261,14 @@ export function InstrumentCombobox({
           >
             <Combobox.List className="max-h-72 overflow-auto p-1">
               <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
-                {searchState === 'loading'
+                {isLoading
                   ? '正在搜索...'
                   : searchState === 'error'
                     ? '搜索暂时不可用，请稍后重试。'
                     : ''}
               </Combobox.Status>
-              {searchState === 'results' &&
+              {!isLoading &&
+                searchState === 'results' &&
                 results.map((instrument, index) => (
                   <Combobox.Item
                     key={instrument.id}
@@ -5055,6 +5063,8 @@ export function PortfolioManagement({
   );
   const instrumentSearchQuery = useRef('');
   const instrumentSearchDebounce = useRef<number | null>(null);
+  const instrumentSearchAbortController = useRef<AbortController | null>(null);
+  const instrumentSearchRequestId = useRef(0);
   const instrumentSelectionInProgress = useRef(false);
   const toastManager = useToastManager();
   const markDirty = (nextDirty = true) => {
@@ -5072,16 +5082,26 @@ export function PortfolioManagement({
   };
   const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
   const selectedAccount = accounts.find((account) => account.id === entryAccountId);
+  const cancelInstrumentSearch = (resetState = true) => {
+    instrumentSearchRequestId.current += 1;
+    if (instrumentSearchDebounce.current !== null) {
+      window.clearTimeout(instrumentSearchDebounce.current);
+      instrumentSearchDebounce.current = null;
+    }
+    instrumentSearchAbortController.current?.abort();
+    instrumentSearchAbortController.current = null;
+    if (resetState) {
+      setInstrumentSearchBusy(false);
+      setInstrumentSearchState('idle');
+    }
+  };
   useEffect(() => {
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
     else if (!entryAccountId && accounts[0]) setEntryAccountId(accounts[0].id);
   }, [accounts, defaultAccountId, entryAccountId]);
 
   useEffect(() => {
-    if (instrumentSearchDebounce.current !== null) {
-      window.clearTimeout(instrumentSearchDebounce.current);
-      instrumentSearchDebounce.current = null;
-    }
+    cancelInstrumentSearch();
     setInstrumentSearchBusy(false);
     if (editing) {
       instrumentSearchQuery.current = editing.symbol;
@@ -5103,9 +5123,7 @@ export function PortfolioManagement({
   }, [editing, positionSheetOpen]);
   useEffect(
     () => () => {
-      if (instrumentSearchDebounce.current !== null) {
-        window.clearTimeout(instrumentSearchDebounce.current);
-      }
+      cancelInstrumentSearch(false);
     },
     [],
   );
@@ -5228,15 +5246,28 @@ export function PortfolioManagement({
     }
   };
 
-  const searchInstruments = async (nextQuery: string) => {
+  const searchInstruments = async (nextQuery: string, requestId: number) => {
     const query = nextQuery.trim();
-    if (!query || editing || instrumentSelectionInProgress.current) return;
+    if (
+      !query ||
+      editing ||
+      instrumentSelectionInProgress.current ||
+      requestId !== instrumentSearchRequestId.current
+    )
+      return;
+    const controller = new AbortController();
+    instrumentSearchAbortController.current = controller;
+    const isCurrentRequest = () =>
+      requestId === instrumentSearchRequestId.current &&
+      instrumentSearchQuery.current.trim() === query &&
+      instrumentSearchAbortController.current === controller &&
+      !controller.signal.aborted;
     setInstrumentSearchBusy(true);
     setInstrumentSearchState('loading');
     try {
       const response = await fetch(
         '/api/v1/market-data/instruments/search?q=' + encodeURIComponent(query),
-        { cache: 'no-store' },
+        { cache: 'no-store', signal: controller.signal },
       );
       if (!response.ok) throw new Error('instrument-search');
       const results = ((await response.json()) as InstrumentLookup[]).filter((instrument) =>
@@ -5244,12 +5275,13 @@ export function PortfolioManagement({
           ? instrument.instrumentType === 'MUTUAL_FUND'
           : ['STOCK', 'ETF'].includes(instrument.instrumentType),
       );
-      if (instrumentSearchQuery.current !== query) return;
+      if (!isCurrentRequest()) return;
       setInstrumentResults(results);
       setInstrumentSearchState(results.length > 0 ? 'results' : 'empty');
       setInstrumentSearchOpen(true);
-    } catch {
-      if (instrumentSearchQuery.current !== query) return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (!isCurrentRequest()) return;
       setInstrumentResults([]);
       setInstrumentSearchState('error');
       setInstrumentSearchOpen(true);
@@ -5261,7 +5293,11 @@ export function PortfolioManagement({
         priority: 'high',
       });
     } finally {
-      if (instrumentSearchQuery.current === query) setInstrumentSearchBusy(false);
+      if (isCurrentRequest()) {
+        setInstrumentSearchBusy(false);
+        setInstrumentSearchState((state) => (state === 'loading' ? 'idle' : state));
+        instrumentSearchAbortController.current = null;
+      }
     }
   };
 
@@ -5277,14 +5313,12 @@ export function PortfolioManagement({
       if (nextQuery.trim()) setInstrumentSearchOpen(true);
       return;
     }
+    cancelInstrumentSearch();
     instrumentSearchQuery.current = nextQuery;
-    if (instrumentSearchDebounce.current !== null) {
-      window.clearTimeout(instrumentSearchDebounce.current);
-      instrumentSearchDebounce.current = null;
-    }
     setInstrumentQuery(nextQuery);
     setSelectedInstrument(null);
     setManualInstrumentEntry(false);
+    setInstrumentSearchBusy(false);
     setInstrumentResults([]);
     if (!nextQuery.trim()) {
       setInstrumentSearchBusy(false);
@@ -5294,19 +5328,18 @@ export function PortfolioManagement({
     }
     setInstrumentSearchState('loading');
     setInstrumentSearchOpen(true);
+    setInstrumentSearchBusy(true);
+    const requestId = instrumentSearchRequestId.current;
     instrumentSearchDebounce.current = window.setTimeout(() => {
       instrumentSearchDebounce.current = null;
-      void searchInstruments(nextQuery);
-    }, 260);
+      void searchInstruments(nextQuery, requestId);
+    }, 500);
   };
 
   const confirmInstrument = async (instrument: InstrumentLookup) => {
     if (!instrument.confirmable || editing) return;
     instrumentSelectionInProgress.current = true;
-    if (instrumentSearchDebounce.current !== null) {
-      window.clearTimeout(instrumentSearchDebounce.current);
-      instrumentSearchDebounce.current = null;
-    }
+    cancelInstrumentSearch();
     setInstrumentSearchBusy(true);
     setInstrumentSearchState('loading');
     setInstrumentSearchOpen(false);
@@ -5339,10 +5372,7 @@ export function PortfolioManagement({
   };
 
   const clearInstrumentSelection = () => {
-    if (instrumentSearchDebounce.current !== null) {
-      window.clearTimeout(instrumentSearchDebounce.current);
-      instrumentSearchDebounce.current = null;
-    }
+    cancelInstrumentSearch();
     instrumentSearchQuery.current = '';
     setInstrumentSearchBusy(false);
     setSelectedInstrument(null);
@@ -5354,10 +5384,7 @@ export function PortfolioManagement({
   };
 
   const startManualInstrumentEntry = () => {
-    if (instrumentSearchDebounce.current !== null) {
-      window.clearTimeout(instrumentSearchDebounce.current);
-      instrumentSearchDebounce.current = null;
-    }
+    cancelInstrumentSearch();
     setInstrumentSearchBusy(false);
     setManualInstrumentEntry(true);
     setInstrumentSearchOpen(false);
@@ -5989,12 +6016,7 @@ export function PortfolioManagement({
                             markDirty(false);
                             setEntryAccountId(value);
                             setSelectedInstrument(null);
-                            if (instrumentSearchDebounce.current !== null) {
-                              window.clearTimeout(instrumentSearchDebounce.current);
-                              instrumentSearchDebounce.current = null;
-                            }
-                            setInstrumentSearchBusy(false);
-                            instrumentSearchQuery.current = '';
+                            cancelInstrumentSearch();
                             setInstrumentQuery('');
                             setInstrumentResults([]);
                             setInstrumentSearchOpen(false);
@@ -6108,9 +6130,9 @@ export function PortfolioManagement({
                           <div className="text-sm font-semibold text-foreground">持仓信息</div>
                           <label>
                             当前数量
-                            <div className="relative">
-                              <Input
-                                className="pr-12"
+                            <InputGroup className="h-10">
+                              <InputGroupInput
+                                className="h-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 name="quantity"
                                 required
                                 type="number"
@@ -6118,23 +6140,25 @@ export function PortfolioManagement({
                                 step="any"
                                 defaultValue={editing?.quantity}
                               />
-                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-                                {assetQuantityUnit(
-                                  selectedInstrument
-                                    ? instrumentAssetType(selectedInstrument.instrumentType)
-                                    : manualInstrumentEntry
-                                      ? manualAssetType
-                                      : editing?.asset.assetType,
-                                  editing?.symbol,
-                                )}
-                              </span>
-                            </div>
+                              <InputGroupAddon align="inline-end">
+                                <InputGroupText>
+                                  {assetQuantityUnit(
+                                    selectedInstrument
+                                      ? instrumentAssetType(selectedInstrument.instrumentType)
+                                      : manualInstrumentEntry
+                                        ? manualAssetType
+                                        : editing?.asset.assetType,
+                                    editing?.symbol,
+                                  )}
+                                </InputGroupText>
+                              </InputGroupAddon>
+                            </InputGroup>
                           </label>
                           <label>
                             平均成本
-                            <div className="relative">
-                              <Input
-                                className="pr-16"
+                            <InputGroup className="h-10">
+                              <InputGroupInput
+                                className="h-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 name="costPrice"
                                 required
                                 type="number"
@@ -6142,18 +6166,20 @@ export function PortfolioManagement({
                                 step="any"
                                 defaultValue={editing?.costPrice}
                               />
-                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-                                元/
-                                {assetQuantityUnit(
-                                  selectedInstrument
-                                    ? instrumentAssetType(selectedInstrument.instrumentType)
-                                    : manualInstrumentEntry
-                                      ? manualAssetType
-                                      : editing?.asset.assetType,
-                                  editing?.symbol,
-                                )}
-                              </span>
-                            </div>
+                              <InputGroupAddon align="inline-end">
+                                <InputGroupText>
+                                  元/
+                                  {assetQuantityUnit(
+                                    selectedInstrument
+                                      ? instrumentAssetType(selectedInstrument.instrumentType)
+                                      : manualInstrumentEntry
+                                        ? manualAssetType
+                                        : editing?.asset.assetType,
+                                    editing?.symbol,
+                                  )}
+                                </InputGroupText>
+                              </InputGroupAddon>
+                            </InputGroup>
                           </label>
                         </div>
                       </>

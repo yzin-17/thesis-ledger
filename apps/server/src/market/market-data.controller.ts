@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { DsaClient } from './dsa-client.js';
+import { DsaClient, DsaError } from './dsa-client.js';
 import { InstrumentService } from './instrument.service.js';
 import { MarketControlService } from './market-control.service.js';
 
@@ -65,13 +65,19 @@ export class MarketDataController {
     return this.instruments.latestGeneration();
   }
 
-  @Get('catalog/jobs/:jobId') catalogJob(@Param('jobId') jobId: string) {
-    return this.dsa.catalogJob(jobId);
+  @Get('catalog/jobs/:jobId') async catalogJob(@Param('jobId') jobId: string) {
+    const job = await this.dsa.catalogJob(jobId);
+    if (job.status !== 'succeeded') return { ...job, acknowledged: false };
+    return { ...job, ...(await this.applyCatalogProjection()) };
   }
 
   @Post('catalog/sync') async syncCatalog() {
     const job = await this.dsa.triggerCatalogJob();
     if (job.status !== 'succeeded') return { ...job, acknowledged: false };
+    return { ...job, ...(await this.applyCatalogProjection()) };
+  }
+
+  private async applyCatalogProjection() {
     const status = await this.instruments.latestGeneration();
     let synced;
     if (status.cursor) {
@@ -79,13 +85,14 @@ export class MarketDataController {
         synced = await this.instruments.applyCatalogDelta(
           await this.dsa.catalogDelta(status.cursor),
         );
-      } catch {
+      } catch (error) {
+        if (!(error instanceof DsaError)) throw error;
         synced = await this.instruments.syncCatalog(await this.dsa.catalogSnapshot());
       }
     } else {
       synced = await this.instruments.syncCatalog(await this.dsa.catalogSnapshot());
     }
     await this.dsa.acknowledgeCatalog(synced.generation, synced.checksum);
-    return { ...synced, job, acknowledged: true };
+    return { ...synced, acknowledged: true };
   }
 }

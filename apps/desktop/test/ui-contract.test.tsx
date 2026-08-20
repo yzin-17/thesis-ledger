@@ -17,7 +17,7 @@ import {
   ProviderSettings,
   replaceProviderRecord,
 } from '../src/ui/App.js';
-import { Toaster } from '../src/components/ui/toast.js';
+import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
 
 const renderWithToast = (node: ReactNode) => renderToStaticMarkup(<Toaster>{node}</Toaster>);
 
@@ -204,10 +204,55 @@ describe('Desktop UI contract', () => {
     );
 
     expect(initial).toContain('搜索代码或名称');
+    expect(initial).toContain('data-slot="input-group"');
+    expect(initial).toContain('data-slot="input-group-addon"');
+    expect(initial).toContain('data-align="inline-start"');
+    expect(initial).toContain('aria-busy="false"');
+    expect(initial).not.toContain('absolute');
     expect(initial).not.toContain('搜索目录');
     expect(initial).not.toContain('已确认：');
     expect(initial).not.toContain('名称（可选）');
     expect(initial).not.toContain('类型（可选）');
+
+    const loading = renderToStaticMarkup(
+      <InstrumentCombobox
+        manualEntry={false}
+        open
+        query="159"
+        results={[]}
+        searchState="loading"
+        selectedInstrument={null}
+        busy
+        onClearSelection={vi.fn()}
+        onManualEntry={vi.fn()}
+        onOpenChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        onSelect={vi.fn()}
+        onStartSearch={vi.fn()}
+      />,
+    );
+    expect(loading).toContain('aria-busy="true"');
+    expect(loading).not.toContain('disabled=""');
+
+    const settled = renderToStaticMarkup(
+      <InstrumentCombobox
+        manualEntry={false}
+        open
+        query="159"
+        results={[]}
+        searchState="loading"
+        selectedInstrument={null}
+        busy={false}
+        onClearSelection={vi.fn()}
+        onManualEntry={vi.fn()}
+        onOpenChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        onSelect={vi.fn()}
+        onStartSearch={vi.fn()}
+      />,
+    );
+    expect(settled).not.toContain('正在搜索...');
+    expect(settled).not.toContain('animate-spin');
 
     const selected = renderToStaticMarkup(
       <InstrumentCombobox
@@ -258,6 +303,31 @@ describe('Desktop UI contract', () => {
     expect(manual).toContain('未找到目录标的，请补充信息');
     expect(manual).toContain('重新搜索');
     expect(manual).toContain('name="symbol"');
+  });
+
+  it('让通知按自然高度纵向排列，避免多个通知互相覆盖', () => {
+    const viewport = renderWithToast(<ToastViewport />);
+    const notifications = renderWithToast(
+      <>
+        <Toast toast={{ id: 'toast-1', title: '标题一', type: 'error' }}>
+          <ToastContent>
+            <span>通知内容一</span>
+          </ToastContent>
+        </Toast>
+        <Toast toast={{ id: 'toast-2', title: '标题二', type: 'error' }}>
+          <ToastContent>
+            <span>通知内容二</span>
+          </ToastContent>
+        </Toast>
+      </>,
+    );
+
+    expect(viewport).toContain('flex-col');
+    expect(viewport).toContain('max-h-[calc(100dvh-2rem)]');
+    expect(notifications.match(/data-slot="toast"/g)).toHaveLength(2);
+    expect(notifications.match(/min-h-14/g)).toHaveLength(2);
+    expect(notifications).not.toContain('h-full');
+    expect(notifications).not.toContain('absolute');
   });
 
   it('keeps account creation separate and presents screenshot import in a sheet', () => {

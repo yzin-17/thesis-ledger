@@ -1128,6 +1128,23 @@ textarea::placeholder {
   border-color: var(--color-border-strong);
 }
 
+/* InputGroup owns the frame; its controls must not inherit the form-card frame. */
+input[data-slot='input-group-control'],
+textarea[data-slot='input-group-control'] {
+  width: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+input[data-slot='input-group-control']:focus-visible,
+textarea[data-slot='input-group-control']:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .form-card [data-slot='select-trigger']:hover,
 .upload-bar [data-slot='select-trigger']:hover,
 .inline-control [data-slot='select-trigger']:hover {

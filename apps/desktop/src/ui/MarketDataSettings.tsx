@@ -374,13 +374,27 @@ export function MarketDataSettings() {
     setBusyAction('catalog-sync');
     setMessage(null);
     try {
-      const result = await requestJson<CatalogStatus>(
+      let result = await requestJson<CatalogStatus>(
         '/api/v1/market-data/catalog/sync',
         {
           method: 'POST',
         },
       );
+      const jobId = result.id;
+      if (result.acknowledged === false && jobId) {
+        for (let attempt = 0; attempt < 80; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          result = await requestJson<CatalogStatus>(
+            `/api/v1/market-data/catalog/jobs/${encodeURIComponent(jobId)}`,
+          );
+          if (result.acknowledged || ['failed', 'timeout'].includes(result.status ?? '')) break;
+        }
+      }
       setCatalog(result);
+      if (result.status === 'failed' || result.status === 'timeout') {
+        setMessage({ type: 'error', text: '标的目录同步任务失败，请稍后重试。' });
+        return;
+      }
       if (result.acknowledged === false) {
         setMessage({
           type: 'error',

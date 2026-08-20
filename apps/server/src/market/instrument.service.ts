@@ -56,6 +56,12 @@ const stableChecksum = (items: CatalogItem[]) =>
     )
     .digest('hex');
 
+const CATALOG_TRANSACTION_OPTIONS = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 10_000,
+  timeout: 60_000,
+} as const;
+
 const normalizedQuery = (value: string) => value.trim().toLocaleLowerCase('zh-CN');
 
 const searchFieldsFor = (item: Pick<CatalogItem, 'canonicalCode' | 'market' | 'displayName'>) => {
@@ -198,7 +204,7 @@ export class InstrumentService {
         }
         return { idempotent: Boolean(state && snapshot.generation === state.generation) };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      CATALOG_TRANSACTION_OPTIONS,
     );
     return {
       generation: snapshot.generation,
@@ -272,7 +278,7 @@ export class InstrumentService {
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      CATALOG_TRANSACTION_OPTIONS,
     );
     return {
       generation: delta.generation,

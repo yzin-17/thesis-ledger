@@ -47,7 +47,9 @@ const keyFor = (item: CatalogItem) =>
 
 class CatalogPrismaFixture {
   readonly records = new Map<string, Record<string, unknown>>();
-  readonly transactionOptions: Array<{ isolationLevel?: unknown } | undefined> = [];
+  readonly transactionOptions: Array<
+    { isolationLevel?: unknown; maxWait?: number; timeout?: number } | undefined
+  > = [];
   state: Record<string, unknown> | null = null;
   readonly instrument = {
     upsert: vi.fn(async ({ where, update, create }: any) => {
@@ -98,7 +100,7 @@ class CatalogPrismaFixture {
 
   async $transaction<T>(
     callback: (transaction: this) => Promise<T>,
-    options?: { isolationLevel?: unknown },
+    options?: { isolationLevel?: unknown; maxWait?: number; timeout?: number },
   ): Promise<T> {
     this.transactionOptions.push(options);
     return callback(this);
@@ -120,6 +122,7 @@ describe('InstrumentService catalog fields and generation', () => {
     await service.syncCatalog(snapshotFor(1, [item()]));
 
     expect(prisma.transactionOptions[0]?.isolationLevel).toBe('Serializable');
+    expect(prisma.transactionOptions[0]).toMatchObject({ maxWait: 10_000, timeout: 60_000 });
     const saved = prisma.records.get(keyFor(item()))!;
     expect(saved.pinyin).toBe('guizhoumaotai');
     expect(saved.pinyinInitials).toBe('gzmt');
