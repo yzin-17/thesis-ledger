@@ -17,6 +17,7 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 
 const CONFIRMABLE_TYPES = new Set(['STOCK', 'ETF', 'MUTUAL_FUND']);
+const SUPPORTED_MARKETS = new Set(['SH', 'SZ', 'BJ', 'OF']);
 const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
 const CATALOG_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.catalog;
 
@@ -34,7 +35,14 @@ const assetTypeFor = (instrumentType: string) => {
   }
 };
 
-const marketCurrencyFor = (market: string) => (market === 'HK' ? 'HKD' : 'CNY');
+const isConfirmableInstrument = (instrumentType: string, market: string) =>
+  CONFIRMABLE_TYPES.has(instrumentType) && SUPPORTED_MARKETS.has(market);
+
+const disabledReasonFor = (instrumentType: string, market: string) => {
+  if (!CONFIRMABLE_TYPES.has(instrumentType)) return 'unsupported_instrument_type';
+  if (!SUPPORTED_MARKETS.has(market)) return 'unsupported_market';
+  return null;
+};
 
 const stableJson = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -370,25 +378,26 @@ export class InstrumentService {
           left.instrument.id.localeCompare(right.instrument.id),
       )
       .slice(0, Math.min(Math.max(limit, 1), 50))
-      .map(({ instrument }) => ({
-        id: instrument.id,
-        instrumentType: instrument.instrumentType,
-        market: instrument.market,
-        canonicalCode: instrument.canonicalCode,
-        displayName: instrument.displayName,
-        pinyin: instrument.pinyin,
-        pinyinInitials: instrument.pinyinInitials,
-        searchAliases: instrument.searchAliases,
-        generation: instrument.generation,
-        active: instrument.active,
-        createdAt: instrument.createdAt,
-        updatedAt: instrument.updatedAt,
-        symbol: `${instrument.canonicalCode}.${instrument.market}`,
-        confirmable: CONFIRMABLE_TYPES.has(instrument.instrumentType),
-        disabledReason: CONFIRMABLE_TYPES.has(instrument.instrumentType)
-          ? null
-          : 'unsupported_instrument_type',
-      }));
+      .map(({ instrument }) => {
+        const disabledReason = disabledReasonFor(instrument.instrumentType, instrument.market);
+        return {
+          id: instrument.id,
+          instrumentType: instrument.instrumentType,
+          market: instrument.market,
+          canonicalCode: instrument.canonicalCode,
+          displayName: instrument.displayName,
+          pinyin: instrument.pinyin,
+          pinyinInitials: instrument.pinyinInitials,
+          searchAliases: instrument.searchAliases,
+          generation: instrument.generation,
+          active: instrument.active,
+          createdAt: instrument.createdAt,
+          updatedAt: instrument.updatedAt,
+          symbol: `${instrument.canonicalCode}.${instrument.market}`,
+          confirmable: disabledReason === null,
+          disabledReason,
+        };
+      });
   }
 
   async confirm(instrumentId: string) {
@@ -396,6 +405,8 @@ export class InstrumentService {
     if (!instrument) throw new NotFoundException('目录标的不存在');
     if (!CONFIRMABLE_TYPES.has(instrument.instrumentType))
       throw new BadRequestException('该标的类型当前不可建立 Asset 关联');
+    if (!SUPPORTED_MARKETS.has(instrument.market))
+      throw new BadRequestException('该市场当前不支持建立 Portfolio Asset');
     const symbol = symbolFor(instrument);
     const assetType = assetTypeFor(instrument.instrumentType);
     const asset = await this.prisma.$transaction(async (transaction) => {
@@ -425,7 +436,7 @@ export class InstrumentService {
               name: instrument.displayName,
               market: instrument.market,
               assetType,
-              currency: marketCurrencyFor(instrument.market),
+              currency: 'CNY',
               identityStatus: CONFIRMED_IDENTITY_STATUS,
               identitySource: CATALOG_IDENTITY_SOURCE,
             },
@@ -455,6 +466,8 @@ export class InstrumentService {
   async requireConfirmed(instrumentId: string) {
     const instrument = await this.prisma.instrument.findUnique({ where: { id: instrumentId } });
     if (!instrument) throw new NotFoundException('目录标的不存在');
+    if (!isConfirmableInstrument(instrument.instrumentType, instrument.market))
+      throw new BadRequestException('该标的当前不支持进入 Portfolio');
     const association = await this.prisma.instrumentAssetAssociation.findUnique({
       where: { symbol: symbolFor(instrument) },
     });
