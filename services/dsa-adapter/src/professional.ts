@@ -1,4 +1,4 @@
-import type { BarV1, QuoteV1 } from '@thesis-ledger/schemas';
+import type { BarInputV1, QuoteV1 } from '@thesis-ledger/schemas';
 import type { MarketDataProvider, MarketCapability, ProviderPluginConfig } from './provider.js';
 
 export interface ProfessionalTransport {
@@ -48,7 +48,7 @@ export const createTushareProvider = (
               '/tushare/bars',
               { symbol, timeframe },
               signal ?? AbortSignal.timeout(5000),
-            )) as BarV1[];
+            )) as BarInputV1[];
           },
         }
       : {}),

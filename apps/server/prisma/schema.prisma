@@ -189,18 +189,21 @@ model TargetAllocation {
 }
 
 model MarketBar {
-  id        BigInt   @id @default(autoincrement())
-  symbol    String
-  timeframe String
-  timestamp DateTime
-  open      Decimal  @db.Decimal(24, 8)
-  high      Decimal  @db.Decimal(24, 8)
-  low       Decimal  @db.Decimal(24, 8)
-  close     Decimal  @db.Decimal(24, 8)
-  volume    Decimal  @db.Decimal(30, 8)
-  amount    Decimal  @db.Decimal(30, 8)
-  provider  String
-  asset     Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  id           BigInt   @id @default(autoincrement())
+  symbol       String
+  timeframe    String
+  timestamp    DateTime
+  open         Decimal  @db.Decimal(24, 8)
+  high         Decimal  @db.Decimal(24, 8)
+  low          Decimal  @db.Decimal(24, 8)
+  close        Decimal  @db.Decimal(24, 8)
+  volume       Decimal  @db.Decimal(30, 8)
+  amount       Decimal  @db.Decimal(30, 8)
+  provider     String
+  fetchedAt    DateTime @default(now())
+  freshness    String   @default("unknown")
+  fallbackUsed Boolean  @default(false)
+  asset        Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
 
   @@unique([symbol, timeframe, timestamp, provider])
   @@index([symbol, timeframe, timestamp])
@@ -340,6 +343,7 @@ model RiskEvent {
   triggered    Boolean
   severity     String
   message      String
+  mode         String    @default("actual")
   accountId    String?   @db.Uuid
   symbol       String?
   triggerValue Decimal?  @db.Decimal(24, 8)
@@ -352,6 +356,7 @@ model RiskEvent {
   @@index([ruleId, evaluatedAt])
   @@index([triggered, severity])
   @@index([accountId, symbol, evaluatedAt])
+  @@index([mode, evaluatedAt, id])
 }
 
 model RiskRuleAudit {

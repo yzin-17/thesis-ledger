@@ -63,10 +63,29 @@ export const riskRuleUpdateSchema = riskRuleFields
     scope: riskRuleFields.shape.scope.optional(),
   });
 
-export const riskScanContextSchema = z.object({
+const riskModeSchema = z.enum(['actual', 'shadow']);
+const riskDataQualitySchema = z.record(z.string(), z.string()).default({});
+const riskPositionSchema = z.object({
+  symbol: z.string(),
+  weight: z.number().min(0).max(1),
+  sector: z.string().optional(),
+  assetType: z.string().optional(),
+  volatility: z.number().nonnegative().optional(),
+});
+const riskAggregateFields = {
+  mode: riskModeSchema.default('actual'),
+  portfolioValues: z.array(z.number()).optional(),
+  performance: z.record(z.string(), z.number()).optional(),
+  positions: z.array(riskPositionSchema).optional(),
+  returns: z.record(z.string(), z.array(z.number())).optional(),
+  dataQuality: riskDataQualitySchema,
+  marketTime: z.iso.datetime({ offset: true }),
+};
+
+export const riskSecurityContextSchema = z.object({
   symbol: z.string(),
   accountId: z.uuid().optional(),
-  mode: z.enum(['actual', 'shadow']).default('actual'),
+  mode: riskModeSchema.default('actual'),
   price: z.number().nonnegative().optional(),
   costPrice: z.number().nonnegative().optional(),
   weight: z.number().min(0).max(1).optional(),
@@ -84,18 +103,25 @@ export const riskScanContextSchema = z.object({
     })
     .optional(),
   performance: z.record(z.string(), z.number()).optional(),
-  positions: z
-    .array(
-      z.object({
-        symbol: z.string(),
-        weight: z.number().min(0).max(1),
-        sector: z.string().optional(),
-        assetType: z.string().optional(),
-        volatility: z.number().nonnegative().optional(),
-      }),
-    )
-    .optional(),
+  positions: z.array(riskPositionSchema).optional(),
   returns: z.record(z.string(), z.array(z.number())).optional(),
-  dataQuality: z.record(z.string(), z.string()).default({}),
+  dataQuality: riskDataQualitySchema,
   marketTime: z.iso.datetime({ offset: true }),
 });
+
+export const riskAccountContextSchema = z.object({
+  accountId: z.uuid(),
+  ...riskAggregateFields,
+});
+
+export const riskPortfolioContextSchema = z.object(riskAggregateFields);
+
+export const riskScanEnvelopeSchema = z.object({
+  security: z.array(riskSecurityContextSchema).default([]),
+  accounts: z.array(riskAccountContextSchema).default([]),
+  portfolio: riskPortfolioContextSchema.optional(),
+  allowStale: z.boolean().default(false),
+});
+
+// Backward-compatible name for callers that still submit a flat security-context array.
+export const riskScanContextSchema = riskSecurityContextSchema;

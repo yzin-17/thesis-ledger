@@ -5,15 +5,20 @@ import {
   type RiskRule,
 } from '@thesis-ledger/domain';
 import {
+  riskAccountContextSchema,
+  riskPortfolioContextSchema,
   riskRuleInputSchema,
   riskRuleUpdateSchema,
   riskScanContextSchema,
+  riskScanEnvelopeSchema,
 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
-type ScanContext = ReturnType<typeof riskScanContextSchema.parse>;
+type SecurityContext = ReturnType<typeof riskScanContextSchema.parse>;
+type AccountContext = ReturnType<typeof riskAccountContextSchema.parse>;
+type PortfolioContext = ReturnType<typeof riskPortfolioContextSchema.parse>;
 type PortfolioMode = 'actual' | 'shadow';
 type StoredRule = {
   id: string;
@@ -27,6 +32,116 @@ type StoredRule = {
   accountId: string | null;
   sourcePlanId?: string | null;
   parameters?: unknown;
+};
+type ParsedScan = {
+  security: SecurityContext[];
+  accounts: AccountContext[];
+  portfolio?: PortfolioContext;
+  allowStale: boolean;
+};
+type EvaluationCandidate = {
+  scope: RiskRule['scope'];
+  mode: PortfolioMode;
+  marketTime: string;
+  dataQuality: Record<string, string>;
+  symbol?: string;
+  accountId?: string;
+  domain: CompleteRiskContext;
+};
+type PositionContext = NonNullable<SecurityContext['positions']>[number];
+
+const latestByMarketTime = <T extends { marketTime: string }>(values: readonly T[]) =>
+  [...values].sort((left, right) => right.marketTime.localeCompare(left.marketTime))[0];
+
+const aggregateDataQuality = (contexts: readonly SecurityContext[]): Record<string, string> =>
+  contexts.reduce<Record<string, string>>(
+    (combined, context) => ({ ...combined, ...context.dataQuality }),
+    {},
+  );
+
+const aggregatePositions = (contexts: readonly SecurityContext[]) => {
+  const explicit = latestByMarketTime(contexts.filter((context) => context.positions !== undefined));
+  if (explicit?.positions) return explicit.positions;
+  const bySymbol = new Map<string, PositionContext>();
+  for (const context of contexts) {
+    if (context.weight === undefined) continue;
+    bySymbol.set(context.symbol, { symbol: context.symbol, weight: context.weight });
+  }
+  return bySymbol.size > 0 ? [...bySymbol.values()] : undefined;
+};
+
+const toDomainPositions = (
+  positions: readonly PositionContext[] | undefined,
+): CompleteRiskContext['positions'] =>
+  positions?.map((position) => ({
+    symbol: position.symbol,
+    weight: position.weight,
+    ...(position.sector === undefined ? {} : { sector: position.sector }),
+    ...(position.assetType === undefined ? {} : { assetType: position.assetType }),
+    ...(position.volatility === undefined ? {} : { volatility: position.volatility }),
+  }));
+
+const deriveAccountContexts = (security: readonly SecurityContext[]): AccountContext[] => {
+  const grouped = new Map<string, SecurityContext[]>();
+  for (const context of security) {
+    if (!context.accountId) continue;
+    const group = grouped.get(context.accountId) ?? [];
+    group.push(context);
+    grouped.set(context.accountId, group);
+  }
+  return [...grouped.entries()].map(([accountId, contexts]) => {
+    const latest = latestByMarketTime(contexts)!;
+    const aggregateSource = latestByMarketTime(
+      contexts.filter(
+        (context) =>
+          context.portfolioValues !== undefined ||
+          context.performance !== undefined ||
+          context.returns !== undefined,
+      ),
+    );
+    const positions = aggregatePositions(contexts);
+    return riskAccountContextSchema.parse({
+      accountId,
+      mode: latest.mode,
+      marketTime: latest.marketTime,
+      dataQuality: aggregateDataQuality(contexts),
+      ...(positions === undefined ? {} : { positions }),
+      ...(aggregateSource?.portfolioValues === undefined
+        ? {}
+        : { portfolioValues: aggregateSource.portfolioValues }),
+      ...(aggregateSource?.performance === undefined
+        ? {}
+        : { performance: aggregateSource.performance }),
+      ...(aggregateSource?.returns === undefined ? {} : { returns: aggregateSource.returns }),
+    });
+  });
+};
+
+const derivePortfolioContext = (security: readonly SecurityContext[]): PortfolioContext | undefined => {
+  if (security.length === 0) return undefined;
+  const latest = latestByMarketTime(security)!;
+  const aggregateSource = latestByMarketTime(
+    security.filter(
+      (context) =>
+        context.portfolioValues !== undefined ||
+        context.performance !== undefined ||
+        context.returns !== undefined,
+    ),
+  );
+  const positions = aggregatePositions(security);
+  return riskPortfolioContextSchema.parse({
+    mode: latest.mode,
+    marketTime: latest.marketTime,
+    dataQuality: aggregateDataQuality(security),
+    ...(positions === undefined ? {} : { positions }),
+    ...(aggregateSource?.portfolioValues === undefined
+      ? {}
+      : { portfolioValues: aggregateSource.portfolioValues }),
+    ...(aggregateSource?.performance === undefined
+      ? {}
+      : { performance: aggregateSource.performance }),
+    ...(aggregateSource?.returns === undefined ? {} : { returns: aggregateSource.returns }),
+  });
 };
 
 @Injectable()
@@ -117,10 +232,10 @@ export class RiskService {
   }
 
   async testRule(id: string, input: unknown) {
-    const { contexts, allowStale } = this.parseScanInput(input);
-    this.rejectStaleContexts(contexts, allowStale);
+    const parsed = this.parseScanInput(input);
+    this.rejectStaleContexts(parsed);
     const stored = await this.prisma.riskRule.findUniqueOrThrow({ where: { id } });
-    const events = this.evaluateStoredRule(stored, contexts).map(({ event }) => event);
+    const events = this.evaluateStoredRule(stored, parsed).map(({ event }) => event);
     await this.prisma.riskRuleAudit.create({
       data: {
         ruleId: id,
@@ -141,8 +256,8 @@ export class RiskService {
   }
 
   async scan(input: unknown) {
-    const { contexts, allowStale } = this.parseScanInput(input);
-    this.rejectStaleContexts(contexts, allowStale);
+    const parsed = this.parseScanInput(input);
+    this.rejectStaleContexts(parsed);
     const rules = await this.prisma.riskRule.findMany({
       where: { enabled: true, effectiveAt: { lte: new Date() } },
     });
@@ -150,7 +265,7 @@ export class RiskService {
     const results: Array<{ ruleId: string; eventId?: string; error?: string }> = [];
     for (const stored of rules) {
       try {
-        for (const { candidate, event } of this.evaluateStoredRule(stored, contexts)) {
+        for (const { candidate, event } of this.evaluateStoredRule(stored, parsed)) {
           if (!event.triggered) continue;
           const saved = await this.prisma.riskEvent.create({
             data: {
@@ -159,14 +274,18 @@ export class RiskService {
               triggered: true,
               severity: event.severity,
               message: event.message,
+              mode: candidate.mode,
               ...(candidate.accountId === undefined ? {} : { accountId: candidate.accountId }),
-              symbol: candidate.symbol,
+              ...(candidate.scope === 'security' && candidate.symbol
+                ? { symbol: candidate.symbol }
+                : {}),
               triggerValue: event.context.value,
               threshold: Number(stored.threshold),
               marketTime: new Date(candidate.marketTime),
               context: {
                 ...event.context,
                 mode: candidate.mode,
+                scope: candidate.scope,
                 traceId,
                 dataQuality: candidate.dataQuality,
               },
@@ -207,16 +326,16 @@ export class RiskService {
     return { traceId, results };
   }
 
-  async history(mode: PortfolioMode = 'actual') {
-    const events = await this.prisma.riskEvent.findMany({
-      orderBy: { evaluatedAt: 'desc' },
-      take: 200,
-    });
-    return events.filter((event) => {
-      const context = event.context;
-      if (typeof context !== 'object' || context === null || !('mode' in context))
-        return mode === 'actual';
-      return (context as { mode?: unknown }).mode === mode;
+  history(
+    mode: PortfolioMode = 'actual',
+    options: { cursor?: string; limit?: number } = {},
+  ) {
+    const limit = Math.min(Math.max(options.limit ?? 200, 1), 200);
+    return this.prisma.riskEvent.findMany({
+      where: { mode },
+      orderBy: [{ evaluatedAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
     });
   }
 
@@ -241,25 +360,65 @@ export class RiskService {
     };
   }
 
-  private parseScanInput(input: unknown) {
-    if (Array.isArray(input)) {
-      return { contexts: riskScanContextSchema.array().parse(input), allowStale: false };
+  private parseScanInput(input: unknown): ParsedScan {
+    if (Array.isArray(input)) return this.fromLegacySecurity(input, false);
+    const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+    if ('security' in raw || 'accounts' in raw || 'portfolio' in raw) {
+      const envelope = riskScanEnvelopeSchema.parse(raw);
+      const derivedAccounts = deriveAccountContexts(envelope.security);
+      const accountIds = new Set(envelope.accounts.map((context) => context.accountId));
+      const accounts = [
+        ...envelope.accounts,
+        ...derivedAccounts.filter((context) => !accountIds.has(context.accountId)),
+      ];
+      const portfolio = envelope.portfolio ?? derivePortfolioContext(envelope.security);
+      const parsed: ParsedScan = {
+        security: envelope.security,
+        accounts,
+        allowStale: envelope.allowStale,
+        ...(portfolio ? { portfolio } : {}),
+      };
+      this.assertSingleMode(parsed);
+      return parsed;
     }
-    const envelope = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
-    return {
-      contexts: riskScanContextSchema.array().parse(envelope.contexts),
-      allowStale: envelope.allowStale === true,
-    };
+    return this.fromLegacySecurity(raw.contexts, raw.allowStale === true);
   }
 
-  private rejectStaleContexts(contexts: ScanContext[], allowStale: boolean) {
-    if (allowStale) return;
+  private fromLegacySecurity(input: unknown, allowStale: boolean): ParsedScan {
+    const security = riskScanContextSchema.array().parse(input);
+    const portfolio = derivePortfolioContext(security);
+    const parsed: ParsedScan = {
+      security,
+      accounts: deriveAccountContexts(security),
+      allowStale,
+      ...(portfolio ? { portfolio } : {}),
+    };
+    this.assertSingleMode(parsed);
+    return parsed;
+  }
+
+  private assertSingleMode(scan: ParsedScan) {
+    const modes = new Set<PortfolioMode>([
+      ...scan.security.map((context) => context.mode),
+      ...scan.accounts.map((context) => context.mode),
+      ...(scan.portfolio ? [scan.portfolio.mode] : []),
+    ]);
+    if (modes.size > 1) throw new BadRequestException('单次 Risk scan 不能混合 actual 与 shadow mode');
+  }
+
+  private rejectStaleContexts(scan: ParsedScan) {
+    if (scan.allowStale) return;
+    const qualities = [
+      ...scan.security.map((context) => context.dataQuality),
+      ...scan.accounts.map((context) => context.dataQuality),
+      ...(scan.portfolio ? [scan.portfolio.dataQuality] : []),
+    ];
     if (
-      contexts.some(
-        (context) =>
-          context.dataQuality.freshness === 'stale' ||
-          context.dataQuality.marketData === 'stale' ||
-          context.dataQuality.status === 'stale',
+      qualities.some(
+        (quality) =>
+          quality.freshness === 'stale' ||
+          quality.marketData === 'stale' ||
+          quality.status === 'stale',
       )
     )
       throw new BadRequestException('行情陈旧，Risk 默认拒绝评估；请在允许陈旧数据后重试');
@@ -269,8 +428,8 @@ export class RiskService {
     return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
   }
 
-  private evaluateStoredRule(stored: StoredRule, contexts: ScanContext[]) {
-    const rule: RiskRule = {
+  private toRule(stored: StoredRule): RiskRule {
+    return {
       id: stored.id,
       version: stored.version,
       kind: stored.kind as RiskRule['kind'],
@@ -284,61 +443,116 @@ export class RiskService {
         ? { parameters: stored.parameters as Record<string, unknown> }
         : {}),
     };
-    return contexts
-      .filter(
-        (context) =>
-          (!rule.symbol || rule.symbol === context.symbol) &&
-          (!rule.accountId || rule.accountId === context.accountId),
-      )
-      .map((candidate) => {
-        const context: CompleteRiskContext = {
-          symbol: candidate.symbol,
-          marketTime: candidate.marketTime,
-          ...(candidate.price === undefined ? {} : { price: candidate.price }),
-          ...(candidate.costPrice === undefined ? {} : { costPrice: candidate.costPrice }),
-          ...(candidate.weight === undefined ? {} : { weight: candidate.weight }),
-          ...(candidate.holdingPeak === undefined ? {} : { holdingPeak: candidate.holdingPeak }),
-          ...(candidate.portfolioValues === undefined
-            ? {}
-            : { portfolioValues: candidate.portfolioValues }),
-          ...(candidate.indicators === undefined ? {} : { indicators: candidate.indicators }),
-          ...(candidate.chip === undefined
-            ? {}
-            : {
-                chip: {
-                  profitRatio: candidate.chip.profitRatio,
-                  concentration: candidate.chip.concentration,
-                  engineVersion: candidate.chip.engineVersion,
-                  calculatedAt: candidate.chip.calculatedAt,
-                  ...(candidate.chip.mainPeak === undefined
-                    ? {}
-                    : { mainPeak: candidate.chip.mainPeak }),
-                  ...(candidate.chip.previousMainPeaks === undefined
-                    ? {}
-                    : { previousMainPeaks: candidate.chip.previousMainPeaks }),
-                },
-              }),
-          ...(candidate.positions === undefined
-            ? {}
-            : {
-                positions: candidate.positions.map((position) => ({
-                  symbol: position.symbol,
-                  weight: position.weight,
-                  ...(position.sector === undefined ? {} : { sector: position.sector }),
-                  ...(position.assetType === undefined ? {} : { assetType: position.assetType }),
-                  ...(position.volatility === undefined ? {} : { volatility: position.volatility }),
-                })),
-              }),
-          ...(candidate.returns === undefined ? {} : { returns: candidate.returns }),
-          dataQuality: candidate.dataQuality,
-        };
-        return { candidate, event: evaluateCompleteRule(rule, context) };
-      })
+  }
+
+  private securityCandidate(context: SecurityContext): EvaluationCandidate {
+    const positions = toDomainPositions(context.positions);
+    const chip =
+      context.chip === undefined
+        ? undefined
+        : {
+            profitRatio: context.chip.profitRatio,
+            concentration: context.chip.concentration,
+            engineVersion: context.chip.engineVersion,
+            calculatedAt: context.chip.calculatedAt,
+            ...(context.chip.mainPeak === undefined ? {} : { mainPeak: context.chip.mainPeak }),
+            ...(context.chip.previousMainPeaks === undefined
+              ? {}
+              : { previousMainPeaks: context.chip.previousMainPeaks }),
+          };
+    return {
+      scope: 'security',
+      mode: context.mode,
+      marketTime: context.marketTime,
+      dataQuality: context.dataQuality,
+      symbol: context.symbol,
+      ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+      domain: {
+        symbol: context.symbol,
+        marketTime: context.marketTime,
+        ...(context.price === undefined ? {} : { price: context.price }),
+        ...(context.costPrice === undefined ? {} : { costPrice: context.costPrice }),
+        ...(context.weight === undefined ? {} : { weight: context.weight }),
+        ...(context.holdingPeak === undefined ? {} : { holdingPeak: context.holdingPeak }),
+        ...(context.portfolioValues === undefined
+          ? {}
+          : { portfolioValues: context.portfolioValues }),
+        ...(context.indicators === undefined ? {} : { indicators: context.indicators }),
+        ...(chip === undefined ? {} : { chip }),
+        ...(positions === undefined ? {} : { positions }),
+        ...(context.returns === undefined ? {} : { returns: context.returns }),
+        dataQuality: context.dataQuality,
+      },
+    };
+  }
+
+  private accountCandidate(context: AccountContext): EvaluationCandidate {
+    const positions = toDomainPositions(context.positions);
+    return {
+      scope: 'account',
+      mode: context.mode,
+      marketTime: context.marketTime,
+      dataQuality: context.dataQuality,
+      accountId: context.accountId,
+      domain: {
+        symbol: `@account:${context.accountId}`,
+        marketTime: context.marketTime,
+        ...(context.portfolioValues === undefined
+          ? {}
+          : { portfolioValues: context.portfolioValues }),
+        ...(positions === undefined ? {} : { positions }),
+        ...(context.returns === undefined ? {} : { returns: context.returns }),
+        dataQuality: context.dataQuality,
+      },
+    };
+  }
+
+  private portfolioCandidate(context: PortfolioContext): EvaluationCandidate {
+    const positions = toDomainPositions(context.positions);
+    return {
+      scope: 'portfolio',
+      mode: context.mode,
+      marketTime: context.marketTime,
+      dataQuality: context.dataQuality,
+      domain: {
+        symbol: '@portfolio',
+        marketTime: context.marketTime,
+        ...(context.portfolioValues === undefined
+          ? {}
+          : { portfolioValues: context.portfolioValues }),
+        ...(positions === undefined ? {} : { positions }),
+        ...(context.returns === undefined ? {} : { returns: context.returns }),
+        dataQuality: context.dataQuality,
+      },
+    };
+  }
+
+  private candidatesForRule(rule: RiskRule, scan: ParsedScan): EvaluationCandidate[] {
+    if (rule.scope === 'portfolio') {
+      return scan.portfolio ? [this.portfolioCandidate(scan.portfolio)] : [];
+    }
+    if (rule.scope === 'account') {
+      const context = scan.accounts.find((candidate) => candidate.accountId === rule.accountId);
+      return context ? [this.accountCandidate(context)] : [];
+    }
+    const matching = scan.security.filter(
+      (context) =>
+        (!rule.symbol || context.symbol === rule.symbol) &&
+        (!rule.accountId || context.accountId === rule.accountId),
+    );
+    const latest = latestByMarketTime(matching);
+    return latest ? [this.securityCandidate(latest)] : [];
+  }
+
+  private evaluateStoredRule(stored: StoredRule, scan: ParsedScan) {
+    const rule = this.toRule(stored);
+    return this.candidatesForRule(rule, scan)
+      .map((candidate) => ({ candidate, event: evaluateCompleteRule(rule, candidate.domain) }))
       .filter(
         (
           result,
         ): result is {
-          candidate: ScanContext;
+          candidate: EvaluationCandidate;
           event: NonNullable<typeof result.event>;
         } => result.event !== null,
       );

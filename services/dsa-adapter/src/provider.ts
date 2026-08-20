@@ -1,4 +1,4 @@
-import type { BarV1, QuoteV1 } from '@thesis-ledger/schemas';
+import { barSchemaV1, type BarInputV1, type BarV1, type QuoteV1 } from '@thesis-ledger/schemas';
 
 export type MarketCapability =
   'quote' | 'bars-1d' | 'bars-1m' | 'indicator' | 'chip' | 'financials' | 'news' | 'announcements';
@@ -46,7 +46,7 @@ export interface MarketDataProvider {
     circuitBreaker?: CircuitBreaker;
   };
   quote?(symbol: string, signal?: AbortSignal): Promise<QuoteV1>;
-  bars?(symbol: string, timeframe: '1m' | '1d', signal?: AbortSignal): Promise<BarV1[]>;
+  bars?(symbol: string, timeframe: '1m' | '1d', signal?: AbortSignal): Promise<BarInputV1[]>;
   health(signal?: AbortSignal): Promise<boolean>;
 }
 
@@ -317,11 +317,23 @@ export class ProviderHealthMonitor {
   }
 }
 
-export const mergeBars = (results: readonly ProviderResult<BarV1[]>[]): ProviderResult<BarV1[]> => {
+export const mergeBars = (
+  results: readonly ProviderResult<BarInputV1[]>[],
+): ProviderResult<BarV1[]> => {
   const byTimestamp = new Map<string, BarV1>();
-  for (const result of results)
-    for (const bar of result.data)
+  results.forEach((result, providerIndex) => {
+    const fetchedAt = new Date().toISOString();
+    for (const raw of result.data) {
+      const bar = barSchemaV1.parse({
+        ...raw,
+        fetchedAt: raw.fetchedAt ?? fetchedAt,
+        freshness: raw.freshness ?? 'unknown',
+        fallbackUsed: raw.fallbackUsed ?? providerIndex > 0,
+        servedFromCache: false,
+      });
       if (!byTimestamp.has(bar.timestamp)) byTimestamp.set(bar.timestamp, bar);
+    }
+  });
   const data = [...byTimestamp.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   return {
     data,

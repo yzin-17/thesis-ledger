@@ -46,7 +46,14 @@ export class RiskController {
   }
 
   @Get('events')
-  events(@Query('mode') mode: 'actual' | 'shadow' = 'actual') {
-    return this.risk.history(mode);
+  events(
+    @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.risk.history(mode, {
+      ...(cursor ? { cursor } : {}),
+      ...(limit ? { limit: Number(limit) } : {}),
+    });
   }
 }
