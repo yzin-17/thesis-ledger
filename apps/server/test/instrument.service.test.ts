@@ -9,6 +9,36 @@ type CatalogItem = {
   displayName: string;
 };
 
+type InstrumentUpsertArgs = {
+  where: {
+    canonicalCode_instrumentType_market: Pick<
+      CatalogItem,
+      'canonicalCode' | 'instrumentType' | 'market'
+    >;
+  };
+  update: Record<string, unknown>;
+  create: Record<string, unknown>;
+};
+
+type InstrumentUpdateManyArgs = {
+  where: { generation: { lt: number } };
+  data: Record<string, unknown>;
+};
+
+type InstrumentFindManyArgs = {
+  where?: { active?: boolean };
+  select?: Record<string, boolean>;
+};
+
+type CatalogStateUpsertArgs = {
+  update: Record<string, unknown>;
+  create: Record<string, unknown>;
+};
+
+type CatalogStateUpdateArgs = {
+  data: Record<string, unknown>;
+};
+
 const stableJson = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -45,6 +75,16 @@ const snapshotFor = (generation: number, items: CatalogItem[]) => ({
 const keyFor = (item: CatalogItem) =>
   `${item.canonicalCode}:${item.instrumentType}:${item.market}`;
 
+const rankInput = (
+  record: Record<string, unknown>,
+): Parameters<typeof instrumentMatchRank>[0] => ({
+  canonicalCode: String(record.canonicalCode ?? ''),
+  displayName: String(record.displayName ?? ''),
+  pinyin: typeof record.pinyin === 'string' ? record.pinyin : null,
+  pinyinInitials: typeof record.pinyinInitials === 'string' ? record.pinyinInitials : null,
+  searchAliases: record.searchAliases,
+});
+
 class CatalogPrismaFixture {
   readonly records = new Map<string, Record<string, unknown>>();
   readonly transactionOptions: Array<
@@ -52,7 +92,7 @@ class CatalogPrismaFixture {
   > = [];
   state: Record<string, unknown> | null = null;
   readonly instrument = {
-    upsert: vi.fn(async ({ where, update, create }: any) => {
+    upsert: vi.fn(async ({ where, update, create }: InstrumentUpsertArgs) => {
       const key = keyFor({
         canonicalCode: where.canonicalCode_instrumentType_market.canonicalCode,
         instrumentType: where.canonicalCode_instrumentType_market.instrumentType,
@@ -70,13 +110,13 @@ class CatalogPrismaFixture {
       this.records.set(key, next);
       return next;
     }),
-    updateMany: vi.fn(async ({ where, data }: any) => {
+    updateMany: vi.fn(async ({ where, data }: InstrumentUpdateManyArgs) => {
       for (const record of this.records.values()) {
         if (Number(record.generation) < Number(where.generation.lt)) Object.assign(record, data);
       }
       return { count: this.records.size };
     }),
-    findMany: vi.fn(async ({ where, select }: any) =>
+    findMany: vi.fn(async ({ where, select }: InstrumentFindManyArgs) =>
       [...this.records.values()]
         .filter((record) => where?.active === undefined || record.active === where.active)
         .map((record) =>
@@ -88,11 +128,11 @@ class CatalogPrismaFixture {
   };
   readonly catalogSyncState = {
     findUnique: vi.fn(async () => this.state),
-    upsert: vi.fn(async ({ update, create }: any) => {
+    upsert: vi.fn(async ({ update, create }: CatalogStateUpsertArgs) => {
       this.state = { ...(this.state ?? create), ...update };
       return this.state;
     }),
-    update: vi.fn(async ({ data }: any) => {
+    update: vi.fn(async ({ data }: CatalogStateUpdateArgs) => {
       this.state = { ...(this.state ?? {}), ...data };
       return this.state;
     }),
@@ -129,8 +169,8 @@ describe('InstrumentService catalog fields and generation', () => {
     expect(saved.searchAliases).toEqual(
       expect.arrayContaining(['贵州茅台', 'guizhoumaotai', 'gzmt', '600519.SH']),
     );
-    expect(instrumentMatchRank(saved as any, 'gzmt')).toBe(3);
-    expect(instrumentMatchRank(saved as any, '600519.SH')).toBe(4);
+    expect(instrumentMatchRank(rankInput(saved), 'gzmt')).toBe(3);
+    expect(instrumentMatchRank(rankInput(saved), '600519.SH')).toBe(4);
   });
 
   it('delta refreshes generated search fields when the display name changes', async () => {
@@ -153,7 +193,7 @@ describe('InstrumentService catalog fields and generation', () => {
     const saved = prisma.records.get(keyFor(item()))!;
     expect(saved.pinyin).toBe('guizhoumaotai jiu'.replace(/\s+/g, ''));
     expect(saved.pinyinInitials).toBe('gzmtj');
-    expect(instrumentMatchRank(saved as any, 'gzmtj')).toBe(3);
+    expect(instrumentMatchRank(rankInput(saved), 'gzmtj')).toBe(3);
   });
 
   it('rejects an older snapshot, keeps same generation idempotent, and detects conflict', async () => {

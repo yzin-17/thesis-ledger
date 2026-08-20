@@ -111,9 +111,8 @@ export class BacktestService {
     const job = backtestJobSchema.parse(input);
     if (hasStaleMarketData(job) && !explicitlyAllowsStale(input))
       throw new BadRequestException('回测默认拒绝陈旧或部分市场数据，请显式允许后重试');
-    const { strategy: _ignoredStrategy, ...persistedInput } = job as typeof job & {
-      strategy?: unknown;
-    };
+    const persistedInput = { ...(job as typeof job & { strategy?: unknown }) };
+    delete persistedInput.strategy;
     return this.prisma.backtestJob.create({
       data: {
         id: job.id,

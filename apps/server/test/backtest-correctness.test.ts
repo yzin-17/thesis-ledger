@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BacktestService } from '../src/backtest/backtest.service.js';
 
+type WorkerRun = (input: unknown, signal: AbortSignal) => Promise<unknown>;
+
 const savedStrategy = {
   version: 1 as const,
   name: 'saved',
@@ -47,7 +49,7 @@ describe('Backtest service correctness regressions', () => {
     };
     const worker = {
       id: 'mock-worker',
-      run: vi.fn(async (_input: unknown, _signal: AbortSignal) => ({ returns: [] })),
+      run: vi.fn<WorkerRun>(async () => ({ returns: [] })),
     };
     await new BacktestService(prisma as never).run(state.id, worker as never);
     expect(worker.run).toHaveBeenCalledWith(
