@@ -204,7 +204,7 @@ describe('Ledger transactional migration', () => {
       position: {
         findMany: vi.fn(async () => [
           {
-            id: 'position-1',
+            id: '11111111-1111-4111-8111-111111111115',
             accountId: '11111111-1111-4111-8111-111111111111',
             symbol: '600519.SH',
             quantity: 10,
