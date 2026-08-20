@@ -17,6 +17,8 @@ import { LedgerService } from './ledger/ledger.service.js';
 import { BacktestService } from './backtest/backtest.service.js';
 import { AiRunService } from './ai/ai.service.js';
 import { AutomationService } from './automation/automation.service.js';
+import { AutomationScheduler } from './automation/automation.scheduler.js';
+import { AutomationRuntimeHandlers } from './automation/automation-runtime.service.js';
 import { RiskController } from './risk/risk.controller.js';
 import { RiskService } from './risk/risk.service.js';
 import { LedgerController } from './ledger/ledger.controller.js';
@@ -85,6 +87,8 @@ import { MarketControlService } from './market/market-control.service.js';
     BacktestService,
     AiRunService,
     AutomationService,
+    AutomationScheduler,
+    AutomationRuntimeHandlers,
     RiskService,
     PerformanceService,
     JournalService,

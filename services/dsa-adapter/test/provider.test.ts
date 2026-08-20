@@ -216,11 +216,8 @@ describe('交易日历', () => {
     expect(defaultCnTradingDay('2025-01-04')).toMatchObject({ open: false, sessions: [] });
     expect(defaultCnTradingDay('2025-01-03')).toMatchObject({ open: true });
   });
-  it('回填范围只报告缺失交易日', () => {
-    expect(missingRanges(['2025-01-02'], '2025-01-01', '2025-01-05')).toEqual([
-      '2025-01-01',
-      '2025-01-03',
-    ]);
+  it('回填范围只报告缺失交易日并排除交易所节假日', () => {
+    expect(missingRanges(['2025-01-02'], '2025-01-01', '2025-01-05')).toEqual(['2025-01-03']);
   });
 });
 

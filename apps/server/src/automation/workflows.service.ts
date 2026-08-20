@@ -1,3 +1,5 @@
+import { cnTradingCalendar } from '@thesis-ledger/domain';
+
 export interface AutomationPosition {
   symbol: string;
   quantity: number;
@@ -12,11 +14,7 @@ export interface AutomationEvent {
   provider?: string;
 }
 
-export const isTradingDay = (date: Date | string) => {
-  const value = new Date(date);
-  const weekday = value.getUTCDay();
-  return weekday !== 0 && weekday !== 6;
-};
+export const isTradingDay = (date: Date | string) => cnTradingCalendar.isTradingDay(date);
 
 export const preMarketPositionEvents = (
   positions: readonly AutomationPosition[],

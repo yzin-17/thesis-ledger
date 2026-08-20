@@ -1,3 +1,5 @@
+import { cnTradingCalendar } from '@thesis-ledger/domain';
+
 export interface TradingCalendarEntry {
   date: string;
   market: 'CN' | 'HK' | 'US';
@@ -6,18 +8,17 @@ export interface TradingCalendarEntry {
 }
 
 export const defaultCnTradingDay = (date: string): TradingCalendarEntry => {
-  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const open = cnTradingCalendar.isTradingDay(`${date}T12:00:00+08:00`);
   return {
     date,
     market: 'CN',
-    open: day !== 0 && day !== 6,
-    sessions:
-      day === 0 || day === 6
-        ? []
-        : [
-            { start: '09:30', end: '11:30' },
-            { start: '13:00', end: '15:00' },
-          ],
+    open,
+    sessions: open
+      ? [
+          { start: '09:30', end: '11:30' },
+          { start: '13:00', end: '15:00' },
+        ]
+      : [],
   };
 };
 

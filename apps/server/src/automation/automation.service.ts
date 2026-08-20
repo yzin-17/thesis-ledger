@@ -1,74 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { automationJobSchema } from '@thesis-ledger/schemas';
+import { Cron } from 'croner';
+import { cnTradingCalendar } from '@thesis-ledger/domain';
+import {
+  automationJobSchema,
+  automationJobTypeSchema,
+  isMarketAutomationJobType,
+  type AutomationJobType,
+} from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
-import { isTradingDay } from './workflows.service.js';
-
-const cronFieldMatches = (field: string, value: number) =>
-  field.split(',').some((part) => {
-    const [range, stepText] = part.split('/');
-    const step = stepText === undefined ? 1 : Number(stepText);
-    if (!Number.isInteger(step) || step <= 0) return false;
-    if (range === '*') return value % step === 0;
-    if (range?.includes('-')) {
-      const [startText, endText] = range.split('-');
-      const start = Number(startText);
-      const end = Number(endText);
-      return (
-        Number.isInteger(start) &&
-        Number.isInteger(end) &&
-        value >= start &&
-        value <= end &&
-        (value - start) % step === 0
-      );
-    }
-    const start = Number(range);
-    return Number.isInteger(start) && value >= start && (value - start) % step === 0;
-  });
 
 export const nextCronOccurrence = (cron: string, timezone: string, after = new Date()) => {
-  const fields = cron.trim().split(/\s+/);
-  if (fields.length !== 5) throw new Error('cron 必须包含 5 个字段');
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    minute: 'numeric',
-    hour: 'numeric',
-    day: 'numeric',
-    month: 'numeric',
-    weekday: 'short',
-    hour12: false,
-  });
-  const weekdayMap: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  const candidate = new Date(after.getTime() - (after.getTime() % 60_000) + 60_000);
-  for (
-    let minute = 0;
-    minute < 527_040;
-    minute += 1, candidate.setUTCMinutes(candidate.getUTCMinutes() + 1)
-  ) {
-    const parts = Object.fromEntries(
-      formatter
-        .formatToParts(candidate)
-        .filter((part) => part.type !== 'literal')
-        .map((part) => [part.type, part.value]),
-    );
-    if (
-      cronFieldMatches(fields[0]!, Number(parts.minute)) &&
-      cronFieldMatches(fields[1]!, Number(parts.hour) % 24) &&
-      cronFieldMatches(fields[2]!, Number(parts.day)) &&
-      cronFieldMatches(fields[3]!, Number(parts.month)) &&
-      cronFieldMatches(fields[4]!, weekdayMap[parts.weekday!] ?? -1)
-    )
-      return new Date(candidate);
+  const schedule = new Cron(cron, { timezone, paused: true });
+  try {
+    const next = schedule.nextRun(after);
+    if (!next) throw new Error('找不到下一次 cron 执行时间');
+    return next;
+  } finally {
+    schedule.stop();
   }
-  throw new Error('一年内找不到下一次执行时间');
 };
 
 export const runWithRetry = async <T>(
@@ -90,8 +40,8 @@ export const runWithRetry = async <T>(
 };
 
 export interface AutomationHandler {
-  readonly type: string;
-  run(signal: AbortSignal): Promise<unknown>;
+  readonly type: AutomationJobType;
+  run(signal: AbortSignal, scheduledAt: Date): Promise<unknown>;
 }
 
 @Injectable()
@@ -100,6 +50,7 @@ export class AutomationService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {}
+
   create(input: unknown) {
     const job = automationJobSchema.parse(input);
     return this.prisma.automationJob.create({
@@ -116,25 +67,63 @@ export class AutomationService {
       },
     });
   }
+
   list() {
     return this.prisma.automationJob.findMany({ orderBy: { name: 'asc' } });
   }
 
   async executeScheduled(jobId: string, handler: AutomationHandler, now = new Date()) {
     const job = await this.prisma.automationJob.findUniqueOrThrow({ where: { id: jobId } });
-    const marketTask = ['bars-sync', 'portfolio-snapshot', 'risk-scan', 'daily-report'].includes(
-      job.type,
-    );
-    if (marketTask && !isTradingDay(now)) return { skipped: true, reason: '休市日跳过市场任务' };
-    if (!job.enabled) return { skipped: true, reason: '任务已停用' };
-    return this.execute(jobId, handler);
+    if (!job.enabled) return { skipped: true, reason: '任务已停用' } as const;
+
+    const type = automationJobTypeSchema.parse(job.type);
+    if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
+
+    const nextRunAt = nextCronOccurrence(job.cron, job.timezone, now);
+    if (isMarketAutomationJobType(type)) {
+      const tradingDay = cnTradingCalendar.status(now);
+      if (!tradingDay.open) {
+        await this.prisma.automationJob.update({
+          where: { id: jobId },
+          data: { nextRunAt },
+        });
+        return {
+          skipped: true,
+          reason:
+            tradingDay.reason === 'calendar-unavailable'
+              ? '交易日历未覆盖，保守跳过市场任务'
+              : '休市日跳过市场任务',
+        } as const;
+      }
+    }
+
+    try {
+      const result = await this.execute(jobId, handler, now);
+      if (result.skipped) return result;
+      await this.prisma.automationJob.update({
+        where: { id: jobId },
+        data: { lastRunAt: now, nextRunAt },
+      });
+      return result;
+    } catch (error) {
+      await this.prisma.automationJob.update({
+        where: { id: jobId },
+        data: { lastRunAt: now, nextRunAt },
+      });
+      throw error;
+    }
   }
-  async execute(jobId: string, handler: AutomationHandler) {
+
+  async execute(jobId: string, handler: AutomationHandler, scheduledAt = new Date()) {
     const job = await this.prisma.automationJob.findUniqueOrThrow({ where: { id: jobId } });
+    const type = automationJobTypeSchema.parse(job.type);
+    if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
+
     const lockKey = redisKey('lock', `automation:${jobId}`);
     const token = crypto.randomUUID();
     const locked = await this.redis.client.set(lockKey, token, 'PX', job.lockTtlMs, 'NX');
-    if (!locked) return { skipped: true, reason: '任务已有实例运行' };
+    if (!locked) return { skipped: true, reason: '任务已有实例运行' } as const;
+
     const run = await this.prisma.automationRun.create({
       data: { jobId, status: 'running', traceId: crypto.randomUUID() },
     });
@@ -146,7 +135,7 @@ export class AutomationService {
             where: { id: run.id },
             data: { attempt },
           });
-        return handler.run(AbortSignal.timeout(job.lockTtlMs));
+        return handler.run(AbortSignal.timeout(job.lockTtlMs), scheduledAt);
       }, retry);
       const output = execution.result;
       await this.prisma.automationRun.update({
@@ -158,7 +147,7 @@ export class AutomationService {
           finishedAt: new Date(),
         },
       });
-      return { skipped: false, output };
+      return { skipped: false, output } as const;
     } catch (error) {
       await this.prisma.automationRun.update({
         where: { id: run.id },
