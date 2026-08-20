@@ -2,13 +2,14 @@ import { z } from 'zod';
 
 const isoDate = z.iso.datetime({ offset: true });
 const finite = z.number().finite();
+const freshnessSchema = z.enum(['live', 'delayed', 'stale', 'unknown']);
 
 export const provenanceSchema = z.object({
   provider: z.string().min(1),
   sourceUrl: z.url().optional(),
   marketTime: isoDate,
   fetchedAt: isoDate,
-  freshness: z.enum(['live', 'delayed', 'stale', 'unknown']),
+  freshness: freshnessSchema,
 });
 
 export const quoteSchemaV1 = z
@@ -39,7 +40,7 @@ export const quoteSchemaV1 = z
 export const barSchemaV1 = z
   .object({
     version: z.literal(1),
-    symbol: z.string().min(1),
+    symbol: z.string().regex(/^\d{6}\.(SH|SZ|BJ)$/),
     timeframe: z.enum(['1m', '1d']),
     timestamp: isoDate,
     open: finite.nonnegative(),
@@ -49,7 +50,10 @@ export const barSchemaV1 = z
     volume: finite.nonnegative(),
     amount: finite.nonnegative(),
     provider: z.string().min(1),
-    fallbackUsed: z.boolean().optional(),
+    fetchedAt: isoDate.default(() => new Date().toISOString()),
+    freshness: freshnessSchema.default('unknown'),
+    fallbackUsed: z.boolean().default(false),
+    servedFromCache: z.boolean().default(false),
   })
   .refine((bar) => bar.high >= Math.max(bar.open, bar.close, bar.low), 'OHLC 最高价非法')
   .refine((bar) => bar.low <= Math.min(bar.open, bar.close, bar.high), 'OHLC 最低价非法');
@@ -186,7 +190,8 @@ export const catalogDeltaSchema = catalogSnapshotSchema.extend({
   requiresFullSnapshot: z.boolean().optional(),
 });
 export type QuoteV1 = z.infer<typeof quoteSchemaV1>;
-export type BarV1 = z.infer<typeof barSchemaV1>;
+export type BarInputV1 = z.input<typeof barSchemaV1>;
+export type BarV1 = z.output<typeof barSchemaV1>;
 export type IndicatorV1 = z.infer<typeof indicatorSchemaV1>;
 export type ChipDistributionV1 = z.infer<typeof chipDistributionSchemaV1>;
 export type FundNavV1 = z.infer<typeof fundNavSchemaV1>;
