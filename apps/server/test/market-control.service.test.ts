@@ -1,10 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MarketControlService } from '../src/market/market-control.service.js';
 
+type Routes = Record<string, Record<string, string[]>>;
+
+type PolicyState = {
+  consumer: string;
+  revision: number;
+  enabled: boolean;
+  routes: Routes;
+  syncState: string;
+  history: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
+
+const historyCreateFrom = (data: Record<string, unknown>) => {
+  if (!data.history || typeof data.history !== 'object' || !('create' in data.history)) {
+    return undefined;
+  }
+  return (data.history as { create: Record<string, unknown> }).create;
+};
+
 describe('MarketControlService', () => {
   it('accepts a monotonic revision jump and pushes the latest policy', async () => {
-    const routes = { REALTIME_QUOTE: { STOCK: ['akshare'] } };
-    let state: any = {
+    const routes: Routes = { REALTIME_QUOTE: { STOCK: ['akshare'] } };
+    const state: PolicyState = {
       consumer: 'thesis-ledger',
       revision: 1,
       enabled: true,
@@ -13,20 +32,19 @@ describe('MarketControlService', () => {
       history: [],
     };
     const record = () => ({ ...state, history: [...state.history] });
-    const transaction: any = {
+    const transaction = {
       $queryRaw: vi.fn(async () => []),
       desiredProviderPolicy: {
         findUnique: vi.fn(async () => record()),
-        update: vi.fn(async ({ data }: any) => {
-          state = {
-            ...state,
-            ...data,
-            history: [...state.history, data.history.create],
-          };
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          const previousHistory = state.history;
+          const historyCreate = historyCreateFrom(data);
+          Object.assign(state, data);
+          state.history = historyCreate ? [...previousHistory, historyCreate] : previousHistory;
           return record();
         }),
-        updateMany: vi.fn(async ({ data }: any) => {
-          state = { ...state, ...data };
+        updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          Object.assign(state, data);
           return { count: 1 };
         }),
         findUniqueOrThrow: vi.fn(async () => record()),
@@ -35,17 +53,19 @@ describe('MarketControlService', () => {
         update: vi.fn(async () => ({})),
       },
     };
-    const prisma: any = {
+    const prisma = {
       desiredProviderPolicy: {
         findUnique: vi.fn(async () => record()),
       },
-      $transaction: vi.fn(async (callback: (tx: any) => unknown) => callback(transaction)),
+      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
     };
-    const dsa: any = {
+    const dsa = {
       applyControlPolicy: vi.fn(async () => ({ effective: { sourceDesiredRevision: 3 } })),
     };
 
-    const result = await new MarketControlService(prisma, dsa).applyPolicy({
+    const result = await new MarketControlService(prisma as never, dsa as never).applyPolicy({
       revision: 3,
       enabled: true,
       routes,
@@ -66,7 +86,7 @@ describe('MarketControlService', () => {
       syncState: 'applied',
       history: [],
     };
-    const prisma: any = {
+    const prisma = {
       desiredProviderPolicy: {
         findUnique: vi.fn(async () => current),
       },
@@ -75,7 +95,9 @@ describe('MarketControlService', () => {
       },
     };
 
-    await expect(new MarketControlService(prisma, {} as any).rollback(2)).rejects.toMatchObject({
+    await expect(
+      new MarketControlService(prisma as never, {} as never).rollback(2),
+    ).rejects.toMatchObject({
       status: 404,
       message: '找不到 revision 2',
     });
