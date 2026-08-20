@@ -48,6 +48,7 @@ type EvaluationCandidate = {
   accountId?: string;
   domain: CompleteRiskContext;
 };
+type PositionContext = NonNullable<SecurityContext['positions']>[number];
 
 const latestByMarketTime = <T extends { marketTime: string }>(values: readonly T[]) =>
   [...values].sort((left, right) => right.marketTime.localeCompare(left.marketTime))[0];
@@ -58,13 +59,24 @@ const aggregateDataQuality = (contexts: readonly SecurityContext[]) =>
 const aggregatePositions = (contexts: readonly SecurityContext[]) => {
   const explicit = latestByMarketTime(contexts.filter((context) => context.positions !== undefined));
   if (explicit?.positions) return explicit.positions;
-  const bySymbol = new Map<string, NonNullable<SecurityContext['positions']>[number]>();
+  const bySymbol = new Map<string, PositionContext>();
   for (const context of contexts) {
     if (context.weight === undefined) continue;
     bySymbol.set(context.symbol, { symbol: context.symbol, weight: context.weight });
   }
   return bySymbol.size > 0 ? [...bySymbol.values()] : undefined;
 };
+
+const toDomainPositions = (
+  positions: readonly PositionContext[] | undefined,
+): CompleteRiskContext['positions'] =>
+  positions?.map((position) => ({
+    symbol: position.symbol,
+    weight: position.weight,
+    ...(position.sector === undefined ? {} : { sector: position.sector }),
+    ...(position.assetType === undefined ? {} : { assetType: position.assetType }),
+    ...(position.volatility === undefined ? {} : { volatility: position.volatility }),
+  }));
 
 const deriveAccountContexts = (security: readonly SecurityContext[]): AccountContext[] => {
   const grouped = new Map<string, SecurityContext[]>();
@@ -84,14 +96,13 @@ const deriveAccountContexts = (security: readonly SecurityContext[]): AccountCon
           context.returns !== undefined,
       ),
     );
+    const positions = aggregatePositions(contexts);
     return riskAccountContextSchema.parse({
       accountId,
       mode: latest.mode,
       marketTime: latest.marketTime,
       dataQuality: aggregateDataQuality(contexts),
-      ...(aggregatePositions(contexts) === undefined
-        ? {}
-        : { positions: aggregatePositions(contexts) }),
+      ...(positions === undefined ? {} : { positions }),
       ...(aggregateSource?.portfolioValues === undefined
         ? {}
         : { portfolioValues: aggregateSource.portfolioValues }),
@@ -357,13 +368,12 @@ export class RiskService {
         ...envelope.accounts,
         ...derivedAccounts.filter((context) => !accountIds.has(context.accountId)),
       ];
+      const portfolio = envelope.portfolio ?? derivePortfolioContext(envelope.security);
       const parsed: ParsedScan = {
         security: envelope.security,
         accounts,
         allowStale: envelope.allowStale,
-        ...(envelope.portfolio ?? derivePortfolioContext(envelope.security)
-          ? { portfolio: envelope.portfolio ?? derivePortfolioContext(envelope.security) }
-          : {}),
+        ...(portfolio ? { portfolio } : {}),
       };
       this.assertSingleMode(parsed);
       return parsed;
@@ -433,6 +443,20 @@ export class RiskService {
   }
 
   private securityCandidate(context: SecurityContext): EvaluationCandidate {
+    const positions = toDomainPositions(context.positions);
+    const chip =
+      context.chip === undefined
+        ? undefined
+        : {
+            profitRatio: context.chip.profitRatio,
+            concentration: context.chip.concentration,
+            engineVersion: context.chip.engineVersion,
+            calculatedAt: context.chip.calculatedAt,
+            ...(context.chip.mainPeak === undefined ? {} : { mainPeak: context.chip.mainPeak }),
+            ...(context.chip.previousMainPeaks === undefined
+              ? {}
+              : { previousMainPeaks: context.chip.previousMainPeaks }),
+          };
     return {
       scope: 'security',
       mode: context.mode,
@@ -451,8 +475,8 @@ export class RiskService {
           ? {}
           : { portfolioValues: context.portfolioValues }),
         ...(context.indicators === undefined ? {} : { indicators: context.indicators }),
-        ...(context.chip === undefined ? {} : { chip: context.chip }),
-        ...(context.positions === undefined ? {} : { positions: context.positions }),
+        ...(chip === undefined ? {} : { chip }),
+        ...(positions === undefined ? {} : { positions }),
         ...(context.returns === undefined ? {} : { returns: context.returns }),
         dataQuality: context.dataQuality,
       },
@@ -460,6 +484,7 @@ export class RiskService {
   }
 
   private accountCandidate(context: AccountContext): EvaluationCandidate {
+    const positions = toDomainPositions(context.positions);
     return {
       scope: 'account',
       mode: context.mode,
@@ -472,7 +497,7 @@ export class RiskService {
         ...(context.portfolioValues === undefined
           ? {}
           : { portfolioValues: context.portfolioValues }),
-        ...(context.positions === undefined ? {} : { positions: context.positions }),
+        ...(positions === undefined ? {} : { positions }),
         ...(context.returns === undefined ? {} : { returns: context.returns }),
         dataQuality: context.dataQuality,
       },
@@ -480,6 +505,7 @@ export class RiskService {
   }
 
   private portfolioCandidate(context: PortfolioContext): EvaluationCandidate {
+    const positions = toDomainPositions(context.positions);
     return {
       scope: 'portfolio',
       mode: context.mode,
@@ -491,7 +517,7 @@ export class RiskService {
         ...(context.portfolioValues === undefined
           ? {}
           : { portfolioValues: context.portfolioValues }),
-        ...(context.positions === undefined ? {} : { positions: context.positions }),
+        ...(positions === undefined ? {} : { positions }),
         ...(context.returns === undefined ? {} : { returns: context.returns }),
         dataQuality: context.dataQuality,
       },
