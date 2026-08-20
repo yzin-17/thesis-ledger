@@ -5,6 +5,7 @@ import { assertAllowedFeishuWebhookUrl } from '../notifications/feishu-webhook-s
 import {
   encryptProviderCredential,
   normalizeProviderCredential,
+  type CredentialPayload,
 } from '../platform/credential-security.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
@@ -53,7 +54,7 @@ export interface ProviderHealthObservation {
 
 interface DraftTestRecord {
   name: string;
-  encryptedCredential: Buffer;
+  encryptedCredential: CredentialPayload;
   expiresAt: number;
   latencyMs: number;
   checkedAt: Date;
