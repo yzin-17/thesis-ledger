@@ -1,7 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { projectAverageCost, projectFifo, type LedgerEvent } from '@thesis-ledger/domain';
 import type { Prisma } from '@prisma/client';
-import { ledgerEventSchemaV1 } from '@thesis-ledger/schemas';
+import {
+  assetIdentitySourceSchema,
+  assetIdentityStatusSchema,
+  ledgerEventSchemaV1,
+} from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { assertAccountCanHoldAsset } from '../portfolio/accounts.service.js';
 
@@ -16,7 +20,15 @@ const monetaryTypes = new Set([
   'CASH_WITHDRAW',
 ]);
 
+const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
+const MANUAL_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.manual;
+const SCREENSHOT_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.screenshot;
+
 type LedgerClient = Pick<PrismaService, 'ledgerEvent'>;
+type LedgerTransactionClient = Pick<
+  Prisma.TransactionClient,
+  'account' | 'asset' | 'ledgerEvent' | 'position'
+>;
 
 const inferAssetType = (symbol: string, requested?: string) => {
   if (requested) return requested;
@@ -154,10 +166,12 @@ export class LedgerService {
         )
       : undefined;
     if (parsed.symbol && assetType) assertSymbolMatchesAssetType(parsed.symbol, assetType);
-    await this.assertAccount(parsed.accountId, assetType);
-    const stored = await appendLedgerEvent(this.prisma, parsed);
-    await this.rebuild(parsed.accountId);
-    return stored;
+    return this.prisma.$transaction(async (transaction) => {
+      await this.assertAccountWithClient(transaction, parsed.accountId, assetType);
+      const stored = await appendLedgerEvent(transaction, parsed);
+      await this.rebuildWithClient(transaction, parsed.accountId, 'AVG');
+      return stored;
+    });
   }
 
   private async assertAccount(accountId: string, assetType?: string) {
@@ -170,23 +184,42 @@ export class LedgerService {
     return account;
   }
 
-  private async upsertAsset(symbol: string, assetName?: string, requestedAssetType?: string) {
+  private async assertAccountWithClient(
+    client: Pick<LedgerTransactionClient, 'account'>,
+    accountId: string,
+    assetType?: string,
+  ) {
+    const account = await client.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new BadRequestException('账户不存在');
+    if (!account.active) throw new BadRequestException('账户已停用，不能新增录入');
+    if (account.currency !== 'CNY')
+      throw new BadRequestException('历史非人民币账户只读，请先转换为 CNY');
+    if (assetType) assertAccountCanHoldAsset(account, assetType);
+    return account;
+  }
+
+  private async upsertAssetWithClient(
+    client: Pick<LedgerTransactionClient, 'asset'>,
+    symbol: string,
+    assetName?: string,
+    requestedAssetType?: string,
+    identitySource: 'manual' | 'screenshot' = MANUAL_IDENTITY_SOURCE,
+  ) {
     const assetType = inferAssetType(symbol, requestedAssetType);
     assertSymbolMatchesAssetType(symbol, assetType);
-    const existing = await this.prisma.asset.findUnique?.({ where: { symbol } });
-    if (
-      existing &&
-      existing.identityStatus === 'user-confirmed' &&
-      existing.assetType !== assetType
-    )
-      throw new BadRequestException('已确认的资产类型不能被录入覆盖');
-    return this.prisma.asset.upsert({
+    const existing = await client.asset.findUnique({ where: { symbol } });
+    if (existing?.identityStatus === CONFIRMED_IDENTITY_STATUS) {
+      if (existing.assetType !== assetType)
+        throw new BadRequestException('已确认的资产类型不能被录入覆盖');
+      return existing;
+    }
+    return client.asset.upsert({
       where: { symbol },
       update: {
         ...(assetName ? { name: assetName } : {}),
-        ...(existing?.identityStatus === 'user-confirmed'
-          ? {}
-          : { assetType, identityStatus: 'user-confirmed', identitySource: 'manual' }),
+        assetType,
+        identityStatus: CONFIRMED_IDENTITY_STATUS,
+        identitySource,
       },
       create: {
         symbol,
@@ -194,8 +227,8 @@ export class LedgerService {
         market: symbol.endsWith('.OF') ? 'CN' : symbol.endsWith('.HK') ? 'HK' : 'CN',
         assetType,
         currency: 'CNY',
-        identityStatus: 'user-confirmed',
-        identitySource: 'manual',
+        identityStatus: CONFIRMED_IDENTITY_STATUS,
+        identitySource,
       },
     });
   }
@@ -211,30 +244,38 @@ export class LedgerService {
   ) {
     const assetType = inferAssetType(symbol, options?.assetType);
     assertSymbolMatchesAssetType(symbol, assetType);
-    await this.assertAccount(accountId, assetType);
-    await this.upsertAsset(symbol, options?.assetName, assetType);
-    const previous = await this.prisma.ledgerEvent.findFirst({
-      where: { accountId, symbol },
-      orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+    return this.prisma.$transaction(async (transaction) => {
+      await this.assertAccountWithClient(transaction, accountId, assetType);
+      await this.upsertAssetWithClient(
+        transaction,
+        symbol,
+        options?.assetName,
+        assetType,
+        source === 'screenshot' ? SCREENSHOT_IDENTITY_SOURCE : MANUAL_IDENTITY_SOURCE,
+      );
+      const previous = await transaction.ledgerEvent.findFirst({
+        where: { accountId, symbol },
+        orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+      });
+      const result = await appendLedgerEvent(transaction, {
+        version: 1,
+        id: crypto.randomUUID(),
+        accountId,
+        type: 'ADJUSTMENT',
+        occurredAt: new Date().toISOString(),
+        symbol,
+        quantity: quantity > 0 ? quantity : undefined,
+        price: costPrice,
+        currency: 'CNY',
+        source,
+        externalUid: `${source}:position:${accountId}:${symbol}:${crypto.randomUUID()}`,
+        ...(previous?.id ? { correctionOf: previous.id } : {}),
+        note: reason,
+        metadata: { kind: 'position-balance', quantity, costPrice, source, reason },
+      });
+      await this.rebuildWithClient(transaction, accountId, 'AVG');
+      return result;
     });
-    const result = await appendLedgerEvent(this.prisma, {
-      version: 1,
-      id: crypto.randomUUID(),
-      accountId,
-      type: 'ADJUSTMENT',
-      occurredAt: new Date().toISOString(),
-      symbol,
-      quantity: quantity > 0 ? quantity : undefined,
-      price: costPrice,
-      currency: 'CNY',
-      source,
-      externalUid: `${source}:position:${accountId}:${symbol}:${crypto.randomUUID()}`,
-      ...(previous?.id ? { correctionOf: previous.id } : {}),
-      note: reason,
-      metadata: { kind: 'position-balance', quantity, costPrice, source, reason },
-    });
-    await this.rebuild(accountId);
-    return result;
   }
 
   async setCashBalance(
@@ -242,74 +283,98 @@ export class LedgerService {
     amount: number,
     source: 'manual' | 'screenshot' = 'manual',
   ) {
-    if (!Number.isFinite(amount) || amount < 0) throw new BadRequestException('现金余额不能为负数');
-    const account = await this.assertAccount(accountId);
-    if (account.currency !== 'CNY') throw new BadRequestException('当前录入只支持人民币现金余额');
-    const result = await appendLedgerEvent(this.prisma, {
-      version: 1,
-      id: crypto.randomUUID(),
-      accountId,
-      type: 'ADJUSTMENT',
-      occurredAt: new Date().toISOString(),
-      amount,
-      currency: 'CNY',
-      source,
-      externalUid: `${source}:cash:${accountId}:${crypto.randomUUID()}`,
-      note: '保存当前现金余额',
-      metadata: { kind: 'cash-balance', amount, source },
+    if (!Number.isFinite(amount) || amount < 0)
+      throw new BadRequestException('现金余额不能为负数');
+    return this.prisma.$transaction(async (transaction) => {
+      const account = await this.assertAccountWithClient(transaction, accountId);
+      if (account.currency !== 'CNY')
+        throw new BadRequestException('当前录入只支持人民币现金余额');
+      const result = await appendLedgerEvent(transaction, {
+        version: 1,
+        id: crypto.randomUUID(),
+        accountId,
+        type: 'ADJUSTMENT',
+        occurredAt: new Date().toISOString(),
+        amount,
+        currency: 'CNY',
+        source,
+        externalUid: `${source}:cash:${accountId}:${crypto.randomUUID()}`,
+        note: '保存当前现金余额',
+        metadata: { kind: 'cash-balance', amount, source },
+      });
+      await this.rebuildWithClient(transaction, accountId, 'AVG');
+      return result;
     });
-    await this.rebuild(accountId);
-    return result;
   }
 
   async migratePositions(accountId?: string) {
-    const positions = await this.prisma.position.findMany({
-      ...(accountId ? { where: { accountId } } : {}),
-      orderBy: [{ accountId: 'asc' }, { symbol: 'asc' }],
-    });
-    const migrated: Array<{
-      accountId: string;
-      symbol: string;
-      quantity: number;
-      costPrice: number;
-    }> = [];
-    for (const position of positions) {
-      await this.upsertAsset(position.symbol, position.symbol, inferAssetType(position.symbol));
-      await appendLedgerEvent(this.prisma, {
-        version: 1,
-        id: crypto.randomUUID(),
-        accountId: position.accountId,
-        type: 'ADJUSTMENT',
-        occurredAt: new Date().toISOString(),
-        symbol: position.symbol,
-        quantity: Number(position.quantity),
-        price: Number(position.costPrice),
-        currency: 'CNY',
-        source: 'migration',
-        externalUid: `migration:position:${position.id}`,
-        correctionOf: position.id,
-        note: 'V0.1 Position 迁移为 Ledger opening balance',
-        metadata: {
-          kind: 'position-balance',
-          migratedPositionId: position.id,
+    return this.prisma.$transaction(async (transaction) => {
+      const positions = await transaction.position.findMany({
+        ...(accountId ? { where: { accountId } } : {}),
+        orderBy: [{ accountId: 'asc' }, { symbol: 'asc' }],
+      });
+      const migrated: Array<{
+        accountId: string;
+        symbol: string;
+        quantity: number;
+        costPrice: number;
+      }> = [];
+      for (const position of positions) {
+        await this.upsertAssetWithClient(
+          transaction,
+          position.symbol,
+          position.symbol,
+          inferAssetType(position.symbol),
+          MANUAL_IDENTITY_SOURCE,
+        );
+        await appendLedgerEvent(transaction, {
+          version: 1,
+          id: crypto.randomUUID(),
+          accountId: position.accountId,
+          type: 'ADJUSTMENT',
+          occurredAt: new Date().toISOString(),
+          symbol: position.symbol,
+          quantity: Number(position.quantity),
+          price: Number(position.costPrice),
+          currency: 'CNY',
+          source: 'migration',
+          externalUid: `migration:position:${position.id}`,
+          correctionOf: position.id,
+          note: 'V0.1 Position 迁移为 Ledger opening balance',
+          metadata: {
+            kind: 'position-balance',
+            migratedPositionId: position.id,
+            quantity: Number(position.quantity),
+            costPrice: Number(position.costPrice),
+          },
+        });
+        migrated.push({
+          accountId: position.accountId,
+          symbol: position.symbol,
           quantity: Number(position.quantity),
           costPrice: Number(position.costPrice),
-        },
-      });
-      migrated.push({
-        accountId: position.accountId,
-        symbol: position.symbol,
-        quantity: Number(position.quantity),
-        costPrice: Number(position.costPrice),
-      });
-    }
-    const accountIds = [...new Set(migrated.map((item) => item.accountId))];
-    const projections = await Promise.all(accountIds.map((id) => this.rebuild(id)));
-    return { migrated, accounts: accountIds, projections };
+        });
+      }
+      const accountIds = [...new Set(migrated.map((item) => item.accountId))];
+      const projections = [];
+      for (const id of accountIds)
+        projections.push(await this.rebuildWithClient(transaction, id, 'AVG'));
+      return { migrated, accounts: accountIds, projections };
+    });
   }
 
   async rebuild(accountId: string, method: 'AVG' | 'FIFO' = 'AVG') {
-    const stored = await this.prisma.ledgerEvent.findMany({
+    return this.prisma.$transaction((transaction) =>
+      this.rebuildWithClient(transaction, accountId, method),
+    );
+  }
+
+  private async rebuildWithClient(
+    client: Pick<LedgerTransactionClient, 'ledgerEvent' | 'position'>,
+    accountId: string,
+    method: 'AVG' | 'FIFO',
+  ) {
+    const stored = await client.ledgerEvent.findMany({
       where: { accountId },
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
     });
@@ -320,21 +385,19 @@ export class LedgerService {
       if (event.type === 'ADJUSTMENT' && event.symbol && event.source)
         sourceBySymbol.set(event.symbol, event.source);
     }
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.position.deleteMany({ where: { accountId } });
-      for (const position of projected) {
-        if (position.quantity <= 0) continue;
-        await transaction.position.create({
-          data: {
-            accountId,
-            symbol: position.symbol,
-            quantity: position.quantity,
-            costPrice: position.averageCost,
-            source: sourceBySymbol.get(position.symbol) ?? 'ledger',
-          },
-        });
-      }
-    });
+    await client.position.deleteMany({ where: { accountId } });
+    for (const position of projected) {
+      if (position.quantity <= 0) continue;
+      await client.position.create({
+        data: {
+          accountId,
+          symbol: position.symbol,
+          quantity: position.quantity,
+          costPrice: position.averageCost,
+          source: sourceBySymbol.get(position.symbol) ?? 'ledger',
+        },
+      });
+    }
     return projected;
   }
 
