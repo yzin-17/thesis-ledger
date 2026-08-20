@@ -40,7 +40,7 @@ export const quoteSchemaV1 = z
 export const barSchemaV1 = z
   .object({
     version: z.literal(1),
-    symbol: z.string().regex(/^\d{6}\.(SH|SZ|BJ)$/),
+    symbol: z.string().min(1),
     timeframe: z.enum(['1m', '1d']),
     timestamp: isoDate,
     open: finite.nonnegative(),
