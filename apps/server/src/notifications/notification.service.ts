@@ -49,7 +49,12 @@ export const classifyDeliveryError = (detail: string, attempt: number, maxAttemp
 
 const stableSerialize = (value: unknown): string => {
   if (value === undefined) return 'undefined';
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? String(value);
+  if (value === null) return 'null';
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value.toString();
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'symbol') return value.description ?? 'symbol';
+  if (typeof value === 'function') return value.name || 'function';
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
   return `{${Object.entries(value as Record<string, unknown>)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -105,13 +110,19 @@ const feishuBusinessError = (summary: string) => {
     return null;
   }
   const rawCode = payload?.code ?? payload?.StatusCode;
-  if (rawCode === undefined || Number(rawCode) === 0) return null;
+  const code =
+    typeof rawCode === 'string'
+      ? rawCode
+      : typeof rawCode === 'number'
+        ? rawCode.toString()
+        : undefined;
+  if (code === undefined || Number(code) === 0) return null;
   const rawMessage = payload?.msg ?? payload?.StatusMessage;
   const message =
     typeof rawMessage === 'string' || typeof rawMessage === 'number'
       ? String(rawMessage).slice(0, 200)
       : 'Feishu webhook business error';
-  return { code: String(rawCode), message };
+  return { code, message };
 };
 
 export class FeishuWebhookProvider implements NotificationProvider {
