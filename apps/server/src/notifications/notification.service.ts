@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Severity } from '@thesis-ledger/domain';
+import { normalizeProviderCredential } from '../platform/credential-security.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import {
   normalizeProviderName,
   ProviderHealthService,
 } from '../providers/provider-health.service.js';
+import { assertAllowedFeishuWebhookUrl } from './feishu-webhook-security.js';
 
 export interface NotificationPolicy {
   channels: Partial<Record<Severity, string[]>>;
@@ -132,8 +134,10 @@ export class FeishuWebhookProvider implements NotificationProvider {
   ) {}
 
   async send(message: NotificationMessage, signal: AbortSignal) {
-    const response = await fetch(this.webhookUrl, {
+    const url = assertAllowedFeishuWebhookUrl(this.webhookUrl);
+    const response = await fetch(url, {
       method: 'POST',
+      redirect: 'error',
       signal,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -332,7 +336,14 @@ export class NotificationService {
         normalizeProviderName(candidate.name) === 'feishu' && Boolean(candidate.encryptedCredentials),
     );
     if (config?.encryptedCredentials) {
-      const webhook = Buffer.from(config.encryptedCredentials).toString('utf8').trim();
+      const normalized = normalizeProviderCredential(config.encryptedCredentials);
+      if (normalized.needsRotation) {
+        await this.prisma.providerConfig.update({
+          where: { name: config.name },
+          data: { encryptedCredentials: normalized.payload },
+        });
+      }
+      const webhook = normalized.credential.trim();
       if (webhook) return new FeishuWebhookProvider(webhook, config.name);
     }
 

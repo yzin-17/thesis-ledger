@@ -177,6 +177,8 @@ export class MarketStorageService {
         market: bar.symbol.endsWith('.HK') ? 'HK' : 'CN',
         assetType: bar.symbol.startsWith('51') || bar.symbol.startsWith('15') ? 'etf' : 'stock',
         currency: bar.symbol.endsWith('.HK') ? 'HKD' : 'CNY',
+        identityStatus: 'provider',
+        identitySource: 'catalog',
       },
     });
   }

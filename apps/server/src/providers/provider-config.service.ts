@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { assertAllowedFeishuWebhookUrl } from '../notifications/feishu-webhook-security.js';
+import {
+  encryptProviderCredential,
+  normalizeProviderCredential,
+  type CredentialPayload,
+} from '../platform/credential-security.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
   ProviderHealthService,
@@ -22,7 +28,12 @@ export interface ProviderConfigInput {
 }
 
 export type ProviderConnectionTestStatus =
-  'healthy' | 'degraded' | 'down' | 'disabled' | 'unconfigured' | 'untested';
+  | 'healthy'
+  | 'degraded'
+  | 'down'
+  | 'disabled'
+  | 'unconfigured'
+  | 'untested';
 
 export interface ProviderConnectionTestResult {
   name: string;
@@ -43,11 +54,13 @@ export interface ProviderHealthObservation {
 
 interface DraftTestRecord {
   name: string;
-  credential: string;
+  encryptedCredential: CredentialPayload;
   expiresAt: number;
   latencyMs: number;
   checkedAt: Date;
 }
+
+const DRAFT_TEST_TTL_MS = 5 * 60 * 1000;
 
 const validate = (input: ProviderConfigInput) => {
   if (!input.name.trim()) throw new Error('Provider 名称不能为空');
@@ -68,21 +81,11 @@ const isFeishuProvider = (name: string, type: string) => {
   );
 };
 
-const readStoredCredential = (value?: Uint8Array | null) =>
-  value ? Buffer.from(value).toString('utf8') : '';
-
 const testFeishuWebhook = async (webhook: string) => {
-  let url: URL;
-  try {
-    url = new URL(webhook);
-  } catch {
-    throw new Error('Webhook 地址格式不正确');
-  }
-  if (!['http:', 'https:'].includes(url.protocol))
-    throw new Error('Webhook 地址必须使用 HTTP 或 HTTPS');
-
+  const url = assertAllowedFeishuWebhookUrl(webhook);
   const response = await fetch(url, {
     method: 'POST',
+    redirect: 'error',
     signal: AbortSignal.timeout(5_000),
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -98,7 +101,7 @@ const testFeishuWebhook = async (webhook: string) => {
     const parsed = JSON.parse(responseBody) as unknown;
     if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>;
   } catch {
-    // Some compatible webhook endpoints return an empty or plain-text 2xx response.
+    // Feishu-compatible endpoints may return an empty successful body.
   }
   const code = payload?.code ?? payload?.StatusCode;
   if (code !== undefined && Number(code) !== 0) {
@@ -119,6 +122,7 @@ export class ProviderConfigService {
   ) {}
 
   private readonly draftTests = new Map<string, DraftTestRecord>();
+  private readonly draftCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   list() {
     return this.prisma.providerConfig
@@ -135,7 +139,15 @@ export class ProviderConfigService {
     const value = validate(input);
     const existing = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
     const tested = this.consumeDraftTest(value);
-    const credential = tested?.credential ?? value.credentialsRef?.trim();
+    let credentialPayload = tested?.encryptedCredential;
+    const rawCredential = value.credentialsRef?.trim();
+    if (!credentialPayload && rawCredential)
+      credentialPayload = encryptProviderCredential(rawCredential);
+    if (!credentialPayload && existing?.encryptedCredentials) {
+      const normalized = normalizeProviderCredential(existing.encryptedCredentials);
+      if (normalized.needsRotation) credentialPayload = normalized.payload;
+    }
+
     const testedHealthy = Boolean(tested);
     const enabled = value.enabled ?? true;
     const healthReset = existing && existing.enabled !== enabled;
@@ -146,7 +158,7 @@ export class ProviderConfigService {
         enabled,
         priority: value.priority,
         capabilities: value.capabilities,
-        ...(credential ? { encryptedCredentials: Buffer.from(credential) } : {}),
+        ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
         settings: (value.settings ?? {}) as Prisma.InputJsonValue,
         ...(value.quota === undefined ? {} : { quota: value.quota }),
         ...(value.cost === undefined ? {} : { cost: value.cost }),
@@ -158,7 +170,7 @@ export class ProviderConfigService {
         enabled,
         priority: value.priority,
         capabilities: value.capabilities,
-        ...(credential ? { encryptedCredentials: Buffer.from(credential) } : {}),
+        ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
         settings: (value.settings ?? {}) as Prisma.InputJsonValue,
         ...(value.quota === undefined ? {} : { quota: value.quota }),
         ...(value.cost === undefined ? {} : { cost: value.cost }),
@@ -197,8 +209,8 @@ export class ProviderConfigService {
     const existing = await this.prisma.providerConfig.findUnique({
       where: { name: value.name },
     });
-    const credential =
-      value.credentialsRef?.trim() || readStoredCredential(existing?.encryptedCredentials);
+    const storedCredential = existing ? await this.readStoredCredential(existing) : '';
+    const credential = value.credentialsRef?.trim() || storedCredential;
     return this.runConnectionTest(
       {
         name: value.name,
@@ -218,19 +230,50 @@ export class ProviderConfigService {
         name: config.name,
         type: config.type,
         enabled: config.enabled,
-        credential: readStoredCredential(config.encryptedCredentials),
+        credential: await this.readStoredCredential(config),
       },
       true,
     );
   }
 
+  private async readStoredCredential(config: {
+    name: string;
+    encryptedCredentials?: Uint8Array | null;
+  }) {
+    if (!config.encryptedCredentials) return '';
+    const normalized = normalizeProviderCredential(config.encryptedCredentials);
+    if (normalized.needsRotation) {
+      await this.prisma.providerConfig.update({
+        where: { name: config.name },
+        data: { encryptedCredentials: normalized.payload },
+      });
+    }
+    return normalized.credential;
+  }
+
   private consumeDraftTest(input: ProviderConfigInput) {
     if (!input.connectionTestToken) return undefined;
-    const record = this.draftTests.get(input.connectionTestToken);
-    this.draftTests.delete(input.connectionTestToken);
+    const token = input.connectionTestToken;
+    const record = this.draftTests.get(token);
+    this.deleteDraftTest(token);
     return record && record.expiresAt > Date.now() && record.name === input.name
       ? record
       : undefined;
+  }
+
+  private storeDraftTest(token: string, record: DraftTestRecord) {
+    this.deleteDraftTest(token);
+    this.draftTests.set(token, record);
+    const timer = setTimeout(() => this.deleteDraftTest(token), DRAFT_TEST_TTL_MS);
+    timer.unref?.();
+    this.draftCleanupTimers.set(token, timer);
+  }
+
+  private deleteDraftTest(token: string) {
+    this.draftTests.delete(token);
+    const timer = this.draftCleanupTimers.get(token);
+    if (timer) clearTimeout(timer);
+    this.draftCleanupTimers.delete(token);
   }
 
   private async runConnectionTest(
@@ -317,10 +360,10 @@ export class ProviderConfigService {
     }
 
     const testToken = randomUUID();
-    this.draftTests.set(testToken, {
+    this.storeDraftTest(testToken, {
       name: input.name,
-      credential: input.credential,
-      expiresAt: Date.now() + 5 * 60 * 1000,
+      encryptedCredential: encryptProviderCredential(input.credential),
+      expiresAt: Date.now() + DRAFT_TEST_TTL_MS,
       latencyMs,
       checkedAt: new Date(),
     });
