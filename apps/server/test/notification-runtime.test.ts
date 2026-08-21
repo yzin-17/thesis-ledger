@@ -30,7 +30,13 @@ const redisFixture = () => {
     values,
     client: {
       set: vi.fn(
-        async (key: string, value: string, _mode: string, _ttl: number, modifier: string) => {
+        async (
+          key: string,
+          value: string,
+          _mode: string,
+          _ttl: number,
+          modifier: string,
+        ) => {
           if (modifier === 'NX' && values.has(key)) return null;
           values.set(key, value);
           return 'OK';
@@ -69,9 +75,8 @@ describe('Feishu provider', () => {
   it('HTTP 200 但业务码非 0 时仍视为失败', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ code: 19002, msg: 'invalid webhook' }), { status: 200 }),
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: 19002, msg: 'invalid webhook' }), { status: 200 }),
       ),
     );
     const provider = new FeishuWebhookProvider(
@@ -251,9 +256,8 @@ describe('Notification dispatch', () => {
     };
     vi.stubGlobal(
       'fetch',
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 }),
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 }),
       ),
     );
     const service = new NotificationService(
@@ -334,10 +338,7 @@ describe('Notification dispatch', () => {
       reason: '通知已有 dispatcher 处理',
     });
     release?.();
-    await expect(first).resolves.toMatchObject({
-      skipped: false,
-      delivery: { status: 'delivered' },
-    });
+    await expect(first).resolves.toMatchObject({ skipped: false, delivery: { status: 'delivered' } });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

@@ -40,19 +40,11 @@ describe('Backtest service correctness regressions', () => {
     const prisma = {
       backtestJob: {
         findUnique: vi.fn(async () => ({ ...state })),
-        update: vi.fn(
-          async ({
-            where,
-            data,
-          }: {
-            where: { status?: string };
-            data: Record<string, unknown>;
-          }) => {
-            if (where.status && state.status !== where.status) throw new Error('record not found');
-            state = { ...state, ...data } as typeof state;
-            return state;
-          },
-        ),
+        update: vi.fn(async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+          if (where.status && state.status !== where.status) throw new Error('record not found');
+          state = { ...state, ...data } as typeof state;
+          return state;
+        }),
       },
     };
     const worker = {
@@ -74,27 +66,16 @@ describe('Backtest service correctness regressions', () => {
     const prisma = {
       backtestJob: {
         findUnique: vi.fn(async () => ({ ...state })),
-        update: vi.fn(
-          async ({
-            where,
-            data,
-          }: {
-            where: { status?: string };
-            data: Record<string, unknown>;
-          }) => {
-            if (where.status && state.status !== where.status) throw new Error('record not found');
-            state = { ...state, ...data } as typeof state;
-            return state;
-          },
-        ),
+        update: vi.fn(async ({ where, data }: { where: { status?: string }; data: Record<string, unknown> }) => {
+          if (where.status && state.status !== where.status) throw new Error('record not found');
+          state = { ...state, ...data } as typeof state;
+          return state;
+        }),
       },
     };
     const worker = { id: 'mock-worker', run: vi.fn(async () => ({ returns: [] })) };
     const service = new BacktestService(prisma as never);
-    await Promise.all([
-      service.run(state.id, worker as never),
-      service.run(state.id, worker as never),
-    ]);
+    await Promise.all([service.run(state.id, worker as never), service.run(state.id, worker as never)]);
     expect(worker.run).toHaveBeenCalledTimes(1);
   });
 

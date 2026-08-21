@@ -131,17 +131,14 @@ describe('Performance correctness regressions', () => {
     ['CASH_WITHDRAW', 40, 60],
     ['TRANSFER_IN', 50, 150],
     ['TRANSFER_OUT', 25, 75],
-  ])(
-    'treats %s as an external flow instead of investment return',
-    async (type, amount, endValue) => {
-      const { service } = summaryService(
-        [snapshot('2025-01-01T00:00:00Z', 100), snapshot('2025-01-02T00:00:00Z', endValue)],
-        [event(type, amount)],
-      );
+  ])('treats %s as an external flow instead of investment return', async (type, amount, endValue) => {
+    const { service } = summaryService(
+      [snapshot('2025-01-01T00:00:00Z', 100), snapshot('2025-01-02T00:00:00Z', endValue)],
+      [event(type, amount)],
+    );
 
-      await expect(service.summary('a')).resolves.toMatchObject({ ttwror: 0 });
-    },
-  );
+    await expect(service.summary('a')).resolves.toMatchObject({ ttwror: 0 });
+  });
 
   it('does not treat security trades as portfolio external flows', async () => {
     const { service } = summaryService(
@@ -166,7 +163,10 @@ describe('Performance correctness regressions', () => {
 
   it('uses multiple contributions and withdrawals as investor cash flows', async () => {
     const { service } = summaryService(
-      [snapshot('2024-01-01T00:00:00Z', 1000), snapshot('2025-01-01T00:00:00Z', 1300)],
+      [
+        snapshot('2024-01-01T00:00:00Z', 1000),
+        snapshot('2025-01-01T00:00:00Z', 1300),
+      ],
       [
         event('CASH_DEPOSIT', 500, '2024-07-01T00:00:00Z'),
         event('CASH_WITHDRAW', 200, '2024-10-01T00:00:00Z'),

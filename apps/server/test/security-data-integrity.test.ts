@@ -146,11 +146,14 @@ describe('Provider credential security', () => {
 describe('Feishu SSRF boundary', () => {
   it('只接受官方 HTTPS webhook 地址', () => {
     expect(
-      assertAllowedFeishuWebhookUrl('https://open.feishu.cn/open-apis/bot/v2/hook/abc123').hostname,
+      assertAllowedFeishuWebhookUrl(
+        'https://open.feishu.cn/open-apis/bot/v2/hook/abc123',
+      ).hostname,
     ).toBe('open.feishu.cn');
     expect(
-      assertAllowedFeishuWebhookUrl('https://open.larksuite.com/open-apis/bot/v2/hook/abc123')
-        .hostname,
+      assertAllowedFeishuWebhookUrl(
+        'https://open.larksuite.com/open-apis/bot/v2/hook/abc123',
+      ).hostname,
     ).toBe('open.larksuite.com');
     expect(() =>
       assertAllowedFeishuWebhookUrl('http://open.feishu.cn/open-apis/bot/v2/hook/abc'),
@@ -161,9 +164,9 @@ describe('Feishu SSRF boundary', () => {
     expect(() =>
       assertAllowedFeishuWebhookUrl('https://169.254.169.254/open-apis/bot/v2/hook/abc'),
     ).toThrow('官方');
-    expect(() => assertAllowedFeishuWebhookUrl('https://open.feishu.cn/internal/admin')).toThrow(
-      '路径',
-    );
+    expect(() =>
+      assertAllowedFeishuWebhookUrl('https://open.feishu.cn/internal/admin'),
+    ).toThrow('路径');
   });
 });
 
@@ -328,9 +331,7 @@ describe('Integrity position projection', () => {
     } as never);
 
     const result = await service.check();
-    expect(result.issues.filter((issue) => issue.code === 'position_projection_mismatch')).toEqual(
-      [],
-    );
+    expect(result.issues.filter((issue) => issue.code === 'position_projection_mismatch')).toEqual([]);
   });
 
   it('DB Position 存在但 Ledger 无非零投影时报告反向不一致', async () => {

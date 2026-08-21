@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RiskService } from '../src/risk/risk.service.js';
 import { MarketService, resolveEffectiveBars } from '../src/market/market.service.js';
-import {
-  classifyEmptyBarRange,
-  MarketStorageService,
-} from '../src/market/market-storage.service.js';
+import { classifyEmptyBarRange, MarketStorageService } from '../src/market/market-storage.service.js';
 import { InstrumentService } from '../src/market/instrument.service.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
@@ -206,7 +203,9 @@ describe('Bar provenance and effective projection', () => {
 
 describe('Backfill outcome and supported markets', () => {
   it('distinguishes legitimate closed-market no-data from incomplete trading-day data', () => {
-    expect(classifyEmptyBarRange('2026-08-22T00:00:00Z', '2026-08-23T23:00:00Z')).toBe('no-data');
+    expect(classifyEmptyBarRange('2026-08-22T00:00:00Z', '2026-08-23T23:00:00Z')).toBe(
+      'no-data',
+    );
     expect(classifyEmptyBarRange('2026-08-20T00:00:00Z', '2026-08-20T23:00:00Z')).toBe(
       'incomplete',
     );
