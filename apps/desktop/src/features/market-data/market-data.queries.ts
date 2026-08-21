@@ -30,10 +30,12 @@ const terminalCatalogState = (status: CatalogStatus | undefined) =>
 export const useCatalogJobQuery = (jobId: string | null) =>
   useQuery({
     queryKey: marketDataKeys.catalogJob(jobId ?? 'idle'),
-    queryFn: () => fetchCatalogJob(jobId!),
+    queryFn: () => {
+      if (!jobId) throw new Error('catalog job id is required');
+      return fetchCatalogJob(jobId);
+    },
     enabled: Boolean(jobId),
-    refetchInterval: (query) =>
-      terminalCatalogState(query.state.data as CatalogStatus | undefined) ? false : 1_500,
+    refetchInterval: (query) => terminalCatalogState(query.state.data) ? false : 1_500,
     refetchIntervalInBackground: true,
   });
 
