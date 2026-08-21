@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { aiContextSchema } from '@thesis-ledger/schemas';
+import { aiContextSchema, researchResultSchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
 import { AiProviderRegistry, completeWithFallback } from './provider-registry.js';
@@ -58,6 +58,17 @@ export class AiRunService {
         ...(durationMs === undefined ? {} : { durationMs }),
       },
     });
+  }
+
+  /** Persist research only after it crosses the structured ResearchResult V1 boundary. */
+  finishResearch(
+    id: string,
+    result: unknown,
+    usage: { inputTokens: number; outputTokens: number; cost: number },
+    durationMs?: number,
+  ) {
+    const parsed = researchResultSchema.parse(result);
+    return this.finish(id, parsed, usage, durationMs);
   }
 
   async completeWithProvider(
