@@ -5,13 +5,15 @@ import {
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
   type ApiErrorResponse,
-  type InstrumentSearchResult,
-  type PerformanceSummaryResponse,
-  type PortfolioValuationResponse,
-  type RiskEventResponse,
 } from '@thesis-ledger/schemas';
 
-export type { ApiErrorResponse, InstrumentSearchResult, PerformanceSummaryResponse, PortfolioValuationResponse, RiskEventResponse } from '@thesis-ledger/schemas';
+export type {
+  ApiErrorResponse,
+  InstrumentSearchResult,
+  PerformanceSummaryResponse,
+  PortfolioValuationResponse,
+  RiskEventResponse,
+} from '@thesis-ledger/schemas';
 
 const queryString = (params: Record<string, string | number | undefined>) => {
   const query = new URLSearchParams();
@@ -45,16 +47,13 @@ export class ThesisLedgerApiClient {
       this.requestParsed(
         `/portfolio/valuation${queryString(params)}`,
         portfolioValuationResponseSchema,
-      ) as Promise<PortfolioValuationResponse>,
+      ),
   };
 
   readonly risk = {
     getEvents: (
       params: { mode?: 'actual' | 'shadow'; cursor?: string; limit?: number; t?: number } = {},
-    ) =>
-      this.requestParsed(`/risk/events${queryString(params)}`, riskEventsResponseSchema) as Promise<
-        RiskEventResponse[]
-      >,
+    ) => this.requestParsed(`/risk/events${queryString(params)}`, riskEventsResponseSchema),
   };
 
   readonly performance = {
@@ -69,7 +68,7 @@ export class ThesisLedgerApiClient {
       this.requestParsed(
         `/performance/summary${queryString(params)}`,
         performanceSummaryResponseSchema,
-      ) as Promise<PerformanceSummaryResponse>,
+      ),
   };
 
   readonly market = {
@@ -77,7 +76,7 @@ export class ThesisLedgerApiClient {
       this.requestParsed(
         `/market-data/instruments/search${queryString(params)}`,
         instrumentSearchResponseSchema,
-      ) as Promise<InstrumentSearchResult[]>,
+      ),
   };
 
   constructor(
