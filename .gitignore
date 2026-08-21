@@ -8,5 +8,10 @@ coverage/
 .DS_Store
 apps/server/prisma/dev.db
 apps/desktop/release/
+apps/mobile/release/
+apps/mobile/.expo/
 apps/mobile/android/keystore.properties
 apps/mobile/android/*.keystore
+*.apk
+*.aab
+*.ipa
