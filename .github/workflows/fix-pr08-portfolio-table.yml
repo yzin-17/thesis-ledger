@@ -1,0 +1,31 @@
+name: Fix PR-08 portfolio table
+
+on:
+  push:
+    branches:
+      - refactor/desktop-features
+    paths:
+      - scripts/fix-pr08-portfolio-table.py
+      - .github/workflows/fix-pr08-portfolio-table.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/desktop-features
+      - name: Repair portfolio table
+        run: python scripts/fix-pr08-portfolio-table.py
+      - name: Commit repair and remove helper
+        run: |
+          rm scripts/fix-pr08-portfolio-table.py .github/workflows/fix-pr08-portfolio-table.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/desktop/src/features/legacy-pages.tsx scripts/fix-pr08-portfolio-table.py .github/workflows/fix-pr08-portfolio-table.yml
+          git diff --cached --check
+          git commit -m "fix: restore portfolio status and action columns"
+          git push origin HEAD:refactor/desktop-features
