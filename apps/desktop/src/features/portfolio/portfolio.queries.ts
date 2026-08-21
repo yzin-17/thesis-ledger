@@ -25,7 +25,7 @@ export const usePortfolioShellQueries = (mode: PortfolioMode) => {
   const accounts = accountsQuery.data ?? [];
   let state: LoadState = 'loading';
   if (portfolioQuery.isError || accountsQuery.isError) state = 'error';
-  else if (portfolioQuery.isSuccess && accountsQuery.isSuccess) {
+  else if (portfolioQuery.isSuccess && accountsQuery.isSuccess && portfolio) {
     state = portfolio.positions.length === 0 ? 'empty' : portfolio.partial ? 'stale' : 'ready';
   }
 
