@@ -11,6 +11,36 @@ permissions:
   contents: read
 
 jobs:
+  test-refactor-preview:
+    if: github.event_name == 'pull_request' && github.head_ref == 'refactor/tests-guardrails'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate feature test split
+        run: |
+          node scripts/_split-tests.mjs
+          pnpm exec prettier --write apps/server/test packages/domain/test
+      - name: Verify generated split
+        run: |
+          pnpm --filter @thesis-ledger/domain test
+          pnpm --filter @thesis-ledger/server test
+          pnpm exec eslint apps/server/test packages/domain/test --max-warnings=0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-refactor-preview
+          path: |
+            apps/server/test
+            packages/domain/test
+          if-no-files-found: error
+
   quality:
     runs-on: ubuntu-latest
     steps:
@@ -28,7 +58,29 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  contracts-and-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Secret scan
+        run: pnpm security:secrets
+      - name: Migration matrix
+        run: pnpm migration:matrix
+      - name: Contract tests
+        run: pnpm contract:test
+      - name: Complexity guardrails
+        run: pnpm guardrails:complexity
+
   desktop-packages:
+    needs: [quality, contracts-and-guardrails]
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
