@@ -16,7 +16,7 @@ export interface AiToolCallAuditInput {
 }
 
 export interface AiToolAuditRecorder {
-  recordToolCall(input: AiToolCallAuditInput): Promise<unknown> | unknown;
+  recordToolCall(input: AiToolCallAuditInput): unknown;
 }
 
 export class ToolPermissionError extends Error {}
@@ -47,14 +47,14 @@ export const executeToolSafely = async (
       status: 'unavailable' as const,
       data: null,
       error: error instanceof Error ? error.message : 'Tool 调用失败',
-      durationMs: Date.now() - startedAt,
+      durationMs: timeoutMs,
     };
   }
 };
 
 const summarize = (value: unknown) => {
   try {
-    const text = JSON.stringify(value, (_key, entry) =>
+    const text = JSON.stringify(value, (_key, entry: unknown) =>
       typeof entry === 'bigint' ? entry.toString() : entry,
     );
     return (text ?? String(value)).slice(0, 500);
