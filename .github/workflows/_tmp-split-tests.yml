@@ -6,7 +6,16 @@ on:
     paths:
       - 'scripts/_split-tests.mjs'
       - '.github/workflows/_tmp-split-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/_split-tests.mjs'
+      - '.github/workflows/_tmp-split-tests.yml'
   workflow_dispatch:
+
+concurrency:
+  group: temporary-test-split-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -47,5 +56,3 @@ jobs:
           git add -- apps/server/test packages/domain/test scripts/_split-tests.mjs .github/workflows/_tmp-split-tests.yml
           git commit -m 'test: split monolithic suites by feature'
           git push origin HEAD:refactor/tests-guardrails
-
-# retrigger after Draft PR creation
