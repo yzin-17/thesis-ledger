@@ -6,7 +6,7 @@ export class DataExportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async exportAccount(accountId?: string) {
-    const [accounts, ledger, positions, journal, plans, strategies, rules, events, notifications] =
+    const [accounts, ledger, positions, journal, plans, strategies, rules, events] =
       await Promise.all([
         this.prisma.account.findMany({ ...(accountId ? { where: { id: accountId } } : {}) }),
         this.prisma.ledgerEvent.findMany({ ...(accountId ? { where: { accountId } } : {}) }),
@@ -16,11 +16,21 @@ export class DataExportService {
         this.prisma.strategy.findMany({ include: { versions: true } }),
         this.prisma.riskRule.findMany({ ...(accountId ? { where: { accountId } } : {}) }),
         this.prisma.riskEvent.findMany({ ...(accountId ? { where: { accountId } } : {}) }),
-        this.prisma.notificationDelivery.findMany(),
       ]);
+    const notifications = accountId
+      ? events.length === 0
+        ? []
+        : await this.prisma.notificationDelivery.findMany({
+            where: { eventId: { in: events.map((event) => event.id) } },
+          })
+      : await this.prisma.notificationDelivery.findMany();
+
     return {
-      formatVersion: 1,
+      formatVersion: 2,
       exportedAt: new Date().toISOString(),
+      scope: accountId
+        ? { kind: 'account' as const, accountId, globalSections: ['strategies'] }
+        : { kind: 'full' as const, accountId: null, globalSections: ['strategies'] },
       accountId: accountId ?? null,
       data: {
         accounts,
@@ -28,11 +38,11 @@ export class DataExportService {
         positions,
         journal,
         plans,
-        strategies,
         rules,
         events,
         notifications,
       },
+      global: { strategies },
       omitted: ['Provider credentials', 'AI API keys', 'Feishu Webhook'],
     };
   }

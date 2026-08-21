@@ -7,6 +7,7 @@ interface Bucket {
 
 export class ApiRateLimiter {
   private readonly buckets = new Map<string, Bucket>();
+  private consumeCount = 0;
 
   constructor(
     private readonly generalLimit = 120,
@@ -14,7 +15,16 @@ export class ApiRateLimiter {
     private readonly windowMs = 60_000,
   ) {}
 
+  private cleanupExpired(now: number) {
+    this.consumeCount += 1;
+    if (this.consumeCount % 256 !== 0 && this.buckets.size < 2048) return;
+    for (const [key, bucket] of this.buckets) {
+      if (now - bucket.startedAt >= this.windowMs) this.buckets.delete(key);
+    }
+  }
+
   consume(key: string, heavy = false, now = Date.now()) {
+    this.cleanupExpired(now);
     const limit = heavy ? this.heavyLimit : this.generalLimit;
     const bucketKey = `${key}:${heavy ? 'heavy' : 'general'}`;
     const bucket = this.buckets.get(bucketKey);
@@ -32,7 +42,7 @@ export class ApiRateLimiter {
   }
 }
 
-const heavyPath = /\/(imports|ai|backtest|automations\/workflows)(?:\/|$)/u;
+const heavyPath = /\/(imports|ai|backtests|automations\/workflows)(?:\/|$)/u;
 
 export const createApiRateLimitMiddleware =
   (limiter = new ApiRateLimiter()) =>
