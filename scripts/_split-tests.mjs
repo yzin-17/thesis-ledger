@@ -119,17 +119,17 @@ const serverClassifier = (title, text) => {
   const value = `${title}\n${text}`;
   const titleRules = [
     ['imports', /截图|导入|Vision|Import/i],
-    ['notifications', /通知|Notification/i],
-    ['ledger', /Ledger|账本|现金余额/i],
     ['risk', /风险|Risk|止损|筹码/i],
+    ['notifications', /通知|Notification/i],
+    ['platform', /环境配置|安全|完整性|限流|配置解析|日志|导出|错误追踪|灾备/i],
+    ['performance', /收益|Performance|TTWROR|XIRR|再平衡/i],
+    ['ledger', /Ledger|账本|现金余额/i],
     ['market', /行情|Market|回填|标的|交易日历/i],
     ['providers', /Provider|数据源|DSA/i],
-    ['performance', /收益|Performance|TTWROR|XIRR|配置|再平衡/i],
     ['backtest', /Backtest|回测|策略版本/i],
     ['journal', /Journal|复盘|交易计划/i],
     ['ai', /\bAI\b|Agent|研究|grounded/i],
     ['automation', /自动化|Automation|Workflow|定时|开盘|盘前|周报|日报/i],
-    ['platform', /安全|完整性|限流|配置解析|日志|导出|错误追踪|灾备/i],
     ['portfolio', /Portfolio|账户|持仓|组合|V0\.1 核心 E2E/i],
   ];
   for (const [bucket, pattern] of titleRules) if (pattern.test(title)) return bucket;
