@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { dataQualityIssueInputSchema } from '@thesis-ledger/schemas';
+import { dataQualityIssueInputSchema, omitUndefinedDeep } from '@thesis-ledger/schemas';
 import { DataQualityService } from './data-quality.service.js';
 
 @Controller('data-quality')
@@ -13,7 +13,7 @@ export class DataQualityController {
 
   @Post('issues')
   record(@Body() input: unknown) {
-    return this.quality.record(dataQualityIssueInputSchema.parse(input));
+    return this.quality.record(omitUndefinedDeep(dataQualityIssueInputSchema.parse(input)));
   }
 
   @Patch('issues/:id/resolve')
