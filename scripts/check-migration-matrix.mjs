@@ -4,11 +4,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsRoot = resolve(root, 'apps/server/prisma/migrations');
+const expectedMigrationCount = 21;
 const entries = (await readdir(migrationsRoot, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (entries.length !== 18) throw new Error(`迁移数量发生变化，请更新矩阵: ${entries.length}`);
+if (entries.length !== expectedMigrationCount)
+  throw new Error(
+    `迁移数量发生变化，请审核并更新矩阵基线: expected=${expectedMigrationCount}, actual=${entries.length}`,
+  );
 for (let index = 0; index < entries.length; index += 1) {
   const name = entries[index];
   if (!/^\d{14}_[a-z0-9_-]+$/u.test(name)) throw new Error(`迁移目录命名无效: ${name}`);

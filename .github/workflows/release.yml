@@ -1,10 +1,9 @@
-name: CI
+name: ThesisLedger Release Artifacts
 
 on:
-  pull_request:
   push:
-    branches: [main]
-    tags: ['v*']
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
@@ -23,35 +22,16 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm security:secrets
+      - run: pnpm migration:matrix
+      - run: pnpm contract:test
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
 
-  contracts-and-guardrails:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.9.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Secret scan
-        run: pnpm security:secrets
-      - name: Migration matrix
-        run: pnpm migration:matrix
-      - name: Contract tests
-        run: pnpm contract:test
-      - name: Complexity guardrails
-        run: pnpm guardrails:complexity
-
-  desktop-packages:
-    needs: [quality, contracts-and-guardrails]
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+  desktop:
+    needs: quality
     strategy:
       fail-fast: false
       matrix:
@@ -73,26 +53,42 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build Desktop installer
-        run: pnpm --filter @thesis-ledger/desktop ${{ matrix.package_script }}
+      - run: pnpm --filter @thesis-ledger/desktop ${{ matrix.package_script }}
         env:
           CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Verify macOS DMG
-        if: runner.os == 'macOS'
-        run: |
-          hdiutil verify "apps/desktop/release/ThesisLedger-0.1.0-arm64.dmg"
-          shasum -a 256 apps/desktop/release/*.dmg
-      - name: Verify Windows NSIS installer
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Get-ChildItem apps/desktop/release -Filter '*.exe' | Get-FileHash -Algorithm SHA256
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: apps/desktop/release/*
+          if-no-files-found: error
+
+  verify-release-artifacts:
+    needs: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: apps/desktop/release
+          merge-multiple: true
+      - name: Verify release artifact set
+        run: pnpm release:artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thesis-ledger-release-artifacts
+          path: |
+            apps/desktop/release/*
+            apps/mobile/release/*
           if-no-files-found: error
