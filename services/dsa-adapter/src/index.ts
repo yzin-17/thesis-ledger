@@ -25,3 +25,4 @@ export * from './provider.js';
 export * from './credentials.js';
 export * from './trading-calendar.js';
 export * from './professional.js';
+export * from './capability.js';
