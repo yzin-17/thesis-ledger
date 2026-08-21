@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
@@ -25,20 +27,26 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate feature test split
+        shell: bash
         run: |
           node scripts/_split-tests.mjs
-          pnpm exec prettier --write apps/server/test packages/domain/test
+          git show origin/main:apps/desktop/test/ui-contract.test.tsx \
+            | sed "s#'../src/ui/App.js'#'../src/features/legacy-pages.js'#" \
+            > apps/desktop/test/ui-contract.test.tsx
+          pnpm exec prettier --write apps/server/test packages/domain/test apps/desktop/test/ui-contract.test.tsx
       - name: Verify generated split
         run: |
           pnpm --filter @thesis-ledger/domain test
           pnpm --filter @thesis-ledger/server test
-          pnpm exec eslint apps/server/test packages/domain/test --max-warnings=0
+          pnpm --filter @thesis-ledger/desktop test
+          pnpm exec eslint apps/server/test packages/domain/test apps/desktop/test --max-warnings=0
       - uses: actions/upload-artifact@v4
         with:
           name: test-refactor-preview
           path: |
             apps/server/test
             packages/domain/test
+            apps/desktop/test/ui-contract.test.tsx
           if-no-files-found: error
 
   quality:
