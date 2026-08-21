@@ -12,10 +12,13 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @thesis-ledger/server prisma generate
 RUN pnpm --filter @thesis-ledger/server... build
+RUN pnpm --filter @thesis-ledger/server deploy --prod /tmp/server-runtime --legacy
 
-FROM node:24-alpine
+FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN corepack enable
-COPY --from=build /workspace /app
+RUN addgroup -S thesis && adduser -S thesis -G thesis
+COPY --from=build /tmp/server-runtime ./
+COPY --from=build /workspace/apps/server/dist ./apps/server/dist
+USER thesis
 CMD ["node", "apps/server/dist/src/main.js"]
