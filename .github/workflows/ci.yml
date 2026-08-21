@@ -11,46 +11,6 @@ permissions:
   contents: read
 
 jobs:
-  test-refactor-preview:
-    if: github.event_name == 'pull_request' && github.head_ref == 'refactor/tests-guardrails'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.9.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Generate feature test split
-        shell: bash
-        run: |
-          node scripts/_split-tests.mjs
-          git show origin/main:apps/desktop/test/ui-contract.test.tsx \
-            | sed "s#'../src/ui/App.js'#'../src/features/legacy-pages.js'#" \
-            > apps/desktop/test/ui-contract.test.tsx
-          pnpm exec prettier --write apps/server/test packages/domain/test apps/desktop/test/ui-contract.test.tsx
-      - name: Build workspace dependencies
-        run: pnpm build
-      - name: Verify generated split
-        run: |
-          pnpm --filter @thesis-ledger/domain test
-          pnpm --filter @thesis-ledger/server test
-          pnpm --filter @thesis-ledger/desktop test
-          pnpm exec eslint apps/server/test packages/domain/test apps/desktop/test --max-warnings=0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: test-refactor-preview
-          path: |
-            apps/server/test
-            packages/domain/test
-            apps/desktop/test/ui-contract.test.tsx
-          if-no-files-found: error
-
   quality:
     runs-on: ubuntu-latest
     steps:
