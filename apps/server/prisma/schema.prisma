@@ -8,18 +8,21 @@ datasource db {
 }
 
 model Account {
-  id          String              @id @default(uuid()) @db.Uuid
-  name        String
-  institution String?
-  type        String
-  mode        String              @default("actual")
-  currency    String              @default("CNY")
-  active      Boolean             @default(true)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  positions   Position[]
-  ledger      LedgerEvent[]
-  snapshots   PortfolioSnapshot[]
+  id           String              @id @default(uuid()) @db.Uuid
+  name         String
+  institution  String?
+  type         String
+  mode         String              @default("actual")
+  currency     String              @default("CNY")
+  active       Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  positions    Position[]
+  ledger       LedgerEvent[]
+  snapshots    PortfolioSnapshot[]
+  importDrafts ImportDraft[]
+  riskRules    RiskRule[]
+  tradePlans   TradePlan[]
 
   @@index([active])
 }
@@ -132,30 +135,32 @@ model ImportDraft {
   createdAt        DateTime  @default(now())
   committedAt      DateTime?
   rolledBackAt     DateTime?
+  account          Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([accountId, status])
 }
 
 model LedgerEvent {
-  id           String   @id @default(uuid()) @db.Uuid
-  accountId    String   @db.Uuid
-  type         String
-  occurredAt   DateTime
-  symbol       String?
-  quantity     Decimal? @db.Decimal(24, 8)
-  price        Decimal? @db.Decimal(24, 8)
-  amount       Decimal? @db.Decimal(24, 8)
-  fee          Decimal? @db.Decimal(24, 8)
-  tax          Decimal? @db.Decimal(24, 8)
-  externalId   String?
-  source       String   @default("manual")
-  currency     String   @default("CNY")
-  note         String?
-  correctionOf String?  @db.Uuid
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  account      Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  asset        Asset?   @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  id             String         @id @default(uuid()) @db.Uuid
+  accountId      String         @db.Uuid
+  type           String
+  occurredAt     DateTime
+  symbol         String?
+  quantity       Decimal?       @db.Decimal(24, 8)
+  price          Decimal?       @db.Decimal(24, 8)
+  amount         Decimal?       @db.Decimal(24, 8)
+  fee            Decimal?       @db.Decimal(24, 8)
+  tax            Decimal?       @db.Decimal(24, 8)
+  externalId     String?
+  source         String         @default("manual")
+  currency       String         @default("CNY")
+  note           String?
+  correctionOf   String?        @db.Uuid
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  account        Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset          Asset?         @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  journalEntries JournalEntry[]
 
   @@unique([accountId, externalId])
   @@index([accountId, occurredAt])
@@ -334,24 +339,29 @@ model RiskRule {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   events       RiskEvent[]
+  account      Account?    @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])
 }
 
 model RiskEvent {
-  id           String    @id @default(uuid()) @db.Uuid
-  ruleId       String    @db.Uuid
-  ruleVersion  Int
-  triggered    Boolean
-  severity     String
-  message      String
-  mode         String    @default("actual")
-  accountId    String?   @db.Uuid
-  symbol       String?
-  triggerValue Decimal?  @db.Decimal(24, 8)
-  threshold    Decimal?  @db.Decimal(24, 8)
-  marketTime   DateTime?
-  context      Json
-  evaluatedAt  DateTime  @default(now())
-  rule         RiskRule  @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  id             String                 @id @default(uuid()) @db.Uuid
+  ruleId         String                 @db.Uuid
+  ruleVersion    Int
+  triggered      Boolean
+  severity       String
+  message        String
+  mode           String                 @default("actual")
+  accountId      String?                @db.Uuid
+  symbol         String?
+  triggerValue   Decimal?               @db.Decimal(24, 8)
+  threshold      Decimal?               @db.Decimal(24, 8)
+  marketTime     DateTime?
+  context        Json
+  evaluatedAt    DateTime               @default(now())
+  rule           RiskRule               @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  deliveries     NotificationDelivery[]
+  journalEntries JournalEntry[]
 
   @@index([ruleId, evaluatedAt])
   @@index([triggered, severity])
@@ -374,7 +384,7 @@ model RiskRuleAudit {
 
 model NotificationDelivery {
   id              String    @id @default(uuid()) @db.Uuid
-  eventId         String
+  eventId         String    @db.Uuid
   channel         String
   provider        String
   severity        String
@@ -386,9 +396,11 @@ model NotificationDelivery {
   lastError       String?
   errorCode       String?
   responseSummary String?
+  event           RiskEvent @relation(fields: [eventId], references: [id], onDelete: Restrict)
 
   @@unique([dedupKey, channel])
   @@index([status, scheduledAt])
+  @@index([eventId])
 }
 
 model Strategy {
@@ -404,14 +416,15 @@ model Strategy {
 }
 
 model StrategyVersion {
-  id            String        @id @default(uuid()) @db.Uuid
-  strategyId    String        @db.Uuid
-  version       Int
-  schemaVersion Int           @default(1)
-  schema        Json
-  createdAt     DateTime      @default(now())
-  strategy      Strategy      @relation(fields: [strategyId], references: [id], onDelete: Restrict)
-  jobs          BacktestJob[]
+  id             String         @id @default(uuid()) @db.Uuid
+  strategyId     String         @db.Uuid
+  version        Int
+  schemaVersion  Int            @default(1)
+  schema         Json
+  createdAt      DateTime       @default(now())
+  strategy       Strategy       @relation(fields: [strategyId], references: [id], onDelete: Restrict)
+  jobs           BacktestJob[]
+  journalEntries JournalEntry[]
 
   @@unique([strategyId, version])
 }
@@ -440,13 +453,13 @@ model BacktestJob {
 }
 
 model JournalEntry {
-  id                String   @id @default(uuid()) @db.Uuid
-  entryType         String   @default("note")
-  accountId         String?  @db.Uuid
-  ledgerEventId     String?  @db.Uuid
-  tradePlanId       String?  @db.Uuid
-  riskEventId       String?  @db.Uuid
-  strategyVersionId String?  @db.Uuid
+  id                String           @id @default(uuid()) @db.Uuid
+  entryType         String           @default("note")
+  accountId         String?          @db.Uuid
+  ledgerEventId     String?          @db.Uuid
+  tradePlanId       String?          @db.Uuid
+  riskEventId       String?          @db.Uuid
+  strategyVersionId String?          @db.Uuid
   symbol            String?
   side              String?
   reason            String
@@ -458,12 +471,18 @@ model JournalEntry {
   exitReason        String?
   emotion           String?
   notes             String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  ledgerEvent       LedgerEvent?     @relation(fields: [ledgerEventId], references: [id], onDelete: Restrict)
+  riskEvent         RiskEvent?       @relation(fields: [riskEventId], references: [id], onDelete: Restrict)
+  strategyVersion   StrategyVersion? @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
 
   @@index([symbol, createdAt])
   @@index([accountId, createdAt])
   @@index([tradePlanId, createdAt])
+  @@index([ledgerEventId])
+  @@index([riskEventId])
+  @@index([strategyVersionId])
 }
 
 model TradePlan {
@@ -484,6 +503,7 @@ model TradePlan {
   status              String    @default("active")
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+  account             Account?  @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([symbol, status])
   @@index([accountId, status])
