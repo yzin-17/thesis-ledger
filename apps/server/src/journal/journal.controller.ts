@@ -5,6 +5,7 @@ import {
   counterfactualInputSchema,
   journalEntryInputSchema,
   journalEntryUpdateSchema,
+  omitUndefinedDeep,
   plannedStopInputSchema,
   reviewWindowInputSchema,
   tradePlanInputSchema,
@@ -17,7 +18,7 @@ export class JournalController {
 
   @Post('entries')
   createEntry(@Body() input: unknown) {
-    return this.journal.createEntry(journalEntryInputSchema.parse(input));
+    return this.journal.createEntry(omitUndefinedDeep(journalEntryInputSchema.parse(input)));
   }
 
   @Get('entries')
@@ -27,12 +28,15 @@ export class JournalController {
 
   @Patch('entries/:id')
   updateEntry(@Param('id') id: string, @Body() input: unknown) {
-    return this.journal.updateEntry(id, journalEntryUpdateSchema.parse(input));
+    return this.journal.updateEntry(
+      id,
+      omitUndefinedDeep(journalEntryUpdateSchema.parse(input)),
+    );
   }
 
   @Post('plans')
   createPlan(@Body() input: unknown) {
-    return this.journal.createPlan(tradePlanInputSchema.parse(input));
+    return this.journal.createPlan(omitUndefinedDeep(tradePlanInputSchema.parse(input)));
   }
 
   @Get('plans')
@@ -42,28 +46,28 @@ export class JournalController {
 
   @Post('analysis/planned-vs-actual')
   plannedVsActual(@Body() input: unknown) {
-    return this.journal.plannedVsActual(completedTradeSchema.parse(input));
+    return this.journal.plannedVsActual(omitUndefinedDeep(completedTradeSchema.parse(input)));
   }
 
   @Post('analysis/planned-stop')
   plannedStop(@Body() input: unknown) {
-    const body = plannedStopInputSchema.parse(input);
+    const body = omitUndefinedDeep(plannedStopInputSchema.parse(input));
     return this.journal.plannedStopReview(body.fact, body.actualPnl);
   }
 
   @Post('analysis/counterfactual')
   counterfactual(@Body() input: unknown) {
-    return this.journal.counterfactual(counterfactualInputSchema.parse(input));
+    return this.journal.counterfactual(omitUndefinedDeep(counterfactualInputSchema.parse(input)));
   }
 
   @Post('analysis/review')
   review(@Body() input: unknown) {
-    return this.journal.review(reviewWindowInputSchema.parse(input));
+    return this.journal.review(omitUndefinedDeep(reviewWindowInputSchema.parse(input)));
   }
 
   @Post('analysis/behavior')
   behavior(@Body() input: unknown) {
-    const body = behaviorInputSchema.parse(input);
+    const body = omitUndefinedDeep(behaviorInputSchema.parse(input));
     return this.journal.behavior(body);
   }
 
