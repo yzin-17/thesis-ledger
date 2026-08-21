@@ -34,6 +34,8 @@ jobs:
             | sed "s#'../src/ui/App.js'#'../src/features/legacy-pages.js'#" \
             > apps/desktop/test/ui-contract.test.tsx
           pnpm exec prettier --write apps/server/test packages/domain/test apps/desktop/test/ui-contract.test.tsx
+      - name: Build workspace dependencies
+        run: pnpm build
       - name: Verify generated split
         run: |
           pnpm --filter @thesis-ledger/domain test
