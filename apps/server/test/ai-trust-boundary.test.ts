@@ -12,18 +12,45 @@ describe('AI trust boundary', () => {
     expect(methods).not.toContain('toolCall');
   });
 
-  it('HTTP start ignores client supplied model metadata', () => {
+  it('HTTP start preserves non-audit model metadata used by deterministic review flows', () => {
     const runs = { start: vi.fn() };
     const controller = new AiController(runs as never);
+    const modelMetadata = {
+      mode: 'deterministic-evidence-only',
+      evidence: { source: 'journal', cost: 12.5 },
+    };
 
     controller.start({
       provider: 'mock',
       model: 'm1',
       promptVersion: 'v1',
-      modelMetadata: { inputTokens: 999999, cost: 999999 },
+      modelMetadata,
     });
 
-    expect(runs.start).toHaveBeenCalledWith('mock', 'm1', 'v1', undefined);
+    expect(runs.start).toHaveBeenCalledWith('mock', 'm1', 'v1', undefined, modelMetadata);
+  });
+
+  it.each([
+    ['inputTokens', 999999],
+    ['outputTokens', 999999],
+    ['cost', 999999],
+    ['durationMs', 999999],
+    ['usage', { inputTokens: 1 }],
+    ['toolCalls', []],
+    ['fallbackErrors', []],
+  ] as const)('HTTP start rejects client-written audit metadata field %s', (field, value) => {
+    const runs = { start: vi.fn() };
+    const controller = new AiController(runs as never);
+
+    expect(() =>
+      controller.start({
+        provider: 'mock',
+        model: 'm1',
+        promptVersion: 'v1',
+        modelMetadata: { [field]: value },
+      }),
+    ).toThrow();
+    expect(runs.start).not.toHaveBeenCalled();
   });
 
   it('persists token usage and cost from the actual provider completion', async () => {
