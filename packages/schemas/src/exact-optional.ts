@@ -9,9 +9,11 @@ export type ExactOptional<T> = T extends readonly (infer Item)[]
   : T extends Date
     ? T
     : T extends object
-      ? { [K in RequiredKeys<T>]: ExactOptional<T[K]> } & {
-          [K in OptionalKeys<T>]?: ExactOptional<Exclude<T[K], undefined>>;
-        }
+      ? string extends keyof T
+        ? { [K in keyof T]: ExactOptional<Exclude<T[K], undefined>> }
+        : { [K in RequiredKeys<T>]: ExactOptional<T[K]> } & {
+            [K in OptionalKeys<T>]?: ExactOptional<Exclude<T[K], undefined>>;
+          }
       : Exclude<T, undefined>;
 
 export const omitUndefinedDeep = <T>(value: T): ExactOptional<T> => {
