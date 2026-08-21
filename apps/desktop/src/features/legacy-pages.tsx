@@ -4645,7 +4645,14 @@ export function PortfolioDashboard({
                       <td className={(position.pnl ?? 0) >= 0 ? 'positive' : 'negative'}>
                         {position.pnl === null ? '—' : money.format(position.pnl)}
                       </td>
-                      
+                      <td>
+                        <Badge
+                          className={position.stale ? 'tag warning' : 'tag'}
+                          variant="secondary"
+                        >
+                          {position.stale ? '陈旧' : '最新'}
+                        </Badge>
+                      </td>
                       <td>
                         <Button
                           className="text-button"
