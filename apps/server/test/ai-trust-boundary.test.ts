@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiController } from '../src/ai/ai.controller.js';
+import type { ToolPermission } from '../src/ai/contracts.js';
 import { AiRunService } from '../src/ai/ai-run.service.js';
 import { AiProviderRegistry } from '../src/ai/provider-registry.js';
-import { executeAuditedTool } from '../src/ai/tool-runtime.js';
+import { executeAuditedTool, type AiToolCallAuditInput } from '../src/ai/tool-runtime.js';
 
 describe('AI trust boundary', () => {
   it('HTTP controller does not expose client-written finish or tool-call audit endpoints', () => {
@@ -63,7 +64,9 @@ describe('AI trust boundary', () => {
   });
 
   it('derives tool audit duration and provenance from the server execution', async () => {
-    const recorder = { recordToolCall: vi.fn(async (input) => input) };
+    const recorder = {
+      recordToolCall: vi.fn(async (input: AiToolCallAuditInput) => input),
+    };
     const result = await executeAuditedTool(
       recorder,
       '11111111-1111-4111-8111-111111111111',
@@ -79,7 +82,7 @@ describe('AI trust boundary', () => {
         },
       },
       { symbol: '600519.SH' },
-      new Set(['market:read']),
+      new Set<ToolPermission>(['market:read']),
     );
 
     expect(result.status).toBe('ok');
