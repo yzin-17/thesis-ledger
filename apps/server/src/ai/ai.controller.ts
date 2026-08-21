@@ -4,6 +4,7 @@ import {
   aiDecisionLogInputSchema,
   aiRunFinishInputSchema,
   aiRunStartInputSchema,
+  omitUndefinedDeep,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { AiRunService } from './ai.service.js';
@@ -69,7 +70,7 @@ export class AiController {
 
   @Post(':id/tool-calls')
   toolCall(@Param('id') id: string, @Body() input: unknown) {
-    const body = aiToolCallHttpSchema.parse(input);
+    const body = omitUndefinedDeep(aiToolCallHttpSchema.parse(input));
     return this.runs.recordToolCall({ runId: id, ...body });
   }
 
@@ -83,7 +84,7 @@ export class AiController {
 
   @Post('decision-logs')
   decisionLog(@Body() input: unknown) {
-    return this.runs.createDecisionLog(aiDecisionLogInputSchema.parse(input));
+    return this.runs.createDecisionLog(omitUndefinedDeep(aiDecisionLogInputSchema.parse(input)));
   }
 
   @Get('decision-logs')
