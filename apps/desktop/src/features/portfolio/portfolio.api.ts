@@ -1,18 +1,6 @@
 import type { PortfolioValuationResponse } from '@thesis-ledger/api-client';
-import { omitUndefinedDeep } from '@thesis-ledger/schemas';
-import { z } from 'zod';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import type { Account, HeldAssetType, Portfolio, PortfolioMode } from './portfolio.types.js';
-
-const accountSchema = z.object({
-  id: z.uuid(),
-  name: z.string(),
-  institution: z.string().nullable().optional(),
-  type: z.enum(['securities', 'fund', 'cash']),
-  mode: z.enum(['actual', 'shadow']),
-  currency: z.enum(['CNY', 'HKD', 'USD']),
-  active: z.boolean().optional(),
-});
 
 const heldAssetType = (value: string | undefined): HeldAssetType | undefined =>
   value === 'stock' || value === 'etf' || value === 'fund' ? value : undefined;
@@ -44,10 +32,36 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
   }),
 });
 
+const parseAccount = (value: unknown): Account => {
+  if (!value || typeof value !== 'object') throw new Error('账户响应契约不匹配');
+  const account = value as Record<string, unknown>;
+  if (
+    typeof account.id !== 'string' ||
+    typeof account.name !== 'string' ||
+    !['securities', 'fund', 'cash'].includes(String(account.type)) ||
+    !['actual', 'shadow'].includes(String(account.mode)) ||
+    !['CNY', 'HKD', 'USD'].includes(String(account.currency))
+  ) {
+    throw new Error('账户响应契约不匹配');
+  }
+  return {
+    id: account.id,
+    name: account.name,
+    type: account.type as Account['type'],
+    mode: account.mode as Account['mode'],
+    currency: account.currency as Account['currency'],
+    ...(typeof account.institution === 'string' || account.institution === null
+      ? { institution: account.institution }
+      : {}),
+    ...(typeof account.active === 'boolean' ? { active: account.active } : {}),
+  };
+};
+
 export const fetchPortfolioValuation = async (mode: PortfolioMode) =>
   normalizePortfolio(await getDesktopApiClient().portfolio.getValuation({ mode, t: Date.now() }));
 
 export const fetchAccounts = async (): Promise<Account[]> => {
   const raw = await getDesktopApiClient().request<unknown>('/accounts', { cache: 'no-store' });
-  return omitUndefinedDeep(z.array(accountSchema).parse(raw));
+  if (!Array.isArray(raw)) throw new Error('账户响应契约不匹配');
+  return raw.map(parseAccount);
 };
