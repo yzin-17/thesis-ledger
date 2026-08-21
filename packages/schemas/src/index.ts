@@ -8,3 +8,4 @@ export * from './ledger.js';
 export * from './asset-identity.js';
 export * from './api.js';
 export * from './performance.js';
+export * from './exact-optional.js';
