@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import {
+  omitUndefinedDeep,
   performanceAllocationInputSchema,
   performanceCalculateInputSchema,
   performanceSnapshotCaptureInputSchema,
@@ -43,12 +44,16 @@ export class PerformanceController {
 
   @Post('calculate')
   calculate(@Body() input: unknown) {
-    return this.performance.calculate(performanceCalculateInputSchema.parse(input));
+    return this.performance.calculate(
+      omitUndefinedDeep(performanceCalculateInputSchema.parse(input)),
+    );
   }
 
   @Post('allocation')
   allocate(@Body() input: unknown) {
-    return this.performance.allocate(performanceAllocationInputSchema.parse(input));
+    return this.performance.allocate(
+      omitUndefinedDeep(performanceAllocationInputSchema.parse(input)),
+    );
   }
 
   @Get('targets')
