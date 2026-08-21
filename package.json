@@ -19,7 +19,7 @@
     "db:integration": "node scripts/db-integration-smoke.mjs",
     "provider:failover": "node scripts/provider-failover-smoke.mjs",
     "v1:e2e": "node scripts/v1-core-e2e-smoke.mjs",
-    "contract:test": "pnpm --filter @thesis-ledger/schemas test && pnpm --filter @thesis-ledger/api-client test && pnpm --filter @thesis-ledger/server exec vitest run test/http-validation.test.ts test/ai-trust-boundary.test.ts test/risk-market-contracts.test.ts",
+    "contract:test": "pnpm db:generate && pnpm --filter @thesis-ledger/shared build && pnpm --filter @thesis-ledger/domain build && pnpm --filter @thesis-ledger/schemas build && pnpm --filter @thesis-ledger/api-client build && pnpm --filter @thesis-ledger/schemas test && pnpm --filter @thesis-ledger/api-client test && pnpm --filter @thesis-ledger/server exec vitest run test/http-validation.test.ts test/ai-trust-boundary.test.ts test/risk-market-contracts.test.ts",
     "contract:smoke": "node scripts/thesis-ledger-contract-smoke.mjs",
     "guardrails:complexity": "eslint apps packages services --rule 'no-nested-ternary:warn' --rule 'complexity:[warn,20]' --rule 'max-lines-per-function:[warn,{max:220,skipBlankLines:true,skipComments:true}]' && node scripts/check-file-size-guardrails.mjs",
     "disaster:recovery": "node scripts/disaster-recovery-smoke.mjs",
