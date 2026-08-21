@@ -100,13 +100,14 @@ export const executeAuditedTool = async (
   const durationMs = Date.now() - startedAt;
   const observed = provenance(data);
   const completedAt = new Date().toISOString();
+  const outputSummary = status === 'ok' ? summarize(data) : errorMessage;
   await recorder.recordToolCall({
     runId,
     tool: tool.name,
     permission: tool.permission,
     status,
     inputSummary: summarize(input),
-    outputSummary: status === 'ok' ? summarize(data) : errorMessage,
+    ...(outputSummary === undefined ? {} : { outputSummary }),
     durationMs,
     ...observed,
     fetchedAt: observed.fetchedAt ?? completedAt,
