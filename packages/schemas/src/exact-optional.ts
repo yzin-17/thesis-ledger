@@ -1,5 +1,5 @@
 type OptionalKeys<T extends object> = {
-  [K in keyof T]-?: {} extends Pick<T, K> ? K : never;
+  [K in keyof T]-?: Pick<T, K> extends Required<Pick<T, K>> ? never : K;
 }[keyof T];
 
 type RequiredKeys<T extends object> = Exclude<keyof T, OptionalKeys<T>>;
@@ -18,12 +18,13 @@ export type ExactOptional<T> = T extends readonly (infer Item)[]
 
 export const omitUndefinedDeep = <T>(value: T): ExactOptional<T> => {
   if (Array.isArray(value)) {
-    return value.map((item) => omitUndefinedDeep(item)) as ExactOptional<T>;
+    const items: readonly unknown[] = value;
+    return items.map((item) => omitUndefinedDeep(item)) as ExactOptional<T>;
   }
   if (value instanceof Date) return value as ExactOptional<T>;
   if (value && typeof value === 'object') {
     const result: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value)) {
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
       if (entry !== undefined) result[key] = omitUndefinedDeep(entry);
     }
     return result as ExactOptional<T>;
