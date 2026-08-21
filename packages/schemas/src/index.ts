@@ -3,6 +3,7 @@ export * from './portfolio.js';
 export * from './strategy.js';
 export * from './automation.js';
 export * from './ai.js';
+export * from './research.js';
 export * from './risk.js';
 export * from './ledger.js';
 export * from './asset-identity.js';
