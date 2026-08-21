@@ -237,10 +237,12 @@ describe('Desktop UI contract', () => {
     expect(providerMarkup).toContain('>提供方</th>');
 
     const bannerMarkup = renderToStaticMarkup(
-      <DataStateBanner state="stale" title="行情陈旧" description="等待刷新" />,
+      <DataStateBanner state="stale" description="等待刷新" />,
     );
-    expect(bannerMarkup).toContain('行情陈旧');
+    expect(bannerMarkup).toContain('数据可能陈旧');
+    expect(bannerMarkup).toContain('等待刷新');
     expect(bannerMarkup).toContain('role="status"');
+    expect(bannerMarkup).toContain('data-state-banner stale');
   });
 
   it('renders toast primitives inside the toast provider', () => {
