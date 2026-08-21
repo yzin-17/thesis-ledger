@@ -1,18 +1,27 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { z } from 'zod';
 import { BacktestService } from './backtest.service.js';
+
+const createStrategyHttpSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  schema: z.unknown(),
+  description: z.string().max(2_000).optional(),
+});
+const createVersionHttpSchema = z.object({ schema: z.unknown() });
 
 @Controller('backtests')
 export class BacktestController {
   constructor(private readonly backtests: BacktestService) {}
 
   @Post('strategies')
-  createStrategy(@Body() body: { name: string; schema: unknown; description?: string }) {
+  createStrategy(@Body() input: unknown) {
+    const body = createStrategyHttpSchema.parse(input);
     return this.backtests.createStrategy(body.name, body.schema, body.description);
   }
 
   @Post('strategies/:id/versions')
-  createVersion(@Param('id') id: string, @Body() body: { schema: unknown }) {
-    return this.backtests.createVersion(id, body.schema);
+  createVersion(@Param('id') id: string, @Body() input: unknown) {
+    return this.backtests.createVersion(id, createVersionHttpSchema.parse(input).schema);
   }
 
   @Post('jobs')

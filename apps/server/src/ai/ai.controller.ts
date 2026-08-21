@@ -1,5 +1,35 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  aiCheckpointInputSchema,
+  aiDecisionLogInputSchema,
+  aiRunFinishInputSchema,
+  aiRunStartInputSchema,
+  omitUndefinedDeep,
+} from '@thesis-ledger/schemas';
+import { z } from 'zod';
 import { AiRunService } from './ai.service.js';
+
+const aiToolCallHttpSchema = z.object({
+  tool: z.string().trim().min(1),
+  permission: z.enum([
+    'market:read',
+    'portfolio:read',
+    'risk:read',
+    'journal:read',
+    'financials:read',
+    'news:read',
+    'announcements:read',
+    'backtest:run',
+  ]),
+  status: z.enum(['ok', 'unavailable', 'denied']),
+  inputSummary: z.string(),
+  outputSummary: z.string().optional(),
+  provider: z.string().optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+  marketTime: z.iso.datetime({ offset: true }).optional(),
+  availableAt: z.iso.datetime({ offset: true }).optional(),
+  fetchedAt: z.iso.datetime({ offset: true }).optional(),
+});
 
 @Controller('ai/runs')
 export class AiController {
@@ -11,16 +41,8 @@ export class AiController {
   }
 
   @Post()
-  start(
-    @Body()
-    body: {
-      provider: string;
-      model: string;
-      promptVersion: string;
-      context?: unknown;
-      modelMetadata?: unknown;
-    },
-  ) {
+  start(@Body() input: unknown) {
+    const body = aiRunStartInputSchema.parse(input);
     return this.runs.start(
       body.provider,
       body.model,
@@ -31,19 +53,13 @@ export class AiController {
   }
 
   @Patch(':id/checkpoint')
-  checkpoint(@Param('id') id: string, @Body() checkpoint: object) {
-    return this.runs.checkpoint(id, checkpoint);
+  checkpoint(@Param('id') id: string, @Body() input: unknown) {
+    return this.runs.checkpoint(id, aiCheckpointInputSchema.parse(input));
   }
 
   @Post(':id/finish')
-  finish(
-    @Param('id') id: string,
-    @Body()
-    body: {
-      result: unknown;
-      usage: { inputTokens: number; outputTokens: number; cost: number };
-    },
-  ) {
+  finish(@Param('id') id: string, @Body() input: unknown) {
+    const body = aiRunFinishInputSchema.parse(input);
     return this.runs.finish(id, body.result, body.usage);
   }
 
@@ -53,22 +69,8 @@ export class AiController {
   }
 
   @Post(':id/tool-calls')
-  toolCall(
-    @Param('id') id: string,
-    @Body()
-    body: {
-      tool: string;
-      permission: Parameters<AiRunService['recordToolCall']>[0]['permission'];
-      status: 'ok' | 'unavailable' | 'denied';
-      inputSummary: string;
-      outputSummary?: string;
-      provider?: string;
-      durationMs?: number;
-      marketTime?: string;
-      availableAt?: string;
-      fetchedAt?: string;
-    },
-  ) {
+  toolCall(@Param('id') id: string, @Body() input: unknown) {
+    const body = omitUndefinedDeep(aiToolCallHttpSchema.parse(input));
     return this.runs.recordToolCall({ runId: id, ...body });
   }
 
@@ -81,19 +83,8 @@ export class AiController {
   }
 
   @Post('decision-logs')
-  decisionLog(
-    @Body()
-    body: {
-      symbol?: string;
-      accountId?: string;
-      question: string;
-      assumptions: unknown;
-      conclusion: unknown;
-      context?: unknown;
-      provenance?: unknown;
-    },
-  ) {
-    return this.runs.createDecisionLog(body);
+  decisionLog(@Body() input: unknown) {
+    return this.runs.createDecisionLog(omitUndefinedDeep(aiDecisionLogInputSchema.parse(input)));
   }
 
   @Get('decision-logs')

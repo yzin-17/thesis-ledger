@@ -1,4 +1,11 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  omitUndefinedDeep,
+  performanceAllocationInputSchema,
+  performanceCalculateInputSchema,
+  performanceSnapshotCaptureInputSchema,
+  performanceTargetsInputSchema,
+} from '@thesis-ledger/schemas';
 import { PerformanceService } from './performance.service.js';
 
 @Controller('performance')
@@ -6,7 +13,8 @@ export class PerformanceController {
   constructor(private readonly performance: PerformanceService) {}
 
   @Post('snapshots')
-  capture(@Body() body: { accountId?: string; capturedAt?: string; mode?: 'actual' | 'shadow' }) {
+  capture(@Body() input: unknown) {
+    const body = performanceSnapshotCaptureInputSchema.parse(input);
     return this.performance.capture(
       body.accountId,
       body.capturedAt ? new Date(body.capturedAt) : undefined,
@@ -35,25 +43,17 @@ export class PerformanceController {
   }
 
   @Post('calculate')
-  calculate(
-    @Body()
-    input: {
-      valuations: { date: string; value: number; externalFlow?: number }[];
-      cashFlows: { date: string; amount: number }[];
-    },
-  ) {
-    return this.performance.calculate(input);
+  calculate(@Body() input: unknown) {
+    return this.performance.calculate(
+      omitUndefinedDeep(performanceCalculateInputSchema.parse(input)),
+    );
   }
 
   @Post('allocation')
-  allocate(
-    @Body()
-    input: {
-      positions: { category: string; marketValue: number }[];
-      targets?: Record<string, number>;
-    },
-  ) {
-    return this.performance.allocate(input);
+  allocate(@Body() input: unknown) {
+    return this.performance.allocate(
+      omitUndefinedDeep(performanceAllocationInputSchema.parse(input)),
+    );
   }
 
   @Get('targets')
@@ -65,15 +65,9 @@ export class PerformanceController {
   }
 
   @Post('targets')
-  saveTargets(
-    @Body()
-    input: {
-      scope: 'account' | 'portfolio';
-      accountId?: string;
-      targets: Record<string, number>;
-    },
-  ) {
-    return this.performance.saveTargets(input.scope, input.targets, input.accountId);
+  saveTargets(@Body() input: unknown) {
+    const body = performanceTargetsInputSchema.parse(input);
+    return this.performance.saveTargets(body.scope, body.targets, body.accountId);
   }
 
   @Get('layers')
