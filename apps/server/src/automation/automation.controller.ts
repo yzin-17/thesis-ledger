@@ -12,6 +12,7 @@ import {
   automationRiskScanInputSchema,
   automationWeeklyPerformanceInputSchema,
   automationWeeklyStrategyInputSchema,
+  omitUndefinedDeep,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AutomationService } from './automation.service.js';
@@ -58,54 +59,59 @@ export class AutomationController {
 
   @Post('workflows/pre-market-events')
   preMarketEvents(@Body() input: unknown) {
-    const body = automationPreMarketEventsInputSchema.parse(input);
+    const body = omitUndefinedDeep(automationPreMarketEventsInputSchema.parse(input));
     return preMarketPositionEvents(body.positions, body.events);
   }
 
   @Post('workflows/risk-preview')
   riskPreview(@Body() input: unknown) {
-    const body = automationRiskPreviewInputSchema.parse(input);
+    const body = omitUndefinedDeep(automationRiskPreviewInputSchema.parse(input));
     return preMarketRiskPreview({ ...body, scan: (contexts) => ({ contexts }) });
   }
 
   @Post('workflows/daily-risk-summary')
   riskSummary(@Body() input: unknown) {
-    return dailyRiskSummary(automationDailyRiskSummaryInputSchema.parse(input).events);
+    const body = omitUndefinedDeep(automationDailyRiskSummaryInputSchema.parse(input));
+    return dailyRiskSummary(body.events);
   }
 
   @Post('workflows/digest')
   digest(@Body() input: unknown) {
-    return dailyDigest(automationDigestInputSchema.parse(input));
+    return dailyDigest(omitUndefinedDeep(automationDigestInputSchema.parse(input)));
   }
 
   @Post('workflows/daily-report')
   dailyReport(@Body() input: unknown) {
-    return investmentDailyReport(automationDailyReportInputSchema.parse(input));
+    return investmentDailyReport(omitUndefinedDeep(automationDailyReportInputSchema.parse(input)));
   }
 
   @Post('workflows/opening-scan')
   opening(@Body() input: unknown) {
-    return openingScan(automationOpeningScanInputSchema.parse(input));
+    return openingScan(omitUndefinedDeep(automationOpeningScanInputSchema.parse(input)));
   }
 
   @Post('workflows/weekly-performance')
   weeklyPerformance(@Body() input: unknown) {
-    return weeklyPerformanceReview(automationWeeklyPerformanceInputSchema.parse(input));
+    return weeklyPerformanceReview(
+      omitUndefinedDeep(automationWeeklyPerformanceInputSchema.parse(input)),
+    );
   }
 
   @Post('workflows/weekly-strategy')
   weeklyStrategy(@Body() input: unknown) {
-    return weeklyStrategyReview(automationWeeklyStrategyInputSchema.parse(input));
+    return weeklyStrategyReview(omitUndefinedDeep(automationWeeklyStrategyInputSchema.parse(input)));
   }
 
   @Post('workflows/close-sync')
   closeSync(@Body() input: unknown) {
-    return this.workflows.closeSync(automationCloseSyncInputSchema.parse(input));
+    return this.workflows.closeSync(omitUndefinedDeep(automationCloseSyncInputSchema.parse(input)));
   }
 
   @Post('workflows/close-snapshots')
   closeSnapshots(@Body() input: unknown) {
-    return this.workflows.closeSnapshots(automationCloseSnapshotsInputSchema.parse(input));
+    return this.workflows.closeSnapshots(
+      omitUndefinedDeep(automationCloseSnapshotsInputSchema.parse(input)),
+    );
   }
 
   @Post('workflows/risk-scan')
