@@ -41,6 +41,7 @@ export class ThesisLedgerContractError extends Error {
 
 export class ThesisLedgerApiClient {
   private readonly baseUrl: string;
+  private readonly fetcher: typeof fetch;
 
   readonly portfolio = {
     getValuation: (params: { mode?: 'actual' | 'shadow'; accountId?: string; t?: number } = {}) =>
@@ -81,9 +82,10 @@ export class ThesisLedgerApiClient {
 
   constructor(
     baseUrl: string,
-    private readonly fetcher: typeof fetch = fetch,
+    fetcher?: typeof fetch,
   ) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    this.fetcher = fetcher ?? globalThis.fetch.bind(globalThis);
   }
 
   async request<T>(path: string, init?: RequestInit): Promise<T> {

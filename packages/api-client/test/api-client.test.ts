@@ -49,6 +49,23 @@ describe('ThesisLedgerApiClient', () => {
     );
   });
 
+  it('默认 fetch 保留全局上下文', async () => {
+    const fetcher = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new Error('fetch receiver mismatch');
+      return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    try {
+      const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1');
+
+      await expect(client.request('/health')).resolves.toEqual({ ok: true });
+      expect(fetcher).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('typed portfolio endpoint validates the shared response schema', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
