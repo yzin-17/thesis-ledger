@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment -- Phosphor 条件导出由 tsc 独立校验。 */
 import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
