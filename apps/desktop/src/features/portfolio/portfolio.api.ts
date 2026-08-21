@@ -1,4 +1,5 @@
 import type { PortfolioValuationResponse } from '@thesis-ledger/api-client';
+import { omitUndefinedDeep } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import type { Account, HeldAssetType, Portfolio, PortfolioMode } from './portfolio.types.js';
@@ -48,5 +49,5 @@ export const fetchPortfolioValuation = async (mode: PortfolioMode) =>
 
 export const fetchAccounts = async (): Promise<Account[]> => {
   const raw = await getDesktopApiClient().request<unknown>('/accounts', { cache: 'no-store' });
-  return z.array(accountSchema).parse(raw);
+  return omitUndefinedDeep(z.array(accountSchema).parse(raw));
 };
