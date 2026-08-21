@@ -40,6 +40,8 @@ jobs:
         run: node scripts/_split-tests.mjs
       - name: Format generated tests
         run: pnpm exec prettier --write apps/server/test packages/domain/test
+      - name: Build workspace dependencies
+        run: pnpm build
       - name: Verify focused tests and lint
         run: |
           pnpm --filter @thesis-ledger/domain test
