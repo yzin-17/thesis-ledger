@@ -8,6 +8,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import {
@@ -3181,6 +3190,7 @@ export function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portf
   const [audit, setAudit] = useState<
     Array<{ id: string; action: string; ruleVersion: number; createdAt: string }>
   >([]);
+  const [auditRule, setAuditRule] = useState<RiskRuleRecord | null>(null);
   const [auditVisible, setAuditVisible] = useState(false);
   const loadSequence = useRef(0);
   const toastManager = useToastManager();
@@ -3273,16 +3283,58 @@ export function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portf
         body: JSON.stringify(patch),
       });
       if (!response.ok) throw new Error('risk-rule-patch');
+      const updatedRule = (await response.json()) as RiskRuleRecord;
+      setRules((currentRules) =>
+        currentRules.map((currentRule) =>
+          currentRule.id === updatedRule.id ? updatedRule : currentRule,
+        ),
+      );
       toastManager.add({
         title: '规则已更新',
         description: '已生成新版本。',
         type: 'success',
         timeout: 2800,
       });
-      await loadRisk();
     } catch {
       toastManager.add({
         title: '规则更新失败',
+        description: '请稍后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const deleteRule = async (rule: RiskRuleRecord) => {
+    if (busyAction) return;
+    if (
+      !window.confirm(
+        `确认删除风险规则“${rule.kind}”？删除后规则会停用，历史事件与审计记录会保留。`,
+      )
+    )
+      return;
+    setBusyAction(`delete:${rule.id}`);
+    try {
+      const response = await fetch(`/api/v1/risk/rules/${rule.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('risk-rule-delete');
+      const updatedRule = (await response.json()) as RiskRuleRecord;
+      setRules((currentRules) =>
+        currentRules.map((currentRule) =>
+          currentRule.id === updatedRule.id ? updatedRule : currentRule,
+        ),
+      );
+      toastManager.add({
+        title: '规则已删除',
+        description: '规则已停用，历史事件与审计记录保留。',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch {
+      toastManager.add({
+        title: '规则删除失败',
         description: '请稍后重试。',
         type: 'error',
         timeout: 0,
@@ -3388,6 +3440,7 @@ export function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portf
       const response = await fetch(`/api/v1/risk/rules/${rule.id}/audit`);
       if (!response.ok) throw new Error('risk-audit');
       setAudit((await response.json()) as typeof audit);
+      setAuditRule(rule);
       setAuditVisible(true);
     } catch {
       toastManager.add({
@@ -3655,7 +3708,24 @@ export function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portf
                             aria-hidden="true"
                           />
                         )}
-                        {busyAction === `audit:${rule.id}` ? '读取中…' : '审计'}
+                        {busyAction === `audit:${rule.id}` ? '读取中…' : '变更记录'}
+                      </Button>
+                      <Button
+                        className="text-button danger"
+                        size="sm"
+                        variant="destructive"
+                        disabled={busyAction !== null}
+                        aria-busy={busyAction === `delete:${rule.id}`}
+                        onClick={() => void deleteRule(rule)}
+                      >
+                        {busyAction === `delete:${rule.id}` && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {busyAction === `delete:${rule.id}` ? '删除中…' : '删除'}
                       </Button>
                     </td>
                   </tr>
@@ -3665,11 +3735,16 @@ export function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portf
           </table>
         </div>
       </section>
-      {auditVisible && (
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>规则审计</h2>
-          </div>
+      <Dialog open={auditVisible} onOpenChange={setAuditVisible}>
+        <DialogContent className="max-h-[calc(100dvh-64px)] overflow-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>变更记录</DialogTitle>
+            <DialogDescription>
+              {auditRule
+                ? `${auditRule.kind} · ${auditRule.symbol ?? auditRule.accountId ?? '全组合'}`
+                : '查看规则版本与操作时间。'}
+            </DialogDescription>
+          </DialogHeader>
           {audit.length === 0 ? (
             <EmptyListState />
           ) : (
@@ -3684,8 +3759,13 @@ export function RiskCenter({ accounts, portfolio }: { accounts: Account[]; portf
               ))}
             </div>
           )}
-        </section>
-      )}
+          <DialogFooter>
+            <DialogClose render={<Button className="secondary" type="button" variant="outline" />}>
+              关闭
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <section className="panel">
         <div className="panel-heading">
           <h2>历史事件</h2>
