@@ -113,6 +113,43 @@ describe('Desktop UI contract', () => {
     ).toBe(false);
   });
 
+  it('counts an applied DSA market provider as the data-source half of onboarding', () => {
+    const notificationProvider = {
+      enabled: true,
+      health: 'healthy',
+      credentialConfigured: true,
+      capabilities: ['notification'],
+    };
+    const marketData = {
+      providers: [
+        {
+          providerId: 'akshare',
+          displayName: 'AKShare',
+          version: 1,
+          capabilities: { REALTIME_QUOTE: ['STOCK'] },
+          configured: true,
+          enabled: true,
+          credentialConfigured: false,
+          requiresCredential: false,
+        },
+      ],
+      policy: {
+        revision: 11,
+        enabled: true,
+        syncState: 'applied' as const,
+        routes: { REALTIME_QUOTE: { STOCK: ['akshare'] } },
+      },
+    };
+
+    expect(hasConfiguredProviderSetup([notificationProvider], marketData)).toBe(true);
+    expect(
+      hasConfiguredProviderSetup([notificationProvider], {
+        ...marketData,
+        policy: { ...marketData.policy, syncState: 'pending' },
+      }),
+    ).toBe(false);
+  });
+
   it('renders portfolio feature state directly without the App compatibility barrel', () => {
     const accountStep = renderWithToast(
       <PortfolioManagement accounts={[]} positions={[]} step="account" onSaved={vi.fn()} />,

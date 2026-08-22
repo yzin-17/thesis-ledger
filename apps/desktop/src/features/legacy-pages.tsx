@@ -38,8 +38,10 @@ import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/MagnifyingGlass';
 import { SpinnerGapIcon } from '@phosphor-icons/react/SpinnerGap';
 import { LoaderCircle } from 'lucide-react';
+import { getDesktopApiClient } from '../shared/api/client.js';
 import type { DesktopNavigationView } from '../views.js';
 import { MarketDetailDialog } from './market-detail/MarketDetailDialog.js';
+import type { MarketPolicy, ProviderManifest } from './market-data/market-data.types.js';
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
 type PortfolioMode = 'actual' | 'shadow';
@@ -412,11 +414,42 @@ export interface OnboardingProviderRecord {
   capabilities?: unknown;
 }
 
+interface OnboardingMarketData {
+  providers: readonly ProviderManifest[];
+  policy: Pick<MarketPolicy, 'enabled' | 'routes' | 'syncState'> | null;
+}
+
 interface OnboardingRiskRuleRecord {
   enabled?: boolean;
 }
 
-export const hasConfiguredProviderSetup = (providers: readonly OnboardingProviderRecord[]) => {
+const isUsableMarketProvider = (provider: ProviderManifest) => {
+  const scopes = provider.health?.scopes ?? [];
+  return (
+    provider.configured === true &&
+    provider.enabled !== false &&
+    !scopes.some((scope) => scope.state === 'down' || scope.circuit === 'open')
+  );
+};
+
+const hasConfiguredDsaQuoteProvider = (marketData?: OnboardingMarketData) => {
+  const policy = marketData?.policy;
+  if (!policy || policy.enabled !== true || policy.syncState !== 'applied') return false;
+
+  const quoteRoutes = Object.values(policy.routes.REALTIME_QUOTE ?? {});
+  return marketData.providers.some(
+    (provider) =>
+      isUsableMarketProvider(provider) &&
+      Array.isArray(provider.capabilities.REALTIME_QUOTE) &&
+      provider.capabilities.REALTIME_QUOTE.length > 0 &&
+      quoteRoutes.some((providerIds) => providerIds.includes(provider.providerId)),
+  );
+};
+
+export const hasConfiguredProviderSetup = (
+  providers: readonly OnboardingProviderRecord[],
+  marketData?: OnboardingMarketData,
+) => {
   const configuredProviders = providers.filter(
     (provider) =>
       provider.enabled !== false &&
@@ -426,10 +459,35 @@ export const hasConfiguredProviderSetup = (providers: readonly OnboardingProvide
   const hasCapability = (provider: OnboardingProviderRecord, capability: string) =>
     Array.isArray(provider.capabilities) &&
     provider.capabilities.some((item) => String(item) === capability);
+  const hasQuoteProvider =
+    configuredProviders.some((provider) => hasCapability(provider, 'quote')) ||
+    hasConfiguredDsaQuoteProvider(marketData);
   return (
-    configuredProviders.some((provider) => hasCapability(provider, 'quote')) &&
+    hasQuoteProvider &&
     configuredProviders.some((provider) => hasCapability(provider, 'notification'))
   );
+};
+
+const fetchOnboardingStatus = async () => {
+  const [providerResponse, riskResponse, marketProviders, marketPolicy] = await Promise.all([
+    fetch('/api/v1/providers/config'),
+    fetch('/api/v1/risk/rules'),
+    getDesktopApiClient().request<{ providers?: ProviderManifest[] }>('/market-data/providers'),
+    getDesktopApiClient().request<MarketPolicy>('/market-data/policy'),
+  ]);
+  if (!providerResponse.ok || !riskResponse.ok) throw new Error('onboarding status');
+
+  const [providers, rules] = await Promise.all([
+    providerResponse.json() as Promise<OnboardingProviderRecord[]>,
+    riskResponse.json() as Promise<OnboardingRiskRuleRecord[]>,
+  ]);
+  return {
+    hasProviderSetup: hasConfiguredProviderSetup(providers, {
+      providers: marketProviders.providers ?? [],
+      policy: marketPolicy,
+    }),
+    hasRiskRule: rules.some((rule) => rule.enabled === true),
+  };
 };
 
 const money = new Intl.NumberFormat('zh-CN', {
@@ -4474,47 +4532,16 @@ export function PortfolioDashboard({
   );
   const [detailPosition, setDetailPosition] = useState<Position | null>(null);
   const hasPosition = (portfolio?.positions.length ?? 0) > 0;
-  const [onboardingStatus, setOnboardingStatus] = useState({
+  const onboardingStatusQuery = useQuery({
+    queryKey: ['desktop', 'onboarding-status', hasPosition],
+    queryFn: fetchOnboardingStatus,
+    enabled: hasPosition,
+    refetchOnMount: 'always',
+  });
+  const onboardingStatus = onboardingStatusQuery.data ?? {
     hasProviderSetup: false,
     hasRiskRule: false,
-  });
-
-  useEffect(() => {
-    if (!hasPosition) {
-      setOnboardingStatus({ hasProviderSetup: false, hasRiskRule: false });
-      return;
-    }
-
-    let active = true;
-    const loadOnboardingStatus = async () => {
-      try {
-        const [providerResponse, riskResponse] = await Promise.all([
-          fetch('/api/v1/providers/config'),
-          fetch('/api/v1/risk/rules'),
-        ]);
-        if (!providerResponse.ok || !riskResponse.ok) {
-          throw new Error('onboarding status');
-        }
-        const [providers, rules] = await Promise.all([
-          providerResponse.json() as Promise<OnboardingProviderRecord[]>,
-          riskResponse.json() as Promise<OnboardingRiskRuleRecord[]>,
-        ]);
-        if (!active) return;
-
-        setOnboardingStatus({
-          hasProviderSetup: hasConfiguredProviderSetup(providers),
-          hasRiskRule: rules.some((rule) => rule.enabled === true),
-        });
-      } catch {
-        if (active) setOnboardingStatus({ hasProviderSetup: false, hasRiskRule: false });
-      }
-    };
-
-    void loadOnboardingStatus();
-    return () => {
-      active = false;
-    };
-  }, [hasPosition]);
+  };
 
   if (state === 'loading') return <DashboardSkeleton />;
   if (state === 'error')
