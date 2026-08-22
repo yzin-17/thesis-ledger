@@ -1,10 +1,13 @@
 import {
   apiErrorResponseSchema,
   instrumentSearchResponseSchema,
+  marketDetailResponseSchema,
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
   type ApiErrorResponse,
+  type MarketDetailRequest,
+  type MarketDetailResponse,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -13,12 +16,24 @@ export type {
   PerformanceSummaryResponse,
   PortfolioValuationResponse,
   RiskEventResponse,
+  MarketDetailCapability,
+  MarketDetailRequest,
+  MarketDetailResponse,
+  MarketDetailSection,
+  MarketDetailSectionStatus,
 } from '@thesis-ledger/schemas';
 
-const queryString = (params: Record<string, string | number | undefined>) => {
+export type MarketDetailQuery = Omit<MarketDetailRequest, 'symbol'> & {
+  signal?: AbortSignal;
+};
+
+type QueryValue = string | number | boolean | readonly string[] | undefined;
+
+const queryString = (params: Record<string, QueryValue>) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) query.set(key, String(value));
+    if (value === undefined) continue;
+    query.set(key, Array.isArray(value) ? value.join(',') : String(value));
   }
   const encoded = query.toString();
   return encoded ? `?${encoded}` : '';
@@ -78,12 +93,21 @@ export class ThesisLedgerApiClient {
         `/market-data/instruments/search${queryString(params)}`,
         instrumentSearchResponseSchema,
       ),
+    getDetail: (symbol: string, params: MarketDetailQuery = {}) => {
+      const { signal, refresh, include, ...query } = params;
+      return this.requestParsed<MarketDetailResponse>(
+        `/market/${encodeURIComponent(symbol)}/detail${queryString({
+          ...query,
+          ...(refresh ? { refresh: 1 } : {}),
+          ...(include ? { include } : {}),
+        })}`,
+        marketDetailResponseSchema,
+        signal ? { signal } : undefined,
+      );
+    },
   };
 
-  constructor(
-    baseUrl: string,
-    fetcher?: typeof fetch,
-  ) {
+  constructor(baseUrl: string, fetcher?: typeof fetch) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
     this.fetcher = fetcher ?? globalThis.fetch.bind(globalThis);
   }

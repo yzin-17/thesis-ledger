@@ -5,6 +5,8 @@ import {
   indicatorSchemaV1,
   quoteSchemaV1,
   fundNavHistorySchemaV1,
+  marketDetailRequestSchema,
+  marketDetailResponseSchema,
   catalogDeltaSchema,
   strategySchemaV1,
   ledgerEventSchemaV1,
@@ -206,6 +208,85 @@ describe('行情契约', () => {
     expect(() =>
       fundNavHistorySchemaV1.parse([point('2025-01-02T00:00:00Z'), point('2025-01-01T00:00:00Z')]),
     ).toThrow('升序');
+  });
+
+  it('接受共享行情详情的分段状态外壳', () => {
+    const response = {
+      version: 1,
+      symbol: '600519.SH',
+      assetType: 'STOCK',
+      identity: { source: 'asset', status: 'confirmed' },
+      requested: ['quote', 'chip'],
+      capabilities: {
+        supported: ['quote', 'bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI', 'chip'],
+        unsupported: ['fund-nav'],
+      },
+      limits: { bars: 30, nav: 30 },
+      sections: {
+        quote: {
+          capability: 'quote',
+          status: 'ready',
+          data: {
+            version: 1,
+            symbol: '600519.SH',
+            open: 10,
+            high: 12,
+            low: 9,
+            price: 11,
+            previousClose: 10,
+            volume: 100,
+            amount: 1100,
+            stale: false,
+            provider: 'fixture',
+            marketTime: time,
+            fetchedAt: time,
+            freshness: 'live',
+          },
+        },
+        chip: {
+          capability: 'chip',
+          status: 'unavailable',
+          error: {
+            code: 'market_data_unavailable',
+            message: '当前行情暂时不可用，请稍后重试。',
+            diagnosticId: 'trace:chip:1',
+          },
+        },
+      },
+      dependencies: {},
+      requestId: 'trace',
+      generatedAt: time,
+    };
+    const result = marketDetailResponseSchema.parse(response);
+    expect(result.sections.chip?.status).toBe('unavailable');
+    expect(() =>
+      marketDetailResponseSchema.parse({
+        ...response,
+        sections: {
+          ...response.sections,
+          quote: { capability: 'quote', status: 'ready', data: { price: 11 } },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      marketDetailResponseSchema.parse({ ...response, sections: { chip: response.sections.chip } }),
+    ).toThrow('requested');
+  });
+
+  it('校验行情详情请求的能力和历史条数边界', () => {
+    expect(
+      marketDetailRequestSchema.parse({
+        symbol: '600519.SH',
+        include: ['quote', 'bars'],
+        barsLimit: 90,
+        navLimit: 30,
+        refresh: true,
+      }),
+    ).toMatchObject({ symbol: '600519.SH', barsLimit: 90 });
+    expect(() => marketDetailRequestSchema.parse({ symbol: '600519.SH', barsLimit: 91 })).toThrow();
+    expect(() =>
+      marketDetailRequestSchema.parse({ symbol: '600519.SH', include: ['indicator:ATR'] }),
+    ).toThrow();
   });
 
   it('目录增量必须携带 fromCursor 与删除身份', () => {

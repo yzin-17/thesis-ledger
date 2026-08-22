@@ -1,13 +1,31 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { MarketService } from './market.service.js';
 import { MarketStorageService } from './market-storage.service.js';
+import { MarketDetailService } from './market-detail.service.js';
 
 @Controller('market')
 export class MarketController {
   constructor(
     private readonly market: MarketService,
     private readonly storage: MarketStorageService,
+    private readonly detail: MarketDetailService,
   ) {}
+
+  @Get(':symbol/detail') detailReadModel(
+    @Param('symbol') symbol: string,
+    @Query('include') include?: string | string[],
+    @Query('barsLimit') barsLimit?: string,
+    @Query('navLimit') navLimit?: string,
+    @Query('refresh') refresh?: string,
+  ) {
+    return this.detail.getDetail(symbol, {
+      ...(include !== undefined ? { include } : {}),
+      ...(barsLimit !== undefined ? { barsLimit } : {}),
+      ...(navLimit !== undefined ? { navLimit } : {}),
+      refresh: refresh === '1',
+    });
+  }
+
   @Get(':symbol/quote') quote(@Param('symbol') symbol: string) {
     return this.market.getQuote(symbol);
   }

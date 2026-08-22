@@ -45,6 +45,48 @@ describe('行情缓存', () => {
     await service.getQuote('600519');
     expect(dsa.get).toHaveBeenCalledTimes(1);
   });
+  it('普通请求与显式 refresh 在缓存未命中时共享同一底层 flight', async () => {
+    const values = new Map<string, string>();
+    let resolveProvider!: (value: typeof quote) => void;
+    const dsa = {
+      get: vi.fn(
+        () =>
+          new Promise<typeof quote>((resolve) => {
+            resolveProvider = resolve;
+          }),
+      ),
+    };
+    const redis = {
+      client: {
+        get: vi.fn(async (key: string) => values.get(key) ?? null),
+        multi: () => {
+          const writes: Array<[string, string]> = [];
+          const chain = {
+            set: (key: string, value: string) => {
+              writes.push([key, value]);
+              return chain;
+            },
+            exec: async () => {
+              for (const [key, value] of writes) values.set(key, value);
+            },
+          };
+          return chain;
+        },
+        set: vi.fn(async () => 'OK'),
+        eval: vi.fn(async () => 0),
+      },
+    };
+    const service = new MarketService(dsa as never, redis as never);
+
+    const regular = service.getQuote('600519');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const refresh = service.getQuote('600519', { refresh: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dsa.get).toHaveBeenCalledOnce();
+    resolveProvider(quote);
+    await expect(Promise.all([regular, refresh])).resolves.toHaveLength(2);
+  });
   it('基金净值历史相同范围并发请求只调用一次 DSA 并使用完整锁 key', async () => {
     const points = [
       {
@@ -172,6 +214,51 @@ describe('行情缓存', () => {
       provider: 'dsa-fork',
       engineVersion: 'fixture',
     });
+  });
+
+  it('Indicator 使用缓存并在 refresh 失败时返回 stale fallback', async () => {
+    const values = new Map<string, string>();
+    const indicatorRaw = {
+      parameters: { period: 14 },
+      timeframe: '1d',
+      marketTime: '2025-01-01T00:00:00Z',
+      calculatedAt: '2025-01-01T00:00:00Z',
+      values: { rsi14: 50 },
+      engineVersion: 'fixture',
+      provider: 'dsa-fork',
+    };
+    const dsa = { get: vi.fn(async () => indicatorRaw) };
+    const redis = {
+      client: {
+        get: vi.fn(async (key: string) => values.get(key) ?? null),
+        multi: () => {
+          const writes: Array<[string, string]> = [];
+          const chain = {
+            set: (key: string, value: string) => {
+              writes.push([key, value]);
+              return chain;
+            },
+            exec: async () => {
+              for (const [key, value] of writes) values.set(key, value);
+            },
+          };
+          return chain;
+        },
+      },
+    };
+    const service = new MarketService(dsa as never, redis as never);
+
+    await expect(service.getIndicator('600519', 'RSI')).resolves.toMatchObject({
+      provider: 'dsa-fork',
+    });
+    await service.getIndicator('600519', 'RSI');
+    expect(dsa.get).toHaveBeenCalledTimes(1);
+
+    dsa.get.mockRejectedValueOnce(new Error('offline'));
+    await expect(service.getIndicator('600519', 'RSI', { refresh: true })).resolves.toMatchObject({
+      fallbackUsed: true,
+    });
+    expect(dsa.get).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -122,14 +122,25 @@ export class MarketService {
     }
   }
 
-  async getQuote(input: string, options: { allowStale?: boolean } = {}): Promise<QuoteV1> {
+  async getQuote(
+    input: string,
+    options: { allowStale?: boolean; refresh?: boolean } = {},
+  ): Promise<QuoteV1> {
     const { symbol } = normalizeSymbol(input);
-    const quote = await this.singleFlight(`quote:${symbol}`, () =>
-      this.withDistributedLock(`quote:${symbol}`, async () => {
-        const freshKey = redisKey('cache', `quote:${symbol}:fresh`);
-        const lastValidKey = redisKey('cache', `quote:${symbol}:last-valid`);
-        const cached = await this.redis.client.get(freshKey);
-        if (cached) return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+    const flightKey = `quote:${symbol}`;
+    const freshKey = redisKey('cache', `quote:${symbol}:fresh`);
+    const lastValidKey = redisKey('cache', `quote:${symbol}:last-valid`);
+    if (!options.refresh) {
+      const cached = await this.redis.client.get(freshKey);
+      if (cached) return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+    }
+    const quote = await this.singleFlight(flightKey, () =>
+      this.withDistributedLock(flightKey, async () => {
+        if (!options.refresh) {
+          const cached = await this.redis.client.get(freshKey);
+          if (cached)
+            return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+        }
         try {
           const raw = await this.dsa.get<Record<string, unknown>>(
             `/api/v1/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}`,
@@ -165,15 +176,26 @@ export class MarketService {
     return quote;
   }
 
-  async getFundNav(input: string, options: { allowStale?: boolean } = {}): Promise<FundNavV1> {
+  async getFundNav(
+    input: string,
+    options: { allowStale?: boolean; refresh?: boolean } = {},
+  ): Promise<FundNavV1> {
     const symbol = input.trim().toUpperCase();
     if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
-    const nav = await this.singleFlight(`fund-nav:${symbol}`, () =>
-      this.withDistributedLock(`fund-nav:${symbol}`, async () => {
-        const freshKey = redisKey('cache', `fund-nav:${symbol}:fresh`);
-        const lastValidKey = redisKey('cache', `fund-nav:${symbol}:last-valid`);
-        const cached = await this.redis.client.get(freshKey);
-        if (cached) return fundNavSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+    const flightKey = `fund-nav:${symbol}`;
+    const freshKey = redisKey('cache', `fund-nav:${symbol}:fresh`);
+    const lastValidKey = redisKey('cache', `fund-nav:${symbol}:last-valid`);
+    if (!options.refresh) {
+      const cached = await this.redis.client.get(freshKey);
+      if (cached) return fundNavSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+    }
+    const nav = await this.singleFlight(flightKey, () =>
+      this.withDistributedLock(flightKey, async () => {
+        if (!options.refresh) {
+          const cached = await this.redis.client.get(freshKey);
+          if (cached)
+            return fundNavSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+        }
         try {
           const raw = await this.dsa.get<Record<string, unknown>>(
             `/api/v1/thesis-ledger/market/fund-nav?symbol=${encodeURIComponent(symbol)}`,
@@ -212,6 +234,7 @@ export class MarketService {
   async getFundNavHistory(
     input: string,
     range: { start?: string; end?: string; limit?: number } = {},
+    options: { refresh?: boolean; persistIdentity?: boolean } = {},
   ): Promise<FundNavHistoryV1> {
     const symbol = input.trim().toUpperCase();
     if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
@@ -227,7 +250,7 @@ export class MarketService {
             `/api/v1/thesis-ledger/market/fund-nav/history?${query.toString()}`,
           );
           const points = fundNavHistorySchemaV1.parse(raw);
-          if (this.prisma && points.length > 0) {
+          if (this.prisma && options.persistIdentity !== false && points.length > 0) {
             await this.prisma.$transaction([
               this.prisma.asset.upsert({
                 where: { symbol },
@@ -306,7 +329,7 @@ export class MarketService {
     input: string,
     timeframe: '1m' | '1d',
     range?: { start?: string; end?: string },
-    options: { allowStale?: boolean } = {},
+    options: { allowStale?: boolean; refresh?: boolean } = {},
   ): Promise<BarV1[]> {
     const { symbol } = normalizeSymbol(input);
     const bars = await this.singleFlight(
@@ -400,30 +423,109 @@ export class MarketService {
     );
   }
 
-  async getIndicator(input: string, name: 'MA' | 'MACD' | 'RSI' | 'ATR'): Promise<IndicatorV1> {
-    const { symbol } = normalizeSymbol(input);
-    const raw = await this.dsa.get<Record<string, unknown>>(
-      `/api/v1/thesis-ledger/market/indicators/${name.toLowerCase()}?symbol=${encodeURIComponent(symbol)}&timeframe=1d`,
-    );
-    return indicatorSchemaV1.parse({
-      ...raw,
-      version: 1,
-      symbol,
-      name,
-      provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
-    });
+  private async cachedTransform<T>(
+    key: string,
+    refresh: boolean,
+    parse: (value: unknown) => T,
+    load: () => Promise<T>,
+    markStale: (value: T) => T,
+  ): Promise<T> {
+    const client = this.redis?.client;
+    if (!client) return load();
+
+    const freshKey = redisKey('cache', `${key}:fresh`);
+    const lastValidKey = redisKey('cache', `${key}:last-valid`);
+    const cached = await client.get(freshKey);
+    if (cached && !refresh) return parse(JSON.parse(cached));
+
+    try {
+      const value = await load();
+      await client
+        .multi()
+        .set(freshKey, JSON.stringify(value), 'EX', 60)
+        .set(lastValidKey, JSON.stringify(value), 'EX', 86_400)
+        .exec();
+      return value;
+    } catch (error) {
+      const lastValid = await client.get(lastValidKey);
+      if (lastValid) return markStale(parse(JSON.parse(lastValid)));
+      throw error;
+    }
   }
 
-  async getChip(input: string): Promise<ChipDistributionV1> {
+  private async readFreshCache<T>(key: string, parse: (value: unknown) => T): Promise<T | null> {
+    const client = this.redis?.client;
+    if (!client) return null;
+    const cached = await client.get(redisKey('cache', `${key}:fresh`));
+    return cached ? parse(JSON.parse(cached)) : null;
+  }
+
+  async getIndicator(
+    input: string,
+    name: 'MA' | 'MACD' | 'RSI' | 'ATR',
+    options: { refresh?: boolean } = {},
+  ): Promise<IndicatorV1> {
     const { symbol } = normalizeSymbol(input);
-    const raw = await this.dsa.get<Record<string, unknown>>(
-      `/api/v1/thesis-ledger/market/chip?symbol=${encodeURIComponent(symbol)}`,
+    const refresh = options.refresh === true;
+    const key = `indicator:${symbol}:${name}`;
+    const parse = (value: unknown) => indicatorSchemaV1.parse(value);
+    if (!refresh) {
+      const cached = await this.readFreshCache(key, parse);
+      if (cached) return cached;
+    }
+    return this.singleFlight(key, () =>
+      this.withDistributedLock(key, () =>
+        this.cachedTransform(
+          key,
+          refresh,
+          parse,
+          async () => {
+            const raw = await this.dsa.get<Record<string, unknown>>(
+              `/api/v1/thesis-ledger/market/indicators/${name.toLowerCase()}?symbol=${encodeURIComponent(symbol)}&timeframe=1d`,
+            );
+            return indicatorSchemaV1.parse({
+              ...raw,
+              version: 1,
+              symbol,
+              name,
+              provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+            });
+          },
+          (value) => indicatorSchemaV1.parse({ ...value, fallbackUsed: true }),
+        ),
+      ),
     );
-    return chipDistributionSchemaV1.parse({
-      ...raw,
-      version: 1,
-      symbol,
-      provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
-    });
+  }
+
+  async getChip(input: string, options: { refresh?: boolean } = {}): Promise<ChipDistributionV1> {
+    const { symbol } = normalizeSymbol(input);
+    const refresh = options.refresh === true;
+    const key = `chip:${symbol}`;
+    const parse = (value: unknown) => chipDistributionSchemaV1.parse(value);
+    if (!refresh) {
+      const cached = await this.readFreshCache(key, parse);
+      if (cached) return cached;
+    }
+    return this.singleFlight(key, () =>
+      this.withDistributedLock(key, () =>
+        this.cachedTransform(
+          key,
+          refresh,
+          parse,
+          async () => {
+            const raw = await this.dsa.get<Record<string, unknown>>(
+              `/api/v1/thesis-ledger/market/chip?symbol=${encodeURIComponent(symbol)}`,
+            );
+            return chipDistributionSchemaV1.parse({
+              ...raw,
+              version: 1,
+              symbol,
+              provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+            });
+          },
+          (value) => chipDistributionSchemaV1.parse({ ...value, fallbackUsed: true }),
+        ),
+      ),
+    );
   }
 }

@@ -58,6 +58,6 @@ describe('Portfolio table contract', () => {
     expect(cells[0]).toContain('贵州茅台');
     expect(cells[1]).toBe('10');
     expect(cells[5]).toContain('最新');
-    expect(cells[6]).toContain('查看');
+    expect(cells[6]).toContain('行情详情');
   });
 });

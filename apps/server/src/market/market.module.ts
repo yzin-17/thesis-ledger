@@ -10,6 +10,7 @@ import { MarketDataController } from './market-data.controller.js';
 import { MarketStorageService } from './market-storage.service.js';
 import { MarketController } from './market.controller.js';
 import { MarketService } from './market.service.js';
+import { MarketDetailService } from './market-detail.service.js';
 
 @Module({
   imports: [QualityModule],
@@ -17,6 +18,7 @@ import { MarketService } from './market.service.js';
   providers: [
     DsaClient,
     MarketService,
+    MarketDetailService,
     MarketStorageService,
     CatalogSyncService,
     InstrumentSearchService,
@@ -27,6 +29,7 @@ import { MarketService } from './market.service.js';
   exports: [
     DsaClient,
     MarketService,
+    MarketDetailService,
     MarketStorageService,
     InstrumentService,
     CatalogSyncService,

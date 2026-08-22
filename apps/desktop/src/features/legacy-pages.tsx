@@ -8,13 +8,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import {
@@ -46,6 +39,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react/MagnifyingGlass';
 import { SpinnerGapIcon } from '@phosphor-icons/react/SpinnerGap';
 import { LoaderCircle } from 'lucide-react';
 import type { DesktopNavigationView } from '../views.js';
+import { MarketDetailDialog } from './market-detail/MarketDetailDialog.js';
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
 type PortfolioMode = 'actual' | 'shadow';
@@ -4661,7 +4655,7 @@ export function PortfolioDashboard({
                           variant="link"
                           onClick={() => setDetailPosition(position)}
                         >
-                          查看
+                          行情详情
                         </Button>
                       </td>
                     </tr>
@@ -4672,163 +4666,9 @@ export function PortfolioDashboard({
         </div>
       </section>
       {detailPosition && (
-        <PositionDetail position={detailPosition} onClose={() => setDetailPosition(null)} />
+        <MarketDetailDialog position={detailPosition} onClose={() => setDetailPosition(null)} />
       )}
     </>
-  );
-}
-
-function PositionDetail({ position, onClose }: { position: Position; onClose: () => void }) {
-  const [data, setData] = useState<{
-    quote: Record<string, unknown>;
-    bars: Array<Record<string, unknown>>;
-    indicators: Array<Record<string, unknown>>;
-    chip: Record<string, unknown>;
-  } | null>(null);
-  const [error, setError] = useState('');
-  const requestSequence = useRef(0);
-  const loadDetail = () => {
-    const sequence = ++requestSequence.current;
-    setData(null);
-    setError('');
-    const symbol = encodeURIComponent(position.symbol);
-    const indicatorNames = ['MA', 'MACD', 'RSI', 'ATR'] as const;
-    void Promise.all([
-      fetch(`/api/v1/market/${symbol}/quote`),
-      fetch(`/api/v1/market/${symbol}/bars?timeframe=1d`),
-      ...indicatorNames.map((name) => fetch(`/api/v1/market/${symbol}/indicators/${name}`)),
-      fetch(`/api/v1/market/${symbol}/chip`),
-    ])
-      .then(async (responses) => {
-        const quoteResponse = responses[0];
-        const barsResponse = responses[1];
-        const chipResponse = responses[6]!;
-        if (!quoteResponse.ok || !barsResponse.ok || !chipResponse.ok) throw new Error('detail');
-        const [quote, bars, chip, ...indicatorValues] = await Promise.all([
-          quoteResponse.json(),
-          barsResponse.json(),
-          chipResponse.json(),
-          ...responses.slice(2, 6).map(async (response, index) =>
-            response.ok
-              ? ((await response.json()) as Record<string, unknown>)
-              : {
-                  name: indicatorNames[index],
-                  values: { status: 'unavailable' },
-                  provider: 'dsa-fork',
-                  marketTime: new Date().toISOString(),
-                },
-          ),
-        ]);
-        if (sequence !== requestSequence.current) return;
-        setData({
-          quote: quote as Record<string, unknown>,
-          bars: bars as Array<Record<string, unknown>>,
-          indicators: indicatorValues,
-          chip: chip as Record<string, unknown>,
-        });
-      })
-      .catch(() => {
-        if (sequence === requestSequence.current) setError('部分行情、指标或筹码数据不可用。');
-      });
-  };
-  useEffect(() => {
-    loadDetail();
-  }, [position.symbol]);
-  const detailState: LoadState = error
-    ? 'error'
-    : !data
-      ? 'loading'
-      : data.quote.empty === true
-        ? 'empty'
-        : data.quote.stale === true
-          ? 'stale'
-          : 'ready';
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        aria-describedby="position-detail-description"
-        className="detail-panel max-h-[calc(100dvh-64px)] max-w-[980px] overflow-auto"
-        showCloseButton={false}
-      >
-        <div className="review-heading">
-          <div>
-            <p className="kicker">Position Detail</p>
-            <DialogTitle id="position-detail-title">
-              {position.asset.name} · {position.symbol}
-            </DialogTitle>
-          </div>
-          <DialogClose render={<Button className="secondary" type="button" variant="outline" />}>
-            关闭
-          </DialogClose>
-        </div>
-        <DialogDescription id="position-detail-description" className="sr-only">
-          查看该持仓的行情、最近 K 线、技术指标和筹码数据。
-        </DialogDescription>
-        <DataStateBanner
-          state={detailState}
-          description={error || undefined}
-          onRetry={loadDetail}
-        />
-        {!data && !error ? (
-          <div className="skeleton table" aria-label="正在加载详情" />
-        ) : data?.quote.empty === true ? (
-          <p className="empty-inline">当前没有可用行情、指标或筹码数据。</p>
-        ) : (
-          data && (
-            <>
-              <div className="detail-metrics">
-                <Metric
-                  label="实时价"
-                  value={money.format(Number(data.quote.price))}
-                  detail={`${String(data.quote.provider)} · ${new Date(String(data.quote.marketTime)).toLocaleString('zh-CN')}`}
-                />
-                <Metric
-                  label="持仓成本"
-                  value={money.format(position.costPrice)}
-                  detail={`${position.quantity} 份`}
-                />
-                <Metric
-                  label="筹码主峰"
-                  value={
-                    data.chip.mainPeak === undefined
-                      ? '未提供'
-                      : money.format(Number(data.chip.mainPeak))
-                  }
-                  detail={`${String(data.chip.provider)} · ${String(data.chip.engineVersion)}${data.chip.mainPeak === undefined ? ' · 仅摘要' : ''}`}
-                />
-              </div>
-              <h3>最近 K 线</h3>
-              <div className="bar-strip">
-                {data.bars.slice(-10).map((bar) => (
-                  <div key={String(bar.timestamp)}>
-                    <span>{new Date(String(bar.timestamp)).toLocaleDateString('zh-CN')}</span>
-                    <strong>{Number(bar.close).toFixed(2)}</strong>
-                    <small>{String(bar.provider)}</small>
-                  </div>
-                ))}
-              </div>
-              <h3>技术指标</h3>
-              <div className="indicator-grid">
-                {data.indicators.map((indicator) => (
-                  <div key={String(indicator.name)}>
-                    <span>{String(indicator.name)}</span>
-                    <strong>
-                      {Object.entries(indicator.values as Record<string, unknown>)
-                        .map(([key, value]) => `${key} ${String(value)}`)
-                        .join(' · ')}
-                    </strong>
-                    <small>
-                      {String(indicator.provider)} ·{' '}
-                      {new Date(String(indicator.marketTime)).toLocaleString('zh-CN')}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            </>
-          )
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
 

@@ -189,6 +189,196 @@ export const catalogDeltaSchema = catalogSnapshotSchema.extend({
   ),
   requiresFullSnapshot: z.boolean().optional(),
 });
+
+export const marketDetailCapabilitySchema = z.enum([
+  'quote',
+  'bars',
+  'indicator:MA',
+  'indicator:MACD',
+  'indicator:RSI',
+  'chip',
+  'fund-nav',
+  'fund-nav-history',
+]);
+
+export const marketDetailRequestSchema = z.object({
+  symbol: z.string().min(1),
+  include: z.array(marketDetailCapabilitySchema).min(1).optional(),
+  barsLimit: z.number().int().min(1).max(90).optional(),
+  navLimit: z.number().int().min(1).max(90).optional(),
+  refresh: z.boolean().optional(),
+});
+
+export const marketDetailAssetTypeSchema = z.enum(['STOCK', 'ETF', 'MUTUAL_FUND', 'UNKNOWN']);
+
+export const marketDetailSectionStatusSchema = z.enum([
+  'ready',
+  'stale',
+  'empty',
+  'unsupported',
+  'unavailable',
+]);
+
+export const marketDetailDiagnosticSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+  diagnosticId: z.string().min(1),
+  requestId: z.string().min(1).optional(),
+});
+
+const marketDetailDataSchemaByCapability = {
+  quote: quoteSchemaV1,
+  bars: barsSchemaV1,
+  'indicator:MA': indicatorSchemaV1.extend({ name: z.literal('MA') }),
+  'indicator:MACD': indicatorSchemaV1.extend({ name: z.literal('MACD') }),
+  'indicator:RSI': indicatorSchemaV1.extend({ name: z.literal('RSI') }),
+  chip: chipDistributionSchemaV1,
+  'fund-nav': fundNavSchemaV1,
+  'fund-nav-history': fundNavHistorySchemaV1,
+} as const;
+
+const marketDetailSectionBaseSchema = z.object({
+  capability: marketDetailCapabilitySchema,
+  status: marketDetailSectionStatusSchema,
+  data: z.unknown().optional(),
+  error: marketDetailDiagnosticSchema.optional(),
+});
+
+const marketDetailSectionSchemaImplementation = marketDetailSectionBaseSchema.superRefine(
+  (section, context) => {
+    if (section.status === 'ready' || section.status === 'stale') {
+      const result = marketDetailDataSchemaByCapability[section.capability].safeParse(section.data);
+      if (!result.success) {
+        context.addIssue({
+          code: 'custom',
+          message: 'ready/stale 分段必须携带对应能力的数据。',
+          path: ['data'],
+        });
+      }
+    }
+
+    if (section.status === 'empty') {
+      const isEmpty =
+        section.data === undefined ||
+        section.data === null ||
+        (Array.isArray(section.data) && section.data.length === 0);
+      if (!isEmpty) {
+        context.addIssue({
+          code: 'custom',
+          message: 'empty 分段只能携带空数组、null 或省略数据。',
+          path: ['data'],
+        });
+      }
+    }
+
+    if (section.status === 'unsupported' || section.status === 'unavailable') {
+      if (!section.error) {
+        context.addIssue({
+          code: 'custom',
+          message: 'unsupported/unavailable 分段必须携带诊断信息。',
+          path: ['error'],
+        });
+      }
+      if (section.data !== undefined && section.data !== null) {
+        context.addIssue({
+          code: 'custom',
+          message: 'unsupported/unavailable 分段不能携带数据。',
+          path: ['data'],
+        });
+      }
+    }
+  },
+);
+
+export const marketDetailSectionSchema = marketDetailSectionSchemaImplementation as z.ZodType<
+  MarketDetailSection
+>;
+
+export const marketDetailDependencySchema = z.object({
+  status: marketDetailSectionStatusSchema,
+  error: marketDetailDiagnosticSchema.optional(),
+}).superRefine((dependency, context) => {
+  if (dependency.status === 'unavailable' && !dependency.error) {
+    context.addIssue({
+      code: 'custom',
+      message: 'unavailable 依赖必须携带诊断信息。',
+      path: ['error'],
+    });
+  }
+});
+
+const marketDetailResponseBaseSchema = z
+  .object({
+    version: z.literal(1),
+    symbol: z.string().min(1),
+    assetType: marketDetailAssetTypeSchema,
+    identity: z.object({
+      source: z.enum(['asset', 'catalog', 'symbol', 'unknown']),
+      status: z.enum(['confirmed', 'provider', 'unknown']),
+    }),
+    requested: z.array(marketDetailCapabilitySchema),
+    capabilities: z.object({
+      supported: z.array(marketDetailCapabilitySchema),
+      unsupported: z.array(marketDetailCapabilitySchema),
+    }),
+    limits: z.object({
+      bars: z.number().int().positive(),
+      nav: z.number().int().positive(),
+    }),
+    sections: z.record(z.string(), marketDetailSectionSchema),
+    dependencies: z.record(z.string(), marketDetailDependencySchema),
+    requestId: z.string().min(1),
+    generatedAt: isoDate,
+  })
+  .passthrough();
+
+const marketDetailResponseSchemaImplementation = marketDetailResponseBaseSchema.superRefine(
+  (response, context) => {
+    const supported = new Set(response.capabilities.supported);
+    const unsupported = new Set(response.capabilities.unsupported);
+    for (const capability of supported) {
+      if (unsupported.has(capability)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'supported 与 unsupported 不能包含相同能力。',
+          path: ['capabilities'],
+        });
+        break;
+      }
+    }
+
+    for (const [key, section] of Object.entries(response.sections)) {
+      if (key !== section.capability) {
+        context.addIssue({
+          code: 'custom',
+          message: '分段键必须与 capability 一致。',
+          path: ['sections', key, 'capability'],
+        });
+      }
+      if (!response.requested.includes(section.capability)) {
+        context.addIssue({
+          code: 'custom',
+          message: '响应分段必须属于 requested 能力。',
+          path: ['sections', key],
+        });
+      }
+    }
+
+    for (const capability of response.requested) {
+      if (!response.sections[capability]) {
+        context.addIssue({
+          code: 'custom',
+          message: '响应必须为每个 requested 能力提供分段状态。',
+          path: ['sections', capability],
+        });
+      }
+    }
+  },
+);
+
+export const marketDetailResponseSchema =
+  marketDetailResponseSchemaImplementation as z.ZodType<MarketDetailResponse>;
+
 export type QuoteV1 = z.infer<typeof quoteSchemaV1>;
 export type BarInputV1 = z.input<typeof barSchemaV1>;
 export type BarV1 = z.output<typeof barSchemaV1>;
@@ -203,3 +393,55 @@ export type EffectiveProviderPolicy = z.infer<typeof effectiveProviderPolicySche
 export type CatalogItem = z.infer<typeof catalogItemSchema>;
 export type CatalogSnapshot = z.infer<typeof catalogSnapshotSchema>;
 export type CatalogDelta = z.infer<typeof catalogDeltaSchema>;
+export type MarketDetailCapability = z.infer<typeof marketDetailCapabilitySchema>;
+export type MarketDetailDataByCapability = {
+  quote: QuoteV1;
+  bars: BarV1[];
+  'indicator:MA': IndicatorV1;
+  'indicator:MACD': IndicatorV1;
+  'indicator:RSI': IndicatorV1;
+  chip: ChipDistributionV1;
+  'fund-nav': FundNavV1;
+  'fund-nav-history': FundNavHistoryV1;
+};
+export type MarketDetailRequest = {
+  symbol: string;
+  include?: readonly MarketDetailCapability[];
+  barsLimit?: number;
+  navLimit?: number;
+  refresh?: boolean;
+};
+export type MarketDetailAssetType = z.infer<typeof marketDetailAssetTypeSchema>;
+export type MarketDetailSectionStatus = z.infer<typeof marketDetailSectionStatusSchema>;
+export type MarketDetailDiagnostic = z.infer<typeof marketDetailDiagnosticSchema>;
+export type MarketDetailSection = {
+  [Capability in MarketDetailCapability]: {
+    capability: Capability;
+    status: MarketDetailSectionStatus;
+    data?: MarketDetailDataByCapability[Capability] | null;
+    error?: MarketDetailDiagnostic;
+  };
+}[MarketDetailCapability];
+export type MarketDetailDependency = {
+  status: MarketDetailSectionStatus;
+  error?: MarketDetailDiagnostic;
+};
+export type MarketDetailResponse = {
+  version: 1;
+  symbol: string;
+  assetType: MarketDetailAssetType;
+  identity: {
+    source: 'asset' | 'catalog' | 'symbol' | 'unknown';
+    status: 'confirmed' | 'provider' | 'unknown';
+  };
+  requested: MarketDetailCapability[];
+  capabilities: {
+    supported: MarketDetailCapability[];
+    unsupported: MarketDetailCapability[];
+  };
+  limits: { bars: number; nav: number };
+  sections: Partial<Record<MarketDetailCapability, MarketDetailSection>>;
+  dependencies: Record<string, MarketDetailDependency>;
+  requestId: string;
+  generatedAt: string;
+};

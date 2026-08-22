@@ -90,6 +90,46 @@ describe('ThesisLedgerApiClient', () => {
     await expect(client.portfolio.getValuation()).rejects.toBeInstanceOf(ThesisLedgerContractError);
   });
 
+  it('通过共享 API Client 请求行情详情并保留 AbortSignal', async () => {
+    const detail = {
+      version: 1,
+      symbol: '600519.SH',
+      assetType: 'STOCK',
+      identity: { source: 'asset', status: 'confirmed' },
+      requested: ['quote', 'bars'],
+      capabilities: {
+        supported: ['quote', 'bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI', 'chip'],
+        unsupported: ['fund-nav'],
+      },
+      limits: { bars: 30, nav: 30 },
+      sections: {
+        quote: { capability: 'quote', status: 'empty', data: null },
+        bars: { capability: 'bars', status: 'empty', data: [] },
+      },
+      dependencies: {},
+      requestId: 'trace-1',
+      generatedAt: '2026-08-21T00:00:00.000Z',
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify(detail), { status: 200 }));
+    const signal = new AbortController().signal;
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+
+    await expect(
+      client.market.getDetail('600519.SH', {
+        include: ['quote', 'bars'],
+        barsLimit: 30,
+        refresh: true,
+        signal,
+      }),
+    ).resolves.toMatchObject({ symbol: '600519.SH', assetType: 'STOCK' });
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(
+      '/market/600519.SH/detail?barsLimit=30&refresh=1&include=quote%2Cbars',
+    );
+    expect(fetcher.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ signal }));
+  });
+
   it('将非 2xx 响应转换为共享错误模型', async () => {
     const fetcher = vi
       .fn<typeof fetch>()

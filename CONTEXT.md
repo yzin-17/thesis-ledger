@@ -44,6 +44,14 @@ _避免_：现金 Position、现金证券
 场外基金在指定净值日期的单位价值，并携带数据来源和新鲜度。基金净值不是证券实时报价。
 _避免_：Quote、成交价
 
+**持仓行情详情（Market Detail）**：
+从 Position 的本地持仓上下文进入的只读市场详情，不改变 Position、Asset 或 Ledger。行情详情通过 Server 共享读模型按资产能力返回 quote、日线、技术指标、筹码摘要或基金净值。
+_避免_：交易执行、持仓写入、客户端直连 Provider
+
+**行情能力分段（Market Detail Section）**：
+共享读模型中的独立数据模块，状态必须区分 ready、stale、empty、unsupported 和 unavailable。客户端的 loading 只表示界面请求状态，不属于 Server 数据契约。
+_避免_：把 Provider 失败伪装成空数据、把不支持能力当作请求失败
+
 ## 持仓录入
 
 **持仓录入（Position Entry）**：
