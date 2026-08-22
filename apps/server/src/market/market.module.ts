@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DsaModule } from '../integration/dsa/dsa.module.js';
-import { QualityModule } from '../quality/quality.module.js;
+import { QualityModule } from '../quality/quality.module.js';
 import { InstrumentService } from './instrument.service.js';
 import { CatalogSyncService } from './instruments/catalog-sync.service.js';
 import { InstrumentAssociationService } from './instruments/instrument-association.service.js';
