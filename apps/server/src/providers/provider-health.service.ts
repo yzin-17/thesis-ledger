@@ -10,7 +10,7 @@ const MAX_HISTORY_PAGE_SIZE = 100;
 
 const providerAliases = new Set(['feishu', 'feishu-webhook', 'lark', 'lark-webhook']);
 
-const normalizeProviderName = (provider: string) => {
+export const normalizeProviderName = (provider: string) => {
   const normalized = provider
     .trim()
     .toLowerCase()

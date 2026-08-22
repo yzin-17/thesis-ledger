@@ -18,7 +18,7 @@ import {
 import { ZodError } from 'zod';
 import { PrismaService } from '../platform/prisma.service.js';
 import { currentTraceId } from '../platform/structured-logger.js';
-import { DsaError } from './dsa-client.js';
+import { DsaError } from '../integration/dsa/dsa.client.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketService } from './market.service.js';
 

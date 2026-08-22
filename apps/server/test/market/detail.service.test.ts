@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DsaError } from '../../src/market/dsa-client.js';
+import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 import {
   MARKET_DETAIL_CAPABILITY_MATRIX,
   MarketDetailService,

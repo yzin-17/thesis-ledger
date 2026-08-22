@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { desiredProviderPolicySchema, type DesiredProviderPolicy } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { DsaClient, DsaError } from './dsa-client.js';
+import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 
 const defaultRoutes = {
   REALTIME_QUOTE: {
