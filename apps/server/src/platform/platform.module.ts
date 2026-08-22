@@ -8,9 +8,11 @@ import { MetricsController } from './metrics.controller.js';
 import { MetricsService } from './metrics.service.js';
 import { PrismaService } from './prisma.service.js';
 import { RedisService } from './redis.service.js';
+import { DsaModule } from '../integration/dsa/dsa.module.js';
 
 @Global()
 @Module({
+  imports: [DsaModule],
   controllers: [HealthController, DataExportController, MetricsController],
   providers: [
     PrismaService,

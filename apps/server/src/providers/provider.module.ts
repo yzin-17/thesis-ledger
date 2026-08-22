@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DsaModule } from '../integration/dsa/dsa.module.js';
 import { NotificationController } from '../notifications/notification.controller.js';
 import { NotificationDispatcher } from '../notifications/notification.dispatcher.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -9,6 +10,7 @@ import { ProviderHealthScheduler } from './provider-health.scheduler.js';
 import { ProviderHealthService } from './provider-health.service.js';
 
 @Module({
+  imports: [DsaModule],
   controllers: [NotificationController, ProviderHealthController, ProviderConfigController],
   providers: [
     NotificationService,
