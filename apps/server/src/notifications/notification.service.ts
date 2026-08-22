@@ -347,8 +347,6 @@ export class NotificationService {
       if (webhook) return new FeishuWebhookProvider(webhook, config.name);
     }
 
-    const bootstrapWebhook = process.env.FEISHU_WEBHOOK_URL?.trim();
-    if (bootstrapWebhook) return new FeishuWebhookProvider(bootstrapWebhook, 'feishu-bootstrap');
     throw new Error('notification_provider_unconfigured:feishu');
   }
 

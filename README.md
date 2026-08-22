@@ -227,7 +227,7 @@ JSON 必须合法，且应包含可识别的 `universe.symbols`。点击“保�
 
 在“新增或更新 Provider”中填写名称、类型、能力和可选的凭证引用。名称是唯一标识：使用相同名称保存会更新配置，换名称会创建新配置。类型支持通知、行情、AI 和图像；能力通过下拉框多选，必须使用实际 Provider Plugin 声明的能力名。提交后凭证输入框会清空，页面只显示“已配置/未配置”，不会回显密钥。
 
-填写时注意：Provider 表单只管理 Registry 配置，不会替换服务端环境变量，也不会自动安装 Provider Plugin。当前真实连接信息仍按部署方式配置：行情使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`，飞书使用 `FEISHU_WEBHOOK_URL`，AI 使用 `AI_PROVIDER`、`AI_MODEL` 与 `AI_API_KEY`。新增、更新、优先级、凭证引用和连通性测试的完整步骤见 [`docs/guides/2026-08-18-user-guide.md`](docs/guides/2026-08-18-user-guide.md) 的“Provider 填写教程”。
+填写时注意：Provider 表单管理 Registry 配置；飞书 Webhook 和 AI Provider 配置不再通过服务端环境变量提供。行情链路仍使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`。新增、更新、优先级、凭证引用和连通性测试的完整步骤见 [`docs/guides/2026-08-18-user-guide.md`](docs/guides/2026-08-18-user-guide.md) 的“Provider 填写教程”。
 
 在 Provider 列表中可以：
 

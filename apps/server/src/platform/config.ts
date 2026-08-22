@@ -10,12 +10,8 @@ const configSchema = z.object({
   PROVIDER_HEALTH_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
   THESIS_LEDGER_DSA_TOKEN: z.string().min(1),
   THESIS_LEDGER_CONTROL_TOKEN: z.string().min(1).optional(),
-  FEISHU_WEBHOOK_URL: z.url().optional().or(z.literal('')),
-  AI_PROVIDER: z.string().default('mock'),
-  AI_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().default('mock-v1'),
   CORS_ORIGINS: z.string().default(''),
-  CREDENTIAL_ENCRYPTION_KEY: z.string().min(16).optional(),
+  CREDENTIAL_ENCRYPTION_KEY: z.string().min(16),
   ERROR_TRACKING_URL: z.url().optional().or(z.literal('')),
 });
 
@@ -37,10 +33,6 @@ export const parseConfig = (environment: Record<string, string | undefined>) => 
     providerHealthCheckIntervalMs: parsed.data.PROVIDER_HEALTH_CHECK_INTERVAL_MS,
     dsaToken: parsed.data.THESIS_LEDGER_DSA_TOKEN,
     controlToken: parsed.data.THESIS_LEDGER_CONTROL_TOKEN || undefined,
-    feishuWebhookUrl: parsed.data.FEISHU_WEBHOOK_URL || undefined,
-    aiProvider: parsed.data.AI_PROVIDER,
-    aiModel: parsed.data.AI_MODEL,
-    hasAiCredential: Boolean(parsed.data.AI_API_KEY),
     corsOrigins: parsed.data.CORS_ORIGINS.split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),

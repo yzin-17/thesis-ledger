@@ -252,18 +252,18 @@ describe('环境配置', () => {
     REDIS_URL: 'redis://localhost:6379',
     DSA_BASE_URL: 'http://localhost:8000',
     THESIS_LEDGER_DSA_TOKEN: 'test-token',
+    CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
   };
   it('解析完整必需配置', () =>
     expect(parseConfig(base)).toMatchObject({
       port: 3000,
-      aiProvider: 'mock',
       providerHealthCheckIntervalMs: 3_600_000,
     }));
   it('缺失数据库配置时明确失败字段', () =>
     expect(() => parseConfig({ ...base, DATABASE_URL: undefined })).toThrow('DATABASE_URL'));
-  it('输出中不包含 AI Key', () =>
-    expect(JSON.stringify(parseConfig({ ...base, AI_API_KEY: 'secret-value' }))).not.toContain(
-      'secret-value',
+  it('缺失凭证加密密钥时明确失败字段', () =>
+    expect(() => parseConfig({ ...base, CREDENTIAL_ENCRYPTION_KEY: undefined })).toThrow(
+      'CREDENTIAL_ENCRYPTION_KEY',
     ));
 });
 

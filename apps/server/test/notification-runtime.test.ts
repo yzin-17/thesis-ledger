@@ -68,7 +68,6 @@ const riskEvent = (id: string, symbol = '600519.SH', accountId = 'account-1') =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete process.env.FEISHU_WEBHOOK_URL;
 });
 
 describe('Feishu provider', () => {
@@ -171,9 +170,7 @@ describe('Notification cooldown', () => {
 });
 
 describe('Notification dispatch', () => {
-  it('实际发送优先使用 ProviderConfig，而不是环境变量', async () => {
-    process.env.FEISHU_WEBHOOK_URL =
-      'https://open.feishu.cn/open-apis/bot/v2/hook/bootstrap-fallback';
+  it('实际发送使用 ProviderConfig 中的凭证', async () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',

@@ -99,11 +99,23 @@ try {
     'REDIS_URL=redis://redis:6379',
     '-e',
     'DSA_BASE_URL=http://dsa:8000',
-    '-e',
-    `FEISHU_WEBHOOK_URL=${webhookUrl}`,
     'server',
   ]);
   await waitForHealth();
+
+  await request('/providers/config', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'feishu',
+      type: 'notification',
+      enabled: true,
+      priority: 0,
+      capabilities: ['notification'],
+      credentialsRef: webhookUrl,
+      settings: {},
+    }),
+  });
 
   const account = await request('/accounts', {
     method: 'POST',
