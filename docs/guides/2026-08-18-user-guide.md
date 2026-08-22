@@ -36,7 +36,7 @@ Quote、Bar、Indicator 和 Chip 使用统一契约。场外基金使用独立�
 
 更新已有 Provider 时，使用同一个名称重新保存即可。能力、类型会更新；凭证引用留空时不会清除已有凭证。新建配置默认启用、优先级为 `1`；需要调整优先级时，在下方 Provider 列表中修改数字并离开输入框，系统会自动保存。在已接入 Provider Registry 的路由中，优先级数字越小越优先，多个 Provider 声明同一能力时按优先级参与路由和 fallback。
 
-请注意，Provider 表单不会修改服务端环境变量，也不会自动安装或注册 Provider Plugin。当前运行链路中的真实连接信息仍按部署方式配置：行情使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`，飞书通知使用 `FEISHU_WEBHOOK_URL`，AI 使用 `AI_PROVIDER`、`AI_MODEL` 与 `AI_API_KEY`。真实密钥不要写入文档、截图、日志或 Git；生产环境应使用环境变量或 Secret Manager。详细边界见 [环境变量与 Secret](../engineering/2026-08-18-environment-and-secrets.md)。
+请注意，Provider 表单管理飞书 Webhook 和 AI Provider 配置，不再依赖对应的服务端环境变量；行情链路仍使用 `DSA_BASE_URL` 与 `THESIS_LEDGER_DSA_TOKEN`。真实密钥不要写入文档、截图、日志或 Git；生产环境应使用环境变量或 Secret Manager。详细边界见 [环境变量与 Secret](../engineering/2026-08-18-environment-and-secrets.md)。
 
 保存后可以在 Provider 列表中确认能力、优先级、启用状态和凭证配置状态，再点击“连通性测试”。健康历史同时包含手动测试、定时检查和实际通知投递结果，页面刷新或修改配置不会主动探测 Provider。页面提示“已排队”只表示测试任务已提交；最终结果应结合健康状态和健康历史判断。`unknown` 表示没有足够的健康结果，`degraded` 表示响应变慢或发生短暂失败，`down` 表示连续失败，不应仅凭“凭证已配置”判断 Provider 可用。
 

@@ -4,8 +4,8 @@
 
 | 目录 | 内容 |
 | --- | --- |
-| [`specs/`](specs/) | 旧版 Investment OS Spec、开源调研、工作区迁移 Spec 和 Provider v1.1 Draft |
-| [`tasks/`](tasks/) | V0.1–V1.0 阶段任务、历史任务索引和工作区迁移任务 |
+| [`specs/`](specs/) | 旧版 Investment OS Spec、开源调研、工作区迁移 Spec、Provider v1.1 Draft 和架构改进 Spec |
+| [`tasks/`](tasks/) | V0.1–V1.0 阶段任务、market-data v1.2 已完成专项、架构改进任务、历史任务索引和工作区迁移任务 |
 | [`reviews/`](reviews/) | Phase 0 与 V0.1–V0.9 一致性 Review |
 | [`architecture/`](architecture/) | DSA 各能力的完整历史审计 |
 | [`domain/`](domain/) | Domain Model 一次性总审计 |

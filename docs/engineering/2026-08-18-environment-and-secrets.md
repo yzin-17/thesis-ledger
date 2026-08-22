@@ -2,7 +2,7 @@
 
 `thesis-ledger-infra/.env.example` 是 Docker 编排配置键清单，不包含可用凭证。生产 Secret 由部署平台注入，不写入数据库明文、日志、错误响应或镜像层。
 
-Server 启动时通过 Zod 校验 `DATABASE_URL`、`REDIS_URL` 和 `DSA_BASE_URL`；缺失或格式错误会立即失败，并只报告字段名。`AI_API_KEY`、Provider Token、飞书 Webhook 和 `CREDENTIAL_ENCRYPTION_KEY` 在日志中只允许记录“已配置/未配置”。Provider 凭证使用 AES-256-GCM 加密，主密钥必须来自环境变量或外部 Secret Manager。
+Server 启动时通过 Zod 校验 `DATABASE_URL`、`REDIS_URL` 和 `DSA_BASE_URL`；缺失或格式错误会立即失败，并只报告字段名。Provider 凭证和 `CREDENTIAL_ENCRYPTION_KEY` 在日志中只允许记录“已配置/未配置”。Provider 凭证使用 AES-256-GCM 加密，主密钥必须来自环境变量或外部 Secret Manager。
 
 `PROVIDER_HEALTH_CHECK_INTERVAL_MS` 是非敏感的定时健康检查间隔配置，默认 1 小时（`3600000` 毫秒）；它不包含凭证，不应被当作 Secret 管理。
 

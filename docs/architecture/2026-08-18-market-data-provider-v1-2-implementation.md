@@ -1,6 +1,6 @@
 # 市场数据与标的中心 v1.2 实施说明
 
-本文记录市场数据与标的中心 v1.2 当前已落地的实现边界。产品范围和验收标准以 [市场数据与标的中心 Spec v1.2](../specs/2026-08-18-market-data-provider-spec-v1.2.md) 为准，实施拆分和完成状态以 [实施任务](../tasks/2026-08-18-market-data-provider-v1-2.md) 为准。
+本文是市场数据与标的中心 v1.2 当前实现边界的 SSOT。产品范围和验收标准以 [市场数据与标的中心 Spec v1.2](../specs/2026-08-18-market-data-provider-spec-v1.2.md) 为准，实施拆分和完成状态以 [实施任务](../tasks/2026-08-18-market-data-provider-v1-2.md) 为准，发布与运行证据以 `docs/reviews/` 为准。
 
 ## 三仓职责
 
