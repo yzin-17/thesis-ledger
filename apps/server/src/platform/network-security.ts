@@ -15,7 +15,12 @@ export const resolveServerNetworkSecurity = (
   const rawMode = environment.SERVER_EXPOSURE_MODE?.trim() || 'desktop-local';
   if (rawMode !== 'desktop-local' && rawMode !== 'lan')
     throw new Error('SERVER_EXPOSURE_MODE 只能是 desktop-local 或 lan');
-  if (rawMode === 'desktop-local') return { mode: rawMode, host: '127.0.0.1' };
+  if (rawMode === 'desktop-local') {
+    const host = environment.SERVER_BIND_HOST?.trim() || '127.0.0.1';
+    if (host !== '127.0.0.1' && host !== '0.0.0.0')
+      throw new Error('SERVER_BIND_HOST 只能是 127.0.0.1 或 0.0.0.0');
+    return { mode: rawMode, host };
+  }
 
   const apiToken = environment.THESIS_LEDGER_API_TOKEN?.trim();
   if (!apiToken || apiToken.length < 16)

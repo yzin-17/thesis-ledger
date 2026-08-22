@@ -188,6 +188,9 @@ importers:
       pinyin-pro:
         specifier: 3.29.2
         version: 3.29.2
+      prisma:
+        specifier: ^6.13.0
+        version: 6.19.3(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -210,9 +213,6 @@ importers:
       '@types/node':
         specifier: ^24.1.0
         version: 24.13.3
-      prisma:
-        specifier: ^6.13.0
-        version: 6.19.3(typescript@5.9.3)
       tsx:
         specifier: ^4.20.3
         version: 4.23.1

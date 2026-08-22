@@ -23,6 +23,7 @@
     "croner": "10.0.1",
     "ioredis": "^5.6.1",
     "pinyin-pro": "3.29.2",
+    "prisma": "^6.13.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.0.14"
@@ -32,7 +33,6 @@
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.1.0",
-    "prisma": "^6.13.0",
     "tsx": "^4.20.3"
   },
   "prisma": {

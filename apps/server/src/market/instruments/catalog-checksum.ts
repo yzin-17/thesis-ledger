@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { Prisma } from '@prisma/client';
 import type { CatalogItem } from '@thesis-ledger/schemas';
 
 const stableJson = (value: unknown): string => {
@@ -27,7 +26,7 @@ export const stableCatalogChecksum = (items: CatalogItem[]) =>
     .digest('hex');
 
 export const CATALOG_TRANSACTION_OPTIONS = {
-  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  isolationLevel: 'Serializable' as const,
   maxWait: 10_000,
   timeout: 60_000,
 } as const;

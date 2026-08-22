@@ -16,7 +16,6 @@ import { MarketDetailService } from './market-detail.service.js';
   imports: [QualityModule],
   controllers: [MarketController, MarketDataController],
   providers: [
-    DsaClient,
     MarketService,
     MarketDetailService,
     MarketStorageService,
@@ -27,7 +26,6 @@ import { MarketDetailService } from './market-detail.service.js';
     MarketControlService,
   ],
   exports: [
-    DsaClient,
     MarketService,
     MarketDetailService,
     MarketStorageService,

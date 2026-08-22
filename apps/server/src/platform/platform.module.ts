@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { DsaClient } from '../market/dsa-client.js';
 import { DataExportController } from './data-export.controller.js';
 import { DataExportService } from './data-export.service.js';
 import { ErrorTrackingService } from './error-tracking.service.js';
@@ -15,11 +16,19 @@ import { RedisService } from './redis.service.js';
   providers: [
     PrismaService,
     RedisService,
+    DsaClient,
     HealthService,
     DataExportService,
     MetricsService,
     ErrorTrackingService,
   ],
-  exports: [PrismaService, RedisService, DataExportService, MetricsService, ErrorTrackingService],
+  exports: [
+    PrismaService,
+    RedisService,
+    DsaClient,
+    DataExportService,
+    MetricsService,
+    ErrorTrackingService,
+  ],
 })
 export class PlatformModule {}

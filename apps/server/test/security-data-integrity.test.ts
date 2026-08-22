@@ -178,6 +178,13 @@ describe('Server network exposure', () => {
     });
   });
 
+  it('容器可以在保持 desktop-local 无鉴权语义的同时监听所有网卡', () => {
+    expect(resolveServerNetworkSecurity({ SERVER_BIND_HOST: '0.0.0.0' })).toEqual({
+      mode: 'desktop-local',
+      host: '0.0.0.0',
+    });
+  });
+
   it('LAN 暴露必须显式配置足够长度的 API token', () => {
     expect(() => resolveServerNetworkSecurity({ SERVER_EXPOSURE_MODE: 'lan' })).toThrow(
       'THESIS_LEDGER_API_TOKEN',
