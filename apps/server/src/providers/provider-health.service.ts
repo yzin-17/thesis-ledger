@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DsaClient } from '../market/dsa-client.js';
+import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
 export type ProviderState = 'healthy' | 'degraded' | 'down';
@@ -94,8 +94,6 @@ export class ProviderHealthService {
   }
 
   async checkAll(source: ProviderHealthSource = 'manual') {
-    // DSA exposes a safe health endpoint. Notification webhooks are intentionally
-    // excluded because probing them would send a real user-visible message.
     return [await this.checkDsa(source)];
   }
 

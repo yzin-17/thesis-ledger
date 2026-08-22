@@ -15,7 +15,7 @@ import {
   type IndicatorV1,
   type QuoteV1,
 } from '@thesis-ledger/schemas';
-import { DsaClient } from './dsa-client.js';
+import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 

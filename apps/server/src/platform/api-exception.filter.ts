@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ZodError } from 'zod';
+import { DsaError } from '../integration/dsa/dsa.client.js';
 import { currentTraceId, StructuredLogger } from './structured-logger.js';
 import { ErrorTrackingService } from './error-tracking.service.js';
-import { DsaError } from '../market/dsa-client.js';
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {

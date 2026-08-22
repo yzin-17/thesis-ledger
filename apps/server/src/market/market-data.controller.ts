@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { DsaClient, DsaError } from './dsa-client.js';
+import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 import { InstrumentService } from './instrument.service.js';
 import { MarketControlService } from './market-control.service.js';
 

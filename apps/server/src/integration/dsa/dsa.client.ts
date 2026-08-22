@@ -5,8 +5,8 @@ import type {
   DesiredProviderPolicy,
   ProviderManifest,
 } from '@thesis-ledger/schemas';
-import { loadConfig } from '../platform/config.js';
-import { currentTraceId } from '../platform/structured-logger.js';
+import { loadConfig } from '../../platform/config.js';
+import { currentTraceId } from '../../platform/structured-logger.js';
 
 type CatalogJob = {
   id: string;
