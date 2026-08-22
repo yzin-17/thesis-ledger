@@ -2,7 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const roots = ['apps', 'packages', 'services', 'infra', 'scripts', 'docs'];
-const ignored = new Set(['.env.example', 'pnpm-lock.yaml']);
+const ignored = new Set(['pnpm-lock.yaml']);
 const ignoredDirectories = new Set(['node_modules', 'dist', 'release']);
 const patterns = [
   /sk-[A-Za-z0-9]{20,}/u,

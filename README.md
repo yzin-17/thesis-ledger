@@ -21,7 +21,6 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 要求 Node.js 22、pnpm 10 和 Docker Desktop。
 
 ```bash
-cp .env.example .env
 pnpm install --frozen-lockfile
 
 cd ../thesis-ledger-infra
