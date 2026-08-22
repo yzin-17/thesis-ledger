@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service.js';
 import { RedisService } from './redis.service.js';
-import { DsaClient } from '../market/dsa-client.js';
+import { DsaClient } from '../integration/dsa/dsa.client.js';
 
 type Status = 'healthy' | 'degraded' | 'down';
 
