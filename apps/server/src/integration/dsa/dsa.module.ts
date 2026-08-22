@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DsaClient } from '../../market/dsa-client.js';
+import { DsaClient } from './dsa.client.js';
 
 @Module({
   providers: [DsaClient],
