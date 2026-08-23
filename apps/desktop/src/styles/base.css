@@ -1301,7 +1301,7 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .detail-panel {
-  width: min(980px, 100%);
+  width: min(1200px, 100%);
   max-height: calc(100dvh - 64px);
   padding: 24px;
   overflow: auto;

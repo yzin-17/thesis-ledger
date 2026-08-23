@@ -259,7 +259,7 @@ function MarketDetailDialogContent({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         aria-describedby="market-detail-description"
-        className="detail-panel max-h-[calc(100dvh-64px)] max-w-[980px] overflow-auto"
+        className="detail-panel max-h-[calc(100dvh-64px)] max-w-[calc(100%-2rem)] overflow-auto sm:max-w-[1200px]"
         showCloseButton={false}
       >
         <div className="review-heading">
