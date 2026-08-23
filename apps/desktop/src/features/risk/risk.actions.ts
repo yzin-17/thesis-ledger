@@ -156,7 +156,6 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     try {
       await scanRiskMutation.mutateAsync(buildRiskContexts(portfolio, mode));
       successToast(toastManager, '风险扫描已完成', '触发事件已写入历史。');
-      await loadRisk();
       return true;
     } catch {
       errorToast(toastManager, '风险扫描失败', '请确认当前组合有可用数据。');
