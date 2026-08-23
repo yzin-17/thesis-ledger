@@ -124,7 +124,6 @@ export function PerformanceDashboard({
             mode={mode}
             onModeChange={onModeChange}
             ariaLabel="收益范围"
-            contextLabel="收益"
           />
         </div>
       </header>

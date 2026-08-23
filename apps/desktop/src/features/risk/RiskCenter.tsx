@@ -192,7 +192,6 @@ export function RiskCenter({
             mode={mode}
             onModeChange={onModeChange}
             ariaLabel="风险范围"
-            contextLabel="风险"
           />
           <Button
             type="button"

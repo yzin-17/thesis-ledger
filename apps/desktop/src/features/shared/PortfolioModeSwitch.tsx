@@ -10,7 +10,6 @@ export function PortfolioModeSwitch({
   mode,
   onModeChange,
   ariaLabel,
-  contextLabel = '模式',
   actualLabel = '实际',
   shadowLabel = '模拟',
   className,
@@ -18,7 +17,6 @@ export function PortfolioModeSwitch({
   mode: PortfolioModeValue;
   onModeChange: (mode: PortfolioModeValue) => void;
   ariaLabel: string;
-  contextLabel?: string;
   actualLabel?: string;
   shadowLabel?: string;
   className?: string;
@@ -33,9 +31,6 @@ export function PortfolioModeSwitch({
       role="group"
       aria-label={ariaLabel}
     >
-      <span className="text-xs font-medium tracking-wide text-muted-foreground">
-        {contextLabel}
-      </span>
       <Switch
         variant="risk"
         checked={isShadow}

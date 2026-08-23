@@ -111,7 +111,6 @@ describe('风险中心 AB 交互契约', () => {
         mode="actual"
         onModeChange={() => undefined}
         ariaLabel="估值范围"
-        contextLabel="估值"
       />,
     );
     const shadowHtml = renderToStaticMarkup(
@@ -119,17 +118,16 @@ describe('风险中心 AB 交互契约', () => {
         mode="shadow"
         onModeChange={() => undefined}
         ariaLabel="风险范围"
-        contextLabel="风险"
       />,
     );
 
     expect(actualHtml).toContain('估值范围');
-    expect(actualHtml).toContain('>估值</span>');
+    expect(actualHtml).not.toContain('>估值</span>');
     expect(actualHtml).toContain('当前实际，切换到模拟');
     expect(actualHtml).toContain('>实际</span>');
     expect(actualHtml).not.toContain('>模拟</span>');
     expect(shadowHtml).toContain('风险范围');
-    expect(shadowHtml).toContain('>风险</span>');
+    expect(shadowHtml).not.toContain('>风险</span>');
     expect(shadowHtml).toContain('当前模拟，切换到实际');
     expect(shadowHtml).toContain('>模拟</span>');
     expect(shadowHtml).not.toContain('>实际</span>');

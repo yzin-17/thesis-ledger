@@ -72,7 +72,6 @@ export function PortfolioDashboard({
           mode={mode}
           onModeChange={onModeChange}
           ariaLabel="估值范围"
-          contextLabel="估值"
         />
         <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
           <ArrowClockwiseIcon />
