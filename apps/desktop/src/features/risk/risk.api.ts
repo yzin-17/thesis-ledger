@@ -1,0 +1,94 @@
+import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import type {
+  CreateRiskRuleInput,
+  NotificationRecord,
+  PortfolioMode,
+  RiskAuditRecord,
+  RiskContext,
+  RiskEventRecord,
+  RiskRuleRecord,
+} from './risk.types.js';
+
+const noStore = { cache: 'no-store' as const };
+
+export const fetchRiskRules = (client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskRuleRecord[]>('/risk/rules', noStore, client);
+
+export const fetchRiskEvents = (mode: PortfolioMode, client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskEventRecord[]>(
+    `/risk/events?mode=${encodeURIComponent(mode)}`,
+    noStore,
+    client,
+  );
+
+export const fetchRiskNotifications = (client?: DesktopRequestClient) =>
+  requestDesktopJson<NotificationRecord[]>('/notifications', noStore, client);
+
+export const createRiskRule = (input: CreateRiskRuleInput, client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskRuleRecord>(
+    '/risk/rules',
+    {
+      ...noStore,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+    client,
+  );
+
+export const patchRiskRule = (ruleId: string, patch: object, client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskRuleRecord>(
+    `/risk/rules/${encodeURIComponent(ruleId)}`,
+    {
+      ...noStore,
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(patch),
+    },
+    client,
+  );
+
+export const deleteRiskRule = (ruleId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskRuleRecord>(
+    `/risk/rules/${encodeURIComponent(ruleId)}`,
+    {
+      ...noStore,
+      method: 'DELETE',
+    },
+    client,
+  );
+
+export const testRiskRule = (
+  ruleId: string,
+  contexts: RiskContext[],
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<Array<{ triggered: boolean }>>(
+    `/risk/rules/${encodeURIComponent(ruleId)}/test`,
+    {
+      ...noStore,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(contexts),
+    },
+    client,
+  );
+
+export const scanRisk = (contexts: RiskContext[], client?: DesktopRequestClient) =>
+  requestDesktopJson<unknown>(
+    '/risk/scan',
+    {
+      ...noStore,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(contexts),
+    },
+    client,
+  );
+
+export const fetchRiskAudit = (ruleId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskAuditRecord[]>(
+    `/risk/rules/${encodeURIComponent(ruleId)}/audit`,
+    noStore,
+    client,
+  );

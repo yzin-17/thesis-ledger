@@ -3,18 +3,16 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { desktopPathForView, type DesktopNavigationView } from '../views.js';
 import { usePortfolioShellQueries } from '../features/portfolio/portfolio.queries.js';
 import type { PortfolioMode } from '../features/portfolio/portfolio.types.js';
-import {
-  AiChat,
-  ImportReview,
-  JournalDashboard,
-  LegacyImportReviewRedirect,
-  PerformanceDashboard,
-  PortfolioDashboard,
-  PortfolioManagement,
-  ProviderSettings,
-  RiskCenter,
-  StrategyDashboard,
-} from '../features/legacy-pages.js';
+import { AiChat } from '../features/ai/AiChat.js';
+import { ImportReview } from '../features/import/ImportReview.js';
+import { LegacyImportReviewRedirect } from '../features/import/LegacyImportReviewRedirect.js';
+import { JournalDashboard } from '../features/journal/JournalDashboard.js';
+import { PerformanceDashboard } from '../features/performance/PerformanceDashboard.js';
+import { PortfolioDashboard } from '../features/portfolio/PortfolioDashboard.js';
+import { PortfolioManagement } from '../features/portfolio/PortfolioManagement.js';
+import { ProviderSettings } from '../features/providers/ProviderSettings.js';
+import { RiskCenter } from '../features/risk/RiskCenter.js';
+import { StrategyDashboard } from '../features/strategy/StrategyDashboard.js';
 import { MarketDataPage } from '../features/market-data/MarketDataPage.js';
 
 type ImportStep = 'account' | 'position' | 'screenshot';
@@ -24,7 +22,8 @@ export function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
-  const { state, portfolio, accounts, accountsReady, refresh } = usePortfolioShellQueries(portfolioMode);
+  const { state, portfolio, accounts, accountsReady, refresh } =
+    usePortfolioShellQueries(portfolioMode);
 
   const navigateTo = (nextView: DesktopNavigationView, options?: NavigationOptions) => {
     if (nextView === 'position-entry' && options?.step === 'account') {
@@ -89,7 +88,10 @@ export function AppRoutes() {
           />
         }
       />
-      <Route path="/risk-center" element={<RiskCenter accounts={accounts} portfolio={portfolio} />} />
+      <Route
+        path="/risk-center"
+        element={<RiskCenter accounts={accounts} portfolio={portfolio} />}
+      />
       <Route path="/performance" element={<PerformanceDashboard accounts={accounts} />} />
       <Route path="/strategy" element={<StrategyDashboard />} />
       <Route path="/journal" element={<JournalDashboard />} />

@@ -1,9 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import { PortfolioDashboard } from '../src/features/legacy-pages.js';
+import { PortfolioDashboard } from '../src/features/portfolio/PortfolioDashboard.js';
 
-const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+const text = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 
 describe('Portfolio table contract', () => {
   it('keeps row cells aligned with the seven semantic headers', () => {
@@ -53,11 +57,17 @@ describe('Portfolio table contract', () => {
       </QueryClientProvider>,
     );
 
-    const table = html.match(/<table>[\s\S]*?<thead>([\s\S]*?标的[\s\S]*?操作[\s\S]*?)<\/thead><tbody>([\s\S]*?)<\/tbody><\/table>/);
+    const table = html.match(
+      /<table>[\s\S]*?<thead>([\s\S]*?标的[\s\S]*?操作[\s\S]*?)<\/thead><tbody>([\s\S]*?)<\/tbody><\/table>/,
+    );
     expect(table).not.toBeNull();
 
-    const headers = [...table![1]!.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((match) => text(match[1]!));
-    const cells = [...table![2]!.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((match) => text(match[1]!));
+    const headers = [...table![1]!.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((match) =>
+      text(match[1]!),
+    );
+    const cells = [...table![2]!.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((match) =>
+      text(match[1]!),
+    );
 
     expect(headers).toEqual(['标的', '数量', '成本价', '市值', '浮盈亏', '状态', '操作']);
     expect(cells).toHaveLength(headers.length);

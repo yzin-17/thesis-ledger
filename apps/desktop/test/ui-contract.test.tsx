@@ -3,21 +3,21 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
+import { ImportReview } from '../src/features/import/ImportReview.js';
+import { FirstRunOnboarding } from '../src/features/onboarding/FirstRunOnboarding.js';
+import { ProviderSettings } from '../src/features/providers/ProviderSettings.js';
+import { hasConfiguredProviderSetup } from '../src/features/onboarding/onboarding.types.js';
 import {
-  DataStateBanner,
-  FirstRunOnboarding,
-  hasConfiguredProviderSetup,
-  InstrumentCombobox,
-  ImportReview,
   normalizeProviderHealthHistory,
-  PortfolioManagement,
   providerCredentialConfiguredAfterSave,
   providerCredentialForSave,
   providerCredentialLabel,
   providerDisplayStatus,
-  ProviderSettings,
   replaceProviderRecord,
-} from '../src/features/legacy-pages.js';
+} from '../src/features/providers/providers.types.js';
+import { PortfolioManagement } from '../src/features/portfolio/PortfolioManagement.js';
+import { InstrumentCombobox } from '../src/features/portfolio/InstrumentCombobox.js';
+import { DataStateBanner } from '../src/features/shared/DesktopPrimitives.js';
 import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
 
 const renderWithToast = (node: ReactNode) => {
@@ -31,7 +31,7 @@ const renderWithToast = (node: ReactNode) => {
   );
 };
 
-describe('Desktop UI contract', () => {
+describe('Desktop UI contract - onboarding and portfolio', () => {
   it('normalizes legacy health history arrays while supporting paginated responses', () => {
     const legacyPage = normalizeProviderHealthHistory(
       [
@@ -179,7 +179,9 @@ describe('Desktop UI contract', () => {
     expect(positionStep).toContain('+ 添加持仓');
     expect(positionStep).toContain('现金余额');
   });
+});
 
+describe('Desktop UI contract - providers and primitives', () => {
   it('renders instrument search and selected instrument state directly', () => {
     const initial = renderToStaticMarkup(
       <InstrumentCombobox

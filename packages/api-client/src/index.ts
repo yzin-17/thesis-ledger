@@ -130,10 +130,15 @@ export class ThesisLedgerApiClient {
   }
 
   private async fetchResponse(path: string, init?: RequestInit) {
-    const response = await this.fetcher(new URL(path.replace(/^\/+/, ''), this.baseUrl), {
-      ...init,
-      headers: { 'content-type': 'application/json', ...init?.headers },
-    });
+    const requestInit: RequestInit = { ...init };
+    const isMultipart = typeof FormData !== 'undefined' && init?.body instanceof FormData;
+    if (!isMultipart) {
+      requestInit.headers = { 'content-type': 'application/json', ...init?.headers };
+    }
+    const response = await this.fetcher(
+      new URL(path.replace(/^\/+/, ''), this.baseUrl),
+      requestInit,
+    );
     if (response.ok) return response;
     let payload: ApiErrorResponse | null = null;
     try {

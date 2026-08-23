@@ -66,6 +66,21 @@ describe('ThesisLedgerApiClient', () => {
     }
   });
 
+  it('FormData 请求不强制写入 JSON Content-Type', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    const body = new FormData();
+    body.set('file', new Blob(['fixture']), 'fixture.png');
+
+    await client.request('/imports/screenshot', { method: 'POST', body });
+
+    const init = fetcher.mock.calls[0]?.[1];
+    expect(init?.body).toBe(body);
+    expect(init?.headers).toBeUndefined();
+  });
+
   it('typed portfolio endpoint validates the shared response schema', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
