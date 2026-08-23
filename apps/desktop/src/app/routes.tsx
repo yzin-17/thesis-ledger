@@ -90,9 +90,26 @@ export function AppRoutes() {
       />
       <Route
         path="/risk-center"
-        element={<RiskCenter accounts={accounts} portfolio={portfolio} />}
+        element={
+          <RiskCenter
+            accounts={accounts}
+            portfolio={portfolio}
+            portfolioState={state}
+            mode={portfolioMode}
+            onModeChange={setPortfolioMode}
+          />
+        }
       />
-      <Route path="/performance" element={<PerformanceDashboard accounts={accounts} />} />
+      <Route
+        path="/performance"
+        element={
+          <PerformanceDashboard
+            accounts={accounts}
+            mode={portfolioMode}
+            onModeChange={setPortfolioMode}
+          />
+        }
+      />
       <Route path="/strategy" element={<StrategyDashboard />} />
       <Route path="/journal" element={<JournalDashboard />} />
       <Route path="/ai-chat" element={<AiChat />} />

@@ -7,6 +7,7 @@ import type {
   RiskContext,
   RiskEventRecord,
   RiskRuleRecord,
+  RiskTestResult,
 } from './risk.types.js';
 
 const noStore = { cache: 'no-store' as const };
@@ -63,7 +64,7 @@ export const testRiskRule = (
   contexts: RiskContext[],
   client?: DesktopRequestClient,
 ) =>
-  requestDesktopJson<Array<{ triggered: boolean }>>(
+  requestDesktopJson<RiskTestResult[]>(
     `/risk/rules/${encodeURIComponent(ruleId)}/test`,
     {
       ...noStore,

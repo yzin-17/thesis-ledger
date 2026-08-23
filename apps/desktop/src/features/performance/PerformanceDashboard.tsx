@@ -4,6 +4,7 @@ import { useToastManager } from '@/components/ui/toast';
 import type { Account } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
+import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
 import { useSavePerformanceTargetsMutation } from './performance.mutations.js';
 import { usePerformanceQueries } from './performance.queries.js';
 import type {
@@ -15,15 +16,22 @@ import type {
 import {
   PerformanceAllocationTable,
   PerformanceMetrics,
-  PerformanceModeAndAccount,
+  PerformanceAccountSelector,
   PerformanceRebalanceTable,
   PerformanceSnapshotTable,
   PerformanceTargetForm,
 } from './PerformanceSections.js';
 
-export function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
+export function PerformanceDashboard({
+  accounts,
+  mode,
+  onModeChange,
+}: {
+  accounts: Account[];
+  mode: PortfolioMode;
+  onModeChange: (mode: PortfolioMode) => void;
+}) {
   const [accountId, setAccountId] = useState('');
-  const [mode, setMode] = useState<PortfolioMode>('actual');
   const [targetText, setTargetText] = useState('{"股票":0.6,"ETF":0.4}');
   const [savingTargets, setSavingTargets] = useState(false);
   const toastManager = useToastManager();
@@ -102,19 +110,32 @@ export function PerformanceDashboard({ accounts }: { accounts: Account[] }) {
   const latest = snapshots.at(-1);
   return (
     <section className="module-page">
-      <p className="kicker">Performance</p>
-      <h1>收益分析</h1>
-      <p className="page-description">
-        所有收益指标从 Ledger 与带数据质量标记的 Portfolio Snapshot
-        计算；指标仅解释历史，不自动下单。
-      </p>
+      <header className="page-header">
+        <div>
+          <p className="kicker">Performance</p>
+          <h1>收益分析</h1>
+          <p className="page-description">
+            所有收益指标从 Ledger 与带数据质量标记的 Portfolio Snapshot
+            计算；指标仅解释历史，不自动下单。
+          </p>
+        </div>
+        <div className="page-header-actions">
+          <PortfolioModeSwitch
+            mode={mode}
+            onModeChange={onModeChange}
+            ariaLabel="收益范围"
+            contextLabel="收益"
+          />
+        </div>
+      </header>
+      {mode === 'shadow' ? (
+        <PortfolioModeNote>当前收益只计算模拟账户，结果仅用于研究。</PortfolioModeNote>
+      ) : null}
       <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <PerformanceModeAndAccount
+      <PerformanceAccountSelector
         accounts={accounts}
         accountId={accountId}
-        mode={mode}
         onAccountChange={setAccountId}
-        onModeChange={setMode}
       />
       <PerformanceMetrics latest={latest} summary={summary} />
       <PerformanceSnapshotTable loadState={loadState} snapshots={snapshots} />

@@ -2,12 +2,39 @@ import type { Portfolio, PortfolioMode } from '../portfolio/portfolio.types.js';
 
 export type { Portfolio, PortfolioMode };
 
+export type KnownRiskRuleKind =
+  | 'fixed-stop'
+  | 'cost-stop'
+  | 'take-profit'
+  | 'price-above'
+  | 'price-below'
+  | 'position-concentration'
+  | 'trailing-stop'
+  | 'drawdown'
+  | 'ma'
+  | 'rsi'
+  | 'macd'
+  | 'atr'
+  | 'volume'
+  | 'chip-peak'
+  | 'chip-ratio'
+  | 'chip-migration'
+  | 'sector-concentration'
+  | 'asset-concentration'
+  | 'volatility-exposure'
+  | 'correlation';
+
+export type RiskRuleKind = KnownRiskRuleKind | (string & {});
+
+export type RiskRuleScope = 'security' | 'account' | 'portfolio';
+export type RiskRuleSeverity = 'info' | 'warning' | 'error' | 'critical';
+
 export interface RiskRuleRecord {
   id: string;
   version: number;
-  kind: string;
-  scope: 'security' | 'account' | 'portfolio';
-  severity: 'info' | 'warning' | 'error' | 'critical';
+  kind: RiskRuleKind;
+  scope: RiskRuleScope;
+  severity: RiskRuleSeverity;
   threshold: number;
   enabled: boolean;
   symbol: string | null;
@@ -19,12 +46,30 @@ export interface RiskEventRecord {
   id: string;
   ruleId: string;
   ruleVersion: number;
+  mode?: string | null;
+  triggered?: boolean;
   severity: string;
   message: string;
   symbol: string | null;
   marketTime: string | null;
   evaluatedAt: string;
   context: Record<string, unknown>;
+}
+
+export interface RiskTestResult {
+  id?: string;
+  ruleId?: string;
+  triggered: boolean;
+  severity?: string;
+  message?: string;
+  evaluatedAt?: string;
+  context?: Record<string, unknown>;
+}
+
+export interface RiskTestRecord {
+  ruleVersion: number;
+  results: RiskTestResult[];
+  testedAt: string;
 }
 
 export interface NotificationRecord {
@@ -43,6 +88,9 @@ export interface RiskAuditRecord {
   action: string;
   ruleVersion: number;
   createdAt: string;
+  actor?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
 }
 
 export interface RiskContext {
@@ -57,11 +105,15 @@ export interface RiskContext {
 }
 
 export interface CreateRiskRuleInput {
-  kind: string;
-  scope: 'security' | 'account' | 'portfolio';
-  severity: 'info' | 'warning' | 'error' | 'critical';
+  kind: RiskRuleKind;
+  scope: RiskRuleScope;
+  severity: RiskRuleSeverity;
   threshold: number;
   enabled: boolean;
   symbol?: string;
   accountId?: string;
 }
+
+export type UpdateRiskRuleInput = Partial<Omit<CreateRiskRuleInput, 'enabled'>> & {
+  enabled?: boolean;
+};

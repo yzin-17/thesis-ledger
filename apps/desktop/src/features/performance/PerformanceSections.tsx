@@ -17,44 +17,23 @@ import { EmptyTableRow } from '../shared/EmptyStates.js';
 import { Metric } from '../shared/DesktopPrimitives.js';
 import type {
   PerformanceAllocationRecord,
-  PortfolioMode,
   RebalanceGapRecord,
   SnapshotRecord,
   PerformanceSummary,
 } from './performance.types.js';
 
-export function PerformanceModeAndAccount({
+export function PerformanceAccountSelector({
   accounts,
   accountId,
-  mode,
   onAccountChange,
-  onModeChange,
 }: {
   accounts: Account[];
   accountId: string;
-  mode: PortfolioMode;
   onAccountChange: (accountId: string) => void;
-  onModeChange: (mode: PortfolioMode) => void;
 }) {
   const selectedAccount = accounts.find((account) => account.id === accountId);
   return (
     <>
-      <div className="portfolio-mode-tabs" role="tablist" aria-label="收益范围">
-        {(['actual', 'shadow'] as const).map((nextMode) => (
-          <Button
-            key={nextMode}
-            type="button"
-            size="sm"
-            variant={mode === nextMode ? 'default' : 'outline'}
-            role="tab"
-            aria-selected={mode === nextMode}
-            onClick={() => onModeChange(nextMode)}
-          >
-            {nextMode === 'actual' ? '实际收益' : '影子收益'}
-          </Button>
-        ))}
-      </div>
-      {mode === 'shadow' && <p className="mode-note">当前收益只计算影子账户，结果标记为模拟。</p>}
       <label className="inline-control">
         账户
         <Select value={accountId || null} onValueChange={(value) => onAccountChange(value ?? '')}>

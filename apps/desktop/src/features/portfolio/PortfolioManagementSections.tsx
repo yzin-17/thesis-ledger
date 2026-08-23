@@ -82,7 +82,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                 <small>
                   {(account.institution || '未填写机构') +
                     ' · ' +
-                    (account.mode === 'shadow' ? '影子' : '实际') +
+                    (account.mode === 'shadow' ? '模拟' : '实际') +
                     ' · ' +
                     account.currency +
                     (account.active === false ? ' · 已停用' : '')}
@@ -196,13 +196,13 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
               <Select name="mode" defaultValue={editingAccount?.mode ?? 'actual'}>
                 <SelectTrigger className="w-full">
                   <SelectValue>
-                    {(value: string | null) => (value === 'shadow' ? '影子账户' : '实际账户')}
+                    {(value: string | null) => (value === 'shadow' ? '模拟账户' : '实际账户')}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="actual">实际账户</SelectItem>
-                    <SelectItem value="shadow">影子账户</SelectItem>
+                    <SelectItem value="shadow">模拟账户</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -655,7 +655,7 @@ function AccountField({
             {accounts.map((account) => (
               <SelectItem key={account.id} value={account.id}>
                 {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                {accountTypeLabel(account.type)} · {account.mode === 'shadow' ? '影子' : '实际'}
+                {accountTypeLabel(account.type)} · {account.mode === 'shadow' ? '模拟' : '实际'}
               </SelectItem>
             ))}
           </SelectGroup>

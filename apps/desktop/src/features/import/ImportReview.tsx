@@ -260,7 +260,7 @@ function ImportPositionPage({
                 {accounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                    {accountTypeLabel(account.type)} · {account.mode === 'shadow' ? '影子' : '实际'}
+                    {accountTypeLabel(account.type)} · {account.mode === 'shadow' ? '模拟' : '实际'}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -270,7 +270,7 @@ function ImportPositionPage({
         <div className="entry-account-meta">
           <span>
             {selectedAccount?.institution || '未填写机构'} · {selectedAccount?.currency} ·{' '}
-            {selectedAccount?.mode === 'shadow' ? '影子账户' : '实际账户'}
+            {selectedAccount?.mode === 'shadow' ? '模拟账户' : '实际账户'}
           </span>
         </div>
       </div>

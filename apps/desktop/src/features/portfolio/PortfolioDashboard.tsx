@@ -20,6 +20,7 @@ import {
 
 import { FirstRunOnboarding } from '../onboarding/FirstRunOnboarding.js';
 import { useOnboardingStatusQuery } from '../onboarding/onboarding.queries.js';
+import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
 
 export function PortfolioDashboard({
   state,
@@ -52,23 +53,65 @@ export function PortfolioDashboard({
     hasProviderSetup: false,
     hasRiskRule: false,
   };
+  const modeNote =
+    mode === 'shadow' ? (
+      <PortfolioModeNote>当前为模拟账户范围，数据仅用于研究。</PortfolioModeNote>
+    ) : null;
 
-  if (state === 'loading') return <DashboardSkeleton />;
+  const pageHeader = (
+    <header className="page-header">
+      <div>
+        <p className="kicker">组合总览</p>
+        <h1>{portfolio ? money.format(portfolio.totalMarketValue) : '投资组合'}</h1>
+        {portfolio && (
+          <p className="as-of">数据时点 {new Date(portfolio.valuedAt).toLocaleString('zh-CN')}</p>
+        )}
+      </div>
+      <div className="page-header-actions">
+        <PortfolioModeSwitch
+          mode={mode}
+          onModeChange={onModeChange}
+          ariaLabel="估值范围"
+          contextLabel="估值"
+        />
+        <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
+          <ArrowClockwiseIcon />
+          刷新
+        </Button>
+      </div>
+    </header>
+  );
+
+  if (state === 'loading') {
+    return (
+      <>
+        {pageHeader}
+        {modeNote}
+        <DashboardSkeleton />
+      </>
+    );
+  }
   if (state === 'error')
     return (
-      <StatePanel
-        title="暂时无法读取投资组合"
-        description="请确认 ThesisLedger Server 与数据服务正在运行。"
-      >
-        <Button type="button" variant="default" onClick={onRetry}>
-          <ArrowClockwiseIcon />
-          重新加载
-        </Button>
-      </StatePanel>
+      <>
+        {pageHeader}
+        {modeNote}
+        <StatePanel
+          title="暂时无法读取投资组合"
+          description="请确认 ThesisLedger Server 与数据服务正在运行。"
+        >
+          <Button type="button" variant="default" onClick={onRetry}>
+            <ArrowClockwiseIcon />
+            重新加载
+          </Button>
+        </StatePanel>
+      </>
     );
   if (state === 'empty')
     return (
       <>
+        {pageHeader}
+        {modeNote}
         <StatePanel
           title="从第一笔持仓开始"
           description="选择账户后手动录入持仓，或上传一张已脱敏的持仓截图；没有账户时再创建账户。"
@@ -86,35 +129,8 @@ export function PortfolioDashboard({
     );
   return (
     <>
-      <header className="page-header">
-        <div>
-          <p className="kicker">组合总览</p>
-          <h1>{money.format(portfolio!.totalMarketValue)}</h1>
-          <p className="as-of">数据时点 {new Date(portfolio!.valuedAt).toLocaleString('zh-CN')}</p>
-        </div>
-        <div className="page-header-actions">
-          <div className="portfolio-mode-tabs" role="tablist" aria-label="估值范围">
-            {(['actual', 'shadow'] as const).map((nextMode) => (
-              <Button
-                key={nextMode}
-                type="button"
-                size="sm"
-                variant={mode === nextMode ? 'default' : 'outline'}
-                aria-selected={mode === nextMode}
-                role="tab"
-                onClick={() => onModeChange(nextMode)}
-              >
-                {nextMode === 'actual' ? '实际' : '影子'}
-              </Button>
-            ))}
-          </div>
-          <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
-            <ArrowClockwiseIcon />
-            刷新
-          </Button>
-        </div>
-      </header>
-      {mode === 'shadow' ? <p className="mode-note">当前为影子账户范围，数据仅用于模拟。</p> : null}
+      {pageHeader}
+      {modeNote}
       <DataStateBanner state={state} onRetry={onRetry} />
       <FirstRunOnboarding
         hasAccount={accounts.length > 0}

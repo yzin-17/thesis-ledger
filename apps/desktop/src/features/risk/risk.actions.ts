@@ -1,13 +1,14 @@
-import type { Dispatch, FormEvent, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { useToastManager } from '@/components/ui/toast';
 
-import type { Account, Portfolio } from '../portfolio/portfolio.types.js';
-import { formText } from '../shared/display.js';
+import type { Portfolio } from '../portfolio/portfolio.types.js';
 import type {
   CreateRiskRuleInput,
   PortfolioMode,
   RiskContext,
   RiskRuleRecord,
+  RiskTestResult,
+  UpdateRiskRuleInput,
 } from './risk.types.js';
 
 type ToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
@@ -15,8 +16,12 @@ type AsyncMutation<Input, Output> = {
   mutateAsync: (input: Input) => Promise<Output>;
 };
 
-const buildRiskContexts = (portfolio: Portfolio | null, mode: PortfolioMode): RiskContext[] =>
-  (portfolio?.positions ?? []).map((position) => ({
+export const buildRiskContexts = (
+  portfolio: Portfolio | null,
+  mode: PortfolioMode,
+): RiskContext[] => {
+  if (!portfolio) return [];
+  return portfolio.positions.map((position) => ({
     symbol: position.symbol,
     accountId: position.accountId,
     mode,
@@ -24,36 +29,37 @@ const buildRiskContexts = (portfolio: Portfolio | null, mode: PortfolioMode): Ri
     ...(position.marketValue === null || position.quantity <= 0
       ? {}
       : { price: position.marketValue / position.quantity }),
-    ...(portfolio && portfolio.totalMarketValue > 0 && position.marketValue !== null
+    ...(portfolio.totalMarketValue > 0 && position.marketValue !== null
       ? { weight: position.marketValue / portfolio.totalMarketValue }
       : {}),
-    marketTime: portfolio?.valuedAt ?? new Date().toISOString(),
+    marketTime: portfolio.valuedAt,
     dataQuality: {
-      portfolio: portfolio?.partial ? ('partial' as const) : ('fresh' as const),
+      portfolio: portfolio.partial ? 'partial' : 'fresh',
     },
   }));
+};
 
 type Dependencies = {
-  accounts: Account[];
   portfolio: Portfolio | null;
   mode: PortfolioMode;
   busyAction: string | null;
   setBusyAction: Dispatch<SetStateAction<string | null>>;
-  setAuditRule: Dispatch<SetStateAction<RiskRuleRecord | null>>;
-  setAuditVisible: Dispatch<SetStateAction<boolean>>;
   toastManager: ToastManager;
   createRuleMutation: AsyncMutation<CreateRiskRuleInput, RiskRuleRecord>;
-  patchRuleMutation: AsyncMutation<{ ruleId: string; patch: object }, RiskRuleRecord>;
+  patchRuleMutation: AsyncMutation<{ ruleId: string; patch: UpdateRiskRuleInput }, RiskRuleRecord>;
   deleteRuleMutation: AsyncMutation<{ ruleId: string }, RiskRuleRecord>;
-  testRuleMutation: AsyncMutation<
-    { ruleId: string; contexts: RiskContext[] },
-    Array<{ triggered: boolean }>
-  >;
+  testRuleMutation: AsyncMutation<{ ruleId: string; contexts: RiskContext[] }, RiskTestResult[]>;
   scanRiskMutation: AsyncMutation<RiskContext[], unknown>;
   refetchRules: () => Promise<unknown>;
   refetchEvents: () => Promise<unknown>;
   refetchNotifications: () => Promise<unknown>;
 };
+
+const successToast = (toastManager: ToastManager, title: string, description: string) =>
+  toastManager.add({ title, description, type: 'success', timeout: 2800 });
+
+const errorToast = (toastManager: ToastManager, title: string, description: string) =>
+  toastManager.add({ title, description, type: 'error', timeout: 0, priority: 'high' });
 
 export const createRiskActionHandlers = (dependencies: Dependencies) => {
   const {
@@ -61,8 +67,6 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     mode,
     busyAction,
     setBusyAction,
-    setAuditRule,
-    setAuditVisible,
     toastManager,
     createRuleMutation,
     patchRuleMutation,
@@ -78,156 +82,89 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     await Promise.all([refetchRules(), refetchEvents(), refetchNotifications()]);
   };
 
-  const createRule = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (busyAction) return;
+  const createRule = async (input: CreateRiskRuleInput) => {
+    if (busyAction) return false;
     setBusyAction('create-rule');
     try {
-      const formElement = event.currentTarget;
-      const form = new FormData(formElement);
-      const scope = formText(form, 'scope') as CreateRiskRuleInput['scope'];
-      await createRuleMutation.mutateAsync({
-        kind: formText(form, 'kind'),
-        scope,
-        severity: formText(form, 'severity') as CreateRiskRuleInput['severity'],
-        threshold: Number(formText(form, 'threshold')),
-        enabled: true,
-        ...(scope === 'security' ? { symbol: formText(form, 'symbol') } : {}),
-        ...(scope === 'account' ? { accountId: formText(form, 'accountId') } : {}),
-      });
-      formElement.reset();
-      toastManager.add({
-        title: '规则已创建',
-        description: '已记录审计。',
-        type: 'success',
-        timeout: 2800,
-      });
+      await createRuleMutation.mutateAsync(input);
+      successToast(toastManager, '规则已创建', '已记录审计。');
       await refetchRules();
+      return true;
     } catch {
-      toastManager.add({
-        title: '规则创建失败',
-        description: '请检查 scope 与目标。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
+      errorToast(toastManager, '规则创建失败', '请检查规则目标和阈值。');
+      return false;
     } finally {
       setBusyAction(null);
     }
   };
 
-  const patchRule = async (rule: RiskRuleRecord) => {
-    if (busyAction) return;
-    setBusyAction(`patch:${rule.id}`);
+  const patchRule = async (ruleId: string, patch: UpdateRiskRuleInput) => {
+    if (busyAction) return false;
+    setBusyAction(`patch:${ruleId}`);
     try {
-      await patchRuleMutation.mutateAsync({ ruleId: rule.id, patch: { enabled: !rule.enabled } });
-      toastManager.add({
-        title: '规则已更新',
-        description: '已生成新版本。',
-        type: 'success',
-        timeout: 2800,
-      });
+      await patchRuleMutation.mutateAsync({ ruleId, patch });
+      successToast(toastManager, '规则已更新', '已生成新版本并记录审计。');
+      return true;
     } catch {
-      toastManager.add({
-        title: '规则更新失败',
-        description: '请稍后重试。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
+      errorToast(toastManager, '规则更新失败', '请稍后重试。');
+      return false;
     } finally {
       setBusyAction(null);
     }
   };
 
-  const deleteRule = async (rule: RiskRuleRecord) => {
-    if (busyAction) return;
-    if (
-      !window.confirm(
-        `确认删除风险规则“${rule.kind}”？删除后规则会停用，历史事件与审计记录会保留。`,
-      )
-    )
-      return;
-    setBusyAction(`delete:${rule.id}`);
+  const archiveRule = async (rule: RiskRuleRecord) => {
+    if (busyAction) return false;
+    setBusyAction(`archive:${rule.id}`);
     try {
       await deleteRuleMutation.mutateAsync({ ruleId: rule.id });
-      toastManager.add({
-        title: '规则已删除',
-        description: '规则已停用，历史事件与审计记录保留。',
-        type: 'success',
-        timeout: 2800,
-      });
+      successToast(toastManager, '规则已归档', '规则已停用，历史事件与审计记录保留。');
+      return true;
     } catch {
-      toastManager.add({
-        title: '规则删除失败',
-        description: '请稍后重试。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
+      errorToast(toastManager, '规则归档失败', '请稍后重试。');
+      return false;
     } finally {
       setBusyAction(null);
     }
   };
 
   const testRule = async (rule: RiskRuleRecord) => {
-    if (busyAction) return;
+    if (busyAction) return null;
     setBusyAction(`test:${rule.id}`);
     try {
       const result = await testRuleMutation.mutateAsync({
         ruleId: rule.id,
         contexts: buildRiskContexts(portfolio, mode),
       });
-      toastManager.add({
-        title: '人工测试完成',
-        description: `${result.filter((item) => item.triggered).length} 个上下文触发。`,
-        type: 'success',
-        timeout: 2800,
-      });
+      successToast(
+        toastManager,
+        '人工测试完成',
+        `${result.filter((item) => item.triggered).length} 个上下文触发。`,
+      );
+      return result;
     } catch {
-      toastManager.add({
-        title: '人工测试失败',
-        description: '请确认组合中有可用数据。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
+      errorToast(toastManager, '人工测试失败', '请确认当前组合有可用数据。');
+      return null;
     } finally {
       setBusyAction(null);
     }
   };
 
   const scanRisk = async () => {
-    if (busyAction) return;
+    if (busyAction) return false;
     setBusyAction('scan-risk');
     try {
       await scanRiskMutation.mutateAsync(buildRiskContexts(portfolio, mode));
-      toastManager.add({
-        title: '风险扫描已完成',
-        description: '触发事件已写入历史。',
-        type: 'success',
-        timeout: 2800,
-      });
+      successToast(toastManager, '风险扫描已完成', '触发事件已写入历史。');
       await loadRisk();
+      return true;
     } catch {
-      toastManager.add({
-        title: '风险扫描失败',
-        description: '请确认当前组合有可用数据。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
+      errorToast(toastManager, '风险扫描失败', '请确认当前组合有可用数据。');
+      return false;
     } finally {
       setBusyAction(null);
     }
   };
 
-  const showAudit = (rule: RiskRuleRecord) => {
-    if (busyAction) return;
-    setBusyAction(`audit:${rule.id}`);
-    setAuditRule(rule);
-    setAuditVisible(true);
-  };
-
-  return { loadRisk, createRule, patchRule, deleteRule, testRule, scanRisk, showAudit };
+  return { loadRisk, createRule, patchRule, archiveRule, testRule, scanRisk };
 };

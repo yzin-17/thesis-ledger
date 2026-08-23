@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
+import { RefreshCw } from 'lucide-react';
 
-import type { Account, Portfolio } from '../portfolio/portfolio.types.js';
+import type { Account, Portfolio, PortfolioMode } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
+import type { LoadState } from '../shared/types.js';
+import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
 import { createRiskActionHandlers } from './risk.actions.js';
 import {
   useCreateRiskRuleMutation,
@@ -14,27 +18,38 @@ import {
   useTestRiskRuleMutation,
 } from './risk.mutations.js';
 import { useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
-import {
-  RiskAuditDialog,
-  RiskEventTable,
-  RiskNotificationTable,
-  RiskRuleForm,
-  RiskRuleTable,
-  RiskSummary,
-} from './RiskSections.js';
-import type { PortfolioMode, RiskRuleRecord } from './risk.types.js';
+import { RiskOverview } from './RiskOverview.js';
+import { RiskRuleWorkbench } from './RiskRuleWorkbench.js';
+import { RiskAuditDialog, RiskEventTable, RiskNotificationTable } from './RiskSections.js';
+import type {
+  CreateRiskRuleInput,
+  RiskRuleRecord,
+  RiskTestRecord,
+  RiskTestResult,
+} from './risk.types.js';
+
+type RiskTab = 'overview' | 'rules' | 'events' | 'notifications';
 
 export function RiskCenter({
   accounts,
   portfolio,
+  portfolioState,
+  mode,
+  onModeChange,
 }: {
   accounts: Account[];
   portfolio: Portfolio | null;
+  portfolioState: LoadState;
+  mode: PortfolioMode;
+  onModeChange: (mode: PortfolioMode) => void;
 }) {
-  const [mode, setMode] = useState<PortfolioMode>('actual');
+  const [tab, setTab] = useState<RiskTab>('overview');
+  const [eventSeverityFilter, setEventSeverityFilter] = useState<string | null>(null);
+  const [notificationStatusFilter, setNotificationStatusFilter] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [auditRule, setAuditRule] = useState<RiskRuleRecord | null>(null);
   const [auditVisible, setAuditVisible] = useState(false);
+  const [testRecords, setTestRecords] = useState<Record<string, RiskTestRecord>>({});
   const toastManager = useToastManager();
   const riskQueries = useRiskQueries(mode);
   const auditQuery = useRiskAuditQuery(auditVisible ? (auditRule?.id ?? null) : null);
@@ -52,14 +67,23 @@ export function RiskCenter({
     hasRiskData,
     hasRiskData && rules.length === 0 && events.length === 0 && deliveries.length === 0,
   );
+  const riskUpdatedAt = useMemo(() => {
+    const timestamp = Math.max(
+      riskQueries.rules.dataUpdatedAt,
+      riskQueries.events.dataUpdatedAt,
+      riskQueries.notifications.dataUpdatedAt,
+    );
+    return timestamp > 0 ? new Date(timestamp).toISOString() : null;
+  }, [
+    riskQueries.events.dataUpdatedAt,
+    riskQueries.notifications.dataUpdatedAt,
+    riskQueries.rules.dataUpdatedAt,
+  ]);
   const actions = createRiskActionHandlers({
-    accounts,
     portfolio,
     mode,
     busyAction,
     setBusyAction,
-    setAuditRule,
-    setAuditVisible,
     toastManager,
     createRuleMutation,
     patchRuleMutation,
@@ -77,12 +101,13 @@ export function RiskCenter({
       return;
     }
     if (!auditRule || busyAction !== `audit:${auditRule.id}`) return;
-    if (!auditQuery.isFetching) setBusyAction(null);
-  }, [auditQuery.isFetching, auditRule, auditVisible, busyAction]);
+    if (!auditQuery.isPending && !auditQuery.isFetching) setBusyAction(null);
+  }, [auditQuery.isFetching, auditQuery.isPending, auditRule, auditVisible, busyAction]);
 
   useEffect(() => {
     if (!auditQuery.isError || !auditRule) return;
     setAuditVisible(false);
+    setAuditRule(null);
     setBusyAction(null);
     toastManager.add({
       title: '审计记录读取失败',
@@ -93,68 +118,166 @@ export function RiskCenter({
     });
   }, [auditQuery.isError, auditRule, toastManager]);
 
+  const selectTab = (nextTab: RiskTab, filter?: string) => {
+    setTab(nextTab);
+    if (nextTab === 'events') {
+      setEventSeverityFilter(filter ?? null);
+      setNotificationStatusFilter(null);
+    } else if (nextTab === 'notifications') {
+      setNotificationStatusFilter(filter ?? null);
+      setEventSeverityFilter(null);
+    } else {
+      setEventSeverityFilter(null);
+      setNotificationStatusFilter(null);
+    }
+  };
+
+  const openAudit = (rule: RiskRuleRecord) => {
+    if (busyAction) return;
+    setBusyAction(`audit:${rule.id}`);
+    setAuditRule(rule);
+    setAuditVisible(true);
+  };
+
+  const closeAudit = (open: boolean) => {
+    setAuditVisible(open);
+    if (!open) {
+      setAuditRule(null);
+      if (busyAction?.startsWith('audit:')) setBusyAction(null);
+    }
+  };
+
+  const createRule = (input: CreateRiskRuleInput) => actions.createRule(input);
+  const invalidateTestRecord = (ruleId: string) => {
+    setTestRecords((current) => {
+      if (!current[ruleId]) return current;
+      const next = { ...current };
+      delete next[ruleId];
+      return next;
+    });
+  };
+  const updateRule = async (ruleId: string, input: CreateRiskRuleInput) => {
+    const updated = await actions.patchRule(ruleId, input);
+    if (updated) invalidateTestRecord(ruleId);
+    return updated;
+  };
+  const toggleRule = async (rule: RiskRuleRecord) => {
+    const updated = await actions.patchRule(rule.id, { enabled: !rule.enabled });
+    if (updated) invalidateTestRecord(rule.id);
+    return updated;
+  };
+  const saveTestRecord = (rule: RiskRuleRecord, results: RiskTestResult[]) => {
+    setTestRecords((current) => ({
+      ...current,
+      [rule.id]: {
+        ruleVersion: rule.version,
+        results,
+        testedAt: new Date().toISOString(),
+      },
+    }));
+  };
+
   return (
     <section className="module-page">
-      <p className="kicker">Risk Center</p>
-      <h1>风险中心</h1>
-      <p className="page-description">
-        规则负责确定性判断；提醒仅用于辅助研究，不代表交易执行保证。事件保留规则版本、数据时间和触发上下文。
-      </p>
-      <div className="page-header-actions">
-        <div className="portfolio-mode-tabs" role="tablist" aria-label="风险范围">
-          {(['actual', 'shadow'] as const).map((nextMode) => (
-            <Button
-              key={nextMode}
-              type="button"
-              size="sm"
-              variant={mode === nextMode ? 'default' : 'outline'}
-              role="tab"
-              aria-selected={mode === nextMode}
-              onClick={() => setMode(nextMode)}
-            >
-              {nextMode === 'actual' ? '实际风险' : '影子风险'}
-            </Button>
-          ))}
+      <header className="page-header">
+        <div>
+          <p className="kicker">Risk Center</p>
+          <h1>风险中心</h1>
+          <p className="page-description">
+            规则负责确定性判断；提醒仅用于辅助研究，不代表交易执行保证。事件保留规则版本、数据时间和触发上下文。
+          </p>
         </div>
-        <Button
-          className="secondary"
-          type="button"
-          variant="outline"
-          onClick={() => void actions.loadRisk()}
-        >
-          刷新风险数据
-        </Button>
-      </div>
-      {mode === 'shadow' && (
-        <p className="mode-note">当前只显示影子风险事件，通知默认不代表实际资产风险。</p>
-      )}
-      <RiskSummary rules={rules} events={events} deliveries={deliveries} />
-      <RiskRuleForm
-        accounts={accounts}
-        busyAction={busyAction}
-        onSubmit={(event) => void actions.createRule(event)}
-        onScan={() => void actions.scanRisk()}
-      />
+        <div className="page-header-actions">
+          <PortfolioModeSwitch
+            mode={mode}
+            onModeChange={onModeChange}
+            ariaLabel="风险范围"
+            contextLabel="风险"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="secondary"
+            disabled={busyAction !== null}
+            onClick={() => void actions.loadRisk()}
+          >
+            <RefreshCw data-icon="inline-start" aria-hidden="true" />
+            刷新
+          </Button>
+        </div>
+      </header>
+
+      {mode === 'shadow' ? (
+        <PortfolioModeNote>
+          仅用于研究和模拟，不代表实际资产风险，也不会触发实际通知。
+        </PortfolioModeNote>
+      ) : null}
+
       <DataStateBanner state={loadState} onRetry={() => void actions.loadRisk()} />
-      <RiskRuleTable
-        loadState={loadState}
-        rules={rules}
-        busyAction={busyAction}
-        onPatch={(rule) => void actions.patchRule(rule)}
-        onTest={(rule) => void actions.testRule(rule)}
-        onAudit={actions.showAudit}
-        onDelete={(rule) => void actions.deleteRule(rule)}
-      />
+
+      <Tabs value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
+        <TabsList variant="line" className="mb-5 w-full justify-start">
+          <TabsTrigger value="overview">总览</TabsTrigger>
+          <TabsTrigger value="rules">规则</TabsTrigger>
+          <TabsTrigger value="events">事件</TabsTrigger>
+          <TabsTrigger value="notifications">通知</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview">
+          <RiskOverview
+            mode={mode}
+            portfolioValueAt={portfolio?.valuedAt ?? null}
+            portfolioState={portfolioState}
+            loadState={loadState}
+            rules={rules}
+            events={events}
+            deliveries={deliveries}
+            lastUpdatedAt={riskUpdatedAt}
+            scanning={busyAction === 'scan-risk'}
+            onScan={() => void actions.scanRisk()}
+            onRefresh={() => void actions.loadRisk()}
+            onSelectTab={selectTab}
+          />
+        </TabsContent>
+        <TabsContent value="rules">
+          <RiskRuleWorkbench
+            rules={rules}
+            accounts={accounts}
+            loadState={loadState}
+            busyAction={busyAction}
+            testRecords={testRecords}
+            onCreate={createRule}
+            onUpdate={updateRule}
+            onToggle={toggleRule}
+            onArchive={actions.archiveRule}
+            onTest={actions.testRule}
+            onTestComplete={saveTestRecord}
+            onAudit={openAudit}
+          />
+        </TabsContent>
+        <TabsContent value="events">
+          <RiskEventTable
+            loadState={loadState}
+            events={events}
+            severityFilter={eventSeverityFilter}
+          />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <RiskNotificationTable
+            loadState={loadState}
+            deliveries={deliveries}
+            statusFilter={notificationStatusFilter}
+          />
+        </TabsContent>
+      </Tabs>
+
       <RiskAuditDialog
         open={auditVisible}
         rule={auditRule}
         audit={auditQuery.data ?? []}
         pending={auditQuery.isPending || auditQuery.isFetching}
         error={auditQuery.isError}
-        onOpenChange={setAuditVisible}
+        onOpenChange={closeAudit}
       />
-      <RiskEventTable loadState={loadState} events={events} />
-      <RiskNotificationTable loadState={loadState} deliveries={deliveries} />
     </section>
   );
 }

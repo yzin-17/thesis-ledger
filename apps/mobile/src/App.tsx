@@ -106,14 +106,14 @@ export function MobileApp() {
               ]}
             >
               <Text style={state.mode === mode ? styles.activeTabText : styles.tabText}>
-                {mode === 'actual' ? '实际' : '影子'}
+                {mode === 'actual' ? '实际' : '模拟'}
               </Text>
             </Pressable>
           ))}
         </View>
         {state.mode === 'shadow' && (
           <Text style={styles.shadowNotice} accessibilityRole="text">
-            当前为影子账户；以下组合与风险事件均为模拟数据，不代表实际账户。
+            当前为模拟账户；以下组合与风险事件均为模拟数据，不代表实际账户。
           </Text>
         )}
         <View style={styles.tabs} accessibilityRole="tablist">
