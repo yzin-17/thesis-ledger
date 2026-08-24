@@ -21,20 +21,32 @@ export const buildRiskContexts = (
   mode: PortfolioMode,
 ): RiskContext[] => {
   if (!portfolio) return [];
+  const accountValues = portfolio.positions.reduce((totals, position) => {
+    if (position.marketValue === null || position.quantity <= 0) return totals;
+    totals.set(position.accountId, (totals.get(position.accountId) ?? 0) + position.marketValue);
+    return totals;
+  }, new Map<string, number>());
   return portfolio.positions.map((position) => ({
     symbol: position.symbol,
     accountId: position.accountId,
+    positionId: position.id,
     mode,
     costPrice: position.costPrice,
+    quantity: position.quantity,
     ...(position.marketValue === null || position.quantity <= 0
       ? {}
       : { price: position.marketValue / position.quantity }),
+    ...(position.updatedAt === undefined ? {} : { positionUpdatedAt: position.updatedAt }),
     ...(portfolio.totalMarketValue > 0 && position.marketValue !== null
       ? { weight: position.marketValue / portfolio.totalMarketValue }
+      : {}),
+    ...(position.marketValue !== null && (accountValues.get(position.accountId) ?? 0) > 0
+      ? { accountWeight: position.marketValue / accountValues.get(position.accountId)! }
       : {}),
     marketTime: portfolio.valuedAt,
     dataQuality: {
       portfolio: portfolio.partial ? 'partial' : 'fresh',
+      ...(position.stale ? { marketData: 'stale' as const } : {}),
     },
   }));
 };
@@ -49,7 +61,7 @@ type Dependencies = {
   patchRuleMutation: AsyncMutation<{ ruleId: string; patch: UpdateRiskRuleInput }, RiskRuleRecord>;
   deleteRuleMutation: AsyncMutation<{ ruleId: string }, RiskRuleRecord>;
   testRuleMutation: AsyncMutation<{ ruleId: string; contexts: RiskContext[] }, RiskTestResult[]>;
-  scanRiskMutation: AsyncMutation<RiskContext[], unknown>;
+  scanRiskMutation: AsyncMutation<{ contexts: RiskContext[]; scanId: string }, unknown>;
   refetchRules: () => Promise<unknown>;
   refetchEvents: () => Promise<unknown>;
   refetchNotifications: () => Promise<unknown>;
@@ -130,6 +142,10 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
 
   const testRule = async (rule: RiskRuleRecord) => {
     if (busyAction) return null;
+    if (rule.needsRepair) {
+      errorToast(toastManager, '规则待修复', '请先补齐账户和标的后再进行测试。');
+      return null;
+    }
     setBusyAction(`test:${rule.id}`);
     try {
       const result = await testRuleMutation.mutateAsync({
@@ -154,7 +170,10 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     if (busyAction) return false;
     setBusyAction('scan-risk');
     try {
-      await scanRiskMutation.mutateAsync(buildRiskContexts(portfolio, mode));
+      await scanRiskMutation.mutateAsync({
+        contexts: buildRiskContexts(portfolio, mode),
+        scanId: crypto.randomUUID(),
+      });
       successToast(toastManager, '风险扫描已完成', '触发事件已写入历史。');
       return true;
     } catch {

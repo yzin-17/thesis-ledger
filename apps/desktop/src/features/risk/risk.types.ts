@@ -37,6 +37,8 @@ export interface RiskRuleRecord {
   severity: RiskRuleSeverity;
   threshold: number;
   enabled: boolean;
+  needsRepair: boolean;
+  repairReason: string | null;
   symbol: string | null;
   accountId: string | null;
   effectiveAt: string;
@@ -47,6 +49,7 @@ export interface RiskEventRecord {
   ruleId: string;
   ruleVersion: number;
   mode?: string | null;
+  scanId?: string | null;
   triggered?: boolean;
   severity: string;
   message: string;
@@ -96,12 +99,16 @@ export interface RiskAuditRecord {
 export interface RiskContext {
   symbol: string;
   accountId: string;
+  positionId: string;
   mode: 'actual' | 'shadow';
   costPrice: number;
+  quantity: number;
   price?: number;
   weight?: number;
+  accountWeight?: number;
+  positionUpdatedAt?: string;
   marketTime: string;
-  dataQuality: { portfolio: 'partial' | 'fresh' };
+  dataQuality: { portfolio: 'partial' | 'fresh'; marketData?: 'stale' };
 }
 
 export interface CreateRiskRuleInput {

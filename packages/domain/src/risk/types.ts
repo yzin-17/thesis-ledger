@@ -40,6 +40,9 @@ export interface RiskEvaluationContext {
   reference?: number;
   symbol?: string;
   accountId?: string;
+  positionId?: string;
+  quantity?: number;
+  positionUpdatedAt?: string;
   marketTime: string;
   inputs: Record<string, number>;
   metadata?: Record<string, string | number | boolean>;
@@ -57,9 +60,14 @@ export interface RiskEvent {
 
 export interface V01RiskContext {
   symbol: string;
+  accountId?: string;
+  positionId?: string;
+  quantity?: number;
+  positionUpdatedAt?: string;
   price?: number;
   costPrice?: number;
   weight?: number;
+  accountWeight?: number;
   marketTime: string;
 }
 
@@ -104,7 +112,7 @@ export const completeRiskEvent = (
   inputs: Record<string, number>,
   metadata?: Record<string, string | number | boolean>,
 ): RiskEvent => ({
-  id: `${rule.id}:${context.symbol}:${context.marketTime}`,
+  id: `${rule.id}:${context.accountId ?? 'all'}:${context.symbol}:${context.marketTime}`,
   ruleId: rule.id,
   triggered,
   severity: rule.severity,
@@ -113,6 +121,12 @@ export const completeRiskEvent = (
   context: {
     value,
     reference: rule.threshold,
+    ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+    ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
+    ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
+    ...(context.positionUpdatedAt === undefined
+      ? {}
+      : { positionUpdatedAt: context.positionUpdatedAt }),
     symbol: context.symbol,
     marketTime: context.marketTime,
     inputs,

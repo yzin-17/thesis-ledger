@@ -43,11 +43,39 @@ describe('V0.1 风险规则', () => {
         { symbol: 'x', price: 1, costPrice: 0, marketTime: 't' },
       ),
     ).toBeNull());
+  it('成本类事件保留持仓生命周期上下文', () => {
+    const event = evaluateV01Rule(
+      { ...rule, kind: 'take-profit', threshold: 0.1 },
+      {
+        symbol: 'x',
+        accountId: 'account-1',
+        positionId: 'position-1',
+        quantity: 10,
+        positionUpdatedAt: '2025-01-01T00:00:00Z',
+        price: 120,
+        costPrice: 100,
+        marketTime: '2025-01-01T01:00:00Z',
+      },
+    );
+    expect(event?.context).toMatchObject({
+      accountId: 'account-1',
+      positionId: 'position-1',
+      quantity: 10,
+      positionUpdatedAt: '2025-01-01T00:00:00Z',
+    });
+  });
   it('集中度使用同一快照权重', () =>
     expect(
       evaluateV01Rule(
         { ...rule, kind: 'position-concentration', threshold: 0.2 },
         { symbol: 'x', weight: 0.3, marketTime: 't' },
+      )?.triggered,
+    ).toBe(true));
+  it('账户绑定的集中度使用账户内权重', () =>
+    expect(
+      evaluateV01Rule(
+        { ...rule, kind: 'position-concentration', threshold: 0.2, accountId: 'account-1' },
+        { symbol: 'x', weight: 0.1, accountWeight: 0.3, accountId: 'account-1', marketTime: 't' },
       )?.triggered,
     ).toBe(true));
 });

@@ -1,5 +1,11 @@
 import { trailingStopTriggered } from './statistics.js';
-import { completeRiskEvent, type CompleteRiskContext, type RiskEvent, type RiskRule, type V01RiskContext } from './types.js';
+import {
+  completeRiskEvent,
+  type CompleteRiskContext,
+  type RiskEvent,
+  type RiskRule,
+  type V01RiskContext,
+} from './types.js';
 
 export const evaluateThresholdRule = (
   rule: RiskRule,
@@ -18,7 +24,7 @@ export const evaluateThresholdRule = (
   );
   const triggered = lowerIsRisk ? context.value <= rule.threshold : context.value >= rule.threshold;
   return {
-    id: `${rule.id}:${context.marketTime}`,
+    id: `${rule.id}:${context.accountId ?? 'all'}:${context.symbol ?? 'all'}:${context.marketTime}`,
     ruleId: rule.id,
     triggered,
     severity: rule.severity,
@@ -51,15 +57,17 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
       break;
     }
     case 'position-concentration':
-      if (context.weight === undefined) return null;
-      value = context.weight;
+      value = rule.accountId
+        ? (context.accountWeight ?? context.weight ?? NaN)
+        : (context.weight ?? NaN);
+      if (!Number.isFinite(value)) return null;
       triggered = value > rule.threshold;
       break;
     default:
       return null;
   }
   return {
-    id: `${rule.id}:${context.symbol}:${context.marketTime}`,
+    id: `${rule.id}:${context.accountId ?? 'all'}:${context.symbol}:${context.marketTime}`,
     ruleId: rule.id,
     triggered,
     severity: rule.severity,
@@ -68,12 +76,19 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
     context: {
       value,
       reference: rule.threshold,
+      ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+      ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
+      ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
+      ...(context.positionUpdatedAt === undefined
+        ? {}
+        : { positionUpdatedAt: context.positionUpdatedAt }),
       symbol: context.symbol,
       marketTime: context.marketTime,
       inputs: {
         ...(context.price === undefined ? {} : { price: context.price }),
         ...(context.costPrice === undefined ? {} : { costPrice: context.costPrice }),
         ...(context.weight === undefined ? {} : { weight: context.weight }),
+        ...(context.accountWeight === undefined ? {} : { accountWeight: context.accountWeight }),
       },
     },
   };
@@ -97,7 +112,11 @@ export const evaluatePriceRule = (
 
   if (rule.kind !== 'trailing-stop') return null;
   if (context.price === undefined || context.holdingPeak === undefined) return null;
-  const result = trailingStopTriggered(context.price, context.holdingPeak, Math.abs(rule.threshold));
+  const result = trailingStopTriggered(
+    context.price,
+    context.holdingPeak,
+    Math.abs(rule.threshold),
+  );
   return result
     ? completeRiskEvent(rule, context, result.drawdown, result.triggered, {
         price: context.price,

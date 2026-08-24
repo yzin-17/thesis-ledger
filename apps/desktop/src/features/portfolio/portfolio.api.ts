@@ -23,6 +23,7 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
   valuedAt: value.valuedAt,
   positions: value.positions.map((position) => {
     const assetType = heldAssetType(position.asset?.assetType);
+    const updatedAt = typeof position.updatedAt === 'string' ? position.updatedAt : undefined;
     return {
       id: position.id,
       accountId: position.accountId,
@@ -32,6 +33,7 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
       marketValue: position.marketValue,
       pnl: position.pnl,
       stale: position.stale,
+      ...(updatedAt === undefined ? {} : { updatedAt }),
       asset: {
         name: position.asset?.name ?? position.symbol,
         ...(assetType ? { assetType } : {}),

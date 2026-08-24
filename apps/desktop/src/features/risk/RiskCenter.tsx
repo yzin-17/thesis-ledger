@@ -162,6 +162,16 @@ export function RiskCenter({
     return updated;
   };
   const toggleRule = async (rule: RiskRuleRecord) => {
+    if (rule.needsRepair && !rule.enabled) {
+      toastManager.add({
+        title: '规则待修复',
+        description: '请先补齐账户和标的后再启用这条旧规则。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+      return false;
+    }
     const updated = await actions.patchRule(rule.id, { enabled: !rule.enabled });
     if (updated) invalidateTestRecord(rule.id);
     return updated;
@@ -188,11 +198,7 @@ export function RiskCenter({
           </p>
         </div>
         <div className="page-header-actions">
-          <PortfolioModeSwitch
-            mode={mode}
-            onModeChange={onModeChange}
-            ariaLabel="风险范围"
-          />
+          <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="风险范围" />
           <Button
             type="button"
             variant="outline"
@@ -241,6 +247,7 @@ export function RiskCenter({
           <RiskRuleWorkbench
             rules={rules}
             accounts={accounts}
+            positions={portfolio?.positions ?? []}
             loadState={loadState}
             busyAction={busyAction}
             testRecords={testRecords}

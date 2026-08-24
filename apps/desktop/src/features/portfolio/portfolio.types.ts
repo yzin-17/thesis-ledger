@@ -64,6 +64,7 @@ export interface Position {
   marketValue: number | null;
   pnl: number | null;
   stale: boolean;
+  updatedAt?: string;
   source?: string;
   asset: { name: string; assetType?: HeldAssetType };
 }

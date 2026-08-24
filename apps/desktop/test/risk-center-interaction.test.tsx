@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { RiskEventTable } from '../src/features/risk/RiskSections.js';
+import { RiskRuleWorkbench } from '../src/features/risk/RiskRuleWorkbench.js';
 import { toInput, validateDraft } from '../src/features/risk/RiskRuleEditorSheet.js';
 import { isPortfolioScanReady, portfolioDataStatus } from '../src/features/risk/RiskOverview.js';
 import {
@@ -11,6 +12,8 @@ import {
 import { buildRiskContexts } from '../src/features/risk/risk.actions.js';
 import {
   formatThreshold,
+  riskRuleNeedsAccount,
+  riskRuleScopeOptionsForKind,
   riskTestRecordForRule,
   riskStatusLabel,
   riskStatusTone,
@@ -36,6 +39,7 @@ const portfolio: Portfolio = {
       marketValue: 1000,
       pnl: 100,
       stale: false,
+      updatedAt: '2026-08-22T00:00:00.000Z',
       asset: { name: 'ETF' },
     },
   ],
@@ -49,23 +53,48 @@ describe('风险中心 AB 交互契约', () => {
     expect(contexts[0]).toMatchObject({
       mode: 'shadow',
       symbol: '159516.SZ',
+      positionId: 'position-1',
+      quantity: 10,
       price: 100,
       weight: 1,
       marketTime: portfolio.valuedAt,
       dataQuality: { portfolio: 'fresh' },
+      positionUpdatedAt: '2026-08-22T00:00:00.000Z',
     });
   });
 
   it('按规则类型转换百分比并生成中文预览', () => {
     expect(formatThreshold('cost-stop', 0.1)).toBe('10%');
+    expect(formatThreshold('trailing-stop', 0.1)).toBe('10%');
     expect(formatThreshold('price-below', 120)).toBe('120');
     expect(
       rulePreview({
         kind: 'position-concentration',
-        scope: 'portfolio',
+        scope: 'security',
         threshold: 0.6,
       }),
     ).toContain('持仓集中度 60%');
+  });
+
+  it('规则类型和范围保持联动', () => {
+    expect(riskRuleScopeOptionsForKind('price-below').map((option) => option.value)).toEqual([
+      'security',
+    ]);
+    expect(riskRuleScopeOptionsForKind('drawdown').map((option) => option.value)).toEqual([
+      'account',
+      'portfolio',
+    ]);
+
+    const invalidScope = validateDraft({
+      kind: 'price-below',
+      scope: 'account',
+      severity: 'warning',
+      threshold: '120',
+      symbol: '',
+      accountId: 'account-1',
+      enabled: true,
+    });
+    expect(invalidScope.scope).toBe('价格低于仅支持证券范围。');
   });
 
   it('编辑 Sheet 的规则校验和百分比转换保持 API 语义', () => {
@@ -75,15 +104,21 @@ describe('风险中心 AB 交互契约', () => {
       severity: 'warning' as const,
       threshold: '10',
       symbol: '159516.SZ',
-      accountId: '',
+      accountId: '00000000-0000-4000-8000-000000000001',
       enabled: true,
     };
 
+    expect(riskRuleNeedsAccount('cost-stop')).toBe(true);
+    expect(riskRuleNeedsAccount('price-below')).toBe(false);
     expect(validateDraft(draft)).toEqual({});
     expect(toInput(draft)).toMatchObject({
       threshold: 0.1,
       symbol: '159516.SZ',
+      accountId: '00000000-0000-4000-8000-000000000001',
       enabled: true,
+    });
+    expect(validateDraft({ ...draft, kind: 'trailing-stop', accountId: '' })).toMatchObject({
+      accountId: '该规则需要绑定账户。',
     });
     expect(validateDraft({ ...draft, scope: 'account', symbol: '', accountId: '' })).toMatchObject({
       accountId: '账户范围必须选择账户。',
@@ -107,18 +142,10 @@ describe('风险中心 AB 交互契约', () => {
 
   it('跨页面模式入口统一使用实际/模拟 Switch 文案和可访问标签', () => {
     const actualHtml = renderToStaticMarkup(
-      <PortfolioModeSwitch
-        mode="actual"
-        onModeChange={() => undefined}
-        ariaLabel="估值范围"
-      />,
+      <PortfolioModeSwitch mode="actual" onModeChange={() => undefined} ariaLabel="估值范围" />,
     );
     const shadowHtml = renderToStaticMarkup(
-      <PortfolioModeSwitch
-        mode="shadow"
-        onModeChange={() => undefined}
-        ariaLabel="风险范围"
-      />,
+      <PortfolioModeSwitch mode="shadow" onModeChange={() => undefined} ariaLabel="风险范围" />,
     );
 
     expect(actualHtml).toContain('估值范围');
@@ -208,5 +235,44 @@ describe('风险中心 AB 交互契约', () => {
     });
     expect(riskTestRecordForRule(records, { id: 'rule-1', version: 3 })).toBeNull();
     expect(riskTestRecordForRule(records, { id: 'rule-2', version: 1 })).toBeNull();
+  });
+
+  it('旧账户缺失规则显示待修复，和主动停用保持区分', () => {
+    const html = renderToStaticMarkup(
+      <RiskRuleWorkbench
+        rules={[
+          {
+            id: 'rule-repair',
+            version: 2,
+            kind: 'cost-stop',
+            scope: 'security',
+            severity: 'warning',
+            threshold: 0.1,
+            enabled: false,
+            needsRepair: true,
+            repairReason: 'account-binding-required',
+            symbol: '159516.SZ',
+            accountId: null,
+            effectiveAt: '2026-08-23T01:00:00.000Z',
+          },
+        ]}
+        accounts={[]}
+        positions={portfolio.positions}
+        loadState="ready"
+        busyAction={null}
+        onCreate={async () => true}
+        onUpdate={async () => true}
+        onToggle={async () => true}
+        onArchive={async () => true}
+        onTest={async () => []}
+        testRecords={{}}
+        onTestComplete={() => undefined}
+        onAudit={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('待修复');
+    expect(html).toContain('需补齐账户和标的');
+    expect(html).toContain('补齐目标后启用');
   });
 });

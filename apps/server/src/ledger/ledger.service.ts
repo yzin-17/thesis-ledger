@@ -160,9 +160,7 @@ export class LedgerService {
     const assetType = parsed.symbol
       ? inferAssetType(
           parsed.symbol,
-          typeof parsed.metadata?.assetType === 'string'
-            ? parsed.metadata.assetType
-            : undefined,
+          typeof parsed.metadata?.assetType === 'string' ? parsed.metadata.assetType : undefined,
         )
       : undefined;
     if (parsed.symbol && assetType) assertSymbolMatchesAssetType(parsed.symbol, assetType);
@@ -283,12 +281,10 @@ export class LedgerService {
     amount: number,
     source: 'manual' | 'screenshot' = 'manual',
   ) {
-    if (!Number.isFinite(amount) || amount < 0)
-      throw new BadRequestException('现金余额不能为负数');
+    if (!Number.isFinite(amount) || amount < 0) throw new BadRequestException('现金余额不能为负数');
     return this.prisma.$transaction(async (transaction) => {
       const account = await this.assertAccountWithClient(transaction, accountId);
-      if (account.currency !== 'CNY')
-        throw new BadRequestException('当前录入只支持人民币现金余额');
+      if (account.currency !== 'CNY') throw new BadRequestException('当前录入只支持人民币现金余额');
       const result = await appendLedgerEvent(transaction, {
         version: 1,
         id: crypto.randomUUID(),
@@ -385,9 +381,35 @@ export class LedgerService {
       if (event.type === 'ADJUSTMENT' && event.symbol && event.source)
         sourceBySymbol.set(event.symbol, event.source);
     }
-    await client.position.deleteMany({ where: { accountId } });
-    for (const position of projected) {
-      if (position.quantity <= 0) continue;
+    const existing = await client.position.findMany({
+      where: { accountId },
+      select: { id: true, symbol: true },
+    });
+    const existingBySymbol = new Map(existing.map((position) => [position.symbol, position]));
+    const nextBySymbol = new Map(
+      projected
+        .filter((position) => position.quantity > 0)
+        .map((position) => [position.symbol, position]),
+    );
+
+    for (const position of existing) {
+      const next = nextBySymbol.get(position.symbol);
+      if (!next) {
+        await client.position.delete({ where: { id: position.id } });
+        continue;
+      }
+      await client.position.update({
+        where: { id: position.id },
+        data: {
+          quantity: next.quantity,
+          costPrice: next.averageCost,
+          source: sourceBySymbol.get(next.symbol) ?? 'ledger',
+        },
+      });
+    }
+
+    for (const position of nextBySymbol.values()) {
+      if (existingBySymbol.has(position.symbol)) continue;
       await client.position.create({
         data: {
           accountId,

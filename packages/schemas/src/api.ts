@@ -4,9 +4,7 @@ export const apiErrorResponseSchema = z
   .object({
     error: z.string(),
     message: z.string().optional(),
-    fields: z
-      .array(z.object({ path: z.string(), message: z.string() }))
-      .optional(),
+    fields: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
   })
   .passthrough();
 
@@ -25,6 +23,7 @@ export const portfolioPositionResponseSchema = z
     pnl: z.number().finite().nullable(),
     pnlRatio: z.number().finite().nullable(),
     stale: z.boolean(),
+    updatedAt: z.iso.datetime({ offset: true }).optional(),
     freshness: z.string().optional(),
     error: z.string().optional(),
     asset: z
@@ -64,6 +63,7 @@ export const riskEventResponseSchema = z
     triggerValue: z.union([z.number(), z.string()]).nullable().optional(),
     threshold: z.union([z.number(), z.string()]).nullable().optional(),
     marketTime: z.iso.datetime({ offset: true }).nullable(),
+    scanId: z.uuid().nullable().optional(),
     context: z.record(z.string(), z.unknown()),
     evaluatedAt: z.iso.datetime({ offset: true }),
   })
@@ -159,20 +159,24 @@ export const automationDailyReportInputSchema = z.object({
   benchmark: z.object({ return: z.number().finite() }).optional(),
   risk: automationDigestInputSchema.shape.risk,
   events: z.array(automationEventSchema),
-  aiSummary: z
-    .object({ conclusion: z.string(), citations: z.array(z.unknown()) })
-    .optional(),
+  aiSummary: z.object({ conclusion: z.string(), citations: z.array(z.unknown()) }).optional(),
 });
 export const automationOpeningScanInputSchema = z.object({
   asOf: z.iso.datetime({ offset: true }),
   quotes: z.array(
-    z.object({ symbol: z.string().min(1), price: z.number().finite(), previousClose: z.number().finite() }),
+    z.object({
+      symbol: z.string().min(1),
+      price: z.number().finite(),
+      previousClose: z.number().finite(),
+    }),
   ),
 });
 export const automationWeeklyPerformanceInputSchema = z.object({
   start: z.string().min(1),
   end: z.string().min(1),
-  snapshots: z.array(z.object({ value: z.number().finite(), drawdown: z.number().finite().optional() })),
+  snapshots: z.array(
+    z.object({ value: z.number().finite(), drawdown: z.number().finite().optional() }),
+  ),
   trades: z.array(z.unknown()),
 });
 export const automationWeeklyStrategyInputSchema = z.object({

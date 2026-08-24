@@ -42,7 +42,7 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
-button:not([data-slot='button']) {
+button:not([data-slot='button']):not([data-slot='toggle-group-item']) {
   color: inherit;
 }
 

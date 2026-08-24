@@ -11,6 +11,8 @@ import {
   strategySchemaV1,
   ledgerEventSchemaV1,
   riskRuleInputSchema,
+  riskRuleUpdateSchema,
+  riskScanEnvelopeSchema,
   aiAnalysisSchema,
 } from '../src/index.js';
 
@@ -64,10 +66,55 @@ describe('风险规则契约', () => {
     expect(() => riskRuleInputSchema.parse({ ...base, scope: 'security' })).toThrow('symbol');
     expect(() => riskRuleInputSchema.parse({ ...base, scope: 'account' })).toThrow('accountId');
   });
+  it('成本、止盈和移动止损必须绑定账户与标的', () => {
+    for (const kind of ['cost-stop', 'take-profit', 'trailing-stop'] as const) {
+      expect(() =>
+        riskRuleInputSchema.parse({
+          ...base,
+          kind,
+          scope: 'security',
+          symbol: '600519.SH',
+        }),
+      ).toThrow('accountId');
+      expect(
+        riskRuleInputSchema.parse({
+          ...base,
+          kind,
+          scope: 'security',
+          symbol: '600519.SH',
+          accountId: '00000000-0000-4000-8000-000000000001',
+        }),
+      ).toMatchObject({ kind, symbol: '600519.SH' });
+    }
+  });
   it('拒绝 portfolio scope 携带局部 target', () =>
     expect(() =>
       riskRuleInputSchema.parse({ ...base, scope: 'portfolio', symbol: '600519.SH' }),
     ).toThrow('portfolio'));
+  it('规则部分更新不隐式改变启用状态', () => {
+    expect(riskRuleUpdateSchema.parse({ threshold: 0.2 })).toEqual({ threshold: 0.2 });
+  });
+  it('风险扫描保留客户端批次 ID 与持仓生命周期字段', () => {
+    const result = riskScanEnvelopeSchema.parse({
+      scanId: '00000000-0000-4000-8000-000000000001',
+      security: [
+        {
+          symbol: '600519.SH',
+          accountId: '00000000-0000-4000-8000-000000000002',
+          positionId: '00000000-0000-4000-8000-000000000003',
+          quantity: 10,
+          positionUpdatedAt: time,
+          marketTime: time,
+          dataQuality: {},
+        },
+      ],
+    });
+    expect(result.scanId).toBe('00000000-0000-4000-8000-000000000001');
+    expect(result.security[0]).toMatchObject({
+      positionId: '00000000-0000-4000-8000-000000000003',
+      quantity: 10,
+    });
+  });
 });
 
 describe('行情契约', () => {

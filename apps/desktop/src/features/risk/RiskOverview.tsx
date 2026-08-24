@@ -80,7 +80,7 @@ export function RiskOverview({
             {scanning && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
             )}
-            {scanning ? '扫描中…' : '扫描当前组合'}
+            {scanning ? '执行中…' : '立即执行风险规则'}
           </Button>
           <Button
             type="button"
@@ -90,7 +90,7 @@ export function RiskOverview({
             onClick={onRefresh}
           >
             <RefreshCw data-icon="inline-start" aria-hidden="true" />
-            刷新风险数据
+            获取最新风险结果
           </Button>
           {portfolioState === 'loading' && (
             <span className="text-xs text-muted-foreground">组合数据准备好后才能扫描。</span>

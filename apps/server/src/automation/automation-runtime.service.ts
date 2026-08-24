@@ -60,14 +60,28 @@ export class AutomationRuntimeHandlers {
         );
         const available = valued.filter((item) => item !== null);
         const totalValue = available.reduce((sum, item) => sum + item.marketValue, 0);
+        const accountValues = available.reduce((totals, item) => {
+          totals.set(
+            item.position.accountId,
+            (totals.get(item.position.accountId) ?? 0) + item.marketValue,
+          );
+          return totals;
+        }, new Map<string, number>());
         const marketTime = scheduledAt.toISOString();
         const contexts = available.map(({ position, price, marketValue }) => ({
           symbol: position.symbol,
           accountId: position.accountId,
+          positionId: position.id,
+          quantity: Number(position.quantity),
           mode: 'actual' as const,
           price,
           costPrice: Number(position.costPrice),
+          positionUpdatedAt: position.updatedAt.toISOString(),
           weight: totalValue === 0 ? 0 : marketValue / totalValue,
+          accountWeight:
+            (accountValues.get(position.accountId) ?? 0) === 0
+              ? 0
+              : marketValue / accountValues.get(position.accountId)!,
           dataQuality: { marketData: 'fresh' },
           marketTime,
         }));
@@ -126,10 +140,7 @@ export class AutomationRuntimeHandlers {
     return handlers;
   }
 
-  private handler(
-    type: AutomationJobType,
-    run: AutomationHandler['run'],
-  ): AutomationHandler {
+  private handler(type: AutomationJobType, run: AutomationHandler['run']): AutomationHandler {
     return { type, run };
   }
 }

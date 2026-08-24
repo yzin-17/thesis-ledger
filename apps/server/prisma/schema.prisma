@@ -22,6 +22,7 @@ model Account {
   snapshots    PortfolioSnapshot[]
   importDrafts ImportDraft[]
   riskRules    RiskRule[]
+  riskPositionStates RiskPositionState[]
   tradePlans   TradePlan[]
 
   @@index([active])
@@ -116,6 +117,8 @@ model Position {
   updatedAt DateTime @updatedAt
   account   Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
   asset     Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  riskPositionStates RiskPositionState[]
+  riskRuleTriggerStates RiskRuleTriggerState[]
 
   @@unique([accountId, symbol])
   @@index([symbol])
@@ -329,6 +332,8 @@ model RiskRule {
   severity     String
   threshold    Decimal     @db.Decimal(24, 8)
   enabled      Boolean     @default(true)
+  needsRepair  Boolean     @default(false)
+  repairReason String?
   symbol       String?
   accountId    String?     @db.Uuid
   sourcePlanId String?     @db.Uuid
@@ -339,9 +344,54 @@ model RiskRule {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   events       RiskEvent[]
+  triggerStates RiskRuleTriggerState[]
   account      Account?    @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([accountId])
+}
+
+model RiskPositionState {
+  id                String   @id @default(uuid()) @db.Uuid
+  accountId         String   @db.Uuid
+  symbol            String
+  mode              String   @default("actual")
+  holdingPeak      Decimal  @db.Decimal(24, 8)
+  peakAt            DateTime
+  positionUpdatedAt DateTime?
+  lastPrice         Decimal  @db.Decimal(24, 8)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  account           Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  positionId        String?  @db.Uuid
+  position          Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  lastQuantity      Decimal  @default(0) @db.Decimal(24, 8)
+
+  @@unique([accountId, symbol, mode])
+  @@index([symbol, mode])
+  @@index([positionId])
+}
+
+model RiskRuleTriggerState {
+  id            String   @id @default(uuid()) @db.Uuid
+  ruleId        String   @db.Uuid
+  targetKey     String
+  symbol        String
+  mode          String   @default("actual")
+  positionId    String?  @db.Uuid
+  ruleVersion   Int
+  breachActive  Boolean  @default(false)
+  activeEventId String?  @db.Uuid
+  lastScanId    String?  @db.Uuid
+  triggeredAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  rule          RiskRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  position      Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  activeEvent   RiskEvent? @relation(fields: [activeEventId], references: [id], onDelete: SetNull)
+
+  @@unique([ruleId, targetKey, symbol, mode])
+  @@index([positionId])
+  @@index([activeEventId])
 }
 
 model RiskEvent {
@@ -357,11 +407,14 @@ model RiskEvent {
   triggerValue   Decimal?               @db.Decimal(24, 8)
   threshold      Decimal?               @db.Decimal(24, 8)
   marketTime     DateTime?
+  scanId         String?                @db.Uuid
+  dedupeKey      String                 @unique
   context        Json
   evaluatedAt    DateTime               @default(now())
   rule           RiskRule               @relation(fields: [ruleId], references: [id], onDelete: Restrict)
   deliveries     NotificationDelivery[]
   journalEntries JournalEntry[]
+  triggerStates  RiskRuleTriggerState[]
 
   @@index([ruleId, evaluatedAt])
   @@index([triggered, severity])

@@ -27,8 +27,10 @@ describe('Ledger Service', () => {
       }),
     );
   });
-  it('rebuild 先清空旧投影再写入 Ledger 投影', async () => {
+  it('rebuild 更新现有投影时保留 Position ID', async () => {
     const create = vi.fn(async ({ data }: { data: object }) => data);
+    const update = vi.fn(async ({ data }: { data: object }) => data);
+    const remove = vi.fn(async () => undefined);
     const ledgerEvent = {
       findMany: vi.fn(async () => [
         {
@@ -45,7 +47,15 @@ describe('Ledger Service', () => {
         },
       ]),
     };
-    const transaction = { ledgerEvent, position: { deleteMany: vi.fn(), create } };
+    const transaction = {
+      ledgerEvent,
+      position: {
+        findMany: vi.fn(async () => [{ id: 'position-1', symbol: '600519.SH' }]),
+        update,
+        delete: remove,
+        create,
+      },
+    };
     const prisma = {
       ledgerEvent,
       $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
@@ -54,11 +64,77 @@ describe('Ledger Service', () => {
       '11111111-1111-4111-8111-111111111111',
     );
     expect(result[0]).toMatchObject({ quantity: 100, averageCost: 10 });
-    expect(transaction.position.deleteMany).toHaveBeenCalledWith({
-      where: { accountId: '11111111-1111-4111-8111-111111111111' },
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'position-1' },
+      data: expect.objectContaining({ source: 'ledger' }),
     });
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ source: 'ledger' }) }),
-    );
+    expect(remove).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('清仓后重建同一标的会删除旧 Position 并创建新生命周期', async () => {
+    const create = vi.fn(async ({ data }: { data: object }) => data);
+    const update = vi.fn(async ({ data }: { data: object }) => data);
+    const remove = vi.fn(async () => undefined);
+    const ledgerEvent = {
+      findMany: vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: 'buy-1',
+            accountId: '11111111-1111-4111-8111-111111111111',
+            type: 'BUY',
+            occurredAt: new Date('2025-01-01'),
+            symbol: '600519.SH',
+            quantity: 100,
+            price: 10,
+            amount: null,
+            fee: 0,
+            tax: 0,
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'buy-2',
+            accountId: '11111111-1111-4111-8111-111111111111',
+            type: 'BUY',
+            occurredAt: new Date('2025-01-02'),
+            symbol: '600519.SH',
+            quantity: 80,
+            price: 12,
+            amount: null,
+            fee: 0,
+            tax: 0,
+          },
+        ]),
+    };
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: 'position-old', symbol: '600519.SH' }])
+      .mockResolvedValueOnce([{ id: 'position-old', symbol: '600519.SH' }])
+      .mockResolvedValueOnce([]);
+    const transaction = {
+      ledgerEvent,
+      position: { findMany, update, delete: remove, create },
+    };
+    const prisma = {
+      ledgerEvent,
+      $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
+    };
+    const service = new LedgerService(prisma as never);
+
+    await service.rebuild('11111111-1111-4111-8111-111111111111');
+    await service.rebuild('11111111-1111-4111-8111-111111111111');
+    await service.rebuild('11111111-1111-4111-8111-111111111111');
+
+    expect(remove).toHaveBeenCalledWith({ where: { id: 'position-old' } });
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        accountId: '11111111-1111-4111-8111-111111111111',
+        symbol: '600519.SH',
+        source: 'ledger',
+      }),
+    });
   });
 });

@@ -14,7 +14,7 @@ import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
 import { LoaderCircle, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-import type { Account } from '../portfolio/portfolio.types.js';
+import type { Account, Position } from '../portfolio/portfolio.types.js';
 import { isDataLoaded } from '../shared/display.js';
 import type { LoadState } from '../shared/types.js';
 import type {
@@ -35,9 +35,21 @@ import {
 } from './risk.format.js';
 import { RiskRuleEditorSheet } from './RiskRuleEditorSheet.js';
 
-const toggleRuleLabel = (toggling: boolean, enabled: boolean) => {
+const toggleRuleLabel = (toggling: boolean, enabled: boolean, needsRepair: boolean) => {
   if (toggling) return '更新中…';
+  if (needsRepair) return '补齐目标后启用';
   return enabled ? '停用规则' : '启用规则';
+};
+
+const ruleStatusLabel = (rule: RiskRuleRecord) => {
+  if (rule.needsRepair) return '待修复';
+  return rule.enabled ? '启用' : '已停用';
+};
+
+const ruleStatusTone = (rule: RiskRuleRecord) => {
+  if (rule.needsRepair) return 'destructive' as const;
+  if (rule.enabled) return 'secondary' as const;
+  return 'outline' as const;
 };
 
 const testResultMessage = (result: RiskTestResult) => {
@@ -48,6 +60,7 @@ const testResultMessage = (result: RiskTestResult) => {
 export function RiskRuleWorkbench({
   rules,
   accounts,
+  positions,
   loadState,
   busyAction,
   onCreate,
@@ -61,6 +74,7 @@ export function RiskRuleWorkbench({
 }: {
   rules: RiskRuleRecord[];
   accounts: Account[];
+  positions: Position[];
   loadState: LoadState;
   busyAction: string | null;
   onCreate: (input: CreateRiskRuleInput) => Promise<boolean>;
@@ -86,6 +100,9 @@ export function RiskRuleWorkbench({
   const selectedTestRecord = selectedRule ? riskTestRecordForRule(testRecords, selectedRule) : null;
   const canCreate = busyAction === null;
   const empty = isDataLoaded(loadState) && rules.length === 0;
+  const accountNameForRule = (rule: RiskRuleRecord) =>
+    rule.accountId ? accounts.find((account) => account.id === rule.accountId)?.name : undefined;
+  const selectedAccountName = selectedRule ? accountNameForRule(selectedRule) : undefined;
 
   const openCreate = () => {
     setEditingRule(null);
@@ -165,12 +182,10 @@ export function RiskRuleWorkbench({
                     <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                       <span className="flex w-full items-center justify-between gap-2">
                         <span className="truncate font-medium">{riskRuleKindLabel(rule.kind)}</span>
-                        <Badge variant={rule.enabled ? 'secondary' : 'outline'}>
-                          {rule.enabled ? '启用' : '已停用'}
-                        </Badge>
+                        <Badge variant={ruleStatusTone(rule)}>{ruleStatusLabel(rule)}</Badge>
                       </span>
                       <span className="w-full truncate text-xs text-muted-foreground">
-                        {ruleTargetLabel(rule)} · v{rule.version}
+                        {ruleTargetLabel(rule, accountNameForRule(rule))} · v{rule.version}
                       </span>
                     </span>
                   </Button>
@@ -182,6 +197,7 @@ export function RiskRuleWorkbench({
               {selectedRule ? (
                 <RuleDetail
                   rule={selectedRule}
+                  {...(selectedAccountName ? { accountName: selectedAccountName } : {})}
                   testResults={selectedTestRecord?.results ?? []}
                   testTime={selectedTestRecord?.testedAt ?? null}
                   busyAction={busyAction}
@@ -205,6 +221,7 @@ export function RiskRuleWorkbench({
         open={editorOpen}
         rule={editingRule}
         accounts={accounts}
+        positions={positions}
         pending={busyAction === 'create-rule' || busyAction === `patch:${editingRule?.id ?? ''}`}
         onOpenChange={setEditorOpen}
         onSubmit={submitEditor}
@@ -253,6 +270,7 @@ export function RiskRuleWorkbench({
 
 function RuleDetail({
   rule,
+  accountName,
   testResults,
   testTime,
   busyAction,
@@ -263,6 +281,7 @@ function RuleDetail({
   onAudit,
 }: {
   rule: RiskRuleRecord;
+  accountName?: string;
   testResults: RiskTestResult[];
   testTime: string | null;
   busyAction: string | null;
@@ -276,6 +295,7 @@ function RuleDetail({
   const toggling = busyAction === `patch:${rule.id}`;
   const archiving = busyAction === `archive:${rule.id}`;
   const triggered = testResults.filter((result) => result.triggered).length;
+  const targetLabel = ruleTargetLabel(rule, accountName);
 
   return (
     <div className="flex flex-col gap-5">
@@ -283,16 +303,20 @@ function RuleDetail({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="m-0 text-xl font-semibold">{riskRuleKindLabel(rule.kind)}</h3>
-            <Badge variant={rule.enabled ? 'secondary' : 'outline'}>
-              {rule.enabled ? '已启用' : '已停用'}
-            </Badge>
+            <Badge variant={ruleStatusTone(rule)}>{ruleStatusLabel(rule)}</Badge>
+            {rule.needsRepair && <Badge variant="destructive">需补齐账户和标的</Badge>}
             <Badge variant={riskSeverityTone(rule.severity)}>
               {riskSeverityLabel(rule.severity)}
             </Badge>
           </div>
           <p className="mt-2 mb-0 text-sm text-muted-foreground">
-            {riskScopeLabel(rule.scope)} · {ruleTargetLabel(rule)}
+            {riskScopeLabel(rule.scope)} · {targetLabel}
           </p>
+          {rule.needsRepair && (
+            <p className="mt-2 mb-0 text-sm text-destructive">
+              这条旧规则缺少账户绑定，编辑并补齐账户和标的后才能恢复。
+            </p>
+          )}
         </div>
         <span className="text-sm font-medium text-muted-foreground">v{rule.version}</span>
       </div>
@@ -308,8 +332,8 @@ function RuleDetail({
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">目标</dt>
-          <dd className="mt-1 truncate font-medium" title={ruleTargetLabel(rule)}>
-            {ruleTargetLabel(rule)}
+          <dd className="mt-1 truncate font-medium" title={targetLabel}>
+            {targetLabel}
           </dd>
         </div>
         <div>
@@ -323,7 +347,7 @@ function RuleDetail({
           type="button"
           variant="outline"
           className="secondary"
-          disabled={busyAction !== null}
+          disabled={busyAction !== null || rule.needsRepair}
           onClick={onTest}
           aria-busy={testing}
         >
@@ -345,14 +369,14 @@ function RuleDetail({
           type="button"
           variant="outline"
           className="secondary"
-          disabled={busyAction !== null}
+          disabled={busyAction !== null || rule.needsRepair}
           onClick={onToggle}
           aria-busy={toggling}
         >
           {toggling && (
             <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
           )}
-          {toggleRuleLabel(toggling, rule.enabled)}
+          {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
         </Button>
         <Button
           type="button"

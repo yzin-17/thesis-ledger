@@ -218,7 +218,8 @@ describe('Ledger transactional migration', () => {
             costPrice: 100,
           },
         ]),
-        deleteMany: vi.fn(async () => ({ count: 1 })),
+        update: vi.fn(async ({ data }: { data: object }) => data),
+        delete: vi.fn(async () => undefined),
         create: vi.fn(async ({ data }: { data: object }) => data),
       },
       asset: {
@@ -254,10 +255,13 @@ describe('Ledger transactional migration', () => {
       migrated: [{ symbol: '600519.SH', quantity: 10, costPrice: 100 }],
     });
     expect(transaction).toHaveBeenCalledOnce();
-    expect(tx.position.findMany).toHaveBeenCalledOnce();
+    expect(tx.position.findMany).toHaveBeenCalledTimes(2);
     expect(tx.ledgerEvent.upsert).toHaveBeenCalledOnce();
-    expect(tx.position.deleteMany).toHaveBeenCalledOnce();
-    expect(tx.position.create).toHaveBeenCalledOnce();
+    expect(tx.position.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: '11111111-1111-4111-8111-111111111115' } }),
+    );
+    expect(tx.position.delete).not.toHaveBeenCalled();
+    expect(tx.position.create).not.toHaveBeenCalled();
   });
 });
 

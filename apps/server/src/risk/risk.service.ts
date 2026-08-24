@@ -8,9 +8,11 @@ import {
   riskAccountContextSchema,
   riskPortfolioContextSchema,
   riskRuleInputSchema,
+  riskRuleStoredSchema,
   riskRuleUpdateSchema,
   riskScanContextSchema,
   riskScanEnvelopeSchema,
+  requiresRiskRuleAccount,
 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -28,12 +30,15 @@ type StoredRule = {
   severity: string;
   threshold: unknown;
   enabled: boolean;
+  needsRepair: boolean;
+  repairReason: string | null;
   symbol: string | null;
   accountId: string | null;
   sourcePlanId?: string | null;
   parameters?: unknown;
 };
 type ParsedScan = {
+  scanId?: string;
   security: SecurityContext[];
   accounts: AccountContext[];
   portfolio?: PortfolioContext;
@@ -46,9 +51,178 @@ type EvaluationCandidate = {
   dataQuality: Record<string, string>;
   symbol?: string;
   accountId?: string;
+  affectedAccountIds?: string[];
   domain: CompleteRiskContext;
 };
 type PositionContext = NonNullable<SecurityContext['positions']>[number];
+type RiskPositionStateRecord = {
+  accountId: string;
+  symbol: string;
+  mode: string;
+  positionId: string | null;
+  holdingPeak: unknown;
+  peakAt: Date;
+  positionUpdatedAt: Date | null;
+  lastQuantity: unknown;
+  lastPrice: unknown;
+};
+type RiskPositionStateDelegate = {
+  findMany: (args: {
+    where: { accountId: { in: string[] }; symbol: { in: string[] }; mode: string };
+  }) => Promise<RiskPositionStateRecord[]>;
+  upsert: (args: {
+    where: { accountId_symbol_mode: { accountId: string; symbol: string; mode: string } };
+    create: {
+      id: string;
+      accountId: string;
+      symbol: string;
+      mode: string;
+      positionId?: string;
+      holdingPeak: number;
+      peakAt: Date;
+      positionUpdatedAt?: Date;
+      lastQuantity: number;
+      lastPrice: number;
+    };
+    update: {
+      holdingPeak: number;
+      peakAt: Date;
+      positionUpdatedAt?: Date;
+      positionId?: string;
+      lastQuantity: number;
+      lastPrice: number;
+    };
+  }) => Promise<unknown>;
+};
+
+type RiskRuleTriggerStateRecord = {
+  id: string;
+  ruleId: string;
+  targetKey: string;
+  symbol: string;
+  mode: string;
+  positionId: string | null;
+  ruleVersion: number;
+  breachActive: boolean;
+  activeEventId: string | null;
+  lastScanId: string | null;
+  triggeredAt: Date | null;
+};
+
+type RiskRuleTriggerStateDelegate = {
+  upsert: (args: {
+    where: {
+      ruleId_targetKey_symbol_mode: {
+        ruleId: string;
+        targetKey: string;
+        symbol: string;
+        mode: string;
+      };
+    };
+    create: {
+      id: string;
+      ruleId: string;
+      targetKey: string;
+      symbol: string;
+      mode: string;
+      positionId?: string;
+      ruleVersion: number;
+      breachActive: boolean;
+      lastScanId?: string;
+    };
+    update: {
+      positionId?: string | null;
+      ruleVersion?: number;
+      breachActive?: boolean;
+      activeEventId?: string | null;
+      lastScanId?: string | null;
+      triggeredAt?: Date | null;
+    };
+  }) => Promise<RiskRuleTriggerStateRecord>;
+  updateMany: (args: {
+    where: {
+      ruleId: string;
+      targetKey: string;
+      symbol: string;
+      mode: string;
+      ruleVersion: number;
+      breachActive: boolean;
+    };
+    data: {
+      breachActive: boolean;
+      lastScanId?: string | null;
+      triggeredAt?: Date | null;
+      activeEventId?: string | null;
+    };
+  }) => Promise<{ count: number }>;
+  findUnique: (args: {
+    where: {
+      ruleId_targetKey_symbol_mode: {
+        ruleId: string;
+        targetKey: string;
+        symbol: string;
+        mode: string;
+      };
+    };
+  }) => Promise<RiskRuleTriggerStateRecord | null>;
+  update: (args: {
+    where: { id: string };
+    data: {
+      positionId?: string | null;
+      ruleVersion?: number;
+      activeEventId?: string | null;
+      lastScanId?: string | null;
+      breachActive: boolean;
+      triggeredAt?: Date | null;
+    };
+  }) => Promise<RiskRuleTriggerStateRecord>;
+};
+
+type RiskEventRecord = {
+  id: string;
+  [key: string]: unknown;
+};
+
+type RiskEventDelegate = {
+  create: (args: { data: Record<string, unknown> }) => Promise<RiskEventRecord>;
+  findUnique?: (args: { where: { dedupeKey: string } }) => Promise<RiskEventRecord | null>;
+};
+
+type NotificationDeliveryRecord = { status: string };
+
+type NotificationDeliveryDelegate = {
+  findMany: (args: { where: { eventId: string } }) => Promise<NotificationDeliveryRecord[]>;
+};
+
+const marketDataRuleKinds: ReadonlySet<string> = new Set([
+  'fixed-stop',
+  'cost-stop',
+  'take-profit',
+  'price-above',
+  'price-below',
+  'trailing-stop',
+  'drawdown',
+  'ma',
+  'rsi',
+  'macd',
+  'atr',
+  'volume',
+  'chip-peak',
+  'chip-ratio',
+  'chip-migration',
+]);
+
+const notificationPolicy = {
+  channels: {
+    info: ['feishu'],
+    warning: ['feishu'],
+    error: ['feishu'],
+    critical: ['feishu'],
+  },
+  cooldownMinutes: 30,
+  maxAttempts: 3,
+  criticalBypassCooldown: true,
+};
 
 const latestByMarketTime = <T extends { marketTime: string }>(values: readonly T[]) =>
   [...values].sort((left, right) => right.marketTime.localeCompare(left.marketTime))[0];
@@ -60,7 +234,9 @@ const aggregateDataQuality = (contexts: readonly SecurityContext[]): Record<stri
   );
 
 const aggregatePositions = (contexts: readonly SecurityContext[]) => {
-  const explicit = latestByMarketTime(contexts.filter((context) => context.positions !== undefined));
+  const explicit = latestByMarketTime(
+    contexts.filter((context) => context.positions !== undefined),
+  );
   if (explicit?.positions) return explicit.positions;
   const bySymbol = new Map<string, PositionContext>();
   for (const context of contexts) {
@@ -117,7 +293,9 @@ const deriveAccountContexts = (security: readonly SecurityContext[]): AccountCon
   });
 };
 
-const derivePortfolioContext = (security: readonly SecurityContext[]): PortfolioContext | undefined => {
+const derivePortfolioContext = (
+  security: readonly SecurityContext[],
+): PortfolioContext | undefined => {
   if (security.length === 0) return undefined;
   const latest = latestByMarketTime(security)!;
   const aggregateSource = latestByMarketTime(
@@ -154,6 +332,7 @@ export class RiskService {
   async createRule(input: unknown) {
     const rule = riskRuleInputSchema.parse(input);
     return this.prisma.$transaction(async (transaction) => {
+      await this.assertRuleTarget(transaction, rule, true);
       const created = await transaction.riskRule.create({ data: this.ruleData(rule) });
       await transaction.riskRuleAudit.create({
         data: {
@@ -174,9 +353,13 @@ export class RiskService {
 
   async updateRule(id: string, input: unknown) {
     const patch = riskRuleUpdateSchema.parse(input);
+    const enableRequested =
+      input !== null &&
+      typeof input === 'object' &&
+      (input as Record<string, unknown>).enabled === true;
     return this.prisma.$transaction(async (transaction) => {
       const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
-      const merged = riskRuleInputSchema.parse({
+      const mergedInput = {
         kind: stored.kind,
         scope: stored.scope,
         severity: stored.severity,
@@ -190,10 +373,32 @@ export class RiskService {
         ...(stored.config === null ? {} : { config: stored.config }),
         effectiveAt: stored.effectiveAt.toISOString(),
         ...patch,
-      });
+      };
+      const needsRepair =
+        requiresRiskRuleAccount(String(mergedInput.kind), String(mergedInput.scope)) &&
+        !mergedInput.accountId;
+      if (needsRepair && enableRequested)
+        throw new BadRequestException('该规则需要先补齐账户和标的后才能启用');
+      const merged = needsRepair
+        ? riskRuleStoredSchema.parse({ ...mergedInput, enabled: false })
+        : riskRuleInputSchema.parse(mergedInput);
+      const targetChanged =
+        (patch.kind !== undefined && patch.kind !== stored.kind) ||
+        (patch.scope !== undefined && patch.scope !== stored.scope) ||
+        (patch.symbol !== undefined && patch.symbol !== stored.symbol) ||
+        (patch.accountId !== undefined && patch.accountId !== stored.accountId);
+      if (targetChanged && needsRepair)
+        throw new BadRequestException('该规则需要同时补齐账户和标的后才能保存');
+      if (!needsRepair && (targetChanged || enableRequested))
+        await this.assertRuleTarget(transaction, merged, true);
       const updated = await transaction.riskRule.update({
         where: { id },
-        data: { ...this.ruleData(merged), version: { increment: 1 } },
+        data: {
+          ...this.ruleData(merged),
+          needsRepair,
+          repairReason: needsRepair ? 'account-binding-required' : null,
+          version: { increment: 1 },
+        },
       });
       const action = patch.enabled === undefined ? 'update' : patch.enabled ? 'enable' : 'disable';
       await transaction.riskRuleAudit.create({
@@ -208,6 +413,34 @@ export class RiskService {
       });
       return updated;
     });
+  }
+
+  private async assertRuleTarget(
+    transaction: Prisma.TransactionClient,
+    rule: {
+      kind: string;
+      scope: string;
+      accountId?: string | undefined;
+      symbol?: string | undefined;
+    },
+    requirePosition: boolean,
+  ) {
+    const accountBound = rule.scope === 'account' || requiresRiskRuleAccount(rule.kind, rule.scope);
+    if (!accountBound || !rule.accountId) return;
+    const account = await transaction.account.findUnique({
+      where: { id: rule.accountId },
+      select: { id: true, active: true },
+    });
+    if (!account) throw new BadRequestException('绑定账户不存在');
+    if (!account.active) throw new BadRequestException('绑定账户已停用');
+    if (!requiresRiskRuleAccount(rule.kind, rule.scope) || !requirePosition) return;
+    if (!rule.symbol) throw new BadRequestException('价格类持仓规则必须绑定证券标的');
+    const position = await transaction.position.findUnique({
+      where: { accountId_symbol: { accountId: rule.accountId, symbol: rule.symbol } },
+      select: { id: true, quantity: true },
+    });
+    if (!position || Number(position.quantity) <= 0)
+      throw new BadRequestException('绑定标的不在该账户当前持仓中');
   }
 
   archiveRule(id: string) {
@@ -232,8 +465,9 @@ export class RiskService {
   }
 
   async testRule(id: string, input: unknown) {
-    const parsed = this.parseScanInput(input);
+    let parsed = this.parseScanInput(input);
     this.rejectStaleContexts(parsed);
+    parsed = await this.enrichHoldingPeaks(parsed, false);
     const stored = await this.prisma.riskRule.findUniqueOrThrow({ where: { id } });
     const events = this.evaluateStoredRule(stored, parsed).map(({ event }) => event);
     await this.prisma.riskRuleAudit.create({
@@ -256,62 +490,58 @@ export class RiskService {
   }
 
   async scan(input: unknown) {
-    const parsed = this.parseScanInput(input);
+    let parsed = this.parseScanInput(input);
     this.rejectStaleContexts(parsed);
+    parsed = await this.enrichHoldingPeaks(parsed, true);
+    const scanId = parsed.scanId ?? crypto.randomUUID();
     const rules = await this.prisma.riskRule.findMany({
-      where: { enabled: true, effectiveAt: { lte: new Date() } },
+      where: { enabled: true, needsRepair: false, effectiveAt: { lte: new Date() } },
     });
     const traceId = crypto.randomUUID();
     const results: Array<{ ruleId: string; eventId?: string; error?: string }> = [];
     for (const stored of rules) {
       try {
         for (const { candidate, event } of this.evaluateStoredRule(stored, parsed)) {
-          if (!event.triggered) continue;
-          const saved = await this.prisma.riskEvent.create({
-            data: {
-              ruleId: stored.id,
-              ruleVersion: stored.version,
-              triggered: true,
-              severity: event.severity,
-              message: event.message,
-              mode: candidate.mode,
-              ...(candidate.accountId === undefined ? {} : { accountId: candidate.accountId }),
-              ...(candidate.scope === 'security' && candidate.symbol
-                ? { symbol: candidate.symbol }
-                : {}),
-              triggerValue: event.context.value,
-              threshold: Number(stored.threshold),
-              marketTime: new Date(candidate.marketTime),
-              context: {
-                ...event.context,
-                mode: candidate.mode,
-                scope: candidate.scope,
-                traceId,
-                dataQuality: candidate.dataQuality,
-              },
-            },
-          });
-          if (candidate.mode === 'shadow') {
-            results.push({ ruleId: stored.id, eventId: saved.id });
+          if (stored.kind === 'trailing-stop') {
+            const outcome = await this.persistTrailingEvent(
+              stored,
+              candidate,
+              event,
+              scanId,
+              traceId,
+            );
+            if (!outcome.eventId) continue;
+            try {
+              await this.enqueueNotificationIfNeeded(
+                outcome.eventId,
+                event.severity,
+                candidate.mode,
+                outcome.created,
+              );
+              results.push({ ruleId: stored.id, eventId: outcome.eventId });
+            } catch (notificationError) {
+              results.push({
+                ruleId: stored.id,
+                eventId: outcome.eventId,
+                error: `风险已记录，通知排队失败：${notificationError instanceof Error ? notificationError.message : '未知错误'}`,
+              });
+            }
             continue;
           }
+          const outcome = await this.persistRegularEvent(stored, candidate, event, scanId, traceId);
+          if (!outcome.eventId) continue;
           try {
-            await this.notifications.enqueue(saved.id, event.severity, {
-              channels: {
-                info: ['feishu'],
-                warning: ['feishu'],
-                error: ['feishu'],
-                critical: ['feishu'],
-              },
-              cooldownMinutes: 30,
-              maxAttempts: 3,
-              criticalBypassCooldown: true,
-            });
-            results.push({ ruleId: stored.id, eventId: saved.id });
+            await this.enqueueNotificationIfNeeded(
+              outcome.eventId,
+              event.severity,
+              candidate.mode,
+              outcome.created,
+            );
+            results.push({ ruleId: stored.id, eventId: outcome.eventId });
           } catch (notificationError) {
             results.push({
               ruleId: stored.id,
-              eventId: saved.id,
+              eventId: outcome.eventId,
               error: `风险已记录，通知排队失败：${notificationError instanceof Error ? notificationError.message : '未知错误'}`,
             });
           }
@@ -323,13 +553,396 @@ export class RiskService {
         });
       }
     }
-    return { traceId, results };
+    return { traceId, scanId, results };
   }
 
-  history(
-    mode: PortfolioMode = 'actual',
-    options: { cursor?: string; limit?: number } = {},
+  private riskEventDelegate(prisma: unknown = this.prisma): RiskEventDelegate | null {
+    const delegate = (prisma as PrismaService & { riskEvent?: unknown }).riskEvent;
+    if (!delegate || typeof delegate !== 'object') return null;
+    const candidate = delegate as { create?: unknown; findUnique?: unknown };
+    if (typeof candidate.create !== 'function') return null;
+    return candidate as unknown as RiskEventDelegate;
+  }
+
+  private notificationDeliveryDelegate(
+    prisma: unknown = this.prisma,
+  ): NotificationDeliveryDelegate | null {
+    const delegate = (prisma as PrismaService & { notificationDelivery?: unknown })
+      .notificationDelivery;
+    if (!delegate || typeof delegate !== 'object') return null;
+    const candidate = delegate as { findMany?: unknown };
+    if (typeof candidate.findMany !== 'function') return null;
+    return candidate as unknown as NotificationDeliveryDelegate;
+  }
+
+  private eventDedupeKey(scanId: string, stored: StoredRule, candidate: EvaluationCandidate) {
+    return [
+      scanId,
+      stored.id,
+      stored.version,
+      candidate.mode,
+      candidate.scope,
+      candidate.accountId ?? 'all',
+      candidate.symbol ?? candidate.domain.symbol,
+    ].join(':');
+  }
+
+  private eventData(
+    stored: StoredRule,
+    candidate: EvaluationCandidate,
+    event: NonNullable<ReturnType<typeof evaluateCompleteRule>>,
+    scanId: string,
+    traceId: string,
+    dedupeKey: string,
+  ): Record<string, unknown> {
+    return {
+      ruleId: stored.id,
+      ruleVersion: stored.version,
+      triggered: true,
+      severity: event.severity,
+      message: event.message,
+      mode: candidate.mode,
+      scanId,
+      dedupeKey,
+      ...(candidate.accountId === undefined ? {} : { accountId: candidate.accountId }),
+      ...(candidate.scope === 'security' && candidate.symbol ? { symbol: candidate.symbol } : {}),
+      triggerValue: event.context.value,
+      threshold: Number(stored.threshold),
+      marketTime: new Date(candidate.marketTime),
+      context: {
+        ...event.context,
+        mode: candidate.mode,
+        scope: candidate.scope,
+        traceId,
+        scanId,
+        dataQuality: candidate.dataQuality,
+        ...(candidate.affectedAccountIds === undefined
+          ? {}
+          : { affectedAccountIds: candidate.affectedAccountIds }),
+      },
+    };
+  }
+
+  private async persistRiskEvent(
+    stored: StoredRule,
+    candidate: EvaluationCandidate,
+    event: NonNullable<ReturnType<typeof evaluateCompleteRule>>,
+    scanId: string,
+    traceId: string,
+    dedupeKey: string,
+    prisma: unknown = this.prisma,
+  ): Promise<{ eventId: string; created: boolean }> {
+    const delegate = this.riskEventDelegate(prisma);
+    if (!delegate) throw new Error('RiskEvent 数据访问不可用');
+    const data = this.eventData(stored, candidate, event, scanId, traceId, dedupeKey);
+    try {
+      const saved = await delegate.create({ data });
+      return { eventId: saved.id, created: true };
+    } catch (error) {
+      if (!delegate.findUnique) throw error;
+      const existing = await delegate.findUnique({ where: { dedupeKey } });
+      if (!existing) throw error;
+      return { eventId: existing.id, created: false };
+    }
+  }
+
+  private async persistRegularEvent(
+    stored: StoredRule,
+    candidate: EvaluationCandidate,
+    event: NonNullable<ReturnType<typeof evaluateCompleteRule>>,
+    scanId: string,
+    traceId: string,
+  ): Promise<{ eventId?: string; created: boolean }> {
+    const triggerState = this.riskRuleTriggerStateDelegate();
+    const dedupeKey = this.eventDedupeKey(scanId, stored, candidate);
+    if (!triggerState) {
+      if (!event.triggered) return { created: false };
+      return this.persistRiskEvent(stored, candidate, event, scanId, traceId, dedupeKey);
+    }
+
+    const targetKey = candidate.accountId ?? 'all';
+    const symbol = candidate.symbol ?? candidate.domain.symbol;
+    return this.withTransaction(async (client) => {
+      const stateDelegate = this.riskRuleTriggerStateDelegate(client);
+      if (!stateDelegate) throw new Error('RiskRuleTriggerState 数据访问不可用');
+      let state = await stateDelegate.findUnique({
+        where: {
+          ruleId_targetKey_symbol_mode: {
+            ruleId: stored.id,
+            targetKey,
+            symbol,
+            mode: candidate.mode,
+          },
+        },
+      });
+      if (!state && !event.triggered) return { created: false };
+      if (!state) {
+        state = await stateDelegate.upsert({
+          where: {
+            ruleId_targetKey_symbol_mode: {
+              ruleId: stored.id,
+              targetKey,
+              symbol,
+              mode: candidate.mode,
+            },
+          },
+          create: {
+            id: crypto.randomUUID(),
+            ruleId: stored.id,
+            targetKey,
+            symbol,
+            mode: candidate.mode,
+            ...(candidate.domain.positionId === undefined
+              ? {}
+              : { positionId: candidate.domain.positionId }),
+            ruleVersion: stored.version,
+            breachActive: false,
+          },
+          update: { ruleVersion: stored.version },
+        });
+      }
+
+      const positionChanged =
+        candidate.domain.positionId !== undefined &&
+        state.positionId !== candidate.domain.positionId;
+      const versionChanged = state.ruleVersion !== stored.version;
+      if (positionChanged || versionChanged) {
+        state = await stateDelegate.update({
+          where: { id: state.id },
+          data: {
+            ...(candidate.domain.positionId === undefined
+              ? {}
+              : { positionId: candidate.domain.positionId }),
+            ruleVersion: stored.version,
+            breachActive: false,
+            activeEventId: null,
+            lastScanId: null,
+            triggeredAt: null,
+          },
+        });
+      }
+
+      if (!event.triggered) {
+        if (state.activeEventId !== null) {
+          await stateDelegate.update({
+            where: { id: state.id },
+            data: {
+              breachActive: false,
+              activeEventId: null,
+              lastScanId: scanId,
+              triggeredAt: null,
+            },
+          });
+        }
+        return { created: false };
+      }
+
+      if (state.activeEventId && state.lastScanId === scanId)
+        return { eventId: state.activeEventId, created: false };
+      if (
+        candidate.mode === 'actual' &&
+        state.activeEventId &&
+        (await this.shouldRetryNotification(state.activeEventId, client))
+      ) {
+        return { eventId: state.activeEventId, created: false };
+      }
+
+      const outcome = await this.persistRiskEvent(
+        stored,
+        candidate,
+        event,
+        scanId,
+        traceId,
+        dedupeKey,
+        client,
+      );
+      await stateDelegate.update({
+        where: { id: state.id },
+        data: {
+          ruleVersion: stored.version,
+          breachActive: false,
+          activeEventId: outcome.eventId,
+          lastScanId: scanId,
+          triggeredAt: new Date(),
+        },
+      });
+      return outcome;
+    });
+  }
+
+  private async persistTrailingEvent(
+    stored: StoredRule,
+    candidate: EvaluationCandidate,
+    event: NonNullable<ReturnType<typeof evaluateCompleteRule>>,
+    scanId: string,
+    traceId: string,
+  ): Promise<{ eventId?: string; created: boolean }> {
+    const triggerState = this.riskRuleTriggerStateDelegate();
+    const dedupeKey = this.eventDedupeKey(scanId, stored, candidate);
+    if (!triggerState) {
+      if (!event.triggered) return { created: false };
+      return this.persistRiskEvent(stored, candidate, event, scanId, traceId, dedupeKey);
+    }
+
+    const targetKey = candidate.accountId ?? 'all';
+    const symbol = candidate.symbol ?? candidate.domain.symbol;
+    return this.withTransaction(async (client) => {
+      const stateDelegate = this.riskRuleTriggerStateDelegate(client);
+      if (!stateDelegate) throw new Error('RiskRuleTriggerState 数据访问不可用');
+      let state = await stateDelegate.findUnique({
+        where: {
+          ruleId_targetKey_symbol_mode: {
+            ruleId: stored.id,
+            targetKey,
+            symbol,
+            mode: candidate.mode,
+          },
+        },
+      });
+      if (!state) {
+        state = await stateDelegate.upsert({
+          where: {
+            ruleId_targetKey_symbol_mode: {
+              ruleId: stored.id,
+              targetKey,
+              symbol,
+              mode: candidate.mode,
+            },
+          },
+          create: {
+            id: crypto.randomUUID(),
+            ruleId: stored.id,
+            targetKey,
+            symbol,
+            mode: candidate.mode,
+            ...(candidate.domain.positionId === undefined
+              ? {}
+              : { positionId: candidate.domain.positionId }),
+            ruleVersion: stored.version,
+            breachActive: false,
+          },
+          update: { ruleVersion: stored.version },
+        });
+      }
+
+      const positionChanged =
+        candidate.domain.positionId !== undefined &&
+        state.positionId !== candidate.domain.positionId;
+      const versionChanged = state.ruleVersion !== stored.version;
+      if (positionChanged || versionChanged) {
+        state = await stateDelegate.update({
+          where: { id: state.id },
+          data: {
+            positionId:
+              candidate.domain.positionId === undefined
+                ? state.positionId
+                : candidate.domain.positionId,
+            ruleVersion: stored.version,
+            breachActive: false,
+            activeEventId: null,
+            lastScanId: null,
+            triggeredAt: null,
+          },
+        });
+      }
+
+      if (!event.triggered) {
+        if (state.breachActive || state.activeEventId !== null) {
+          await stateDelegate.update({
+            where: { id: state.id },
+            data: {
+              breachActive: false,
+              activeEventId: null,
+              lastScanId: scanId,
+              triggeredAt: null,
+            },
+          });
+        }
+        return { created: false };
+      }
+
+      if (state.breachActive && state.activeEventId) {
+        return { eventId: state.activeEventId, created: false };
+      }
+
+      const claim = await stateDelegate.updateMany({
+        where: {
+          ruleId: stored.id,
+          targetKey,
+          symbol,
+          mode: candidate.mode,
+          ruleVersion: stored.version,
+          breachActive: false,
+        },
+        data: {
+          breachActive: true,
+          lastScanId: scanId,
+          triggeredAt: new Date(),
+          activeEventId: null,
+        },
+      });
+      if (claim.count === 0) {
+        const current = await stateDelegate.findUnique({
+          where: {
+            ruleId_targetKey_symbol_mode: {
+              ruleId: stored.id,
+              targetKey,
+              symbol,
+              mode: candidate.mode,
+            },
+          },
+        });
+        return current?.activeEventId
+          ? { eventId: current.activeEventId, created: false }
+          : { created: false };
+      }
+
+      const outcome = await this.persistRiskEvent(
+        stored,
+        candidate,
+        event,
+        scanId,
+        traceId,
+        dedupeKey,
+        client,
+      );
+      await stateDelegate.update({
+        where: { id: state.id },
+        data: {
+          breachActive: true,
+          activeEventId: outcome.eventId,
+          lastScanId: scanId,
+          triggeredAt: new Date(),
+        },
+      });
+      return outcome;
+    });
+  }
+
+  private async shouldRetryNotification(eventId: string, prisma: unknown = this.prisma) {
+    const delegate = this.notificationDeliveryDelegate(prisma);
+    if (!delegate) return false;
+    const deliveries = await delegate.findMany({ where: { eventId } });
+    if (deliveries.length === 0) return true;
+    return deliveries.some((delivery) => ['failed', 'error'].includes(delivery.status));
+  }
+
+  private async enqueueNotificationIfNeeded(
+    eventId: string,
+    severity: string,
+    mode: PortfolioMode,
+    created: boolean,
   ) {
+    if (mode === 'shadow') return;
+    if (!created && !(await this.shouldRetryNotification(eventId))) return;
+    await this.notifications.enqueue(
+      eventId,
+      severity as Parameters<NotificationService['enqueue']>[1],
+      notificationPolicy,
+    );
+  }
+
+  history(mode: PortfolioMode = 'actual', options: { cursor?: string; limit?: number } = {}) {
     const limit = Math.min(Math.max(options.limit ?? 200, 1), 200);
     return this.prisma.riskEvent.findMany({
       where: { mode },
@@ -339,13 +952,15 @@ export class RiskService {
     });
   }
 
-  private ruleData(rule: ReturnType<typeof riskRuleInputSchema.parse>) {
+  private ruleData(rule: ReturnType<typeof riskRuleStoredSchema.parse>) {
     return {
       kind: rule.kind,
       scope: rule.scope,
       severity: rule.severity,
       threshold: rule.threshold,
       enabled: rule.enabled,
+      needsRepair: false,
+      repairReason: null,
       ...(rule.symbol === undefined ? {} : { symbol: rule.symbol }),
       ...(rule.accountId === undefined ? {} : { accountId: rule.accountId }),
       ...(rule.sourcePlanId === undefined ? {} : { sourcePlanId: rule.sourcePlanId }),
@@ -376,6 +991,7 @@ export class RiskService {
         security: envelope.security,
         accounts,
         allowStale: envelope.allowStale,
+        ...(envelope.scanId === undefined ? {} : { scanId: envelope.scanId }),
         ...(portfolio ? { portfolio } : {}),
       };
       this.assertSingleMode(parsed);
@@ -403,7 +1019,8 @@ export class RiskService {
       ...scan.accounts.map((context) => context.mode),
       ...(scan.portfolio ? [scan.portfolio.mode] : []),
     ]);
-    if (modes.size > 1) throw new BadRequestException('单次 Risk scan 不能混合 actual 与 shadow mode');
+    if (modes.size > 1)
+      throw new BadRequestException('单次 Risk scan 不能混合 actual 与 shadow mode');
   }
 
   private rejectStaleContexts(scan: ParsedScan) {
@@ -422,6 +1039,156 @@ export class RiskService {
       )
     )
       throw new BadRequestException('行情陈旧，Risk 默认拒绝评估；请在允许陈旧数据后重试');
+  }
+
+  private riskPositionStateDelegate(
+    prisma: unknown = this.prisma,
+  ): RiskPositionStateDelegate | null {
+    const delegate = (prisma as PrismaService & { riskPositionState?: unknown }).riskPositionState;
+    if (!delegate || typeof delegate !== 'object') return null;
+    const candidate = delegate as { findMany?: unknown; upsert?: unknown };
+    if (typeof candidate.findMany !== 'function' || typeof candidate.upsert !== 'function')
+      return null;
+    return candidate as unknown as RiskPositionStateDelegate;
+  }
+
+  private riskRuleTriggerStateDelegate(
+    prisma: unknown = this.prisma,
+  ): RiskRuleTriggerStateDelegate | null {
+    const delegate = (prisma as PrismaService & { riskRuleTriggerState?: unknown })
+      .riskRuleTriggerState;
+    if (!delegate || typeof delegate !== 'object') return null;
+    const candidate = delegate as {
+      upsert?: unknown;
+      updateMany?: unknown;
+      findUnique?: unknown;
+      update?: unknown;
+    };
+    if (
+      typeof candidate.upsert !== 'function' ||
+      typeof candidate.updateMany !== 'function' ||
+      typeof candidate.findUnique !== 'function' ||
+      typeof candidate.update !== 'function'
+    )
+      return null;
+    return candidate as unknown as RiskRuleTriggerStateDelegate;
+  }
+
+  private async withTransaction<T>(callback: (client: PrismaService) => Promise<T>): Promise<T> {
+    const transaction = this.prisma as PrismaService & {
+      $transaction?: (fn: (client: PrismaService) => Promise<T>) => Promise<T>;
+    };
+    if (typeof transaction.$transaction !== 'function') return callback(this.prisma);
+    return transaction.$transaction(callback);
+  }
+
+  private async enrichHoldingPeaks(scan: ParsedScan, persist: boolean): Promise<ParsedScan> {
+    const contexts = scan.security.filter(
+      (context) =>
+        context.accountId &&
+        context.price !== undefined &&
+        context.price > 0 &&
+        !Object.values(context.dataQuality).some((value) => value === 'stale'),
+    );
+    if (contexts.length === 0) return scan;
+    const delegate = this.riskPositionStateDelegate();
+    if (!delegate) return scan;
+
+    const mode = contexts[0]!.mode;
+    const accountIds = [...new Set(contexts.map((context) => context.accountId!))];
+    const symbols = [...new Set(contexts.map((context) => context.symbol))];
+    const states = await delegate.findMany({
+      where: { accountId: { in: accountIds }, symbol: { in: symbols }, mode },
+    });
+    const statesByKey = new Map(
+      states.map((state) => [
+        this.positionStateKey(state.accountId, state.symbol, state.mode),
+        state,
+      ]),
+    );
+    const latestByKey = new Map<string, SecurityContext>();
+    for (const context of contexts) {
+      const key = this.positionStateKey(context.accountId!, context.symbol, context.mode);
+      const current = latestByKey.get(key);
+      if (!current || current.marketTime < context.marketTime) latestByKey.set(key, context);
+    }
+
+    const peaksByKey = new Map<string, number>();
+    for (const [key, context] of latestByKey) {
+      const state = statesByKey.get(key);
+      const positionUpdatedAt = context.positionUpdatedAt
+        ? new Date(context.positionUpdatedAt)
+        : undefined;
+      let positionChanged = false;
+      if (state && context.positionId !== undefined) {
+        positionChanged = state.positionId !== context.positionId;
+      } else if (
+        state &&
+        state.positionId === null &&
+        state.positionUpdatedAt !== null &&
+        state.positionUpdatedAt !== undefined &&
+        positionUpdatedAt !== undefined
+      ) {
+        positionChanged = state.positionUpdatedAt.getTime() !== positionUpdatedAt.getTime();
+      }
+      const currentPrice = context.price!;
+      const firstObservation = state === undefined;
+      const previousPeak =
+        firstObservation || positionChanged ? 0 : Number(state?.holdingPeak ?? 0);
+      const suppliedPeak = firstObservation || positionChanged ? 0 : (context.holdingPeak ?? 0);
+      const holdingPeak = Math.max(currentPrice, previousPeak, suppliedPeak);
+      const peakAt =
+        state && Number(state.holdingPeak) >= holdingPeak
+          ? state.peakAt
+          : new Date(context.marketTime);
+      peaksByKey.set(key, holdingPeak);
+
+      if (persist) {
+        await delegate.upsert({
+          where: {
+            accountId_symbol_mode: {
+              accountId: context.accountId!,
+              symbol: context.symbol,
+              mode: context.mode,
+            },
+          },
+          create: {
+            id: crypto.randomUUID(),
+            accountId: context.accountId!,
+            symbol: context.symbol,
+            mode: context.mode,
+            ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
+            holdingPeak,
+            peakAt,
+            ...(positionUpdatedAt ? { positionUpdatedAt } : {}),
+            lastQuantity: context.quantity ?? 0,
+            lastPrice: currentPrice,
+          },
+          update: {
+            holdingPeak,
+            peakAt,
+            ...(positionUpdatedAt ? { positionUpdatedAt } : {}),
+            ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
+            lastQuantity: context.quantity ?? Number(state?.lastQuantity ?? 0),
+            lastPrice: currentPrice,
+          },
+        });
+      }
+    }
+
+    return {
+      ...scan,
+      security: scan.security.map((context) => {
+        if (!context.accountId || context.price === undefined) return context;
+        const key = this.positionStateKey(context.accountId, context.symbol, context.mode);
+        const holdingPeak = peaksByKey.get(key);
+        return holdingPeak === undefined ? context : { ...context, holdingPeak };
+      }),
+    };
+  }
+
+  private positionStateKey(accountId: string, symbol: string, mode: string) {
+    return `${accountId}:${symbol}:${mode}`;
   }
 
   private snapshot(value: object): Prisma.InputJsonValue {
@@ -445,7 +1212,11 @@ export class RiskService {
     };
   }
 
-  private securityCandidate(context: SecurityContext): EvaluationCandidate {
+  private securityCandidate(
+    context: SecurityContext,
+    weight = context.weight,
+    affectedAccountIds?: string[],
+  ): EvaluationCandidate {
     const positions = toDomainPositions(context.positions);
     const chip =
       context.chip === undefined
@@ -467,12 +1238,20 @@ export class RiskService {
       dataQuality: context.dataQuality,
       symbol: context.symbol,
       ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+      ...(affectedAccountIds === undefined ? {} : { affectedAccountIds }),
       domain: {
         symbol: context.symbol,
+        ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+        ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
+        ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
+        ...(context.positionUpdatedAt === undefined
+          ? {}
+          : { positionUpdatedAt: context.positionUpdatedAt }),
         marketTime: context.marketTime,
         ...(context.price === undefined ? {} : { price: context.price }),
         ...(context.costPrice === undefined ? {} : { costPrice: context.costPrice }),
-        ...(context.weight === undefined ? {} : { weight: context.weight }),
+        ...(weight === undefined ? {} : { weight }),
+        ...(context.accountWeight === undefined ? {} : { accountWeight: context.accountWeight }),
         ...(context.holdingPeak === undefined ? {} : { holdingPeak: context.holdingPeak }),
         ...(context.portfolioValues === undefined
           ? {}
@@ -527,6 +1306,25 @@ export class RiskService {
     };
   }
 
+  private latestSecurityContexts(contexts: readonly SecurityContext[]) {
+    const latest = new Map<string, SecurityContext>();
+    for (const context of contexts) {
+      const key = this.positionStateKey(context.accountId ?? 'all', context.symbol, context.mode);
+      const current = latest.get(key);
+      if (!current || current.marketTime < context.marketTime) latest.set(key, context);
+    }
+    return [...latest.values()];
+  }
+
+  private latestSecurityContextsBySymbol(contexts: readonly SecurityContext[]) {
+    const latest = new Map<string, SecurityContext>();
+    for (const context of contexts) {
+      const current = latest.get(context.symbol);
+      if (!current || current.marketTime < context.marketTime) latest.set(context.symbol, context);
+    }
+    return [...latest.values()];
+  }
+
   private candidatesForRule(rule: RiskRule, scan: ParsedScan): EvaluationCandidate[] {
     if (rule.scope === 'portfolio') {
       return scan.portfolio ? [this.portfolioCandidate(scan.portfolio)] : [];
@@ -540,13 +1338,67 @@ export class RiskService {
         (!rule.symbol || context.symbol === rule.symbol) &&
         (!rule.accountId || context.accountId === rule.accountId),
     );
-    const latest = latestByMarketTime(matching);
-    return latest ? [this.securityCandidate(latest)] : [];
+    const accountSpecific =
+      Boolean(rule.accountId) || requiresRiskRuleAccount(rule.kind, rule.scope);
+    if (rule.kind === 'position-concentration' && !accountSpecific) {
+      const grouped = new Map<string, { context: SecurityContext; weight: number }>();
+      for (const context of this.latestSecurityContexts(matching)) {
+        const current = grouped.get(context.symbol);
+        const weight = context.weight ?? 0;
+        if (!current) grouped.set(context.symbol, { context, weight });
+        else current.weight += weight;
+      }
+      return [...grouped.values()].map(({ context, weight }) => {
+        const affectedAccountIds = [
+          ...new Set(
+            matching
+              .filter((candidate) => candidate.symbol === context.symbol && candidate.accountId)
+              .map((candidate) => candidate.accountId!),
+          ),
+        ].sort();
+        return this.securityCandidate(
+          this.globalSecurityContext(context),
+          weight,
+          affectedAccountIds,
+        );
+      });
+    }
+    if (accountSpecific)
+      return this.latestSecurityContexts(matching).map((context) =>
+        this.securityCandidate(context),
+      );
+    return this.latestSecurityContextsBySymbol(matching).map((context) => {
+      const affectedAccountIds = [
+        ...new Set(
+          matching
+            .filter((candidate) => candidate.symbol === context.symbol && candidate.accountId)
+            .map((candidate) => candidate.accountId!),
+        ),
+      ].sort();
+      return this.securityCandidate(
+        this.globalSecurityContext(context),
+        context.weight,
+        affectedAccountIds,
+      );
+    });
+  }
+
+  private globalSecurityContext(context: SecurityContext): SecurityContext {
+    const globalContext = { ...context };
+    delete globalContext.accountId;
+    delete globalContext.positionId;
+    delete globalContext.costPrice;
+    delete globalContext.quantity;
+    delete globalContext.accountWeight;
+    delete globalContext.positionUpdatedAt;
+    delete globalContext.holdingPeak;
+    return globalContext;
   }
 
   private evaluateStoredRule(stored: StoredRule, scan: ParsedScan) {
     const rule = this.toRule(stored);
     return this.candidatesForRule(rule, scan)
+      .filter((candidate) => !this.shouldSkipStaleRule(rule.kind, candidate, scan))
       .map((candidate) => ({ candidate, event: evaluateCompleteRule(rule, candidate.domain) }))
       .filter(
         (
@@ -556,5 +1408,10 @@ export class RiskService {
           event: NonNullable<typeof result.event>;
         } => result.event !== null,
       );
+  }
+
+  private shouldSkipStaleRule(kind: string, candidate: EvaluationCandidate, scan: ParsedScan) {
+    if (!scan.allowStale || !marketDataRuleKinds.has(kind)) return false;
+    return Object.values(candidate.dataQuality).some((value) => value === 'stale');
   }
 }

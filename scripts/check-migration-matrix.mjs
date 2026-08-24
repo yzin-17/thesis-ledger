@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsRoot = resolve(root, 'apps/server/prisma/migrations');
-const expectedMigrationCount = 21;
+const expectedMigrationCount = 22;
 const entries = (await readdir(migrationsRoot, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)

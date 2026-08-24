@@ -51,7 +51,8 @@ export const useTestRiskRuleMutation = () =>
 export const useScanRiskMutation = () => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (contexts: RiskContext[]) => scanRisk(contexts),
+    mutationFn: ({ contexts, scanId }: { contexts: RiskContext[]; scanId: string }) =>
+      scanRisk(contexts, scanId),
     onSuccess: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: riskKeys.events('actual') }),

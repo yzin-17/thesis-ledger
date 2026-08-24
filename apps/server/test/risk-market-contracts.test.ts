@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RiskService } from '../src/risk/risk.service.js';
 import { MarketService, resolveEffectiveBars } from '../src/market/market.service.js';
-import { classifyEmptyBarRange, MarketStorageService } from '../src/market/market-storage.service.js';
+import {
+  classifyEmptyBarRange,
+  MarketStorageService,
+} from '../src/market/market-storage.service.js';
 import { InstrumentService } from '../src/market/instrument.service.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
@@ -125,6 +128,182 @@ describe('Risk scope and mode contracts', () => {
     ).rejects.toThrow('不能混合');
   });
 
+  it('evaluates account-bound security rules against the matching account only', async () => {
+    const accountB = '22222222-2222-4222-8222-222222222222';
+    const rules = [
+      {
+        ...baseRule,
+        id: '61111111-1111-4111-8111-111111111111',
+        kind: 'cost-stop',
+        scope: 'security',
+        threshold: 0.1,
+        symbol: '600519.SH',
+        accountId,
+      },
+    ];
+    const creates: Array<Record<string, unknown>> = [];
+    const prisma = {
+      riskRule: { findMany: vi.fn(async () => rules) },
+      riskEvent: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          creates.push(data);
+          return { id: `event-${creates.length}`, ...data };
+        }),
+      },
+    };
+    const notifications = { enqueue: vi.fn(async () => undefined) };
+    const service = new RiskService(prisma as never, notifications as never);
+
+    await service.scan([
+      {
+        symbol: '600519.SH',
+        accountId,
+        mode: 'shadow',
+        price: 89,
+        costPrice: 100,
+        marketTime: '2026-08-20T02:00:00Z',
+        dataQuality: {},
+      },
+      {
+        symbol: '600519.SH',
+        accountId: accountB,
+        mode: 'shadow',
+        price: 80,
+        costPrice: 100,
+        marketTime: '2026-08-20T02:00:00Z',
+        dataQuality: {},
+      },
+    ]);
+
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toMatchObject({ accountId, symbol: '600519.SH' });
+  });
+
+  it('maintains a trailing-stop peak per account and triggers after a drawdown', async () => {
+    const state = new Map<string, Record<string, unknown>>();
+    const stateDelegate = {
+      findMany: vi.fn(async () => [...state.values()]),
+      upsert: vi.fn(
+        async ({
+          where,
+          create,
+          update,
+        }: {
+          where: { accountId_symbol_mode: { accountId: string; symbol: string; mode: string } };
+          create: Record<string, unknown>;
+          update: Record<string, unknown>;
+        }) => {
+          const key = `${where.accountId_symbol_mode.accountId}:${where.accountId_symbol_mode.symbol}:${where.accountId_symbol_mode.mode}`;
+          const next = { ...(state.get(key) ?? create), ...update };
+          state.set(key, next);
+          return next;
+        },
+      ),
+    };
+    const prisma = {
+      riskRule: {
+        findMany: vi.fn(async () => [
+          {
+            ...baseRule,
+            id: '71111111-1111-4111-8111-111111111111',
+            kind: 'trailing-stop',
+            scope: 'security',
+            threshold: 0.1,
+            symbol: '600519.SH',
+            accountId,
+          },
+        ]),
+      },
+      riskEvent: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          id: 'event-trailing',
+          ...data,
+        })),
+      },
+      riskPositionState: stateDelegate,
+    };
+    const service = new RiskService(prisma as never, { enqueue: vi.fn() } as never);
+    const context = (price: number) => ({
+      symbol: '600519.SH',
+      accountId,
+      mode: 'actual' as const,
+      price,
+      costPrice: 100,
+      positionUpdatedAt: '2026-08-20T00:00:00Z',
+      marketTime: `2026-08-20T0${price === 120 ? '1' : '2'}:00:00Z`,
+      dataQuality: {},
+    });
+
+    const first = await service.scan([context(120)]);
+    const second = await service.scan([context(105)]);
+
+    expect(first.results).toEqual([]);
+    expect(second.results).toHaveLength(1);
+    expect(prisma.riskEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          accountId,
+          context: expect.objectContaining({
+            accountId,
+            inputs: expect.objectContaining({ holdingPeak: 120, price: 105 }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('aggregates an unbound concentration rule across accounts', async () => {
+    const creates: Array<Record<string, unknown>> = [];
+    const prisma = {
+      riskRule: {
+        findMany: vi.fn(async () => [
+          {
+            ...baseRule,
+            id: '81111111-1111-4111-8111-111111111111',
+            kind: 'position-concentration',
+            scope: 'security',
+            threshold: 0.7,
+            symbol: '600519.SH',
+            accountId: null,
+          },
+        ]),
+      },
+      riskEvent: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          creates.push(data);
+          return { id: 'event-concentration', ...data };
+        }),
+      },
+    };
+    const service = new RiskService(prisma as never, { enqueue: vi.fn() } as never);
+
+    await service.scan([
+      {
+        symbol: '600519.SH',
+        accountId,
+        mode: 'shadow',
+        price: 100,
+        weight: 0.4,
+        accountWeight: 0.8,
+        marketTime: '2026-08-20T02:00:00Z',
+        dataQuality: {},
+      },
+      {
+        symbol: '600519.SH',
+        accountId: '22222222-2222-4222-8222-222222222222',
+        mode: 'shadow',
+        price: 100,
+        weight: 0.4,
+        accountWeight: 0.9,
+        marketTime: '2026-08-20T02:00:00Z',
+        dataQuality: {},
+      },
+    ]);
+
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toMatchObject({ triggerValue: 0.8, symbol: '600519.SH' });
+  });
+
   it('filters mode and paginates in the database', async () => {
     const findMany = vi.fn(async () => []);
     const service = new RiskService({ riskEvent: { findMany } } as never, {} as never);
@@ -203,9 +382,7 @@ describe('Bar provenance and effective projection', () => {
 
 describe('Backfill outcome and supported markets', () => {
   it('distinguishes legitimate closed-market no-data from incomplete trading-day data', () => {
-    expect(classifyEmptyBarRange('2026-08-22T00:00:00Z', '2026-08-23T23:00:00Z')).toBe(
-      'no-data',
-    );
+    expect(classifyEmptyBarRange('2026-08-22T00:00:00Z', '2026-08-23T23:00:00Z')).toBe('no-data');
     expect(classifyEmptyBarRange('2026-08-20T00:00:00Z', '2026-08-20T23:00:00Z')).toBe(
       'incomplete',
     );

@@ -5,6 +5,7 @@ import type {
   RiskRuleSeverity,
   RiskTestRecord,
 } from './risk.types.js';
+import { requiresRiskRuleAccount } from '@thesis-ledger/schemas';
 
 export const riskRuleKindOptions: Array<{ value: KnownRiskRuleKind; label: string }> = [
   { value: 'price-below', label: '价格低于' },
@@ -35,6 +36,47 @@ export const riskScopeOptions: Array<{ value: RiskRuleScope; label: string }> = 
   { value: 'portfolio', label: '组合' },
 ];
 
+const securityRuleKinds: ReadonlySet<string> = new Set([
+  'fixed-stop',
+  'cost-stop',
+  'take-profit',
+  'price-above',
+  'price-below',
+  'position-concentration',
+  'trailing-stop',
+  'ma',
+  'rsi',
+  'macd',
+  'atr',
+  'volume',
+  'chip-peak',
+  'chip-ratio',
+  'chip-migration',
+]);
+
+const aggregateRuleKinds: ReadonlySet<string> = new Set([
+  'drawdown',
+  'sector-concentration',
+  'asset-concentration',
+  'volatility-exposure',
+  'correlation',
+]);
+
+export const riskRuleScopeOptionsForKind = (kind: string) => {
+  if (securityRuleKinds.has(kind)) {
+    return riskScopeOptions.filter((option) => option.value === 'security');
+  }
+  if (aggregateRuleKinds.has(kind)) {
+    return riskScopeOptions.filter((option) => option.value !== 'security');
+  }
+  return riskScopeOptions;
+};
+
+export const riskRuleNeedsAccount = (kind: string) => requiresRiskRuleAccount(kind, 'security');
+
+export const isRiskRuleScopeAllowed = (kind: string, scope: RiskRuleScope) =>
+  riskRuleScopeOptionsForKind(kind).some((option) => option.value === scope);
+
 export const riskSeverityOptions: Array<{ value: RiskRuleSeverity; label: string }> = [
   { value: 'info', label: '提示' },
   { value: 'warning', label: '警告' },
@@ -53,6 +95,7 @@ export const percentageRuleKinds: ReadonlySet<string> = new Set([
   'cost-stop',
   'take-profit',
   'position-concentration',
+  'trailing-stop',
 ]);
 
 export const isPercentageRule = (kind: string) => percentageRuleKinds.has(kind);
@@ -62,12 +105,18 @@ export const formatThreshold = (kind: string, threshold: number) => {
   return threshold.toLocaleString('zh-CN', { maximumFractionDigits: 6 });
 };
 
-export const ruleTargetLabel = (rule: {
-  scope: string;
-  symbol: string | null | undefined;
-  accountId: string | null | undefined;
-}) => {
-  if (rule.scope === 'security') return rule.symbol ?? '未指定证券';
+export const ruleTargetLabel = (
+  rule: {
+    scope: string;
+    symbol: string | null | undefined;
+    accountId: string | null | undefined;
+  },
+  accountName?: string,
+) => {
+  if (rule.scope === 'security') {
+    const symbol = rule.symbol ?? '未指定证券';
+    return rule.accountId ? `${symbol} · ${accountName ?? '指定账户'}` : symbol;
+  }
   if (rule.scope === 'account') return rule.accountId ?? '未指定账户';
   return '全组合';
 };
@@ -78,10 +127,13 @@ export const rulePreview = (input: {
   threshold: number | null;
   symbol?: string;
   accountId?: string;
+  accountLabel?: string;
 }) => {
   let target = '当前组合';
-  if (input.scope === 'security') target = input.symbol || '当前证券';
-  else if (input.scope === 'account') target = input.accountId || '当前账户';
+  if (input.scope === 'security') {
+    target = input.symbol || '当前证券';
+    if (input.accountId) target += ` · ${input.accountLabel ?? '指定账户'}`;
+  } else if (input.scope === 'account') target = input.accountId || '当前账户';
   const threshold =
     input.threshold === null ? '待填写' : formatThreshold(input.kind, input.threshold);
   const kind = riskRuleKindLabel(input.kind);
