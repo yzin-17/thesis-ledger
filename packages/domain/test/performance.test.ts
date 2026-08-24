@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { allocation, ttwror, xirr, rebalanceGap, quantStatsAnalytics } from '../src/index.js';
+import {
+  allocation,
+  normalizeAllocationCategory,
+  normalizeAllocationTargets,
+  ttwror,
+  xirr,
+  rebalanceGap,
+  quantStatsAnalytics,
+} from '../src/index.js';
 
 describe('收益与配置', () => {
   it('计算 TTWROR', () =>
@@ -41,6 +49,24 @@ describe('收益与配置', () => {
       { category: '现金', amountGap: 10, direction: 'increase' },
     ]);
     expect(() => rebalanceGap([], { 股票: 0.8 })).toThrow('100%');
+  });
+  it('规范化配置类别并允许无持仓指数目标', () => {
+    expect(normalizeAllocationCategory(' ETF ')).toBe('etf');
+    expect(normalizeAllocationCategory('现金')).toBe('cash');
+    expect(normalizeAllocationCategory('legacy')).toBeNull();
+    expect(
+      rebalanceGap([{ category: 'stock', marketValue: 100 }], { stock: 0.6, index: 0.4 }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: 'index', currentWeight: 0, targetWeight: 0.4 }),
+      ]),
+    );
+  });
+  it('规范化目标时保留零权重分类并合并别名', () => {
+    expect(normalizeAllocationTargets({ 股票: 0, stock: 0, ETF: 1 })).toEqual({
+      targets: { stock: 0, etf: 1 },
+      unknown: [],
+    });
   });
 });
 

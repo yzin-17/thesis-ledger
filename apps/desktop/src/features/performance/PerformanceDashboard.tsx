@@ -1,25 +1,20 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useToastManager } from '@/components/ui/toast';
 
 import type { Account } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
-import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import { PortfolioModeNote } from '../shared/PortfolioModeSwitch.js';
 import { useSavePerformanceTargetsMutation } from './performance.mutations.js';
 import { usePerformanceQueries } from './performance.queries.js';
-import type {
-  PerformanceAllocationRecord,
-  RebalanceGapRecord,
-  SnapshotRecord,
-  PortfolioMode,
-} from './performance.types.js';
+import type { AllocationCategory, PortfolioMode } from './performance.types.js';
 import {
-  PerformanceAllocationTable,
-  PerformanceMetrics,
   PerformanceAccountSelector,
-  PerformanceRebalanceTable,
+  PerformanceAllocationSection,
+  PerformanceMetrics,
   PerformanceSnapshotTable,
-  PerformanceTargetForm,
+  PerformanceTargetSheet,
 } from './PerformanceSections.js';
 
 export function PerformanceDashboard({
@@ -32,82 +27,107 @@ export function PerformanceDashboard({
   onModeChange: (mode: PortfolioMode) => void;
 }) {
   const [accountId, setAccountId] = useState('');
-  const [targetText, setTargetText] = useState('{"股票":0.6,"ETF":0.4}');
-  const [savingTargets, setSavingTargets] = useState(false);
+  const [targetSheetOpen, setTargetSheetOpen] = useState(false);
+  const [targetSaveError, setTargetSaveError] = useState<string | null>(null);
   const toastManager = useToastManager();
-  const performanceQueries = usePerformanceQueries(mode, accountId);
+  const modeAccounts = useMemo(
+    () => accounts.filter((account) => account.mode === mode && account.active !== false),
+    [accounts, mode],
+  );
+  const mixedCurrencies = useMemo(
+    () => new Set(modeAccounts.map((account) => account.currency)).size > 1,
+    [modeAccounts],
+  );
+  const scopeEnabled = !mixedCurrencies || Boolean(accountId);
+  const performanceQueries = usePerformanceQueries(mode, accountId, scopeEnabled);
+
+  useEffect(() => {
+    if (accountId && !modeAccounts.some((account) => account.id === accountId)) setAccountId('');
+  }, [accountId, modeAccounts]);
+
+  const snapshots = scopeEnabled ? (performanceQueries.history.data ?? []) : [];
+  const summary =
+    scopeEnabled && !performanceQueries.summary.isError
+      ? (performanceQueries.summary.data ?? null)
+      : null;
+  const layers = scopeEnabled ? performanceQueries.layers.data : undefined;
+  const allocationResponse = scopeEnabled ? performanceQueries.allocation.data : undefined;
+  const targetsUnavailable = scopeEnabled && performanceQueries.targets.isError;
+  const targetsResponse =
+    scopeEnabled && !targetsUnavailable ? performanceQueries.targets.data : undefined;
+  const targets = targetsResponse?.targets ?? {};
+  const latestSnapshot = snapshots.at(-1);
+  const latest = [...snapshots].reverse().find((snapshot) => !snapshot.partial);
+  const scopeHasData = [
+    performanceQueries.history,
+    performanceQueries.summary,
+    performanceQueries.layers,
+    performanceQueries.targets,
+  ].some((query) => query.data !== undefined);
+  const scopeWideError =
+    !scopeHasData &&
+    [
+      performanceQueries.history,
+      performanceQueries.summary,
+      performanceQueries.layers,
+      performanceQueries.targets,
+    ].every((query) => query.isError);
+  const historyState = resolveLoadState(
+    [performanceQueries.history],
+    performanceQueries.history.data !== undefined,
+    performanceQueries.history.data !== undefined && snapshots.length === 0,
+  );
+  const allocationState = resolveLoadState(
+    [performanceQueries.layers, performanceQueries.targets, performanceQueries.allocation],
+    allocationResponse !== undefined,
+    allocationResponse !== undefined && allocationResponse.allocation.length === 0,
+  );
+  const refreshing = [
+    performanceQueries.history,
+    performanceQueries.summary,
+    performanceQueries.layers,
+    performanceQueries.targets,
+    performanceQueries.allocation,
+  ].some((query) => query.isFetching);
   const saveTargetsMutation = useSavePerformanceTargetsMutation();
-  const snapshots: SnapshotRecord[] = performanceQueries.history.data ?? [];
-  const summary = performanceQueries.summary.data ?? null;
-  const allocationRows: PerformanceAllocationRecord[] =
-    performanceQueries.allocation.data?.allocation ?? [];
-  const rebalanceRows: RebalanceGapRecord[] = performanceQueries.allocation.data?.rebalance ?? [];
-  const hasPerformanceData = Object.values(performanceQueries).some(
-    (query) => query.data !== undefined,
-  );
-  const loadState = resolveLoadState(
-    Object.values(performanceQueries),
-    hasPerformanceData,
-    hasPerformanceData && snapshots.length === 0,
-  );
-  useEffect(() => {
-    if (!accountId && accounts[0]) setAccountId(accounts[0].id);
-  }, [accountId, accounts]);
-  const load = async () => {
-    await Promise.all([performanceQueries.layers.refetch(), performanceQueries.targets.refetch()]);
-    await Promise.all([performanceQueries.history.refetch(), performanceQueries.summary.refetch()]);
+
+  const retry = () => {
+    void Promise.all([
+      performanceQueries.history.refetch(),
+      performanceQueries.summary.refetch(),
+      performanceQueries.layers.refetch(),
+      performanceQueries.targets.refetch(),
+    ]);
   };
-  useEffect(() => {
-    const loadedTargets = performanceQueries.targets.data?.targets ?? {};
-    if (Object.keys(loadedTargets).length > 0) setTargetText(JSON.stringify(loadedTargets));
-  }, [performanceQueries.targets.data]);
-  const saveTargets = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (savingTargets) return;
-    setSavingTargets(true);
-    let targets: Record<string, number>;
-    try {
-      const parsed: unknown = JSON.parse(targetText);
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
-        throw new Error('targets');
-      targets = parsed as Record<string, number>;
-    } catch {
-      toastManager.add({
-        title: '目标配置保存失败',
-        description: '目标配置必须是 JSON 对象。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
-      setSavingTargets(false);
-      return;
-    }
+  const retryAllocation = () => {
+    void Promise.all([
+      performanceQueries.layers.refetch(),
+      performanceQueries.targets.refetch(),
+      performanceQueries.allocation.refetch(),
+    ]);
+  };
+
+  const saveTargets = async (nextTargets: Record<AllocationCategory, number>) => {
+    setTargetSaveError(null);
     try {
       await saveTargetsMutation.mutateAsync({
         scope: accountId ? 'account' : 'portfolio',
         ...(accountId ? { accountId } : {}),
-        targets,
+        targets: nextTargets,
       });
+      setTargetSheetOpen(false);
       toastManager.add({
         title: '目标配置已保存',
-        description: '已生成新版本。',
+        description: '已生成新版本，配置比较会自动更新。',
         type: 'success',
         timeout: 2800,
       });
-      await load();
-    } catch {
-      toastManager.add({
-        title: '目标配置保存失败',
-        description: '目标权重必须合计 100%。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
-    } finally {
-      setSavingTargets(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '目标保存失败，请稍后重试。';
+      setTargetSaveError(message);
     }
   };
-  const latest = snapshots.at(-1);
+
   return (
     <section className="module-page">
       <header className="page-header">
@@ -120,31 +140,93 @@ export function PerformanceDashboard({
           </p>
         </div>
         <div className="page-header-actions">
-          <PortfolioModeSwitch
-            mode={mode}
-            onModeChange={onModeChange}
-            ariaLabel="收益范围"
-          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!scopeEnabled || targetsUnavailable}
+            onClick={() => {
+              if (scopeEnabled && !targetsUnavailable) {
+                setTargetSaveError(null);
+                setTargetSheetOpen(true);
+              }
+            }}
+          >
+            调整目标
+          </Button>
         </div>
       </header>
       {mode === 'shadow' ? (
         <PortfolioModeNote>当前收益只计算模拟账户，结果仅用于研究。</PortfolioModeNote>
       ) : null}
-      <DataStateBanner state={loadState} onRetry={() => void load()} />
       <PerformanceAccountSelector
         accounts={accounts}
+        mode={mode}
         accountId={accountId}
+        mixedCurrencies={mixedCurrencies}
+        latestSnapshotAt={latest?.capturedAt}
+        valuedAt={layers?.valuedAt}
+        onModeChange={onModeChange}
         onAccountChange={setAccountId}
       />
-      <PerformanceMetrics latest={latest} summary={summary} />
-      <PerformanceSnapshotTable loadState={loadState} snapshots={snapshots} />
-      <PerformanceAllocationTable loadState={loadState} rows={allocationRows} />
-      <PerformanceRebalanceTable loadState={loadState} rows={rebalanceRows} />
-      <PerformanceTargetForm
-        targetText={targetText}
-        saving={savingTargets}
-        onChange={setTargetText}
-        onSubmit={(event) => void saveTargets(event)}
+      {mixedCurrencies && !accountId ? (
+        <DataStateBanner
+          state="error"
+          description="当前模式包含多个币种，已暂停全部账户聚合。请选择一个账户后继续。"
+        />
+      ) : null}
+      {!mixedCurrencies && scopeWideError ? (
+        <DataStateBanner state="error" onRetry={retry} />
+      ) : null}
+      <PerformanceMetrics
+        latest={latest}
+        summary={summary}
+        snapshotCount={snapshots.length}
+        latestPartial={latestSnapshot?.partial === true}
+        summaryError={
+          performanceQueries.summary.isError
+            ? '收益摘要暂不可用，请检查行情完整性后重试'
+            : undefined
+        }
+      />
+      <PerformanceSnapshotTable
+        loadState={historyState}
+        snapshots={snapshots}
+        refreshing={refreshing}
+        onRetry={() => void performanceQueries.history.refetch()}
+      />
+      <PerformanceAllocationSection
+        loadState={allocationState}
+        allocationRows={allocationResponse?.allocation ?? []}
+        rebalanceRows={allocationResponse?.rebalance ?? []}
+        targets={targets}
+        dataQuality={
+          allocationResponse?.partial
+            ? {
+                partial: true,
+                missingSymbols: allocationResponse.missingSymbols,
+              }
+            : performanceQueries.quality
+        }
+        targetsUnavailable={targetsUnavailable}
+        valuedAt={layers?.valuedAt}
+        editDisabled={!scopeEnabled || targetsUnavailable}
+        onRetry={retryAllocation}
+        onEditTargets={() => {
+          if (scopeEnabled && !targetsUnavailable) {
+            setTargetSaveError(null);
+            setTargetSheetOpen(true);
+          }
+        }}
+      />
+      <PerformanceTargetSheet
+        open={targetSheetOpen}
+        onOpenChange={setTargetSheetOpen}
+        targets={targetsResponse?.targets}
+        version={targetsResponse?.version}
+        createdAt={targetsResponse?.createdAt}
+        saving={saveTargetsMutation.isPending}
+        error={targetSaveError}
+        onSave={saveTargets}
       />
     </section>
   );

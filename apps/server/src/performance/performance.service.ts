@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   allocation,
+  normalizeAllocationCategory,
+  normalizeAllocationTargets,
   projectCashBalance,
   rebalanceGap,
   ttwror,
@@ -26,7 +28,26 @@ type PerformanceLedgerEvent = {
   amount: unknown;
 };
 
-const EXTERNAL_FLOW_TYPES = ['CASH_DEPOSIT', 'CASH_WITHDRAW', 'TRANSFER_IN', 'TRANSFER_OUT'] as const;
+type PrismaLedgerEvent = {
+  id: string;
+  accountId: string;
+  type: string;
+  occurredAt: Date;
+  symbol: string | null;
+  quantity: unknown;
+  price: unknown;
+  amount: unknown;
+  fee: unknown;
+  tax: unknown;
+  metadata?: unknown;
+};
+
+const EXTERNAL_FLOW_TYPES = [
+  'CASH_DEPOSIT',
+  'CASH_WITHDRAW',
+  'TRANSFER_IN',
+  'TRANSFER_OUT',
+] as const;
 
 const snapshotPayload = (payload: unknown) =>
   payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
@@ -49,6 +70,22 @@ const snapshotMissingSymbols = (snapshot: Pick<PerformanceSnapshot, 'payload'>) 
 const snapshotValue = (snapshot: Pick<PerformanceSnapshot, 'marketValue' | 'cashValue'>) =>
   Number(snapshot.marketValue) + Number(snapshot.cashValue);
 
+const toLedgerEvent = (event: PrismaLedgerEvent): LedgerEvent => ({
+  id: event.id,
+  accountId: event.accountId,
+  type: event.type as LedgerEvent['type'],
+  occurredAt: event.occurredAt.toISOString(),
+  ...(event.symbol === null ? {} : { symbol: event.symbol }),
+  ...(event.quantity === null ? {} : { quantity: Number(event.quantity) }),
+  ...(event.price === null ? {} : { price: Number(event.price) }),
+  ...(event.amount === null ? {} : { amount: Number(event.amount) }),
+  ...(event.fee === null ? {} : { fee: Number(event.fee) }),
+  ...(event.tax === null ? {} : { tax: Number(event.tax) }),
+  ...(event.metadata && typeof event.metadata === 'object'
+    ? { metadata: event.metadata as Record<string, unknown> }
+    : {}),
+});
+
 const externalPortfolioFlow = (event: Pick<PerformanceLedgerEvent, 'type' | 'amount'>) => {
   const amount = Number(event.amount ?? 0);
   if (!Number.isFinite(amount) || amount === 0) return 0;
@@ -64,7 +101,27 @@ export class PerformanceService {
     private readonly market: MarketService,
   ) {}
 
+  private async assertCurrencyScope(accountId: string | undefined, mode: PortfolioMode) {
+    if (accountId) return;
+    const accountDelegate = (this.prisma as unknown as { account?: unknown }).account as
+      { findMany?: (args: unknown) => Promise<Array<{ currency?: string | null }>> } | undefined;
+    if (typeof accountDelegate?.findMany !== 'function') return;
+    const accounts = await accountDelegate.findMany({
+      where: { mode },
+      select: { currency: true },
+    });
+    const currencies = new Set(accounts.map((account) => account.currency ?? 'CNY'));
+    if (currencies.size > 1) {
+      throw new BadRequestException({
+        code: 'MIXED_CURRENCY_SCOPE',
+        message: '当前范围包含多个币种，请选择单个账户后再分析',
+        currencies: [...currencies],
+      });
+    }
+  }
+
   async capture(accountId?: string, capturedAt = new Date(), mode: PortfolioMode = 'actual') {
+    await this.assertCurrencyScope(accountId, mode);
     const accountWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
     const [positions, ledger] = await Promise.all([
       this.prisma.position.findMany({
@@ -117,28 +174,12 @@ export class PerformanceService {
         }
       }),
     );
-    const knownMarketValue = valued.reduce(
-      (sum, position) => sum + (position.marketValue ?? 0),
-      0,
-    );
+    const knownMarketValue = valued.reduce((sum, position) => sum + (position.marketValue ?? 0), 0);
     const costValue = valued.reduce(
       (sum, position) => sum + position.quantity * position.costPrice,
       0,
     );
-    const cash = projectCashBalance(
-      ledger.map((event): LedgerEvent => ({
-        id: event.id,
-        accountId: event.accountId,
-        type: event.type as LedgerEvent['type'],
-        occurredAt: event.occurredAt.toISOString(),
-        ...(event.symbol === null ? {} : { symbol: event.symbol }),
-        ...(event.quantity === null ? {} : { quantity: Number(event.quantity) }),
-        ...(event.price === null ? {} : { price: Number(event.price) }),
-        ...(event.amount === null ? {} : { amount: Number(event.amount) }),
-        ...(event.fee === null ? {} : { fee: Number(event.fee) }),
-        ...(event.tax === null ? {} : { tax: Number(event.tax) }),
-      })),
-    );
+    const cash = projectCashBalance(ledger.map(toLedgerEvent));
     const cashValue = accountId
       ? (cash.get(accountId) ?? 0)
       : [...cash.values()].reduce((sum, value) => sum + value, 0);
@@ -272,7 +313,13 @@ export class PerformanceService {
     targets: Record<string, number>,
     accountId?: string,
   ) {
-    const values = Object.values(targets);
+    const normalizedTargetResult = normalizeAllocationTargets(targets);
+    if (normalizedTargetResult.unknown.length > 0)
+      throw new BadRequestException(
+        `无法识别配置类别: ${normalizedTargetResult.unknown.join('、')}`,
+      );
+    const normalizedTargets = normalizedTargetResult.targets;
+    const values = Object.values(normalizedTargets);
     if (values.length === 0 || values.some((value) => !Number.isFinite(value) || value < 0))
       throw new BadRequestException('目标权重必须是非负有限数字');
     if (Math.abs(values.reduce((sum, value) => sum + value, 0) - 1) > 1e-8)
@@ -290,7 +337,7 @@ export class PerformanceService {
         scope,
         ...(accountId === undefined ? {} : { accountId }),
         version: (latest?.version ?? 0) + 1,
-        targets,
+        targets: normalizedTargets,
         active: true,
       },
     });
@@ -304,6 +351,7 @@ export class PerformanceService {
   }
 
   async history(accountId?: string, start?: string, end?: string, mode: PortfolioMode = 'actual') {
+    await this.assertCurrencyScope(accountId, mode);
     const snapshots = await this.prisma.portfolioSnapshot.findMany({
       where: {
         accountId: accountId ?? null,
@@ -345,24 +393,57 @@ export class PerformanceService {
   allocate(input: {
     positions: { category: string; marketValue: number }[];
     targets?: Record<string, number>;
+    dataQuality?: { partial: boolean; missingSymbols: string[] };
   }) {
     if (input.positions.some((position) => position.marketValue < 0))
       throw new BadRequestException('资产市值不能为负数');
+    const positions = input.positions.map((position) => {
+      const category = normalizeAllocationCategory(position.category);
+      if (!category) throw new BadRequestException(`无法识别配置类别: ${position.category}`);
+      return { ...position, category };
+    });
+    const normalizedTargetResult = normalizeAllocationTargets(input.targets);
+    if (normalizedTargetResult.unknown.length > 0)
+      throw new BadRequestException(
+        `无法识别配置类别: ${normalizedTargetResult.unknown.join('、')}`,
+      );
+    const targets = input.targets ? normalizedTargetResult.targets : undefined;
+    const partial = input.dataQuality?.partial === true;
+    const missingSymbols = input.dataQuality?.missingSymbols ?? [];
+    const calculatedAllocation = allocation(positions);
     return {
-      allocation: allocation(input.positions),
-      rebalance: input.targets ? rebalanceGap(input.positions, input.targets) : [],
+      allocation: partial
+        ? calculatedAllocation.map((item) => ({ ...item, weight: null }))
+        : calculatedAllocation,
+      rebalance: partial || !targets ? [] : rebalanceGap(positions, targets),
+      partial,
+      missingSymbols,
     };
   }
 
   async layers(accountId?: string, symbol?: string, mode: PortfolioMode = 'actual') {
-    const positions = await this.prisma.position.findMany({
-      where: {
-        ...(accountId ? { accountId } : {}),
-        ...(symbol ? { symbol } : {}),
-        ...(accountId ? {} : { account: { mode } }),
-      },
-      include: { asset: true },
-    });
+    await this.assertCurrencyScope(accountId, mode);
+    const positionWhere = {
+      ...(accountId ? { accountId } : {}),
+      ...(symbol ? { symbol } : {}),
+      account: { mode },
+    };
+    const ledgerWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
+    const ledgerDelegate = (this.prisma as unknown as { ledgerEvent?: unknown }).ledgerEvent as
+      | {
+          findMany?: (args: unknown) => Promise<unknown[]>;
+        }
+      | undefined;
+    const [positions, storedLedger] = await Promise.all([
+      this.prisma.position.findMany({ where: positionWhere, include: { asset: true } }),
+      typeof ledgerDelegate?.findMany === 'function'
+        ? ledgerDelegate.findMany({
+            where: ledgerWhere,
+            orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+          })
+        : Promise.resolve([]),
+    ]);
+    const ledger = storedLedger as PrismaLedgerEvent[];
     const security = await Promise.all(
       positions.map(async (position) => {
         let marketValue: number | null = null;
@@ -387,19 +468,49 @@ export class PerformanceService {
         };
       }),
     );
+    const cashBalances = projectCashBalance(ledger.map(toLedgerEvent));
     const byAccount = new Map<
       string,
-      { costValue: number; marketValue: number; partial: boolean }
+      {
+        costValue: number;
+        marketValue: number;
+        cashValue: number;
+        partial: boolean;
+        missingSymbols: string[];
+      }
     >();
+    for (const [id, cashValue] of cashBalances.entries()) {
+      byAccount.set(id, {
+        costValue: 0,
+        marketValue: 0,
+        cashValue,
+        partial: false,
+        missingSymbols: [],
+      });
+    }
+    if (accountId && !byAccount.has(accountId)) {
+      byAccount.set(accountId, {
+        costValue: 0,
+        marketValue: 0,
+        cashValue: 0,
+        partial: false,
+        missingSymbols: [],
+      });
+    }
     for (const item of security) {
       const current = byAccount.get(item.accountId) ?? {
         costValue: 0,
         marketValue: 0,
+        cashValue: 0,
         partial: false,
+        missingSymbols: [],
       };
       current.costValue += item.costValue;
       current.marketValue += item.marketValue ?? 0;
-      current.partial ||= item.marketValue === null;
+      if (item.marketValue === null) {
+        current.partial = true;
+        current.missingSymbols.push(item.symbol);
+      }
       byAccount.set(item.accountId, current);
     }
     const account = [...byAccount.entries()].map(([id, value]) => ({ accountId: id, ...value }));
@@ -407,10 +518,30 @@ export class PerformanceService {
       (total, value) => ({
         costValue: total.costValue + value.costValue,
         marketValue: total.marketValue + value.marketValue,
+        cashValue: total.cashValue + value.cashValue,
         partial: total.partial || value.partial,
+        missingSymbols: [...total.missingSymbols, ...value.missingSymbols],
       }),
-      { costValue: 0, marketValue: 0, partial: false },
+      {
+        costValue: 0,
+        marketValue: 0,
+        cashValue: 0,
+        partial: false,
+        missingSymbols: [] as string[],
+      },
     );
-    return { security, account, portfolio };
+    return {
+      security,
+      account,
+      portfolio: {
+        ...portfolio,
+        missingSymbols: [...new Set(portfolio.missingSymbols)],
+      },
+      valuedAt: new Date().toISOString(),
+      dataQuality: {
+        partial: portfolio.partial,
+        missingSymbols: [...new Set(portfolio.missingSymbols)],
+      },
+    };
   }
 }

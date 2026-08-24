@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { portfolioModeSchema } from './api.js';
 
+export const allocationCategorySchema = z.enum(['stock', 'etf', 'fund', 'index', 'cash']);
+export type AllocationCategory = z.infer<typeof allocationCategorySchema>;
+
 export const performanceSnapshotCaptureInputSchema = z.object({
   accountId: z.uuid().optional(),
   capturedAt: z.iso.datetime({ offset: true }).optional(),
@@ -23,6 +26,12 @@ export const performanceCalculateInputSchema = z.object({
 export const performanceAllocationInputSchema = z.object({
   positions: z.array(z.object({ category: z.string().min(1), marketValue: z.number().finite() })),
   targets: z.record(z.string(), z.number().finite()).optional(),
+  dataQuality: z
+    .object({
+      partial: z.boolean(),
+      missingSymbols: z.array(z.string()),
+    })
+    .optional(),
 });
 
 export const performanceTargetsInputSchema = z.object({
