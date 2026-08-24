@@ -29,7 +29,7 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
     <ToastPrimitive.Viewport
       data-slot="toast-viewport"
       className={cn(
-        'pointer-events-none fixed top-4 right-4 layer-toast flex max-h-[calc(100dvh-2rem)] w-[min(360px,calc(100vw-2rem))] flex-col gap-3 overflow-y-auto outline-none',
+        'pointer-events-none fixed top-4 right-4 layer-toast flex max-h-[calc(100dvh-2rem)] w-[min(360px,calc(100vw-2rem))] flex-col gap-3 overflow-y-auto rounded-2xl outline-none',
         className,
       )}
       {...props}

@@ -292,7 +292,9 @@ describe('Desktop UI contract - providers and primitives', () => {
       </Toast>,
     );
     expect(viewport).toContain('flex-col');
+    expect(viewport).toContain('rounded-2xl');
     expect(notifications).toContain('完成');
     expect(notifications).toContain('data-slot="toast"');
+    expect(notifications).toContain('rounded-2xl');
   });
 });
