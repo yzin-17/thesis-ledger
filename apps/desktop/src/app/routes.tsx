@@ -107,6 +107,7 @@ export function AppRoutes() {
             accounts={accounts}
             mode={portfolioMode}
             onModeChange={setPortfolioMode}
+            onNavigate={navigateTo}
           />
         }
       />

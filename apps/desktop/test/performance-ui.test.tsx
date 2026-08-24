@@ -5,7 +5,9 @@ import {
   PerformanceAccountSelector,
   PerformanceAllocationSection,
   PerformanceMetrics,
+  PerformanceSnapshotTable,
 } from '../src/features/performance/PerformanceSections.js';
+import { PortfolioModeSwitch } from '../src/features/shared/PortfolioModeSwitch.js';
 import { fetchPerformanceHistory } from '../src/features/performance/performance.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 
@@ -23,14 +25,20 @@ describe('收益分析交互契约', () => {
         mixedCurrencies
         latestSnapshotAt={undefined}
         valuedAt={undefined}
-        onModeChange={vi.fn()}
         onAccountChange={vi.fn()}
       />,
     );
     expect(markup).toContain('当前模式包含多个币种');
-    expect(markup).toContain('role="tablist"');
     expect(markup).toContain('人民币账户');
     expect(markup).not.toContain('影子账户');
+  });
+
+  it('组合模式复用右上角 Switch 语义', () => {
+    const markup = renderToStaticMarkup(
+      <PortfolioModeSwitch mode="actual" onModeChange={vi.fn()} ariaLabel="收益范围" />,
+    );
+    expect(markup).toContain('当前实际，切换到模拟');
+    expect(markup).toContain('data-slot="switch"');
   });
 
   it('Snapshot 不足或 partial 时使用破折号和明确原因', () => {
@@ -52,7 +60,7 @@ describe('收益分析交互契约', () => {
     );
     expect(markup).toContain('>—<');
     expect(markup).toContain('收益摘要包含 partial Snapshot，请补齐行情');
-    expect(markup).toContain('行情不完整，暂不显示总资产');
+    expect(markup).toContain('行情不完整，尚无完整估值');
   });
 
   it('partial 配置保留金额、隐藏权重并暂停建议，包含无持仓指数目标', () => {
@@ -64,7 +72,7 @@ describe('收益分析交互契约', () => {
         targets={{ stock: 0.6, index: 0.4 }}
         dataQuality={{ partial: true, missingSymbols: ['600519.SH'] }}
         valuedAt="2026-08-24T00:00:00.000Z"
-        onEditTargets={vi.fn()}
+        onSaveTargets={vi.fn(async () => true)}
       />,
     );
     expect(markup).toContain('行情不完整');
@@ -83,7 +91,7 @@ describe('收益分析交互契约', () => {
         targets={{ stock: 0, etf: 1 }}
         dataQuality={{ partial: false, missingSymbols: [] }}
         valuedAt="2026-08-24T00:00:00.000Z"
-        onEditTargets={vi.fn()}
+        onSaveTargets={vi.fn(async () => true)}
       />,
     );
     expect(markup).toContain('股票');
@@ -102,12 +110,38 @@ describe('收益分析交互契约', () => {
         targetsUnavailable
         valuedAt="2026-08-24T00:00:00.000Z"
         editDisabled
-        onEditTargets={vi.fn()}
+        onSaveTargets={vi.fn(async () => true)}
       />,
     );
     expect(markup).toContain('目标配置不可用');
     expect(markup).toContain('不可用');
     expect(markup).toContain('¥100.00');
+  });
+
+  it('没有 Snapshot 时使用紧凑空状态而不是空表格', () => {
+    const markup = renderToStaticMarkup(
+      <PerformanceSnapshotTable loadState="empty" snapshots={[]} onCompleteDataSetup={vi.fn()} />,
+    );
+    expect(markup).toContain('暂无收益历史');
+    expect(markup).toContain('完成数据配置');
+    expect(markup).not.toContain('<table');
+  });
+
+  it('没有 Snapshot 时仍显示当前持仓估值和成本差', () => {
+    const markup = renderToStaticMarkup(
+      <PerformanceMetrics
+        latest={undefined}
+        summary={null}
+        snapshotCount={0}
+        currentValue={1084.5}
+        currentPnl={32.4}
+        currentPnlRate={0.0308}
+      />,
+    );
+    expect(markup).toContain('¥1,084.50');
+    expect(markup).toContain('+¥32.40');
+    expect(markup).toContain('+3.08%');
+    expect(markup).toContain('需要 ≥ 2 个快照');
   });
 
   it('Snapshot 适配层保留服务端 partial 与 missingSymbols', async () => {
