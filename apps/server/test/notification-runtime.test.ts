@@ -170,7 +170,7 @@ describe('Notification cooldown', () => {
 });
 
 describe('Notification dispatch', () => {
-  it('风险提示标题补充证券名称', async () => {
+  it('风险提示标题不重复证券名称，正文使用事件消息', async () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',
@@ -193,9 +193,6 @@ describe('Notification dispatch', () => {
       },
       riskEvent: {
         findUnique: vi.fn(async () => riskEvent('event-1', '159516.SZ')),
-      },
-      asset: {
-        findUnique: vi.fn(async () => ({ name: '半导体设备ETF国泰' })),
       },
       providerConfig: {
         findMany: vi.fn(async () => [
@@ -222,12 +219,12 @@ describe('Notification dispatch', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(providerWebhook),
       expect.objectContaining({
-        body: expect.stringContaining('风险提醒 · 159516.SZ · 半导体设备ETF国泰'),
+        body: expect.stringContaining('风险提醒\\n价格跌破阈值'),
       }),
     );
   });
 
-  it('事件上下文已有证券名称时不依赖名称查询', async () => {
+  it('事件上下文中的证券名称不会重复拼入通知标题', async () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-context-name',
@@ -284,7 +281,7 @@ describe('Notification dispatch', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(providerWebhook),
       expect.objectContaining({
-        body: expect.stringContaining('风险提醒 · 159516.SZ · 半导体设备ETF国泰'),
+        body: expect.stringContaining('风险提醒\\n价格跌破阈值'),
       }),
     );
   });

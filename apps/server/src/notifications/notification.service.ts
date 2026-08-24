@@ -364,33 +364,8 @@ export class NotificationService {
       event.context && typeof event.context === 'object'
         ? (event.context as Record<string, unknown>)
         : undefined;
-    const contextAssetName =
-      typeof context?.assetName === 'string' && context.assetName.trim()
-        ? context.assetName.trim()
-        : undefined;
-    const contextAccountName =
-      typeof context?.accountName === 'string' && context.accountName.trim()
-        ? context.accountName.trim()
-        : undefined;
-    let assetName = contextAssetName;
-    if (!assetName && event.symbol && typeof this.prisma.asset?.findUnique === 'function') {
-      try {
-        const asset = await this.prisma.asset.findUnique({
-          where: { symbol: event.symbol },
-          select: { name: true },
-        });
-        assetName = asset?.name?.trim() || undefined;
-      } catch {
-        // 名称补全失败时继续发送已有事件信息。
-      }
-    }
-    let subject = contextAccountName ?? event.accountId ?? '组合';
-    if (event.symbol) {
-      subject = event.symbol;
-      if (assetName && assetName !== event.symbol) subject = `${event.symbol} · ${assetName}`;
-    }
     return {
-      title: `风险提醒 · ${subject}`,
+      title: '风险提醒',
       body: event.message,
       severity,
       traceId: typeof context?.traceId === 'string' ? context.traceId : crypto.randomUUID(),
