@@ -68,11 +68,7 @@ export function PortfolioDashboard({
         )}
       </div>
       <div className="page-header-actions">
-        <PortfolioModeSwitch
-          mode={mode}
-          onModeChange={onModeChange}
-          ariaLabel="估值范围"
-        />
+        <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="估值范围" />
         <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
           <ArrowClockwiseIcon />
           刷新

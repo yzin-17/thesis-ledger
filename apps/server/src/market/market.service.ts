@@ -7,9 +7,12 @@ import {
   fundNavHistorySchemaV1,
   indicatorSchemaV1,
   quoteSchemaV1,
+  fxRatesResponseSchemaV1,
   type BarInputV1,
   type BarV1,
   type ChipDistributionV1,
+  type CurrencyV1,
+  type FxRatesResponseV1,
   type FundNavV1,
   type FundNavHistoryV1,
   type IndicatorV1,
@@ -120,6 +123,24 @@ export class MarketService {
         // TTL 负责最终释放锁；释放失败不能覆盖已获得的行情结果。
       }
     }
+  }
+
+  async getFxRates(input: {
+    baseCurrency: CurrencyV1;
+    currencies: readonly CurrencyV1[];
+    asOf?: string;
+  }): Promise<FxRatesResponseV1> {
+    const currencies = [...new Set(input.currencies)].sort();
+    const asOf = input.asOf?.slice(0, 10);
+    const key = `fx-rates:${input.baseCurrency}:${currencies.join(',')}:${asOf ?? 'today'}`;
+    return this.singleFlight(key, async () => {
+      const raw = await this.dsa.fxRates({
+        baseCurrency: input.baseCurrency,
+        currencies,
+        ...(asOf ? { asOf } : {}),
+      });
+      return fxRatesResponseSchemaV1.parse(raw);
+    });
   }
 
   async getQuote(

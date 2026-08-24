@@ -1,5 +1,4 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch, SwitchThumb } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -26,10 +26,13 @@ import type {
   AllocationCategory,
   PerformanceAllocationRecord,
   PerformanceDataQuality,
+  PerformanceFxMeta,
+  PerformancePortfolioTotal,
   PerformanceSummary,
   PortfolioMode,
   RebalanceGapRecord,
   SnapshotRecord,
+  Currency,
 } from './performance.types.js';
 
 const ALL_ACCOUNTS_VALUE = '__all_accounts__';
@@ -41,6 +44,15 @@ const CATEGORY_LABELS: Record<AllocationCategory, string> = {
   index: '指数',
   cash: '现金',
 };
+
+const moneyByCurrency: Record<Currency, Intl.NumberFormat> = {
+  CNY: money,
+  HKD: new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'HKD' }),
+  USD: new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'USD' }),
+};
+
+const formatMoney = (value: number, currency?: Currency) =>
+  (currency ? moneyByCurrency[currency] : money).format(value);
 
 const formatWeight = (weight: number | null | undefined) => {
   if (weight === null || weight === undefined || !Number.isFinite(weight)) return '—';
@@ -86,8 +98,8 @@ const formatDate = (value?: string | null) => {
 
 const snapshotValue = (snapshot: SnapshotRecord) => snapshot.marketValue + snapshot.cashValue;
 
-const signedMoney = (value: number) =>
-  value >= 0 ? `+${money.format(value)}` : money.format(value);
+const signedMoney = (value: number, currency?: Currency) =>
+  value >= 0 ? `+${formatMoney(value, currency)}` : formatMoney(value, currency);
 
 const signedPercent = (value: number) => {
   const formatted = `${Math.abs(value * 100).toFixed(2)}%`;
@@ -147,7 +159,7 @@ const PerformanceHistoryChart = ({ snapshots }: { snapshots: SnapshotRecord[] })
         className="h-52 w-full text-primary"
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label="Snapshot 资产价值走势"
+        aria-label="快照资产价值走势"
       >
         <line
           x1={padding.left}
@@ -178,7 +190,9 @@ const PerformanceHistoryChart = ({ snapshots }: { snapshots: SnapshotRecord[] })
       <div className="flex justify-between gap-3 text-xs text-muted-foreground">
         <span>{first ? formatDate(first.capturedAt) : '尚无数据时点'}</span>
         <span>
-          {last ? `${formatDate(last.capturedAt)} · ${money.format(snapshotValue(last))}` : ''}
+          {last
+            ? `${formatDate(last.capturedAt)} · ${formatMoney(snapshotValue(last), last.currency)}`
+            : ''}
         </span>
       </div>
     </div>
@@ -193,6 +207,12 @@ export function PerformanceAccountSelector({
   latestSnapshotAt,
   valuedAt,
   onAccountChange,
+  fxMerge,
+  baseCurrency,
+  onFxMergeChange,
+  onBaseCurrencyChange,
+  onRetry,
+  fx,
 }: {
   accounts: Account[];
   mode: PortfolioMode;
@@ -201,7 +221,18 @@ export function PerformanceAccountSelector({
   latestSnapshotAt?: string | undefined;
   valuedAt?: string | undefined;
   onAccountChange: (accountId: string) => void;
+  fxMerge?: boolean;
+  baseCurrency?: 'CNY' | 'HKD' | 'USD';
+  onFxMergeChange?: (checked: boolean) => void;
+  onBaseCurrencyChange?: (currency: 'CNY' | 'HKD' | 'USD') => void;
+  onRetry?: (() => void) | undefined;
+  fx?: PerformanceFxMeta | undefined;
 }) {
+  const resolvedFxMerge = fxMerge ?? false;
+  const resolvedBaseCurrency = baseCurrency ?? 'CNY';
+  const handleFxMergeChange = onFxMergeChange ?? (() => undefined);
+  const handleBaseCurrencyChange = onBaseCurrencyChange ?? (() => undefined);
+  const fxAvailable = mixedCurrencies && !accountId;
   const modeAccounts = accounts.filter(
     (account) => account.mode === mode && account.active !== false,
   );
@@ -210,42 +241,103 @@ export function PerformanceAccountSelector({
   const statusLabel = statusDate
     ? `数据截至 ${formatDate(statusDate)} · ${latestSnapshotAt ? '有收益快照' : '暂无收益快照'}`
     : '数据截至 -- · 暂无估值快照';
+  const fxDate = fx?.asOf ? formatDate(fx.asOf) : undefined;
+  let fxStatusLabel = '当前无需换算';
+  if (fxAvailable && !resolvedFxMerge) fxStatusLabel = '分币种显示 · 未合并';
+  else if (fx?.status === 'ready') fxStatusLabel = `已换算至 ${resolvedBaseCurrency}`;
+  else if (fx?.status === 'stale')
+    fxStatusLabel = `已换算至 ${resolvedBaseCurrency} · 使用陈旧汇率`;
+  else if (fx?.status === 'blocked') fxStatusLabel = '无法获取汇率，保留分币种结果';
+  let mixedCurrencyHint = '';
+  if (mixedCurrencies && !fxAvailable)
+    mixedCurrencyHint = '当前模式包含多个币种；当前已选择单个账户，金额使用该账户原币种。';
+  else if (fxAvailable && resolvedFxMerge)
+    mixedCurrencyHint = '合并仅影响收益分析展示，不改变账本、持仓或目标配置的原始币种。';
+  else if (fxAvailable)
+    mixedCurrencyHint =
+      '当前模式包含多个币种；关闭汇率合并时按币种分组展示，不计算跨币种目标偏差或再平衡。';
   return (
-    <div className="flex flex-wrap items-end gap-4 border-b border-border/70 pb-3">
-      <label className="flex min-w-0 basis-full items-center gap-2 text-sm text-muted-foreground md:flex-1 md:basis-auto md:max-w-md">
-        <span className="shrink-0">账户</span>
-        <Select
-          value={accountId || ALL_ACCOUNTS_VALUE}
-          onValueChange={(value) => {
-            onAccountChange(value === ALL_ACCOUNTS_VALUE ? '' : (value ?? ''));
-          }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue>
-              {mixedCurrencies && !accountId ? '请选择账户' : (selectedAccount?.name ?? '全部账户')}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value={ALL_ACCOUNTS_VALUE} disabled={mixedCurrencies}>
-                全部账户
-              </SelectItem>
-              {modeAccounts.map((account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name} · {account.currency}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </label>
-      <p className="m-0 basis-full text-xs text-muted-foreground md:basis-auto md:ml-auto">
-        {statusLabel}
-      </p>
-      {mixedCurrencies ? (
-        <p className="basis-full m-0 text-xs text-destructive">
-          当前模式包含多个币种。没有 FX 契约，不能直接合并金额，请选择单个账户。
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex min-w-0 basis-full items-center gap-2 text-sm text-muted-foreground sm:basis-auto">
+          <span className="shrink-0">账户</span>
+          <Select
+            value={accountId || ALL_ACCOUNTS_VALUE}
+            onValueChange={(value) => {
+              onAccountChange(value === ALL_ACCOUNTS_VALUE ? '' : (value ?? ''));
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue>{selectedAccount?.name ?? '全部账户'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={ALL_ACCOUNTS_VALUE}>全部账户</SelectItem>
+                {modeAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name} · {account.currency}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </label>
+        <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+          <span>汇率合并</span>
+          <Switch
+            variant="risk"
+            checked={resolvedFxMerge}
+            disabled={!fxAvailable}
+            aria-label={fxAvailable ? '汇率合并' : '当前范围无需汇率换算'}
+            onCheckedChange={handleFxMergeChange}
+          >
+            <SwitchThumb variant="risk" aria-hidden="true" />
+          </Switch>
+        </div>
+        <label className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+          <span>基准币种</span>
+          <Select
+            value={resolvedBaseCurrency}
+            disabled={!fxAvailable || !resolvedFxMerge}
+            onValueChange={(value) => {
+              if (value === 'CNY' || value === 'HKD' || value === 'USD')
+                handleBaseCurrencyChange(value);
+            }}
+          >
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="CNY">CNY</SelectItem>
+                <SelectItem value="HKD">HKD</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground sm:justify-end">
+        <p className="m-0">
+          {fxStatusLabel}
+          {fxDate ? ` · 汇率截至 ${fxDate}` : ''}
+          {resolvedFxMerge && fx?.estimated ? ' · 按当前汇率回算 · 估算' : ''}
+          {` · ${statusLabel}`}
         </p>
+        {fxAvailable && resolvedFxMerge && fx?.status === 'blocked' && onRetry ? (
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-7 px-0 text-xs"
+            onClick={onRetry}
+          >
+            重新获取汇率
+          </Button>
+        ) : null}
+      </div>
+      {mixedCurrencies ? (
+        <p className="m-0 text-xs text-muted-foreground">{mixedCurrencyHint}</p>
       ) : null}
     </div>
   );
@@ -262,15 +354,13 @@ const PerformanceKpiCard = ({
   detail: string;
   tone: 'positive' | 'negative' | undefined;
 }) => (
-  <Card className="rounded-lg border-0 bg-muted/35 py-0 shadow-none ring-0">
-    <CardContent className="p-4">
+  <Card className="h-[120px] rounded-xl border border-border/70 bg-muted/25 py-0 shadow-none ring-0">
+    <CardContent className="flex h-full flex-col justify-between p-4">
       <p className="m-0 text-xs text-muted-foreground">{label}</p>
-      <strong className="mt-3 block text-2xl font-semibold tracking-tight text-foreground">
+      <strong className="block text-2xl font-semibold tracking-tight text-foreground">
         {value}
       </strong>
-      <p className={tone ? `m-0 mt-2 text-xs ${tone}` : 'm-0 mt-2 text-xs text-muted-foreground'}>
-        {detail}
-      </p>
+      <p className={tone ? `m-0 text-xs ${tone}` : 'm-0 text-xs text-muted-foreground'}>{detail}</p>
     </CardContent>
   </Card>
 );
@@ -285,6 +375,9 @@ export function PerformanceMetrics({
   currentValuePartial,
   currentPnl,
   currentPnlRate,
+  currentCurrency,
+  currencyTotals = [],
+  fx,
 }: {
   latest: SnapshotRecord | undefined;
   summary: PerformanceSummary | null;
@@ -295,13 +388,17 @@ export function PerformanceMetrics({
   currentValuePartial?: boolean | undefined;
   currentPnl?: number | null | undefined;
   currentPnlRate?: number | null | undefined;
+  currentCurrency?: Currency | undefined;
+  currencyTotals?: PerformancePortfolioTotal[];
+  fx?: PerformanceFxMeta | undefined;
 }) {
+  const resolvedFx = fx ?? summary?.fx;
   const hasCurrentValue = currentValue !== undefined && Number.isFinite(currentValue);
   const hasSnapshotValue = latest !== undefined && !latest.partial;
   const snapshotPartial = latestPartial ?? latest?.partial === true;
   let assetValue = '—';
-  if (hasCurrentValue) assetValue = money.format(currentValue);
-  else if (hasSnapshotValue) assetValue = money.format(snapshotValue(latest));
+  if (hasCurrentValue) assetValue = formatMoney(currentValue, currentCurrency);
+  else if (hasSnapshotValue) assetValue = formatMoney(snapshotValue(latest), latest.currency);
 
   let assetDetail = '暂无即时估值';
   if (currentValuePartial) assetDetail = '当前估值，行情不完整';
@@ -312,28 +409,33 @@ export function PerformanceMetrics({
       currentPnlRate !== null &&
       currentPnlRate !== undefined
     ) {
-      assetDetail = `较持仓成本 ${signedMoney(currentPnl)} · ${signedPercent(currentPnlRate)}`;
+      assetDetail = `较持仓成本 ${signedMoney(currentPnl, currentCurrency)} · ${signedPercent(currentPnlRate)}`;
     } else {
       assetDetail = '当前估值';
     }
   } else if (hasSnapshotValue) {
     if (snapshotPartial) {
-      assetDetail = `最近完整 Snapshot ${formatDate(latest.capturedAt)} · 最新快照缺行情`;
+      assetDetail = `最近完整快照 ${formatDate(latest.capturedAt)} · 最新快照缺行情`;
     } else {
-      assetDetail = `最近完整 Snapshot ${formatDate(latest.capturedAt)}`;
+      assetDetail = `最近完整快照 ${formatDate(latest.capturedAt)}`;
     }
-  } else if (snapshotPartial) assetDetail = '行情不完整，尚无完整估值';
+  } else if (currencyTotals.length > 1) assetDetail = '分币种估值 · 开启汇率合并查看合计';
+  else if (snapshotPartial) assetDetail = '行情不完整，尚无完整估值';
   let assetTone: 'positive' | 'negative' | undefined;
   if (currentPnlRate !== null && currentPnlRate !== undefined) {
     if (currentPnlRate > 0) assetTone = 'positive';
     else if (currentPnlRate < 0) assetTone = 'negative';
   }
-  const canCalculateTtwror = summary !== null && snapshotCount >= 2;
+  const canCalculateTtwror = summary !== null && summary.ttwror !== null && snapshotCount >= 2;
   let ttwrorValue = '—';
-  if (canCalculateTtwror) ttwrorValue = `${(summary.ttwror * 100).toFixed(2)}%`;
+  if (summary && summary.ttwror !== null && snapshotCount >= 2)
+    ttwrorValue = `${(summary.ttwror * 100).toFixed(2)}%`;
   let ttwrorDetail = '需要 ≥ 2 个快照';
   if (summaryError) ttwrorDetail = summaryError;
   else if (canCalculateTtwror) ttwrorDetail = '不混入外部现金流';
+  else if (summary?.xirrReason) ttwrorDetail = summary.xirrReason;
+  if (resolvedFx?.status === 'stale') ttwrorDetail = '按当前汇率回算 · 估算 · 使用陈旧汇率';
+  if (resolvedFx?.status === 'blocked') ttwrorDetail = '无法获取汇率，暂不可计算合并收益';
   const canDisplayXirr = summary?.xirr !== null && summary?.xirr !== undefined;
   let xirrValue = '—';
   if (summary && summary.xirr !== null && summary.xirr !== undefined) {
@@ -341,20 +443,47 @@ export function PerformanceMetrics({
   }
   let xirrDetail = '现金流不足或无法收敛';
   if (summaryError) xirrDetail = summaryError;
-  else if (canDisplayXirr) xirrDetail = '基于 Ledger 现金流';
+  else if (canDisplayXirr) xirrDetail = '基于账本现金流';
   else if (snapshotCount < 2) xirrDetail = '需要 ≥ 2 个现金流节点';
   else if (summary?.xirrReason) xirrDetail = summary.xirrReason;
+  if (resolvedFx?.status === 'stale') xirrDetail = '按当前汇率回算 · 估算 · 使用陈旧汇率';
+  if (resolvedFx?.status === 'blocked') xirrDetail = '无法获取汇率，暂不可计算合并收益';
   return (
-    <div className="mb-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <PerformanceKpiCard label="总资产" value={assetValue} detail={assetDetail} tone={assetTone} />
-      <PerformanceKpiCard
-        label="TTWROR"
-        value={ttwrorValue}
-        detail={ttwrorDetail}
-        tone={undefined}
-      />
-      <PerformanceKpiCard label="XIRR" value={xirrValue} detail={xirrDetail} tone={undefined} />
-    </div>
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <PerformanceKpiCard
+          label="总资产"
+          value={assetValue}
+          detail={assetDetail}
+          tone={assetTone}
+        />
+        <PerformanceKpiCard
+          label="TTWROR"
+          value={ttwrorValue}
+          detail={ttwrorDetail}
+          tone={undefined}
+        />
+        <PerformanceKpiCard label="XIRR" value={xirrValue} detail={xirrDetail} tone={undefined} />
+      </div>
+      {currencyTotals.length > 1 ? (
+        <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="分币种总资产">
+          {currencyTotals.map((total) => (
+            <Card
+              key={total.currency ?? 'unknown'}
+              className="rounded-lg border border-border/60 bg-muted/15 py-0 shadow-none ring-0"
+            >
+              <CardContent className="p-3">
+                <p className="m-0 text-xs text-muted-foreground">{total.currency ?? '未知币种'}</p>
+                <strong className="mt-1 block text-base font-semibold">
+                  {formatMoney(total.marketValue + total.cashValue, total.currency)}
+                </strong>
+                <p className="m-0 mt-1 text-xs text-muted-foreground">原币种估值</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -364,12 +493,14 @@ export function PerformanceSnapshotTable({
   refreshing,
   onRetry,
   onCompleteDataSetup,
+  groupedByCurrency = false,
 }: {
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   snapshots: SnapshotRecord[];
   refreshing?: boolean;
   onRetry?: (() => void) | undefined;
   onCompleteDataSetup?: (() => void) | undefined;
+  groupedByCurrency?: boolean;
 }) {
   const hasSnapshots = snapshots.length > 0;
   const [range, setRange] = useState<SnapshotRange>('ALL');
@@ -378,12 +509,30 @@ export function PerformanceSnapshotTable({
   let content: ReactNode;
   if (loadState === 'loading' && !hasSnapshots) {
     content = <Skeleton className="h-52 w-full rounded-lg" aria-label="资产走势加载中" />;
+  } else if (groupedByCurrency && hasSnapshots && visibleSnapshots.length > 0) {
+    const groups = new Map<string, SnapshotRecord[]>();
+    for (const snapshot of visibleSnapshots) {
+      const currency = snapshot.currency ?? '未知币种';
+      const current = groups.get(currency) ?? [];
+      current.push(snapshot);
+      groups.set(currency, current);
+    }
+    content = (
+      <div className="grid gap-3 lg:grid-cols-2">
+        {[...groups.entries()].map(([currency, group]) => (
+          <div key={currency} className="rounded-lg bg-muted/20 p-3">
+            <p className="m-0 mb-2 text-sm font-medium">{currency} 资产走势</p>
+            <PerformanceHistoryChart snapshots={group} />
+          </div>
+        ))}
+      </div>
+    );
   } else if (hasSnapshots && visibleSnapshots.length > 0) {
     content = (
       <>
         <PerformanceHistoryChart snapshots={visibleSnapshots} />
         <details className="mt-3 rounded-lg bg-muted/20 px-3 py-2 text-sm">
-          <summary className="cursor-pointer text-muted-foreground">查看 Snapshot 明细</summary>
+          <summary className="cursor-pointer text-muted-foreground">查看快照明细</summary>
           <div className="table-wrap mt-2">
             <table>
               <thead>
@@ -399,9 +548,9 @@ export function PerformanceSnapshotTable({
                 {visibleSnapshots.map((snapshot) => (
                   <tr key={snapshot.id}>
                     <td>{formatDate(snapshot.capturedAt)}</td>
-                    <td>{money.format(snapshot.marketValue)}</td>
-                    <td>{money.format(snapshot.costValue)}</td>
-                    <td>{money.format(snapshot.cashValue)}</td>
+                    <td>{formatMoney(snapshot.marketValue, snapshot.currency)}</td>
+                    <td>{formatMoney(snapshot.costValue, snapshot.currency)}</td>
+                    <td>{formatMoney(snapshot.cashValue, snapshot.currency)}</td>
                     <td>
                       {snapshot.partial ? (
                         <Badge variant="destructive">缺行情</Badge>
@@ -420,20 +569,18 @@ export function PerformanceSnapshotTable({
   } else if (hasSnapshots) {
     content = (
       <Empty className="min-h-20 rounded-lg border-0 bg-muted/30 px-4 py-6" aria-live="polite">
-        <EmptyDescription>该时间范围暂无 Snapshot。</EmptyDescription>
+        <EmptyDescription>该时间范围暂无快照。</EmptyDescription>
       </Empty>
     );
   } else {
     content = (
       <Empty
-        className="items-start rounded-lg border-0 bg-muted/30 px-5 py-6 text-left"
+        className="min-h-[176px] items-start justify-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-5 py-6 text-left"
         aria-live="polite"
       >
         <EmptyTitle>暂无收益历史</EmptyTitle>
-        <EmptyDescription>
-          创建第一个 Snapshot 后即可查看资产曲线、TTWROR 和 XIRR。
-        </EmptyDescription>
-        <div className="flex flex-wrap items-center gap-2">
+        <EmptyDescription>创建第一个快照后即可查看资产曲线、TTWROR 和 XIRR。</EmptyDescription>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {onCompleteDataSetup ? (
             <Button type="button" size="sm" onClick={onCompleteDataSetup}>
               完成数据配置
@@ -450,20 +597,18 @@ export function PerformanceSnapshotTable({
         </div>
         {showCalculationInfo ? (
           <p className="m-0 text-xs text-muted-foreground" role="note">
-            TTWROR 使用完整 Snapshot 计算，XIRR 还会结合 Ledger 的外部现金流。
+            TTWROR 使用完整快照计算，XIRR 还会结合账本的外部现金流。
           </p>
         ) : null}
       </Empty>
     );
   }
   return (
-    <section className="mt-8">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="m-0 text-xl font-semibold tracking-tight">资产走势</h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            市值、现金和数据时点按 Snapshot 回放。
-          </p>
+          <p className="m-0 mt-1 text-sm text-muted-foreground">市值、现金和数据时点按快照回放。</p>
         </div>
         {hasSnapshots ? (
           <ToggleGroup
@@ -505,14 +650,21 @@ const adjustmentLabel = (
   row: ComparisonRow,
   weightsUnavailable: boolean,
   targetsUnavailable: boolean,
+  currency?: Currency,
 ) => {
   if (weightsUnavailable) return { text: '暂不可用', className: 'text-muted-foreground' };
   if (targetsUnavailable) return { text: '目标不可用', className: 'text-muted-foreground' };
   if (row.direction === 'increase' && row.amountGap !== null) {
-    return { text: `↑ 买入 ${money.format(Math.abs(row.amountGap))}`, className: 'positive' };
+    return {
+      text: `↑ 买入 ${formatMoney(Math.abs(row.amountGap), currency)}`,
+      className: 'positive',
+    };
   }
   if (row.direction === 'decrease' && row.amountGap !== null) {
-    return { text: `↓ 减少 ${money.format(Math.abs(row.amountGap))}`, className: 'negative' };
+    return {
+      text: `↓ 减少 ${formatMoney(Math.abs(row.amountGap), currency)}`,
+      className: 'negative',
+    };
   }
   if (row.direction === 'balanced') return { text: '无需调整', className: 'text-muted-foreground' };
   return { text: '暂无建议', className: 'text-muted-foreground' };
@@ -558,7 +710,11 @@ export function PerformanceAllocationSection({
   targets,
   dataQuality,
   targetsUnavailable = false,
+  portfolioScope = false,
   valuedAt,
+  fx,
+  currencyTotals = [],
+  allocationUnavailable = false,
   targetVersion,
   targetCreatedAt,
   targetSaving = false,
@@ -573,7 +729,11 @@ export function PerformanceAllocationSection({
   targets: Record<string, number>;
   dataQuality: PerformanceDataQuality;
   targetsUnavailable?: boolean | undefined;
+  portfolioScope?: boolean | undefined;
   valuedAt?: string | undefined;
+  fx?: PerformanceFxMeta | undefined;
+  currencyTotals?: PerformancePortfolioTotal[];
+  allocationUnavailable?: boolean;
   targetVersion?: number | undefined;
   targetCreatedAt?: string | undefined;
   targetSaving?: boolean | undefined;
@@ -583,8 +743,11 @@ export function PerformanceAllocationSection({
   onSaveTargets: (targets: Record<AllocationCategory, number>) => Promise<boolean>;
 }) {
   const rows = comparisonRows(allocationRows, rebalanceRows, targets);
+  const displayCurrency =
+    fx?.baseCurrency ?? (currencyTotals.length === 1 ? currencyTotals[0]?.currency : undefined);
   const hasTargets = !targetsUnavailable && Object.keys(targets).length > 0;
-  const weightsUnavailable = dataQuality.partial || targetsUnavailable;
+  const fxBlocked = fx?.status === 'blocked';
+  const weightsUnavailable = dataQuality.partial || allocationUnavailable || fxBlocked;
   const [editingTargets, setEditingTargets] = useState(false);
   const [draftRows, setDraftRows] = useState<TargetRow[]>([]);
   const beginEdit = () => {
@@ -650,14 +813,31 @@ export function PerformanceAllocationSection({
   let targetButtonLabel = '设置目标';
   if (editingTargets) targetButtonLabel = '取消';
   else if (hasTargets) targetButtonLabel = '调整目标';
+  const hasLoadNotice = loadState === 'error' || loadState === 'stale';
+  const hasStatusNotice =
+    hasLoadNotice ||
+    dataQuality.partial ||
+    targetsUnavailable ||
+    allocationUnavailable ||
+    fxBlocked;
+  const loadNoticeTitle = loadState === 'error' ? '数据读取失败' : '数据可能陈旧';
+  const loadNoticeDescription =
+    loadState === 'error'
+      ? '当前配置数据未更新为正常值，请检查服务后重试。'
+      : '部分来源不可用，当前结果会保留陈旧标记。';
   return (
-    <section className="mt-10">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="m-0 text-xl font-semibold tracking-tight">配置与目标</h2>
           <p className="m-0 mt-1 text-sm text-muted-foreground">
-            估值于 {formatDate(valuedAt)}；现金来自 Ledger Cash Balance，仅提供建议，不会自动下单。
+            估值于 {formatDate(valuedAt)}；现金来自账本现金余额，仅提供建议，不会自动下单。
           </p>
+          {fx?.status === 'stale' ? (
+            <p className="m-0 mt-1 text-xs text-muted-foreground">
+              按当前汇率回算 · 估算 · 使用陈旧汇率
+            </p>
+          ) : null}
           {targetVersion !== undefined ? (
             <p className="m-0 mt-1 text-xs text-muted-foreground">
               目标版本 v{targetVersion} · 生效于 {formatDate(targetCreatedAt)}
@@ -678,115 +858,193 @@ export function PerformanceAllocationSection({
           {targetButtonLabel}
         </Button>
       </div>
-      {dataQuality.partial ? (
-        <Alert variant="default" className="mb-4">
-          <AlertTriangle aria-hidden="true" />
-          <AlertTitle>行情不完整</AlertTitle>
-          <AlertDescription>
-            已保留可用金额，但权重暂不可用，再平衡建议已暂停。缺失标的或类别：
-            {dataQuality.missingSymbols.length > 0
-              ? dataQuality.missingSymbols.join('、')
-              : '未返回'}
-            。
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {targetsUnavailable ? (
-        <Alert variant="default" className="mb-4">
-          <AlertTriangle aria-hidden="true" />
-          <AlertTitle>目标配置不可用</AlertTitle>
-          <AlertDescription>
-            当前配置仍可查看，但目标权重和再平衡建议暂不可用。请先重新加载目标配置。
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
-        <DataStateBanner state={loadState} onRetry={onRetry} />
+      {hasStatusNotice ? (
+        <div
+          className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle
+              className="mt-0.5 size-4 shrink-0 text-[color:var(--color-warning)]"
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1 space-y-2 text-sm">
+              {hasLoadNotice ? (
+                <div>
+                  <p className="m-0 font-medium">{loadNoticeTitle}</p>
+                  <p className="m-0 mt-1 text-muted-foreground">{loadNoticeDescription}</p>
+                </div>
+              ) : null}
+              {dataQuality.partial ? (
+                <div>
+                  <p className="m-0 font-medium">行情不完整</p>
+                  <p className="m-0 mt-1 text-muted-foreground">
+                    已保留可用金额，但权重暂不可用，再平衡建议已暂停。缺失标的或类别：
+                    {dataQuality.missingSymbols.length > 0
+                      ? dataQuality.missingSymbols.join('、')
+                      : '未返回'}
+                    。
+                  </p>
+                </div>
+              ) : null}
+              {targetsUnavailable ? (
+                <div>
+                  <p className="m-0 font-medium">
+                    {portfolioScope ? '组合目标暂时无法读取' : '目标配置不可用'}
+                  </p>
+                  <p className="m-0 mt-1 text-muted-foreground">
+                    当前配置仍可查看，当前权重保持可用；目标权重和再平衡建议暂不可用。
+                    {portfolioScope
+                      ? ' 你仍可以为全部账户设置组合目标，保存失败时会保留草稿。'
+                      : ' 请先重新加载目标配置。'}
+                  </p>
+                </div>
+              ) : null}
+              {allocationUnavailable ? (
+                <div>
+                  <p className="m-0 font-medium">当前为分币种配置</p>
+                  <p className="m-0 mt-1 text-muted-foreground">
+                    不同币种没有共同权重分母，已按币种保留估值；开启汇率合并后才会计算全局目标偏差和再平衡。
+                  </p>
+                  {currencyTotals.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {currencyTotals.map((total) => (
+                        <div
+                          key={total.currency ?? 'unknown'}
+                          className="rounded-md bg-background/70 px-3 py-1.5"
+                        >
+                          <span className="text-xs text-muted-foreground">
+                            {total.currency ?? '未知币种'}
+                          </span>
+                          <span className="ml-2 font-medium">
+                            {formatMoney(total.marketValue + total.cashValue, total.currency)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {fxBlocked && !allocationUnavailable ? (
+                <div>
+                  <p className="m-0 font-medium">无法获取汇率</p>
+                  <p className="m-0 mt-1 text-muted-foreground">
+                    已保留原币种金额，合并配置与再平衡暂不可用。重新获取汇率后重试。
+                  </p>
+                </div>
+              ) : null}
+            </div>
+            {onRetry ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={onRetry}
+              >
+                重新加载
+              </Button>
+            ) : null}
+          </div>
+        </div>
       ) : null}
       {loadState === 'loading' && rows.length === 0 ? (
-        <Skeleton className="h-32 w-full rounded-lg" aria-label="配置数据加载中" />
-      ) : rows.length > 0 ? (
-        <div className="table-wrap">
-          <table className="min-w-[680px] md:min-w-0">
-            <thead>
-              <tr>
-                <th>分类</th>
-                <th>当前金额</th>
-                <th>当前权重</th>
-                <th>目标权重</th>
-                <th>权重偏差</th>
-                <th>调整</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const adjustment = adjustmentLabel(row, weightsUnavailable, targetsUnavailable);
-                const draftRow = draftRows.find(
-                  (draft) => normalizeAllocationCategory(draft.category) === row.category,
-                );
-                return (
-                  <tr key={row.category}>
-                    <td>{CATEGORY_LABELS[row.category]}</td>
-                    <td className="text-muted-foreground">{money.format(row.value)}</td>
-                    <td>
-                      <WeightBar
-                        value={row.currentWeight}
-                        label={`${CATEGORY_LABELS[row.category]}当前权重`}
-                        unavailable={weightsUnavailable}
-                      />
-                    </td>
-                    <td>
-                      {editingTargets ? (
-                        draftRow ? (
-                          <div className="flex min-w-40 items-center justify-end gap-1">
-                            <Input
-                              className="h-8 w-20 text-right"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={draftRow.percent ?? ''}
-                              aria-label={`${CATEGORY_LABELS[row.category]}目标权重百分比`}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                updateDraftRow(draftRow.id, {
-                                  percent: value === '' ? null : Number(value),
-                                });
-                              }}
-                            />
-                            <span className="text-xs text-muted-foreground">%</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="px-1.5 text-xs text-muted-foreground"
-                              aria-label={`移除${CATEGORY_LABELS[row.category]}目标`}
-                              onClick={() => removeDraftRow(draftRow.id)}
-                            >
-                              移除
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">未设置</span>
-                        )
-                      ) : (
+        <Skeleton className="h-[120px] w-full rounded-xl" aria-label="配置数据加载中" />
+      ) : rows.length > 0 && !allocationUnavailable && !fxBlocked ? (
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
+          <div className="table-wrap px-4">
+            <table className="min-w-[680px] md:min-w-0">
+              <thead>
+                <tr>
+                  <th>分类</th>
+                  <th>当前金额</th>
+                  <th>当前权重</th>
+                  <th>目标权重</th>
+                  <th>权重偏差</th>
+                  <th>调整</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const adjustment = adjustmentLabel(
+                    row,
+                    weightsUnavailable,
+                    targetsUnavailable,
+                    displayCurrency,
+                  );
+                  const draftRow = draftRows.find(
+                    (draft) => normalizeAllocationCategory(draft.category) === row.category,
+                  );
+                  return (
+                    <tr key={row.category}>
+                      <td>{CATEGORY_LABELS[row.category]}</td>
+                      <td className="text-muted-foreground">
+                        {formatMoney(row.value, displayCurrency)}
+                      </td>
+                      <td>
                         <WeightBar
-                          value={row.targetWeight}
-                          label={`${CATEGORY_LABELS[row.category]}目标权重`}
+                          value={row.currentWeight}
+                          label={`${CATEGORY_LABELS[row.category]}当前权重`}
                           unavailable={weightsUnavailable}
                         />
-                      )}
-                    </td>
-                    <td>{formatWeight(weightsUnavailable ? null : row.weightGap)}</td>
-                    <td className={`font-medium ${adjustment.className}`}>{adjustment.text}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        {editingTargets ? (
+                          draftRow ? (
+                            <div className="flex min-w-40 items-center justify-end gap-1">
+                              <Input
+                                className="h-8 w-20 text-right"
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={draftRow.percent ?? ''}
+                                aria-label={`${CATEGORY_LABELS[row.category]}目标权重百分比`}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  updateDraftRow(draftRow.id, {
+                                    percent: value === '' ? null : Number(value),
+                                  });
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="px-1.5 text-xs text-muted-foreground"
+                                aria-label={`移除${CATEGORY_LABELS[row.category]}目标`}
+                                onClick={() => removeDraftRow(draftRow.id)}
+                              >
+                                移除
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">未设置</span>
+                          )
+                        ) : (
+                          <WeightBar
+                            value={row.targetWeight}
+                            label={`${CATEGORY_LABELS[row.category]}目标权重`}
+                            unavailable={weightsUnavailable}
+                          />
+                        )}
+                      </td>
+                      <td>{formatWeight(weightsUnavailable ? null : row.weightGap)}</td>
+                      <td className={`font-medium ${adjustment.className}`}>{adjustment.text}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
-        <Empty className="min-h-20 rounded-lg border-0 bg-muted/30 px-4 py-6" aria-live="polite">
+        <Empty
+          className="min-h-[120px] rounded-xl border border-border/60 bg-muted/20 px-4 py-6"
+          aria-live="polite"
+        >
           <EmptyDescription>
             {hasTargets ? '当前范围暂无可估值配置。' : '先设置目标配置，保存后可在这里比较。'}
           </EmptyDescription>

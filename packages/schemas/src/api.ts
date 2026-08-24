@@ -75,7 +75,7 @@ export const performanceSummaryResponseSchema = z
   .object({
     accountId: z.uuid().nullable(),
     snapshots: z.array(z.unknown()),
-    ttwror: z.number().finite(),
+    ttwror: z.number().finite().nullable(),
     xirr: z.number().finite().nullable(),
     xirrReason: z.string().nullable().optional(),
   })

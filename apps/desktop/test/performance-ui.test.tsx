@@ -33,15 +33,74 @@ describe('收益分析交互契约', () => {
     expect(markup).not.toContain('影子账户');
   });
 
-  it('组合模式复用右上角 Switch 语义', () => {
+  it('组合模式使用实际/模拟 Switch', () => {
     const markup = renderToStaticMarkup(
       <PortfolioModeSwitch mode="actual" onModeChange={vi.fn()} ariaLabel="收益范围" />,
     );
-    expect(markup).toContain('当前实际，切换到模拟');
+    expect(markup).toContain('收益范围');
     expect(markup).toContain('data-slot="switch"');
+    expect(markup).toContain('data-mode="actual"');
+    expect(markup).toContain('h-7');
+    expect(markup).toContain('w-[70px]');
+    expect(markup).toContain('bg-[color:var(--color-mode-switch-track)]');
+    expect(markup).toContain('text-[color:var(--color-mode-switch-text)]');
+    expect(markup).toContain('border-[color:var(--color-mode-switch-border)]');
+    expect(markup).toContain('border-[color:var(--color-mode-switch-thumb-border)]');
+    expect(markup).not.toContain('shadow-[var(--color-mode-switch-thumb-shadow)]');
+    expect(markup).toContain('data-checked:translate-x-[40px]');
+    expect(markup).not.toContain('data-checked:bg-');
+    expect(markup).toContain('实际');
+    expect(markup).toContain('模拟');
+    expect(markup).not.toContain('data-slot="toggle-group"');
   });
 
-  it('Snapshot 不足或 partial 时使用破折号和明确原因', () => {
+  it('混合币种默认关闭汇率合并并显示分币种提示', () => {
+    const markup = renderToStaticMarkup(
+      <PerformanceAccountSelector
+        accounts={[
+          { id: 'cny', name: '人民币账户', type: 'securities', mode: 'actual', currency: 'CNY' },
+          { id: 'hkd', name: '港币账户', type: 'securities', mode: 'actual', currency: 'HKD' },
+        ]}
+        mode="actual"
+        accountId=""
+        mixedCurrencies
+        latestSnapshotAt={undefined}
+        valuedAt={undefined}
+        onAccountChange={vi.fn()}
+      />,
+    );
+    expect(markup).toContain('汇率合并');
+    expect(markup).toContain('data-unchecked');
+    expect(markup).toContain('按币种分组展示');
+  });
+
+  it('汇率陈旧与阻断状态不伪装成普通收益值', () => {
+    const staleMarkup = renderToStaticMarkup(
+      <PerformanceMetrics
+        latest={undefined}
+        summary={{
+          ttwror: null,
+          xirr: null,
+          fx: {
+            enabled: true,
+            status: 'stale',
+            baseCurrency: 'CNY',
+            estimated: true,
+            conversionMode: 'current-rate',
+            fxAsOf: '2026-08-24',
+            fxStale: true,
+            missingCurrencies: [],
+            rates: [],
+          },
+        }}
+        snapshotCount={2}
+      />,
+    );
+    expect(staleMarkup).toContain('按当前汇率回算 · 估算 · 使用陈旧汇率');
+    expect(staleMarkup).toContain('>—<');
+  });
+
+  it('快照不足或 partial 时使用破折号和明确原因', () => {
     const markup = renderToStaticMarkup(
       <PerformanceMetrics
         latest={{
@@ -55,11 +114,11 @@ describe('收益分析交互契约', () => {
         }}
         summary={null}
         snapshotCount={1}
-        summaryError="收益摘要包含 partial Snapshot，请补齐行情"
+        summaryError="收益摘要包含部分快照，请补齐行情"
       />,
     );
     expect(markup).toContain('>—<');
-    expect(markup).toContain('收益摘要包含 partial Snapshot，请补齐行情');
+    expect(markup).toContain('收益摘要包含部分快照，请补齐行情');
     expect(markup).toContain('行情不完整，尚无完整估值');
   });
 
@@ -102,23 +161,26 @@ describe('收益分析交互契约', () => {
   it('目标读取失败时保留当前配置但标记目标不可用', () => {
     const markup = renderToStaticMarkup(
       <PerformanceAllocationSection
-        loadState="stale"
+        loadState="ready"
         allocationRows={[{ category: 'stock', value: 100, weight: 1 }]}
         rebalanceRows={[]}
         targets={{}}
         dataQuality={{ partial: false, missingSymbols: [] }}
         targetsUnavailable
+        portfolioScope
         valuedAt="2026-08-24T00:00:00.000Z"
         editDisabled
         onSaveTargets={vi.fn(async () => true)}
       />,
     );
-    expect(markup).toContain('目标配置不可用');
+    expect(markup).toContain('组合目标暂时无法读取');
     expect(markup).toContain('不可用');
     expect(markup).toContain('¥100.00');
+    expect(markup).toContain('100.00%');
+    expect(markup).not.toContain('数据可能陈旧');
   });
 
-  it('没有 Snapshot 时使用紧凑空状态而不是空表格', () => {
+  it('没有快照时使用紧凑空状态而不是空表格', () => {
     const markup = renderToStaticMarkup(
       <PerformanceSnapshotTable loadState="empty" snapshots={[]} onCompleteDataSetup={vi.fn()} />,
     );
@@ -127,7 +189,7 @@ describe('收益分析交互契约', () => {
     expect(markup).not.toContain('<table');
   });
 
-  it('没有 Snapshot 时仍显示当前持仓估值和成本差', () => {
+  it('没有快照时仍显示当前持仓估值和成本差', () => {
     const markup = renderToStaticMarkup(
       <PerformanceMetrics
         latest={undefined}
@@ -144,7 +206,7 @@ describe('收益分析交互契约', () => {
     expect(markup).toContain('需要 ≥ 2 个快照');
   });
 
-  it('Snapshot 适配层保留服务端 partial 与 missingSymbols', async () => {
+  it('快照适配层保留服务端 partial 与 missingSymbols', async () => {
     const request = vi.fn(
       async <T,>() =>
         [

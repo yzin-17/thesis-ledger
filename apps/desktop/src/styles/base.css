@@ -92,6 +92,11 @@ textarea:focus-visible {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100dvh;
   background: var(--color-page-bg);
+  transition: grid-template-columns 180ms ease;
+}
+
+.app-shell[data-sidebar-collapsed='true'] {
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -104,6 +109,67 @@ textarea:focus-visible {
   padding: 20px 16px 16px;
   border-right: 1px solid var(--color-border);
   background: var(--color-sidebar-bg);
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sidebar-head .brand {
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-collapse {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  margin-top: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sidebar-collapse:hover {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.sidebar[data-collapsed='true'] .sidebar-head {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar[data-collapsed='true'] .sidebar-head .brand {
+  width: 100%;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding-inline: 0;
+  padding-bottom: 8px;
+}
+
+.sidebar[data-collapsed='true'] .brand > span:last-child,
+.sidebar[data-collapsed='true'] .nav-item span,
+.sidebar[data-collapsed='true'] .connection-status {
+  display: none;
+}
+
+.sidebar[data-collapsed='true'] .nav-item {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar[data-collapsed='true'] .sidebar-foot {
+  justify-content: center;
+  padding-inline: 0;
 }
 
 .brand {
@@ -206,9 +272,9 @@ textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   width: 40px;
-  height: 24px;
+  height: 22px;
   flex: 0 0 auto;
-  padding: 2px;
+  padding: 1px;
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
   color: var(--color-text-muted);
@@ -260,7 +326,7 @@ textarea:focus-visible {
 
 .theme-switch[data-checked] .theme-switch-thumb {
   color: var(--color-text-primary);
-  transform: translateX(16px);
+  transform: translateX(18px);
 }
 
 .theme-switch-thumb svg {
@@ -350,14 +416,14 @@ textarea:focus-visible {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 20px;
-  padding-bottom: 18px;
+  gap: var(--space-card);
+  margin-bottom: var(--space-group);
+  padding-bottom: var(--space-card);
   border-bottom: 1px solid var(--color-border);
 }
 
 .kicker {
-  margin: 0 0 7px;
+  margin: 0 0 var(--space-text);
   color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 650;
@@ -388,7 +454,7 @@ h3 {
 }
 
 .as-of {
-  margin: 8px 0 0;
+  margin: var(--space-text) 0 0;
   color: var(--color-text-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -444,7 +510,7 @@ h3 {
 
 .metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 30px;
+  margin-bottom: var(--space-module);
 }
 
 .metric {
@@ -497,13 +563,13 @@ h3 {
 }
 
 .panel {
-  margin-top: 30px;
+  margin-top: var(--space-module);
   border-top: 1px solid var(--color-border);
 }
 
 .panel-heading {
   display: block;
-  padding: 19px 0 13px;
+  padding: var(--space-group) 0;
 }
 
 .panel-heading h2 {
@@ -515,7 +581,7 @@ h3 {
 }
 
 .panel-heading p {
-  margin: 6px 0 0;
+  margin: var(--space-text) 0 0;
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.5;
@@ -725,6 +791,10 @@ td span {
 .module-page {
   max-width: 1360px;
   padding-top: 4px;
+}
+
+.performance-page {
+  max-width: 1200px;
 }
 
 .module-page h1 {
@@ -1104,12 +1174,12 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .onboarding {
-  margin: 38px 0 0;
-  padding: 20px;
+  margin: var(--space-module) 0 var(--space-group);
+  padding: var(--space-card);
 }
 
 .onboarding .panel-heading {
-  padding: 0 0 16px;
+  padding: 0 0 var(--space-group);
 }
 
 .onboarding .panel-heading h2 {
@@ -1117,7 +1187,7 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .onboarding-progress {
-  margin: 9px 0 0;
+  margin: var(--space-text) 0 0;
   color: var(--color-text-muted);
   font-size: 12px;
 }
@@ -1136,8 +1206,8 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .onboarding-steps li {
-  min-height: 178px;
-  padding: 16px;
+  min-height: 160px;
+  padding: var(--space-group);
   background: var(--color-surface-1);
 }
 
@@ -1150,7 +1220,7 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .onboarding-steps li > div {
-  margin-top: 13px;
+  margin-top: var(--space-text);
 }
 
 .onboarding-steps strong {
@@ -1161,8 +1231,8 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .onboarding-steps p {
-  min-height: 56px;
-  margin: 7px 0 13px;
+  min-height: 40px;
+  margin: var(--space-text) 0 var(--space-group);
   color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 1.55;
@@ -1188,6 +1258,15 @@ textarea[data-slot='input-group-control']:focus-visible {
 
 .onboarding .form-actions {
   flex-wrap: wrap;
+}
+
+.metrics + .panel {
+  margin-top: var(--space-section);
+  border-top: 0;
+}
+
+.metrics + .panel .panel-heading {
+  padding: 0 0 var(--space-card);
 }
 
 .management-grid {
@@ -1475,6 +1554,7 @@ textarea[data-slot='input-group-control']:focus-visible {
   }
 
   .nav-item,
+  .sidebar-collapse,
   .secondary,
   .text-button {
     color: ButtonText;
@@ -1520,12 +1600,17 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 @media (max-width: 800px) {
-  .app-shell {
+  .app-shell,
+  .app-shell[data-sidebar-collapsed='true'] {
     grid-template-columns: 70px minmax(0, 1fr);
   }
 
   .sidebar {
     padding-inline: 10px;
+  }
+
+  .sidebar-collapse {
+    display: none;
   }
 
   .brand {
@@ -1643,7 +1728,7 @@ textarea[data-slot='input-group-control']:focus-visible {
 
   .page-header {
     display: grid;
-    gap: 14px;
+    gap: var(--space-group);
   }
 
   .page-header .secondary {
@@ -1655,7 +1740,7 @@ textarea[data-slot='input-group-control']:focus-visible {
   }
 
   .onboarding {
-    padding: 18px;
+    padding: var(--space-group);
   }
 
   .onboarding-steps {

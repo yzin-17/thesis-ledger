@@ -21,23 +21,35 @@ export function PortfolioModeSwitch({
   shadowLabel?: string;
   className?: string;
 }) {
-  const isShadow = mode === 'shadow';
-  const currentLabel = isShadow ? shadowLabel : actualLabel;
-  const nextLabel = isShadow ? actualLabel : shadowLabel;
+  const isActual = mode === 'actual';
+  const currentLabel = isActual ? actualLabel : shadowLabel;
+  const nextLabel = isActual ? shadowLabel : actualLabel;
+  const modeLabelClass =
+    'pointer-events-none absolute inset-y-0 z-0 flex items-center text-[13px] font-medium leading-none text-[color:var(--color-mode-switch-text)] whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none';
 
   return (
-    <div
-      className={cn('inline-flex min-h-7 items-center gap-1 whitespace-nowrap', className)}
-      role="group"
-      aria-label={ariaLabel}
-    >
+    <div className={cn('inline-flex items-center', className)}>
       <Switch
-        variant="risk"
-        checked={isShadow}
-        aria-label={`当前${currentLabel}，切换到${nextLabel}`}
-        onCheckedChange={(checked) => onModeChange(checked ? 'shadow' : 'actual')}
+        variant="mode"
+        checked={isActual}
+        data-mode={mode}
+        aria-label={`${ariaLabel}：当前${currentLabel}，切换到${nextLabel}`}
+        title={`当前${currentLabel}，切换到${nextLabel}`}
+        onCheckedChange={(checked) => onModeChange(checked ? 'actual' : 'shadow')}
       >
-        <SwitchThumb variant="risk">{currentLabel}</SwitchThumb>
+        <span
+          aria-hidden="true"
+          className={cn(modeLabelClass, 'left-2 px-1', isActual ? 'opacity-100' : 'opacity-0')}
+        >
+          {actualLabel}
+        </span>
+        <span
+          aria-hidden="true"
+          className={cn(modeLabelClass, 'right-2 px-1', isActual ? 'opacity-0' : 'opacity-100')}
+        >
+          {shadowLabel}
+        </span>
+        <SwitchThumb variant="mode" aria-hidden="true" />
       </Switch>
     </div>
   );

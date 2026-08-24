@@ -8,7 +8,7 @@ import { resolveLoadState } from '../shared/loadState.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
 import { useSavePerformanceTargetsMutation } from './performance.mutations.js';
 import { usePerformanceQueries } from './performance.queries.js';
-import type { AllocationCategory, PortfolioMode } from './performance.types.js';
+import type { AllocationCategory, Currency, PortfolioMode } from './performance.types.js';
 import {
   PerformanceAccountSelector,
   PerformanceAllocationSection,
@@ -28,6 +28,8 @@ export function PerformanceDashboard({
   onNavigate: (view: DesktopNavigationView) => void;
 }) {
   const [accountId, setAccountId] = useState('');
+  const [fxMerge, setFxMerge] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState<Currency>('CNY');
   const [targetSaveError, setTargetSaveError] = useState<string | null>(null);
   const toastManager = useToastManager();
   const modeAccounts = useMemo(
@@ -38,23 +40,35 @@ export function PerformanceDashboard({
     () => new Set(modeAccounts.map((account) => account.currency)).size > 1,
     [modeAccounts],
   );
-  const scopeEnabled = !mixedCurrencies || Boolean(accountId);
-  const performanceQueries = usePerformanceQueries(mode, accountId, scopeEnabled);
+  const canMergeFx = mixedCurrencies && !accountId;
+  const effectiveFxMerge = canMergeFx && fxMerge;
+  const queryOptions = { fxMerge: effectiveFxMerge, baseCurrency };
+  const performanceQueries = usePerformanceQueries(mode, accountId, true, queryOptions);
 
   useEffect(() => {
     if (accountId && !modeAccounts.some((account) => account.id === accountId)) setAccountId('');
   }, [accountId, modeAccounts]);
 
-  const snapshots = scopeEnabled ? (performanceQueries.history.data ?? []) : [];
-  const summary =
-    scopeEnabled && !performanceQueries.summary.isError
-      ? (performanceQueries.summary.data ?? null)
-      : null;
-  const layers = scopeEnabled ? performanceQueries.layers.data : undefined;
-  const allocationResponse = scopeEnabled ? performanceQueries.allocation.data : undefined;
-  const targetsUnavailable = scopeEnabled && performanceQueries.targets.isError;
-  const targetsResponse =
-    scopeEnabled && !targetsUnavailable ? performanceQueries.targets.data : undefined;
+  useEffect(() => {
+    setFxMerge(false);
+    setBaseCurrency('CNY');
+  }, [mode]);
+
+  useEffect(() => {
+    if (!mixedCurrencies) {
+      setFxMerge(false);
+      setBaseCurrency('CNY');
+    }
+  }, [mixedCurrencies]);
+
+  const snapshots = performanceQueries.history.data ?? [];
+  const summary = !performanceQueries.summary.isError
+    ? (performanceQueries.summary.data ?? null)
+    : null;
+  const layers = performanceQueries.layers.data;
+  const allocationResponse = performanceQueries.allocation.data;
+  const targetsUnavailable = performanceQueries.targets.isError;
+  const targetsResponse = !targetsUnavailable ? performanceQueries.targets.data : undefined;
   const targets = targetsResponse?.targets ?? {};
   const latestSnapshot = snapshots.at(-1);
   const latest = [...snapshots].reverse().find((snapshot) => !snapshot.partial);
@@ -95,7 +109,12 @@ export function PerformanceDashboard({
     performanceQueries.history.data !== undefined && snapshots.length === 0,
   );
   const allocationState = resolveLoadState(
-    [performanceQueries.layers, performanceQueries.targets, performanceQueries.allocation],
+    [
+      performanceQueries.layers,
+      // 目标配置单独展示“目标配置不可用”；它不应把当前估值标记为陈旧。
+      { isPending: performanceQueries.targets.isPending, isError: false },
+      performanceQueries.allocation,
+    ],
     allocationResponse !== undefined,
     allocationResponse !== undefined && allocationResponse.allocation.length === 0,
   );
@@ -147,13 +166,13 @@ export function PerformanceDashboard({
   };
 
   return (
-    <section className="module-page">
-      <header className="mb-7 flex items-start gap-4">
+    <section className="module-page performance-page w-full">
+      <header className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <p className="kicker text-[10px]">Performance</p>
+          <p className="kicker text-[10px]">收益表现</p>
           <h1>收益分析</h1>
           <p className="m-0 mt-2 max-w-3xl text-sm text-muted-foreground">
-            基于 Portfolio Snapshot 计算历史收益，不触发自动交易。
+            基于历史快照计算收益，不触发自动交易。
           </p>
         </div>
         <PortfolioModeSwitch
@@ -166,69 +185,89 @@ export function PerformanceDashboard({
       {mode === 'shadow' ? (
         <PortfolioModeNote>当前收益只计算模拟账户，结果仅用于研究。</PortfolioModeNote>
       ) : null}
-      <PerformanceAccountSelector
-        accounts={accounts}
-        mode={mode}
-        accountId={accountId}
-        mixedCurrencies={mixedCurrencies}
-        latestSnapshotAt={latest?.capturedAt}
-        valuedAt={layers?.valuedAt}
-        onAccountChange={setAccountId}
-      />
-      {mixedCurrencies && !accountId ? (
-        <DataStateBanner
-          state="error"
-          description="当前模式包含多个币种，已暂停全部账户聚合。请选择一个账户后继续。"
+      <div className="mt-8 space-y-10">
+        <div className="space-y-4">
+          <PerformanceAccountSelector
+            accounts={accounts}
+            mode={mode}
+            accountId={accountId}
+            mixedCurrencies={mixedCurrencies}
+            latestSnapshotAt={latest?.capturedAt}
+            valuedAt={layers?.valuedAt}
+            onAccountChange={setAccountId}
+            fxMerge={effectiveFxMerge}
+            baseCurrency={baseCurrency}
+            onFxMergeChange={setFxMerge}
+            onBaseCurrencyChange={setBaseCurrency}
+            onRetry={retry}
+            fx={layers?.fx ?? summary?.fx}
+          />
+          {scopeWideError ? <DataStateBanner state="error" onRetry={retry} /> : null}
+          <PerformanceMetrics
+            latest={latest}
+            summary={summary}
+            snapshotCount={snapshots.length}
+            latestPartial={latestSnapshot?.partial === true}
+            currentValue={currentValue}
+            currentValuePartial={currentValuePartial}
+            currentPnl={currentPnl}
+            currentPnlRate={currentPnlRate}
+            currentCurrency={scopedTotal?.currency}
+            currencyTotals={
+              !accountId && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
+                ? (layers?.byCurrency ?? [])
+                : []
+            }
+            fx={layers?.fx ?? summary?.fx}
+            summaryError={
+              performanceQueries.summary.isError
+                ? '收益摘要暂不可用，请检查行情完整性后重试'
+                : undefined
+            }
+          />
+        </div>
+        <PerformanceSnapshotTable
+          loadState={historyState}
+          snapshots={snapshots}
+          groupedByCurrency={
+            !accountId && mixedCurrencies && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
+          }
+          refreshing={refreshing}
+          onRetry={() => void performanceQueries.history.refetch()}
+          onCompleteDataSetup={() => onNavigate('providers')}
         />
-      ) : null}
-      {!mixedCurrencies && scopeWideError ? (
-        <DataStateBanner state="error" onRetry={retry} />
-      ) : null}
-      <PerformanceMetrics
-        latest={latest}
-        summary={summary}
-        snapshotCount={snapshots.length}
-        latestPartial={latestSnapshot?.partial === true}
-        currentValue={currentValue}
-        currentValuePartial={currentValuePartial}
-        currentPnl={currentPnl}
-        currentPnlRate={currentPnlRate}
-        summaryError={
-          performanceQueries.summary.isError
-            ? '收益摘要暂不可用，请检查行情完整性后重试'
-            : undefined
-        }
-      />
-      <PerformanceSnapshotTable
-        loadState={historyState}
-        snapshots={snapshots}
-        refreshing={refreshing}
-        onRetry={() => void performanceQueries.history.refetch()}
-        onCompleteDataSetup={() => onNavigate('providers')}
-      />
-      <PerformanceAllocationSection
-        loadState={allocationState}
-        allocationRows={allocationResponse?.allocation ?? []}
-        rebalanceRows={allocationResponse?.rebalance ?? []}
-        targets={targets}
-        dataQuality={
-          allocationResponse?.partial
-            ? {
-                partial: true,
-                missingSymbols: allocationResponse.missingSymbols,
-              }
-            : performanceQueries.quality
-        }
-        targetsUnavailable={targetsUnavailable}
-        valuedAt={layers?.valuedAt}
-        targetVersion={targetsResponse?.version}
-        targetCreatedAt={targetsResponse?.createdAt}
-        targetSaving={saveTargetsMutation.isPending}
-        targetSaveError={targetSaveError}
-        editDisabled={!scopeEnabled || targetsUnavailable || performanceQueries.targets.isPending}
-        onRetry={retryAllocation}
-        onSaveTargets={saveTargets}
-      />
+        <PerformanceAllocationSection
+          loadState={allocationState}
+          allocationRows={allocationResponse?.allocation ?? []}
+          rebalanceRows={allocationResponse?.rebalance ?? []}
+          targets={targets}
+          dataQuality={
+            allocationResponse?.partial
+              ? {
+                  partial: true,
+                  missingSymbols: allocationResponse.missingSymbols,
+                }
+              : performanceQueries.quality
+          }
+          targetsUnavailable={targetsUnavailable}
+          portfolioScope={!accountId}
+          valuedAt={layers?.valuedAt}
+          fx={layers?.fx ?? summary?.fx}
+          currencyTotals={layers?.byCurrency ?? []}
+          allocationUnavailable={performanceQueries.allocationUnavailable}
+          targetVersion={targetsResponse?.version}
+          targetCreatedAt={targetsResponse?.createdAt}
+          targetSaving={saveTargetsMutation.isPending}
+          targetSaveError={targetSaveError}
+          editDisabled={
+            performanceQueries.targets.isPending ||
+            performanceQueries.allocationUnavailable ||
+            (targetsUnavailable && Boolean(accountId))
+          }
+          onRetry={retryAllocation}
+          onSaveTargets={saveTargets}
+        />
+      </div>
     </section>
   );
 }

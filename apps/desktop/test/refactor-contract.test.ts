@@ -4,7 +4,10 @@ import { fetchRiskAudit, fetchRiskEvents } from '../src/features/risk/risk.api.j
 import { riskAuditQueryOptions, riskKeys } from '../src/features/risk/risk.queries.js';
 import { fetchProviderHealthHistory } from '../src/features/providers/providers.api.js';
 import { providerKeys } from '../src/features/providers/providers.queries.js';
-import { fetchPerformanceHistory } from '../src/features/performance/performance.api.js';
+import {
+  fetchPerformanceHistory,
+  fetchPerformanceTargets,
+} from '../src/features/performance/performance.api.js';
 import { performanceKeys } from '../src/features/performance/performance.queries.js';
 import { fetchImportDrafts, uploadScreenshotImport } from '../src/features/import/import.api.js';
 import { importKeys } from '../src/features/import/import.queries.js';
@@ -114,6 +117,19 @@ describe('拆分后的领域请求契约', () => {
     expect(performanceKeys.history('actual', 'account-2')).not.toEqual(
       performanceKeys.history('shadow', 'account-2'),
     );
+    await fetchPerformanceTargets(
+      'shadow',
+      undefined,
+      { fxMerge: true, baseCurrency: 'HKD' },
+      performance.client,
+    );
+    expect(performance.request).toHaveBeenLastCalledWith(
+      '/performance/targets?scope=portfolio&mode=shadow&fxMerge=true&baseCurrency=HKD',
+      expect.anything(),
+    );
+    expect(
+      performanceKeys.targets('actual', '', { fxMerge: false, baseCurrency: 'CNY' }),
+    ).not.toEqual(performanceKeys.targets('shadow', '', { fxMerge: true, baseCurrency: 'HKD' }));
 
     const imports = makeClient([]);
     await fetchImportDrafts('account-2', imports.client);

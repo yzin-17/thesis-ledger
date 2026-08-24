@@ -31,8 +31,23 @@
   --color-error-soft: #fff7f7;
   --color-overlay: rgb(22 29 38 / 0.46);
   --color-focus-ring: rgb(41 98 255 / 0.22);
+  --color-mode-switch-track: #ffffff;
+  --color-mode-switch-border: #e5e7eb;
+  --color-mode-switch-border-hover: #d1d5db;
+  --color-mode-switch-text: #525866;
+  --color-mode-switch-thumb: #ffffff;
+  --color-mode-switch-thumb-border: rgb(0 0 0 / 0.08);
+  --color-mode-switch-thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.05);
+  --color-mode-switch-focus: rgb(82 88 102 / 0.28);
   --color-skeleton: #e9edf2;
   --shadow-overlay: 0 18px 48px rgb(30 40 52 / 0.18);
+  --space-text: 8px;
+  --space-related: 12px;
+  --space-group: 16px;
+  --space-card: 24px;
+  --space-module: 32px;
+  --space-section: 40px;
+  --space-page: 48px;
   --radius-control: 6px;
   --radius-container: 6px;
   --sidebar-width: 248px;
@@ -131,6 +146,14 @@
   --color-error-soft: #3a2020;
   --color-overlay: rgb(3 5 8 / 0.64);
   --color-focus-ring: rgb(78 141 243 / 0.3);
+  --color-mode-switch-track: #25282d;
+  --color-mode-switch-border: #34383f;
+  --color-mode-switch-border-hover: #4a4f57;
+  --color-mode-switch-text: #d5d7db;
+  --color-mode-switch-thumb: #41464e;
+  --color-mode-switch-thumb-border: rgb(255 255 255 / 0.08);
+  --color-mode-switch-thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.25);
+  --color-mode-switch-focus: rgb(213 215 219 / 0.36);
   --color-skeleton: #242a31;
   --shadow-overlay: 0 20px 52px rgb(5 7 9 / 0.52);
 }
@@ -167,8 +190,15 @@
     --color-error-soft: #3a2020;
     --color-overlay: rgb(3 5 8 / 0.64);
     --color-focus-ring: rgb(78 141 243 / 0.3);
+    --color-mode-switch-track: #25282d;
+    --color-mode-switch-border: #34383f;
+    --color-mode-switch-border-hover: #4a4f57;
+    --color-mode-switch-text: #d5d7db;
+    --color-mode-switch-thumb: #41464e;
+    --color-mode-switch-thumb-border: rgb(255 255 255 / 0.08);
+    --color-mode-switch-thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.25);
+    --color-mode-switch-focus: rgb(213 215 219 / 0.36);
     --color-skeleton: #242a31;
     --shadow-overlay: 0 20px 52px rgb(5 7 9 / 0.52);
   }
 }
-

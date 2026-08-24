@@ -149,15 +149,21 @@ describe('风险中心 AB 交互契约', () => {
     );
 
     expect(actualHtml).toContain('估值范围');
-    expect(actualHtml).not.toContain('>估值</span>');
+    expect(actualHtml).toContain('data-slot="switch"');
+    expect(actualHtml).toContain('data-mode="actual"');
+    expect(actualHtml).toContain('实际');
+    expect(actualHtml).toContain('模拟');
     expect(actualHtml).toContain('当前实际，切换到模拟');
-    expect(actualHtml).toContain('>实际</span>');
-    expect(actualHtml).not.toContain('>模拟</span>');
+    expect(actualHtml).toContain('left-2 px-1 opacity-100');
+    expect(actualHtml).toContain('right-2 px-1 opacity-0');
     expect(shadowHtml).toContain('风险范围');
-    expect(shadowHtml).not.toContain('>风险</span>');
+    expect(shadowHtml).toContain('data-slot="switch"');
+    expect(shadowHtml).toContain('data-mode="shadow"');
+    expect(shadowHtml).toContain('实际');
+    expect(shadowHtml).toContain('模拟');
     expect(shadowHtml).toContain('当前模拟，切换到实际');
-    expect(shadowHtml).toContain('>模拟</span>');
-    expect(shadowHtml).not.toContain('>实际</span>');
+    expect(shadowHtml).toContain('left-2 px-1 opacity-0');
+    expect(shadowHtml).toContain('right-2 px-1 opacity-100');
 
     const noteHtml = renderToStaticMarkup(
       <PortfolioModeNote>仅用于研究和模拟。</PortfolioModeNote>,

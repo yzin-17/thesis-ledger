@@ -9,20 +9,49 @@ import {
   xirr,
   type LedgerEvent,
 } from '@thesis-ledger/domain';
+import type { CurrencyV1, FxRateV1, FxRatesResponseV1 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 
 type PortfolioMode = 'actual' | 'shadow';
+type Currency = CurrencyV1;
+
+type PerformanceFxOptions = {
+  fxMerge?: boolean;
+  baseCurrency?: Currency;
+};
+
+type PerformanceFxMeta = {
+  enabled: boolean;
+  status: 'disabled' | 'not_needed' | 'ready' | 'stale' | 'blocked';
+  baseCurrency?: Currency;
+  asOf?: string;
+  fxAsOf?: string;
+  estimated?: boolean;
+  conversionMode?: 'current-rate';
+  stale?: boolean;
+  fxStale?: boolean;
+  missingCurrencies: Currency[];
+  rates: FxRateV1[];
+};
 
 type PerformanceSnapshot = {
   id?: string;
+  accountId?: string | null;
   capturedAt: Date;
   marketValue: unknown;
+  costValue?: unknown;
   cashValue: unknown;
   payload: unknown;
+  currency?: Currency;
+  estimated?: boolean;
+  conversionMode?: 'current-rate';
+  fxAsOf?: string;
+  fxStale?: boolean;
 };
 
 type PerformanceLedgerEvent = {
+  accountId?: string;
   type: string;
   occurredAt: Date;
   amount: unknown;
@@ -48,7 +77,6 @@ const EXTERNAL_FLOW_TYPES = [
   'TRANSFER_IN',
   'TRANSFER_OUT',
 ] as const;
-
 const snapshotPayload = (payload: unknown) =>
   payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
 
@@ -69,6 +97,11 @@ const snapshotMissingSymbols = (snapshot: Pick<PerformanceSnapshot, 'payload'>) 
 
 const snapshotValue = (snapshot: Pick<PerformanceSnapshot, 'marketValue' | 'cashValue'>) =>
   Number(snapshot.marketValue) + Number(snapshot.cashValue);
+
+const snapshotMode = (snapshot: PerformanceSnapshot) => {
+  const payload = snapshotPayload(snapshot.payload);
+  return typeof payload.mode === 'string' ? payload.mode : 'actual';
+};
 
 const toLedgerEvent = (event: PrismaLedgerEvent): LedgerEvent => ({
   id: event.id,
@@ -94,6 +127,17 @@ const externalPortfolioFlow = (event: Pick<PerformanceLedgerEvent, 'type' | 'amo
   return 0;
 };
 
+const fxResponseFields = (fx: PerformanceFxMeta) => {
+  if (!fx.estimated) return {};
+  const fxAsOf = fx.fxAsOf ?? fx.asOf;
+  return {
+    estimated: true,
+    conversionMode: 'current-rate' as const,
+    ...(fxAsOf ? { fxAsOf } : {}),
+    fxStale: fx.fxStale ?? fx.stale ?? false,
+  };
+};
+
 @Injectable()
 export class PerformanceService {
   constructor(
@@ -101,16 +145,176 @@ export class PerformanceService {
     private readonly market: MarketService,
   ) {}
 
+  private async accountCurrencies(accountId: string | undefined, mode: PortfolioMode) {
+    const accountDelegate = (this.prisma as unknown as { account?: unknown }).account as
+      | {
+          findMany?: (args: unknown) => Promise<Array<{ id?: string; currency?: string | null }>>;
+        }
+      | undefined;
+    if (typeof accountDelegate?.findMany !== 'function')
+      return new Map<string, Currency>(accountId ? [[accountId, 'CNY']] : []);
+    const rows = await accountDelegate.findMany({
+      where: { ...(accountId ? { id: accountId } : {}), mode },
+      select: { id: true, currency: true },
+    });
+    return new Map(
+      rows.map((row, index) => [
+        row.id ?? `__currency-${index}`,
+        (row.currency ?? 'CNY') as Currency,
+      ]),
+    );
+  }
+
+  private async resolveFx(
+    currencies: readonly Currency[],
+    options: PerformanceFxOptions,
+    asOf: Date,
+  ): Promise<{ meta: PerformanceFxMeta; rates: Map<Currency, number> }> {
+    const uniqueCurrencies = [...new Set(currencies)];
+    const fxMerge = options.fxMerge === true;
+    const baseCurrency = options.baseCurrency ?? 'CNY';
+    if (!fxMerge)
+      return {
+        meta: {
+          enabled: false,
+          status: uniqueCurrencies.length > 1 ? 'disabled' : 'not_needed',
+          missingCurrencies: [],
+          rates: [],
+        },
+        rates: new Map(),
+      };
+    if (uniqueCurrencies.length <= 1)
+      return {
+        meta: {
+          enabled: false,
+          status: 'not_needed',
+          baseCurrency,
+          missingCurrencies: [],
+          rates: [],
+        },
+        rates: new Map([[uniqueCurrencies[0] ?? baseCurrency, 1]]),
+      };
+
+    let response: FxRatesResponseV1;
+    try {
+      response = await this.market.getFxRates({
+        baseCurrency,
+        currencies: uniqueCurrencies,
+        asOf: asOf.toISOString(),
+      });
+    } catch {
+      return {
+        meta: {
+          enabled: true,
+          status: 'blocked',
+          baseCurrency,
+          asOf: asOf.toISOString(),
+          fxAsOf: asOf.toISOString(),
+          estimated: true,
+          conversionMode: 'current-rate',
+          missingCurrencies: uniqueCurrencies,
+          rates: [],
+        },
+        rates: new Map(),
+      };
+    }
+    const available = response.rates.filter((rate) => rate.available && rate.rate !== undefined);
+    const rateMap = new Map(available.map((rate) => [rate.fromCurrency, rate.rate!]));
+    const missingCurrencies = uniqueCurrencies.filter((currency) => !rateMap.has(currency));
+    const stale = available.some((rate) => rate.stale);
+    return {
+      meta: {
+        enabled: true,
+        status: missingCurrencies.length > 0 ? 'blocked' : stale ? 'stale' : 'ready',
+        baseCurrency,
+        asOf: response.asOf,
+        fxAsOf: response.asOf,
+        estimated: true,
+        conversionMode: 'current-rate',
+        stale,
+        fxStale: stale,
+        missingCurrencies,
+        rates: response.rates,
+      },
+      rates: rateMap,
+    };
+  }
+
+  private convertFx(
+    value: number,
+    currency: Currency,
+    fx: { meta: PerformanceFxMeta; rates: Map<Currency, number> },
+  ) {
+    if (!fx.meta.enabled || fx.meta.status === 'disabled' || fx.meta.status === 'not_needed')
+      return value;
+    const rate = fx.rates.get(currency);
+    return rate === undefined ? null : value * rate;
+  }
+
+  private groupSnapshotsByCurrency(
+    snapshots: PerformanceSnapshot[],
+    mode: PortfolioMode,
+    fx?: PerformanceFxMeta,
+  ) {
+    const groups = new Map<
+      string,
+      {
+        currency: Currency;
+        capturedAt: Date;
+        marketValue: number;
+        costValue: number;
+        cashValue: number;
+        partial: boolean;
+        missingSymbols: string[];
+      }
+    >();
+    for (const snapshot of snapshots) {
+      const currency = snapshot.currency ?? 'CNY';
+      const key = `${currency}:${snapshot.capturedAt.toISOString()}`;
+      const current = groups.get(key) ?? {
+        currency,
+        capturedAt: snapshot.capturedAt,
+        marketValue: 0,
+        costValue: 0,
+        cashValue: 0,
+        partial: false,
+        missingSymbols: [],
+      };
+      current.marketValue += Number(snapshot.marketValue);
+      current.costValue += Number(snapshot.costValue ?? 0);
+      current.cashValue += Number(snapshot.cashValue);
+      current.partial ||= partialSnapshot(snapshot);
+      current.missingSymbols.push(...snapshotMissingSymbols(snapshot));
+      groups.set(key, current);
+    }
+    return [...groups.values()]
+      .sort((left, right) => left.capturedAt.getTime() - right.capturedAt.getTime())
+      .map((group) => ({
+        id: `currency-${group.currency}-${group.capturedAt.getTime()}`,
+        accountId: null,
+        capturedAt: group.capturedAt,
+        marketValue: group.marketValue,
+        costValue: group.costValue,
+        cashValue: group.cashValue,
+        currency: group.currency,
+        payload: {
+          mode,
+          partial: group.partial,
+          missingSymbols: [...new Set(group.missingSymbols)],
+          dataQuality: {
+            partial: group.partial,
+            missingSymbols: [...new Set(group.missingSymbols)],
+          },
+          ...(fx ? { fx } : {}),
+        },
+        ...(fx ? fxResponseFields(fx) : {}),
+      }));
+  }
+
   private async assertCurrencyScope(accountId: string | undefined, mode: PortfolioMode) {
     if (accountId) return;
-    const accountDelegate = (this.prisma as unknown as { account?: unknown }).account as
-      { findMany?: (args: unknown) => Promise<Array<{ currency?: string | null }>> } | undefined;
-    if (typeof accountDelegate?.findMany !== 'function') return;
-    const accounts = await accountDelegate.findMany({
-      where: { mode },
-      select: { currency: true },
-    });
-    const currencies = new Set(accounts.map((account) => account.currency ?? 'CNY'));
+    const accounts = await this.accountCurrencies(undefined, mode);
+    const currencies = new Set(accounts.values());
     if (currencies.size > 1) {
       throw new BadRequestException({
         code: 'MIXED_CURRENCY_SCOPE',
@@ -235,8 +439,17 @@ export class PerformanceService {
     });
   }
 
-  async summary(accountId?: string, start?: string, end?: string, mode: PortfolioMode = 'actual') {
-    const snapshots = (await this.history(accountId, start, end, mode)) as PerformanceSnapshot[];
+  async summary(
+    accountId?: string,
+    start?: string,
+    end?: string,
+    mode: PortfolioMode = 'actual',
+    options: PerformanceFxOptions = {},
+  ) {
+    const snapshots = await this.history(accountId, start, end, mode, options);
+    const accountCurrencyMap = await this.accountCurrencies(accountId, mode);
+    const currencies = [...new Set(accountCurrencyMap.values())] as Currency[];
+    const fx = await this.resolveFx(currencies, options, new Date());
     const partialSnapshots = snapshots.filter(partialSnapshot);
     if (partialSnapshots.length > 0) {
       throw new BadRequestException({
@@ -250,9 +463,35 @@ export class PerformanceService {
       return {
         accountId: accountId ?? null,
         snapshots,
-        ttwror: 0,
+        ttwror: null,
         xirr: null,
         xirrReason: '至少需要两个完整快照',
+        fx: fx.meta,
+        ...fxResponseFields(fx.meta),
+      };
+    }
+
+    if (!accountId && currencies.length > 1 && !options.fxMerge) {
+      return {
+        accountId: null,
+        snapshots,
+        ttwror: null,
+        xirr: null,
+        xirrReason: '混合币种未合并，收益请按币种查看',
+        fx: fx.meta,
+        ...fxResponseFields(fx.meta),
+      };
+    }
+
+    if (options.fxMerge && fx.meta.status === 'blocked') {
+      return {
+        accountId: accountId ?? null,
+        snapshots,
+        ttwror: null,
+        xirr: null,
+        xirrReason: '无法获取有效汇率，暂时无法计算合并收益',
+        fx: fx.meta,
+        ...fxResponseFields(fx.meta),
       };
     }
 
@@ -268,13 +507,21 @@ export class PerformanceService {
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
     })) as PerformanceLedgerEvent[];
 
+    const convertFlow = (event: PerformanceLedgerEvent) => {
+      const flow = externalPortfolioFlow(event);
+      if (flow === 0 || !fx.meta.enabled || fx.meta.status === 'not_needed') return flow;
+      const currency = event.accountId ? accountCurrencyMap.get(event.accountId) : undefined;
+      const rate = currency ? fx.rates.get(currency) : undefined;
+      return rate === undefined ? 0 : flow * rate;
+    };
+
     const valuations = snapshots.map((snapshot, index) => {
       const previous = index === 0 ? undefined : snapshots[index - 1];
       const externalFlow = previous
         ? externalEvents.reduce((sum, event) => {
             if (event.occurredAt <= previous.capturedAt || event.occurredAt > snapshot.capturedAt)
               return sum;
-            return sum + externalPortfolioFlow(event);
+            return sum + convertFlow(event);
           }, 0)
         : 0;
       return {
@@ -290,7 +537,7 @@ export class PerformanceService {
         amount: -snapshotValue(firstSnapshot),
       },
       ...externalEvents.flatMap((event) => {
-        const portfolioFlow = externalPortfolioFlow(event);
+        const portfolioFlow = convertFlow(event);
         return portfolioFlow === 0
           ? []
           : [{ date: event.occurredAt.toISOString(), amount: -portfolioFlow }];
@@ -304,6 +551,8 @@ export class PerformanceService {
     return {
       accountId: accountId ?? null,
       snapshots,
+      fx: fx.meta,
+      ...fxResponseFields(fx.meta),
       ...this.calculate({ valuations, cashFlows }),
     };
   }
@@ -343,19 +592,154 @@ export class PerformanceService {
     });
   }
 
-  targets(scope: 'account' | 'portfolio', accountId?: string) {
-    return this.prisma.targetAllocation.findFirst({
+  async targets(
+    scope: 'account' | 'portfolio',
+    accountId?: string,
+    mode: PortfolioMode = 'actual',
+    options: PerformanceFxOptions = {},
+  ) {
+    const explicitTarget = await this.prisma.targetAllocation.findFirst({
       where: { scope, accountId: accountId ?? null, active: true },
       orderBy: { version: 'desc' },
     });
+    if (explicitTarget) return { ...explicitTarget, source: 'explicit' as const };
+    if (scope === 'account') {
+      return {
+        scope,
+        accountId: accountId ?? null,
+        targets: {},
+        source: 'none' as const,
+      };
+    }
+
+    const accounts = await this.prisma.account.findMany({
+      where: { mode, active: true },
+      select: { id: true },
+    });
+    const accountIds = accounts.map((account) => account.id);
+    if (accountIds.length === 0) {
+      return {
+        scope,
+        accountId: null,
+        targets: {},
+        source: 'none' as const,
+      };
+    }
+
+    const storedTargets = await this.prisma.targetAllocation.findMany({
+      where: {
+        scope: 'account',
+        accountId: { in: accountIds },
+        active: true,
+      },
+      orderBy: [{ accountId: 'asc' }, { version: 'desc' }],
+    });
+    const latestTargetsByAccount = new Map<string, (typeof storedTargets)[number]>();
+    for (const target of storedTargets) {
+      if (target.accountId && !latestTargetsByAccount.has(target.accountId)) {
+        latestTargetsByAccount.set(target.accountId, target);
+      }
+    }
+    if (latestTargetsByAccount.size === 0) {
+      return {
+        scope,
+        accountId: null,
+        targets: {},
+        source: 'none' as const,
+      };
+    }
+
+    const currentLayers = await this.layers(undefined, undefined, mode, options);
+    if (!currentLayers.portfolio) {
+      return {
+        scope,
+        accountId: null,
+        targets: {},
+        source: 'none' as const,
+        aggregationUnavailableReason: 'mixed-currency' as const,
+      };
+    }
+
+    const accountValues = new Map(
+      currentLayers.account.map((account) => [
+        account.accountId,
+        Math.max(0, account.marketValue + account.cashValue),
+      ]),
+    );
+    const weightedTargets: Array<{
+      accountId: string;
+      accountValue: number;
+      targets: Record<string, number>;
+    }> = [];
+    for (const [targetAccountId, target] of latestTargetsByAccount) {
+      const rawTargets =
+        target.targets && typeof target.targets === 'object' && !Array.isArray(target.targets)
+          ? (target.targets as Record<string, number>)
+          : {};
+      const normalized = normalizeAllocationTargets(rawTargets);
+      if (normalized.unknown.length > 0 || Object.keys(normalized.targets).length === 0) continue;
+      weightedTargets.push({
+        accountId: targetAccountId,
+        accountValue: accountValues.get(targetAccountId) ?? 0,
+        targets: normalized.targets,
+      });
+    }
+    if (weightedTargets.length === 0) {
+      return {
+        scope,
+        accountId: null,
+        targets: {},
+        source: 'none' as const,
+      };
+    }
+
+    const totalAccountValue = weightedTargets.reduce((sum, target) => sum + target.accountValue, 0);
+    const equalAccountWeight = 1 / weightedTargets.length;
+    const aggregatedTargets: Record<string, number> = {};
+    for (const target of weightedTargets) {
+      const accountWeight =
+        totalAccountValue > 0 ? target.accountValue / totalAccountValue : equalAccountWeight;
+      for (const [category, targetWeight] of Object.entries(target.targets)) {
+        aggregatedTargets[category] =
+          (aggregatedTargets[category] ?? 0) + targetWeight * accountWeight;
+      }
+    }
+    const aggregateTotal = Object.values(aggregatedTargets).reduce(
+      (sum, targetWeight) => sum + targetWeight,
+      0,
+    );
+    if (aggregateTotal > 0) {
+      for (const category of Object.keys(aggregatedTargets)) {
+        aggregatedTargets[category] = (aggregatedTargets[category] ?? 0) / aggregateTotal;
+      }
+    }
+    return {
+      scope,
+      accountId: null,
+      targets: aggregatedTargets,
+      source: 'account-aggregate' as const,
+      aggregatedAccountCount: weightedTargets.length,
+    };
   }
 
-  async history(accountId?: string, start?: string, end?: string, mode: PortfolioMode = 'actual') {
-    await this.assertCurrencyScope(accountId, mode);
-    const snapshots = await this.prisma.portfolioSnapshot.findMany({
+  async history(
+    accountId?: string,
+    start?: string,
+    end?: string,
+    mode: PortfolioMode = 'actual',
+    options: PerformanceFxOptions = {},
+  ) {
+    const accountCurrencyMap = await this.accountCurrencies(accountId, mode);
+    const currencies = [...new Set([...accountCurrencyMap.values()])] as Currency[];
+    const mixedCurrencyScope = !accountId && currencies.length > 1;
+    const useAccountSnapshots = !accountId && mixedCurrencyScope;
+    const snapshots = (await this.prisma.portfolioSnapshot.findMany({
       where: {
-        accountId: accountId ?? null,
-        ...(accountId ? { account: { mode } } : {}),
+        ...(accountId
+          ? { accountId, account: { mode } }
+          : useAccountSnapshots
+            ? { accountId: { not: null }, account: { mode } }
+            : { accountId: null }),
         ...(start || end
           ? {
               capturedAt: {
@@ -365,15 +749,84 @@ export class PerformanceService {
             }
           : {}),
       },
+      include: { account: { select: { currency: true } } },
       orderBy: { capturedAt: 'asc' },
-    });
-    if (accountId) return snapshots;
-    return snapshots.filter((snapshot) => {
-      const payload = snapshot.payload;
-      if (typeof payload !== 'object' || payload === null || !('mode' in payload))
-        return mode === 'actual';
-      return (payload as { mode?: unknown }).mode === mode;
-    });
+    })) as Array<PerformanceSnapshot & { account?: { currency?: string | null } | null }>;
+    const filtered = snapshots
+      .filter((snapshot) => snapshotMode(snapshot) === mode)
+      .map((snapshot) => ({
+        ...snapshot,
+        currency: (snapshot.account?.currency ??
+          (snapshot.accountId ? accountCurrencyMap.get(snapshot.accountId) : currencies[0]) ??
+          'CNY') as Currency,
+      }));
+    if (!useAccountSnapshots) return filtered;
+    if (!options.fxMerge) return this.groupSnapshotsByCurrency(filtered, mode);
+
+    const fx = await this.resolveFx(currencies, options, new Date());
+    if (fx.meta.status === 'blocked') return this.groupSnapshotsByCurrency(filtered, mode, fx.meta);
+
+    const byAccount = new Map<string, typeof filtered>();
+    for (const accountId of accountCurrencyMap.keys()) {
+      if (!accountId.startsWith('__currency-')) byAccount.set(accountId, []);
+    }
+    for (const snapshot of filtered) {
+      const key = snapshot.accountId ?? '__portfolio';
+      const values = byAccount.get(key) ?? [];
+      values.push(snapshot);
+      byAccount.set(key, values);
+    }
+    const timestamps = [...new Set(filtered.map((snapshot) => snapshot.capturedAt.getTime()))].sort(
+      (left, right) => left - right,
+    );
+    const merged: PerformanceSnapshot[] = [];
+    for (const timestamp of timestamps) {
+      let marketValue = 0;
+      let costValue = 0;
+      let cashValue = 0;
+      let partial = false;
+      const missingSymbols: string[] = [];
+      let included = 0;
+      for (const accountSnapshots of byAccount.values()) {
+        const point = [...accountSnapshots]
+          .reverse()
+          .find((snapshot) => snapshot.capturedAt.getTime() <= timestamp);
+        if (!point) {
+          partial = true;
+          continue;
+        }
+        const rate = fx.rates.get(point.currency ?? 'CNY');
+        if (rate === undefined) {
+          partial = true;
+          continue;
+        }
+        included += 1;
+        marketValue += Number(point.marketValue) * rate;
+        costValue += Number(point.costValue ?? 0) * rate;
+        cashValue += Number(point.cashValue) * rate;
+        missingSymbols.push(...snapshotMissingSymbols(point));
+        partial ||= partialSnapshot(point);
+      }
+      if (included === 0) continue;
+      merged.push({
+        id: `fx-${timestamp}`,
+        accountId: null,
+        capturedAt: new Date(timestamp),
+        marketValue,
+        costValue,
+        cashValue,
+        ...(fx.meta.baseCurrency ? { currency: fx.meta.baseCurrency } : {}),
+        payload: {
+          mode,
+          partial,
+          missingSymbols: [...new Set(missingSymbols)],
+          dataQuality: { partial, missingSymbols: [...new Set(missingSymbols)] },
+          fx: fx.meta,
+        },
+        ...fxResponseFields(fx.meta),
+      });
+    }
+    return merged;
   }
 
   calculate(input: {
@@ -421,8 +874,12 @@ export class PerformanceService {
     };
   }
 
-  async layers(accountId?: string, symbol?: string, mode: PortfolioMode = 'actual') {
-    await this.assertCurrencyScope(accountId, mode);
+  async layers(
+    accountId?: string,
+    symbol?: string,
+    mode: PortfolioMode = 'actual',
+    options: PerformanceFxOptions = {},
+  ) {
     const positionWhere = {
       ...(accountId ? { accountId } : {}),
       ...(symbol ? { symbol } : {}),
@@ -434,7 +891,7 @@ export class PerformanceService {
           findMany?: (args: unknown) => Promise<unknown[]>;
         }
       | undefined;
-    const [positions, storedLedger] = await Promise.all([
+    const [positions, storedLedger, accountCurrencyMap] = await Promise.all([
       this.prisma.position.findMany({ where: positionWhere, include: { asset: true } }),
       typeof ledgerDelegate?.findMany === 'function'
         ? ledgerDelegate.findMany({
@@ -442,9 +899,11 @@ export class PerformanceService {
             orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
           })
         : Promise.resolve([]),
+      this.accountCurrencies(accountId, mode),
     ]);
     const ledger = storedLedger as PrismaLedgerEvent[];
-    const security = await Promise.all(
+    const valuedAt = new Date();
+    const securityNative = await Promise.all(
       positions.map(async (position) => {
         let marketValue: number | null = null;
         try {
@@ -457,90 +916,242 @@ export class PerformanceService {
         } catch {
           // 保留 null，调用方可以区分缺行情和零市值。
         }
+        const currency = accountCurrencyMap.get(position.accountId) ?? 'CNY';
         const costValue = Number(position.quantity) * Number(position.costPrice);
         return {
           accountId: position.accountId,
           symbol: position.symbol,
           assetType: position.asset.assetType,
-          costValue,
-          marketValue,
-          unrealizedPnl: marketValue === null ? null : marketValue - costValue,
+          currency,
+          nativeCostValue: costValue,
+          nativeMarketValue: marketValue,
+          nativeUnrealizedPnl: marketValue === null ? null : marketValue - costValue,
         };
       }),
     );
+    const currencies = [
+      ...new Set([...accountCurrencyMap.values(), ...securityNative.map((item) => item.currency)]),
+    ] as Currency[];
+    const fx = await this.resolveFx(currencies, options, valuedAt);
+    const merged = fx.meta.enabled && fx.meta.status !== 'blocked';
+    const security = securityNative.map((item) => {
+      const marketValue =
+        item.nativeMarketValue === null
+          ? null
+          : merged
+            ? this.convertFx(item.nativeMarketValue, item.currency, fx)
+            : item.nativeMarketValue;
+      const costValue = merged
+        ? this.convertFx(item.nativeCostValue, item.currency, fx)
+        : item.nativeCostValue;
+      return {
+        accountId: item.accountId,
+        symbol: item.symbol,
+        assetType: item.assetType,
+        currency: item.currency,
+        nativeCostValue: item.nativeCostValue,
+        nativeMarketValue: item.nativeMarketValue,
+        costValue: costValue ?? item.nativeCostValue,
+        marketValue,
+        unrealizedPnl: marketValue === null || costValue === null ? null : marketValue - costValue,
+      };
+    });
     const cashBalances = projectCashBalance(ledger.map(toLedgerEvent));
     const byAccount = new Map<
       string,
       {
-        costValue: number;
-        marketValue: number;
-        cashValue: number;
+        currency: Currency;
+        nativeCostValue: number;
+        nativeMarketValue: number;
+        nativeCashValue: number;
         partial: boolean;
         missingSymbols: string[];
       }
     >();
+    for (const [id, currency] of accountCurrencyMap.entries()) {
+      if (!id.startsWith('__currency-'))
+        byAccount.set(id, {
+          currency,
+          nativeCostValue: 0,
+          nativeMarketValue: 0,
+          nativeCashValue: 0,
+          partial: false,
+          missingSymbols: [],
+        });
+    }
     for (const [id, cashValue] of cashBalances.entries()) {
-      byAccount.set(id, {
-        costValue: 0,
-        marketValue: 0,
-        cashValue,
-        partial: false,
-        missingSymbols: [],
-      });
-    }
-    if (accountId && !byAccount.has(accountId)) {
-      byAccount.set(accountId, {
-        costValue: 0,
-        marketValue: 0,
-        cashValue: 0,
-        partial: false,
-        missingSymbols: [],
-      });
-    }
-    for (const item of security) {
-      const current = byAccount.get(item.accountId) ?? {
-        costValue: 0,
-        marketValue: 0,
-        cashValue: 0,
+      const current = byAccount.get(id) ?? {
+        currency: accountCurrencyMap.get(id) ?? 'CNY',
+        nativeCostValue: 0,
+        nativeMarketValue: 0,
+        nativeCashValue: 0,
         partial: false,
         missingSymbols: [],
       };
-      current.costValue += item.costValue;
-      current.marketValue += item.marketValue ?? 0;
-      if (item.marketValue === null) {
+      current.nativeCashValue += cashValue;
+      byAccount.set(id, current);
+    }
+    if (accountId && !byAccount.has(accountId)) {
+      byAccount.set(accountId, {
+        currency: accountCurrencyMap.get(accountId) ?? 'CNY',
+        nativeCostValue: 0,
+        nativeMarketValue: 0,
+        nativeCashValue: 0,
+        partial: false,
+        missingSymbols: [],
+      });
+    }
+    for (const item of securityNative) {
+      const current = byAccount.get(item.accountId) ?? {
+        currency: item.currency,
+        nativeCostValue: 0,
+        nativeMarketValue: 0,
+        nativeCashValue: 0,
+        partial: false,
+        missingSymbols: [],
+      };
+      current.nativeCostValue += item.nativeCostValue;
+      current.nativeMarketValue += item.nativeMarketValue ?? 0;
+      if (item.nativeMarketValue === null) {
         current.partial = true;
         current.missingSymbols.push(item.symbol);
       }
       byAccount.set(item.accountId, current);
     }
-    const account = [...byAccount.entries()].map(([id, value]) => ({ accountId: id, ...value }));
-    const portfolio = account.reduce(
-      (total, value) => ({
-        costValue: total.costValue + value.costValue,
-        marketValue: total.marketValue + value.marketValue,
-        cashValue: total.cashValue + value.cashValue,
-        partial: total.partial || value.partial,
-        missingSymbols: [...total.missingSymbols, ...value.missingSymbols],
-      }),
+    const account = [...byAccount.entries()].map(([id, value]) => {
+      const costValue = merged
+        ? this.convertFx(value.nativeCostValue, value.currency, fx)
+        : value.nativeCostValue;
+      const marketValue = merged
+        ? this.convertFx(value.nativeMarketValue, value.currency, fx)
+        : value.nativeMarketValue;
+      const cashValue = merged
+        ? this.convertFx(value.nativeCashValue, value.currency, fx)
+        : value.nativeCashValue;
+      return {
+        accountId: id,
+        currency: value.currency,
+        nativeCostValue: value.nativeCostValue,
+        nativeMarketValue: value.nativeMarketValue,
+        nativeCashValue: value.nativeCashValue,
+        costValue: costValue ?? value.nativeCostValue,
+        marketValue: marketValue ?? value.nativeMarketValue,
+        cashValue: cashValue ?? value.nativeCashValue,
+        partial: value.partial,
+        missingSymbols: [...new Set(value.missingSymbols)],
+      };
+    });
+    const byCurrencyMap = new Map<
+      Currency,
       {
-        costValue: 0,
-        marketValue: 0,
-        cashValue: 0,
+        currency: Currency;
+        nativeCostValue: number;
+        nativeMarketValue: number;
+        nativeCashValue: number;
+        partial: boolean;
+        missingSymbols: string[];
+      }
+    >();
+    for (const currency of accountCurrencyMap.values()) {
+      if (!byCurrencyMap.has(currency)) {
+        byCurrencyMap.set(currency, {
+          currency,
+          nativeCostValue: 0,
+          nativeMarketValue: 0,
+          nativeCashValue: 0,
+          partial: false,
+          missingSymbols: [],
+        });
+      }
+    }
+    for (const value of byAccount.values()) {
+      const current = byCurrencyMap.get(value.currency) ?? {
+        currency: value.currency,
+        nativeCostValue: 0,
+        nativeMarketValue: 0,
+        nativeCashValue: 0,
         partial: false,
-        missingSymbols: [] as string[],
-      },
-    );
+        missingSymbols: [],
+      };
+      current.nativeCostValue += value.nativeCostValue;
+      current.nativeMarketValue += value.nativeMarketValue;
+      current.nativeCashValue += value.nativeCashValue;
+      current.partial ||= value.partial;
+      current.missingSymbols.push(...value.missingSymbols);
+      byCurrencyMap.set(value.currency, current);
+    }
+    const byCurrency = [...byCurrencyMap.values()].map((value) => ({
+      currency: value.currency,
+      nativeCostValue: value.nativeCostValue,
+      nativeMarketValue: value.nativeMarketValue,
+      nativeCashValue: value.nativeCashValue,
+      costValue: value.nativeCostValue,
+      marketValue: value.nativeMarketValue,
+      cashValue: value.nativeCashValue,
+      partial: value.partial,
+      missingSymbols: [...new Set(value.missingSymbols)],
+    }));
+    const hasSingleCurrency = byCurrency.length <= 1;
+    const nativePortfolio = hasSingleCurrency
+      ? byCurrency.reduce(
+          (total, value) => ({
+            ...total,
+            currency: value.currency,
+            costValue: total.costValue + value.costValue,
+            marketValue: total.marketValue + value.marketValue,
+            cashValue: total.cashValue + value.cashValue,
+            partial: total.partial || value.partial,
+            missingSymbols: [...total.missingSymbols, ...value.missingSymbols],
+          }),
+          {
+            currency: byCurrency[0]?.currency,
+            costValue: 0,
+            marketValue: 0,
+            cashValue: 0,
+            partial: false,
+            missingSymbols: [] as string[],
+          },
+        )
+      : null;
+    const mergedPortfolio = merged
+      ? account.reduce(
+          (total, value) => ({
+            ...total,
+            currency: fx.meta.baseCurrency,
+            costValue: total.costValue + value.costValue,
+            marketValue: total.marketValue + value.marketValue,
+            cashValue: total.cashValue + value.cashValue,
+            partial: total.partial || value.partial,
+            missingSymbols: [...total.missingSymbols, ...value.missingSymbols],
+          }),
+          {
+            currency: fx.meta.baseCurrency,
+            costValue: 0,
+            marketValue: 0,
+            cashValue: 0,
+            partial: false,
+            missingSymbols: [] as string[],
+          },
+        )
+      : null;
+    const portfolio = mergedPortfolio ?? nativePortfolio;
     return {
       security,
       account,
-      portfolio: {
-        ...portfolio,
-        missingSymbols: [...new Set(portfolio.missingSymbols)],
-      },
-      valuedAt: new Date().toISOString(),
+      portfolio: portfolio
+        ? { ...portfolio, missingSymbols: [...new Set(portfolio.missingSymbols)] }
+        : null,
+      byCurrency,
+      valuedAt: valuedAt.toISOString(),
+      fx: fx.meta,
+      ...fxResponseFields(fx.meta),
       dataQuality: {
-        partial: portfolio.partial,
-        missingSymbols: [...new Set(portfolio.missingSymbols)],
+        partial: portfolio?.partial ?? byCurrency.some((value) => value.partial),
+        missingSymbols: [
+          ...new Set(
+            portfolio?.missingSymbols ?? byCurrency.flatMap((value) => value.missingSymbols),
+          ),
+        ],
       },
     };
   }

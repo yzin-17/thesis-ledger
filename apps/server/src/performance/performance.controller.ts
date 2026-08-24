@@ -5,8 +5,12 @@ import {
   performanceCalculateInputSchema,
   performanceSnapshotCaptureInputSchema,
   performanceTargetsInputSchema,
+  currencySchema,
 } from '@thesis-ledger/schemas';
 import { PerformanceService } from './performance.service.js';
+
+const parseFxMerge = (value?: string) => value === 'true';
+const parseBaseCurrency = (value?: string) => currencySchema.parse(value ?? 'CNY');
 
 @Controller('performance')
 export class PerformanceController {
@@ -28,8 +32,13 @@ export class PerformanceController {
     @Query('start') start?: string,
     @Query('end') end?: string,
     @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('fxMerge') fxMerge?: string,
+    @Query('baseCurrency') baseCurrency?: string,
   ) {
-    return this.performance.history(accountId, start, end, mode);
+    return this.performance.history(accountId, start, end, mode, {
+      fxMerge: parseFxMerge(fxMerge),
+      baseCurrency: parseBaseCurrency(baseCurrency),
+    });
   }
 
   @Get('summary')
@@ -38,8 +47,13 @@ export class PerformanceController {
     @Query('start') start?: string,
     @Query('end') end?: string,
     @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('fxMerge') fxMerge?: string,
+    @Query('baseCurrency') baseCurrency?: string,
   ) {
-    return this.performance.summary(accountId, start, end, mode);
+    return this.performance.summary(accountId, start, end, mode, {
+      fxMerge: parseFxMerge(fxMerge),
+      baseCurrency: parseBaseCurrency(baseCurrency),
+    });
   }
 
   @Post('calculate')
@@ -60,8 +74,14 @@ export class PerformanceController {
   targets(
     @Query('scope') scope: 'account' | 'portfolio' = 'portfolio',
     @Query('accountId') accountId?: string,
+    @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('fxMerge') fxMerge?: string,
+    @Query('baseCurrency') baseCurrency?: string,
   ) {
-    return this.performance.targets(scope, accountId);
+    return this.performance.targets(scope, accountId, mode, {
+      fxMerge: parseFxMerge(fxMerge),
+      baseCurrency: parseBaseCurrency(baseCurrency),
+    });
   }
 
   @Post('targets')
@@ -75,7 +95,12 @@ export class PerformanceController {
     @Query('accountId') accountId?: string,
     @Query('symbol') symbol?: string,
     @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('fxMerge') fxMerge?: string,
+    @Query('baseCurrency') baseCurrency?: string,
   ) {
-    return this.performance.layers(accountId, symbol, mode);
+    return this.performance.layers(accountId, symbol, mode, {
+      fxMerge: parseFxMerge(fxMerge),
+      baseCurrency: parseBaseCurrency(baseCurrency),
+    });
   }
 }

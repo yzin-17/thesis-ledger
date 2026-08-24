@@ -4,7 +4,10 @@ import type {
   CatalogDelta,
   DesiredProviderPolicy,
   ProviderManifest,
+  CurrencyV1,
+  FxRatesResponseV1,
 } from '@thesis-ledger/schemas';
+import { fxRatesResponseSchemaV1 } from '@thesis-ledger/schemas';
 import { loadConfig } from '../../platform/config.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
 
@@ -139,6 +142,21 @@ export class DsaClient {
       contractVersion?: number;
       capabilities?: Record<string, unknown>;
     }>('/api/v1/thesis-ledger/capabilities', 1);
+  }
+
+  fxRates(input: {
+    baseCurrency: CurrencyV1;
+    currencies: readonly CurrencyV1[];
+    asOf?: string;
+  }): Promise<FxRatesResponseV1> {
+    const params = new URLSearchParams({
+      baseCurrency: input.baseCurrency,
+      currencies: [...new Set(input.currencies)].join(','),
+    });
+    if (input.asOf) params.set('asOf', input.asOf.slice(0, 10));
+    return this.get<unknown>(`/api/v1/thesis-ledger/market/fx-rates?${params.toString()}`).then(
+      (raw) => fxRatesResponseSchemaV1.parse(raw),
+    );
   }
 
   controlHandshake(requestId = crypto.randomUUID()) {

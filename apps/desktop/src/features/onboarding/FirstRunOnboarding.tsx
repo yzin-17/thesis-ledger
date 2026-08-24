@@ -61,12 +61,13 @@ export function FirstRunOnboarding({
   onNavigate: (view: DesktopNavigationView, options?: OnboardingNavigationOptions) => void;
 }) {
   const currentStep = resolveCurrentStep(hasAccount, hasPosition, hasProviderSetup, hasRiskRule);
+  if (currentStep === null) return null;
 
   return (
     <section
       className="onboarding"
       aria-labelledby="onboarding-title"
-      data-onboarding-step={currentStep ?? 'complete'}
+      data-onboarding-step={currentStep}
     >
       <div className="panel-heading">
         <p className="kicker">First Run</p>
@@ -74,9 +75,7 @@ export function FirstRunOnboarding({
         <p>
           按顺序完成账户、持仓、数据源与通知、风险提醒配置。自动化任务可以稍后单独设置；敏感凭证由服务端安全保存，页面不会显示。
         </p>
-        <p className="onboarding-progress">
-          {currentStep === null ? '四步已完成' : `当前步骤 ${currentStep} / 4`}
-        </p>
+        <p className="onboarding-progress">当前步骤 {currentStep} / 4</p>
       </div>
       <ol className="onboarding-steps">
         <OnboardingStep

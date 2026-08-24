@@ -4,6 +4,42 @@ import type { AllocationCategory } from '@thesis-ledger/domain';
 export type { PortfolioMode };
 export type { AllocationCategory };
 
+export type Currency = 'CNY' | 'HKD' | 'USD';
+
+export interface PerformanceQueryOptions {
+  fxMerge: boolean;
+  baseCurrency: Currency;
+}
+
+export type FxMergeStatus = 'disabled' | 'not_needed' | 'ready' | 'stale' | 'blocked';
+
+export interface PerformanceFxRate {
+  fromCurrency: Currency;
+  toCurrency: Currency;
+  rate?: number;
+  rateDate?: string;
+  provider?: string;
+  fetchedAt?: string;
+  freshness: 'live' | 'delayed' | 'stale' | 'unavailable';
+  stale: boolean;
+  ageDays: number | null;
+  available: boolean;
+}
+
+export interface PerformanceFxMeta {
+  enabled: boolean;
+  status: FxMergeStatus;
+  baseCurrency?: Currency;
+  asOf?: string;
+  fxAsOf?: string;
+  estimated?: boolean;
+  conversionMode?: 'current-rate';
+  stale?: boolean;
+  fxStale?: boolean;
+  missingCurrencies: Currency[];
+  rates: PerformanceFxRate[];
+}
+
 export interface PerformanceDataQuality {
   partial: boolean;
   missingSymbols: string[];
@@ -17,6 +53,7 @@ export interface SnapshotRecord {
   cashValue: number;
   partial: boolean;
   missingSymbols: string[];
+  currency?: Currency;
 }
 
 export interface PerformanceAllocationRecord {
@@ -41,6 +78,9 @@ export interface PerformanceLayerRecord {
   costValue: number;
   marketValue: number | null;
   unrealizedPnl: number | null;
+  currency?: Currency;
+  nativeCostValue?: number;
+  nativeMarketValue?: number | null;
 }
 
 export interface PerformanceAccountTotal {
@@ -50,6 +90,10 @@ export interface PerformanceAccountTotal {
   cashValue: number;
   partial: boolean;
   missingSymbols: string[];
+  currency?: Currency;
+  nativeCostValue?: number;
+  nativeMarketValue?: number;
+  nativeCashValue?: number;
 }
 
 export interface PerformancePortfolioTotal {
@@ -58,20 +102,36 @@ export interface PerformancePortfolioTotal {
   cashValue: number;
   partial: boolean;
   missingSymbols: string[];
+  currency?: Currency;
+  nativeCostValue?: number;
+  nativeMarketValue?: number;
+  nativeCashValue?: number;
 }
 
 export interface PerformanceSummary {
-  ttwror: number;
+  ttwror: number | null;
   xirr: number | null;
   xirrReason?: string | null;
+  currency?: Currency;
+  fx?: PerformanceFxMeta;
+  estimated?: boolean;
+  conversionMode?: 'current-rate';
+  fxAsOf?: string;
+  fxStale?: boolean;
 }
 
 export interface PerformanceLayersResponse {
   security: PerformanceLayerRecord[];
   account: PerformanceAccountTotal[];
-  portfolio: PerformancePortfolioTotal;
+  portfolio: PerformancePortfolioTotal | null;
+  byCurrency?: PerformancePortfolioTotal[];
   valuedAt: string;
   dataQuality: PerformanceDataQuality;
+  fx?: PerformanceFxMeta;
+  estimated?: boolean;
+  conversionMode?: 'current-rate';
+  fxAsOf?: string;
+  fxStale?: boolean;
 }
 
 export interface PerformanceTargetsResponse {
@@ -80,6 +140,9 @@ export interface PerformanceTargetsResponse {
   accountId?: string | null;
   version?: number;
   createdAt?: string;
+  source?: 'explicit' | 'account-aggregate' | 'none';
+  aggregatedAccountCount?: number;
+  aggregationUnavailableReason?: 'mixed-currency';
 }
 
 export interface PerformanceAllocationResponse {
@@ -87,6 +150,7 @@ export interface PerformanceAllocationResponse {
   rebalance: RebalanceGapRecord[];
   partial: boolean;
   missingSymbols: string[];
+  fx?: PerformanceFxMeta;
 }
 
 export interface PerformanceAllocationInput {

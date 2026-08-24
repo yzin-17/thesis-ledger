@@ -7,8 +7,8 @@ export const useSavePerformanceTargetsMutation = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: SavePerformanceTargetsInput) => savePerformanceTargets(input),
-    onSuccess: (_, input) => {
-      void client.invalidateQueries({ queryKey: performanceKeys.targets(input.accountId ?? '') });
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: performanceKeys.targetsRoot });
       void client.invalidateQueries({ queryKey: performanceKeys.allocationRoot });
     },
   });

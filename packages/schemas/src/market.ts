@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 const isoDate = z.iso.datetime({ offset: true });
+const isoCalendarDate = z.iso.date();
 const finite = z.number().finite();
 const freshnessSchema = z.enum(['live', 'delayed', 'stale', 'unknown']);
+export const currencySchema = z.enum(['CNY', 'HKD', 'USD']);
+export type CurrencyV1 = z.infer<typeof currencySchema>;
 
 export const provenanceSchema = z.object({
   provider: z.string().min(1),
@@ -11,6 +14,30 @@ export const provenanceSchema = z.object({
   fetchedAt: isoDate,
   freshness: freshnessSchema,
 });
+
+export const fxRateSchemaV1 = z.object({
+  fromCurrency: currencySchema,
+  toCurrency: currencySchema,
+  rate: finite.positive().optional(),
+  rateDate: isoCalendarDate.optional(),
+  provider: z.string().min(1).optional(),
+  fetchedAt: isoDate.optional(),
+  freshness: z.enum(['live', 'delayed', 'stale', 'unavailable']),
+  stale: z.boolean(),
+  ageDays: z.number().int().nonnegative().nullable(),
+  available: z.boolean(),
+});
+
+export const fxRatesResponseSchemaV1 = z.object({
+  version: z.literal(1),
+  baseCurrency: currencySchema,
+  asOf: isoCalendarDate,
+  fetchedAt: isoDate,
+  maxAgeDays: z.number().int().nonnegative(),
+  rates: z.array(fxRateSchemaV1),
+});
+export type FxRateV1 = z.infer<typeof fxRateSchemaV1>;
+export type FxRatesResponseV1 = z.infer<typeof fxRatesResponseSchemaV1>;
 
 export const quoteSchemaV1 = z
   .object({

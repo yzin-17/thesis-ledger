@@ -18,6 +18,7 @@ import {
 import { PortfolioManagement } from '../src/features/portfolio/PortfolioManagement.js';
 import { InstrumentCombobox } from '../src/features/portfolio/InstrumentCombobox.js';
 import { DataStateBanner } from '../src/features/shared/DesktopPrimitives.js';
+import { Switch, SwitchThumb } from '../src/components/ui/switch.js';
 import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
 
 const renderWithToast = (node: ReactNode) => {
@@ -78,6 +79,20 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     expect(firstStep).toContain('配置数据源与通知');
     expect(firstStep).toContain('设置风险规则');
     expect(firstStep.match(/<li/g)).toHaveLength(4);
+  });
+
+  it('removes completed onboarding from the page', () => {
+    const complete = renderToStaticMarkup(
+      <FirstRunOnboarding
+        hasAccount
+        hasPosition
+        hasProviderSetup
+        hasRiskRule
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(complete).toBe('');
   });
 
   it('requires a credentialed provider that covers data and notification onboarding', () => {
@@ -182,6 +197,23 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
 });
 
 describe('Desktop UI contract - providers and primitives', () => {
+  it('风险 Switch 使用圆形滑块并收窄内外间隙', () => {
+    const markup = renderToStaticMarkup(
+      <Switch variant="risk" checked>
+        <SwitchThumb variant="risk" />
+      </Switch>,
+    );
+
+    expect(markup).toContain('h-6');
+    expect(markup).toContain('w-11');
+    expect(markup).toContain('cursor-pointer');
+    expect(markup).toContain('bg-input');
+    expect(markup).not.toContain('bg-muted');
+    expect(markup).toContain('p-0.5');
+    expect(markup).toContain('size-5');
+    expect(markup).toContain('data-checked:translate-x-5');
+  });
+
   it('renders instrument search and selected instrument state directly', () => {
     const initial = renderToStaticMarkup(
       <InstrumentCombobox

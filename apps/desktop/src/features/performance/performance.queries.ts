@@ -11,20 +11,70 @@ import type {
   PerformanceAllocationInput,
   PerformanceAllocationResponse,
   PerformanceDataQuality,
+  PerformanceQueryOptions,
   PortfolioMode,
 } from './performance.types.js';
 
 const performanceRoot = ['desktop', 'performance'] as const;
+const defaultPerformanceQueryOptions: PerformanceQueryOptions = {
+  fxMerge: false,
+  baseCurrency: 'CNY',
+};
 
 export const performanceKeys = {
   root: performanceRoot,
-  history: (mode: PortfolioMode, accountId: string) =>
-    [...performanceKeys.root, 'history', mode, accountId] as const,
-  summary: (mode: PortfolioMode, accountId: string) =>
-    [...performanceKeys.root, 'summary', mode, accountId] as const,
-  layers: (mode: PortfolioMode, accountId: string) =>
-    [...performanceKeys.root, 'layers', mode, accountId] as const,
-  targets: (accountId: string) => [...performanceKeys.root, 'targets', accountId] as const,
+  history: (
+    mode: PortfolioMode,
+    accountId: string,
+    options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
+  ) =>
+    [
+      ...performanceKeys.root,
+      'history',
+      mode,
+      accountId,
+      options.fxMerge,
+      options.baseCurrency,
+    ] as const,
+  summary: (
+    mode: PortfolioMode,
+    accountId: string,
+    options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
+  ) =>
+    [
+      ...performanceKeys.root,
+      'summary',
+      mode,
+      accountId,
+      options.fxMerge,
+      options.baseCurrency,
+    ] as const,
+  layers: (
+    mode: PortfolioMode,
+    accountId: string,
+    options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
+  ) =>
+    [
+      ...performanceKeys.root,
+      'layers',
+      mode,
+      accountId,
+      options.fxMerge,
+      options.baseCurrency,
+    ] as const,
+  targetsRoot: [...performanceRoot, 'targets'] as const,
+  targets: (
+    mode: PortfolioMode,
+    accountId: string,
+    options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
+  ) =>
+    [
+      ...performanceKeys.targetsRoot,
+      mode,
+      accountId,
+      options.fxMerge,
+      options.baseCurrency,
+    ] as const,
   allocationRoot: [...performanceRoot, 'allocation'] as const,
   allocation: (mode: PortfolioMode, accountId: string, positionsKey: string, targetsKey: string) =>
     [...performanceKeys.root, 'allocation', mode, accountId, positionsKey, targetsKey] as const,
@@ -46,31 +96,40 @@ const emptyAllocation = (
   missingSymbols,
 });
 
-export const usePerformanceQueries = (mode: PortfolioMode, accountId: string, enabled = true) => {
+export const usePerformanceQueries = (
+  mode: PortfolioMode,
+  accountId: string,
+  enabled = true,
+  options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
+) => {
   const history = useQuery({
-    queryKey: performanceKeys.history(mode, accountId),
-    queryFn: () => fetchPerformanceHistory(mode, accountId || undefined),
+    queryKey: performanceKeys.history(mode, accountId, options),
+    queryFn: () => fetchPerformanceHistory(mode, accountId || undefined, options),
     enabled,
   });
   const summary = useQuery({
-    queryKey: performanceKeys.summary(mode, accountId),
-    queryFn: () => fetchPerformanceSummary(mode, accountId || undefined),
+    queryKey: performanceKeys.summary(mode, accountId, options),
+    queryFn: () => fetchPerformanceSummary(mode, accountId || undefined, options),
     enabled,
   });
   const layers = useQuery({
-    queryKey: performanceKeys.layers(mode, accountId),
-    queryFn: () => fetchPerformanceLayers(mode, accountId || undefined),
+    queryKey: performanceKeys.layers(mode, accountId, options),
+    queryFn: () => fetchPerformanceLayers(mode, accountId || undefined, options),
     enabled,
   });
   const targets = useQuery({
-    queryKey: performanceKeys.targets(accountId),
-    queryFn: () => fetchPerformanceTargets(accountId || undefined),
+    queryKey: performanceKeys.targets(mode, accountId, options),
+    queryFn: () => fetchPerformanceTargets(mode, accountId || undefined, options),
     enabled,
   });
 
   const selectedTotal = accountId
     ? (layers.data?.account ?? []).find((item) => item.accountId === accountId)
     : layers.data?.portfolio;
+  const allocationUnavailable =
+    !accountId &&
+    layers.data?.portfolio === null &&
+    (options.fxMerge === false || layers.data?.fx?.status === 'blocked');
   const baseQuality: PerformanceDataQuality = {
     partial: layers.data?.dataQuality?.partial === true || selectedTotal?.partial === true,
     missingSymbols: [
@@ -125,7 +184,7 @@ export const usePerformanceQueries = (mode: PortfolioMode, accountId: string, en
         dataQuality: quality,
       });
     },
-    enabled: enabled && layers.data !== undefined && targets.isFetched,
+    enabled: enabled && !allocationUnavailable && layers.data !== undefined && targets.isFetched,
   });
-  return { history, summary, layers, targets, allocation, quality };
+  return { history, summary, layers, targets, allocation, quality, allocationUnavailable };
 };
