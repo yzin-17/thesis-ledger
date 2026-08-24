@@ -248,6 +248,12 @@ describe('风险事件与通知解耦', () => {
     const prisma = {
       riskRule: { findMany: vi.fn(async () => [rule]) },
       riskEvent,
+      asset: {
+        findMany: vi.fn(async () => [{ symbol: '600519.SH', name: '贵州茅台' }]),
+      },
+      account: {
+        findMany: vi.fn(async () => [{ id: accountA, name: '同花顺' }]),
+      },
     };
     const result = await new RiskService(
       prisma as never,
@@ -271,7 +277,10 @@ describe('风险事件与通知解耦', () => {
     expect(riskEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          message: '600519.SH · 贵州茅台 · 同花顺 · 成本止损 10% 已触发',
           context: expect.objectContaining({
+            accountName: '同花顺',
+            assetName: '贵州茅台',
             positionId: positionA,
             quantity: 10,
             positionUpdatedAt: '2025-01-01T00:00:00Z',
@@ -279,5 +288,79 @@ describe('风险事件与通知解耦', () => {
         }),
       }),
     );
+  });
+
+  it('账户范围事件使用账户名称而不是内部账户标识', async () => {
+    const rule = {
+      id: 'account-rule',
+      version: 1,
+      kind: 'drawdown',
+      scope: 'account',
+      severity: 'warning',
+      threshold: 0.1,
+      enabled: true,
+      accountId: accountA,
+    };
+    const riskEvent = { create: vi.fn(async () => ({ id: 'account-event' })) };
+    const prisma = {
+      riskRule: { findMany: vi.fn(async () => [rule]) },
+      riskEvent,
+      account: {
+        findMany: vi.fn(async () => [{ id: accountA, name: '同花顺' }]),
+      },
+    };
+
+    await new RiskService(prisma as never, { enqueue: vi.fn(async () => undefined) } as never).scan(
+      {
+        accounts: [
+          {
+            accountId: accountA,
+            mode: 'actual',
+            portfolioValues: [100, 80],
+            marketTime: '2025-01-01T01:00:00Z',
+            dataQuality: {},
+          },
+        ],
+      },
+    );
+
+    expect(riskEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          message: '同花顺 · 回撤 0.1 已触发',
+          context: expect.objectContaining({ accountName: '同花顺' }),
+        }),
+      }),
+    );
+  });
+
+  it('名称查询失败时仍继续执行风险扫描', async () => {
+    const rule = {
+      id: 'label-fallback-rule',
+      version: 1,
+      kind: 'price-below',
+      scope: 'security',
+      severity: 'warning',
+      threshold: 100,
+      enabled: true,
+      symbol: '600519.SH',
+    };
+    const riskEvent = { create: vi.fn(async () => ({ id: 'label-fallback-event' })) };
+    const prisma = {
+      riskRule: { findMany: vi.fn(async () => [rule]) },
+      riskEvent,
+      asset: { findMany: vi.fn(async () => Promise.reject(new Error('asset db down'))) },
+    };
+
+    await expect(
+      new RiskService(prisma as never, { enqueue: vi.fn(async () => undefined) } as never).scan([
+        {
+          symbol: '600519.SH',
+          price: 99,
+          marketTime: '2025-01-01T01:00:00Z',
+          dataQuality: {},
+        },
+      ]),
+    ).resolves.toMatchObject({ results: [{ ruleId: rule.id, eventId: 'label-fallback-event' }] });
   });
 });

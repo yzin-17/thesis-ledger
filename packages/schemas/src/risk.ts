@@ -105,6 +105,8 @@ const riskAggregateFields = {
 export const riskSecurityContextSchema = z.object({
   symbol: z.string(),
   accountId: z.uuid().optional(),
+  accountName: z.string().optional(),
+  assetName: z.string().optional(),
   positionId: z.uuid().optional(),
   mode: riskModeSchema.default('actual'),
   price: z.number().nonnegative().optional(),
@@ -135,6 +137,7 @@ export const riskSecurityContextSchema = z.object({
 
 export const riskAccountContextSchema = z.object({
   accountId: z.uuid(),
+  accountName: z.string().optional(),
   ...riskAggregateFields,
 });
 

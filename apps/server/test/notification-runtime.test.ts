@@ -30,13 +30,7 @@ const redisFixture = () => {
     values,
     client: {
       set: vi.fn(
-        async (
-          key: string,
-          value: string,
-          _mode: string,
-          _ttl: number,
-          modifier: string,
-        ) => {
+        async (key: string, value: string, _mode: string, _ttl: number, modifier: string) => {
           if (modifier === 'NX' && values.has(key)) return null;
           values.set(key, value);
           return 'OK';
@@ -55,14 +49,19 @@ const riskRule = {
   parameters: { window: 1 },
 };
 
-const riskEvent = (id: string, symbol = '600519.SH', accountId = 'account-1') => ({
+const riskEvent = (
+  id: string,
+  symbol = '600519.SH',
+  accountId = 'account-1',
+  context: Record<string, unknown> = {},
+) => ({
   id,
   ruleId: 'rule-1',
   accountId,
   symbol,
   message: '价格跌破阈值',
   severity: 'warning',
-  context: { traceId: `trace-${id}` },
+  context: { traceId: `trace-${id}`, ...context },
   rule: riskRule,
 });
 
@@ -74,8 +73,9 @@ describe('Feishu provider', () => {
   it('HTTP 200 但业务码非 0 时仍视为失败', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ code: 19002, msg: 'invalid webhook' }), { status: 200 }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 19002, msg: 'invalid webhook' }), { status: 200 }),
       ),
     );
     const provider = new FeishuWebhookProvider(
@@ -170,6 +170,125 @@ describe('Notification cooldown', () => {
 });
 
 describe('Notification dispatch', () => {
+  it('风险提示标题补充证券名称', async () => {
+    const redis = redisFixture();
+    const delivery = {
+      id: 'delivery-1',
+      eventId: 'event-1',
+      channel: 'feishu',
+      provider: 'feishu',
+      severity: 'warning',
+      status: 'pending',
+      attemptCount: 0,
+      scheduledAt: new Date('2026-08-20T10:00:00Z'),
+    };
+    const prisma = {
+      notificationDelivery: {
+        findUniqueOrThrow: vi.fn(async () => delivery),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          ...delivery,
+          ...data,
+          status: data.status,
+        })),
+      },
+      riskEvent: {
+        findUnique: vi.fn(async () => riskEvent('event-1', '159516.SZ')),
+      },
+      asset: {
+        findUnique: vi.fn(async () => ({ name: '半导体设备ETF国泰' })),
+      },
+      providerConfig: {
+        findMany: vi.fn(async () => [
+          {
+            name: 'feishu',
+            type: 'notification',
+            enabled: true,
+            priority: 1,
+            encryptedCredentials: encryptProviderCredential(providerWebhook),
+          },
+        ]),
+      },
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
+
+    await service.dispatchOne('delivery-1', new Date('2026-08-20T10:01:00Z'));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(providerWebhook),
+      expect.objectContaining({
+        body: expect.stringContaining('风险提醒 · 159516.SZ · 半导体设备ETF国泰'),
+      }),
+    );
+  });
+
+  it('事件上下文已有证券名称时不依赖名称查询', async () => {
+    const redis = redisFixture();
+    const delivery = {
+      id: 'delivery-context-name',
+      eventId: 'event-context-name',
+      channel: 'feishu',
+      provider: 'feishu',
+      severity: 'warning',
+      status: 'pending',
+      attemptCount: 0,
+      scheduledAt: new Date('2026-08-20T10:00:00Z'),
+    };
+    const assetLookup = vi.fn(async () => Promise.reject(new Error('asset db down')));
+    const prisma = {
+      notificationDelivery: {
+        findUniqueOrThrow: vi.fn(async () => delivery),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          ...delivery,
+          ...data,
+          status: data.status,
+        })),
+      },
+      riskEvent: {
+        findUnique: vi.fn(async () =>
+          riskEvent('event-context-name', '159516.SZ', 'account-1', {
+            assetName: '半导体设备ETF国泰',
+          }),
+        ),
+      },
+      asset: { findUnique: assetLookup },
+      providerConfig: {
+        findMany: vi.fn(async () => [
+          {
+            name: 'feishu',
+            type: 'notification',
+            enabled: true,
+            priority: 1,
+            encryptedCredentials: encryptProviderCredential(providerWebhook),
+          },
+        ]),
+      },
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new NotificationService(
+      prisma as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
+
+    await expect(
+      service.dispatchOne('delivery-context-name', new Date('2026-08-20T10:01:00Z')),
+    ).resolves.toMatchObject({ skipped: false, delivery: { status: 'delivered' } });
+    expect(assetLookup).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(providerWebhook),
+      expect.objectContaining({
+        body: expect.stringContaining('风险提醒 · 159516.SZ · 半导体设备ETF国泰'),
+      }),
+    );
+  });
+
   it('实际发送使用 ProviderConfig 中的凭证', async () => {
     const redis = redisFixture();
     const delivery = {
@@ -253,8 +372,9 @@ describe('Notification dispatch', () => {
     };
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 }),
       ),
     );
     const service = new NotificationService(
@@ -335,7 +455,10 @@ describe('Notification dispatch', () => {
       reason: '通知已有 dispatcher 处理',
     });
     release?.();
-    await expect(first).resolves.toMatchObject({ skipped: false, delivery: { status: 'delivered' } });
+    await expect(first).resolves.toMatchObject({
+      skipped: false,
+      delivery: { status: 'delivered' },
+    });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

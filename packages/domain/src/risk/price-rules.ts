@@ -1,6 +1,7 @@
 import { trailingStopTriggered } from './statistics.js';
 import {
   completeRiskEvent,
+  formatRiskEventName,
   type CompleteRiskContext,
   type RiskEvent,
   type RiskRule,
@@ -14,6 +15,8 @@ export const evaluateThresholdRule = (
     reference?: number;
     symbol?: string;
     accountId?: string;
+    accountName?: string;
+    assetName?: string;
     marketTime: string;
     inputs: Record<string, number>;
     metadata?: Record<string, string | number | boolean>;
@@ -28,7 +31,7 @@ export const evaluateThresholdRule = (
     ruleId: rule.id,
     triggered,
     severity: rule.severity,
-    message: triggered ? `${rule.kind} 已触发` : `${rule.kind} 未触发`,
+    message: `${formatRiskEventName(rule, context)} ${triggered ? '已触发' : '未触发'}`,
     evaluatedAt: new Date().toISOString(),
     context,
   };
@@ -71,12 +74,14 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
     ruleId: rule.id,
     triggered,
     severity: rule.severity,
-    message: triggered ? `${rule.kind} 已触发` : `${rule.kind} 未触发`,
+    message: `${formatRiskEventName(rule, context)} ${triggered ? '已触发' : '未触发'}`,
     evaluatedAt: new Date().toISOString(),
     context: {
       value,
       reference: rule.threshold,
       ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+      ...(context.accountName === undefined ? {} : { accountName: context.accountName }),
+      ...(context.assetName === undefined ? {} : { assetName: context.assetName }),
       ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
       ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
       ...(context.positionUpdatedAt === undefined

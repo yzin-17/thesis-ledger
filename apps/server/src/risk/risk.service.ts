@@ -466,6 +466,7 @@ export class RiskService {
 
   async testRule(id: string, input: unknown) {
     let parsed = this.parseScanInput(input);
+    parsed = await this.enrichRiskLabels(parsed);
     this.rejectStaleContexts(parsed);
     parsed = await this.enrichHoldingPeaks(parsed, false);
     const stored = await this.prisma.riskRule.findUniqueOrThrow({ where: { id } });
@@ -491,6 +492,7 @@ export class RiskService {
 
   async scan(input: unknown) {
     let parsed = this.parseScanInput(input);
+    parsed = await this.enrichRiskLabels(parsed);
     this.rejectStaleContexts(parsed);
     parsed = await this.enrichHoldingPeaks(parsed, true);
     const scanId = parsed.scanId ?? crypto.randomUUID();
@@ -1187,6 +1189,81 @@ export class RiskService {
     };
   }
 
+  private async enrichRiskLabels(scan: ParsedScan): Promise<ParsedScan> {
+    const symbols = [
+      ...new Set(
+        scan.security.filter((context) => !context.assetName).map((context) => context.symbol),
+      ),
+    ];
+    const accountIds = [
+      ...new Set([
+        ...scan.security
+          .filter((context) => context.accountId && !context.accountName)
+          .map((context) => context.accountId!),
+        ...scan.accounts
+          .filter((context) => !context.accountName)
+          .map((context) => context.accountId),
+      ]),
+    ];
+    const prismaWithLabels = this.prisma as PrismaService & {
+      asset?: {
+        findMany?: (args: {
+          where: { symbol: { in: string[] } };
+          select: { symbol: true; name: true };
+        }) => Promise<Array<{ symbol: string; name: string }>>;
+      };
+      account?: {
+        findMany?: (args: {
+          where: { id: { in: string[] } };
+          select: { id: true; name: true };
+        }) => Promise<Array<{ id: string; name: string }>>;
+      };
+    };
+    const [assets, accounts] = await Promise.all([
+      symbols.length > 0 && typeof prismaWithLabels.asset?.findMany === 'function'
+        ? prismaWithLabels.asset
+            .findMany({
+              where: { symbol: { in: symbols } },
+              select: { symbol: true, name: true },
+            })
+            .catch(() => [])
+        : Promise.resolve([]),
+      accountIds.length > 0 && typeof prismaWithLabels.account?.findMany === 'function'
+        ? prismaWithLabels.account
+            .findMany({
+              where: { id: { in: accountIds } },
+              select: { id: true, name: true },
+            })
+            .catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    if (assets.length === 0 && accounts.length === 0) return scan;
+
+    const assetNames = new Map(assets.map((asset) => [asset.symbol, asset.name]));
+    const accountNames = new Map(accounts.map((account) => [account.id, account.name]));
+    return {
+      ...scan,
+      security: scan.security.map((context) => {
+        const assetName = context.assetName || assetNames.get(context.symbol);
+        const accountName =
+          context.accountName ||
+          (context.accountId ? accountNames.get(context.accountId) : undefined);
+        return {
+          ...context,
+          ...(assetName ? { assetName } : {}),
+          ...(accountName ? { accountName } : {}),
+        };
+      }),
+      accounts: scan.accounts.map((context) => {
+        const accountName = context.accountName || accountNames.get(context.accountId);
+        return {
+          ...context,
+          ...(accountName ? { accountName } : {}),
+        };
+      }),
+    };
+  }
+
   private positionStateKey(accountId: string, symbol: string, mode: string) {
     return `${accountId}:${symbol}:${mode}`;
   }
@@ -1242,6 +1319,8 @@ export class RiskService {
       domain: {
         symbol: context.symbol,
         ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+        ...(context.accountName === undefined ? {} : { accountName: context.accountName }),
+        ...(context.assetName === undefined ? {} : { assetName: context.assetName }),
         ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
         ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
         ...(context.positionUpdatedAt === undefined
@@ -1275,6 +1354,7 @@ export class RiskService {
       accountId: context.accountId,
       domain: {
         symbol: `@account:${context.accountId}`,
+        ...(context.accountName === undefined ? {} : { accountName: context.accountName }),
         marketTime: context.marketTime,
         ...(context.portfolioValues === undefined
           ? {}
@@ -1386,6 +1466,7 @@ export class RiskService {
   private globalSecurityContext(context: SecurityContext): SecurityContext {
     const globalContext = { ...context };
     delete globalContext.accountId;
+    delete globalContext.accountName;
     delete globalContext.positionId;
     delete globalContext.costPrice;
     delete globalContext.quantity;

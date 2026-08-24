@@ -40,6 +40,8 @@ export interface RiskEvaluationContext {
   reference?: number;
   symbol?: string;
   accountId?: string;
+  accountName?: string;
+  assetName?: string;
   positionId?: string;
   quantity?: number;
   positionUpdatedAt?: string;
@@ -61,6 +63,8 @@ export interface RiskEvent {
 export interface V01RiskContext {
   symbol: string;
   accountId?: string;
+  accountName?: string;
+  assetName?: string;
   positionId?: string;
   quantity?: number;
   positionUpdatedAt?: string;
@@ -94,6 +98,73 @@ export interface CompleteRiskContext extends V01RiskContext {
   dataQuality?: Readonly<Record<string, string>>;
 }
 
+const riskRuleKindLabels: Readonly<Record<string, string>> = {
+  'price-below': '价格低于',
+  'price-above': '价格高于',
+  'cost-stop': '成本止损',
+  'take-profit': '止盈',
+  'position-concentration': '持仓集中度',
+  'fixed-stop': '固定止损',
+  'trailing-stop': '移动止损',
+  drawdown: '回撤',
+  ma: '均线',
+  rsi: 'RSI',
+  macd: 'MACD',
+  atr: 'ATR',
+  volume: '成交量',
+  'chip-peak': '筹码峰',
+  'chip-ratio': '筹码比例',
+  'chip-migration': '筹码迁移',
+  'sector-concentration': '行业集中度',
+  'asset-concentration': '资产集中度',
+  'volatility-exposure': '波动暴露',
+  correlation: '组合相关性',
+};
+
+const percentageRuleKinds: ReadonlySet<string> = new Set([
+  'cost-stop',
+  'take-profit',
+  'position-concentration',
+  'trailing-stop',
+]);
+
+export const riskRuleKindLabel = (kind: string) => riskRuleKindLabels[kind] ?? kind;
+
+export const formatRiskRuleThreshold = (kind: string, threshold: number) => {
+  const percentage = percentageRuleKinds.has(kind);
+  const value = percentage ? threshold * 100 : threshold;
+  const formatted = percentage
+    ? value.toLocaleString('zh-CN')
+    : value.toLocaleString('zh-CN', { maximumFractionDigits: 6 });
+  return percentage ? `${formatted}%` : formatted;
+};
+
+export const formatRiskEventName = (
+  rule: Pick<RiskRule, 'kind' | 'threshold'>,
+  context: {
+    symbol?: string;
+    accountId?: string;
+    accountName?: string;
+    assetName?: string;
+  },
+) => {
+  let target = '组合';
+  if (context.symbol === '@portfolio') {
+    target = '组合';
+  } else if (context.symbol?.startsWith('@account:')) {
+    target = context.accountName ?? '指定账户';
+  } else {
+    const targetParts: string[] = [];
+    if (context.symbol) targetParts.push(context.symbol);
+    if (context.assetName && context.assetName !== context.symbol)
+      targetParts.push(context.assetName);
+    if (context.accountName) targetParts.push(context.accountName);
+    else if (context.accountId) targetParts.push('指定账户');
+    if (targetParts.length > 0) target = targetParts.join(' · ');
+  }
+  return `${target} · ${riskRuleKindLabel(rule.kind)} ${formatRiskRuleThreshold(rule.kind, rule.threshold)}`;
+};
+
 export const riskParameter = (rule: RiskRule, name: string, fallback: number) => {
   const value = rule.parameters?.[name];
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -116,12 +187,14 @@ export const completeRiskEvent = (
   ruleId: rule.id,
   triggered,
   severity: rule.severity,
-  message: triggered ? `${rule.kind} 已触发` : `${rule.kind} 未触发`,
+  message: `${formatRiskEventName(rule, context)} ${triggered ? '已触发' : '未触发'}`,
   evaluatedAt: new Date().toISOString(),
   context: {
     value,
     reference: rule.threshold,
     ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+    ...(context.accountName === undefined ? {} : { accountName: context.accountName }),
+    ...(context.assetName === undefined ? {} : { assetName: context.assetName }),
     ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
     ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
     ...(context.positionUpdatedAt === undefined

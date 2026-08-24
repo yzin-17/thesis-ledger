@@ -64,6 +64,32 @@ describe('V0.1 风险规则', () => {
       positionUpdatedAt: '2025-01-01T00:00:00Z',
     });
   });
+  it('事件名与规则预览保持一致并补全账户名称', () => {
+    const event = evaluateV01Rule(
+      { ...rule, kind: 'cost-stop', threshold: 0.1 },
+      {
+        symbol: '159516.SZ',
+        accountId: 'account-1',
+        accountName: '同花顺',
+        assetName: '半导体设备ETF国泰',
+        price: 89,
+        costPrice: 100,
+        marketTime: '2025-01-01T01:00:00Z',
+      },
+    );
+    expect(event?.message).toBe('159516.SZ · 半导体设备ETF国泰 · 同花顺 · 成本止损 10% 已触发');
+  });
+  it('组合事件使用用户可读的组合名称', () => {
+    const event = evaluateCompleteRule(
+      { ...rule, kind: 'drawdown', threshold: 0.1 },
+      {
+        symbol: '@portfolio',
+        portfolioValues: [100, 80],
+        marketTime: '2025-01-01T01:00:00Z',
+      },
+    );
+    expect(event?.message).toBe('组合 · 回撤 0.1 已触发');
+  });
   it('集中度使用同一快照权重', () =>
     expect(
       evaluateV01Rule(
