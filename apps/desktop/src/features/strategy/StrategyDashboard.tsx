@@ -1,53 +1,52 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
-
 import type { LoadState } from '../shared/types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import {
   useCancelBacktestMutation,
   useCreateStrategyMutation,
+  useCreateStrategyVersionMutation,
   useFetchStrategyBarsMutation,
   useQueueBacktestMutation,
   useRunBacktestMutation,
 } from './strategy.mutations.js';
-import { useStrategyQueries } from './strategy.queries.js';
 import { createStrategyActionHandlers } from './strategy.actions.js';
+import { useStrategyQueries } from './strategy.queries.js';
+import { StrategyEditorSheet } from './StrategyEditorSheet.js';
 import {
-  StrategyEditor,
+  BacktestSetupDialog,
   StrategyJobs,
-  StrategyResult,
-  StrategyVersions,
+  StrategyLibrary,
+  StrategyResultDialog,
 } from './StrategySections.js';
-import type { BacktestJob, StrategyRecord } from './strategy.types.js';
+import type {
+  BacktestJob,
+  BacktestSetupInput,
+  StrategyRecord,
+  StrategySchema,
+  StrategyVersion,
+} from './strategy.types.js';
 
-const defaultStrategySchema = {
-  version: 1,
-  name: '我的第一条策略',
-  universe: { symbols: ['600519.SH'], asOf: new Date().toISOString() },
-  entrySignals: [{ indicator: 'close', operator: 'gt', value: 10 }],
-  exitSignals: [{ indicator: 'close', operator: 'lt', value: 9 }],
-  stopLoss: { type: 'fixed', value: 0.1 },
-  sizing: { type: 'weight', value: 0.5 },
-  execution: { price: 'close', tPlusOne: true, lotSize: 100 },
-  cost: {
-    commissionRate: 0.0003,
-    minimumCommission: 5,
-    stampDutyRate: 0.0005,
-    slippageRate: 0.001,
-  },
-  riskConstraints: [],
-  benchmark: '000300.SH',
+type EditorSelection = {
+  mode: 'create' | 'edit';
+  strategy: StrategyRecord | null;
+  version: StrategyVersion | null;
 };
+type BacktestSelection = { strategy: StrategyRecord; version: StrategyVersion };
 
 export function StrategyDashboard() {
-  const [name, setName] = useState('我的第一条策略');
-  const [schemaText, setSchemaText] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('library');
+  const [editorSelection, setEditorSelection] = useState<EditorSelection | null>(null);
+  const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
+  const [resultJob, setResultJob] = useState<BacktestJob | null>(null);
   const toastManager = useToastManager();
   const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
   const createMutation = useCreateStrategyMutation();
+  const createVersionMutation = useCreateStrategyVersionMutation();
   const queueMutation = useQueueBacktestMutation();
   const fetchBarsMutation = useFetchStrategyBarsMutation();
   const runMutation = useRunBacktestMutation();
@@ -58,21 +57,19 @@ export function StrategyDashboard() {
   if (strategiesQuery.isError || jobsQuery.isError) {
     loadState = strategies.length || jobs.length ? 'stale' : 'error';
   } else if (strategiesQuery.isSuccess && jobsQuery.isSuccess) {
-    loadState = strategies.length === 0 && jobs.length === 0 ? 'empty' : 'ready';
+    loadState = 'ready';
   }
-  useEffect(() => {
-    if (!schemaText) setSchemaText(JSON.stringify(defaultStrategySchema, null, 2));
-  }, [schemaText]);
   const load = async () => {
     await Promise.all([strategiesQuery.refetch(), jobsQuery.refetch()]);
   };
   const actions = createStrategyActionHandlers({
-    name,
-    schemaText,
+    name: '',
+    schemaText: '',
     busyAction,
     setBusyAction,
     toastManager,
     createMutation,
+    createVersionMutation,
     fetchBarsMutation,
     queueMutation,
     runMutation,
@@ -80,42 +77,121 @@ export function StrategyDashboard() {
     load,
   });
 
-  const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? null;
+  const saveSchema = async (schema: StrategySchema) => {
+    if (!editorSelection) return;
+    let succeeded = false;
+    if (editorSelection.mode === 'edit' && editorSelection.strategy) {
+      succeeded = await actions.createVersion(editorSelection.strategy.id, schema);
+    } else {
+      const name = typeof schema.name === 'string' ? schema.name : '未命名策略';
+      succeeded = await actions.createStrategy({ name, schema });
+    }
+    if (succeeded) setEditorSelection(null);
+  };
+
+  const startBacktest = async (setup: BacktestSetupInput) => {
+    if (!backtestSelection) return false;
+    const succeeded = await actions.startBacktest(backtestSelection.version, setup);
+    if (succeeded) setActiveTab('jobs');
+    return succeeded;
+  };
+
+  const selectedJob = resultJob ? (jobs.find((job) => job.id === resultJob.id) ?? resultJob) : null;
   return (
     <section className="module-page">
-      <p className="kicker">Strategy Lab</p>
-      <h1>策略实验</h1>
-      <p className="page-description">
-        策略使用版本化 Schema 与可替换 Worker；回测结果保留数据时点、引擎版本、成本和已知偏差提示。
-      </p>
-      <Button className="secondary" type="button" variant="outline" onClick={() => void load()}>
-        刷新策略任务
-      </Button>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="kicker">Strategy Lab</p>
+          <h1>策略实验</h1>
+          <p className="page-description">
+            用版本化 Schema
+            记录策略假设，配置可复现的回测，并保留数据时点、引擎版本、成本和偏差提示。
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loadState === 'loading'}
+            onClick={() => void load()}
+          >
+            <RefreshCw data-icon="inline-start" />
+            刷新
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setEditorSelection({ mode: 'create', strategy: null, version: null })}
+          >
+            新建策略
+          </Button>
+        </div>
+      </div>
       <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <StrategyEditor
-        name={name}
-        schemaText={schemaText}
-        busy={busyAction === 'create-strategy'}
-        onNameChange={setName}
-        onSchemaChange={setSchemaText}
-        onSubmit={(event) => void actions.createStrategy(event)}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+        <TabsList variant="line" className="w-full justify-start">
+          <TabsTrigger value="library">策略库</TabsTrigger>
+          <TabsTrigger value="jobs">
+            回测任务{jobs.length > 0 ? ` (${jobs.length})` : ''}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="library" className="mt-0">
+          <StrategyLibrary
+            strategies={strategies}
+            jobs={jobs}
+            loadState={loadState}
+            busyAction={busyAction}
+            onCreate={() => setEditorSelection({ mode: 'create', strategy: null, version: null })}
+            onEdit={(strategy, version) => setEditorSelection({ mode: 'edit', strategy, version })}
+            onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
+          />
+        </TabsContent>
+        <TabsContent value="jobs" className="mt-0">
+          <StrategyJobs
+            jobs={jobs}
+            strategies={strategies}
+            loadState={loadState}
+            busyAction={busyAction}
+            onRun={(jobId) => void actions.run(jobId)}
+            onCancel={(jobId) => void actions.cancel(jobId)}
+            onViewResult={setResultJob}
+          />
+        </TabsContent>
+      </Tabs>
+      <StrategyEditorSheet
+        open={editorSelection !== null}
+        mode={editorSelection?.mode ?? 'create'}
+        strategy={editorSelection?.strategy ?? null}
+        version={editorSelection?.version ?? null}
+        busy={
+          busyAction === 'create-strategy' ||
+          (editorSelection?.strategy
+            ? busyAction === `create-version:${editorSelection.strategy.id}`
+            : false)
+        }
+        onOpenChange={(open) => {
+          if (!open) setEditorSelection(null);
+        }}
+        onSave={(schema) => void saveSchema(schema)}
       />
-      <StrategyVersions
-        strategies={strategies}
-        loadState={loadState}
-        busyAction={busyAction}
-        onQueue={(strategy) => void actions.queue(strategy)}
+      <BacktestSetupDialog
+        open={backtestSelection !== null}
+        strategy={backtestSelection?.strategy ?? null}
+        version={backtestSelection?.version ?? null}
+        busy={Boolean(busyAction?.startsWith('queue:'))}
+        onOpenChange={(open) => {
+          if (!open) setBacktestSelection(null);
+        }}
+        onSubmit={startBacktest}
       />
-      <StrategyJobs
-        jobs={jobs}
-        loadState={loadState}
-        busyAction={busyAction}
-        selectedJobId={selectedJobId}
-        onSelect={setSelectedJobId}
-        onRun={(jobId) => void actions.run(jobId)}
-        onCancel={(jobId) => void actions.cancel(jobId)}
+      <StrategyResultDialog
+        job={selectedJob}
+        open={resultJob !== null}
+        onOpenChange={(open) => {
+          if (!open) setResultJob(null);
+        }}
       />
-      <StrategyResult job={selectedJob} />
     </section>
   );
 }

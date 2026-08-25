@@ -21,7 +21,14 @@ import type {
   JournalReviewResult,
   ReviewTrade,
 } from '../src/features/journal/journal.types.js';
-import { fetchStrategyBars, queueBacktest } from '../src/features/strategy/strategy.api.js';
+import {
+  cancelBacktest,
+  createStrategy,
+  createStrategyVersion,
+  fetchStrategyBars,
+  queueBacktest,
+  runBacktest,
+} from '../src/features/strategy/strategy.api.js';
 import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
 import { shouldPollJobs } from '../src/features/strategy/strategy.queries.js';
 import type { BacktestJob, StrategyRecord } from '../src/features/strategy/strategy.types.js';
@@ -406,6 +413,130 @@ describe('AI 与 Journal 行为契约', () => {
 });
 
 describe('Strategy 任务行为契约', () => {
+  it('Strategy 创建版本请求只提交既有版本 endpoint 的 schema payload', async () => {
+    const strategy = makeClient({ id: 'version-2', version: 2 });
+    await createStrategyVersion(
+      { strategyId: 'strategy/1', schema: { version: 1, name: 'fixture' } },
+      strategy.client,
+    );
+    expect(strategy.request).toHaveBeenCalledWith(
+      '/backtests/strategies/strategy%2F1/versions',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ schema: { version: 1, name: 'fixture' } }),
+      }),
+    );
+  });
+
+  it('Strategy 创建、运行和取消请求保持既有 wire shape', async () => {
+    const strategy = makeClient({ id: 'strategy-1' });
+    await createStrategy(
+      { name: 'fixture', schema: { version: 1, name: 'fixture' } },
+      strategy.client,
+    );
+    await runBacktest('job/1', strategy.client);
+    await cancelBacktest('job/1', strategy.client);
+    expect(strategy.request).toHaveBeenNthCalledWith(
+      1,
+      '/backtests/strategies',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(strategy.request).toHaveBeenNthCalledWith(
+      2,
+      '/backtests/jobs/job%2F1/run',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(strategy.request).toHaveBeenNthCalledWith(
+      3,
+      '/backtests/jobs/job%2F1/cancel',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('Strategy 回测只使用版本 Schema，按版本号排序并将 Dialog 参数传入队列后自动运行', async () => {
+    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
+    const queueMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-2' } as BacktestJob),
+    };
+    const runMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-2' } as BacktestJob) };
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: JSON.stringify({ universe: { symbols: ['global-symbol'] } }),
+      busyAction: null,
+      setBusyAction: vi.fn(),
+      toastManager: { add: vi.fn() },
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation,
+      queueMutation,
+      runMutation,
+      cancelMutation: { mutateAsync: vi.fn() },
+      load: vi.fn().mockResolvedValue(undefined),
+    });
+    await expect(
+      handlers.queue({
+        id: 'strategy-1',
+        name: 'fixture',
+        versions: [
+          { id: 'version-1', version: 1, schema: { universe: { symbols: ['old-symbol'] } } },
+          { id: 'version-3', version: 3, schema: { universe: { symbols: ['new-symbol'] } } },
+        ],
+      }),
+    ).resolves.toBe(true);
+    expect(fetchBarsMutation.mutateAsync).toHaveBeenCalledWith('new-symbol');
+    expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        strategyVersionId: 'version-3',
+        period: { start: '2025-01-01', end: '2025-01-31' },
+        initialCash: 100_000,
+        strategy: { universe: { symbols: ['new-symbol'] } },
+      }),
+    );
+    expect(runMutation.mutateAsync).toHaveBeenCalledWith('job-2');
+  });
+
+  it('Strategy 启动失败保留排队任务并清理 busy 状态，资金和日期无效时不请求 bars', async () => {
+    const setBusyAction = vi.fn();
+    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([]) };
+    const queueMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-3' } as BacktestJob),
+    };
+    const toastManager = { add: vi.fn() };
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: '{}',
+      busyAction: null,
+      setBusyAction,
+      toastManager,
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation,
+      queueMutation,
+      runMutation: { mutateAsync: vi.fn().mockRejectedValue(new Error('worker unavailable')) },
+      cancelMutation: { mutateAsync: vi.fn() },
+      load: vi.fn().mockResolvedValue(undefined),
+    });
+    await expect(
+      handlers.startBacktest(
+        { id: 'version-1', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
+        { period: { start: '2026-02-01', end: '2026-01-01' }, initialCash: 0 },
+      ),
+    ).resolves.toBe(false);
+    expect(fetchBarsMutation.mutateAsync).not.toHaveBeenCalled();
+    await expect(
+      handlers.startBacktest(
+        { id: 'version-1', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
+        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
+      ),
+    ).resolves.toBe(true);
+    expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(toastManager.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '回测启动失败',
+        description: expect.stringContaining('队列'),
+      }),
+    );
+    expect(setBusyAction).toHaveBeenLastCalledWith(null);
+  });
+
   it('Strategy bars 网络异常不会继续排队，HTTP 错误仍回退为空 bars', async () => {
     const networkRequest = vi.fn().mockRejectedValue(new Error('network down'));
     const networkClient = { request: networkRequest } as unknown as DesktopRequestClient;
