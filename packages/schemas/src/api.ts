@@ -309,8 +309,64 @@ export const reviewWindowInputSchema = z.object({
 });
 export const behaviorInputSchema = z.object({ trades: z.array(completedTradeSchema) });
 
+export const journalReviewEvidenceCompletenessSchema = z.enum([
+  'complete',
+  'partial',
+  'actual-only',
+]);
+export const journalReviewPlanSchema = z
+  .object({
+    id: z.uuid(),
+    plannedEntry: z.number().finite().optional(),
+    plannedExit: z.number().finite().optional(),
+    stopLoss: z.number().finite().optional(),
+    takeProfit: z.number().finite().optional(),
+    targetWeight: z.number().finite().optional(),
+    expectedHoldingDays: z.number().int().nonnegative().optional(),
+    plannedEntryAt: z.iso.datetime({ offset: true }).optional(),
+    plannedExitAt: z.iso.datetime({ offset: true }).optional(),
+    status: z.string().optional(),
+  })
+  .passthrough();
+export const journalReviewCandidateSchema = completedTradeSchema.extend({
+  id: z.string().min(1),
+  accountId: z.uuid(),
+  quantity: z.number().positive(),
+  plan: journalReviewPlanSchema.nullable(),
+  evidenceCompleteness: journalReviewEvidenceCompletenessSchema,
+  missingEvidence: z.array(z.string().min(1)),
+  sources: z.object({
+    entryEventIds: z.array(z.uuid()),
+    exitEventIds: z.array(z.uuid()),
+    journalEntryIds: z.array(z.uuid()),
+    planId: z.uuid().optional(),
+  }),
+});
+export const journalReviewCandidatesQuerySchema = z
+  .object({
+    accountId: z.uuid(),
+    symbol: z.string().trim().min(1).optional(),
+    start: z.iso.datetime({ offset: true }).optional(),
+    end: z.iso.datetime({ offset: true }).optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .superRefine((value, context) => {
+    if (value.start && value.end && value.start > value.end)
+      context.addIssue({ code: 'custom', path: ['end'], message: '结束时间不能早于开始时间' });
+  });
+export const journalReviewCandidatesResponseSchema = z.object({
+  items: z.array(journalReviewCandidateSchema),
+  total: z.number().int().nonnegative(),
+  nextCursor: z.string().min(1).nullable(),
+});
+
 export type PortfolioValuationResponse = z.infer<typeof portfolioValuationResponseSchema>;
 export type RiskEventResponse = z.infer<typeof riskEventResponseSchema>;
 export type PerformanceSummaryResponse = z.infer<typeof performanceSummaryResponseSchema>;
 export type InstrumentSearchResult = z.infer<typeof instrumentSearchResultSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
+export type JournalReviewCandidate = z.infer<typeof journalReviewCandidateSchema>;
+export type JournalReviewCandidatesInput = z.input<typeof journalReviewCandidatesQuerySchema>;
+export type JournalReviewCandidatesQuery = z.infer<typeof journalReviewCandidatesQuerySchema>;
+export type JournalReviewCandidatesResponse = z.infer<typeof journalReviewCandidatesResponseSchema>;

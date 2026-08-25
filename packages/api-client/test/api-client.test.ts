@@ -105,6 +105,65 @@ describe('ThesisLedgerApiClient', () => {
     await expect(client.portfolio.getValuation()).rejects.toBeInstanceOf(ThesisLedgerContractError);
   });
 
+  it('typed journal endpoint validates and serializes review candidate queries', async () => {
+    const candidate = {
+      id: `review:${accountId}:600519.SH:buy-1:sell-1`,
+      accountId,
+      symbol: '600519.SH',
+      entryAt: '2026-08-01T09:30:00.000Z',
+      exitAt: '2026-08-03T09:30:00.000Z',
+      pnl: 187,
+      quantity: 100,
+      entryPrice: 10,
+      exitPrice: 12,
+      actualExit: 12,
+      turnover: 2200,
+      plannedStop: 9,
+      plannedHoldingDays: 2,
+      plannedEntry: 10,
+      plannedExit: 13,
+      targetWeight: 0.1,
+      plan: {
+        id: '00000000-0000-4000-8000-000000000003',
+        plannedEntry: 10,
+        plannedExit: 13,
+        stopLoss: 9,
+        takeProfit: 13,
+        targetWeight: 0.1,
+        expectedHoldingDays: 2,
+        plannedEntryAt: '2026-08-01T09:30:00.000Z',
+        plannedExitAt: '2026-08-03T09:30:00.000Z',
+        status: 'executed',
+      },
+      evidenceCompleteness: 'complete',
+      missingEvidence: [],
+      sources: {
+        entryEventIds: ['00000000-0000-4000-8000-000000000004'],
+        exitEventIds: ['00000000-0000-4000-8000-000000000005'],
+        journalEntryIds: ['00000000-0000-4000-8000-000000000006'],
+        planId: '00000000-0000-4000-8000-000000000003',
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ items: [candidate], total: 1, nextCursor: null }), {
+        status: 200,
+      }),
+    );
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+
+    await expect(
+      client.journal.getReviewCandidates({
+        accountId,
+        start: '2026-08-01T00:00:00.000Z',
+        end: '2026-08-31T00:00:00.000Z',
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({ total: 1, items: [{ symbol: '600519.SH' }] });
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(
+      '/journal/review-candidates?accountId=00000000-0000-4000-8000-000000000001&start=2026-08-01T00%3A00%3A00.000Z&end=2026-08-31T00%3A00%3A00.000Z&limit=10',
+    );
+  });
+
   it('通过共享 API Client 请求行情详情并保留 AbortSignal', async () => {
     const detail = {
       version: 1,

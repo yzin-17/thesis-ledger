@@ -22,7 +22,7 @@ export function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
-  const { state, portfolio, accounts, accountsReady, refresh } =
+  const { state, portfolio, accounts, accountsReady, accountsPending, accountsError, refresh } =
     usePortfolioShellQueries(portfolioMode);
 
   const navigateTo = (nextView: DesktopNavigationView, options?: NavigationOptions) => {
@@ -112,7 +112,20 @@ export function AppRoutes() {
         }
       />
       <Route path="/strategy" element={<StrategyDashboard />} />
-      <Route path="/journal" element={<JournalDashboard />} />
+      <Route
+        path="/journal"
+        element={
+          <JournalDashboard
+            accounts={accounts}
+            accountsReady={accountsReady}
+            accountsPending={accountsPending}
+            accountsError={accountsError}
+            onRetry={() => void refresh()}
+            onNavigateAccounts={() => void navigate('/accounts')}
+            onNavigatePosition={() => void navigate('/position-entry')}
+          />
+        }
+      />
       <Route path="/ai-chat" element={<AiChat />} />
       <Route path="/providers" element={<ProviderSettings />} />
       <Route path="/market-data" element={<MarketDataPage />} />

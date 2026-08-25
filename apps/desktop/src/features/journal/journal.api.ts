@@ -1,6 +1,53 @@
 import { createAiRun } from '../ai/ai.api.js';
+import { ThesisLedgerContractError } from '@thesis-ledger/api-client';
+import { journalReviewCandidatesResponseSchema } from '@thesis-ledger/schemas';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
-import type { BehaviorReviewResult, JournalReviewResult, ReviewTrade } from './journal.types.js';
+import type {
+  BehaviorReviewResult,
+  DeterministicJournalReviewResult,
+  JournalReviewCandidate,
+  JournalReviewResult,
+  ReviewTrade,
+  ReviewWindow,
+} from './journal.types.js';
+
+export interface ReviewCandidatesQuery {
+  accountId: string;
+  symbol?: string;
+  start?: string;
+  end?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ReviewCandidatesResponse {
+  items: JournalReviewCandidate[];
+  total: number;
+  nextCursor: string | null;
+}
+
+const noStore = { cache: 'no-store' as const };
+
+const queryString = (params: ReviewCandidatesQuery) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    query.set(key, String(value));
+  }
+  const encoded = query.toString();
+  return encoded ? `?${encoded}` : '';
+};
+
+export const fetchReviewCandidates = async (
+  params: ReviewCandidatesQuery,
+  client?: DesktopRequestClient,
+) => {
+  const path = `/journal/review-candidates${queryString(params)}`;
+  const raw = await requestDesktopJson<unknown>(path, noStore, client);
+  const parsed = journalReviewCandidatesResponseSchema.safeParse(raw);
+  if (!parsed.success) throw new ThesisLedgerContractError(path);
+  return parsed.data;
+};
 
 const requestAnalysis = (path: string, body: unknown, client?: DesktopRequestClient) =>
   requestDesktopJson<unknown>(
@@ -34,10 +81,10 @@ const startAiExplanation = async (
   }
 };
 
-export const reviewSingleTrade = async (
+export const analyzeSingleTrade = async (
   trade: ReviewTrade,
   client?: DesktopRequestClient,
-): Promise<JournalReviewResult> => {
+): Promise<DeterministicJournalReviewResult> => {
   const [plannedVsActual, behavior, counterfactual] = await Promise.all([
     requestAnalysis('/journal/analysis/planned-vs-actual', trade, client),
     requestAnalysis('/journal/analysis/behavior', { trades: [trade] }, client),
@@ -51,32 +98,127 @@ export const reviewSingleTrade = async (
       client,
     ),
   ]);
-  const aiRun = await startAiExplanation(
-    { kind: 'single-trade-review', trade, plannedVsActual, behavior, counterfactual },
-    trade.symbol,
+  return { plannedVsActual, behavior, counterfactual };
+};
+
+export const analyzeBehavior = async (
+  trades: ReviewTrade[],
+  window?: ReviewWindow,
+  client?: DesktopRequestClient,
+): Promise<Omit<BehaviorReviewResult, 'aiRun'>> => {
+  const start =
+    window?.start ?? trades.map((trade) => trade.entryAt).sort()[0] ?? new Date().toISOString();
+  const end =
+    window?.end ??
+    trades
+      .map((trade) => trade.exitAt)
+      .sort()
+      .at(-1) ??
+    new Date().toISOString();
+  const [metrics, review] = await Promise.all([
+    requestAnalysis('/journal/analysis/behavior', { trades }, client),
+    requestAnalysis('/journal/analysis/review', { trades, start, end }, client),
+  ]);
+  return { metrics, window: review };
+};
+
+export const explainSingleTrade = (
+  trade: ReviewTrade,
+  result: DeterministicJournalReviewResult,
+  client?: DesktopRequestClient,
+  sources?: JournalReviewCandidate['sources'],
+) =>
+  createAiRun(
+    {
+      provider: 'mock',
+      model: 'behavior-review-default',
+      promptVersion: 'journal-review-v1',
+      context: { scope: 'position', symbol: trade.symbol },
+      modelMetadata: {
+        mode: 'deterministic-evidence-only',
+        evidence: {
+          kind: 'single-trade-review',
+          trade,
+          ...result,
+          ...(sources ? { sources } : {}),
+        },
+      },
+    },
     client,
   );
-  return { plannedVsActual, behavior, counterfactual, aiRun };
+
+export const explainBehavior = (
+  trades: ReviewTrade[],
+  result: Omit<BehaviorReviewResult, 'aiRun'>,
+  window: ReviewWindow,
+  client?: DesktopRequestClient,
+  sources?: JournalReviewCandidate['sources'][],
+) =>
+  createAiRun(
+    {
+      provider: 'mock',
+      model: 'behavior-review-default',
+      promptVersion: 'journal-review-v1',
+      context: { scope: 'portfolio' },
+      modelMetadata: {
+        mode: 'deterministic-evidence-only',
+        evidence: {
+          kind: 'behavior-review',
+          trades,
+          selectedWindow: window,
+          metrics: result.metrics,
+          review: result.window,
+          ...(sources ? { sources } : {}),
+        },
+      },
+    },
+    client,
+  );
+
+export const reviewSingleTrade = async (
+  trade: ReviewTrade,
+  client?: DesktopRequestClient,
+): Promise<JournalReviewResult> => {
+  const result = await analyzeSingleTrade(trade, client);
+  let aiRun = null;
+  try {
+    aiRun = await startAiExplanation(
+      { kind: 'single-trade-review', trade, ...result },
+      trade.symbol,
+      client,
+    );
+  } catch {
+    aiRun = null;
+  }
+  return { ...result, aiRun };
 };
 
 export const reviewBehavior = async (
   trades: ReviewTrade[],
   client?: DesktopRequestClient,
 ): Promise<BehaviorReviewResult> => {
-  const start = trades.map((trade) => trade.entryAt).sort()[0] ?? new Date().toISOString();
-  const end =
-    trades
-      .map((trade) => trade.exitAt)
-      .sort()
-      .at(-1) ?? new Date().toISOString();
-  const [metrics, window] = await Promise.all([
-    requestAnalysis('/journal/analysis/behavior', { trades }, client),
-    requestAnalysis('/journal/analysis/review', { trades, start, end }, client),
-  ]);
-  const aiRun = await startAiExplanation(
-    { kind: 'behavior-review', window: { start, end }, metrics, review: window },
-    undefined,
-    client,
-  );
-  return { metrics, window, aiRun };
+  const result = await analyzeBehavior(trades, undefined, client);
+  let aiRun = null;
+  try {
+    aiRun = await startAiExplanation(
+      {
+        kind: 'behavior-review',
+        selectedWindow: {
+          start: trades.map((trade) => trade.entryAt).sort()[0] ?? new Date().toISOString(),
+          end:
+            trades
+              .map((trade) => trade.exitAt)
+              .sort()
+              .at(-1) ?? new Date().toISOString(),
+        },
+        metrics: result.metrics,
+        review: result.window,
+      },
+      undefined,
+      client,
+    );
+  } catch {
+    aiRun = null;
+  }
+  return { ...result, aiRun };
 };

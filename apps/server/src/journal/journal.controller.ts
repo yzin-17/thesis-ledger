@@ -5,6 +5,7 @@ import {
   counterfactualInputSchema,
   journalEntryInputSchema,
   journalEntryUpdateSchema,
+  journalReviewCandidatesQuerySchema,
   omitUndefinedDeep,
   plannedStopInputSchema,
   reviewWindowInputSchema,
@@ -26,12 +27,14 @@ export class JournalController {
     return this.journal.listEntries(symbol, accountId);
   }
 
+  @Get('review-candidates')
+  reviewCandidates(@Query() input: Record<string, string | undefined>) {
+    return this.journal.listReviewCandidates(journalReviewCandidatesQuerySchema.parse(input));
+  }
+
   @Patch('entries/:id')
   updateEntry(@Param('id') id: string, @Body() input: unknown) {
-    return this.journal.updateEntry(
-      id,
-      omitUndefinedDeep(journalEntryUpdateSchema.parse(input)),
-    );
+    return this.journal.updateEntry(id, omitUndefinedDeep(journalEntryUpdateSchema.parse(input)));
   }
 
   @Post('plans')

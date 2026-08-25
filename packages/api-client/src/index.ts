@@ -1,6 +1,7 @@
 import {
   apiErrorResponseSchema,
   instrumentSearchResponseSchema,
+  journalReviewCandidatesResponseSchema,
   marketDetailResponseSchema,
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
@@ -8,6 +9,8 @@ import {
   type ApiErrorResponse,
   type MarketDetailRequest,
   type MarketDetailResponse,
+  type JournalReviewCandidatesQuery,
+  type JournalReviewCandidatesResponse,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -21,6 +24,9 @@ export type {
   MarketDetailResponse,
   MarketDetailSection,
   MarketDetailSectionStatus,
+  JournalReviewCandidate,
+  JournalReviewCandidatesQuery,
+  JournalReviewCandidatesResponse,
 } from '@thesis-ledger/schemas';
 
 export type MarketDetailQuery = Omit<MarketDetailRequest, 'symbol'> & {
@@ -105,6 +111,16 @@ export class ThesisLedgerApiClient {
         signal ? { signal } : undefined,
       );
     },
+  };
+
+  readonly journal = {
+    getReviewCandidates: (
+      params: Omit<JournalReviewCandidatesQuery, 'limit'> & { limit?: number },
+    ): Promise<JournalReviewCandidatesResponse> =>
+      this.requestParsed(
+        `/journal/review-candidates${queryString(params)}`,
+        journalReviewCandidatesResponseSchema,
+      ),
   };
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {
