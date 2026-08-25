@@ -1,5 +1,15 @@
+import { Injectable } from '@nestjs/common';
 import type { AiProvider } from './contracts.js';
 
+const safeErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : '调用失败';
+  return message
+    .replace(/Bearer\s+\S+/giu, 'Bearer [REDACTED]')
+    .replace(/(?:sk-|api[_-]?key[=:])\S+/giu, '[REDACTED]')
+    .slice(0, 240);
+};
+
+@Injectable()
 export class AiProviderRegistry {
   private readonly providers = new Map<string, AiProvider>();
 
@@ -22,6 +32,15 @@ export class AiProviderRegistry {
     }));
   }
 
+  hasProviders() {
+    return this.providers.size > 0;
+  }
+
+  defaultModel() {
+    const provider = [...this.providers.values()].find((item) => item.metadata?.health !== 'down');
+    return provider?.models[0];
+  }
+
   route(preferred: string | undefined, model: string) {
     const direct = preferred ? this.providers.get(preferred) : undefined;
     if (direct?.models.includes(model)) return direct;
@@ -38,6 +57,8 @@ export class AiProviderRegistry {
       .sort((left, right) => {
         if (left.id === preferred) return -1;
         if (right.id === preferred) return 1;
+        const priorityDelta = (right.metadata?.priority ?? 0) - (left.metadata?.priority ?? 0);
+        if (priorityDelta !== 0) return priorityDelta;
         return left.id.localeCompare(right.id);
       });
   }
@@ -53,7 +74,7 @@ export const completeWithFallback = async (
       const result = await provider.complete(input, AbortSignal.timeout(30_000));
       return { ...result, provider: provider.id, fallbackErrors: errors };
     } catch (error) {
-      errors.push(`${provider.id}: ${error instanceof Error ? error.message : '调用失败'}`);
+      errors.push(`${provider.id}: ${safeErrorMessage(error)}`);
     }
   }
   throw new AggregateError(errors, `没有可用的 AI Provider: ${input.model}`);

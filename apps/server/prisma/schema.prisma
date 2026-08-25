@@ -613,6 +613,7 @@ model AiRun {
   model         String
   promptVersion String
   status        String
+  question      String?
   inputTokens   Int      @default(0)
   outputTokens  Int      @default(0)
   cost          Decimal  @default(0) @db.Decimal(18, 8)
@@ -620,13 +621,24 @@ model AiRun {
   result        Json?
   context       Json?
   modelMetadata Json?
+  errorCode     String?
+  errorSummary  String?
   durationMs    Int?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  retryOfRunId  String?  @db.Uuid
+  executionAttempt Int      @default(0)
+  claimedAt     DateTime?
+  leaseUntil    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   toolCalls AiToolCall[]
 
   @@index([status, createdAt])
+  @@index([status, createdAt, id])
+  @@index([retryOfRunId])
+  @@index([leaseUntil])
 }
 
 model AiToolCall {

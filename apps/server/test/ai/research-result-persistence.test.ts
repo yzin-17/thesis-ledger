@@ -55,4 +55,45 @@ describe('AiRun research persistence', () => {
     ).toThrow();
     expect(update).toHaveBeenCalledTimes(1);
   });
+
+  it('新研究结果必须引用同一任务的 Tool call', async () => {
+    const update = vi.fn(async ({ data }: { data: object }) => ({ id: 'run-2', ...data }));
+    const service = new AiRunService({
+      aiRun: { update },
+      aiToolCall: {
+        findMany: vi.fn(async () => [{ id: '21111111-1111-4111-8111-111111111111' }]),
+      },
+    } as never);
+    const result = {
+      ...validResearchResult,
+      evidence: [
+        {
+          claim: '报价可用',
+          citations: [
+            {
+              tool: 'quote',
+              sourceId: '600519.SH',
+              provider: 'dsa-fork',
+              observedAt: time,
+              toolCallId: '21111111-1111-4111-8111-111111111111',
+            },
+          ],
+        },
+      ],
+    };
+    await expect(
+      service.finishResearch(
+        'run-2',
+        result,
+        { inputTokens: 1, outputTokens: 1, cost: 0 },
+        undefined,
+        {
+          provider: 'fixture',
+          model: 'research-fixture',
+          toolCallIds: ['21111111-1111-4111-8111-111111111111'],
+        },
+      ),
+    ).resolves.toMatchObject({ status: 'succeeded', provider: 'fixture' });
+    expect(update).toHaveBeenCalledTimes(1);
+  });
 });

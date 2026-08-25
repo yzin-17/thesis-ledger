@@ -101,7 +101,7 @@ export const executeAuditedTool = async (
   const observed = provenance(data);
   const completedAt = new Date().toISOString();
   const outputSummary = status === 'ok' ? summarize(data) : errorMessage;
-  await recorder.recordToolCall({
+  const audit = await recorder.recordToolCall({
     runId,
     tool: tool.name,
     permission: tool.permission,
@@ -113,7 +113,17 @@ export const executeAuditedTool = async (
     fetchedAt: observed.fetchedAt ?? completedAt,
   });
 
+  const toolCallId =
+    audit && typeof audit === 'object' && 'id' in audit && typeof audit.id === 'string'
+      ? audit.id
+      : undefined;
   return status === 'ok'
-    ? { status, data, durationMs }
-    : { status, data: null, error: errorMessage ?? 'Tool 调用失败', durationMs };
+    ? { status, data, durationMs, ...(toolCallId ? { toolCallId } : {}) }
+    : {
+        status,
+        data: null,
+        error: errorMessage ?? 'Tool 调用失败',
+        durationMs,
+        ...(toolCallId ? { toolCallId } : {}),
+      };
 };

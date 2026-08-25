@@ -13,6 +13,12 @@ const configSchema = z.object({
   CORS_ORIGINS: z.string().default(''),
   CREDENTIAL_ENCRYPTION_KEY: z.string().min(16),
   ERROR_TRACKING_URL: z.url().optional().or(z.literal('')),
+  AI_PROVIDER_ID: z.string().trim().min(1).optional(),
+  AI_BASE_URL: z.url().optional(),
+  AI_API_KEY: z.string().trim().min(1).optional(),
+  AI_MODEL: z.string().trim().min(1).optional(),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  AI_FIXTURE_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -37,6 +43,12 @@ export const parseConfig = (environment: Record<string, string | undefined>) => 
       .map((origin) => origin.trim())
       .filter(Boolean),
     errorTrackingUrl: parsed.data.ERROR_TRACKING_URL || undefined,
+    aiProviderId: parsed.data.AI_PROVIDER_ID,
+    aiBaseUrl: parsed.data.AI_BASE_URL,
+    aiApiKey: parsed.data.AI_API_KEY,
+    aiModel: parsed.data.AI_MODEL,
+    aiTimeoutMs: parsed.data.AI_TIMEOUT_MS,
+    aiFixtureEnabled: parsed.data.AI_FIXTURE_ENABLED === 'true',
   };
 };
 

@@ -1,5 +1,7 @@
+import { Injectable } from '@nestjs/common';
 import type { PromptTemplate } from './contracts.js';
 
+@Injectable()
 export class PromptVersionRegistry {
   private readonly prompts = new Map<string, PromptTemplate[]>();
 

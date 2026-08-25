@@ -202,6 +202,9 @@ export const aiRunStartInputSchema = z.object({
   model: z.string().trim().min(1),
   promptVersion: z.string().trim().min(1),
   context: z.unknown().optional(),
+  question: z.string().trim().min(1).max(2_000).optional(),
+  templateId: z.string().trim().min(1).optional(),
+  retryOfRunId: z.uuid().optional(),
   modelMetadata: z.unknown().optional(),
 });
 export const aiCheckpointInputSchema = z.record(z.string(), z.unknown());

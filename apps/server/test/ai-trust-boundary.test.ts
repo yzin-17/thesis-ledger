@@ -30,6 +30,42 @@ describe('AI trust boundary', () => {
     expect(runs.start).toHaveBeenCalledWith('mock', 'm1', 'v1', undefined, modelMetadata);
   });
 
+  it('研究启动由服务端接收问题和精确上下文，不接受客户端 Provider 审计字段', () => {
+    const runs = { startResearch: vi.fn() };
+    const controller = new AiController(runs as never);
+    controller.start({
+      question: '当前组合的主要风险是什么？',
+      context: { scope: 'portfolio' },
+      templateId: 'primary-risks',
+    });
+    expect(runs.startResearch).toHaveBeenCalledWith({
+      question: '当前组合的主要风险是什么？',
+      context: { scope: 'portfolio' },
+      templateId: 'primary-risks',
+    });
+    expect(() =>
+      controller.start({
+        question: '风险？',
+        context: { scope: 'portfolio' },
+        modelMetadata: { cost: 1 },
+      }),
+    ).toThrow();
+  });
+
+  it('历史 limit 非数字时回退默认值，不把 NaN 传给 Prisma', () => {
+    const runs = { list: vi.fn() };
+    const controller = new AiController(runs as never);
+    controller.history('not-a-number', 'running');
+    expect(runs.list).toHaveBeenCalledWith(undefined, 'running');
+  });
+
+  it('历史状态筛选只接受有限任务状态', () => {
+    const runs = { list: vi.fn() };
+    const controller = new AiController(runs as never);
+    expect(() => controller.history('20', 'unknown')).toThrow();
+    expect(runs.list).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['inputTokens', 999999],
     ['outputTokens', 999999],
@@ -58,11 +94,36 @@ describe('AI trust boundary', () => {
       aiRun: {
         update: vi.fn(async ({ data }: { data: object }) => data),
       },
+      aiToolCall: {
+        findMany: vi.fn(async () => [{ id: '21111111-1111-4111-8111-111111111111' }]),
+      },
     };
     const runs = new AiRunService(prisma as never);
     const registry = new AiProviderRegistry();
     const complete = vi.fn(async () => ({
-      content: { conclusion: 'trusted' },
+      content: {
+        version: 1,
+        provider: 'trusted-provider',
+        conclusion: 'trusted',
+        evidence: [
+          {
+            claim: 'trusted evidence',
+            citations: [
+              {
+                toolCallId: '21111111-1111-4111-8111-111111111111',
+                tool: 'fixture',
+                sourceId: 'fixture:1',
+                provider: 'trusted-provider',
+                observedAt: '2026-08-26T00:00:00.000Z',
+              },
+            ],
+          },
+        ],
+        risks: [],
+        unknowns: [],
+        disclaimer: '仅供研究参考。',
+        createdAt: '2026-08-26T00:00:00.000Z',
+      },
       inputTokens: 17,
       outputTokens: 23,
       cost: 0.0042,
@@ -73,6 +134,7 @@ describe('AI trust boundary', () => {
       model: 'm1',
       messages: [{ role: 'user', content: 'question' }],
       tools: [],
+      toolCallIds: ['21111111-1111-4111-8111-111111111111'],
     });
 
     expect(complete).toHaveBeenCalledOnce();
@@ -88,6 +150,40 @@ describe('AI trust boundary', () => {
         }),
       }),
     );
+  });
+
+  it('rejects an invalid provider result instead of persisting succeeded', async () => {
+    const updates: object[] = [];
+    const prisma = {
+      aiRun: {
+        update: vi.fn(async ({ data }: { data: object }) => {
+          updates.push(data);
+          return data;
+        }),
+      },
+    };
+    const runs = new AiRunService(prisma as never);
+    const registry = new AiProviderRegistry();
+    registry.register({
+      id: 'invalid-provider',
+      models: ['m1'],
+      complete: vi.fn(async () => ({
+        content: { conclusion: 'free form' },
+        inputTokens: 1,
+        outputTokens: 1,
+        cost: 0,
+      })),
+    });
+
+    await expect(
+      runs.completeWithProvider('11111111-1111-4111-8111-111111111111', registry, {
+        model: 'm1',
+        messages: [],
+        tools: [],
+      }),
+    ).rejects.toThrow();
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ status: 'failed', errorCode: 'provider_completion_failed' });
   });
 
   it('derives tool audit duration and provenance from the server execution', async () => {

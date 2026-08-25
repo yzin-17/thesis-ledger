@@ -15,6 +15,7 @@ export type AiProviderHealth = 'unknown' | 'healthy' | 'degraded' | 'down';
 export interface AiProviderMetadata {
   baseURL?: string;
   capabilities?: readonly string[];
+  priority?: number;
   health?: AiProviderHealth;
   costPer1kInput?: number;
   costPer1kOutput?: number;

@@ -1,6 +1,6 @@
 import { aiAnalysisSchema } from '@thesis-ledger/schemas';
 
-export const evidenceCitation = (tool: string, data: unknown) => {
+export const evidenceCitation = (tool: string, data: unknown, toolCallId?: string) => {
   const value = data as {
     sourceId?: string;
     provider?: string;
@@ -10,6 +10,7 @@ export const evidenceCitation = (tool: string, data: unknown) => {
   };
   const observedAt = value.marketTime ?? value.availableAt ?? new Date().toISOString();
   return {
+    ...(toolCallId ? { toolCallId } : {}),
     tool,
     sourceId: value.sourceId ?? `${tool}:result`,
     provider: value.provider ?? 'thesis-ledger-tool',

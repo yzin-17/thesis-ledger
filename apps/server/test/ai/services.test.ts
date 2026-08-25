@@ -43,6 +43,55 @@ describe('AI 运行审计', () => {
     });
     await expect(service.list()).resolves.toHaveLength(2);
   });
+
+  it('研究启动保存问题、精确上下文和重试关系，列表支持状态筛选', async () => {
+    const create = vi.fn(async ({ data }: { data: object }) => ({ id: 'run-2', ...data }));
+    const findMany = vi.fn(async () => [{ id: 'run-2', status: 'queued', question: '风险？' }]);
+    const findUnique = vi.fn(async () => ({ id: 'run-2', toolCalls: [] }));
+    const service = new AiRunService({ aiRun: { create, findMany, findUnique } } as never);
+
+    await expect(
+      service.startResearch({
+        question: '  当前组合最主要的风险是什么？ ',
+        context: { scope: 'portfolio' },
+        templateId: 'primary-risks',
+        retryOfRunId: '11111111-1111-4111-8111-111111111111',
+      }),
+    ).resolves.toMatchObject({
+      id: 'run-2',
+      status: 'queued',
+      question: '当前组合最主要的风险是什么？',
+      context: { scope: 'portfolio' },
+      retryOfRunId: '11111111-1111-4111-8111-111111111111',
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ provider: 'pending', model: 'pending' }),
+      }),
+    );
+    await service.list(20, 'failed');
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'failed' }, take: 20 }),
+    );
+    await service.resume('run-2');
+    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'run-2' } }));
+  });
+  it('列表只向客户端暴露脱敏后的 Provider fallback 摘要', async () => {
+    const service = new AiRunService({
+      aiRun: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'run-3',
+            modelMetadata: { fallbackErrors: ['provider-a: temporary secret-like detail'] },
+          },
+        ]),
+      },
+    } as never);
+    await expect(service.list()).resolves.toMatchObject([
+      { id: 'run-3', fallbackSummary: 'provider-a: temporary secret-like detail' },
+    ]);
+  });
+
   it('Decision Log 按标的保留研究时间线', async () => {
     const prisma = {
       aiDecisionLog: {

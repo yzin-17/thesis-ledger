@@ -32,7 +32,7 @@
   - 涉及范围：Journal 服务、Controller、候选查询、TradePlan/JournalEntry/LedgerEvent 证据关联、分页和账户隔离。
   - 完成条件：endpoint 返回 T1 契约；显式关联的 JournalEntry、LedgerEvent、TradePlan 优先，未显式关联时计划字段保持缺失；不同账户数据严格隔离；候选查询不产生数据库写入。
   - 验证方式：server service/controller 测试覆盖显式关联、无关联、失效引用、跨账户、标的筛选、时间窗口、分页和只读性；必要时使用真实 Prisma 测试确认查询行为。
-  - 验证证据：`apps/server/test/journal/services.test.ts` 覆盖显式计划关联、无计划 actual-only、标的/退出窗口、账户过滤、稳定 cursor 和无写入 mock；`pnpm --filter @thesis-ledger/server typecheck` 通过。
+  - 验证证据：`apps/server/test/journal/services.test.ts` 覆盖显式计划关联、无计划 actual-only、标的/退出窗口、账户过滤、稳定 cursor 和无写入 mock；`pnpm --filter @thesis-ledger/server typecheck`、`pnpm --filter @thesis-ledger/server build` 通过。
 
 - [x] T4：建立 Desktop 复盘数据访问层
   - 涉及范围：`apps/desktop/src/features/journal/` 下的候选类型、API、Query key、queries 和确定性/AI mutations，必要的 API client 适配。
@@ -110,7 +110,7 @@
 - Domain：`pnpm --filter @thesis-ledger/domain build`；`pnpm --filter @thesis-ledger/domain test -- journal-review.test.ts`，7 个文件、74 tests passed。
 - Schema：`pnpm --filter @thesis-ledger/schemas build`；`pnpm --filter @thesis-ledger/schemas test -- journal-review.test.ts`，4 个文件、45 tests passed。
 - API Client：`pnpm --filter @thesis-ledger/api-client build`；`pnpm --filter @thesis-ledger/api-client test -- api-client.test.ts`，8 tests passed。
-- Server：`pnpm --filter @thesis-ledger/server typecheck`；`pnpm --filter @thesis-ledger/server test -- journal/services.test.ts`，26 个文件、210 tests passed。
+- Server：`pnpm --filter @thesis-ledger/server typecheck`；`pnpm --filter @thesis-ledger/server build`；`pnpm --filter @thesis-ledger/server test -- journal/services.test.ts`，26 个文件、210 tests passed。
 - Desktop：`pnpm --filter @thesis-ledger/desktop typecheck`；`pnpm --filter @thesis-ledger/desktop build`；`pnpm --filter @thesis-ledger/desktop test`，12 个文件、83 tests passed。
 - 质量检查：本次修改文件的 Prettier check、定向 ESLint（含 `no-nested-ternary:error`）和 `git diff --check` 通过。全局 `pnpm guardrails:complexity` 被既有 mobile React Native Flow 文件的 ESLint 解析错误阻断，未修改该依赖文件。
 - 运行时边界：尚未执行 Electron/浏览器视觉验收、真实数据库候选读取和在线 AI Provider 验收；这些不以本地类型检查或 Vitest 结果替代。

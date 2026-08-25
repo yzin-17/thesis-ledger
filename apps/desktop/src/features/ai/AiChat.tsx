@@ -1,199 +1,231 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { RefreshCw } from 'lucide-react';
+import { NewResearchSheet } from './NewResearchSheet.js';
+import { AiRunDetail } from './AiRunDetail.js';
+import { AiRunList } from './AiRunList.js';
+import { EvidenceChainSheet } from './EvidenceChainSheet.js';
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { useToastManager } from '@/components/ui/toast';
-import { LoaderCircle } from 'lucide-react';
-
-import type { LoadState } from '../shared/types.js';
-import { isDataLoaded } from '../shared/display.js';
-import { EmptyTableRow } from '../shared/EmptyStates.js';
-import { DataStateBanner } from '../shared/DesktopPrimitives.js';
-
-const researchScopeLabel = (scope: string) => {
-  if (scope === 'portfolio') return '全组合';
-  if (scope === 'account') return '账户';
-  if (scope === 'position') return '单个持仓';
-  return '策略版本';
-};
-import { useCreateAiRunMutation } from './ai.mutations.js';
-import { resolveAiRunsLoadState, useAiRunsQuery } from './ai.queries.js';
-import type { AiResearchScope, AiRunRecord, AiRunResult } from './ai.types.js';
+  findAiRun,
+  resolveAiRunsLoadState,
+  useAiCapabilitiesQuery,
+  useAiRunQuery,
+  useAiRunsQuery,
+  useAiToolCallsQuery,
+} from './ai.queries.js';
+import type { AiRunFilterStatus, AiRunRecord, AiRunResult, AiToolCall } from './ai.types.js';
 
 export function AiChat() {
-  const [scope, setScope] = useState<AiResearchScope>('portfolio');
-  const [symbol, setSymbol] = useState('600519.SH');
-  const [question, setQuestion] = useState('请收集证据并说明当前主要风险。');
-  const [run, setRun] = useState<AiRunResult | null>(null);
-  const toastManager = useToastManager();
-  const runsQuery = useAiRunsQuery();
-  const createRun = useCreateAiRunMutation();
-  const history: AiRunRecord[] = runsQuery.data ?? [];
-  const busy = createRun.isPending;
-  const loadState: LoadState = resolveAiRunsLoadState({
+  const [filter, setFilter] = useState<AiRunFilterStatus>('all');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [newResearchOpen, setNewResearchOpen] = useState(false);
+  const [initialQuestion, setInitialQuestion] = useState('');
+  const [retryOfRunId, setRetryOfRunId] = useState<string | undefined>();
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [loadedRuns, setLoadedRuns] = useState<AiRunRecord[]>([]);
+  const [toolCursor, setToolCursor] = useState<string | undefined>();
+  const [loadedToolCalls, setLoadedToolCalls] = useState<AiToolCall[]>([]);
+  const listFilter = {
+    ...(filter === 'all' ? {} : { status: filter }),
+    ...(cursor ? { cursor } : {}),
+  };
+  const runsQuery = useAiRunsQuery(listFilter);
+  const detailQuery = useAiRunQuery(selectedId);
+  const capabilitiesQuery = useAiCapabilitiesQuery();
+  const toolCallsQuery = useAiToolCallsQuery(
+    selectedId,
+    evidenceOpen,
+    toolCursor ? { cursor: toolCursor } : {},
+  );
+  const runsPage = runsQuery.data;
+  const runs = loadedRuns;
+  const selectedFromList = findAiRun(runs, selectedId);
+  const selectedRun = detailQuery.data ?? selectedFromList;
+  const loadState = resolveAiRunsLoadState({
     isPending: runsQuery.isPending,
     isError: runsQuery.isError,
     isSuccess: runsQuery.isSuccess,
-    hasRuns: history.length > 0,
+    hasRuns: runs.length > 0,
   });
 
-  const loadHistory = () => runsQuery.refetch();
-  const startResearch = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (busy) return;
-    try {
-      const nextRun = await createRun.mutateAsync({
-        provider: 'mock',
-        model: 'research-default',
-        promptVersion: 'research-v1',
-        context: { scope, ...(scope === 'position' ? { symbol } : {}) },
-      });
-      setRun(nextRun);
-      toastManager.add({
-        title: '研究任务已创建',
-        description: `已记录研究问题：${question}`,
-        type: 'success',
-        timeout: 2800,
-      });
-    } catch {
-      toastManager.add({
-        title: '研究任务创建失败',
-        description: '请检查 Provider 状态和服务连接。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
+  useEffect(() => {
+    setLoadedRuns([]);
+    setCursor(undefined);
+  }, [filter]);
+
+  useEffect(() => {
+    if (!runsPage) return;
+    setLoadedRuns((previous) => {
+      if (!cursor) return runsPage.items;
+      const merged = new Map(previous.map((run) => [run.id, run]));
+      for (const run of runsPage.items) merged.set(run.id, run);
+      return [...merged.values()];
+    });
+  }, [cursor, runsPage]);
+
+  useEffect(() => {
+    setLoadedToolCalls([]);
+    setToolCursor(undefined);
+  }, [selectedId, evidenceOpen]);
+
+  useEffect(() => {
+    if (!toolCallsQuery.data) return;
+    setLoadedToolCalls((previous) => {
+      if (!toolCursor) return toolCallsQuery.data.items;
+      const merged = new Map(
+        previous.map((call) => [call.id ?? `${call.tool}-${call.createdAt}`, call]),
+      );
+      for (const call of toolCallsQuery.data.items)
+        merged.set(call.id ?? `${call.tool}-${call.createdAt}`, call);
+      return [...merged.values()];
+    });
+  }, [toolCallsQuery.data, toolCursor]);
+
+  useEffect(() => {
+    if (runs.length === 0) {
+      setSelectedId(null);
+      return;
     }
+    const firstRun = runs[0];
+    if (!firstRun) return;
+    if (!selectedId || !runs.some((run) => run.id === selectedId)) setSelectedId(firstRun.id);
+  }, [runs, selectedId]);
+
+  const refresh = async () => {
+    await runsQuery.refetch();
+    if (selectedId) await detailQuery.refetch();
   };
+
+  const openNewResearch = (question = '', retryId?: string) => {
+    setInitialQuestion(question);
+    setRetryOfRunId(retryId);
+    setNewResearchOpen(true);
+  };
+
+  const handleCreated = (run: AiRunResult) => {
+    setFilter('all');
+    setCursor(undefined);
+    setLoadedRuns([]);
+    setSelectedId(run.id);
+    setRetryOfRunId(undefined);
+  };
+
+  const detail = selectedRun && detailQuery.data?.id === selectedRun.id ? detailQuery.data : null;
+  let providerLabel = 'Provider 检查中';
+  let providerVariant: 'outline' | 'secondary' | 'destructive' = 'secondary';
+  if (capabilitiesQuery.data) {
+    const hasError = capabilitiesQuery.data.providers.some(
+      (provider) => provider.state === 'error',
+    );
+    if (capabilitiesQuery.data.canStart) {
+      providerLabel = 'Provider 已就绪';
+      providerVariant = 'outline';
+    } else if (hasError) {
+      providerLabel = 'Provider 异常';
+      providerVariant = 'destructive';
+    } else {
+      providerLabel = 'Provider 未配置';
+    }
+  } else if (capabilitiesQuery.isError) {
+    providerLabel = 'Provider 检查失败';
+    providerVariant = 'destructive';
+  }
   return (
-    <section className="module-page">
-      <p className="kicker">Research Assistant</p>
-      <h1>研究助手</h1>
-      <p className="page-description">
-        先选择研究上下文，再由只读 Tool 提供行情、财务、新闻、风险和回测事实；助手不会写入 Ledger
-        或生成订单。
-      </p>
-      <Button
-        className="secondary"
-        type="button"
-        variant="outline"
-        onClick={() => void loadHistory()}
-      >
-        刷新研究历史
-      </Button>
-      <form className="panel form-card" onSubmit={(event) => void startResearch(event)}>
-        <label>
-          上下文
-          <Select value={scope} onValueChange={(value) => value && setScope(value)}>
-            <SelectTrigger className="w-full">
-              <SelectValue>{researchScopeLabel(scope)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="portfolio">全组合</SelectItem>
-                <SelectItem value="account">账户</SelectItem>
-                <SelectItem value="position">单个持仓</SelectItem>
-                <SelectItem value="strategy">策略版本</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </label>
-        {scope === 'position' && (
-          <label>
-            标的
-            <Input value={symbol} onChange={(event) => setSymbol(event.target.value)} />
-          </label>
-        )}
-        <label>
-          研究问题
-          <Textarea
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            rows={3}
-          />
-        </label>
-        <Button disabled={busy} type="submit" variant="default">
-          {busy && (
-            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-          )}
-          {busy ? '创建中…' : '创建研究任务'}
-        </Button>
-      </form>
-      <DataStateBanner state={loadState} onRetry={() => void loadHistory()} />
-      {run && (
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>研究任务 {run.id.slice(0, 8)}</h2>
-            <p>
-              {run.provider}/{run.model} · Prompt {run.promptVersion}
-            </p>
-          </div>
-          <div className="module-grid">
-            <div>
-              <span>上下文</span>
-              <strong>{scope}</strong>
-            </div>
-            <div>
-              <span>来源链</span>
-              <strong>Tool 调用记录</strong>
-            </div>
-            <div>
-              <span>执行边界</span>
-              <strong>只读研究</strong>
-            </div>
-          </div>
-        </section>
+    <section className="module-page flex flex-col gap-5">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1>研究助手</h1>
+          <p className="page-description">基于已授权数据生成可追溯结论，不会修改账本或生成订单。</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1">
+          <Badge variant={providerVariant}>{providerLabel}</Badge>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void refresh()}
+            disabled={runsQuery.isFetching || detailQuery.isFetching}
+          >
+            <RefreshCw
+              data-icon="inline-start"
+              className={runsQuery.isFetching ? 'animate-spin' : undefined}
+            />
+            刷新
+          </Button>
+          <Button type="button" size="sm" onClick={() => openNewResearch()}>
+            新建研究
+          </Button>
+        </div>
+      </header>
+      <div className="grid min-h-[34rem] gap-4 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
+        <AiRunList
+          runs={runs}
+          selectedId={selectedId}
+          filter={filter}
+          loadState={loadState}
+          onFilterChange={setFilter}
+          onSelect={setSelectedId}
+          onRefresh={() => void refresh()}
+          onCreate={() => openNewResearch()}
+          hasMore={Boolean(runsPage?.hasMore)}
+          onLoadMore={() => {
+            if (runsPage?.nextCursor) setCursor(runsPage.nextCursor);
+          }}
+          isLoadingMore={runsQuery.isFetching && Boolean(cursor)}
+        />
+        <AiRunDetail
+          run={selectedRun}
+          detail={detail}
+          isLoading={Boolean(selectedId) && detailQuery.isPending}
+          detailError={detailQuery.isError}
+          onEvidence={() => setEvidenceOpen(true)}
+          onRetry={(run) => openNewResearch(run.question ?? '', run.id)}
+          onDetailRetry={() => void detailQuery.refetch()}
+          onCreate={() => openNewResearch()}
+        />
+      </div>
+      {selectedRun && (
+        <EvidenceChainSheet
+          open={evidenceOpen}
+          onOpenChange={setEvidenceOpen}
+          evidence={selectedRun.result?.evidence ?? []}
+          toolCalls={loadedToolCalls}
+          toolCallsLoading={toolCallsQuery.isPending}
+          toolCallsError={toolCallsQuery.isError}
+          toolCallsHasMore={Boolean(toolCallsQuery.data?.hasMore)}
+          onLoadMoreToolCalls={() => {
+            if (toolCallsQuery.data?.nextCursor) setToolCursor(toolCallsQuery.data.nextCursor);
+          }}
+          toolCallsLoadingMore={toolCallsQuery.isFetching && Boolean(toolCursor)}
+        />
       )}
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>研究历史</h2>
-          <p>每条任务保留 context metadata，便于区分全组合、账户、持仓和策略研究。</p>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>任务</th>
-                <th>上下文</th>
-                <th>Provider / Model</th>
-                <th>状态</th>
-                <th>创建时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isDataLoaded(loadState) && history.length === 0 ? (
-                <EmptyTableRow colSpan={5} />
-              ) : (
-                history.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <strong>{item.id.slice(0, 8)}</strong>
-                      <span>{item.promptVersion}</span>
-                    </td>
-                    <td>
-                      {item.context?.scope ?? '未知'}
-                      {item.context?.symbol ? ` · ${item.context.symbol}` : ''}
-                    </td>
-                    <td>
-                      {item.provider} / {item.model}
-                    </td>
-                    <td>{item.status}</td>
-                    <td>{new Date(item.createdAt).toLocaleString('zh-CN')}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <NewResearchSheet
+        open={newResearchOpen}
+        onOpenChange={(open) => {
+          setNewResearchOpen(open);
+          if (!open) {
+            setInitialQuestion('');
+            setRetryOfRunId(undefined);
+          }
+        }}
+        initialQuestion={initialQuestion}
+        retryOfRunId={retryOfRunId}
+        onCreated={handleCreated}
+      />
+      {runsQuery.isError && runs.length > 0 && (
+        <p className="text-xs text-muted-foreground" role="status">
+          研究任务列表更新失败，保留最近一次成功数据。
+          <button
+            type="button"
+            className="ml-1 underline underline-offset-4"
+            onClick={() => void runsQuery.refetch()}
+          >
+            重试
+          </button>
+        </p>
+      )}
     </section>
   );
 }

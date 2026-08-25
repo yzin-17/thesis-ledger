@@ -1,12 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Optional, Param, Patch, Post, Query } from '@nestjs/common';
 import {
   aiCheckpointInputSchema,
   aiDecisionLogInputSchema,
+  aiResearchStartInputSchema,
+  aiRunCursorSchema,
+  aiRunStatusSchema,
   aiRunStartInputSchema,
   omitUndefinedDeep,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { AiRunService } from './ai-run.service.js';
+import { AiResearchExecutor } from './ai-research.executor.js';
 
 const clientAuditMetadataFields = new Set([
   'inputTokens',
@@ -31,22 +35,67 @@ const clientModelMetadataSchema = z.unknown().superRefine((value, context) => {
   }
 });
 
+const parseHistoryLimit = (value?: string) => {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 @Controller('ai/runs')
 export class AiController {
-  constructor(private readonly runs: AiRunService) {}
+  constructor(
+    private readonly runs: AiRunService,
+    @Optional() private readonly executor?: AiResearchExecutor,
+  ) {}
 
   @Get()
-  history(@Query('limit') limit?: string) {
-    return this.runs.list(limit === undefined ? undefined : Number(limit));
+  history(
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const parsedStatus = status === undefined ? undefined : aiRunStatusSchema.parse(status);
+    const parsedCursor = cursor === undefined ? undefined : aiRunCursorSchema.parse(cursor);
+    const listPage = (
+      this.runs as unknown as {
+        listPage?: (pageLimit?: number, pageStatus?: string, pageCursor?: string) => unknown;
+      }
+    ).listPage;
+    if (listPage)
+      return listPage.call(this.runs, parseHistoryLimit(limit), parsedStatus, parsedCursor);
+    return this.runs.list(parseHistoryLimit(limit), parsedStatus);
   }
 
   @Post()
   start(@Body() input: unknown) {
+    if (
+      input &&
+      typeof input === 'object' &&
+      !Array.isArray(input) &&
+      'question' in input &&
+      !('provider' in input)
+    ) {
+      const created = this.runs.startResearch(aiResearchStartInputSchema.parse(input));
+      if (this.executor)
+        void Promise.resolve(created).then((run) => this.executor?.dispatch(run.id));
+      return created;
+    }
     const body = aiRunStartInputSchema.parse(input);
     const modelMetadata =
       body.modelMetadata === undefined
         ? undefined
         : clientModelMetadataSchema.parse(body.modelMetadata);
+    if (body.question !== undefined || body.retryOfRunId !== undefined) {
+      return this.runs.start(
+        body.provider,
+        body.model,
+        body.promptVersion,
+        body.context,
+        modelMetadata,
+        body.question,
+        body.retryOfRunId,
+      );
+    }
     return this.runs.start(
       body.provider,
       body.model,
@@ -77,6 +126,27 @@ export class AiController {
   @Get('decision-logs')
   decisionLogs(@Query('symbol') symbol?: string) {
     return this.runs.listDecisionLogs(symbol);
+  }
+
+  @Get('capabilities')
+  capabilities() {
+    return (
+      this.executor?.capabilities() ?? {
+        canStart: false,
+        providers: [],
+        checkedAt: new Date().toISOString(),
+      }
+    );
+  }
+
+  @Get(':id/tool-calls')
+  toolCalls(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const parsedCursor = cursor === undefined ? undefined : aiRunCursorSchema.parse(cursor);
+    return this.runs.listToolCalls(id, parseHistoryLimit(limit), parsedCursor);
   }
 
   @Get(':id')
