@@ -29,6 +29,8 @@ type LedgerTransactionClient = Pick<
   Prisma.TransactionClient,
   'account' | 'asset' | 'ledgerEvent' | 'position'
 >;
+type PositionSource = 'manual' | 'migration' | 'screenshot';
+type PositionOptions = { assetName?: string; assetType?: 'stock' | 'etf' | 'fund' };
 
 const inferAssetType = (symbol: string, requested?: string) => {
   if (requested) return requested;
@@ -231,48 +233,99 @@ export class LedgerService {
     });
   }
 
+  private async setPositionWithClient(
+    transaction: LedgerTransactionClient,
+    accountId: string,
+    symbol: string,
+    quantity: number,
+    costPrice: number,
+    source: PositionSource,
+    reason: string,
+    options?: PositionOptions,
+  ) {
+    const assetType = inferAssetType(symbol, options?.assetType);
+    assertSymbolMatchesAssetType(symbol, assetType);
+    await this.assertAccountWithClient(transaction, accountId, assetType);
+    await this.upsertAssetWithClient(
+      transaction,
+      symbol,
+      options?.assetName,
+      assetType,
+      source === 'screenshot' ? SCREENSHOT_IDENTITY_SOURCE : MANUAL_IDENTITY_SOURCE,
+    );
+    const previous = await transaction.ledgerEvent.findFirst({
+      where: { accountId, symbol },
+      orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+    });
+    const result = await appendLedgerEvent(transaction, {
+      version: 1,
+      id: crypto.randomUUID(),
+      accountId,
+      type: 'ADJUSTMENT',
+      occurredAt: new Date().toISOString(),
+      symbol,
+      quantity: quantity > 0 ? quantity : undefined,
+      price: costPrice,
+      currency: 'CNY',
+      source,
+      externalUid: `${source}:position:${accountId}:${symbol}:${crypto.randomUUID()}`,
+      ...(previous?.id ? { correctionOf: previous.id } : {}),
+      note: reason,
+      metadata: { kind: 'position-balance', quantity, costPrice, source, reason },
+    });
+    await this.rebuildWithClient(transaction, accountId, 'AVG');
+    return result;
+  }
+
   async setPosition(
     accountId: string,
     symbol: string,
     quantity: number,
     costPrice: number,
-    source: 'manual' | 'migration' | 'screenshot',
+    source: PositionSource,
     reason: string,
-    options?: { assetName?: string; assetType?: 'stock' | 'etf' | 'fund' },
+    options?: PositionOptions,
   ) {
-    const assetType = inferAssetType(symbol, options?.assetType);
-    assertSymbolMatchesAssetType(symbol, assetType);
-    return this.prisma.$transaction(async (transaction) => {
-      await this.assertAccountWithClient(transaction, accountId, assetType);
-      await this.upsertAssetWithClient(
+    return this.prisma.$transaction((transaction) =>
+      this.setPositionWithClient(
         transaction,
-        symbol,
-        options?.assetName,
-        assetType,
-        source === 'screenshot' ? SCREENSHOT_IDENTITY_SOURCE : MANUAL_IDENTITY_SOURCE,
-      );
-      const previous = await transaction.ledgerEvent.findFirst({
-        where: { accountId, symbol },
-        orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
-      });
-      const result = await appendLedgerEvent(transaction, {
-        version: 1,
-        id: crypto.randomUUID(),
         accountId,
-        type: 'ADJUSTMENT',
-        occurredAt: new Date().toISOString(),
         symbol,
-        quantity: quantity > 0 ? quantity : undefined,
-        price: costPrice,
-        currency: 'CNY',
+        quantity,
+        costPrice,
         source,
-        externalUid: `${source}:position:${accountId}:${symbol}:${crypto.randomUUID()}`,
-        ...(previous?.id ? { correctionOf: previous.id } : {}),
-        note: reason,
-        metadata: { kind: 'position-balance', quantity, costPrice, source, reason },
-      });
-      await this.rebuildWithClient(transaction, accountId, 'AVG');
-      return result;
+        reason,
+        options,
+      ),
+    );
+  }
+
+  async movePosition(
+    from: { accountId: string; symbol: string; costPrice: number },
+    to: { accountId: string; symbol: string; quantity: number; costPrice: number },
+    source: PositionSource,
+    options?: PositionOptions,
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      await this.setPositionWithClient(
+        transaction,
+        from.accountId,
+        from.symbol,
+        0,
+        from.costPrice,
+        'manual',
+        '手工修改持仓并迁移原标的',
+      );
+      return this.setPositionWithClient(
+        transaction,
+        to.accountId,
+        to.symbol,
+        to.quantity,
+        to.costPrice,
+        source,
+        '手工修改持仓',
+        options,
+      );
     });
   }
 
