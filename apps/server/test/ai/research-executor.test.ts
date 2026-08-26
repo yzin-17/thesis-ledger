@@ -114,14 +114,17 @@ describe('AI 研究执行器', () => {
 
   it('把实际 Tool 返回的数据放进 Provider 研究上下文', async () => {
     const { runs, finishResearch } = runRecorder();
-    let providerInput = '';
+    let providerRequest: {
+      evidence?: unknown[];
+      context?: unknown;
+      toolResults?: Array<{ tool?: string; data?: unknown }>;
+    } = {};
     const providers = new AiProviderRegistry();
     providers.register({
       id: 'capture',
       models: ['capture-model'],
       metadata: { health: 'healthy' },
       complete: vi.fn(async (input: { messages: unknown[] }) => {
-        providerInput = JSON.stringify(input.messages);
         const user = input.messages.find(
           (message) =>
             message &&
@@ -130,21 +133,18 @@ describe('AI 研究执行器', () => {
             (message as { role?: unknown }).role === 'user',
         ) as { content?: string } | undefined;
         const marker = 'RESEARCH_REQUEST_JSON:';
-        const request = JSON.parse(user?.content?.split(marker)[1] ?? '{}') as {
-          evidence?: unknown[];
-          context?: unknown;
-        };
+        providerRequest = JSON.parse(user?.content?.split(marker)[1] ?? '{}') as typeof providerRequest;
         return {
           content: {
             version: 1,
             provider: 'capture',
             conclusion: '基于持仓事实完成研究。',
-            evidence: request.evidence ?? [],
+            evidence: providerRequest.evidence ?? [],
             risks: [],
             unknowns: [],
             signals: [],
             disclaimer: 'test',
-            context: request.context,
+            context: providerRequest.context,
             createdAt: '2026-08-26T00:00:00.000Z',
           },
           inputTokens: 1,
@@ -163,9 +163,12 @@ describe('AI 研究执行器', () => {
     executor.dispatch(runId);
     await vi.waitFor(() => expect(finishResearch).toHaveBeenCalledOnce());
 
-    expect(providerInput).toContain('600519.SH');
-    expect(providerInput).toContain('"quantity":10');
-    expect(providerInput).toContain('"costPrice":100');
+    const positionsResult = providerRequest.toolResults?.find(
+      (result) => result.tool === 'getPositions',
+    )?.data as { positions?: Array<{ symbol?: string; quantity?: number; costPrice?: number }> };
+    expect(positionsResult.positions).toEqual([
+      expect.objectContaining({ symbol: '600519.SH', quantity: 10, costPrice: 100 }),
+    ]);
   });
 
   it('策略研究只读取指定 StrategyVersion，不退化读取全局 Risk/Journal', async () => {
