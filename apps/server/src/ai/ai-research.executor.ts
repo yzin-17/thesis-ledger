@@ -11,6 +11,7 @@ import { PromptVersionRegistry } from './prompt-registry.js';
 const allowedPermissions = new Set([
   'market:read',
   'portfolio:read',
+  'strategy:read',
   'risk:read',
   'journal:read',
 ] as const);
@@ -92,7 +93,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
   }
 
   capabilities() {
-    const tools = ['getPortfolio', 'getPositions', 'getRisk', 'getJournal'];
+    const tools = ['getPortfolio', 'getPositions', 'getRisk', 'getJournal', 'getStrategyVersion'];
     const configured = this.providers.list();
     const providers = configured.length
       ? configured.map((provider) => {
@@ -246,11 +247,47 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       };
     };
 
-    return { getPortfolio, getPositions, getRisk, getJournal };
+    const getStrategyVersion = async (input: unknown, signal: AbortSignal) => {
+      if (signal.aborted) throw new Error('Tool 调用已取消');
+      const value = contextScope(input);
+      const strategyVersionId =
+        typeof value.strategyVersionId === 'string' ? value.strategyVersionId : undefined;
+      if (!strategyVersionId) throw new Error('策略研究缺少 strategyVersionId');
+      const strategyVersion = await this.prisma.strategyVersion.findUnique({
+        where: { id: strategyVersionId },
+        select: {
+          id: true,
+          strategyId: true,
+          version: true,
+          schemaVersion: true,
+          schema: true,
+          createdAt: true,
+          strategy: { select: { name: true, description: true, status: true } },
+        },
+      });
+      if (!strategyVersion) throw new Error(`策略版本不存在: ${strategyVersionId}`);
+      return {
+        sourceId: `strategy-version:${strategyVersionId}`,
+        provider: 'thesis-ledger',
+        fetchedAt: source(),
+        strategyVersion,
+      };
+    };
+
+    return { getPortfolio, getPositions, getRisk, getJournal, getStrategyVersion };
   }
 
   private tools(scope: string = 'portfolio') {
     const adapters = this.toolAdapters();
+    if (scope === 'strategy') {
+      return [
+        {
+          name: 'getStrategyVersion',
+          permission: 'strategy:read' as const,
+          execute: adapters.getStrategyVersion,
+        },
+      ];
+    }
     const tools = [
       ...createCoreTools({
         getPortfolio: adapters.getPortfolio,
@@ -260,15 +297,22 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       ...createResearchTools({ journal: adapters.getJournal }),
     ];
     if (scope === 'portfolio') return tools.filter((tool) => tool.name !== 'getJournal');
-    if (scope === 'strategy')
-      return tools.filter((tool) => tool.name === 'getRisk' || tool.name === 'getJournal');
     return tools;
+  }
+
+  private startLeaseHeartbeat(id: string) {
+    const heartbeat = setInterval(() => {
+      void this.runs.renewLease(id).catch(() => undefined);
+    }, 20_000);
+    heartbeat.unref?.();
+    return heartbeat;
   }
 
   private async execute(id: string) {
     const startedAt = Date.now();
     const run = await this.runs.claim(id);
     if (!run) return;
+    const leaseHeartbeat = this.startLeaseHeartbeat(id);
     try {
       const model = run.model === 'pending' ? this.providers.defaultModel() : run.model;
       if (!model) throw new Error('没有配置可用的 AI Provider/Model');
@@ -305,6 +349,11 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
             question: input.question,
             context,
             evidence,
+            toolResults: successfulCalls.map((call) => ({
+              tool: call.tool,
+              ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
+              data: call.data,
+            })),
           })}`,
         },
       ];
@@ -369,6 +418,8 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
         ? 'research_execution_failed'
         : 'provider_unavailable';
       await this.runs.fail(id, errorCode, summary, Date.now() - startedAt);
+    } finally {
+      clearInterval(leaseHeartbeat);
     }
   }
 }
