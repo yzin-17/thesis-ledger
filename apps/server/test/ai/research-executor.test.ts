@@ -38,22 +38,36 @@ const prismaFixture = () => ({
   },
   riskEvent: { findMany: vi.fn(async () => []) },
   journalEntry: { findMany: vi.fn(async () => []) },
+  strategyVersion: {
+    findUnique: vi.fn(async () => ({
+      id: '61111111-1111-4111-8111-111111111111',
+      strategyId: 'strategy-1',
+      version: 3,
+      schemaVersion: 1,
+      schema: { universe: { symbols: ['600519.SH'] } },
+      createdAt: new Date('2026-08-26T00:00:00.000Z'),
+      strategy: { name: '质量策略', description: null, status: 'active' },
+    })),
+  },
 });
 
-describe('AI 研究执行器', () => {
-  it('领取队列任务，执行只读 Tool，并把证据关联到实际 Tool call', async () => {
-    const toolCallIds = new Map([
-      ['getPortfolio', '21111111-1111-4111-8111-111111111111'],
-      ['getPositions', '31111111-1111-4111-8111-111111111111'],
-      ['getRisk', '41111111-1111-4111-8111-111111111111'],
-      ['getJournal', '51111111-1111-4111-8111-111111111111'],
-    ]);
-    const finishResearch = vi.fn(async (id: string, result: unknown) => {
-      void id;
-      void result;
-      return undefined;
-    });
-    const runs = {
+const toolCallIds = new Map([
+  ['getPortfolio', '21111111-1111-4111-8111-111111111111'],
+  ['getPositions', '31111111-1111-4111-8111-111111111111'],
+  ['getRisk', '41111111-1111-4111-8111-111111111111'],
+  ['getJournal', '51111111-1111-4111-8111-111111111111'],
+  ['getStrategyVersion', '71111111-1111-4111-8111-111111111111'],
+]);
+
+const runRecorder = (context: object = { scope: 'portfolio' }) => {
+  const finishResearch = vi.fn(async (id: string, result: unknown) => {
+    void id;
+    void result;
+    return undefined;
+  });
+  return {
+    finishResearch,
+    runs: {
       claim: vi.fn(async () => ({
         id: runId,
         provider: 'pending',
@@ -61,14 +75,21 @@ describe('AI 研究执行器', () => {
         promptVersion: 'research-v1',
         status: 'running',
         question: '当前组合的主要风险是什么？',
-        context: { scope: 'portfolio' },
+        context,
       })),
+      renewLease: vi.fn(async () => ({ count: 1 })),
       recordToolCall: vi.fn(async (input: { tool: string }) => ({
         id: toolCallIds.get(input.tool),
       })),
       finishResearch,
       fail: vi.fn(async () => undefined),
-    };
+    },
+  };
+};
+
+describe('AI 研究执行器', () => {
+  it('领取队列任务，执行只读 Tool，并把证据关联到实际 Tool call', async () => {
+    const { runs, finishResearch } = runRecorder();
     const providers = new AiProviderRegistry();
     providers.register(new FixtureAiProvider());
     const executor = new AiResearchExecutor(
@@ -91,6 +112,85 @@ describe('AI 研究执行器', () => {
     expect(runs.fail).not.toHaveBeenCalled();
   });
 
+  it('把实际 Tool 返回的数据放进 Provider 研究上下文', async () => {
+    const { runs, finishResearch } = runRecorder();
+    let providerInput = '';
+    const providers = new AiProviderRegistry();
+    providers.register({
+      id: 'capture',
+      models: ['capture-model'],
+      metadata: { health: 'healthy' },
+      complete: vi.fn(async (input: { messages: unknown[] }) => {
+        providerInput = JSON.stringify(input.messages);
+        const user = input.messages.find(
+          (message) =>
+            message &&
+            typeof message === 'object' &&
+            !Array.isArray(message) &&
+            (message as { role?: unknown }).role === 'user',
+        ) as { content?: string } | undefined;
+        const marker = 'RESEARCH_REQUEST_JSON:';
+        const request = JSON.parse(user?.content?.split(marker)[1] ?? '{}') as {
+          evidence?: unknown[];
+          context?: unknown;
+        };
+        return {
+          content: {
+            version: 1,
+            provider: 'capture',
+            conclusion: '基于持仓事实完成研究。',
+            evidence: request.evidence ?? [],
+            risks: [],
+            unknowns: [],
+            signals: [],
+            disclaimer: 'test',
+            context: request.context,
+            createdAt: '2026-08-26T00:00:00.000Z',
+          },
+          inputTokens: 1,
+          outputTokens: 1,
+          cost: 0,
+        };
+      }),
+    });
+    const executor = new AiResearchExecutor(
+      runs as never,
+      prismaFixture() as never,
+      providers,
+      promptRegistry(),
+    );
+
+    executor.dispatch(runId);
+    await vi.waitFor(() => expect(finishResearch).toHaveBeenCalledOnce());
+
+    expect(providerInput).toContain('600519.SH');
+    expect(providerInput).toContain('"quantity":10');
+    expect(providerInput).toContain('"costPrice":100');
+  });
+
+  it('策略研究只读取指定 StrategyVersion，不退化读取全局 Risk/Journal', async () => {
+    const strategyVersionId = '61111111-1111-4111-8111-111111111111';
+    const { runs, finishResearch } = runRecorder({ scope: 'strategy', strategyVersionId });
+    const prisma = prismaFixture();
+    const providers = new AiProviderRegistry();
+    providers.register(new FixtureAiProvider());
+    const executor = new AiResearchExecutor(
+      runs as never,
+      prisma as never,
+      providers,
+      promptRegistry(),
+    );
+
+    executor.dispatch(runId);
+    await vi.waitFor(() => expect(finishResearch).toHaveBeenCalledOnce());
+
+    expect(prisma.strategyVersion.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: strategyVersionId } }),
+    );
+    expect(prisma.riskEvent.findMany).not.toHaveBeenCalled();
+    expect(prisma.journalEntry.findMany).not.toHaveBeenCalled();
+  });
+
   it('没有 Provider 时把任务标记为明确的 provider_unavailable', async () => {
     const fail = vi.fn(async (id: string, code: string) => {
       void id;
@@ -107,6 +207,7 @@ describe('AI 研究执行器', () => {
         question: '风险？',
         context: { scope: 'portfolio' },
       })),
+      renewLease: vi.fn(async () => ({ count: 1 })),
       fail,
     };
     const executor = new AiResearchExecutor(
