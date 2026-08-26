@@ -3,6 +3,7 @@ export type PortfolioMode = 'actual' | 'shadow';
 export type ToolPermission =
   | 'market:read'
   | 'portfolio:read'
+  | 'strategy:read'
   | 'risk:read'
   | 'journal:read'
   | 'financials:read'

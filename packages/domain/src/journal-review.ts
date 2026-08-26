@@ -42,8 +42,9 @@ const adjustment = (event: LedgerEvent) => {
     return null;
   const quantity = typeof metadata.quantity === 'number' ? metadata.quantity : event.quantity;
   const costPrice = typeof metadata.costPrice === 'number' ? metadata.costPrice : event.price;
-  if (quantity === undefined || costPrice === undefined || quantity <= 0) return null;
-  return { quantity, costPrice };
+  if (quantity === undefined || quantity < 0) return null;
+  if (quantity > 0 && costPrice === undefined) return null;
+  return { quantity, costPrice: costPrice ?? 0 };
 };
 
 const scaleLots = (lots: ReviewLot[], multiplier: number) => {
@@ -95,13 +96,15 @@ const averageTrade = (events: readonly LedgerEvent[], accountId: string, symbol:
     const action = adjustment(event);
     if (action) {
       lots.length = 0;
-      lots.push({
-        quantity: action.quantity,
-        unitCost: action.costPrice,
-        unitPrice: action.costPrice,
-        openedAt: event.occurredAt,
-        eventIds: [event.id],
-      });
+      if (action.quantity > 0) {
+        lots.push({
+          quantity: action.quantity,
+          unitCost: action.costPrice,
+          unitPrice: action.costPrice,
+          openedAt: event.occurredAt,
+          eventIds: [event.id],
+        });
+      }
       continue;
     }
     if (event.type === 'BONUS' && lots.length > 0) {
@@ -182,13 +185,15 @@ const fifoTrade = (events: readonly LedgerEvent[], accountId: string, symbol: st
     const action = adjustment(event);
     if (action) {
       lots.length = 0;
-      lots.push({
-        quantity: action.quantity,
-        unitCost: action.costPrice,
-        unitPrice: action.costPrice,
-        openedAt: event.occurredAt,
-        eventIds: [event.id],
-      });
+      if (action.quantity > 0) {
+        lots.push({
+          quantity: action.quantity,
+          unitCost: action.costPrice,
+          unitPrice: action.costPrice,
+          openedAt: event.occurredAt,
+          eventIds: [event.id],
+        });
+      }
       continue;
     }
     if (event.type === 'BONUS' && lots.length > 0) {

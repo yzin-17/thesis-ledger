@@ -147,18 +147,20 @@ export class PortfolioService {
             ...(data.assetName === undefined ? {} : { assetName: data.assetName }),
             ...(data.assetType === undefined ? {} : { assetType: data.assetType }),
           };
+    const ledger = this.requireLedger();
     if (accountId !== previous.accountId || symbol !== previous.symbol) {
-      await this.requireLedger().setPosition(
-        previous.accountId,
-        previous.symbol,
-        0,
-        Number(previous.costPrice),
-        'manual',
-        '手工修改持仓并迁移原标的',
+      await ledger.movePosition(
+        {
+          accountId: previous.accountId,
+          symbol: previous.symbol,
+          costPrice: Number(previous.costPrice),
+        },
+        { accountId, symbol, quantity, costPrice },
+        data.source ?? 'manual',
+        options,
       );
-    }
-    if (options) {
-      await this.requireLedger().setPosition(
+    } else if (options) {
+      await ledger.setPosition(
         accountId,
         symbol,
         quantity,
@@ -168,7 +170,7 @@ export class PortfolioService {
         options,
       );
     } else {
-      await this.requireLedger().setPosition(
+      await ledger.setPosition(
         accountId,
         symbol,
         quantity,
