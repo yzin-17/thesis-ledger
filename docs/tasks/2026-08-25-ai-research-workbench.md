@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-用户已确认开始实施。本轮已完成 T1-T9 的代码、接口、Desktop 交互和确定性回归；T10 正在执行最终一致性 Review。真实 Provider 运行时 smoke、连接外部来源的浏览器验收仍取决于部署环境凭证与服务可用性，未把本地 fixture 测试冒充为外部运行证据。
+T1-T10 的代码、接口、Desktop 交互、确定性回归和代码一致性 Review 已完成。真实 Provider、服务进程重启、外部来源长任务以及浏览器视觉/键盘 smoke 仍属于独立的运行时验收门禁，当前状态为 **Implementation Complete / Runtime Acceptance Pending**；不得把本地 fixture 或单元测试表述为这些外部运行证据。
 
 本轮整改采用“持久化队列 + 专用研究执行器”：创建接口快速返回 `queued` 任务，执行器负责 Provider 路由、Tool 审计、结果契约校验、终态写入和服务重启恢复。Provider 未配置时能力预检会禁用新建提交；直接调用接口也会收敛到明确的失败终态，而不会永久停留在 `queued/running`。
 
@@ -21,7 +21,7 @@
 - 表单使用 `FieldGroup`、`Field` 及对应 Label/Description/Error；Select item 位于 `SelectGroup`；Sheet 必须包含可访问的 Title 和 Description。
 - 不新增页面级传统 CSS、`!important`、多重嵌套三元表达式、重复渲染分支或无真实 checkpoint 支持的假进度。
 - 不覆盖或回滚当前工作树中的其他修改；发现同文件并行改动时基于最新内容适配。
-- 只有实现完成且对应验证通过后才能勾选任务，并在任务下补充实际验证命令、结果和运行时验收边界。
+- 实现任务只有在代码完成且对应确定性验证通过后才能勾选；真实 Provider、浏览器、进程重启和外部服务验证统一记录在“运行时验收门禁”，不能与实现完成状态混用。
 
 ## 依赖顺序
 
@@ -59,9 +59,9 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
 
 - [x] T2：实现真实研究启动、Provider 路由和终态收敛
   - 涉及范围：`apps/server/src/ai/ai.controller.ts`、`ai-run.service.ts`、`provider-registry.ts`、`prompt-registry.ts`、Tool runtime、研究执行器、Provider adapter、任务恢复调度和相关服务端测试。
-  - 完成条件：T2.1-T2.4 全部完成；一次“开始研究”会创建并实际启动可收敛到成功/失败的任务，服务重启后不遗失任务，mock/fixture 与真实 Provider 结果可区分。
-  - 验证方式：执行器、Provider、Tool、授权、结果契约、恢复和重试测试全部通过；至少一次真实 Provider 运行时 smoke 单独记录。
-  - 实际验证：Server 全量测试通过 225 项；新增执行器、Provider adapter、结果契约、租约恢复、分页与授权测试均通过。真实 Provider smoke 尚未在本机执行，待部署环境提供 `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` 后补跑。
+  - 完成条件：T2.1-T2.4 全部完成；一次“开始研究”会创建并实际启动可收敛到成功/失败的任务，服务重启恢复、mock/fixture 与真实 Provider 区分等行为具备实现和确定性测试证据。
+  - 验证方式：执行器、Provider、Tool、授权、结果契约、恢复和重试测试全部通过；真实 Provider 和真实进程重启 smoke 作为独立运行时门禁单独记录。
+  - 实际验证：Server 全量测试通过 225 项；新增执行器、Provider adapter、结果契约、租约恢复、分页与授权测试均通过。真实 Provider smoke 尚未执行，已转入“运行时验收门禁”，待部署环境提供 `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` 后补跑。
 
 - [x] T2.1：接入 Provider/Prompt adapter 与能力状态
   - 涉及范围：`apps/server/src/ai/provider-registry.ts`、`prompt-registry.ts`、新增 Provider adapter、`AiModule`、Provider 配置/健康适配和 `GET /ai/capabilities`。
@@ -129,8 +129,8 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
     - loading、empty、error、stale 和 ready 在左栏局部表达，不用通用横幅遮断整个页面。
     - 为窄窗口定义明确的两级布局或单列回退，不无限压缩任务列表与详情。
   - 完成条件：默认页面不再长期展示大表单或历史数据表；用户可以通过业务内容识别、筛选并选择任务；Provider 状态来自能力 Query。
-  - 验证方式：组件测试覆盖五类加载状态、Provider 状态、四个筛选、未知状态、历史兼容、任务选择、创建置顶、手动刷新和窄布局 DOM 契约；浏览器视觉 smoke 覆盖常用 Desktop 宽度。
-  - 实际验证：主从工作台、中文状态、局部 loading/empty/error/stale、Provider 能力 Badge 和分页加载已实现；Desktop UI contract 与生产构建通过。浏览器视觉 smoke 未在本轮重新执行，保留为外部验收门槛。
+  - 验证方式：组件测试覆盖五类加载状态、Provider 状态、四个筛选、未知状态、历史兼容、任务选择、创建置顶、手动刷新和窄布局 DOM 契约；浏览器视觉 smoke 作为独立运行时门禁记录。
+  - 实际验证：主从工作台、中文状态、局部 loading/empty/error/stale、Provider 能力 Badge 和分页加载已实现；Desktop UI contract 与生产构建通过。浏览器视觉 smoke 未在本轮重新执行，保留为运行时验收门槛。
 
 - [x] T6：实现新建研究 Sheet、真实上下文选择和能力预检
   - 涉及范围：`NewResearchSheet`、`ResearchContextFields`、账户/持仓/策略查询复用、表单辅助函数、组件测试。
@@ -191,7 +191,7 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
     - 更新 README，从“选择范围、输入问题、查看元数据”同步为任务工作台、新建研究、自动状态和来源链流程。
     - 文档明确区分确定性测试、浏览器视觉验收、真实 Provider、外部新闻/财务来源和长任务运行时验收。
   - 完成条件：关键交互、执行链、信任边界、分页、证据关联和历史兼容都有自动化回归；用户文档与实际页面一致。
-  - 验证方式：运行 schemas、server AI、Desktop AI/UI contract 目标测试；执行键盘/视觉 smoke、真实 Provider smoke，并记录无法在本地替代的外部验收门槛。
+  - 验证方式：运行 schemas、server AI、Desktop AI/UI contract 目标测试；运行时视觉、真实 Provider、外部来源和长任务 smoke 在独立门禁中记录。
   - 实际验证：schemas 49 项、Server 225 项、Desktop 90 项测试通过；Server/Desktop build、typecheck、Prisma validate、Prettier、受影响范围 ESLint 和 `git diff --check` 通过。Guardrail 为 warning-only，报告仓库既有复杂度/文件大小告警；真实 Provider、浏览器视觉和外部新闻/财务来源 smoke 尚未执行。
 
 ## 历史验证记录（整改前，仅证明基础实现，不作为当前任务完成证据）
@@ -227,8 +227,17 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
     - 检查旧任务、mock 模式、Provider/Tool 失败和结果契约错误是否被诚实表达。
     - 更新每个已完成任务的验证证据和最终 Review 结论。
   - 完成条件：Spec、任务、代码、测试和用户文档一致；所有遗留风险有明确归属和验收边界。
-  - 验证方式：执行受影响 workspace 的 typecheck、目标测试、完整相关测试、build、格式检查、lint/复杂度或文件大小 guardrail、Prisma/schema 检查和 `git diff --check`；条件允许时执行真实运行时 smoke。
-  - 实际验证：逐条复核验收标准 1-23、所有 `succeeded` 写入路径、详情与 Tool 分页边界、历史兼容和只读范围；上述本轮验证记录全部通过。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 受环境条件限制，作为明确遗留风险保留。
+  - 验证方式：执行受影响 workspace 的 typecheck、目标测试、完整相关测试、build、格式检查、lint/复杂度或文件大小 guardrail、Prisma/schema 检查和 `git diff --check`；运行时 smoke 在独立门禁中记录。
+  - 实际验证：逐条复核验收标准 1-23、所有 `succeeded` 写入路径、详情与 Tool 分页边界、历史兼容和只读范围；上述本轮确定性验证全部通过。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 受环境条件限制，保留为未完成的运行时验收门禁。
+
+## 运行时验收门禁（未完成）
+
+- [ ] 真实 OpenAI-compatible Provider smoke：使用部署环境 `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` 完成至少一次真实研究任务并核对 Provider/Model/Token/来源链事实。
+- [ ] 服务进程重启 smoke：在任务处于 `queued/running` 时重启服务，确认租约恢复和终态收敛符合设计。
+- [ ] 外部来源长任务 smoke：连接实际新闻/财务等来源，确认 Tool 部分失败、超时和 citation 关联在真实链路下可解释。
+- [ ] 浏览器视觉/键盘 smoke：覆盖工作台宽窄布局、新建 Sheet、来源链 Sheet、焦点返回和长内容滚动。
+
+完成以上门禁后再将本任务从 `docs/tasks/` 移入 `docs/archive/tasks/`。
 
 ## 验收标准映射
 
@@ -258,13 +267,16 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
 
 ## 最终一致性 Review
 
-- [x] Spec 中的全部验收标准均有对应实现或明确的环境遗留记录
-- [x] 所有已勾选任务均有实际验证证据
+- [x] Spec 中的实现项均有对应代码或明确的环境遗留记录
+- [x] 所有已勾选的实现任务均有确定性验证证据
 - [x] 实现未超出 Spec 声明的范围和 AI 只读边界
 - [x] 共享 Schema、服务端 wire shape、Desktop 类型和 UI 文案一致
 - [x] 测试、README、Spec 与任务文档已同步更新
 - [x] 历史兼容、mock 模式和外部运行时风险已明确记录
+- [ ] 运行时验收门禁全部完成
 
 ### Review 结论
 
-本轮一致性 Review 通过：T1-T9 的实现、接口、Desktop 交互、回归测试和用户文档已与 Spec 对齐；创建任务现在由持久化队列和专用执行器驱动，Provider、Tool 审计、结果契约、租约恢复、稳定分页、能力预检和 citation 关联均有代码与确定性测试证据。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 尚未在本机执行，属于上线前必须补齐的环境验收，不影响本轮代码一致性结论。
+代码一致性 Review 通过：T1-T10 的实现、接口、Desktop 交互、回归测试和用户文档已与 Spec 对齐；创建任务由持久化队列和专用执行器驱动，Provider、Tool 审计、结果契约、租约恢复、稳定分页、能力预检和 citation 关联均有代码与确定性测试证据。
+
+整体任务状态仍为 **Implementation Complete / Runtime Acceptance Pending**。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 尚未完成，因此本任务继续保留在 `docs/tasks/`，不能归档，也不能把上述运行时门禁描述为已验收。
