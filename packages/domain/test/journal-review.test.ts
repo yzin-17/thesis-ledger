@@ -72,4 +72,55 @@ describe('已平仓交易生命周期投影', () => {
       '卖出数量超过持仓',
     );
   });
+
+  it.each(['AVG', 'FIFO'] as const)('quantity=0 的持仓校正会切断旧 lot（%s）', (method) => {
+    const resetEvents: LedgerEvent[] = [
+      {
+        id: 'old-buy',
+        accountId: 'account',
+        type: 'BUY',
+        symbol: '600519.SH',
+        quantity: 100,
+        price: 10,
+        occurredAt: '2025-01-01T09:30:00.000Z',
+      },
+      {
+        id: 'manual-clear',
+        accountId: 'account',
+        type: 'ADJUSTMENT',
+        symbol: '600519.SH',
+        occurredAt: '2025-01-02T09:30:00.000Z',
+        metadata: { kind: 'position-balance', quantity: 0, costPrice: 10 },
+      },
+      {
+        id: 'new-buy',
+        accountId: 'account',
+        type: 'BUY',
+        symbol: '600519.SH',
+        quantity: 20,
+        price: 30,
+        occurredAt: '2025-01-03T09:30:00.000Z',
+      },
+      {
+        id: 'new-sell',
+        accountId: 'account',
+        type: 'SELL',
+        symbol: '600519.SH',
+        quantity: 20,
+        price: 35,
+        occurredAt: '2025-01-04T09:30:00.000Z',
+      },
+    ];
+
+    expect(projectCompletedTrades(resetEvents, method)).toEqual([
+      expect.objectContaining({
+        entryAt: '2025-01-03T09:30:00.000Z',
+        entryEventIds: ['new-buy'],
+        exitEventIds: ['new-sell'],
+        quantity: 20,
+        entryPrice: 30,
+        pnl: 100,
+      }),
+    ]);
+  });
 });
