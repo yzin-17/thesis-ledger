@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { projectAverageCost } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
-import { toDomainEvents } from '../ledger/ledger-legacy-adapter.js';
 
 export interface IntegrityIssue {
   code: string;
@@ -40,34 +38,20 @@ export class IntegrityService {
           });
         if (event.externalId) seen.add(event.externalId);
       }
-      let projected;
-      try {
-        projected = projectAverageCost(toDomainEvents(account.ledger));
-      } catch (error) {
-        issues.push({
-          code: 'ledger_projection_failed',
-          severity: 'error',
-          entity: account.id,
-          message: error instanceof Error ? error.message : 'Ledger 投影失败',
-          suggestion: '检查事件顺序、超卖和公司行动参数',
-        });
-        continue;
-      }
       const actual = new Map(account.positions.map((position) => [position.symbol, position]));
-      if (Array.isArray(account.trades)) {
-        const activeTradeQuantities = new Map<string, number>();
-        for (const trade of account.trades) {
-          if (trade.lifecycle !== 'ACTIVE') continue;
-          activeTradeQuantities.set(
-            trade.symbol,
-            (activeTradeQuantities.get(trade.symbol) ?? 0) + Number(trade.remainingQuantity),
-          );
-        }
-        const symbols = new Set([...activeTradeQuantities.keys(), ...actual.keys()]);
-        for (const symbol of symbols) {
-          const expectedQuantity = activeTradeQuantities.get(symbol) ?? 0;
-          const storedQuantity = Number(actual.get(symbol)?.quantity ?? 0);
-          if (Math.abs(storedQuantity - expectedQuantity) <= 1e-6) continue;
+      const activeTradeQuantities = new Map<string, number>();
+      for (const trade of account.trades ?? []) {
+        if (trade.lifecycle !== 'ACTIVE') continue;
+        activeTradeQuantities.set(
+          trade.symbol,
+          (activeTradeQuantities.get(trade.symbol) ?? 0) + Number(trade.remainingQuantity),
+        );
+      }
+      const symbols = new Set([...activeTradeQuantities.keys(), ...actual.keys()]);
+      for (const symbol of symbols) {
+        const expectedQuantity = activeTradeQuantities.get(symbol) ?? 0;
+        const storedQuantity = Number(actual.get(symbol)?.quantity ?? 0);
+        if (Math.abs(storedQuantity - expectedQuantity) > 1e-6)
           issues.push({
             code: 'position_trade_quantity_mismatch',
             severity: 'error',
@@ -75,32 +59,11 @@ export class IntegrityService {
             message: 'Position 数量与 ACTIVE Trade 剩余数量不一致',
             suggestion: '在确认 Ledger 正确后重建 Trade 与 Position 核心投影',
           });
-        }
-      }
-      const expected = new Map(
-        projected
-          .filter((position) => Math.abs(position.quantity) > POSITION_EPSILON)
-          .map((position) => [position.symbol, position]),
-      );
-      for (const position of expected.values()) {
-        const stored = actual.get(position.symbol);
-        if (
-          !stored ||
-          Math.abs(Number(stored.quantity) - position.quantity) > 1e-6 ||
-          Math.abs(Number(stored.costPrice) - position.averageCost) > 1e-4
-        )
-          issues.push({
-            code: 'position_projection_mismatch',
-            severity: 'error',
-            entity: `${account.id}:${position.symbol}`,
-            message: 'Position 与 Ledger AVG 投影不一致',
-            suggestion: '在确认 Ledger 正确后执行只读预览，再运行 Position rebuild',
-          });
       }
       for (const position of account.positions) {
         if (
           Math.abs(Number(position.quantity)) > POSITION_EPSILON &&
-          !expected.has(position.symbol)
+          !activeTradeQuantities.has(position.symbol)
         )
           issues.push({
             code: 'position_without_ledger_projection',

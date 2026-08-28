@@ -11,13 +11,6 @@ export type StoredCashEvent = {
   type: string;
   occurredAt?: Date | null;
   createdAt?: Date | null;
-  currency?: string | null;
-  quantity?: unknown;
-  price?: unknown;
-  amount?: unknown;
-  fee?: unknown;
-  tax?: unknown;
-  metadata?: unknown;
   factId?: string | null;
   ledgerRevision?: bigint | null;
   timePrecision?: string | null;
@@ -93,17 +86,6 @@ const decimalString = (value: unknown) => {
   return '0';
 };
 
-const metadataRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-
-const occurredAt = (value: unknown) => {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === 'string' ? value : null;
-};
-
 const compareCashOperation = (left: CashOperation, right: CashOperation) => {
   if (left.occurredAt === null && right.occurredAt !== null) return -1;
   if (left.occurredAt !== null && right.occurredAt === null) return 1;
@@ -128,95 +110,6 @@ const settlement = (input: {
   settledAt: input.settledAt ?? null,
   status: settledStatus(input.settledAt, input.now),
 });
-
-const legacyOperations = (stored: StoredCashEvent[]): CashOperation[] =>
-  stored
-    .filter((event) => event.factId == null)
-    .flatMap((event): CashOperation[] => {
-      const metadata = metadataRecord(event.metadata);
-      const currency = typeof event.currency === 'string' ? event.currency : 'CNY';
-      const base = {
-        accountId: event.accountId,
-        currency,
-        occurredAt: occurredAt(event.occurredAt),
-        order: `${typeof event.economicOrderKey === 'string' ? event.economicOrderKey : ''}:${event.id}`,
-        eventId: event.id,
-        factId: event.id,
-        sourceType: event.type,
-      };
-      if (event.type === 'ADJUSTMENT' && metadata.kind === 'cash-balance')
-        return [{ ...base, set: decimal(metadata.amount ?? event.amount) }];
-      if (event.type === 'CASH_DEPOSIT' || event.type === 'TRANSFER_IN')
-        return [
-          {
-            ...base,
-            delta: decimal(event.amount),
-            settlement: {
-              direction: 'RECEIVABLE' as const,
-              amount: decimal(event.amount),
-              settledAt: null,
-              status: 'SETTLED' as const,
-            },
-          },
-        ];
-      if (event.type === 'CASH_WITHDRAW' || event.type === 'TRANSFER_OUT')
-        return [
-          {
-            ...base,
-            delta: decimal(event.amount).neg(),
-            settlement: {
-              direction: 'PAYABLE' as const,
-              amount: decimal(event.amount),
-              settledAt: null,
-              status: 'SETTLED' as const,
-            },
-          },
-        ];
-      if (event.type === 'DIVIDEND' || event.type === 'INTEREST')
-        return [
-          {
-            ...base,
-            delta: decimal(event.amount),
-            settlement: {
-              direction: 'RECEIVABLE' as const,
-              amount: decimal(event.amount),
-              settledAt: null,
-              status: 'SETTLED' as const,
-            },
-          },
-        ];
-      if (event.type === 'FEE' || event.type === 'TAX')
-        return [
-          {
-            ...base,
-            delta: decimal(event.amount).neg(),
-            settlement: {
-              direction: 'PAYABLE' as const,
-              amount: decimal(event.amount),
-              settledAt: null,
-              status: 'SETTLED' as const,
-            },
-          },
-        ];
-      if (event.type === 'BUY' || event.type === 'SELL') {
-        const gross = decimal(event.quantity).mul(decimal(event.price));
-        const charges = decimal(event.fee).plus(decimal(event.tax));
-        const amount = event.type === 'BUY' ? gross.plus(charges) : gross.minus(charges);
-        return [
-          {
-            ...base,
-            delta: event.type === 'BUY' ? amount.neg() : amount,
-            settlement: {
-              direction: event.type === 'BUY' ? ('PAYABLE' as const) : ('RECEIVABLE' as const),
-              amount,
-              settledAt: null,
-              status: 'SETTLED' as const,
-            },
-          },
-        ];
-      }
-      return [];
-    });
 
 const toStoredV2Event = (event: StoredCashEvent): LedgerEventV2 | undefined => {
   if (event.factId == null) return undefined;
@@ -373,9 +266,7 @@ const v2Operations = (stored: StoredCashEvent[], now = new Date()): CashOperatio
 
 export const projectCashBalances = (stored: StoredCashEvent[]) => {
   const balances = new Map<string, Map<string, Prisma.Decimal>>();
-  const operations = [...legacyOperations(stored), ...v2Operations(stored)].sort(
-    compareCashOperation,
-  );
+  const operations = v2Operations(stored).sort(compareCashOperation);
   for (const operation of operations) {
     const byCurrency = balances.get(operation.accountId) ?? new Map<string, Prisma.Decimal>();
     const current = byCurrency.get(operation.currency) ?? new Prisma.Decimal(0);
@@ -393,9 +284,7 @@ export const projectCashMaterialization = (
   now = new Date(),
 ): CashProjectionMaterialization => {
   const balances = new Map<string, CashMaterializedBalance & { issueSet: Set<string> }>();
-  const operations = [...legacyOperations(stored), ...v2Operations(stored, now)].sort(
-    compareCashOperation,
-  );
+  const operations = v2Operations(stored, now).sort(compareCashOperation);
   const settlements: CashMaterializedSettlement[] = [];
   for (const operation of operations) {
     const key = `${operation.accountId}:${operation.currency}`;

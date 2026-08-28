@@ -4,7 +4,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const infraRoot = resolve(root, '../thesis-ledger-infra');
+const infraRoot = process.env.THESIS_LEDGER_INFRA_ROOT
+  ? resolve(process.env.THESIS_LEDGER_INFRA_ROOT)
+  : resolve(root, '../thesis-ledger-infra');
 const migrationsRoot = resolve(root, 'apps/server/prisma/migrations');
 const targetMigration = '20260826050000_migrate_legacy_ledger_v2';
 const envFileFromInput = process.env.THESIS_LEDGER_INFRA_ENV_FILE;
@@ -104,6 +106,13 @@ const postTargetMigrationNames = [
   '20260826060000_baseline_import_draft',
   '20260826070000_allow_unknown_ledger_time',
   '20260826080000_remove_legacy_correction_of',
+  '20260826090000_store_projection_generation',
+  '20260827010000_repair_baseline_observation_batch_refs',
+  '20260827020000_import_draft_content_fingerprint',
+  '20260827030000_persist_ledger_source_row_id',
+  '20260827040000_materialize_core_projections',
+  '20260828010000_journal_trade_projection',
+  '20260828020000_harden_v2_projection_schema',
 ];
 const postTargetSql = (
   await Promise.all(
@@ -334,6 +343,16 @@ const runFullFixtureScenario = async () => {
               AND table_name = 'LedgerEvent'
               AND column_name = 'correctionOf'
           ),
+          'legacyLedgerColumnsRemaining', (
+            SELECT count(*)
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'LedgerEvent'
+              AND column_name IN (
+                'symbol', 'quantity', 'price', 'amount', 'fee', 'tax',
+                'source', 'currency', 'note', 'metadata'
+              )
+          ),
           'positions', COALESCE((
             SELECT jsonb_agg(
               jsonb_build_object(
@@ -396,7 +415,24 @@ const runFullFixtureScenario = async () => {
     assert(Number(after.accountLedgerRevision) === 17, '账户账本 Revision 回填异常');
     assert(after.correctionOfColumnExists === false, '旧 correctionOf 未在收缩迁移中删除');
     assert(
-      JSON.stringify(after.positions) === JSON.stringify(before.positions),
+      Number(after.legacyLedgerColumnsRemaining) === 0,
+      `旧 LedgerEvent 宽表字段仍存在: ${after.legacyLedgerColumnsRemaining}`,
+    );
+    assert(
+      JSON.stringify(
+        after.positions.map((position) => ({
+          ...position,
+          quantity: canonicalDecimal(position.quantity),
+          costPrice: canonicalDecimal(position.costPrice),
+        })),
+      ) ===
+        JSON.stringify(
+          before.positions.map((position) => ({
+            ...position,
+            quantity: canonicalDecimal(position.quantity),
+            costPrice: canonicalDecimal(position.costPrice),
+          })),
+        ),
       `Position 迁移前后不一致: before=${JSON.stringify(before.positions)} after=${JSON.stringify(after.positions)}`,
     );
 
@@ -476,6 +512,7 @@ console.log(
         positions: fullFixture.after.positions.length,
         cashFlows: fullFixture.after.cashFlows,
         cashBaselineBatchRefs: fullFixture.after.cashBaselineBatchRefs,
+        legacyLedgerColumnsRemaining: fullFixture.after.legacyLedgerColumnsRemaining,
         strategyRows: fullFixture.after.strategyRows,
         correctionOfColumnExists: fullFixture.after.correctionOfColumnExists,
       },

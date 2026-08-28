@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 
+export const draftLedgerEventPrefix = (draftId: string) => `draft:${draftId}:`;
+
 export const stableBaselineHash = (events: unknown[]) => {
   const decimalValue = (value: unknown) => {
     if (value === null) return null;
@@ -17,12 +19,18 @@ export const stableBaselineHash = (events: unknown[]) => {
       id: item.id,
       type: item.type,
       occurredAt: item.occurredAt instanceof Date ? item.occurredAt.toISOString() : item.occurredAt,
-      symbol: item.symbol,
-      quantity: decimalValue(item.quantity),
-      price: decimalValue(item.price),
-      amount: decimalValue(item.amount),
-      source: item.source,
-      metadata: item.metadata,
+      factId: item.factId,
+      ledgerRevision: decimalValue(item.ledgerRevision),
+      sourceRowId: item.sourceRowId,
+      payloadVersion: item.payloadVersion,
+      payload: item.payload,
+      sourceCategory: item.sourceCategory,
+      sourceChannel: item.sourceChannel,
+      externalId: item.externalId,
+      actorId: item.actorId,
+      revisionAction: item.revisionAction,
+      supersedesEventId: item.supersedesEventId,
+      reason: item.reason,
     };
   }) as Array<Record<string, unknown>>;
   return createHash('sha256')

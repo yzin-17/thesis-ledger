@@ -7,7 +7,7 @@ import {
   type LedgerEventsResponseV2,
   type LedgerReplayResponseV2,
 } from '@thesis-ledger/schemas';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { LedgerV2Repository, toLedgerEventV2 } from './ledger-v2.repository.js';
 
@@ -16,18 +16,8 @@ type StoredLedgerEvent = {
   accountId: string;
   type: string;
   occurredAt: Date | null;
-  symbol: string | null;
-  quantity: Prisma.Decimal | null;
-  price: Prisma.Decimal | null;
-  amount: Prisma.Decimal | null;
-  fee: Prisma.Decimal | null;
-  tax: Prisma.Decimal | null;
   externalId: string | null;
-  source: string;
   sourceRowId: string | null;
-  currency: string;
-  note: string | null;
-  metadata: Prisma.JsonValue | null;
   createdAt: Date;
   factId: string | null;
   ledgerRevision: bigint | null;
@@ -56,52 +46,6 @@ const assertRevision = (value: string | undefined) => {
     });
   return value;
 };
-
-const decimal = (value: unknown) => {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Prisma.Decimal) return value.toString();
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint')
-    return String(value);
-  return null;
-};
-
-const metadata = (value: Prisma.JsonValue | null) =>
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-
-const isV2Event = (event: StoredLedgerEvent) =>
-  event.factId !== null &&
-  event.ledgerRevision !== null &&
-  event.timePrecision !== null &&
-  event.sourceTimezone !== null &&
-  event.economicOrderKey !== null &&
-  event.payloadVersion !== null &&
-  event.sourceCategory !== null &&
-  event.sourceChannel !== null &&
-  event.actorId !== null &&
-  event.revisionAction !== null;
-
-const mapLegacyEvent = (event: StoredLedgerEvent) => ({
-  version: 1 as const,
-  id: event.id,
-  accountId: event.accountId,
-  type: event.type,
-  occurredAt: event.occurredAt?.toISOString() ?? null,
-  symbol: event.symbol,
-  quantity: decimal(event.quantity),
-  price: decimal(event.price),
-  amount: decimal(event.amount),
-  fee: decimal(event.fee),
-  tax: decimal(event.tax),
-  externalId: event.externalId,
-  source: event.source,
-  sourceRowId: event.sourceRowId,
-  currency: event.currency,
-  note: event.note,
-  metadata: metadata(event.metadata),
-  createdAt: event.createdAt.toISOString(),
-});
 
 const revisionOf = (event: { ledgerRevision: string }) => BigInt(event.ledgerRevision);
 
@@ -149,9 +93,7 @@ export class LedgerQueryService {
       },
       orderBy: [{ ledgerRevision: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     })) as StoredLedgerEvent[];
-    const events = stored.map((event) =>
-      isV2Event(event) ? toLedgerEventV2(event) : mapLegacyEvent(event),
-    );
+    const events = stored.map(toLedgerEventV2);
     return ledgerAuditResponseSchemaV2.parse({
       accountId,
       asOfLedgerRevision: asOf,

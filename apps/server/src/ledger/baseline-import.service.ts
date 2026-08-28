@@ -46,7 +46,12 @@ import {
   findOrphanSellRowIds,
   type DraftRowAppendContext,
 } from './baseline-import-support.js';
-import { readAccount, readLedgerEvents, stableBaselineHash } from './import-state.js';
+import {
+  draftLedgerEventPrefix,
+  readAccount,
+  readLedgerEvents,
+  stableBaselineHash,
+} from './import-state.js';
 import type { ImportDraftOptions } from './import-draft.types.js';
 import { validateImportPositionCandidate } from './import-position-validation.js';
 
@@ -543,7 +548,7 @@ export class BaselineImportService {
       }
       const accountCurrency = currencySchema.parse(account?.currency ?? 'CNY');
       if (lockedDraft.baselineHash) {
-        const importEventPrefix = `draft:${lockedDraft.id}:`;
+        const importEventPrefix = draftLedgerEventPrefix(lockedDraft.id);
         const currentEvents = await readLedgerEvents(context.transaction, lockedDraft.accountId);
         const baselineEvents = currentEvents.filter((event) => {
           if (!event || typeof event !== 'object') return true;

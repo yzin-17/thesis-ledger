@@ -35,18 +35,8 @@ const storedEvent = (value: LedgerEventV2) => ({
   accountId: value.accountId,
   type: value.type,
   occurredAt: value.occurredAt === null ? null : new Date(value.occurredAt),
-  symbol: 'AAPL.US',
-  quantity: '1.25',
-  price: '205.30',
-  amount: null,
-  fee: null,
-  tax: null,
   externalId: value.source.externalId ?? null,
-  source: value.source.channel,
   sourceRowId: null,
-  currency: 'USD',
-  note: null,
-  metadata: null,
   createdAt: new Date(value.recordedAt),
   factId: value.factId,
   ledgerRevision: BigInt(value.ledgerRevision),
@@ -66,47 +56,13 @@ const storedEvent = (value: LedgerEventV2) => ({
 });
 
 describe('Ledger 查询 API 服务', () => {
-  it('有效事件读取返回账户版本，审计读取保留旧事件并使用十进制字符串', async () => {
-    const legacy = {
-      id: '44444444-4444-4444-8444-444444444444',
-      accountId,
-      type: 'BUY',
-      occurredAt: new Date('2025-01-01T00:00:00.000Z'),
-      symbol: '600519.SH',
-      quantity: '10.00',
-      price: '100.25',
-      amount: null,
-      fee: '1.50',
-      tax: null,
-      externalId: 'legacy-1',
-      source: 'manual',
-      sourceRowId: 'row-1',
-      currency: 'CNY',
-      note: 'legacy',
-      metadata: { migrated: true },
-      createdAt: new Date('2025-01-02T00:00:00.000Z'),
-      factId: null,
-      ledgerRevision: null,
-      timePrecision: null,
-      sourceTimezone: null,
-      economicOrderKey: null,
-      recordedAt: new Date('2025-01-02T00:00:00.000Z'),
-      projectionGeneration: null,
-      payloadVersion: null,
-      payload: null,
-      sourceCategory: null,
-      sourceChannel: null,
-      actorId: null,
-      revisionAction: null,
-      supersedesEventId: null,
-      reason: null,
-    };
+  it('有效事件读取返回账户版本，审计读取仅接受 V2 事件', async () => {
     const prisma = {
       account: { findUnique: vi.fn(async () => ({ id: accountId })) },
       accountLedgerState: {
         findUnique: vi.fn(async () => ({ ledgerRevision: 3n, projectionGeneration: 4n })),
       },
-      ledgerEvent: { findMany: vi.fn(async () => [storedEvent(event), legacy]) },
+      ledgerEvent: { findMany: vi.fn(async () => [storedEvent(event)]) },
     };
     const repository = {
       readEffectiveEvents: vi.fn(async () => [event]),
@@ -123,8 +79,10 @@ describe('Ledger 查询 API 服务', () => {
       asOfLedgerRevision: '3',
       effective: false,
       events: [
-        expect.objectContaining({ version: 2 }),
-        expect.objectContaining({ version: 1, quantity: '10.00', fee: '1.50' }),
+        expect.objectContaining({
+          version: 2,
+          payload: expect.objectContaining({ quantity: '1.25' }),
+        }),
       ],
     });
   });

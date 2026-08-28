@@ -304,6 +304,11 @@ describe('Trade Projection 领域引擎', () => {
       completeness: 'CONFLICTED',
     });
     expect(trade.issues).toEqual(['QUANTITY_CONFLICT']);
+    expect(trade.baselineComponents[0]).toMatchObject({
+      observedQuantity: '80',
+      quantity: '0',
+      remainingQuantity: '0',
+    });
   });
 
   it('实际账户和影子账户按账户模式分别投影', () => {

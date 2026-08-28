@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PerformanceService } from '../../src/performance/performance.service.js';
+import { cashBalanceEvent, cashFlowEvent, fixtureUuid } from '../ledger/ledger-event-fixtures.js';
 
 const fxResponse = (asOf: string, hkdRate = 0.92) => ({
   version: 1 as const,
@@ -35,6 +36,9 @@ const fxResponse = (asOf: string, hkdRate = 0.92) => ({
   ],
 });
 
+const accountA = fixtureUuid('a');
+const accountMain = fixtureUuid('account-a');
+
 describe('Ledger Snapshot 与收益摘要', () => {
   it('快照使用行情估值、Ledger 现金和 dataQuality，而不是成本替代市值', async () => {
     const snapshot = vi.fn(async ({ data }: { data: object }) => data);
@@ -51,18 +55,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
       },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
-            id: 'deposit',
-            accountId: 'a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01'),
-            symbol: null,
-            quantity: null,
-            price: null,
-            amount: 1000,
-            fee: null,
-            tax: null,
-          },
+          cashFlowEvent({ id: 'deposit', accountId: accountA, amount: 1000 }),
         ]),
       },
       portfolioSnapshot: { findFirst: vi.fn(async () => null), create: snapshot },
@@ -71,7 +64,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
       getQuote: vi.fn(async () => ({ price: 12, provider: 'dsa', stale: false })),
     };
     const result = await new PerformanceService(prisma as never, market as never).capture(
-      'a',
+      accountA,
       new Date('2025-01-02'),
     );
     expect(result).toMatchObject({ marketValue: 1200, costValue: 1000, cashValue: 1000 });
@@ -220,46 +213,22 @@ describe('Ledger Snapshot 与收益摘要', () => {
       position: { findMany: vi.fn(async () => []) },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
-            id: 'cash',
-            accountId: 'a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01'),
-            symbol: null,
-            quantity: null,
-            price: null,
-            amount: 400,
-            fee: null,
-            tax: null,
-            metadata: null,
-          },
+          cashBalanceEvent({ id: 'cash', accountId: accountA, amount: 400 }),
         ]),
       },
       account: { findMany: vi.fn(async () => [{ currency: 'CNY' }]) },
     };
     const layers = await new PerformanceService(prisma as never, {} as never).layers();
-    expect(layers.account).toMatchObject([{ accountId: 'a', cashValue: 400, marketValue: 0 }]);
+    expect(layers.account).toMatchObject([{ accountId: accountA, cashValue: 400, marketValue: 0 }]);
     expect(layers.portfolio).toMatchObject({ cashValue: 400, partial: false });
   });
 
-  it('Snapshot capture 保留 cash-balance adjustment 的 metadata', async () => {
+  it('Snapshot capture 保留现金余额观察', async () => {
     const prisma = {
       position: { findMany: vi.fn(async () => []) },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
-            id: 'cash-adjustment',
-            accountId: 'a',
-            type: 'ADJUSTMENT',
-            occurredAt: new Date('2025-01-01'),
-            symbol: null,
-            quantity: null,
-            price: null,
-            amount: 900,
-            fee: null,
-            tax: null,
-            metadata: { kind: 'cash-balance', amount: 1200 },
-          },
+          cashBalanceEvent({ id: 'cash-adjustment', accountId: accountA, amount: 1200 }),
         ]),
       },
       portfolioSnapshot: {
@@ -268,7 +237,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
       },
     };
     const snapshot = await new PerformanceService(prisma as never, {} as never).capture(
-      'a',
+      accountA,
       new Date('2025-01-02'),
     );
     expect(snapshot).toMatchObject({ cashValue: 1200 });
@@ -457,35 +426,31 @@ describe('Ledger Snapshot 与收益摘要', () => {
       position: { findMany: vi.fn(async () => []) },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
+          cashFlowEvent({
             id: 'cash-cny',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountMain,
             amount: 100,
             currency: 'CNY',
-          },
-          {
+          }),
+          cashFlowEvent({
             id: 'cash-hkd',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountMain,
             amount: 100,
             currency: 'HKD',
-          },
+          }),
         ]),
       },
       account: {
-        findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]),
+        findMany: vi.fn(async () => [{ id: accountMain, currency: 'CNY' }]),
       },
     };
     const market = {
       getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
     };
     const service = new PerformanceService(prisma as never, market as never);
-    const native = await service.layers('account-a');
+    const native = await service.layers(accountMain);
     expect(native.account).toMatchObject([
-      { accountId: 'account-a', cashValue: null, partial: true },
+      { accountId: accountMain, cashValue: null, partial: true },
     ]);
     expect(native.portfolio).toBeNull();
     expect(native.byCurrency).toEqual(
@@ -495,12 +460,12 @@ describe('Ledger Snapshot 与收益摘要', () => {
       ]),
     );
 
-    const merged = await service.layers('account-a', undefined, 'actual', {
+    const merged = await service.layers(accountMain, undefined, 'actual', {
       fxMerge: true,
       baseCurrency: 'CNY',
     });
     expect(merged.account).toMatchObject([
-      { accountId: 'account-a', currency: 'CNY', cashValue: 192, partial: false },
+      { accountId: accountMain, currency: 'CNY', cashValue: 192, partial: false },
     ]);
     expect(merged.portfolio).toMatchObject({ currency: 'CNY', cashValue: 192 });
     expect(merged.fx).toMatchObject({
@@ -598,14 +563,13 @@ describe('Ledger Snapshot 与收益摘要', () => {
       },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
+          cashFlowEvent({
             id: 'cash-flow',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-02T00:00:00.000Z'),
+            accountId: accountMain,
             amount: 100,
             currency: 'HKD',
-          },
+            occurredAt: '2025-01-02T00:00:00.000Z',
+          }),
         ]),
       },
     };

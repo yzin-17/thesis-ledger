@@ -11,6 +11,7 @@ import {
 import { AccountsService } from '../../src/portfolio/accounts.service.js';
 import { PortfolioService } from '../../src/portfolio/portfolio.service.js';
 import { RiskService } from '../../src/risk/risk.service.js';
+import { cashFlowEvent, fixtureUuid } from '../ledger/ledger-event-fixtures.js';
 
 const fxResponse = (asOf: string) => ({
   version: 1 as const,
@@ -45,6 +46,8 @@ const fxResponse = (asOf: string) => ({
     },
   ],
 });
+
+const accountA = fixtureUuid('account-a');
 
 describe('V0.1 核心 E2E', () => {
   it('账户→截图 Review/Commit→Portfolio→Risk→通知→AI Explain 可一键执行', async () => {
@@ -258,31 +261,32 @@ describe('账户与组合', () => {
     const update = vi.fn();
     const prisma = {
       account: {
-        findUnique: vi.fn(async () => ({ id: 'account-a', currency: 'CNY', positions: [] })),
+        findUnique: vi.fn(async () => ({ id: accountA, currency: 'CNY', positions: [] })),
         update,
       },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
+          cashFlowEvent({
             id: 'cash-cny',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountA,
             amount: 100,
             currency: 'CNY',
-          },
-          {
+            direction: 'INFLOW',
+            category: 'DEPOSIT',
+          }),
+          cashFlowEvent({
             id: 'cash-hkd',
-            accountId: 'account-a',
-            type: 'CASH_WITHDRAW',
-            occurredAt: new Date('2025-01-02T00:00:00.000Z'),
+            accountId: accountA,
             amount: 100,
             currency: 'HKD',
-          },
+            direction: 'OUTFLOW',
+            category: 'WITHDRAWAL',
+            occurredAt: '2025-01-02T00:00:00.000Z',
+          }),
         ]),
       },
     };
-    await expect(new AccountsService(prisma as never).deactivate('account-a')).rejects.toThrow(
+    await expect(new AccountsService(prisma as never).deactivate(accountA)).rejects.toThrow(
       '现金余额',
     );
     expect(update).not.toHaveBeenCalled();
@@ -316,33 +320,33 @@ describe('账户与组合', () => {
       position: { findMany: vi.fn(async () => []) },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
+          cashFlowEvent({
             id: 'cash-cny',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountA,
             amount: 100,
             currency: 'CNY',
-          },
-          {
+            direction: 'INFLOW',
+            category: 'DEPOSIT',
+          }),
+          cashFlowEvent({
             id: 'cash-hkd',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountA,
             amount: 100,
             currency: 'HKD',
-          },
+            direction: 'INFLOW',
+            category: 'DEPOSIT',
+          }),
         ]),
       },
       account: {
-        findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]),
+        findMany: vi.fn(async () => [{ id: accountA, currency: 'CNY' }]),
       },
     };
     const market = {
       getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
     };
     const service = new PortfolioService(prisma as never, market as never);
-    const native = await service.value('account-a', 'actual', {
+    const native = await service.value(accountA, 'actual', {
       fxMerge: false,
       baseCurrency: 'CNY',
     });
@@ -354,7 +358,7 @@ describe('账户与组合', () => {
       ]),
     );
 
-    const merged = await service.value('account-a', 'actual', {
+    const merged = await service.value(accountA, 'actual', {
       fxMerge: true,
       baseCurrency: 'CNY',
     });
@@ -365,7 +369,7 @@ describe('账户与组合', () => {
       baseCurrency: 'CNY',
     });
     expect(merged.cashByAccount).toMatchObject([
-      { accountId: 'account-a', amount: 192, currency: 'CNY' },
+      { accountId: accountA, amount: 192, currency: 'CNY' },
     ]);
   });
 
@@ -374,26 +378,26 @@ describe('账户与组合', () => {
       position: { findMany: vi.fn(async () => []) },
       ledgerEvent: {
         findMany: vi.fn(async () => [
-          {
+          cashFlowEvent({
             id: 'cash-cny',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountA,
             amount: 100,
             currency: 'CNY',
-          },
-          {
+            direction: 'INFLOW',
+            category: 'DEPOSIT',
+          }),
+          cashFlowEvent({
             id: 'cash-usd',
-            accountId: 'account-a',
-            type: 'CASH_DEPOSIT',
-            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            accountId: accountA,
             amount: 100,
             currency: 'USD',
-          },
+            direction: 'INFLOW',
+            category: 'DEPOSIT',
+          }),
         ]),
       },
       account: {
-        findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]),
+        findMany: vi.fn(async () => [{ id: accountA, currency: 'CNY' }]),
       },
     };
     const market = {
@@ -403,7 +407,7 @@ describe('账户与组合', () => {
       })),
     };
     const result = await new PortfolioService(prisma as never, market as never).value(
-      'account-a',
+      accountA,
       'actual',
       { fxMerge: true, baseCurrency: 'CNY' },
     );

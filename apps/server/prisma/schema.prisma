@@ -7,6 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum TradeAccountMode {
+  actual
+  shadow
+}
+
+enum TradeLifecycle {
+  ACTIVE
+  ENDED
+}
+
+enum TradeExitProgress {
+  NONE
+  PARTIAL
+  FULL
+}
+
+enum TradeEndEvidence {
+  SELL_EXECUTION
+  BALANCE_OBSERVATION
+  UNKNOWN
+}
+
+enum TradeEvidenceCompleteness {
+  COMPLETE
+  PARTIAL
+  CONFLICTED
+}
+
 model Account {
   id                 String                       @id @default(uuid()) @db.Uuid
   name               String
@@ -72,7 +100,6 @@ model Asset {
   updatedAt                   DateTime                     @updatedAt
   positions                   Position[]
   trades                      Trade[]
-  ledgerEvents                LedgerEvent[]
   bars                        MarketBar[]
   fundNavPoints               FundNavPoint[]
   instrumentAssetAssociations InstrumentAssetAssociation[]
@@ -159,11 +186,11 @@ model Position {
 model Trade {
   id                     String                           @id
   accountId              String                           @db.Uuid
-  accountMode            String
+  accountMode            TradeAccountMode
   symbol                 String
-  lifecycle              String
-  exitProgress           String
-  endEvidence            String
+  lifecycle              TradeLifecycle
+  exitProgress           TradeExitProgress
+  endEvidence            TradeEndEvidence
   openedAt               DateTime?
   closedAt               DateTime?
   earliestEvidenceAt     DateTime?
@@ -174,7 +201,7 @@ model Trade {
   netRealizedPnl         Decimal?                         @db.Decimal(38, 18)
   realizedNetReturnRate  Decimal?                         @db.Decimal(38, 18)
   costEstimated          Boolean                          @default(false)
-  completeness           String
+  completeness           TradeEvidenceCompleteness
   issues                 Json
   costIssues             Json
   algorithmVersion       String
@@ -438,18 +465,8 @@ model LedgerEvent {
   accountId            String         @db.Uuid
   type                 String
   occurredAt           DateTime?
-  symbol               String?
-  quantity             Decimal?       @db.Decimal(24, 8)
-  price                Decimal?       @db.Decimal(24, 8)
-  amount               Decimal?       @db.Decimal(24, 8)
-  fee                  Decimal?       @db.Decimal(24, 8)
-  tax                  Decimal?       @db.Decimal(24, 8)
   externalId           String?
-  source               String         @default("manual")
   sourceRowId          String?
-  currency             String         @default("CNY")
-  note                 String?
-  metadata             Json?
   createdAt            DateTime       @default(now())
   factId               String?        @db.Uuid
   ledgerRevision       BigInt?
@@ -467,7 +484,6 @@ model LedgerEvent {
   supersedesEventId    String?        @db.Uuid
   reason               String?
   account              Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  asset                Asset?         @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
   journalEntries       JournalEntry[]
   supersedesEvent      LedgerEvent?   @relation("LedgerRevisionChain", fields: [supersedesEventId], references: [id], onDelete: Restrict)
   laterRevisions       LedgerEvent[]  @relation("LedgerRevisionChain")
@@ -479,7 +495,6 @@ model LedgerEvent {
   @@index([accountId, occurredAt])
   @@index([accountId, factId, ledgerRevision])
   @@index([accountId, occurredAt, economicOrderKey, id])
-  @@index([symbol, occurredAt])
 }
 
 model PortfolioSnapshot {

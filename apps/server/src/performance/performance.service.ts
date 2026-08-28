@@ -52,20 +52,12 @@ type PerformanceSnapshot = {
 };
 
 type PerformanceLedgerEvent = {
-  accountId?: string;
+  accountId: string;
   type: string;
   occurredAt: Date | null;
-  amount: unknown;
-  currency?: string | null;
-  payload?: unknown;
+  payload: Prisma.JsonValue | null;
 };
 
-const EXTERNAL_FLOW_TYPES = [
-  'CASH_DEPOSIT',
-  'CASH_WITHDRAW',
-  'TRANSFER_IN',
-  'TRANSFER_OUT',
-] as const;
 const snapshotPayload = (payload: unknown) =>
   payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
 
@@ -116,21 +108,15 @@ const snapshotMode = (snapshot: PerformanceSnapshot) => {
   return typeof payload.mode === 'string' ? payload.mode : 'actual';
 };
 
-const externalPortfolioFlow = (
-  event: Pick<PerformanceLedgerEvent, 'type' | 'amount' | 'currency' | 'payload'>,
-) => {
+const externalPortfolioFlow = (event: Pick<PerformanceLedgerEvent, 'type' | 'payload'>) => {
+  if (event.type !== 'CASH_FLOW') return { amount: 0, currency: undefined };
   const payload = snapshotPayload(event.payload);
-  const amount = Number(event.type === 'CASH_FLOW' ? payload.amount : (event.amount ?? 0));
+  const amount = Number(payload.amount);
   if (!Number.isFinite(amount) || amount === 0) return { amount: 0, currency: undefined };
-  if (event.type === 'CASH_DEPOSIT' || event.type === 'TRANSFER_IN')
-    return { amount, currency: supportedCurrency(event.currency) };
-  if (event.type === 'CASH_WITHDRAW' || event.type === 'TRANSFER_OUT')
-    return { amount: -amount, currency: supportedCurrency(event.currency) };
   if (
-    event.type === 'CASH_FLOW' &&
-    (payload.category === 'DEPOSIT' ||
-      payload.category === 'WITHDRAWAL' ||
-      payload.category === 'TRANSFER')
+    payload.category === 'DEPOSIT' ||
+    payload.category === 'WITHDRAWAL' ||
+    payload.category === 'TRANSFER'
   )
     return {
       amount: payload.direction === 'OUTFLOW' ? -amount : amount,
@@ -607,7 +593,7 @@ export class PerformanceService {
     const externalEvents = (await this.prisma.ledgerEvent.findMany({
       where: {
         ...accountWhere,
-        type: { in: [...EXTERNAL_FLOW_TYPES, 'CASH_FLOW'] },
+        type: 'CASH_FLOW',
         occurredAt: { gt: firstSnapshot.capturedAt, lte: lastSnapshot.capturedAt },
       },
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],

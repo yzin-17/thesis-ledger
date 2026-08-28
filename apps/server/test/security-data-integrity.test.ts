@@ -14,6 +14,7 @@ import { ProviderConfigService } from '../src/providers/provider-config.service.
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { ImportRollbackService } from '../src/imports/import-rollback.service.js';
 import { IntegrityService } from '../src/integrity/integrity.service.js';
+import { storedV2Event } from './ledger/ledger-event-fixtures.js';
 
 const ring = (activeVersion: string, keys: Record<string, Buffer>): CredentialKeyRing => ({
   activeVersion,
@@ -388,11 +389,46 @@ describe('Ledger transactional migration', () => {
 describe('Screenshot rollback protection', () => {
   it('导入提交后同账户同标的出现新 Ledger 事件时拒绝自动回滚', async () => {
     const append = vi.fn();
+    const draftId = '11111111-1111-4111-8111-111111111114';
+    const accountId = '11111111-1111-4111-8111-111111111111';
+    const submittedEvent = storedV2Event({
+      id: '22222222-2222-4222-8222-222222222221',
+      accountId,
+      type: 'POSITION_BASELINE_OBSERVATION',
+      occurredAt: new Date('2026-08-20T09:59:00Z'),
+      sourceCategory: 'IMPORT',
+      sourceChannel: 'screenshot',
+      externalId: `draft:${draftId}:1:row-1`,
+      payload: {
+        symbol: '600519.SH',
+        batchId: '33333333-3333-4333-8333-333333333331',
+        batchScope: 'PARTIAL',
+        quantity: '5',
+        averageCost: '90',
+        currency: 'CNY',
+        costIncludesFees: 'UNKNOWN',
+      },
+    });
+    const laterEvent = storedV2Event({
+      id: '22222222-2222-4222-8222-222222222222',
+      accountId,
+      type: 'BUY_EXECUTION',
+      occurredAt: new Date('2026-08-20T10:05:00Z'),
+      externalId: 'manual-after-import',
+      payload: {
+        symbol: '600519.SH',
+        quantity: '1',
+        price: '100',
+        currency: 'CNY',
+        capabilityVerification: 'VERIFIED',
+        charges: [],
+      },
+    });
     const tx = {
       importDraft: {
         findUnique: vi.fn(async () => ({
-          id: '11111111-1111-4111-8111-111111111114',
-          accountId: '11111111-1111-4111-8111-111111111111',
+          id: draftId,
+          accountId,
           status: 'committed',
           committedAt: new Date('2026-08-20T10:00:00Z'),
           beforeState: [{ symbol: '600519.SH', quantity: 5, costPrice: 90 }],
@@ -401,12 +437,12 @@ describe('Screenshot rollback protection', () => {
         update: vi.fn(),
       },
       ledgerEvent: {
-        findFirst: vi.fn(async () => ({
-          id: 'manual-after-import',
-          symbol: '600519.SH',
-          createdAt: new Date('2026-08-20T10:05:00Z'),
-        })),
-        findMany: vi.fn(async () => []),
+        findFirst: vi.fn(async () => null),
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([submittedEvent])
+          .mockResolvedValueOnce([laterEvent])
+          .mockResolvedValueOnce([]),
         upsert: append,
       },
     };
@@ -428,9 +464,7 @@ describe('Screenshot rollback protection', () => {
     };
     const service = new ImportRollbackService(prisma as never, repository as never);
 
-    await expect(service.rollback('11111111-1111-4111-8111-111111111114')).rejects.toThrow(
-      '已有新的 Ledger 事件',
-    );
+    await expect(service.rollback(draftId)).rejects.toThrow('已有新的 Ledger 事件');
     expect(append).not.toHaveBeenCalled();
     expect(tx.importDraft.update).not.toHaveBeenCalled();
   });

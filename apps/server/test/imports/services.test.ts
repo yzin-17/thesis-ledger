@@ -10,6 +10,7 @@ import { AssetMatcherService } from '../../src/imports/asset-matcher.service.js'
 import { ImportCommitService } from '../../src/imports/import-commit.service.js';
 import { ImportDraftService } from '../../src/imports/import-draft.service.js';
 import { ImportRollbackService } from '../../src/imports/import-rollback.service.js';
+import { storedV2Event } from '../ledger/ledger-event-fixtures.js';
 
 describe('截图导入', () => {
   it('Ground Truth fixture 覆盖三类来源且字段可回归', () => {
@@ -180,6 +181,25 @@ describe('截图导入', () => {
   });
   it('回滚恢复导入前持仓并保留历史状态', async () => {
     const draftId = '11111111-1111-4111-8111-111111111113';
+    const submittedEvent = storedV2Event({
+      id: '22222222-2222-4222-8222-222222222222',
+      accountId: '11111111-1111-4111-8111-111111111111',
+      type: 'POSITION_BASELINE_OBSERVATION',
+      occurredAt: new Date('2026-08-26T00:59:00.000Z'),
+      sourceCategory: 'IMPORT',
+      sourceChannel: 'screenshot',
+      externalId: `draft:${draftId}:1:row-1`,
+      sourceRowId: 'row-1',
+      payload: {
+        symbol: '600519.SH',
+        batchId: '44444444-4444-4444-8444-444444444444',
+        batchScope: 'PARTIAL',
+        quantity: '100',
+        averageCost: '10',
+        currency: 'CNY',
+        costIncludesFees: 'UNKNOWN',
+      },
+    });
     const tx = {
       importDraft: {
         findUnique: vi.fn(async () => ({
@@ -193,38 +213,12 @@ describe('截图导入', () => {
       },
       ledgerEvent: {
         findFirst: vi.fn(async () => null),
-        findMany: vi.fn(async () => [
-          {
-            id: '22222222-2222-4222-8222-222222222222',
-            accountId: '11111111-1111-4111-8111-111111111111',
-            type: 'POSITION_BASELINE_OBSERVATION',
-            occurredAt: new Date('2026-08-26T00:59:00.000Z'),
-            factId: '33333333-3333-4333-8333-333333333333',
-            ledgerRevision: 1n,
-            timePrecision: 'INSTANT',
-            sourceTimezone: 'UTC',
-            economicOrderKey: 'draft:000000',
-            recordedAt: new Date('2026-08-26T01:00:00.000Z'),
-            payloadVersion: 1,
-            payload: {
-              symbol: '600519.SH',
-              batchId: '44444444-4444-4444-8444-444444444444',
-              batchScope: 'PARTIAL',
-              quantity: '100',
-              averageCost: '10',
-              currency: 'CNY',
-              costIncludesFees: 'UNKNOWN',
-            },
-            sourceCategory: 'IMPORT',
-            sourceChannel: 'screenshot',
-            externalId: `draft:${draftId}:1:row-1`,
-            sourceRowId: 'row-1',
-            actorId: 'user-1',
-            revisionAction: 'CREATE',
-            supersedesEventId: null,
-            reason: null,
-          },
-        ]),
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([submittedEvent])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValue([]),
       },
       position: {
         findMany: vi.fn(async () => []),
@@ -253,11 +247,10 @@ describe('截图导入', () => {
       appendRevision,
     };
     await new ImportRollbackService(prisma as never, repository as never).rollback(draftId);
-    expect(tx.ledgerEvent.findFirst).toHaveBeenCalledWith(
+    expect(tx.ledgerEvent.findMany).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
-        where: expect.objectContaining({
-          OR: [{ externalId: null }, { externalId: { not: { startsWith: `draft:${draftId}:` } } }],
-        }),
+        where: expect.objectContaining({ externalId: { startsWith: `draft:${draftId}:` } }),
       }),
     );
     expect(appendRevision).toHaveBeenCalledOnce();
@@ -276,10 +269,25 @@ describe('截图导入', () => {
 
   it('导入事实已被外部 VOID 修正时拒绝再次追加回滚 VOID', async () => {
     const draftId = '11111111-1111-4111-8111-111111111115';
-    const original = {
+    const original = storedV2Event({
       id: '22222222-2222-4222-8222-222222222223',
       accountId: '11111111-1111-4111-8111-111111111111',
       factId: '33333333-3333-4333-8333-333333333334',
+      type: 'POSITION_BASELINE_OBSERVATION',
+      payload: {
+        symbol: '600519.SH',
+        batchId: '44444444-4444-4444-8444-444444444445',
+        batchScope: 'PARTIAL',
+        quantity: '100',
+        averageCost: '10',
+        currency: 'CNY',
+        costIncludesFees: 'UNKNOWN',
+      },
+    });
+    const externalVoid = {
+      id: '22222222-2222-4222-8222-222222222224',
+      factId: original.factId,
+      supersedesEventId: original.id,
     };
     const tx = {
       importDraft: {
@@ -293,17 +301,11 @@ describe('截图导入', () => {
         update: vi.fn(),
       },
       ledgerEvent: {
-        findMany: vi.fn(async (args: { select?: unknown }) =>
-          args.select
-            ? [
-                {
-                  id: 'external-void',
-                  factId: original.factId,
-                  supersedesEventId: original.id,
-                },
-              ]
-            : [original],
-        ),
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([original])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([externalVoid]),
         findFirst: vi.fn(async () => null),
       },
     };

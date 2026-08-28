@@ -13,9 +13,15 @@ type Snapshot = {
 
 type ExternalEvent = {
   type: string;
+  accountId: string;
   occurredAt: Date;
-  amount: number;
   createdAt: Date;
+  payload: {
+    direction: 'INFLOW' | 'OUTFLOW';
+    category: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+    amount: string;
+    currency: string;
+  };
 };
 
 const snapshot = (
@@ -33,12 +39,27 @@ const snapshot = (
   payload,
 });
 
-const event = (type: string, amount: number, date = '2025-01-01T12:00:00Z'): ExternalEvent => ({
-  type,
-  amount,
-  occurredAt: new Date(date),
-  createdAt: new Date(date),
-});
+const event = (type: string, amount: number, date = '2025-01-01T12:00:00Z'): ExternalEvent => {
+  const cashFlowType = ['CASH_DEPOSIT', 'CASH_WITHDRAW', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
+    type,
+  );
+  const outflow = type === 'CASH_WITHDRAW' || type === 'TRANSFER_OUT';
+  let category: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' = 'DEPOSIT';
+  if (type === 'TRANSFER_IN' || type === 'TRANSFER_OUT') category = 'TRANSFER';
+  else if (outflow) category = 'WITHDRAWAL';
+  return {
+    type: cashFlowType ? 'CASH_FLOW' : type,
+    accountId: 'a',
+    occurredAt: new Date(date),
+    createdAt: new Date(date),
+    payload: {
+      direction: outflow ? 'OUTFLOW' : 'INFLOW',
+      category,
+      amount: String(amount),
+      currency: 'CNY',
+    },
+  };
+};
 
 const summaryService = (snapshots: Snapshot[], events: ExternalEvent[] = []) => {
   const prisma = {

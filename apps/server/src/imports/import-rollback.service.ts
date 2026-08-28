@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { ledgerEventSymbol } from '../ledger/ledger-event-v2.js';
 import { LedgerV2Repository, toLedgerEventV2 } from '../ledger/ledger-v2.repository.js';
 import { rebuildLedgerProjection } from '../ledger/ledger-projection.js';
 import { PrismaService } from '../platform/prisma.service.js';
+import { draftLedgerEventPrefix } from './import-state.js';
 
 @Injectable()
 export class ImportRollbackService {
@@ -20,7 +22,7 @@ export class ImportRollbackService {
       const lockedDraft = await context.transaction.importDraft.findUnique({ where: { id } });
       if (!lockedDraft || lockedDraft.status !== 'committed')
         throw new BadRequestException('只能回滚已提交的导入');
-      const importEventPrefix = `draft:${lockedDraft.id}:`;
+      const importEventPrefix = draftLedgerEventPrefix(lockedDraft.id);
       const submitted = await context.transaction.ledgerEvent.findMany({
         where: {
           accountId: lockedDraft.accountId,
@@ -41,19 +43,22 @@ export class ImportRollbackService {
           .filter(Boolean),
       );
       if (submittedSymbols.size > 0 && lockedDraft.committedAt) {
-        const laterEvent = await context.transaction.ledgerEvent.findFirst({
+        const laterEvents = await context.transaction.ledgerEvent.findMany({
           where: {
             accountId: lockedDraft.accountId,
+            factId: { not: null },
             ...(submittedIds.length > 0 ? { id: { notIn: submittedIds } } : {}),
-            symbol: { in: [...submittedSymbols] },
             createdAt: { gt: lockedDraft.committedAt },
             OR: [{ externalId: null }, { externalId: { not: { startsWith: importEventPrefix } } }],
           },
           orderBy: { createdAt: 'asc' },
         });
-        if (laterEvent)
+        const laterSymbol = laterEvents
+          .map((event) => ledgerEventSymbol(toLedgerEventV2(event)))
+          .find((symbol) => symbol !== undefined && submittedSymbols.has(symbol));
+        if (laterSymbol)
           throw new ConflictException(
-            `导入提交后 ${laterEvent.symbol ?? '相关标的'} 已有新的 Ledger 事件，不能自动回滚`,
+            `导入提交后 ${laterSymbol} 已有新的 Ledger 事件，不能自动回滚`,
           );
       }
       const submittedFactIds = [

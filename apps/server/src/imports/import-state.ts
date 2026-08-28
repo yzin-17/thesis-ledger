@@ -1,1 +1,6 @@
-export { readAccount, readLedgerEvents, stableBaselineHash } from '../ledger/import-state.js';
+export {
+  draftLedgerEventPrefix,
+  readAccount,
+  readLedgerEvents,
+  stableBaselineHash,
+} from '../ledger/import-state.js';

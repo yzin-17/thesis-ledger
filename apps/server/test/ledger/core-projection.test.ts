@@ -29,7 +29,6 @@ const execution = (input: {
   type: input.type,
   occurredAt: new Date(input.occurredAt),
   createdAt: new Date(input.occurredAt),
-  currency: 'USD',
   factId: input.factId,
   ledgerRevision: BigInt(input.revision),
   timePrecision: 'INSTANT',

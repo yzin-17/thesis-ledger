@@ -345,29 +345,18 @@ describe('数据完整性', () => {
               {
                 id: '1',
                 accountId: 'account',
-                type: 'BUY',
-                symbol: '600519.SH',
-                quantity: 100,
-                price: 10,
-                fee: 0,
-                tax: 0,
+                type: 'BUY_EXECUTION',
                 externalId: 'same',
-                occurredAt: new Date('2025-01-01T00:00:00Z'),
               },
               {
                 id: '2',
                 accountId: 'account',
-                type: 'BONUS',
-                symbol: '600519.SH',
-                quantity: 10,
-                price: null,
-                fee: null,
-                tax: null,
+                type: 'BONUS_SHARE',
                 externalId: 'same',
-                occurredAt: new Date('2025-01-02T00:00:00Z'),
               },
             ],
             positions: [{ symbol: '600519.SH', quantity: 100, costPrice: 10 }],
+            trades: [{ symbol: '600519.SH', lifecycle: 'ACTIVE', remainingQuantity: 99 }],
             snapshots: [{ id: 'snapshot', marketValue: -1, costValue: 1 }],
           },
         ]),
@@ -377,33 +366,20 @@ describe('数据完整性', () => {
     expect(result.healthy).toBe(false);
     expect(result.issues.map((issue) => issue.code)).toEqual([
       'duplicate_external_uid',
-      'position_projection_mismatch',
+      'position_trade_quantity_mismatch',
       'invalid_snapshot_value',
     ]);
     expect(Object.keys(prisma)).toEqual(['account']);
   });
-  it('识别带 opening-balance metadata 的 Ledger 投影', async () => {
+  it('物化 Trade 与 Position 一致时通过完整性检查', async () => {
     const prisma = {
       account: {
         findMany: vi.fn(async () => [
           {
             id: 'account',
-            ledger: [
-              {
-                id: 'adjustment',
-                accountId: 'account',
-                type: 'ADJUSTMENT',
-                symbol: '600519.SH',
-                quantity: 10,
-                price: 1450,
-                fee: null,
-                tax: null,
-                externalId: 'opening-balance',
-                metadata: { kind: 'opening-balance', quantity: 10, costPrice: 1450 },
-                occurredAt: new Date('2025-01-01T00:00:00Z'),
-              },
-            ],
+            ledger: [],
             positions: [{ symbol: '600519.SH', quantity: 10, costPrice: 1450 }],
+            trades: [{ symbol: '600519.SH', lifecycle: 'ACTIVE', remainingQuantity: 10 }],
             snapshots: [],
           },
         ]),

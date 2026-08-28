@@ -53,17 +53,6 @@ const decimalString = (value: unknown, fallback = '0') => {
   return fallback;
 };
 
-const storedOccurredAt = (value: unknown): string | null => {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === 'string' ? value : null;
-};
-
-const recordMetadata = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-
 const compareOperationOrder = (left: PositionOperation, right: PositionOperation) => {
   if (left.occurredAt === null && right.occurredAt !== null) return -1;
   if (left.occurredAt !== null && right.occurredAt === null) return 1;
@@ -130,67 +119,6 @@ const v2Operations = (stored: StoredLedgerEvent[]): PositionOperation[] => {
       operations.push({ ...base, kind: operation.kind, quantity: decimal(operation.quantity) });
   }
   return operations;
-};
-
-const legacyOperations = (stored: StoredLedgerEvent[]): PositionOperation[] => {
-  const legacy = stored.filter((event) => event.factId == null);
-  return legacy.flatMap((event): PositionOperation[] => {
-    if (!event.symbol) return [];
-    const metadata = recordMetadata(event.metadata);
-    const base = {
-      accountId: event.accountId,
-      symbol: event.symbol,
-      occurredAt: storedOccurredAt(event.occurredAt),
-      order: `${typeof metadata.economicOrderKey === 'string' ? metadata.economicOrderKey : ''}:${event.id}`,
-    };
-    if (event.type === 'ADJUSTMENT') {
-      if (
-        metadata.kind !== 'opening-balance' &&
-        metadata.kind !== 'position-balance' &&
-        metadata.kind !== 'rollback'
-      )
-        return [];
-      return [
-        {
-          ...base,
-          kind: 'SET' as const,
-          quantity: decimal(metadata.quantity ?? event.quantity),
-          unitCost: decimal(metadata.costPrice ?? event.price),
-        },
-      ];
-    }
-    if (event.type === 'BUY' || event.type === 'SELL')
-      return [
-        {
-          ...base,
-          kind: event.type === 'BUY' ? ('ADD' as const) : ('SUBTRACT' as const),
-          quantity: decimal(event.quantity),
-          unitCost: decimal(event.price),
-          charges: decimal(event.fee).plus(decimal(event.tax)),
-        },
-      ];
-    if (event.type === 'BONUS')
-      return [{ ...base, kind: 'BONUS' as const, quantity: decimal(event.quantity) }];
-    if (event.type === 'SPLIT')
-      return [
-        {
-          ...base,
-          kind: 'RATIO' as const,
-          fromUnits: new Prisma.Decimal(1),
-          toUnits: decimal(event.quantity),
-        },
-      ];
-    if (event.type === 'MERGE')
-      return [
-        {
-          ...base,
-          kind: 'RATIO' as const,
-          fromUnits: decimal(event.quantity),
-          toUnits: new Prisma.Decimal(1),
-        },
-      ];
-    return [];
-  });
 };
 
 const groupOperations = (operations: PositionOperation[]) => {
@@ -323,7 +251,7 @@ const projectFifo = (operations: PositionOperation[]): PositionProjection[] =>
   });
 
 const projectPositions = (stored: StoredLedgerEvent[], method: 'AVG' | 'FIFO') => {
-  const operations = [...legacyOperations(stored), ...v2Operations(stored)];
+  const operations = v2Operations(stored);
   return method === 'AVG' ? projectAverage(operations) : projectFifo(operations);
 };
 

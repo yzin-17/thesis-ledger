@@ -47,12 +47,6 @@ export const ledgerEventSymbol = (event: LedgerEventV2) => {
   return undefined;
 };
 
-export const ledgerEventCurrency = (event: LedgerEventV2) => {
-  if (event.revisionAction === 'VOID') return 'CNY';
-  if ('currency' in event.payload) return event.payload.currency;
-  return 'CNY';
-};
-
 export type LedgerPositionOperation =
   | { symbol: string; kind: 'SET' | 'ADD' | 'SUBTRACT'; quantity: string }
   | { symbol: string; kind: 'RATIO'; fromUnits: string; toUnits: string };

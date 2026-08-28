@@ -53,8 +53,13 @@
 | R-STD-03 | P2 | 已修复 | `apps/desktop/src/features/portfolio/PortfolioTradeView.tsx` | 账户范围和生命周期两个 Select 的所有 `SelectItem` 均已放入 `SelectGroup`，符合 shadcn 组件组合规范且不改变筛选行为。 | T17 |
 | R-STD-04 | P2 | 已修复 | `apps/desktop/src/features/account-data/AccountDataExecutionSheet.tsx` | 成交数量/价格、时间/精度和费用明细的表单网格已改为 `FieldGroup` + `Field`，保留原有字段、校验和布局断点，并补充结构契约测试。 | T17 |
 | R-STD-05 | P2 | 已修复 | `apps/desktop/src/features/account-data/AccountDataExecutionSheet.tsx` | 底部操作区的原生 `border-t` 已改为项目 `Separator` 组件，保留原有按钮顺序、间距和提交行为，并补充结构契约断言。 | T17 |
+| R-STD-06 | P2 | 已修复 | `apps/server/src/imports/import-state.ts`、`apps/server/src/imports/import-rollback.service.ts`、`apps/server/src/ledger/baseline-import.service.ts` | Draft 事件前缀的重复字符串已抽为 `draftLedgerEventPrefix`，导入提交与回滚共享同一规则；新增 V2 测试 fixture 统一事件 envelope，避免测试 helper 重复构造旧宽表事件。 | T17-R1 |
+| R-STD-07 | P2 | 已修复 | `apps/server/prisma/schema.prisma`、`apps/server/src/ledger/trade-query.service.ts` | `Trade` 的账户模式、生命周期、退出进度、结束证据和证据完整度已改为 Prisma enum；查询映射移除不必要断言，禁止用任意字符串表达有限状态。 | T17-R1 |
+| R-SPEC-01 | P1 | 已修复 | `apps/server/prisma/schema.prisma`、`20260828020000_harden_v2_projection_schema`、`apps/server/src/ledger/*` | V2 收缩不再只删除 `correctionOf`：新 migration 在 preflight 后删除 LedgerEvent V1 宽字段，运行时移除 legacy projection/adapter 路径，并保留 `sourceRowId` 等 V2 来源字段；迁移 smoke 已验证旧列为 0。 | T17-R1 |
+| R-SPEC-02 | P2 | 已验证为误报 | `packages/domain/src/trade-projection.ts`、`packages/domain/test/trade-projection.test.ts` | Review 对负残量的担忧并未发生：`observedQuantity` 仍保留权威观察值，贡献数量为 0、剩余数量为 0，并记录 `QUANTITY_CONFLICT`；新增回归断言锁定该语义，不修改正确的领域行为。 | T17-R1 |
+| R-SPEC-03 | P3 | 独立既有范围 | Market Data provider/catalog/policy 相关 Spec 与实现 | 该组改动属于当前工作树中已有的独立 Market Data Spec/Task，不是 Trade Spec 的实现偏离；本轮保留，不通过删除用户范围内改动来消除 Review 计数。 | 无 |
 | R-DOC-01 | P2 | 已修复 | `docs/engineering/2026-08-18-database-index-review.md` | 索引说明已同步为 `accountId + sourceChannel + externalId` 唯一约束和 `accountId + sourceChannel + sourceRowId` 来源行索引。 | T6-R3 |
-| R-DOC-02 | P2 | 已修复 | 原始实施任务 T2/T3/T4/T5/T6 证据 | 历史任务证据保留其当时的 server 测试与迁移数量，并明确 Compose 演练实际部署的迁移；当前收尾证据已同步为 server 291 个测试、34 条迁移。 | T6-R3 |
+| R-DOC-02 | P2 | 已修复 | 原始实施任务 T2/T3/T4/T5/T6 证据 | 历史任务证据保留其当时的 server 测试与迁移数量，并明确 Compose 演练实际部署的迁移；当前收尾证据已同步为 server 294 个测试、35 条迁移。 | T6-R3 |
 | R-FX-01 | P1（T11 范围） | 已修复 | `market/fx-conversion.ts`、`portfolio.service.ts`、`performance.service.ts`、`ledger/cash-projection.ts` | 原币 Cash/Position 先按币种分桶，本位币汇总统一通过按日期解析的 FX Conversion View；成交非同币种费用独立进入费用原币种 Cash/settlement 并保留 `FEE_CURRENCY_MISMATCH`；缺失 FX 保留原币结果和部分状态，已删除直接跨币种求和路径。 | T11 |
 | R-VAL-01 | 范围外 | 不纳入当前任务 | 正式发布环境验收 | 生产数据副本、正式发布环境浏览器、在线 FX、进程重启和最终切换/回滚不属于当前任务范围；未来若发布需另立门禁。 | 无 |
 | R-CODE-01 | P3 判断项 | 已评估，暂不拆分 | `ImportService`、`PerformanceService` | `ImportService` 当前是显式依赖的组合 Facade，移除后会把 Draft/匹配/提交/回滚四个 Adapter 的编排泄漏到 Controller；`PerformanceService` 虽有 8 个公开方法和快照、FX、目标、分层估值、纯计算等职责簇，但当前没有第二个独立 Adapter 或消费者 seam。依据 deletion test、depth、leverage 和 locality，立即拆分会制造多个浅层模块；后续出现第二个独立消费者、可替换 Adapter 或独立发布/性能边界时再拆分。 | T17 |
@@ -202,6 +207,13 @@
   - 验证证据：新增 [`Trade Projection 影子迁移与分阶段切换手册`](../operations/2026-08-28-trade-projection-cutover.md)，并同步环境变量、迁移矩阵、总 Spec 与本任务证据；确定性测试和本地 Compose/浏览器运行态证据已完整记录，正式发布环境不纳入当前验收。
   - 本地最终回归：`pnpm test`、`pnpm typecheck`、34 条 migration matrix、全仓 ESLint、定向 Prettier、脚本语法检查和 `git diff --check` 均通过；当前 server 为 291 个测试、schemas 为 96 个测试；T5/T6/T14/T16 本地运行态证据已同步。
 
+- [x] **T17-R1：收口本轮 Standards + Spec Review 发现（本地环境已完成）**
+  - 涉及范围：Draft 前缀与测试 helper 重复、Trade 有限状态字段、V2 schema/运行时收缩和 Baseline 负残量观察复核。
+  - 完成条件：重复规则只有一个实现入口；Trade 有限状态不再以 primitive string 持久化；V2 收缩同时覆盖数据库宽字段与运行时 legacy 路径；误报不通过改变领域语义“修复”。
+  - 验证证据：`draftLedgerEventPrefix` 已由提交/回滚/基线导入共享；Trade 五个状态字段使用 Prisma enum；`20260828020000_harden_v2_projection_schema` preflight 后删除 V1 LedgerEvent 宽字段，`ledger-projection`、`cash-projection`、`ledger-query` 和 legacy adapter 路径已清理；Baseline 测试断言观察数量仍保留。Market Data provider/catalog/policy 改动按独立既有 Spec/Task 保留。
+  - 回归结果：server 38 个测试文件/294 个测试、domain 9 个测试文件/97 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试全部通过；build、typecheck、全仓 ESLint、35 条 migration matrix、受影响文件 Prettier、`git diff --check` 通过。
+  - Docker smoke：临时隔离数据库验证 17 条事件迁移前后数量一致、2 条 Position、7 条 Cash Flow、`cashBaselineBatchRefs=0`、`legacyLedgerColumnsRemaining=0`，非法费用和未知类型 fixture 均在迁移前阻断并回滚。
+
 ## 完成规则
 
 - 任务只有在实现、对应测试和必要运行时验收均通过后才能勾选。
@@ -220,7 +232,7 @@
 
 ### Review 结论
 
-- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T14、T15、T16 与 T17 已完成并通过代码、测试和本地运行态验证。当前 Spec 范围内的本地任务已收尾，正式发布环境明确不在范围内。
-- 发现的问题：T10 发现的后续 Baseline 绝对成本重复累加已修复为检查点重估；`db:integration` 的两个既有 Position 不一致已通过核心重建修复；R-FX-01 已通过原币分桶和独立 FX Conversion View 修复；旧 `projectCompletedTrades` 路径及重复 fixture 已删除，当前完整性检查为 healthy；R-STD-02 已修复为 TanStack Query mutation，Journal 快照保存成功后会失效候选查询；R-STD-03 已为 PortfolioTradeView 的两个 Select 补齐 SelectGroup；R-STD-04 已将 AccountDataExecutionSheet 的表单网格改为 FieldGroup/Field 组合；R-STD-05 已将底部操作区的 border-t 改为 Separator。R-CODE-01 已完成结构评估：`ImportService` 保留为组合 Facade，`PerformanceService` 暂不拆分，触发条件已记录。
-- 遗留风险：当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；当前开发持久卷已成功应用第 34 条 migration。全量 `pnpm format` 仍报告 49 个既有文件格式差异，本轮未覆盖无关文件。
-  - 验证命令与结果：domain 9 个测试文件/97 个测试、server 37 个测试文件/291 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试通过；server typecheck/build、Prisma schema validate、34 条 migration matrix、定向 ESLint/Prettier、根脚本 `node --check`、固定快照 diff/switch gate、Compose migration/permission hardening/health/integrity 和逐账户事务回滚 shadow rebuild 均通过。
+- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T14、T15、T16、T17 与 T17-R1 已完成并通过代码、测试和本地运行态验证。当前 Spec 范围内的本地任务已收尾，正式发布环境明确不在范围内。
+- 发现的问题：T10 发现的后续 Baseline 绝对成本重复累加已修复为检查点重估；`db:integration` 的两个既有 Position 不一致已通过核心重建修复；R-FX-01 已通过原币分桶和独立 FX Conversion View 修复；旧 `projectCompletedTrades` 路径及重复 fixture 已删除，当前完整性检查为 healthy；R-STD-02 已修复为 TanStack Query mutation，Journal 快照保存成功后会失效候选查询；R-STD-03 已为 PortfolioTradeView 的两个 Select 补齐 SelectGroup；R-STD-04 已将 AccountDataExecutionSheet 的表单网格改为 FieldGroup/Field 组合；R-STD-05 已将底部操作区的 border-t 改为 Separator；R-STD-06/07 与 R-SPEC-01 已在 T17-R1 中修复，R-SPEC-02 已通过回归断言确认是误报，R-SPEC-03 确认为独立既有范围。R-CODE-01 已完成结构评估：`ImportService` 保留为组合 Facade，`PerformanceService` 暂不拆分，触发条件已记录。
+- 遗留风险：当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；本轮 Docker smoke 使用临时隔离数据库，不修改开发持久卷。完整 `pnpm format` 仍报告 2 个本轮未修改的基线文件格式差异（`apps/server/test/ai/research-executor.test.ts`、`docs/reviews/2026-08-26-doc-governance-followup.md`），不将无关文件纳入本轮变更。
+  - 验证命令与结果：domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试通过；server typecheck/build、Prisma schema validate、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、`git diff --check`、固定快照 diff/switch gate 和 Docker 隔离迁移 smoke 均通过。

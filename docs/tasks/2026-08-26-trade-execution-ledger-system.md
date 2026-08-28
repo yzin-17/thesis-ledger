@@ -202,8 +202,9 @@
   - 完成条件：当前 Spec 范围内的本地验收标准均有实现与证据；正式发布环境属于非目标；确定性测试与本地真实运行证据分别记录；所有 P1/P2 均已修复。
   - 验证方式：运行受影响包的测试、类型检查、构建、格式、ESLint、Markdown 链接扫描、`git diff --check` 和最终 Spec/任务/实现三方核对。
   - 验证证据：新增 [`Trade Projection 影子迁移与分阶段切换手册`](../operations/2026-08-28-trade-projection-cutover.md)，并同步环境变量、迁移矩阵、总 Spec 与本任务证据；确定性测试和本地 Compose/浏览器运行态证据已完整记录，正式发布环境不纳入当前验收。
-  - 本地最终回归：`pnpm test` 通过，domain 9 个测试文件/97 个测试、server 37 个测试文件/291 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试全部通过；`pnpm typecheck`、34 条 migration matrix、全仓 ESLint、定向 Prettier、脚本 `node --check`、`git diff --check` 均通过。
-  - 本地运行态：T5 迁移 smoke、T6 数据库不变量、T14 本地浏览器验收、T16 影子差异/回滚/切换门禁、Compose health/integrity 均通过；`/api/v1/health` 为 `healthy`，`/api/v1/integrity` 为 `issueCount=0`。
+  - 本地最终回归：`pnpm test` 通过，domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试全部通过；`pnpm typecheck`、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、脚本 `node --check`、`git diff --check` 均通过。
+  - 本轮 Review 收口：新增 V2 projection schema hardening migration，将 Trade 状态字段改为 Prisma enum，删除 LedgerEvent V1 宽字段和运行时 legacy projection 分支；Draft 事件前缀改用共享 helper，测试 fixture 统一使用 V2 envelope；Baseline 负残量回归明确保留 `observedQuantity` 并断言 `quantity=0`，确认该 Review 观察不构成语义缺陷。Market Data provider/catalog/policy 改动属于独立既有 Spec/Task，保留在当前工作树范围内。
+  - 本地运行态：T5 迁移 smoke、T6 数据库不变量、T14 本地浏览器验收、T16 影子差异/回滚/切换门禁、Compose health/integrity 均通过；V2 全类型迁移 smoke 确认 `eventsBefore=17`、`eventsAfter=17`、`positions=2`、`cashFlows=7`、`cashBaselineBatchRefs=0`、`legacyLedgerColumnsRemaining=0`，`/api/v1/health` 为 `healthy`，`/api/v1/integrity` 为 `issueCount=0`。
   - 范围说明：生产数据副本提交型迁移与恢复、并发/性能、在线 FX、正式发布环境浏览器、分阶段发布和旧镜像回滚不属于当前任务范围，不影响本地环境完成。
 
 ## 最终 Review 返工任务
@@ -213,7 +214,9 @@
 - [x] T6-R1：将 Draft 幂等查写收敛到可串行化事务，完整比较内容指纹，并规范并发唯一键冲突响应。
 - [x] T6-R2：持久化 V2 事件的 `sourceRowId`，补充来源行读取契约和回归测试。
 - [x] T6-R3：拆除当前变更引入的多重嵌套三元，并同步数据库索引说明和测试证据数量。
-  - 验证证据：定向 `no-nested-ternary` ESLint、相关 Markdown 文档的 8 个本地链接扫描、定向 Prettier、受影响 server 测试和 `git diff --check` 均通过；当前 server 为 32 个测试文件/262 个测试，迁移矩阵为 32 条。
+  - 验证证据：定向 `no-nested-ternary` ESLint、相关 Markdown 文档的 8 个本地链接扫描、受影响文件 Prettier、受影响 server 测试和 `git diff --check` 均通过；当前 server 为 38 个测试文件/294 个测试，迁移矩阵为 35 条。
+- [x] T17-R1：收口本轮 Standards + Spec Review 的重复 helper、Trade 原始状态字段、V2 schema 收缩和 Baseline 负残量观察。
+  - 验证证据：`draftLedgerEventPrefix` 统一 Draft 事件前缀；`Trade` 的账户模式、生命周期、退出进度、结束证据和证据完整度改为 Prisma enum；`20260828020000_harden_v2_projection_schema` 在 preflight 后删除 LedgerEvent V1 宽字段，运行时仅消费 V2 envelope；新增 V2 shared fixture 与 Baseline `observedQuantity` 回归断言。全量测试、构建、typecheck、lint、35 条 migration matrix 和 Docker 隔离迁移 smoke 均通过。
 
 ## 验收标准映射
 
@@ -256,5 +259,5 @@
   - R-STD-03 已修复：PortfolioTradeView 的账户范围和生命周期 Select 均已将 SelectItem 放入 SelectGroup，符合 shadcn 组件组合规范且保持筛选行为不变。
   - R-STD-04 已修复：AccountDataExecutionSheet 的成交与费用表单网格均已改为 FieldGroup/Field 组合，保留原有字段、校验和布局行为。
   - R-STD-05 已修复：AccountDataExecutionSheet 底部操作区已使用 Separator 替代原生 border-t，保留原有按钮布局和提交行为。
-  - 遗留风险：当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；当前开发持久卷已成功应用第 34 条 migration。全量 `pnpm format` 仍报告 49 个既有文件格式差异，本轮未覆盖无关文件。
-  - 验证命令与结果：domain 9 个测试文件/97 个测试、server 37 个测试文件/291 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试通过；server typecheck/build、Prisma schema validate、34 条 migration matrix、定向 ESLint/Prettier、根脚本 `node --check`、固定快照 diff/switch gate、Compose migration/permission hardening/health/integrity 和逐账户事务回滚 shadow rebuild 均通过。
+  - 遗留风险：当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；本轮 Docker smoke 使用临时隔离数据库，不修改开发持久卷。完整 `pnpm format` 仍报告 2 个本轮未修改的基线文件格式差异（`apps/server/test/ai/research-executor.test.ts`、`docs/reviews/2026-08-26-doc-governance-followup.md`），不将无关文件纳入本轮变更。
+  - 验证命令与结果：domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试通过；server typecheck/build、Prisma schema validate、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、`git diff --check`、固定快照 diff/switch gate、Docker 隔离迁移 smoke 均通过。

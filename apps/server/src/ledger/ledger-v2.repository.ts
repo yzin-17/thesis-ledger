@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ledgerEventEnvelopeSchemaV2, type LedgerEventV2 } from '@thesis-ledger/schemas';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
-import {
-  latestLedgerEventByFact,
-  ledgerEventCurrency,
-  ledgerEventSymbol,
-} from './ledger-event-v2.js';
+import { latestLedgerEventByFact } from './ledger-event-v2.js';
 
 type LedgerTransaction = Prisma.TransactionClient;
 
@@ -53,17 +49,13 @@ const toCreateInput = (
   event: LedgerEventV2,
   projectionGeneration: bigint,
 ): Prisma.LedgerEventUncheckedCreateInput => {
-  const symbol = ledgerEventSymbol(event);
   return {
     id: event.eventId,
     accountId: event.accountId,
     type: event.type,
     occurredAt: event.occurredAt === null ? null : new Date(event.occurredAt),
-    ...(symbol === undefined ? {} : { symbol }),
     ...(event.source.externalId === undefined ? {} : { externalId: event.source.externalId }),
     ...(event.source.sourceRowId === undefined ? {} : { sourceRowId: event.source.sourceRowId }),
-    source: event.source.channel,
-    currency: ledgerEventCurrency(event),
     factId: event.factId,
     ledgerRevision: BigInt(event.ledgerRevision),
     projectionGeneration,

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LedgerService } from '../../src/ledger/ledger.service.js';
 import { projectCashBalances } from '../../src/ledger/cash-projection.js';
+import { executionEvent } from './ledger-event-fixtures.js';
 
 describe('Ledger Service', () => {
   it('运行时拒绝旧通用 V1 LedgerEvent 写入入口', async () => {
@@ -14,18 +15,7 @@ describe('Ledger Service', () => {
     const remove = vi.fn(async () => undefined);
     const ledgerEvent = {
       findMany: vi.fn(async () => [
-        {
-          id: 'buy',
-          accountId: '11111111-1111-4111-8111-111111111111',
-          type: 'BUY',
-          occurredAt: new Date('2025-01-01'),
-          symbol: '600519.SH',
-          quantity: 100,
-          price: 10,
-          amount: null,
-          fee: 0,
-          tax: 0,
-        },
+        executionEvent({ id: 'buy', type: 'BUY_EXECUTION', quantity: '100', price: '10' }),
       ]),
     };
     const transaction = {
@@ -61,33 +51,11 @@ describe('Ledger Service', () => {
       findMany: vi
         .fn()
         .mockResolvedValueOnce([
-          {
-            id: 'buy-1',
-            accountId: '11111111-1111-4111-8111-111111111111',
-            type: 'BUY',
-            occurredAt: new Date('2025-01-01'),
-            symbol: '600519.SH',
-            quantity: 100,
-            price: 10,
-            amount: null,
-            fee: 0,
-            tax: 0,
-          },
+          executionEvent({ id: 'buy-1', type: 'BUY_EXECUTION', quantity: '100', price: '10' }),
         ])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
-          {
-            id: 'buy-2',
-            accountId: '11111111-1111-4111-8111-111111111111',
-            type: 'BUY',
-            occurredAt: new Date('2025-01-02'),
-            symbol: '600519.SH',
-            quantity: 80,
-            price: 12,
-            amount: null,
-            fee: 0,
-            tax: 0,
-          },
+          executionEvent({ id: 'buy-2', type: 'BUY_EXECUTION', quantity: '80', price: '12' }),
         ]),
     };
     const findMany = vi
