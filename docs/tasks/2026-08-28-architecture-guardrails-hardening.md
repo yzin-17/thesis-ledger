@@ -24,17 +24,18 @@
 ## Task 2：收敛 Import/Ledger 依赖方向
 
 - [x] 将 Ledger-owned 的 import state helper 移到 `apps/server/src/ledger/`。
-- [x] 将截图来源类型/检测所依赖的共享契约调整为 Ledger-owned 单向依赖。
-- [x] 将 Vision position 校验原语调整为 Ledger-owned 单向依赖。
+- [x] 保持 `ScreenshotSource`、来源检测和 Vision Provider/Schema 由 `imports` 适配层所有。
+- [x] 将与具体截图来源无关的持仓数值一致性校验提取为 Ledger-owned 原语，并由 Vision 校验复用。
 - [x] 将 `ImportDraftOptions` 从 `imports` 实现类中抽出为 Ledger-owned 类型。
-- [x] 更新 `imports` 与 `ledger/baseline-import.service.ts` 的 import path。
-- [x] 移除 `imports` 中重复实现；原路径仅保留兼容 re-export。
+- [x] 更新 `imports` 与 `ledger/baseline-import.service.ts` 的依赖方向。
+- [x] 移除 `imports/import-state.ts` 中重复实现；原路径仅保留兼容 re-export。
 - [x] 在 boundary guardrail 增加 `ledger -> imports` 禁止规则。
 
 验证：
 
-- `main...HEAD` 静态 diff 显示 `baseline-import.service.ts` 仅有 4 行 import 增删，没有业务逻辑变化。
-- `apps/server/src/ledger/**` 的已确认反向依赖已移除，并由 `scripts/check-boundaries.mjs` 防止回归。
+- PR patch Review 确认 `BaselineImportService` 不再 import `imports/**`，也不再持有 `ScreenshotSource` / `VisionPosition` 等 adapter 专属类型。
+- 截图来源白名单校验保留在 `ImportCommitService`；Ledger 只接收普通 `sourceChannel`。
+- 原 Vision 数值校验算法由 `validateImportPositionCandidate` 复用，未改变阈值和计算逻辑。
 - `imports` 继续作为截图上传/识别适配层单向消费 Ledger-owned 原语。
 - 未修改 HTTP route、公共 Schema 或 API Client Contract。
 
@@ -76,24 +77,24 @@
 
 验证：
 
-- `main...HEAD` 中 `.expo` 和 Mobile release 仅为删除；包括移除已跟踪的 `investment-os-0.1.0.aab`。
+- PR diff 中 `.expo` 和 Mobile release 仅为删除；包括移除已跟踪的 `investment-os-0.1.0.aab`。
 
 ## Task 6：最终 Review
 
 - [x] 比较 `main...HEAD` 全部 diff。
 - [x] 检查是否有 API/Schema/业务行为变化。
 - [x] 检查是否新增无关重构。
-- [x] 检查 Server feature 依赖方向。
+- [x] 检查 Server feature 依赖方向和概念所有权。
 - [x] 检查 CI ratchet 不会要求一次性拆完所有存量大文件。
 - [x] 检查 Native CI 不依赖 emulator。
 - [x] 更新本 Task 状态和验证证据。
-- [ ] 创建单一 PR，正文关联 Spec/Task 并总结架构发现与验证范围。
+- [x] 创建单一 PR，正文关联 Spec/Task 并总结架构发现与验证范围：PR #22。
 
 ## 验证状态
 
-- 已完成 GitHub `main...HEAD` 静态 diff Review；当前分支相对 `main` 无无关业务改动。
+- 已完成 `main...HEAD` 静态 diff Review，并在 PR patch Review 中发现并修正第一版把截图 adapter 类型搬入 Ledger 的 ownership 问题。
 - 由于当前执行容器无法解析 `github.com`，无法在本地 clone 后运行 `pnpm`，因此没有把静态检查冒充运行验证。
-- PR 创建后以仓库 CI 的 `quality`、`contracts-and-guardrails`、`mobile-android-native` 作为真实运行验证；若暴露现有原生构建问题，应做最小修复，不通过跳过 job 规避。
+- PR #22 已创建；仓库 CI 的 `quality`、`contracts-and-guardrails`、`mobile-android-native` 作为真实运行验证。若暴露现有原生构建问题，应做最小修复，不通过跳过 job 规避。
 
 ## 风险
 
