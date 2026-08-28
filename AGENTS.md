@@ -14,6 +14,7 @@
 
 - Server feature 的源码依赖方向必须与 Nest Module 和领域依赖方向一致；核心/下游模块不得反向 import 上游适配层。例如 `ImportModule -> LedgerModule` 时，`ledger/**` 不得反向依赖 `imports/**`。
 - 跨 feature 复用代码前必须先确认概念所有权：优先放回真正拥有该领域概念或契约的模块，由调用方单向消费；只有稳定、无业务编排且确实跨应用复用的能力才提升到 `packages/*`。
+- 修复反向依赖时不能只为改变 import 方向而机械搬文件；Provider、截图来源、外部协议 DTO 等适配器专属概念必须继续留在适配层，核心模块只接收稳定的通用契约或领域原语。
 - 不得为了消除循环依赖、缩短 import path 或临时复用而新增无明确所有权的 `common`、`shared`、`utils` 大杂烩；需要共享时应能说明其稳定边界和依赖方向。
 - 修改模块 import/export、跨 feature 依赖或共享层职责时，必须同步检查并维护 `scripts/check-boundaries.mjs`；已确认的非法依赖模式应尽量固化为自动门禁，而不是长期依赖人工 Review。
 - 涉及跨模块架构、契约、工程门禁等系统性改动时，按 `docs/DOCUMENTATION-GUIDE.md` 先建立成对的 `docs/specs/YYYY-MM-DD-<topic>.md` 与 `docs/tasks/YYYY-MM-DD-<topic>.md`，再实施代码修改。
