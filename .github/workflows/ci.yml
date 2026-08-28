@@ -32,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
@@ -48,6 +50,28 @@ jobs:
         run: pnpm contract:test
       - name: Complexity guardrails
         run: pnpm guardrails:complexity
+        env:
+          GUARDRAIL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+  mobile-android-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pnpm install --frozen-lockfile
+      - name: Build Android debug app
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleDebug --no-daemon
 
   desktop-packages:
     needs: [quality, contracts-and-guardrails]

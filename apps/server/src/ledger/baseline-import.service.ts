@@ -46,10 +46,9 @@ import {
   findOrphanSellRowIds,
   type DraftRowAppendContext,
 } from './baseline-import-support.js';
-import { readAccount, readLedgerEvents, stableBaselineHash } from '../imports/import-state.js';
-import type { ImportDraftOptions } from '../imports/import-draft.service.js';
-import { screenshotSources, type ScreenshotSource } from '../imports/screenshot-source.js';
-import { validateVisionPosition } from '../imports/vision-validation.js';
+import { readAccount, readLedgerEvents, stableBaselineHash } from './import-state.js';
+import type { ImportDraftOptions } from './import-draft.types.js';
+import { validateImportPositionCandidate } from './import-position-validation.js';
 
 const conflict = (errorCode: string, message: string, details?: Record<string, unknown>) =>
   new ConflictException({ errorCode, message, ...(details ? { details } : {}) });
@@ -522,11 +521,9 @@ export class BaselineImportService {
   async commitReviewedImport(
     id: string,
     reviewedRows: unknown[],
-    reviewedSource?: ScreenshotSource,
+    reviewedSource?: string,
     temporal?: ImportDraftOptions,
   ) {
-    if (reviewedSource !== undefined && !screenshotSources.includes(reviewedSource))
-      throw new BadRequestException('截图来源无效');
     const draft = await this.prisma.importDraft.findUnique({
       where: { id },
       select: { accountId: true },
@@ -586,9 +583,7 @@ export class BaselineImportService {
         throw new BadRequestException('同一草稿不能包含重复证券代码');
       if (
         normalizedRows.some((row) => {
-          const issues = validateVisionPosition({
-            ...(row.symbol ? { symbol: row.symbol } : {}),
-            ...(row.rawName ? { name: row.rawName } : {}),
+          const issues = validateImportPositionCandidate({
             ...(row.quantity === undefined ? {} : { quantity: row.quantity }),
             ...(row.costPrice === undefined ? {} : { costPrice: row.costPrice }),
             ...(row.marketPrice === undefined ? {} : { marketPrice: row.marketPrice }),
@@ -596,7 +591,6 @@ export class BaselineImportService {
             ...(row.profit === undefined ? {} : { profit: row.profit }),
             ...(row.profitRate === undefined ? {} : { profitRate: row.profitRate }),
             confidence: row.confidence,
-            rawText: row.rawText,
           });
           return (
             issues.length > 0 ||

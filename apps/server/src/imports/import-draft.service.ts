@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { currencySchema, importDraftSchema, type ImportDraft } from '@thesis-ledger/schemas';
+import type { ImportDraftOptions } from '../ledger/import-draft.types.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AssetMatcherService } from './asset-matcher.service.js';
 import { readAccount, readLedgerEvents, stableBaselineHash } from './import-state.js';
@@ -14,13 +15,7 @@ import {
   type VisionPosition,
 } from './vision-validation.js';
 
-export interface ImportDraftOptions {
-  scope?: 'FULL' | 'PARTIAL';
-  observedAt?: string;
-  capturedAt?: string;
-  timePrecision?: 'INSTANT' | 'DATE';
-  sourceTimezone?: string;
-}
+export type { ImportDraftOptions } from '../ledger/import-draft.types.js';
 
 @Injectable()
 export class ImportDraftService {
