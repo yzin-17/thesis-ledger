@@ -115,7 +115,6 @@ describe('Ledger 投影', () => {
         symbol: '600519.SH',
         quantity: 100,
         price: 12,
-        correctionOf: 'draft',
         occurredAt: '2025-01-01T00:00:00Z',
         metadata: { kind: 'opening-balance', quantity: 100, costPrice: 12 },
       },
@@ -126,13 +125,42 @@ describe('Ledger 投影', () => {
         symbol: '600519.SH',
         quantity: 80,
         price: 10,
-        correctionOf: 'opening',
         occurredAt: '2025-01-02T00:00:00Z',
         metadata: { kind: 'rollback', quantity: 80, costPrice: 10 },
       },
     ];
     expect(projectAverageCost(events)[0]).toMatchObject({ quantity: 80, averageCost: 10 });
     expect(projectFifo(events)[0]).toMatchObject({ quantity: 80, averageCost: 10 });
+  });
+  it('未知业务时间保持为空，并在确定性排序下先建立基线持仓', () => {
+    const events: LedgerEvent[] = [
+      {
+        id: 'unknown-baseline',
+        accountId: 'a',
+        type: 'ADJUSTMENT',
+        symbol: '600519.SH',
+        quantity: 10,
+        price: 100,
+        occurredAt: null,
+        metadata: {
+          kind: 'position-balance',
+          quantity: 10,
+          costPrice: 100,
+          economicOrderKey: 'baseline:1',
+          timePrecision: 'UNKNOWN',
+        },
+      },
+      {
+        id: 'known-sell',
+        accountId: 'a',
+        type: 'SELL',
+        symbol: '600519.SH',
+        quantity: 5,
+        price: 120,
+        occurredAt: '2025-01-01T00:00:00Z',
+      },
+    ];
+    expect(projectAverageCost(events)[0]).toMatchObject({ quantity: 5, averageCost: 100 });
   });
   it('从 Ledger 重建现金余额并区分买卖费用', () =>
     expect(

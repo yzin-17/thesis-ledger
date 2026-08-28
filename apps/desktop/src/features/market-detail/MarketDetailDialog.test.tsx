@@ -39,18 +39,18 @@ const position = {
 };
 
 const detail = (input: Partial<MarketDetailResponse>): MarketDetailResponse => ({
-    version: 1,
-    symbol: '600519.SH',
-    assetType: 'STOCK',
-    identity: { source: 'asset', status: 'confirmed' },
-    requested: [],
-    capabilities: { supported: [], unsupported: [] },
-    limits: { bars: 30, nav: 30 },
-    sections: {},
-    dependencies: {},
-    requestId: 'request-1',
-    generatedAt: time,
-    ...input,
+  version: 1,
+  symbol: '600519.SH',
+  assetType: 'STOCK',
+  identity: { source: 'asset', status: 'confirmed' },
+  requested: [],
+  capabilities: { supported: [], unsupported: [] },
+  limits: { bars: 30, nav: 30 },
+  sections: {},
+  dependencies: {},
+  requestId: 'request-1',
+  generatedAt: time,
+  ...input,
 });
 
 const readyQuote = {
@@ -132,9 +132,7 @@ describe('MarketDetailDialog UI contract', () => {
       isFetching: false,
     });
 
-    const html = renderToStaticMarkup(
-      <MarketDetailDialog position={position} onClose={vi.fn()} />,
-    );
+    const html = renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
 
     expect(html).toContain('持仓数量');
     expect(html).toContain('实时价');
@@ -145,10 +143,19 @@ describe('MarketDetailDialog UI contract', () => {
   });
 
   it('ETF 隐藏 unsupported chip，而基金只渲染 NAV 分段', () => {
-    useQueryMock.mockReturnValue({ data: null, isPending: false, isError: false, isFetching: false });
+    useQueryMock.mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
     const etfHtml = renderToStaticMarkup(
       <MarketDetailDialog
-        position={{ ...position, symbol: '510300.SH', asset: { name: '示例 ETF', assetType: 'etf' } }}
+        position={{
+          ...position,
+          symbol: '510300.SH',
+          asset: { name: '示例 ETF', assetType: 'etf' },
+        }}
         onClose={vi.fn()}
       />,
     );
@@ -186,7 +193,11 @@ describe('MarketDetailDialog UI contract', () => {
     });
     const fundHtml = renderToStaticMarkup(
       <MarketDetailDialog
-        position={{ ...position, symbol: '000001.OF', asset: { name: '示例基金', assetType: 'fund' } }}
+        position={{
+          ...position,
+          symbol: '000001.OF',
+          asset: { name: '示例基金', assetType: 'fund' },
+        }}
         onClose={vi.fn()}
       />,
     );
@@ -196,13 +207,23 @@ describe('MarketDetailDialog UI contract', () => {
   });
 
   it('保留 loading 和整页读取失败状态', () => {
-    useQueryMock.mockReturnValue({ data: undefined, isPending: true, isError: false, isFetching: true });
+    useQueryMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      isFetching: true,
+    });
     const loadingHtml = renderToStaticMarkup(
       <MarketDetailDialog position={position} onClose={vi.fn()} />,
     );
     expect(loadingHtml).toContain('行情分段加载中');
 
-    useQueryMock.mockReturnValue({ data: undefined, isPending: false, isError: true, isFetching: false });
+    useQueryMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      isFetching: false,
+    });
     const errorHtml = renderToStaticMarkup(
       <MarketDetailDialog position={position} onClose={vi.fn()} />,
     );

@@ -1,25 +1,37 @@
-import { BadRequestException, ConflictException, Injectable, Optional } from '@nestjs/common';
-import { appendLedgerEvent, LedgerService } from '../ledger/ledger.service.js';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { LedgerV2Repository, toLedgerEventV2 } from '../ledger/ledger-v2.repository.js';
+import { rebuildLedgerProjection } from '../ledger/ledger-projection.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
 @Injectable()
 export class ImportRollbackService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly ledger?: LedgerService,
+    private readonly repository: LedgerV2Repository,
   ) {}
 
   async rollback(id: string) {
-    const result = await this.prisma.$transaction(async (transaction) => {
-      const draft = await transaction.importDraft.findUnique({ where: { id } });
-      if (!draft || draft.status !== 'committed')
+    const draft = await this.prisma.$transaction((transaction) =>
+      transaction.importDraft.findUnique({ where: { id } }),
+    );
+    if (!draft) throw new BadRequestException('导入草稿不存在');
+    const result = await this.repository.withAccountWrite(draft.accountId, async (context) => {
+      const lockedDraft = await context.transaction.importDraft.findUnique({ where: { id } });
+      if (!lockedDraft || lockedDraft.status !== 'committed')
         throw new BadRequestException('只能回滚已提交的导入');
-      const before = (Array.isArray(draft.beforeState) ? draft.beforeState : []) as Array<{
-        symbol?: unknown;
-        quantity?: unknown;
-        costPrice?: unknown;
-      }>;
-      const rows = (Array.isArray(draft.rows) ? draft.rows : []) as unknown[];
+      const importEventPrefix = `draft:${lockedDraft.id}:`;
+      const submitted = await context.transaction.ledgerEvent.findMany({
+        where: {
+          accountId: lockedDraft.accountId,
+          factId: { not: null },
+          externalId: { startsWith: importEventPrefix },
+        },
+        orderBy: { economicOrderKey: 'asc' },
+      });
+      const submittedIds = submitted.map((event) => event.id);
+      const submittedIdSet = new Set(submittedIds);
+      const rows = (Array.isArray(lockedDraft.rows) ? lockedDraft.rows : []) as unknown[];
       const submittedSymbols = new Set(
         rows
           .filter((row): row is Record<string, unknown> =>
@@ -28,12 +40,14 @@ export class ImportRollbackService {
           .map((row) => (typeof row.symbol === 'string' ? row.symbol : ''))
           .filter(Boolean),
       );
-      if (submittedSymbols.size > 0 && draft.committedAt) {
-        const laterEvent = await transaction.ledgerEvent.findFirst({
+      if (submittedSymbols.size > 0 && lockedDraft.committedAt) {
+        const laterEvent = await context.transaction.ledgerEvent.findFirst({
           where: {
-            accountId: draft.accountId,
+            accountId: lockedDraft.accountId,
+            ...(submittedIds.length > 0 ? { id: { notIn: submittedIds } } : {}),
             symbol: { in: [...submittedSymbols] },
-            createdAt: { gt: draft.committedAt },
+            createdAt: { gt: lockedDraft.committedAt },
+            OR: [{ externalId: null }, { externalId: { not: { startsWith: importEventPrefix } } }],
           },
           orderBy: { createdAt: 'asc' },
         });
@@ -42,52 +56,74 @@ export class ImportRollbackService {
             `导入提交后 ${laterEvent.symbol ?? '相关标的'} 已有新的 Ledger 事件，不能自动回滚`,
           );
       }
-      for (const symbol of submittedSymbols) {
-        await appendLedgerEvent(transaction, {
-          version: 1,
-          id: crypto.randomUUID(),
-          accountId: draft.accountId,
-          type: 'ADJUSTMENT',
-          occurredAt: new Date().toISOString(),
-          symbol,
-          currency: 'CNY',
-          source: 'screenshot:rollback',
-          externalUid: `screenshot:${draft.id}:rollback:${symbol}`,
-          correctionOf: draft.id,
-          note: '回滚截图导入',
-          metadata: { kind: 'rollback', importDraftId: draft.id, quantity: 0, costPrice: 0 },
-        });
-      }
-      for (const item of before) {
-        if (typeof item.symbol !== 'string' || !submittedSymbols.has(item.symbol)) continue;
-        await appendLedgerEvent(transaction, {
-          version: 1,
-          id: crypto.randomUUID(),
-          accountId: draft.accountId,
-          type: 'ADJUSTMENT',
-          occurredAt: new Date().toISOString(),
-          symbol: item.symbol,
-          quantity: Number(item.quantity),
-          price: Number(item.costPrice),
-          currency: 'CNY',
-          source: 'screenshot:rollback',
-          externalUid: `screenshot:${draft.id}:rollback:before:${item.symbol}`,
-          correctionOf: draft.id,
-          note: '恢复截图导入前持仓',
-          metadata: {
-            kind: 'rollback',
-            importDraftId: draft.id,
-            quantity: Number(item.quantity),
-            costPrice: Number(item.costPrice),
+      const submittedFactIds = [
+        ...new Set(
+          submitted
+            .map((event) => event.factId)
+            .filter((factId): factId is string => typeof factId === 'string'),
+        ),
+      ];
+      if (submittedFactIds.length > 0) {
+        const laterRevisions = await context.transaction.ledgerEvent.findMany({
+          where: {
+            accountId: lockedDraft.accountId,
+            factId: { in: submittedFactIds },
+            ...(submittedIds.length > 0 ? { id: { notIn: submittedIds } } : {}),
+            supersedesEventId: { not: null },
           },
+          select: { id: true, factId: true, supersedesEventId: true },
+        });
+        const externalRevision = laterRevisions.find(
+          (event) =>
+            !submittedIdSet.has(event.id) &&
+            typeof event.factId === 'string' &&
+            event.supersedesEventId !== null,
+        );
+        if (externalRevision) throw new ConflictException('导入事实已被其他修正，不能自动回滚');
+      }
+      const recordedAt = new Date().toISOString();
+      for (const stored of submitted) {
+        const event = toLedgerEventV2(stored);
+        await this.repository.appendRevision(context, {
+          version: 2,
+          eventId: randomUUID(),
+          factId: event.factId,
+          accountId: event.accountId,
+          ledgerRevision: context.nextLedgerRevision.toString(),
+          type: event.type,
+          occurredAt: event.occurredAt,
+          timePrecision: event.timePrecision,
+          sourceTimezone: event.sourceTimezone,
+          economicOrderKey: event.economicOrderKey,
+          recordedAt,
+          payloadVersion: event.payloadVersion,
+          source: {
+            category: 'IMPORT',
+            channel: 'screenshot:rollback',
+            externalId: `draft:${lockedDraft.id}:rollback:${event.eventId}`,
+            ...(event.source.sourceRowId === undefined
+              ? {}
+              : { sourceRowId: event.source.sourceRowId }),
+          },
+          actorId: 'screenshot-rollback',
+          revisionAction: 'VOID',
+          supersedesEventId: event.eventId,
+          reason: '回滚截图导入',
         });
       }
-      return transaction.importDraft.update({
+      if (submitted.length > 0)
+        await rebuildLedgerProjection(
+          context.transaction,
+          lockedDraft.accountId,
+          'AVG',
+          context.nextProjectionGeneration,
+        );
+      const updated = await context.transaction.importDraft.update({
         where: { id },
         data: { status: 'cancelled', rolledBackAt: new Date() },
       });
+      return { value: updated, advanceRevision: submitted.length > 0 };
     });
-    if (this.ledger) await this.ledger.rebuild(result.accountId);
-    return result;
+    return result.value;
   }
 }

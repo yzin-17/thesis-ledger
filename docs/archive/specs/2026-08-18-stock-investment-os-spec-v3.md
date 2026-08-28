@@ -401,11 +401,7 @@ Investment OS 只能通过统一接口使用：
 interface MarketService {
   getQuote(symbol: string): Promise<Quote>;
 
-  getBars(
-    symbol: string,
-    timeframe: Timeframe,
-    range: TimeRange,
-  ): Promise<Bar[]>;
+  getBars(symbol: string, timeframe: Timeframe, range: TimeRange): Promise<Bar[]>;
 
   getFundamentals(symbol: string): Promise<Fundamentals>;
 }
@@ -796,18 +792,13 @@ Custom Quant Worker
 
 ```yaml
 services:
+  postgres: ...
 
-  postgres:
-    ...
+  redis: ...
 
-  redis:
-    ...
+  investment-os: ...
 
-  investment-os:
-    ...
-
-  dsa:
-    ...
+  dsa: ...
 ```
 
 逻辑：
@@ -1053,31 +1044,31 @@ Benchmark
 
 # 20. 最终模块归属
 
-| 模块                  | Investment OS |    DSA Fork |          其他 |
-| ------------------- | ------------: | ----------: | ----------: |
-| User                |             ✓ |             |             |
-| Account             |             ✓ |             |             |
-| Ledger              |             ✓ |             |             |
-| Position            |             ✓ |             |             |
-| Portfolio           |             ✓ |             |             |
-| Snapshot            |             ✓ |             |             |
-| Screenshot Workflow |             ✓ |      Vision |             |
-| Asset Matching      |             ✓ |             |             |
-| Quote               |      Contract |           ✓ |    Provider |
-| Kline               |      Contract |           ✓ |    Provider |
-| Financial           |      Contract |           ✓ |    Provider |
-| Indicator           |      Contract |           ✓ | InStock 可替换 |
-| Chip                |      Contract |           ✓ | InStock 可替换 |
-| RiskRule            |             ✓ |             |             |
-| RiskEvent           |             ✓ |             |             |
-| Alert Evaluation    |             ✓ |      提供行情输入 |             |
-| Feishu              |            编排 | Adapter 可复用 |             |
-| AI Tools            |             ✓ |   AI Engine |             |
-| Journal             |             ✓ |             |             |
-| Strategy Definition |             ✓ |             |             |
-| Backtest Job        |             ✓ |      Worker |   Vibe/LEAN |
-| Behavior Analysis   |             ✓ |          AI |        Vibe |
-| Execution           |   后期 Contract |             |  vn.py/LEAN |
+| 模块                | Investment OS |       DSA Fork |           其他 |
+| ------------------- | ------------: | -------------: | -------------: |
+| User                |             ✓ |                |                |
+| Account             |             ✓ |                |                |
+| Ledger              |             ✓ |                |                |
+| Position            |             ✓ |                |                |
+| Portfolio           |             ✓ |                |                |
+| Snapshot            |             ✓ |                |                |
+| Screenshot Workflow |             ✓ |         Vision |                |
+| Asset Matching      |             ✓ |                |                |
+| Quote               |      Contract |              ✓ |       Provider |
+| Kline               |      Contract |              ✓ |       Provider |
+| Financial           |      Contract |              ✓ |       Provider |
+| Indicator           |      Contract |              ✓ | InStock 可替换 |
+| Chip                |      Contract |              ✓ | InStock 可替换 |
+| RiskRule            |             ✓ |                |                |
+| RiskEvent           |             ✓ |                |                |
+| Alert Evaluation    |             ✓ |   提供行情输入 |                |
+| Feishu              |          编排 | Adapter 可复用 |                |
+| AI Tools            |             ✓ |      AI Engine |                |
+| Journal             |             ✓ |                |                |
+| Strategy Definition |             ✓ |                |                |
+| Backtest Job        |             ✓ |         Worker |      Vibe/LEAN |
+| Behavior Analysis   |             ✓ |             AI |           Vibe |
+| Execution           | 后期 Contract |                |     vn.py/LEAN |
 
 ---
 

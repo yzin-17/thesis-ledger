@@ -1,4 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { JournalReviewSnapshotInput } from '@thesis-ledger/api-client';
 import {
   analyzeBehavior,
   analyzeSingleTrade,
@@ -6,7 +7,9 @@ import {
   explainSingleTrade,
   reviewBehavior,
   reviewSingleTrade,
+  saveReviewSnapshot,
 } from './journal.api.js';
+import { journalKeys } from './journal.queries.js';
 import type {
   DeterministicJournalReviewResult,
   JournalReviewCandidate,
@@ -56,3 +59,11 @@ export const useBehaviorExplanationMutation = () =>
       sources?: JournalReviewCandidate['sources'][];
     }) => explainBehavior(trades, result, window, undefined, sources),
   });
+
+export const useSaveReviewSnapshotMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: JournalReviewSnapshotInput) => saveReviewSnapshot(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: journalKeys.root }),
+  });
+};

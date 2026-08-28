@@ -1,12 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { projectCashBalance } from '@thesis-ledger/domain';
 import { accountInputSchema } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
+import { projectCashBalances } from '../ledger/cash-projection.js';
 
 export type AccountContainerType = 'securities' | 'fund' | 'cash';
 export type AccountMode = 'actual' | 'shadow';
 export type HeldAssetType = 'stock' | 'etf' | 'fund';
+
+const hasCashBalance = (balances: Map<string, Prisma.Decimal>) =>
+  [...balances.values()].some((value) => Math.abs(value.toNumber()) > 0.00000001);
 
 export const assertAccountCanHoldAsset = (
   account: { type: string; mode?: string; currency?: string },
@@ -32,8 +35,6 @@ export class AccountsService {
 
   async create(input: unknown) {
     const data = accountInputSchema.parse(input);
-    if (data.currency !== 'CNY')
-      throw new BadRequestException('新账户只支持人民币；历史非 CNY 账户只能在无余额时转换');
     return this.prisma.account.create({
       data: {
         name: data.name,
@@ -59,54 +60,19 @@ export class AccountsService {
     const typeChanged = data.type !== undefined && data.type !== account.type;
     const modeChanged = data.mode !== undefined && data.mode !== account.mode;
     const currencyChanged = data.currency !== undefined && data.currency !== account.currency;
-    if (account.currency !== 'CNY' && (typeChanged || modeChanged))
-      throw new BadRequestException('历史非 CNY 账户的类型和模式只读，请先转换为 CNY');
-    if (account.currency !== 'CNY' && data.currency !== undefined && data.currency !== 'CNY')
-      throw new BadRequestException('历史非 CNY 账户只读，请先转换为 CNY');
     if ((typeChanged || modeChanged || currencyChanged) && ledgerCount > 0)
       throw new BadRequestException('账户已有 Ledger 事件，类型、模式和币种已锁定');
-    if (currencyChanged && data.currency !== 'CNY' && account.currency === 'CNY')
-      throw new BadRequestException('新账户只支持人民币');
-    if (currencyChanged && account.currency !== 'CNY' && data.currency === 'CNY') {
+    if (currencyChanged) {
       if (account.positions.some((position) => Number(position.quantity) > 0))
-        throw new BadRequestException('历史非 CNY 账户仍有持仓，清空后才能转换为 CNY');
+        throw new BadRequestException('账户仍有持仓，清空后才能修改本位币');
       const ledgerEvents =
         typeof (this.prisma.ledgerEvent as { findMany?: unknown } | undefined)?.findMany ===
         'function'
           ? await this.prisma.ledgerEvent.findMany({ where: { accountId: id } })
           : [];
-      const cash =
-        projectCashBalance(
-          (
-            ledgerEvents as Array<{
-              id: string;
-              accountId: string;
-              type: string;
-              occurredAt: Date;
-              quantity: number | null;
-              price: number | null;
-              amount: number | null;
-              fee: number | null;
-              tax: number | null;
-              metadata?: unknown;
-            }>
-          ).map((event) => ({
-            id: event.id,
-            accountId: event.accountId,
-            type: event.type as never,
-            occurredAt: event.occurredAt.toISOString(),
-            ...(event.quantity === null ? {} : { quantity: Number(event.quantity) }),
-            ...(event.price === null ? {} : { price: Number(event.price) }),
-            ...(event.amount === null ? {} : { amount: Number(event.amount) }),
-            ...(event.fee === null ? {} : { fee: Number(event.fee) }),
-            ...(event.tax === null ? {} : { tax: Number(event.tax) }),
-            ...(event.metadata && typeof event.metadata === 'object'
-              ? { metadata: event.metadata as Record<string, unknown> }
-              : {}),
-          })),
-        ).get(id) ?? 0;
-      if (Math.abs(cash) > 0.00000001)
-        throw new BadRequestException('历史非 CNY 账户仍有现金余额，清空后才能转换为 CNY');
+      const balances = projectCashBalances(ledgerEvents);
+      if (hasCashBalance(balances.get(id) ?? new Map<string, Prisma.Decimal>()))
+        throw new BadRequestException('账户仍有现金余额，清空后才能修改本位币');
     }
     const update: Prisma.AccountUpdateInput = {
       ...(data.name === undefined ? {} : { name: data.name }),
@@ -135,37 +101,8 @@ export class AccountsService {
       'function'
         ? await this.prisma.ledgerEvent.findMany({ where: { accountId: id } })
         : [];
-    const cash =
-      projectCashBalance(
-        (
-          ledgerEvents as Array<{
-            id: string;
-            accountId: string;
-            type: string;
-            occurredAt: Date;
-            quantity: number | null;
-            price: number | null;
-            amount: number | null;
-            fee: number | null;
-            tax: number | null;
-            metadata?: unknown;
-          }>
-        ).map((event) => ({
-          id: event.id,
-          accountId: event.accountId,
-          type: event.type as never,
-          occurredAt: event.occurredAt.toISOString(),
-          ...(event.quantity === null ? {} : { quantity: Number(event.quantity) }),
-          ...(event.price === null ? {} : { price: Number(event.price) }),
-          ...(event.amount === null ? {} : { amount: Number(event.amount) }),
-          ...(event.fee === null ? {} : { fee: Number(event.fee) }),
-          ...(event.tax === null ? {} : { tax: Number(event.tax) }),
-          ...(event.metadata && typeof event.metadata === 'object'
-            ? { metadata: event.metadata as Record<string, unknown> }
-            : {}),
-        })),
-      ).get(id) ?? 0;
-    if (Math.abs(cash) > 0.00000001)
+    const balances = projectCashBalances(ledgerEvents);
+    if (hasCashBalance(balances.get(id) ?? new Map<string, Prisma.Decimal>()))
       throw new BadRequestException('账户仍有现金余额，只能先清空现金再停用');
     return this.prisma.account.update({ where: { id }, data: { active: false } });
   }

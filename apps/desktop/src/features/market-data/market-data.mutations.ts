@@ -59,6 +59,7 @@ export const useConfirmInstrumentMutation = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: confirmMarketInstrument,
-    onSuccess: () => client.invalidateQueries({ queryKey: [...marketDataKeys.root, 'instruments'] }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [...marketDataKeys.root, 'instruments'] }),
   });
 };

@@ -297,7 +297,9 @@ export const runBacktest = (input: {
     cash +
     [...holdings.entries()].reduce(
       (sum, [symbol, holding]) =>
-        sum + holding.quantity * (prices.get(symbol) ?? latestCloseBySymbol.get(symbol) ?? holding.entryPrice),
+        sum +
+        holding.quantity *
+          (prices.get(symbol) ?? latestCloseBySymbol.get(symbol) ?? holding.entryPrice),
       0,
     );
 
@@ -325,7 +327,9 @@ export const runBacktest = (input: {
     const maxPositionWeight = strategy.riskConstraints?.find(
       (item) => item.kind === 'maxPositionWeight',
     )?.threshold;
-    const cashFloor = strategy.riskConstraints?.find((item) => item.kind === 'cashFloor')?.threshold;
+    const cashFloor = strategy.riskConstraints?.find(
+      (item) => item.kind === 'cashFloor',
+    )?.threshold;
     const positionValue = decision.quantity * decision.fillPrice;
     const violatesWeight =
       maxPositionWeight !== undefined &&
@@ -431,10 +435,7 @@ export const runBacktest = (input: {
   for (const [date, dailyBars] of barsByDate) {
     const valuationPrices = new Map(latestCloseBySymbol);
     for (const bar of dailyBars) {
-      valuationPrices.set(
-        bar.symbol,
-        strategy.execution.price === 'close' ? bar.close : bar.open,
-      );
+      valuationPrices.set(bar.symbol, strategy.execution.price === 'close' ? bar.close : bar.open);
     }
 
     for (const bar of dailyBars) {

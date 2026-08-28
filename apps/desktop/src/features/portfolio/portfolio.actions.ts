@@ -35,6 +35,7 @@ export type PortfolioActionDependencies = {
   editing: Position | null;
   editingAccount: Account | null;
   selectedAccount: Account | undefined;
+  calibrationMode: boolean;
   entryAccountId: string;
   selectedInstrument: InstrumentLookup | null;
   manualInstrumentEntry: boolean;

@@ -19,6 +19,10 @@ export class NotificationController {
 
   @Post(':id/deliver/feishu')
   deliver(@Param('id') id: string, @Body() input: unknown) {
-    return this.notifications.dispatchOne(id, new Date(), notificationDeliveryMessageSchema.parse(input));
+    return this.notifications.dispatchOne(
+      id,
+      new Date(),
+      notificationDeliveryMessageSchema.parse(input),
+    );
   }
 }

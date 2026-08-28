@@ -3,7 +3,10 @@ import { portfolioModeSchema } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { RiskService } from './risk.service.js';
 
-const createFromPlanSchema = z.object({ sourcePlanId: z.uuid(), rule: z.record(z.string(), z.unknown()) });
+const createFromPlanSchema = z.object({
+  sourcePlanId: z.uuid(),
+  rule: z.record(z.string(), z.unknown()),
+});
 const riskEventQueryHttpSchema = z.object({
   mode: portfolioModeSchema.default('actual'),
   cursor: z.uuid().optional(),

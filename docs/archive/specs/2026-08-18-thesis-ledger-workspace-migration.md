@@ -101,14 +101,14 @@ DSA 返回的业务数据必须映射到主系统 `packages/schemas` 的 Quote�
 
 ## 风险与取舍
 
-| 风险 | 处理方式 |
-| --- | --- |
-| 目录移动误覆盖未提交改动 | 先记录状态，使用保留 Git 元数据的目录移动，移动后逐项核对 diff |
-| 旧环境变量仍被脚本使用 | 全局搜索活动代码和配置，历史文档单独排除并在任务报告中列出 |
-| DSA 能力不足以填充主系统旧字段 | 以 capability 和 optional 字段表达缺失，更新 UI/风险读取逻辑 |
-| 真实镜像在线数据不稳定 | fixture mode 作为阻断集成门槛，online smoke 非阻断 |
-| 镜像 tag 漂移 | thesis-ledger-infra 默认 tag 加 digest 配置，生产示例强制 digest |
-| DSA release workflow 拒绝 Fork 版本号 | 将发布校验扩展到 `-thesisledger.N`，并增加 workflow 校验测试 |
+| 风险                                  | 处理方式                                                         |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| 目录移动误覆盖未提交改动              | 先记录状态，使用保留 Git 元数据的目录移动，移动后逐项核对 diff   |
+| 旧环境变量仍被脚本使用                | 全局搜索活动代码和配置，历史文档单独排除并在任务报告中列出       |
+| DSA 能力不足以填充主系统旧字段        | 以 capability 和 optional 字段表达缺失，更新 UI/风险读取逻辑     |
+| 真实镜像在线数据不稳定                | fixture mode 作为阻断集成门槛，online smoke 非阻断               |
+| 镜像 tag 漂移                         | thesis-ledger-infra 默认 tag 加 digest 配置，生产示例强制 digest |
+| DSA release workflow 拒绝 Fork 版本号 | 将发布校验扩展到 `-thesisledger.N`，并增加 workflow 校验测试     |
 
 ## 未决事项
 

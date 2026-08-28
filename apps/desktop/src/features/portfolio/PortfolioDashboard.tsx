@@ -21,6 +21,8 @@ import {
 import { FirstRunOnboarding } from '../onboarding/FirstRunOnboarding.js';
 import { useOnboardingStatusQuery } from '../onboarding/onboarding.queries.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import { PortfolioTradeView } from './PortfolioTradeView.js';
+import type { PortfolioTradeReviewTarget } from './PortfolioTradeDetailSheet.js';
 
 export function PortfolioDashboard({
   state,
@@ -30,6 +32,7 @@ export function PortfolioDashboard({
   onModeChange,
   onRetry,
   onNavigate,
+  onOpenReview,
 }: {
   state: LoadState;
   portfolio: Portfolio | null;
@@ -38,6 +41,7 @@ export function PortfolioDashboard({
   onModeChange: (mode: PortfolioMode) => void;
   onRetry: () => void;
   onNavigate: (view: DesktopNavigationView, options?: OnboardingNavigationOptions) => void;
+  onOpenReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
   const largest = useMemo(
     () =>
@@ -47,6 +51,7 @@ export function PortfolioDashboard({
     [portfolio],
   );
   const [detailPosition, setDetailPosition] = useState<Position | null>(null);
+  const [portfolioTab, setPortfolioTab] = useState<'overview' | 'trades'>('overview');
   const hasPosition = (portfolio?.positions.length ?? 0) > 0;
   const onboardingStatusQuery = useOnboardingStatusQuery(hasPosition);
   const onboardingStatus = onboardingStatusQuery.data ?? {
@@ -127,92 +132,126 @@ export function PortfolioDashboard({
       {pageHeader}
       {modeNote}
       <DataStateBanner state={state} onRetry={onRetry} />
-      <FirstRunOnboarding
-        hasAccount={accounts.length > 0}
-        hasPosition={hasPosition}
-        hasProviderSetup={onboardingStatus.hasProviderSetup}
-        hasRiskRule={onboardingStatus.hasRiskRule}
-        onNavigate={onNavigate}
-      />
-      <section className="metrics" aria-label="组合关键指标">
-        <Metric label="持仓成本" value={money.format(portfolio!.totalCost)} />
-        <Metric
-          label="累计浮盈亏"
-          value={money.format(portfolio!.totalPnl)}
-          tone={portfolio!.totalPnl >= 0 ? 'positive' : 'negative'}
-        />
-        <Metric
-          label="最大持仓"
-          value={largest?.asset.name ?? '—'}
-          {...(largest ? { detail: money.format(largest.marketValue ?? 0) } : {})}
-        />
-      </section>
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <h2>当前持仓</h2>
-            <p>{portfolio!.positions.length} 个标的，按市值排序</p>
-          </div>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>标的</th>
-                <th>数量</th>
-                <th>成本价</th>
-                <th>市值</th>
-                <th>浮盈亏</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {portfolio!.positions.length === 0 ? (
-                <EmptyTableRow colSpan={7} />
-              ) : (
-                [...portfolio!.positions]
-                  .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
-                  .map((position) => (
-                    <tr key={position.id}>
-                      <td>
-                        <strong>{position.asset.name}</strong>
-                        <span>{position.symbol}</span>
-                      </td>
-                      <td>{position.quantity}</td>
-                      <td>{money.format(position.costPrice)}</td>
-                      <td>
-                        {position.marketValue === null ? '—' : money.format(position.marketValue)}
-                      </td>
-                      <td className={cn((position.pnl ?? 0) >= 0 ? 'positive' : 'negative')}>
-                        {position.pnl === null ? '—' : money.format(position.pnl)}
-                      </td>
-                      <td>
-                        <Badge
-                          className={cn('tag', position.stale && 'warning')}
-                          variant="secondary"
-                        >
-                          {position.stale ? '陈旧' : '最新'}
-                        </Badge>
-                      </td>
-                      <td>
-                        <Button
-                          className="text-button"
-                          size="sm"
-                          type="button"
-                          variant="link"
-                          onClick={() => setDetailPosition(position)}
-                        >
-                          行情详情
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div
+        className="flex w-full max-w-md rounded-lg bg-muted p-1"
+        role="tablist"
+        aria-label="组合内容"
+      >
+        <Button
+          className="flex-1"
+          type="button"
+          variant={portfolioTab === 'overview' ? 'secondary' : 'ghost'}
+          role="tab"
+          aria-selected={portfolioTab === 'overview'}
+          onClick={() => setPortfolioTab('overview')}
+        >
+          组合概览
+        </Button>
+        <Button
+          className="flex-1"
+          type="button"
+          variant={portfolioTab === 'trades' ? 'secondary' : 'ghost'}
+          role="tab"
+          aria-selected={portfolioTab === 'trades'}
+          onClick={() => setPortfolioTab('trades')}
+        >
+          交易
+        </Button>
+      </div>
+      {portfolioTab === 'trades' ? (
+        <PortfolioTradeView mode={mode} accounts={accounts} onReview={onOpenReview} />
+      ) : (
+        <>
+          <FirstRunOnboarding
+            hasAccount={accounts.length > 0}
+            hasPosition={hasPosition}
+            hasProviderSetup={onboardingStatus.hasProviderSetup}
+            hasRiskRule={onboardingStatus.hasRiskRule}
+            onNavigate={onNavigate}
+          />
+          <section className="metrics" aria-label="组合关键指标">
+            <Metric label="持仓成本" value={money.format(portfolio!.totalCost)} />
+            <Metric
+              label="累计浮盈亏"
+              value={money.format(portfolio!.totalPnl)}
+              tone={portfolio!.totalPnl >= 0 ? 'positive' : 'negative'}
+            />
+            <Metric
+              label="最大持仓"
+              value={largest?.asset.name ?? '—'}
+              {...(largest ? { detail: money.format(largest.marketValue ?? 0) } : {})}
+            />
+          </section>
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <h2>当前持仓</h2>
+                <p>{portfolio!.positions.length} 个标的，按市值排序</p>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>标的</th>
+                    <th>数量</th>
+                    <th>成本价</th>
+                    <th>市值</th>
+                    <th>浮盈亏</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {portfolio!.positions.length === 0 ? (
+                    <EmptyTableRow colSpan={7} />
+                  ) : (
+                    [...portfolio!.positions]
+                      .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
+                      .map((position) => (
+                        <tr key={position.id}>
+                          <td>
+                            <strong>{position.asset.name}</strong>
+                            <span>{position.symbol}</span>
+                          </td>
+                          <td>{position.quantity}</td>
+                          <td>{money.format(position.costPrice)}</td>
+                          <td>
+                            {position.marketValue === null
+                              ? '—'
+                              : money.format(position.marketValue)}
+                          </td>
+                          <td className={cn((position.pnl ?? 0) >= 0 ? 'positive' : 'negative')}>
+                            {position.pnl === null ? '—' : money.format(position.pnl)}
+                          </td>
+                          <td>
+                            <Badge
+                              className={cn('tag', position.stale && 'warning')}
+                              variant="secondary"
+                            >
+                              {position.stale ? '陈旧' : '最新'}
+                            </Badge>
+                          </td>
+                          <td>
+                            <Button
+                              className="text-button"
+                              size="sm"
+                              type="button"
+                              variant="link"
+                              onClick={() => setDetailPosition(position)}
+                            >
+                              行情详情
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
       {detailPosition && (
         <MarketDetailDialog position={detailPosition} onClose={() => setDetailPosition(null)} />
       )}

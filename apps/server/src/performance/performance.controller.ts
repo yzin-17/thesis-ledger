@@ -17,12 +17,20 @@ export class PerformanceController {
   constructor(private readonly performance: PerformanceService) {}
 
   @Post('snapshots')
-  capture(@Body() input: unknown) {
+  capture(
+    @Body() input: unknown,
+    @Query('fxMerge') fxMerge?: string,
+    @Query('baseCurrency') baseCurrency?: string,
+  ) {
     const body = performanceSnapshotCaptureInputSchema.parse(input);
     return this.performance.capture(
       body.accountId,
       body.capturedAt ? new Date(body.capturedAt) : undefined,
       body.mode ?? 'actual',
+      {
+        ...(fxMerge === undefined ? {} : { fxMerge: parseFxMerge(fxMerge) }),
+        ...(baseCurrency === undefined ? {} : { baseCurrency: parseBaseCurrency(baseCurrency) }),
+      },
     );
   }
 

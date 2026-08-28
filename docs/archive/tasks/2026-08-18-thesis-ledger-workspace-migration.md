@@ -23,14 +23,14 @@
 
 ## 验证证据
 
-| 任务 | 验证 | 结果 |
-| --- | --- | --- |
-| T1 | 三个仓库分别执行 `git status --short --branch`；父目录无 `.git`，嵌套 DSA 路径不存在 | 通过：`thesis-ledger`、`daily-stock-analysis`、`thesis-ledger-infra` 为同级独立仓库 |
-| T2 | 活动代码旧品牌搜索、`pnpm install --frozen-lockfile --offline`、server/mobile typecheck、desktop build | 通过；旧入口仅保留在迁移脚本文件名和历史文档中 |
-| T3 | `bash -n scripts/migrate-to-thesis-ledger.sh`；检查脚本的同库拒绝、非空目标拒绝、备份校验、计数校验和不删除旧库行为 | 通过；未连接真实数据库执行迁移演练，避免误操作用户数据 |
-| T4-T6 | DSA Python `py_compile`、主仓 adapter 测试、发布 workflow/Dockerfile 静态检查 | 通过静态检查；DSA pytest/容器运行验证受本机依赖和 Docker 权限阻塞 |
-| T7-T8 | 主仓和 thesis-ledger-infra `docker compose config -q`、主仓全量测试、Stub Contract Test 文件检查 | 通过；真实黑盒运行需 Docker daemon 可用 |
-| T9 | `pnpm lint`、`pnpm -r test`、server typecheck/test、desktop test/build、三个仓库 `git diff --check` | 通过；桌面构建仅有既有的大 chunk warning |
+| 任务  | 验证                                                                                                                | 结果                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| T1    | 三个仓库分别执行 `git status --short --branch`；父目录无 `.git`，嵌套 DSA 路径不存在                                | 通过：`thesis-ledger`、`daily-stock-analysis`、`thesis-ledger-infra` 为同级独立仓库 |
+| T2    | 活动代码旧品牌搜索、`pnpm install --frozen-lockfile --offline`、server/mobile typecheck、desktop build              | 通过；旧入口仅保留在迁移脚本文件名和历史文档中                                      |
+| T3    | `bash -n scripts/migrate-to-thesis-ledger.sh`；检查脚本的同库拒绝、非空目标拒绝、备份校验、计数校验和不删除旧库行为 | 通过；未连接真实数据库执行迁移演练，避免误操作用户数据                              |
+| T4-T6 | DSA Python `py_compile`、主仓 adapter 测试、发布 workflow/Dockerfile 静态检查                                       | 通过静态检查；DSA pytest/容器运行验证受本机依赖和 Docker 权限阻塞                   |
+| T7-T8 | 主仓和 thesis-ledger-infra `docker compose config -q`、主仓全量测试、Stub Contract Test 文件检查                    | 通过；真实黑盒运行需 Docker daemon 可用                                             |
+| T9    | `pnpm lint`、`pnpm -r test`、server typecheck/test、desktop test/build、三个仓库 `git diff --check`                 | 通过；桌面构建仅有既有的大 chunk warning                                            |
 
 ## 已实现内容
 

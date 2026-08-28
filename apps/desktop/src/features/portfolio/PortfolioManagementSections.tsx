@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 import { money } from '../shared/display.js';
 import { PositionFields } from './PortfolioPositionFields.js';
@@ -37,8 +38,10 @@ const positionSaveLabel = (
   saving: boolean,
   editing: Position | null,
   selectedAccount: Account | undefined,
+  calibrationMode: boolean,
 ) => {
   if (saving) return '保存中…';
+  if (calibrationMode) return editing ? '保存持仓观察' : '记录持仓观察';
   if (editing) return '保存修改';
   if (selectedAccount?.type === 'cash') return '保存当前现金';
   return '添加持仓';
@@ -258,13 +261,29 @@ function PositionOverview({
   clearPositions,
   setEntryAccountId,
   remove,
+  showCash = true,
+  calibrationMode = false,
 }: PortfolioManagementViewProps) {
+  const positionHeading = calibrationMode ? '持仓余额观察' : '持仓';
+  const positionDescription = calibrationMode
+    ? '这里记录观察检查点，不代表真实成交；成交请在“成交记录”中录入。'
+    : undefined;
+  const clearLabel = calibrationMode ? '清空持仓观察' : '清空持仓';
+  const addLabel = calibrationMode ? '校准持仓余额' : '+ 添加持仓';
+  const emptyLabel = calibrationMode
+    ? '暂无持仓观察，点击右上角“校准持仓余额”记录检查点。'
+    : '暂无持仓，点击右上角“添加持仓”开始。';
   return (
     <>
       {selectedAccount?.type !== 'cash' && (
         <>
           <div className="flex items-center justify-between gap-4">
-            <h2 className="m-0 text-xl font-semibold">持仓</h2>
+            <div>
+              <h2 className="m-0 text-xl font-semibold">{positionHeading}</h2>
+              {positionDescription && (
+                <p className="m-0 mt-1 text-sm text-muted-foreground">{positionDescription}</p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {positions.length > 0 && (
                 <Button
@@ -283,7 +302,7 @@ function PositionOverview({
                       aria-hidden="true"
                     />
                   )}
-                  {busyAction === 'clear-positions' ? '清空中…' : '清空持仓'}
+                  {busyAction === 'clear-positions' ? '清空中…' : clearLabel}
                 </Button>
               )}
               <Button
@@ -295,7 +314,7 @@ function PositionOverview({
                   openEntrySheet('position');
                 }}
               >
-                + 添加持仓
+                {addLabel}
               </Button>
             </div>
           </div>
@@ -304,7 +323,7 @@ function PositionOverview({
               {positions.map((position) => (
                 <div
                   key={position.id}
-                  className="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(72px,0.8fr)_minmax(120px,1fr)_auto] sm:items-center"
+                  className="grid gap-x-4 gap-y-2 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(72px,0.8fr)_minmax(120px,1fr)_minmax(150px,1.4fr)_auto] sm:items-center"
                 >
                   <div className="min-w-0">
                     <strong className="block truncate text-sm font-medium text-foreground">
@@ -320,6 +339,12 @@ function PositionOverview({
                   <span className="text-sm text-muted-foreground">
                     {position.pnl === null ? '—' : money.format(position.pnl)}
                   </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{calibrationMode ? '观察检查点' : '当前记录'}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      来源：{position.source ?? '未知'}
+                    </span>
+                  </div>
                   <div className="form-actions justify-end">
                     <Button
                       className="text-button"
@@ -332,7 +357,7 @@ function PositionOverview({
                         openEntrySheet('position');
                       }}
                     >
-                      编辑
+                      {calibrationMode ? '校准' : '编辑'}
                     </Button>
                     <Button
                       className="text-button danger"
@@ -350,7 +375,11 @@ function PositionOverview({
                           aria-hidden="true"
                         />
                       )}
-                      {busyAction === `remove:${position.id}` ? '删除中…' : '删除'}
+                      {busyAction === `remove:${position.id}`
+                        ? '移除中…'
+                        : calibrationMode
+                          ? '移除校准'
+                          : '删除'}
                     </Button>
                   </div>
                 </div>
@@ -358,34 +387,41 @@ function PositionOverview({
             </div>
           ) : (
             <div className="empty-state" role="status">
-              暂无持仓，点击右上角“添加持仓”开始。
+              {emptyLabel}
             </div>
           )}
         </>
       )}
-      <div className="mt-8">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="m-0 text-xl font-semibold">现金余额</h2>
-          <Button
-            className="text-button"
-            size="sm"
-            type="button"
-            variant="link"
-            onClick={() => {
-              setEditing(null);
-              openEntrySheet('cash');
-            }}
-          >
-            编辑
-          </Button>
+      {selectedAccount?.type === 'cash' && !showCash && (
+        <div className="mt-6 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+          当前是现金账户，没有持仓余额；请切换到“现金”页签查看已结算和待结算金额。
         </div>
-        <div className="mt-2 flex items-center justify-between gap-4 border-y border-border px-1 py-4">
-          <span className="text-sm text-muted-foreground">当前余额</span>
-          <strong className="font-mono text-base font-medium text-foreground">
-            {money.format(cashValue ?? 0)}
-          </strong>
+      )}
+      {showCash && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="m-0 text-xl font-semibold">现金余额</h2>
+            <Button
+              className="text-button"
+              size="sm"
+              type="button"
+              variant="link"
+              onClick={() => {
+                setEditing(null);
+                openEntrySheet('cash');
+              }}
+            >
+              编辑
+            </Button>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-4 border-y border-border px-1 py-4">
+            <span className="text-sm text-muted-foreground">当前余额</span>
+            <strong className="font-mono text-base font-medium text-foreground">
+              {money.format(cashValue ?? 0)}
+            </strong>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
@@ -396,9 +432,27 @@ const positionSheetTitle = (entrySheetMode: 'position' | 'cash', editing: Positi
   return '添加持仓';
 };
 
+const positionSheetHeading = (
+  entrySheetMode: 'position' | 'cash',
+  editing: Position | null,
+  calibrationMode: boolean,
+) => {
+  if (entrySheetMode === 'position' && calibrationMode) {
+    if (editing) return '修改持仓观察';
+    return '校准持仓余额';
+  }
+  return positionSheetTitle(entrySheetMode, editing);
+};
+
 function PositionEntrySheet(props: PortfolioManagementViewProps) {
-  const { positionSheetOpen, setPositionSheetOpen, entrySheetMode, editing, selectedAccount } =
-    props;
+  const {
+    positionSheetOpen,
+    setPositionSheetOpen,
+    entrySheetMode,
+    editing,
+    selectedAccount,
+    calibrationMode = false,
+  } = props;
   return (
     <Sheet open={positionSheetOpen} onOpenChange={setPositionSheetOpen}>
       <SheetContent
@@ -407,9 +461,11 @@ function PositionEntrySheet(props: PortfolioManagementViewProps) {
         className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
       >
         <div className="panel-heading">
-          <SheetTitle>{positionSheetTitle(entrySheetMode, editing)}</SheetTitle>
+          <SheetTitle>{positionSheetHeading(entrySheetMode, editing, calibrationMode)}</SheetTitle>
           <SheetDescription id="position-form-description">
-            录入账户当前实际持仓，用于初始化或校准持仓数据。
+            {calibrationMode
+              ? '这会创建持仓观察检查点，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
+              : '录入账户当前实际持仓，用于初始化或校准持仓数据。'}
           </SheetDescription>
         </div>
         {entrySheetMode === 'cash' && selectedAccount?.type !== 'cash' ? (
@@ -496,6 +552,7 @@ function PositionForm(props: PortfolioManagementViewProps) {
     clearInstrumentSelection,
     startManualInstrumentEntry,
     handleInstrumentQueryChange,
+    calibrationMode = false,
   } = props;
   return (
     <form
@@ -572,6 +629,7 @@ function PositionForm(props: PortfolioManagementViewProps) {
             busyAction === 'position-save' || busyAction === 'cash-save',
             editing,
             selectedAccount,
+            calibrationMode,
           )}
         </Button>
       </div>

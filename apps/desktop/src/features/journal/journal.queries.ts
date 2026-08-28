@@ -8,6 +8,7 @@ export const journalKeys = {
       ...journalKeys.root,
       'review-candidates',
       params.accountId,
+      params.mode ?? 'actual',
       params.symbol ?? '',
       params.start ?? '',
       params.end ?? '',

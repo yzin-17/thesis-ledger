@@ -74,12 +74,15 @@ const fxMeta = (value: unknown): PerformanceFxMeta => {
       return mapped;
     }),
   };
+  if (typeof record.version === 'number') result.version = record.version;
+  if (typeof record.evidenceVersion === 'string') result.evidenceVersion = record.evidenceVersion;
   const baseCurrency = currencyValue(record.baseCurrency);
   if (baseCurrency) result.baseCurrency = baseCurrency;
   if (typeof record.asOf === 'string') result.asOf = record.asOf;
   if (typeof record.fxAsOf === 'string') result.fxAsOf = record.fxAsOf;
   if (record.estimated === true) result.estimated = true;
-  if (record.conversionMode === 'current-rate') result.conversionMode = 'current-rate';
+  if (record.conversionMode === 'current-rate' || record.conversionMode === 'historical-rate')
+    result.conversionMode = record.conversionMode;
   if (record.stale === true) result.stale = true;
   if (record.fxStale === true) result.fxStale = true;
   return result;
@@ -215,6 +218,11 @@ const layersResponse = (value: unknown): PerformanceLayersResponse => {
         securityMissingSymbols.length > 0 ||
         missingSymbols.length > 0,
       missingSymbols,
+      missingCurrencies: Array.isArray(qualityRecord.missingCurrencies)
+        ? qualityRecord.missingCurrencies
+            .map(currencyValue)
+            .filter((item): item is NonNullable<typeof item> => item !== undefined)
+        : [],
     },
     fx: fxMeta(record.fx),
   };

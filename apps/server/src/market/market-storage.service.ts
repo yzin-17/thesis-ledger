@@ -13,7 +13,10 @@ const dateKey = (value: string) => {
   return date.toISOString().slice(0, 10);
 };
 
-export const classifyEmptyBarRange = (start?: string, end?: string): Exclude<BarSyncOutcome, 'data'> => {
+export const classifyEmptyBarRange = (
+  start?: string,
+  end?: string,
+): Exclude<BarSyncOutcome, 'data'> => {
   if (!start || !end) return 'incomplete';
   const first = dateKey(start);
   const last = dateKey(end);

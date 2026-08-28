@@ -4,16 +4,15 @@ export function LegacyImportReviewRedirect() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const step = params.get('step');
-  if (step === 'account') {
-    return <Navigate to="/accounts" replace />;
-  }
-  if (step === 'position') params.set('method', 'manual');
-  if (step === 'screenshot') params.set('method', 'screenshot');
+  if (step === 'account') params.set('setup', '1');
+  else if (step === 'screenshot' || params.get('method') === 'screenshot') {
+    params.set('tab', 'positions');
+    params.set('entry', 'screenshot');
+  } else params.set('tab', 'positions');
+  params.delete('step');
+  params.delete('method');
   const search = params.toString();
   return (
-    <Navigate
-      to={{ pathname: '/position-entry', ...(search ? { search: `?${search}` } : {}) }}
-      replace
-    />
+    <Navigate to={{ pathname: '/accounts', ...(search ? { search: `?${search}` } : {}) }} replace />
   );
 }

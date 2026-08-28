@@ -66,6 +66,10 @@ export interface Position {
   stale: boolean;
   updatedAt?: string;
   source?: string;
+  currency?: Account['currency'];
+  baseMarketValue?: number | null;
+  baseCostValue?: number | null;
+  basePnl?: number | null;
   asset: { name: string; assetType?: HeldAssetType };
 }
 
@@ -78,4 +82,27 @@ export interface Portfolio {
   partial: boolean;
   valuedAt: string;
   positions: Position[];
+  baseCurrency?: Account['currency'];
+  cashByCurrency?: Array<{
+    currency: Account['currency'];
+    amount: number;
+    convertedAmount: number | null;
+  }>;
+  fx?: {
+    version?: number | undefined;
+    evidenceVersion?: string | undefined;
+    enabled: boolean;
+    status: string;
+    baseCurrency?: Account['currency'] | undefined;
+    asOf?: string | undefined;
+    fxAsOf?: string | undefined;
+    conversionMode?: 'current-rate' | 'historical-rate' | undefined;
+    missingCurrencies: Account['currency'][];
+    rates: unknown[];
+  };
+  dataQuality?: {
+    partial: boolean;
+    missingSymbols: string[];
+    missingCurrencies?: Account['currency'][] | undefined;
+  };
 }

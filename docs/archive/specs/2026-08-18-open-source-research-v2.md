@@ -60,21 +60,21 @@ Fork daily_stock_analysis
 
 ## 2. 项目优先级矩阵
 
-| 项目 | Star 快照 | 许可证 | 功能贴合度 | 扩展价值 | 推荐角色 |
-|---|---:|---|---:|---:|---|
-| **daily_stock_analysis** | ~59.7k | MIT | **95%** | **高** | **主仓 fork 首选** |
-| **InStock / myhhub/stock** | ~13.6k | Apache-2.0 | **82%** | 高 | A 股筹码/指标/选股/策略能力来源；次级 fork 候选 |
-| **Vibe-Trading** | 20k+ | MIT | 72% | **很高** | V0.5+ 策略/Agent/行为复盘扩展 |
-| Ghostfolio | ~9k | AGPL-3.0 | 65% | 高 | Wealth/Ledger/Performance 参考，不优先 fork |
-| TradingAgents | 1k+ | Apache-2.0 | 50% | 很高 | 多 Agent 决策架构 |
-| Qlib | 1k+ | MIT | 45% | 很高 | V2 因子/ML/组合研究 |
-| vn.py | 1k+ | MIT | 40% 当前 / 80% 实盘阶段 | 很高 | V3 Execution/OMS/Broker Gateway |
-| LEAN | 1k+ | Apache-2.0 | 40% 当前 / 75% 实盘阶段 | 很高 | 专业 Backtest/Execution 备选 |
-| Portfolio Performance | 1k+ | EPL-1.0 | 55% | 中 | Ledger / Performance 语义参考 |
-| Hikyuu | 1k+ | Apache-2.0 | 50% | 中高 | A 股 Strategy/Risk 领域模型参考 |
-| QuantStats | 1k+ | Apache-2.0 | 30% | 高 | 直接依赖 Analytics |
-| PyPortfolioOpt | 1k+ | MIT | 25% | 高 | V2 Portfolio Optimization |
-| Riskfolio-Lib | 1k+ | BSD-3-Clause | 25% | 高 | V2 Advanced Risk |
+| 项目                       | Star 快照 | 许可证       |              功能贴合度 | 扩展价值 | 推荐角色                                        |
+| -------------------------- | --------: | ------------ | ----------------------: | -------: | ----------------------------------------------- |
+| **daily_stock_analysis**   |    ~59.7k | MIT          |                 **95%** |   **高** | **主仓 fork 首选**                              |
+| **InStock / myhhub/stock** |    ~13.6k | Apache-2.0   |                 **82%** |       高 | A 股筹码/指标/选股/策略能力来源；次级 fork 候选 |
+| **Vibe-Trading**           |      20k+ | MIT          |                     72% | **很高** | V0.5+ 策略/Agent/行为复盘扩展                   |
+| Ghostfolio                 |       ~9k | AGPL-3.0     |                     65% |       高 | Wealth/Ledger/Performance 参考，不优先 fork     |
+| TradingAgents              |       1k+ | Apache-2.0   |                     50% |     很高 | 多 Agent 决策架构                               |
+| Qlib                       |       1k+ | MIT          |                     45% |     很高 | V2 因子/ML/组合研究                             |
+| vn.py                      |       1k+ | MIT          | 40% 当前 / 80% 实盘阶段 |     很高 | V3 Execution/OMS/Broker Gateway                 |
+| LEAN                       |       1k+ | Apache-2.0   | 40% 当前 / 75% 实盘阶段 |     很高 | 专业 Backtest/Execution 备选                    |
+| Portfolio Performance      |       1k+ | EPL-1.0      |                     55% |       中 | Ledger / Performance 语义参考                   |
+| Hikyuu                     |       1k+ | Apache-2.0   |                     50% |     中高 | A 股 Strategy/Risk 领域模型参考                 |
+| QuantStats                 |       1k+ | Apache-2.0   |                     30% |       高 | 直接依赖 Analytics                              |
+| PyPortfolioOpt             |       1k+ | MIT          |                     25% |       高 | V2 Portfolio Optimization                       |
+| Riskfolio-Lib              |       1k+ | BSD-3-Clause |                     25% |       高 | V2 Advanced Risk                                |
 
 > Star 只用来筛成熟社区项目；最终排序以需求贴合和扩展性为主。
 
@@ -130,14 +130,14 @@ Ghostfolio 已经有：
 它的 `DataProviderInterface` 已经包含：
 
 ```ts
-canHandle()
-getAssetProfile()
-getDividends()
-getHistorical()
-getQuotes()
-search()
-getName()
-getTestSymbol()
+canHandle();
+getAssetProfile();
+getDividends();
+getHistorical();
+getQuotes();
+search();
+getName();
+getTestSymbol();
 ```
 
 这个设计和我们计划的 `MarketDataProvider` 高度一致，值得直接作为接口设计参考。

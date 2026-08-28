@@ -92,14 +92,19 @@ export function MarketDataPage() {
       setPolicyDraft(saved);
       setMessage({ type: 'success', text: `路由策略已提交，revision ${saved.revision}。` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '路由策略提交失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : '路由策略提交失败。',
+      });
     } finally {
       setBusyAction(null);
     }
   };
 
   const replaceProvider = (provider: ProviderManifest) =>
-    setProviderDrafts((current) => current.map((item) => item.providerId === provider.providerId ? provider : item));
+    setProviderDrafts((current) =>
+      current.map((item) => (item.providerId === provider.providerId ? provider : item)),
+    );
 
   const handleSaveProvider = async (provider: ProviderManifest) => {
     setBusyAction(`provider-save:${provider.providerId}`);
@@ -111,7 +116,10 @@ export function MarketDataPage() {
       await queryClient.invalidateQueries({ queryKey: marketDataKeys.providers() });
       setMessage({ type: 'success', text: `${provider.displayName} 配置已保存。` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Provider 配置保存失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Provider 配置保存失败。',
+      });
     } finally {
       setBusyAction(null);
     }
@@ -122,7 +130,10 @@ export function MarketDataPage() {
     setMessage(null);
     const credential = credentials[provider.providerId]?.trim();
     try {
-      const result = await testProvider.mutateAsync({ provider, ...(credential ? { credential } : {}) });
+      const result = await testProvider.mutateAsync({
+        provider,
+        ...(credential ? { credential } : {}),
+      });
       if (result.status !== 'healthy') {
         const details = Object.entries(result.capabilityResults ?? {})
           .filter(([, item]) => item.status !== 'healthy')
@@ -132,7 +143,10 @@ export function MarketDataPage() {
       }
       setMessage({ type: 'success', text: `${provider.displayName} 只读连通性测试通过。` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Provider 测试失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Provider 测试失败。',
+      });
     } finally {
       setBusyAction(null);
     }
@@ -147,22 +161,40 @@ export function MarketDataPage() {
       await queryClient.invalidateQueries({ queryKey: marketDataKeys.providers() });
       setMessage({ type: 'success', text: `${provider.displayName} 凭证已清除。` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Provider 凭证清除失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Provider 凭证清除失败。',
+      });
     } finally {
       setBusyAction(null);
     }
   };
 
   const handleRemoveProvider = async (provider: ProviderManifest) => {
-    if (!window.confirm(`确认从所有市场数据路由中移除 ${provider.displayName}？该操作会生成新的 Policy revision。`)) return;
+    if (
+      !window.confirm(
+        `确认从所有市场数据路由中移除 ${provider.displayName}？该操作会生成新的 Policy revision。`,
+      )
+    )
+      return;
     setBusyAction(`provider-remove:${provider.providerId}`);
     try {
       const result = await removeProvider.mutateAsync(provider);
-      if (!result.removed) throw new Error(result.message ?? (result.pending ? 'Policy 尚未在 DSA 生效，请稍后重试。' : 'Provider 未被移除。'));
+      if (!result.removed)
+        throw new Error(
+          result.message ??
+            (result.pending ? 'Policy 尚未在 DSA 生效，请稍后重试。' : 'Provider 未被移除。'),
+        );
       if (result.policy) setPolicyDraft(result.policy);
-      setMessage({ type: 'success', text: `${provider.displayName} 已从路由移除，并保留 tombstone。` });
+      setMessage({
+        type: 'success',
+        text: `${provider.displayName} 已从路由移除，并保留 tombstone。`,
+      });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Provider 移除失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Provider 移除失败。',
+      });
     } finally {
       setBusyAction(null);
     }
@@ -183,7 +215,10 @@ export function MarketDataPage() {
         setMessage({ type: 'success', text: '标的目录同步任务已提交，状态将自动刷新。' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '标的目录同步失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : '标的目录同步失败。',
+      });
     } finally {
       setBusyAction(null);
     }
@@ -196,7 +231,10 @@ export function MarketDataPage() {
       await instrumentSearch.refetch();
       setMessage({ type: 'success', text: `${instrument.displayName} 已确认，可用于持仓关联。` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '标的确认失败。' });
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : '标的确认失败。',
+      });
     } finally {
       setBusyAction(null);
     }
@@ -210,28 +248,122 @@ export function MarketDataPage() {
           <h1 id="market-data-title">市场数据与标的中心</h1>
           <p className="page-subtitle">管理 DSA Provider、路由策略、目录同步与已确认的投资标的。</p>
         </div>
-        <Button type="button" variant="outline" onClick={() => void refresh()} disabled={busyAction !== null}>刷新状态</Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void refresh()}
+          disabled={busyAction !== null}
+        >
+          刷新状态
+        </Button>
       </div>
 
       {loadState === 'degraded' && (
-        <Alert variant="destructive"><AlertTitle>DSA Control 暂时不可用</AlertTitle><AlertDescription>只读展示已加载的最后状态；保存、测试和目录同步已暂停。</AlertDescription></Alert>
+        <Alert variant="destructive">
+          <AlertTitle>DSA Control 暂时不可用</AlertTitle>
+          <AlertDescription>
+            只读展示已加载的最后状态；保存、测试和目录同步已暂停。
+          </AlertDescription>
+        </Alert>
       )}
-      {message && <Alert variant={message.type === 'error' ? 'destructive' : 'default'}><AlertDescription>{message.text}</AlertDescription></Alert>}
+      {message && (
+        <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
+          <AlertDescription>{message.text}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="p-5"><p className="kicker">Control Policy</p><strong className="mt-2 block text-2xl font-semibold">{policyDraft ? `r${policyDraft.revision}` : '—'}</strong><p className="mt-1 text-sm text-muted-foreground">{policyDraft?.syncState === 'applied' ? '已同步到 DSA' : policyDraft?.syncState === 'pending' ? '等待同步' : '需要检查'}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="kicker">Provider</p><strong className="mt-2 block text-2xl font-semibold">{configuredProviderCount}/{providerDrafts.length || 2}</strong><p className="mt-1 text-sm text-muted-foreground">已启用且已配置凭证</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="kicker">Instrument Catalog</p><strong className="mt-2 block text-2xl font-semibold">{catalog.data?.generation ? `g${catalog.data.generation}` : '—'}</strong><p className="mt-1 text-sm text-muted-foreground">{catalog.data?.instrumentCount ? `${catalog.data.instrumentCount} 个本地标的` : '由 DSA 快照驱动'}</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="kicker">Control Policy</p>
+            <strong className="mt-2 block text-2xl font-semibold">
+              {policyDraft ? `r${policyDraft.revision}` : '—'}
+            </strong>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {policyDraft?.syncState === 'applied'
+                ? '已同步到 DSA'
+                : policyDraft?.syncState === 'pending'
+                  ? '等待同步'
+                  : '需要检查'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="kicker">Provider</p>
+            <strong className="mt-2 block text-2xl font-semibold">
+              {configuredProviderCount}/{providerDrafts.length || 2}
+            </strong>
+            <p className="mt-1 text-sm text-muted-foreground">已启用且已配置凭证</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="kicker">Instrument Catalog</p>
+            <strong className="mt-2 block text-2xl font-semibold">
+              {catalog.data?.generation ? `g${catalog.data.generation}` : '—'}
+            </strong>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {catalog.data?.instrumentCount
+                ? `${catalog.data.instrumentCount} 个本地标的`
+                : '由 DSA 快照驱动'}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-        <MarketPolicyPanel policy={policyDraft} providers={providerDrafts} disabled={controlsDisabled} saving={savePolicy.isPending} onChange={setPolicyDraft} onSave={() => void handleSavePolicy()} />
-        <MarketProviderPanel providers={providerDrafts} credentials={credentials} disabled={controlsDisabled} busyAction={busyAction} onProviderChange={replaceProvider} onCredentialChange={(providerId, value) => setCredentials((current) => ({ ...current, [providerId]: value }))} onSave={(provider) => void handleSaveProvider(provider)} onTest={(provider) => void handleTestProvider(provider)} onClearCredential={(provider) => void handleClearCredential(provider)} onRemove={(provider) => void handleRemoveProvider(provider)} />
+        <MarketPolicyPanel
+          policy={policyDraft}
+          providers={providerDrafts}
+          disabled={controlsDisabled}
+          saving={savePolicy.isPending}
+          onChange={setPolicyDraft}
+          onSave={() => void handleSavePolicy()}
+        />
+        <MarketProviderPanel
+          providers={providerDrafts}
+          credentials={credentials}
+          disabled={controlsDisabled}
+          busyAction={busyAction}
+          onProviderChange={replaceProvider}
+          onCredentialChange={(providerId, value) =>
+            setCredentials((current) => ({ ...current, [providerId]: value }))
+          }
+          onSave={(provider) => void handleSaveProvider(provider)}
+          onTest={(provider) => void handleTestProvider(provider)}
+          onClearCredential={(provider) => void handleClearCredential(provider)}
+          onRemove={(provider) => void handleRemoveProvider(provider)}
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <InstrumentCatalogPanel catalog={catalogJob.data ?? catalog.data ?? null} disabled={controlsDisabled} syncing={syncCatalog.isPending || Boolean(catalogJobId)} searchBusy={instrumentSearch.isFetching} searchResults={instrumentSearch.data ?? []} confirmingId={busyAction?.startsWith('instrument-confirm:') ? busyAction.slice('instrument-confirm:'.length) : null} onSync={() => void handleSyncCatalog()} onSearch={setSubmittedSearch} onConfirm={(instrument) => void handleConfirmInstrument(instrument)} />
-        <Card><CardContent className="space-y-4 p-6"><h2 className="m-0 text-xl font-semibold">数据边界</h2><ul className="m-0 space-y-3 pl-5 text-sm text-muted-foreground"><li>Desktop 是市场数据配置的完整入口；Mobile 只读展示组合和风险状态。</li><li>行情、净值和 Bar 保留实际 Provider 与 freshness；不会把缓存伪装成 Provider。</li><li>目录搜索结果只有服务端确认后，才能进入持仓关联边界。</li><li>Control Contract 只在服务端调用 DSA，浏览器不会接触 Control Token。</li></ul></CardContent></Card>
+        <InstrumentCatalogPanel
+          catalog={catalogJob.data ?? catalog.data ?? null}
+          disabled={controlsDisabled}
+          syncing={syncCatalog.isPending || Boolean(catalogJobId)}
+          searchBusy={instrumentSearch.isFetching}
+          searchResults={instrumentSearch.data ?? []}
+          confirmingId={
+            busyAction?.startsWith('instrument-confirm:')
+              ? busyAction.slice('instrument-confirm:'.length)
+              : null
+          }
+          onSync={() => void handleSyncCatalog()}
+          onSearch={setSubmittedSearch}
+          onConfirm={(instrument) => void handleConfirmInstrument(instrument)}
+        />
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <h2 className="m-0 text-xl font-semibold">数据边界</h2>
+            <ul className="m-0 space-y-3 pl-5 text-sm text-muted-foreground">
+              <li>Desktop 是市场数据配置的完整入口；Mobile 只读展示组合和风险状态。</li>
+              <li>行情、净值和 Bar 保留实际 Provider 与 freshness；不会把缓存伪装成 Provider。</li>
+              <li>目录搜索结果只有服务端确认后，才能进入持仓关联边界。</li>
+              <li>Control Contract 只在服务端调用 DSA，浏览器不会接触 Control Token。</li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
     </section>
   );

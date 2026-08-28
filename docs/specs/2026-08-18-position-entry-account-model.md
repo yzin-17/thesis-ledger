@@ -73,15 +73,15 @@ Provider 无法识别资产时，用户可以提供名称并确认资产类型�
 
 ### 手动录入
 
-手动录入表示“设置当前余额”，不是新增一笔买入。例如当前数量 100，输入 120 后结果为 120。主操作文案为“添加持仓”，Ledger 仍写入带 `source=manual` 的 Adjustment。
+手动录入表示“设置当前余额”，不是新增一笔买入。例如当前数量 100，输入 120 后结果为 120。主操作文案为“添加持仓”，Ledger 写入带 `source=manual` 的 `POSITION_BASELINE_OBSERVATION`。
 
 - 证券/基金持仓先通过标的搜索选择目录结果，搜索支持代码、带市场后缀的代码和名称；选择结果后自动带入标的名称与类型，不再要求用户重复填写。
 - 目录未找到标的时允许展开手动录入分支，要求补充代码、名称和类型后写入绝对数量和成本状态。
 - 数量单位根据资产类型显示为股票“股”、ETF/基金“份”；成本字段对用户显示为“平均成本”，内部字段仍为 `costPrice`。
-- “清空持仓”是独立的破坏性操作，经确认后写入归零 Adjustment。
-- 现金使用独立区域设置当前现金余额，Ledger Adjustment 元数据为 `kind=cash-balance`，不伪装为入金事件；不允许负现金。
+- “清空持仓”是独立的破坏性操作，经确认后写入数量为零的 `POSITION_BASELINE_OBSERVATION`。
+- 现金使用独立区域设置当前现金余额，Ledger 写入 `CASH_BALANCE_OBSERVATION`，不伪装为入金事件；不允许负现金。
 - 证券和基金账户在同一手动页的次要区域显示现金；现金账户只显示现金区域。
-- 持仓列表根据最近一次相关 Ledger Adjustment 显示“手动设置”或“截图导入（来源）”。
+- 持仓列表根据最近一次相关 V2 Observation 显示“手动设置”或“截图导入（来源）”。
 
 ### 截图导入
 
@@ -108,7 +108,7 @@ Import Draft 保存创建时的 Ledger 基线。目标标的在审核期间变�
 
 ### `thesis-ledger`
 
-- 负责 Account、Asset Identity、Ledger Adjustment、Import Draft 和聚合查询的数据库、Schema 与 `/api/v1` Contract。
+- 负责 Account、Asset Identity、V2 Ledger Observation、Import Draft 和聚合查询的数据库、Schema 与 `/api/v1` Contract。
 - 负责 Desktop/Mobile 交互、DSA client、Fund NAV 缓存和 Portfolio/Performance/Risk 消费逻辑。
 - 保留 DSA Stub 和确定性 Contract Test；Stub 不作为生产 Provider。
 

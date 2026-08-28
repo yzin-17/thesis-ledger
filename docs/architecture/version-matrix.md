@@ -2,15 +2,15 @@
 
 本文是 ThesisLedger、DSA Fork 与运行时基础设施之间的发布级版本兼容 SSOT。Data/Control Contract V1 的能力明细和验证规则见 [DSA Contract V1 兼容说明](2026-08-18-thesis-ledger-dsa-compatibility.md)；infra 的部署清单和 Compose 细节仍以 `thesis-ledger-infra` 为准。
 
-| 组件 | 当前基线 | 兼容边界 | 阻断门禁 |
-| --- | --- | --- | --- |
-| ThesisLedger | `0.1.0` | 产品/API release | `pnpm contract:test` |
-| DSA Data Contract | `V1` | `/api/v1/thesis-ledger` | capability + black-box contract smoke |
-| DSA Control Contract | `V1` | handshake、Provider Policy、Catalog control | control contract smoke |
-| DSA Fork release | `v3.28.0-thesisledger.1` convention | upstream version + ThesisLedger patch revision | immutable GHCR digest + contract smoke |
-| `@thesis-ledger/schemas` | `0.1.0` | versioned shared contracts | schema tests |
-| PostgreSQL schema | migration controlled | ordered Prisma migrations | `pnpm migration:matrix` |
-| Infrastructure | immutable image digests | Compose + persistent volume contract | infra compatibility + contract tests |
+| 组件                     | 当前基线                            | 兼容边界                                       | 阻断门禁                               |
+| ------------------------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
+| ThesisLedger             | `0.1.0`                             | 产品/API release                               | `pnpm contract:test`                   |
+| DSA Data Contract        | `V1`                                | `/api/v1/thesis-ledger`                        | capability + black-box contract smoke  |
+| DSA Control Contract     | `V1`                                | handshake、Provider Policy、Catalog control    | control contract smoke                 |
+| DSA Fork release         | `v3.28.0-thesisledger.1` convention | upstream version + ThesisLedger patch revision | immutable GHCR digest + contract smoke |
+| `@thesis-ledger/schemas` | `0.1.0`                             | versioned shared contracts                     | schema tests                           |
+| PostgreSQL schema        | migration controlled                | ordered Prisma migrations                      | `pnpm migration:matrix`                |
+| Infrastructure           | immutable image digests             | Compose + persistent volume contract           | infra compatibility + contract tests   |
 
 ## 兼容规则
 

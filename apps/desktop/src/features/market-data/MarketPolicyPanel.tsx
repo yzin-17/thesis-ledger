@@ -66,7 +66,9 @@ export function MarketPolicyPanel({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="m-0 text-xl font-semibold">Provider 路由策略</h2>
-            <p className="mt-1 text-sm text-muted-foreground">每个能力/标的类型独立排序；数据记录不会混用字段。</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              每个能力/标的类型独立排序；数据记录不会混用字段。
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -88,8 +90,12 @@ export function MarketPolicyPanel({
                   className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-center"
                 >
                   <div>
-                    <strong className="block text-sm font-medium">{routeLabel(capability, instrumentType)}</strong>
-                    <span className="font-mono text-xs text-muted-foreground">{capability} / {instrumentType}</span>
+                    <strong className="block text-sm font-medium">
+                      {routeLabel(capability, instrumentType)}
+                    </strong>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {capability} / {instrumentType}
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     {providers.map((provider) => {
@@ -101,30 +107,65 @@ export function MarketPolicyPanel({
                               type="checkbox"
                               checked={routeIndex >= 0}
                               disabled={disabled}
-                              onChange={() => updateRoute(capability, instrumentType, provider.providerId)}
+                              onChange={() =>
+                                updateRoute(capability, instrumentType, provider.providerId)
+                              }
                             />
-                            {routeIndex >= 0 ? `${routeIndex + 1}. ` : ''}{provider.displayName}
+                            {routeIndex >= 0 ? `${routeIndex + 1}. ` : ''}
+                            {provider.displayName}
                           </label>
                           {routeIndex >= 0 && (
                             <span className="flex gap-1">
-                              <Button type="button" size="sm" variant="ghost" disabled={disabled || routeIndex === 0} aria-label={`${provider.displayName} 上移`} onClick={() => moveRoute(capability, instrumentType, provider.providerId, -1)}>↑</Button>
-                              <Button type="button" size="sm" variant="ghost" disabled={disabled || routeIndex === candidates.length - 1} aria-label={`${provider.displayName} 下移`} onClick={() => moveRoute(capability, instrumentType, provider.providerId, 1)}>↓</Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                disabled={disabled || routeIndex === 0}
+                                aria-label={`${provider.displayName} 上移`}
+                                onClick={() =>
+                                  moveRoute(capability, instrumentType, provider.providerId, -1)
+                                }
+                              >
+                                ↑
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                disabled={disabled || routeIndex === candidates.length - 1}
+                                aria-label={`${provider.displayName} 下移`}
+                                onClick={() =>
+                                  moveRoute(capability, instrumentType, provider.providerId, 1)
+                                }
+                              >
+                                ↓
+                              </Button>
                             </span>
                           )}
                         </div>
                       );
                     })}
-                    {providers.length === 0 && <span className="text-sm text-muted-foreground">Provider 状态不可用</span>}
+                    {providers.length === 0 && (
+                      <span className="text-sm text-muted-foreground">Provider 状态不可用</span>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
-        ) : <p className="text-sm text-muted-foreground">正在读取路由策略…</p>}
-        {policy?.lastError && <p className="text-sm text-destructive">最近同步错误：{policy.lastError.message ?? policy.lastError.code}</p>}
+        ) : (
+          <p className="text-sm text-muted-foreground">正在读取路由策略…</p>
+        )}
+        {policy?.lastError && (
+          <p className="text-sm text-destructive">
+            最近同步错误：{policy.lastError.message ?? policy.lastError.code}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" onClick={onSave} disabled={disabled || !policy}>
-            {saving && <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />}
+            {saving && (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+            )}
             {saving ? '提交中…' : `提交下一版策略${policy ? `（r${policy.revision + 1}）` : ''}`}
           </Button>
           <span className="text-xs text-muted-foreground">同一 revision 的内容冲突会被拒绝。</span>

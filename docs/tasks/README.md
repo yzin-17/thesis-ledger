@@ -4,6 +4,8 @@
 
 ## 仍在实施或待完成
 
+- [交易与成交记录系统](2026-08-26-trade-execution-ledger-system.md)
+- [交易与成交记录系统剩余问题与返工任务](2026-08-26-trade-execution-ledger-system-follow-up.md)
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
 - [市场数据 v1.2 closure-11：最终追踪 Review](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md)

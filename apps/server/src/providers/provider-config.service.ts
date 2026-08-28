@@ -28,12 +28,7 @@ export interface ProviderConfigInput {
 }
 
 export type ProviderConnectionTestStatus =
-  | 'healthy'
-  | 'degraded'
-  | 'down'
-  | 'disabled'
-  | 'unconfigured'
-  | 'untested';
+  'healthy' | 'degraded' | 'down' | 'disabled' | 'unconfigured' | 'untested';
 
 export interface ProviderConnectionTestResult {
   name: string;

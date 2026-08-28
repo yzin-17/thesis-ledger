@@ -391,7 +391,6 @@ describe('Ledger 契约', () => {
     {
       ...base,
       type: 'ADJUSTMENT' as const,
-      correctionOf: '33333333-3333-4333-8333-333333333333',
       note: '修正历史缺失记录',
     },
   ])('接受 $type 事件', (event) => expect(ledgerEventSchemaV1.parse(event).type).toBe(event.type));
@@ -401,7 +400,6 @@ describe('Ledger 契约', () => {
       ledgerEventSchemaV1.parse({
         ...base,
         type: 'ADJUSTMENT',
-        correctionOf: '33333333-3333-4333-8333-333333333333',
       }),
     ).toThrow('受控修正'));
 });

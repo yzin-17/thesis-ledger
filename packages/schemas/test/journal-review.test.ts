@@ -11,6 +11,14 @@ const eventId = '00000000-0000-4000-8000-000000000002';
 const base = {
   id: 'review:account:symbol:entry:exit',
   accountId,
+  accountMode: 'actual' as const,
+  reviewObjectType: 'TRADE_CYCLE' as const,
+  reviewObjectId: 'trade:account:symbol:entry',
+  tradeId: 'trade:account:symbol:entry',
+  reviewStatus: 'CURRENT' as const,
+  stale: false,
+  statisticsEligible: true,
+  excludedReasons: [] as string[],
   symbol: '600519.SH',
   entryAt: '2026-01-01T09:30:00.000Z',
   exitAt: '2026-01-03T09:30:00.000Z',
@@ -19,6 +27,15 @@ const base = {
   plan: null,
   evidenceCompleteness: 'actual-only' as const,
   missingEvidence: ['交易计划'],
+  projection: {
+    ledgerRevision: '1',
+    projectionGeneration: '1',
+    projectionFingerprint: null,
+    factIds: [eventId],
+    eventIds: [eventId],
+    fxEvidenceVersion: null,
+    conversionFingerprint: null,
+  },
   sources: { entryEventIds: [eventId], exitEventIds: [eventId], journalEntryIds: [] },
 };
 

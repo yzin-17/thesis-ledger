@@ -1,14 +1,13 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { LedgerService } from '../ledger/ledger.service.js';
-import { PrismaService } from '../platform/prisma.service.js';
+import { Injectable } from '@nestjs/common';
 import { AssetMatcherService } from './asset-matcher.service.js';
 import { ImportCommitService } from './import-commit.service.js';
-import { ImportDraftService } from './import-draft.service.js';
+import { ImportDraftService, type ImportDraftOptions } from './import-draft.service.js';
 import { ImportRollbackService } from './import-rollback.service.js';
 import type { ScreenshotSource } from './screenshot-source.js';
 import type { PositionVisionProvider, VisionPosition } from './vision-validation.js';
 
 export { detectScreenshotSource, type ScreenshotSource } from './screenshot-source.js';
+export type { ImportDraftOptions } from './import-draft.service.js';
 export {
   validateVisionPosition,
   type PositionVisionProvider,
@@ -18,29 +17,11 @@ export {
 @Injectable()
 export class ImportService {
   constructor(
-    private readonly prisma: PrismaService,
-    @Optional() private readonly ledger?: LedgerService,
-    @Optional() private readonly matcher?: AssetMatcherService,
-    @Optional() private readonly drafts?: ImportDraftService,
-    @Optional() private readonly commits?: ImportCommitService,
-    @Optional() private readonly rollbacks?: ImportRollbackService,
+    private readonly matcher: AssetMatcherService,
+    private readonly drafts: ImportDraftService,
+    private readonly commits: ImportCommitService,
+    private readonly rollbacks: ImportRollbackService,
   ) {}
-
-  private assetMatcher() {
-    return this.matcher ?? new AssetMatcherService(this.prisma);
-  }
-
-  private draftService() {
-    return this.drafts ?? new ImportDraftService(this.prisma, this.assetMatcher());
-  }
-
-  private commitService() {
-    return this.commits ?? new ImportCommitService(this.prisma, this.ledger);
-  }
-
-  private rollbackService() {
-    return this.rollbacks ?? new ImportRollbackService(this.prisma, this.ledger);
-  }
 
   createDraftFromProvider(
     accountId: string,
@@ -48,18 +29,20 @@ export class ImportService {
     source: ScreenshotSource,
     provider: PositionVisionProvider,
     sourceConfidence?: number,
+    temporal?: ImportDraftOptions,
   ) {
-    return this.draftService().createDraftFromProvider(
+    return this.drafts.createDraftFromProvider(
       accountId,
       image,
       source,
       provider,
       sourceConfidence,
+      temporal,
     );
   }
 
   matchAsset(row: VisionPosition) {
-    return this.assetMatcher().matchAsset(row);
+    return this.matcher.matchAsset(row);
   }
 
   createDraft(
@@ -68,23 +51,29 @@ export class ImportService {
     source: ScreenshotSource,
     extracted: VisionPosition[],
     sourceConfidence?: number,
+    temporal?: ImportDraftOptions,
   ) {
-    return this.draftService().createDraft(accountId, image, source, extracted, sourceConfidence);
+    return this.drafts.createDraft(accountId, image, source, extracted, sourceConfidence, temporal);
   }
 
   rebaseline(id: string) {
-    return this.draftService().rebaseline(id);
+    return this.drafts.rebaseline(id);
   }
 
-  commit(id: string, reviewedRows: unknown[], reviewedSource?: ScreenshotSource) {
-    return this.commitService().commit(id, reviewedRows, reviewedSource);
+  async commit(
+    id: string,
+    reviewedRows: unknown[],
+    reviewedSource?: ScreenshotSource,
+    temporal?: ImportDraftOptions,
+  ) {
+    return this.commits.commit(id, reviewedRows, reviewedSource, temporal);
   }
 
   history(accountId: string) {
-    return this.draftService().history(accountId);
+    return this.drafts.history(accountId);
   }
 
   rollback(id: string) {
-    return this.rollbackService().rollback(id);
+    return this.rollbacks.rollback(id);
   }
 }

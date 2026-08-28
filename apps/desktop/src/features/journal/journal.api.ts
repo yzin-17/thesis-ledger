@@ -1,6 +1,14 @@
 import { createAiRun } from '../ai/ai.api.js';
-import { ThesisLedgerContractError } from '@thesis-ledger/api-client';
-import { journalReviewCandidatesResponseSchema } from '@thesis-ledger/schemas';
+import {
+  ThesisLedgerContractError,
+  type JournalReviewCandidatesResponse,
+  type JournalReviewSnapshotInput,
+  type JournalReviewSnapshotResponse,
+} from '@thesis-ledger/api-client';
+import {
+  journalReviewCandidatesResponseSchema,
+  journalReviewSnapshotResponseSchema,
+} from '@thesis-ledger/schemas';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
 import type {
   BehaviorReviewResult,
@@ -13,6 +21,7 @@ import type {
 
 export interface ReviewCandidatesQuery {
   accountId: string;
+  mode?: 'actual' | 'shadow';
   symbol?: string;
   start?: string;
   end?: string;
@@ -24,6 +33,7 @@ export interface ReviewCandidatesResponse {
   items: JournalReviewCandidate[];
   total: number;
   nextCursor: string | null;
+  legacyItems: JournalReviewCandidatesResponse['legacyItems'];
 }
 
 const noStore = { cache: 'no-store' as const };
@@ -45,6 +55,25 @@ export const fetchReviewCandidates = async (
   const path = `/journal/review-candidates${queryString(params)}`;
   const raw = await requestDesktopJson<unknown>(path, noStore, client);
   const parsed = journalReviewCandidatesResponseSchema.safeParse(raw);
+  if (!parsed.success) throw new ThesisLedgerContractError(path);
+  return parsed.data;
+};
+
+export const saveReviewSnapshot = async (
+  input: JournalReviewSnapshotInput,
+  client?: DesktopRequestClient,
+): Promise<JournalReviewSnapshotResponse> => {
+  const path = '/journal/review-snapshots';
+  const raw = await requestDesktopJson<unknown>(
+    path,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+    client,
+  );
+  const parsed = journalReviewSnapshotResponseSchema.safeParse(raw);
   if (!parsed.success) throw new ThesisLedgerContractError(path);
   return parsed.data;
 };

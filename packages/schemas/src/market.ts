@@ -317,22 +317,23 @@ const marketDetailSectionSchemaImplementation = marketDetailSectionBaseSchema.su
   },
 );
 
-export const marketDetailSectionSchema = marketDetailSectionSchemaImplementation as z.ZodType<
-  MarketDetailSection
->;
+export const marketDetailSectionSchema =
+  marketDetailSectionSchemaImplementation as z.ZodType<MarketDetailSection>;
 
-export const marketDetailDependencySchema = z.object({
-  status: marketDetailSectionStatusSchema,
-  error: marketDetailDiagnosticSchema.optional(),
-}).superRefine((dependency, context) => {
-  if (dependency.status === 'unavailable' && !dependency.error) {
-    context.addIssue({
-      code: 'custom',
-      message: 'unavailable 依赖必须携带诊断信息。',
-      path: ['error'],
-    });
-  }
-});
+export const marketDetailDependencySchema = z
+  .object({
+    status: marketDetailSectionStatusSchema,
+    error: marketDetailDiagnosticSchema.optional(),
+  })
+  .superRefine((dependency, context) => {
+    if (dependency.status === 'unavailable' && !dependency.error) {
+      context.addIssue({
+        code: 'custom',
+        message: 'unavailable 依赖必须携带诊断信息。',
+        path: ['error'],
+      });
+    }
+  });
 
 const marketDetailResponseBaseSchema = z
   .object({

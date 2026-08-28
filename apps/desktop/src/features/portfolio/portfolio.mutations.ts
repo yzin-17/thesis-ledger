@@ -10,6 +10,7 @@ import {
 } from './portfolio.api.js';
 import { portfolioKeys } from './portfolio.queries.js';
 import type { SaveAccountInput, SavePositionInput } from './portfolio.api.js';
+import type { Account } from './portfolio.types.js';
 
 const invalidatePortfolio = (client: ReturnType<typeof useQueryClient>) =>
   client.invalidateQueries({ queryKey: portfolioKeys.root });
@@ -47,8 +48,15 @@ export const useSavePositionMutation = () => {
 export const useSaveCashBalanceMutation = () => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ accountId, amount }: { accountId: string; amount: number }) =>
-      saveCashBalance(accountId, amount),
+    mutationFn: ({
+      accountId,
+      amount,
+      currency,
+    }: {
+      accountId: string;
+      amount: string;
+      currency?: Account['currency'];
+    }) => saveCashBalance(accountId, amount, currency),
     onSuccess: () => invalidatePortfolio(client),
   });
 };

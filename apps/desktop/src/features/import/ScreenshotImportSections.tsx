@@ -279,7 +279,7 @@ function ScreenshotImportRow({
           min="0"
           step="any"
           value={row.quantity ?? ''}
-          onChange={(event) => onUpdate(index, { quantity: Number(event.target.value) })}
+          onChange={(event) => onUpdate(index, { quantity: event.target.value })}
         />
       </label>
       <label>
@@ -289,7 +289,7 @@ function ScreenshotImportRow({
           min="0"
           step="any"
           value={row.costPrice ?? ''}
-          onChange={(event) => onUpdate(index, { costPrice: Number(event.target.value) })}
+          onChange={(event) => onUpdate(index, { costPrice: event.target.value })}
         />
       </label>
       <div className="row-status">

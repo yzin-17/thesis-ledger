@@ -29,24 +29,24 @@
 
 ## 2. 项目优先级矩阵
 
-| 项目 | Star 快照 | 许可证 | 最值得借鉴 | 与本项目重合度 | 建议 |
-|---|---:|---|---|---:|---|
-| daily_stock_analysis | ~59.7k | MIT | 图片导入、A股多源行情、飞书、AI报告、告警、自动化 | 85% 产品 / 35% 架构 | 深度参考；可做 PoC fork/Sidecar |
-| TradingAgents | ~95.1k | Apache-2.0 | 多 Agent、Risk/Portfolio Gate、决策日志、复盘 | 45% | AI Worker 参考 |
-| Qlib | ~46.9k | MIT | 因子、ML、组合、回测、PIT 数据 | 35% | V2 研究 Worker |
-| vn.py | ~44.1k | MIT | 事件引擎、模拟盘、交易网关、OMS、风控 | 35% 当前 / 75% 未来实盘 | V2/V3 接入，不 fork App |
-| Vibe-Trading | ~28.9k | MIT | Agent、Shadow Account、fallback、回测验证、行为复盘 | 65% | V0.5+ 重点参考/Worker |
-| Lean | ~21.0k | Apache-2.0 | 专业事件驱动回测、优化、实盘、插件式引擎 | 30% 当前 / 70% 未来 | 后期回测/执行备选 |
-| RD-Agent | ~14k | MIT | 自动因子挖掘、模型优化、研究闭环 | 20% | V2/V3 |
-| QUANTAXIS | ~10k | MIT | 多账户、QIFI、OMS、行情/交易全栈 | 35% | 账户/OMS 概念参考 |
-| Ghostfolio | ~9.0k | AGPL-3.0 | NestJS、Postgres、Redis、Ledger、Portfolio、Provider | **90% 架构 / 75% 产品** | **条件式主仓 fork 候选** |
-| FinRobot | ~7k | Apache-2.0 | 确定性计算 + LLM 解释、可追溯报告、多 Agent | 35% | AI 架构参考 |
-| QuantStats | ~7k | Apache-2.0 | 收益/风险统计、图表、HTML tear sheet | 30% | 直接依赖 |
-| PyPortfolioOpt | ~6k | MIT | 均值方差、Black-Litterman、HRP、CVaR | 25% | V2 直接依赖 |
-| Riskfolio-Lib | ~4k | BSD-3-Clause | 多种风险度量、组合优化 | 25% | V2 直接依赖 |
-| Portfolio Performance | ~4k | EPL-1.0 | Ledger、TTWROR、IRR、税费、再平衡 | 60% 领域 | 领域模型参考，不 fork |
-| Hikyuu | ~3k | Apache-2.0 | A股策略系统拆分、止损、资金管理、滑点 | 40% | Backtest/Strategy 参考 |
-| OpenBB | >1k | AGPL-3.0 | Provider/数据目录/API 平台化 | 25% | 架构参考，注意许可 |
+| 项目                  | Star 快照 | 许可证       | 最值得借鉴                                           |          与本项目重合度 | 建议                            |
+| --------------------- | --------: | ------------ | ---------------------------------------------------- | ----------------------: | ------------------------------- |
+| daily_stock_analysis  |    ~59.7k | MIT          | 图片导入、A股多源行情、飞书、AI报告、告警、自动化    |     85% 产品 / 35% 架构 | 深度参考；可做 PoC fork/Sidecar |
+| TradingAgents         |    ~95.1k | Apache-2.0   | 多 Agent、Risk/Portfolio Gate、决策日志、复盘        |                     45% | AI Worker 参考                  |
+| Qlib                  |    ~46.9k | MIT          | 因子、ML、组合、回测、PIT 数据                       |                     35% | V2 研究 Worker                  |
+| vn.py                 |    ~44.1k | MIT          | 事件引擎、模拟盘、交易网关、OMS、风控                | 35% 当前 / 75% 未来实盘 | V2/V3 接入，不 fork App         |
+| Vibe-Trading          |    ~28.9k | MIT          | Agent、Shadow Account、fallback、回测验证、行为复盘  |                     65% | V0.5+ 重点参考/Worker           |
+| Lean                  |    ~21.0k | Apache-2.0   | 专业事件驱动回测、优化、实盘、插件式引擎             |     30% 当前 / 70% 未来 | 后期回测/执行备选               |
+| RD-Agent              |      ~14k | MIT          | 自动因子挖掘、模型优化、研究闭环                     |                     20% | V2/V3                           |
+| QUANTAXIS             |      ~10k | MIT          | 多账户、QIFI、OMS、行情/交易全栈                     |                     35% | 账户/OMS 概念参考               |
+| Ghostfolio            |     ~9.0k | AGPL-3.0     | NestJS、Postgres、Redis、Ledger、Portfolio、Provider | **90% 架构 / 75% 产品** | **条件式主仓 fork 候选**        |
+| FinRobot              |       ~7k | Apache-2.0   | 确定性计算 + LLM 解释、可追溯报告、多 Agent          |                     35% | AI 架构参考                     |
+| QuantStats            |       ~7k | Apache-2.0   | 收益/风险统计、图表、HTML tear sheet                 |                     30% | 直接依赖                        |
+| PyPortfolioOpt        |       ~6k | MIT          | 均值方差、Black-Litterman、HRP、CVaR                 |                     25% | V2 直接依赖                     |
+| Riskfolio-Lib         |       ~4k | BSD-3-Clause | 多种风险度量、组合优化                               |                     25% | V2 直接依赖                     |
+| Portfolio Performance |       ~4k | EPL-1.0      | Ledger、TTWROR、IRR、税费、再平衡                    |                60% 领域 | 领域模型参考，不 fork           |
+| Hikyuu                |       ~3k | Apache-2.0   | A股策略系统拆分、止损、资金管理、滑点                |                     40% | Backtest/Strategy 参考          |
+| OpenBB                |       >1k | AGPL-3.0     | Provider/数据目录/API 平台化                         |                     25% | 架构参考，注意许可              |
 
 > Star 只是成熟度和社区信号之一，不能替代代码质量、许可证、维护状态、测试覆盖和领域适配度评估。
 
@@ -102,14 +102,14 @@ Ghostfolio 已经有：
 它的 `DataProviderInterface` 已经包含：
 
 ```ts
-canHandle()
-getAssetProfile()
-getDividends()
-getHistorical()
-getQuotes()
-search()
-getName()
-getTestSymbol()
+canHandle();
+getAssetProfile();
+getDividends();
+getHistorical();
+getQuotes();
+search();
+getName();
+getTestSymbol();
 ```
 
 这个设计和我们计划的 `MarketDataProvider` 高度一致，值得直接作为接口设计参考。

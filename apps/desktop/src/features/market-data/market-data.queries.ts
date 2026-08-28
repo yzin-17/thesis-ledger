@@ -19,7 +19,10 @@ export const marketDataKeys = {
 
 export const useMarketDataQueries = () => {
   const policy = useQuery({ queryKey: marketDataKeys.policy(), queryFn: fetchMarketPolicy });
-  const providers = useQuery({ queryKey: marketDataKeys.providers(), queryFn: fetchMarketProviders });
+  const providers = useQuery({
+    queryKey: marketDataKeys.providers(),
+    queryFn: fetchMarketProviders,
+  });
   const catalog = useQuery({ queryKey: marketDataKeys.catalog(), queryFn: fetchCatalogStatus });
   return { policy, providers, catalog };
 };
@@ -35,7 +38,7 @@ export const useCatalogJobQuery = (jobId: string | null) =>
       return fetchCatalogJob(jobId);
     },
     enabled: Boolean(jobId),
-    refetchInterval: (query) => terminalCatalogState(query.state.data) ? false : 1_500,
+    refetchInterval: (query) => (terminalCatalogState(query.state.data) ? false : 1_500),
     refetchIntervalInBackground: true,
   });
 

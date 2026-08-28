@@ -27,6 +27,7 @@ import { ReviewCandidateList } from './ReviewCandidateList.js';
 import {
   useBehaviorAnalysisMutation,
   useBehaviorExplanationMutation,
+  useSaveReviewSnapshotMutation,
   useSingleTradeAnalysisMutation,
   useSingleTradeExplanationMutation,
 } from './journal.mutations.js';
@@ -65,7 +66,8 @@ const isFiniteNumber = (value: unknown): value is number =>
 const toReviewTrade = (
   candidate: JournalReviewCandidate,
   evidence: ReviewEvidenceDraft = {},
-): ReviewTrade => {
+): ReviewTrade | null => {
+  if (candidate.pnl === null) return null;
   const trade: ReviewTrade = {
     symbol: candidate.symbol,
     entryAt: candidate.entryAt,
@@ -291,6 +293,7 @@ export function JournalDashboard({
   onRetry,
   onNavigateAccounts,
   onNavigatePosition,
+  search = '',
 }: {
   accounts?: Account[];
   accountsReady?: boolean;
@@ -299,8 +302,19 @@ export function JournalDashboard({
   onRetry?: () => void;
   onNavigateAccounts?: () => void;
   onNavigatePosition?: () => void;
+  search?: string;
 }) {
   const toastManager = useToastManager();
+  const requestedReview = useMemo(() => {
+    const params = new URLSearchParams(search);
+    return {
+      accountId: params.get('accountId'),
+      tradeId: params.get('tradeId'),
+      reviewObjectType: params.get('reviewObjectType'),
+      closeSliceId: params.get('closeSliceId'),
+      mode: params.get('mode') === 'shadow' ? ('shadow' as const) : ('actual' as const),
+    };
+  }, [search]);
   const [tab, setTab] = useState<'single' | 'period'>('single');
   const [accountId, setAccountId] = useState('');
   const [symbolFilter, setSymbolFilter] = useState('');
@@ -324,15 +338,25 @@ export function JournalDashboard({
   const [periodAiRun, setPeriodAiRun] = useState<BehaviorReviewResult['aiRun']>(null);
 
   useEffect(() => {
+    const requestedAccount = accounts.find(
+      (account) =>
+        account.id === requestedReview.accountId && account.mode === requestedReview.mode,
+    );
+    if (requestedAccount && accountId !== requestedAccount.id) {
+      setAccountId(requestedAccount.id);
+      return;
+    }
     if (accountId && accounts.some((account) => account.id === accountId)) return;
-    const nextAccount = accounts.find((account) => account.active !== false) ?? accounts[0];
+    const nextAccount =
+      requestedAccount ?? accounts.find((account) => account.active !== false) ?? accounts[0];
     setAccountId(nextAccount?.id ?? '');
-  }, [accountId, accounts]);
+  }, [accountId, accounts, requestedReview.accountId, requestedReview.mode]);
 
   const selectedAccount = accounts.find((account) => account.id === accountId);
   const candidateParams = useMemo(
     () => ({
       accountId,
+      mode: selectedAccount?.mode ?? requestedReview.mode,
       ...(symbolFilter.trim() ? { symbol: symbolFilter.trim() } : {}),
       limit: 100,
       ...(tab === 'period'
@@ -346,6 +370,8 @@ export function JournalDashboard({
       accountId,
       periodWindow.end,
       periodWindow.start,
+      requestedReview.mode,
+      selectedAccount?.mode,
       singleEndDate,
       singleStartDate,
       symbolFilter,
@@ -357,6 +383,30 @@ export function JournalDashboard({
     Boolean(accountId && accountsReady && !accountsError),
   );
   const candidates = candidateQuery.data?.items ?? [];
+  const periodCandidates = candidates.filter(
+    (candidate) =>
+      candidate.reviewObjectType === 'TRADE_CYCLE' &&
+      candidate.statisticsEligible &&
+      !candidate.stale &&
+      candidate.pnl !== null,
+  );
+
+  useEffect(() => {
+    if (selectedCandidate || !requestedReview.tradeId || candidates.length === 0) return;
+    const target = candidates.find(
+      (candidate) =>
+        candidate.tradeId === requestedReview.tradeId &&
+        candidate.reviewObjectType === requestedReview.reviewObjectType &&
+        (requestedReview.reviewObjectType !== 'CLOSE_SLICE' ||
+          candidate.closeSliceId === requestedReview.closeSliceId),
+    );
+    if (!target) return;
+    setSelectedCandidate(target);
+    setManualTrade(null);
+    setEvidenceDraft({});
+    setSingleResult(null);
+    setSingleAiRun(null);
+  }, [candidates, requestedReview, selectedCandidate]);
 
   const currentSingleTrade = useMemo(() => {
     if (manualTrade) return manualTrade;
@@ -364,13 +414,18 @@ export function JournalDashboard({
     return null;
   }, [evidenceDraft, manualTrade, selectedCandidate]);
   const periodTrades =
-    periodTradesOverride ?? candidates.map((candidate) => toReviewTrade(candidate));
+    periodTradesOverride ??
+    periodCandidates.flatMap((candidate) => {
+      const trade = toReviewTrade(candidate);
+      return trade ? [trade] : [];
+    });
   const periodWindowInvalid = periodWindow.start >= periodWindow.end;
 
   const singleAnalysis = useSingleTradeAnalysisMutation();
   const periodAnalysis = useBehaviorAnalysisMutation();
   const singleExplanation = useSingleTradeExplanationMutation();
   const periodExplanation = useBehaviorExplanationMutation();
+  const reviewSnapshotMutation = useSaveReviewSnapshotMutation();
 
   const resetReviewState = () => {
     setSelectedCandidate(null);
@@ -400,12 +455,36 @@ export function JournalDashboard({
     setSingleAiRun(null);
   };
 
+  const persistReviewSnapshot = async (trade: ReviewTrade, outputSnapshot: unknown) => {
+    if (!selectedCandidate) return;
+    try {
+      await reviewSnapshotMutation.mutateAsync({
+        accountId: selectedCandidate.accountId,
+        mode: selectedCandidate.accountMode,
+        reviewObjectType: selectedCandidate.reviewObjectType,
+        tradeId: selectedCandidate.tradeId,
+        ...(selectedCandidate.closeSliceId ? { closeSliceId: selectedCandidate.closeSliceId } : {}),
+        inputSnapshot: trade,
+        outputSnapshot,
+      });
+    } catch {
+      toastManager.add({
+        title: '复盘快照保存失败',
+        description: '确定性结果仍然保留，但本次结果未写入长期复盘快照。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    }
+  };
+
   const startSingleReview = async () => {
     if (!currentSingleTrade) return;
     setSingleAiRun(null);
     try {
       const result = await singleAnalysis.mutateAsync(currentSingleTrade);
       setSingleResult(result);
+      await persistReviewSnapshot(currentSingleTrade, result);
       toastManager.add({
         title: '单笔复盘完成',
         description: '确定性事实已计算；AI 解读需要单独触发。',
@@ -580,6 +659,7 @@ export function JournalDashboard({
           <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(18rem,25rem)_minmax(0,1fr)]">
             <ReviewCandidateList
               candidates={candidates}
+              legacyItems={candidateQuery.data?.legacyItems}
               selectedId={selectedCandidate?.id ?? null}
               filter={symbolFilter}
               onFilterChange={setSymbolFilter}
@@ -599,7 +679,30 @@ export function JournalDashboard({
               loading={candidateQuery.isPending}
             />
             <div className="flex min-w-0 flex-col gap-4">
-              {currentSingleTrade ? (
+              {selectedCandidate && !currentSingleTrade ? (
+                <Card className="shadow-none">
+                  <CardHeader>
+                    <CardTitle>该复盘对象的证据不足</CardTitle>
+                    <CardDescription>
+                      当前投影没有足够的确定性事实，不能把缺失字段当作零值继续计算。
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      缺少：{selectedCandidate.missingEvidence.join('、') || '已实现净收益'}。
+                    </p>
+                    {selectedCandidate.excludedReasons.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCandidate.excludedReasons.map((reason) => (
+                          <Badge key={reason} variant="outline">
+                            {reason}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : currentSingleTrade ? (
                 <>
                   <EvidenceSummary
                     candidate={selectedCandidate}
@@ -671,7 +774,13 @@ export function JournalDashboard({
                             result: singleResult,
                             ...(selectedCandidate ? { sources: selectedCandidate.sources } : {}),
                           })
-                          .then((run) => setSingleAiRun(run))
+                          .then(async (run) => {
+                            setSingleAiRun(run);
+                            await persistReviewSnapshot(currentSingleTrade, {
+                              ...singleResult,
+                              aiRun: run,
+                            });
+                          })
                           .catch(() => undefined);
                       }}
                     />
@@ -833,6 +942,11 @@ export function JournalDashboard({
                   <Badge variant={periodTrades.length > 0 ? 'secondary' : 'outline'}>
                     {periodTrades.length} 笔样本
                   </Badge>
+                  {periodCandidates.length < candidates.length && !periodTradesOverride && (
+                    <span className="text-xs text-muted-foreground">
+                      已排除 {candidates.length - periodCandidates.length} 个非完整交易对象
+                    </span>
+                  )}
                   {periodTradesOverride && (
                     <span className="text-muted-foreground">来自高级 JSON</span>
                   )}
@@ -874,6 +988,7 @@ export function JournalDashboard({
           )}
           <ReviewCandidateList
             candidates={candidates}
+            legacyItems={candidateQuery.data?.legacyItems}
             filter={symbolFilter}
             onFilterChange={setSymbolFilter}
             loading={candidateQuery.isPending}

@@ -5,13 +5,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { JournalReviewCandidate } from './journal.types.js';
+import type { JournalLegacyReviewCandidate, JournalReviewCandidate } from './journal.types.js';
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(value));
 
-const formatMoney = (value: number) =>
-  new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value);
+const formatMoney = (value: number | null) =>
+  value === null
+    ? '证据不足'
+    : new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value);
+
+const pnlClass = (value: number | null) => {
+  if (value === null) return 'text-muted-foreground';
+  return value >= 0 ? 'text-positive' : 'text-negative';
+};
+
+const objectLabel = (candidate: JournalReviewCandidate) =>
+  candidate.reviewObjectType === 'TRADE_CYCLE' ? '完整交易' : '减仓片段';
 
 const completenessLabel = (value: JournalReviewCandidate['evidenceCompleteness']) => {
   if (value === 'complete') return '证据完整';
@@ -27,6 +37,7 @@ const completenessVariant = (value: JournalReviewCandidate['evidenceCompleteness
 
 export function ReviewCandidateList({
   candidates,
+  legacyItems = [],
   selectedId,
   filter,
   onFilterChange,
@@ -39,6 +50,7 @@ export function ReviewCandidateList({
   onEndDateChange,
 }: {
   candidates: JournalReviewCandidate[];
+  legacyItems?: JournalLegacyReviewCandidate[] | undefined;
   selectedId?: string | null;
   filter: string;
   onFilterChange: (value: string) => void;
@@ -90,8 +102,8 @@ export function ReviewCandidateList({
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="flex items-center justify-between gap-3">
                 <strong className="truncate font-medium">{candidate.symbol}</strong>
-                <span className={candidate.pnl >= 0 ? 'text-positive' : 'text-negative'}>
-                  {candidate.pnl >= 0 ? '+' : ''}
+                <span className={pnlClass(candidate.pnl)}>
+                  {candidate.pnl !== null && candidate.pnl >= 0 ? '+' : ''}
                   {formatMoney(candidate.pnl)}
                 </span>
               </span>
@@ -99,9 +111,13 @@ export function ReviewCandidateList({
                 <span>
                   {formatDate(candidate.entryAt)} → {formatDate(candidate.exitAt)}
                 </span>
-                <Badge variant={completenessVariant(candidate.evidenceCompleteness)}>
-                  {completenessLabel(candidate.evidenceCompleteness)}
-                </Badge>
+                <span className="flex flex-wrap justify-end gap-1">
+                  <Badge variant="outline">{objectLabel(candidate)}</Badge>
+                  <Badge variant={completenessVariant(candidate.evidenceCompleteness)}>
+                    {completenessLabel(candidate.evidenceCompleteness)}
+                  </Badge>
+                  {candidate.stale && <Badge variant="destructive">投影已过期</Badge>}
+                </span>
               </span>
             </span>
           </Button>
@@ -111,53 +127,78 @@ export function ReviewCandidateList({
   }
 
   return (
-    <Card className="min-w-0 shadow-none">
-      <CardHeader className="gap-3 border-b">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>已平仓交易</CardTitle>
-            <CardDescription>从 Ledger 读取，不会自动写入任何记录。</CardDescription>
+    <div className="flex min-w-0 flex-col gap-3">
+      <Card className="min-w-0 shadow-none">
+        <CardHeader className="gap-3 border-b">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>已平仓交易</CardTitle>
+              <CardDescription>从 Ledger 读取，不会自动写入任何记录。</CardDescription>
+            </div>
+            <Badge variant="outline">{candidates.length} 笔</Badge>
           </div>
-          <Badge variant="outline">{candidates.length} 笔</Badge>
-        </div>
-        <label className="relative block">
-          <span className="sr-only">按标的筛选</span>
-          <SearchIcon
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            value={filter}
-            onChange={(event) => onFilterChange(event.target.value)}
-            className="pl-9"
-            placeholder="搜索标的代码"
-            aria-label="按标的筛选"
-          />
-        </label>
-        {(onStartDateChange || onEndDateChange) && (
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              开始日期
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(event) => onStartDateChange?.(event.target.value)}
-                aria-label="按开始日期筛选"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              结束日期
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(event) => onEndDateChange?.(event.target.value)}
-                aria-label="按结束日期筛选"
-              />
-            </label>
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="p-2">{content}</CardContent>
-    </Card>
+          <label className="relative block">
+            <span className="sr-only">按标的筛选</span>
+            <SearchIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={filter}
+              onChange={(event) => onFilterChange(event.target.value)}
+              className="pl-9"
+              placeholder="搜索标的代码"
+              aria-label="按标的筛选"
+            />
+          </label>
+          {(onStartDateChange || onEndDateChange) && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                开始日期
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => onStartDateChange?.(event.target.value)}
+                  aria-label="按开始日期筛选"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                结束日期
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => onEndDateChange?.(event.target.value)}
+                  aria-label="按结束日期筛选"
+                />
+              </label>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="p-2">{content}</CardContent>
+      </Card>
+      {legacyItems.length > 0 && (
+        <Card className="min-w-0 border-dashed shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">旧复盘引用待确认</CardTitle>
+            <CardDescription>
+              以下 Journal 引用无法唯一对应当前 Close Slice，不会按标的或日期自动猜测。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            {legacyItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
+              >
+                <span>
+                  {item.symbol ?? '未知标的'} · {item.journalEntryId.slice(0, 8)}
+                </span>
+                <Badge variant="outline">人工确认</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

@@ -1,31 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LedgerService, appendLedgerEvent } from '../../src/ledger/ledger.service.js';
+import { LedgerService } from '../../src/ledger/ledger.service.js';
+import { projectCashBalances } from '../../src/ledger/cash-projection.js';
 
 describe('Ledger Service', () => {
-  it('externalUid upsert 提供幂等事件写入', async () => {
-    const upsert = vi.fn(async ({ where }: { where: object }) => where);
-    await appendLedgerEvent({ ledgerEvent: { upsert } } as never, {
-      version: 1,
-      id: '11111111-1111-4111-8111-111111111115',
-      accountId: '11111111-1111-4111-8111-111111111111',
-      type: 'CASH_DEPOSIT',
-      amount: 1000,
-      occurredAt: '2025-01-01T00:00:00Z',
-      source: 'manual',
-      externalUid: 'bank-1',
-      currency: 'CNY',
-    });
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          accountId_externalId: {
-            accountId: '11111111-1111-4111-8111-111111111111',
-            externalId: 'bank-1',
-          },
-        },
-        update: {},
-      }),
-    );
+  it('运行时拒绝旧通用 V1 LedgerEvent 写入入口', async () => {
+    await expect(
+      new LedgerService({} as never, {} as never).append({ version: 1 }),
+    ).rejects.toThrow('旧通用 LedgerEvent 写入入口已停用');
   });
   it('rebuild 更新现有投影时保留 Position ID', async () => {
     const create = vi.fn(async ({ data }: { data: object }) => data);
@@ -60,10 +41,10 @@ describe('Ledger Service', () => {
       ledgerEvent,
       $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
     };
-    const result = await new LedgerService(prisma as never).rebuild(
+    const result = await new LedgerService(prisma as never, {} as never).rebuild(
       '11111111-1111-4111-8111-111111111111',
     );
-    expect(result[0]).toMatchObject({ quantity: 100, averageCost: 10 });
+    expect(result[0]).toMatchObject({ quantity: '100', averageCost: '10' });
     expect(update).toHaveBeenCalledWith({
       where: { id: 'position-1' },
       data: expect.objectContaining({ source: 'ledger' }),
@@ -122,7 +103,7 @@ describe('Ledger Service', () => {
       ledgerEvent,
       $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
     };
-    const service = new LedgerService(prisma as never);
+    const service = new LedgerService(prisma as never, {} as never);
 
     await service.rebuild('11111111-1111-4111-8111-111111111111');
     await service.rebuild('11111111-1111-4111-8111-111111111111');
@@ -136,5 +117,68 @@ describe('Ledger Service', () => {
         source: 'ledger',
       }),
     });
+  });
+
+  it('现金读取使用 V2 事件并保留十进制精度', () => {
+    const balances = projectCashBalances([
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        type: 'CASH_FLOW',
+        factId: '22222222-2222-4222-8222-222222222222',
+        ledgerRevision: 1n,
+        occurredAt: new Date('2026-08-20T01:00:00.000Z'),
+        timePrecision: 'INSTANT',
+        sourceTimezone: 'UTC',
+        economicOrderKey: 'cash-flow:1',
+        recordedAt: new Date('2026-08-20T01:00:01.000Z'),
+        payloadVersion: 1,
+        payload: {
+          direction: 'INFLOW',
+          category: 'DEPOSIT',
+          amount: '9007199254740993.12345678',
+          currency: 'USD',
+        },
+        sourceCategory: 'MANUAL',
+        sourceChannel: 'manual',
+        externalId: null,
+        actorId: 'user-1',
+        revisionAction: 'CREATE',
+        supersedesEventId: null,
+        reason: null,
+      },
+    ]);
+
+    expect(balances.get('11111111-1111-4111-8111-111111111111')?.get('USD')?.toString()).toBe(
+      '9007199254740993.12345678',
+    );
+  });
+
+  it('现金余额写入保留显式原币种', async () => {
+    const appendRevision = vi.fn(async (_context: unknown, event: unknown) => event);
+    const withAccountWrite = vi.fn(
+      async (_accountId: string, callback: (context: unknown) => unknown) =>
+        callback({
+          transaction: {
+            account: {
+              findUnique: vi.fn(async () => ({ active: true, currency: 'HKD', type: 'cash' })),
+            },
+          },
+          nextLedgerRevision: 1n,
+          nextProjectionGeneration: 1n,
+        }),
+    );
+    const service = new LedgerService({} as never, { appendRevision, withAccountWrite } as never);
+    vi.spyOn(service as never, 'rebuildWithClient' as never).mockResolvedValue(undefined);
+
+    await service.setCashBalance('account-1', '12.50', 'manual', 'HKD');
+
+    expect(appendRevision).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'CASH_BALANCE_OBSERVATION',
+        payload: { currency: 'HKD', amount: '12.50', capturedAt: expect.any(String) },
+      }),
+    );
   });
 });

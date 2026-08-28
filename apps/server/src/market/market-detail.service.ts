@@ -200,16 +200,10 @@ export class MarketDetailService {
     } else if (requestedIndicators.length > 0 && !policyEnabledCapabilities.includes('bars')) {
       const firstIndicator = sections[requestedIndicators[0]!];
       const error =
-        firstIndicator?.error ??
-        this.diagnostic(requestId, 'bars', 'capability_not_enabled');
+        firstIndicator?.error ?? this.diagnostic(requestId, 'bars', 'capability_not_enabled');
       dependencies.DAILY_BAR = { status: 'unavailable', error };
       for (const capability of requestedIndicators) {
-        sections[capability] = this.unavailableSection(
-          capability,
-          requestId,
-          error.code,
-          error,
-        );
+        sections[capability] = this.unavailableSection(capability, requestId, error.code, error);
       }
     }
 

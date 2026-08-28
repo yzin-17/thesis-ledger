@@ -6,6 +6,8 @@ Server 启动时通过 Zod 校验 `DATABASE_URL`、`REDIS_URL` 和 `DSA_BASE_URL
 
 `PROVIDER_HEALTH_CHECK_INTERVAL_MS` 是非敏感的定时健康检查间隔配置，默认 1 小时（`3600000` 毫秒）；它不包含凭证，不应被当作 Secret 管理。
 
+`PROJECTION_READ_MODE` 只允许 `legacy`、`shadow` 或 `unified`，默认 `unified`；`PROJECTION_SWITCH_STAGE` 只允许 `trade-query`、`account-data`、`portfolio` 或 `journal`，默认 `journal`。两者用于发布控制面记录当前投影读取阶段，切换前必须通过 `pnpm projection:switch-gate`；当前构建的 Journal/Trade 读取固定消费统一物化投影，不能把环境变量当作旧路径兼容层。
+
 浏览器跨源访问只通过 `CORS_ORIGINS` 配置允许的来源，生产环境不得使用通配符；本地 Expo Web 可在 `thesis-ledger-infra/.env.example` 的开发端口上显式配置。Docker Desktop 构建/运行前需保留足够宿主机磁盘空间；内容存储出现 I/O 或空间错误时先恢复 Docker，再重跑 Compose 运行态门禁，不得把历史通过记录当作当前健康状态。
 
 提交前执行 Secret Scanner，并人工检查 `.env*`、日志 fixture 和截图 Ground Truth。发现泄漏时先吊销并轮换凭证，再清理历史；仅删除当前文件不视为完成。

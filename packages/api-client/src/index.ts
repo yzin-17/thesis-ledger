@@ -1,16 +1,56 @@
 import {
   apiErrorResponseSchema,
+  baselineReconciliationCandidatesResponseSchemaV2,
   instrumentSearchResponseSchema,
+  importDraftCommandResponseSchemaV2,
+  importDraftRevisionResponseSchemaV2,
   journalReviewCandidatesResponseSchema,
+  journalReviewSnapshotResponseSchema,
+  ledgerCommandResponseSchemaV2,
+  ledgerAuditResponseSchemaV2,
+  ledgerEventsResponseSchemaV2,
+  ledgerReplayResponseSchemaV2,
   marketDetailResponseSchema,
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
+  tradeCloseSliceQueryResponseSchemaV2,
+  tradeDetailResponseSchemaV2,
+  tradeListResponseSchemaV2,
+  tradeReferenceResolveResponseSchemaV2,
   type ApiErrorResponse,
+  type CreateBaselineObservationBatchCommandV2,
+  type CreateExecutionCommandV2,
+  type CreateImportDraftRevisionCommandV2,
+  type MoveExecutionAccountCommandV2,
+  type ReplaceExecutionCommandV2,
+  type RestoreExecutionCommandV2,
+  type ReviseImportDraftCommandV2,
+  type SubmitImportDraftRevisionCommandV2,
+  type VoidExecutionCommandV2,
   type MarketDetailRequest,
   type MarketDetailResponse,
   type JournalReviewCandidatesQuery,
   type JournalReviewCandidatesResponse,
+  type JournalReviewSnapshotInput,
+  type JournalReviewSnapshotResponse,
+  type BaselineReconciliationCandidatesResponseV2,
+  type ConfirmBaselineReconciliationCommandV2,
+  type RestoreBaselineReconciliationCommandV2,
+  type VoidBaselineReconciliationCommandV2,
+  type LedgerCommandResponseV2,
+  type LedgerAuditResponseV2,
+  type LedgerEventsResponseV2,
+  type LedgerReplayResponseV2,
+  type ImportDraftCommandResponseV2,
+  type ImportDraftRevisionResponseV2,
+  type TradeCloseSliceQueryResponseV2,
+  type TradeDetailResponseV2,
+  type TradeListQueryV2,
+  type TradeListResponseV2,
+  type TradeReferenceResolveRequestV2,
+  type TradeReferenceResolveResponseV2,
+  type CurrencyV1,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -27,7 +67,47 @@ export type {
   JournalReviewCandidate,
   JournalReviewCandidatesQuery,
   JournalReviewCandidatesResponse,
+  JournalReviewSnapshotInput,
+  JournalReviewSnapshotResponse,
+  LedgerEventV2,
+  DecimalString,
+  ExecutionChargeV2,
+  LedgerCommandErrorCodeV2,
+  LedgerCommandErrorV2,
+  MoneyV2,
+  CreateExecutionCommandV2,
+  ReplaceExecutionCommandV2,
+  VoidExecutionCommandV2,
+  RestoreExecutionCommandV2,
+  MoveExecutionAccountCommandV2,
+  ExecutionCommandV2,
+  CreateBaselineObservationBatchCommandV2,
+  CreateImportDraftRevisionCommandV2,
+  ReviseImportDraftCommandV2,
+  SubmitImportDraftRevisionCommandV2,
+  LedgerCommandResponseV2,
+  LedgerAuditResponseV2,
+  LedgerEventsResponseV2,
+  LedgerReplayResponseV2,
+  ImportDraftCommandResponseV2,
+  ImportDraftRevisionResponseV2,
+  TradeCloseSliceQueryResponseV2,
+  TradeDetailResponseV2,
+  TradeSummaryResponseV2,
+  TradeListQueryV2,
+  TradeListResponseV2,
+  TradeReferenceResolveRequestV2,
+  TradeReferenceResolveResponseV2,
+  BaselineReconciliationCandidateV2,
+  BaselineReconciliationCheckpointV2,
+  BaselineReconciliationCandidatesResponseV2,
+  BaselineReconciliationCommandV2,
+  ConfirmBaselineReconciliationCommandV2,
+  VoidBaselineReconciliationCommandV2,
+  RestoreBaselineReconciliationCommandV2,
 } from '@thesis-ledger/schemas';
+
+export type { JournalLegacyReviewCandidate } from '@thesis-ledger/schemas';
 
 export type MarketDetailQuery = Omit<MarketDetailRequest, 'symbol'> & {
   signal?: AbortSignal;
@@ -65,10 +145,47 @@ export class ThesisLedgerApiClient {
   private readonly fetcher: typeof fetch;
 
   readonly portfolio = {
-    getValuation: (params: { mode?: 'actual' | 'shadow'; accountId?: string; t?: number } = {}) =>
+    getValuation: (
+      params: {
+        mode?: 'actual' | 'shadow';
+        accountId?: string;
+        fxMerge?: boolean;
+        baseCurrency?: CurrencyV1;
+        t?: number;
+      } = {},
+    ) =>
       this.requestParsed(
         `/portfolio/valuation${queryString(params)}`,
         portfolioValuationResponseSchema,
+      ),
+    getTrades: (params: Partial<TradeListQueryV2> = {}): Promise<TradeListResponseV2> =>
+      this.requestParsed(`/portfolio/trades${queryString(params)}`, tradeListResponseSchemaV2),
+    getTrade: (
+      accountId: string,
+      tradeId: string,
+      mode: 'actual' | 'shadow' = 'actual',
+    ): Promise<TradeDetailResponseV2> =>
+      this.requestParsed(
+        `/portfolio/trades/${encodeURIComponent(tradeId)}${queryString({ accountId, mode })}`,
+        tradeDetailResponseSchemaV2,
+      ),
+    getCloseSlice: (
+      accountId: string,
+      tradeId: string,
+      sliceId: string,
+      mode: 'actual' | 'shadow' = 'actual',
+    ): Promise<TradeCloseSliceQueryResponseV2> =>
+      this.requestParsed(
+        `/portfolio/trades/${encodeURIComponent(tradeId)}/close-slices/${encodeURIComponent(sliceId)}${queryString({ accountId, mode })}`,
+        tradeCloseSliceQueryResponseSchemaV2,
+      ),
+    resolveTradeReference: (
+      request: TradeReferenceResolveRequestV2,
+    ): Promise<TradeReferenceResolveResponseV2> =>
+      this.postParsed(
+        '/portfolio/trades/resolve-reference',
+        request,
+        tradeReferenceResolveResponseSchemaV2,
       ),
   };
 
@@ -85,6 +202,8 @@ export class ThesisLedgerApiClient {
         start?: string;
         end?: string;
         mode?: 'actual' | 'shadow';
+        fxMerge?: boolean;
+        baseCurrency?: CurrencyV1;
       } = {},
     ) =>
       this.requestParsed(
@@ -121,6 +240,97 @@ export class ThesisLedgerApiClient {
         `/journal/review-candidates${queryString(params)}`,
         journalReviewCandidatesResponseSchema,
       ),
+    saveReviewSnapshot: (
+      input: JournalReviewSnapshotInput,
+    ): Promise<JournalReviewSnapshotResponse> =>
+      this.postParsed('/journal/review-snapshots', input, journalReviewSnapshotResponseSchema),
+  };
+
+  readonly ledger = {
+    createExecution: (command: CreateExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/executions', command, ledgerCommandResponseSchemaV2),
+    replaceExecution: (command: ReplaceExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/executions/replace', command, ledgerCommandResponseSchemaV2),
+    voidExecution: (command: VoidExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/executions/void', command, ledgerCommandResponseSchemaV2),
+    restoreExecution: (command: RestoreExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/executions/restore', command, ledgerCommandResponseSchemaV2),
+    moveExecutionAccount: (
+      command: MoveExecutionAccountCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/executions/move-account', command, ledgerCommandResponseSchemaV2),
+    createBaselineObservationBatch: (
+      command: CreateBaselineObservationBatchCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed(
+        '/ledger/baseline-observation-batches',
+        command,
+        ledgerCommandResponseSchemaV2,
+      ),
+    createImportDraftRevision: (
+      command: CreateImportDraftRevisionCommandV2,
+    ): Promise<ImportDraftCommandResponseV2> =>
+      this.postParsed(
+        '/ledger/import-draft-revisions',
+        command,
+        importDraftCommandResponseSchemaV2,
+      ),
+    reviseImportDraft: (
+      command: ReviseImportDraftCommandV2,
+    ): Promise<ImportDraftRevisionResponseV2> =>
+      this.postParsed(
+        '/ledger/import-draft-revisions/revise',
+        command,
+        importDraftRevisionResponseSchemaV2,
+      ),
+    submitImportDraftRevision: (
+      command: SubmitImportDraftRevisionCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed(
+        '/ledger/import-draft-revisions/submit',
+        command,
+        ledgerCommandResponseSchemaV2,
+      ),
+    getEvents: (
+      accountId: string,
+      params: { asOfRevision?: string } = {},
+    ): Promise<LedgerEventsResponseV2> =>
+      this.requestParsed(
+        `/ledger/${encodeURIComponent(accountId)}/events${queryString(params)}`,
+        ledgerEventsResponseSchemaV2,
+      ),
+    getEventAudit: (
+      accountId: string,
+      params: { asOfRevision?: string } = {},
+    ): Promise<LedgerAuditResponseV2> =>
+      this.requestParsed(
+        `/ledger/${encodeURIComponent(accountId)}/events/audit${queryString(params)}`,
+        ledgerAuditResponseSchemaV2,
+      ),
+    replayEvents: (accountId: string, asOfRevision: string): Promise<LedgerReplayResponseV2> =>
+      this.requestParsed(
+        `/ledger/${encodeURIComponent(accountId)}/events/replay${queryString({ asOfRevision })}`,
+        ledgerReplayResponseSchemaV2,
+      ),
+    getReconciliationCandidates: (
+      accountId: string,
+    ): Promise<BaselineReconciliationCandidatesResponseV2> =>
+      this.requestParsed(
+        `/ledger/${encodeURIComponent(accountId)}/reconciliation-candidates`,
+        baselineReconciliationCandidatesResponseSchemaV2,
+      ),
+    confirmBaselineReconciliation: (
+      command: ConfirmBaselineReconciliationCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/reconciliations/confirm', command, ledgerCommandResponseSchemaV2),
+    voidBaselineReconciliation: (
+      command: VoidBaselineReconciliationCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/reconciliations/void', command, ledgerCommandResponseSchemaV2),
+    restoreBaselineReconciliation: (
+      command: RestoreBaselineReconciliationCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/reconciliations/restore', command, ledgerCommandResponseSchemaV2),
   };
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {
@@ -131,6 +341,17 @@ export class ThesisLedgerApiClient {
   async request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await this.fetchResponse(path, init);
     return (await response.json()) as T;
+  }
+
+  private postParsed<T>(
+    path: string,
+    body: unknown,
+    schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
+  ): Promise<T> {
+    return this.requestParsed(path, schema, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
   }
 
   private async requestParsed<T>(

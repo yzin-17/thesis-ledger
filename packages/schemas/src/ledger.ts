@@ -47,7 +47,6 @@ export const ledgerEventSchemaV1 = z
     source: z.string().min(1),
     externalUid: z.string().min(1),
     note: z.string().max(1000).optional(),
-    correctionOf: z.uuid().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((event, context) => {

@@ -1,6 +1,40 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PerformanceService } from '../../src/performance/performance.service.js';
 
+const fxResponse = (asOf: string, hkdRate = 0.92) => ({
+  version: 1 as const,
+  baseCurrency: 'CNY' as const,
+  asOf,
+  fetchedAt: `${asOf}T00:00:00.000Z`,
+  maxAgeDays: 7,
+  rates: [
+    {
+      fromCurrency: 'CNY' as const,
+      toCurrency: 'CNY' as const,
+      rate: 1,
+      rateDate: asOf,
+      provider: 'identity',
+      fetchedAt: `${asOf}T00:00:00.000Z`,
+      freshness: 'live' as const,
+      stale: false,
+      ageDays: 0,
+      available: true,
+    },
+    {
+      fromCurrency: 'HKD' as const,
+      toCurrency: 'CNY' as const,
+      rate: hkdRate,
+      rateDate: asOf,
+      provider: 'fixture',
+      fetchedAt: `${asOf}T00:00:00.000Z`,
+      freshness: 'live' as const,
+      stale: false,
+      ageDays: 0,
+      available: true,
+    },
+  ],
+});
+
 describe('Ledger Snapshot 与收益摘要', () => {
   it('快照使用行情估值、Ledger 现金和 dataQuality，而不是成本替代市值', async () => {
     const snapshot = vi.fn(async ({ data }: { data: object }) => data);
@@ -416,5 +450,180 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(layers.portfolio).toBeNull();
     expect(layers.byCurrency).toHaveLength(2);
     expect(layers.fx).toMatchObject({ status: 'blocked', missingCurrencies: ['USD'] });
+  });
+
+  it('同一账户的多币种现金不直接相加，开启合并后按本位币换算', async () => {
+    const prisma = {
+      position: { findMany: vi.fn(async () => []) },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'cash-cny',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'CNY',
+          },
+          {
+            id: 'cash-hkd',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'HKD',
+          },
+        ]),
+      },
+      account: {
+        findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]),
+      },
+    };
+    const market = {
+      getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
+    };
+    const service = new PerformanceService(prisma as never, market as never);
+    const native = await service.layers('account-a');
+    expect(native.account).toMatchObject([
+      { accountId: 'account-a', cashValue: null, partial: true },
+    ]);
+    expect(native.portfolio).toBeNull();
+    expect(native.byCurrency).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ currency: 'CNY', cashValue: 100 }),
+        expect.objectContaining({ currency: 'HKD', cashValue: 100 }),
+      ]),
+    );
+
+    const merged = await service.layers('account-a', undefined, 'actual', {
+      fxMerge: true,
+      baseCurrency: 'CNY',
+    });
+    expect(merged.account).toMatchObject([
+      { accountId: 'account-a', currency: 'CNY', cashValue: 192, partial: false },
+    ]);
+    expect(merged.portfolio).toMatchObject({ currency: 'CNY', cashValue: 192 });
+    expect(merged.fx).toMatchObject({
+      status: 'ready',
+      evidenceVersion: expect.stringContaining('fx-v1'),
+    });
+  });
+
+  it('历史快照按各自发生日请求 FX，并保留 historical-rate 证据', async () => {
+    const prisma = {
+      account: { findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]) },
+      portfolioSnapshot: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'snapshot-1',
+            accountId: 'account-a',
+            capturedAt: new Date('2025-01-01T00:00:00.000Z'),
+            marketValue: 100,
+            costValue: 100,
+            cashValue: 0,
+            payload: {
+              mode: 'actual',
+              currency: 'CNY',
+              nativeByCurrency: [
+                { currency: 'HKD', marketValue: 100, costValue: 100, cashValue: 0 },
+              ],
+            },
+          },
+          {
+            id: 'snapshot-2',
+            accountId: 'account-a',
+            capturedAt: new Date('2025-01-02T00:00:00.000Z'),
+            marketValue: 100,
+            costValue: 100,
+            cashValue: 0,
+            payload: {
+              mode: 'actual',
+              currency: 'CNY',
+              nativeByCurrency: [
+                { currency: 'HKD', marketValue: 100, costValue: 100, cashValue: 0 },
+              ],
+            },
+          },
+        ]),
+      },
+    };
+    const market = {
+      getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
+    };
+    const history = await new PerformanceService(prisma as never, market as never).history(
+      'account-a',
+      undefined,
+      undefined,
+      'actual',
+      { fxMerge: true, baseCurrency: 'CNY' },
+    );
+    expect(market.getFxRates).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ asOf: '2025-01-01' }),
+    );
+    expect(market.getFxRates).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ asOf: '2025-01-02' }),
+    );
+    expect(history).toMatchObject([
+      { marketValue: 92, currency: 'CNY', conversionMode: 'historical-rate' },
+      { marketValue: 92, currency: 'CNY', conversionMode: 'historical-rate' },
+    ]);
+  });
+
+  it('收益摘要按现金流发生日换算外部资金流', async () => {
+    const prisma = {
+      account: { findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]) },
+      portfolioSnapshot: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'snapshot-1',
+            accountId: 'account-a',
+            capturedAt: new Date('2025-01-01T00:00:00.000Z'),
+            marketValue: 100,
+            costValue: 100,
+            cashValue: 0,
+            payload: { mode: 'actual', currency: 'CNY' },
+          },
+          {
+            id: 'snapshot-2',
+            accountId: 'account-a',
+            capturedAt: new Date('2025-01-03T00:00:00.000Z'),
+            marketValue: 200,
+            costValue: 200,
+            cashValue: 0,
+            payload: { mode: 'actual', currency: 'CNY' },
+          },
+        ]),
+      },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'cash-flow',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-02T00:00:00.000Z'),
+            amount: 100,
+            currency: 'HKD',
+          },
+        ]),
+      },
+    };
+    const market = {
+      getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
+    };
+    const summary = await new PerformanceService(prisma as never, market as never).summary(
+      'account-a',
+      undefined,
+      undefined,
+      'actual',
+      { fxMerge: true, baseCurrency: 'CNY' },
+    );
+    expect(market.getFxRates).toHaveBeenCalledWith(expect.objectContaining({ asOf: '2025-01-02' }));
+    expect((summary as { fxEvidence?: unknown }).fxEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ asOf: '2025-01-02', conversionMode: 'historical-rate' }),
+      ]),
+    );
   });
 });

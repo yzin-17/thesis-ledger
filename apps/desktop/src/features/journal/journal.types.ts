@@ -1,4 +1,7 @@
-import type { JournalReviewCandidate as ApiJournalReviewCandidate } from '@thesis-ledger/api-client';
+import type {
+  JournalLegacyReviewCandidate as ApiJournalLegacyReviewCandidate,
+  JournalReviewCandidate as ApiJournalReviewCandidate,
+} from '@thesis-ledger/api-client';
 
 export interface ReviewTrade {
   symbol: string;
@@ -19,6 +22,7 @@ export interface ReviewTrade {
 }
 
 export type JournalReviewCandidate = ApiJournalReviewCandidate;
+export type JournalLegacyReviewCandidate = ApiJournalLegacyReviewCandidate;
 
 export type ReviewWindowPreset = '7d' | '30d' | 'custom';
 

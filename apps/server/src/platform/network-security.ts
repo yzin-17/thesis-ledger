@@ -35,8 +35,8 @@ export const authorizedBearer = (authorization: string | undefined, expectedToke
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 };
 
-export const createLanAuthMiddleware = (apiToken: string) =>
-  (request: Request, response: Response, next: NextFunction) => {
+export const createLanAuthMiddleware =
+  (apiToken: string) => (request: Request, response: Response, next: NextFunction) => {
     if (request.method === 'OPTIONS') {
       next();
       return;

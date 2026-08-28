@@ -1,0 +1,232 @@
+import type { LedgerCommandResponseV2, LedgerEventV2 } from '@thesis-ledger/api-client';
+import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+
+import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
+import type { AccountDataEventFilter } from './account-data.queries.js';
+import type {
+  Currency,
+  ExecutionEvent,
+  ExecutionDraft,
+  LedgerAuditEvent,
+  TimePrecision,
+  VoidEvent,
+} from './account-data.types.js';
+
+export const currencies: Currency[] = ['CNY', 'HKD', 'USD'];
+export const transactionFilters: Array<{ value: AccountDataEventFilter; label: string }> = [
+  { value: 'executions', label: '成交记录' },
+  { value: 'other', label: '其他账本事件' },
+  { value: 'all', label: '全部事件' },
+];
+
+export const isExecutionEvent = (event: LedgerEventV2): event is ExecutionEvent =>
+  event.revisionAction !== 'VOID' &&
+  (event.type === 'BUY_EXECUTION' || event.type === 'SELL_EXECUTION');
+
+export const isVoidEvent = (event: LedgerEventV2): event is VoidEvent =>
+  event.revisionAction === 'VOID';
+
+export const isLegacyAuditEvent = (
+  event: LedgerAuditEvent,
+): event is Extract<LedgerAuditEvent, { version: 1 }> => 'version' in event;
+
+export const isCurrency = (value: string | null): value is Currency =>
+  value === 'CNY' || value === 'HKD' || value === 'USD';
+
+export const supportedCurrency = (value: string): Currency => {
+  if (value === 'HKD' || value === 'USD') return value;
+  return 'CNY';
+};
+
+export const dateOnly = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+export const formatDate = (value: string | null) => {
+  if (!value) return '时间未知';
+  if (dateOnly(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsed);
+};
+
+export const formatDecimal = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return '—';
+  return String(value);
+};
+
+export const formatCurrencyAmount = (amount: number, currency: Currency) =>
+  new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 8,
+  }).format(amount);
+
+export const currencyLabel = (currency: Currency) => {
+  if (currency === 'CNY') return 'CNY · 人民币';
+  if (currency === 'HKD') return 'HKD · 港币';
+  return 'USD · 美元';
+};
+
+export const eventTypeLabel = (event: LedgerEventV2) => {
+  if (event.type === 'BUY_EXECUTION') return '买入成交';
+  if (event.type === 'SELL_EXECUTION') return '卖出成交';
+  if (event.type === 'POSITION_BASELINE_OBSERVATION') return '持仓余额观察';
+  if (event.type === 'CASH_BALANCE_OBSERVATION') return '现金余额观察';
+  if (event.type === 'BASELINE_RECONCILIATION') return '基线对账';
+  if (event.type === 'BONUS_SHARE') return '送股';
+  if (event.type === 'SPLIT') return '拆分';
+  if (event.type === 'MERGE') return '合并';
+  if (event.type === 'DIVIDEND') return '分红';
+  return '现金流';
+};
+
+export const revisionLabel = (event: LedgerEventV2) => {
+  if (event.revisionAction === 'REPLACE') return '已更正';
+  if (event.revisionAction === 'RESTORE') return '已恢复';
+  return '当前有效';
+};
+
+export const revisionBadgeVariant = (event: LedgerEventV2): 'default' | 'secondary' | 'outline' => {
+  if (event.revisionAction === 'REPLACE') return 'secondary';
+  if (event.revisionAction === 'RESTORE') return 'default';
+  return 'outline';
+};
+
+export const executionSideLabel = (event: ExecutionEvent) =>
+  event.type === 'BUY_EXECUTION' ? 'BUY 买入' : 'SELL 卖出';
+
+export const transactionAmount = (event: LedgerEventV2, execution: ExecutionEvent | null) => {
+  if (execution)
+    return `${formatDecimal(execution.payload.quantity)} ${execution.payload.currency}`;
+  if (event.revisionAction !== 'VOID' && event.type === 'CASH_BALANCE_OBSERVATION')
+    return formatDecimal(event.payload.amount);
+  return '—';
+};
+
+export const decimalPattern = /^\d+(?:\.\d+)?$/;
+
+export const isPositiveDecimal = (value: string) => {
+  const normalized = value.trim();
+  return decimalPattern.test(normalized) && /[1-9]/.test(normalized.replace('.', ''));
+};
+
+export const isNonNegativeDecimal = (value: string) => {
+  const normalized = value.trim();
+  return decimalPattern.test(normalized) && !normalized.startsWith('-');
+};
+
+export const createClientCommandId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    return crypto.randomUUID();
+  return `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+export const localDateTimeValue = (value: string | null | undefined, precision: TimePrecision) => {
+  if (precision === 'DATE') {
+    if (!value) return '';
+    if (dateOnly(value)) return value;
+    return value.slice(0, 10);
+  }
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+};
+
+export const currentLocalDateTime = () => localDateTimeValue(new Date().toISOString(), 'INSTANT');
+
+export const sourceTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+};
+
+export const toCommandTime = (value: string, precision: TimePrecision) => {
+  if (precision === 'DATE') return value;
+  return new Date(value).toISOString();
+};
+
+export const errorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof ThesisLedgerApiError) return error.payload?.message ?? fallback;
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
+export const errorCode = (error: unknown) =>
+  error instanceof ThesisLedgerApiError ? error.payload?.errorCode : undefined;
+
+export const commandFeedback = (response: LedgerCommandResponseV2, action: string) =>
+  response.idempotentReplay ? `${action}已存在，未重复写入` : `${action}已写入账本`;
+
+export const executionSubmitLabel = (submitting: boolean, editing: boolean) => {
+  if (submitting) return '写入中…';
+  if (editing) return '提交更正';
+  return '记录成交';
+};
+
+export const correctionSubmitLabel = (pending: boolean, action: 'void' | 'restore') => {
+  if (pending) return '提交中…';
+  return action === 'void' ? '确认作废' : '确认恢复';
+};
+
+export const reconciliationBadgeLabel = (conflicted: boolean, selected: boolean) => {
+  if (conflicted) return '存在冲突';
+  if (selected) return '待确认';
+  return '可用';
+};
+
+export const reconciliationBadgeVariant = (
+  conflicted: boolean,
+  selected: boolean,
+): 'default' | 'destructive' | 'outline' => {
+  if (conflicted) return 'destructive';
+  if (selected) return 'default';
+  return 'outline';
+};
+
+export const readLastAccount = () => {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem('thesis-ledger-last-account') ?? '';
+  } catch {
+    return '';
+  }
+};
+
+export const existingInstrument = (event: ExecutionEvent | null): InstrumentLookup | null => {
+  if (!event) return null;
+  const market = event.payload.symbol.split('.').at(-1) ?? '';
+  return {
+    id: `existing:${event.eventId}`,
+    symbol: event.payload.symbol,
+    canonicalCode: event.payload.symbol.split('.')[0] ?? event.payload.symbol,
+    instrumentType: 'STOCK',
+    market,
+    displayName: event.payload.symbol,
+    confirmable: true,
+  };
+};
+
+export const executionDraft = (
+  event: ExecutionEvent | null,
+  defaultCurrency: Currency = 'CNY',
+): ExecutionDraft => ({
+  side: event?.type === 'SELL_EXECUTION' ? 'SELL' : 'BUY',
+  symbol: event?.payload.symbol ?? '',
+  quantity: event?.payload.quantity ?? '',
+  price: event?.payload.price ?? '',
+  currency: supportedCurrency(event?.payload.currency ?? defaultCurrency),
+  occurredAt:
+    localDateTimeValue(event?.occurredAt, event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT') ||
+    currentLocalDateTime(),
+  timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
+  settledAt: localDateTimeValue(event?.payload.settledAt, 'INSTANT'),
+  capabilityVerification: event?.payload.capabilityVerification ?? 'UNVERIFIED',
+  note: event?.payload.note ?? '',
+  reason: '',
+});

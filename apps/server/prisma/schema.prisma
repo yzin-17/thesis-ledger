@@ -8,24 +8,55 @@ datasource db {
 }
 
 model Account {
-  id           String              @id @default(uuid()) @db.Uuid
-  name         String
-  institution  String?
-  type         String
-  mode         String              @default("actual")
-  currency     String              @default("CNY")
-  active       Boolean             @default(true)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  positions    Position[]
-  ledger       LedgerEvent[]
-  snapshots    PortfolioSnapshot[]
-  importDrafts ImportDraft[]
-  riskRules    RiskRule[]
+  id                 String                       @id @default(uuid()) @db.Uuid
+  name               String
+  institution        String?
+  type               String
+  mode               String                       @default("actual")
+  currency           String                       @default("CNY")
+  active             Boolean                      @default(true)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  positions          Position[]
+  ledger             LedgerEvent[]
+  snapshots          PortfolioSnapshot[]
+  importDrafts       ImportDraft[]
+  riskRules          RiskRule[]
   riskPositionStates RiskPositionState[]
-  tradePlans   TradePlan[]
+  tradePlans         TradePlan[]
+  ledgerState        AccountLedgerState?
+  costStrategies     AccountCostStrategyVersion[]
+  baselineBatches    BaselineObservationBatch[]
+  trades             Trade[]
+  cashBalances       CashBalance[]
+  cashSettlements    CashSettlement[]
 
   @@index([active])
+}
+
+model AccountLedgerState {
+  accountId            String   @id @db.Uuid
+  ledgerRevision       BigInt   @default(0)
+  projectionGeneration BigInt   @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  account              Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+}
+
+model AccountCostStrategyVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  accountId   String   @db.Uuid
+  revision    Int
+  method      String
+  effectiveAt DateTime
+  reason      String
+  actorId     String
+  createdAt   DateTime @default(now())
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  trades      Trade[]
+
+  @@unique([accountId, revision])
+  @@index([accountId, effectiveAt])
 }
 
 model Asset {
@@ -40,6 +71,7 @@ model Asset {
   metadata                    Json?
   updatedAt                   DateTime                     @updatedAt
   positions                   Position[]
+  trades                      Trade[]
   ledgerEvents                LedgerEvent[]
   bars                        MarketBar[]
   fundNavPoints               FundNavPoint[]
@@ -108,65 +140,345 @@ model CatalogSyncState {
 }
 
 model Position {
-  id        String   @id @default(uuid()) @db.Uuid
-  accountId String   @db.Uuid
-  symbol    String
-  quantity  Decimal  @db.Decimal(24, 8)
-  costPrice Decimal  @db.Decimal(24, 8)
-  source    String
-  updatedAt DateTime @updatedAt
-  account   Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  asset     Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
-  riskPositionStates RiskPositionState[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  accountId             String                 @db.Uuid
+  symbol                String
+  quantity              Decimal                @db.Decimal(38, 18)
+  costPrice             Decimal                @db.Decimal(38, 18)
+  source                String
+  updatedAt             DateTime               @updatedAt
+  account               Account                @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset                 Asset                  @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  riskPositionStates    RiskPositionState[]
   riskRuleTriggerStates RiskRuleTriggerState[]
 
   @@unique([accountId, symbol])
   @@index([symbol])
 }
 
+model Trade {
+  id                     String                           @id
+  accountId              String                           @db.Uuid
+  accountMode            String
+  symbol                 String
+  lifecycle              String
+  exitProgress           String
+  endEvidence            String
+  openedAt               DateTime?
+  closedAt               DateTime?
+  earliestEvidenceAt     DateTime?
+  sourceQuantity         Decimal                          @db.Decimal(38, 18)
+  closedQuantity         Decimal                          @db.Decimal(38, 18)
+  remainingQuantity      Decimal                          @db.Decimal(38, 18)
+  grossRealizedPnl       Decimal?                         @db.Decimal(38, 18)
+  netRealizedPnl         Decimal?                         @db.Decimal(38, 18)
+  realizedNetReturnRate  Decimal?                         @db.Decimal(38, 18)
+  costEstimated          Boolean                          @default(false)
+  completeness           String
+  issues                 Json
+  costIssues             Json
+  algorithmVersion       String
+  projectionFingerprint  String?
+  projectionGeneration   BigInt                           @default(0)
+  costStrategyRevisionId String?                          @db.Uuid
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  account                Account                          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset                  Asset                            @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  costStrategyRevision   AccountCostStrategyVersion?      @relation(fields: [costStrategyRevisionId], references: [id], onDelete: Restrict)
+  entryLegs              TradeEntryLeg[]
+  baselineComponents     TradeBaselineComponent[]
+  corporateActions       TradeCorporateActionAdjustment[]
+  closeSlices            TradeCloseSlice[]
+  dividendAttributions   TradeDividendAttribution[]
+  evidenceSources        TradeEvidenceSource[]
+
+  @@index([accountId, accountMode, symbol])
+  @@index([accountId, projectionGeneration])
+  @@index([accountId, openedAt])
+  @@index([costStrategyRevisionId])
+}
+
+model TradeEntryLeg {
+  id                String    @id @default(uuid()) @db.Uuid
+  tradeId           String
+  eventId           String
+  factId            String
+  occurredAt        DateTime?
+  currency          String
+  price             Decimal   @db.Decimal(38, 18)
+  originalQuantity  Decimal   @db.Decimal(38, 18)
+  quantity          Decimal   @db.Decimal(38, 18)
+  remainingQuantity Decimal   @db.Decimal(38, 18)
+  rawCost           Decimal?  @db.Decimal(38, 18)
+  remainingCost     Decimal?  @db.Decimal(38, 18)
+  rawCostEstimated  Boolean   @default(false)
+  charges           Json
+  trade             Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, factId])
+  @@index([tradeId, occurredAt])
+}
+
+model TradeBaselineComponent {
+  id                         String    @id @default(uuid()) @db.Uuid
+  tradeId                    String
+  eventId                    String
+  factId                     String
+  batchId                    String
+  batchScope                 String
+  occurredAt                 DateTime?
+  currency                   String
+  observedQuantity           Decimal   @db.Decimal(38, 18)
+  quantity                   Decimal   @db.Decimal(38, 18)
+  remainingQuantity          Decimal   @db.Decimal(38, 18)
+  averageCost                Decimal?  @db.Decimal(38, 18)
+  rawCost                    Decimal?  @db.Decimal(38, 18)
+  remainingCost              Decimal?  @db.Decimal(38, 18)
+  rawCostEstimated           Boolean   @default(false)
+  costIncludesFees           String
+  reconciledExecutionFactIds Json
+  reconciliationFactIds      Json
+  trade                      Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, factId])
+  @@index([tradeId, occurredAt])
+}
+
+model TradeCorporateActionAdjustment {
+  id                     String    @id @default(uuid()) @db.Uuid
+  tradeId                String
+  eventId                String
+  factId                 String
+  type                   String
+  occurredAt             DateTime?
+  quantity               Decimal?  @db.Decimal(38, 18)
+  fromUnits              Decimal?  @db.Decimal(38, 18)
+  toUnits                Decimal?  @db.Decimal(38, 18)
+  positionQuantityBefore Decimal   @db.Decimal(38, 18)
+  positionQuantityAfter  Decimal   @db.Decimal(38, 18)
+  trade                  Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, factId])
+  @@index([tradeId, occurredAt])
+}
+
+model TradeCloseSlice {
+  id                     String                 @id
+  tradeId                String
+  eventId                String
+  factId                 String
+  occurredAt             DateTime?
+  currency               String
+  price                  Decimal?               @db.Decimal(38, 18)
+  quantity               Decimal                @db.Decimal(38, 18)
+  remainingQuantityAfter Decimal                @db.Decimal(38, 18)
+  charges                Json
+  grossRealizedPnl       Decimal?               @db.Decimal(38, 18)
+  netRealizedPnl         Decimal?               @db.Decimal(38, 18)
+  realizedNetReturnRate  Decimal?               @db.Decimal(38, 18)
+  costEstimated          Boolean                @default(false)
+  trade                  Trade                  @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  allocations            TradeCloseAllocation[]
+
+  @@unique([tradeId, factId])
+  @@index([tradeId, occurredAt])
+}
+
+model TradeCloseAllocation {
+  id                  String          @id @default(uuid()) @db.Uuid
+  closeSliceId        String
+  source              String
+  sourceEventId       String
+  sourceFactId        String
+  quantity            Decimal         @db.Decimal(38, 18)
+  originalCost        Decimal?        @db.Decimal(38, 18)
+  allocatedBuyCharges Json
+  closeSlice          TradeCloseSlice @relation(fields: [closeSliceId], references: [id], onDelete: Cascade)
+
+  @@unique([closeSliceId, sourceFactId])
+  @@index([sourceFactId])
+}
+
+model TradeDividendAttribution {
+  id         String    @id @default(uuid()) @db.Uuid
+  tradeId    String
+  eventId    String
+  factId     String
+  occurredAt DateTime?
+  amount     Decimal   @db.Decimal(38, 18)
+  currency   String
+  trade      Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, factId])
+  @@index([tradeId, occurredAt])
+}
+
+model TradeEvidenceSource {
+  id      String @id @default(uuid()) @db.Uuid
+  tradeId String
+  kind    String
+  eventId String
+  factId  String
+  source  Json
+  trade   Trade  @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, kind, factId])
+  @@index([tradeId, eventId])
+}
+
+model CashBalance {
+  id                   String   @id @default(uuid()) @db.Uuid
+  accountId            String   @db.Uuid
+  currency             String
+  settledAmount        Decimal  @db.Decimal(38, 18)
+  pendingReceivable    Decimal  @db.Decimal(38, 18)
+  pendingPayable       Decimal  @db.Decimal(38, 18)
+  completeness         String
+  issues               Json
+  projectionGeneration BigInt   @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  account              Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([accountId, currency])
+  @@index([accountId, projectionGeneration])
+}
+
+model CashSettlement {
+  id                   String    @id @default(uuid()) @db.Uuid
+  accountId            String    @db.Uuid
+  eventId              String
+  factId               String
+  currency             String
+  direction            String
+  amount               Decimal   @db.Decimal(38, 18)
+  occurredAt           DateTime?
+  settledAt            DateTime?
+  status               String
+  sourceType           String
+  projectionGeneration BigInt    @default(0)
+  createdAt            DateTime  @default(now())
+  account              Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([accountId, factId])
+  @@index([accountId, status, settledAt])
+  @@index([accountId, currency])
+}
+
 model ImportDraft {
-  id               String    @id @default(uuid()) @db.Uuid
-  accountId        String    @db.Uuid
-  source           String
-  sourceConfidence Decimal   @default(0) @db.Decimal(5, 4)
-  status           String
-  idempotencyKey   String    @unique
-  imageHash        String
-  rows             Json
-  baselineHash     String?
-  beforeState      Json?
-  createdAt        DateTime  @default(now())
-  committedAt      DateTime?
-  rolledBackAt     DateTime?
-  account          Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  id                 String                @id @default(uuid()) @db.Uuid
+  accountId          String                @db.Uuid
+  source             String
+  sourceConfidence   Decimal               @default(0) @db.Decimal(5, 4)
+  scope              String                @default("FULL")
+  status             String
+  idempotencyKey     String                @unique
+  contentFingerprint String?
+  imageHash          String
+  rows               Json
+  baselineHash       String?
+  beforeState        Json?
+  createdAt          DateTime              @default(now())
+  committedAt        DateTime?
+  rolledBackAt       DateTime?
+  currentRevision    Int                   @default(0)
+  account            Account               @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  revisions          ImportDraftRevision[]
 
   @@index([accountId, status])
 }
 
-model LedgerEvent {
-  id             String         @id @default(uuid()) @db.Uuid
-  accountId      String         @db.Uuid
-  type           String
-  occurredAt     DateTime
-  symbol         String?
-  quantity       Decimal?       @db.Decimal(24, 8)
-  price          Decimal?       @db.Decimal(24, 8)
-  amount         Decimal?       @db.Decimal(24, 8)
-  fee            Decimal?       @db.Decimal(24, 8)
-  tax            Decimal?       @db.Decimal(24, 8)
-  externalId     String?
-  source         String         @default("manual")
-  currency       String         @default("CNY")
-  note           String?
-  correctionOf   String?        @db.Uuid
-  metadata       Json?
-  createdAt      DateTime       @default(now())
-  account        Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  asset          Asset?         @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
-  journalEntries JournalEntry[]
+model ImportDraftRevision {
+  id              String      @id @default(uuid()) @db.Uuid
+  draftId         String      @db.Uuid
+  revision        Int
+  parserVersion   String
+  rawEvidenceRef  String
+  contentHash     String
+  scope           String      @default("FULL")
+  observedAt      DateTime?
+  capturedAt      DateTime?
+  timePrecision   String?
+  sourceTimezone  String?
+  rows            Json
+  issues          Json
+  createdAt       DateTime    @default(now())
+  submittedAt     DateTime?
+  submittedRowIds Json?
+  draft           ImportDraft @relation(fields: [draftId], references: [id], onDelete: Restrict)
 
-  @@unique([accountId, externalId])
+  @@unique([draftId, revision])
+  @@index([draftId, submittedAt])
+}
+
+model BaselineObservationBatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  accountId      String    @db.Uuid
+  scope          String
+  observedAt     DateTime?
+  timePrecision  String    @default("INSTANT")
+  capturedAt     DateTime?
+  recordedAt     DateTime  @default(now())
+  sourceCategory String
+  sourceChannel  String
+  externalId     String
+  evidenceRef    String
+  contentHash    String
+  status         String    @default("DRAFT")
+  submittedAt    DateTime?
+  account        Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([accountId, sourceChannel, externalId])
+  @@index([accountId, observedAt])
+}
+
+model LedgerEvent {
+  id                   String         @id @default(uuid()) @db.Uuid
+  accountId            String         @db.Uuid
+  type                 String
+  occurredAt           DateTime?
+  symbol               String?
+  quantity             Decimal?       @db.Decimal(24, 8)
+  price                Decimal?       @db.Decimal(24, 8)
+  amount               Decimal?       @db.Decimal(24, 8)
+  fee                  Decimal?       @db.Decimal(24, 8)
+  tax                  Decimal?       @db.Decimal(24, 8)
+  externalId           String?
+  source               String         @default("manual")
+  sourceRowId          String?
+  currency             String         @default("CNY")
+  note                 String?
+  metadata             Json?
+  createdAt            DateTime       @default(now())
+  factId               String?        @db.Uuid
+  ledgerRevision       BigInt?
+  timePrecision        String?
+  sourceTimezone       String?
+  economicOrderKey     String?
+  recordedAt           DateTime       @default(now())
+  projectionGeneration BigInt?
+  payloadVersion       Int?
+  payload              Json?
+  sourceCategory       String?
+  sourceChannel        String?
+  actorId              String?
+  revisionAction       String?
+  supersedesEventId    String?        @db.Uuid
+  reason               String?
+  account              Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset                Asset?         @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  journalEntries       JournalEntry[]
+  supersedesEvent      LedgerEvent?   @relation("LedgerRevisionChain", fields: [supersedesEventId], references: [id], onDelete: Restrict)
+  laterRevisions       LedgerEvent[]  @relation("LedgerRevisionChain")
+
+  @@unique([accountId, sourceChannel, externalId])
+  @@unique([supersedesEventId])
+  @@index([accountId, sourceChannel, sourceRowId])
+  @@index([accountId, ledgerRevision])
   @@index([accountId, occurredAt])
+  @@index([accountId, factId, ledgerRevision])
+  @@index([accountId, occurredAt, economicOrderKey, id])
   @@index([symbol, occurredAt])
 }
 
@@ -325,46 +637,46 @@ model ProviderTombstone {
 }
 
 model RiskRule {
-  id           String      @id @default(uuid()) @db.Uuid
-  version      Int         @default(1)
-  kind         String
-  scope        String
-  severity     String
-  threshold    Decimal     @db.Decimal(24, 8)
-  enabled      Boolean     @default(true)
-  needsRepair  Boolean     @default(false)
-  repairReason String?
-  symbol       String?
-  accountId    String?     @db.Uuid
-  sourcePlanId String?     @db.Uuid
-  condition    Json?
-  parameters   Json?
-  config       Json?
-  effectiveAt  DateTime    @default(now())
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  events       RiskEvent[]
+  id            String                 @id @default(uuid()) @db.Uuid
+  version       Int                    @default(1)
+  kind          String
+  scope         String
+  severity      String
+  threshold     Decimal                @db.Decimal(24, 8)
+  enabled       Boolean                @default(true)
+  needsRepair   Boolean                @default(false)
+  repairReason  String?
+  symbol        String?
+  accountId     String?                @db.Uuid
+  sourcePlanId  String?                @db.Uuid
+  condition     Json?
+  parameters    Json?
+  config        Json?
+  effectiveAt   DateTime               @default(now())
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  events        RiskEvent[]
   triggerStates RiskRuleTriggerState[]
-  account      Account?    @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  account       Account?               @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([accountId])
 }
 
 model RiskPositionState {
-  id                String   @id @default(uuid()) @db.Uuid
-  accountId         String   @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  accountId         String    @db.Uuid
   symbol            String
-  mode              String   @default("actual")
-  holdingPeak      Decimal  @db.Decimal(24, 8)
+  mode              String    @default("actual")
+  holdingPeak       Decimal   @db.Decimal(24, 8)
   peakAt            DateTime
   positionUpdatedAt DateTime?
-  lastPrice         Decimal  @db.Decimal(24, 8)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  account           Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  positionId        String?  @db.Uuid
+  lastPrice         Decimal   @db.Decimal(24, 8)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  positionId        String?   @db.Uuid
   position          Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
-  lastQuantity      Decimal  @default(0) @db.Decimal(24, 8)
+  lastQuantity      Decimal   @default(0) @db.Decimal(24, 8)
 
   @@unique([accountId, symbol, mode])
   @@index([symbol, mode])
@@ -372,21 +684,21 @@ model RiskPositionState {
 }
 
 model RiskRuleTriggerState {
-  id            String   @id @default(uuid()) @db.Uuid
-  ruleId        String   @db.Uuid
+  id            String     @id @default(uuid()) @db.Uuid
+  ruleId        String     @db.Uuid
   targetKey     String
   symbol        String
-  mode          String   @default("actual")
-  positionId    String?  @db.Uuid
+  mode          String     @default("actual")
+  positionId    String?    @db.Uuid
   ruleVersion   Int
-  breachActive  Boolean  @default(false)
-  activeEventId String?  @db.Uuid
-  lastScanId    String?  @db.Uuid
+  breachActive  Boolean    @default(false)
+  activeEventId String?    @db.Uuid
+  lastScanId    String?    @db.Uuid
   triggeredAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  rule          RiskRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
-  position      Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  rule          RiskRule   @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  position      Position?  @relation(fields: [positionId], references: [id], onDelete: SetNull)
   activeEvent   RiskEvent? @relation(fields: [activeEventId], references: [id], onDelete: SetNull)
 
   @@unique([ruleId, targetKey, symbol, mode])
@@ -541,6 +853,7 @@ model JournalEntry {
 model TradePlan {
   id                  String    @id @default(uuid()) @db.Uuid
   accountId           String?   @db.Uuid
+  tradeId             String?
   symbol              String
   side                String?
   plannedEntry        Decimal?  @db.Decimal(24, 8)
@@ -560,6 +873,32 @@ model TradePlan {
 
   @@index([symbol, status])
   @@index([accountId, status])
+  @@index([tradeId, status])
+}
+
+model JournalReviewSnapshot {
+  id                    String   @id @default(uuid()) @db.Uuid
+  accountId             String   @db.Uuid
+  mode                  String
+  reviewObjectType      String
+  tradeId               String
+  closeSliceId          String?
+  factIds               Json
+  eventIds              Json
+  ledgerRevision        BigInt
+  projectionGeneration  BigInt
+  projectionFingerprint String?
+  fxEvidenceVersion     String?
+  conversionFingerprint String?
+  inputSnapshot         Json
+  outputSnapshot        Json
+  status                String   @default("CURRENT")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([accountId, reviewObjectType, tradeId])
+  @@index([tradeId, closeSliceId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ProviderConfig {
@@ -608,30 +947,30 @@ model AutomationRun {
 }
 
 model AiRun {
-  id            String   @id @default(uuid()) @db.Uuid
-  provider      String
-  model         String
-  promptVersion String
-  status        String
-  question      String?
-  inputTokens   Int      @default(0)
-  outputTokens  Int      @default(0)
-  cost          Decimal  @default(0) @db.Decimal(18, 8)
-  checkpoint    Json?
-  result        Json?
-  context       Json?
-  modelMetadata Json?
-  errorCode     String?
-  errorSummary  String?
-  durationMs    Int?
-  startedAt     DateTime?
-  completedAt   DateTime?
-  retryOfRunId  String?  @db.Uuid
-  executionAttempt Int      @default(0)
-  claimedAt     DateTime?
-  leaseUntil    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String    @id @default(uuid()) @db.Uuid
+  provider         String
+  model            String
+  promptVersion    String
+  status           String
+  question         String?
+  inputTokens      Int       @default(0)
+  outputTokens     Int       @default(0)
+  cost             Decimal   @default(0) @db.Decimal(18, 8)
+  checkpoint       Json?
+  result           Json?
+  context          Json?
+  modelMetadata    Json?
+  errorCode        String?
+  errorSummary     String?
+  durationMs       Int?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  retryOfRunId     String?   @db.Uuid
+  executionAttempt Int       @default(0)
+  claimedAt        DateTime?
+  leaseUntil       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   toolCalls AiToolCall[]
 

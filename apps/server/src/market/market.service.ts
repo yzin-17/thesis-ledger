@@ -159,8 +159,7 @@ export class MarketService {
       this.withDistributedLock(flightKey, async () => {
         if (!options.refresh) {
           const cached = await this.redis.client.get(freshKey);
-          if (cached)
-            return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+          if (cached) return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
         }
         try {
           const raw = await this.dsa.get<Record<string, unknown>>(

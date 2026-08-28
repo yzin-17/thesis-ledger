@@ -8,12 +8,12 @@
 
 ## 能力边界摘要
 
-| 能力 | DSA 可复用部分 | ThesisLedger 必须拥有的边界 |
-| --- | --- | --- |
-| 行情与筹码 | Provider Fetcher、行情/指标/筹码计算、Provider fallback 和运行诊断 | Data Contract、标准化 Schema、provenance、质量状态、长期 Bar Store 和产品缓存 |
-| Portfolio / Risk | 上游账户、交易、估值和风险行为可作为 fixture 或对照 | Account、Ledger、Position Projection、Snapshot、RiskRule、RiskEvent 和事实源 |
-| Notification | 飞书 Sender、底层重试和幂等能力 | RiskEvent 到通知的编排、severity、静默、Daily Digest、Delivery Result 和审计 |
-| AI / Tool | Tool Registry、Tool Policy、ToolSurface、超时/取消、Provider Trace | AI Provider Registry、Prompt/Token/Cost/Decision Log、Tool 权限和真实组合事实 |
+| 能力             | DSA 可复用部分                                                     | ThesisLedger 必须拥有的边界                                                   |
+| ---------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| 行情与筹码       | Provider Fetcher、行情/指标/筹码计算、Provider fallback 和运行诊断 | Data Contract、标准化 Schema、provenance、质量状态、长期 Bar Store 和产品缓存 |
+| Portfolio / Risk | 上游账户、交易、估值和风险行为可作为 fixture 或对照                | Account、Ledger、Position Projection、Snapshot、RiskRule、RiskEvent 和事实源  |
+| Notification     | 飞书 Sender、底层重试和幂等能力                                    | RiskEvent 到通知的编排、severity、静默、Daily Digest、Delivery Result 和审计  |
+| AI / Tool        | Tool Registry、Tool Policy、ToolSurface、超时/取消、Provider Trace | AI Provider Registry、Prompt/Token/Cost/Decision Log、Tool 权限和真实组合事实 |
 
 ### 行情与筹码
 

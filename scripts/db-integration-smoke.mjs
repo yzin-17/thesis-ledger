@@ -1,7 +1,14 @@
 import { execFileSync } from 'node:child_process';
+import { access } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;
+const infraRoot = resolve(root, '../thesis-ledger-infra');
 const baseUrl = process.env.THESIS_LEDGER_BASE_URL ?? 'http://localhost:3000/api/v1';
+const requestedEnvFile = process.env.THESIS_LEDGER_INFRA_ENV_FILE ?? '.env';
+const envFile = await access(resolve(infraRoot, requestedEnvFile))
+  .then(() => resolve(infraRoot, requestedEnvFile))
+  .catch(() => null);
 
 const request = async (path, init = {}) => {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -25,8 +32,19 @@ const health = await request(`/health?t=${Date.now()}`);
 if (health.status !== 'healthy') throw new Error(`依赖未就绪: ${JSON.stringify(health)}`);
 
 const lockKey = `thesis-ledger:lock:v1:integration:${Date.now()}`;
+const composeArgs = [
+  'compose',
+  ...(envFile === null ? [] : ['--env-file', envFile]),
+  '-f',
+  resolve(infraRoot, 'compose.yml'),
+  '-f',
+  resolve(infraRoot, 'compose.dev.yml'),
+];
 const compose = (args) =>
-  execFileSync('docker', ['compose', ...args], { cwd: root, encoding: 'utf8' }).trim();
+  execFileSync('docker', [...composeArgs, ...args], {
+    cwd: infraRoot,
+    encoding: 'utf8',
+  }).trim();
 const firstLock = compose([
   'exec',
   '-T',

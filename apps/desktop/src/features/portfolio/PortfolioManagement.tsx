@@ -21,6 +21,8 @@ export function PortfolioManagement({
   positions,
   cashValue,
   step,
+  showCash = true,
+  calibrationMode = false,
   defaultAccountId,
   accountsReady = true,
   onAccountEntry,
@@ -34,6 +36,8 @@ export function PortfolioManagement({
   positions: Position[];
   cashValue?: number;
   step: 'account' | 'position';
+  showCash?: boolean;
+  calibrationMode?: boolean;
   defaultAccountId?: string;
   accountsReady?: boolean;
   onAccountEntry?: (accountId: string) => void;
@@ -150,6 +154,7 @@ export function PortfolioManagement({
     selectedInstrument,
     manualInstrumentEntry,
     manualAssetType,
+    calibrationMode,
     instrumentQuery,
     instrumentSelectionInProgress,
     setInstrumentConfirmationBusy,
@@ -174,6 +179,8 @@ export function PortfolioManagement({
       positions={positions}
       cashValue={cashValue}
       step={step}
+      showCash={showCash}
+      calibrationMode={calibrationMode}
       managedAccounts={managedAccounts}
       onAccountEntry={onAccountEntry}
       selectedAccount={selectedAccount}

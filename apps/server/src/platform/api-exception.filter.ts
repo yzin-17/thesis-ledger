@@ -11,6 +11,13 @@ import { DsaError } from '../integration/dsa/dsa.client.js';
 import { currentTraceId, StructuredLogger } from './structured-logger.js';
 import { ErrorTrackingService } from './error-tracking.service.js';
 
+const normalizeHttpResponse = (payload: unknown) => {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return payload;
+  const record = payload as Record<string, unknown>;
+  if (typeof record.error === 'string' || typeof record.errorCode !== 'string') return payload;
+  return { ...record, error: record.errorCode };
+};
+
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new StructuredLogger('thesis-ledger.errors');
@@ -67,7 +74,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
         traceId: currentTraceId() ?? 'unknown',
         status: exception.getStatus(),
       });
-      response.status(exception.getStatus()).json(exception.getResponse());
+      response.status(exception.getStatus()).json(normalizeHttpResponse(exception.getResponse()));
       return;
     }
     this.logger.error({

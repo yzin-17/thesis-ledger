@@ -4,7 +4,7 @@
 
 `LedgerEvent` 是交易、现金流、公司行动和受控修正的唯一事实源。`Position` 只是由 Ledger 重建的当前投影，`PortfolioSnapshot` 是带数据质量的历史缓存。清空 Position 后运行 `/api/v1/ledger/:accountId/rebuild`，应得到同一账户的最新投影。
 
-截图审核提交会写入带 `source=screenshot:*`、`externalUid`、`correctionOf`、原因和开仓余额 metadata 的 `ADJUSTMENT`，随后重建 Position；回滚写入补偿 Adjustment，不删除事实流水。手工持仓修改也必须通过 Ledger Adjustment。
+截图审核提交会通过专用 V2 命令写入 `POSITION_BASELINE_OBSERVATION`，由 `factId` 与追加式修正链表达事实版本，随后重建 Position；回滚追加带 `supersedesEventId` 的 `VOID`，不删除事实流水。手工持仓修改同样必须通过 V2 Baseline Observation，不得直接写入 Position。
 
 ## 成本、现金与收益
 

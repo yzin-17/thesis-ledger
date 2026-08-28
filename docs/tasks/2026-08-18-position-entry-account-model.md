@@ -15,7 +15,7 @@
 - [x] T1 在主仓完成数据库迁移预检与 Account 模型重构：移除 `source`，新增 `institution`、`mode`，处理历史 shadow、非 CNY、字段锁定和停用规则。
 - [x] T2 更新共享 Schema、主系统 `/api/v1`、版本握手、fixture 和 API client，并为不兼容客户端与数据库 Schema 增加快速失败测试。
 - [x] T3 实现 Asset Identity 状态和股票、ETF、场外基金的容器校验，包括用户确认资产与 Provider 冲突阻断。
-- [x] T4 实现手动“设置当前余额”及清空持仓、现金余额 Adjustment、最近录入方式投影和对应 Ledger 测试。
+- [x] T4 实现手动“设置当前余额”及清空持仓、现金余额 Observation、最近录入方式投影和对应 Ledger 测试（事件语义已由当前 V2 Ledger Spec 统一）。
 - [x] T5 扩展 Import Draft 的截图来源注册表、增量提交、现金忽略、重复代码校验、类型校验、Ledger 基线、重新基线和回滚。
 - [x] T6 重构 Desktop `/position-entry`：账户选择、手动持仓/现金列表布局、截图导入右侧 Sheet、添加与编辑右侧录入 Sheet、独立账户管理页、空列表自动打开、账户列表跳转自动选中但不自动打开 Sheet、账户锁定、URL 覆盖、脏状态确认和旧路由重定向。
 - [x] T7 更新 Portfolio、Risk、Performance 和 AI 的真实/影子查询范围及现金、成本、盈亏展示；实现 Desktop 与 Mobile 的范围切换和模拟标签。

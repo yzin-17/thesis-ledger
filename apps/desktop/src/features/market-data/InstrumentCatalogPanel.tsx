@@ -38,10 +38,14 @@ export function InstrumentCatalogPanel({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="m-0 text-xl font-semibold">标的目录</h2>
-            <p className="mt-1 text-sm text-muted-foreground">完整快照、generation 与 ACK 由服务端原子切换。</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              完整快照、generation 与 ACK 由服务端原子切换。
+            </p>
           </div>
           <Button type="button" variant="outline" onClick={onSync} disabled={disabled || syncing}>
-            {syncing && <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />}
+            {syncing && (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+            )}
             {syncing ? '同步中…' : '同步目录'}
           </Button>
         </div>
@@ -56,10 +60,19 @@ export function InstrumentCatalogPanel({
           </div>
         </div>
         <form className="space-y-3" onSubmit={submit}>
-          <label className="block text-sm font-medium" htmlFor="instrument-search">搜索已同步标的</label>
+          <label className="block text-sm font-medium" htmlFor="instrument-search">
+            搜索已同步标的
+          </label>
           <div className="flex gap-2">
-            <Input id="instrument-search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="代码、名称或拼音首字母" />
-            <Button type="submit" variant="outline" disabled={searchBusy}>{searchBusy ? '搜索中…' : '搜索'}</Button>
+            <Input
+              id="instrument-search"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="代码、名称或拼音首字母"
+            />
+            <Button type="submit" variant="outline" disabled={searchBusy}>
+              {searchBusy ? '搜索中…' : '搜索'}
+            </Button>
           </div>
         </form>
         {searchResults.length > 0 && (
@@ -67,11 +80,27 @@ export function InstrumentCatalogPanel({
             {searchResults.map((instrument) => (
               <div key={instrument.id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <strong className="block truncate text-sm font-medium">{instrument.displayName}</strong>
-                  <span className="font-mono text-xs text-muted-foreground">{instrument.symbol} · {instrument.instrumentType}</span>
+                  <strong className="block truncate text-sm font-medium">
+                    {instrument.displayName}
+                  </strong>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {instrument.symbol} · {instrument.instrumentType}
+                  </span>
                 </div>
-                <Button type="button" size="sm" variant="outline" disabled={!instrument.confirmable || confirmingId !== null} onClick={() => onConfirm(instrument)}>
-                  {confirmingId === instrument.id && <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!instrument.confirmable || confirmingId !== null}
+                  onClick={() => onConfirm(instrument)}
+                >
+                  {confirmingId === instrument.id && (
+                    <LoaderCircle
+                      data-icon="inline-start"
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                  )}
                   {instrument.confirmable ? '确认标的' : '已确认'}
                 </Button>
               </div>

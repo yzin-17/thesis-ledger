@@ -1,10 +1,4 @@
-export type ScreenshotSource =
-  | 'alipay'
-  | 'ths'
-  | 'broker'
-  | 'bank'
-  | 'fund-platform'
-  | 'unknown';
+export type ScreenshotSource = 'alipay' | 'ths' | 'broker' | 'bank' | 'fund-platform' | 'unknown';
 
 export const screenshotSources: readonly ScreenshotSource[] = [
   'alipay',

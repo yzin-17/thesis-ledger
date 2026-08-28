@@ -99,7 +99,9 @@ export class AutomationController {
 
   @Post('workflows/weekly-strategy')
   weeklyStrategy(@Body() input: unknown) {
-    return weeklyStrategyReview(omitUndefinedDeep(automationWeeklyStrategyInputSchema.parse(input)));
+    return weeklyStrategyReview(
+      omitUndefinedDeep(automationWeeklyStrategyInputSchema.parse(input)),
+    );
   }
 
   @Post('workflows/close-sync')

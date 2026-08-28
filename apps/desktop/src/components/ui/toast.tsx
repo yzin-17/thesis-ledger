@@ -55,10 +55,7 @@ function ToastContent({ className, ...props }: ToastPrimitive.Content.Props) {
   return (
     <ToastPrimitive.Content
       data-slot="toast-content"
-      className={cn(
-        'flex min-h-14 items-center gap-3 p-4',
-        className,
-      )}
+      className={cn('flex min-h-14 items-center gap-3 p-4', className)}
       {...props}
     />
   );

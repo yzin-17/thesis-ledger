@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ImportService } from '../../src/imports/import.service.js';
+import { AssetMatcherService } from '../../src/imports/asset-matcher.service.js';
+import { ImportCommitService } from '../../src/imports/import-commit.service.js';
+import { ImportDraftService } from '../../src/imports/import-draft.service.js';
 import {
   createCoreTools,
   runRiskExplanation,
@@ -8,6 +11,40 @@ import {
 import { AccountsService } from '../../src/portfolio/accounts.service.js';
 import { PortfolioService } from '../../src/portfolio/portfolio.service.js';
 import { RiskService } from '../../src/risk/risk.service.js';
+
+const fxResponse = (asOf: string) => ({
+  version: 1 as const,
+  baseCurrency: 'CNY' as const,
+  asOf,
+  fetchedAt: `${asOf}T00:00:00.000Z`,
+  maxAgeDays: 7,
+  rates: [
+    {
+      fromCurrency: 'CNY' as const,
+      toCurrency: 'CNY' as const,
+      rate: 1,
+      rateDate: asOf,
+      provider: 'identity',
+      fetchedAt: `${asOf}T00:00:00.000Z`,
+      freshness: 'live' as const,
+      stale: false,
+      ageDays: 0,
+      available: true,
+    },
+    {
+      fromCurrency: 'HKD' as const,
+      toCurrency: 'CNY' as const,
+      rate: 0.92,
+      rateDate: asOf,
+      provider: 'fixture',
+      fetchedAt: `${asOf}T00:00:00.000Z`,
+      freshness: 'live' as const,
+      stale: false,
+      ageDays: 0,
+      available: true,
+    },
+  ],
+});
 
 describe('V0.1 核心 E2E', () => {
   it('账户→截图 Review/Commit→Portfolio→Risk→通知→AI Explain 可一键执行', async () => {
@@ -23,6 +60,7 @@ describe('V0.1 核心 E2E', () => {
     const positions: Array<Record<string, unknown>> = [];
     type DraftRecord = { id?: string; [key: string]: unknown };
     let draft: DraftRecord | null = null;
+    let draftRevision: Record<string, unknown> | null = null;
     type E2ePrisma = {
       [key: string]: unknown;
       $transaction: <T>(callback: (transaction: unknown) => Promise<T>) => Promise<T>;
@@ -58,10 +96,19 @@ describe('V0.1 核心 E2E', () => {
           return draft;
         }),
       },
+      importDraftRevision: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          draftRevision = { createdAt: new Date('2026-08-26T01:00:00.000Z'), ...data };
+          return draftRevision;
+        }),
+        findUnique: vi.fn(async () => draftRevision),
+      },
+      accountLedgerState: { findUnique: vi.fn(async () => ({ ledgerRevision: 0n })) },
       ledgerEvent: {
-        upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => {
-          ledgerEvents.push(create);
-          return create;
+        findUnique: vi.fn(async () => null),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          ledgerEvents.push(data);
+          return data;
         }),
       },
       riskRule: {
@@ -96,8 +143,9 @@ describe('V0.1 核心 E2E', () => {
     });
     expect(account).toMatchObject({ id: accountId });
 
-    const ledger = {
-      rebuild: vi.fn(async () => {
+    const baselineImport = {
+      commitReviewedImport: vi.fn(async () => {
+        ledgerEvents.push({ type: 'POSITION_BASELINE_OBSERVATION', symbol: '600519.SH' });
         positions.splice(0, positions.length, {
           accountId,
           symbol: '600519.SH',
@@ -105,9 +153,14 @@ describe('V0.1 核心 E2E', () => {
           costPrice: 1000,
           asset,
         });
+        draft = { ...draft, status: 'committed' };
+        return draft;
       }),
     };
-    const imports = new ImportService(prisma as never, ledger as never);
+    const matcher = new AssetMatcherService(prisma as never);
+    const drafts = new ImportDraftService(prisma as never, matcher);
+    const commits = new ImportCommitService(baselineImport as never);
+    const imports = new ImportService(matcher, drafts, commits, {} as never);
     const createdDraft = await imports.createDraftFromProvider(
       accountId,
       new Uint8Array([1, 2, 3]),
@@ -117,12 +170,12 @@ describe('V0.1 核心 E2E', () => {
         extract: async () => [
           {
             symbol: '600519.SH',
-            quantity: 100,
-            costPrice: 1000,
-            marketPrice: 1100,
-            marketValue: 110_000,
-            profit: 10_000,
-            profitRate: 0.1,
+            quantity: '100',
+            costPrice: '1000',
+            marketPrice: '1100',
+            marketValue: '110000',
+            profit: '10000',
+            profitRate: '0.1',
             confidence: 0.99,
           },
         ],
@@ -131,7 +184,10 @@ describe('V0.1 核心 E2E', () => {
     expect(createdDraft.status).toBe('pending');
     await imports.commit(createdDraft.id, createdDraft.rows as unknown as unknown[]);
     expect(ledgerEvents).toHaveLength(1);
-    expect(ledgerEvents[0]).toMatchObject({ type: 'ADJUSTMENT', symbol: '600519.SH' });
+    expect(ledgerEvents[0]).toMatchObject({
+      type: 'POSITION_BASELINE_OBSERVATION',
+      symbol: '600519.SH',
+    });
 
     const portfolio = await new PortfolioService(
       prisma as never,
@@ -187,12 +243,49 @@ describe('账户与组合', () => {
       service.create({ name: '证券', type: 'securities', mode: 'actual', currency: 'CNY' }),
     ).resolves.toMatchObject({ name: '证券' });
     await expect(
+      service.create({ name: '港股', type: 'securities', mode: 'actual', currency: 'HKD' }),
+    ).resolves.toMatchObject({ name: '港股', currency: 'HKD' });
+    await expect(
       service.create({ name: '证券', type: 'securities', mode: 'actual', currency: 'CNY' }),
     ).resolves.toMatchObject({ name: '证券' });
     await expect(
       service.create({ name: '非法', type: 'securities', mode: 'actual', currency: 'EUR' }),
     ).rejects.toThrow();
     await expect(service.deactivate('with-position')).rejects.toThrow('仍有持仓');
+  });
+
+  it('停用账户时不同币种的现金余额不能互相抵消', async () => {
+    const update = vi.fn();
+    const prisma = {
+      account: {
+        findUnique: vi.fn(async () => ({ id: 'account-a', currency: 'CNY', positions: [] })),
+        update,
+      },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'cash-cny',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'CNY',
+          },
+          {
+            id: 'cash-hkd',
+            accountId: 'account-a',
+            type: 'CASH_WITHDRAW',
+            occurredAt: new Date('2025-01-02T00:00:00.000Z'),
+            amount: 100,
+            currency: 'HKD',
+          },
+        ]),
+      },
+    };
+    await expect(new AccountsService(prisma as never).deactivate('account-a')).rejects.toThrow(
+      '现金余额',
+    );
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('用三持仓 fixture 计算部分估值和盈亏', async () => {
@@ -217,6 +310,116 @@ describe('账户与组合', () => {
     });
     expect(result.positions[2]).toMatchObject({ marketValue: null, stale: true });
   });
+
+  it('组合估值不直接相加不同币种现金，并可通过 FX View 汇总', async () => {
+    const prisma = {
+      position: { findMany: vi.fn(async () => []) },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'cash-cny',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'CNY',
+          },
+          {
+            id: 'cash-hkd',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'HKD',
+          },
+        ]),
+      },
+      account: {
+        findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]),
+      },
+    };
+    const market = {
+      getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
+    };
+    const service = new PortfolioService(prisma as never, market as never);
+    const native = await service.value('account-a', 'actual', {
+      fxMerge: false,
+      baseCurrency: 'CNY',
+    });
+    expect(native).toMatchObject({ cashValue: 0, totalMarketValue: 0, partial: true });
+    expect(native.cashByCurrency).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ currency: 'CNY', amount: 100 }),
+        expect.objectContaining({ currency: 'HKD', amount: 100 }),
+      ]),
+    );
+
+    const merged = await service.value('account-a', 'actual', {
+      fxMerge: true,
+      baseCurrency: 'CNY',
+    });
+    expect(merged).toMatchObject({
+      cashValue: 192,
+      totalMarketValue: 192,
+      partial: false,
+      baseCurrency: 'CNY',
+    });
+    expect(merged.cashByAccount).toMatchObject([
+      { accountId: 'account-a', amount: 192, currency: 'CNY' },
+    ]);
+  });
+
+  it('缺少 FX 时保留原币现金，并将本位币汇总标记为部分可用', async () => {
+    const prisma = {
+      position: { findMany: vi.fn(async () => []) },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'cash-cny',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'CNY',
+          },
+          {
+            id: 'cash-usd',
+            accountId: 'account-a',
+            type: 'CASH_DEPOSIT',
+            occurredAt: new Date('2025-01-01T00:00:00.000Z'),
+            amount: 100,
+            currency: 'USD',
+          },
+        ]),
+      },
+      account: {
+        findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]),
+      },
+    };
+    const market = {
+      getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => ({
+        ...fxResponse(asOf),
+        rates: [fxResponse(asOf).rates[0]],
+      })),
+    };
+    const result = await new PortfolioService(prisma as never, market as never).value(
+      'account-a',
+      'actual',
+      { fxMerge: true, baseCurrency: 'CNY' },
+    );
+    expect(result).toMatchObject({
+      cashValue: 100,
+      totalMarketValue: 100,
+      partial: true,
+      fx: { status: 'blocked', missingCurrencies: ['USD'] },
+    });
+    expect(result.cashByCurrency).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ currency: 'CNY', amount: 100, convertedAmount: 100 }),
+        expect.objectContaining({ currency: 'USD', amount: 100, convertedAmount: null }),
+      ]),
+    );
+  });
   it('编辑持仓可同时修正账户、数量和成本', async () => {
     const findUniqueOrThrow = vi
       .fn()
@@ -236,18 +439,18 @@ describe('账户与组合', () => {
     );
     await service.updatePosition('position', {
       accountId: '11111111-1111-4111-8111-111111111111',
-      quantity: 200,
-      costPrice: 12,
+      quantity: '200',
+      costPrice: '12',
     });
     expect(setPosition).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111',
       '600519.SH',
-      200,
-      12,
+      '200',
+      '12',
       'manual',
       '手工修改持仓',
     );
-    await expect(service.updatePosition('position', { quantity: 0 })).rejects.toThrow();
+    await expect(service.updatePosition('position', { quantity: '0' })).rejects.toThrow();
   });
   it('目录未命中时允许使用名称和类型手动录入持仓', async () => {
     const setPosition = vi.fn(async () => ({}));
@@ -255,8 +458,8 @@ describe('账户与组合', () => {
       id: 'position',
       accountId: '11111111-1111-4111-8111-111111111111',
       symbol: '600519.SH',
-      quantity: 20,
-      costPrice: 100,
+      quantity: '20',
+      costPrice: '100',
       asset: { name: '自定义标的', assetType: 'stock' },
     }));
     const service = new PortfolioService(
@@ -268,8 +471,8 @@ describe('账户与组合', () => {
     await service.upsertPosition({
       accountId: '11111111-1111-4111-8111-111111111111',
       symbol: '600519.SH',
-      quantity: 20,
-      costPrice: 100,
+      quantity: '20',
+      costPrice: '100',
       source: 'manual',
       assetName: '自定义标的',
       assetType: 'stock',
@@ -278,8 +481,8 @@ describe('账户与组合', () => {
     expect(setPosition).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111',
       '600519.SH',
-      20,
-      100,
+      '20',
+      '100',
       'manual',
       '保存当前持仓',
       { assetName: '自定义标的', assetType: 'stock' },
@@ -288,8 +491,8 @@ describe('账户与组合', () => {
       service.upsertPosition({
         accountId: '11111111-1111-4111-8111-111111111111',
         symbol: '600519.SH',
-        quantity: 20,
-        costPrice: 100,
+        quantity: '20',
+        costPrice: '100',
         source: 'manual',
       }),
     ).rejects.toThrow('未找到目录标的时需要补充名称和类型');

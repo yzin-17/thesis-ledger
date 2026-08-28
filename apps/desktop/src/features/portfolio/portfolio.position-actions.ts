@@ -5,14 +5,16 @@ import type { PortfolioActionDependencies, PortfolioToastManager } from './portf
 import type { HeldAssetType, InstrumentLookup, Position } from './portfolio.types.js';
 import { formText } from '../shared/display.js';
 
-const positionSuccessTitle = (isCash: boolean, isEditing: boolean) => {
+const positionSuccessTitle = (isCash: boolean, isEditing: boolean, calibrationMode: boolean) => {
   if (isCash) return '现金余额已保存';
+  if (calibrationMode) return isEditing ? '持仓观察已更新' : '持仓观察已记录';
   if (isEditing) return '持仓已更新';
   return '持仓已添加';
 };
 
-const positionFailureTitle = (isCash: boolean, isEditing: boolean) => {
+const positionFailureTitle = (isCash: boolean, isEditing: boolean, calibrationMode: boolean) => {
   if (isCash) return '现金余额保存失败';
+  if (calibrationMode) return isEditing ? '持仓观察更新失败' : '持仓观察记录失败';
   if (isEditing) return '持仓更新失败';
   return '持仓添加失败';
 };
@@ -77,8 +79,8 @@ const buildPositionInput = ({
   return {
     accountId,
     symbol: formText(form, 'symbol').trim().toUpperCase(),
-    quantity: Number(formText(form, 'quantity')),
-    costPrice: Number(formText(form, 'costPrice')),
+    quantity: formText(form, 'quantity'),
+    costPrice: formText(form, 'costPrice'),
     source: 'manual',
     ...(selectedInstrument ? { instrumentId: selectedInstrument.id } : {}),
     ...(assetName ? { assetName } : {}),
@@ -95,6 +97,7 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
     selectedInstrument,
     manualInstrumentEntry,
     manualAssetType,
+    calibrationMode,
     mutations,
     setBusyAction,
     setEditing,
@@ -127,7 +130,7 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
       if (isCash) {
         await mutations.saveCash.mutateAsync({
           accountId,
-          amount: Number(formText(form, 'cashAmount')),
+          amount: formText(form, 'cashAmount'),
         });
       } else {
         await mutations.savePosition.mutateAsync({
@@ -141,14 +144,14 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
       setPositionSheetOpen(false);
       onSaved();
       toastManager.add({
-        title: positionSuccessTitle(isCash, isEditing),
+        title: positionSuccessTitle(isCash, isEditing, calibrationMode),
         description: isCash ? undefined : '组合将重新估值。',
         type: 'success',
         timeout: 2800,
       });
     } catch {
       toastManager.add({
-        title: positionFailureTitle(isCash, isEditing),
+        title: positionFailureTitle(isCash, isEditing, calibrationMode),
         description: isCash ? '请检查金额。' : '请检查标的、数量和平均成本。',
         type: 'error',
         timeout: 0,
@@ -179,7 +182,7 @@ const createCashSubmitHandler = (dependencies: PortfolioActionDependencies) => {
     try {
       await mutations.saveCash.mutateAsync({
         accountId: entryAccountId,
-        amount: Number(formText(form, 'cashAmount')),
+        amount: formText(form, 'cashAmount'),
       });
       event.currentTarget.reset();
       markDirty(false);
@@ -204,6 +207,7 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
   const {
     entryAccountId,
     positions,
+    calibrationMode,
     busyAction,
     mutations,
     setBusyAction,
@@ -214,7 +218,9 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
   return async () => {
     if (!entryAccountId || positions.length === 0 || busyAction) return;
     if (
-      !window.confirm('确认清空当前账户的全部持仓？该操作会写入归零 Adjustment，现金余额不受影响。')
+      !window.confirm(
+        '确认清空当前账户的全部持仓？该操作会写入数量为零的持仓观察，现金余额不受影响。',
+      )
     )
       return;
     setBusyAction('clear-positions');
@@ -222,10 +228,14 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
       await mutations.clearPositions.mutateAsync(entryAccountId);
       markDirty(false);
       onSaved();
-      toastManager.add({ title: '持仓已清空', type: 'success', timeout: 2800 });
+      toastManager.add({
+        title: calibrationMode ? '持仓观察已清空' : '持仓已清空',
+        type: 'success',
+        timeout: 2800,
+      });
     } catch {
       toastManager.add({
-        title: '清空持仓失败',
+        title: calibrationMode ? '清空持仓观察失败' : '清空持仓失败',
         description: '请稍后重试。',
         type: 'error',
         timeout: 0,
@@ -238,19 +248,33 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
 };
 
 const createRemovePositionHandler = (dependencies: PortfolioActionDependencies) => {
-  const { busyAction, mutations, setBusyAction, markDirty, onSaved, toastManager } = dependencies;
+  const {
+    busyAction,
+    mutations,
+    setBusyAction,
+    markDirty,
+    onSaved,
+    toastManager,
+    calibrationMode,
+  } = dependencies;
   return async (position: Position) => {
     if (busyAction) return;
-    if (!window.confirm(`确认删除 ${position.asset.name}（${position.symbol}）？`)) return;
+    const actionLabel = calibrationMode ? '移除持仓观察' : '删除持仓';
+    if (!window.confirm(`确认${actionLabel} ${position.asset.name}（${position.symbol}）？`))
+      return;
     setBusyAction(`remove:${position.id}`);
     try {
       await mutations.removePosition.mutateAsync(position.id);
       markDirty(false);
       onSaved();
-      toastManager.add({ title: '持仓已删除', type: 'success', timeout: 2800 });
+      toastManager.add({
+        title: calibrationMode ? '持仓观察已移除' : '持仓已删除',
+        type: 'success',
+        timeout: 2800,
+      });
     } catch {
       toastManager.add({
-        title: '持仓删除失败',
+        title: calibrationMode ? '持仓观察移除失败' : '持仓删除失败',
         description: '请稍后重试。',
         type: 'error',
         timeout: 0,

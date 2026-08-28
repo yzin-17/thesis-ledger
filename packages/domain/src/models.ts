@@ -89,6 +89,7 @@ export interface JournalEntry {
 export interface TradePlan {
   id: string;
   accountId?: string;
+  tradeId?: string;
   symbol: string;
   side?: 'buy' | 'sell';
   plannedEntry?: number;

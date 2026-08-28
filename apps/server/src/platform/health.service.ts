@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service.js';
 import { RedisService } from './redis.service.js';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
+import { loadConfig } from './config.js';
 
 type Status = 'healthy' | 'degraded' | 'down';
 
@@ -13,6 +14,7 @@ export class HealthService {
     private readonly dsa: DsaClient,
   ) {}
   async check() {
+    const config = loadConfig();
     const checks = await Promise.allSettled([
       this.prisma.$queryRaw`SELECT 1`,
       this.redis.ping(),
@@ -41,6 +43,8 @@ export class HealthService {
         accountModel: 'container-v1',
         fundNav: fundNavAvailable,
         modes: ['actual', 'shadow'],
+        projectionReadMode: config.projectionReadMode,
+        projectionSwitchStage: config.projectionSwitchStage,
       },
       dependencies,
       checkedAt: new Date().toISOString(),

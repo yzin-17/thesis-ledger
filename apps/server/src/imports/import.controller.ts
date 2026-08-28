@@ -10,9 +10,31 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ImportService, type ScreenshotSource, type VisionPosition } from './import.service.js';
+import { z } from 'zod';
+import { ImportService, type ImportDraftOptions, type ScreenshotSource } from './import.service.js';
+import { visionPositionSchema, type VisionPosition } from './vision-validation.js';
 
 const allowedMime = new Set(['image/png', 'image/jpeg', 'image/webp']);
+
+type ImportDraftOptionBody = {
+  scope?: string;
+  observedAt?: string;
+  capturedAt?: string;
+  timePrecision?: string;
+  sourceTimezone?: string;
+};
+
+const readImportDraftOptions = (body: ImportDraftOptionBody): ImportDraftOptions => {
+  const options: ImportDraftOptions = {};
+  if (body.scope === 'FULL' || body.scope === 'PARTIAL') options.scope = body.scope;
+  if (body.observedAt) options.observedAt = body.observedAt;
+  if (body.capturedAt) options.capturedAt = body.capturedAt;
+  if (body.timePrecision === 'INSTANT' || body.timePrecision === 'DATE')
+    options.timePrecision = body.timePrecision;
+  if (body.sourceTimezone) options.sourceTimezone = body.sourceTimezone;
+  return options;
+};
+
 export const matchesSignature = (buffer: Buffer, mime: string) => {
   if (mime === 'image/png')
     return buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
@@ -41,22 +63,28 @@ export class ImportController {
       throw new BadRequestException('仅支持内容有效的 PNG、JPG、JPEG 或 WebP 图片');
     let extracted: VisionPosition[];
     try {
-      extracted = JSON.parse(body.extracted ?? '[]') as VisionPosition[];
+      extracted = z.array(visionPositionSchema).parse(JSON.parse(body.extracted ?? '[]'));
     } catch {
-      throw new BadRequestException('extracted 必须是合法 JSON');
+      throw new BadRequestException('extracted 必须是包含十进制字符串的合法 JSON');
     }
+    const temporal = readImportDraftOptions(body);
     return this.imports.createDraft(
       body.accountId ?? '',
       file.buffer,
       (body.source ?? 'unknown') as ScreenshotSource,
       extracted,
       Number(body.sourceConfidence ?? (body.source === 'unknown' ? 0 : 1)),
+      temporal,
     );
   }
 
   @Post(':id/commit')
-  commit(@Param('id') id: string, @Body() body: { rows?: unknown[]; source?: ScreenshotSource }) {
-    return this.imports.commit(id, body.rows ?? [], body.source);
+  commit(
+    @Param('id') id: string,
+    @Body()
+    body: { rows?: unknown[]; source?: ScreenshotSource } & ImportDraftOptions,
+  ) {
+    return this.imports.commit(id, body.rows ?? [], body.source, readImportDraftOptions(body));
   }
 
   @Post(':id/rebaseline')

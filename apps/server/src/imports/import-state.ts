@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 
 export const stableBaselineHash = (events: unknown[]) => {
+  const decimalValue = (value: unknown) => {
+    if (value === null) return null;
+    if (value === undefined) return '0';
+    if (value instanceof Prisma.Decimal) return value.toString();
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint')
+      return String(value);
+    return JSON.stringify(value);
+  };
   const normalized = events.map((event) => {
     if (!event || typeof event !== 'object') return event;
     const item = event as Record<string, unknown>;
@@ -9,11 +18,10 @@ export const stableBaselineHash = (events: unknown[]) => {
       type: item.type,
       occurredAt: item.occurredAt instanceof Date ? item.occurredAt.toISOString() : item.occurredAt,
       symbol: item.symbol,
-      quantity: item.quantity === null ? null : Number(item.quantity ?? 0),
-      price: item.price === null ? null : Number(item.price ?? 0),
-      amount: item.amount === null ? null : Number(item.amount ?? 0),
+      quantity: decimalValue(item.quantity),
+      price: decimalValue(item.price),
+      amount: decimalValue(item.amount),
       source: item.source,
-      correctionOf: item.correctionOf,
       metadata: item.metadata,
     };
   }) as Array<Record<string, unknown>>;

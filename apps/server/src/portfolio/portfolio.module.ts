@@ -5,10 +5,11 @@ import { AccountsController } from './accounts.controller.js';
 import { AccountsService } from './accounts.service.js';
 import { PortfolioController } from './portfolio.controller.js';
 import { PortfolioService } from './portfolio.service.js';
+import { TradeController } from './trade.controller.js';
 
 @Module({
   imports: [MarketModule, LedgerModule],
-  controllers: [AccountsController, PortfolioController],
+  controllers: [AccountsController, PortfolioController, TradeController],
   providers: [AccountsService, PortfolioService],
   exports: [AccountsService, PortfolioService],
 })

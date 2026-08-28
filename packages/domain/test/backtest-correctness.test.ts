@@ -33,7 +33,11 @@ const run = (currentStrategy: BacktestStrategy, bars: BacktestBar[]) =>
     strategy: currentStrategy,
     bars,
     start: '2025-01-01',
-    end: bars.map((item) => item.date).sort().at(-1) ?? '2025-01-01',
+    end:
+      bars
+        .map((item) => item.date)
+        .sort()
+        .at(-1) ?? '2025-01-01',
     dataAsOf: '2025-02-01T00:00:00Z',
     initialCash: 20_000,
   });
@@ -113,10 +117,7 @@ describe('Backtest correctness regressions', () => {
       sizing: { type: 'fixed', value: 5_000 },
       riskConstraints: [{ kind: 'maxPositionWeight', threshold: 0.3 }],
     });
-    const result = run(currentStrategy, [
-      bar('A', '2025-01-01', 100),
-      bar('B', '2025-01-01', 10),
-    ]);
+    const result = run(currentStrategy, [bar('A', '2025-01-01', 100), bar('B', '2025-01-01', 10)]);
     expect(result.trades.filter((trade) => trade.side === 'buy')).toHaveLength(2);
     expect(result.rejectedOrders).toHaveLength(0);
   });

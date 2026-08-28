@@ -4,14 +4,14 @@
 
 ## Data Contract V1 能力
 
-| 能力 | V1 状态 | 数据边界 |
-| --- | --- | --- |
-| Quote | 支持 | 统一 Quote V1，携带 `provider`、`marketTime`、`fetchedAt` 和 freshness |
-| Bars | 仅 `1d` | `1m` 返回 `unsupported_capability` |
-| MA/MACD/RSI | 支持 | 使用日线输入和 DSA `engineVersion` |
-| ATR | 不支持 | 返回 `unsupported_capability`，主系统页面保留不可用状态 |
-| Chip 摘要 | 支持 | `averageCost`、`profitRatio`、`range70`、`range90`、`concentration` |
-| Chip 完整分布 | 可选 | 没有可靠 `buckets`/`mainPeak` 时省略，不伪造 |
+| 能力          | V1 状态 | 数据边界                                                               |
+| ------------- | ------- | ---------------------------------------------------------------------- |
+| Quote         | 支持    | 统一 Quote V1，携带 `provider`、`marketTime`、`fetchedAt` 和 freshness |
+| Bars          | 仅 `1d` | `1m` 返回 `unsupported_capability`                                     |
+| MA/MACD/RSI   | 支持    | 使用日线输入和 DSA `engineVersion`                                     |
+| ATR           | 不支持  | 返回 `unsupported_capability`，主系统页面保留不可用状态                |
+| Chip 摘要     | 支持    | `averageCost`、`profitRatio`、`range70`、`range90`、`concentration`    |
+| Chip 完整分布 | 可选    | 没有可靠 `buckets`/`mainPeak` 时省略，不伪造                           |
 
 ## Control Contract V1 能力
 

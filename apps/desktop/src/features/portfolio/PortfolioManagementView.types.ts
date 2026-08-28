@@ -12,6 +12,8 @@ export type PortfolioManagementViewProps = {
   positions: Position[];
   cashValue: number | undefined;
   step: 'account' | 'position';
+  showCash?: boolean;
+  calibrationMode?: boolean;
   managedAccounts: Account[];
   onAccountEntry: ((accountId: string) => void) | undefined;
   selectedAccount: Account | undefined;

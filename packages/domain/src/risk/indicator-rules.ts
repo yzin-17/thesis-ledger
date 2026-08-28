@@ -1,5 +1,11 @@
 import { crossed, ratioThreshold } from './statistics.js';
-import { completeRiskEvent, riskDirection, type CompleteRiskContext, type RiskEvent, type RiskRule } from './types.js';
+import {
+  completeRiskEvent,
+  riskDirection,
+  type CompleteRiskContext,
+  type RiskEvent,
+  type RiskRule,
+} from './types.js';
 
 export const evaluateIndicatorRule = (
   rule: RiskRule,

@@ -6,6 +6,7 @@ import {
   journalEntryInputSchema,
   journalEntryUpdateSchema,
   journalReviewCandidatesQuerySchema,
+  journalReviewSnapshotInputSchema,
   omitUndefinedDeep,
   plannedStopInputSchema,
   reviewWindowInputSchema,
@@ -30,6 +31,11 @@ export class JournalController {
   @Get('review-candidates')
   reviewCandidates(@Query() input: Record<string, string | undefined>) {
     return this.journal.listReviewCandidates(journalReviewCandidatesQuerySchema.parse(input));
+  }
+
+  @Post('review-snapshots')
+  saveReviewSnapshot(@Body() input: unknown) {
+    return this.journal.saveReviewSnapshot(journalReviewSnapshotInputSchema.parse(input));
   }
 
   @Patch('entries/:id')

@@ -22,12 +22,6 @@ import { DsaModule } from '../integration/dsa/dsa.module.js';
     MetricsService,
     ErrorTrackingService,
   ],
-  exports: [
-    PrismaService,
-    RedisService,
-    DataExportService,
-    MetricsService,
-    ErrorTrackingService,
-  ],
+  exports: [PrismaService, RedisService, DataExportService, MetricsService, ErrorTrackingService],
 })
 export class PlatformModule {}

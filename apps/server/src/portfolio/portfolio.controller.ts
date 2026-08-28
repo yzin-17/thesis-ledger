@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { currencySchema } from '@thesis-ledger/schemas';
 import { PortfolioService } from './portfolio.service.js';
 
 @Controller('portfolio')
@@ -14,12 +15,19 @@ export class PortfolioController {
     return this.portfolio.upsertPosition(body);
   }
   @Post('cash') cash(
-    @Body() body: { accountId?: string; amount?: number; source?: 'manual' | 'screenshot' },
+    @Body()
+    body: {
+      accountId?: string;
+      amount?: string;
+      source?: 'manual' | 'screenshot';
+      currency?: string;
+    },
   ) {
     return this.portfolio.setCashBalance(
       body.accountId ?? '',
-      Number(body.amount),
+      body.amount ?? '',
       body.source ?? 'manual',
+      body.currency === undefined ? undefined : currencySchema.parse(body.currency),
     );
   }
   @Post('positions/clear') clear(@Body() body: { accountId?: string }) {
@@ -34,7 +42,12 @@ export class PortfolioController {
   @Get('valuation') value(
     @Query('accountId') accountId?: string,
     @Query('mode') mode: 'actual' | 'shadow' = 'actual',
+    @Query('fxMerge') fxMerge?: string,
+    @Query('baseCurrency') baseCurrency?: string,
   ) {
-    return this.portfolio.value(accountId, mode);
+    return this.portfolio.value(accountId, mode, {
+      ...(fxMerge === undefined ? {} : { fxMerge: fxMerge === 'true' }),
+      ...(baseCurrency === undefined ? {} : { baseCurrency: currencySchema.parse(baseCurrency) }),
+    });
   }
 }

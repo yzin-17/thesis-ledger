@@ -20,7 +20,7 @@ export interface LedgerEvent {
   id: string;
   accountId: string;
   type: LedgerEventType;
-  occurredAt: string;
+  occurredAt: string | null;
   symbol?: string;
   quantity?: number;
   price?: number;
@@ -29,9 +29,20 @@ export interface LedgerEvent {
   tax?: number;
   externalId?: string;
   source?: string;
-  correctionOf?: string;
   metadata?: Record<string, unknown>;
 }
+
+const compareLedgerEventOrder = (left: LedgerEvent, right: LedgerEvent) => {
+  if (left.occurredAt === null && right.occurredAt !== null) return -1;
+  if (left.occurredAt !== null && right.occurredAt === null) return 1;
+  if (left.occurredAt !== right.occurredAt)
+    return (left.occurredAt ?? '').localeCompare(right.occurredAt ?? '');
+  const leftOrder =
+    typeof left.metadata?.economicOrderKey === 'string' ? left.metadata.economicOrderKey : '';
+  const rightOrder =
+    typeof right.metadata?.economicOrderKey === 'string' ? right.metadata.economicOrderKey : '';
+  return leftOrder.localeCompare(rightOrder) || left.id.localeCompare(right.id);
+};
 
 const adjustmentMetadata = (event: LedgerEvent) =>
   event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
@@ -76,7 +87,7 @@ export const projectAverageCost = (events: readonly LedgerEvent[]): ProjectedPos
       let quantity = 0;
       let cost = 0;
       let realizedPnl = 0;
-      for (const event of [...group].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
+      for (const event of [...group].sort(compareLedgerEventOrder)) {
         if (
           applyPositionAdjustment(event, {
             get quantity() {
@@ -135,7 +146,7 @@ export const projectFifo = (events: readonly LedgerEvent[]): ProjectedPosition[]
     (group) => {
       const lots: Array<{ quantity: number; unitCost: number }> = [];
       let realizedPnl = 0;
-      for (const event of [...group].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
+      for (const event of [...group].sort(compareLedgerEventOrder)) {
         if (isPositionAdjustment(event)) {
           const metadata = adjustmentMetadata(event);
           const quantity =
@@ -198,7 +209,7 @@ export const projectFifo = (events: readonly LedgerEvent[]): ProjectedPosition[]
 
 export const projectCashBalance = (events: readonly LedgerEvent[]) => {
   const balances = new Map<string, number>();
-  for (const event of [...events].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
+  for (const event of [...events].sort(compareLedgerEventOrder)) {
     const metadata = adjustmentMetadata(event);
     if (event.type === 'ADJUSTMENT' && metadata.kind === 'cash-balance') {
       const balance = typeof metadata.amount === 'number' ? metadata.amount : (event.amount ?? 0);

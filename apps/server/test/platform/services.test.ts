@@ -258,7 +258,21 @@ describe('环境配置', () => {
     expect(parseConfig(base)).toMatchObject({
       port: 3000,
       providerHealthCheckIntervalMs: 3_600_000,
+      projectionReadMode: 'unified',
+      projectionSwitchStage: 'journal',
     }));
+  it('限制投影读取模式和分阶段切换值', () => {
+    expect(
+      parseConfig({
+        ...base,
+        PROJECTION_READ_MODE: 'shadow',
+        PROJECTION_SWITCH_STAGE: 'portfolio',
+      }),
+    ).toMatchObject({ projectionReadMode: 'shadow', projectionSwitchStage: 'portfolio' });
+    expect(() => parseConfig({ ...base, PROJECTION_READ_MODE: 'invalid' })).toThrow(
+      'PROJECTION_READ_MODE',
+    );
+  });
   it('缺失数据库配置时明确失败字段', () =>
     expect(() => parseConfig({ ...base, DATABASE_URL: undefined })).toThrow('DATABASE_URL'));
   it('缺失凭证加密密钥时明确失败字段', () =>

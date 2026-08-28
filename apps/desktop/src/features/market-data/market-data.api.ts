@@ -5,7 +5,8 @@ const api = () => getDesktopApiClient();
 
 export const fetchMarketPolicy = () => api().request<MarketPolicy>('/market-data/policy');
 export const fetchMarketProviders = async () =>
-  (await api().request<{ providers?: ProviderManifest[] }>('/market-data/providers')).providers ?? [];
+  (await api().request<{ providers?: ProviderManifest[] }>('/market-data/providers')).providers ??
+  [];
 export const fetchCatalogStatus = () => api().request<CatalogStatus>('/market-data/catalog/status');
 export const fetchCatalogJob = (jobId: string) =>
   api().request<CatalogStatus>(`/market-data/catalog/jobs/${encodeURIComponent(jobId)}`);
@@ -35,10 +36,7 @@ export const clearMarketProviderCredential = (provider: ProviderManifest) =>
     body: JSON.stringify({ enabled: provider.enabled, clearCredentials: true }),
   });
 
-export const testMarketProvider = (
-  provider: ProviderManifest,
-  credential?: string,
-) =>
+export const testMarketProvider = (provider: ProviderManifest, credential?: string) =>
   api().request<{
     status?: string;
     capabilityResults?: Record<string, { status?: string; errorCode?: string }>;

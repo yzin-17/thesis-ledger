@@ -1,10 +1,15 @@
 import { z } from 'zod';
+import { currencySchema, fxRateSchemaV1 } from './market.js';
 
 export const apiErrorResponseSchema = z
   .object({
     error: z.string(),
+    errorCode: z.string().optional(),
     message: z.string().optional(),
     fields: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
+    accountId: z.string().trim().min(1).optional(),
+    currentLedgerRevision: z.string().regex(/^\d+$/).optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 
@@ -40,12 +45,60 @@ export const portfolioPositionResponseSchema = z
 export const portfolioValuationResponseSchema = z.object({
   positions: z.array(portfolioPositionResponseSchema),
   cashValue: z.number().finite(),
-  cashByAccount: z.array(z.object({ accountId: z.uuid(), amount: z.number().finite() })),
+  cashByAccount: z.array(
+    z
+      .object({
+        accountId: z.uuid(),
+        amount: z.number().finite(),
+        currency: currencySchema.optional(),
+        nativeCurrency: currencySchema.optional(),
+        nativeAmount: z.number().finite().nullable().optional(),
+        partial: z.boolean().optional(),
+        missingCurrencies: z.array(currencySchema).optional(),
+      })
+      .passthrough(),
+  ),
+  cashByCurrency: z
+    .array(
+      z.object({
+        currency: currencySchema,
+        amount: z.number().finite(),
+        convertedAmount: z.number().finite().nullable(),
+      }),
+    )
+    .optional(),
   totalCost: z.number().finite(),
   totalMarketValue: z.number().finite(),
   totalPnl: z.number().finite(),
   partial: z.boolean(),
   mode: portfolioModeSchema,
+  baseCurrency: currencySchema.optional(),
+  fx: z
+    .object({
+      version: z.literal(1).optional(),
+      evidenceVersion: z.string().min(1).optional(),
+      enabled: z.boolean(),
+      status: z.enum(['disabled', 'not_needed', 'ready', 'stale', 'blocked']),
+      baseCurrency: currencySchema.optional(),
+      asOf: z.iso.date().optional(),
+      fxAsOf: z.iso.date().optional(),
+      estimated: z.boolean().optional(),
+      conversionMode: z.enum(['current-rate', 'historical-rate']).optional(),
+      stale: z.boolean().optional(),
+      fxStale: z.boolean().optional(),
+      missingCurrencies: z.array(currencySchema),
+      rates: z.array(fxRateSchemaV1),
+    })
+    .passthrough()
+    .optional(),
+  dataQuality: z
+    .object({
+      partial: z.boolean(),
+      missingSymbols: z.array(z.string()),
+      missingCurrencies: z.array(currencySchema).optional(),
+    })
+    .passthrough()
+    .optional(),
   valuedAt: z.iso.datetime({ offset: true }),
 });
 
@@ -260,6 +313,7 @@ export const journalEntryInputSchema = z.object({
 export const journalEntryUpdateSchema = journalEntryInputSchema.partial();
 export const tradePlanInputSchema = z.object({
   accountId: z.uuid().optional(),
+  tradeId: z.string().trim().min(1).optional(),
   symbol: z.string().min(1),
   side: z.enum(['buy', 'sell']).optional(),
   plannedEntry: z.number().finite().optional(),
@@ -317,6 +371,23 @@ export const journalReviewEvidenceCompletenessSchema = z.enum([
   'partial',
   'actual-only',
 ]);
+export const journalReviewObjectTypeSchema = z.enum(['TRADE_CYCLE', 'CLOSE_SLICE']);
+export const journalReviewStatusSchema = z.enum([
+  'CURRENT',
+  'STALE',
+  'LEGACY_REVIEW_NEEDS_CONFIRMATION',
+]);
+export const journalReviewProjectionSchema = z
+  .object({
+    ledgerRevision: z.string().regex(/^\d+$/),
+    projectionGeneration: z.string().regex(/^\d+$/),
+    projectionFingerprint: z.string().trim().min(1).nullable(),
+    factIds: z.array(z.uuid()),
+    eventIds: z.array(z.uuid()),
+    fxEvidenceVersion: z.string().trim().min(1).nullable(),
+    conversionFingerprint: z.string().trim().min(1).nullable(),
+  })
+  .strict();
 export const journalReviewPlanSchema = z
   .object({
     id: z.uuid(),
@@ -334,20 +405,100 @@ export const journalReviewPlanSchema = z
 export const journalReviewCandidateSchema = completedTradeSchema.extend({
   id: z.string().min(1),
   accountId: z.uuid(),
+  accountMode: portfolioModeSchema,
+  reviewObjectType: journalReviewObjectTypeSchema,
+  reviewObjectId: z.string().min(1),
+  tradeId: z.string().min(1),
+  closeSliceId: z.string().min(1).optional(),
+  reviewStatus: journalReviewStatusSchema,
+  stale: z.boolean(),
+  statisticsEligible: z.boolean(),
+  excludedReasons: z.array(z.string().min(1)),
+  entryAt: z.iso.datetime({ offset: true }),
+  exitAt: z.iso.datetime({ offset: true }),
+  pnl: z.number().finite().nullable(),
   quantity: z.number().positive(),
   plan: journalReviewPlanSchema.nullable(),
   evidenceCompleteness: journalReviewEvidenceCompletenessSchema,
   missingEvidence: z.array(z.string().min(1)),
-  sources: z.object({
-    entryEventIds: z.array(z.uuid()),
-    exitEventIds: z.array(z.uuid()),
-    journalEntryIds: z.array(z.uuid()),
-    planId: z.uuid().optional(),
-  }),
+  projection: journalReviewProjectionSchema,
+  sources: z
+    .object({
+      entryEventIds: z.array(z.uuid()),
+      exitEventIds: z.array(z.uuid()),
+      journalEntryIds: z.array(z.uuid()),
+      planId: z.uuid().optional(),
+    })
+    .strict(),
 });
+export const journalLegacyReviewCandidateSchema = z
+  .object({
+    id: z.string().min(1),
+    accountId: z.uuid(),
+    accountMode: portfolioModeSchema,
+    reviewObjectType: z.literal('CLOSE_SLICE'),
+    reviewObjectId: z.string().min(1),
+    tradeId: z.string().min(1).nullable(),
+    closeSliceId: z.string().min(1).nullable(),
+    reviewStatus: z.literal('LEGACY_REVIEW_NEEDS_CONFIRMATION'),
+    journalEntryId: z.uuid(),
+    ledgerEventId: z.uuid().nullable(),
+    symbol: z.string().trim().min(1).nullable(),
+    snapshot: z.unknown().nullable(),
+  })
+  .strict();
+export const journalReviewSnapshotInputSchema = z
+  .object({
+    accountId: z.uuid(),
+    mode: portfolioModeSchema.default('actual'),
+    reviewObjectType: journalReviewObjectTypeSchema,
+    tradeId: z.string().trim().min(1),
+    closeSliceId: z.string().trim().min(1).optional(),
+    fxEvidenceVersion: z.string().trim().min(1).nullable().optional(),
+    conversionFingerprint: z.string().trim().min(1).nullable().optional(),
+    inputSnapshot: z.unknown(),
+    outputSnapshot: z.unknown(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.reviewObjectType === 'CLOSE_SLICE' && value.closeSliceId === undefined)
+      context.addIssue({
+        code: 'custom',
+        path: ['closeSliceId'],
+        message: 'CLOSE_SLICE 必须提供 closeSliceId',
+      });
+    if (value.reviewObjectType === 'TRADE_CYCLE' && value.closeSliceId !== undefined)
+      context.addIssue({
+        code: 'custom',
+        path: ['closeSliceId'],
+        message: 'TRADE_CYCLE 不应提供 closeSliceId',
+      });
+  });
+export const journalReviewSnapshotResponseSchema = z
+  .object({
+    id: z.uuid(),
+    accountId: z.uuid(),
+    mode: portfolioModeSchema,
+    reviewObjectType: journalReviewObjectTypeSchema,
+    tradeId: z.string().trim().min(1),
+    closeSliceId: z.string().trim().min(1).optional(),
+    fxEvidenceVersion: z.string().trim().min(1).nullable(),
+    conversionFingerprint: z.string().trim().min(1).nullable(),
+    ledgerRevision: z.string().regex(/^\d+$/),
+    projectionGeneration: z.string().regex(/^\d+$/),
+    projectionFingerprint: z.string().trim().min(1).nullable(),
+    factIds: z.array(z.uuid()),
+    eventIds: z.array(z.uuid()),
+    inputSnapshot: z.unknown(),
+    outputSnapshot: z.unknown(),
+    status: z.literal('CURRENT'),
+    createdAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
 export const journalReviewCandidatesQuerySchema = z
   .object({
     accountId: z.uuid(),
+    mode: portfolioModeSchema.default('actual'),
     symbol: z.string().trim().min(1).optional(),
     start: z.iso.datetime({ offset: true }).optional(),
     end: z.iso.datetime({ offset: true }).optional(),
@@ -362,6 +513,7 @@ export const journalReviewCandidatesResponseSchema = z.object({
   items: z.array(journalReviewCandidateSchema),
   total: z.number().int().nonnegative(),
   nextCursor: z.string().min(1).nullable(),
+  legacyItems: z.array(journalLegacyReviewCandidateSchema).default([]),
 });
 
 export type PortfolioValuationResponse = z.infer<typeof portfolioValuationResponseSchema>;
@@ -370,6 +522,9 @@ export type PerformanceSummaryResponse = z.infer<typeof performanceSummaryRespon
 export type InstrumentSearchResult = z.infer<typeof instrumentSearchResultSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type JournalReviewCandidate = z.infer<typeof journalReviewCandidateSchema>;
+export type JournalLegacyReviewCandidate = z.infer<typeof journalLegacyReviewCandidateSchema>;
+export type JournalReviewSnapshotInput = z.input<typeof journalReviewSnapshotInputSchema>;
+export type JournalReviewSnapshotResponse = z.infer<typeof journalReviewSnapshotResponseSchema>;
 export type JournalReviewCandidatesInput = z.input<typeof journalReviewCandidatesQuerySchema>;
 export type JournalReviewCandidatesQuery = z.infer<typeof journalReviewCandidatesQuerySchema>;
 export type JournalReviewCandidatesResponse = z.infer<typeof journalReviewCandidatesResponseSchema>;

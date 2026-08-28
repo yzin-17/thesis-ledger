@@ -12,7 +12,7 @@ import {
 import { assertAllowedFeishuWebhookUrl } from '../src/notifications/feishu-webhook-security.js';
 import { ProviderConfigService } from '../src/providers/provider-config.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
-import { ImportService } from '../src/imports/import.service.js';
+import { ImportRollbackService } from '../src/imports/import-rollback.service.js';
 import { IntegrityService } from '../src/integrity/integrity.service.js';
 
 const ring = (activeVersion: string, keys: Record<string, Buffer>): CredentialKeyRing => ({
@@ -146,14 +146,11 @@ describe('Provider credential security', () => {
 describe('Feishu SSRF boundary', () => {
   it('只接受官方 HTTPS webhook 地址', () => {
     expect(
-      assertAllowedFeishuWebhookUrl(
-        'https://open.feishu.cn/open-apis/bot/v2/hook/abc123',
-      ).hostname,
+      assertAllowedFeishuWebhookUrl('https://open.feishu.cn/open-apis/bot/v2/hook/abc123').hostname,
     ).toBe('open.feishu.cn');
     expect(
-      assertAllowedFeishuWebhookUrl(
-        'https://open.larksuite.com/open-apis/bot/v2/hook/abc123',
-      ).hostname,
+      assertAllowedFeishuWebhookUrl('https://open.larksuite.com/open-apis/bot/v2/hook/abc123')
+        .hostname,
     ).toBe('open.larksuite.com');
     expect(() =>
       assertAllowedFeishuWebhookUrl('http://open.feishu.cn/open-apis/bot/v2/hook/abc'),
@@ -164,9 +161,9 @@ describe('Feishu SSRF boundary', () => {
     expect(() =>
       assertAllowedFeishuWebhookUrl('https://169.254.169.254/open-apis/bot/v2/hook/abc'),
     ).toThrow('官方');
-    expect(() =>
-      assertAllowedFeishuWebhookUrl('https://open.feishu.cn/internal/admin'),
-    ).toThrow('路径');
+    expect(() => assertAllowedFeishuWebhookUrl('https://open.feishu.cn/internal/admin')).toThrow(
+      '路径',
+    );
   });
 });
 
@@ -205,7 +202,7 @@ describe('Server network exposure', () => {
 });
 
 describe('Ledger transactional migration', () => {
-  it('Position migration 的读写和 rebuild 都在同一 transaction client', async () => {
+  it('Position migration 追加 V2 Baseline 并重建兼容投影', async () => {
     const ledgerEvents: Array<Record<string, unknown>> = [];
     const tx = {
       position: {
@@ -216,6 +213,7 @@ describe('Ledger transactional migration', () => {
             symbol: '600519.SH',
             quantity: 10,
             costPrice: 100,
+            updatedAt: new Date('2026-08-20T01:00:00.000Z'),
           },
         ]),
         update: vi.fn(async ({ data }: { data: object }) => data),
@@ -226,10 +224,25 @@ describe('Ledger transactional migration', () => {
         findUnique: vi.fn(async () => null),
         upsert: vi.fn(async ({ create }: { create: object }) => create),
       },
+      account: {
+        findMany: vi.fn(async () => [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+          },
+        ]),
+        findUnique: vi.fn(async () => ({
+          id: '11111111-1111-4111-8111-111111111111',
+          active: true,
+          currency: 'CNY',
+          type: 'securities',
+        })),
+      },
+      baselineObservationBatch: { create: vi.fn(async ({ data }: { data: object }) => data) },
       ledgerEvent: {
-        upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => {
-          ledgerEvents.push(create);
-          return create;
+        findUnique: vi.fn(async () => null),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          ledgerEvents.push(data);
+          return data;
         }),
         findMany: vi.fn(async () =>
           ledgerEvents.map((event) => ({
@@ -242,21 +255,128 @@ describe('Ledger transactional migration', () => {
             fee: event.fee ?? null,
             tax: event.tax ?? null,
             source: event.source ?? null,
-            correctionOf: event.correctionOf ?? null,
             metadata: event.metadata,
           })),
         ),
       },
     };
     const transaction = vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx));
-    const service = new LedgerService({ $transaction: transaction } as never);
+    const repository = {
+      withAccountsWrite: async (
+        accountIds: string[],
+        operation: (contexts: Map<string, object>) => Promise<{
+          value: unknown;
+          advanceAccountIds: string[];
+        }>,
+      ) => {
+        const contexts = new Map(
+          accountIds.map((accountId) => [
+            accountId,
+            {
+              transaction: tx,
+              accountId,
+              currentLedgerRevision: 0n,
+              nextLedgerRevision: 1n,
+              currentProjectionGeneration: 0n,
+              nextProjectionGeneration: 1n,
+            },
+          ]),
+        );
+        return operation(contexts).then((mutation) => ({
+          value: mutation.value,
+          ledgerRevisions: Object.fromEntries(
+            accountIds.map((accountId) => [
+              accountId,
+              mutation.advanceAccountIds.includes(accountId) ? '1' : '0',
+            ]),
+          ),
+          projectionGenerations: Object.fromEntries(
+            accountIds.map((accountId) => [
+              accountId,
+              mutation.advanceAccountIds.includes(accountId) ? '1' : '0',
+            ]),
+          ),
+        }));
+      },
+      withAccountWrite: async (
+        accountId: string,
+        operation: (context: object) => Promise<{ value: unknown; advanceRevision: boolean }>,
+      ) => {
+        const mutation = await operation({
+          transaction: tx,
+          accountId,
+          currentLedgerRevision: 0n,
+          nextLedgerRevision: 1n,
+          currentProjectionGeneration: 0n,
+          nextProjectionGeneration: 1n,
+        });
+        return { value: mutation.value, ledgerRevision: '1', projectionGeneration: '1' };
+      },
+      appendRevision: vi.fn(async (_context: object, event: Record<string, unknown>) => {
+        ledgerEvents.push({
+          id: event.eventId,
+          accountId: event.accountId,
+          type: event.type,
+          occurredAt: event.occurredAt === null ? null : new Date(event.occurredAt as string),
+          symbol: (event.payload as { symbol?: string }).symbol ?? null,
+          quantity: null,
+          price: null,
+          amount: null,
+          fee: null,
+          tax: null,
+          source: (event.source as { channel: string }).channel,
+          metadata: null,
+          factId: event.factId,
+          ledgerRevision: BigInt(event.ledgerRevision as string),
+          timePrecision: event.timePrecision,
+          sourceTimezone: event.sourceTimezone,
+          economicOrderKey: event.economicOrderKey,
+          recordedAt: new Date(event.recordedAt as string),
+          payloadVersion: event.payloadVersion,
+          payload: event.payload,
+          sourceCategory: (event.source as { category: string }).category,
+          sourceChannel: (event.source as { channel: string }).channel,
+          externalId: (event.source as { externalId?: string }).externalId ?? null,
+          actorId: event.actorId,
+          revisionAction: event.revisionAction,
+          supersedesEventId: null,
+          reason: event.reason ?? null,
+        });
+        return event;
+      }),
+    };
+    const service = new LedgerService(
+      { account: tx.account, position: tx.position, $transaction: transaction } as never,
+      repository as never,
+    );
 
     await expect(service.migratePositions()).resolves.toMatchObject({
-      migrated: [{ symbol: '600519.SH', quantity: 10, costPrice: 100 }],
+      migrated: [{ symbol: '600519.SH', quantity: '10', costPrice: '100' }],
     });
-    expect(transaction).toHaveBeenCalledOnce();
+    expect(repository.appendRevision).toHaveBeenCalledOnce();
+    expect(tx.baselineObservationBatch.create).toHaveBeenCalledOnce();
+    expect(tx.baselineObservationBatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        accountId: '11111111-1111-4111-8111-111111111111',
+        scope: 'PARTIAL',
+        timePrecision: 'UNKNOWN',
+        status: 'SUBMITTED',
+      }),
+    });
+    const batchCreateCall = tx.baselineObservationBatch.create.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    const baselinePayload = ledgerEvents[0]!.payload as Record<string, unknown>;
+    expect(batchCreateCall.data.id).toBe(baselinePayload.batchId);
+    expect(batchCreateCall.data).not.toHaveProperty('observedAt');
+    expect(batchCreateCall.data).not.toHaveProperty('capturedAt');
+    expect(ledgerEvents[0]).toMatchObject({
+      occurredAt: null,
+      timePrecision: 'UNKNOWN',
+      sourceTimezone: 'UNKNOWN',
+      payload: expect.not.objectContaining({ capturedAt: expect.anything() }),
+    });
     expect(tx.position.findMany).toHaveBeenCalledTimes(2);
-    expect(tx.ledgerEvent.upsert).toHaveBeenCalledOnce();
     expect(tx.position.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: '11111111-1111-4111-8111-111111111115' } }),
     );
@@ -286,13 +406,27 @@ describe('Screenshot rollback protection', () => {
           symbol: '600519.SH',
           createdAt: new Date('2026-08-20T10:05:00Z'),
         })),
+        findMany: vi.fn(async () => []),
         upsert: append,
       },
     };
-    const prisma = {
-      $transaction: (operation: (client: typeof tx) => unknown) => operation(tx),
+    const prisma = { $transaction: (operation: (client: typeof tx) => unknown) => operation(tx) };
+    const repository = {
+      withAccountWrite: async (
+        accountId: string,
+        operation: (context: object) => Promise<unknown>,
+      ) =>
+        operation({
+          transaction: tx,
+          accountId,
+          currentLedgerRevision: 1n,
+          nextLedgerRevision: 2n,
+          currentProjectionGeneration: 1n,
+          nextProjectionGeneration: 2n,
+        }),
+      appendRevision: append,
     };
-    const service = new ImportService(prisma as never);
+    const service = new ImportRollbackService(prisma as never, repository as never);
 
     await expect(service.rollback('11111111-1111-4111-8111-111111111114')).rejects.toThrow(
       '已有新的 Ledger 事件',
@@ -342,7 +476,9 @@ describe('Integrity position projection', () => {
     } as never);
 
     const result = await service.check();
-    expect(result.issues.filter((issue) => issue.code === 'position_projection_mismatch')).toEqual([]);
+    expect(result.issues.filter((issue) => issue.code === 'position_projection_mismatch')).toEqual(
+      [],
+    );
   });
 
   it('DB Position 存在但 Ledger 无非零投影时报告反向不一致', async () => {
@@ -363,6 +499,30 @@ describe('Integrity position projection', () => {
     expect(result.issues).toContainEqual(
       expect.objectContaining({
         code: 'position_without_ledger_projection',
+        entity: 'account-1:600519.SH',
+      }),
+    );
+  });
+
+  it('ACTIVE Trade 剩余数量与 Position 不一致时报告核心投影不变量', async () => {
+    const service = new IntegrityService({
+      account: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'account-1',
+            ledger: [],
+            positions: [{ symbol: '600519.SH', quantity: 10, costPrice: 100 }],
+            trades: [{ symbol: '600519.SH', lifecycle: 'ACTIVE', remainingQuantity: 9 }],
+            snapshots: [],
+          },
+        ]),
+      },
+    } as never);
+
+    const result = await service.check();
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'position_trade_quantity_mismatch',
         entity: 'account-1:600519.SH',
       }),
     );

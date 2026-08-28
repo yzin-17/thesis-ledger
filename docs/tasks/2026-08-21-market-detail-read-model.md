@@ -37,6 +37,13 @@
 - [x] T10 更新 Spec、Task、ADR、CONTEXT 领域词汇和用户可见变更文档；实际 changelog 路径不存在时不得擅自创建平行格式。
 - [ ] T11 执行最终一致性 Review：逐项核对 Spec、Task、ADR、Schema、Server、Desktop、Mobile、Contract 和验收证据，处理问题或记录用户接受的遗留项。
 
+## 详细 Ticket
+
+- [01：股票 Market Detail 最小闭环](2026-08-21-market-detail-read-model/01-stock-market-detail.md)
+- [02：ETF/基金能力矩阵闭环](2026-08-21-market-detail-read-model/02-asset-capability-matrix.md)
+- [03：分段状态与失败恢复闭环](2026-08-21-market-detail-read-model/03-partial-failure-recovery.md)
+- [04：请求去重与跨端最终验收](2026-08-21-market-detail-read-model/04-dedupe-cross-client-acceptance.md)
+
 ## 验收标准
 
 1. 股票详情能够返回并展示 quote、最近 30 条日线、MA/MACD/RSI 和可用 chip；最多允许请求 90 条历史数据。
@@ -78,4 +85,4 @@
 - [ ] 测试覆盖截图中的 ETF 422、ATR 422、指标 503、重复请求和长期 Pending 反例。
 - [ ] 浏览器 Network/视觉证据与实际代码、测试和文档一致。
 
-2026-08-22 复核记录：Standards 与 Spec 双轴复核均未发现当前 P0/P1/P2 问题。由于 In-app Browser 对本地 `/api` 请求返回 `net::ERR_BLOCKED_BY_CLIENT`，T7a、T8、T11 继续保持未勾选；这表示验收证据缺口，不代表代码复核通过等同于浏览器验收通过。完整审查报告见 `.scratch/market-detail-read-model/review-2026-08-22.md`。
+2026-08-22 复核记录：Standards 与 Spec 双轴复核均未发现当前 P0/P1/P2 问题。由于 In-app Browser 对本地 `/api` 请求返回 `net::ERR_BLOCKED_BY_CLIENT`，T7a、T8、T11 继续保持未勾选；这表示验收证据缺口，不代表代码复核通过等同于浏览器验收通过。完整审查报告见 [`docs/reviews/2026-08-22-market-detail-read-model-review.md`](../reviews/2026-08-22-market-detail-read-model-review.md)。

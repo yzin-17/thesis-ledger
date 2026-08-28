@@ -4,19 +4,19 @@
 
 ## 文档类别与唯一事实源
 
-| 类别 | 路径 | 应记录的内容 |
-| --- | --- | --- |
-| Architecture | `docs/architecture/` | 当前系统架构、跨仓职责、技术约束和兼容边界 |
-| Domain | `docs/domain/` | 稳定的领域术语、模型和业务不变量 |
-| ADR | `docs/adr/` | 已接受且需要长期保留的架构决策 |
-| Specs | `docs/specs/` | 产品需求、设计目标、范围和验收标准 |
-| Tasks | `docs/tasks/` | 实施拆分、完成状态、验证方式和当前遗留项 |
-| Guides | `docs/guides/` | 面向用户的使用教程和操作说明 |
-| Engineering | `docs/engineering/` | 数据库、依赖、组件和工程实现规范 |
-| Operations | `docs/operations/` | 部署、维护、备份、恢复和发布流程 |
-| Reviews | `docs/reviews/` | 一致性 Review、发布门禁、运行结果和一次性证据索引 |
-| Benchmarks | `docs/benchmarks/` | 固定基准集和性能证据 |
-| Archive | `docs/archive/` | 已完成、被替代或仅用于历史审计的文档 |
+| 类别         | 路径                 | 应记录的内容                                      |
+| ------------ | -------------------- | ------------------------------------------------- |
+| Architecture | `docs/architecture/` | 当前系统架构、跨仓职责、技术约束和兼容边界        |
+| Domain       | `docs/domain/`       | 稳定的领域术语、模型和业务不变量                  |
+| ADR          | `docs/adr/`          | 已接受且需要长期保留的架构决策                    |
+| Specs        | `docs/specs/`        | 产品需求、设计目标、范围和验收标准                |
+| Tasks        | `docs/tasks/`        | 实施拆分、完成状态、验证方式和当前遗留项          |
+| Guides       | `docs/guides/`       | 面向用户的使用教程和操作说明                      |
+| Engineering  | `docs/engineering/`  | 数据库、依赖、组件和工程实现规范                  |
+| Operations   | `docs/operations/`   | 部署、维护、备份、恢复和发布流程                  |
+| Reviews      | `docs/reviews/`      | 一致性 Review、发布门禁、运行结果和一次性证据索引 |
+| Benchmarks   | `docs/benchmarks/`   | 固定基准集和性能证据                              |
+| Archive      | `docs/archive/`      | 已完成、被替代或仅用于历史审计的文档              |
 
 同一事实只能有一个正文 SSOT。其他文档应通过链接引用，不复制整段设计、接口或验证结论。
 

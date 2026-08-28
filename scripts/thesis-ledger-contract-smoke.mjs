@@ -146,9 +146,7 @@ assert(
   'Fund NAV history must be strictly ordered',
 );
 
-const quotePath = checkCapabilities
-  ? '/market/quote?symbol=600519.SH'
-  : '/market/600519.SH/quote';
+const quotePath = checkCapabilities ? '/market/quote?symbol=600519.SH' : '/market/600519.SH/quote';
 const quote = await request(quotePath);
 assert(quote.version === 1 && quote.symbol === '600519.SH', 'Quote identity is invalid');
 assert(

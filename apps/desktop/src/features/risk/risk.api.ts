@@ -75,11 +75,7 @@ export const testRiskRule = (
     client,
   );
 
-export const scanRisk = (
-  contexts: RiskContext[],
-  scanId?: string,
-  client?: DesktopRequestClient,
-) =>
+export const scanRisk = (contexts: RiskContext[], scanId?: string, client?: DesktopRequestClient) =>
   requestDesktopJson<unknown>(
     '/risk/scan',
     {

@@ -27,13 +27,15 @@ export interface PerformanceFxRate {
 }
 
 export interface PerformanceFxMeta {
+  version?: number;
+  evidenceVersion?: string;
   enabled: boolean;
   status: FxMergeStatus;
   baseCurrency?: Currency;
   asOf?: string;
   fxAsOf?: string;
   estimated?: boolean;
-  conversionMode?: 'current-rate';
+  conversionMode?: 'current-rate' | 'historical-rate';
   stale?: boolean;
   fxStale?: boolean;
   missingCurrencies: Currency[];
@@ -43,6 +45,7 @@ export interface PerformanceFxMeta {
 export interface PerformanceDataQuality {
   partial: boolean;
   missingSymbols: string[];
+  missingCurrencies?: Currency[];
 }
 
 export interface SnapshotRecord {
@@ -114,8 +117,9 @@ export interface PerformanceSummary {
   xirrReason?: string | null;
   currency?: Currency;
   fx?: PerformanceFxMeta;
+  fxEvidence?: PerformanceFxMeta[];
   estimated?: boolean;
-  conversionMode?: 'current-rate';
+  conversionMode?: 'current-rate' | 'historical-rate';
   fxAsOf?: string;
   fxStale?: boolean;
 }
@@ -129,7 +133,7 @@ export interface PerformanceLayersResponse {
   dataQuality: PerformanceDataQuality;
   fx?: PerformanceFxMeta;
   estimated?: boolean;
-  conversionMode?: 'current-rate';
+  conversionMode?: 'current-rate' | 'historical-rate';
   fxAsOf?: string;
   fxStale?: boolean;
 }

@@ -6,6 +6,7 @@ import {
   analyzeSingleTrade,
   explainSingleTrade,
   fetchReviewCandidates,
+  saveReviewSnapshot,
 } from '../src/features/journal/journal.api.js';
 import { journalKeys } from '../src/features/journal/journal.queries.js';
 import type { ReviewTrade } from '../src/features/journal/journal.types.js';
@@ -24,6 +25,14 @@ const candidateResponse = {
     {
       id: 'review:account-1:600519.SH:entry:sell',
       accountId,
+      accountMode: 'actual' as const,
+      reviewObjectType: 'TRADE_CYCLE' as const,
+      reviewObjectId: 'trade:account-1:600519.SH:entry',
+      tradeId: 'trade:account-1:600519.SH:entry',
+      reviewStatus: 'CURRENT' as const,
+      stale: false,
+      statisticsEligible: true,
+      excludedReasons: [] as string[],
       symbol: trade.symbol,
       entryAt: trade.entryAt,
       exitAt: trade.exitAt,
@@ -33,10 +42,20 @@ const candidateResponse = {
       evidenceCompleteness: 'actual-only' as const,
       missingEvidence: ['交易计划'],
       sources: { entryEventIds: [], exitEventIds: [], journalEntryIds: [] },
+      projection: {
+        ledgerRevision: '1',
+        projectionGeneration: '1',
+        projectionFingerprint: 'fingerprint-1',
+        factIds: [],
+        eventIds: [],
+        fxEvidenceVersion: null,
+        conversionFingerprint: null,
+      },
     },
   ],
   total: 1,
   nextCursor: null,
+  legacyItems: [],
 };
 
 const clientFor = (response: unknown) => {
@@ -105,5 +124,46 @@ describe('投资复盘 Desktop 数据访问契约', () => {
       start: '2026-01-01T00:00:00.000Z',
       end: '2026-01-31T23:59:59.000Z',
     });
+  });
+
+  it('保存复盘快照使用 POST 并保留输入输出证据', async () => {
+    const input = {
+      accountId,
+      mode: 'actual' as const,
+      reviewObjectType: 'TRADE_CYCLE' as const,
+      tradeId: 'trade:account-1:600519.SH:entry',
+      inputSnapshot: trade,
+      outputSnapshot: { kind: 'deterministic-review' },
+    };
+    const response = {
+      id: '55555555-5555-4555-8555-555555555555',
+      accountId,
+      mode: 'actual' as const,
+      reviewObjectType: 'TRADE_CYCLE' as const,
+      tradeId: input.tradeId,
+      fxEvidenceVersion: null,
+      conversionFingerprint: null,
+      ledgerRevision: '1',
+      projectionGeneration: '1',
+      projectionFingerprint: 'fingerprint-1',
+      factIds: [],
+      eventIds: [],
+      inputSnapshot: input.inputSnapshot,
+      outputSnapshot: input.outputSnapshot,
+      status: 'CURRENT' as const,
+      createdAt: '2026-08-28T02:30:00.000Z',
+    };
+    const request = vi.fn(async <T>() => response as T);
+    const client = { request } as unknown as DesktopRequestClient;
+
+    await expect(saveReviewSnapshot(input, client)).resolves.toMatchObject({
+      id: response.id,
+      tradeId: input.tradeId,
+    });
+    expect(request).toHaveBeenCalledWith(
+      '/journal/review-snapshots',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(JSON.parse(request.mock.calls[0]?.[1]?.body as string)).toEqual(input);
   });
 });

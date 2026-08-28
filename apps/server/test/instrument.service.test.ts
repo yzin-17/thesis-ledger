@@ -72,12 +72,9 @@ const snapshotFor = (generation: number, items: CatalogItem[]) => ({
   items,
 });
 
-const keyFor = (item: CatalogItem) =>
-  `${item.canonicalCode}:${item.instrumentType}:${item.market}`;
+const keyFor = (item: CatalogItem) => `${item.canonicalCode}:${item.instrumentType}:${item.market}`;
 
-const rankInput = (
-  record: Record<string, unknown>,
-): Parameters<typeof instrumentMatchRank>[0] => ({
+const rankInput = (record: Record<string, unknown>): Parameters<typeof instrumentMatchRank>[0] => ({
   canonicalCode: String(record.canonicalCode ?? ''),
   displayName: String(record.displayName ?? ''),
   pinyin: typeof record.pinyin === 'string' ? record.pinyin : null,

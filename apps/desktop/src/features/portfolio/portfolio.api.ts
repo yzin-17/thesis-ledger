@@ -11,6 +11,14 @@ import type {
 const heldAssetType = (value: string | undefined): HeldAssetType | undefined =>
   value === 'stock' || value === 'etf' || value === 'fund' ? value : undefined;
 
+const currencyValue = (value: unknown): Account['currency'] | undefined =>
+  value === 'CNY' || value === 'HKD' || value === 'USD' ? value : undefined;
+
+const nullableNumberValue = (value: unknown): number | null | undefined => {
+  if (value === null) return null;
+  return typeof value === 'number' ? value : undefined;
+};
+
 const noStore = { cache: 'no-store' as const };
 
 const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
@@ -21,9 +29,18 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
   mode: value.mode,
   partial: value.partial,
   valuedAt: value.valuedAt,
+  ...(value.baseCurrency ? { baseCurrency: value.baseCurrency } : {}),
+  ...(value.cashByCurrency ? { cashByCurrency: value.cashByCurrency } : {}),
+  ...(value.fx ? { fx: value.fx } : {}),
+  ...(value.dataQuality ? { dataQuality: value.dataQuality } : {}),
   positions: value.positions.map((position) => {
     const assetType = heldAssetType(position.asset?.assetType);
     const updatedAt = typeof position.updatedAt === 'string' ? position.updatedAt : undefined;
+    const currency = currencyValue(position.currency);
+    const baseMarketValue = nullableNumberValue(position.baseMarketValue);
+    const baseCostValue =
+      typeof position.baseCostValue === 'number' ? position.baseCostValue : undefined;
+    const basePnl = nullableNumberValue(position.basePnl);
     return {
       id: position.id,
       accountId: position.accountId,
@@ -34,6 +51,10 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
       pnl: position.pnl,
       stale: position.stale,
       ...(updatedAt === undefined ? {} : { updatedAt }),
+      ...(currency ? { currency } : {}),
+      ...(baseMarketValue === undefined ? {} : { baseMarketValue }),
+      ...(baseCostValue === undefined ? {} : { baseCostValue }),
+      ...(basePnl === undefined ? {} : { basePnl }),
       asset: {
         name: position.asset?.name ?? position.symbol,
         ...(assetType ? { assetType } : {}),
@@ -155,8 +176,8 @@ export const toggleAccount = (accountId: string, active: boolean, client?: Deskt
 export interface SavePositionInput {
   accountId: string;
   symbol: string;
-  quantity: number;
-  costPrice: number;
+  quantity: string;
+  costPrice: string;
   source: 'manual';
   instrumentId?: string;
   assetName?: string;
@@ -179,14 +200,24 @@ export const savePosition = (
     client,
   );
 
-export const saveCashBalance = (accountId: string, amount: number, client?: DesktopRequestClient) =>
+export const saveCashBalance = (
+  accountId: string,
+  amount: string,
+  currency?: Account['currency'],
+  client?: DesktopRequestClient,
+) =>
   requestDesktopJson<unknown>(
     '/portfolio/cash',
     {
       ...noStore,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accountId, amount, source: 'manual' }),
+      body: JSON.stringify({
+        accountId,
+        amount,
+        source: 'manual',
+        ...(currency ? { currency } : {}),
+      }),
     },
     client,
   );

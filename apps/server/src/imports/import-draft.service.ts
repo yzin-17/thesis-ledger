@@ -1,16 +1,26 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { importDraftSchema, type ImportDraft } from '@thesis-ledger/schemas';
+import { currencySchema, importDraftSchema, type ImportDraft } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AssetMatcherService } from './asset-matcher.service.js';
 import { readAccount, readLedgerEvents, stableBaselineHash } from './import-state.js';
 import type { ScreenshotSource } from './screenshot-source.js';
+import { inferAssetType } from '../ledger/asset-type.js';
+import { inferTimePrecision } from '../ledger/temporal.js';
 import {
-  inferAssetType,
   validateVisionPosition,
+  visionPositionSchema,
   type PositionVisionProvider,
   type VisionPosition,
 } from './vision-validation.js';
+
+export interface ImportDraftOptions {
+  scope?: 'FULL' | 'PARTIAL';
+  observedAt?: string;
+  capturedAt?: string;
+  timePrecision?: 'INSTANT' | 'DATE';
+  sourceTimezone?: string;
+}
 
 @Injectable()
 export class ImportDraftService {
@@ -25,9 +35,10 @@ export class ImportDraftService {
     source: ScreenshotSource,
     provider: PositionVisionProvider,
     sourceConfidence?: number,
+    temporal?: ImportDraftOptions,
   ) {
     const extracted = await provider.extract(image, source);
-    return this.createDraft(accountId, image, source, extracted, sourceConfidence);
+    return this.createDraft(accountId, image, source, extracted, sourceConfidence, temporal);
   }
 
   async createDraft(
@@ -36,6 +47,7 @@ export class ImportDraftService {
     source: ScreenshotSource,
     extracted: VisionPosition[],
     sourceConfidence = source === 'unknown' ? 0 : 1,
+    temporal?: ImportDraftOptions,
   ) {
     if (image.byteLength === 0 || image.byteLength > 10 * 1024 * 1024)
       throw new BadRequestException('截图大小必须在 1 字节到 10MB 之间');
@@ -43,15 +55,33 @@ export class ImportDraftService {
     if (account) {
       if (account.active === false) throw new BadRequestException('账户已停用，不能创建导入草稿');
       if (account.type === 'cash') throw new BadRequestException('现金账户不支持截图导入');
-      if (account.currency !== 'CNY')
-        throw new BadRequestException('历史非人民币账户只读，请先转换为 CNY');
     }
+    const accountCurrency = currencySchema.parse(account?.currency ?? 'CNY');
+    const parsedExtracted = extracted.map((row) => {
+      const parsed = visionPositionSchema.safeParse(row);
+      if (!parsed.success) throw new BadRequestException('识别结果必须使用十进制字符串');
+      return parsed.data;
+    });
     const imageHash = createHash('sha256').update(image).digest('hex');
-    const idempotencyKey = createHash('sha256').update(`${accountId}:${imageHash}`).digest('hex');
+    const temporalPrecision = temporal?.timePrecision ?? inferTimePrecision(temporal?.observedAt);
+    const idempotencyKey = createHash('sha256')
+      .update(
+        JSON.stringify({
+          accountId,
+          imageHash,
+          source,
+          scope: temporal?.scope ?? 'FULL',
+          observedAt: temporal?.observedAt ?? null,
+          capturedAt: temporal?.capturedAt ?? null,
+          timePrecision: temporalPrecision ?? null,
+          sourceTimezone: temporal?.sourceTimezone ?? null,
+        }),
+      )
+      .digest('hex');
     const existing = await this.prisma.importDraft.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
     const rows = await Promise.all(
-      extracted.map(async (row) => {
+      parsedExtracted.map(async (row) => {
         const match = await this.matcher.matchAsset(row);
         const symbol = match.asset?.symbol ?? row.symbol?.trim().toUpperCase();
         const assetType = inferAssetType(symbol, match.asset?.assetType);
@@ -78,37 +108,91 @@ export class ImportDraftService {
       }),
     );
     const baselineEvents = await readLedgerEvents(this.prisma, accountId);
+    const draftId = crypto.randomUUID();
+    const rowsWithIds = rows.map((row, index) => ({
+      ...row,
+      rowId: `screenshot:${draftId}:${String(index).padStart(6, '0')}`,
+    }));
     const draft: ImportDraft = importDraftSchema.parse({
-      id: crypto.randomUUID(),
+      id: draftId,
       accountId,
       source,
       sourceConfidence,
       status: 'pending',
+      scope: temporal?.scope ?? 'FULL',
       idempotencyKey,
-      rows,
+      rows: rowsWithIds,
       baselineHash: stableBaselineHash(baselineEvents),
       createdAt: new Date().toISOString(),
     });
     const beforeState = (await this.prisma.position.findMany({ where: { accountId } })).map(
       (position) => ({
         symbol: position.symbol,
-        quantity: Number(position.quantity),
-        costPrice: Number(position.costPrice),
+        quantity: String(position.quantity),
+        costPrice: String(position.costPrice),
       }),
     );
-    return this.prisma.importDraft.create({
-      data: {
-        id: draft.id,
-        accountId,
-        source,
-        sourceConfidence,
-        status: draft.status,
-        idempotencyKey,
-        imageHash,
-        rows: draft.rows,
-        ...(draft.baselineHash === undefined ? {} : { baselineHash: draft.baselineHash }),
-        beforeState,
-      },
+    const revisionRows = rowsWithIds.map((row, index) => {
+      const rowId = row.rowId ?? `screenshot:${draft.id}:${String(index).padStart(6, '0')}`;
+      if (row.symbol && row.quantity !== undefined && row.costPrice !== undefined) {
+        return {
+          rowId,
+          kind: 'POSITION_BASELINE' as const,
+          symbol: row.symbol,
+          quantity: String(row.quantity),
+          averageCost: String(row.costPrice),
+          currency: accountCurrency,
+          costIncludesFees: 'UNKNOWN' as const,
+          ...(temporal?.observedAt ? { observedAt: temporal.observedAt } : {}),
+          ...(temporal?.capturedAt ? { capturedAt: temporal.capturedAt } : {}),
+          ...(temporalPrecision ? { timePrecision: temporalPrecision } : {}),
+          ...(temporal?.sourceTimezone ? { sourceTimezone: temporal.sourceTimezone } : {}),
+          ...(row.rawName ? { assetName: row.rawName } : {}),
+          ...(row.assetType ? { assetType: row.assetType } : {}),
+          issues: row.issues,
+        };
+      }
+      return {
+        rowId,
+        kind: 'UNRESOLVED' as const,
+        raw: row.rawText,
+        issues: row.issues.length > 0 ? row.issues : ['MISSING_REQUIRED_POSITION_FIELDS'],
+      };
+    });
+    return this.prisma.$transaction(async (transaction) => {
+      const created = await transaction.importDraft.create({
+        data: {
+          id: draft.id,
+          accountId,
+          source,
+          sourceConfidence,
+          scope: temporal?.scope ?? 'FULL',
+          status: draft.status,
+          idempotencyKey,
+          imageHash,
+          rows: draft.rows,
+          ...(draft.baselineHash === undefined ? {} : { baselineHash: draft.baselineHash }),
+          beforeState,
+          currentRevision: 1,
+        },
+      });
+      await transaction.importDraftRevision.create({
+        data: {
+          draftId: draft.id,
+          revision: 1,
+          parserVersion: 'screenshot-vision@1',
+          rawEvidenceRef: `screenshot-import://${draft.id}/image/${imageHash}`,
+          contentHash: imageHash,
+          scope: temporal?.scope ?? 'FULL',
+          ...(temporal?.observedAt ? { observedAt: new Date(temporal.observedAt) } : {}),
+          ...(temporal?.capturedAt ? { capturedAt: new Date(temporal.capturedAt) } : {}),
+          ...(temporalPrecision ? { timePrecision: temporalPrecision } : {}),
+          ...(temporal?.sourceTimezone ? { sourceTimezone: temporal.sourceTimezone } : {}),
+          rows: revisionRows,
+          issues: revisionRows.flatMap((row) => row.issues),
+        },
+      });
+      return created;
     });
   }
 
@@ -127,8 +211,8 @@ export class ImportDraftService {
         baselineHash: stableBaselineHash(events),
         beforeState: positions.map((position) => ({
           symbol: position.symbol,
-          quantity: Number(position.quantity),
-          costPrice: Number(position.costPrice),
+          quantity: String(position.quantity),
+          costPrice: String(position.costPrice),
         })),
       },
     });

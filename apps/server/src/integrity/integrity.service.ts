@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { projectAverageCost, type LedgerEvent } from '@thesis-ledger/domain';
+import { projectAverageCost } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
+import { toDomainEvents } from '../ledger/ledger-legacy-adapter.js';
 
 export interface IntegrityIssue {
   code: string;
@@ -18,7 +19,12 @@ export class IntegrityService {
 
   async check() {
     const accounts = await this.prisma.account.findMany({
-      include: { ledger: true, positions: true, snapshots: true },
+      include: {
+        ledger: true,
+        positions: true,
+        snapshots: true,
+        trades: { select: { symbol: true, lifecycle: true, remainingQuantity: true } },
+      },
     });
     const issues: IntegrityIssue[] = [];
     for (const account of accounts) {
@@ -36,22 +42,7 @@ export class IntegrityService {
       }
       let projected;
       try {
-        projected = projectAverageCost(
-          account.ledger.map((event): LedgerEvent => ({
-            id: event.id,
-            accountId: event.accountId,
-            type: event.type as LedgerEvent['type'],
-            occurredAt: event.occurredAt.toISOString(),
-            ...(event.symbol === null ? {} : { symbol: event.symbol }),
-            ...(event.quantity === null ? {} : { quantity: Number(event.quantity) }),
-            ...(event.price === null ? {} : { price: Number(event.price) }),
-            ...(event.fee === null ? {} : { fee: Number(event.fee) }),
-            ...(event.tax === null ? {} : { tax: Number(event.tax) }),
-            ...(event.metadata && typeof event.metadata === 'object'
-              ? { metadata: event.metadata as Record<string, unknown> }
-              : {}),
-          })),
-        );
+        projected = projectAverageCost(toDomainEvents(account.ledger));
       } catch (error) {
         issues.push({
           code: 'ledger_projection_failed',
@@ -63,6 +54,29 @@ export class IntegrityService {
         continue;
       }
       const actual = new Map(account.positions.map((position) => [position.symbol, position]));
+      if (Array.isArray(account.trades)) {
+        const activeTradeQuantities = new Map<string, number>();
+        for (const trade of account.trades) {
+          if (trade.lifecycle !== 'ACTIVE') continue;
+          activeTradeQuantities.set(
+            trade.symbol,
+            (activeTradeQuantities.get(trade.symbol) ?? 0) + Number(trade.remainingQuantity),
+          );
+        }
+        const symbols = new Set([...activeTradeQuantities.keys(), ...actual.keys()]);
+        for (const symbol of symbols) {
+          const expectedQuantity = activeTradeQuantities.get(symbol) ?? 0;
+          const storedQuantity = Number(actual.get(symbol)?.quantity ?? 0);
+          if (Math.abs(storedQuantity - expectedQuantity) <= 1e-6) continue;
+          issues.push({
+            code: 'position_trade_quantity_mismatch',
+            severity: 'error',
+            entity: `${account.id}:${symbol}`,
+            message: 'Position 数量与 ACTIVE Trade 剩余数量不一致',
+            suggestion: '在确认 Ledger 正确后重建 Trade 与 Position 核心投影',
+          });
+        }
+      }
       const expected = new Map(
         projected
           .filter((position) => Math.abs(position.quantity) > POSITION_EPSILON)

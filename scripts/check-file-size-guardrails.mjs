@@ -8,7 +8,8 @@ const walk = async (directory) => {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    if (['node_modules', 'dist', 'coverage', 'generated', 'third_party'].includes(entry.name)) continue;
+    if (['node_modules', 'dist', 'coverage', 'generated', 'third_party'].includes(entry.name))
+      continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) files.push(...(await walk(path)));
     else files.push(path);
@@ -34,7 +35,9 @@ const rules = [
     root,
     maxLines: 800,
     match: (path) =>
-      /[/\\]test[/\\].+\.test\.(?:ts|tsx)$/u.test(path) || path.endsWith('.test.ts') || path.endsWith('.test.tsx'),
+      /[/\\]test[/\\].+\.test\.(?:ts|tsx)$/u.test(path) ||
+      path.endsWith('.test.ts') ||
+      path.endsWith('.test.tsx'),
   },
 ];
 
@@ -62,5 +65,7 @@ for (const rule of rules) {
 if (warnings.length === 0) {
   console.log('File-size guardrails: no warnings');
 } else {
-  console.log(`File-size guardrails: ${warnings.length} warning(s); warning-only ratchet is active`);
+  console.log(
+    `File-size guardrails: ${warnings.length} warning(s); warning-only ratchet is active`,
+  );
 }

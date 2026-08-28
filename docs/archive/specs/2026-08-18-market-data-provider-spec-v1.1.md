@@ -59,12 +59,12 @@ Capability Router
 
 ### 4.1 默认数据源
 
-| Provider | 角色 | 定位 |
-|---|---|---|
-| AKShare | Primary | 默认主数据源 |
-| efinance | Fallback | 默认备用数据源 |
-| DSA | Optional | 股票分析能力 |
-| Tushare / RQData / JQData | Future | 用户自行配置的增强 / 专业 Provider |
+| Provider                  | 角色     | 定位                               |
+| ------------------------- | -------- | ---------------------------------- |
+| AKShare                   | Primary  | 默认主数据源                       |
+| efinance                  | Fallback | 默认备用数据源                     |
+| DSA                       | Optional | 股票分析能力                       |
+| Tushare / RQData / JQData | Future   | 用户自行配置的增强 / 专业 Provider |
 
 ### 4.2 AKShare
 
@@ -190,13 +190,7 @@ Web / Electron / React Native
 
 ```ts
 type InstrumentType =
-  | 'STOCK'
-  | 'ETF'
-  | 'LOF'
-  | 'MUTUAL_FUND'
-  | 'INDEX'
-  | 'BOND'
-  | 'CONVERTIBLE_BOND';
+  'STOCK' | 'ETF' | 'LOF' | 'MUTUAL_FUND' | 'INDEX' | 'BOND' | 'CONVERTIBLE_BOND';
 
 type PriceMode = 'MARKET_PRICE' | 'NAV';
 
@@ -279,16 +273,16 @@ interface ProviderCapability {
 
 ### 8.1 默认能力矩阵
 
-| Capability | 类型 | AKShare | efinance |
-|---|---|---:|---:|
-| 标的主数据 | STOCK | ✅ | ✅ / 辅助 |
-| 标的主数据 | ETF | ✅ | ✅ / 辅助 |
-| 标的主数据 | MUTUAL_FUND | ✅ | ✅ / 辅助 |
-| 实时行情 | STOCK | ✅ Primary | ✅ Fallback |
-| 实时行情 | ETF | ✅ Primary | ✅ Fallback |
-| 日线 | STOCK | ✅ Primary | ✅ Fallback |
-| 日线 | ETF | ✅ Primary | ✅ Fallback |
-| 基金 NAV | MUTUAL_FUND | ✅ Primary | ✅ Fallback |
+| Capability   | 类型        |    AKShare |    efinance |
+| ------------ | ----------- | ---------: | ----------: |
+| 标的主数据   | STOCK       |         ✅ |   ✅ / 辅助 |
+| 标的主数据   | ETF         |         ✅ |   ✅ / 辅助 |
+| 标的主数据   | MUTUAL_FUND |         ✅ |   ✅ / 辅助 |
+| 实时行情     | STOCK       | ✅ Primary | ✅ Fallback |
+| 实时行情     | ETF         | ✅ Primary | ✅ Fallback |
+| 日线         | STOCK       | ✅ Primary | ✅ Fallback |
+| 日线         | ETF         | ✅ Primary | ✅ Fallback |
+| 基金 NAV     | MUTUAL_FUND | ✅ Primary | ✅ Fallback |
 | 基金历史 NAV | MUTUAL_FUND | ✅ Primary | ✅ Fallback |
 
 实际 Capability 必须通过 Provider Contract Test 后再启用。
@@ -301,26 +295,17 @@ interface MarketDataProvider {
 
   getCapabilities(): Promise<ProviderCapability[]>;
 
-  listInstruments?(
-    options?: ListInstrumentOptions
-  ): Promise<ProviderInstrument[]>;
+  listInstruments?(options?: ListInstrumentOptions): Promise<ProviderInstrument[]>;
 
-  getQuotes?(
-    instruments: ProviderInstrumentRef[]
-  ): Promise<ProviderQuote[]>;
+  getQuotes?(instruments: ProviderInstrumentRef[]): Promise<ProviderQuote[]>;
 
-  getBars?(
-    instrument: ProviderInstrumentRef,
-    options: BarQuery
-  ): Promise<ProviderBar[]>;
+  getBars?(instrument: ProviderInstrumentRef, options: BarQuery): Promise<ProviderBar[]>;
 
-  getFundNav?(
-    instrument: ProviderInstrumentRef
-  ): Promise<ProviderFundNav>;
+  getFundNav?(instrument: ProviderInstrumentRef): Promise<ProviderFundNav>;
 
   getFundNavHistory?(
     instrument: ProviderInstrumentRef,
-    options: DateRange
+    options: DateRange,
   ): Promise<ProviderFundNav[]>;
 
   healthCheck(): Promise<ProviderHealth>;
@@ -495,12 +480,7 @@ freshness
 ## 16. Provider Health
 
 ```ts
-type ProviderStatus =
-  | 'CONNECTED'
-  | 'DEGRADED'
-  | 'RATE_LIMITED'
-  | 'ERROR'
-  | 'DISABLED';
+type ProviderStatus = 'CONNECTED' | 'DEGRADED' | 'RATE_LIMITED' | 'ERROR' | 'DISABLED';
 
 interface ProviderHealth {
   status: ProviderStatus;
@@ -842,13 +822,7 @@ ETF 实时行情
 ```ts
 interface DataSourceConfig {
   id: string;
-  providerType:
-    | 'AKSHARE'
-    | 'EFINANCE'
-    | 'DSA'
-    | 'TUSHARE'
-    | 'RQDATA'
-    | 'CUSTOM';
+  providerType: 'AKSHARE' | 'EFINANCE' | 'DSA' | 'TUSHARE' | 'RQDATA' | 'CUSTOM';
   name: string;
   enabled: boolean;
   endpoint?: string;
