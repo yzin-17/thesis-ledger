@@ -10,6 +10,30 @@
 
 - 不使用多重嵌套三元表达式；复杂状态判断应使用清晰的 `if / else if` 条件分支或独立函数。
 
+## 架构与模块边界
+
+- Server feature 的源码依赖方向必须与 Nest Module 和领域依赖方向一致；核心/下游模块不得反向 import 上游适配层。例如 `ImportModule -> LedgerModule` 时，`ledger/**` 不得反向依赖 `imports/**`。
+- 跨 feature 复用代码前必须先确认概念所有权：优先放回真正拥有该领域概念或契约的模块，由调用方单向消费；只有稳定、无业务编排且确实跨应用复用的能力才提升到 `packages/*`。
+- 不得为了消除循环依赖、缩短 import path 或临时复用而新增无明确所有权的 `common`、`shared`、`utils` 大杂烩；需要共享时应能说明其稳定边界和依赖方向。
+- 修改模块 import/export、跨 feature 依赖或共享层职责时，必须同步检查并维护 `scripts/check-boundaries.mjs`；已确认的非法依赖模式应尽量固化为自动门禁，而不是长期依赖人工 Review。
+- 涉及跨模块架构、契约、工程门禁等系统性改动时，按 `docs/DOCUMENTATION-GUIDE.md` 先建立成对的 `docs/specs/YYYY-MM-DD-<topic>.md` 与 `docs/tasks/YYYY-MM-DD-<topic>.md`，再实施代码修改。
+
+## 复杂度与职责收敛
+
+- 已超过项目复杂度或文件尺寸阈值的存量文件视为技术债 ratchet：后续修改不得继续增加其规模；新增职责应优先提取为边界明确的纯函数、domain helper、repository/query、orchestrator 或独立组件。
+- 不得通过提高阈值、关闭 guardrail、增加 ignore，或把代码机械切成无语义的小文件来规避复杂度门禁；确需调整阈值时必须在对应 Spec/Task 中说明原因和新的约束。
+- 大文件拆分以职责和依赖方向为依据，不以“达到某个行数”作为唯一目标；已有稳定行为应优先保持，避免借复杂度治理做无关的大规模重构。
+
+## 原生客户端验证
+
+- `apps/mobile/android`、`apps/mobile/ios` 属于实际维护的原生工程；`tsc`、前端 `build` 或单元测试不能替代 Native compile。
+- 修改 React Native/Expo 原生依赖、Gradle、AndroidManifest、Podfile、Xcode 工程、原生插件或构建配置时，必须执行与平台匹配的原生编译验证，并保持对应 CI 门禁可用；不得用跳过 Native job 的方式掩盖真实构建问题。
+
+## 仓库卫生
+
+- 已被 `.gitignore` 覆盖的生成目录、缓存、安装包和发布产物不得继续被 Git 跟踪；发现历史遗留的 `.expo/`、`release/`、`*.apk`、`*.aab`、`*.ipa` 等产物时，应从 Git 索引清理，发布文件改由 CI artifact 或 Release 承载。
+- 新增构建产物前先确认其是否属于源码或可复现输入；可由构建流程重新生成的二进制和缓存默认不进入仓库。
+
 ## 前端样式
 
 - 修改或新增界面样式时，必须优先使用项目现有的原子类直接组合样式。
