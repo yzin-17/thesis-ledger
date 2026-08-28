@@ -1,8 +1,10 @@
-# 收益分析 Snapshot 自动化入口
+# 收益分析 Snapshot 自动化入口（历史基线）
 
 - 日期：2026-08-24
-- 状态：待实现
+- 状态：已被 [`投资组合快照系统 Spec`](2026-08-28-portfolio-snapshot-system.md) 取代
 - 适用范围：`apps/desktop`、Automation Job、Portfolio Snapshot
+
+当前实现入口改用 [`投资组合快照系统 Spec`](2026-08-28-portfolio-snapshot-system.md) 及其对应任务；本文件保留原始交互需求和历史上下文，不再作为实施 SSOT。
 
 ## 背景
 

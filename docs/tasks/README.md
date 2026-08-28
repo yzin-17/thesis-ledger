@@ -6,12 +6,14 @@
 
 - [交易与成交记录系统](2026-08-26-trade-execution-ledger-system.md)
 - [交易与成交记录系统剩余问题与返工任务](2026-08-26-trade-execution-ledger-system-follow-up.md)
+- [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
 - [市场数据 v1.2 closure-11：最终追踪 Review](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md)
 - [录入持仓与账户模型重构](2026-08-18-position-entry-account-model.md)
 - [持仓行情详情共享读模型](2026-08-21-market-detail-read-model.md)
-- [收益分析 Snapshot 自动化入口](2026-08-24-performance-snapshot-automation.md)
+- [投资组合快照系统](2026-08-28-portfolio-snapshot-system.md)
+- [投资复盘工作台（统一 Trade Projection）](2026-08-28-journal-review-trade-projection.md)
 
 ## 实现完成，仍保留验收边界
 
@@ -20,7 +22,7 @@
 - [巨型组件拆分与请求层统一](2026-08-23-large-component-split.md)
 - [风险中心 AB 组合交互](2026-08-23-risk-center-interaction.md)
 - [研究助手任务工作台](2026-08-25-ai-research-workbench.md)
-- [投资复盘工作台](2026-08-25-journal-review-interaction-design.md)
+- [投资复盘工作台（历史基线）](2026-08-25-journal-review-interaction-design.md)
 - [策略实验工作台](2026-08-25-strategy-lab-workbench.md)
 
 其中“实现完成”只表示代码一致性和已记录的确定性验证完成，不等于真实 Provider、生产数据、设备、浏览器或 Worker 运行时验收已经完成。运行时门禁完成后，再按 `DOCUMENTATION-GUIDE.md` 进行归档判断。

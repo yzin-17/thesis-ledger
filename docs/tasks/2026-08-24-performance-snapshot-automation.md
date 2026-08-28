@@ -1,8 +1,10 @@
-# 收益分析 Snapshot 自动化入口实施任务
+# 收益分析 Snapshot 自动化入口实施任务（历史基线）
 
 对应规格：[`../specs/2026-08-24-performance-snapshot-automation.md`](../specs/2026-08-24-performance-snapshot-automation.md)
 
-状态：待实现
+状态：已被 [`投资组合快照系统实施任务`](2026-08-28-portfolio-snapshot-system.md) 取代
+
+当前实施入口使用新的投资组合快照系统任务；本文件保留原始任务拆分，不再作为当前实施 SSOT。
 
 ## 执行约束
 
