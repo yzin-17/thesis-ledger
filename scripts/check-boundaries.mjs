@@ -4,6 +4,9 @@ import { dirname, extname, join, relative, resolve } from 'node:path';
 const root = new URL('..', import.meta.url).pathname;
 const violations = [];
 
+const serverLedgerPrefix = 'apps/server/src/ledger/';
+const serverImportsPrefix = 'apps/server/src/imports/';
+
 async function walk(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     if (['node_modules', 'dist', 'coverage'].includes(entry.name)) continue;
@@ -18,10 +21,10 @@ async function inspect(path) {
   const imports = [...source.matchAll(/(?:from\s+|import\s*\()['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );
-  const file = relative(root, path);
+  const file = relative(root, path).replaceAll('\\', '/');
   for (const specifier of imports) {
     if (!specifier.startsWith('.')) continue;
-    const target = relative(root, resolve(dirname(path), specifier));
+    const target = relative(root, resolve(dirname(path), specifier)).replaceAll('\\', '/');
     if (
       file.startsWith('packages/') &&
       (target.startsWith('apps/') || target.startsWith('services/'))
@@ -35,6 +38,9 @@ async function inspect(path) {
     }
     if (file.startsWith('apps/') && target.startsWith('services/')) {
       violations.push(`${file} -> ${specifier}`);
+    }
+    if (file.startsWith(serverLedgerPrefix) && target.startsWith(serverImportsPrefix)) {
+      violations.push(`${file} -> ${specifier} (ledger must not depend on imports adapter)`);
     }
   }
 }
