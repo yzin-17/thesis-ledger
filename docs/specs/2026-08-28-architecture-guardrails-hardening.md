@@ -41,7 +41,12 @@ imports（截图上传/识别适配）
 
 Ledger 不再直接 import `apps/server/src/imports/*`。
 
-现有 `ledger/baseline-import.service.ts` 所依赖的 Ledger-owned 导入状态、来源类型和校验原语移入 `ledger`；`imports` 侧改为消费 Ledger 提供的这些原语。
+本轮按概念所有权拆分依赖：
+
+- Ledger-owned：Import Draft 状态读取、`ImportDraftOptions`、与截图来源无关的导入持仓数值一致性校验；
+- Imports-owned：`ScreenshotSource`、`VisionPosition`、Provider 接口和 Vision Schema 等截图/识别适配概念；
+- `imports` 可以单向消费 Ledger-owned 原语，Ledger 不知道截图 Provider 或具体截图来源枚举；
+- 旧的 `imports/import-state.ts` 仅保留兼容 re-export，不保留第二份实现。
 
 ### G3. 将文件尺寸告警改为增量 ratchet
 
@@ -101,7 +106,8 @@ Server feature 间依赖需要同时满足：
 1. 模块层依赖方向清晰，例如 `ImportModule` 引用 `LedgerModule`；
 2. 源码 import 不得出现相反方向；
 3. 跨模块共享概念由真正拥有该概念的一方暴露，调用方单向消费；
-4. 只有稳定、无业务编排的跨应用能力才提升到 `packages/*`。
+4. 适配器专属类型不得为了消除反向依赖被搬进核心模块；
+5. 只有稳定、无业务编排的跨应用能力才提升到 `packages/*`。
 
 本轮为已确认的 `ledger -> imports` 回归增加静态检查，后续其他 feature 在 Review 中按同一原则增量纳入。
 
@@ -132,6 +138,7 @@ base > threshold && current <= base      -> pass + warning
 
 - [ ] `AGENTS.md` 包含 Server 边界、复杂度 ratchet、Native 验证、生成物治理规则。
 - [ ] `apps/server/src/ledger/**` 不再 import `../imports/*`。
+- [ ] `ScreenshotSource` / `VisionPosition` 等适配器专属概念仍归 `imports` 所有。
 - [ ] boundary guardrail 能阻止新的 `ledger -> imports` 依赖。
 - [ ] 文件尺寸 guardrail 在 CI 中对新增超标和存量增长返回失败。
 - [ ] 存量超标但未增长的文件仍允许通过。
@@ -144,5 +151,5 @@ base > threshold && current <= base      -> pass + warning
 
 - Ratchet 对 Git 基线选择敏感：CI 必须显式提供 base SHA；无有效基线时脚本应退化为 warning。
 - 原生 Android CI 会增加少量运行时间，但不需要 emulator，成本可控。
-- 移动导入原语时必须同步所有 import path，避免编译失败；不改变原语实现本身以降低行为风险。
+- 移动/提取导入原语时必须同步所有 import path，并保持 adapter/core 所有权清晰；不改变校验算法本身以降低行为风险。
 - 任一门禁导致不可接受的误报时，可以单独回滚对应 guardrail，不需要回滚业务代码。
