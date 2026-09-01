@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -17,9 +15,8 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-import type { Account, PortfolioMode } from '../portfolio/portfolio.types.js';
+import type { Account } from '../portfolio/portfolio.types.js';
 import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
 import { ScreenshotImportReview } from '../import/ScreenshotImportReview.js';
@@ -39,7 +36,20 @@ import { ExecutionFormSheet } from './AccountDataExecutionSheet.js';
 import { AuditSheet, CorrectionReasonSheet } from './AccountDataAuditSheets.js';
 import { ReconciliationSheet } from './AccountDataReconciliationSheet.js';
 import { CashObservationSheet } from './AccountDataCashObservationSheet.js';
-import type { AccountDataTab, ExecutionEvent, VoidEvent } from './account-data.types.js';
+import { CashTransferCorrectionSheet } from './AccountDataCashTransferCorrectionSheet.js';
+import type {
+  AccountDataTab,
+  CashTransferEvent,
+  ExecutionEvent,
+  VoidEvent,
+} from './account-data.types.js';
+
+function accountDisplayLabel(account: Account) {
+  const modeLabel = account.mode === 'shadow' ? '模拟' : '实际';
+  const institutionLabel =
+    account.institution && account.institution !== account.name ? ` · ${account.institution}` : '';
+  return `${account.name}${institutionLabel} · ${account.currency} · ${modeLabel}`;
+}
 
 export function AccountDataPage({
   accounts,
@@ -82,6 +92,10 @@ export function AccountDataPage({
   const [importOpen, setImportOpen] = useState(entryRequested === 'screenshot');
   const [reconciliationOpen, setReconciliationOpen] = useState(false);
   const [cashObservationOpen, setCashObservationOpen] = useState(false);
+  const [cashTransferAction, setCashTransferAction] = useState<{
+    event: CashTransferEvent;
+    mode: 'replace' | 'void' | 'restore';
+  } | null>(null);
   const [accountManagerOpen, setAccountManagerOpen] = useState(params.get('setup') === '1');
   const [draftDirty, setDraftDirty] = useState(false);
   const selectedAccount = accounts.find((account) => account.id === accountId);
@@ -139,7 +153,10 @@ export function AccountDataPage({
   const confirmDiscard = () =>
     !draftDirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
 
-  const selectAccount = (nextAccountId: string) => {
+  const selectAccount = (
+    nextAccountId: string,
+    extraLocationUpdates: Record<string, string | null> = {},
+  ) => {
     if (!nextAccountId || nextAccountId === accountId || !confirmDiscard()) return;
     setDraftDirty(false);
     setExecutionOpen(false);
@@ -150,13 +167,14 @@ export function AccountDataPage({
     setImportOpen(false);
     setReconciliationOpen(false);
     setCashObservationOpen(false);
+    setCashTransferAction(null);
     setAccountId(nextAccountId);
     try {
       window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
     } catch {
       /* sessionStorage is optional */
     }
-    updateLocation({ accountId: nextAccountId, entry: null });
+    updateLocation({ accountId: nextAccountId, entry: null, ...extraLocationUpdates });
   };
 
   const selectTab = (nextTab: AccountDataTab) => {
@@ -169,6 +187,7 @@ export function AccountDataPage({
     setImportOpen(false);
     setReconciliationOpen(false);
     setCashObservationOpen(false);
+    setCashTransferAction(null);
     updateLocation({ tab: nextTab, entry: null });
   };
 
@@ -219,6 +238,17 @@ export function AccountDataPage({
     updateLocation({ entry: null });
   };
 
+  const closeAccountManager = (open: boolean) => {
+    if (open) {
+      setAccountManagerOpen(true);
+      return;
+    }
+    if (!confirmDiscard()) return;
+    setDraftDirty(false);
+    setAccountManagerOpen(false);
+    updateLocation({ setup: null });
+  };
+
   const openAudit = (event: LedgerEventV2) => {
     setAuditEvent(event);
   };
@@ -257,8 +287,7 @@ export function AccountDataPage({
     return (
       <AccountDataFrame>
         <div className="flex flex-col gap-2">
-          <p className="m-0 text-sm font-medium text-muted-foreground">Account Data</p>
-          <h1 className="m-0 text-3xl font-semibold tracking-tight">账户数据</h1>
+          <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
           <p className="m-0 max-w-2xl text-sm leading-6 text-muted-foreground">
             先创建一个账户，再录入真实成交或记录持仓观察。
           </p>
@@ -278,98 +307,54 @@ export function AccountDataPage({
 
   return (
     <AccountDataFrame>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          <p className="m-0 text-sm font-medium text-muted-foreground">Account Data</p>
-          <h1 className="m-0 mt-1 text-3xl font-semibold tracking-tight">账户数据</h1>
-          <p className="m-0 mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            真实成交是主录入入口；持仓和现金只记录观察检查点，不会伪造成交。
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" data-selected-account-id={selectedAccount?.id}>
-            {selectedAccount?.mode === 'shadow' ? '模拟账户' : '实际账户'}
-          </Badge>
+      <div className="min-w-0">
+        <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
+        <p className="m-0 mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          真实成交是主录入入口；持仓和现金只记录观察检查点，不会伪造成交。
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Field className="min-w-0 flex-1 sm:flex-row sm:items-center sm:gap-3">
+          <FieldLabel htmlFor="account-data-account" className="shrink-0 whitespace-nowrap">
+            当前账户
+          </FieldLabel>
+          <Select
+            value={accountId || null}
+            onValueChange={(value) => {
+              if (value) selectAccount(value);
+            }}
+          >
+            <SelectTrigger id="account-data-account" className="w-full">
+              <SelectValue placeholder="选择账户">
+                {selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {accountDisplayLabel(account)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <div className="flex shrink-0">
           <Button type="button" variant="outline" onClick={() => setAccountManagerOpen(true)}>
             管理账户
           </Button>
         </div>
       </div>
 
-      <Card className="shadow-none">
-        <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(240px,1.3fr)_minmax(240px,1fr)] md:items-end">
-          <Field>
-            <FieldLabel htmlFor="account-data-account">当前账户</FieldLabel>
-            <Select
-              value={accountId || null}
-              onValueChange={(value) => {
-                if (value) selectAccount(value);
-              }}
-            >
-              <SelectTrigger id="account-data-account" className="w-full">
-                <SelectValue placeholder="选择账户">
-                  {selectedAccount?.name ?? '选择账户'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                      {account.mode === 'shadow' ? '模拟' : '实际'}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <FieldDescription>
-              {selectedAccount?.institution || '未填写机构'} · 本位币 {selectedAccount?.currency}
-            </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel>账本模式</FieldLabel>
-            <ToggleGroup
-              value={selectedAccount ? [selectedAccount.mode] : []}
-              aria-label="账户数据账本模式"
-              className="w-full"
-              onValueChange={(value) => {
-                const nextMode = value[0] as PortfolioMode | undefined;
-                if (!nextMode || nextMode === selectedAccount?.mode) return;
-                const nextAccount = accounts.find((account) => account.mode === nextMode);
-                if (nextAccount) selectAccount(nextAccount.id);
-              }}
-            >
-              <ToggleGroupItem
-                value="actual"
-                className="flex-1"
-                disabled={!accounts.some((account) => account.mode === 'actual')}
-              >
-                实际账户
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="shadow"
-                className="flex-1"
-                disabled={!accounts.some((account) => account.mode === 'shadow')}
-              >
-                模拟账户
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <FieldDescription>
-              {selectedAccount?.mode === 'shadow'
-                ? '本页提交会记录为模拟成交。'
-                : '本页提交会记录为实际成交。'}
-            </FieldDescription>
-          </Field>
-        </CardContent>
-      </Card>
-
       <Tabs value={tab} onValueChange={(value) => selectTab(value as AccountDataTab)}>
-        <TabsList variant="line" className="grid w-full grid-cols-3">
+        <TabsList variant="line" className="min-h-11 w-fit">
           <TabsTrigger value="positions">持仓</TabsTrigger>
           <TabsTrigger value="transactions">成交记录</TabsTrigger>
           <TabsTrigger value="cash">现金</TabsTrigger>
         </TabsList>
-        <TabsContent value="transactions" className="mt-0 pt-5">
+        <TabsContent value="transactions" className="mt-0 pt-3">
           <TransactionSection
             account={selectedAccount}
             events={events}
@@ -379,12 +364,14 @@ export function AccountDataPage({
             onCreate={openCreateExecution}
             onCorrect={openCorrectExecution}
             onVoid={openVoidExecution}
+            onCorrectTransfer={(event) => setCashTransferAction({ event, mode: 'replace' })}
+            onVoidTransfer={(event) => setCashTransferAction({ event, mode: 'void' })}
             onAudit={openAudit}
             onOpenImport={openImport}
             onOpenReconciliation={() => setReconciliationOpen(true)}
           />
         </TabsContent>
-        <TabsContent value="positions" className="mt-0 pt-5">
+        <TabsContent value="positions" className="mt-0 pt-3">
           <PositionCalibrationSection
             key={selectedAccount.id}
             account={selectedAccount}
@@ -398,9 +385,10 @@ export function AccountDataPage({
             onOpenReconciliation={() => setReconciliationOpen(true)}
           />
         </TabsContent>
-        <TabsContent value="cash" className="mt-0 pt-5">
+        <TabsContent value="cash" className="mt-0 pt-3">
           <CashSection
             account={selectedAccount}
+            accounts={accounts}
             valuation={valuationQuery.data}
             valuationQuery={valuationQuery}
             events={events}
@@ -427,6 +415,9 @@ export function AccountDataPage({
         onCorrect={openCorrectExecution}
         onVoid={openVoidExecution}
         onRestore={(event, source) => setRestoreEvent({ event, source })}
+        onRestoreTransfer={(_event, source) =>
+          setCashTransferAction({ event: source, mode: 'restore' })
+        }
       />
       <CorrectionReasonSheet
         account={selectedAccount}
@@ -462,12 +453,26 @@ export function AccountDataPage({
         onOpenChange={setCashObservationOpen}
         onSaved={onPortfolioChanged}
       />
+      {cashTransferAction && (
+        <CashTransferCorrectionSheet
+          key={`${cashTransferAction.mode}:${cashTransferAction.event.eventId}`}
+          event={cashTransferAction.event}
+          mode={cashTransferAction.mode}
+          open
+          onOpenChange={(open) => {
+            if (!open) setCashTransferAction(null);
+          }}
+          {...(cashTransferAction.mode === 'void'
+            ? { onSaved: () => setAuditEvent(cashTransferAction.event) }
+            : {})}
+        />
+      )}
       <Sheet open={importOpen} onOpenChange={closeImport}>
         <SheetContent
           side="right"
           className="h-[100dvh] w-[900px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
         >
-          <SheetTitle>ImportDraft：持仓快照</SheetTitle>
+          <SheetTitle>持仓快照导入草稿</SheetTitle>
           <SheetDescription>
             上传只创建可审阅草稿；原始证据、来源行、重复和冲突状态会保留，提交前不会写入持仓。
           </SheetDescription>
@@ -483,26 +488,22 @@ export function AccountDataPage({
           </div>
         </SheetContent>
       </Sheet>
-      <Sheet
-        open={accountManagerOpen}
-        onOpenChange={(open) => {
-          setAccountManagerOpen(open);
-          if (!open) updateLocation({ setup: null });
-        }}
-      >
+      <Sheet open={accountManagerOpen} onOpenChange={closeAccountManager}>
         <SheetContent
           side="right"
-          className="h-[100dvh] w-[720px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
+          aria-describedby="account-manager-description"
+          className="h-[100dvh] min-h-0 w-[720px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
         >
-          <SheetTitle>账户设置</SheetTitle>
-          <SheetDescription>账户是成交、持仓观察和现金观察的容器。</SheetDescription>
           <PortfolioManagement
             accounts={accounts}
             positions={[]}
             step="account"
             accountsReady={accountsReady}
+            accountFormInline
+            accountManagerOpen={accountManagerOpen}
+            onDirtyChange={setDraftDirty}
             onAccountEntry={(nextAccountId) => {
-              selectAccount(nextAccountId);
+              selectAccount(nextAccountId, { setup: null });
               setAccountManagerOpen(false);
             }}
             onSaved={onPortfolioChanged}
@@ -515,8 +516,8 @@ export function AccountDataPage({
 
 function AccountDataFrame({ children }: { children: React.ReactNode }) {
   return (
-    <section className="module-page flex flex-col gap-6" data-account-data-page>
-      {children}
+    <section className="module-page" data-account-data-page>
+      <div className="flex w-full max-w-7xl flex-col gap-6">{children}</div>
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
-import { projectCashBalances, type StoredCashEvent } from '../ledger/cash-projection.js';
+import { projectCashMaterialization, type StoredCashEvent } from '../ledger/cash-projection.js';
 import { positionInputSchema, type CurrencyV1 } from '@thesis-ledger/schemas';
 import { roundMoney } from '@thesis-ledger/shared';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -13,6 +13,10 @@ import {
 } from '../market/fx-conversion.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { InstrumentService } from '../market/instrument.service.js';
+import {
+  investmentAccountRelationWhere,
+  investmentAccountWhere,
+} from './investment-account-scope.js';
 
 const isFundSymbol = (symbol: string) => /^\d{6}\.OF$/.test(symbol);
 const isZeroDecimal = (value: string) => /^0(?:\.0+)?$/.test(value);
@@ -72,7 +76,7 @@ export class PortfolioService {
     if (typeof accountDelegate?.findMany !== 'function')
       return new Map<string, CurrencyV1>(accountId ? [[accountId, 'CNY']] : []);
     const rows = await accountDelegate.findMany({
-      where: { ...(accountId ? { id: accountId } : {}), mode },
+      where: accountId ? { id: accountId, mode } : investmentAccountWhere(mode),
       select: { id: true, currency: true },
     });
     return new Map(
@@ -85,7 +89,9 @@ export class PortfolioService {
 
   listPositions(accountId?: string, mode: 'actual' | 'shadow' = 'actual') {
     return this.prisma.position.findMany({
-      where: accountId ? { accountId, account: { mode } } : { account: { mode } },
+      where: accountId
+        ? { accountId, account: { mode } }
+        : investmentAccountRelationWhere(mode),
       include: { asset: true },
     });
   }
@@ -314,19 +320,20 @@ export class PortfolioService {
       | undefined;
     if (typeof ledgerDelegate?.findMany === 'function') {
       const stored = await ledgerDelegate.findMany({
-        where: accountId ? { accountId, account: { mode } } : { account: { mode } },
+        where: accountId
+          ? { accountId, account: { mode } }
+          : investmentAccountRelationWhere(mode),
         orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
       });
-      const balances = projectCashBalances(stored as StoredCashEvent[]);
-      for (const [id, byCurrency] of balances.entries()) {
+      const materialization = projectCashMaterialization(stored as StoredCashEvent[]);
+      for (const balance of materialization.balances) {
+        const id = balance.accountId;
         const accountAmounts = cashByAccountAmounts.get(id) ?? [];
-        for (const [rawCurrency, amount] of byCurrency.entries()) {
-          const currency =
-            supportedCurrency(rawCurrency) ?? accountCurrencyMap.get(id) ?? baseCurrency;
-          const numericAmount = amount.toNumber();
-          accountAmounts.push({ currency, amount: numericAmount });
-          cashAmounts.push({ accountId: id, currency, amount: numericAmount });
-        }
+        const currency =
+          supportedCurrency(balance.currency) ?? accountCurrencyMap.get(id) ?? baseCurrency;
+        const numericAmount = balance.settledAmount.toNumber();
+        accountAmounts.push({ currency, amount: numericAmount });
+        cashAmounts.push({ accountId: id, currency, amount: numericAmount });
         cashByAccountAmounts.set(id, accountAmounts);
       }
     }

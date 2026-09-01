@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Severity } from '@thesis-ledger/domain';
+import type { Prisma } from '@prisma/client';
 import { normalizeProviderCredential } from '../platform/credential-security.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
@@ -8,7 +9,7 @@ import {
   normalizeProviderName,
   ProviderHealthService,
 } from '../providers/provider-health.service.js';
-import { assertAllowedFeishuWebhookUrl } from './feishu-webhook-security.js';
+import { assertAllowedFeishuWebhookUrl } from '../providers/feishu-webhook-security.js';
 
 export interface NotificationPolicy {
   channels: Partial<Record<Severity, string[]>>;
@@ -25,6 +26,19 @@ export interface NotificationMessage {
   traceId: string;
 }
 
+export interface NotificationSubject {
+  type: string;
+  id: string;
+  dedupKey?: string;
+}
+
+export interface NotificationSubjectDeliveryStatus {
+  subjectType: string;
+  subjectId: string;
+  statuses: string[];
+  shouldRetry: boolean;
+}
+
 export interface NotificationProvider {
   readonly id: string;
   send(message: NotificationMessage, signal: AbortSignal): Promise<{ summary: string }>;
@@ -33,6 +47,28 @@ export interface NotificationProvider {
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DELIVERY_CLAIM_TTL_MS = 15_000;
 const severityValues = new Set<Severity>(['info', 'warning', 'error', 'critical']);
+
+const storedMessage = (value: unknown): NotificationMessage => {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('notification_message_invalid');
+  const message = value as Partial<NotificationMessage>;
+  if (
+    typeof message.title !== 'string' ||
+    message.title.trim().length === 0 ||
+    typeof message.body !== 'string' ||
+    message.body.trim().length === 0 ||
+    !severityValues.has(message.severity as Severity) ||
+    typeof message.traceId !== 'string' ||
+    message.traceId.trim().length === 0
+  )
+    throw new Error('notification_message_invalid');
+  return {
+    title: message.title,
+    body: message.body,
+    severity: message.severity as Severity,
+    traceId: message.traceId,
+  };
+};
 
 export const channelsForSeverity = (policy: NotificationPolicy, severity: Severity) =>
   policy.channels[severity] ?? policy.channels.warning ?? [];
@@ -174,18 +210,30 @@ export class NotificationService {
     private readonly providerHealth: ProviderHealthService,
   ) {}
 
-  async enqueue(eventId: string, severity: Severity, policy: NotificationPolicy, now = new Date()) {
-    const channels = channelsForSeverity(policy, severity);
+  async enqueue(
+    subject: NotificationSubject,
+    message: NotificationMessage,
+    policy: NotificationPolicy,
+    now = new Date(),
+  ) {
+    const channels = channelsForSeverity(policy, message.severity);
+    const messageSnapshot: Prisma.InputJsonValue = {
+      title: message.title,
+      body: message.body,
+      severity: message.severity,
+      traceId: message.traceId,
+    };
     const scheduledAt =
-      isQuietTime(now, policy) && severity !== 'critical'
+      isQuietTime(now, policy) && message.severity !== 'critical'
         ? new Date(new Date(now).setHours(8, 0, 0, 0) + 86_400_000)
         : now;
-    const fingerprint = await this.cooldownFingerprint(eventId, severity);
-    const bypassCooldown = severity === 'critical' && policy.criticalBypassCooldown === true;
+    const fingerprint = subject.dedupKey ?? `${subject.type}:${subject.id}:${message.severity}`;
+    const bypassCooldown =
+      message.severity === 'critical' && policy.criticalBypassCooldown === true;
 
     return Promise.all(
       channels.map(async (channel) => {
-        const deliveryDedupKey = `${fingerprint}:${eventId}`;
+        const deliveryDedupKey = `${fingerprint}:${subject.id}`;
         const cooldownKey = redisKey('cache', `notification:${channel}:${fingerprint}`);
         const reservationToken = crypto.randomUUID();
         if (!bypassCooldown) {
@@ -201,10 +249,12 @@ export class NotificationService {
         try {
           return await this.prisma.notificationDelivery.upsert({
             where: { dedupKey_channel: { dedupKey: deliveryDedupKey, channel } },
-            update: { status: 'pending', scheduledAt },
+            update: { status: 'pending', scheduledAt, message: messageSnapshot },
             create: {
-              eventId,
-              severity,
+              subjectType: subject.type,
+              subjectId: subject.id,
+              message: messageSnapshot,
+              severity: message.severity,
               channel,
               provider: channel,
               status: 'pending',
@@ -221,6 +271,23 @@ export class NotificationService {
         }
       }),
     );
+  }
+
+  async subjectDeliveryStatus(
+    subject: Pick<NotificationSubject, 'type' | 'id'>,
+  ): Promise<NotificationSubjectDeliveryStatus> {
+    const deliveries = await this.prisma.notificationDelivery.findMany({
+      where: { subjectType: subject.type, subjectId: subject.id },
+      select: { status: true },
+    });
+    const statuses = deliveries.map((delivery) => delivery.status);
+    return {
+      subjectType: subject.type,
+      subjectId: subject.id,
+      statuses,
+      shouldRetry:
+        deliveries.length === 0 || statuses.some((status) => ['failed', 'error'].includes(status)),
+    };
   }
 
   async deliver(
@@ -289,7 +356,7 @@ export class NotificationService {
 
       try {
         const provider = await this.resolveProvider(delivery.channel);
-        const message = messageOverride ?? (await this.messageForDelivery(delivery));
+        const message = messageOverride ?? this.messageForDelivery(delivery);
         const result = await this.deliver(id, message, provider);
         return { skipped: false, delivery: result } as const;
       } catch (error) {
@@ -301,26 +368,6 @@ export class NotificationService {
       const current = await this.redis.client.get(lockKey);
       if (current === token) await this.redis.client.del(lockKey);
     }
-  }
-
-  private async cooldownFingerprint(eventId: string, severity: Severity) {
-    if (typeof this.prisma.riskEvent?.findUnique !== 'function')
-      return `event:${eventId}:${severity}`;
-    const event = await this.prisma.riskEvent.findUnique({
-      where: { id: eventId },
-      include: { rule: true },
-    });
-    if (!event) return `event:${eventId}:${severity}`;
-    return notificationRiskFingerprint({
-      ruleId: event.ruleId,
-      accountId: event.accountId,
-      symbol: event.symbol,
-      severity,
-      kind: event.rule.kind,
-      threshold: String(event.rule.threshold),
-      condition: event.rule.condition,
-      parameters: event.rule.parameters,
-    });
   }
 
   private async resolveProvider(channel: string): Promise<NotificationProvider> {
@@ -351,25 +398,8 @@ export class NotificationService {
     throw new Error('notification_provider_unconfigured:feishu');
   }
 
-  private async messageForDelivery(delivery: {
-    eventId: string;
-    severity: string;
-  }): Promise<NotificationMessage> {
-    const event = await this.prisma.riskEvent.findUnique({ where: { id: delivery.eventId } });
-    if (!event) throw new Error(`notification_event_not_found:${delivery.eventId}`);
-    const severity = severityValues.has(delivery.severity as Severity)
-      ? (delivery.severity as Severity)
-      : 'warning';
-    const context =
-      event.context && typeof event.context === 'object'
-        ? (event.context as Record<string, unknown>)
-        : undefined;
-    return {
-      title: '风险提醒',
-      body: event.message,
-      severity,
-      traceId: typeof context?.traceId === 'string' ? context.traceId : crypto.randomUUID(),
-    };
+  private messageForDelivery(delivery: { message: unknown }): NotificationMessage {
+    return storedMessage(delivery.message);
   }
 
   private async updateFailure(id: string, detail: string, maxAttempts: number) {

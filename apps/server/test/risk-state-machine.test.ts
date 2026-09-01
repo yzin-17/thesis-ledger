@@ -132,7 +132,12 @@ const context = (price: number, positionId = positionA, marketHour = 1) => ({
 
 const createService = (
   rules: StoredState[],
-  options: { notifications?: { enqueue: ReturnType<typeof vi.fn> } } = {},
+  options: {
+    notifications?: {
+      enqueue: ReturnType<typeof vi.fn>;
+      subjectDeliveryStatus?: ReturnType<typeof vi.fn>;
+    };
+  } = {},
 ) => {
   let eventCount = 0;
   const events = new Map<string, StoredState & { id: string }>();
@@ -160,7 +165,15 @@ const createService = (
       findMany: vi.fn(async (): Promise<Array<{ status: string }>> => []),
     },
   };
-  const notifications = options.notifications ?? { enqueue: vi.fn(async () => undefined) };
+  const notifications = options.notifications ?? {
+    enqueue: vi.fn(async () => undefined),
+    subjectDeliveryStatus: vi.fn(async () => ({
+      subjectType: 'risk-event',
+      subjectId: 'event-1',
+      statuses: [],
+      shouldRetry: true,
+    })),
+  };
   return {
     service: new RiskService(prisma as never, notifications as never),
     prisma,
@@ -384,12 +397,19 @@ describe('风险扫描状态机', () => {
       sourcePlanId: null,
       parameters: null,
     };
-    const notifications = { enqueue: vi.fn() };
+    const notifications = {
+      enqueue: vi.fn(),
+      subjectDeliveryStatus: vi.fn(async () => ({
+        subjectType: 'risk-event',
+        subjectId: 'event-1',
+        statuses: ['failed'],
+        shouldRetry: true,
+      })),
+    };
     notifications.enqueue
       .mockRejectedValueOnce(new Error('provider down'))
       .mockResolvedValueOnce([]);
     const { service, prisma } = createService([rule], { notifications });
-    prisma.notificationDelivery.findMany.mockResolvedValue([{ status: 'failed' }]);
     const payload = {
       scanId: '88888888-8888-4888-8888-888888888888',
       security: [context(90)],
@@ -405,5 +425,9 @@ describe('风险扫描状态机', () => {
     expect(second.results).toEqual([{ ruleId: ruleA, eventId: 'event-1' }]);
     expect(prisma.riskEvent.create).toHaveBeenCalledTimes(1);
     expect(notifications.enqueue).toHaveBeenCalledTimes(2);
+    expect(notifications.subjectDeliveryStatus).toHaveBeenCalledWith({
+      type: 'risk-event',
+      id: 'event-1',
+    });
   });
 });

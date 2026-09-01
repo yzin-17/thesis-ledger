@@ -50,6 +50,7 @@ export type PortfolioActionDependencies = {
   setInstrumentSearchOpen: Dispatch<SetStateAction<boolean>>;
   setManualInstrumentEntry: Dispatch<SetStateAction<boolean>>;
   setManualAssetType: Dispatch<SetStateAction<HeldAssetType>>;
+  setAccountSheetOpen: Dispatch<SetStateAction<boolean>>;
   setPositionSheetOpen: (open: boolean) => void;
   markDirty: (nextDirty?: boolean) => void;
   onSaved: () => void;

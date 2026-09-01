@@ -77,7 +77,8 @@ export interface RiskTestRecord {
 
 export interface NotificationRecord {
   id: string;
-  eventId: string;
+  subjectId: string;
+  subjectType: string;
   channel: string;
   severity: string;
   status: string;

@@ -107,7 +107,7 @@ export function FirstRunOnboarding({
           description={
             hasPosition
               ? '已录入持仓，可以继续配置数据源。'
-              : '可以手动录入，也可以前往截图审核；草稿确认前不会修改 Ledger。'
+              : '当前支持手动录入；截图导入暂未开放。'
           }
           actions={
             <div className="form-actions">
@@ -123,9 +123,10 @@ export function FirstRunOnboarding({
                 className="secondary"
                 type="button"
                 variant="outline"
+                disabled
                 onClick={() => onNavigate('position-entry', { step: 'screenshot' })}
               >
-                截图导入
+                截图导入（暂未开放）
               </Button>
             </div>
           }

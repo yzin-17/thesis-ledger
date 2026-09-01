@@ -7,6 +7,7 @@ export const automationJobTypes = [
   'snapshot',
   'backup',
   'provider-health',
+  'cash-deposit-materialization',
 ] as const;
 
 export const automationJobTypeSchema = z.enum(automationJobTypes);

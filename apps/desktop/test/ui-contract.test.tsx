@@ -79,6 +79,9 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     expect(firstStep).toContain('配置数据源与通知');
     expect(firstStep).toContain('设置风险规则');
     expect(firstStep.match(/<li/g)).toHaveLength(4);
+    expect(firstStep).toMatch(
+      /<button[^>]*disabled[^>]*>截图导入（暂未开放）<\/button>/,
+    );
   });
 
   it('removes completed onboarding from the page', () => {

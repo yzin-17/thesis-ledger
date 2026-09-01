@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { automationJobTypes, type AutomationJobType } from '@thesis-ledger/schemas';
+import { RecurringCashDepositService } from '../cash-plans/recurring-cash-deposit.service.js';
 import { MarketService } from '../market/market.service.js';
 import { DataExportService } from '../platform/data-export.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { ProviderHealthService } from '../providers/provider-health.service.js';
+import { investmentAccountWhere } from '../portfolio/investment-account-scope.js';
 import type { AutomationHandler } from './automation.service.js';
 import { AutomationWorkflowRunner } from './workflow-runner.service.js';
 import { dailyDigest, dailyRiskSummary } from './workflows.service.js';
@@ -16,6 +18,7 @@ export class AutomationRuntimeHandlers {
     private readonly market: MarketService,
     private readonly providerHealth: ProviderHealthService,
     private readonly dataExport: DataExportService,
+    private readonly recurringCashDeposits: RecurringCashDepositService,
   ) {}
 
   for(type: AutomationJobType): AutomationHandler {
@@ -121,7 +124,7 @@ export class AutomationRuntimeHandlers {
       }),
       snapshot: this.handler('snapshot', async (_signal, scheduledAt) => {
         const accounts = await this.prisma.account.findMany({
-          where: { active: true, mode: 'actual' },
+          where: investmentAccountWhere('actual'),
           select: { id: true },
         });
         return this.workflows.closeSnapshots({
@@ -133,6 +136,10 @@ export class AutomationRuntimeHandlers {
       'provider-health': this.handler('provider-health', async () => ({
         checks: await this.providerHealth.checkAll('scheduled'),
       })),
+      'cash-deposit-materialization': this.handler(
+        'cash-deposit-materialization',
+        async (_signal, scheduledAt) => this.recurringCashDeposits.materializeDue(scheduledAt),
+      ),
     } satisfies Record<AutomationJobType, AutomationHandler>;
 
     if (Object.keys(handlers).length !== automationJobTypes.length)

@@ -27,7 +27,12 @@ import {
   revisionBadgeVariant,
   revisionLabel,
 } from './account-data.helpers.js';
-import type { ExecutionEvent, VoidEvent } from './account-data.types.js';
+import {
+  isCashTransferEvent,
+  type CashTransferEvent,
+  type ExecutionEvent,
+  type VoidEvent,
+} from './account-data.types.js';
 import type { useAccountLedgerAuditQuery } from './account-data.queries.js';
 
 export function AuditSheet({
@@ -37,6 +42,7 @@ export function AuditSheet({
   onCorrect,
   onVoid,
   onRestore,
+  onRestoreTransfer,
 }: {
   target: LedgerEventV2 | null;
   query: ReturnType<typeof useAccountLedgerAuditQuery>;
@@ -44,6 +50,7 @@ export function AuditSheet({
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
+  onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
 }) {
   const events = query.data?.events ?? [];
   const targetFactId = target?.factId;
@@ -70,6 +77,7 @@ export function AuditSheet({
           onCorrect={onCorrect}
           onVoid={onVoid}
           onRestore={onRestore}
+          onRestoreTransfer={onRestoreTransfer}
         />
         {query.isError && query.data && (
           <Alert className="mt-4">
@@ -89,6 +97,7 @@ function AuditResults({
   onCorrect,
   onVoid,
   onRestore,
+  onRestoreTransfer,
 }: {
   query: ReturnType<typeof useAccountLedgerAuditQuery>;
   chain: LedgerEventV2[];
@@ -96,6 +105,7 @@ function AuditResults({
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
+  onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
 }) {
   if (query.isPending && !query.data) {
     return (
@@ -179,6 +189,7 @@ function AuditResults({
                   source={source}
                   childExists={childExists}
                   onRestore={onRestore}
+                  onRestoreTransfer={onRestoreTransfer}
                 />
               </div>
             </div>
@@ -194,13 +205,28 @@ function RestoreAuditAction({
   source,
   childExists,
   onRestore,
+  onRestoreTransfer,
 }: {
   event: LedgerEventV2;
   source: LedgerEventV2 | undefined;
   childExists: boolean;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
+  onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
 }) {
-  if (!isVoidEvent(event) || childExists || !source || !isExecutionEvent(source)) return null;
+  if (!isVoidEvent(event) || childExists || !source) return null;
+  if (isCashTransferEvent(source)) {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onRestoreTransfer(event, source)}
+      >
+        恢复划转
+      </Button>
+    );
+  }
+  if (!isExecutionEvent(source)) return null;
   return (
     <Button type="button" size="sm" variant="outline" onClick={() => onRestore(event, source)}>
       恢复

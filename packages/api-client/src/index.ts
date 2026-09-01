@@ -14,20 +14,32 @@ import {
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
+  recurringCashDepositOccurrenceSchema,
+  recurringCashDepositOccurrencesResponseSchema,
+  recurringCashDepositPlanSchema,
+  recurringCashDepositPlansResponseSchema,
   tradeCloseSliceQueryResponseSchemaV2,
   tradeDetailResponseSchemaV2,
   tradeListResponseSchemaV2,
   tradeReferenceResolveResponseSchemaV2,
   type ApiErrorResponse,
   type CreateBaselineObservationBatchCommandV2,
+  type CreateCashFlowCommandV2,
+  type CreateCashTransferCommandV2,
   type CreateExecutionCommandV2,
   type CreateImportDraftRevisionCommandV2,
   type MoveExecutionAccountCommandV2,
   type ReplaceExecutionCommandV2,
+  type ReplaceCashFlowCommandV2,
+  type ReplaceCashTransferCommandV2,
   type RestoreExecutionCommandV2,
+  type RestoreCashFlowCommandV2,
+  type RestoreCashTransferCommandV2,
   type ReviseImportDraftCommandV2,
   type SubmitImportDraftRevisionCommandV2,
   type VoidExecutionCommandV2,
+  type VoidCashFlowCommandV2,
+  type VoidCashTransferCommandV2,
   type MarketDetailRequest,
   type MarketDetailResponse,
   type JournalReviewCandidatesQuery,
@@ -51,6 +63,11 @@ import {
   type TradeReferenceResolveRequestV2,
   type TradeReferenceResolveResponseV2,
   type CurrencyV1,
+  type ConfirmRecurringCashDepositOccurrence,
+  type CreateRecurringCashDepositPlan,
+  type RecurringCashDepositOccurrence,
+  type RecurringCashDepositPlan,
+  type UpdateRecurringCashDepositPlan,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -75,6 +92,18 @@ export type {
   LedgerCommandErrorCodeV2,
   LedgerCommandErrorV2,
   MoneyV2,
+  CashFlowPayloadV2,
+  CashTransferMetadataV2,
+  CreateCashFlowCommandV2,
+  ReplaceCashFlowCommandV2,
+  VoidCashFlowCommandV2,
+  RestoreCashFlowCommandV2,
+  CashFlowCommandV2,
+  CreateCashTransferCommandV2,
+  ReplaceCashTransferCommandV2,
+  VoidCashTransferCommandV2,
+  RestoreCashTransferCommandV2,
+  CashTransferCommandV2,
   CreateExecutionCommandV2,
   ReplaceExecutionCommandV2,
   VoidExecutionCommandV2,
@@ -105,6 +134,11 @@ export type {
   ConfirmBaselineReconciliationCommandV2,
   VoidBaselineReconciliationCommandV2,
   RestoreBaselineReconciliationCommandV2,
+  ConfirmRecurringCashDepositOccurrence,
+  CreateRecurringCashDepositPlan,
+  RecurringCashDepositOccurrence,
+  RecurringCashDepositPlan,
+  UpdateRecurringCashDepositPlan,
 } from '@thesis-ledger/schemas';
 
 export type { JournalLegacyReviewCandidate } from '@thesis-ledger/schemas';
@@ -189,6 +223,83 @@ export class ThesisLedgerApiClient {
       ),
   };
 
+  readonly cashDeposits = {
+    getPlans: (
+      params: { accountId?: string; status?: 'ACTIVE' | 'PAUSED' | 'ENDED' } = {},
+    ): Promise<RecurringCashDepositPlan[]> =>
+      this.requestParsed(
+        `/cash-deposit-plans${queryString(params)}`,
+        recurringCashDepositPlansResponseSchema,
+      ),
+    createPlan: (input: CreateRecurringCashDepositPlan): Promise<RecurringCashDepositPlan> =>
+      this.postParsed('/cash-deposit-plans', input, recurringCashDepositPlanSchema),
+    updatePlan: (
+      id: string,
+      input: UpdateRecurringCashDepositPlan,
+    ): Promise<RecurringCashDepositPlan> =>
+      this.patchParsed(
+        `/cash-deposit-plans/${encodeURIComponent(id)}`,
+        input,
+        recurringCashDepositPlanSchema,
+      ),
+    pausePlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
+      this.postParsed(
+        `/cash-deposit-plans/${encodeURIComponent(id)}/pause`,
+        { expectedVersion },
+        recurringCashDepositPlanSchema,
+      ),
+    resumePlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
+      this.postParsed(
+        `/cash-deposit-plans/${encodeURIComponent(id)}/resume`,
+        { expectedVersion },
+        recurringCashDepositPlanSchema,
+      ),
+    endPlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
+      this.postParsed(
+        `/cash-deposit-plans/${encodeURIComponent(id)}/end`,
+        { expectedVersion },
+        recurringCashDepositPlanSchema,
+      ),
+    getOccurrences: (
+      params: {
+        accountId?: string;
+        planId?: string;
+        status?: 'PENDING' | 'CONFIRMED' | 'SKIPPED';
+      } = {},
+    ): Promise<RecurringCashDepositOccurrence[]> =>
+      this.requestParsed(
+        `/cash-deposit-occurrences${queryString(params)}`,
+        recurringCashDepositOccurrencesResponseSchema,
+      ),
+    confirmOccurrence: (
+      id: string,
+      input: ConfirmRecurringCashDepositOccurrence,
+    ): Promise<RecurringCashDepositOccurrence> =>
+      this.postParsed(
+        `/cash-deposit-occurrences/${encodeURIComponent(id)}/confirm`,
+        input,
+        recurringCashDepositOccurrenceSchema,
+      ),
+    skipOccurrence: (
+      id: string,
+      input: { expectedVersion: number; reason: string },
+    ): Promise<RecurringCashDepositOccurrence> =>
+      this.postParsed(
+        `/cash-deposit-occurrences/${encodeURIComponent(id)}/skip`,
+        input,
+        recurringCashDepositOccurrenceSchema,
+      ),
+    reopenOccurrence: (
+      id: string,
+      expectedVersion: number,
+    ): Promise<RecurringCashDepositOccurrence> =>
+      this.postParsed(
+        `/cash-deposit-occurrences/${encodeURIComponent(id)}/reopen`,
+        { expectedVersion },
+        recurringCashDepositOccurrenceSchema,
+      ),
+  };
+
   readonly risk = {
     getEvents: (
       params: { mode?: 'actual' | 'shadow'; cursor?: string; limit?: number; t?: number } = {},
@@ -247,6 +358,30 @@ export class ThesisLedgerApiClient {
   };
 
   readonly ledger = {
+    createCashFlow: (command: CreateCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-flows', command, ledgerCommandResponseSchemaV2),
+    replaceCashFlow: (command: ReplaceCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-flows/replace', command, ledgerCommandResponseSchemaV2),
+    voidCashFlow: (command: VoidCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-flows/void', command, ledgerCommandResponseSchemaV2),
+    restoreCashFlow: (command: RestoreCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-flows/restore', command, ledgerCommandResponseSchemaV2),
+    createCashTransfer: (
+      command: CreateCashTransferCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-transfers', command, ledgerCommandResponseSchemaV2),
+    replaceCashTransfer: (
+      command: ReplaceCashTransferCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-transfers/replace', command, ledgerCommandResponseSchemaV2),
+    voidCashTransfer: (
+      command: VoidCashTransferCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-transfers/void', command, ledgerCommandResponseSchemaV2),
+    restoreCashTransfer: (
+      command: RestoreCashTransferCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed('/ledger/cash-transfers/restore', command, ledgerCommandResponseSchemaV2),
     createExecution: (command: CreateExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
       this.postParsed('/ledger/executions', command, ledgerCommandResponseSchemaV2),
     replaceExecution: (command: ReplaceExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
@@ -350,6 +485,17 @@ export class ThesisLedgerApiClient {
   ): Promise<T> {
     return this.requestParsed(path, schema, {
       method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  private patchParsed<T>(
+    path: string,
+    body: unknown,
+    schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
+  ): Promise<T> {
+    return this.requestParsed(path, schema, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     });
   }

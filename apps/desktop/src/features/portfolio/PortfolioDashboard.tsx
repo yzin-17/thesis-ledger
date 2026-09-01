@@ -114,7 +114,7 @@ export function PortfolioDashboard({
         {modeNote}
         <StatePanel
           title="从第一笔持仓开始"
-          description="选择账户后手动录入持仓，或上传一张已脱敏的持仓截图；没有账户时再创建账户。"
+          description="选择账户后手动录入持仓；截图导入暂未开放。没有账户时再创建账户。"
         >
           <span className="muted">下方表单会先校验账户、证券代码、数量和成本价。</span>
         </StatePanel>

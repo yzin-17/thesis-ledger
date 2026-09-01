@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LedgerController } from './ledger.controller.js';
+import { CashLedgerCommandService } from './cash-ledger-command.service.js';
 import { BaselineImportService } from './baseline-import.service.js';
 import { BaselineReconciliationService } from './baseline-reconciliation.service.js';
 import { LedgerCommandService } from './ledger-command.service.js';
@@ -14,6 +15,7 @@ import { TradeQueryService } from './trade-query.service.js';
     LedgerService,
     LedgerV2Repository,
     LedgerCommandService,
+    CashLedgerCommandService,
     LedgerQueryService,
     TradeQueryService,
     BaselineImportService,
@@ -23,6 +25,7 @@ import { TradeQueryService } from './trade-query.service.js';
     LedgerService,
     LedgerV2Repository,
     LedgerCommandService,
+    CashLedgerCommandService,
     LedgerQueryService,
     TradeQueryService,
     BaselineImportService,

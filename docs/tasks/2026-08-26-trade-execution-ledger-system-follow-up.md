@@ -33,7 +33,7 @@
 | T10 | 已完成 | Position、Trade、Cash 物化投影、账户级 Projection Generation、待结算状态和核心重建已实现并通过 Docker 运行时验收。 |
 | T11 | 已完成 | 多币种原币 Cash、独立 FX Conversion View、历史汇率证据、部分可用/缺失状态和运行时验证已完成。 |
 | T12 | 已完成 | 服务端专用命令、物化 Trade/账本查询、审计重放、稳定游标和旧引用解析已实现并通过定向测试与本地 Docker 验证。 |
-| T13 | 已完成 | 账户数据三页签、成交主录入、修正链、观察校准、ImportDraft/对账入口已实现并通过桌面测试与本地浏览器非写入检查。 |
+| T13/T13-R1/T13-R2/T13-R3 | 已完成（本地环境） | 账户数据三页签、成交主录入、修正链、观察校准、ImportDraft/对账入口、页面信息层级收敛、持仓表操作列固定及两个行级操作直显均已通过桌面测试和本地浏览器非写入检查。 |
 | T14–T15 | 已完成（本地环境） | 投资组合 Trade 只读读模型和 Journal 统一 Trade Projection 已通过代码、测试、本地 Compose 和本地浏览器列表/详情/响应式验收。 |
 | T16–T17 | T16、T17 已完成（本地环境） | 影子差异/切换门禁、迁移手册、全量本地回归和最终一致性 Review 已完成；正式发布环境事项不属于当前任务范围。 |
 
@@ -175,6 +175,33 @@
   - 完成条件：默认进入成交记录；持仓校准明确是观察检查点；成交列表默认当前有效版本且可展开历史；现金按币种区分已结算和待结算。
   - 验证方式：TanStack Query 组件测试覆盖加载、空态、失败、账户/模式切换、成交提交、版本冲突、修正、作废、恢复和对账确认；浏览器检查可访问性。
   - 验证证据：账户数据模块已拆分为页面编排、页签区块、成交/审计/对账/现金 Sheet、纯类型与 helper 以及 API/query/mutation 模块；默认成交记录、实际/模拟模式、按账户隔离的 query key、当前有效事件列表、审计修正链、观察型 Position/Cash、ImportDraft 与显式对账确认入口均已实现。桌面端 16 个测试文件/99 个测试、typecheck/build、定向 ESLint、定向 Prettier 和 `git diff --check` 通过；本地浏览器检查覆盖三页签、成交表单、持仓观察、现金分层、ImportDraft 和对账入口，四个主要时间/数值字段各有唯一可访问标签且数量输入获得焦点，未执行写入型浏览器操作。
+  - 本轮 Review 回归：Desktop 定向 5 个测试文件/34 个测试通过，覆盖账户切换和 Tab 切换清理 `cashTransferAction`、持仓 Empty 组合、Risk subject 展示和 Portfolio 观察；`pnpm --filter @thesis-ledger/desktop typecheck` 通过。本轮未执行浏览器或生产 build。
+
+- [x] **T13-R1：收敛账户数据页面信息层级与持仓观察表格**
+  - 覆盖验收标准：AC-UI-1、AC-UI-2、AC-UI-3、AC-UI-4、AC-UI-5、AC-UI-6、AC-UI-7。
+  - 依赖：T13。
+  - 涉及范围：`AccountDataPage` 的标题、账户选择行和页签间距；`PositionCalibrationSection` 与 `PositionManagementSection` 的重复说明收敛；持仓观察表头、字段排版、Badge、DropdownMenu 操作和响应式布局；受影响 Desktop UI 契约测试与 shadcn DropdownMenu 组件。
+  - 完成条件：页面按标题/账户/页签/操作与数据表四层呈现；当前账户选中值显示完整信息；持仓观察仅保留一次说明并使用七列表格；已校准记录不常驻“移除校准”红色按钮，取消校准和清空观察通过更多菜单进入；不改变查询、保存、移除、清空和导入/对账回调。
+  - 验证方式：Desktop 账户数据 UI 测试、TypeScript 检查、受影响文件 Prettier、`git diff --check`；人工或浏览器检查桌面宽度、窄屏折叠、键盘菜单和加载/空态/错误状态。
+  - 验证证据：`pnpm --filter @thesis-ledger/desktop test` 通过，18 个测试文件/104 个测试通过；Desktop TypeScript、受影响文件 ESLint 和 Prettier、`GUARDRAIL_BASE_REF=HEAD node scripts/check-file-size-guardrails.mjs`、`git diff --check` 均通过。文件尺寸门禁仅保留 9 个既有超阈值文件 warning，`PortfolioManagementSections.tsx` 从 1030 行降至 760 行。浏览器非写入检查覆盖本地 Vite 1280×720、1600×900 和 390×844：账户选中值展示完整信息，页签高度为 44px 且激活线随内容宽度，持仓表七列、金额右对齐、已校准 Badge 和行级更多菜单均可见；窄屏仅表格内部横向滚动，页面本身无横向溢出；更多菜单包含“重新校准”“取消校准”以及区块级“校准持仓余额”“清空持仓观察”。
+  - 本轮 Review 回归：`pnpm --filter @thesis-ledger/desktop exec vitest run test/account-data.cash.test.tsx test/account-data.ui.test.tsx test/risk-center-interaction.test.tsx test/portfolio-table.test.tsx test/ui-contract.test.tsx`：5 个测试文件/34 个测试通过；持仓空态已使用现有 `Empty` composition。`pnpm --filter @thesis-ledger/desktop typecheck`：通过。本轮未执行浏览器或生产 build。`pnpm dlx shadcn@latest docs empty` 因本机 `@modelcontextprotocol/sdk` 引用 Zod `./v3` 导出错误失败，记录为工具限制；本地已检查 `components.json` 和已安装 `Empty` 实现，未安装或覆盖组件。
+
+- [x] **T13-R2：固定持仓观察表操作列**
+  - 覆盖验收标准：AC-UI-8。
+  - 依赖：T13-R1。
+  - 涉及范围：持仓观察表格的操作表头与单元格定位样式，以及对应的 UI 契约断言。
+  - 完成条件：横向滚动表格时操作列固定在容器右侧，操作按钮背景不透出底层数据列；页面不产生文档级横向溢出；菜单点击行为不变。
+  - 验证方式：Desktop 账户数据 UI 测试、受影响文件 TypeScript/ESLint/Prettier、`git diff --check`；浏览器在窄屏滚动表格后检查操作列位置和页面滚动宽度。
+  - 验证证据：`PortfolioPositionObservation.tsx` 的操作表头与单元格使用 `sticky right-0`、独立背景和左边界；`pnpm --filter @thesis-ledger/desktop test` 通过，18 个测试文件/104 个测试通过；Desktop 生产构建、受影响文件 ESLint/Prettier 和 `git diff --check` 均通过。浏览器 390×844 横向滚动至 `scrollLeft=604` 后，操作单元格右边界为 373px、容器右边界为 374px，`document.body.scrollWidth` 为 390px，页面无横向溢出。
+  - 本轮未修改操作列定位；相关回归由 Desktop 定向 5 个测试文件/34 个测试和 Desktop typecheck 覆盖。本轮未重新执行浏览器滚动验收。
+
+- [x] **T13-R3：将两个行级校准操作直接显示在操作列**
+  - 覆盖验收标准：AC-UI-6。
+  - 依赖：T13-R2。
+  - 涉及范围：持仓观察行级操作列及其 Desktop UI 契约测试；区块级更多菜单保持用于新增观察和清空观察。
+  - 完成条件：操作列直接显示“重新校准”和“取消校准”，不再需要打开行级 `•••` 菜单；重新校准、取消校准的回调和确认语义不变。
+  - 验证方式：Desktop 账户数据 UI 测试、受影响文件 TypeScript/ESLint/Prettier、`git diff --check`；浏览器检查操作列在横向滚动后的固定位置与两个按钮的可见性。
+  - 验证证据：操作列直接渲染两个 `Button`，区块级更多菜单仍保留“校准持仓余额”和“清空持仓观察”；Desktop 104 项测试、生产构建、受影响文件 ESLint/Prettier 与 `git diff --check` 均通过，浏览器窄屏横向滚动检查通过。
 
 - [x] **T14：实现投资组合 Trade 列表与详情（本地环境已完成）**
   - 涉及范围：投资组合“交易”页签、筛选、游标、Trade 详情、Entry/Close/Allocation/公司行动/分红时间线和证据入口。
@@ -232,7 +259,8 @@
 
 ### Review 结论
 
-- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T14、T15、T16、T17 与 T17-R1 已完成并通过代码、测试和本地运行态验证。当前 Spec 范围内的本地任务已收尾，正式发布环境明确不在范围内。
+- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T13-R1、T13-R2、T13-R3、T14、T15、T16、T17 与 T17-R1 已完成并通过代码、测试和本地运行态验证。当前 Spec 范围内的本地任务已收尾，正式发布环境明确不在范围内。
 - 发现的问题：T10 发现的后续 Baseline 绝对成本重复累加已修复为检查点重估；`db:integration` 的两个既有 Position 不一致已通过核心重建修复；R-FX-01 已通过原币分桶和独立 FX Conversion View 修复；旧 `projectCompletedTrades` 路径及重复 fixture 已删除，当前完整性检查为 healthy；R-STD-02 已修复为 TanStack Query mutation，Journal 快照保存成功后会失效候选查询；R-STD-03 已为 PortfolioTradeView 的两个 Select 补齐 SelectGroup；R-STD-04 已将 AccountDataExecutionSheet 的表单网格改为 FieldGroup/Field 组合；R-STD-05 已将底部操作区的 border-t 改为 Separator；R-STD-06/07 与 R-SPEC-01 已在 T17-R1 中修复，R-SPEC-02 已通过回归断言确认是误报，R-SPEC-03 确认为独立既有范围。R-CODE-01 已完成结构评估：`ImportService` 保留为组合 Facade，`PerformanceService` 暂不拆分，触发条件已记录。
 - 遗留风险：当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；本轮 Docker smoke 使用临时隔离数据库，不修改开发持久卷。完整 `pnpm format` 仍报告 2 个本轮未修改的基线文件格式差异（`apps/server/test/ai/research-executor.test.ts`、`docs/reviews/2026-08-26-doc-governance-followup.md`），不将无关文件纳入本轮变更。
-  - 验证命令与结果：domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试通过；server typecheck/build、Prisma schema validate、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、`git diff --check`、固定快照 diff/switch gate 和 Docker 隔离迁移 smoke 均通过。
+- 验证命令与结果：domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/104 个测试、mobile 1 个测试文件/7 个测试通过；server typecheck/build、Prisma schema validate、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、`git diff --check`、固定快照 diff/switch gate 和 Docker 隔离迁移 smoke 均通过；本次 T13-R1/T13-R2/T13-R3 的 Desktop 浏览器布局检查和文件尺寸 ratchet 也已通过。
+- 本轮 Review 回归结果：Server 定向 10 个测试文件/78 个测试、Schema ledger-v2 42 个测试、Desktop 定向 5 个测试文件/34 个测试、Server/Desktop typecheck 与 `scripts/check-boundaries.mjs` 均通过；现金投影的 Schema/Domain 可选字段差异已通过显式 normalize 解决，无双重断言。本轮未执行浏览器、Compose、真实迁移或外部通知运行时验收。`pnpm dlx shadcn@latest docs empty` 因本机 Zod `./v3` 导出解析错误失败，记录为工具限制。

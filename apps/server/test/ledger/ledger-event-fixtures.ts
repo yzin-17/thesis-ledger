@@ -83,6 +83,7 @@ export const cashFlowEvent = ({
   direction = 'INFLOW',
   category = direction === 'INFLOW' ? 'DEPOSIT' : 'WITHDRAWAL',
   occurredAt,
+  settledAt,
 }: {
   id: string;
   accountId?: string;
@@ -91,6 +92,7 @@ export const cashFlowEvent = ({
   direction?: 'INFLOW' | 'OUTFLOW';
   category?: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'INTEREST' | 'FEE' | 'TAX';
   occurredAt?: Date | string;
+  settledAt?: Date | string;
 }) =>
   storedV2Event({
     id,
@@ -102,6 +104,7 @@ export const cashFlowEvent = ({
       category,
       amount: String(amount),
       currency,
+      ...(settledAt ? { settledAt: new Date(settledAt).toISOString() } : {}),
     },
   });
 

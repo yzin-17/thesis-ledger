@@ -13,6 +13,13 @@ import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 import { projectCashBalances, type StoredCashEvent } from '../ledger/cash-projection.js';
 import {
+  incompatibleAccountScopeSummary,
+  performanceAccountWhere,
+  performanceRelationWhere,
+  performanceSnapshotWhere,
+} from './performance-account-scope.js';
+import { externalPortfolioFlow } from './performance-ledger-flow.js';
+import {
   aggregateCurrencyAmounts,
   convertAmount,
   resolveFx as resolveFxView,
@@ -108,23 +115,6 @@ const snapshotMode = (snapshot: PerformanceSnapshot) => {
   return typeof payload.mode === 'string' ? payload.mode : 'actual';
 };
 
-const externalPortfolioFlow = (event: Pick<PerformanceLedgerEvent, 'type' | 'payload'>) => {
-  if (event.type !== 'CASH_FLOW') return { amount: 0, currency: undefined };
-  const payload = snapshotPayload(event.payload);
-  const amount = Number(payload.amount);
-  if (!Number.isFinite(amount) || amount === 0) return { amount: 0, currency: undefined };
-  if (
-    payload.category === 'DEPOSIT' ||
-    payload.category === 'WITHDRAWAL' ||
-    payload.category === 'TRANSFER'
-  )
-    return {
-      amount: payload.direction === 'OUTFLOW' ? -amount : amount,
-      currency: supportedCurrency(payload.currency),
-    };
-  return { amount: 0, currency: undefined };
-};
-
 const fxResponseFields = (fx: PerformanceFxMeta) => {
   if (!fx.estimated) return {};
   const fxAsOf = fx.fxAsOf ?? fx.asOf;
@@ -134,16 +124,6 @@ const fxResponseFields = (fx: PerformanceFxMeta) => {
     ...(fxAsOf ? { fxAsOf } : {}),
     fxStale: fx.fxStale ?? fx.stale ?? false,
   };
-};
-
-const snapshotAccountWhere = (
-  accountId: string | undefined,
-  useAccountSnapshots: boolean,
-  mode: PortfolioMode,
-): Prisma.PortfolioSnapshotWhereInput => {
-  if (accountId) return { accountId, account: { mode } };
-  if (useAccountSnapshots) return { accountId: { not: null }, account: { mode } };
-  return { accountId: null };
 };
 
 @Injectable()
@@ -162,7 +142,7 @@ export class PerformanceService {
     if (typeof accountDelegate?.findMany !== 'function')
       return new Map<string, Currency>(accountId ? [[accountId, 'CNY']] : []);
     const rows = await accountDelegate.findMany({
-      where: { ...(accountId ? { id: accountId } : {}), mode },
+      where: performanceAccountWhere(mode, accountId),
       select: { id: true, currency: true },
     });
     return new Map(
@@ -307,7 +287,7 @@ export class PerformanceService {
   ) {
     const captureOptions = { ...options, fxMerge: options.fxMerge ?? true };
     await this.assertCurrencyScope(accountId, mode, captureOptions);
-    const accountWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
+    const accountWhere = performanceRelationWhere(mode, accountId);
     const [positions, ledger, accountCurrencyMap] = await Promise.all([
       this.prisma.position.findMany({
         where: accountWhere,
@@ -455,6 +435,7 @@ export class PerformanceService {
     const payload = {
       positions: valued,
       mode,
+      accountScopePolicy: accountId ? 'account-v1' : 'investment-only-v1',
       currency: baseCurrency,
       knownMarketValue,
       totalMarketValue: partial ? null : knownMarketValue,
@@ -524,6 +505,13 @@ export class PerformanceService {
       ]),
     ] as Currency[];
     const fx = await this.resolveFx(currencies, options, new Date());
+    const incompatibleScope = incompatibleAccountScopeSummary(
+      snapshots,
+      accountId,
+      fx.meta,
+      fxResponseFields(fx.meta),
+    );
+    if (incompatibleScope) return incompatibleScope;
     const partialSnapshots = snapshots.filter(partialSnapshot);
     if (partialSnapshots.length > 0) {
       throw new BadRequestException({
@@ -589,7 +577,7 @@ export class PerformanceService {
 
     const firstSnapshot = snapshots[0]!;
     const lastSnapshot = snapshots[snapshots.length - 1]!;
-    const accountWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
+    const accountWhere = performanceRelationWhere(mode, accountId);
     const externalEvents = (await this.prisma.ledgerEvent.findMany({
       where: {
         ...accountWhere,
@@ -751,7 +739,7 @@ export class PerformanceService {
     }
 
     const accounts = await this.prisma.account.findMany({
-      where: { mode, active: true },
+      where: performanceAccountWhere(mode),
       select: { id: true },
     });
     const accountIds = accounts.map((account) => account.id);
@@ -873,7 +861,7 @@ export class PerformanceService {
     const useAccountSnapshots = !accountId && mixedCurrencyScope;
     const snapshots = (await this.prisma.portfolioSnapshot.findMany({
       where: {
-        ...snapshotAccountWhere(accountId, useAccountSnapshots, mode),
+        ...performanceSnapshotWhere(accountId, useAccountSnapshots, mode),
         ...(start || end
           ? {
               capturedAt: {
@@ -1033,6 +1021,7 @@ export class PerformanceService {
         ...(primaryFx?.baseCurrency ? { currency: primaryFx.baseCurrency } : {}),
         payload: {
           mode,
+          accountScopePolicy: 'investment-only-v1',
           partial,
           missingSymbols: [...new Set(missingSymbols)],
           dataQuality: { partial, missingSymbols: [...new Set(missingSymbols)] },
@@ -1099,9 +1088,9 @@ export class PerformanceService {
     const positionWhere = {
       ...(accountId ? { accountId } : {}),
       ...(symbol ? { symbol } : {}),
-      account: { mode },
+      account: performanceAccountWhere(mode, accountId),
     };
-    const ledgerWhere = accountId ? { accountId, account: { mode } } : { account: { mode } };
+    const ledgerWhere = performanceRelationWhere(mode, accountId);
     const ledgerDelegate = (this.prisma as unknown as { ledgerEvent?: unknown }).ledgerEvent as
       | {
           findMany?: (args: unknown) => Promise<unknown[]>;

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
 import { sumBy } from 'es-toolkit';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -6,8 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { MoreHorizontalIcon } from 'lucide-react';
 
 import type { Account, Position } from '../portfolio/portfolio.types.js';
 import type { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
@@ -25,8 +33,15 @@ import {
   transactionAmount,
   transactionFilters,
 } from './account-data.helpers.js';
-import type { ExecutionEvent, Currency } from './account-data.types.js';
+import {
+  isCashTransferEvent,
+  type CashTransferEvent,
+  type Currency,
+  type ExecutionEvent,
+} from './account-data.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
+import { CashTransferSheet } from './AccountDataCashTransferSheet.js';
+import { RecurringCashDeposits } from './AccountDataRecurringCashDeposits.js';
 
 type QueryLike = {
   data: { events: LedgerEventV2[]; ledgerRevision: string } | undefined;
@@ -45,6 +60,8 @@ export function TransactionSection({
   onCreate,
   onCorrect,
   onVoid,
+  onCorrectTransfer,
+  onVoidTransfer,
   onAudit,
   onOpenImport,
   onOpenReconciliation,
@@ -57,6 +74,8 @@ export function TransactionSection({
   onCreate: () => void;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
+  onCorrectTransfer: (event: CashTransferEvent) => void;
+  onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEventV2) => void;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
@@ -75,20 +94,15 @@ export function TransactionSection({
             成交记录
           </h2>
           <p className="m-0 mt-1 text-sm text-muted-foreground">
-            这里显示当前有效版本；修正链保留在审计 Sheet 中，不会重复计数。
+            这里显示当前有效版本；修正链保留在审计面板中，不会重复计数。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={onCreate} disabled={account.type === 'cash'}>
             录入成交
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onOpenImport}
-            disabled={account.type === 'cash'}
-          >
-            ImportDraft
+          <Button type="button" variant="outline" onClick={onOpenImport} disabled>
+            导入草稿（暂未开放）
           </Button>
           <Button type="button" variant="outline" onClick={onOpenReconciliation}>
             打开对账
@@ -119,6 +133,8 @@ export function TransactionSection({
         filteredEvents={filteredEvents}
         onCorrect={onCorrect}
         onVoid={onVoid}
+        onCorrectTransfer={onCorrectTransfer}
+        onVoidTransfer={onVoidTransfer}
         onAudit={onAudit}
       />
       {query.isError && query.data && (
@@ -140,6 +156,8 @@ function TransactionResults({
   filteredEvents,
   onCorrect,
   onVoid,
+  onCorrectTransfer,
+  onVoidTransfer,
   onAudit,
 }: {
   query: QueryLike;
@@ -148,6 +166,8 @@ function TransactionResults({
   filteredEvents: LedgerEventV2[];
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
+  onCorrectTransfer: (event: CashTransferEvent) => void;
+  onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEventV2) => void;
 }) {
   if (query.isPending && !query.data) {
@@ -203,6 +223,8 @@ function TransactionResults({
               event={event}
               onCorrect={onCorrect}
               onVoid={onVoid}
+              onCorrectTransfer={onCorrectTransfer}
+              onVoidTransfer={onVoidTransfer}
               onAudit={onAudit}
             />
           ))}
@@ -216,14 +238,19 @@ function TransactionRow({
   event,
   onCorrect,
   onVoid,
+  onCorrectTransfer,
+  onVoidTransfer,
   onAudit,
 }: {
   event: LedgerEventV2;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
+  onCorrectTransfer: (event: CashTransferEvent) => void;
+  onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEventV2) => void;
 }) {
   const execution = isExecutionEvent(event);
+  const cashTransfer = isCashTransferEvent(event);
   const title = execution ? event.payload.symbol : eventTypeLabel(event);
   const detail = execution
     ? `${executionSideLabel(event)} · ${formatDecimal(event.payload.quantity)} · ${formatDecimal(event.payload.price)} ${event.payload.currency}`
@@ -261,6 +288,27 @@ function TransactionRow({
                 作废
               </Button>
             </>
+          )}
+          {cashTransfer && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button type="button" size="icon-sm" variant="ghost" aria-label="管理现金划转">
+                    <MoreHorizontalIcon />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => onCorrectTransfer(event)}>
+                    更正划转
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onClick={() => onVoidTransfer(event)}>
+                    作废划转
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button type="button" size="sm" variant="ghost" onClick={() => onAudit(event)}>
             查看修正链
@@ -317,50 +365,22 @@ export function PositionCalibrationSection({
     );
   }
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="account-data-positions-title">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 id="account-data-positions-title" className="m-0 text-xl font-semibold">
-            持仓余额观察
-          </h2>
-          <p className="m-0 mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            “校准持仓余额”创建观察检查点，不代表真实成交；单标的录入属于 PARTIAL 观察。
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onOpenImport}
-            disabled={account.type === 'cash'}
-          >
-            导入持仓快照
-          </Button>
-          <Button type="button" variant="outline" onClick={onOpenReconciliation}>
-            查看对账候选
-          </Button>
-        </div>
-      </div>
-      <Card className="shadow-none">
-        <CardContent className="p-4 text-sm text-muted-foreground">
-          当前结果来自账本投影；每条记录会显示来源和观察检查点状态。需要录入 BUY/SELL
-          时，请回到“成交记录”。
-        </CardContent>
-      </Card>
-      <PortfolioManagement
-        key={account.id}
-        accounts={accounts}
-        positions={positions}
-        cashValue={cashValue}
-        step="position"
-        defaultAccountId={account.id}
-        entryAccountLocked
-        showCash={false}
-        calibrationMode
-        onDirtyChange={onDirtyChange}
-        onSaved={onSaved}
-      />
-    </section>
+    <PortfolioManagement
+      key={account.id}
+      accounts={accounts}
+      positions={positions}
+      cashValue={cashValue}
+      step="position"
+      defaultAccountId={account.id}
+      entryAccountLocked
+      showCash={false}
+      calibrationMode
+      embedded
+      onOpenImport={onOpenImport}
+      onOpenReconciliation={onOpenReconciliation}
+      onDirtyChange={onDirtyChange}
+      onSaved={onSaved}
+    />
   );
 }
 
@@ -440,6 +460,7 @@ const pendingCash = (events: LedgerEventV2[]): PendingCash[] => {
 
 export function CashSection({
   account,
+  accounts,
   valuation,
   valuationQuery,
   events,
@@ -447,12 +468,14 @@ export function CashSection({
   onCalibrate,
 }: {
   account: Account;
+  accounts: Account[];
   valuation: NonNullable<ValuationLike['data']> | undefined;
   valuationQuery: ValuationLike;
   events: LedgerEventV2[];
   eventsQuery: QueryLike;
   onCalibrate: () => void;
 }) {
+  const [transferOpen, setTransferOpen] = useState(false);
   const settledRows = useMemo(() => {
     const rows = valuation?.cashByCurrency ?? [];
     const seen = new Set(rows.map((row) => row.currency));
@@ -474,9 +497,18 @@ export function CashSection({
             已结算余额按币种分桶；有明确 settledAt 的未来现金影响单独列为待结算。
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={onCalibrate}>
-          校准现金余额
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={() => setTransferOpen(true)}
+            disabled={account.mode !== 'actual' || account.active === false}
+          >
+            账户间划转
+          </Button>
+          <Button type="button" variant="outline" onClick={onCalibrate}>
+            校准现金余额
+          </Button>
+        </div>
       </div>
       <CashResults
         account={account}
@@ -492,6 +524,13 @@ export function CashSection({
           <AlertDescription>现金余额仍保留上次成功结果；请刷新账本后再做校准。</AlertDescription>
         </Alert>
       )}
+      <RecurringCashDeposits account={account} />
+      <CashTransferSheet
+        account={account}
+        accounts={accounts}
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+      />
     </section>
   );
 }

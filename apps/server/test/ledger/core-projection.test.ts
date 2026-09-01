@@ -110,6 +110,96 @@ const fakeCoreClient = (events: StoredCashEvent[]) => ({
 });
 
 describe('core ledger projection', () => {
+  it('兼容旧迁移产生的无 transfer 元数据现金划转，并保留进出金额效果', () => {
+    const legacyEvent = (input: {
+      id: string;
+      accountId: string;
+      factId: string;
+      direction: 'INFLOW' | 'OUTFLOW';
+      amount: string;
+    }): StoredCashEvent => ({
+      id: input.id,
+      accountId: input.accountId,
+      type: 'CASH_FLOW',
+      occurredAt: new Date('2026-08-01T00:00:00.000Z'),
+      createdAt: new Date('2026-08-01T00:00:00.000Z'),
+      factId: input.factId,
+      ledgerRevision: 1n,
+      timePrecision: 'UNKNOWN',
+      sourceTimezone: 'UNKNOWN',
+      economicOrderKey: `migration:${input.id}`,
+      recordedAt: new Date('2026-08-01T00:00:00.000Z'),
+      payloadVersion: 1,
+      payload: {
+        direction: input.direction,
+        category: 'TRANSFER',
+        amount: input.amount,
+        currency: 'CNY',
+      },
+      sourceCategory: 'MANUAL',
+      sourceChannel: 'manual',
+      externalId: null,
+      actorId: 'migration:legacy-ledger-v2',
+      revisionAction: 'CREATE',
+      supersedesEventId: null,
+      reason: null,
+    });
+
+    const balances = projectCashBalances([
+      legacyEvent({
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        accountId,
+        factId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        direction: 'OUTFLOW',
+        amount: '40',
+      }),
+      legacyEvent({
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        accountId: strategyId,
+        factId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        direction: 'INFLOW',
+        amount: '75',
+      }),
+    ]);
+
+    expect(balances.get(accountId)?.get('CNY')?.toString()).toBe('-40');
+    expect(balances.get(strategyId)?.get('CNY')?.toString()).toBe('75');
+  });
+
+  it('当前事件载荷解析失败时显式中止现金投影', () => {
+    const malformed: StoredCashEvent = {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      accountId,
+      type: 'CASH_FLOW',
+      occurredAt: new Date('2026-08-01T00:00:00.000Z'),
+      createdAt: new Date('2026-08-01T00:00:00.000Z'),
+      factId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      ledgerRevision: 1n,
+      timePrecision: 'INSTANT',
+      sourceTimezone: 'UTC',
+      economicOrderKey: 'current:1',
+      recordedAt: new Date('2026-08-01T00:00:00.000Z'),
+      payloadVersion: 1,
+      payload: {
+        direction: 'INFLOW',
+        category: 'TRANSFER',
+        amount: '50',
+        currency: 'CNY',
+      },
+      sourceCategory: 'MANUAL',
+      sourceChannel: 'desktop',
+      externalId: null,
+      actorId: 'user-1',
+      revisionAction: 'CREATE',
+      supersedesEventId: null,
+      reason: null,
+    };
+
+    expect(() => projectCashMaterialization([malformed])).toThrow(
+      `现金投影无法解析账本事件 ${malformed.id}`,
+    );
+  });
+
   it('将 ACTIVE Trade 的剩余来源物化为 Position，并保存稳定的子表引用', async () => {
     const events = [
       execution({

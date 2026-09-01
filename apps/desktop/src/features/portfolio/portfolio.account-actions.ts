@@ -10,6 +10,7 @@ export const createAccountActionHandlers = ({
   editingAccount,
   setBusyAction,
   setEditingAccount,
+  setAccountSheetOpen,
   markDirty,
   onSaved,
   toastManager,
@@ -38,6 +39,7 @@ export const createAccountActionHandlers = ({
       formElement.reset();
       setEditingAccount(null);
       markDirty(false);
+      setAccountSheetOpen(false);
       await loadManagedAccounts();
       onSaved();
       toastManager.add({

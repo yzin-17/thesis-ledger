@@ -6,6 +6,31 @@ const violations = [];
 
 const serverLedgerPrefix = 'apps/server/src/ledger/';
 const serverImportsPrefix = 'apps/server/src/imports/';
+const serverProvidersPrefix = 'apps/server/src/providers/';
+const forbiddenServerFeatureDependencies = [
+  [serverLedgerPrefix, serverImportsPrefix, 'ledger must not depend on imports adapter'],
+  [
+    serverProvidersPrefix,
+    'apps/server/src/notifications/',
+    'providers must not own or import notification feature',
+  ],
+  [serverLedgerPrefix, 'apps/server/src/cash-plans/', 'ledger must not depend on cash plans'],
+  [
+    'apps/server/src/cash-plans/',
+    'apps/server/src/automation/',
+    'cash plans must not depend on automation orchestration',
+  ],
+  [
+    'apps/server/src/notifications/',
+    'apps/server/src/risk/',
+    'notification outbox must not depend on risk callers',
+  ],
+  [
+    'apps/server/src/notifications/',
+    'apps/server/src/cash-plans/',
+    'notification outbox must not depend on cash plan callers',
+  ],
+];
 
 async function walk(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -39,8 +64,10 @@ async function inspect(path) {
     if (file.startsWith('apps/') && target.startsWith('services/')) {
       violations.push(`${file} -> ${specifier}`);
     }
-    if (file.startsWith(serverLedgerPrefix) && target.startsWith(serverImportsPrefix)) {
-      violations.push(`${file} -> ${specifier} (ledger must not depend on imports adapter)`);
+    for (const [sourcePrefix, targetPrefix, reason] of forbiddenServerFeatureDependencies) {
+      if (file.startsWith(sourcePrefix) && target.startsWith(targetPrefix)) {
+        violations.push(`${file} -> ${specifier} (${reason})`);
+      }
     }
   }
 }

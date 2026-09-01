@@ -5,6 +5,7 @@ import {
   NotificationService,
   type NotificationMessage,
   type NotificationPolicy,
+  notificationRiskFingerprint,
 } from '../src/notifications/notification.service.js';
 import { encryptProviderCredential } from '../src/platform/credential-security.js';
 
@@ -49,20 +50,34 @@ const riskRule = {
   parameters: { window: 1 },
 };
 
-const riskEvent = (
+const riskSubject = (
   id: string,
   symbol = '600519.SH',
   accountId = 'account-1',
-  context: Record<string, unknown> = {},
+  severity: NotificationMessage['severity'] = 'warning',
 ) => ({
+  type: 'risk-event',
   id,
-  ruleId: 'rule-1',
-  accountId,
-  symbol,
-  message: '价格跌破阈值',
-  severity: 'warning',
-  context: { traceId: `trace-${id}`, ...context },
-  rule: riskRule,
+  dedupKey: notificationRiskFingerprint({
+    ruleId: 'rule-1',
+    accountId,
+    symbol,
+    severity,
+    kind: riskRule.kind,
+    threshold: riskRule.threshold,
+    condition: riskRule.condition,
+    parameters: riskRule.parameters,
+  }),
+});
+
+const riskMessage = (
+  traceId: string,
+  severity: NotificationMessage['severity'] = 'warning',
+): NotificationMessage => ({
+  title: '风险提醒',
+  body: '价格跌破阈值',
+  severity,
+  traceId,
 });
 
 afterEach(() => {
@@ -92,9 +107,6 @@ describe('Notification cooldown', () => {
     const redis = redisFixture();
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
     const prisma = {
-      riskEvent: {
-        findUnique: vi.fn(async ({ where }: { where: { id: string } }) => riskEvent(where.id)),
-      },
       notificationDelivery: { upsert },
     };
     const service = new NotificationService(
@@ -104,14 +116,14 @@ describe('Notification cooldown', () => {
     );
 
     const first = await service.enqueue(
-      'event-a',
-      'warning',
+      riskSubject('event-a'),
+      riskMessage('trace-event-a'),
       policy,
       new Date('2026-08-20T10:00:00Z'),
     );
     const second = await service.enqueue(
-      'event-b',
-      'warning',
+      riskSubject('event-b'),
+      riskMessage('trace-event-b'),
       policy,
       new Date('2026-08-20T10:01:00Z'),
     );
@@ -119,19 +131,22 @@ describe('Notification cooldown', () => {
     expect(first[0]).not.toBeNull();
     expect(second).toEqual([null]);
     expect(upsert).toHaveBeenCalledOnce();
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          subjectType: 'risk-event',
+          subjectId: 'event-a',
+          message: riskMessage('trace-event-a'),
+          severity: 'warning',
+        }),
+      }),
+    );
   });
 
   it('不同 symbol 或 account 不会互相误去重', async () => {
     const redis = redisFixture();
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
     const prisma = {
-      riskEvent: {
-        findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
-          where.id === 'event-a'
-            ? riskEvent(where.id, '600519.SH', 'account-1')
-            : riskEvent(where.id, '000001.SZ', 'account-2'),
-        ),
-      },
       notificationDelivery: { upsert },
     };
     const service = new NotificationService(
@@ -140,8 +155,16 @@ describe('Notification cooldown', () => {
       { record: vi.fn() } as never,
     );
 
-    await service.enqueue('event-a', 'warning', policy);
-    await service.enqueue('event-b', 'warning', policy);
+    await service.enqueue(
+      riskSubject('event-a', '600519.SH', 'account-1'),
+      riskMessage('trace-event-a'),
+      policy,
+    );
+    await service.enqueue(
+      riskSubject('event-b', '000001.SZ', 'account-2'),
+      riskMessage('trace-event-b'),
+      policy,
+    );
 
     expect(upsert).toHaveBeenCalledTimes(2);
   });
@@ -150,9 +173,6 @@ describe('Notification cooldown', () => {
     const redis = redisFixture();
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
     const prisma = {
-      riskEvent: {
-        findUnique: vi.fn(async ({ where }: { where: { id: string } }) => riskEvent(where.id)),
-      },
       notificationDelivery: { upsert },
     };
     const service = new NotificationService(
@@ -161,8 +181,16 @@ describe('Notification cooldown', () => {
       { record: vi.fn() } as never,
     );
 
-    await service.enqueue('critical-a', 'critical', policy);
-    await service.enqueue('critical-b', 'critical', policy);
+    await service.enqueue(
+      riskSubject('critical-a', '600519.SH', 'account-1', 'critical'),
+      riskMessage('trace-critical-a', 'critical'),
+      policy,
+    );
+    await service.enqueue(
+      riskSubject('critical-b', '600519.SH', 'account-1', 'critical'),
+      riskMessage('trace-critical-b', 'critical'),
+      policy,
+    );
 
     expect(upsert).toHaveBeenCalledTimes(2);
     expect(redis.client.set).not.toHaveBeenCalled();
@@ -174,7 +202,9 @@ describe('Notification dispatch', () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',
-      eventId: 'event-1',
+      subjectType: 'risk-event',
+      subjectId: 'event-1',
+      message,
       channel: 'feishu',
       provider: 'feishu',
       severity: 'warning',
@@ -190,9 +220,6 @@ describe('Notification dispatch', () => {
           ...data,
           status: data.status,
         })),
-      },
-      riskEvent: {
-        findUnique: vi.fn(async () => riskEvent('event-1', '159516.SZ')),
       },
       providerConfig: {
         findMany: vi.fn(async () => [
@@ -219,7 +246,7 @@ describe('Notification dispatch', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(providerWebhook),
       expect.objectContaining({
-        body: expect.stringContaining('风险提醒\\n价格跌破阈值'),
+        body: expect.stringContaining('风险提醒\\n测试消息'),
       }),
     );
   });
@@ -228,7 +255,9 @@ describe('Notification dispatch', () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-context-name',
-      eventId: 'event-context-name',
+      subjectType: 'risk-event',
+      subjectId: 'event-context-name',
+      message,
       channel: 'feishu',
       provider: 'feishu',
       severity: 'warning',
@@ -237,6 +266,7 @@ describe('Notification dispatch', () => {
       scheduledAt: new Date('2026-08-20T10:00:00Z'),
     };
     const assetLookup = vi.fn(async () => Promise.reject(new Error('asset db down')));
+    const riskEventLookup = vi.fn();
     const prisma = {
       notificationDelivery: {
         findUniqueOrThrow: vi.fn(async () => delivery),
@@ -247,11 +277,7 @@ describe('Notification dispatch', () => {
         })),
       },
       riskEvent: {
-        findUnique: vi.fn(async () =>
-          riskEvent('event-context-name', '159516.SZ', 'account-1', {
-            assetName: '半导体设备ETF国泰',
-          }),
-        ),
+        findUnique: riskEventLookup,
       },
       asset: { findUnique: assetLookup },
       providerConfig: {
@@ -277,11 +303,12 @@ describe('Notification dispatch', () => {
     await expect(
       service.dispatchOne('delivery-context-name', new Date('2026-08-20T10:01:00Z')),
     ).resolves.toMatchObject({ skipped: false, delivery: { status: 'delivered' } });
+    expect(riskEventLookup).not.toHaveBeenCalled();
     expect(assetLookup).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(providerWebhook),
       expect.objectContaining({
-        body: expect.stringContaining('风险提醒\\n价格跌破阈值'),
+        body: expect.stringContaining('风险提醒\\n测试消息'),
       }),
     );
   });
@@ -290,7 +317,9 @@ describe('Notification dispatch', () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',
-      eventId: 'event-1',
+      subjectType: 'risk-event',
+      subjectId: 'event-1',
+      message,
       channel: 'feishu',
       provider: 'feishu',
       severity: 'warning',
@@ -337,7 +366,9 @@ describe('Notification dispatch', () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',
-      eventId: 'event-1',
+      subjectType: 'risk-event',
+      subjectId: 'event-1',
+      message,
       channel: 'feishu',
       provider: 'feishu',
       severity: 'warning',
@@ -401,7 +432,9 @@ describe('Notification dispatch', () => {
     const redis = redisFixture();
     const delivery = {
       id: 'delivery-1',
-      eventId: 'event-1',
+      subjectType: 'risk-event',
+      subjectId: 'event-1',
+      message,
       channel: 'feishu',
       provider: 'feishu',
       severity: 'warning',

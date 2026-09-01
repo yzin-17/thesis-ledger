@@ -13,6 +13,7 @@
 
 - `PortfolioSnapshot` 只有 `accountId`、`capturedAt`、金额和 JSON `payload`，不能表达来源、状态、创建时间或完整的数据质量；
 - 全部账户是服务层对 `Account` 的虚拟聚合，项目没有持久化 `Portfolio` 实体；
+- 当前投资组合账户范围已明确为启用的证券和基金账户；独立现金账户只保留账户级数据，不进入组合快照；
 - 服务端已有手动创建 API，但 Desktop 没有创建快照的入口；
 - 自动化任务只有通用 cron 和 `snapshot` 类型，不能持久化快照范围、实际/影子模式或币种口径；
 - 交易和导入完成后没有统一的快照触发接缝；
@@ -56,7 +57,7 @@ type Currency = 'CNY' | 'HKD' | 'USD';
 ```
 
 - `scope = 'account'` 时必须有 `accountId`，快照只包含该账户；
-- `scope = 'portfolio'` 时 `accountId` 必须为空，快照包含当前 `mode` 下所有有效账户；
+- `scope = 'portfolio'` 时 `accountId` 必须为空，快照包含当前 `mode` 下所有启用的证券和基金账户；
 - `mode` 是快照身份的一部分，实际和影子数据绝不混合；
 - `portfolio` 不是可授权的独立实体，当前 MVP 不声称支持用户级 Portfolio 权限。
 
@@ -164,6 +165,7 @@ MVP 使用版本化 JSON，避免为了引入快照而立即重构 Position、In
 ```ts
 interface SnapshotPayloadV2 {
   version: 2;
+  accountScopePolicy: 'account-v1' | 'investment-only-v1';
   summary: {
     marketValue: string | null;
     costValue: string | null;
@@ -219,6 +221,8 @@ interface SnapshotPayloadV2 {
   };
 }
 ```
+
+缺少 `accountScopePolicy` 的旧组合快照视为 `legacy-all-accounts-v0`。旧口径快照继续作为历史证据可见，但不得与 `investment-only-v1` 快照共同计算 TTWROR、XIRR 或区间收益，也不得静默重算或删除。
 
 `instrumentId` 在当前持仓没有可确认目录关联时可以缺省；`symbol + accountId` 仍是当前 Position 的稳定引用。后续如果要求所有快照持仓必须关联 Instrument，另立目录迁移设计。
 

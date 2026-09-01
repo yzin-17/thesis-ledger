@@ -1,6 +1,13 @@
 import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -9,12 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LoaderCircle } from 'lucide-react';
+import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 
 import { money } from '../shared/display.js';
 import { PositionFields } from './PortfolioPositionFields.js';
+import {
+  PositionObservationContent,
+  PositionOverviewMenu,
+  StandardPositionContent,
+} from './PortfolioPositionObservation.js';
 import type { Account, Position } from './portfolio.types.js';
 import type { PortfolioManagementViewProps } from './PortfolioManagementView.types.js';
 
@@ -52,135 +63,206 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
     managedAccounts,
     onAccountEntry,
     busyAction,
-    editingAccount,
     accountSheetOpen,
+    accountFormInline = false,
     markDirty,
     setEditingAccount,
     setAccountSheetOpen,
-    submitAccount,
     toggleAccount,
   } = props;
+
+  if (accountFormInline && accountSheetOpen) {
+    return (
+      <div
+        className="flex h-full min-h-0 flex-col animate-in fade-in slide-in-from-right-6 duration-200 motion-reduce:animate-none"
+        data-account-manager-view="form"
+      >
+        <AccountFormContent {...props} inline />
+      </div>
+    );
+  }
+
   return (
     <>
-      <div className="mt-6 flex items-center justify-between gap-4">
-        <h2 className="m-0 text-xl font-semibold">已有账户</h2>
-        <Button
-          type="button"
-          variant="default"
-          onClick={() => {
-            setEditingAccount(null);
-            markDirty(false);
-            setAccountSheetOpen(true);
-          }}
+      <div
+        className={cn(
+          accountFormInline &&
+            'min-h-0 overflow-y-auto animate-in fade-in slide-in-from-left-6 duration-200 motion-reduce:animate-none',
+        )}
+        data-account-manager-view={accountFormInline ? 'list' : undefined}
+      >
+        {accountFormInline && (
+          <div className="panel-heading">
+            <SheetTitle>账户设置</SheetTitle>
+            <SheetDescription id="account-manager-description">
+              账户是成交、持仓观察和现金观察的容器。
+            </SheetDescription>
+          </div>
+        )}
+        <div
+          className={cn('flex items-center justify-between gap-4', !accountFormInline && 'mt-6')}
         >
-          创建账户
-        </Button>
-      </div>
-      {managedAccounts.length > 0 ? (
-        <div className="account-list" aria-label="已有账户">
-          {managedAccounts.map((account) => (
-            <div key={account.id}>
-              <span>
-                {account.name}
-                <small>
-                  {(account.institution || '未填写机构') +
-                    ' · ' +
-                    (account.mode === 'shadow' ? '模拟' : '实际') +
-                    ' · ' +
-                    account.currency +
-                    (account.active === false ? ' · 已停用' : '')}
-                </small>
-              </span>
-              <div className="form-actions">
-                {account.active !== false && onAccountEntry && (
+          <h2 className="m-0 text-xl font-semibold">已有账户</h2>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              setEditingAccount(null);
+              markDirty(false);
+              setAccountSheetOpen(true);
+            }}
+          >
+            创建账户
+          </Button>
+        </div>
+        {managedAccounts.length > 0 ? (
+          <div className="account-list" aria-label="已有账户">
+            {managedAccounts.map((account) => (
+              <div key={account.id}>
+                <span>
+                  {account.name}
+                  <small>
+                    {(account.institution || '未填写机构') +
+                      ' · ' +
+                      (account.mode === 'shadow' ? '模拟' : '实际') +
+                      ' · ' +
+                      account.currency +
+                      (account.active === false ? ' · 已停用' : '')}
+                  </small>
+                </span>
+                <div className="form-actions">
+                  {account.active !== false && onAccountEntry && (
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      type="button"
+                      variant="link"
+                      onClick={() => onAccountEntry(account.id)}
+                    >
+                      录入持仓
+                    </Button>
+                  )}
                   <Button
                     className="text-button"
                     size="sm"
                     type="button"
                     variant="link"
-                    onClick={() => onAccountEntry(account.id)}
+                    onClick={() => {
+                      setEditingAccount(account);
+                      markDirty(false);
+                      setAccountSheetOpen(true);
+                    }}
                   >
-                    录入持仓
+                    编辑
                   </Button>
-                )}
-                <Button
-                  className="text-button"
-                  size="sm"
-                  type="button"
-                  variant="link"
-                  onClick={() => {
-                    setEditingAccount(account);
-                    markDirty(false);
-                    setAccountSheetOpen(true);
-                  }}
-                >
-                  编辑
-                </Button>
-                <Button
-                  className={cn('text-button', account.active !== false && 'danger')}
-                  size="sm"
-                  type="button"
-                  variant={account.active === false ? 'outline' : 'destructive'}
-                  disabled={busyAction !== null}
-                  aria-busy={busyAction === `account-toggle:${account.id}`}
-                  onClick={() => void toggleAccount(account)}
-                >
-                  {busyAction === `account-toggle:${account.id}` && (
-                    <LoaderCircle
-                      data-icon="inline-start"
-                      className="animate-spin"
-                      aria-hidden="true"
-                    />
-                  )}
-                  {accountToggleLabel(
-                    busyAction === `account-toggle:${account.id}`,
-                    account.active !== false,
-                  )}
-                </Button>
+                  <Button
+                    className={cn('text-button', account.active !== false && 'danger')}
+                    size="sm"
+                    type="button"
+                    variant={account.active === false ? 'outline' : 'destructive'}
+                    disabled={busyAction !== null}
+                    aria-busy={busyAction === `account-toggle:${account.id}`}
+                    onClick={() => void toggleAccount(account)}
+                  >
+                    {busyAction === `account-toggle:${account.id}` && (
+                      <LoaderCircle
+                        data-icon="inline-start"
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {accountToggleLabel(
+                      busyAction === `account-toggle:${account.id}`,
+                      account.active !== false,
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state" role="status">
-          暂无账户，点击右上角“创建账户”开始。
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state" role="status">
+            暂无账户，点击右上角“创建账户”开始。
+          </div>
+        )}
+      </div>
+      {!accountFormInline && (
+        <Sheet open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
+          <SheetContent
+            side="right"
+            aria-describedby="account-form-description"
+            className="h-[100dvh] min-h-0 w-[620px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+          >
+            <AccountFormContent {...props} />
+          </SheetContent>
+        </Sheet>
       )}
-      <Sheet open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
-        <SheetContent
-          side="right"
-          aria-describedby="account-form-description"
-          className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
-        >
-          <div className="panel-heading">
+    </>
+  );
+}
+
+function AccountFormContent({
+  inline = false,
+  ...props
+}: PortfolioManagementViewProps & { inline?: boolean }) {
+  const { busyAction, editingAccount, markDirty, setAccountSheetOpen, submitAccount } = props;
+  const descriptionId = inline ? 'account-manager-description' : 'account-form-description';
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <div className="panel-heading shrink-0">
+        <div className="flex items-start gap-1.5">
+          {inline && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="返回账户设置"
+              onClick={() => setAccountSheetOpen(false)}
+            >
+              <ArrowLeft data-icon="inline-start" aria-hidden="true" />
+            </Button>
+          )}
+          <div className="min-w-0">
             <SheetTitle>{editingAccount ? '编辑账户' : '创建账户'}</SheetTitle>
-            <SheetDescription id="account-form-description">
+            <SheetDescription id={descriptionId}>
               账户是持仓的容器；类型、模式和币种在出现 Ledger 事件后锁定。
             </SheetDescription>
           </div>
-          <form
-            key={editingAccount?.id ?? 'new-account'}
-            className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
-            onChange={() => markDirty()}
-            onSubmit={(event) => void submitAccount(event)}
-          >
-            <label>
-              账户名称
-              <Input name="name" required maxLength={80} defaultValue={editingAccount?.name} />
-            </label>
-            <label>
-              机构（可选）
+        </div>
+      </div>
+      <form
+        key={editingAccount?.id ?? 'new-account'}
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+        onChange={() => markDirty()}
+        onSubmit={(event) => void submitAccount(event)}
+      >
+        <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="account-name">账户名称</FieldLabel>
               <Input
+                id="account-name"
+                name="name"
+                required
+                maxLength={80}
+                defaultValue={editingAccount?.name}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="account-institution">机构（可选）</FieldLabel>
+              <Input
+                id="account-institution"
                 name="institution"
                 maxLength={80}
                 defaultValue={editingAccount?.institution ?? undefined}
                 placeholder="例如：支付宝、某某证券"
               />
-            </label>
-            <label>
-              账户类型
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="account-type">账户类型</FieldLabel>
               <Select name="type" defaultValue={editingAccount?.type ?? 'securities'}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="account-type" className="w-full">
                   <SelectValue>
                     {(value: string | null) => accountTypeLabel(value as Account['type'])}
                   </SelectValue>
@@ -193,11 +275,11 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-            </label>
-            <label>
-              账户模式
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="account-mode">账户模式</FieldLabel>
               <Select name="mode" defaultValue={editingAccount?.mode ?? 'actual'}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="account-mode" className="w-full">
                   <SelectValue>
                     {(value: string | null) => (value === 'shadow' ? '模拟账户' : '实际账户')}
                   </SelectValue>
@@ -209,42 +291,33 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-            </label>
-            <label>
-              <Input value="人民币（CNY）" readOnly aria-label="币种" />
-            </label>
-            <div className="form-actions">
-              <Button type="submit" variant="default" disabled={busyAction !== null}>
-                {busyAction === 'account-save' && (
-                  <LoaderCircle
-                    data-icon="inline-start"
-                    className="animate-spin"
-                    aria-hidden="true"
-                  />
-                )}
-                {accountSaveLabel(busyAction === 'account-save', Boolean(editingAccount))}
-              </Button>
-              {editingAccount && (
-                <Button
-                  className="secondary"
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditingAccount(null)}
-                >
-                  取消
-                </Button>
-              )}
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-    </>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="account-currency">币种</FieldLabel>
+              <Input id="account-currency" value="人民币（CNY）" readOnly aria-label="币种" />
+            </Field>
+          </FieldGroup>
+        </div>
+        <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+          <Button type="button" variant="outline" onClick={() => setAccountSheetOpen(false)}>
+            取消
+          </Button>
+          <Button type="submit" variant="default" disabled={busyAction !== null}>
+            {busyAction === 'account-save' && (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+            )}
+            {accountSaveLabel(busyAction === 'account-save', Boolean(editingAccount))}
+          </Button>
+        </SheetFooter>
+      </form>
+    </div>
   );
 }
 
 export function PositionManagementSection(props: PortfolioManagementViewProps) {
+  const { embedded = false } = props;
   return (
-    <div className="mt-6">
+    <div className={cn(!embedded && 'mt-6')}>
       <PositionOverview {...props} />
       <PositionEntrySheet {...props} />
     </div>
@@ -263,134 +336,99 @@ function PositionOverview({
   remove,
   showCash = true,
   calibrationMode = false,
+  onOpenImport,
+  onOpenReconciliation,
 }: PortfolioManagementViewProps) {
-  const positionHeading = calibrationMode ? '持仓余额观察' : '持仓';
+  const positionHeading = calibrationMode ? '持仓观察' : '持仓';
   const positionDescription = calibrationMode
-    ? '这里记录观察检查点，不代表真实成交；成交请在“成交记录”中录入。'
+    ? '用于记录校准检查点，不产生 BUY / SELL 成交记录。'
     : undefined;
-  const clearLabel = calibrationMode ? '清空持仓观察' : '清空持仓';
-  const addLabel = calibrationMode ? '校准持仓余额' : '+ 添加持仓';
-  const emptyLabel = calibrationMode
-    ? '暂无持仓观察，点击右上角“校准持仓余额”记录检查点。'
-    : '暂无持仓，点击右上角“添加持仓”开始。';
+  const editPosition = (position: Position) => {
+    setEditing(position);
+    setEntryAccountId(position.accountId);
+    openEntrySheet('position');
+  };
+  const createPosition = () => {
+    setEditing(null);
+    openEntrySheet('position');
+  };
+  const positionActions = calibrationMode ? (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {onOpenImport && (
+        <Button type="button" variant="outline" onClick={onOpenImport} disabled>
+          导入持仓快照（暂未开放）
+        </Button>
+      )}
+      {onOpenReconciliation && (
+        <Button type="button" variant="outline" onClick={onOpenReconciliation}>
+          对账候选
+        </Button>
+      )}
+      <PositionOverviewMenu
+        positions={positions}
+        busyAction={busyAction}
+        clearPositions={clearPositions}
+        onCreate={createPosition}
+      />
+    </div>
+  ) : (
+    <div className="flex items-center gap-2">
+      {positions.length > 0 && (
+        <Button
+          className="text-button danger"
+          size="sm"
+          type="button"
+          variant="destructive"
+          disabled={busyAction !== null}
+          aria-busy={busyAction === 'clear-positions'}
+          onClick={() => void clearPositions()}
+        >
+          {busyAction === 'clear-positions' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {busyAction === 'clear-positions' ? '清空中…' : '清空持仓'}
+        </Button>
+      )}
+      <Button className="text-button" type="button" variant="link" onClick={createPosition}>
+        + 添加持仓
+      </Button>
+    </div>
+  );
+
   return (
     <>
       {selectedAccount?.type !== 'cash' && (
-        <>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="m-0 text-xl font-semibold">{positionHeading}</h2>
+        <section className="flex flex-col gap-4" aria-labelledby="portfolio-position-title">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h2 id="portfolio-position-title" className="m-0 text-xl font-semibold">
+                {positionHeading}
+              </h2>
               {positionDescription && (
-                <p className="m-0 mt-1 text-sm text-muted-foreground">{positionDescription}</p>
+                <p className="m-0 mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                  {positionDescription}
+                </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {positions.length > 0 && (
-                <Button
-                  className="text-button danger"
-                  size="sm"
-                  type="button"
-                  variant="destructive"
-                  disabled={busyAction !== null}
-                  aria-busy={busyAction === 'clear-positions'}
-                  onClick={() => void clearPositions()}
-                >
-                  {busyAction === 'clear-positions' && (
-                    <LoaderCircle
-                      data-icon="inline-start"
-                      className="animate-spin"
-                      aria-hidden="true"
-                    />
-                  )}
-                  {busyAction === 'clear-positions' ? '清空中…' : clearLabel}
-                </Button>
-              )}
-              <Button
-                className="text-button"
-                type="button"
-                variant="link"
-                onClick={() => {
-                  setEditing(null);
-                  openEntrySheet('position');
-                }}
-              >
-                {addLabel}
-              </Button>
-            </div>
+            {positionActions}
           </div>
-          {positions.length > 0 ? (
-            <div className="mt-2 divide-y border-y border-border" aria-label="持仓操作">
-              {positions.map((position) => (
-                <div
-                  key={position.id}
-                  className="grid gap-x-4 gap-y-2 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(72px,0.8fr)_minmax(120px,1fr)_minmax(150px,1.4fr)_auto] sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <strong className="block truncate text-sm font-medium text-foreground">
-                      {position.asset.name || position.symbol}
-                    </strong>
-                    <span className="text-xs text-muted-foreground">
-                      {position.symbol} · {position.quantity} · {money.format(position.costPrice)}
-                    </span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {position.marketValue === null ? '—' : money.format(position.marketValue)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {position.pnl === null ? '—' : money.format(position.pnl)}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{calibrationMode ? '观察检查点' : '当前记录'}</Badge>
-                    <span className="text-xs text-muted-foreground">
-                      来源：{position.source ?? '未知'}
-                    </span>
-                  </div>
-                  <div className="form-actions justify-end">
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      type="button"
-                      variant="link"
-                      onClick={() => {
-                        setEditing(position);
-                        setEntryAccountId(position.accountId);
-                        openEntrySheet('position');
-                      }}
-                    >
-                      {calibrationMode ? '校准' : '编辑'}
-                    </Button>
-                    <Button
-                      className="text-button danger"
-                      size="sm"
-                      type="button"
-                      variant="destructive"
-                      disabled={busyAction !== null}
-                      aria-busy={busyAction === `remove:${position.id}`}
-                      onClick={() => void remove(position)}
-                    >
-                      {busyAction === `remove:${position.id}` && (
-                        <LoaderCircle
-                          data-icon="inline-start"
-                          className="animate-spin"
-                          aria-hidden="true"
-                        />
-                      )}
-                      {busyAction === `remove:${position.id}`
-                        ? '移除中…'
-                        : calibrationMode
-                          ? '移除校准'
-                          : '删除'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {calibrationMode ? (
+            <PositionObservationContent
+              positions={positions}
+              busyAction={busyAction}
+              onCreate={createPosition}
+              onEdit={editPosition}
+              remove={remove}
+            />
           ) : (
-            <div className="empty-state" role="status">
-              {emptyLabel}
-            </div>
+            <StandardPositionContent
+              positions={positions}
+              busyAction={busyAction}
+              onEdit={editPosition}
+              remove={remove}
+            />
           )}
-        </>
+        </section>
       )}
       {selectedAccount?.type === 'cash' && !showCash && (
         <div className="mt-6 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">

@@ -21,6 +21,8 @@
 
 本轮交易与成交记录系统入口见 [`交易与成交记录系统`](specs/2026-08-26-trade-execution-ledger-system.md)；统一 Trade Projection 的投资复盘入口见 [`投资复盘工作台（统一 Trade Projection）`](specs/2026-08-28-journal-review-trade-projection.md)。
 
+本轮本地更新流程入口见 [`Docker 构建缓存重试`](specs/2026-09-01-docker-build-cache-retry.md)。
+
 ## 历史文档
 
 [`archive/`](archive/) 保存已完成、被取代或仅用于历史审计的 Spec、Task、Review、Architecture 和 Domain 文档。归档保留上下文和验证证据，不表示这些文档仍是当前实现依据；归档入口见 [`archive/README.md`](archive/README.md)。

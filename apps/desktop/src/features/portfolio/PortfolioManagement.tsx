@@ -23,6 +23,11 @@ export function PortfolioManagement({
   step,
   showCash = true,
   calibrationMode = false,
+  embedded = false,
+  onOpenImport,
+  onOpenReconciliation,
+  accountFormInline = false,
+  accountManagerOpen,
   defaultAccountId,
   accountsReady = true,
   onAccountEntry,
@@ -38,6 +43,11 @@ export function PortfolioManagement({
   step: 'account' | 'position';
   showCash?: boolean;
   calibrationMode?: boolean;
+  embedded?: boolean;
+  onOpenImport?: () => void;
+  onOpenReconciliation?: () => void;
+  accountFormInline?: boolean;
+  accountManagerOpen?: boolean;
   defaultAccountId?: string;
   accountsReady?: boolean;
   onAccountEntry?: (accountId: string) => void;
@@ -109,6 +119,16 @@ export function PortfolioManagement({
     setPositionSheetOpen(true);
   };
   const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const closeAccountSheet = (open: boolean) => {
+    if (open) {
+      setAccountSheetOpen(true);
+      return;
+    }
+    if (!confirmDiscard()) return;
+    setEditingAccount(null);
+    markDirty(false);
+    setAccountSheetOpen(false);
+  };
 
   useEffect(() => {
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
@@ -137,10 +157,26 @@ export function PortfolioManagement({
       step === 'account' &&
       accountsReady &&
       managedAccountsLoaded &&
-      managedAccounts.length === 0
+      managedAccounts.length === 0 &&
+      (!accountFormInline || accountManagerOpen !== false)
     )
       setAccountSheetOpen(true);
-  }, [accountsReady, managedAccounts.length, managedAccountsLoaded, step]);
+  }, [
+    accountFormInline,
+    accountManagerOpen,
+    accountsReady,
+    managedAccounts.length,
+    managedAccountsLoaded,
+    step,
+  ]);
+
+  useEffect(() => {
+    if (!accountFormInline || accountManagerOpen !== false) return;
+    setAccountSheetOpen(false);
+    setEditingAccount(null);
+    setDirty(false);
+    onDirtyChange?.(false);
+  }, [accountFormInline, accountManagerOpen, onDirtyChange]);
 
   const actions = createPortfolioActionHandlers({
     accounts,
@@ -160,6 +196,7 @@ export function PortfolioManagement({
     setInstrumentConfirmationBusy,
     setEditing,
     setEditingAccount,
+    setAccountSheetOpen,
     setSelectedInstrument,
     setInstrumentQuery,
     setInstrumentSearchOpen,
@@ -181,6 +218,10 @@ export function PortfolioManagement({
       step={step}
       showCash={showCash}
       calibrationMode={calibrationMode}
+      embedded={embedded}
+      {...(onOpenImport ? { onOpenImport } : {})}
+      {...(onOpenReconciliation ? { onOpenReconciliation } : {})}
+      accountFormInline={accountFormInline}
       managedAccounts={managedAccounts}
       onAccountEntry={onAccountEntry}
       selectedAccount={selectedAccount}
@@ -213,7 +254,7 @@ export function PortfolioManagement({
       clearInstrumentSelection={actions.clearInstrumentSelection}
       startManualInstrumentEntry={actions.startManualInstrumentEntry}
       handleInstrumentQueryChange={actions.handleInstrumentQueryChange}
-      setAccountSheetOpen={setAccountSheetOpen}
+      setAccountSheetOpen={closeAccountSheet}
       setPositionSheetOpen={setPositionSheetOpen}
       setEditingAccount={setEditingAccount}
       setEditing={setEditing}

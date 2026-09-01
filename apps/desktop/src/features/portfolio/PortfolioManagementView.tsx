@@ -9,10 +9,23 @@ import type { PortfolioManagementViewProps } from './PortfolioManagementView.typ
 export type { PortfolioManagementViewProps } from './PortfolioManagementView.types.js';
 
 export function PortfolioManagementView(props: PortfolioManagementViewProps) {
-  const { step, accountSheetOpen, positionSheetOpen } = props;
+  const {
+    step,
+    embedded = false,
+    accountFormInline = false,
+    accountSheetOpen,
+    positionSheetOpen,
+  } = props;
+  let sectionClassName = 'management';
+  if (step === 'account') {
+    sectionClassName = accountFormInline
+      ? 'module-page flex min-h-0 flex-1 flex-col'
+      : 'module-page';
+  } else if (embedded) sectionClassName = 'flex flex-col gap-4';
+
   return (
     <section
-      className={cn(step === 'account' ? 'module-page' : 'management')}
+      className={cn(sectionClassName)}
       id="portfolio-management"
       aria-labelledby="portfolio-management-title"
       data-management-step={step}
@@ -20,7 +33,7 @@ export function PortfolioManagementView(props: PortfolioManagementViewProps) {
       data-account-sheet-open={step === 'account' ? String(accountSheetOpen) : undefined}
       data-entry-sheet-open={step === 'position' ? String(positionSheetOpen) : undefined}
     >
-      {step === 'account' && (
+      {step === 'account' && !accountFormInline && (
         <div className="panel-heading">
           <p className="kicker">Account Management</p>
           <div className="entry-page-heading">
@@ -33,7 +46,7 @@ export function PortfolioManagementView(props: PortfolioManagementViewProps) {
           </div>
         </div>
       )}
-      <div className="management-grid single-step">
+      <div className={cn('management-grid single-step', accountFormInline && 'min-h-0 flex-1')}>
         {step === 'account' && <AccountManagementSection {...props} />}
         {step === 'position' && <PositionManagementSection {...props} />}
       </div>

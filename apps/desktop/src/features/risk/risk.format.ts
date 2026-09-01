@@ -178,6 +178,12 @@ export const riskChannelLabel = (channel: string) => {
   return channel;
 };
 
+export const riskSubjectLabel = (subjectType: string) => {
+  if (subjectType === 'risk-event') return '风险事件';
+  if (subjectType === 'recurring-cash-deposit-plan') return '定期入账计划';
+  return `通知主题（${subjectType}）`;
+};
+
 export const riskStatusLabel = (status: string) => {
   if (status === 'sent' || status === 'success') return '已发送';
   if (status === 'delivered') return '已送达';

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { RiskEventTable } from '../src/features/risk/RiskSections.js';
+import { RiskEventTable, RiskNotificationTable } from '../src/features/risk/RiskSections.js';
 import { RiskRuleWorkbench } from '../src/features/risk/RiskRuleWorkbench.js';
 import { toInput, validateDraft } from '../src/features/risk/RiskRuleEditorSheet.js';
 import { isPortfolioScanReady, portfolioDataStatus } from '../src/features/risk/RiskOverview.js';
@@ -17,6 +17,7 @@ import {
   riskTestRecordForRule,
   riskStatusLabel,
   riskStatusTone,
+  riskSubjectLabel,
   rulePreview,
 } from '../src/features/risk/risk.format.js';
 import type { Portfolio } from '../src/features/portfolio/portfolio.types.js';
@@ -224,6 +225,33 @@ describe('风险中心 AB 交互契约', () => {
     expect(riskStatusLabel('unexpected')).toBe('未知状态（unexpected）');
     expect(riskStatusTone('delivered')).toBe('secondary');
     expect(riskStatusTone('retrying')).toBe('outline');
+    expect(riskSubjectLabel('risk-event')).toBe('风险事件');
+    expect(riskSubjectLabel('recurring-cash-deposit-plan')).toBe('定期入账计划');
+  });
+
+  it('通知表使用 subject 字段并显示可识别的主题标签', () => {
+    const html = renderToStaticMarkup(
+      <RiskNotificationTable
+        loadState="ready"
+        deliveries={[
+          {
+            id: 'delivery-1',
+            subjectType: 'risk-event',
+            subjectId: 'event-1',
+            channel: 'feishu',
+            severity: 'warning',
+            status: 'delivered',
+            attemptCount: 1,
+            scheduledAt: '2026-08-23T01:00:00.000Z',
+            lastError: null,
+          },
+        ]}
+      />
+    );
+
+    expect(html).toContain('飞书 · 风险事件');
+    expect(html).toContain('主题 event-1');
+    expect(html).not.toContain('事件 undefined');
   });
 
   it('人工测试结果按规则版本匹配，版本变更后不复用旧结果', () => {

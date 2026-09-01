@@ -85,6 +85,7 @@ describe('HTTP runtime validation', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     expect(() => controller.createExecution({ command: 'CREATE_EXECUTION' })).toThrow(z.ZodError);
@@ -94,6 +95,7 @@ describe('HTTP runtime validation', () => {
   it('Ledger 查询在 Controller 层拒绝非法 Revision，避免把字符串直接交给数据库', () => {
     const queries = { effectiveEvents: vi.fn() };
     const controller = new LedgerController(
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

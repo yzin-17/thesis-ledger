@@ -68,4 +68,26 @@ describe('通知策略', () => {
       'delivery',
     );
   });
+
+  it('通过 subject 契约读取投递状态并标记失败可重试', async () => {
+    const findMany = vi.fn(async () => [{ status: 'delivered' }, { status: 'failed' }]);
+    const service = new NotificationService(
+      { notificationDelivery: { findMany } } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.subjectDeliveryStatus({ type: 'risk-event', id: 'event-1' }),
+    ).resolves.toEqual({
+      subjectType: 'risk-event',
+      subjectId: 'event-1',
+      statuses: ['delivered', 'failed'],
+      shouldRetry: true,
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { subjectType: 'risk-event', subjectId: 'event-1' },
+      select: { status: true },
+    });
+  });
 });

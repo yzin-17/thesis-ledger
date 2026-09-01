@@ -210,9 +210,23 @@ describe('V0.1 核心 E2E', () => {
     ]);
     expect(risk.results).toEqual([{ ruleId: 'risk-1', eventId: 'risk-event-1' }]);
     expect(notifications.enqueue).toHaveBeenCalledWith(
-      'risk-event-1',
-      'warning',
-      expect.any(Object),
+      expect.objectContaining({
+        type: 'risk-event',
+        id: 'risk-event-1',
+        dedupKey: expect.any(String),
+      }),
+      expect.objectContaining({
+        title: '风险提醒',
+        body: '600519.SH · 贵州茅台 · 价格低于 100 已触发',
+        severity: 'warning',
+        traceId: expect.any(String),
+      }),
+      expect.objectContaining({
+        channels: expect.objectContaining({ warning: ['feishu'] }),
+        cooldownMinutes: 30,
+        maxAttempts: 3,
+        criticalBypassCooldown: true,
+      }),
     );
 
     const analysis = await runRiskExplanation(
@@ -233,6 +247,44 @@ describe('V0.1 核心 E2E', () => {
 });
 
 describe('账户与组合', () => {
+  it('组合范围排除独立现金账户，显式账户查询仍保留', async () => {
+    const positionFindMany = vi.fn(async () => []);
+    const ledgerFindMany = vi.fn(async () => []);
+    const accountFindMany = vi.fn(async () => []);
+    const service = new PortfolioService(
+      {
+        position: { findMany: positionFindMany },
+        ledgerEvent: { findMany: ledgerFindMany },
+        account: { findMany: accountFindMany },
+      } as never,
+      {} as never,
+    );
+
+    await service.value(undefined, 'actual');
+    expect(positionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          account: { mode: 'actual', active: true, type: { in: ['securities', 'fund'] } },
+        },
+      }),
+    );
+    expect(ledgerFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          account: { mode: 'actual', active: true, type: { in: ['securities', 'fund'] } },
+        },
+      }),
+    );
+
+    await service.value(accountA, 'actual');
+    expect(positionFindMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { accountId: accountA, account: { mode: 'actual' } } }),
+    );
+    expect(ledgerFindMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { accountId: accountA, account: { mode: 'actual' } } }),
+    );
+  });
+
   it('允许同名账户、拒绝非法币种和有持仓账户停用', async () => {
     const prisma = {
       account: {
@@ -329,6 +381,15 @@ describe('账户与组合', () => {
             category: 'DEPOSIT',
           }),
           cashFlowEvent({
+            id: 'cash-future',
+            accountId: accountA,
+            amount: 500,
+            currency: 'CNY',
+            direction: 'INFLOW',
+            category: 'DEPOSIT',
+            settledAt: '2099-01-01T00:00:00.000Z',
+          }),
+          cashFlowEvent({
             id: 'cash-hkd',
             accountId: accountA,
             amount: 100,
@@ -356,6 +417,9 @@ describe('账户与组合', () => {
         expect.objectContaining({ currency: 'CNY', amount: 100 }),
         expect.objectContaining({ currency: 'HKD', amount: 100 }),
       ]),
+    );
+    expect(native.cashByCurrency).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ currency: 'CNY', amount: 600 })]),
     );
 
     const merged = await service.value(accountA, 'actual', {

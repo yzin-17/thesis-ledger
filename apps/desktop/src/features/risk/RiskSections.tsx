@@ -23,6 +23,7 @@ import {
   riskSeverityTone,
   riskStatusLabel,
   riskStatusTone,
+  riskSubjectLabel,
   ruleTargetLabel,
 } from './risk.format.js';
 import type {
@@ -167,8 +168,10 @@ export function RiskNotificationTable({
               visibleDeliveries.map((delivery) => (
                 <tr key={delivery.id}>
                   <td>
-                    <strong>{riskChannelLabel(delivery.channel)}</strong>
-                    <span>{delivery.lastError ?? `事件 ${delivery.eventId}`}</span>
+                    <strong>
+                      {riskChannelLabel(delivery.channel)} · {riskSubjectLabel(delivery.subjectType)}
+                    </strong>
+                    <span>{delivery.lastError ?? `主题 ${delivery.subjectId}`}</span>
                   </td>
                   <td>
                     <Badge variant={riskSeverityTone(delivery.severity)}>

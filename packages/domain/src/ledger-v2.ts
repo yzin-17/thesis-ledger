@@ -98,6 +98,11 @@ export interface CashFlowPayloadV2 {
   currency: CurrencyCode;
   settledAt?: string;
   note?: string;
+  transfer?: {
+    transferId: string;
+    counterpartyAccountId: string;
+    leg: 'OUTFLOW' | 'INFLOW';
+  };
 }
 
 export interface LedgerEventPayloadByTypeV2 {

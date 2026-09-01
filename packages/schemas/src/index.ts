@@ -13,5 +13,6 @@ export * from './trade-api.js';
 export * from './asset-identity.js';
 export * from './api.js';
 export * from './performance.js';
+export * from './recurring-cash-deposit.js';
 export * from './exact-optional.js';
 export { isDateOnly } from './temporal.js';

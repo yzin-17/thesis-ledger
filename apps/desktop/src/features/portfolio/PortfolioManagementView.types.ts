@@ -14,6 +14,10 @@ export type PortfolioManagementViewProps = {
   step: 'account' | 'position';
   showCash?: boolean;
   calibrationMode?: boolean;
+  embedded?: boolean;
+  onOpenImport?: () => void;
+  onOpenReconciliation?: () => void;
+  accountFormInline?: boolean;
   managedAccounts: Account[];
   onAccountEntry: ((accountId: string) => void) | undefined;
   selectedAccount: Account | undefined;

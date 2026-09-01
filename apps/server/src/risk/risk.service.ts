@@ -17,6 +17,7 @@ import {
 import type { Prisma } from '@prisma/client';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
+import { enqueueRiskNotificationIfNeeded, type RiskNotificationInput } from './risk-notification.js';
 
 type SecurityContext = ReturnType<typeof riskScanContextSchema.parse>;
 type AccountContext = ReturnType<typeof riskAccountContextSchema.parse>;
@@ -35,6 +36,7 @@ type StoredRule = {
   symbol: string | null;
   accountId: string | null;
   sourcePlanId?: string | null;
+  condition?: unknown;
   parameters?: unknown;
 };
 type ParsedScan = {
@@ -188,12 +190,6 @@ type RiskEventDelegate = {
   findUnique?: (args: { where: { dedupeKey: string } }) => Promise<RiskEventRecord | null>;
 };
 
-type NotificationDeliveryRecord = { status: string };
-
-type NotificationDeliveryDelegate = {
-  findMany: (args: { where: { eventId: string } }) => Promise<NotificationDeliveryRecord[]>;
-};
-
 const marketDataRuleKinds: ReadonlySet<string> = new Set([
   'fixed-stop',
   'cost-stop',
@@ -211,18 +207,6 @@ const marketDataRuleKinds: ReadonlySet<string> = new Set([
   'chip-ratio',
   'chip-migration',
 ]);
-
-const notificationPolicy = {
-  channels: {
-    info: ['feishu'],
-    warning: ['feishu'],
-    error: ['feishu'],
-    critical: ['feishu'],
-  },
-  cooldownMinutes: 30,
-  maxAttempts: 3,
-  criticalBypassCooldown: true,
-};
 
 const latestByMarketTime = <T extends { marketTime: string }>(values: readonly T[]) =>
   [...values].sort((left, right) => right.marketTime.localeCompare(left.marketTime))[0];
@@ -514,12 +498,17 @@ export class RiskService {
             );
             if (!outcome.eventId) continue;
             try {
-              await this.enqueueNotificationIfNeeded(
-                outcome.eventId,
-                event.severity,
-                candidate.mode,
-                outcome.created,
-              );
+              await this.enqueueNotificationIfNeeded({
+                eventId: outcome.eventId,
+                severity: event.severity,
+                message: event.message,
+                traceId,
+                mode: candidate.mode,
+                created: outcome.created,
+                rule: stored,
+                ...(candidate.accountId === undefined ? {} : { accountId: candidate.accountId }),
+                ...(candidate.symbol === undefined ? {} : { symbol: candidate.symbol }),
+              });
               results.push({ ruleId: stored.id, eventId: outcome.eventId });
             } catch (notificationError) {
               results.push({
@@ -533,12 +522,17 @@ export class RiskService {
           const outcome = await this.persistRegularEvent(stored, candidate, event, scanId, traceId);
           if (!outcome.eventId) continue;
           try {
-            await this.enqueueNotificationIfNeeded(
-              outcome.eventId,
-              event.severity,
-              candidate.mode,
-              outcome.created,
-            );
+            await this.enqueueNotificationIfNeeded({
+              eventId: outcome.eventId,
+              severity: event.severity,
+              message: event.message,
+              traceId,
+              mode: candidate.mode,
+              created: outcome.created,
+              rule: stored,
+              ...(candidate.accountId === undefined ? {} : { accountId: candidate.accountId }),
+              ...(candidate.symbol === undefined ? {} : { symbol: candidate.symbol }),
+            });
             results.push({ ruleId: stored.id, eventId: outcome.eventId });
           } catch (notificationError) {
             results.push({
@@ -564,17 +558,6 @@ export class RiskService {
     const candidate = delegate as { create?: unknown; findUnique?: unknown };
     if (typeof candidate.create !== 'function') return null;
     return candidate as unknown as RiskEventDelegate;
-  }
-
-  private notificationDeliveryDelegate(
-    prisma: unknown = this.prisma,
-  ): NotificationDeliveryDelegate | null {
-    const delegate = (prisma as PrismaService & { notificationDelivery?: unknown })
-      .notificationDelivery;
-    if (!delegate || typeof delegate !== 'object') return null;
-    const candidate = delegate as { findMany?: unknown };
-    if (typeof candidate.findMany !== 'function') return null;
-    return candidate as unknown as NotificationDeliveryDelegate;
   }
 
   private eventDedupeKey(scanId: string, stored: StoredRule, candidate: EvaluationCandidate) {
@@ -741,12 +724,12 @@ export class RiskService {
 
       if (state.activeEventId && state.lastScanId === scanId)
         return { eventId: state.activeEventId, created: false };
-      if (
-        candidate.mode === 'actual' &&
-        state.activeEventId &&
-        (await this.shouldRetryNotification(state.activeEventId, client))
-      ) {
-        return { eventId: state.activeEventId, created: false };
+      if (candidate.mode === 'actual' && state.activeEventId) {
+        const deliveryStatus = await this.notifications.subjectDeliveryStatus({
+          type: 'risk-event',
+          id: state.activeEventId,
+        });
+        if (deliveryStatus.shouldRetry) return { eventId: state.activeEventId, created: false };
       }
 
       const outcome = await this.persistRiskEvent(
@@ -921,27 +904,10 @@ export class RiskService {
     });
   }
 
-  private async shouldRetryNotification(eventId: string, prisma: unknown = this.prisma) {
-    const delegate = this.notificationDeliveryDelegate(prisma);
-    if (!delegate) return false;
-    const deliveries = await delegate.findMany({ where: { eventId } });
-    if (deliveries.length === 0) return true;
-    return deliveries.some((delivery) => ['failed', 'error'].includes(delivery.status));
-  }
-
   private async enqueueNotificationIfNeeded(
-    eventId: string,
-    severity: string,
-    mode: PortfolioMode,
-    created: boolean,
+    input: RiskNotificationInput & { mode: PortfolioMode; created: boolean },
   ) {
-    if (mode === 'shadow') return;
-    if (!created && !(await this.shouldRetryNotification(eventId))) return;
-    await this.notifications.enqueue(
-      eventId,
-      severity as Parameters<NotificationService['enqueue']>[1],
-      notificationPolicy,
-    );
+    await enqueueRiskNotificationIfNeeded(this.notifications, input);
   }
 
   history(mode: PortfolioMode = 'actual', options: { cursor?: string; limit?: number } = {}) {

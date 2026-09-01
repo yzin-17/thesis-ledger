@@ -1,8 +1,13 @@
 import type { LedgerEventV2 as DomainLedgerEventV2 } from '@thesis-ledger/domain';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  createCashFlowCommandSchemaV2,
+  createCashTransferCommandSchemaV2,
   createExecutionCommandSchemaV2,
+  cashFlowPayloadSchemaV2,
   decimalStringSchema,
+  legacyMigratedCashTransferEventSchemaV2,
+  legacyMigratedCashTransferPayloadSchemaV2,
   ledgerCommandErrorSchemaV2,
   ledgerEventEnvelopeSchemaV2,
   ledgerCommandResponseSchemaV2,
@@ -234,6 +239,11 @@ describe('LedgerEvent V2 契约', () => {
         amount: '500.00',
         currency: 'CNY',
         note: '旧现金划转迁移',
+        transfer: {
+          transferId: '44444444-4444-4444-8444-444444444444',
+          counterpartyAccountId: '55555555-5555-4555-8555-555555555555',
+          leg: 'OUTFLOW',
+        },
       },
     ],
   ] as const)('接受 %s 的专用载荷', (type, payload) => {
@@ -371,6 +381,92 @@ describe('成交命令契约', () => {
         idempotentReplay: false,
       }).ledgerRevisions[baseEnvelope.accountId],
     ).toBe('9007199254740993');
+  });
+});
+
+describe('现金流与现金划转命令契约', () => {
+  const cashCommand = {
+    command: 'CREATE_CASH_FLOW' as const,
+    accountId: baseEnvelope.accountId,
+    occurredAt: baseEnvelope.occurredAt,
+    timePrecision: baseEnvelope.timePrecision,
+    sourceTimezone: baseEnvelope.sourceTimezone,
+    economicOrderKey: baseEnvelope.economicOrderKey,
+    payload: {
+      direction: 'INFLOW' as const,
+      category: 'DEPOSIT' as const,
+      amount: '1000.00',
+      currency: 'CNY',
+      note: '工资',
+    },
+    source: baseEnvelope.source,
+    actorId: baseEnvelope.actorId,
+  };
+
+  it('外部现金流命令拒绝 TRANSFER 类别', () => {
+    expect(createCashFlowCommandSchemaV2.parse(cashCommand).payload.category).toBe('DEPOSIT');
+    expect(() =>
+      createCashFlowCommandSchemaV2.parse({
+        ...cashCommand,
+        payload: {
+          ...cashCommand.payload,
+          category: 'TRANSFER',
+          transfer: {
+            transferId: '44444444-4444-4444-8444-444444444444',
+            counterpartyAccountId: '55555555-5555-4555-8555-555555555555',
+            leg: 'INFLOW',
+          },
+        },
+      }),
+    ).toThrow('现金划转命令');
+  });
+
+  it('现金划转要求不同账户、字符串 Revision 和正数金额', () => {
+    const transfer = {
+      command: 'CREATE_CASH_TRANSFER' as const,
+      transferId: '44444444-4444-4444-8444-444444444444',
+      sourceAccountId: baseEnvelope.accountId,
+      targetAccountId: '55555555-5555-4555-8555-555555555555',
+      expectedSourceLedgerRevision: '1',
+      expectedTargetLedgerRevision: '2',
+      occurredAt: baseEnvelope.occurredAt,
+      timePrecision: baseEnvelope.timePrecision,
+      sourceTimezone: baseEnvelope.sourceTimezone,
+      economicOrderKey: baseEnvelope.economicOrderKey,
+      amount: '500.00',
+      currency: 'CNY',
+      source: baseEnvelope.source,
+      actorId: baseEnvelope.actorId,
+    };
+    expect(createCashTransferCommandSchemaV2.parse(transfer).amount).toBe('500.00');
+    expect(() =>
+      createCashTransferCommandSchemaV2.parse({
+        ...transfer,
+        targetAccountId: transfer.sourceAccountId,
+      }),
+    ).toThrow('源账户');
+    expect(() => createCashTransferCommandSchemaV2.parse({ ...transfer, amount: '0' })).toThrow();
+  });
+
+  it('将历史迁移划转兼容契约与新的划转载荷契约隔离', () => {
+    const legacyPayload = {
+      direction: 'INFLOW' as const,
+      category: 'TRANSFER' as const,
+      amount: '500.00',
+      currency: 'CNY' as const,
+    };
+
+    expect(() => cashFlowPayloadSchemaV2.parse(legacyPayload)).toThrow('transfer');
+    expect(legacyMigratedCashTransferPayloadSchemaV2.parse(legacyPayload)).toEqual(legacyPayload);
+    expect(
+      legacyMigratedCashTransferEventSchemaV2.parse({
+        ...baseEnvelope,
+        actorId: 'migration:legacy-ledger-v2',
+        type: 'CASH_FLOW',
+        revisionAction: 'CREATE',
+        payload: legacyPayload,
+      }).payload,
+    ).toEqual(legacyPayload);
   });
 });
 

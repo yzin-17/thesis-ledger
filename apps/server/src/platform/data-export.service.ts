@@ -21,7 +21,10 @@ export class DataExportService {
       ? events.length === 0
         ? []
         : await this.prisma.notificationDelivery.findMany({
-            where: { eventId: { in: events.map((event) => event.id) } },
+            where: {
+              subjectType: 'risk-event',
+              subjectId: { in: events.map((event) => event.id) },
+            },
           })
       : await this.prisma.notificationDelivery.findMany();
 

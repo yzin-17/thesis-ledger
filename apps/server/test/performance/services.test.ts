@@ -40,6 +40,73 @@ const accountA = fixtureUuid('a');
 const accountMain = fixtureUuid('account-a');
 
 describe('Ledger Snapshot 与收益摘要', () => {
+  it('组合快照使用投资账户范围并标记稳定口径', async () => {
+    const positionFindMany = vi.fn(async () => []);
+    const ledgerFindMany = vi.fn(async () => []);
+    const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
+    const prisma = {
+      position: { findMany: positionFindMany },
+      ledgerEvent: { findMany: ledgerFindMany },
+      account: { findMany: vi.fn(async () => []) },
+      portfolioSnapshot: { findMany: vi.fn(async () => []), create },
+    };
+
+    const result = await new PerformanceService(prisma as never, {} as never).capture(
+      undefined,
+      new Date('2026-08-30T01:00:00.000Z'),
+    );
+
+    expect(positionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          account: { mode: 'actual', active: true, type: { in: ['securities', 'fund'] } },
+        },
+      }),
+    );
+    expect(ledgerFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          account: { mode: 'actual', active: true, type: { in: ['securities', 'fund'] } },
+        },
+      }),
+    );
+    expect(result.payload).toMatchObject({ accountScopePolicy: 'investment-only-v1' });
+  });
+
+  it('收益摘要拒绝混合旧账户口径和当前投资范围快照', async () => {
+    const service = new PerformanceService(
+      { account: { findMany: vi.fn(async () => []) } } as never,
+      {} as never,
+    );
+    service.history = vi.fn(async () => [
+      {
+        id: 'legacy',
+        accountId: null,
+        capturedAt: new Date('2026-07-01T00:00:00.000Z'),
+        marketValue: 100,
+        costValue: 100,
+        cashValue: 0,
+        payload: { mode: 'actual' },
+      },
+      {
+        id: 'current',
+        accountId: null,
+        capturedAt: new Date('2026-08-01T00:00:00.000Z'),
+        marketValue: 120,
+        costValue: 100,
+        cashValue: 0,
+        payload: { mode: 'actual', accountScopePolicy: 'investment-only-v1' },
+      },
+    ]) as never;
+
+    await expect(service.summary()).resolves.toMatchObject({
+      ttwror: null,
+      xirr: null,
+      accountScopeCompatibility: 'incompatible',
+      xirrReason: expect.stringContaining('账户口径不一致'),
+    });
+  });
+
   it('快照使用行情估值、Ledger 现金和 dataQuality，而不是成本替代市值', async () => {
     const snapshot = vi.fn(async ({ data }: { data: object }) => data);
     const prisma = {
@@ -256,10 +323,20 @@ describe('Ledger Snapshot 与收益摘要', () => {
       'shadow',
     );
     expect(positionFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { accountId: 'account-1', account: { mode: 'shadow' } } }),
+      expect.objectContaining({
+        where: {
+          accountId: 'account-1',
+          account: expect.objectContaining({ id: 'account-1', mode: 'shadow' }),
+        },
+      }),
     );
     expect(ledgerFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { accountId: 'account-1', account: { mode: 'shadow' } } }),
+      expect.objectContaining({
+        where: {
+          accountId: 'account-1',
+          account: { mode: 'shadow' },
+        },
+      }),
     );
   });
 

@@ -1,22 +1,31 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   confirmBaselineReconciliationCommandSchemaV2,
+  createCashFlowCommandSchemaV2,
+  createCashTransferCommandSchemaV2,
   createBaselineObservationBatchCommandSchemaV2,
   createExecutionCommandSchemaV2,
   createImportDraftRevisionCommandSchemaV2,
   moveExecutionAccountCommandSchemaV2,
   replaceExecutionCommandSchemaV2,
+  replaceCashFlowCommandSchemaV2,
+  replaceCashTransferCommandSchemaV2,
   restoreBaselineReconciliationCommandSchemaV2,
   restoreExecutionCommandSchemaV2,
+  restoreCashFlowCommandSchemaV2,
+  restoreCashTransferCommandSchemaV2,
   reviseImportDraftCommandSchemaV2,
   submitImportDraftRevisionCommandSchemaV2,
   voidBaselineReconciliationCommandSchemaV2,
   voidExecutionCommandSchemaV2,
+  voidCashFlowCommandSchemaV2,
+  voidCashTransferCommandSchemaV2,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { BaselineReconciliationService } from './baseline-reconciliation.service.js';
 import { BaselineImportService } from './baseline-import.service.js';
 import { LedgerCommandService } from './ledger-command.service.js';
+import { CashLedgerCommandService } from './cash-ledger-command.service.js';
 import { LedgerQueryService } from './ledger-query.service.js';
 import { LedgerService } from './ledger.service.js';
 
@@ -33,6 +42,7 @@ export class LedgerController {
   constructor(
     private readonly ledger: LedgerService,
     private readonly commands: LedgerCommandService,
+    private readonly cashCommands: CashLedgerCommandService,
     private readonly imports: BaselineImportService,
     private readonly reconciliation: BaselineReconciliationService,
     private readonly queries: LedgerQueryService,
@@ -66,6 +76,50 @@ export class LedgerController {
   @Post('executions/move-account')
   moveExecutionAccount(@Body() command: unknown) {
     return this.commands.moveExecutionAccount(moveExecutionAccountCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-flows')
+  createCashFlow(@Body() command: unknown) {
+    return this.cashCommands.createCashFlow(createCashFlowCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-flows/replace')
+  replaceCashFlow(@Body() command: unknown) {
+    return this.cashCommands.replaceCashFlow(replaceCashFlowCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-flows/void')
+  voidCashFlow(@Body() command: unknown) {
+    return this.cashCommands.voidCashFlow(voidCashFlowCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-flows/restore')
+  restoreCashFlow(@Body() command: unknown) {
+    return this.cashCommands.restoreCashFlow(restoreCashFlowCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-transfers')
+  createCashTransfer(@Body() command: unknown) {
+    return this.cashCommands.createCashTransfer(createCashTransferCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-transfers/replace')
+  replaceCashTransfer(@Body() command: unknown) {
+    return this.cashCommands.replaceCashTransfer(
+      replaceCashTransferCommandSchemaV2.parse(command),
+    );
+  }
+
+  @Post('cash-transfers/void')
+  voidCashTransfer(@Body() command: unknown) {
+    return this.cashCommands.voidCashTransfer(voidCashTransferCommandSchemaV2.parse(command));
+  }
+
+  @Post('cash-transfers/restore')
+  restoreCashTransfer(@Body() command: unknown) {
+    return this.cashCommands.restoreCashTransfer(
+      restoreCashTransferCommandSchemaV2.parse(command),
+    );
   }
 
   @Post('baseline-observation-batches')

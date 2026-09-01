@@ -7,6 +7,7 @@ import {
   type AutomationJobType,
 } from '@thesis-ledger/schemas';
 import { AutomationScheduler } from '../src/automation/automation.scheduler.js';
+import { AutomationRuntimeHandlers } from '../src/automation/automation-runtime.service.js';
 import {
   AutomationService,
   nextCronOccurrence,
@@ -51,6 +52,7 @@ describe('Automation job types', () => {
       'snapshot',
       'backup',
       'provider-health',
+      'cash-deposit-materialization',
     ]);
     expect(isMarketAutomationJobType('market-sync')).toBe(true);
     expect(isMarketAutomationJobType('risk-evaluation')).toBe(true);
@@ -58,6 +60,27 @@ describe('Automation job types', () => {
     expect(isMarketAutomationJobType('snapshot')).toBe(true);
     expect(isMarketAutomationJobType('backup')).toBe(false);
     expect(isMarketAutomationJobType('provider-health')).toBe(false);
+    expect(isMarketAutomationJobType('cash-deposit-materialization')).toBe(false);
+  });
+});
+
+describe('Automation runtime handlers', () => {
+  it('定期现金入账 handler 使用调度时刻补齐到期实例', async () => {
+    const materializeDue = vi.fn(async () => ({ planCount: 1, results: [] }));
+    const handlers = new AutomationRuntimeHandlers(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { materializeDue } as never,
+    );
+    const scheduledAt = new Date('2026-08-31T01:00:00.000Z');
+
+    await expect(
+      handlers.for('cash-deposit-materialization').run(new AbortController().signal, scheduledAt),
+    ).resolves.toEqual({ planCount: 1, results: [] });
+    expect(materializeDue).toHaveBeenCalledWith(scheduledAt);
   });
 });
 
@@ -117,8 +140,8 @@ const redisFixture = () => {
 };
 
 describe('AutomationService scheduled execution', () => {
-  it('Redis claim 保证同一 job 并发只执行一次并维护运行时间', async () => {
-    const stored = job();
+  it('Redis claim 保证现金补期 job 并发只执行一次并维护运行时间', async () => {
+    const stored = job('cash-deposit-materialization');
     const prisma = {
       automationJob: {
         findUniqueOrThrow: vi.fn(async () => stored),
@@ -132,7 +155,7 @@ describe('AutomationService scheduled execution', () => {
     const redis = redisFixture();
     let release: ((value: unknown) => void) | undefined;
     const handler: AutomationHandler = {
-      type: 'provider-health',
+      type: 'cash-deposit-materialization',
       run: vi.fn(
         async () =>
           new Promise((resolve) => {

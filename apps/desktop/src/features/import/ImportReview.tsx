@@ -290,12 +290,12 @@ function ImportPositionPage({
         </Button>
         <Button
           type="button"
-          disabled={selectedAccount?.type === 'cash'}
+          disabled
           variant={screenshotSheetOpen ? 'default' : 'outline'}
           className={cn(!screenshotSheetOpen && 'secondary')}
           onClick={onOpenScreenshot}
         >
-          截图导入
+          截图导入（暂未开放）
         </Button>
       </nav>
       <PortfolioManagement

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { assertAllowedFeishuWebhookUrl } from '../notifications/feishu-webhook-security.js';
+import { assertAllowedFeishuWebhookUrl } from './feishu-webhook-security.js';
 import {
   encryptProviderCredential,
   normalizeProviderCredential,

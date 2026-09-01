@@ -9,7 +9,7 @@ import {
   authorizedBearer,
   resolveServerNetworkSecurity,
 } from '../src/platform/network-security.js';
-import { assertAllowedFeishuWebhookUrl } from '../src/notifications/feishu-webhook-security.js';
+import { assertAllowedFeishuWebhookUrl } from '../src/providers/feishu-webhook-security.js';
 import { ProviderConfigService } from '../src/providers/provider-config.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { ImportRollbackService } from '../src/imports/import-rollback.service.js';

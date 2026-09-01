@@ -19,7 +19,7 @@
 - `PortfolioMode`：`actual | shadow`。
 - `SnapshotSource`：`DAILY_CLOSE | TRANSACTION | IMPORT | MANUAL | SYSTEM`；`SYNC` 仅为后续扩展。
 - `SnapshotStatus`：MVP 为 `VALID | INVALID`。
-- `SnapshotPayloadV2`：顶层摘要、`accounts[]`、`positions[]`、`nativeByCurrency[]`、`dataQuality`、`projection` 和可选 `fx`。
+- `SnapshotPayloadV2`：`accountScopePolicy`、顶层摘要、`accounts[]`、`positions[]`、`nativeByCurrency[]`、`dataQuality`、`projection` 和可选 `fx`；组合口径固定为 `investment-only-v1`。
 - `SnapshotService.create/list/get/invalidate`：唯一创建和状态管理入口。
 - `SnapshotTrigger`：事务后 `TRANSACTION/IMPORT` 请求，使用唯一 `idempotencyKey` 和 `PENDING/RUNNING/SUCCEEDED/FAILED` 状态。
 - 公开手动创建不接受 `source`、`idempotencyKey` 或历史 `snapshotAt`；Server 填充 `MANUAL`、当前时间和随机幂等键。
