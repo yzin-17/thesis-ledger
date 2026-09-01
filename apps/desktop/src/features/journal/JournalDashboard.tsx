@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DateInput } from '@/components/ui/date-input';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -899,7 +900,7 @@ export function JournalDashboard({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     开始时间
-                    <Input
+                    <DateInput
                       type="datetime-local"
                       value={toLocalDateTime(periodWindow.start)}
                       onChange={(event) => {
@@ -914,7 +915,7 @@ export function JournalDashboard({
                   </label>
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     结束时间
-                    <Input
+                    <DateInput
                       type="datetime-local"
                       value={toLocalDateTime(periodWindow.end)}
                       onChange={(event) => {

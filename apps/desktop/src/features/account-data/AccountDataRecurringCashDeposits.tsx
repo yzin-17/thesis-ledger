@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DateInput } from '@/components/ui/date-input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -607,7 +608,7 @@ function OccurrenceActionSheet({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="cash-occurrence-date">实际到账时间</FieldLabel>
-                    <Input
+                    <DateInput
                       id="cash-occurrence-date"
                       type="datetime-local"
                       value={occurredAt}

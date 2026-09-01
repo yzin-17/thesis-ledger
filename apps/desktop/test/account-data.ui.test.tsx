@@ -196,7 +196,8 @@ describe('账户数据页面契约', () => {
   });
 
   it('成交表单表达成交字段、未验证规则和稳定写入语义', () => {
-    const markup = renderPage('?entry=execution');
+    const fullAccountName = '这是一个需要完整显示的长账户名称';
+    const markup = renderPage('?entry=execution', [{ ...account, name: fullAccountName }]);
     const accountDataSource = [
       'AccountDataPage.tsx',
       'AccountDataExecutionSheet.tsx',
@@ -211,14 +212,31 @@ describe('账户数据页面契约', () => {
       new URL('../src/features/account-data/AccountDataExecutionSheet.tsx', import.meta.url),
       'utf8',
     );
+    const dateInputSource = readFileSync(
+      new URL('../src/components/ui/date-input.tsx', import.meta.url),
+      'utf8',
+    );
 
     expect(markup).toContain('录入成交');
+    expect(markup).toContain(fullAccountName);
+    expect(markup).not.toContain('实际成交');
     expect(accountDataSource).toContain('数量');
     expect(accountDataSource).toContain('价格');
     expect(accountDataSource).toContain('成交币种');
     expect(accountDataSource).toContain('成交时间');
     expect(accountDataSource).toContain('时间精度');
     expect(accountDataSource).toContain('结算时间（可选）');
+    expect(dateInputSource).toContain('showPicker');
+    expect(dateInputSource).toContain('YYYY-MM-DD');
+    expect(dateInputSource).toContain('YYYY-MM-DD HH:mm');
+    expect(dateInputSource).toContain('onPointerDown={openDatePicker}');
+    expect(dateInputSource).toContain('ref={setInputRef}');
+    expect(dateInputSource).toContain('CalendarIcon');
+    expect(dateInputSource).toContain('opacity-0');
+    expect(dateInputSource).toContain('::-webkit-datetime-edit');
+    expect(dateInputSource).toContain('pickerSupported === false');
+    expect(executionSource.match(/<DateInput/g)).toHaveLength(2);
+    expect(executionSource).not.toContain('DatePickerInput');
     expect(accountDataSource).toContain('费用明细');
     expect(accountDataSource).toContain('交易规则未验证');
     expect(accountDataSource).toContain('重复重放不会重复写入');
@@ -229,6 +247,14 @@ describe('账户数据页面契约', () => {
     expect(accountDataSource).toContain('作废');
     expect(executionSource).not.toContain('<div className="grid');
     expect(executionSource).toContain('<FieldGroup className="grid');
+    expect(executionSource).toContain('whitespace-normal break-words');
+    expect(executionSource).not.toContain('truncate">{account.name}</span>');
+    expect(executionSource).not.toContain('实际成交');
+    expect(executionSource).toContain('{accountSummary}');
+    expect(executionSource).toContain('accountTypeLabel(account.type)');
+    expect(executionSource).toContain('证券账户');
+    expect(executionSource).toContain('基金账户');
+    expect(executionSource).toContain('现金账户');
     expect(executionSource).not.toContain('border-t');
     expect(executionSource).toContain('<Separator />');
   });

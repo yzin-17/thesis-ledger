@@ -2,6 +2,7 @@ import { SearchIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DateInput } from '@/components/ui/date-input';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -155,7 +156,7 @@ export function ReviewCandidateList({
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                 开始日期
-                <Input
+                <DateInput
                   type="date"
                   value={startDate}
                   onChange={(event) => onStartDateChange?.(event.target.value)}
@@ -164,7 +165,7 @@ export function ReviewCandidateList({
               </label>
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                 结束日期
-                <Input
+                <DateInput
                   type="date"
                   value={endDate}
                   onChange={(event) => onEndDateChange?.(event.target.value)}

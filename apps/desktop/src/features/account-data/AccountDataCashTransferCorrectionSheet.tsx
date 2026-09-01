@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -114,7 +115,7 @@ export function CashTransferCorrectionSheet({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="cash-transfer-correction-date">更正时间</FieldLabel>
-                    <Input
+                    <DateInput
                       id="cash-transfer-correction-date"
                       type="datetime-local"
                       value={occurredAt}

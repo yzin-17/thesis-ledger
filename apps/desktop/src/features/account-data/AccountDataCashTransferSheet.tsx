@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftRightIcon, Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -177,7 +178,7 @@ export function CashTransferSheet({
               </Field>
               <Field>
                 <FieldLabel htmlFor="cash-transfer-occurred-at">划转时间</FieldLabel>
-                <Input
+                <DateInput
                   id="cash-transfer-occurred-at"
                   type="datetime-local"
                   value={occurredAt}

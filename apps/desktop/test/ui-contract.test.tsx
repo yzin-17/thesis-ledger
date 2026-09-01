@@ -18,6 +18,7 @@ import {
 import { PortfolioManagement } from '../src/features/portfolio/PortfolioManagement.js';
 import { InstrumentCombobox } from '../src/features/portfolio/InstrumentCombobox.js';
 import { DataStateBanner } from '../src/features/shared/DesktopPrimitives.js';
+import { DateInput } from '../src/components/ui/date-input.js';
 import { Switch, SwitchThumb } from '../src/components/ui/switch.js';
 import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
 
@@ -200,6 +201,49 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
 });
 
 describe('Desktop UI contract - providers and primitives', () => {
+  it('shared date input normalizes display text and preserves native input props', () => {
+    const dateMarkup = renderToStaticMarkup(
+      <DateInput
+        type="date"
+        name="review-start"
+        value="2026-09-02"
+        min="2026-01-01"
+        max="2026-12-31"
+        required
+        onChange={vi.fn()}
+      />,
+    );
+    const dateTimeMarkup = renderToStaticMarkup(
+      <DateInput
+        type="datetime-local"
+        name="review-at"
+        value="2026-09-02T03:04:56"
+        step="60"
+        aria-invalid
+        onChange={vi.fn()}
+      />,
+    );
+    const emptyDateTimeMarkup = renderToStaticMarkup(
+      <DateInput type="datetime-local" value="" onChange={vi.fn()} />,
+    );
+
+    expect(dateMarkup).toContain('>2026-09-02</span>');
+    expect(dateMarkup).toContain('type="date"');
+    expect(dateMarkup).toContain('name="review-start"');
+    expect(dateMarkup).toContain('min="2026-01-01"');
+    expect(dateMarkup).toContain('max="2026-12-31"');
+    expect(dateMarkup).toContain('required');
+    expect(dateMarkup).toContain('opacity-0');
+    expect(dateMarkup).toContain('::-webkit-datetime-edit');
+    expect(dateMarkup).toContain('<svg');
+    expect(dateTimeMarkup).toContain('>2026-09-02 03:04</span>');
+    expect(dateTimeMarkup).toContain('type="datetime-local"');
+    expect(dateTimeMarkup).toContain('name="review-at"');
+    expect(dateTimeMarkup).toContain('step="60"');
+    expect(dateTimeMarkup).toContain('aria-invalid="true"');
+    expect(emptyDateTimeMarkup).toContain('>YYYY-MM-DD HH:mm</span>');
+  });
+
   it('风险 Switch 使用圆形滑块并收窄内外间隙', () => {
     const markup = renderToStaticMarkup(
       <Switch variant="risk" checked>
@@ -238,6 +282,25 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(initial).toContain('搜索代码或名称');
     expect(initial).toContain('aria-busy="false"');
 
+    const idleOpen = renderToStaticMarkup(
+      <InstrumentCombobox
+        manualEntry={false}
+        open
+        query=""
+        results={[]}
+        searchState="idle"
+        selectedInstrument={null}
+        busy={false}
+        onClearSelection={vi.fn()}
+        onManualEntry={vi.fn()}
+        onOpenChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        onSelect={vi.fn()}
+        onStartSearch={vi.fn()}
+      />,
+    );
+    expect(idleOpen).not.toContain('标的搜索结果');
+
     const selected = renderToStaticMarkup(
       <InstrumentCombobox
         manualEntry={false}
@@ -266,6 +329,10 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(selected).toContain('沪深300ETF');
     expect(selected).toContain('510300.SH');
     expect(selected).toContain('ETF · 上海证券交易所');
+    expect(selected).toContain('更换标的');
+    expect(selected).not.toContain('当前为');
+    expect(selected).toContain('border-border');
+    expect(selected).not.toContain('border-brand-soft-border');
   });
 
   it('renders import review directly with its router context', () => {

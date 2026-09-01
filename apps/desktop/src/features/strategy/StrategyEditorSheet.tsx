@@ -4,6 +4,7 @@ import { debounce } from 'es-toolkit';
 import { CheckIcon, ChevronDownIcon, LoaderCircle, Plus, SearchIcon, Trash2 } from 'lucide-react';
 import { strategySchemaV1 } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
@@ -681,7 +682,7 @@ export function StrategyEditorSheet({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="strategy-as-of">数据时点</FieldLabel>
-                  <Input
+                  <DateInput
                     id="strategy-as-of"
                     type="datetime-local"
                     value={toDateTimeLocal(universe.asOf)}

@@ -2,8 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { LedgerCommandResponseV2 } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -53,6 +53,12 @@ import type {
   TimePrecision,
 } from './account-data.types.js';
 
+const accountTypeLabel = (type: Account['type']) => {
+  if (type === 'fund') return '基金账户';
+  if (type === 'cash') return '现金账户';
+  return '证券账户';
+};
+
 export function ExecutionFormSheet({
   account,
   open,
@@ -92,6 +98,14 @@ export function ExecutionFormSheet({
     instrumentQuery,
     toastManager,
   });
+  const accountSummary = [
+    account.name,
+    account.institution && account.institution !== account.name ? account.institution : null,
+    account.currency,
+    accountTypeLabel(account.type),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const submitting = createMutation.isPending || replaceMutation.isPending;
 
   useEffect(() => {
@@ -282,17 +296,10 @@ export function ExecutionFormSheet({
               <FieldLabel htmlFor="execution-account">账户</FieldLabel>
               <div
                 id="execution-account"
-                className="flex min-h-9 items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 text-sm"
+                className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm"
               >
-                <span className="truncate">{account.name}</span>
-                <Badge variant="outline">
-                  {account.mode === 'shadow' ? '模拟成交' : '实际成交'}
-                </Badge>
+                <span className="whitespace-normal break-words">{accountSummary}</span>
               </div>
-              <FieldDescription>
-                {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                {account.type === 'fund' ? '基金账户' : '证券账户'}
-              </FieldDescription>
             </Field>
             <Field>
               <FieldLabel>标的</FieldLabel>
@@ -399,7 +406,7 @@ export function ExecutionFormSheet({
             <FieldGroup className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.7fr)]">
               <Field>
                 <FieldLabel htmlFor="execution-occurred-at">成交时间</FieldLabel>
-                <Input
+                <DateInput
                   id="execution-occurred-at"
                   type={draft.timePrecision === 'DATE' ? 'date' : 'datetime-local'}
                   value={draft.occurredAt}
@@ -435,7 +442,7 @@ export function ExecutionFormSheet({
             </FieldGroup>
             <Field>
               <FieldLabel htmlFor="execution-settled-at">结算时间（可选）</FieldLabel>
-              <Input
+              <DateInput
                 id="execution-settled-at"
                 type="datetime-local"
                 value={draft.settledAt}

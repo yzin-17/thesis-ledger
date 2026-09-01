@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EmptyListState, EmptyTableRow } from '../shared/EmptyStates.js';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -431,7 +432,7 @@ export function BacktestSetupDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field invalid={Boolean(error && error.includes('日期'))}>
               <FieldLabel htmlFor="backtest-start">开始日期</FieldLabel>
-              <Input
+              <DateInput
                 id="backtest-start"
                 type="date"
                 value={period.start}
@@ -442,7 +443,7 @@ export function BacktestSetupDialog({
             </Field>
             <Field invalid={Boolean(error && error.includes('日期'))}>
               <FieldLabel htmlFor="backtest-end">结束日期</FieldLabel>
-              <Input
+              <DateInput
                 id="backtest-end"
                 type="date"
                 value={period.end}

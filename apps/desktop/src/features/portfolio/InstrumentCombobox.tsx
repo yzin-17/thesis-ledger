@@ -40,6 +40,8 @@ export function InstrumentCombobox({
   onStartSearch: () => void;
 }) {
   const isLoading = busy;
+  const showPopup =
+    open && (Boolean(query.trim()) || isLoading || searchState !== 'idle' || results.length > 0);
   let searchStatus = '';
   if (isLoading) searchStatus = '正在搜索...';
   else if (searchState === 'error') searchStatus = '搜索暂时不可用，请稍后重试。';
@@ -69,12 +71,7 @@ export function InstrumentCombobox({
   if (selectedInstrument) {
     return (
       <div className="grid gap-2">
-        <button
-          type="button"
-          className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-brand-soft-border bg-brand-soft px-3 py-2.5 text-left transition-colors hover:bg-brand-soft/80"
-          aria-label={`更换标的，当前为${selectedInstrument.displayName}`}
-          onClick={onClearSelection}
-        >
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-left">
           <span className="min-w-0">
             <strong className="block truncate text-sm font-medium text-foreground">
               {selectedInstrument.displayName}
@@ -84,10 +81,21 @@ export function InstrumentCombobox({
               {instrumentMarketLabel(selectedInstrument.market)}
             </span>
           </span>
-          <code className="self-start pt-0.5 font-mono text-xs text-muted-foreground">
-            {selectedInstrument.symbol}
-          </code>
-        </button>
+          <div className="flex items-start gap-2">
+            <code className="self-start pt-0.5 font-mono text-xs text-muted-foreground">
+              {selectedInstrument.symbol}
+            </code>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              aria-label="更换标的"
+              onClick={onClearSelection}
+            >
+              更换
+            </Button>
+          </div>
+        </div>
         <input type="hidden" name="symbol" value={selectedInstrument.symbol} />
       </div>
     );
@@ -153,55 +161,62 @@ export function InstrumentCombobox({
           </InputGroupAddon>
         )}
       </InputGroup>
-      <Combobox.Portal>
-        <Combobox.Positioner className="layer-popover" side="bottom" align="start" sideOffset={4}>
-          <Combobox.Popup
-            aria-label="标的搜索结果"
-            className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+      {showPopup && (
+        <Combobox.Portal>
+          <Combobox.Positioner
+            className="layer-popover"
+            side="bottom"
+            align="start"
+            sideOffset={4}
           >
-            <Combobox.List className="max-h-72 overflow-auto p-1">
-              <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
-                {searchStatus}
-              </Combobox.Status>
-              {!isLoading &&
-                searchState === 'results' &&
-                results.map((instrument, index) => (
-                  <Combobox.Item
-                    key={instrument.id}
-                    value={instrument}
-                    index={index}
-                    className="flex w-full cursor-default items-start gap-3 rounded-sm px-3 py-2 text-left outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <code className="block font-mono text-xs text-muted-foreground">
-                        {instrument.symbol}
-                      </code>
-                      <strong className="mt-0.5 block truncate text-sm font-medium">
-                        {instrument.displayName}
-                      </strong>
-                      <small className="mt-0.5 block text-xs text-muted-foreground">
-                        {instrumentTypeLabel(instrument.instrumentType)} ·{' '}
-                        {instrumentMarketLabel(instrument.market)}
-                      </small>
-                    </span>
-                  </Combobox.Item>
-                ))}
-              <Combobox.Empty className="px-3 py-2">
-                {searchState === 'empty' && (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate text-sm text-muted-foreground">
-                      未找到“{query}”
-                    </span>
-                    <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
-                      手动录入标的
-                    </Button>
-                  </div>
-                )}
-              </Combobox.Empty>
-            </Combobox.List>
-          </Combobox.Popup>
-        </Combobox.Positioner>
-      </Combobox.Portal>
+            <Combobox.Popup
+              aria-label="标的搜索结果"
+              className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+            >
+              <Combobox.List className="max-h-72 overflow-auto p-1">
+                <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
+                  {searchStatus}
+                </Combobox.Status>
+                {!isLoading &&
+                  searchState === 'results' &&
+                  results.map((instrument, index) => (
+                    <Combobox.Item
+                      key={instrument.id}
+                      value={instrument}
+                      index={index}
+                      className="flex w-full cursor-default items-start gap-3 rounded-sm px-3 py-2 text-left outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <code className="block font-mono text-xs text-muted-foreground">
+                          {instrument.symbol}
+                        </code>
+                        <strong className="mt-0.5 block truncate text-sm font-medium">
+                          {instrument.displayName}
+                        </strong>
+                        <small className="mt-0.5 block text-xs text-muted-foreground">
+                          {instrumentTypeLabel(instrument.instrumentType)} ·{' '}
+                          {instrumentMarketLabel(instrument.market)}
+                        </small>
+                      </span>
+                    </Combobox.Item>
+                  ))}
+                <Combobox.Empty className="px-3 py-2">
+                  {searchState === 'empty' && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm text-muted-foreground">
+                        未找到“{query}”
+                      </span>
+                      <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
+                        手动录入标的
+                      </Button>
+                    </div>
+                  )}
+                </Combobox.Empty>
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Positioner>
+        </Combobox.Portal>
+      )}
     </Combobox.Root>
   );
 }

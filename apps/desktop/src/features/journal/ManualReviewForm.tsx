@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -143,7 +144,7 @@ export function ManualReviewForm({
             </Field>
             <Field invalid={Boolean(errors.entryAt)}>
               <FieldLabel htmlFor="manual-review-entry-at">入场时间</FieldLabel>
-              <Input
+              <DateInput
                 id="manual-review-entry-at"
                 type="datetime-local"
                 value={draft.entryAt}
@@ -154,7 +155,7 @@ export function ManualReviewForm({
             </Field>
             <Field invalid={Boolean(errors.exitAt)}>
               <FieldLabel htmlFor="manual-review-exit-at">退出时间</FieldLabel>
-              <Input
+              <DateInput
                 id="manual-review-exit-at"
                 type="datetime-local"
                 value={draft.exitAt}
