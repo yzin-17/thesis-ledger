@@ -1,23 +1,52 @@
-# 策略与回测
+# 策略与回测领域边界
 
-## 统一契约
+## 当前事实
 
-策略以 `Strategy` 和不可变的 `StrategyVersion` 保存。每次修改都创建新版本，回测任务只引用版本 ID；因此历史结果不会被后续编辑覆盖。`strategySchemaV1` 包含固定 universe、有效期、入场/出场信号、止损止盈、仓位、成交与成本、风险约束和基准。组合条件使用 `all`、`any`、`not` 表达，不绑定某个 Python 函数名。
+策略使用 `Strategy` 和不可变的 `StrategyVersion` 保存；修改策略创建新版本，历史回测结果继续引用原版本，不被后续编辑覆盖。当前已落地的回测能力仍以 V1 策略 Schema、进程内引擎和既有 Strategy Lab 为主；统一回测 V2 已完成 Spec/Task 评审，但仍处于实施阶段，不能把 V2 目标描述成已经上线的能力。
 
-回测任务的状态为 `queued`、`running`、`succeeded`、`failed` 或 `cancelled`，并记录进度、时间、引擎版本和结果 checksum。Worker 只依赖 `BacktestWorker` 的 `run/cancel/status/result` 边界，内置实现的引擎标识为 `thesis-ledger-engine-v1`。
+当前 V1 回测主要覆盖 A 股日线执行语义，包括 T+1、涨跌停、停牌、最小交易单位、手续费、印花税、滑点、公司行动、PIT、数据完整度、基准和样本切分。当前实现仍有 `number` 数值、任务直接携带 bars、CN-only 日历等历史边界，后续由 V2 逐步替换。
 
-## A 股交易规则
+## 真实账户域与回测模拟域
 
-本地执行模型在生成成交前依次检查停牌、T+1、涨跌停和最小交易单位，再计算滑点、佣金和卖出印花税。每笔成交保留费用拆分；被拒订单保留日期、数量和原因。策略可以配置单标的仓位上限和现金下限。
+真实账户和回测必须保持两个事实域：
 
-公司行动通过行情 Bar 的 `dividend` 与 `splitFactor` 表示：分红进入现金，拆分调整数量和单位成本，避免把价格调整重复计入收益。生产接入时应把这些事实同步到 Ledger 的公司行动事件。
+```text
+真实账户域
+专用成交命令 → LedgerEventV2 → Position / Trade / Cash Projection → Portfolio / Journal
 
-## 偏差防护与数据完整度
+回测模拟域
+DSA → DataSnapshot → Simulation Event Engine → SimulationLedger → BacktestResult
+```
 
-只使用 `availableAt <= dataAsOf` 的数据。回测开始前检查 universe 标的和区间日期；缺失内容在结果 `completeness` 和 `warnings` 中明确列出，不会静默缩小 universe。缺少退市或历史成分覆盖时，结果固定标记 `survivorship_coverage_unknown`。
+回测成交不得写入真实 `LedgerEventV2`，不得使用 `actual/shadow` 账户承载模拟，不得改变账户 `Ledger Revision` / `Projection Generation`，也不得把回测结果写入真实 Portfolio Trade、Journal Candidate 或 AI Review。
 
-结果同时保存交易级指标、period-based analytics、样本内/样本外指标和基准超额收益。`metadata` 保存策略版本、schema 版本、数据版本、provider、引擎版本、参数和成本模型，`resultChecksum` 用于固定输入重跑比较。
+两个事实域只共享稳定基础契约和纯计算规则，例如：
 
-## 验证边界
+- `Asset.symbol`；
+- Decimal / Money；
+- `TradingCalendar` interface；
+- Instrument Facts、FX fact contract；
+- 时间可用性、聚合和不依赖账户持久化的纯计算规则。
 
-领域回归覆盖 T+1、涨跌停、停牌、交易单位、成本拆分、公司行动、PIT、universe 完整度、风险约束、基准、样本切分和 period analytics。桌面端可创建策略、创建版本、排队、运行、取消并查询任务；真实行情数据和人工浏览器验收仍需在接入运行环境后执行。
+不要为了复用而让 Simulation Event 伪装成 LedgerEvent，也不要提前建设只有单一消费者的通用 MarketRuleSet/Trade Projection Adapter。
+
+## 统一回测 V2 目标
+
+当前 V2 规格的目标范围为：
+
+- 中国内地、香港、美国 Stock / ETF；中国内地 NAV Fund；
+- 场内 `1d/60m/30m/15m/5m/1m`，CN NAV Fund 日频；
+- Typed AST、Series/Indicator、统一 `occurredAt/availableAt` 和未来函数防护；
+- `Signal → TargetIntent → Order → Fill → Position` 的确定性模拟链；
+- 场内 Market + DAY 全成或拒绝，场外 NAV Fund 独立申购/赎回确认与结算模拟；
+- Server 创建独占 DataSnapshot，并使用本地 Artifact 保存冻结输入；
+- 分币种封闭现金、原币持仓和只读 FX 估值；
+- 输出独立 `BacktestResult` / `BacktestTrade`，支持可复现重放。
+
+V2 不支持 Limit Order、Partial Fill、GTC、做空、融资、衍生品、组合优化、复杂 FX routing、Parameter Sweep 或通用 Trade Projection Adapter。完整当前范围以 [`../specs/2026-08-28-unified-backtest-v2.md`](../specs/2026-08-28-unified-backtest-v2.md) 为准。
+
+## 数据完整度与可复现性
+
+任何回测都必须明确数据来源、数据时点、完整度和限制。决策时只使用当时已经可用的数据；缺失历史成分、公司行动、分钟数据或 Provider 能力时必须保留 warning/unavailable，不得静默缩小 universe 或用当前数据补历史事实。
+
+可复现结果至少固定 StrategyVersion、RunConfig、DataSnapshot、规则/聚合版本、引擎版本和结果 checksum。当前 V1 的历史结果按原契约保留；V2 不通过长期双写或隐式 V1→V2 转换制造第二套兼容真源。
