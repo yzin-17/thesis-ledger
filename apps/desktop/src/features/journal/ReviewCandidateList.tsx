@@ -138,7 +138,7 @@ export function ReviewCandidateList({
             </div>
             <Badge variant="outline">{candidates.length} 笔</Badge>
           </div>
-          <label className="relative block">
+          <div className="relative block">
             <span className="sr-only">按标的筛选</span>
             <SearchIcon
               aria-hidden="true"
@@ -151,27 +151,27 @@ export function ReviewCandidateList({
               placeholder="搜索标的代码"
               aria-label="按标的筛选"
             />
-          </label>
+          </div>
           {(onStartDateChange || onEndDateChange) && (
             <div className="grid gap-2 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                开始日期
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span>开始日期</span>
                 <DateInput
                   type="date"
                   value={startDate}
                   onChange={(event) => onStartDateChange?.(event.target.value)}
                   aria-label="按开始日期筛选"
                 />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                结束日期
+              </div>
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span>结束日期</span>
                 <DateInput
                   type="date"
                   value={endDate}
                   onChange={(event) => onEndDateChange?.(event.target.value)}
                   aria-label="按结束日期筛选"
                 />
-              </label>
+              </div>
             </div>
           )}
         </CardHeader>

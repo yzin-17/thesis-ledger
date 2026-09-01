@@ -36,6 +36,7 @@
 | T13/T13-R1/T13-R2/T13-R3 | 已完成（本地环境） | 账户数据三页签、成交主录入、修正链、观察校准、ImportDraft/对账入口、页面信息层级收敛、持仓表操作列固定及两个行级操作直显均已通过桌面测试和本地浏览器非写入检查。 |
 | T14–T15 | 已完成（本地环境） | 投资组合 Trade 只读读模型和 Journal 统一 Trade Projection 已通过代码、测试、本地 Compose 和本地浏览器列表/详情/响应式验收。 |
 | T16–T17 | T16、T17 已完成（本地环境） | 影子差异/切换门禁、迁移手册、全量本地回归和最终一致性 Review 已完成；正式发布环境事项不属于当前任务范围。 |
+| T18：交易规则能力元数据验证 | 未完成 | 当前 Desktop 仅能以 `UNVERIFIED` 状态执行通用数量和价格校验；Provider/DSA 能力元数据的版本、范围和真实运行时证据尚未完成。 |
 
 此前基线结果：server 32 个测试文件/262 个测试、schemas 92 个测试、domain 75 个测试，类型检查、构建、根 lint、32 条迁移矩阵、Compose 配置和 `git diff --check` 均通过。上述历史结果不能替代下列语义阻断项的修复验收。
 
@@ -241,6 +242,12 @@
   - 回归结果：server 38 个测试文件/294 个测试、domain 9 个测试文件/97 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试全部通过；build、typecheck、全仓 ESLint、35 条 migration matrix、受影响文件 Prettier、`git diff --check` 通过。
   - Docker smoke：临时隔离数据库验证 17 条事件迁移前后数量一致、2 条 Position、7 条 Cash Flow、`cashBaselineBatchRefs=0`、`legacyLedgerColumnsRemaining=0`，非法费用和未知类型 fixture 均在迁移前阻断并回滚。
 
+- [ ] **T18：完成交易规则能力元数据验证与运行时验收**
+  - 涉及范围：交易规则能力元数据来源、Provider/DSA capability Contract、成交表单的 `capabilityVerification` 状态和降级校验提示。
+  - 完成条件：能力元数据能由受支持的运行时来源明确返回并完成版本/范围校验；成交表单能区分已验证与未验证状态；已验证状态下使用对应规则校验，未验证状态继续明确提示并禁止误称为已完成；不改变 LedgerEvent、成交幂等或实际/模拟账户隔离语义。
+  - 验证方式：补充 capability manifest/Contract 测试、Provider/DSA 运行时 smoke、成交表单状态测试，并核对真实规则校验结果、失败降级和来源版本；分别记录确定性检查与真实运行时证据。
+  - 当前状态：未完成。当前 Desktop 仅以 `UNVERIFIED` 默认状态展示“交易规则未验证”，并执行通用的高精度数量和价格校验；尚未形成已验证能力元数据的 Provider/DSA 运行时证据，因此不得将该项任务勾选完成。
+
 ## 完成规则
 
 - 任务只有在实现、对应测试和必要运行时验收均通过后才能勾选。
@@ -259,8 +266,8 @@
 
 ### Review 结论
 
-- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T13-R1、T13-R2、T13-R3、T14、T15、T16、T17 与 T17-R1 已完成并通过代码、测试和本地运行态验证。当前 Spec 范围内的本地任务已收尾，正式发布环境明确不在范围内。
+- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T13-R1、T13-R2、T13-R3、T14、T15、T16、T17 与 T17-R1 已完成并通过代码、测试和本地运行态验证。T18 仍未完成，当前本地任务保留交易规则能力元数据的运行时验收缺口；正式发布环境明确不在范围内。
 - 发现的问题：T10 发现的后续 Baseline 绝对成本重复累加已修复为检查点重估；`db:integration` 的两个既有 Position 不一致已通过核心重建修复；R-FX-01 已通过原币分桶和独立 FX Conversion View 修复；旧 `projectCompletedTrades` 路径及重复 fixture 已删除，当前完整性检查为 healthy；R-STD-02 已修复为 TanStack Query mutation，Journal 快照保存成功后会失效候选查询；R-STD-03 已为 PortfolioTradeView 的两个 Select 补齐 SelectGroup；R-STD-04 已将 AccountDataExecutionSheet 的表单网格改为 FieldGroup/Field 组合；R-STD-05 已将底部操作区的 border-t 改为 Separator；R-STD-06/07 与 R-SPEC-01 已在 T17-R1 中修复，R-SPEC-02 已通过回归断言确认是误报，R-SPEC-03 确认为独立既有范围。R-CODE-01 已完成结构评估：`ImportService` 保留为组合 Facade，`PerformanceService` 暂不拆分，触发条件已记录。
-- 遗留风险：当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；本轮 Docker smoke 使用临时隔离数据库，不修改开发持久卷。完整 `pnpm format` 仍报告 2 个本轮未修改的基线文件格式差异（`apps/server/test/ai/research-executor.test.ts`、`docs/reviews/2026-08-26-doc-governance-followup.md`），不将无关文件纳入本轮变更。
+- 遗留风险：T18“交易规则能力元数据验证与运行时验收”仍未完成；当前实现只能以 `UNVERIFIED` 状态执行通用数量和价格校验，不能宣称交易规则能力已验证。除此之外，当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；本轮 Docker smoke 使用临时隔离数据库，不修改开发持久卷。完整 `pnpm format` 仍报告 2 个本轮未修改的基线文件格式差异（`apps/server/test/ai/research-executor.test.ts`、`docs/reviews/2026-08-26-doc-governance-followup.md`），不将无关文件纳入本轮变更。
 - 验证命令与结果：domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/104 个测试、mobile 1 个测试文件/7 个测试通过；server typecheck/build、Prisma schema validate、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、`git diff --check`、固定快照 diff/switch gate 和 Docker 隔离迁移 smoke 均通过；本次 T13-R1/T13-R2/T13-R3 的 Desktop 浏览器布局检查和文件尺寸 ratchet 也已通过。
 - 本轮 Review 回归结果：Server 定向 10 个测试文件/78 个测试、Schema ledger-v2 42 个测试、Desktop 定向 5 个测试文件/34 个测试、Server/Desktop typecheck 与 `scripts/check-boundaries.mjs` 均通过；现金投影的 Schema/Domain 可选字段差异已通过显式 normalize 解决，无双重断言。本轮未执行浏览器、Compose、真实迁移或外部通知运行时验收。`pnpm dlx shadcn@latest docs empty` 因本机 Zod `./v3` 导出解析错误失败，记录为工具限制。

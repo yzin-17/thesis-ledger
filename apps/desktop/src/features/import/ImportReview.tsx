@@ -244,13 +244,13 @@ function ImportPositionPage({
         </Button>
       </div>
       <div className="entry-context">
-        <label>
-          当前账户
+        <div className="grid gap-2 text-xs text-muted-foreground">
+          <span>当前账户</span>
           <Select
             value={accountId || null}
             onValueChange={(value) => value && onSelectAccount(value)}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger aria-label="当前账户" className="w-full">
               <SelectValue placeholder="选择账户">
                 {selectedAccount?.name ?? '选择账户'}
               </SelectValue>
@@ -266,7 +266,7 @@ function ImportPositionPage({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
+        </div>
         <div className="entry-account-meta">
           <span>
             {selectedAccount?.institution || '未填写机构'} · {selectedAccount?.currency} ·{' '}

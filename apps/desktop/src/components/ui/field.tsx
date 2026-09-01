@@ -21,12 +21,44 @@ function Field({ className, invalid, ...props }: FieldPrimitive.Root.Props) {
   );
 }
 
-function FieldLabel({ className, ...props }: FieldPrimitive.Label.Props) {
+type LabelInteractionEvent = Pick<React.SyntheticEvent<HTMLElement>, 'preventDefault' | 'target'>;
+
+function isInteractiveLabelTarget(target: EventTarget | null) {
+  if (!target) return false;
+  const element = target as EventTarget & {
+    closest?: (selectors: string) => Element | null;
+  };
+  return typeof element.closest === 'function' && element.closest('button,input,select,textarea') !== null;
+}
+
+function preventLabelActivation(event: LabelInteractionEvent) {
+  if (!isInteractiveLabelTarget(event.target)) event.preventDefault();
+}
+
+function FieldLabel({
+  className,
+  onClick,
+  onMouseDown,
+  onPointerDown,
+  ...props
+}: FieldPrimitive.Label.Props) {
   return (
     <FieldPrimitive.Label
       data-slot="field-label"
       className={cn('text-sm font-medium text-foreground', className)}
       {...props}
+      onClick={(event) => {
+        preventLabelActivation(event);
+        onClick?.(event);
+      }}
+      onMouseDown={(event) => {
+        preventLabelActivation(event);
+        onMouseDown?.(event);
+      }}
+      onPointerDown={(event) => {
+        preventLabelActivation(event);
+        onPointerDown?.(event);
+      }}
     />
   );
 }

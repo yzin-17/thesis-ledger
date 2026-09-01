@@ -73,9 +73,10 @@ export const ProviderEditorSheet = ({
           className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
           onSubmit={onSave}
         >
-          <label>
-            名称
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>名称</span>
             <Input
+              aria-label="名称"
               value={providerDraft.name}
               onChange={(event) =>
                 onUpdateDraft((current) => ({ ...current, name: event.target.value }))
@@ -84,30 +85,30 @@ export const ProviderEditorSheet = ({
               required
               maxLength={80}
             />
-          </label>
-          <label>
-            类型
+          </div>
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>类型</span>
             <Select
               value={providerDraft.type}
               onValueChange={(value) =>
                 value && onUpdateDraft((current) => ({ ...current, type: value }))
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger aria-label="类型" className="w-full">
                 <SelectValue>{providerTypeLabel(providerDraft.type)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="notification">通知</SelectItem>
                   <SelectItem value="market">行情</SelectItem>
-                  <SelectItem value="ai">AI</SelectItem>
+                  <SelectItem value="ai">人工智能</SelectItem>
                   <SelectItem value="vision">图像</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
-          </label>
-          <label>
-            能力（可多选）
+          </div>
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>能力（可多选）</span>
             <Select
               multiple
               items={providerCapabilityOptions}
@@ -116,7 +117,7 @@ export const ProviderEditorSheet = ({
                 onUpdateDraft((current) => ({ ...current, capabilities: value }))
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger aria-label="能力（可多选）" className="w-full">
                 <SelectValue placeholder="选择能力" />
               </SelectTrigger>
               <SelectContent>
@@ -129,10 +130,11 @@ export const ProviderEditorSheet = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
-          </label>
-          <label>
-            优先级
+          </div>
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>优先级</span>
             <Input
+              aria-label="优先级"
               type="number"
               min={0}
               step={1}
@@ -142,11 +144,12 @@ export const ProviderEditorSheet = ({
               }
               required
             />
-          </label>
+          </div>
           {credentialInputOpen ? (
-            <label>
-              {credentialLabel}
+            <div className="grid gap-1.5 text-xs text-muted-foreground">
+              <span>{credentialLabel}</span>
               <Input
+                aria-label={credentialLabel}
                 type="password"
                 autoComplete="off"
                 value={providerDraft.credentialsRef}
@@ -155,7 +158,7 @@ export const ProviderEditorSheet = ({
                 }
                 placeholder={providerCredentialPlaceholder(credentialLabel)}
               />
-            </label>
+            </div>
           ) : (
             <div className="provider-credential-field">
               <span className="provider-credential-label">凭证</span>

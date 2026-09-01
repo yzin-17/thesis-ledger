@@ -530,9 +530,10 @@ function CashBalanceForm({
     >
       <h3>现金余额</h3>
       <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
-      <label>
-        当前现金余额（CNY）
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>当前现金余额（CNY）</span>
         <Input
+          aria-label="当前现金余额（CNY）"
           name="cashAmount"
           required
           type="number"
@@ -540,7 +541,7 @@ function CashBalanceForm({
           step="0.01"
           defaultValue={cashValue ?? 0}
         />
-      </label>
+      </div>
       <div className="form-actions">
         <Button
           type="submit"
@@ -615,9 +616,10 @@ function PositionForm(props: PortfolioManagementViewProps) {
         setEntrySheetMode={setEntrySheetMode}
       />
       {selectedAccount?.type === 'cash' ? (
-        <label>
-          当前现金余额（CNY）
+        <div className="grid gap-1.5 text-xs text-muted-foreground">
+          <span>当前现金余额（CNY）</span>
           <Input
+            aria-label="当前现金余额（CNY）"
             name="cashAmount"
             required
             type="number"
@@ -625,7 +627,7 @@ function PositionForm(props: PortfolioManagementViewProps) {
             step="0.01"
             defaultValue={cashValue ?? 0}
           />
-        </label>
+        </div>
       ) : (
         <PositionFields
           editing={editing}
@@ -724,8 +726,8 @@ function AccountField({
     );
   }
   return (
-    <label>
-      账户
+    <div className="grid gap-1.5 text-xs text-muted-foreground">
+      <span>账户</span>
       <Select
         name="accountId"
         required
@@ -743,7 +745,7 @@ function AccountField({
           setEntrySheetMode(nextAccount?.type === 'cash' ? 'cash' : 'position');
         }}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger aria-label="账户" className="w-full">
           <SelectValue placeholder="选择账户">{selectedAccount?.name ?? '选择账户'}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -757,6 +759,6 @@ function AccountField({
           </SelectGroup>
         </SelectContent>
       </Select>
-    </label>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { Sheet } from '../src/components/ui/sheet.js';
 import { Toaster } from '../src/components/ui/toast.js';
 import { AccountDataPage } from '../src/features/account-data/AccountDataPage.js';
+import { chargeCategoryLabel } from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
 import { AccountManagementSection } from '../src/features/portfolio/PortfolioManagementSections.js';
 import type { PortfolioManagementViewProps } from '../src/features/portfolio/PortfolioManagementView.types.js';
@@ -155,17 +156,13 @@ describe('账户数据页面契约', () => {
     expect(markup).toContain('成交记录');
     expect(markup).toContain('现金');
     expect(markup).toContain('录入成交');
-    expect(markup).toMatch(
-      /<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/,
-    );
+    expect(markup).toMatch(/<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/);
     expect(markup).toContain('实际证券账户 · 测试机构 · CNY · 实际');
     expect(markup).not.toContain('账本模式');
     expect(markup).not.toContain('data-selected-account-id');
     expect(pageSource).toContain("account.mode === 'shadow' ? '模拟' : '实际'");
     expect(markup).toContain('data-active');
-    expect(pageSource).toMatch(
-      /const selectAccount[\s\S]*?setCashTransferAction\(null\)/,
-    );
+    expect(pageSource).toMatch(/const selectAccount[\s\S]*?setCashTransferAction\(null\)/);
     expect(pageSource).toMatch(/const selectTab[\s\S]*?setCashTransferAction\(null\)/);
   });
 
@@ -239,8 +236,13 @@ describe('账户数据页面契约', () => {
     expect(executionSource).not.toContain('DatePickerInput');
     expect(accountDataSource).toContain('费用明细');
     expect(accountDataSource).toContain('交易规则未验证');
+    expect(executionSource).toContain('<Alert variant="subtle">');
     expect(accountDataSource).toContain('重复重放不会重复写入');
     expect(accountDataSource).toContain('账本版本已变化');
+    expect(executionSource).toContain('if (submitting) return;');
+    expect(executionSource).not.toContain('window.confirm');
+    expect(executionSource).toContain('skipDiscardConfirm: true');
+    expect(accountDataSource).toContain('!options?.skipDiscardConfirm && !confirmDiscard()');
     expect(accountDataSource).toContain('原因必填');
     expect(accountDataSource).toContain('确认对账并写入账本');
     expect(accountDataSource).toContain('恢复');
@@ -255,8 +257,18 @@ describe('账户数据页面契约', () => {
     expect(executionSource).toContain('证券账户');
     expect(executionSource).toContain('基金账户');
     expect(executionSource).toContain('现金账户');
+    expect(executionSource).not.toContain('{category}');
     expect(executionSource).not.toContain('border-t');
     expect(executionSource).toContain('<Separator />');
+  });
+
+  it('费用类别下拉使用中文显示名并保留后端枚举映射', () => {
+    expect(chargeCategoryLabel('COMMISSION')).toBe('佣金');
+    expect(chargeCategoryLabel('TAX')).toBe('税费');
+    expect(chargeCategoryLabel('LEVY')).toBe('征费');
+    expect(chargeCategoryLabel('EXCHANGE')).toBe('交易所费用');
+    expect(chargeCategoryLabel('REGULATORY')).toBe('监管费');
+    expect(chargeCategoryLabel('OTHER')).toBe('其他费用');
   });
 
   it('持仓页签明确是观察检查点，现金页签按币种和结算状态分层', () => {
@@ -268,9 +280,7 @@ describe('账户数据页面契约', () => {
     expect(positionMarkup).toContain('持仓观察');
     expect(positionMarkup).toContain('不产生 BUY / SELL 成交记录');
     expect(positionMarkup).toContain('导入持仓快照');
-    expect(positionMarkup).toMatch(
-      /<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/,
-    );
+    expect(positionMarkup).toMatch(/<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/);
     expect(positionMarkup).toContain('持仓市值');
     expect(positionMarkup).toContain('观察状态');
     expect(positionMarkup).toContain('校准状态');

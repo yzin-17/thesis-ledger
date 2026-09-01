@@ -64,8 +64,9 @@ export function MarketProviderPanel({
                     健康：{providerHealthLabel(provider)}
                   </span>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm">
                   <input
+                    aria-label={`${provider.displayName} 启用`}
                     type="checkbox"
                     checked={provider.enabled}
                     disabled={disabled}
@@ -73,8 +74,8 @@ export function MarketProviderPanel({
                       onProviderChange({ ...provider, enabled: event.target.checked })
                     }
                   />
-                  启用
-                </label>
+                  <span>启用</span>
+                </div>
               </div>
               {provider.requiresCredential && (
                 <Input

@@ -60,12 +60,10 @@ export function InstrumentCatalogPanel({
           </div>
         </div>
         <form className="space-y-3" onSubmit={submit}>
-          <label className="block text-sm font-medium" htmlFor="instrument-search">
-            搜索已同步标的
-          </label>
+          <span className="block text-sm font-medium">搜索已同步标的</span>
           <div className="flex gap-2">
             <Input
-              id="instrument-search"
+              aria-label="搜索已同步标的"
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               placeholder="代码、名称或拼音首字母"

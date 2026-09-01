@@ -32,7 +32,10 @@ import {
   PositionCalibrationSection,
   TransactionSection,
 } from './AccountDataSections.js';
-import { ExecutionFormSheet } from './AccountDataExecutionSheet.js';
+import {
+  ExecutionFormSheet,
+  type ExecutionSheetCloseOptions,
+} from './AccountDataExecutionSheet.js';
 import { AuditSheet, CorrectionReasonSheet } from './AccountDataAuditSheets.js';
 import { ReconciliationSheet } from './AccountDataReconciliationSheet.js';
 import { CashObservationSheet } from './AccountDataCashObservationSheet.js';
@@ -208,12 +211,12 @@ export function AccountDataPage({
     updateLocation({ tab: 'transactions', entry: 'execution' });
   };
 
-  const closeExecution = (open: boolean) => {
+  const closeExecution = (open: boolean, options?: ExecutionSheetCloseOptions) => {
     if (open) {
       setExecutionOpen(true);
       return;
     }
-    if (!confirmDiscard()) return;
+    if (!options?.skipDiscardConfirm && !confirmDiscard()) return;
     setDraftDirty(false);
     setEditingEvent(null);
     setExecutionOpen(false);

@@ -4,6 +4,7 @@ import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
 import type {
+  ChargeCategory,
   Currency,
   ExecutionEvent,
   ExecutionDraft,
@@ -13,6 +14,18 @@ import type {
 } from './account-data.types.js';
 
 export const currencies: Currency[] = ['CNY', 'HKD', 'USD'];
+export const chargeCategoryOptions: Array<{ value: ChargeCategory; label: string }> = [
+  { value: 'COMMISSION', label: '佣金' },
+  { value: 'TAX', label: '税费' },
+  { value: 'LEVY', label: '征费' },
+  { value: 'EXCHANGE', label: '交易所费用' },
+  { value: 'REGULATORY', label: '监管费' },
+  { value: 'OTHER', label: '其他费用' },
+];
+
+export const chargeCategoryLabel = (category: ChargeCategory) =>
+  chargeCategoryOptions.find((option) => option.value === category)?.label ?? '其他';
+
 export const transactionFilters: Array<{ value: AccountDataEventFilter; label: string }> = [
   { value: 'executions', label: '成交记录' },
   { value: 'other', label: '其他账本事件' },

@@ -76,7 +76,7 @@ export function PortfolioTradeView({
       </div>
 
       <div className="grid gap-3 rounded-lg border border-border bg-muted/10 p-3 md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_10rem]">
-        <label className="flex flex-col gap-1 text-xs font-medium">
+        <div className="flex flex-col gap-1 text-xs font-medium">
           账户范围
           <Select
             value={accountId || 'all'}
@@ -100,8 +100,8 @@ export function PortfolioTradeView({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium">
+        </div>
+        <div className="flex flex-col gap-1 text-xs font-medium">
           标的筛选
           <Input
             aria-label="交易标的筛选"
@@ -109,8 +109,8 @@ export function PortfolioTradeView({
             onChange={(event) => setSymbol(event.target.value)}
             placeholder="例如 600519.SH"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium">
+        </div>
+        <div className="flex flex-col gap-1 text-xs font-medium">
           生命周期
           <Select value={lifecycle} onValueChange={(value) => value && setLifecycle(value)}>
             <SelectTrigger aria-label="交易生命周期" className="w-full bg-background">
@@ -124,7 +124,7 @@ export function PortfolioTradeView({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
+        </div>
       </div>
 
       {query.isError && (

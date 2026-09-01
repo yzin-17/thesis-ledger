@@ -603,11 +603,9 @@ export function JournalDashboard({
             </p>
           </div>
           <div className="flex min-w-56 flex-col gap-2">
-            <label className="text-sm font-medium" htmlFor="journal-review-account">
-              复盘账户
-            </label>
+            <span className="text-sm font-medium">复盘账户</span>
             <Select value={accountId} onValueChange={(value) => value && selectAccount(value)}>
-              <SelectTrigger id="journal-review-account">
+              <SelectTrigger aria-label="复盘账户">
                 <SelectValue placeholder="选择账户">
                   {selectedAccount?.name ?? '选择账户'}
                 </SelectValue>
@@ -898,9 +896,10 @@ export function JournalDashboard({
               </div>
               {periodPreset === 'custom' && (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2 text-sm font-medium">
-                    开始时间
+                  <div className="flex flex-col gap-2 text-sm font-medium">
+                    <span>开始时间</span>
                     <DateInput
+                      aria-label="开始时间"
                       type="datetime-local"
                       value={toLocalDateTime(periodWindow.start)}
                       onChange={(event) => {
@@ -912,10 +911,11 @@ export function JournalDashboard({
                         }
                       }}
                     />
-                  </label>
-                  <label className="flex flex-col gap-2 text-sm font-medium">
-                    结束时间
+                  </div>
+                  <div className="flex flex-col gap-2 text-sm font-medium">
+                    <span>结束时间</span>
                     <DateInput
+                      aria-label="结束时间"
                       type="datetime-local"
                       value={toLocalDateTime(periodWindow.end)}
                       onChange={(event) => {
@@ -927,7 +927,7 @@ export function JournalDashboard({
                         }
                       }}
                     />
-                  </label>
+                  </div>
                 </div>
               )}
               {periodWindowInvalid && (

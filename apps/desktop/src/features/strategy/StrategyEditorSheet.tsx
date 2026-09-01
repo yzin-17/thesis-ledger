@@ -779,7 +779,7 @@ export function StrategyEditorSheet({
                         <SelectGroup>
                           <SelectItem value="fixed">固定比例</SelectItem>
                           <SelectItem value="trailing">移动止损</SelectItem>
-                          <SelectItem value="atr">ATR</SelectItem>
+                          <SelectItem value="atr">平均真实波幅</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>

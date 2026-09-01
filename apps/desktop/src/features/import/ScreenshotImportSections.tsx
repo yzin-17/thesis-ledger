@@ -54,8 +54,8 @@ export function ScreenshotImportUpload({
 }) {
   return (
     <form className="upload-bar" onSubmit={onSubmit}>
-      <label>
-        账户
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>账户</span>
         <Select
           disabled={accountLocked}
           value={accountId || null}
@@ -63,7 +63,7 @@ export function ScreenshotImportUpload({
             if (value) onAccountChange(value);
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger aria-label="账户" className="w-full">
             <SelectValue placeholder="选择账户">
               {accounts.find((account) => account.id === accountId)?.name ?? '选择账户'}
             </SelectValue>
@@ -79,11 +79,11 @@ export function ScreenshotImportUpload({
             </SelectGroup>
           </SelectContent>
         </Select>
-      </label>
-      <label>
-        截图来源
+      </div>
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>截图来源</span>
         <Select value={source} onValueChange={(value) => value && onSourceChange(value)}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger aria-label="截图来源" className="w-full">
             <SelectValue>{importSourceLabel(source)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -97,11 +97,17 @@ export function ScreenshotImportUpload({
             </SelectGroup>
           </SelectContent>
         </Select>
-      </label>
-      <label>
-        持仓截图
-        <Input name="file" type="file" required accept="image/png,image/jpeg,image/webp" />
-      </label>
+      </div>
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>持仓截图</span>
+        <Input
+          aria-label="持仓截图"
+          name="file"
+          type="file"
+          required
+          accept="image/png,image/jpeg,image/webp"
+        />
+      </div>
       <Button type="submit" variant="default" disabled={busyAction !== null}>
         {busyAction === 'upload' && (
           <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
@@ -258,40 +264,44 @@ function ScreenshotImportRow({
 }) {
   return (
     <div className="review-row">
-      <label>
-        名称
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>名称</span>
         <Input
+          aria-label="名称"
           value={row.rawName ?? ''}
           onChange={(event) => onUpdate(index, { rawName: event.target.value })}
         />
-      </label>
-      <label>
-        代码
+      </div>
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>代码</span>
         <Input
+          aria-label="代码"
           value={row.symbol ?? ''}
           onChange={(event) => onUpdate(index, { symbol: event.target.value.toUpperCase() })}
         />
-      </label>
-      <label>
-        数量
+      </div>
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>数量</span>
         <Input
+          aria-label="数量"
           type="number"
           min="0"
           step="any"
           value={row.quantity ?? ''}
           onChange={(event) => onUpdate(index, { quantity: event.target.value })}
         />
-      </label>
-      <label>
-        成本价
+      </div>
+      <div className="grid gap-1.5 text-xs text-muted-foreground">
+        <span>成本价</span>
         <Input
+          aria-label="成本价"
           type="number"
           min="0"
           step="any"
           value={row.costPrice ?? ''}
           onChange={(event) => onUpdate(index, { costPrice: event.target.value })}
         />
-      </label>
+      </div>
       <div className="row-status">
         <Badge className={cn('tag', row.confidence < 0.75 && 'warning')} variant="secondary">
           {Math.round(row.confidence * 100)}%

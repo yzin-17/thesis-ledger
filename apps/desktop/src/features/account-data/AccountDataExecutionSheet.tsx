@@ -30,6 +30,8 @@ import {
 } from './account-data.mutations.js';
 import {
   commandFeedback,
+  chargeCategoryLabel,
+  chargeCategoryOptions,
   createClientCommandId,
   currencyLabel,
   dateOnly,
@@ -53,6 +55,10 @@ import type {
   TimePrecision,
 } from './account-data.types.js';
 
+export type ExecutionSheetCloseOptions = {
+  skipDiscardConfirm?: boolean;
+};
+
 const accountTypeLabel = (type: Account['type']) => {
   if (type === 'fund') return '基金账户';
   if (type === 'cash') return '现金账户';
@@ -71,7 +77,7 @@ export function ExecutionFormSheet({
   open: boolean;
   editingEvent: ExecutionEvent | null;
   ledgerRevision: string;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean, options?: ExecutionSheetCloseOptions) => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const toastManager = useToastManager();
@@ -87,7 +93,6 @@ export function ExecutionFormSheet({
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [instrumentOpen, setInstrumentOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
   const instrumentSearch = usePortfolioInstrumentSearch({
     accountType: account.type,
     positionSheetOpen: open,
@@ -125,18 +130,15 @@ export function ExecutionFormSheet({
     setManualInstrumentEntry(false);
     setInstrumentOpen(false);
     setFormError(null);
-    setDirty(false);
     onDirtyChange(false);
   }, [account.currency, editingEvent?.eventId, onDirtyChange, open]);
 
   const updateDraft = <K extends keyof ExecutionDraft>(key: K, value: ExecutionDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
-    setDirty(true);
     onDirtyChange(true);
   };
 
   const updateDirty = (nextDirty = true) => {
-    setDirty(nextDirty);
     onDirtyChange(nextDirty);
   };
 
@@ -145,8 +147,7 @@ export function ExecutionFormSheet({
       onOpenChange(true);
       return;
     }
-    if (dirty && !window.confirm('当前有未保存修改，关闭后会丢弃，继续吗？')) return;
-    updateDirty(false);
+    if (submitting) return;
     onOpenChange(false);
   };
 
@@ -156,7 +157,7 @@ export function ExecutionFormSheet({
       setSelectedInstrument(instrument);
       setInstrumentQuery(instrument.symbol);
       setInstrumentOpen(false);
-      updateDirty(true);
+      onDirtyChange(true);
     } catch (error) {
       setFormError(errorMessage(error, '标的确认失败，请检查标的目录。'));
     }
@@ -265,8 +266,8 @@ export function ExecutionFormSheet({
         type: 'success',
         timeout: 2800,
       });
-      updateDirty(false);
-      onOpenChange(false);
+      onDirtyChange(false);
+      onOpenChange(false, { skipDiscardConfirm: true });
     } catch (error) {
       const code = errorCode(error);
       const conflict = code === 'LEDGER_REVISION_CONFLICT';
@@ -451,13 +452,13 @@ export function ExecutionFormSheet({
               <FieldDescription>未填写时不推测待结算状态。</FieldDescription>
             </Field>
           </FieldGroup>
-          <Alert>
+          <Alert variant="subtle">
             <AlertTitle>交易规则未验证</AlertTitle>
             <AlertDescription>
               当前能力元数据未验证，系统仅执行通用的高精度数量和价格校验。
             </AlertDescription>
           </Alert>
-          <FieldGroup className="rounded-lg border p-4">
+          <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="m-0 text-sm font-semibold">费用明细</h3>
@@ -485,131 +486,133 @@ export function ExecutionFormSheet({
                 添加费用
               </Button>
             </div>
-            {charges.length === 0 && (
-              <p className="m-0 text-xs text-muted-foreground">暂无费用明细</p>
-            )}
-            {charges.map((charge, index) => (
-              <FieldGroup
-                key={`${index}-${charge.category}`}
-                className="grid gap-3 rounded-md bg-muted/30 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
-              >
-                <Field>
-                  <FieldLabel htmlFor={`charge-category-${index}`}>类别</FieldLabel>
-                  <Select
-                    value={charge.category}
-                    onValueChange={(value) => {
-                      setCharges((current) =>
-                        current.map((item, itemIndex) =>
-                          itemIndex === index
-                            ? { ...item, category: value as ChargeDraft['category'] }
-                            : item,
-                        ),
-                      );
-                      updateDirty(true);
-                    }}
-                  >
-                    <SelectTrigger id={`charge-category-${index}`} className="w-full">
-                      <SelectValue>{charge.category}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {['COMMISSION', 'TAX', 'LEVY', 'EXCHANGE', 'REGULATORY', 'OTHER'].map(
-                          (category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
+            <FieldGroup className="rounded-lg border p-4">
+              {charges.length === 0 && (
+                <p className="m-0 text-xs text-muted-foreground">暂无费用明细</p>
+              )}
+              {charges.map((charge, index) => (
+                <FieldGroup
+                  key={`${index}-${charge.category}`}
+                  className="grid gap-3 rounded-md bg-muted/30 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                >
+                  <Field>
+                    <FieldLabel htmlFor={`charge-category-${index}`}>类别</FieldLabel>
+                    <Select
+                      value={charge.category}
+                      onValueChange={(value) => {
+                        setCharges((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, category: value as ChargeDraft['category'] }
+                              : item,
                           ),
-                        )}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`charge-amount-${index}`}>金额</FieldLabel>
-                  <Input
-                    id={`charge-amount-${index}`}
-                    inputMode="decimal"
-                    value={charge.amount}
-                    onChange={(event) => {
-                      setCharges((current) =>
-                        current.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, amount: event.target.value } : item,
-                        ),
-                      );
-                      updateDirty(true);
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`charge-currency-${index}`}>币种</FieldLabel>
-                  <Select
-                    value={charge.currency}
-                    onValueChange={(value) => {
-                      if (!isCurrency(value)) return;
-                      setCharges((current) =>
-                        current.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, currency: value } : item,
-                        ),
-                      );
-                      updateDirty(true);
-                    }}
-                  >
-                    <SelectTrigger id={`charge-currency-${index}`} className="w-full">
-                      <SelectValue>{charge.currency}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {currencies.map((currency) => (
-                          <SelectItem key={currency} value={currency}>
-                            {currency}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field className="justify-end">
-                  <FieldLabel className="sr-only" htmlFor={`remove-charge-${index}`}>
-                    费用操作
-                  </FieldLabel>
-                  <Button
-                    id={`remove-charge-${index}`}
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={`移除第 ${index + 1} 条费用`}
-                    onClick={() => {
-                      setCharges((current) =>
-                        current.filter((_, itemIndex) => itemIndex !== index),
-                      );
-                      updateDirty(true);
-                    }}
-                  >
-                    ×
-                  </Button>
-                </Field>
-                <Field className="sm:col-span-3">
-                  <FieldLabel className="sr-only" htmlFor={`charge-description-${index}`}>
-                    费用说明
-                  </FieldLabel>
-                  <Input
-                    id={`charge-description-${index}`}
-                    aria-label={`第 ${index + 1} 条费用说明`}
-                    value={charge.description}
-                    placeholder="说明（可选）"
-                    onChange={(event) => {
-                      setCharges((current) =>
-                        current.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, description: event.target.value } : item,
-                        ),
-                      );
-                      updateDirty(true);
-                    }}
-                  />
-                </Field>
-              </FieldGroup>
-            ))}
-          </FieldGroup>
+                        );
+                        updateDirty(true);
+                      }}
+                    >
+                      <SelectTrigger id={`charge-category-${index}`} className="w-full">
+                        <SelectValue>{chargeCategoryLabel(charge.category)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {chargeCategoryOptions.map(({ value, label }) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor={`charge-amount-${index}`}>金额</FieldLabel>
+                    <Input
+                      id={`charge-amount-${index}`}
+                      inputMode="decimal"
+                      value={charge.amount}
+                      onChange={(event) => {
+                        setCharges((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, amount: event.target.value } : item,
+                          ),
+                        );
+                        updateDirty(true);
+                      }}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor={`charge-currency-${index}`}>币种</FieldLabel>
+                    <Select
+                      value={charge.currency}
+                      onValueChange={(value) => {
+                        if (!isCurrency(value)) return;
+                        setCharges((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, currency: value } : item,
+                          ),
+                        );
+                        updateDirty(true);
+                      }}
+                    >
+                      <SelectTrigger id={`charge-currency-${index}`} className="w-full">
+                        <SelectValue>{charge.currency}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {currencies.map((currency) => (
+                            <SelectItem key={currency} value={currency}>
+                              {currency}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field className="justify-end">
+                    <FieldLabel className="sr-only" htmlFor={`remove-charge-${index}`}>
+                      费用操作
+                    </FieldLabel>
+                    <Button
+                      id={`remove-charge-${index}`}
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`移除第 ${index + 1} 条费用`}
+                      onClick={() => {
+                        setCharges((current) =>
+                          current.filter((_, itemIndex) => itemIndex !== index),
+                        );
+                        updateDirty(true);
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </Field>
+                  <Field className="sm:col-span-3">
+                    <FieldLabel className="sr-only" htmlFor={`charge-description-${index}`}>
+                      费用说明
+                    </FieldLabel>
+                    <Input
+                      id={`charge-description-${index}`}
+                      aria-label={`第 ${index + 1} 条费用说明`}
+                      value={charge.description}
+                      placeholder="说明（可选）"
+                      onChange={(event) => {
+                        setCharges((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, description: event.target.value }
+                              : item,
+                          ),
+                        );
+                        updateDirty(true);
+                      }}
+                    />
+                  </Field>
+                </FieldGroup>
+              ))}
+            </FieldGroup>
+          </div>
           <FieldGroup>
             {editingEvent && (
               <Field>

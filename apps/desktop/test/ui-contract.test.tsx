@@ -1,5 +1,8 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,6 +22,7 @@ import { PortfolioManagement } from '../src/features/portfolio/PortfolioManageme
 import { InstrumentCombobox } from '../src/features/portfolio/InstrumentCombobox.js';
 import { DataStateBanner } from '../src/features/shared/DesktopPrimitives.js';
 import { DateInput } from '../src/components/ui/date-input.js';
+import { FieldLabel } from '../src/components/ui/field.js';
 import { Switch, SwitchThumb } from '../src/components/ui/switch.js';
 import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
 
@@ -32,6 +36,26 @@ const renderWithToast = (node: ReactNode) => {
     </QueryClientProvider>,
   );
 };
+
+type LabelInteractionEvent = {
+  preventDefault: () => void;
+  target: EventTarget | null;
+};
+
+type LabelElementProps = {
+  onClick?: (event: LabelInteractionEvent) => void;
+  onMouseDown?: (event: LabelInteractionEvent) => void;
+  onPointerDown?: (event: LabelInteractionEvent) => void;
+};
+
+const desktopSourceDirectory = fileURLToPath(new URL('../src', import.meta.url));
+
+const readDesktopSource = (directory: string): string[] =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = join(directory, entry.name);
+    if (entry.isDirectory()) return readDesktopSource(entryPath);
+    return /\.(?:ts|tsx|js|jsx)$/.test(entry.name) ? [readFileSync(entryPath, 'utf8')] : [];
+  });
 
 describe('Desktop UI contract - onboarding and portfolio', () => {
   it('normalizes legacy health history arrays while supporting paginated responses', () => {
@@ -201,6 +225,32 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
 });
 
 describe('Desktop UI contract - providers and primitives', () => {
+  it('guards FieldLabel activation while retaining label semantics and removes native wrappers', () => {
+    const labelElement = FieldLabel({ children: '名称', htmlFor: 'label-target' }) as ReactElement<
+      LabelElementProps
+    >;
+    const preventDefault = vi.fn();
+    const labelSurfaceEvent = { preventDefault, target: null };
+
+    labelElement.props.onPointerDown?.(labelSurfaceEvent);
+    labelElement.props.onMouseDown?.(labelSurfaceEvent);
+    labelElement.props.onClick?.(labelSurfaceEvent);
+
+    expect(preventDefault).toHaveBeenCalledTimes(3);
+    expect(
+      labelElement.props.onClick?.({
+        preventDefault,
+        target: { closest: () => ({}) } as EventTarget,
+      }),
+    ).toBeUndefined();
+    expect(preventDefault).toHaveBeenCalledTimes(3);
+
+    const nativeLabelUsages = readDesktopSource(desktopSourceDirectory).filter((source) =>
+      /<label\b/i.test(source),
+    );
+    expect(nativeLabelUsages).toEqual([]);
+  });
+
   it('shared date input normalizes display text and preserves native input props', () => {
     const dateMarkup = renderToStaticMarkup(
       <DateInput

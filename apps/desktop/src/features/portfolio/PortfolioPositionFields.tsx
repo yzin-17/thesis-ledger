@@ -35,7 +35,7 @@ function ManualAssetTypeOptions({ manualAssetType }: { manualAssetType: HeldAsse
   return (
     <>
       <SelectItem value="stock">股票</SelectItem>
-      <SelectItem value="etf">ETF</SelectItem>
+      <SelectItem value="etf">交易所交易基金</SelectItem>
     </>
   );
 }
@@ -99,12 +99,12 @@ export function PositionFields({
       </div>
       {manualInstrumentEntry && (
         <div className="grid gap-4 rounded-md border border-border bg-muted/20 p-3">
-          <label>
-            名称
-            <Input name="assetName" required maxLength={120} />
-          </label>
-          <label>
-            类型
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>名称</span>
+            <Input aria-label="名称" name="assetName" required maxLength={120} />
+          </div>
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>类型</span>
             <Select
               name="assetType"
               required
@@ -114,7 +114,7 @@ export function PositionFields({
                   setManualAssetType(value);
               }}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger aria-label="类型" className="w-full">
                 <SelectValue>
                   {(value: string | null) => assetTypeLabel(value as HeldAssetType)}
                 </SelectValue>
@@ -125,15 +125,16 @@ export function PositionFields({
                 </SelectGroup>
               </SelectContent>
             </Select>
-          </label>
+          </div>
         </div>
       )}
       <div className="grid gap-4 border-t border-border pt-4">
         <div className="text-sm font-semibold text-foreground">持仓信息</div>
-        <label>
-          当前数量
+        <div className="grid gap-1.5 text-xs text-muted-foreground">
+          <span>当前数量</span>
           <InputGroup className="h-10">
             <InputGroupInput
+              aria-label="当前数量"
               className="h-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               name="quantity"
               required
@@ -156,11 +157,12 @@ export function PositionFields({
               </InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-        </label>
-        <label>
-          平均成本
+        </div>
+        <div className="grid gap-1.5 text-xs text-muted-foreground">
+          <span>平均成本</span>
           <InputGroup className="h-10">
             <InputGroupInput
+              aria-label="平均成本"
               className="h-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               name="costPrice"
               required
@@ -184,7 +186,7 @@ export function PositionFields({
               </InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-        </label>
+        </div>
       </div>
     </>
   );

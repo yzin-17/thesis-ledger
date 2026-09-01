@@ -259,7 +259,7 @@ export function PerformanceAccountSelector({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex min-w-0 basis-full items-center gap-2 text-sm text-muted-foreground sm:basis-auto">
+        <div className="flex min-w-0 basis-full items-center gap-2 text-sm text-muted-foreground sm:basis-auto">
           <span className="shrink-0">账户</span>
           <Select
             value={accountId || ALL_ACCOUNTS_VALUE}
@@ -267,7 +267,7 @@ export function PerformanceAccountSelector({
               onAccountChange(value === ALL_ACCOUNTS_VALUE ? '' : (value ?? ''));
             }}
           >
-            <SelectTrigger className="w-full sm:w-72">
+            <SelectTrigger aria-label="账户" className="w-full sm:w-72">
               <SelectValue>{selectedAccount?.name ?? '全部账户'}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -281,7 +281,7 @@ export function PerformanceAccountSelector({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
+        </div>
         <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
           <span>汇率合并</span>
           <Switch
@@ -294,7 +294,7 @@ export function PerformanceAccountSelector({
             <SwitchThumb variant="risk" aria-hidden="true" />
           </Switch>
         </div>
-        <label className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
           <span>基准币种</span>
           <Select
             value={resolvedBaseCurrency}
@@ -304,7 +304,7 @@ export function PerformanceAccountSelector({
                 handleBaseCurrencyChange(value);
             }}
           >
-            <SelectTrigger className="w-24">
+            <SelectTrigger aria-label="基准币种" className="w-24">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -315,7 +315,7 @@ export function PerformanceAccountSelector({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
+        </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground sm:justify-end">
         <p className="m-0">

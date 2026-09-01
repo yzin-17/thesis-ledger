@@ -70,15 +70,16 @@ export function MarketPolicyPanel({
               每个能力/标的类型独立排序；数据记录不会混用字段。
             </p>
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 text-sm">
             <input
+              aria-label="启用路由"
               type="checkbox"
               checked={policy?.enabled ?? false}
               disabled={disabled || !policy}
               onChange={(event) => policy && onChange({ ...policy, enabled: event.target.checked })}
             />
-            启用路由
-          </label>
+            <span>启用路由</span>
+          </div>
         </div>
         {policy ? (
           <div className="divide-y border-y border-border">
@@ -102,8 +103,9 @@ export function MarketPolicyPanel({
                       const routeIndex = candidates.indexOf(provider.providerId);
                       return (
                         <div key={provider.providerId} className="flex items-center gap-2 text-sm">
-                          <label className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
                             <input
+                              aria-label={`${provider.displayName} 路由`}
                               type="checkbox"
                               checked={routeIndex >= 0}
                               disabled={disabled}
@@ -111,9 +113,11 @@ export function MarketPolicyPanel({
                                 updateRoute(capability, instrumentType, provider.providerId)
                               }
                             />
-                            {routeIndex >= 0 ? `${routeIndex + 1}. ` : ''}
-                            {provider.displayName}
-                          </label>
+                            <span>
+                              {routeIndex >= 0 ? `${routeIndex + 1}. ` : ''}
+                              {provider.displayName}
+                            </span>
+                          </div>
                           {routeIndex >= 0 && (
                             <span className="flex gap-1">
                               <Button

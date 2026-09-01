@@ -845,13 +845,6 @@ td span {
   font-size: 13px;
 }
 
-.entry-context label {
-  display: grid;
-  gap: 7px;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
-
 .entry-context [data-slot='select-trigger'] {
   min-height: 42px;
 }
@@ -957,15 +950,6 @@ td span {
 
 .cash-secondary {
   align-self: start;
-}
-
-.form-card label,
-.upload-bar label,
-.review-row label {
-  display: grid;
-  gap: 6px;
-  color: var(--color-text-secondary);
-  font-size: 12px;
 }
 
 .form-card input,
