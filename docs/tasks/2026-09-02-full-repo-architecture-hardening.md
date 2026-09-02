@@ -1,7 +1,7 @@
 # 全仓架构审查与核心边界加固 Tasks
 
 > 日期：2026-09-02  
-> 状态：Validating  
+> 状态：Completed  
 > 对应 Spec：[`2026-09-02-full-repo-architecture-hardening`](../specs/2026-09-02-full-repo-architecture-hardening.md)
 
 ## 1. 执行原则
@@ -248,23 +248,23 @@ Review 收口：#31。
 
 ## 13. 完整验证门禁
 
-#31 最终收口必须通过以下门禁；在 GitHub Actions 验证完成前保持未勾选：
+#31 的代码与架构收口已通过 GitHub Actions CI #233 的完整代码门禁：
 
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
-- [ ] `pnpm contract:test`
-- [ ] `pnpm guardrails:complexity`
-- [ ] `pnpm migration:matrix`（本轮无 schema/migration 变化；CI 仍会执行现有 matrix）
+- [x] `pnpm lint`
+- [x] `pnpm typecheck`
+- [x] `pnpm test`
+- [x] `pnpm build`
+- [x] `pnpm contract:test`
+- [x] `pnpm guardrails:complexity`
+- [x] `pnpm migration:matrix`（本轮无 schema/migration 变化；CI 仍执行现有 matrix）
 
 定向验证：
 
-- [ ] Ledger atomic rollback / lock order / rebuild count。
-- [ ] Risk regular + trailing state / dedupe / notification retry。
-- [ ] Performance mixed currency / historical FX / target aggregation。
-- [ ] workspace dependency fixtures。
-- [ ] 旧 `/ledger/events` 写面不存在的 regression contract。
+- [x] Ledger atomic rollback / lock order / rebuild count。
+- [x] Risk regular + trailing state / dedupe / notification retry。
+- [x] Performance mixed currency / historical FX / target aggregation。
+- [x] workspace dependency fixtures。
+- [x] 旧 `/ledger/events` 写面不存在的 regression contract。
 
 ## 14. 风险控制
 
@@ -286,4 +286,4 @@ Review 收口：#31。
 | `TASK-ARCH-078` | #30 | 删除旧通用 Ledger 写入口 |
 | `TASK-DOC-079` / `TASK-REVIEW-080` | #31 | Architecture SSOT、全仓回归 Review、CI 收口 |
 
-当前仅剩 #31 完整 CI 门禁验证；通过后将本文状态改为 `Completed` 并勾选第 13 节验证项。
+本轮 `TASK-ARCH-072`–`TASK-REVIEW-080` 已全部完成；#31 负责承载最终 CI 修复、Architecture SSOT 与任务状态收口。
