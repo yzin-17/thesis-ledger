@@ -1,14 +1,42 @@
-# V1 发布清单
+# 发布检查清单
 
-- [x] 当前 Prisma migration 已在 Compose PostgreSQL 部署并通过无 pending migrations；跨快照矩阵仍需 staging 复核。
-- [x] Compose 集成 smoke 已重新通过 integrity、Redis 锁互斥与 Snapshot 幂等；Docker Desktop 重启后已复跑数据库/Redis 集成、DSA failover、V1 核心 E2E 与灾备恢复，备份恢复仍需 staging 演练。随后一次重启尝试因 Docker helper 未退出而暂时无法连接 daemon；2026-08-01 多次启动现有应用后 `docker compose ps` 仍返回 `Docker Desktop is unable to start`，host 日志记录 VM 写入 `console.log` 时 `no space left on device`，恢复后需补一次短 smoke，未删除数据卷。
-- [x] 隔离 release-candidate E2E 已通过账户、截图、Ledger、Portfolio、行情、Risk、Feishu、AI、Journal、Backtest、日报和 integrity；报告见 `docs/reviews/2026-08-18-v1-core-e2e-report.md`。
-- [x] 灾备演练已通过隔离 backup/restore、DSA failover 和通知失败重试；生产 staging 演练仍需发布负责人执行。
-- [x] Accessibility/responsive 代码级检查已通过；Desktop 浏览器及 Android API 35 模拟器（1080×2400、600×1000）人工验收已归档，iOS 与签名包仍待目标环境复核。
-- [x] `pnpm format`、`pnpm security:secrets`、全包 build/typecheck/test、Contract/Regression 通过。
-- [x] Provider、Automation、AI、Notification 指标和健康历史 API/桌面运维视图已实现；Compose 故障注入已通过，staging 仍需按同一脚本复核。
-- [x] Desktop Vite production 静态构建、Electron 未签名 DMG/Windows NSIS 产物、Onboarding/UI 契约测试、Expo Mobile web bundle 和 Android arm64 APK/AAB 已通过；Android Portfolio/Risk 与 loading/empty/error/stale、小屏人工 checklist 已归档，真实 Desktop Windows 安装、签名和跨端 UI 对照仍待完成。
-- [x] `pnpm release:artifacts` 已静态核对 DMG/EXE、APK/AAB 文件、SHA-256、Android JS bundle 和 arm64 单架构内容；该检查不替代签名、安装启动或设备验收。
-- [x] V1.0 Desktop 不启用隐式自动更新；更新策略与后续启用条件已记录。
-- [x] 依赖许可证扫描已通过并生成 `THIRD_PARTY_LICENSES.md` 与清单；DSA Fork Delta/Upstream Playbook 已完成，移植代码 attribution 和 Known Limitations 仍需人工 Review。
-- [x] Spec Traceability 与架构 Review 已记录当前 294 项任务中 290 项完成、4 项外部门禁、owner 和明确遗留门禁；最终版本发布仍需完成剩余发布项。
+本文件是可复用的发布前检查模板，不记录某次发布的执行结果。具体发布证据、失败记录和一次性环境信息应写入 `docs/reviews/`；历史发布记录归档到 `docs/archive/reviews/`。
+
+## 版本与数据库
+
+- [ ] 已确认发布版本、Git commit、镜像 tag/digest 和目标环境一致。
+- [ ] 当前数据库 baseline / migration 与应用版本匹配，无未解释的 schema 漂移。
+- [ ] 发布前备份已完成，并保留 checksum、版本和恢复入口。
+- [ ] 若涉及数据库结构变化，已完成隔离 fresh 演练或批准的升级/重建演练。
+
+## 质量门禁
+
+- [ ] 格式、Lint、Typecheck、单元测试和关键 Contract/Regression 测试通过。
+- [ ] `pnpm security:secrets` 或等价 Secret 扫描通过。
+- [ ] 数据完整性、核心 Portfolio/Ledger/Trade/Journal 路径已完成与本次变更风险相称的验证。
+- [ ] 相关架构/边界 Guardrail 通过，没有新增未解释的反向依赖或生成物污染。
+
+## 运行时与外部依赖
+
+- [ ] PostgreSQL、Redis、DSA/Provider 等必要依赖健康状态符合发布要求。
+- [ ] 涉及外部 Provider、Webhook、Worker、Scheduler 或通知时，已完成对应真实环境验收；未完成项明确标记为发布门禁或 Known Limitation。
+- [ ] 涉及 Desktop/Mobile 原生能力时，已完成目标平台构建；需要安装、签名或设备验收的项目有明确状态。
+- [ ] 不把静态检查、Mock 或未签名构建结果表述为真实线上/设备验收。
+
+## 发布与回滚
+
+- [ ] 已确认发布步骤、负责人、维护窗口和观察指标。
+- [ ] 已确认应用回滚版本与当前数据库 schema 兼容。
+- [ ] 数据库恢复或卷重建仅使用已批准流程，不执行未授权的 destructive reset。
+- [ ] DSA / Provider / 基础设施版本可追溯，不使用不可确认来源的 `latest` 作为发布证据。
+
+## 发布后检查
+
+- [ ] 服务健康检查通过，关键 API、任务和投影无异常。
+- [ ] 关键指标、错误日志和通知/自动化历史无新增阻断问题。
+- [ ] 必要的 Smoke / E2E 已在目标环境执行。
+- [ ] 发布结果、未完成门禁、回滚信息和验证证据已写入对应 Review。
+
+## 证据记录原则
+
+本模板只维护长期检查项，不在这里持续追加某次发布的测试数量、机器故障、截图或临时阻塞。发布完成后，应在 `docs/reviews/YYYY-MM-DD-<release>-release-review.md` 或等价 Review 中记录实际结果；该 Review 失去当前门禁价值后再移入 archive。

@@ -9,10 +9,9 @@
 - `2026-08-18-v1-accessibility-responsive-checklist.md`、`2026-08-18-v1-desktop-e2e-checklist.md`、`2026-08-18-v1-mobile-e2e-checklist.md`、`2026-08-18-v1.0-state-and-onboarding-review.md`：V1 发布验证包中的专项清单和结论。
 - [`2026-08-22-market-detail-read-model-review.md`](2026-08-22-market-detail-read-model-review.md)：持仓行情详情共享读模型的 Standards/Spec 复核与浏览器验收证据缺口。
 - [`2026-08-28-journal-review-task-applicability.md`](2026-08-28-journal-review-task-applicability.md)：Trade Projection 引入后投资复盘 Spec/任务的适用性复核与契约漂移记录。
-- [`2026-08-28-unified-backtest-trade-integration-review.md`](2026-08-28-unified-backtest-trade-integration-review.md)：交易系统加入后的回测任务衔接、事实源隔离与任务重排 Review。
-- [`2026-08-28-unified-backtest-trade-integration-review-v2.md`](2026-08-28-unified-backtest-trade-integration-review-v2.md)：复核版；修正任务计数、过早共享抽象和当前 MarketRuleSet/运行时能力判断。
+- [`2026-08-28-unified-backtest-trade-integration-review-v2.md`](2026-08-28-unified-backtest-trade-integration-review-v2.md)：统一回测与交易系统衔接的复核版结论；旧版已归档。
 
-V0.1–V0.9 和 Phase 0 的历史一致性 Review 已移至 [`../archive/reviews/`](../archive/reviews/)。
+V0.1–V0.9、Phase 0、被新版取代的 Review 和历史发布执行记录已移至 [`../archive/reviews/`](../archive/reviews/)。
 
 `evidence/` 下的截图、XML 和一次性运行产物只作为验证证据，不作为产品需求或运行手册。外部归档和发布附件确认前，不删除现有证据。
 
