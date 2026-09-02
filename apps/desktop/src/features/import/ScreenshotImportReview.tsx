@@ -225,7 +225,9 @@ export function ScreenshotImportReview({
       confirmDiscard={confirmDiscard}
       loadDrafts={loadDrafts}
       upload={upload}
-      choose={choose}
+      choose={(draft) => {
+        void choose(draft);
+      }}
       updateRow={updateRow}
       commit={commit}
       rollback={rollback}
