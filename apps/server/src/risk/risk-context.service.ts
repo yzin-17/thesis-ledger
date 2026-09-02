@@ -462,7 +462,7 @@ export class RiskContextService {
               where: { symbol: { in: symbols } },
               select: { symbol: true, name: true },
             })
-            .catch(() => []),
+            .catch(() => [])
         : Promise.resolve([]),
       accountIds.length > 0 && typeof prismaWithLabels.account?.findMany === 'function'
         ? prismaWithLabels.account
@@ -470,7 +470,7 @@ export class RiskContextService {
               where: { id: { in: accountIds } },
               select: { id: true, name: true },
             })
-            .catch(() => []),
+            .catch(() => [])
         : Promise.resolve([]),
     ]);
     if (assets.length === 0 && accounts.length === 0) return scan;
