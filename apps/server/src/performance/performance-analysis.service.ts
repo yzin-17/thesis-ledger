@@ -7,7 +7,6 @@ import {
   ttwror,
   xirr,
 } from '@thesis-ledger/domain';
-import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { performanceRelationWhere, incompatibleAccountScopeSummary } from './performance-account-scope.js';
 import { PerformanceDataService } from './performance-data.service.js';
