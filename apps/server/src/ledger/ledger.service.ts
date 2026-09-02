@@ -85,13 +85,6 @@ export class LedgerService {
     private readonly repository: LedgerV2Repository,
   ) {}
 
-  append(rawInput: unknown) {
-    void rawInput;
-    return Promise.reject(
-      new BadRequestException('旧通用 LedgerEvent 写入入口已停用，请使用专用 V2 命令'),
-    );
-  }
-
   private async assertAccountWithClient(
     client: Pick<LedgerTransactionClient, 'account'>,
     accountId: string,
