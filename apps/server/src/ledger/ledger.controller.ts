@@ -48,11 +48,6 @@ export class LedgerController {
     private readonly queries: LedgerQueryService,
   ) {}
 
-  @Post('events')
-  append(@Body() event: unknown) {
-    return this.ledger.append(event);
-  }
-
   @Post('executions')
   createExecution(@Body() command: unknown) {
     return this.commands.createExecution(createExecutionCommandSchemaV2.parse(command));
