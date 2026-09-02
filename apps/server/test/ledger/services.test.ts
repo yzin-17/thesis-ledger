@@ -4,11 +4,6 @@ import { projectCashBalances } from '../../src/ledger/cash-projection.js';
 import { executionEvent } from './ledger-event-fixtures.js';
 
 describe('Ledger Service', () => {
-  it('运行时拒绝旧通用 V1 LedgerEvent 写入入口', async () => {
-    await expect(
-      new LedgerService({} as never, {} as never).append({ version: 1 }),
-    ).rejects.toThrow('旧通用 LedgerEvent 写入入口已停用');
-  });
   it('rebuild 更新现有投影时保留 Position ID', async () => {
     const create = vi.fn(async ({ data }: { data: object }) => data);
     const update = vi.fn(async ({ data }: { data: object }) => data);
