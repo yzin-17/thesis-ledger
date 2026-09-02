@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type DateInputType = 'date' | 'datetime-local';
-type PickerInputElement = HTMLInputElement & { showPicker?: () => void };
 
 export type DateInputProps = Omit<React.ComponentPropsWithoutRef<typeof Input>, 'type'> & {
   type: DateInputType;
@@ -47,12 +46,12 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     );
 
     useIsomorphicLayoutEffect(() => {
-      const input = inputRef.current as PickerInputElement | null;
+      const input = inputRef.current;
       setPickerSupported(typeof input?.showPicker === 'function');
     }, []);
 
     const openDatePicker = (event: React.PointerEvent<HTMLInputElement>) => {
-      const input = event.currentTarget as PickerInputElement;
+      const input = event.currentTarget;
       if (event.button !== 0 || typeof input.showPicker !== 'function') {
         onPointerDown?.(event);
         return;
