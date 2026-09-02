@@ -1,5 +1,5 @@
 import type { CompleteRiskContext, RiskRule } from '@thesis-ledger/domain';
-import {
+import type {
   riskAccountContextSchema,
   riskPortfolioContextSchema,
   riskScanContextSchema,
