@@ -377,12 +377,16 @@ export function AccountDataPage({
             filter={transactionFilter}
             onFilterChange={setTransactionFilter}
             onCreate={openCreateExecution}
-            onCorrect={openCorrectExecution}
+            onCorrect={(event) => {
+              void openCorrectExecution(event);
+            }}
             onVoid={openVoidExecution}
             onCorrectTransfer={(event) => setCashTransferAction({ event, mode: 'replace' })}
             onVoidTransfer={(event) => setCashTransferAction({ event, mode: 'void' })}
             onAudit={openAudit}
-            onOpenImport={openImport}
+            onOpenImport={() => {
+              void openImport();
+            }}
             onOpenReconciliation={() => setReconciliationOpen(true)}
           />
         </TabsContent>
@@ -396,7 +400,9 @@ export function AccountDataPage({
             valuationQuery={valuationQuery}
             onDirtyChange={setDraftDirty}
             onSaved={onPortfolioChanged}
-            onOpenImport={openImport}
+            onOpenImport={() => {
+              void openImport();
+            }}
             onOpenReconciliation={() => setReconciliationOpen(true)}
           />
         </TabsContent>
@@ -418,7 +424,9 @@ export function AccountDataPage({
         open={executionOpen}
         editingEvent={editingEvent}
         ledgerRevision={currentLedgerRevision}
-        onOpenChange={closeExecution}
+        onOpenChange={(open, options) => {
+          void closeExecution(open, options);
+        }}
         onDirtyChange={setDraftDirty}
       />
       <AuditSheet
@@ -427,7 +435,9 @@ export function AccountDataPage({
         onOpenChange={(open) => {
           if (!open) setAuditEvent(null);
         }}
-        onCorrect={openCorrectExecution}
+        onCorrect={(event) => {
+          void openCorrectExecution(event);
+        }}
         onVoid={openVoidExecution}
         onRestore={(event, source) => setRestoreEvent({ event, source })}
         onRestoreTransfer={(_event, source) =>
@@ -482,7 +492,12 @@ export function AccountDataPage({
             : {})}
         />
       )}
-      <Sheet open={importOpen} onOpenChange={closeImport}>
+      <Sheet
+        open={importOpen}
+        onOpenChange={(open) => {
+          void closeImport(open);
+        }}
+      >
         <SheetContent
           side="right"
           className="h-[100dvh] w-[900px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
@@ -503,7 +518,12 @@ export function AccountDataPage({
           </div>
         </SheetContent>
       </Sheet>
-      <Sheet open={accountManagerOpen} onOpenChange={closeAccountManager}>
+      <Sheet
+        open={accountManagerOpen}
+        onOpenChange={(open) => {
+          void closeAccountManager(open);
+        }}
+      >
         <SheetContent
           side="right"
           aria-describedby="account-manager-description"
@@ -517,10 +537,12 @@ export function AccountDataPage({
             accountFormInline
             accountManagerOpen={accountManagerOpen}
             onDirtyChange={setDraftDirty}
-            onAccountEntry={async (nextAccountId) => {
-              if (await selectAccount(nextAccountId, { setup: null })) {
-                setAccountManagerOpen(false);
-              }
+            onAccountEntry={(nextAccountId) => {
+              void (async () => {
+                if (await selectAccount(nextAccountId, { setup: null })) {
+                  setAccountManagerOpen(false);
+                }
+              })();
             }}
             onSaved={onPortfolioChanged}
           />

@@ -6,11 +6,11 @@ import {
 } from '@thesis-ledger/schemas';
 import { Prisma } from '@prisma/client';
 import { isEqual } from 'es-toolkit';
-import { projectCashMaterialization, type StoredCashEvent } from './cash-projection.js';
+import { projectCashMaterialization } from './cash-projection.js';
 import {
-  LedgerV2Repository,
   toLedgerEventV2,
   type AccountLedgerWriteContext,
+  type LedgerV2Repository,
 } from './ledger-v2.repository.js';
 import { rebuildLedgerProjection } from './ledger-projection.js';
 
@@ -309,7 +309,7 @@ export class CashLedgerCommandSupport {
       where: { accountId: context.accountId },
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
     });
-    const projected = projectCashMaterialization(stored as StoredCashEvent[]);
+    const projected = projectCashMaterialization(stored);
     return (
       projected.balances.find(
         (balance) =>

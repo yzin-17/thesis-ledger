@@ -26,8 +26,6 @@
 - 回测：V2 设计使用独立模拟事实域 `DataSnapshot → Simulation Event Engine → SimulationLedger → BacktestResult`，不得写入真实 Ledger。
 - 市场数据：ThesisLedger 负责 Desired Policy、目录和产品侧缓存；DSA Fork 负责 Provider runtime、Effective Policy 与行情能力。
 
-本轮本地更新流程入口见 [`Docker 构建缓存重试`](specs/2026-09-01-docker-build-cache-retry.md)。
-
 ## 历史文档
 
 [`archive/`](archive/) 保存已完成、被取代或仅用于历史审计的 Spec、Task、Review、Architecture 和 Domain 文档。归档文档保留上下文和验证证据，但不作为当前实现依据；入口见 [`archive/README.md`](archive/README.md)。
