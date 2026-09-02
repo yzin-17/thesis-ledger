@@ -1,5 +1,7 @@
 # Fresh Database Baseline Spec
 
+> 状态：已完成并归档。当前架构决策以 [`ADR-018`](../../adr/2026-09-02-ADR-018-fresh-database-lifecycle.md) 为准。
+
 ## 背景与问题
 
 ThesisLedger 当前仍处于 `0.1.0` 阶段，开发栈通过四个 Compose 一次性数据库任务依次完成角色配置、Prisma migration 与权限收紧。该设计支持保留旧数据并逐版本升级，但当前产品不要求旧数据库兼容，继续维护完整升级链会增加启动拓扑、迁移验证和本地运行噪声。

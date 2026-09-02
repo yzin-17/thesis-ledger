@@ -148,6 +148,6 @@ pnpm projection:switch-gate -- \
 
 ## 当前本地证据与范围外事项
 
-本手册中的 Trade Projection 影子切换证据属于历史实现记录；当前数据库运行时输入已收敛为 1 个 current baseline。fresh baseline、Schema marker、权限和 health 的最新确定性证据记录在 `docs/tasks/2026-09-02-fresh-database-baseline.md`；真实 external volume 切换仍属于 T3，不在本轮执行。
+本手册中的 Trade Projection 影子切换证据属于历史实现记录；当前数据库运行时输入已收敛为 1 个 current baseline。fresh baseline、Schema marker、权限和 health 的完成证据记录在 [`Fresh Database Baseline 实施任务`](../archive/tasks/2026-09-02-fresh-database-baseline.md)；真实 external volume 切换已在该任务的 T3 中完成。
 
 以下项目属于未来正式发布流程参考，不纳入当前任务：生产数据副本上的提交型迁移与恢复、全量性能和并发写入演练、正式发布环境浏览器响应式验收、在线 FX 完整性，以及包含旧读取路径的应用镜像回滚。本地任务不执行这些范围外状态变更。

@@ -1,5 +1,7 @@
 # Fresh Database Baseline 实施任务
 
+> 状态：T1–T3 及最终一致性 Review 已完成，已归档。
+
 对应 Spec：[`../specs/2026-09-02-fresh-database-baseline.md`](../specs/2026-09-02-fresh-database-baseline.md)
 
 ## 任务
