@@ -164,17 +164,21 @@ export class PortfolioService {
     const quantity = data.quantity ?? previous.quantity.toString();
     const costPrice = data.costPrice ?? previous.costPrice.toString();
     const options = buildPositionOptions(data);
-    if (accountId !== previous.accountId || symbol !== previous.symbol) {
-      await this.requireLedger().setPosition(
-        previous.accountId,
-        previous.symbol,
-        '0',
-        previous.costPrice.toString(),
-        'manual',
-        '手工修改持仓并迁移原标的',
-      );
-    }
-    if (options) {
+    const identityChanged = accountId !== previous.accountId || symbol !== previous.symbol;
+
+    if (identityChanged) {
+      await this.requireLedger().movePositionBaseline({
+        positionId: id,
+        fromAccountId: previous.accountId,
+        fromSymbol: previous.symbol,
+        toAccountId: accountId,
+        toSymbol: symbol,
+        quantity,
+        costPrice,
+        source: data.source ?? 'manual',
+        ...(options ? { options } : {}),
+      });
+    } else if (options) {
       await this.requireLedger().setPosition(
         accountId,
         symbol,
@@ -204,18 +208,8 @@ export class PortfolioService {
 
   async clearPositions(accountId: string) {
     if (!accountId) throw new BadRequestException('清空持仓需要 accountId');
-    const positions = await this.prisma.position.findMany({ where: { accountId } });
-    for (const position of positions) {
-      await this.requireLedger().setPosition(
-        accountId,
-        position.symbol,
-        '0',
-        position.costPrice.toString(),
-        'manual',
-        '清空持仓',
-      );
-    }
-    return { accountId, cleared: positions.length, sourceOfTruth: 'ledger' as const };
+    const result = await this.requireLedger().clearPositions(accountId);
+    return { ...result, sourceOfTruth: 'ledger' as const };
   }
 
   async removePosition(id: string) {

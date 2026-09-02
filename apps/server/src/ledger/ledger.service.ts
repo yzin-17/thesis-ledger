@@ -33,6 +33,18 @@ type SetPositionOptions = {
   temporal?: PositionBaselineTemporal;
 };
 
+type MovePositionBaselineInput = {
+  positionId: string;
+  fromAccountId: string;
+  fromSymbol: string;
+  toAccountId: string;
+  toSymbol: string;
+  quantity: string;
+  costPrice: string;
+  source: 'manual' | 'migration' | 'screenshot';
+  options?: SetPositionOptions;
+};
+
 export const assertSymbolMatchesAssetType = (symbol: string, assetType: string) => {
   if (symbol.endsWith('.OF') && assetType !== 'fund')
     throw new BadRequestException('场外基金代码必须使用基金资产类型');
@@ -50,6 +62,9 @@ const assetMarket = (symbol: string) => {
   if (symbol.endsWith('.HK')) return 'HK';
   return 'CN';
 };
+
+const batchOrderKey = (command: string, commandId: string, index: number) =>
+  `${command}:${commandId}:${String(index).padStart(6, '0')}`;
 
 export const assertWritableAccount = <
   T extends { active: boolean; currency: string; type: string },
@@ -132,6 +147,7 @@ export class LedgerService {
     options: SetPositionOptions | undefined,
     batchId: string,
     recordedAt: string,
+    economicOrderKey = `baseline:${batchId}:000000`,
   ) {
     const assetType = inferAssetType(symbol, options?.assetType);
     const timePrecision = options?.temporal?.timePrecision ?? 'INSTANT';
@@ -181,7 +197,7 @@ export class LedgerService {
       occurredAt: observedAt,
       timePrecision,
       sourceTimezone,
-      economicOrderKey: `baseline:${batchId}:000000`,
+      economicOrderKey,
       recordedAt,
       payloadVersion: 1,
       source: {
@@ -240,6 +256,140 @@ export class LedgerService {
         context.nextProjectionGeneration,
       );
       return { value: event, advanceRevision: true };
+    });
+    return result.value;
+  }
+
+  async movePositionBaseline(input: MovePositionBaselineInput) {
+    nonNegativeDecimalStringSchema.parse(input.quantity);
+    nonNegativeDecimalStringSchema.parse(input.costPrice);
+    const targetAssetType = inferAssetType(input.toSymbol, input.options?.assetType);
+    assertSymbolMatchesAssetType(input.toSymbol, targetAssetType);
+    const commandId = randomUUID();
+    const recordedAt = new Date().toISOString();
+
+    const mutate = async (
+      sourceContext: Parameters<LedgerV2Repository['appendRevision']>[0],
+      targetContext: Parameters<LedgerV2Repository['appendRevision']>[0],
+    ) => {
+      const current = await sourceContext.transaction.position.findUnique({
+        where: { id: input.positionId },
+      });
+      if (
+        !current ||
+        current.accountId !== input.fromAccountId ||
+        current.symbol !== input.fromSymbol
+      ) {
+        throw new BadRequestException('持仓已变化，请刷新后重试');
+      }
+
+      await this.appendPositionBaselineWithClient(
+        sourceContext,
+        input.fromAccountId,
+        input.fromSymbol,
+        '0',
+        current.costPrice.toString(),
+        'manual',
+        '手工修改持仓并迁移原标的',
+        undefined,
+        randomUUID(),
+        recordedAt,
+        batchOrderKey('baseline-move', commandId, 0),
+      );
+      await this.appendPositionBaselineWithClient(
+        targetContext,
+        input.toAccountId,
+        input.toSymbol,
+        input.quantity,
+        input.costPrice,
+        input.source,
+        '手工修改持仓',
+        input.options,
+        randomUUID(),
+        recordedAt,
+        batchOrderKey('baseline-move', commandId, 1),
+      );
+    };
+
+    if (input.fromAccountId === input.toAccountId) {
+      const result = await this.repository.withAccountWrite(input.fromAccountId, async (context) => {
+        await mutate(context, context);
+        await this.rebuildWithClient(
+          context.transaction,
+          input.fromAccountId,
+          'AVG',
+          context.nextProjectionGeneration,
+        );
+        return {
+          value: { fromAccountId: input.fromAccountId, toAccountId: input.toAccountId },
+          advanceRevision: true,
+        };
+      });
+      return result.value;
+    }
+
+    const result = await this.repository.withAccountsWrite(
+      [input.fromAccountId, input.toAccountId],
+      async (contexts) => {
+        const sourceContext = contexts.get(input.fromAccountId);
+        const targetContext = contexts.get(input.toAccountId);
+        if (!sourceContext || !targetContext) throw new Error('缺少持仓迁移账户账本上下文');
+        await mutate(sourceContext, targetContext);
+        await this.rebuildWithClient(
+          sourceContext.transaction,
+          input.fromAccountId,
+          'AVG',
+          sourceContext.nextProjectionGeneration,
+        );
+        await this.rebuildWithClient(
+          targetContext.transaction,
+          input.toAccountId,
+          'AVG',
+          targetContext.nextProjectionGeneration,
+        );
+        return {
+          value: { fromAccountId: input.fromAccountId, toAccountId: input.toAccountId },
+          advanceAccountIds: [input.fromAccountId, input.toAccountId],
+        };
+      },
+    );
+    return result.value;
+  }
+
+  async clearPositions(accountId: string) {
+    const commandId = randomUUID();
+    const recordedAt = new Date().toISOString();
+    const result = await this.repository.withAccountWrite(accountId, async (context) => {
+      const positions = await context.transaction.position.findMany({
+        where: { accountId },
+        orderBy: { symbol: 'asc' },
+      });
+      if (positions.length === 0) {
+        return { value: { accountId, cleared: 0 }, advanceRevision: false };
+      }
+
+      for (const [index, position] of positions.entries()) {
+        await this.appendPositionBaselineWithClient(
+          context,
+          accountId,
+          position.symbol,
+          '0',
+          position.costPrice.toString(),
+          'manual',
+          '清空持仓',
+          undefined,
+          randomUUID(),
+          recordedAt,
+          batchOrderKey('baseline-clear', commandId, index),
+        );
+      }
+      await this.rebuildWithClient(
+        context.transaction,
+        accountId,
+        'AVG',
+        context.nextProjectionGeneration,
+      );
+      return { value: { accountId, cleared: positions.length }, advanceRevision: true };
     });
     return result.value;
   }
