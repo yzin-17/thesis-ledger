@@ -192,13 +192,19 @@ export function ImportReview({
       positionSheetOpen={positionSheetOpen}
       requestedAccountId={requestedAccountId}
       onNavigateAccounts={() => void navigate('/accounts')}
-      onSelectAccount={selectAccount}
+      onSelectAccount={(nextAccountId) => {
+        void selectAccount(nextAccountId);
+      }}
       onShowManualEntry={showManualEntry}
-      onOpenScreenshot={openScreenshotSheet}
+      onOpenScreenshot={() => {
+        void openScreenshotSheet();
+      }}
       onClosePositionSheet={closePositionSheet}
       onDirtyChange={setDirty}
       onPortfolioChanged={onPortfolioChanged}
-      onCloseScreenshotSheet={closeScreenshotSheet}
+      onCloseScreenshotSheet={(open) => {
+        void closeScreenshotSheet(open);
+      }}
     />
   );
 }
