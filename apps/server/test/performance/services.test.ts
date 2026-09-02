@@ -74,11 +74,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
   });
 
   it('收益摘要拒绝混合旧账户口径和当前投资范围快照', async () => {
-    const service = new PerformanceService(
-      { account: { findMany: vi.fn(async () => []) } } as never,
-      {} as never,
-    );
-    service.history = vi.fn(async () => [
+    const snapshots = [
       {
         id: 'legacy',
         accountId: null,
@@ -97,7 +93,14 @@ describe('Ledger Snapshot 与收益摘要', () => {
         cashValue: 0,
         payload: { mode: 'actual', accountScopePolicy: 'investment-only-v1' },
       },
-    ]) as never;
+    ];
+    const service = new PerformanceService(
+      {
+        account: { findMany: vi.fn(async () => []) },
+        portfolioSnapshot: { findMany: vi.fn(async () => snapshots) },
+      } as never,
+      {} as never,
+    );
 
     await expect(service.summary()).resolves.toMatchObject({
       ttwror: null,
