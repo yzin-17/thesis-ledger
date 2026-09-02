@@ -266,7 +266,9 @@ export function PortfolioManagement({
       clearInstrumentSelection={actions.clearInstrumentSelection}
       startManualInstrumentEntry={actions.startManualInstrumentEntry}
       handleInstrumentQueryChange={actions.handleInstrumentQueryChange}
-      setAccountSheetOpen={closeAccountSheet}
+      setAccountSheetOpen={(open) => {
+        void closeAccountSheet(open);
+      }}
       setPositionSheetOpen={setPositionSheetOpen}
       setEditingAccount={setEditingAccount}
       setEditing={setEditing}
