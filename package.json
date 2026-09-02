@@ -7,7 +7,7 @@
     "build": "pnpm db:generate && pnpm -r build",
     "typecheck": "pnpm build && pnpm -r typecheck",
     "test": "pnpm -r test",
-    "lint": "pnpm build && node scripts/check-boundaries.mjs && eslint . --max-warnings=0",
+    "lint": "pnpm build && node scripts/check-boundaries.mjs && node scripts/check-workspace-dependencies.mjs && eslint . --max-warnings=0",
     "security:secrets": "node scripts/check-secrets.mjs",
     "accessibility:check": "node scripts/check-accessibility.mjs",
     "release:artifacts": "node scripts/check-release-artifacts.mjs",
