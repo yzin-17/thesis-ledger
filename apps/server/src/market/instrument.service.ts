@@ -51,6 +51,10 @@ export class InstrumentService {
     return this.catalog().latestGeneration();
   }
 
+  markCatalogChecked(generation: number, checksum: string) {
+    return this.catalog().markCatalogChecked(generation, checksum);
+  }
+
   associations(symbol?: string) {
     return this.associationsService().associations(symbol);
   }

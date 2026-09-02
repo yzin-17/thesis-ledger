@@ -1,5 +1,6 @@
 FROM node:24-alpine AS build
 ENV CI=true
+RUN apk add --no-cache g++ make python3
 RUN corepack enable
 WORKDIR /workspace
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./

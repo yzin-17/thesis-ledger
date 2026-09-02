@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { debounce } from 'es-toolkit';
 import type { useToastManager } from '@/components/ui/toast';
 
@@ -11,6 +12,24 @@ import type {
 } from './portfolio.types.js';
 
 type ToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
+
+export const instrumentSearchErrorFeedback = (error: unknown) => {
+  if (
+    error instanceof ThesisLedgerApiError &&
+    error.status === 503 &&
+    (error.payload?.errorCode === 'catalog_not_ready' ||
+      error.payload?.error === 'catalog_not_ready')
+  ) {
+    return {
+      title: '标的目录准备中',
+      description: '服务器正在准备标的目录，请稍后重试。',
+    } as const;
+  }
+  return {
+    title: '标的搜索失败',
+    description: '搜索暂时不可用，请稍后重试。',
+  } as const;
+};
 
 const filterInstrumentResults = (
   accountType: Account['type'] | undefined,
@@ -108,14 +127,22 @@ export const usePortfolioInstrumentSearch = ({
     const errorKey = `${accountType ?? 'all'}:${debouncedQuery}`;
     if (errorNotified.current === errorKey) return;
     errorNotified.current = errorKey;
+    const feedback = instrumentSearchErrorFeedback(query.error);
     toastManager.add({
-      title: '标的搜索失败',
-      description: '请确认市场数据与标的中心已完成目录同步。',
+      ...feedback,
       type: 'error',
       timeout: 0,
       priority: 'high',
     });
-  }, [accountType, busy, debouncedQuery, normalizedQuery, query.isError, toastManager]);
+  }, [
+    accountType,
+    busy,
+    debouncedQuery,
+    normalizedQuery,
+    query.error,
+    query.isError,
+    toastManager,
+  ]);
 
   return {
     debouncedQuery,

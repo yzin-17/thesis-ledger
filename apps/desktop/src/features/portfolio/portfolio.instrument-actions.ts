@@ -48,7 +48,7 @@ export const createInstrumentActionHandlers = ({
     } catch {
       toastManager.add({
         title: '标的确认失败',
-        description: '请先同步目录，或检查服务端数据库迁移状态。',
+        description: '标的确认暂时不可用，请稍后重试。',
         type: 'error',
         timeout: 0,
         priority: 'high',

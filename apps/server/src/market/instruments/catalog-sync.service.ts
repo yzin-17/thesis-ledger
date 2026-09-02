@@ -164,4 +164,14 @@ export class CatalogSyncService {
       instrumentCount,
     };
   }
+
+  async markCatalogChecked(generation: number, checksum: string) {
+    const result = await this.prisma.catalogSyncState.updateMany({
+      where: { consumer: 'thesis-ledger', generation, checksum },
+      data: { syncedAt: new Date() },
+    });
+    if (result.count !== 1)
+      throw new ConflictException('目录成功校验时本地 generation 或 checksum 已变化');
+    return this.latestGeneration();
+  }
 }

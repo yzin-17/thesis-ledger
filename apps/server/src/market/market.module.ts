@@ -5,6 +5,7 @@ import { InstrumentService } from './instrument.service.js';
 import { CatalogSyncService } from './instruments/catalog-sync.service.js';
 import { InstrumentAssociationService } from './instruments/instrument-association.service.js';
 import { InstrumentSearchService } from './instruments/instrument-search.service.js';
+import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketDataController } from './market-data.controller.js';
 import { MarketStorageService } from './market-storage.service.js';
@@ -20,6 +21,7 @@ import { MarketService } from './market.service.js';
     MarketDetailService,
     MarketStorageService,
     CatalogSyncService,
+    CatalogReadinessService,
     InstrumentSearchService,
     InstrumentAssociationService,
     InstrumentService,

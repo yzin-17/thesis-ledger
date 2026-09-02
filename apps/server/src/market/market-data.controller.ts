@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
+import { Body, Controller, Get, Optional, Param, Post, Put, Query } from '@nestjs/common';
+import { DsaClient } from '../integration/dsa/dsa.client.js';
+import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { InstrumentService } from './instrument.service.js';
 import { MarketControlService } from './market-control.service.js';
 
@@ -9,7 +10,12 @@ export class MarketDataController {
     private readonly control: MarketControlService,
     private readonly instruments: InstrumentService,
     private readonly dsa: DsaClient,
+    @Optional() private readonly catalogReadiness?: CatalogReadinessService,
   ) {}
+
+  private readiness() {
+    return this.catalogReadiness ?? new CatalogReadinessService(this.instruments, this.dsa);
+  }
 
   @Get('policy') policy() {
     return this.control.getPolicy();
@@ -49,7 +55,9 @@ export class MarketDataController {
     return this.control.removeProvider(providerId);
   }
 
-  @Get('instruments/search') search(@Query('q') query = '', @Query('limit') limit = '20') {
+  @Get('instruments/search') async search(@Query('q') query = '', @Query('limit') limit = '20') {
+    if (!query.trim()) return [];
+    await this.readiness().ensureReady();
     return this.instruments.search(query, Number(limit));
   }
 
@@ -62,37 +70,16 @@ export class MarketDataController {
   }
 
   @Get('catalog/status') catalogStatus() {
-    return this.instruments.latestGeneration();
+    return this.readiness().status();
   }
 
   @Get('catalog/jobs/:jobId') async catalogJob(@Param('jobId') jobId: string) {
     const job = await this.dsa.catalogJob(jobId);
     if (job.status !== 'succeeded') return { ...job, acknowledged: false };
-    return { ...job, ...(await this.applyCatalogProjection()) };
+    return { ...job, ...(await this.readiness().projectSucceededJob(job)) };
   }
 
   @Post('catalog/sync') async syncCatalog() {
-    const job = await this.dsa.triggerCatalogJob();
-    if (job.status !== 'succeeded') return { ...job, acknowledged: false };
-    return { ...job, ...(await this.applyCatalogProjection()) };
-  }
-
-  private async applyCatalogProjection() {
-    const status = await this.instruments.latestGeneration();
-    let synced;
-    if (status.cursor) {
-      try {
-        synced = await this.instruments.applyCatalogDelta(
-          await this.dsa.catalogDelta(status.cursor),
-        );
-      } catch (error) {
-        if (!(error instanceof DsaError)) throw error;
-        synced = await this.instruments.syncCatalog(await this.dsa.catalogSnapshot());
-      }
-    } else {
-      synced = await this.instruments.syncCatalog(await this.dsa.catalogSnapshot());
-    }
-    await this.dsa.acknowledgeCatalog(synced.generation, synced.checksum);
-    return { ...synced, acknowledged: true };
+    return this.readiness().triggerAndProject();
   }
 }

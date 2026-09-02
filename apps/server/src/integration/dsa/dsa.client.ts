@@ -11,7 +11,7 @@ import { fxRatesResponseSchemaV1 } from '@thesis-ledger/schemas';
 import { loadConfig } from '../../platform/config.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
 
-type CatalogJob = {
+export type CatalogJob = {
   id: string;
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'timeout';
   generation: number;

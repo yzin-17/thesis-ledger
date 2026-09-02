@@ -39,6 +39,11 @@ type CatalogStateUpdateArgs = {
   data: Record<string, unknown>;
 };
 
+type CatalogStateUpdateManyArgs = {
+  where: { consumer: string; generation: number; checksum: string };
+  data: Record<string, unknown>;
+};
+
 const stableJson = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -122,6 +127,16 @@ class CatalogPrismaFixture {
             : record,
         ),
     ),
+    findFirst: vi.fn(async () => {
+      const records = [...this.records.values()].sort(
+        (left, right) => Number(right.generation) - Number(left.generation),
+      );
+      return records[0] ? { generation: records[0].generation } : null;
+    }),
+    count: vi.fn(
+      async ({ where }: { where: { active: boolean } }) =>
+        [...this.records.values()].filter((record) => record.active === where.active).length,
+    ),
   };
   readonly catalogSyncState = {
     findUnique: vi.fn(async () => this.state),
@@ -132,6 +147,16 @@ class CatalogPrismaFixture {
     update: vi.fn(async ({ data }: CatalogStateUpdateArgs) => {
       this.state = { ...(this.state ?? {}), ...data };
       return this.state;
+    }),
+    updateMany: vi.fn(async ({ where, data }: CatalogStateUpdateManyArgs) => {
+      if (
+        this.state?.consumer !== where.consumer ||
+        this.state.generation !== where.generation ||
+        this.state.checksum !== where.checksum
+      )
+        return { count: 0 };
+      this.state = { ...this.state, ...data };
+      return { count: 1 };
     }),
   };
 
@@ -205,6 +230,23 @@ describe('InstrumentService catalog fields and generation', () => {
     await expect(service.syncCatalog(current)).resolves.toMatchObject({ idempotent: true });
     await expect(service.syncCatalog(snapshotFor(2, [item('冲突名称')]))).rejects.toThrow(
       'checksum 冲突',
+    );
+  });
+
+  it('records a successful same-generation catalog check for the refresh window', async () => {
+    const prisma = new CatalogPrismaFixture();
+    const service = new InstrumentService(prisma as never);
+    const snapshot = snapshotFor(2, [item()]);
+    await service.syncCatalog(snapshot);
+
+    await expect(service.markCatalogChecked(2, snapshot.checksum)).resolves.toMatchObject({
+      generation: 2,
+      checksum: snapshot.checksum,
+      syncedAt: expect.any(Date),
+      instrumentCount: 1,
+    });
+    await expect(service.markCatalogChecked(1, snapshot.checksum)).rejects.toThrow(
+      'generation 或 checksum 已变化',
     );
   });
 
