@@ -67,12 +67,13 @@ try {
         'accounts', (select count(*) from "Account"),
         'ledgerEvents', (select count(*) from "LedgerEvent"),
         'snapshots', (select count(*) from "PortfolioSnapshot"),
-        'migrations', (select count(*) from "_prisma_migrations")
+        'schemaVersion', (select "version" from "SchemaVersion" where "id" = 1)
       )`,
     ]),
   );
   const restored = JSON.parse(counts);
-  if (restored.migrations !== 29) throw new Error(`恢复库迁移数量异常: ${counts}`);
+  if (restored.schemaVersion !== '20260902000000_fresh_database_baseline')
+    throw new Error(`恢复库 Schema marker 异常: ${counts}`);
 
   console.log(
     JSON.stringify(

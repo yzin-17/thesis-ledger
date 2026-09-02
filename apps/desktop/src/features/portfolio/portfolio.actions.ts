@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
 import type { useToastManager } from '@/components/ui/toast';
 
 import type { Account, HeldAssetType, InstrumentLookup, Position } from './portfolio.types.js';
@@ -16,6 +17,7 @@ import { createInstrumentActionHandlers } from './portfolio.instrument-actions.j
 import { createPositionActionHandlers } from './portfolio.position-actions.js';
 
 export type PortfolioToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
+export type PortfolioConfirmDialog = (options: ConfirmDialogOptions) => Promise<boolean>;
 
 export type PortfolioMutationBundle = {
   saveAccount: ReturnType<typeof useSaveAccountMutation>;
@@ -55,6 +57,7 @@ export type PortfolioActionDependencies = {
   markDirty: (nextDirty?: boolean) => void;
   onSaved: () => void;
   toastManager: PortfolioToastManager;
+  confirm: PortfolioConfirmDialog;
   loadManagedAccounts: () => Promise<unknown>;
   mutations: PortfolioMutationBundle;
 };

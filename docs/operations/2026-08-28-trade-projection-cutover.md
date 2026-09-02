@@ -16,14 +16,14 @@
 ## 发布前准备
 
 1. 在目标数据库副本上生成备份和 SHA-256 校验，记录应用镜像、Git revision、迁移数量、数据库副本名称和操作者。生产数据库必须先停写或使用一致性快照。
-2. 在副本上执行当前迁移链并核对迁移矩阵：
+2. 在副本上核对 current baseline 与 Schema marker：
 
    ```text
-   DATABASE_URL=<副本 owner 连接串> pnpm db:migrate
+   DATABASE_URL=<隔离副本 owner 连接串> pnpm db:migrate
    pnpm migration:matrix
    ```
 
-   当前工作树应通过 34 条迁移；应用使用 app role，migration 使用 owner role。迁移完成后重新执行权限 hardening，并确认 app role 不能更新或删除 `LedgerEvent`。
+   当前工作树应通过 1 个 current baseline。空副本由 PostgreSQL 官方 init 路径安装 baseline；应用使用 app role，owner 凭证不进入 ThesisLedger。核对 marker、三项不可变 trigger 和 app role 不能更新或删除 `LedgerEvent`。
 
 3. 在副本上执行确定性回归：
 
@@ -148,6 +148,6 @@ pnpm projection:switch-gate -- \
 
 ## 当前本地证据与范围外事项
 
-本轮已完成：34 条迁移矩阵、domain 97/97、server 290/290、schemas 94/94、api-client 10/10、desktop 102/102；本地 Compose 新镜像、migration、权限 hardening、health 和 integrity 均通过，`integrity.issueCount = 0`；两个开发账户的事务回滚 shadow rebuild 均 `rolledBack = true` 且稳定报告为 `PASS`；固定快照差异报告为全零并允许 unified 四阶段切换。
+本手册中的 Trade Projection 影子切换证据属于历史实现记录；当前数据库运行时输入已收敛为 1 个 current baseline。fresh baseline、Schema marker、权限和 health 的最新确定性证据记录在 `docs/tasks/2026-09-02-fresh-database-baseline.md`；真实 external volume 切换仍属于 T3，不在本轮执行。
 
 以下项目属于未来正式发布流程参考，不纳入当前任务：生产数据副本上的提交型迁移与恢复、全量性能和并发写入演练、正式发布环境浏览器响应式验收、在线 FX 完整性，以及包含旧读取路径的应用镜像回滚。本地任务不执行这些范围外状态变更。

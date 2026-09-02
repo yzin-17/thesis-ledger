@@ -16,6 +16,7 @@ const bootstrap = async () => {
   const config = loadConfig();
   const network = resolveServerNetworkSecurity();
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
+  app.enableShutdownHooks();
   app.enableCors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false });
   app.use(createApiRateLimitMiddleware());
   if (network.mode === 'lan') app.use(createLanAuthMiddleware(network.apiToken!));

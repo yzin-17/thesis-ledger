@@ -244,10 +244,10 @@ describe('Ledger V2 不可变持久化', () => {
     );
   });
 
-  it('迁移通过触发器与权限双重禁止 LedgerEvent 修改和删除', async () => {
+  it('current baseline 通过触发器禁止 LedgerEvent 修改和删除', async () => {
     const sql = await readFile(
       new URL(
-        '../../prisma/migrations/20260826040000_ledger_v2_foundation/migration.sql',
+        '../../prisma/migrations/20260902000000_fresh_database_baseline/migration.sql',
         import.meta.url,
       ),
       'utf8',
@@ -257,7 +257,6 @@ describe('Ledger V2 不可变持久化', () => {
       'utf8',
     );
     expect(sql).toContain('BEFORE UPDATE OR DELETE ON "LedgerEvent"');
-    expect(sql).toContain('REVOKE UPDATE, DELETE ON TABLE "LedgerEvent"');
     expect(repositorySource).toContain('FOR UPDATE');
   });
 });

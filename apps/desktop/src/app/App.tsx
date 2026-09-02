@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router';
+import { ConfirmDialogProvider } from '../components/ui/confirm-dialog.js';
 import { Toaster } from '../components/ui/toast.js';
 import { ThemeProvider } from '../ui/theme.js';
 import { AppShell } from './AppShell.js';
@@ -17,9 +18,11 @@ export function App() {
       <BrowserRouter>
         <ThemeProvider>
           <Toaster>
-            <AppShell>
-              <AppRoutes />
-            </AppShell>
+            <ConfirmDialogProvider>
+              <AppShell>
+                <AppRoutes />
+              </AppShell>
+            </ConfirmDialogProvider>
           </Toaster>
         </ThemeProvider>
       </BrowserRouter>

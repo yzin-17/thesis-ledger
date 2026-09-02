@@ -3,6 +3,11 @@ import { PrismaService } from './prisma.service.js';
 import { RedisService } from './redis.service.js';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { loadConfig } from './config.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  isCurrentDatabaseSchemaVersion,
+  parseDatabaseSchemaVersion,
+} from './schema-version.js';
 
 type Status = 'healthy' | 'degraded' | 'down';
 
@@ -16,18 +21,23 @@ export class HealthService {
   async check() {
     const config = loadConfig();
     const checks = await Promise.allSettled([
-      this.prisma.$queryRaw`SELECT 1`,
+      this.prisma.$queryRaw`SELECT "version" FROM "SchemaVersion" WHERE "id" = 1 LIMIT 1`,
       this.redis.ping(),
       this.dsa.health(),
       this.dsa.capabilities(),
     ]);
+    const databaseVersion =
+      checks[0].status === 'fulfilled' ? parseDatabaseSchemaVersion(checks[0].value) : null;
     const dsaCapabilities =
       checks[3].status === 'fulfilled' ? checks[3].value.capabilities : undefined;
     const fundNavAvailable =
       dsaCapabilities !== undefined &&
       Object.prototype.hasOwnProperty.call(dsaCapabilities, 'fund-nav');
     const dependencies = {
-      database: state(checks[0]),
+      database:
+        checks[0].status === 'fulfilled' && isCurrentDatabaseSchemaVersion(databaseVersion)
+          ? 'healthy'
+          : 'down',
       redis: state(checks[1]),
       dsa: state(checks[2]) === 'healthy' && fundNavAvailable ? 'healthy' : 'down',
     } as const;
@@ -38,7 +48,7 @@ export class HealthService {
       service: 'thesis-ledger',
       version: '0.1.0',
       contractVersion: 1,
-      schemaVersion: '20260818000000_market_data_provider_v12',
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       capabilities: {
         accountModel: 'container-v1',
         fundNav: fundNavAvailable,

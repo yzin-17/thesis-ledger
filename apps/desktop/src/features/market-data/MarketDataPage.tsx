@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InstrumentCatalogPanel } from './InstrumentCatalogPanel.js';
 import { MarketPolicyPanel } from './MarketPolicyPanel.js';
 import { MarketProviderPanel } from './MarketProviderPanel.js';
@@ -25,6 +26,7 @@ import type { MarketPolicy, ProviderManifest } from './market-data.types.js';
 
 export function MarketDataPage() {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmDialog();
   const { policy, providers, catalog } = useMarketDataQueries();
   const savePolicy = useSaveMarketPolicyMutation();
   const saveProvider = useSaveMarketProviderMutation();
@@ -153,7 +155,16 @@ export function MarketDataPage() {
   };
 
   const handleClearCredential = async (provider: ProviderManifest) => {
-    if (!window.confirm(`确认清除 ${provider.displayName} 的已保存凭证？`)) return;
+    if (
+      !(await confirm({
+        title: `清除 ${provider.displayName} 的已保存凭证？`,
+        description: '清除后将无法使用当前已保存凭证，之后可重新配置。',
+        confirmLabel: '清除凭证',
+        cancelLabel: '取消',
+        variant: 'destructive',
+      }))
+    )
+      return;
     setBusyAction(`provider-clear:${provider.providerId}`);
     try {
       await clearCredential.mutateAsync(provider);
@@ -172,9 +183,13 @@ export function MarketDataPage() {
 
   const handleRemoveProvider = async (provider: ProviderManifest) => {
     if (
-      !window.confirm(
-        `确认从所有市场数据路由中移除 ${provider.displayName}？该操作会生成新的 Policy revision。`,
-      )
+      !(await confirm({
+        title: `移除 ${provider.displayName}？`,
+        description: '该操作会从所有市场数据路由中移除 Provider，并生成新的 Policy revision。',
+        confirmLabel: '移除 Provider',
+        cancelLabel: '取消',
+        variant: 'destructive',
+      }))
     )
       return;
     setBusyAction(`provider-remove:${provider.providerId}`);

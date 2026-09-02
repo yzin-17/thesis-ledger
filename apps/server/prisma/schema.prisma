@@ -35,6 +35,12 @@ enum TradeEvidenceCompleteness {
   CONFLICTED
 }
 
+model SchemaVersion {
+  id        Int      @id @default(1)
+  version   String   @unique
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
 model Account {
   id                 String                       @id @default(uuid()) @db.Uuid
   name               String

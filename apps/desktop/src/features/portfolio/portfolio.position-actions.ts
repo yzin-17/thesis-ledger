@@ -214,13 +214,18 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
     markDirty,
     onSaved,
     toastManager,
+    confirm,
   } = dependencies;
   return async () => {
     if (!entryAccountId || positions.length === 0 || busyAction) return;
     if (
-      !window.confirm(
-        '确认清空当前账户的全部持仓？该操作会写入数量为零的持仓观察，现金余额不受影响。',
-      )
+      !(await confirm({
+        title: '清空当前账户的全部持仓？',
+        description: '该操作会写入数量为零的持仓观察，现金余额不受影响。',
+        confirmLabel: '清空持仓',
+        cancelLabel: '取消',
+        variant: 'destructive',
+      }))
     )
       return;
     setBusyAction('clear-positions');
@@ -256,11 +261,20 @@ const createRemovePositionHandler = (dependencies: PortfolioActionDependencies) 
     onSaved,
     toastManager,
     calibrationMode,
+    confirm,
   } = dependencies;
   return async (position: Position) => {
     if (busyAction) return;
     const actionLabel = calibrationMode ? '移除持仓观察' : '删除持仓';
-    if (!window.confirm(`确认${actionLabel} ${position.asset.name}（${position.symbol}）？`))
+    if (
+      !(await confirm({
+        title: `${actionLabel}？`,
+        description: `确认${actionLabel} ${position.asset.name}（${position.symbol}）？`,
+        confirmLabel: actionLabel,
+        cancelLabel: '取消',
+        variant: 'destructive',
+      }))
+    )
       return;
     setBusyAction(`remove:${position.id}`);
     try {

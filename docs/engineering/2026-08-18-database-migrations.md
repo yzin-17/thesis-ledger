@@ -1,4 +1,4 @@
-# 数据库迁移规范
+# 数据库 Schema 与 current baseline 规范
 
 ## 选型
 
@@ -7,11 +7,11 @@
 ## 流程
 
 1. 修改 `apps/server/prisma/schema.prisma`。
-2. 在开发数据库执行 `prisma migrate dev --name <change>` 生成 SQL。
-3. 人工审核 SQL、锁范围、索引和数据回填方案。
-4. CI 从空库执行 `prisma migrate deploy`，再执行 seed 与集成测试。
-5. 生产仅执行已经进入版本控制的 `prisma migrate deploy`，禁止 `db push`。
+2. 以当前最终 schema 重新生成并人工审核 `apps/server/prisma/migrations/20260902000000_fresh_database_baseline/migration.sql`。
+3. 确认 Prisma 无法表达的 `CHECK`、函数、触发器、扩展、部分索引、Schema marker 和角色权限仍在 baseline 中。
+4. CI 对空 PostgreSQL 数据库执行 baseline，并运行 Prisma validate、Server 定向测试和数据库不变量演练。
+5. Compose 由 PostgreSQL 官方 init 路径执行 baseline；ThesisLedger 不执行数据库初始化或 owner 连接串。
 
-破坏性变更采用“扩展—迁移—收缩”：先新增兼容字段，发布回填和双读版本，确认完成后再单独删除旧字段。回滚优先回退应用版本；数据库使用前向修复 migration，不自动执行不可逆 SQL。
+本阶段不提供旧 Schema 或旧业务数据升级链。baseline 版本变化后，已有 PostgreSQL external volume 必须由运维人员显式备份、删除并重建；应用、更新脚本和 entrypoint 均不得自动执行卷删除。
 
-开发 seed 位于 `apps/server/prisma/seed.ts`，必须幂等且不得包含真实账户或凭证。
+活动 migration 目录只保留一份 current baseline；旧 migration 不属于运行时输入。开发 seed 位于 `apps/server/prisma/seed.ts`，必须幂等且不得包含真实账户或凭证。

@@ -22,6 +22,7 @@ import { PortfolioManagement } from '../src/features/portfolio/PortfolioManageme
 import { InstrumentCombobox } from '../src/features/portfolio/InstrumentCombobox.js';
 import { DataStateBanner } from '../src/features/shared/DesktopPrimitives.js';
 import { DateInput } from '../src/components/ui/date-input.js';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { FieldLabel } from '../src/components/ui/field.js';
 import { Switch, SwitchThumb } from '../src/components/ui/switch.js';
 import { Toast, ToastContent, ToastViewport, Toaster } from '../src/components/ui/toast.js';
@@ -32,7 +33,9 @@ const renderWithToast = (node: ReactNode) => {
   });
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
-      <Toaster>{node}</Toaster>
+      <Toaster>
+        <ConfirmDialogProvider>{node}</ConfirmDialogProvider>
+      </Toaster>
     </QueryClientProvider>,
   );
 };
@@ -58,6 +61,23 @@ const readDesktopSource = (directory: string): string[] =>
   });
 
 describe('Desktop UI contract - onboarding and portfolio', () => {
+  it('uses the shared alert dialog for business confirmations', () => {
+    const sources = readDesktopSource(desktopSourceDirectory);
+    expect(sources.some((source) => source.includes('window.confirm'))).toBe(false);
+
+    const confirmDialogSource = readFileSync(
+      new URL('../src/components/ui/confirm-dialog.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(confirmDialogSource).toContain('ConfirmDialogProvider');
+    expect(confirmDialogSource).toContain('useConfirmDialog');
+    expect(confirmDialogSource).toContain('<AlertDialogTitle>');
+    expect(confirmDialogSource).toContain('<AlertDialogDescription>');
+    expect(confirmDialogSource).toContain('<AlertDialogClose');
+    expect(confirmDialogSource).toContain('variant="outline"');
+    expect(confirmDialogSource).toContain("variant={request.options.variant ?? 'default'}");
+  });
+
   it('normalizes legacy health history arrays while supporting paginated responses', () => {
     const legacyPage = normalizeProviderHealthHistory(
       [
@@ -104,9 +124,7 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     expect(firstStep).toContain('配置数据源与通知');
     expect(firstStep).toContain('设置风险规则');
     expect(firstStep.match(/<li/g)).toHaveLength(4);
-    expect(firstStep).toMatch(
-      /<button[^>]*disabled[^>]*>截图导入（暂未开放）<\/button>/,
-    );
+    expect(firstStep).toMatch(/<button[^>]*disabled[^>]*>截图导入（暂未开放）<\/button>/);
   });
 
   it('removes completed onboarding from the page', () => {
@@ -226,9 +244,10 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
 
 describe('Desktop UI contract - providers and primitives', () => {
   it('guards FieldLabel activation while retaining label semantics and removes native wrappers', () => {
-    const labelElement = FieldLabel({ children: '名称', htmlFor: 'label-target' }) as ReactElement<
-      LabelElementProps
-    >;
+    const labelElement = FieldLabel({
+      children: '名称',
+      htmlFor: 'label-target',
+    }) as ReactElement<LabelElementProps>;
     const preventDefault = vi.fn();
     const labelSurfaceEvent = { preventDefault, target: null };
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 
 import type { Account, HeldAssetType, InstrumentLookup, Position } from './portfolio.types.js';
@@ -73,6 +74,7 @@ export function PortfolioManagement({
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [manualAssetType, setManualAssetType] = useState<HeldAssetType>('stock');
   const instrumentSelectionInProgress = useRef(false);
+  const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const managedAccountsQuery = useManagedAccountsQuery(step === 'account' && accountsReady);
   const managedAccounts = managedAccountsQuery.data ?? accounts;
@@ -118,13 +120,22 @@ export function PortfolioManagement({
     setEntrySheetMode(mode);
     setPositionSheetOpen(true);
   };
-  const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
-  const closeAccountSheet = (open: boolean) => {
+  const confirmDiscard = async () => {
+    if (!dirty) return true;
+    return confirm({
+      title: '放弃未保存修改？',
+      description: '当前有未保存修改，切换后会丢弃，继续吗？',
+      confirmLabel: '放弃修改',
+      cancelLabel: '继续编辑',
+      variant: 'destructive',
+    });
+  };
+  const closeAccountSheet = async (open: boolean) => {
     if (open) {
       setAccountSheetOpen(true);
       return;
     }
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     setEditingAccount(null);
     markDirty(false);
     setAccountSheetOpen(false);
@@ -204,6 +215,7 @@ export function PortfolioManagement({
     setManualAssetType,
     setPositionSheetOpen,
     markDirty,
+    confirm,
     onSaved,
     toastManager,
     loadManagedAccounts,

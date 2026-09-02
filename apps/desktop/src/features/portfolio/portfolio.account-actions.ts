@@ -14,6 +14,7 @@ export const createAccountActionHandlers = ({
   markDirty,
   onSaved,
   toastManager,
+  confirm,
   loadManagedAccounts,
   mutations,
 }: PortfolioActionDependencies) => {
@@ -65,7 +66,17 @@ export const createAccountActionHandlers = ({
   const toggleAccount = async (account: Account) => {
     if (busyAction) return;
     const active = account.active !== false;
-    if (active && !window.confirm(`确认停用账户“${account.name}”？`)) return;
+    if (
+      active &&
+      !(await confirm({
+        title: `停用账户“${account.name}”？`,
+        description: '停用后账户仍保留历史数据，但不能继续用于录入。',
+        confirmLabel: '停用账户',
+        cancelLabel: '取消',
+        variant: 'destructive',
+      }))
+    )
+      return;
     setBusyAction(`account-toggle:${account.id}`);
     try {
       await mutations.toggleAccount.mutateAsync({ accountId: account.id, active });

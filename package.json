@@ -15,8 +15,6 @@
     "benchmarks:check": "node scripts/check-benchmarks.mjs",
     "benchmarks:portfolio": "pnpm --filter @thesis-ledger/server build && node scripts/portfolio-benchmark.mjs",
     "migration:matrix": "node scripts/check-migration-matrix.mjs",
-    "migration:legacy-ledger": "node scripts/legacy-ledger-migration-smoke.mjs",
-    "migration:thesis-ledger": "bash scripts/migrate-to-thesis-ledger.sh",
     "projection:shadow-diff": "node scripts/projection-shadow-diff.mjs",
     "projection:shadow-rebuild": "pnpm --filter @thesis-ledger/server build && node scripts/projection-shadow-rebuild.mjs",
     "projection:switch-gate": "node scripts/projection-switch-gate.mjs",

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const migrationSql = readFile(
   new URL(
-    '../../prisma/migrations/20260830010000_recurring_cash_deposits/migration.sql',
+    '../../prisma/migrations/20260902000000_fresh_database_baseline/migration.sql',
     import.meta.url,
   ),
   'utf8',

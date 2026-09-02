@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 
 import { Sheet } from '../src/components/ui/sheet.js';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { Toaster } from '../src/components/ui/toast.js';
 import { AccountDataPage } from '../src/features/account-data/AccountDataPage.js';
 import { chargeCategoryLabel } from '../src/features/account-data/account-data.helpers.js';
@@ -76,7 +77,9 @@ const renderPage = (search = '', accounts = [account, shadowAccount], seed = tru
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[`/accounts${search}`]}>
         <Toaster>
-          <AccountDataPage accounts={accounts} onPortfolioChanged={() => undefined} />
+          <ConfirmDialogProvider>
+            <AccountDataPage accounts={accounts} onPortfolioChanged={() => undefined} />
+          </ConfirmDialogProvider>
         </Toaster>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -137,9 +140,11 @@ const renderInlineAccountManager = (accountSheetOpen: boolean) => {
   } as unknown as PortfolioManagementViewProps;
 
   return renderToStaticMarkup(
-    <Sheet open>
-      <AccountManagementSection {...props} />
-    </Sheet>,
+    <ConfirmDialogProvider>
+      <Sheet open>
+        <AccountManagementSection {...props} />
+      </Sheet>
+    </ConfirmDialogProvider>,
   );
 };
 
@@ -242,7 +247,9 @@ describe('账户数据页面契约', () => {
     expect(executionSource).toContain('if (submitting) return;');
     expect(executionSource).not.toContain('window.confirm');
     expect(executionSource).toContain('skipDiscardConfirm: true');
-    expect(accountDataSource).toContain('!options?.skipDiscardConfirm && !confirmDiscard()');
+    expect(accountDataSource).toContain(
+      '!options?.skipDiscardConfirm && !(await confirmDiscard())',
+    );
     expect(accountDataSource).toContain('原因必填');
     expect(accountDataSource).toContain('确认对账并写入账本');
     expect(accountDataSource).toContain('恢复');

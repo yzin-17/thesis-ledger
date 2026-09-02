@@ -11,14 +11,15 @@ curl http://localhost:3000/api/v1/health
 
 健康响应分别报告 PostgreSQL、Redis 和 DSA，并声明 Account model、actual/shadow 和 `fund-nav` capability。任一依赖失败时 Server 应返回 `degraded`，并保留其余可用能力；缺少 Fund NAV capability 时不得用 Quote 或截图净值替代。
 
-## 数据库迁移
+## 数据库初始化与 Schema 版本
 
 ```bash
-docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-ledger sh -c 'cd apps/server && ./node_modules/.bin/prisma migrate deploy'
 docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-ledger sh -c 'cd apps/server && ./node_modules/.bin/tsx prisma/seed.ts'
 ```
 
-发布前先备份并在副本演练迁移。账户模型迁移 `20260807100000_account_entry_model` 会先检查账户类型与持仓资产冲突，预检失败必须停止。迁移失败时恢复上一兼容应用和备份；禁止对生产库执行 `migrate reset`。
+空 PostgreSQL 卷由 PostgreSQL 官方 init 路径安装 current baseline、创建 app role 并写入 Schema marker；ThesisLedger 不执行 `prisma migrate deploy`，也不接收 owner 连接串。健康检查会拒绝缺失或不匹配 `THESIS_LEDGER_SCHEMA_VERSION` 的数据库，应用不会启动。
+
+发布前先备份并在隔离副本演练 baseline。版本不匹配时保留卷和日志，确认备份后再由运维人员显式重建 PostgreSQL external volume；禁止脚本或 entrypoint 自动删除卷。
 
 ## Provider 故障
 
@@ -47,6 +48,6 @@ DSA 定时检查间隔由 `PROVIDER_HEALTH_CHECK_INTERVAL_MS` 控制，默认 1 
 - 数据库：优先前向修复；必须恢复时使用发布前备份并执行完整性检查。
 - DSA：镜像标签必须绑定 Git commit，不使用不可追溯的 `latest`。
 - DSA Contract：确认 `THESIS_LEDGER_DSA_TOKEN` 与 DSA 服务一致，并检查 `/capabilities` 的 `fund-nav.assetSuffix=.OF`；生产配置使用 GHCR digest。
-- 数据库迁移：先备份原 `investment_os` 数据库，再恢复并校验到 `thesis_ledger`；Redis 不迁移旧 key，启动后由新命名空间重建缓存。
+- 数据库切换：先备份并由运维人员显式重建 PostgreSQL external volume；Redis 不迁移旧 key，启动后由新命名空间重建缓存。
 
-数据迁移使用 `pnpm migration:thesis-ledger`，需要显式提供 `SOURCE_DATABASE_URL` 和已创建的空 `TARGET_DATABASE_URL`。脚本拒绝源/目标相同或目标非空，不删除旧库；完成后保留 dump 和 checksum，Redis 只通过新命名空间重新生成。
+本阶段不提供旧 Schema 或旧业务数据导入 current baseline 的迁移命令。需要切换时保留备份、卷和日志，按 T3 的受控流程执行。

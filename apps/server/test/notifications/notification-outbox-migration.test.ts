@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const migrationSql = readFile(
   new URL(
-    '../../prisma/migrations/20260830010000_recurring_cash_deposits/migration.sql',
+    '../../prisma/migrations/20260902000000_fresh_database_baseline/migration.sql',
     import.meta.url,
   ),
   'utf8',
@@ -13,8 +13,8 @@ const fixtureSql = readFile(
   'utf8',
 );
 
-describe('Notification Outbox 旧数据迁移', () => {
-  it('fixture 覆盖旧 eventId、投递状态和无效严重级别', async () => {
+describe('NotificationDelivery current baseline', () => {
+  it('fixture 仍记录历史 outbox 输入，供最终结构审阅', async () => {
     const fixture = await fixtureSql;
 
     expect(fixture).toContain('"eventId"');
@@ -23,16 +23,12 @@ describe('Notification Outbox 旧数据迁移', () => {
     expect(fixture).toContain("'legacy-severity'");
   });
 
-  it('迁移回填稳定 subject 和完整风险消息快照', async () => {
+  it('current baseline 直接创建稳定 subject 和完整风险消息字段', async () => {
     const migration = await migrationSql;
 
-    expect(migration).toContain("'risk-event'");
-    expect(migration).toContain('delivery."eventId"::text');
-    expect(migration).toContain("'title', '风险提醒'");
-    expect(migration).toContain(`'body', event."message"`);
-    expect(migration).toContain(`'traceId', COALESCE(NULLIF(event."context"->>'traceId'`);
-    expect(migration).toContain('ALTER COLUMN "subjectType" SET NOT NULL');
-    expect(migration).toContain('DROP COLUMN "eventId"');
-    expect(migration).toContain('DROP CONSTRAINT "NotificationDelivery_eventId_fkey"');
+    expect(migration).toContain('"subjectType" TEXT NOT NULL');
+    expect(migration).toContain('"subjectId" TEXT NOT NULL');
+    expect(migration).toContain('"message" JSONB NOT NULL');
+    expect(migration).not.toContain('"eventId" UUID');
   });
 });

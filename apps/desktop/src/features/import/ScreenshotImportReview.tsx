@@ -1,5 +1,6 @@
 import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,7 @@ type ScreenshotImportContentProps = {
   drafts: ImportDraftRecord[];
   selected: ImportDraftRecord | null;
   rows: ImportRow[];
-  confirmDiscard: () => boolean;
+  confirmDiscard: () => Promise<boolean>;
   loadDrafts: (accountId: string) => Promise<void>;
   upload: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   choose: (draft: ImportDraftRecord) => void;
@@ -65,6 +66,7 @@ export function ScreenshotImportReview({
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const draftsQuery = useImportDraftsQuery(accountId);
   const uploadMutation = useUploadScreenshotImportMutation();
@@ -80,7 +82,16 @@ export function ScreenshotImportReview({
     setDirty(nextDirty);
     onDirtyChange?.(nextDirty);
   };
-  const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const confirmDiscard = async () => {
+    if (!dirty) return true;
+    return confirm({
+      title: '放弃未保存修改？',
+      description: '当前有未保存修改，切换后会丢弃，继续吗？',
+      confirmLabel: '放弃修改',
+      cancelLabel: '继续编辑',
+      variant: 'destructive',
+    });
+  };
   useEffect(() => {
     if (accountLocked && initialAccountId && initialAccountId !== accountId) {
       setAccountId(initialAccountId);
@@ -124,8 +135,8 @@ export function ScreenshotImportReview({
     }
   };
 
-  const choose = (draft: ImportDraftRecord) => {
-    if (!confirmDiscard()) return;
+  const choose = async (draft: ImportDraftRecord) => {
+    if (!(await confirmDiscard())) return;
     setSelected(draft);
     setRows(draft.rows);
     setSource(draft.source);
@@ -249,6 +260,12 @@ function ScreenshotImportContent({
   setSource,
   setRows,
 }: ScreenshotImportContentProps) {
+  const handleAccountChange = async (value: string) => {
+    if (!(await confirmDiscard())) return;
+    markDirty(false);
+    setAccountId(value);
+  };
+
   return (
     <div
       className={cn(
@@ -281,11 +298,7 @@ function ScreenshotImportContent({
           source={source}
           accountLocked={accountLocked}
           busyAction={busyAction}
-          onAccountChange={(value) => {
-            if (!value || !confirmDiscard()) return;
-            markDirty(false);
-            setAccountId(value);
-          }}
+          onAccountChange={(value) => void handleAccountChange(value)}
           onSourceChange={(value) => {
             markDirty();
             setSource(value);

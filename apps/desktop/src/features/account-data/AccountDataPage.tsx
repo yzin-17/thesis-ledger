@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import {
   Select,
@@ -101,6 +102,7 @@ export function AccountDataPage({
   } | null>(null);
   const [accountManagerOpen, setAccountManagerOpen] = useState(params.get('setup') === '1');
   const [draftDirty, setDraftDirty] = useState(false);
+  const { confirm } = useConfirmDialog();
   const selectedAccount = accounts.find((account) => account.id === accountId);
   const valuationQuery = useAccountValuationQuery(
     accountId,
@@ -153,14 +155,23 @@ export function AccountDataPage({
     void navigate({ pathname: '/accounts', ...(search ? { search: `?${search}` } : {}) });
   };
 
-  const confirmDiscard = () =>
-    !draftDirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const confirmDiscard = async () => {
+    if (!draftDirty) return true;
+    return confirm({
+      title: '放弃未保存修改？',
+      description: '当前有未保存修改，切换后会丢弃，继续吗？',
+      confirmLabel: '放弃修改',
+      cancelLabel: '继续编辑',
+      variant: 'destructive',
+    });
+  };
 
-  const selectAccount = (
+  const selectAccount = async (
     nextAccountId: string,
     extraLocationUpdates: Record<string, string | null> = {},
   ) => {
-    if (!nextAccountId || nextAccountId === accountId || !confirmDiscard()) return;
+    if (!nextAccountId || nextAccountId === accountId) return true;
+    if (!(await confirmDiscard())) return false;
     setDraftDirty(false);
     setExecutionOpen(false);
     setEditingEvent(null);
@@ -178,11 +189,12 @@ export function AccountDataPage({
       /* sessionStorage is optional */
     }
     updateLocation({ accountId: nextAccountId, entry: null, ...extraLocationUpdates });
+    return true;
   };
 
-  const selectTab = (nextTab: AccountDataTab) => {
+  const selectTab = async (nextTab: AccountDataTab) => {
     if (nextTab === tab) return;
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     setDraftDirty(false);
     setTab(nextTab);
     setExecutionOpen(false);
@@ -202,8 +214,8 @@ export function AccountDataPage({
     updateLocation({ tab: 'transactions', entry: 'execution' });
   };
 
-  const openCorrectExecution = (event: ExecutionEvent) => {
-    if (!confirmDiscard()) return;
+  const openCorrectExecution = async (event: ExecutionEvent) => {
+    if (!(await confirmDiscard())) return;
     setAuditEvent(null);
     setEditingEvent(event);
     setExecutionOpen(true);
@@ -211,42 +223,42 @@ export function AccountDataPage({
     updateLocation({ tab: 'transactions', entry: 'execution' });
   };
 
-  const closeExecution = (open: boolean, options?: ExecutionSheetCloseOptions) => {
+  const closeExecution = async (open: boolean, options?: ExecutionSheetCloseOptions) => {
     if (open) {
       setExecutionOpen(true);
       return;
     }
-    if (!options?.skipDiscardConfirm && !confirmDiscard()) return;
+    if (!options?.skipDiscardConfirm && !(await confirmDiscard())) return;
     setDraftDirty(false);
     setEditingEvent(null);
     setExecutionOpen(false);
     updateLocation({ entry: null });
   };
 
-  const openImport = () => {
-    if (!selectedAccount || selectedAccount.type === 'cash' || !confirmDiscard()) return;
+  const openImport = async () => {
+    if (!selectedAccount || selectedAccount.type === 'cash' || !(await confirmDiscard())) return;
     setDraftDirty(false);
     setImportOpen(true);
     updateLocation({ tab: 'positions', entry: 'screenshot' });
   };
 
-  const closeImport = (open: boolean) => {
+  const closeImport = async (open: boolean) => {
     if (open) {
       setImportOpen(true);
       return;
     }
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     setDraftDirty(false);
     setImportOpen(false);
     updateLocation({ entry: null });
   };
 
-  const closeAccountManager = (open: boolean) => {
+  const closeAccountManager = async (open: boolean) => {
     if (open) {
       setAccountManagerOpen(true);
       return;
     }
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     setDraftDirty(false);
     setAccountManagerOpen(false);
     updateLocation({ setup: null });
@@ -325,7 +337,7 @@ export function AccountDataPage({
           <Select
             value={accountId || null}
             onValueChange={(value) => {
-              if (value) selectAccount(value);
+              if (value) void selectAccount(value);
             }}
           >
             <SelectTrigger id="account-data-account" className="w-full">
@@ -351,7 +363,7 @@ export function AccountDataPage({
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(value) => selectTab(value as AccountDataTab)}>
+      <Tabs value={tab} onValueChange={(value) => void selectTab(value as AccountDataTab)}>
         <TabsList variant="line" className="min-h-11 w-fit">
           <TabsTrigger value="positions">持仓</TabsTrigger>
           <TabsTrigger value="transactions">成交记录</TabsTrigger>
@@ -505,9 +517,10 @@ export function AccountDataPage({
             accountFormInline
             accountManagerOpen={accountManagerOpen}
             onDirtyChange={setDraftDirty}
-            onAccountEntry={(nextAccountId) => {
-              selectAccount(nextAccountId, { setup: null });
-              setAccountManagerOpen(false);
+            onAccountEntry={async (nextAccountId) => {
+              if (await selectAccount(nextAccountId, { setup: null })) {
+                setAccountManagerOpen(false);
+              }
             }}
             onSaved={onPortfolioChanged}
           />

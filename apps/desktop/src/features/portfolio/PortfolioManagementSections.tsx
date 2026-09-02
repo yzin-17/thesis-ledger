@@ -707,6 +707,19 @@ function AccountField({
   | 'setManualAssetType'
   | 'setEntrySheetMode'
 >) {
+  const handleAccountChange = async (value: string | null) => {
+    if (!value || !(await confirmDiscard())) return;
+    const nextAccount = accounts.find((account) => account.id === value);
+    markDirty(false);
+    setEntryAccountId(value);
+    setSelectedInstrument(null);
+    setInstrumentQuery('');
+    setInstrumentSearchOpen(false);
+    setManualInstrumentEntry(false);
+    setManualAssetType(nextAccount?.type === 'fund' ? 'fund' : 'stock');
+    setEntrySheetMode(nextAccount?.type === 'cash' ? 'cash' : 'position');
+  };
+
   if (entryAccountLocked) {
     return (
       <div className="grid gap-1.5">
@@ -732,18 +745,7 @@ function AccountField({
         name="accountId"
         required
         value={entryAccountId || null}
-        onValueChange={(value) => {
-          if (!value || !confirmDiscard()) return;
-          const nextAccount = accounts.find((account) => account.id === value);
-          markDirty(false);
-          setEntryAccountId(value);
-          setSelectedInstrument(null);
-          setInstrumentQuery('');
-          setInstrumentSearchOpen(false);
-          setManualInstrumentEntry(false);
-          setManualAssetType(nextAccount?.type === 'fund' ? 'fund' : 'stock');
-          setEntrySheetMode(nextAccount?.type === 'cash' ? 'cash' : 'position');
-        }}
+        onValueChange={(value) => void handleAccountChange(value)}
       >
         <SelectTrigger aria-label="账户" className="w-full">
           <SelectValue placeholder="选择账户">{selectedAccount?.name ?? '选择账户'}</SelectValue>

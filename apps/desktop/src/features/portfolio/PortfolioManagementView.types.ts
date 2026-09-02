@@ -38,7 +38,7 @@ export type PortfolioManagementViewProps = {
   manualInstrumentEntry: boolean;
   manualAssetType: HeldAssetType;
   markDirty: (nextDirty?: boolean) => void;
-  confirmDiscard: () => boolean;
+  confirmDiscard: () => Promise<boolean>;
   openEntrySheet: (mode?: 'position' | 'cash') => void;
   toggleAccount: (account: Account) => Promise<void>;
   submitAccount: (event: FormEvent<HTMLFormElement>) => Promise<void>;

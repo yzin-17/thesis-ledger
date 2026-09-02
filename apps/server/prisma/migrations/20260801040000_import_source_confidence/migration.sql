@@ -1,2 +1,0 @@
-ALTER TABLE "ImportDraft"
-ADD COLUMN "sourceConfidence" DECIMAL(5, 4) NOT NULL DEFAULT 0;

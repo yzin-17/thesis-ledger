@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import {
@@ -39,6 +40,7 @@ export function ImportReview({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { confirm } = useConfirmDialog();
   const params = new URLSearchParams(location.search);
   const queryStep = params.get('step');
   const queryMethod = params.get('method');
@@ -96,7 +98,16 @@ export function ImportReview({
     }
   }, [screenshotQueryRequested, selectedAccount?.type]);
   const accountPositions = entryPositions.filter((position) => position.accountId === accountId);
-  const confirmDiscard = () => !dirty || window.confirm('当前有未保存修改，切换后会丢弃，继续吗？');
+  const confirmDiscard = async () => {
+    if (!dirty) return true;
+    return confirm({
+      title: '放弃未保存修改？',
+      description: '当前有未保存修改，切换后会丢弃，继续吗？',
+      confirmLabel: '放弃修改',
+      cancelLabel: '继续编辑',
+      variant: 'destructive',
+    });
+  };
 
   const setScreenshotEntryUrl = (open: boolean) => {
     const next = new URLSearchParams(location.search);
@@ -108,32 +119,32 @@ export function ImportReview({
     void navigate({ pathname: '/position-entry', search: '?' + next.toString() });
   };
 
-  const openScreenshotSheet = () => {
-    if (selectedAccount?.type === 'cash' || !confirmDiscard()) return;
+  const openScreenshotSheet = async () => {
+    if (selectedAccount?.type === 'cash' || !(await confirmDiscard())) return;
     setDirty(false);
     setPositionSheetOpen(false);
     setScreenshotSheetOpen(true);
     setScreenshotEntryUrl(true);
   };
 
-  const closeScreenshotSheet = (open: boolean) => {
+  const closeScreenshotSheet = async (open: boolean) => {
     if (open) {
       setScreenshotSheetOpen(true);
       return;
     }
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     setDirty(false);
     setScreenshotSheetOpen(false);
     setScreenshotEntryUrl(false);
   };
 
   const showManualEntry = () => {
-    if (screenshotSheetOpen) closeScreenshotSheet(false);
+    if (screenshotSheetOpen) void closeScreenshotSheet(false);
   };
 
-  const selectAccount = (nextAccountId: string) => {
+  const selectAccount = async (nextAccountId: string) => {
     if (nextAccountId === accountId) return;
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     setDirty(false);
     setPositionSheetOpen(false);
     setScreenshotSheetOpen(false);
@@ -248,7 +259,9 @@ function ImportPositionPage({
           <span>当前账户</span>
           <Select
             value={accountId || null}
-            onValueChange={(value) => value && onSelectAccount(value)}
+            onValueChange={(value) => {
+              if (value) void onSelectAccount(value);
+            }}
           >
             <SelectTrigger aria-label="当前账户" className="w-full">
               <SelectValue placeholder="选择账户">

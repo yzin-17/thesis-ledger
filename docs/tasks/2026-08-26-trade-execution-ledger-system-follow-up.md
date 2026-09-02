@@ -44,7 +44,7 @@
 
 | 编号 | 严重度 | 状态 | 位置 | 问题与影响 | 归属任务 |
 | --- | --- | --- | --- | --- | --- |
-| R-T3-01 | P1 | 已修复 | `thesis-ledger-infra/compose.yml`、`scripts/validate-db-roles.sh`、`scripts/bootstrap-app-role.sql`、`scripts/harden-app-role.sql` | Compose 预检和 bootstrap SQL 均拒绝空值或同名角色；migration 后再次 harden `LedgerEvent` 权限，应用角色只保留业务写入所需权限。 | T3-R1 |
+| R-T3-01 | P1 | 已修复 | `thesis-ledger-infra/compose.yml`、`scripts/bootstrap-app-role.sql` | PostgreSQL 官方 init SQL 拒绝空值或同名角色并收紧 `LedgerEvent` 权限，应用角色只保留业务写入所需权限。 | T3-R1 |
 | R-T5-01 | P1 | 已修复 | `20260826050000_migrate_legacy_ledger_v2/migration.sql`、`scripts/legacy-ledger-migration-smoke.mjs` | BUY/SELL 的负数、缺失值和 `NaN` 在事务预检阶段阻断；零费用不生成明细，正费用按类别保真写入 V2 `charges`，失败时不创建策略表或改写原事件。 | T5-R1 |
 | R-T6-01 | P1 | 已修复 | `BaselineImportService.createImportDraft` | Draft 创建已在 Serializable 事务内完成完整内容指纹比较和写入；P2002/P2034 竞争会有限重试并返回原 Draft 或稳定冲突。 | T6-R1 |
 | R-T6-02 | P2 | 已修复 | `baseline-import-support.ts`、`ledger-v2.repository.ts`、`schema.prisma`、`20260827030000_persist_ledger_source_row_id` | Draft 行的 `sourceRowId` 已持久化到 LedgerEvent；当前有效事件、修正链和导入回滚均可读回，历史事件的 nullable 字段保持为空。 | T6-R2 |
