@@ -59,7 +59,7 @@ export function CashObservationSheet({
       await mutation.mutateAsync({ accountId: account.id, amount: amount.trim(), currency });
       toastManager.add({
         title: '现金观察已记录',
-        description: '这不是现金流成交，仅更新观察检查点。',
+        description: '这不是现金流成交，仅更新现金快照。',
         type: 'success',
         timeout: 2800,
       });

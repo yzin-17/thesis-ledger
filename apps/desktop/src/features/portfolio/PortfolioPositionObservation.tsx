@@ -51,7 +51,7 @@ export function PositionOverviewMenu({
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
           <DropdownMenuItem disabled={busy} onClick={onCreate}>
-            校准持仓余额
+            记录持仓快照
           </DropdownMenuItem>
           {positions.length > 0 && (
             <DropdownMenuItem
@@ -86,11 +86,11 @@ export function PositionObservationContent({
       <Empty className="rounded-lg border p-8" role="status">
         <EmptyHeader>
           <EmptyTitle>暂无持仓观察</EmptyTitle>
-          <EmptyDescription>记录一个检查点后会显示在这里。</EmptyDescription>
+          <EmptyDescription>记录一个快照后会显示在这里。</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button type="button" variant="outline" onClick={onCreate}>
-            校准持仓余额
+            记录持仓快照
           </Button>
         </EmptyContent>
       </Empty>
@@ -108,7 +108,7 @@ export function PositionObservationContent({
             <th className="px-4 py-3 text-right font-medium">盈亏</th>
             <th className="px-4 py-3 font-medium">观察状态</th>
             <th className="px-4 py-3 font-medium">来源</th>
-            <th className="px-4 py-3 font-medium">校准状态</th>
+            <th className="px-4 py-3 font-medium">基准状态</th>
             <th className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-muted px-3 py-3 text-center font-medium">
               操作
             </th>
@@ -143,16 +143,16 @@ export function PositionObservationContent({
                 {position.pnl === null ? '—' : money.format(position.pnl)}
               </td>
               <td className="px-4 py-3">
-                <Badge variant="outline">观察检查点</Badge>
+                <Badge variant="outline">持仓快照</Badge>
               </td>
               <td className="px-4 py-3 text-sm text-muted-foreground">
                 {position.source ?? '未知'}
               </td>
               <td className="px-4 py-3">
-                <Badge variant="secondary">已校准</Badge>
+                <Badge variant="secondary">已设为基准</Badge>
               </td>
               <td className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-background px-3 py-2 text-center">
-                <div className="flex items-center justify-center gap-1">
+                <div className="flex flex-wrap items-center justify-center gap-1">
                   <Button
                     className="px-2"
                     size="sm"
@@ -161,7 +161,7 @@ export function PositionObservationContent({
                     disabled={busyAction !== null}
                     onClick={() => onEdit(position)}
                   >
-                    重新校准
+                    重新设为基准
                   </Button>
                   <Button
                     className="px-2"
@@ -179,7 +179,7 @@ export function PositionObservationContent({
                         aria-hidden="true"
                       />
                     )}
-                    {busyAction === `remove:${position.id}` ? '移除中…' : '取消校准'}
+                    {busyAction === `remove:${position.id}` ? '移除中…' : '取消基准'}
                   </Button>
                 </div>
               </td>

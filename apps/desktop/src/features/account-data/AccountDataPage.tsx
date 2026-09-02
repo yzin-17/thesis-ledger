@@ -325,7 +325,7 @@ export function AccountDataPage({
       <div className="min-w-0">
         <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
         <p className="m-0 mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          真实成交是主录入入口；持仓和现金只记录观察检查点，不会伪造成交。
+          真实成交是主录入入口；持仓和现金只记录快照基准，不会伪造成交。
         </p>
       </div>
 

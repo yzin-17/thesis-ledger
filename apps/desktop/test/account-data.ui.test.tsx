@@ -290,19 +290,19 @@ describe('账户数据页面契约', () => {
     expect(positionMarkup).toMatch(/<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/);
     expect(positionMarkup).toContain('持仓市值');
     expect(positionMarkup).toContain('观察状态');
-    expect(positionMarkup).toContain('校准状态');
-    expect(positionMarkup).toContain('已校准');
+    expect(positionMarkup).toContain('基准状态');
+    expect(positionMarkup).toContain('已设为基准');
     expect(positionMarkup).toContain('sticky right-0');
     expect(positionMarkup).toContain('bg-background');
     expect(positionMarkup).toContain('w-40 min-w-40');
-    expect(positionMarkup).toContain('flex items-center justify-center gap-1');
+    expect(positionMarkup).toContain('flex flex-wrap items-center justify-center gap-1');
     expect(positionMarkup).toContain('h-8');
     expect(positionMarkup).toContain('shadow-none');
-    expect(positionMarkup).toContain('重新校准');
-    expect(positionMarkup).toContain('取消校准');
+    expect(positionMarkup).toContain('重新设为基准');
+    expect(positionMarkup).toContain('取消基准');
     expect(positionMarkup).not.toContain('更多操作：半导体设备ETF国泰');
     expect(positionMarkup).not.toContain('当前结果来自账本投影');
-    expect(positionSource).toContain('取消校准');
+    expect(positionSource).toContain('取消基准');
     expect(positionSource).toContain('清空持仓观察');
 
     const cashMarkup = renderPage('?tab=cash');

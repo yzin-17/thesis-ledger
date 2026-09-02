@@ -341,7 +341,7 @@ function PositionOverview({
 }: PortfolioManagementViewProps) {
   const positionHeading = calibrationMode ? '持仓观察' : '持仓';
   const positionDescription = calibrationMode
-    ? '用于记录校准检查点，不产生 BUY / SELL 成交记录。'
+    ? '用于记录持仓快照基准，不产生 BUY / SELL 成交记录。'
     : undefined;
   const editPosition = (position: Position) => {
     setEditing(position);
@@ -477,7 +477,7 @@ const positionSheetHeading = (
 ) => {
   if (entrySheetMode === 'position' && calibrationMode) {
     if (editing) return '修改持仓观察';
-    return '校准持仓余额';
+    return '记录持仓快照';
   }
   return positionSheetTitle(entrySheetMode, editing);
 };
@@ -502,7 +502,7 @@ function PositionEntrySheet(props: PortfolioManagementViewProps) {
           <SheetTitle>{positionSheetHeading(entrySheetMode, editing, calibrationMode)}</SheetTitle>
           <SheetDescription id="position-form-description">
             {calibrationMode
-              ? '这会创建持仓观察检查点，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
+              ? '这会创建持仓快照基准，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
               : '录入账户当前实际持仓，用于初始化或校准持仓数据。'}
           </SheetDescription>
         </div>
