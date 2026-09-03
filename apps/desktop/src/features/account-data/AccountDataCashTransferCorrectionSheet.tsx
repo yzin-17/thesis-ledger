@@ -19,9 +19,24 @@ import { currentLocalDateTime, localDateTimeValue } from './account-data.helpers
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
 
 const correctionLabels = {
-  replace: { title: '更正现金划转', reason: '更正原因', submit: '确认更正', success: '现金划转已更正' },
-  void: { title: '作废现金划转', reason: '作废原因', submit: '确认作废', success: '现金划转已作废' },
-  restore: { title: '恢复现金划转', reason: '恢复原因', submit: '确认恢复', success: '现金划转已恢复' },
+  replace: {
+    title: '更正现金划转',
+    reason: '更正原因',
+    submit: '确认更正',
+    success: '现金划转已更正',
+  },
+  void: {
+    title: '作废现金划转',
+    reason: '作废原因',
+    submit: '确认作废',
+    success: '现金划转已作废',
+  },
+  restore: {
+    title: '恢复现金划转',
+    reason: '恢复原因',
+    submit: '确认恢复',
+    success: '现金划转已恢复',
+  },
 } as const;
 
 export function CashTransferCorrectionSheet({
@@ -41,8 +56,8 @@ export function CashTransferCorrectionSheet({
   const labels = correctionLabels[mode];
   const mutations = useCashOperationsMutations(event.accountId, 'actual');
   const [amount, setAmount] = useState(event.payload.amount);
-  const [occurredAt, setOccurredAt] = useState(() =>
-    localDateTimeValue(event.occurredAt, 'INSTANT') || currentLocalDateTime(),
+  const [occurredAt, setOccurredAt] = useState(
+    () => localDateTimeValue(event.occurredAt, 'INSTANT') || currentLocalDateTime(),
   );
   const [note, setNote] = useState(event.payload.note ?? '');
   const [reason, setReason] = useState('');
@@ -92,7 +107,7 @@ export function CashTransferCorrectionSheet({
       >
         <SheetHeader className="border-b">
           <SheetTitle>{labels.title}</SheetTitle>
-          <SheetDescription>该操作始终同时更新划转两端，并保留完整 Revision 链。</SheetDescription>
+          <SheetDescription>该操作始终同时更新划转两端，并保留完整版本链。</SheetDescription>
         </SheetHeader>
         <form
           className="flex min-h-0 flex-1 flex-col"
@@ -133,9 +148,7 @@ export function CashTransferCorrectionSheet({
                 </>
               )}
               <Field invalid={Boolean(error) && !reason.trim()}>
-                <FieldLabel htmlFor="cash-transfer-correction-reason">
-                  {labels.reason}
-                </FieldLabel>
+                <FieldLabel htmlFor="cash-transfer-correction-reason">{labels.reason}</FieldLabel>
                 <Input
                   id="cash-transfer-correction-reason"
                   value={reason}

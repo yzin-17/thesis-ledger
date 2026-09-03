@@ -67,7 +67,7 @@ export function PortfolioTradeView({
           </h2>
           <p className="m-0 mt-1 max-w-2xl text-sm text-muted-foreground">
             这里只读展示统一 Trade
-            Projection。实际账户与模拟账户隔离，基线观察、平仓片段和证据来源均可追溯。
+            Projection。实际账户与模拟账户隔离，持仓快照、平仓片段和证据来源均可追溯。
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => void query.refetch()}>
@@ -114,7 +114,9 @@ export function PortfolioTradeView({
           生命周期
           <Select value={lifecycle} onValueChange={(value) => value && setLifecycle(value)}>
             <SelectTrigger aria-label="交易生命周期" className="w-full bg-background">
-              <SelectValue />
+              <SelectValue>
+                {lifecycle === 'ACTIVE' ? '进行中' : lifecycle === 'ENDED' ? '已结束' : '全部'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

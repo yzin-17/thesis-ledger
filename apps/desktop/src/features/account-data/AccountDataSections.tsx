@@ -22,6 +22,9 @@ import type { useAccountValuationQuery } from '../portfolio/portfolio.queries.js
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
 import {
   eventTypeLabel,
+  eventSubjectDetail,
+  eventSymbol,
+  cashFlowCategoryLabel,
   executionSideLabel,
   formatCurrencyAmount,
   formatDate,
@@ -29,6 +32,7 @@ import {
   isExecutionEvent,
   revisionBadgeVariant,
   revisionLabel,
+  sourceChannelLabel,
   supportedCurrency,
   transactionAmount,
   transactionFilters,
@@ -41,6 +45,7 @@ import {
 } from './account-data.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
 import { CashTransferSheet } from './AccountDataCashTransferSheet.js';
+import { CashDepositSheet } from './AccountDataCashDepositSheet.js';
 import { RecurringCashDeposits } from './AccountDataRecurringCashDeposits.js';
 
 type QueryLike = {
@@ -65,6 +70,9 @@ export function TransactionSection({
   onAudit,
   onOpenImport,
   onOpenReconciliation,
+  findSnapshotPosition,
+  onEditSnapshot,
+  onRemoveSnapshot,
 }: {
   account: Account;
   events: LedgerEventV2[];
@@ -79,6 +87,9 @@ export function TransactionSection({
   onAudit: (event: LedgerEventV2) => void;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
+  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
+  onEditSnapshot: (event: LedgerEventV2) => void;
+  onRemoveSnapshot: (event: LedgerEventV2) => void;
 }) {
   const filteredEvents = events.filter((event) => {
     if (filter === 'all') return true;
@@ -104,8 +115,8 @@ export function TransactionSection({
           <Button type="button" variant="outline" onClick={onOpenImport} disabled>
             导入草稿（暂未开放）
           </Button>
-          <Button type="button" variant="outline" onClick={onOpenReconciliation}>
-            打开对账
+          <Button type="button" variant="outline" onClick={onOpenReconciliation} disabled>
+            打开对账（暂未开放）
           </Button>
         </div>
       </div>
@@ -131,6 +142,9 @@ export function TransactionSection({
         filter={filter}
         emptyTitle={emptyTitle}
         filteredEvents={filteredEvents}
+        findSnapshotPosition={findSnapshotPosition}
+        onEditSnapshot={onEditSnapshot}
+        onRemoveSnapshot={onRemoveSnapshot}
         onCorrect={onCorrect}
         onVoid={onVoid}
         onCorrectTransfer={onCorrectTransfer}
@@ -154,6 +168,9 @@ function TransactionResults({
   filter,
   emptyTitle,
   filteredEvents,
+  findSnapshotPosition,
+  onEditSnapshot,
+  onRemoveSnapshot,
   onCorrect,
   onVoid,
   onCorrectTransfer,
@@ -164,6 +181,9 @@ function TransactionResults({
   filter: AccountDataEventFilter;
   emptyTitle: string;
   filteredEvents: LedgerEventV2[];
+  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
+  onEditSnapshot: (event: LedgerEventV2) => void;
+  onRemoveSnapshot: (event: LedgerEventV2) => void;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onCorrectTransfer: (event: CashTransferEvent) => void;
@@ -193,7 +213,7 @@ function TransactionResults({
     const emptyDescription =
       filter === 'executions'
         ? '录入第一笔真实成交后，BUY/SELL 会在这里按当前有效版本展示。'
-        : 'Baseline、余额观察、公司行动、分红和现金流会在产生后显示。';
+        : '持仓快照、余额快照、公司行动、分红和现金流会在产生后显示。';
     return (
       <Empty className="min-h-56 rounded-xl border bg-card p-8">
         <EmptyHeader>
@@ -210,9 +230,10 @@ function TransactionResults({
         <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">事实</th>
-            <th className="px-4 py-3 font-medium">时间</th>
+            <th className="px-4 py-3 font-medium">发生时间</th>
             <th className="px-4 py-3 font-medium">金额/数量</th>
-            <th className="px-4 py-3 font-medium">来源与状态</th>
+            <th className="px-4 py-3 font-medium">来源</th>
+            <th className="px-4 py-3 font-medium">状态</th>
             <th className="px-4 py-3 text-right font-medium">操作</th>
           </tr>
         </thead>
@@ -221,6 +242,9 @@ function TransactionResults({
             <TransactionRow
               key={event.eventId}
               event={event}
+              findSnapshotPosition={findSnapshotPosition}
+              onEditSnapshot={onEditSnapshot}
+              onRemoveSnapshot={onRemoveSnapshot}
               onCorrect={onCorrect}
               onVoid={onVoid}
               onCorrectTransfer={onCorrectTransfer}
@@ -241,6 +265,9 @@ function TransactionRow({
   onCorrectTransfer,
   onVoidTransfer,
   onAudit,
+  findSnapshotPosition,
+  onEditSnapshot,
+  onRemoveSnapshot,
 }: {
   event: LedgerEventV2;
   onCorrect: (event: ExecutionEvent) => void;
@@ -248,13 +275,17 @@ function TransactionRow({
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEventV2) => void;
+  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
+  onEditSnapshot: (event: LedgerEventV2) => void;
+  onRemoveSnapshot: (event: LedgerEventV2) => void;
 }) {
   const execution = isExecutionEvent(event);
   const cashTransfer = isCashTransferEvent(event);
-  const title = execution ? event.payload.symbol : eventTypeLabel(event);
+  const snapshotPosition = findSnapshotPosition(event);
+  const title = eventSymbol(event) ?? eventTypeLabel(event);
   const detail = execution
     ? `${executionSideLabel(event)} · ${formatDecimal(event.payload.quantity)} · ${formatDecimal(event.payload.price)} ${event.payload.currency}`
-    : `Revision ${event.ledgerRevision} · ${event.source.channel}`;
+    : (eventSubjectDetail(event) ?? sourceChannelLabel(event.source.channel));
   const amount = transactionAmount(event, execution ? event : null);
   return (
     <tr data-ledger-event-id={event.eventId}>
@@ -264,18 +295,23 @@ function TransactionRow({
       </td>
       <td className="whitespace-nowrap px-4 py-3 align-top text-muted-foreground">
         {formatDate(event.occurredAt)}
+        <span className="mt-1 block text-xs">记录于 {formatDate(event.recordedAt)}</span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 align-top font-mono text-xs text-muted-foreground">
         {amount}
       </td>
       <td className="px-4 py-3 align-top">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={revisionBadgeVariant(event)}>{revisionLabel(event)}</Badge>
-          <span className="text-xs text-muted-foreground">{event.source.channel}</span>
-        </div>
-        <span className="mt-1 block text-xs text-muted-foreground">
-          {event.source.sourceRowId ? `来源行 ${event.source.sourceRowId}` : '来源行未提供'}
+        <span className="block text-xs text-muted-foreground">
+          {sourceChannelLabel(event.source.channel)}
         </span>
+        {event.source.sourceRowId && (
+          <span className="mt-1 block text-xs text-muted-foreground">
+            来源行 {event.source.sourceRowId}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3 align-top">
+        <Badge variant={revisionBadgeVariant(event)}>{revisionLabel(event)}</Badge>
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex flex-wrap justify-end gap-1">
@@ -286,6 +322,26 @@ function TransactionRow({
               </Button>
               <Button type="button" size="sm" variant="destructive" onClick={() => onVoid(event)}>
                 作废
+              </Button>
+            </>
+          )}
+          {snapshotPosition && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onEditSnapshot(event)}
+              >
+                修改
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                onClick={() => onRemoveSnapshot(event)}
+              >
+                移除
               </Button>
             </>
           )}
@@ -329,6 +385,10 @@ export function PositionCalibrationSection({
   onSaved,
   onOpenImport,
   onOpenReconciliation,
+  entrySheetOpen,
+  onEntrySheetOpenChange,
+  editingPosition,
+  onEditingPositionChange,
 }: {
   account: Account;
   accounts: Account[];
@@ -339,6 +399,10 @@ export function PositionCalibrationSection({
   onSaved: () => void;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
+  entrySheetOpen: boolean;
+  onEntrySheetOpenChange: (open: boolean) => void;
+  editingPosition: Position | null;
+  onEditingPositionChange: (editing: Position | null) => void;
 }) {
   if (valuationQuery.isPending && !valuationQuery.data) {
     return (
@@ -352,7 +416,7 @@ export function PositionCalibrationSection({
     return (
       <Alert variant="destructive">
         <AlertTitle>持仓读取失败</AlertTitle>
-        <AlertDescription>当前余额观察未更新，请重试。</AlertDescription>
+        <AlertDescription>当前余额快照未更新，请重试。</AlertDescription>
         <Button
           type="button"
           variant="outline"
@@ -376,6 +440,10 @@ export function PositionCalibrationSection({
       showCash={false}
       calibrationMode
       embedded
+      entrySheetOpen={entrySheetOpen}
+      onEntrySheetOpenChange={onEntrySheetOpenChange}
+      editingPosition={editingPosition}
+      onEditingPositionChange={onEditingPositionChange}
       onOpenImport={onOpenImport}
       onOpenReconciliation={onOpenReconciliation}
       onDirtyChange={onDirtyChange}
@@ -401,12 +469,25 @@ const chargeTotal = (event: ExecutionEvent, currency: Currency) =>
     return Number(charge.amount);
   });
 
+const pendingCashTime = (event: LedgerEventV2) => {
+  if (event.revisionAction === 'VOID') return null;
+  if (
+    event.type === 'BUY_EXECUTION' ||
+    event.type === 'SELL_EXECUTION' ||
+    event.type === 'DIVIDEND' ||
+    event.type === 'CASH_FLOW'
+  )
+    return event.payload.settledAt ?? event.payload.expectedAt ?? event.occurredAt;
+  return null;
+};
+
 const pendingCash = (events: LedgerEventV2[]): PendingCash[] => {
   const now = Date.now();
   const rows: PendingCash[] = [];
   for (const event of events) {
-    if (isExecutionEvent(event) && event.payload.settledAt) {
-      const settled = new Date(event.payload.settledAt);
+    const pendingAt = pendingCashTime(event);
+    if (isExecutionEvent(event) && pendingAt) {
+      const settled = new Date(pendingAt);
       const amount = Number(event.payload.quantity) * Number(event.payload.price);
       if (Number.isNaN(settled.getTime()) || settled.getTime() <= now || !Number.isFinite(amount))
         continue;
@@ -421,12 +502,12 @@ const pendingCash = (events: LedgerEventV2[]): PendingCash[] => {
           event.type === 'BUY_EXECUTION'
             ? `买入 ${event.payload.symbol}`
             : `卖出 ${event.payload.symbol}`,
-        settledAt: event.payload.settledAt,
+        settledAt: pendingAt,
       });
       continue;
     }
-    if (event.revisionAction !== 'VOID' && event.type === 'CASH_FLOW' && event.payload.settledAt) {
-      const settled = new Date(event.payload.settledAt);
+    if (event.revisionAction !== 'VOID' && event.type === 'CASH_FLOW' && pendingAt) {
+      const settled = new Date(pendingAt);
       const amount = Number(event.payload.amount);
       if (Number.isNaN(settled.getTime()) || settled.getTime() <= now || !Number.isFinite(amount))
         continue;
@@ -435,13 +516,13 @@ const pendingCash = (events: LedgerEventV2[]): PendingCash[] => {
         currency: supportedCurrency(event.payload.currency),
         amount,
         direction: event.payload.direction === 'INFLOW' ? '应收' : '应付',
-        label: event.payload.category,
-        settledAt: event.payload.settledAt,
+        label: cashFlowCategoryLabel(event.payload.category),
+        settledAt: pendingAt,
       });
       continue;
     }
-    if (event.revisionAction !== 'VOID' && event.type === 'DIVIDEND' && event.payload.settledAt) {
-      const settled = new Date(event.payload.settledAt);
+    if (event.revisionAction !== 'VOID' && event.type === 'DIVIDEND' && pendingAt) {
+      const settled = new Date(pendingAt);
       const amount = Number(event.payload.amount);
       if (Number.isNaN(settled.getTime()) || settled.getTime() <= now || !Number.isFinite(amount))
         continue;
@@ -451,7 +532,7 @@ const pendingCash = (events: LedgerEventV2[]): PendingCash[] => {
         amount,
         direction: '应收',
         label: `分红 ${event.payload.symbol}`,
-        settledAt: event.payload.settledAt,
+        settledAt: pendingAt,
       });
     }
   }
@@ -476,6 +557,9 @@ export function CashSection({
   onCalibrate: () => void;
 }) {
   const [transferOpen, setTransferOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const canCreateCashDeposit =
+    account.type === 'cash' && account.mode === 'actual' && account.active !== false;
   const settledRows = useMemo(() => {
     const rows = valuation?.cashByCurrency ?? [];
     const seen = new Set(rows.map((row) => row.currency));
@@ -494,10 +578,15 @@ export function CashSection({
             现金
           </h2>
           <p className="m-0 mt-1 text-sm text-muted-foreground">
-            已结算余额按币种分桶；有明确 settledAt 的未来现金影响单独列为待结算。
+            已结算余额按币种分桶；有明确结算时间的未来现金影响单独列为待结算。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canCreateCashDeposit && (
+            <Button type="button" onClick={() => setDepositOpen(true)}>
+              现金入账
+            </Button>
+          )}
           <Button
             type="button"
             onClick={() => setTransferOpen(true)}
@@ -506,7 +595,7 @@ export function CashSection({
             账户间划转
           </Button>
           <Button type="button" variant="outline" onClick={onCalibrate}>
-            校准现金余额
+            记录现金快照
           </Button>
         </div>
       </div>
@@ -521,7 +610,9 @@ export function CashSection({
       {eventsQuery.isError && eventsQuery.data && (
         <Alert>
           <AlertTitle>待结算列表可能陈旧</AlertTitle>
-          <AlertDescription>现金余额仍保留上次成功结果；请刷新账本后再做校准。</AlertDescription>
+          <AlertDescription>
+            现金余额仍保留上次成功结果；请刷新账本后再记录现金快照。
+          </AlertDescription>
         </Alert>
       )}
       <RecurringCashDeposits account={account} />
@@ -531,6 +622,9 @@ export function CashSection({
         open={transferOpen}
         onOpenChange={setTransferOpen}
       />
+      {canCreateCashDeposit && (
+        <CashDepositSheet account={account} open={depositOpen} onOpenChange={setDepositOpen} />
+      )}
     </section>
   );
 }
@@ -610,7 +704,7 @@ function CashResults({
         <CardHeader className="gap-2 border-b">
           <CardTitle>待结算应收 / 应付</CardTitle>
           <CardDescription>
-            只根据账本中明确的未来 settledAt 展示，不推测缺失的结算时间。
+            只根据账本中明确的未来结算时间展示，不推测缺失的结算时间。
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

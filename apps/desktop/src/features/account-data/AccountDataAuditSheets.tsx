@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { LoaderCircle } from 'lucide-react';
 
-import type { Account } from '../portfolio/portfolio.types.js';
+import type { Account, Position } from '../portfolio/portfolio.types.js';
 import { useRestoreExecutionMutation, useVoidExecutionMutation } from './account-data.mutations.js';
 import {
   commandFeedback,
@@ -26,6 +26,7 @@ import {
   isVoidEvent,
   revisionBadgeVariant,
   revisionLabel,
+  sourceChannelLabel,
 } from './account-data.helpers.js';
 import {
   isCashTransferEvent,
@@ -38,7 +39,10 @@ import type { useAccountLedgerAuditQuery } from './account-data.queries.js';
 export function AuditSheet({
   target,
   query,
+  snapshotPositions = [],
   onOpenChange,
+  onEditSnapshot,
+  onRemoveSnapshot,
   onCorrect,
   onVoid,
   onRestore,
@@ -46,7 +50,10 @@ export function AuditSheet({
 }: {
   target: LedgerEventV2 | null;
   query: ReturnType<typeof useAccountLedgerAuditQuery>;
+  snapshotPositions?: Position[] | undefined;
   onOpenChange: (open: boolean) => void;
+  onEditSnapshot?: ((event: LedgerEventV2) => void) | undefined;
+  onRemoveSnapshot?: ((event: LedgerEventV2) => void) | undefined;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
@@ -60,20 +67,32 @@ export function AuditSheet({
           !isLegacyAuditEvent(event) && event.factId === targetFactId,
       )
     : [];
+  const findSnapshotPosition = (event: LedgerEventV2) =>
+    event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID'
+      ? snapshotPositions.find(
+          (position) =>
+            position.accountId === event.accountId && position.symbol === event.payload.symbol,
+        )
+      : undefined;
   return (
     <Sheet open={Boolean(target)} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         className="h-[100dvh] w-[720px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <SheetTitle>成交修正链</SheetTitle>
+        <SheetTitle>
+          {target?.type === 'POSITION_BASELINE_OBSERVATION' ? '持仓快照修正链' : '成交修正链'}
+        </SheetTitle>
         <SheetDescription>
-          当前列表只计有效版本；这里展示同一 fact 的 CREATE、REPLACE、VOID、RESTORE 审计记录。
+          当前列表只计有效版本；这里展示同一事实的录入、更正、作废、恢复全部审计记录。
         </SheetDescription>
         <AuditResults
           query={query}
           chain={chain}
           targetEventId={target?.eventId}
+          findSnapshotPosition={findSnapshotPosition}
+          onEditSnapshot={onEditSnapshot}
+          onRemoveSnapshot={onRemoveSnapshot}
           onCorrect={onCorrect}
           onVoid={onVoid}
           onRestore={onRestore}
@@ -94,6 +113,9 @@ function AuditResults({
   query,
   chain,
   targetEventId,
+  findSnapshotPosition,
+  onEditSnapshot,
+  onRemoveSnapshot,
   onCorrect,
   onVoid,
   onRestore,
@@ -102,6 +124,9 @@ function AuditResults({
   query: ReturnType<typeof useAccountLedgerAuditQuery>;
   chain: LedgerEventV2[];
   targetEventId: string | undefined;
+  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
+  onEditSnapshot?: ((event: LedgerEventV2) => void) | undefined;
+  onRemoveSnapshot?: ((event: LedgerEventV2) => void) | undefined;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
@@ -129,7 +154,7 @@ function AuditResults({
   if (chain.length === 0) {
     return (
       <Empty className="mt-5 min-h-48 rounded-xl border bg-card p-8">
-        <EmptyDescription>当前事实没有可显示的 V2 修正链。</EmptyDescription>
+        <EmptyDescription>当前事实没有可显示的修正链。</EmptyDescription>
       </Empty>
     );
   }
@@ -156,8 +181,10 @@ function AuditResults({
                   {event.revisionAction === 'VOID' && <Badge variant="destructive">已作废</Badge>}
                 </div>
                 <p className="m-0 mt-2 text-xs text-muted-foreground">
-                  Revision {event.ledgerRevision} · {formatDate(event.occurredAt)} ·{' '}
-                  {event.source.channel}
+                  {formatDate(event.occurredAt)} · {sourceChannelLabel(event.source.channel)}
+                </p>
+                <p className="m-0 mt-1 text-xs text-muted-foreground">
+                  记录于 {formatDate(event.recordedAt)}
                 </p>
                 {event.reason && (
                   <p className="m-0 mt-2 text-sm text-muted-foreground">原因：{event.reason}</p>
@@ -184,6 +211,29 @@ function AuditResults({
                     </Button>
                   </>
                 )}
+                {event.type === 'POSITION_BASELINE_OBSERVATION' &&
+                  event.revisionAction !== 'VOID' &&
+                  event.eventId === targetEventId &&
+                  findSnapshotPosition(event) && (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onEditSnapshot?.(event)}
+                      >
+                        修改
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => onRemoveSnapshot?.(event)}
+                      >
+                        移除
+                      </Button>
+                    </>
+                  )}
                 <RestoreAuditAction
                   event={event}
                   source={source}
@@ -335,8 +385,8 @@ export function CorrectionReasonSheet({
         <SheetTitle>{action === 'void' ? '作废成交' : '恢复成交'}</SheetTitle>
         <SheetDescription>
           {action === 'void'
-            ? '作废会生成 VOID 版本，不会从历史中删除事实。'
-            : '恢复会生成 RESTORE 版本，原 VOID 记录和本次原因仍会保留。'}
+            ? '作废会生成一条作废版本，不会从历史中删除事实。'
+            : '恢复会生成一条恢复版本，原作废记录和本次原因仍会保留。'}
         </SheetDescription>
         <form className="mt-5 flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           <Field>

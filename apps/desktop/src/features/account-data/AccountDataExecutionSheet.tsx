@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { LoaderCircle } from 'lucide-react';
@@ -211,12 +210,20 @@ export function ExecutionFormSheet({
     }
     const commandId = createClientCommandId();
     const occurredAt = toCommandTime(draft.occurredAt, draft.timePrecision);
+    const settlementAt = draft.settledAt.trim()
+      ? new Date(draft.settledAt).toISOString()
+      : undefined;
+    let settlementTiming: { expectedAt?: string; settledAt?: string } = {};
+    if (settlementAt) {
+      if (new Date(settlementAt).getTime() > Date.now()) settlementTiming = { expectedAt: settlementAt };
+      else settlementTiming = { settledAt: settlementAt };
+    }
     const payload = {
       symbol,
       quantity: draft.quantity.trim(),
       price: draft.price.trim(),
       currency: draft.currency,
-      ...(draft.settledAt.trim() ? { settledAt: new Date(draft.settledAt).toISOString() } : {}),
+      ...settlementTiming,
       capabilityVerification: draft.capabilityVerification,
       charges: parsedCharges,
       ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
@@ -283,363 +290,378 @@ export function ExecutionFormSheet({
     <Sheet open={open} onOpenChange={close}>
       <SheetContent
         side="right"
-        className="h-[100dvh] w-[680px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
+        className="h-[100dvh] min-h-0 w-[680px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <SheetTitle>{editingEvent ? '更正成交' : '录入成交'}</SheetTitle>
-        <SheetDescription>
-          {editingEvent
-            ? '更正会生成新的 REPLACE 版本，原始成交和原因仍可在修正链中审计。'
-            : '录入真实 BUY/SELL 事实；提交使用稳定客户端命令 ID，重复重放不会重复写入。'}
-        </SheetDescription>
-        <form className="mt-4 flex flex-col gap-5" onSubmit={(event) => void submit(event)}>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="execution-account">账户</FieldLabel>
-              <div
-                id="execution-account"
-                className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm"
-              >
-                <span className="whitespace-normal break-words">{accountSummary}</span>
-              </div>
-            </Field>
-            <Field>
-              <FieldLabel>标的</FieldLabel>
-              {editingEvent ? (
-                <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border bg-muted/30 px-3">
-                  <span className="text-sm font-medium">{editingEvent.payload.symbol}</span>
-                  <span className="text-xs text-muted-foreground">已确认标的</span>
-                </div>
-              ) : (
-                <InstrumentCombobox
-                  manualEntry={manualInstrumentEntry}
-                  open={instrumentOpen}
-                  query={instrumentQuery}
-                  results={instrumentSearch.results}
-                  searchState={instrumentSearch.state}
-                  selectedInstrument={selectedInstrument}
-                  busy={instrumentSearch.busy}
-                  onClearSelection={() => {
-                    setSelectedInstrument(null);
-                    setInstrumentQuery('');
-                    updateDirty(true);
-                  }}
-                  onManualEntry={() => {
-                    setManualInstrumentEntry(true);
-                    setInstrumentOpen(false);
-                    updateDirty(true);
-                  }}
-                  onOpenChange={setInstrumentOpen}
-                  onQueryChange={(value) => {
-                    setInstrumentQuery(value.toUpperCase());
-                    setSelectedInstrument(null);
-                    updateDirty(true);
-                  }}
-                  onSelect={(instrument) => void confirmInstrument(instrument)}
-                  onStartSearch={() => {
-                    if (instrumentQuery.trim()) setInstrumentOpen(true);
-                  }}
-                />
-              )}
-              {editingEvent && (
-                <input type="hidden" name="symbol" value={editingEvent.payload.symbol} />
-              )}
-            </Field>
-            <Field>
-              <FieldLabel>方向</FieldLabel>
-              <ToggleGroup
-                value={[draft.side]}
-                aria-label="成交方向"
-                onValueChange={(value) => {
-                  const next = value[0] as ExecutionSide | undefined;
-                  if (next) updateDraft('side', next);
-                }}
-              >
-                <ToggleGroupItem value="BUY">买入 BUY</ToggleGroupItem>
-                <ToggleGroupItem value="SELL">卖出 SELL</ToggleGroupItem>
-              </ToggleGroup>
-            </Field>
-            <FieldGroup className="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor="execution-quantity">数量</FieldLabel>
-                <Input
-                  id="execution-quantity"
-                  inputMode="decimal"
-                  value={draft.quantity}
-                  onChange={(event) => updateDraft('quantity', event.target.value)}
-                  placeholder="例如 100"
-                  required
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="execution-price">价格</FieldLabel>
-                <Input
-                  id="execution-price"
-                  inputMode="decimal"
-                  value={draft.price}
-                  onChange={(event) => updateDraft('price', event.target.value)}
-                  placeholder="例如 12.3456"
-                  required
-                />
-              </Field>
-            </FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="execution-currency">成交币种</FieldLabel>
-              <Select
-                value={draft.currency}
-                onValueChange={(value) => {
-                  if (isCurrency(value)) updateDraft('currency', value);
-                }}
-              >
-                <SelectTrigger id="execution-currency" className="w-full">
-                  <SelectValue>{currencyLabel(draft.currency)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {currencies.map((currency) => (
-                      <SelectItem key={currency} value={currency}>
-                        {currencyLabel(currency)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <FieldGroup className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.7fr)]">
-              <Field>
-                <FieldLabel htmlFor="execution-occurred-at">成交时间</FieldLabel>
-                <DateInput
-                  id="execution-occurred-at"
-                  type={draft.timePrecision === 'DATE' ? 'date' : 'datetime-local'}
-                  value={draft.occurredAt}
-                  onChange={(event) => updateDraft('occurredAt', event.target.value)}
-                  required
-                />
-              </Field>
-              <Field>
-                <FieldLabel>时间精度</FieldLabel>
-                <Select
-                  value={draft.timePrecision}
-                  onValueChange={(value) => {
-                    const next = value as TimePrecision;
-                    if (next === draft.timePrecision) return;
-                    updateDraft('timePrecision', next);
-                    if (next === 'DATE') updateDraft('occurredAt', draft.occurredAt.slice(0, 10));
-                    else updateDraft('occurredAt', '');
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>
-                      {draft.timePrecision === 'DATE' ? '仅日期' : '精确时间'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="INSTANT">精确时间</SelectItem>
-                      <SelectItem value="DATE">仅日期</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="execution-settled-at">结算时间（可选）</FieldLabel>
-              <DateInput
-                id="execution-settled-at"
-                type="datetime-local"
-                value={draft.settledAt}
-                onChange={(event) => updateDraft('settledAt', event.target.value)}
-              />
-              <FieldDescription>未填写时不推测待结算状态。</FieldDescription>
-            </Field>
-          </FieldGroup>
-          <Alert variant="subtle">
-            <AlertTitle>交易规则未验证</AlertTitle>
-            <AlertDescription>
-              当前能力元数据未验证，系统仅执行通用的高精度数量和价格校验。
-            </AlertDescription>
-          </Alert>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="m-0 text-sm font-semibold">费用明细</h3>
-                <p className="m-0 mt-1 text-xs text-muted-foreground">
-                  没有费用时可以留空；每行金额必须大于 0。
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setCharges((current) => [
-                    ...current,
-                    {
-                      category: 'COMMISSION',
-                      amount: '',
-                      currency: draft.currency,
-                      description: '',
-                    },
-                  ]);
-                  updateDirty(true);
-                }}
-              >
-                添加费用
-              </Button>
-            </div>
-            <FieldGroup className="rounded-lg border p-4">
-              {charges.length === 0 && (
-                <p className="m-0 text-xs text-muted-foreground">暂无费用明细</p>
-              )}
-              {charges.map((charge, index) => (
-                <FieldGroup
-                  key={`${index}-${charge.category}`}
-                  className="grid gap-3 rounded-md bg-muted/30 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
-                >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+          <div className="shrink-0">
+            <SheetTitle>{editingEvent ? '更正成交' : '录入成交'}</SheetTitle>
+            <SheetDescription>
+              {editingEvent
+                ? '更正会生成新的 REPLACE 版本，原始成交和原因仍可在修正链中审计。'
+                : '录入真实 BUY/SELL 事实；提交使用稳定客户端命令 ID，重复重放不会重复写入。'}
+            </SheetDescription>
+          </div>
+          <form
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            onSubmit={(event) => void submit(event)}
+          >
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+              <div className="flex flex-col gap-5">
+                <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor={`charge-category-${index}`}>类别</FieldLabel>
-                    <Select
-                      value={charge.category}
-                      onValueChange={(value) => {
-                        setCharges((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index
-                              ? { ...item, category: value as ChargeDraft['category'] }
-                              : item,
-                          ),
-                        );
-                        updateDirty(true);
-                      }}
+                    <FieldLabel htmlFor="execution-account">账户</FieldLabel>
+                    <div
+                      id="execution-account"
+                      className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm"
                     >
-                      <SelectTrigger id={`charge-category-${index}`} className="w-full">
-                        <SelectValue>{chargeCategoryLabel(charge.category)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {chargeCategoryOptions.map(({ value, label }) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      <span className="whitespace-normal break-words">{accountSummary}</span>
+                    </div>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor={`charge-amount-${index}`}>金额</FieldLabel>
-                    <Input
-                      id={`charge-amount-${index}`}
-                      inputMode="decimal"
-                      value={charge.amount}
-                      onChange={(event) => {
-                        setCharges((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, amount: event.target.value } : item,
-                          ),
-                        );
-                        updateDirty(true);
-                      }}
-                    />
+                    <FieldLabel>标的</FieldLabel>
+                    {editingEvent ? (
+                      <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border bg-muted/30 px-3">
+                        <span className="text-sm font-medium">{editingEvent.payload.symbol}</span>
+                        <span className="text-xs text-muted-foreground">已确认标的</span>
+                      </div>
+                    ) : (
+                      <InstrumentCombobox
+                        manualEntry={manualInstrumentEntry}
+                        open={instrumentOpen}
+                        query={instrumentQuery}
+                        results={instrumentSearch.results}
+                        searchState={instrumentSearch.state}
+                        selectedInstrument={selectedInstrument}
+                        busy={instrumentSearch.busy}
+                        onClearSelection={() => {
+                          setSelectedInstrument(null);
+                          setInstrumentQuery('');
+                          updateDirty(true);
+                        }}
+                        onManualEntry={() => {
+                          setManualInstrumentEntry(true);
+                          setInstrumentOpen(false);
+                          updateDirty(true);
+                        }}
+                        onOpenChange={setInstrumentOpen}
+                        onQueryChange={(value) => {
+                          setInstrumentQuery(value.toUpperCase());
+                          setSelectedInstrument(null);
+                          updateDirty(true);
+                        }}
+                        onSelect={(instrument) => void confirmInstrument(instrument)}
+                        onStartSearch={() => {
+                          if (instrumentQuery.trim()) setInstrumentOpen(true);
+                        }}
+                      />
+                    )}
+                    {editingEvent && (
+                      <input type="hidden" name="symbol" value={editingEvent.payload.symbol} />
+                    )}
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor={`charge-currency-${index}`}>币种</FieldLabel>
-                    <Select
-                      value={charge.currency}
+                    <FieldLabel>方向</FieldLabel>
+                    <ToggleGroup
+                      value={[draft.side]}
+                      aria-label="成交方向"
                       onValueChange={(value) => {
-                        if (!isCurrency(value)) return;
-                        setCharges((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, currency: value } : item,
-                          ),
-                        );
-                        updateDirty(true);
+                        const next = value[0] as ExecutionSide | undefined;
+                        if (next) updateDraft('side', next);
                       }}
                     >
-                      <SelectTrigger id={`charge-currency-${index}`} className="w-full">
-                        <SelectValue>{charge.currency}</SelectValue>
+                      <ToggleGroupItem value="BUY">买入 BUY</ToggleGroupItem>
+                      <ToggleGroupItem value="SELL">卖出 SELL</ToggleGroupItem>
+                    </ToggleGroup>
+                  </Field>
+                  <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="execution-quantity">数量</FieldLabel>
+                      <Input
+                        id="execution-quantity"
+                        inputMode="decimal"
+                        value={draft.quantity}
+                        onChange={(event) => updateDraft('quantity', event.target.value)}
+                        placeholder="例如 100"
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="execution-price">价格</FieldLabel>
+                      <Input
+                        id="execution-price"
+                        inputMode="decimal"
+                        value={draft.price}
+                        onChange={(event) => updateDraft('price', event.target.value)}
+                        placeholder="例如 12.3456"
+                        required
+                      />
+                    </Field>
+                  </FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="execution-currency">成交币种</FieldLabel>
+                    <Select
+                      value={draft.currency}
+                      onValueChange={(value) => {
+                        if (isCurrency(value)) updateDraft('currency', value);
+                      }}
+                    >
+                      <SelectTrigger id="execution-currency" className="w-full">
+                        <SelectValue>{currencyLabel(draft.currency)}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
                           {currencies.map((currency) => (
                             <SelectItem key={currency} value={currency}>
-                              {currency}
+                              {currencyLabel(currency)}
                             </SelectItem>
                           ))}
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field className="justify-end">
-                    <FieldLabel className="sr-only" htmlFor={`remove-charge-${index}`}>
-                      费用操作
-                    </FieldLabel>
+                  <FieldGroup className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.7fr)]">
+                    <Field>
+                      <FieldLabel htmlFor="execution-occurred-at">成交时间</FieldLabel>
+                      <DateInput
+                        id="execution-occurred-at"
+                        type={draft.timePrecision === 'DATE' ? 'date' : 'datetime-local'}
+                        value={draft.occurredAt}
+                        onChange={(event) => updateDraft('occurredAt', event.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel>时间精度</FieldLabel>
+                      <Select
+                        value={draft.timePrecision}
+                        onValueChange={(value) => {
+                          const next = value as TimePrecision;
+                          if (next === draft.timePrecision) return;
+                          updateDraft('timePrecision', next);
+                          if (next === 'DATE')
+                            updateDraft('occurredAt', draft.occurredAt.slice(0, 10));
+                          else updateDraft('occurredAt', '');
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue>
+                            {draft.timePrecision === 'DATE' ? '仅日期' : '精确时间'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="INSTANT">精确时间</SelectItem>
+                            <SelectItem value="DATE">仅日期</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="execution-settled-at">结算时间（可选）</FieldLabel>
+                    <DateInput
+                      id="execution-settled-at"
+                      type="datetime-local"
+                      value={draft.settledAt}
+                      onChange={(event) => updateDraft('settledAt', event.target.value)}
+                    />
+                    <FieldDescription>未来时间会先进入待结算资金。</FieldDescription>
+                  </Field>
+                </FieldGroup>
+                <Alert variant="subtle">
+                  <AlertTitle>交易规则未验证</AlertTitle>
+                  <AlertDescription>
+                    当前能力元数据未验证，系统仅执行通用的高精度数量和价格校验。
+                  </AlertDescription>
+                </Alert>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="m-0 text-sm font-semibold">费用明细</h3>
+                      <p className="m-0 mt-1 text-xs text-muted-foreground">
+                        没有费用时可以留空；每行金额必须大于 0。
+                      </p>
+                    </div>
                     <Button
-                      id={`remove-charge-${index}`}
                       type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={`移除第 ${index + 1} 条费用`}
+                      size="sm"
+                      variant="outline"
                       onClick={() => {
-                        setCharges((current) =>
-                          current.filter((_, itemIndex) => itemIndex !== index),
-                        );
+                        setCharges((current) => [
+                          ...current,
+                          {
+                            category: 'COMMISSION',
+                            amount: '',
+                            currency: draft.currency,
+                            description: '',
+                          },
+                        ]);
                         updateDirty(true);
                       }}
                     >
-                      ×
+                      添加费用
                     </Button>
-                  </Field>
-                  <Field className="sm:col-span-3">
-                    <FieldLabel className="sr-only" htmlFor={`charge-description-${index}`}>
-                      费用说明
-                    </FieldLabel>
-                    <Input
-                      id={`charge-description-${index}`}
-                      aria-label={`第 ${index + 1} 条费用说明`}
-                      value={charge.description}
-                      placeholder="说明（可选）"
-                      onChange={(event) => {
-                        setCharges((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index
-                              ? { ...item, description: event.target.value }
-                              : item,
-                          ),
-                        );
-                        updateDirty(true);
-                      }}
+                  </div>
+                  <FieldGroup className="rounded-lg border p-4">
+                    {charges.length === 0 && (
+                      <p className="m-0 text-xs text-muted-foreground">暂无费用明细</p>
+                    )}
+                    {charges.map((charge, index) => (
+                      <FieldGroup
+                        key={`${index}-${charge.category}`}
+                        className="grid gap-3 rounded-md bg-muted/30 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                      >
+                        <Field>
+                          <FieldLabel htmlFor={`charge-category-${index}`}>类别</FieldLabel>
+                          <Select
+                            value={charge.category}
+                            onValueChange={(value) => {
+                              setCharges((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, category: value as ChargeDraft['category'] }
+                                    : item,
+                                ),
+                              );
+                              updateDirty(true);
+                            }}
+                          >
+                            <SelectTrigger id={`charge-category-${index}`} className="w-full">
+                              <SelectValue>{chargeCategoryLabel(charge.category)}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {chargeCategoryOptions.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor={`charge-amount-${index}`}>金额</FieldLabel>
+                          <Input
+                            id={`charge-amount-${index}`}
+                            inputMode="decimal"
+                            value={charge.amount}
+                            onChange={(event) => {
+                              setCharges((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, amount: event.target.value }
+                                    : item,
+                                ),
+                              );
+                              updateDirty(true);
+                            }}
+                          />
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor={`charge-currency-${index}`}>币种</FieldLabel>
+                          <Select
+                            value={charge.currency}
+                            onValueChange={(value) => {
+                              if (!isCurrency(value)) return;
+                              setCharges((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index ? { ...item, currency: value } : item,
+                                ),
+                              );
+                              updateDirty(true);
+                            }}
+                          >
+                            <SelectTrigger id={`charge-currency-${index}`} className="w-full">
+                              <SelectValue>{charge.currency}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {currencies.map((currency) => (
+                                  <SelectItem key={currency} value={currency}>
+                                    {currency}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field className="justify-end">
+                          <FieldLabel className="sr-only" htmlFor={`remove-charge-${index}`}>
+                            费用操作
+                          </FieldLabel>
+                          <Button
+                            id={`remove-charge-${index}`}
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`移除第 ${index + 1} 条费用`}
+                            onClick={() => {
+                              setCharges((current) =>
+                                current.filter((_, itemIndex) => itemIndex !== index),
+                              );
+                              updateDirty(true);
+                            }}
+                          >
+                            ×
+                          </Button>
+                        </Field>
+                        <Field className="sm:col-span-3">
+                          <FieldLabel className="sr-only" htmlFor={`charge-description-${index}`}>
+                            费用说明
+                          </FieldLabel>
+                          <Input
+                            id={`charge-description-${index}`}
+                            aria-label={`第 ${index + 1} 条费用说明`}
+                            value={charge.description}
+                            placeholder="说明（可选）"
+                            onChange={(event) => {
+                              setCharges((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, description: event.target.value }
+                                    : item,
+                                ),
+                              );
+                              updateDirty(true);
+                            }}
+                          />
+                        </Field>
+                      </FieldGroup>
+                    ))}
+                  </FieldGroup>
+                </div>
+                <FieldGroup>
+                  {editingEvent && (
+                    <Field>
+                      <FieldLabel htmlFor="execution-reason">更正原因</FieldLabel>
+                      <Textarea
+                        id="execution-reason"
+                        value={draft.reason}
+                        onChange={(event) => updateDraft('reason', event.target.value)}
+                        placeholder="说明为什么需要生成新的成交版本"
+                        required
+                      />
+                    </Field>
+                  )}
+                  <Field>
+                    <FieldLabel htmlFor="execution-note">备注（可选）</FieldLabel>
+                    <Textarea
+                      id="execution-note"
+                      value={draft.note}
+                      onChange={(event) => updateDraft('note', event.target.value)}
+                      placeholder="记录来源、人工判断或其他上下文"
                     />
                   </Field>
                 </FieldGroup>
-              ))}
-            </FieldGroup>
-          </div>
-          <FieldGroup>
-            {editingEvent && (
-              <Field>
-                <FieldLabel htmlFor="execution-reason">更正原因</FieldLabel>
-                <Textarea
-                  id="execution-reason"
-                  value={draft.reason}
-                  onChange={(event) => updateDraft('reason', event.target.value)}
-                  placeholder="说明为什么需要生成新的成交版本"
-                  required
-                />
-              </Field>
-            )}
-            <Field>
-              <FieldLabel htmlFor="execution-note">备注（可选）</FieldLabel>
-              <Textarea
-                id="execution-note"
-                value={draft.note}
-                onChange={(event) => updateDraft('note', event.target.value)}
-                placeholder="记录来源、人工判断或其他上下文"
-              />
-            </Field>
-          </FieldGroup>
-          {formError && <FieldError>{formError}</FieldError>}
-          <div className="flex flex-col gap-4">
-            <Separator />
-            <div className="flex flex-wrap justify-end gap-2">
+                {formError && (
+                  <Field invalid>
+                    <FieldError>{formError}</FieldError>
+                  </Field>
+                )}
+              </div>
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border pt-4">
               <Button type="button" variant="outline" onClick={() => close(false)}>
                 取消
               </Button>
@@ -654,8 +676,8 @@ export function ExecutionFormSheet({
                 {executionSubmitLabel(submitting, Boolean(editingEvent))}
               </Button>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </SheetContent>
     </Sheet>
   );

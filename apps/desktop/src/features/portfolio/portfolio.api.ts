@@ -182,6 +182,7 @@ export interface SavePositionInput {
   instrumentId?: string;
   assetName?: string;
   assetType?: HeldAssetType;
+  occurredAt?: string;
 }
 
 export const savePosition = (

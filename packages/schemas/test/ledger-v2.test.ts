@@ -53,6 +53,7 @@ describe('LedgerEvent V2 契约', () => {
         quantity: '1.25',
         price: '205.30',
         currency: 'USD',
+        expectedAt: '2026-08-27T02:30:00.000Z',
         settledAt: '2026-08-28T02:30:00.000Z',
         capabilityVerification: 'VERIFIED',
         charges: [
@@ -63,7 +64,11 @@ describe('LedgerEvent V2 契约', () => {
     });
 
     expect(parsed.type).toBe('BUY_EXECUTION');
-    expect(parsed.payload).toMatchObject({ quantity: '1.25', price: '205.30' });
+    expect(parsed.payload).toMatchObject({
+      quantity: '1.25',
+      price: '205.30',
+      expectedAt: '2026-08-27T02:30:00.000Z',
+    });
   });
 
   it('接受日期级精度和明确经济排序键', () => {
@@ -228,6 +233,7 @@ describe('LedgerEvent V2 契约', () => {
         symbol: 'AAPL.US',
         amount: '5.25',
         currency: 'USD',
+        expectedAt: '2026-08-27T02:30:00.000Z',
         settledAt: '2026-08-28T02:30:00.000Z',
       },
     ],
@@ -397,6 +403,7 @@ describe('现金流与现金划转命令契约', () => {
       category: 'DEPOSIT' as const,
       amount: '1000.00',
       currency: 'CNY',
+      expectedAt: '2026-08-27T02:30:00.000Z',
       note: '工资',
     },
     source: baseEnvelope.source,
@@ -404,7 +411,10 @@ describe('现金流与现金划转命令契约', () => {
   };
 
   it('外部现金流命令拒绝 TRANSFER 类别', () => {
-    expect(createCashFlowCommandSchemaV2.parse(cashCommand).payload.category).toBe('DEPOSIT');
+    expect(createCashFlowCommandSchemaV2.parse(cashCommand).payload).toMatchObject({
+      category: 'DEPOSIT',
+      expectedAt: '2026-08-27T02:30:00.000Z',
+    });
     expect(() =>
       createCashFlowCommandSchemaV2.parse({
         ...cashCommand,
@@ -435,10 +445,14 @@ describe('现金流与现金划转命令契约', () => {
       economicOrderKey: baseEnvelope.economicOrderKey,
       amount: '500.00',
       currency: 'CNY',
+      expectedAt: '2026-08-27T02:30:00.000Z',
       source: baseEnvelope.source,
       actorId: baseEnvelope.actorId,
     };
-    expect(createCashTransferCommandSchemaV2.parse(transfer).amount).toBe('500.00');
+    expect(createCashTransferCommandSchemaV2.parse(transfer)).toMatchObject({
+      amount: '500.00',
+      expectedAt: '2026-08-27T02:30:00.000Z',
+    });
     expect(() =>
       createCashTransferCommandSchemaV2.parse({
         ...transfer,

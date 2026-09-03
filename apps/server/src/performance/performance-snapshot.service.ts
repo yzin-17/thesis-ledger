@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { projectCashBalances } from '../ledger/cash-projection.js';
-import { aggregateCurrencyAmounts, supportedCurrency, type ResolvedFx } from '../market/fx-conversion.js';
+import {
+  aggregateCurrencyAmounts,
+  supportedCurrency,
+  type ResolvedFx,
+} from '../market/fx-conversion.js';
 import { MarketService } from '../market/market.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
-import {
-  performanceRelationWhere,
-  performanceSnapshotWhere,
-} from './performance-account-scope.js';
+import { performanceRelationWhere, performanceSnapshotWhere } from './performance-account-scope.js';
 import { PerformanceDataService } from './performance-data.service.js';
 import {
   fxResponseFields,
@@ -104,7 +105,7 @@ export class PerformanceSnapshotService {
         }
       }),
     );
-    const cashBalances = projectCashBalances(ledger);
+    const cashBalances = projectCashBalances(ledger, capturedAt);
     const cashAmounts = [...cashBalances.entries()].flatMap(([id, byCurrency]) =>
       [...byCurrency.entries()].map(([currency, amount]) => ({
         accountId: id,
@@ -204,7 +205,9 @@ export class PerformanceSnapshotService {
       typeof snapshotDelegate.findMany === 'function'
         ? await snapshotDelegate.findMany({ where: { accountId: accountId ?? null, capturedAt } })
         : [
-            await snapshotDelegate.findFirst?.({ where: { accountId: accountId ?? null, capturedAt } }),
+            await snapshotDelegate.findFirst?.({
+              where: { accountId: accountId ?? null, capturedAt },
+            }),
           ].filter(
             (snapshot): snapshot is { payload: unknown } =>
               snapshot !== null && snapshot !== undefined,

@@ -58,7 +58,7 @@ export function CashObservationSheet({
     try {
       await mutation.mutateAsync({ accountId: account.id, amount: amount.trim(), currency });
       toastManager.add({
-        title: '现金观察已记录',
+        title: '现金快照已记录',
         description: '这不是现金流成交，仅更新现金快照。',
         type: 'success',
         timeout: 2800,
@@ -66,17 +66,15 @@ export function CashObservationSheet({
       onSaved();
       onOpenChange(false);
     } catch (caught) {
-      setError(errorMessage(caught, '现金观察记录失败；当前输入已保留。'));
+      setError(errorMessage(caught, '现金快照记录失败；当前输入已保留。'));
     }
   };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[520px] max-w-[calc(100%-16px)] p-6">
-        <SheetTitle>校准现金余额</SheetTitle>
-        <SheetDescription>
-          这会创建 CASH_BALANCE_OBSERVATION，不代表存入、取出或转账。
-        </SheetDescription>
+        <SheetTitle>记录现金快照</SheetTitle>
+        <SheetDescription>这会记录一条现金快照，不代表存入、取出或转账。</SheetDescription>
         <form className="mt-5 flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           <FieldGroup>
             <Field>
@@ -125,7 +123,7 @@ export function CashObservationSheet({
                   aria-hidden="true"
                 />
               )}
-              {mutation.isPending ? '记录中…' : '记录现金观察'}
+              {mutation.isPending ? '记录中…' : '记录现金快照'}
             </Button>
           </div>
         </form>

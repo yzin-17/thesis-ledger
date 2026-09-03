@@ -310,7 +310,7 @@ export class BaselineImportService {
         });
         if (existing) {
           if (existing.contentHash !== command.contentHash)
-            throw conflict('LEDGER_IDEMPOTENCY_CONFLICT', '相同基线幂等键的内容不同');
+            throw conflict('LEDGER_IDEMPOTENCY_CONFLICT', '相同快照幂等键的内容不同');
           const events = await context.transaction.ledgerEvent.findMany({
             where: {
               accountId: command.accountId,
@@ -557,7 +557,7 @@ export class BaselineImportService {
         });
         const currentHash = stableBaselineHash(baselineEvents);
         if (currentHash !== lockedDraft.baselineHash)
-          throw new ConflictException('草稿创建后 Ledger 已变化，请重新建立基线');
+          throw new ConflictException('草稿创建后 Ledger 已变化，请重新导入快照');
       }
 
       const currentRevision = await context.transaction.importDraftRevision.findUnique({
@@ -959,7 +959,7 @@ export class BaselineImportService {
     if (baselineRows.length > 0 && (!observedAt || !capturedAt || !sourceTimezone))
       throw conflict(
         'IMPORT_DRAFT_TIME_REQUIRED',
-        'Baseline 必须提供业务观察时间、采集时间和来源时区',
+        '持仓快照必须提供业务观察时间、采集时间和来源时区',
       );
 
     for (const row of selected) {

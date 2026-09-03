@@ -42,8 +42,7 @@ export class PerformanceLayerService {
     };
     const ledgerWhere = performanceRelationWhere(mode, accountId);
     const ledgerDelegate = (this.prisma as unknown as { ledgerEvent?: unknown }).ledgerEvent as
-      | { findMany?: (args: unknown) => Promise<unknown[]> }
-      | undefined;
+      { findMany?: (args: unknown) => Promise<unknown[]> } | undefined;
     const [positions, storedLedger, accountCurrencyMap] = await Promise.all([
       this.prisma.position.findMany({ where: positionWhere, include: { asset: true } }),
       typeof ledgerDelegate?.findMany === 'function'
@@ -85,7 +84,7 @@ export class PerformanceLayerService {
         };
       }),
     );
-    const cashBalances = projectCashBalances(ledger as StoredCashEvent[]);
+    const cashBalances = projectCashBalances(ledger as StoredCashEvent[], valuedAt);
     const byAccountCurrency = new Map<string, Map<Currency, NativeCurrencyTotals>>();
     const ensureAccountCurrency = (id: string, currency: Currency) => {
       const currenciesForAccount =

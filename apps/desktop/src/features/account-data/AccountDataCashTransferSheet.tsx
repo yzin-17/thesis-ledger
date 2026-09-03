@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeftRightIcon, Loader2Icon } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -12,19 +12,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetFooter, SheetTitle } from '@/components/ui/sheet';
 import { useToastManager } from '@/components/ui/toast';
 
 import type { Account } from '../portfolio/portfolio.types.js';
-import { currentLocalDateTime } from './account-data.helpers.js';
+import { currentLocalDateTime, errorCode } from './account-data.helpers.js';
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
+
+export const cashTransferErrorMessage = (error: unknown) => {
+  if (errorCode(error) === 'LEDGER_INSUFFICIENT_CASH') {
+    return '可用现金余额不足，请调整金额后重试。';
+  }
+  return '现金划转失败，请稍后重试。';
+};
 
 export function CashTransferSheet({
   account,
@@ -62,6 +62,20 @@ export function CashTransferSheet({
     setCounterpartyId(counterparties[0]?.id ?? '');
   }, [counterparties, counterpartyId, open]);
 
+  const resetForm = () => {
+    setDirection('out');
+    setCounterpartyId('');
+    setAmount('');
+    setOccurredAt(currentLocalDateTime());
+    setNote('');
+    setError('');
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) resetForm();
+    onOpenChange(nextOpen);
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
@@ -89,136 +103,135 @@ export function CashTransferSheet({
       });
       toastManager.add({
         title: '现金划转已入账',
-        description: '两端账户已原子更新。',
+        description: '两个账户的余额已更新。',
         type: 'success',
       });
-      setAmount('');
-      setNote('');
-      setOccurredAt(currentLocalDateTime());
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch (submissionError) {
-      setError(
-        submissionError instanceof Error ? submissionError.message : '现金划转失败，请稍后重试。',
-      );
+      setError(cashTransferErrorMessage(submissionError));
     }
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden sm:max-w-[calc(100%-16px)]"
+        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <SheetHeader className="border-b">
-          <SheetTitle>账户间现金划转</SheetTitle>
-          <SheetDescription>
-            仅支持真实现金账户与同币种证券或基金账户；提交后两端同时入账。
-          </SheetDescription>
-        </SheetHeader>
-        <form
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={(formEvent) => void submit(formEvent)}
-        >
-          <div className="flex-1 overflow-y-auto p-4">
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="cash-transfer-direction">当前账户方向</FieldLabel>
-                <Select
-                  value={direction}
-                  onValueChange={(value) => value && setDirection(value)}
-                >
-                  <SelectTrigger id="cash-transfer-direction" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="out">从 {account.name} 转出</SelectItem>
-                      <SelectItem value="in">转入 {account.name}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field invalid={!counterpartyId && Boolean(error)}>
-                <FieldLabel htmlFor="cash-transfer-counterparty">对方账户</FieldLabel>
-                <Select
-                  value={counterpartyId || null}
-                  onValueChange={(value) => value && setCounterpartyId(value)}
-                >
-                  <SelectTrigger
-                    id="cash-transfer-counterparty"
-                    className="w-full"
-                    aria-invalid={!counterpartyId && Boolean(error)}
-                  >
-                    <SelectValue placeholder="选择同币种账户" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {counterparties.map((candidate) => (
-                        <SelectItem key={candidate.id} value={candidate.id}>
-                          {candidate.name} · {candidate.currency}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <FieldDescription>
-                  可用范围由账户类型、模式、币种和启用状态共同决定。
-                </FieldDescription>
-              </Field>
-              <Field invalid={Boolean(error) && (!amount || Number(amount) <= 0)}>
-                <FieldLabel htmlFor="cash-transfer-amount">金额（{account.currency}）</FieldLabel>
-                <Input
-                  id="cash-transfer-amount"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  aria-invalid={Boolean(error) && (!amount || Number(amount) <= 0)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="cash-transfer-occurred-at">划转时间</FieldLabel>
-                <DateInput
-                  id="cash-transfer-occurred-at"
-                  type="datetime-local"
-                  value={occurredAt}
-                  onChange={(event) => setOccurredAt(event.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="cash-transfer-note">备注（可选）</FieldLabel>
-                <Input
-                  id="cash-transfer-note"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder="例如：转入证券账户备用金"
-                />
-              </Field>
-              {error && <FieldError>{error}</FieldError>}
-            </FieldGroup>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+          <div className="shrink-0">
+            <SheetTitle>账户间现金划转</SheetTitle>
           </div>
-          <SheetFooter className="border-t bg-popover">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={mutations.transfer.isPending}
-            >
-              取消
-            </Button>
-            <Button
-              type="submit"
-              disabled={mutations.transfer.isPending || counterparties.length === 0}
-            >
-              {mutations.transfer.isPending ? (
-                <Loader2Icon data-icon="inline-start" className="animate-spin" />
-              ) : (
-                <ArrowLeftRightIcon data-icon="inline-start" />
-              )}
-              确认划转
-            </Button>
-          </SheetFooter>
-        </form>
+          <form
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            onSubmit={(formEvent) => void submit(formEvent)}
+          >
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="cash-transfer-direction">当前账户方向</FieldLabel>
+                  <Select value={direction} onValueChange={(value) => value && setDirection(value)}>
+                    <SelectTrigger id="cash-transfer-direction" className="w-full">
+                      <SelectValue>
+                        {direction === 'out' ? `从 ${account.name} 转出` : `转入 ${account.name}`}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="out">从 {account.name} 转出</SelectItem>
+                        <SelectItem value="in">转入 {account.name}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field invalid={!counterpartyId && Boolean(error)}>
+                  <FieldLabel htmlFor="cash-transfer-counterparty">对方账户</FieldLabel>
+                  <Select
+                    value={counterpartyId || null}
+                    onValueChange={(value) => value && setCounterpartyId(value)}
+                  >
+                    <SelectTrigger
+                      id="cash-transfer-counterparty"
+                      className="w-full"
+                      aria-invalid={!counterpartyId && Boolean(error)}
+                    >
+                      <SelectValue placeholder="选择同币种账户">
+                        {(() => {
+                          const selected = counterparties.find(
+                            (candidate) => candidate.id === counterpartyId,
+                          );
+                          return selected ? `${selected.name} · ${selected.currency}` : '';
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {counterparties.map((candidate) => (
+                          <SelectItem key={candidate.id} value={candidate.id}>
+                            {candidate.name} · {candidate.currency}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field invalid={Boolean(error) && (!amount || Number(amount) <= 0)}>
+                  <FieldLabel htmlFor="cash-transfer-amount">金额（{account.currency}）</FieldLabel>
+                  <Input
+                    id="cash-transfer-amount"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    aria-invalid={Boolean(error) && (!amount || Number(amount) <= 0)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="cash-transfer-occurred-at">划转时间</FieldLabel>
+                  <DateInput
+                    id="cash-transfer-occurred-at"
+                    type="datetime-local"
+                    value={occurredAt}
+                    onChange={(event) => setOccurredAt(event.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="cash-transfer-note">备注（可选）</FieldLabel>
+                  <Input
+                    id="cash-transfer-note"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="例如：转入证券账户备用金"
+                  />
+                </Field>
+                {error && (
+                  <Field invalid>
+                    <FieldError>{error}</FieldError>
+                  </Field>
+                )}
+              </FieldGroup>
+            </div>
+            <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={mutations.transfer.isPending}
+              >
+                取消
+              </Button>
+              <Button
+                type="submit"
+                disabled={mutations.transfer.isPending || counterparties.length === 0}
+              >
+                {mutations.transfer.isPending && (
+                  <Loader2Icon data-icon="inline-start" className="animate-spin" />
+                )}
+                确认划转
+              </Button>
+            </SheetFooter>
+          </form>
+        </div>
       </SheetContent>
     </Sheet>
   );

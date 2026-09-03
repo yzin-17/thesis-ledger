@@ -52,7 +52,7 @@ const positionSaveLabel = (
   calibrationMode: boolean,
 ) => {
   if (saving) return '保存中…';
-  if (calibrationMode) return editing ? '保存持仓观察' : '记录持仓观察';
+  if (calibrationMode) return editing ? '保存持仓快照' : '记录持仓快照';
   if (editing) return '保存修改';
   if (selectedAccount?.type === 'cash') return '保存当前现金';
   return '添加持仓';
@@ -95,7 +95,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
           <div className="panel-heading">
             <SheetTitle>账户设置</SheetTitle>
             <SheetDescription id="account-manager-description">
-              账户是成交、持仓观察和现金观察的容器。
+              账户是成交、持仓快照和现金快照的容器。
             </SheetDescription>
           </div>
         )}
@@ -339,9 +339,9 @@ function PositionOverview({
   onOpenImport,
   onOpenReconciliation,
 }: PortfolioManagementViewProps) {
-  const positionHeading = calibrationMode ? '持仓观察' : '持仓';
+  const positionHeading = calibrationMode ? '持仓快照' : '持仓';
   const positionDescription = calibrationMode
-    ? '用于记录持仓快照基准，不产生 BUY / SELL 成交记录。'
+    ? '用于记录持仓快照，不产生 BUY / SELL 成交记录。'
     : undefined;
   const editPosition = (position: Position) => {
     setEditing(position);
@@ -354,21 +354,23 @@ function PositionOverview({
   };
   const positionActions = calibrationMode ? (
     <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button type="button" onClick={createPosition}>
+        记录持仓快照
+      </Button>
       {onOpenImport && (
         <Button type="button" variant="outline" onClick={onOpenImport} disabled>
           导入持仓快照（暂未开放）
         </Button>
       )}
       {onOpenReconciliation && (
-        <Button type="button" variant="outline" onClick={onOpenReconciliation}>
-          对账候选
+        <Button type="button" variant="outline" onClick={onOpenReconciliation} disabled>
+          对账候选（暂未开放）
         </Button>
       )}
       <PositionOverviewMenu
         positions={positions}
         busyAction={busyAction}
         clearPositions={clearPositions}
-        onCreate={createPosition}
       />
     </div>
   ) : (
@@ -476,7 +478,7 @@ const positionSheetHeading = (
   calibrationMode: boolean,
 ) => {
   if (entrySheetMode === 'position' && calibrationMode) {
-    if (editing) return '修改持仓观察';
+    if (editing) return '修改持仓快照';
     return '记录持仓快照';
   }
   return positionSheetTitle(entrySheetMode, editing);
@@ -496,21 +498,25 @@ function PositionEntrySheet(props: PortfolioManagementViewProps) {
       <SheetContent
         side="right"
         aria-describedby="position-form-description"
-        className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
+        className="h-[100dvh] min-h-0 w-[620px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <div className="panel-heading">
-          <SheetTitle>{positionSheetHeading(entrySheetMode, editing, calibrationMode)}</SheetTitle>
-          <SheetDescription id="position-form-description">
-            {calibrationMode
-              ? '这会创建持仓快照基准，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
-              : '录入账户当前实际持仓，用于初始化或校准持仓数据。'}
-          </SheetDescription>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+          <div className="panel-heading shrink-0">
+            <SheetTitle>
+              {positionSheetHeading(entrySheetMode, editing, calibrationMode)}
+            </SheetTitle>
+            <SheetDescription id="position-form-description">
+              {calibrationMode
+                ? '这会记录持仓快照，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
+                : '录入账户当前实际持仓，用于初始化或核对持仓数据。'}
+            </SheetDescription>
+          </div>
+          {entrySheetMode === 'cash' && selectedAccount?.type !== 'cash' ? (
+            <CashBalanceForm {...props} />
+          ) : (
+            <PositionForm {...props} />
+          )}
         </div>
-        {entrySheetMode === 'cash' && selectedAccount?.type !== 'cash' ? (
-          <CashBalanceForm {...props} />
-        ) : (
-          <PositionForm {...props} />
-        )}
       </SheetContent>
     </Sheet>
   );
@@ -524,25 +530,27 @@ function CashBalanceForm({
 }: PortfolioManagementViewProps) {
   return (
     <form
-      className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
       onChange={() => markDirty()}
       onSubmit={(event) => void submitCashBalance(event)}
     >
-      <h3>现金余额</h3>
-      <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
-      <div className="grid gap-1.5 text-xs text-muted-foreground">
-        <span>当前现金余额（CNY）</span>
-        <Input
-          aria-label="当前现金余额（CNY）"
-          name="cashAmount"
-          required
-          type="number"
-          min="0"
-          step="0.01"
-          defaultValue={cashValue ?? 0}
-        />
+      <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+        <h3>现金余额</h3>
+        <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
+        <div className="grid gap-1.5 text-xs text-muted-foreground">
+          <span>当前现金余额（CNY）</span>
+          <Input
+            aria-label="当前现金余额（CNY）"
+            name="cashAmount"
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={cashValue ?? 0}
+          />
+        </div>
       </div>
-      <div className="form-actions">
+      <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
         <Button
           type="submit"
           variant="default"
@@ -554,7 +562,7 @@ function CashBalanceForm({
           )}
           {busyAction === 'cash-save' ? '保存中…' : '保存当前现金'}
         </Button>
-      </div>
+      </SheetFooter>
     </form>
   );
 }
@@ -595,59 +603,61 @@ function PositionForm(props: PortfolioManagementViewProps) {
   } = props;
   return (
     <form
-      className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
       onChange={() => markDirty()}
       onSubmit={(event) => void submitPosition(event)}
       key={editing?.id ?? 'new'}
     >
-      <AccountField
-        accounts={accounts}
-        entryAccountLocked={entryAccountLocked}
-        entryAccountId={entryAccountId}
-        selectedAccount={selectedAccount}
-        confirmDiscard={confirmDiscard}
-        markDirty={markDirty}
-        setEntryAccountId={setEntryAccountId}
-        setSelectedInstrument={setSelectedInstrument}
-        setInstrumentQuery={setInstrumentQuery}
-        setInstrumentSearchOpen={setInstrumentSearchOpen}
-        setManualInstrumentEntry={setManualInstrumentEntry}
-        setManualAssetType={setManualAssetType}
-        setEntrySheetMode={setEntrySheetMode}
-      />
-      {selectedAccount?.type === 'cash' ? (
-        <div className="grid gap-1.5 text-xs text-muted-foreground">
-          <span>当前现金余额（CNY）</span>
-          <Input
-            aria-label="当前现金余额（CNY）"
-            name="cashAmount"
-            required
-            type="number"
-            min="0"
-            step="0.01"
-            defaultValue={cashValue ?? 0}
-          />
-        </div>
-      ) : (
-        <PositionFields
-          editing={editing}
-          instrumentQuery={instrumentQuery}
-          instrumentResults={instrumentResults}
-          instrumentSearchState={instrumentSearchState}
-          instrumentSearchBusy={instrumentSearchBusy}
-          instrumentSearchOpen={instrumentSearchOpen}
-          selectedInstrument={selectedInstrument}
-          manualInstrumentEntry={manualInstrumentEntry}
-          manualAssetType={manualAssetType}
+      <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+        <AccountField
+          accounts={accounts}
+          entryAccountLocked={entryAccountLocked}
+          entryAccountId={entryAccountId}
+          selectedAccount={selectedAccount}
+          confirmDiscard={confirmDiscard}
+          markDirty={markDirty}
+          setEntryAccountId={setEntryAccountId}
+          setSelectedInstrument={setSelectedInstrument}
+          setInstrumentQuery={setInstrumentQuery}
           setInstrumentSearchOpen={setInstrumentSearchOpen}
-          handleInstrumentQueryChange={handleInstrumentQueryChange}
-          confirmInstrument={confirmInstrument}
-          clearInstrumentSelection={clearInstrumentSelection}
-          startManualInstrumentEntry={startManualInstrumentEntry}
+          setManualInstrumentEntry={setManualInstrumentEntry}
           setManualAssetType={setManualAssetType}
+          setEntrySheetMode={setEntrySheetMode}
         />
-      )}
-      <div className="form-actions justify-end border-t border-border pt-4">
+        {selectedAccount?.type === 'cash' ? (
+          <div className="grid gap-1.5 text-xs text-muted-foreground">
+            <span>当前现金余额（CNY）</span>
+            <Input
+              aria-label="当前现金余额（CNY）"
+              name="cashAmount"
+              required
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={cashValue ?? 0}
+            />
+          </div>
+        ) : (
+          <PositionFields
+            editing={editing}
+            instrumentQuery={instrumentQuery}
+            instrumentResults={instrumentResults}
+            instrumentSearchState={instrumentSearchState}
+            instrumentSearchBusy={instrumentSearchBusy}
+            instrumentSearchOpen={instrumentSearchOpen}
+            selectedInstrument={selectedInstrument}
+            manualInstrumentEntry={manualInstrumentEntry}
+            manualAssetType={manualAssetType}
+            setInstrumentSearchOpen={setInstrumentSearchOpen}
+            handleInstrumentQueryChange={handleInstrumentQueryChange}
+            confirmInstrument={confirmInstrument}
+            clearInstrumentSelection={clearInstrumentSelection}
+            startManualInstrumentEntry={startManualInstrumentEntry}
+            setManualAssetType={setManualAssetType}
+          />
+        )}
+      </div>
+      <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
         <Button
           className="secondary"
           type="button"
@@ -672,7 +682,7 @@ function PositionForm(props: PortfolioManagementViewProps) {
             calibrationMode,
           )}
         </Button>
-      </div>
+      </SheetFooter>
     </form>
   );
 }

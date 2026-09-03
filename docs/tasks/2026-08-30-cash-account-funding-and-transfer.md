@@ -2,11 +2,14 @@
 
 对应 Spec：[`../specs/2026-08-30-cash-account-funding-and-transfer.md`](../specs/2026-08-30-cash-account-funding-and-transfer.md)
 
+状态：T1-T4 已完成并验证。
+
 ## 跨任务契约
 
 - `InvestmentAccountScope`：组合级查询只返回启用的 `securities | fund` 账户；显式账户查询不应用该过滤。
 - `CashTransferMetadata`：`transferId + counterpartyAccountId + leg`，只允许用于 `CASH_FLOW / TRANSFER`。
 - `accountScopePolicy`：新组合快照固定为 `investment-only-v1`。
+- `ManualCashDeposit`：一次性外部入账使用 `CREATE_CASH_FLOW`，固定为 `INFLOW / DEPOSIT`，写入真实现金账户；不携带划转元数据。
 
 ## 任务
 
@@ -46,6 +49,21 @@
     - `pnpm --filter @thesis-ledger/desktop typecheck`：通过。
     - 本轮未执行浏览器或 Compose 运行时验收，不将其作为本轮证据。
 
+- [x] T4：交付 Desktop 一次性现金入账入口并支持未来资金
+  - 覆盖验收标准：AC3、AC8
+  - 依赖：T1、T2
+  - 涉及范围：账户数据现金页、现金流 API 适配、TanStack Query、现金入账 Sheet、错误反馈和状态清理测试。
+  - 完成条件：真实现金账户可填写金额、预计或实际到账时间和备注并写入外部 `DEPOSIT`；未来时间进入待结算应收且不计入已结算余额；成功后刷新账户 Ledger、审计与估值；关闭或提交后不保留输入和错误；不复用现金快照或账户间划转。
+  - 验证方式：Desktop API/UI 测试、typecheck、build、宽窄屏浏览器和键盘验收。
+  - 验证证据：
+    - `pnpm exec vitest run test/account-data.cash.test.tsx test/account-data.ui.test.tsx`：2 个测试文件、18 个测试通过，覆盖外部 `DEPOSIT` 命令、`settledAt`、幂等命令 ID、入口账户条件、未来资金反馈、关闭状态清理、错误文案和查询失效。
+    - `pnpm exec vitest run test/ledger/core-projection.test.ts`：1 个测试文件、6 个测试通过，覆盖未来外部入账在结算前只进入 `pendingReceivable`，结算后才进入 `settledAmount`。
+    - `pnpm exec tsc -p tsconfig.json --noEmit`：通过。
+    - `pnpm --filter @thesis-ledger/desktop build`：通过；Vite 仅报告既有 chunk size warning。
+    - `pnpm exec prettier --check`：相关源码、测试和文档通过。
+    - `git diff --check`：通过。
+    - 本轮未执行浏览器、键盘和真实服务验收，不将其作为运行时证据。
+
 ## 最终一致性 Review
 
 - [x] Spec 中的全部验收标准均有对应实现
@@ -61,7 +79,7 @@
 
 ### Review 结论
 
-- 结论：本轮 10 项 review finding 的确定性回归已通过；legacy 兼容、通知模块边界、subject 契约、现金 UI 和账户/Tab 状态清理均已覆盖；现金投影对 Schema/Domain 可选字段差异使用显式 normalize，保持类型安全。
+- 结论：T1-T4 的实现、契约、测试和文档已保持一致，未来资金的结算边界已由 Desktop 命令测试和服务端投影测试共同验证。
 - 发现的问题：无确定性测试失败。
-- 遗留风险：本轮未执行浏览器、Compose、真实迁移部署和外部通知投递；`pnpm dlx shadcn@latest docs empty` 因本机 `@modelcontextprotocol/sdk` 引用 Zod `./v3` 导出错误退出，仅作为工具限制记录。
-- 验证命令与结果：Schema ledger-v2 42/42；Server 定向 10 个文件 78/78；Desktop 定向 5 个文件 34/34；Schema build、Server typecheck、Desktop typecheck 和 `scripts/check-boundaries.mjs` 均通过。
+- 遗留风险：本轮未执行浏览器、键盘、Compose/真实服务运行、真实迁移部署和外部通知投递；这些不影响已完成的确定性 API/UI、投影、typecheck、build、格式和 diff 检查结论。
+- 验证命令与结果：保留前序 T1-T3 证据；T4 Desktop 定向测试 2 个文件 18/18、Server 投影测试 6/6、Desktop typecheck、Desktop build、Prettier 和 `git diff --check` 均通过。

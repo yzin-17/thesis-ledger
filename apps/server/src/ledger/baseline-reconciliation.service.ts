@@ -187,7 +187,7 @@ export class BaselineReconciliationService {
         );
         const input = toEngineInput(events);
         const baseline = input.baselines.find((item) => item.factId === command.baselineFactId);
-        if (!baseline) throw new NotFoundException('找不到可对账的 Baseline 观察');
+        if (!baseline) throw new NotFoundException('找不到可对账的持仓快照');
         const desired = this.createConfirmationEvent(command, context, baseline);
         const replay = await this.findIdempotentReplay(context, desired);
         if (replay)
@@ -245,7 +245,7 @@ export class BaselineReconciliationService {
       command.accountId,
       async (context) => {
         const target = await this.requireEvent(context, command.supersedesEventId);
-        if (!isReconciliationEvent(target)) throw conflict('只能修正 Baseline 对账事件');
+        if (!isReconciliationEvent(target)) throw conflict('只能修正快照对账事件');
         const desired =
           command.command === 'VOID_BASELINE_RECONCILIATION'
             ? this.createVoidEvent(command, context, target)

@@ -99,7 +99,7 @@ export function ReconciliationSheet({
         side="right"
         className="h-[100dvh] w-[720px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <SheetTitle>Baseline 对账</SheetTitle>
+        <SheetTitle>持仓快照对账</SheetTitle>
         <SheetDescription>
           展示确定性匹配依据、覆盖数量、剩余量和冲突；只有最后的确认按钮会写入账本。
         </SheetDescription>
@@ -198,7 +198,11 @@ function ReconciliationResults({
                 onChange={(event) => onReasonChange(event.target.value)}
               />
             </Field>
-            {error && <FieldError>{error}</FieldError>}
+            {error && (
+              <Field invalid>
+                <FieldError>{error}</FieldError>
+              </Field>
+            )}
             <Button type="button" onClick={onSubmit} disabled={mutation.isPending}>
               {mutation.isPending && (
                 <LoaderCircle
@@ -212,7 +216,11 @@ function ReconciliationResults({
           </CardContent>
         </Card>
       )}
-      {!selectedCandidate && error && <FieldError>{error}</FieldError>}
+      {!selectedCandidate && error && (
+        <Field invalid>
+          <FieldError>{error}</FieldError>
+        </Field>
+      )}
     </div>
   );
 }

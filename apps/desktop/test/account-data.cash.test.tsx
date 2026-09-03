@@ -1,10 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { describe, expect, it, vi } from 'vitest';
 import { Toaster } from '../src/components/ui/toast.js';
-import { RecurringCashDeposits } from '../src/features/account-data/AccountDataRecurringCashDeposits.js';
 import {
+  cashDepositErrorMessage,
+  cashDepositSettlementTiming,
+  cashDepositSuccessDescription,
+} from '../src/features/account-data/AccountDataCashDepositSheet.js';
+import { RecurringCashDeposits } from '../src/features/account-data/AccountDataRecurringCashDeposits.js';
+import { cashTransferErrorMessage } from '../src/features/account-data/AccountDataCashTransferSheet.js';
+import {
+  cashFlowCategoryLabel,
+  sourceChannelLabel,
+} from '../src/features/account-data/account-data.helpers.js';
+import {
+  createManualCashDeposit,
   createManualCashTransfer,
   replaceManualCashTransfer,
   restoreManualCashTransfer,
@@ -30,6 +42,102 @@ const securitiesAccount = {
 };
 
 describe('账户现金操作', () => {
+  it('一次性入账提交外部 DEPOSIT 现金流，不携带划转元数据', async () => {
+    const createCashFlow = vi.fn(async (command) => command);
+    const commandId = 'desktop-cash-deposit-retry-1';
+
+    await createManualCashDeposit(
+      {
+        accountId: cashAccount.id,
+        amount: '1200.00',
+        currency: 'CNY',
+        occurredAt: '2026-08-31T01:00:00.000Z',
+        settledAt: '2026-08-31T01:00:00.000Z',
+        note: '8 月工资',
+        commandId,
+      },
+      {
+        ledger: { createCashFlow } as never,
+        cashDeposits: {} as never,
+      },
+    );
+    await createManualCashDeposit(
+      {
+        accountId: cashAccount.id,
+        amount: '1200.00',
+        currency: 'CNY',
+        occurredAt: '2026-08-31T01:00:00.000Z',
+        settledAt: '2026-08-31T01:00:00.000Z',
+        note: '8 月工资',
+        commandId,
+      },
+      {
+        ledger: { createCashFlow } as never,
+        cashDeposits: {} as never,
+      },
+    );
+
+    expect(createCashFlow).toHaveBeenCalledTimes(2);
+    expect(createCashFlow).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        command: 'CREATE_CASH_FLOW',
+        accountId: cashAccount.id,
+        occurredAt: '2026-08-31T01:00:00.000Z',
+        timePrecision: 'INSTANT',
+        payload: {
+          direction: 'INFLOW',
+          category: 'DEPOSIT',
+          amount: '1200.00',
+          currency: 'CNY',
+          settledAt: '2026-08-31T01:00:00.000Z',
+          note: '8 月工资',
+        },
+        source: {
+          category: 'MANUAL',
+          channel: 'desktop-cash-deposit',
+          externalId: commandId,
+        },
+        economicOrderKey: `desktop-cash-deposit:${commandId}`,
+      }),
+    );
+    const firstCommand = createCashFlow.mock.calls[0]?.[0];
+    const secondCommand = createCashFlow.mock.calls[1]?.[0];
+    expect(firstCommand?.economicOrderKey).toBe(`desktop-cash-deposit:${commandId}`);
+    expect(firstCommand?.source.externalId).toBe(commandId);
+    expect(secondCommand?.economicOrderKey).toBe(firstCommand?.economicOrderKey);
+    expect(secondCommand?.source.externalId).toBe(firstCommand?.source.externalId);
+    expect(firstCommand?.payload).not.toHaveProperty('transfer');
+  });
+
+  it('未来现金入账通过 expectedAt 表达预计生效时间', async () => {
+    const createCashFlow = vi.fn(async (command) => command);
+    const expectedAt = '2099-01-05T01:00:00.000Z';
+
+    await createManualCashDeposit(
+      {
+        accountId: cashAccount.id,
+        amount: '800',
+        currency: 'CNY',
+        occurredAt: expectedAt,
+        expectedAt,
+        commandId: 'desktop-cash-deposit-future-1',
+      },
+      {
+        ledger: { createCashFlow } as never,
+        cashDeposits: {} as never,
+      },
+    );
+
+    expect(createCashFlow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ expectedAt }),
+      }),
+    );
+    const command = createCashFlow.mock.calls[0]?.[0];
+    expect(command?.payload).not.toHaveProperty('settledAt');
+  });
+
   it('手动划转提交前读取两端最新 Revision，并生成关联命令', async () => {
     const getEvents = vi
       .fn()
@@ -188,8 +296,7 @@ describe('账户现金操作', () => {
       ledgerRevision: accountId === cashAccount.id ? '5' : '9',
     }));
     const getEventAudit = vi.fn(async (accountId: string) => ({
-      events:
-        accountId === cashAccount.id ? [sourceEvent, sourceVoid] : [targetEvent, targetVoid],
+      events: accountId === cashAccount.id ? [sourceEvent, sourceVoid] : [targetEvent, targetVoid],
       ledgerRevision: accountId === cashAccount.id ? '5' : '9',
     }));
     const restoreCashTransfer = vi.fn(async (command) => command);
@@ -227,7 +334,114 @@ describe('账户现金操作', () => {
     expect(source).toContain('<SheetFooter');
     expect(source).toContain('确认划转');
     expect(source).toContain('setError(');
-    expect(source).toContain('onOpenChange(false)');
+    expect(source).toContain('onOpenChange(nextOpen)');
+    expect(source).toContain('const resetForm = () =>');
+    expect(source).toContain("setDirection('out')");
+    expect(source).toContain("setCounterpartyId('')");
+    expect(source).toContain("setAmount('')");
+    expect(source).toContain("setNote('')");
+    expect(source).toContain("setError('')");
+    expect(source).toContain('if (!nextOpen) resetForm();');
+    expect(source).toContain('onOpenChange={handleOpenChange}');
+  });
+
+  it('现金入账 Sheet 使用实际到账字段，并在关闭后清理状态且不泄露错误', () => {
+    const source = readFileSync(
+      new URL('../src/features/account-data/AccountDataCashDepositSheet.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toContain('现金入账');
+    expect(source).toContain('金额（{account.currency}）');
+    expect(source).toContain('到账时间');
+    expect(source).toContain('备注（可选）');
+    expect(source).toContain('<SheetFooter');
+    expect(source).toContain('确认入账');
+    expect(source).toContain('填写实际到账的金额和时间。');
+    expect(source).toContain('未来时间会先显示在待结算资金中。');
+    expect(source).toContain('cashDepositSettlementTiming(isFuture, occurredAtIso)');
+    expect(source).toContain('const isFuture = new Date(occurredAtIso).getTime() > Date.now();');
+    expect(cashDepositSettlementTiming(true, '2099-01-05T01:00:00.000Z')).toEqual({
+      expectedAt: '2099-01-05T01:00:00.000Z',
+    });
+    expect(cashDepositSettlementTiming(false, '2026-09-05T01:00:00.000Z')).toEqual({
+      settledAt: '2026-09-05T01:00:00.000Z',
+    });
+    expect(cashDepositSuccessDescription('CNY', true)).toBe('已列入待结算，到账后计入余额。');
+    expect(cashDepositSuccessDescription('CNY', false)).toBe('CNY 现金余额已更新。');
+    expect(source).not.toContain('账户间划转');
+    expect(source).not.toContain('现金快照');
+    expect(source).toContain('const resetForm = () =>');
+    expect(source).toContain("setAmount('')");
+    expect(source).toContain('setOccurredAt(currentLocalDateTime())');
+    expect(source).toContain("setNote('')");
+    expect(source).toContain("setError('')");
+    expect(source).toContain('const commandIdRef = useRef<string | null>(null);');
+    expect(source).toContain('createClientCommandId()');
+    expect(source).toContain('commandId,');
+    expect(source).toContain('commandIdRef.current = null;');
+    expect(source).toContain('if (!nextOpen) resetForm();');
+    expect(source).toContain('onOpenChange={handleOpenChange}');
+    expect(source).not.toContain('submissionError.message');
+    expect(cashDepositErrorMessage(new Error('ThesisLedger API 500: internal error'))).toBe(
+      '现金入账失败，请稍后重试。',
+    );
+  });
+
+  it('待结算现金流和现金入账来源使用用户显示名', () => {
+    const sectionsSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataSections.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(cashFlowCategoryLabel('DEPOSIT')).toBe('现金入账');
+    expect(cashFlowCategoryLabel('WITHDRAWAL')).toBe('现金支出');
+    expect(cashFlowCategoryLabel('UNKNOWN')).toBe('现金流');
+    expect(sourceChannelLabel('desktop-cash-deposit')).toBe('桌面端 · 现金入账');
+    expect(sectionsSource).toContain('cashFlowCategoryLabel(event.payload.category)');
+    expect(sectionsSource).toContain("if (event.revisionAction === 'VOID') return null;");
+    expect(sectionsSource).toContain(
+      'event.payload.settledAt ?? event.payload.expectedAt ?? event.occurredAt',
+    );
+    expect(sectionsSource).not.toContain('label: event.payload.category');
+  });
+
+  it('现金入账成功后刷新当前账本、审计链和估值', () => {
+    const source = readFileSync(
+      new URL('../src/features/account-data/account-data.cash.queries.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).toMatch(
+      /const invalidateCashAccount[\s\S]*?queryClient\.invalidateQueries\(\{ queryKey: accountDataKeys\.audit\(accountId, mode\) \}\)/,
+    );
+    expect(source).toMatch(
+      /const invalidateCashAccount[\s\S]*?queryClient\.invalidateQueries\(\{ queryKey: portfolioKeys\.valuation\(mode, accountId\) \}\)/,
+    );
+  });
+
+  it('划转反馈不暴露 API 文案，并将余额不足解释为可操作提示', () => {
+    const source = readFileSync(
+      new URL('../src/features/account-data/AccountDataCashTransferSheet.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(source).not.toContain('仅支持真实现金账户与同币种证券或基金账户');
+    expect(source).not.toContain('可用范围由账户类型、模式、币种和启用状态共同决定');
+    expect(source).not.toContain('原子更新');
+    expect(source).not.toContain('submissionError.message');
+    expect(
+      cashTransferErrorMessage(
+        new ThesisLedgerApiError(409, {
+          error: 'conflict',
+          errorCode: 'LEDGER_INSUFFICIENT_CASH',
+          message: '已结算现金余额不足',
+        }),
+      ),
+    ).toBe('可用现金余额不足，请调整金额后重试。');
+    expect(cashTransferErrorMessage(new Error('ThesisLedger API 409: 已结算现金余额不足'))).toBe(
+      '现金划转失败，请稍后重试。',
+    );
   });
 
   it('定期入账突出待确认实例，并把破坏性计划操作放进上下文菜单', () => {

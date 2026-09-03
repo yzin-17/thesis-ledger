@@ -195,7 +195,7 @@ export class ImportDraftService {
     const draft = await this.prisma.importDraft.findUnique({ where: { id } });
     if (!draft) throw new NotFoundException('导入草稿不存在');
     if (!['pending', 'reviewed'].includes(draft.status))
-      throw new BadRequestException('只有待审核草稿可以重新建立基线');
+      throw new BadRequestException('只有待审核草稿可以重新导入快照');
     const [events, positions] = await Promise.all([
       readLedgerEvents(this.prisma, draft.accountId),
       this.prisma.position.findMany({ where: { accountId: draft.accountId } }),

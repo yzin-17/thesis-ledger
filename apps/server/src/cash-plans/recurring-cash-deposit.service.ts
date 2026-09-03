@@ -86,9 +86,7 @@ export class RecurringCashDepositService {
       where: { id, version: input.expectedVersion },
       data: {
         ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.expectedAmount === undefined
-          ? {}
-          : { expectedAmount: input.expectedAmount }),
+        ...(input.expectedAmount === undefined ? {} : { expectedAmount: input.expectedAmount }),
         ...(input.dayOfMonth === undefined ? {} : { dayOfMonth: input.dayOfMonth, nextDueAt }),
         version: { increment: 1 },
       },
@@ -125,8 +123,7 @@ export class RecurringCashDepositService {
     const input = confirmRecurringCashDepositOccurrenceSchema.parse(rawInput);
     const occurrence = await this.requireOccurrence(id);
     if (occurrence.status === 'CONFIRMED') return occurrence;
-    if (occurrence.status !== 'PENDING')
-      throw new BadRequestException('只有待确认入账可以确认');
+    if (occurrence.status !== 'PENDING') throw new BadRequestException('只有待确认入账可以确认');
     if (occurrence.version !== input.expectedVersion) throw versionConflict();
     await this.requireCashAccount(occurrence.accountId);
 
@@ -143,6 +140,7 @@ export class RecurringCashDepositService {
           category: 'DEPOSIT',
           amount: input.actualAmount,
           currency: occurrence.currency,
+          settledAt: input.occurredAt,
           note: occurrence.planName,
         },
         source: {
@@ -295,9 +293,7 @@ export class RecurringCashDepositService {
     if (status === 'ACTIVE' && plan.status !== 'PAUSED')
       throw new BadRequestException('只有暂停计划可以恢复');
     const nextDueAt =
-      status === 'ACTIVE'
-        ? nextScheduledAtOrAfter(now, plan.dayOfMonth, plan.startPeriod)
-        : null;
+      status === 'ACTIVE' ? nextScheduledAtOrAfter(now, plan.dayOfMonth, plan.startPeriod) : null;
     const updated = await this.prisma.recurringCashDepositPlan.updateMany({
       where: { id, version: input.expectedVersion },
       data: {

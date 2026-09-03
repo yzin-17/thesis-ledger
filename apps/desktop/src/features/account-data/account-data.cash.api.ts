@@ -2,6 +2,7 @@ import type {
   CashFlowPayloadV2,
   CashTransferMetadataV2,
   ConfirmRecurringCashDepositOccurrence,
+  CreateCashFlowCommandV2,
   CreateCashTransferCommandV2,
   CreateRecurringCashDepositPlan,
   LedgerAuditResponseV2,
@@ -17,12 +18,14 @@ import type {
 } from '@thesis-ledger/api-client';
 
 import { getDesktopApiClient } from '../../shared/api/client.js';
+import { createClientCommandId, sourceTimezone } from './account-data.helpers.js';
 
 export type CashOperationsClient = {
   ledger: Pick<
     ThesisLedgerApiClient['ledger'],
     | 'getEvents'
     | 'getEventAudit'
+    | 'createCashFlow'
     | 'createCashTransfer'
     | 'replaceCashTransfer'
     | 'voidCashTransfer'
@@ -32,6 +35,46 @@ export type CashOperationsClient = {
 };
 
 const defaultClient = (): CashOperationsClient => getDesktopApiClient();
+
+export const createManualCashDeposit = async (
+  input: {
+    accountId: string;
+    amount: string;
+    currency: 'CNY' | 'HKD' | 'USD';
+    occurredAt: string;
+    expectedAt?: string;
+    settledAt?: string;
+    note?: string;
+    commandId?: string;
+  },
+  client: CashOperationsClient = defaultClient(),
+): Promise<LedgerCommandResponseV2> => {
+  const commandId = input.commandId ?? createClientCommandId();
+  const command: CreateCashFlowCommandV2 = {
+    command: 'CREATE_CASH_FLOW',
+    accountId: input.accountId,
+    occurredAt: input.occurredAt,
+    timePrecision: 'INSTANT',
+    sourceTimezone: sourceTimezone(),
+    economicOrderKey: `desktop-cash-deposit:${commandId}`,
+    payload: {
+      direction: 'INFLOW',
+      category: 'DEPOSIT',
+      amount: input.amount,
+      currency: input.currency,
+      ...(input.expectedAt === undefined ? {} : { expectedAt: input.expectedAt }),
+      ...(input.settledAt === undefined ? {} : { settledAt: input.settledAt }),
+      ...(input.note ? { note: input.note } : {}),
+    },
+    source: {
+      category: 'MANUAL',
+      channel: 'desktop-cash-deposit',
+      externalId: commandId,
+    },
+    actorId: 'desktop-user',
+  };
+  return client.ledger.createCashFlow(command);
+};
 
 export const createManualCashTransfer = async (
   input: {

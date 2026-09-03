@@ -41,7 +41,7 @@ export const isVoidEvent = (event: LedgerEventV2): event is VoidEvent =>
 
 export const isLegacyAuditEvent = (
   event: LedgerAuditEvent,
-): event is Extract<LedgerAuditEvent, { version: 1 }> => 'version' in event;
+): event is Extract<LedgerAuditEvent, { version: 1 }> => event.version === 1;
 
 export const isCurrency = (value: string | null): value is Currency =>
   value === 'CNY' || value === 'HKD' || value === 'USD';
@@ -82,12 +82,34 @@ export const currencyLabel = (currency: Currency) => {
   return 'USD · 美元';
 };
 
+const sourceChannelLabels: Record<string, string> = {
+  manual: '桌面端 · 资产录入',
+  'desktop-account-data': '桌面端 · 资产录入',
+  'desktop-account-data-reconciliation': '桌面端 · 快照对账',
+  'desktop-cash-deposit': '桌面端 · 现金入账',
+  'desktop-cash-transfer': '桌面端 · 资金划转',
+  'recurring-cash-deposit': '服务端 · 周期存款',
+  'screenshot:rollback': '服务端 · 截图回滚',
+};
+
+export const sourceChannelLabel = (channel: string) => sourceChannelLabels[channel] ?? channel;
+
+export const cashFlowCategoryLabel = (category: string) => {
+  if (category === 'DEPOSIT') return '现金入账';
+  if (category === 'WITHDRAWAL') return '现金支出';
+  if (category === 'TRANSFER') return '账户间划转';
+  if (category === 'INTEREST') return '利息收入';
+  if (category === 'FEE') return '费用';
+  if (category === 'TAX') return '税费';
+  return '现金流';
+};
+
 export const eventTypeLabel = (event: LedgerEventV2) => {
   if (event.type === 'BUY_EXECUTION') return '买入成交';
   if (event.type === 'SELL_EXECUTION') return '卖出成交';
-  if (event.type === 'POSITION_BASELINE_OBSERVATION') return '持仓余额观察';
-  if (event.type === 'CASH_BALANCE_OBSERVATION') return '现金余额观察';
-  if (event.type === 'BASELINE_RECONCILIATION') return '基线对账';
+  if (event.type === 'POSITION_BASELINE_OBSERVATION') return '持仓快照';
+  if (event.type === 'CASH_BALANCE_OBSERVATION') return '现金快照';
+  if (event.type === 'BASELINE_RECONCILIATION') return '快照对账';
   if (event.type === 'BONUS_SHARE') return '送股';
   if (event.type === 'SPLIT') return '拆分';
   if (event.type === 'MERGE') return '合并';
@@ -108,11 +130,91 @@ export const revisionBadgeVariant = (event: LedgerEventV2): 'default' | 'seconda
 };
 
 export const executionSideLabel = (event: ExecutionEvent) =>
-  event.type === 'BUY_EXECUTION' ? 'BUY 买入' : 'SELL 卖出';
+  event.type === 'BUY_EXECUTION' ? '买入' : '卖出';
+
+export const eventSymbol = (event: LedgerEventV2): string | null => {
+  if (event.revisionAction === 'VOID') return null;
+  switch (event.type) {
+    case 'BUY_EXECUTION':
+    case 'SELL_EXECUTION':
+    case 'POSITION_BASELINE_OBSERVATION':
+    case 'BASELINE_RECONCILIATION':
+    case 'BONUS_SHARE':
+    case 'SPLIT':
+    case 'MERGE':
+    case 'DIVIDEND':
+      return event.payload.symbol;
+    default:
+      return null;
+  }
+};
+
+export const eventSubjectDetail = (event: LedgerEventV2): string | null => {
+  if (event.revisionAction === 'VOID') return null;
+  switch (event.type) {
+    case 'POSITION_BASELINE_OBSERVATION': {
+      const { quantity, averageCost, currency } = event.payload;
+      const cost = averageCost !== undefined ? ` · ${formatDecimal(averageCost)} ${currency}` : '';
+      return `${eventTypeLabel(event)} · ${formatDecimal(quantity)}${cost}`;
+    }
+    case 'BASELINE_RECONCILIATION':
+      return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.coveredQuantity)} · ${formatDecimal(event.payload.coveredCost)}`;
+    case 'BONUS_SHARE':
+      return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.quantity)}`;
+    case 'SPLIT':
+    case 'MERGE':
+      return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.fromUnits)} → ${formatDecimal(event.payload.toUnits)}`;
+    case 'DIVIDEND':
+      return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.amount)} ${event.payload.currency}`;
+    default:
+      return null;
+  }
+};
+
+const multiplyDecimalStrings = (left: string, right: string) => {
+  const parse = (value: string) => {
+    if (!/^-?\d+(?:\.\d+)?$/.test(value)) throw new Error(`非法十进制值: ${value}`);
+    const negative = value.startsWith('-');
+    const unsigned = negative ? value.slice(1) : value;
+    const [integer, fraction = ''] = unsigned.split('.');
+    return {
+      coefficient: BigInt(`${integer}${fraction}`) * (negative ? -1n : 1n),
+      scale: fraction.length,
+    };
+  };
+  const a = parse(left);
+  const b = parse(right);
+  const coefficient = a.coefficient * b.coefficient;
+  const scale = a.scale + b.scale;
+  const sign = coefficient < 0n ? '-' : '';
+  const digits = (coefficient < 0n ? -coefficient : coefficient).toString();
+  if (scale === 0) return `${sign}${digits}`;
+  const padded = digits.padStart(scale + 1, '0');
+  const integer = padded.slice(0, -scale);
+  const fraction = padded.slice(-scale).replace(/0+$/, '');
+  return fraction ? `${sign}${integer}.${fraction}` : `${sign}${integer}`;
+};
 
 export const transactionAmount = (event: LedgerEventV2, execution: ExecutionEvent | null) => {
-  if (execution)
-    return `${formatDecimal(execution.payload.quantity)} ${execution.payload.currency}`;
+  if (execution) {
+    try {
+      const gross = multiplyDecimalStrings(execution.payload.quantity, execution.payload.price);
+      return `${gross} ${execution.payload.currency}`;
+    } catch {
+      return `${formatDecimal(execution.payload.quantity)} ${execution.payload.currency}`;
+    }
+  }
+  if (event.revisionAction !== 'VOID' && event.type === 'POSITION_BASELINE_OBSERVATION') {
+    const { quantity, averageCost, currency } = event.payload;
+    if (averageCost !== undefined) {
+      try {
+        return `${multiplyDecimalStrings(quantity, averageCost)} ${currency}`;
+      } catch {
+        return `${formatDecimal(quantity)} ${currency}`;
+      }
+    }
+    return `${formatDecimal(quantity)} ${currency}`;
+  }
   if (event.revisionAction !== 'VOID' && event.type === 'CASH_BALANCE_OBSERVATION')
     return formatDecimal(event.payload.amount);
   return '—';
@@ -238,7 +340,10 @@ export const executionDraft = (
     localDateTimeValue(event?.occurredAt, event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT') ||
     currentLocalDateTime(),
   timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
-  settledAt: localDateTimeValue(event?.payload.settledAt, 'INSTANT'),
+  settledAt: localDateTimeValue(
+    event?.payload.settledAt ?? event?.payload.expectedAt,
+    'INSTANT',
+  ),
   capabilityVerification: event?.payload.capabilityVerification ?? 'UNVERIFIED',
   note: event?.payload.note ?? '',
   reason: '',

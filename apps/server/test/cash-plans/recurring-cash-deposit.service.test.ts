@@ -54,10 +54,19 @@ type FixturePrisma = {
 const createFixture = () => {
   const now = new Date('2026-08-30T00:00:00.000Z');
   const accounts = new Map([
-    [cashAccountId, { id: cashAccountId, active: true, mode: 'actual', type: 'cash', currency: 'CNY' }],
+    [
+      cashAccountId,
+      { id: cashAccountId, active: true, mode: 'actual', type: 'cash', currency: 'CNY' },
+    ],
     [
       securitiesAccountId,
-      { id: securitiesAccountId, active: true, mode: 'actual', type: 'securities', currency: 'CNY' },
+      {
+        id: securitiesAccountId,
+        active: true,
+        mode: 'actual',
+        type: 'securities',
+        currency: 'CNY',
+      },
     ],
   ]);
   const plans = new Map<string, PlanRow>();
@@ -90,74 +99,109 @@ const createFixture = () => {
         [...plans.values()].filter((plan) => {
           if (where.accountId && plan.accountId !== where.accountId) return false;
           if (where.status && plan.status !== where.status) return false;
-          if (where.nextDueAt && plan.nextDueAt && plan.nextDueAt > (where.nextDueAt as { lte: Date }).lte)
+          if (
+            where.nextDueAt &&
+            plan.nextDueAt &&
+            plan.nextDueAt > (where.nextDueAt as { lte: Date }).lte
+          )
             return false;
           return true;
         }),
       ),
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => plans.get(where.id) ?? null),
-      updateMany: vi.fn(async ({ where, data }: { where: { id: string; version?: number; status?: string }; data: Record<string, unknown> }) => {
-        const row = plans.get(where.id);
-        if (!row || (where.version !== undefined && row.version !== where.version)) return { count: 0 };
-        if (where.status !== undefined && row.status !== where.status) return { count: 0 };
-        if (typeof data.status === 'string') row.status = data.status as PlanRow['status'];
-        if (data.nextDueAt !== undefined) row.nextDueAt = data.nextDueAt as Date | null;
-        if (data.pausedAt !== undefined) row.pausedAt = data.pausedAt as Date | null;
-        if (data.endedAt !== undefined) row.endedAt = data.endedAt as Date | null;
-        if (typeof data.name === 'string') row.name = data.name;
-        if (typeof data.expectedAmount === 'string') row.expectedAmount = data.expectedAmount;
-        if (typeof data.dayOfMonth === 'number') row.dayOfMonth = data.dayOfMonth;
-        if (data.version && typeof data.version === 'object' && 'increment' in data.version)
-          row.version += Number((data.version as { increment: number }).increment);
-        row.updatedAt = now;
-        return { count: 1 };
-      }),
+      findUnique: vi.fn(
+        async ({ where }: { where: { id: string } }) => plans.get(where.id) ?? null,
+      ),
+      updateMany: vi.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string; version?: number; status?: string };
+          data: Record<string, unknown>;
+        }) => {
+          const row = plans.get(where.id);
+          if (!row || (where.version !== undefined && row.version !== where.version))
+            return { count: 0 };
+          if (where.status !== undefined && row.status !== where.status) return { count: 0 };
+          if (typeof data.status === 'string') row.status = data.status as PlanRow['status'];
+          if (data.nextDueAt !== undefined) row.nextDueAt = data.nextDueAt as Date | null;
+          if (data.pausedAt !== undefined) row.pausedAt = data.pausedAt as Date | null;
+          if (data.endedAt !== undefined) row.endedAt = data.endedAt as Date | null;
+          if (typeof data.name === 'string') row.name = data.name;
+          if (typeof data.expectedAmount === 'string') row.expectedAmount = data.expectedAmount;
+          if (typeof data.dayOfMonth === 'number') row.dayOfMonth = data.dayOfMonth;
+          if (data.version && typeof data.version === 'object' && 'increment' in data.version)
+            row.version += Number((data.version as { increment: number }).increment);
+          row.updatedAt = now;
+          return { count: 1 };
+        },
+      ),
     },
     recurringCashDepositOccurrence: {
-      createMany: vi.fn(async ({ data }: { data: Array<Omit<OccurrenceRow, 'id' | 'createdAt' | 'updatedAt'>> }) => {
-        for (const input of data) {
-          const row = {
-            ...input,
-            status: input.status ?? 'PENDING',
-            actualAmount: input.actualAmount ?? null,
-            occurredAt: input.occurredAt ?? null,
-            ledgerEventId: input.ledgerEventId ?? null,
-            ledgerFactId: input.ledgerFactId ?? null,
-            version: input.version ?? 1,
-            skippedReason: input.skippedReason ?? null,
-            confirmedAt: input.confirmedAt ?? null,
-            skippedAt: input.skippedAt ?? null,
-            id: `occurrence-${++occurrenceSequence}`,
-            createdAt: now,
-            updatedAt: now,
-          } as OccurrenceRow;
-          occurrences.set(row.id, row);
-        }
-        return { count: data.length };
-      }),
+      createMany: vi.fn(
+        async ({
+          data,
+        }: {
+          data: Array<Omit<OccurrenceRow, 'id' | 'createdAt' | 'updatedAt'>>;
+        }) => {
+          for (const input of data) {
+            const row = {
+              ...input,
+              status: input.status ?? 'PENDING',
+              actualAmount: input.actualAmount ?? null,
+              occurredAt: input.occurredAt ?? null,
+              ledgerEventId: input.ledgerEventId ?? null,
+              ledgerFactId: input.ledgerFactId ?? null,
+              version: input.version ?? 1,
+              skippedReason: input.skippedReason ?? null,
+              confirmedAt: input.confirmedAt ?? null,
+              skippedAt: input.skippedAt ?? null,
+              id: `occurrence-${++occurrenceSequence}`,
+              createdAt: now,
+              updatedAt: now,
+            } as OccurrenceRow;
+            occurrences.set(row.id, row);
+          }
+          return { count: data.length };
+        },
+      ),
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
         [...occurrences.values()].filter((occurrence) => {
           if (where.planId && occurrence.planId !== where.planId) return false;
           if (where.accountId && occurrence.accountId !== where.accountId) return false;
           if (where.status && occurrence.status !== where.status) return false;
           if (where.periodKey && typeof where.periodKey === 'object' && 'in' in where.periodKey)
-            return ((where.periodKey as { in: string[] }).in).includes(occurrence.periodKey);
+            return (where.periodKey as { in: string[] }).in.includes(occurrence.periodKey);
           return true;
         }),
       ),
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => occurrences.get(where.id) ?? null),
-      updateMany: vi.fn(async ({ where, data }: { where: { id: string; status?: string; version?: number }; data: Record<string, unknown> }) => {
-        const row = occurrences.get(where.id);
-        if (!row || (where.status !== undefined && row.status !== where.status) || (where.version !== undefined && row.version !== where.version))
-          return { count: 0 };
-        for (const [key, value] of Object.entries(data)) {
-          if (key === 'version' && typeof value === 'object' && value && 'increment' in value)
-            row.version += Number((value as { increment: number }).increment);
-          else if (key in row) (row as unknown as Record<string, unknown>)[key] = value;
-        }
-        row.updatedAt = now;
-        return { count: 1 };
-      }),
+      findUnique: vi.fn(
+        async ({ where }: { where: { id: string } }) => occurrences.get(where.id) ?? null,
+      ),
+      updateMany: vi.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string; status?: string; version?: number };
+          data: Record<string, unknown>;
+        }) => {
+          const row = occurrences.get(where.id);
+          if (
+            !row ||
+            (where.status !== undefined && row.status !== where.status) ||
+            (where.version !== undefined && row.version !== where.version)
+          )
+            return { count: 0 };
+          for (const [key, value] of Object.entries(data)) {
+            if (key === 'version' && typeof value === 'object' && value && 'increment' in value)
+              row.version += Number((value as { increment: number }).increment);
+            else if (key in row) (row as unknown as Record<string, unknown>)[key] = value;
+          }
+          row.updatedAt = now;
+          return { count: 1 };
+        },
+      ),
     },
     $transaction: vi.fn((operation: (transaction: FixturePrisma) => Promise<unknown>) =>
       operation(prisma),
@@ -168,12 +212,12 @@ const createFixture = () => {
     createCashFlowWithEffect: vi.fn(
       async (
         command: unknown,
-        effect: (transaction: typeof prisma, event: { eventId: string; factId: string }) => Promise<void>,
+        effect: (
+          transaction: typeof prisma,
+          event: { eventId: string; factId: string },
+        ) => Promise<void>,
       ) => {
-        await effect(
-          prisma,
-          { eventId: 'ledger-event-1', factId: 'ledger-fact-1' },
-        );
+        await effect(prisma, { eventId: 'ledger-event-1', factId: 'ledger-fact-1' });
         return { response: { idempotentReplay: false }, command };
       },
     ),
@@ -283,7 +327,13 @@ describe('定期现金入账计划', () => {
     });
     expect(fixture.cashCommands.createCashFlowWithEffect).toHaveBeenCalledTimes(1);
     expect(fixture.cashCommands.createCashFlowWithEffect.mock.calls[0]?.[0]).toMatchObject({
-      payload: { direction: 'INFLOW', category: 'DEPOSIT', amount: '980.50', currency: 'CNY' },
+      payload: {
+        direction: 'INFLOW',
+        category: 'DEPOSIT',
+        amount: '980.50',
+        currency: 'CNY',
+        settledAt: '2026-07-31T01:30:00.000Z',
+      },
     });
     await expect(
       fixture.service.confirmOccurrence(occurrence.id, {

@@ -4,6 +4,7 @@ import type { LedgerEventV2 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useToastManager } from '@/components/ui/toast';
 import { Field, FieldLabel } from '@/components/ui/field';
 import {
   Select,
@@ -18,7 +19,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import type { Account } from '../portfolio/portfolio.types.js';
+import type { Position } from '../portfolio/portfolio.types.js';
 import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
+import { useRemovePortfolioPositionMutation } from '../portfolio/portfolio.mutations.js';
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
 import { ScreenshotImportReview } from '../import/ScreenshotImportReview.js';
 import {
@@ -27,7 +30,7 @@ import {
   useReconciliationCandidatesQuery,
   type AccountDataEventFilter,
 } from './account-data.queries.js';
-import { readLastAccount } from './account-data.helpers.js';
+import { readLastAccount, errorMessage } from './account-data.helpers.js';
 import {
   CashSection,
   PositionCalibrationSection,
@@ -102,8 +105,13 @@ export function AccountDataPage({
   } | null>(null);
   const [accountManagerOpen, setAccountManagerOpen] = useState(params.get('setup') === '1');
   const [draftDirty, setDraftDirty] = useState(false);
+  const [positionSheetOpen, setPositionSheetOpen] = useState(false);
+  const [positionSheetEditing, setPositionSheetEditing] = useState<Position | null>(null);
   const { confirm } = useConfirmDialog();
+  const toastManager = useToastManager();
+  const removeSnapshotMutation = useRemovePortfolioPositionMutation();
   const selectedAccount = accounts.find((account) => account.id === accountId);
+  const isCashAccount = selectedAccount?.type === 'cash';
   const valuationQuery = useAccountValuationQuery(
     accountId,
     selectedAccount?.mode,
@@ -193,6 +201,7 @@ export function AccountDataPage({
   };
 
   const selectTab = async (nextTab: AccountDataTab) => {
+    if (isCashAccount && nextTab !== 'cash') return;
     if (nextTab === tab) return;
     if (!(await confirmDiscard())) return;
     setDraftDirty(false);
@@ -215,6 +224,7 @@ export function AccountDataPage({
   };
 
   const openCorrectExecution = async (event: ExecutionEvent) => {
+    if (isCashAccount) return;
     if (!(await confirmDiscard())) return;
     setAuditEvent(null);
     setEditingEvent(event);
@@ -278,6 +288,49 @@ export function AccountDataPage({
   const accountPositions = valuationQuery.data?.positions ?? [];
   const cashValue = valuationQuery.data?.cashValue ?? 0;
 
+  const findSnapshotPosition = (event: LedgerEventV2) =>
+    event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID'
+      ? accountPositions.find(
+          (position) =>
+            position.accountId === event.accountId && position.symbol === event.payload.symbol,
+        )
+      : undefined;
+
+  const openSnapshotEditor = (event: LedgerEventV2) => {
+    const position = findSnapshotPosition(event);
+    if (!position) return;
+    setPositionSheetEditing(position);
+    setPositionSheetOpen(true);
+    void selectTab('positions');
+  };
+
+  const removeSnapshot = async (event: LedgerEventV2) => {
+    const position = findSnapshotPosition(event);
+    if (!position) return;
+    if (
+      !(await confirm({
+        title: '移除快照？',
+        description: `确认移除 ${position.asset.name || position.symbol}（${position.symbol}）？`,
+        confirmLabel: '移除快照',
+        cancelLabel: '取消',
+        variant: 'destructive',
+      }))
+    )
+      return;
+    try {
+      await removeSnapshotMutation.mutateAsync(position.id);
+      toastManager.add({ title: '持仓快照已移除', type: 'success', timeout: 2800 });
+      onPortfolioChanged();
+    } catch (caught) {
+      toastManager.add({
+        title: '持仓快照移除失败',
+        description: errorMessage(caught, '请稍后重试。'),
+        type: 'error',
+        timeout: 0,
+      });
+    }
+  };
+
   if (accountsPending && accounts.length === 0) {
     return <AccountDataLoading />;
   }
@@ -304,7 +357,7 @@ export function AccountDataPage({
         <div className="flex flex-col gap-2">
           <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
           <p className="m-0 max-w-2xl text-sm leading-6 text-muted-foreground">
-            先创建一个账户，再录入真实成交或记录持仓观察。
+            先创建一个账户，再录入真实成交或记录持仓快照。
           </p>
         </div>
         <PortfolioManagement
@@ -320,12 +373,16 @@ export function AccountDataPage({
 
   if (!selectedAccount) return <AccountDataLoading />;
 
+  const activeTab = isCashAccount ? 'cash' : tab;
+
   return (
     <AccountDataFrame>
       <div className="min-w-0">
         <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
         <p className="m-0 mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          真实成交是主录入入口；持仓和现金只记录快照基准，不会伪造成交。
+          {isCashAccount
+            ? '现金账户支持现金入账、账户划转和定期入账。'
+            : '真实成交是主录入入口；持仓和现金只记录快照，不会伪造成交。'}
         </p>
       </div>
 
@@ -363,49 +420,63 @@ export function AccountDataPage({
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(value) => void selectTab(value as AccountDataTab)}>
+      <Tabs value={activeTab} onValueChange={(value) => void selectTab(value as AccountDataTab)}>
         <TabsList variant="line" className="min-h-11 w-fit">
-          <TabsTrigger value="positions">持仓</TabsTrigger>
-          <TabsTrigger value="transactions">成交记录</TabsTrigger>
+          {!isCashAccount && <TabsTrigger value="positions">持仓</TabsTrigger>}
+          {!isCashAccount && <TabsTrigger value="transactions">成交记录</TabsTrigger>}
           <TabsTrigger value="cash">现金</TabsTrigger>
         </TabsList>
-        <TabsContent value="transactions" className="mt-0 pt-3">
-          <TransactionSection
-            account={selectedAccount}
-            events={events}
-            query={ledgerEventsQuery}
-            filter={transactionFilter}
-            onFilterChange={setTransactionFilter}
-            onCreate={openCreateExecution}
-            onCorrect={(event) => {
-              void openCorrectExecution(event);
-            }}
-            onVoid={openVoidExecution}
-            onCorrectTransfer={(event) => setCashTransferAction({ event, mode: 'replace' })}
-            onVoidTransfer={(event) => setCashTransferAction({ event, mode: 'void' })}
-            onAudit={openAudit}
-            onOpenImport={() => {
-              void openImport();
-            }}
-            onOpenReconciliation={() => setReconciliationOpen(true)}
-          />
-        </TabsContent>
-        <TabsContent value="positions" className="mt-0 pt-3">
-          <PositionCalibrationSection
-            key={selectedAccount.id}
-            account={selectedAccount}
-            accounts={accounts}
-            positions={accountPositions}
-            cashValue={cashValue}
-            valuationQuery={valuationQuery}
-            onDirtyChange={setDraftDirty}
-            onSaved={onPortfolioChanged}
-            onOpenImport={() => {
-              void openImport();
-            }}
-            onOpenReconciliation={() => setReconciliationOpen(true)}
-          />
-        </TabsContent>
+        {!isCashAccount && (
+          <>
+            <TabsContent value="transactions" className="mt-0 pt-3">
+              <TransactionSection
+                account={selectedAccount}
+                events={events}
+                query={ledgerEventsQuery}
+                filter={transactionFilter}
+                onFilterChange={setTransactionFilter}
+                onCreate={openCreateExecution}
+                onCorrect={(event) => {
+                  void openCorrectExecution(event);
+                }}
+                onVoid={openVoidExecution}
+                onCorrectTransfer={(event) => setCashTransferAction({ event, mode: 'replace' })}
+                onVoidTransfer={(event) => setCashTransferAction({ event, mode: 'void' })}
+                onAudit={openAudit}
+                findSnapshotPosition={findSnapshotPosition}
+                onEditSnapshot={openSnapshotEditor}
+                onRemoveSnapshot={(event) => void removeSnapshot(event)}
+                onOpenImport={() => {
+                  void openImport();
+                }}
+                onOpenReconciliation={() => setReconciliationOpen(true)}
+              />
+            </TabsContent>
+            <TabsContent value="positions" className="mt-0 pt-3">
+              <PositionCalibrationSection
+                key={selectedAccount.id}
+                account={selectedAccount}
+                accounts={accounts}
+                positions={accountPositions}
+                cashValue={cashValue}
+                valuationQuery={valuationQuery}
+                onDirtyChange={setDraftDirty}
+                onSaved={onPortfolioChanged}
+                entrySheetOpen={positionSheetOpen}
+                onEntrySheetOpenChange={(open) => {
+                  setPositionSheetOpen(open);
+                  if (!open) setPositionSheetEditing(null);
+                }}
+                editingPosition={positionSheetEditing}
+                onEditingPositionChange={setPositionSheetEditing}
+                onOpenImport={() => {
+                  void openImport();
+                }}
+                onOpenReconciliation={() => setReconciliationOpen(true)}
+              />
+            </TabsContent>
+          </>
+        )}
         <TabsContent value="cash" className="mt-0 pt-3">
           <CashSection
             account={selectedAccount}
@@ -421,7 +492,7 @@ export function AccountDataPage({
 
       <ExecutionFormSheet
         account={selectedAccount}
-        open={executionOpen}
+        open={executionOpen && !isCashAccount}
         editingEvent={editingEvent}
         ledgerRevision={currentLedgerRevision}
         onOpenChange={(open, options) => {
@@ -432,9 +503,12 @@ export function AccountDataPage({
       <AuditSheet
         target={auditEvent}
         query={auditQuery}
+        snapshotPositions={accountPositions}
         onOpenChange={(open) => {
           if (!open) setAuditEvent(null);
         }}
+        onEditSnapshot={openSnapshotEditor}
+        onRemoveSnapshot={(event) => void removeSnapshot(event)}
         onCorrect={(event) => {
           void openCorrectExecution(event);
         }}
@@ -493,7 +567,7 @@ export function AccountDataPage({
         />
       )}
       <Sheet
-        open={importOpen}
+        open={importOpen && !isCashAccount}
         onOpenChange={(open) => {
           void closeImport(open);
         }}

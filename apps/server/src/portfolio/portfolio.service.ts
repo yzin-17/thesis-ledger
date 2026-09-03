@@ -27,11 +27,18 @@ type PortfolioFxOptions = FxConversionOptions;
 type PositionOptions = {
   assetName?: string;
   assetType?: PositionAssetType;
+  temporal?: {
+    observedAt?: string;
+    capturedAt?: string;
+    timePrecision?: 'INSTANT' | 'DATE' | 'UNKNOWN';
+    sourceTimezone?: string;
+  };
 };
 
 type PositionInputOptions = {
   assetName?: string | undefined;
   assetType?: PositionAssetType | undefined;
+  occurredAt?: string | undefined;
 };
 
 type ConfirmedInstrumentSummary = {
@@ -49,6 +56,12 @@ const buildPositionOptions = (
   if (data.assetType !== undefined) options.assetType = data.assetType;
   else if (confirmedInstrument)
     options.assetType = confirmedInstrument.assetType as PositionAssetType;
+  if (data.occurredAt !== undefined)
+    options.temporal = {
+      observedAt: data.occurredAt,
+      capturedAt: data.occurredAt,
+      timePrecision: 'INSTANT',
+    };
   if (Object.keys(options).length === 0) return undefined;
   return options;
 };
@@ -89,9 +102,7 @@ export class PortfolioService {
 
   listPositions(accountId?: string, mode: 'actual' | 'shadow' = 'actual') {
     return this.prisma.position.findMany({
-      where: accountId
-        ? { accountId, account: { mode } }
-        : investmentAccountRelationWhere(mode),
+      where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
       include: { asset: true },
     });
   }
@@ -314,12 +325,10 @@ export class PortfolioService {
       | undefined;
     if (typeof ledgerDelegate?.findMany === 'function') {
       const stored = await ledgerDelegate.findMany({
-        where: accountId
-          ? { accountId, account: { mode } }
-          : investmentAccountRelationWhere(mode),
+        where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
         orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
       });
-      const materialization = projectCashMaterialization(stored as StoredCashEvent[]);
+      const materialization = projectCashMaterialization(stored as StoredCashEvent[], valuedAt);
       for (const balance of materialization.balances) {
         const id = balance.accountId;
         const accountAmounts = cashByAccountAmounts.get(id) ?? [];

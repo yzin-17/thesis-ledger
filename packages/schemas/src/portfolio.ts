@@ -18,6 +18,7 @@ export const positionInputSchema = z.object({
   source: z.enum(['manual', 'screenshot', 'migration']),
   assetName: z.string().trim().max(120).optional(),
   assetType: z.enum(['stock', 'etf', 'fund']).optional(),
+  occurredAt: z.iso.datetime().optional(),
 });
 
 export const importRowSchema = z.object({

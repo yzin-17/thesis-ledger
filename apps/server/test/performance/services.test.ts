@@ -293,6 +293,28 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(layers.portfolio).toMatchObject({ cashValue: 400, partial: false });
   });
 
+  it('当前 layers 以 valuedAt 为现金目标时间，不吸收未来现金', async () => {
+    const prisma = {
+      position: { findMany: vi.fn(async () => []) },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          cashFlowEvent({
+            id: 'future-layer-cash',
+            accountId: accountA,
+            amount: 500,
+            occurredAt: '2026-09-03T00:00:00.000Z',
+            settledAt: '2099-01-01T00:00:00.000Z',
+          }),
+        ]),
+      },
+      account: { findMany: vi.fn(async () => [{ id: accountA, currency: 'CNY' }]) },
+    };
+
+    const layers = await new PerformanceService(prisma as never, {} as never).layers();
+
+    expect(layers.account).toMatchObject([{ accountId: accountA, cashValue: 0 }]);
+  });
+
   it('Snapshot capture 保留现金余额观察', async () => {
     const prisma = {
       position: { findMany: vi.fn(async () => []) },
@@ -311,6 +333,32 @@ describe('Ledger Snapshot 与收益摘要', () => {
       new Date('2025-01-02'),
     );
     expect(snapshot).toMatchObject({ cashValue: 1200 });
+  });
+
+  it('历史 Snapshot capture 以 capturedAt 为现金目标时间，不吸收未来现金', async () => {
+    const snapshot = vi.fn(async ({ data }: { data: object }) => data);
+    const prisma = {
+      position: { findMany: vi.fn(async () => []) },
+      ledgerEvent: {
+        findMany: vi.fn(async () => [
+          cashFlowEvent({
+            id: 'future-cash-flow',
+            accountId: accountA,
+            amount: 500,
+            occurredAt: '2025-01-01T00:00:00.000Z',
+            settledAt: '2025-01-03T00:00:00.000Z',
+          }),
+        ]),
+      },
+      portfolioSnapshot: { findFirst: vi.fn(async () => null), create: snapshot },
+    };
+
+    const result = await new PerformanceService(prisma as never, {} as never).capture(
+      accountA,
+      new Date('2025-01-02T00:00:00.000Z'),
+    );
+
+    expect(result).toMatchObject({ cashValue: 0 });
   });
 
   it('layers 在指定账户时同时隔离实际/影子模式', async () => {

@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client';
-import type { LedgerEventV2 } from '@thesis-ledger/domain';
 import {
   legacyMigratedCashTransferEventSchemaV2,
   type LegacyMigratedCashTransferEventV2,
+  type LedgerEventV2,
 } from '@thesis-ledger/schemas';
 import { latestLedgerEventByFact } from './ledger-event-v2.js';
 import { toLedgerEventV2 } from './ledger-v2.repository.js';
@@ -37,6 +37,7 @@ type CashOperation = {
   accountId: string;
   currency: string;
   occurredAt: string | null;
+  effectiveAt: string | null;
   order: string;
   eventId?: string;
   factId?: string;
@@ -47,8 +48,7 @@ type CashOperation = {
   settlement?: {
     direction: 'RECEIVABLE' | 'PAYABLE';
     amount: Prisma.Decimal;
-    settledAt: string | null;
-    status: 'SETTLED' | 'PENDING';
+    effectiveAt: string | null;
   };
 };
 
@@ -94,29 +94,38 @@ const decimalString = (value: unknown) => {
   return '0';
 };
 
+const cashTimeValue = (value: string | null) => {
+  if (value === null) return Number.NEGATIVE_INFINITY;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+};
+
 const compareCashOperation = (left: CashOperation, right: CashOperation) => {
-  if (left.occurredAt === null && right.occurredAt !== null) return -1;
-  if (left.occurredAt !== null && right.occurredAt === null) return 1;
-  if (left.occurredAt !== right.occurredAt)
-    return (left.occurredAt ?? '').localeCompare(right.occurredAt ?? '');
+  const leftTime = cashTimeValue(left.effectiveAt);
+  const rightTime = cashTimeValue(right.effectiveAt);
+  if (leftTime !== rightTime) return leftTime - rightTime;
   return left.order.localeCompare(right.order);
 };
 
-const settledStatus = (settledAt: string | undefined, now: Date) => {
-  if (settledAt === undefined) return 'SETTLED' as const;
-  return new Date(settledAt) > now ? ('PENDING' as const) : ('SETTLED' as const);
+type CashTiming = {
+  settledAt?: string | undefined;
+  expectedAt?: string | undefined;
+};
+
+const cashEffectiveAt = (payload: unknown, occurredAt: string | null) => {
+  if (typeof payload !== 'object' || payload === null) return occurredAt;
+  const timing = payload as CashTiming;
+  return timing.settledAt ?? timing.expectedAt ?? occurredAt;
 };
 
 const settlement = (input: {
   amount: Prisma.Decimal;
   direction: 'RECEIVABLE' | 'PAYABLE';
-  settledAt: string | undefined;
-  now: Date;
+  effectiveAt: string | null;
 }) => ({
   direction: input.direction,
   amount: input.amount,
-  settledAt: input.settledAt ?? null,
-  status: settledStatus(input.settledAt, input.now),
+  effectiveAt: input.effectiveAt,
 });
 
 const storedEventInput = (event: StoredCashEvent) => ({
@@ -204,9 +213,7 @@ type ParsedExecutionCharge = Extract<
   { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }
 >['payload']['charges'][number];
 
-const normalizeExecutionCharge = (
-  charge: ParsedExecutionCharge,
-) => ({
+const normalizeExecutionCharge = (charge: ParsedExecutionCharge) => ({
   category: charge.category,
   amount: charge.amount,
   currency: charge.currency,
@@ -216,10 +223,11 @@ const normalizeExecutionCharge = (
 const normalizeExecutionPayload = (
   payload: Extract<ParsedLedgerEventV2, { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }>['payload'],
 ) => {
-  const { settledAt, note, charges, ...base } = payload;
+  const { expectedAt, settledAt, note, charges, ...base } = payload;
   return {
     ...base,
     charges: charges.map(normalizeExecutionCharge),
+    ...(expectedAt === undefined ? {} : { expectedAt }),
     ...(settledAt === undefined ? {} : { settledAt }),
     ...(note === undefined ? {} : { note }),
   };
@@ -246,16 +254,21 @@ const normalizeCashBalancePayload = (
 const normalizeDividendPayload = (
   payload: Extract<ParsedLedgerEventV2, { type: 'DIVIDEND' }>['payload'],
 ) => {
-  const { settledAt, ...base } = payload;
-  return { ...base, ...(settledAt === undefined ? {} : { settledAt }) };
+  const { expectedAt, settledAt, ...base } = payload;
+  return {
+    ...base,
+    ...(expectedAt === undefined ? {} : { expectedAt }),
+    ...(settledAt === undefined ? {} : { settledAt }),
+  };
 };
 
 const normalizeCashFlowPayload = (
   payload: Extract<ParsedLedgerEventV2, { type: 'CASH_FLOW' }>['payload'],
 ) => {
-  const { settledAt, note, transfer, ...base } = payload;
+  const { expectedAt, settledAt, note, transfer, ...base } = payload;
   return {
     ...base,
+    ...(expectedAt === undefined ? {} : { expectedAt }),
     ...(settledAt === undefined ? {} : { settledAt }),
     ...(note === undefined ? {} : { note }),
     ...(transfer === undefined ? {} : { transfer }),
@@ -387,10 +400,11 @@ const v2Events = (stored: StoredCashEvent[]) =>
 
 type ExecutionEvent = Extract<LedgerEventV2, { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }>;
 
-const executionCashOperations = (event: ExecutionEvent, now: Date): CashOperation[] => {
+const executionCashOperations = (event: ExecutionEvent): CashOperation[] => {
   const base = {
     accountId: event.accountId,
     occurredAt: event.occurredAt,
+    effectiveAt: cashEffectiveAt(event.payload, event.occurredAt),
     order: `${event.economicOrderKey}:${event.eventId}`,
     eventId: event.eventId,
     factId: event.factId,
@@ -417,8 +431,7 @@ const executionCashOperations = (event: ExecutionEvent, now: Date): CashOperatio
       settlement: settlement({
         amount,
         direction: event.type === 'BUY_EXECUTION' ? 'PAYABLE' : 'RECEIVABLE',
-        settledAt: event.payload.settledAt,
-        now,
+        effectiveAt: base.effectiveAt,
       }),
     },
   ];
@@ -435,15 +448,14 @@ const executionCashOperations = (event: ExecutionEvent, now: Date): CashOperatio
       settlement: settlement({
         amount: chargeAmount,
         direction: 'PAYABLE',
-        settledAt: event.payload.settledAt,
-        now,
+        effectiveAt: base.effectiveAt,
       }),
     });
   }
   return operations;
 };
 
-const v2Operations = (stored: StoredCashEvent[], now = new Date()): CashOperation[] => {
+const v2Operations = (stored: StoredCashEvent[]): CashOperation[] => {
   const candidates = stored.filter((event) => event.factId != null);
   if (candidates.length === 0) return [];
   const valid = v2Events(candidates);
@@ -454,6 +466,10 @@ const v2Operations = (stored: StoredCashEvent[], now = new Date()): CashOperatio
     const base = {
       accountId: event.accountId,
       occurredAt: event.occurredAt,
+      effectiveAt:
+        event.type === 'CASH_BALANCE_OBSERVATION'
+          ? (event.payload.capturedAt ?? event.occurredAt)
+          : cashEffectiveAt(event.payload, event.occurredAt),
       order: `${event.economicOrderKey}:${event.eventId}`,
       eventId: event.eventId,
       factId: event.factId,
@@ -477,14 +493,13 @@ const v2Operations = (stored: StoredCashEvent[], now = new Date()): CashOperatio
         settlement: settlement({
           amount,
           direction: inflow ? 'RECEIVABLE' : 'PAYABLE',
-          settledAt: event.payload.settledAt,
-          now,
+          effectiveAt: base.effectiveAt,
         }),
       });
       continue;
     }
     if (event.type === 'BUY_EXECUTION' || event.type === 'SELL_EXECUTION') {
-      operations.push(...executionCashOperations(event, now));
+      operations.push(...executionCashOperations(event));
       continue;
     }
     if (event.type === 'DIVIDEND') {
@@ -496,8 +511,7 @@ const v2Operations = (stored: StoredCashEvent[], now = new Date()): CashOperatio
         settlement: settlement({
           amount,
           direction: 'RECEIVABLE',
-          settledAt: event.payload.settledAt,
-          now,
+          effectiveAt: base.effectiveAt,
         }),
       });
     }
@@ -505,68 +519,99 @@ const v2Operations = (stored: StoredCashEvent[], now = new Date()): CashOperatio
   return operations;
 };
 
-export const projectCashBalances = (stored: StoredCashEvent[]) => {
-  const balances = new Map<string, Map<string, Prisma.Decimal>>();
-  const operations = v2Operations(stored).sort(compareCashOperation);
-  for (const operation of operations) {
-    const byCurrency = balances.get(operation.accountId) ?? new Map<string, Prisma.Decimal>();
-    const current = byCurrency.get(operation.currency) ?? new Prisma.Decimal(0);
-    byCurrency.set(
-      operation.currency,
-      operation.set === undefined ? current.plus(operation.delta ?? 0) : operation.set,
-    );
-    balances.set(operation.accountId, byCurrency);
-  }
-  return balances;
-};
+const isAtOrBefore = (value: string | null, targetAt: Date) =>
+  value !== null && cashTimeValue(value) <= targetAt.getTime();
+
+const balanceKey = (accountId: string, currency: string) => `${accountId}:${currency}`;
+
+type MutableCashMaterializedBalance = CashMaterializedBalance & { issueSet: Set<string> };
+
+const createMaterializedBalance = (
+  accountId: string,
+  currency: string,
+): MutableCashMaterializedBalance => ({
+  accountId,
+  currency,
+  settledAmount: new Prisma.Decimal(0),
+  pendingReceivable: new Prisma.Decimal(0),
+  pendingPayable: new Prisma.Decimal(0),
+  completeness: 'COMPLETE' as const,
+  issues: [],
+  issueSet: new Set<string>(),
+});
 
 export const projectCashMaterialization = (
   stored: StoredCashEvent[],
-  now = new Date(),
+  targetAt = new Date(),
 ): CashProjectionMaterialization => {
-  const balances = new Map<string, CashMaterializedBalance & { issueSet: Set<string> }>();
-  const operations = v2Operations(stored, now).sort(compareCashOperation);
+  const operations = v2Operations(stored).sort(compareCashOperation);
+  const snapshots = new Map<string, CashOperation>();
+  for (const operation of operations) {
+    if (
+      operation.set === undefined ||
+      operation.effectiveAt === null ||
+      !isAtOrBefore(operation.effectiveAt, targetAt)
+    )
+      continue;
+    const key = balanceKey(operation.accountId, operation.currency);
+    const current = snapshots.get(key);
+    if (current === undefined || compareCashOperation(current, operation) < 0)
+      snapshots.set(key, operation);
+  }
+
+  const balances = new Map<string, ReturnType<typeof createMaterializedBalance>>();
+  for (const snapshot of snapshots.values()) {
+    const key = balanceKey(snapshot.accountId, snapshot.currency);
+    const current = createMaterializedBalance(snapshot.accountId, snapshot.currency);
+    current.settledAmount = snapshot.set!;
+    balances.set(key, current);
+  }
+
   const settlements: CashMaterializedSettlement[] = [];
   for (const operation of operations) {
-    const key = `${operation.accountId}:${operation.currency}`;
-    const current = balances.get(key) ?? {
-      accountId: operation.accountId,
-      currency: operation.currency,
-      settledAmount: new Prisma.Decimal(0),
-      pendingReceivable: new Prisma.Decimal(0),
-      pendingPayable: new Prisma.Decimal(0),
-      completeness: 'COMPLETE' as const,
-      issues: [],
-      issueSet: new Set<string>(),
-    };
-    if (operation.set !== undefined) {
-      current.settledAmount = operation.set;
-    } else if (operation.delta !== undefined) {
-      const cashSettlement = operation.settlement;
-      if (cashSettlement?.status === 'PENDING') {
-        if (cashSettlement.direction === 'RECEIVABLE')
+    if (operation.set !== undefined) continue;
+    const key = balanceKey(operation.accountId, operation.currency);
+    const current =
+      balances.get(key) ?? createMaterializedBalance(operation.accountId, operation.currency);
+    const snapshot = snapshots.get(key);
+    const absorbedBySnapshot =
+      snapshot !== undefined &&
+      cashTimeValue(operation.effectiveAt) <= cashTimeValue(snapshot.effectiveAt);
+    const cashSettlement = operation.settlement;
+    const status =
+      cashSettlement === undefined ||
+      cashTimeValue(cashSettlement.effectiveAt) <= targetAt.getTime()
+        ? ('SETTLED' as const)
+        : ('PENDING' as const);
+
+    if (!absorbedBySnapshot && operation.delta !== undefined) {
+      if (status === 'PENDING') {
+        if (cashSettlement?.direction === 'RECEIVABLE')
           current.pendingReceivable = current.pendingReceivable.plus(cashSettlement.amount);
-        else current.pendingPayable = current.pendingPayable.plus(cashSettlement.amount);
+        else if (cashSettlement?.direction === 'PAYABLE')
+          current.pendingPayable = current.pendingPayable.plus(cashSettlement.amount);
       } else current.settledAmount = current.settledAmount.plus(operation.delta);
-      if (cashSettlement && operation.eventId && operation.factId && operation.sourceType)
-        settlements.push({
-          accountId: operation.accountId,
-          eventId: operation.eventId,
-          factId: operation.factId,
-          currency: operation.currency,
-          direction: cashSettlement.direction,
-          amount: cashSettlement.amount,
-          occurredAt: operation.occurredAt,
-          settledAt: cashSettlement.settledAt,
-          status: cashSettlement.status,
-          sourceType: operation.sourceType,
-        });
     }
+
+    if (cashSettlement && operation.eventId && operation.factId && operation.sourceType)
+      settlements.push({
+        accountId: operation.accountId,
+        eventId: operation.eventId,
+        factId: operation.factId,
+        currency: operation.currency,
+        direction: cashSettlement.direction,
+        amount: cashSettlement.amount,
+        occurredAt: operation.occurredAt,
+        settledAt: cashSettlement.effectiveAt,
+        status,
+        sourceType: operation.sourceType,
+      });
     for (const issue of operation.issues ?? []) current.issueSet.add(issue);
     current.issues = [...current.issueSet].sort();
     current.completeness = current.issues.length === 0 ? 'COMPLETE' : 'PARTIAL';
     balances.set(key, current);
   }
+
   return {
     balances: [...balances.values()]
       .map((value) => {
@@ -581,4 +626,14 @@ export const projectCashMaterialization = (
       ),
     settlements,
   };
+};
+
+export const projectCashBalances = (stored: StoredCashEvent[], targetAt = new Date()) => {
+  const balances = new Map<string, Map<string, Prisma.Decimal>>();
+  for (const balance of projectCashMaterialization(stored, targetAt).balances) {
+    const byCurrency = balances.get(balance.accountId) ?? new Map<string, Prisma.Decimal>();
+    byCurrency.set(balance.currency, balance.settledAmount);
+    balances.set(balance.accountId, byCurrency);
+  }
+  return balances;
 };

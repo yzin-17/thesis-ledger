@@ -7,6 +7,7 @@ import type { PortfolioMode } from '../portfolio/portfolio.types.js';
 import {
   changeCashDepositPlanState,
   confirmCashDepositOccurrence,
+  createManualCashDeposit,
   createCashDepositPlan,
   createManualCashTransfer,
   fetchCashDepositOccurrences,
@@ -44,6 +45,15 @@ export const useCashOperationsMutations = (accountId: string, mode: PortfolioMod
   const queryClient = useQueryClient();
   const invalidateCashDeposits = () =>
     queryClient.invalidateQueries({ queryKey: cashDepositKeys.root });
+  const invalidateCashAccount = () =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: [...accountDataKeys.root, 'events', accountId],
+      }),
+      queryClient.invalidateQueries({ queryKey: accountDataKeys.audit(accountId, mode) }),
+      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode, accountId) }),
+      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode) }),
+    ]);
   const invalidateTransfer = async (sourceAccountId: string, targetAccountId: string) => {
     await Promise.all([
       queryClient.invalidateQueries({
@@ -61,6 +71,11 @@ export const useCashOperationsMutations = (accountId: string, mode: PortfolioMod
   };
 
   return {
+    deposit: useMutation({
+      mutationFn: (input: Parameters<typeof createManualCashDeposit>[0]) =>
+        createManualCashDeposit(input),
+      onSuccess: invalidateCashAccount,
+    }),
     transfer: useMutation({
       mutationFn: (input: Parameters<typeof createManualCashTransfer>[0]) =>
         createManualCashTransfer(input),
@@ -126,13 +141,7 @@ export const useCashOperationsMutations = (accountId: string, mode: PortfolioMod
       }) => confirmCashDepositOccurrence(id, input),
       onSuccess: async () => {
         await invalidateCashDeposits();
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: [...accountDataKeys.root, 'events', accountId],
-          }),
-          queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode, accountId) }),
-          queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode) }),
-        ]);
+        await invalidateCashAccount();
       },
     }),
     skipOccurrence: useMutation({

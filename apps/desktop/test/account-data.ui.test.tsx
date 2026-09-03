@@ -31,6 +31,15 @@ const shadowAccount = {
   mode: 'shadow' as const,
 };
 
+const cashAccount = {
+  id: 'account-cash',
+  name: '现金账户',
+  type: 'cash' as const,
+  mode: 'actual' as const,
+  currency: 'CNY' as const,
+  active: true,
+};
+
 const seedAccountData = (queryClient: QueryClient) => {
   const valuation = {
     totalMarketValue: 1000,
@@ -171,6 +180,38 @@ describe('账户数据页面契约', () => {
     expect(pageSource).toMatch(/const selectTab[\s\S]*?setCashTransferAction\(null\)/);
   });
 
+  it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {
+    const markup = renderPage('?tab=transactions&entry=execution', [cashAccount], false);
+    const pageSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataPage.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(markup).toContain('现金账户 · CNY · 实际');
+    expect(markup).toContain('现金账户支持现金入账、账户划转和定期入账。');
+    expect(markup).toContain('现金');
+    expect(markup).not.toContain('持仓');
+    expect(markup).not.toContain('成交记录');
+    expect(markup).not.toContain('录入成交');
+    expect(pageSource).toContain("const activeTab = isCashAccount ? 'cash' : tab;");
+    expect(pageSource).toContain('open={executionOpen && !isCashAccount}');
+    expect(pageSource).toContain('open={importOpen && !isCashAccount}');
+  });
+
+  it('现金入账入口只显示在真实且启用的现金账户', () => {
+    const activeMarkup = renderPage('?tab=cash', [cashAccount], false);
+    const shadowMarkup = renderPage(
+      '?tab=cash',
+      [{ ...cashAccount, mode: 'shadow' as const }],
+      false,
+    );
+    const inactiveMarkup = renderPage('?tab=cash', [{ ...cashAccount, active: false }], false);
+
+    expect(activeMarkup).toMatch(/<button[^>]*>现金入账<\/button>/);
+    expect(shadowMarkup).not.toMatch(/<button[^>]*>现金入账<\/button>/);
+    expect(inactiveMarkup).not.toMatch(/<button[^>]*>现金入账<\/button>/);
+  });
+
   it('账户设置在同一个 Drawer 内切换账户列表和账户表单', () => {
     const listMarkup = renderInlineAccountManager(false);
     const formMarkup = renderInlineAccountManager(true);
@@ -228,6 +269,8 @@ describe('账户数据页面契约', () => {
     expect(accountDataSource).toContain('成交时间');
     expect(accountDataSource).toContain('时间精度');
     expect(accountDataSource).toContain('结算时间（可选）');
+    expect(executionSource).toContain('settlementTiming');
+    expect(executionSource).toContain('expectedAt');
     expect(dateInputSource).toContain('showPicker');
     expect(dateInputSource).toContain('YYYY-MM-DD');
     expect(dateInputSource).toContain('YYYY-MM-DD HH:mm');
@@ -265,8 +308,9 @@ describe('账户数据页面契约', () => {
     expect(executionSource).toContain('基金账户');
     expect(executionSource).toContain('现金账户');
     expect(executionSource).not.toContain('{category}');
-    expect(executionSource).not.toContain('border-t');
-    expect(executionSource).toContain('<Separator />');
+    expect(executionSource).not.toContain('<Separator />');
+    expect(executionSource).toContain('min-h-0 flex-1 overflow-y-auto');
+    expect(executionSource).toContain('shrink-0 justify-end gap-2 border-t border-border pt-4');
   });
 
   it('费用类别下拉使用中文显示名并保留后端枚举映射', () => {
@@ -278,37 +322,36 @@ describe('账户数据页面契约', () => {
     expect(chargeCategoryLabel('OTHER')).toBe('其他费用');
   });
 
-  it('持仓页签明确是观察检查点，现金页签按币种和结算状态分层', () => {
+  it('持仓页签明确是快照记录，现金页签按币种和结算状态分层', () => {
     const positionMarkup = renderPage('?tab=positions');
     const positionSource = readFileSync(
       new URL('../src/features/portfolio/PortfolioPositionObservation.tsx', import.meta.url),
       'utf8',
     );
-    expect(positionMarkup).toContain('持仓观察');
+    expect(positionMarkup).toContain('持仓快照');
     expect(positionMarkup).toContain('不产生 BUY / SELL 成交记录');
     expect(positionMarkup).toContain('导入持仓快照');
     expect(positionMarkup).toMatch(/<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/);
     expect(positionMarkup).toContain('持仓市值');
-    expect(positionMarkup).toContain('观察状态');
-    expect(positionMarkup).toContain('基准状态');
-    expect(positionMarkup).toContain('已设为基准');
+    expect(positionMarkup).toContain('记录类型');
+    expect(positionMarkup).toContain('快照状态');
+    expect(positionMarkup).toContain('已记录快照');
     expect(positionMarkup).toContain('sticky right-0');
     expect(positionMarkup).toContain('bg-background');
     expect(positionMarkup).toContain('w-40 min-w-40');
-    expect(positionMarkup).toContain('flex flex-wrap items-center justify-center gap-1');
+    expect(positionMarkup).toContain('flex flex-wrap justify-end gap-1');
     expect(positionMarkup).toContain('h-8');
-    expect(positionMarkup).toContain('shadow-none');
-    expect(positionMarkup).toContain('重新设为基准');
-    expect(positionMarkup).toContain('取消基准');
+    expect(positionMarkup).toContain('修改快照');
+    expect(positionMarkup).toContain('移除快照');
     expect(positionMarkup).not.toContain('更多操作：半导体设备ETF国泰');
     expect(positionMarkup).not.toContain('当前结果来自账本投影');
-    expect(positionSource).toContain('取消基准');
-    expect(positionSource).toContain('清空持仓观察');
+    expect(positionSource).toContain('移除快照');
+    expect(positionSource).toContain('清空持仓快照');
 
     const cashMarkup = renderPage('?tab=cash');
     expect(cashMarkup).toContain('已结算余额');
     expect(cashMarkup).toContain('待结算应收 / 应付');
     expect(cashMarkup).toContain('证据完整度');
-    expect(cashMarkup).toContain('校准现金余额');
+    expect(cashMarkup).toContain('记录现金快照');
   });
 });

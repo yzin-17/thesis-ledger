@@ -24,14 +24,13 @@ export function PositionOverviewMenu({
   positions,
   busyAction,
   clearPositions,
-  onCreate,
 }: {
   positions: Position[];
   busyAction: string | null;
   clearPositions: () => Promise<void>;
-  onCreate: () => void;
 }) {
   const busy = busyAction !== null;
+  if (positions.length === 0) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -50,16 +49,13 @@ export function PositionOverviewMenu({
       />
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
-          <DropdownMenuItem disabled={busy} onClick={onCreate}>
-            记录持仓快照
-          </DropdownMenuItem>
           {positions.length > 0 && (
             <DropdownMenuItem
               variant="destructive"
               disabled={busy}
               onClick={() => void clearPositions()}
             >
-              {busyAction === 'clear-positions' ? '清空中…' : '清空持仓观察'}
+              {busyAction === 'clear-positions' ? '清空中…' : '清空持仓快照'}
             </DropdownMenuItem>
           )}
         </DropdownMenuGroup>
@@ -85,7 +81,7 @@ export function PositionObservationContent({
     return (
       <Empty className="rounded-lg border p-8" role="status">
         <EmptyHeader>
-          <EmptyTitle>暂无持仓观察</EmptyTitle>
+          <EmptyTitle>暂无持仓快照</EmptyTitle>
           <EmptyDescription>记录一个快照后会显示在这里。</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -100,16 +96,16 @@ export function PositionObservationContent({
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-sm">
-        <caption className="sr-only">持仓观察列表</caption>
+        <caption className="sr-only">持仓快照列表</caption>
         <thead className="border-b bg-muted text-xs text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">标的</th>
             <th className="px-4 py-3 text-right font-medium">持仓市值</th>
             <th className="px-4 py-3 text-right font-medium">盈亏</th>
-            <th className="px-4 py-3 font-medium">观察状态</th>
+            <th className="px-4 py-3 font-medium">记录类型</th>
             <th className="px-4 py-3 font-medium">来源</th>
-            <th className="px-4 py-3 font-medium">基准状态</th>
-            <th className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-muted px-3 py-3 text-center font-medium">
+            <th className="px-4 py-3 font-medium">快照状态</th>
+            <th className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-muted px-3 py-3 text-right font-medium">
               操作
             </th>
           </tr>
@@ -149,25 +145,23 @@ export function PositionObservationContent({
                 {position.source ?? '未知'}
               </td>
               <td className="px-4 py-3">
-                <Badge variant="secondary">已设为基准</Badge>
+                <Badge variant="secondary">已记录快照</Badge>
               </td>
-              <td className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-background px-3 py-2 text-center">
-                <div className="flex flex-wrap items-center justify-center gap-1">
+              <td className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-background px-3 py-2">
+                <div className="flex flex-wrap justify-end gap-1">
                   <Button
-                    className="px-2"
                     size="sm"
                     type="button"
-                    variant="recalibrate"
+                    variant="outline"
                     disabled={busyAction !== null}
                     onClick={() => onEdit(position)}
                   >
-                    重新设为基准
+                    修改快照
                   </Button>
                   <Button
-                    className="px-2"
                     size="sm"
                     type="button"
-                    variant="destructive-ghost"
+                    variant="destructive"
                     disabled={busyAction !== null}
                     aria-busy={busyAction === `remove:${position.id}`}
                     onClick={() => void remove(position)}
@@ -179,7 +173,7 @@ export function PositionObservationContent({
                         aria-hidden="true"
                       />
                     )}
-                    {busyAction === `remove:${position.id}` ? '移除中…' : '取消基准'}
+                    {busyAction === `remove:${position.id}` ? '移除中…' : '移除快照'}
                   </Button>
                 </div>
               </td>

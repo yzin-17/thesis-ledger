@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 
@@ -35,6 +35,8 @@ export function PortfolioManagement({
   entryAccountLocked = false,
   entrySheetOpen,
   onEntrySheetOpenChange,
+  editingPosition,
+  onEditingPositionChange,
   onDirtyChange,
   onSaved,
 }: {
@@ -55,11 +57,19 @@ export function PortfolioManagement({
   entryAccountLocked?: boolean;
   entrySheetOpen?: boolean;
   onEntrySheetOpenChange?: (open: boolean) => void;
+  editingPosition?: Position | null;
+  onEditingPositionChange?: (editing: Position | null) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved: () => void;
 }) {
   const initialEntryAccountId = defaultAccountId ?? accounts[0]?.id ?? '';
-  const [editing, setEditing] = useState<Position | null>(null);
+  const [uncontrolledEditing, setUncontrolledEditing] = useState<Position | null>(null);
+  const editing = editingPosition ?? uncontrolledEditing;
+  const setEditing = (position: SetStateAction<Position | null>) => {
+    const next = typeof position === 'function' ? position(uncontrolledEditing) : position;
+    setUncontrolledEditing(next);
+    onEditingPositionChange?.(next);
+  };
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
   const [uncontrolledEntrySheetOpen, setUncontrolledEntrySheetOpen] = useState(false);
@@ -152,12 +162,12 @@ export function PortfolioManagement({
       setSelectedInstrument(null);
       setInstrumentSearchOpen(false);
       setManualInstrumentEntry(false);
-    } else if (!positionSheetOpen) {
-      setInstrumentQuery('');
-      setSelectedInstrument(null);
-      setInstrumentSearchOpen(false);
-      setManualInstrumentEntry(false);
+      return;
     }
+    setInstrumentQuery('');
+    setSelectedInstrument(null);
+    setInstrumentSearchOpen(false);
+    setManualInstrumentEntry(false);
   }, [editing, positionSheetOpen]);
 
   const loadManagedAccounts = async () => {

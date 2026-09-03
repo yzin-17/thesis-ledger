@@ -54,6 +54,7 @@ const executionPayloadSchema = z
     quantity: positiveDecimalStringSchema,
     price: positiveDecimalStringSchema,
     currency: currencyCodeSchema,
+    expectedAt: z.iso.datetime().optional(),
     settledAt: z.iso.datetime().optional(),
     capabilityVerification: z.enum(['VERIFIED', 'UNVERIFIED']),
     charges: z.array(executionChargeSchemaV2).default([]),
@@ -117,6 +118,7 @@ const dividendPayloadSchema = z
     symbol: z.string().trim().min(1),
     amount: positiveDecimalStringSchema,
     currency: currencyCodeSchema,
+    expectedAt: z.iso.datetime().optional(),
     settledAt: z.iso.datetime().optional(),
   })
   .strict();
@@ -135,6 +137,7 @@ export const cashFlowPayloadSchemaV2 = z
     category: z.enum(['DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'INTEREST', 'FEE', 'TAX']),
     amount: positiveDecimalStringSchema,
     currency: currencyCodeSchema,
+    expectedAt: z.iso.datetime().optional(),
     settledAt: z.iso.datetime().optional(),
     note: z.string().trim().min(1).max(1000).optional(),
     transfer: cashTransferMetadataSchemaV2.optional(),
@@ -481,6 +484,7 @@ const cashTransferCommandBaseShapeV2 = {
   ...ledgerCommandTimeShapeV2,
   amount: positiveDecimalStringSchema,
   currency: currencyCodeSchema,
+  expectedAt: z.iso.datetime().optional(),
   settledAt: z.iso.datetime().optional(),
   note: z.string().trim().min(1).max(1000).optional(),
   source: ledgerCommandSourceSchemaV2,

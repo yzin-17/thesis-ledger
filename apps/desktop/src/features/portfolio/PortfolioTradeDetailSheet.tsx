@@ -36,7 +36,7 @@ const exitProgressLabel = (value: TradeSummaryResponseV2['exitProgress']) => {
 
 const endEvidenceLabel = (value: TradeSummaryResponseV2['endEvidence']) => {
   if (value === 'SELL_EXECUTION') return '卖出成交结束';
-  if (value === 'BALANCE_OBSERVATION') return '余额观察结束';
+  if (value === 'BALANCE_OBSERVATION') return '余额快照结束';
   return '结束证据未知';
 };
 
@@ -185,23 +185,23 @@ function TradeDetailContent({
       <section className="flex flex-col gap-2" aria-labelledby="trade-baseline-title">
         <div>
           <h3 id="trade-baseline-title" className="m-0 text-sm font-medium">
-            基线观察
+            持仓快照
           </h3>
           <p className="m-0 mt-1 text-xs text-muted-foreground">
-            基线是来源证据，不伪装成真实买入。
+            快照是来源证据，不伪装成真实买入。
           </p>
         </div>
         {detail.baselineComponents.length === 0 ? (
           <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-            暂无基线组成。
+            暂无快照组成。
           </p>
         ) : (
-          <DetailTable label="基线观察组成">
+          <DetailTable label="快照组成">
             <thead className="border-b bg-muted/30 text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">批次</th>
                 <th className="px-3 py-2">范围</th>
-                <th className="px-3 py-2">观察数量</th>
+                <th className="px-3 py-2">快照数量</th>
                 <th className="px-3 py-2">已纳入数量</th>
                 <th className="px-3 py-2">剩余数量</th>
                 <th className="px-3 py-2">平均成本</th>

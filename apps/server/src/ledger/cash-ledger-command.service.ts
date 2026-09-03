@@ -33,22 +33,13 @@ import {
   type PairedCashMutation,
   type SingleCashMutation,
 } from './cash-ledger-command-support.js';
-import {
-  LedgerV2Repository,
-  type AccountLedgerWriteContext,
-} from './ledger-v2.repository.js';
+import { LedgerV2Repository, type AccountLedgerWriteContext } from './ledger-v2.repository.js';
 type StandaloneCashCorrectionCommand =
-  | ReplaceCashFlowCommandV2
-  | RestoreCashFlowCommandV2
-  | VoidCashFlowCommandV2;
+  ReplaceCashFlowCommandV2 | RestoreCashFlowCommandV2 | VoidCashFlowCommandV2;
 type CashTransferPayloadCommand =
-  | CreateCashTransferCommandV2
-  | ReplaceCashTransferCommandV2
-  | RestoreCashTransferCommandV2;
+  CreateCashTransferCommandV2 | ReplaceCashTransferCommandV2 | RestoreCashTransferCommandV2;
 type CashTransferCorrectionCommand =
-  | ReplaceCashTransferCommandV2
-  | RestoreCashTransferCommandV2
-  | VoidCashTransferCommandV2;
+  ReplaceCashTransferCommandV2 | RestoreCashTransferCommandV2 | VoidCashTransferCommandV2;
 
 @Injectable()
 export class CashLedgerCommandService {
@@ -69,35 +60,32 @@ export class CashLedgerCommandService {
     const command = createCashFlowCommandSchemaV2.parse(rawCommand);
     const result = await this.repository.withAccountWrite<
       SingleCashMutation & { effectResult: T | undefined }
-    >(
-      command.accountId,
-      async (context) => {
-        const desired = this.createStandalonePayloadEvent(
-          command,
-          context.nextLedgerRevision,
-          randomUUID(),
-          'CREATE',
-        );
-        const replay = await this.support.findIdempotentReplay(context, desired);
-        if (replay)
-          return {
-            value: {
-              event: replay.event,
-              replay: true,
-              projectionGeneration: replay.projectionGeneration,
-              effectResult: undefined,
-            },
-            advanceRevision: false,
-          };
+    >(command.accountId, async (context) => {
+      const desired = this.createStandalonePayloadEvent(
+        command,
+        context.nextLedgerRevision,
+        randomUUID(),
+        'CREATE',
+      );
+      const replay = await this.support.findIdempotentReplay(context, desired);
+      if (replay)
+        return {
+          value: {
+            event: replay.event,
+            replay: true,
+            projectionGeneration: replay.projectionGeneration,
+            effectResult: undefined,
+          },
+          advanceRevision: false,
+        };
 
-        await this.support.assertAccountWritable(context, desired.payload.currency);
-        await this.support.assertBalanceAfterRevision(context, undefined, desired);
-        const event = await this.repository.appendRevision(context, desired);
-        const effectResult = effect ? await effect(context.transaction, event) : undefined;
-        await this.support.rebuild(context);
-        return { value: { event, replay: false, effectResult }, advanceRevision: true };
-      },
-    );
+      await this.support.assertAccountWritable(context, desired.payload.currency);
+      await this.support.assertBalanceAfterRevision(context, undefined, desired);
+      const event = await this.repository.appendRevision(context, desired);
+      const effectResult = effect ? await effect(context.transaction, event) : undefined;
+      await this.support.rebuild(context);
+      return { value: { event, replay: false, effectResult }, advanceRevision: true };
+    });
     return {
       response: this.support.singleResponse(result.value, result),
       effectResult: result.value.effectResult,
@@ -112,10 +100,7 @@ export class CashLedgerCommandService {
   }
 
   async voidCashFlow(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    return this.correctStandaloneCashFlow(
-      voidCashFlowCommandSchemaV2.parse(rawCommand),
-      'VOID',
-    );
+    return this.correctStandaloneCashFlow(voidCashFlowCommandSchemaV2.parse(rawCommand), 'VOID');
   }
 
   async restoreCashFlow(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
@@ -364,6 +349,7 @@ export class CashLedgerCommandService {
       category: 'TRANSFER',
       amount: command.amount,
       currency: command.currency,
+      ...(command.expectedAt === undefined ? {} : { expectedAt: command.expectedAt }),
       ...(command.settledAt === undefined ? {} : { settledAt: command.settledAt }),
       ...(command.note === undefined ? {} : { note: command.note }),
       transfer: {
@@ -470,10 +456,7 @@ export class CashLedgerCommandService {
       sourcePayload.amount === targetPayload.amount &&
       sourcePayload.currency === targetPayload.currency;
     if (!valid)
-      throw cashLedgerConflict(
-        'LEDGER_VALIDATION_FAILED',
-        '现金划转修正目标不是同一笔完整划转',
-      );
+      throw cashLedgerConflict('LEDGER_VALIDATION_FAILED', '现金划转修正目标不是同一笔完整划转');
   }
 
   private async transferPayloadForTip(
@@ -512,5 +495,4 @@ export class CashLedgerCommandService {
         context.accountId,
       );
   }
-
 }

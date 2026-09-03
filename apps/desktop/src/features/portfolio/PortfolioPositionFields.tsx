@@ -30,6 +30,11 @@ const positionAssetType = (
   return editing?.asset.assetType;
 };
 
+const toLocalDatetimeInputValue = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 function ManualAssetTypeOptions({ manualAssetType }: { manualAssetType: HeldAssetType }) {
   if (manualAssetType === 'fund') return <SelectItem value="fund">基金</SelectItem>;
   return (
@@ -186,6 +191,16 @@ export function PositionFields({
               </InputGroupText>
             </InputGroupAddon>
           </InputGroup>
+        </div>
+        <div className="grid gap-1.5 text-xs text-muted-foreground">
+          <span>发生时间</span>
+          <Input
+            aria-label="发生时间"
+            name="occurredAt"
+            type="datetime-local"
+            defaultValue={toLocalDatetimeInputValue(new Date())}
+          />
+          <span>快照实际观察的时间，默认为保存时刻。</span>
         </div>
       </div>
     </>
