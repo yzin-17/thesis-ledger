@@ -218,7 +218,10 @@ export function RiskCenter({
         </PortfolioModeNote>
       ) : null}
 
-      <DataStateBanner state={loadState} onRetry={() => void actions.loadRisk()} />
+      {/* 规则、事件、通知全部为空时，指标卡和表格的 0 值已表达状态，不再叠加“暂无数据”横幅。 */}
+      {loadState === 'empty' ? null : (
+        <DataStateBanner state={loadState} onRetry={() => void actions.loadRisk()} />
+      )}
 
       <Tabs value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
         <TabsList variant="line" className="mb-5 w-full justify-start">

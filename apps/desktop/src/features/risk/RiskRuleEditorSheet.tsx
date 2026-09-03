@@ -12,14 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CheckIcon, ChevronDownIcon, LoaderCircle } from 'lucide-react';
@@ -368,20 +361,16 @@ export function RiskRuleEditorSheet({
       <SheetContent
         side="right"
         aria-describedby="risk-rule-editor-description"
-        className="h-[100dvh] min-h-0 w-[620px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+        className="h-[100dvh] min-h-0 w-[680px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <SheetHeader className="shrink-0 p-0">
+        <div className="shrink-0">
           <SheetTitle>{editing ? '编辑风险规则' : '新建风险规则'}</SheetTitle>
           <SheetDescription id="risk-rule-editor-description">
             规则只负责确定性判断；保存后会记录版本和审计信息。
           </SheetDescription>
-        </SheetHeader>
-        <form
-          id="risk-rule-editor-form"
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
-          onSubmit={handleFormSubmit}
-        >
-          <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+        </div>
+        <form className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" onSubmit={handleFormSubmit}>
+          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
             <FieldGroup>
               <Field invalid={Boolean(errors.kind)}>
                 <FieldLabel htmlFor="risk-rule-kind">类型</FieldLabel>
@@ -732,22 +721,16 @@ export function RiskRuleEditorSheet({
             </FieldGroup>
           </div>
 
-          <SheetFooter className="shrink-0 flex-row justify-end p-0">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border pt-4">
             <Button
               type="button"
               variant="outline"
-              className="secondary"
               disabled={pending}
               onClick={() => onOpenChange(false)}
             >
               取消
             </Button>
-            <Button
-              type="submit"
-              form="risk-rule-editor-form"
-              disabled={pending}
-              aria-busy={pending}
-            >
+            <Button type="submit" disabled={pending} aria-busy={pending}>
               {pending && (
                 <LoaderCircle
                   data-icon="inline-start"
@@ -757,7 +740,7 @@ export function RiskRuleEditorSheet({
               )}
               {saveRuleLabel(pending, editing)}
             </Button>
-          </SheetFooter>
+          </div>
         </form>
       </SheetContent>
     </Sheet>

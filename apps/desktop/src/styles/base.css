@@ -510,7 +510,6 @@ h3 {
 
 .metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: var(--space-module);
 }
 
 .metric {
@@ -563,13 +562,16 @@ h3 {
 }
 
 .panel {
-  margin-top: var(--space-module);
   border-top: 1px solid var(--color-border);
 }
 
-.panel-heading {
-  display: block;
-  padding: var(--space-group) 0;
+/* 放入 base 层：未分层样式会压过 Tailwind 工具类，导致 panel-heading 上的
+   flex / justify-between 等布局类全部失效（如规则工作台标题的右侧按钮）。 */
+@layer base {
+  .panel-heading {
+    display: block;
+    padding: var(--space-group) 0;
+  }
 }
 
 .panel-heading h2 {
@@ -1159,6 +1161,11 @@ textarea[data-slot='input-group-control']:focus-visible {
 .metrics + .panel {
   margin-top: var(--space-section);
   border-top: 0;
+}
+
+/* 组件显式标注 mt-0 时（如风险总览的“最近风险事件”），不再叠加 metrics 后的额外间距。 */
+.metrics + .panel.mt-0 {
+  margin-top: 0;
 }
 
 .metrics + .panel .panel-heading {
