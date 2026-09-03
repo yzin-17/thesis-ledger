@@ -21,6 +21,7 @@ export class PortfolioController {
       amount?: string;
       source?: 'manual' | 'screenshot';
       currency?: string;
+      capturedAt?: string;
     },
   ) {
     return this.portfolio.setCashBalance(
@@ -28,6 +29,7 @@ export class PortfolioController {
       body.amount ?? '',
       body.source ?? 'manual',
       body.currency === undefined ? undefined : currencySchema.parse(body.currency),
+      body.capturedAt,
     );
   }
   @Post('positions/clear') clear(@Body() body: { accountId?: string }) {

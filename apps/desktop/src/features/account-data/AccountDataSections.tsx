@@ -1,10 +1,7 @@
-import { useMemo, useState } from 'react';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
-import { sumBy } from 'es-toolkit';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import {
   DropdownMenu,
@@ -24,29 +21,22 @@ import {
   eventTypeLabel,
   eventSubjectDetail,
   eventSymbol,
-  cashFlowCategoryLabel,
   executionSideLabel,
-  formatCurrencyAmount,
   formatDate,
   formatDecimal,
   isExecutionEvent,
   revisionBadgeVariant,
   revisionLabel,
   sourceChannelLabel,
-  supportedCurrency,
   transactionAmount,
   transactionFilters,
 } from './account-data.helpers.js';
 import {
   isCashTransferEvent,
   type CashTransferEvent,
-  type Currency,
   type ExecutionEvent,
 } from './account-data.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
-import { CashTransferSheet } from './AccountDataCashTransferSheet.js';
-import { CashDepositSheet } from './AccountDataCashDepositSheet.js';
-import { RecurringCashDeposits } from './AccountDataRecurringCashDeposits.js';
 
 type QueryLike = {
   data: { events: LedgerEventV2[]; ledgerRevision: string } | undefined;
@@ -449,291 +439,5 @@ export function PositionCalibrationSection({
       onDirtyChange={onDirtyChange}
       onSaved={onSaved}
     />
-  );
-}
-
-type ValuationLike = ReturnType<typeof useAccountValuationQuery>;
-
-type PendingCash = {
-  id: string;
-  currency: Currency;
-  amount: number;
-  direction: '应收' | '应付';
-  label: string;
-  settledAt: string;
-};
-
-const chargeTotal = (event: ExecutionEvent, currency: Currency) =>
-  sumBy(event.payload.charges, (charge) => {
-    if (charge.currency !== currency) return 0;
-    return Number(charge.amount);
-  });
-
-const pendingCashTime = (event: LedgerEventV2) => {
-  if (event.revisionAction === 'VOID') return null;
-  if (
-    event.type === 'BUY_EXECUTION' ||
-    event.type === 'SELL_EXECUTION' ||
-    event.type === 'DIVIDEND' ||
-    event.type === 'CASH_FLOW'
-  )
-    return event.payload.settledAt ?? event.payload.expectedAt ?? event.occurredAt;
-  return null;
-};
-
-const pendingCash = (events: LedgerEventV2[]): PendingCash[] => {
-  const now = Date.now();
-  const rows: PendingCash[] = [];
-  for (const event of events) {
-    const pendingAt = pendingCashTime(event);
-    if (isExecutionEvent(event) && pendingAt) {
-      const settled = new Date(pendingAt);
-      const amount = Number(event.payload.quantity) * Number(event.payload.price);
-      if (Number.isNaN(settled.getTime()) || settled.getTime() <= now || !Number.isFinite(amount))
-        continue;
-      const currency = supportedCurrency(event.payload.currency);
-      const total = amount + chargeTotal(event, currency);
-      rows.push({
-        id: event.eventId,
-        currency,
-        amount: total,
-        direction: event.type === 'BUY_EXECUTION' ? '应付' : '应收',
-        label:
-          event.type === 'BUY_EXECUTION'
-            ? `买入 ${event.payload.symbol}`
-            : `卖出 ${event.payload.symbol}`,
-        settledAt: pendingAt,
-      });
-      continue;
-    }
-    if (event.revisionAction !== 'VOID' && event.type === 'CASH_FLOW' && pendingAt) {
-      const settled = new Date(pendingAt);
-      const amount = Number(event.payload.amount);
-      if (Number.isNaN(settled.getTime()) || settled.getTime() <= now || !Number.isFinite(amount))
-        continue;
-      rows.push({
-        id: event.eventId,
-        currency: supportedCurrency(event.payload.currency),
-        amount,
-        direction: event.payload.direction === 'INFLOW' ? '应收' : '应付',
-        label: cashFlowCategoryLabel(event.payload.category),
-        settledAt: pendingAt,
-      });
-      continue;
-    }
-    if (event.revisionAction !== 'VOID' && event.type === 'DIVIDEND' && pendingAt) {
-      const settled = new Date(pendingAt);
-      const amount = Number(event.payload.amount);
-      if (Number.isNaN(settled.getTime()) || settled.getTime() <= now || !Number.isFinite(amount))
-        continue;
-      rows.push({
-        id: event.eventId,
-        currency: supportedCurrency(event.payload.currency),
-        amount,
-        direction: '应收',
-        label: `分红 ${event.payload.symbol}`,
-        settledAt: pendingAt,
-      });
-    }
-  }
-  return rows;
-};
-
-export function CashSection({
-  account,
-  accounts,
-  valuation,
-  valuationQuery,
-  events,
-  eventsQuery,
-  onCalibrate,
-}: {
-  account: Account;
-  accounts: Account[];
-  valuation: NonNullable<ValuationLike['data']> | undefined;
-  valuationQuery: ValuationLike;
-  events: LedgerEventV2[];
-  eventsQuery: QueryLike;
-  onCalibrate: () => void;
-}) {
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const canCreateCashDeposit =
-    account.type === 'cash' && account.mode === 'actual' && account.active !== false;
-  const settledRows = useMemo(() => {
-    const rows = valuation?.cashByCurrency ?? [];
-    const seen = new Set(rows.map((row) => row.currency));
-    if (!seen.has(account.currency)) {
-      return [{ currency: account.currency, amount: 0, convertedAmount: null }, ...rows];
-    }
-    return rows;
-  }, [account.currency, valuation?.cashByCurrency]);
-  const pendingRows = useMemo(() => pendingCash(events), [events]);
-  const evidencePartial = Boolean(valuation?.dataQuality?.partial) || eventsQuery.isError;
-  return (
-    <section className="flex flex-col gap-4" aria-labelledby="account-data-cash-title">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 id="account-data-cash-title" className="m-0 text-xl font-semibold">
-            现金
-          </h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            已结算余额按币种分桶；有明确结算时间的未来现金影响单独列为待结算。
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canCreateCashDeposit && (
-            <Button type="button" onClick={() => setDepositOpen(true)}>
-              现金入账
-            </Button>
-          )}
-          <Button
-            type="button"
-            onClick={() => setTransferOpen(true)}
-            disabled={account.mode !== 'actual' || account.active === false}
-          >
-            账户间划转
-          </Button>
-          <Button type="button" variant="outline" onClick={onCalibrate}>
-            记录现金快照
-          </Button>
-        </div>
-      </div>
-      <CashResults
-        account={account}
-        valuation={valuation}
-        valuationQuery={valuationQuery}
-        settledRows={settledRows}
-        pendingRows={pendingRows}
-        evidencePartial={evidencePartial}
-      />
-      {eventsQuery.isError && eventsQuery.data && (
-        <Alert>
-          <AlertTitle>待结算列表可能陈旧</AlertTitle>
-          <AlertDescription>
-            现金余额仍保留上次成功结果；请刷新账本后再记录现金快照。
-          </AlertDescription>
-        </Alert>
-      )}
-      <RecurringCashDeposits account={account} />
-      <CashTransferSheet
-        account={account}
-        accounts={accounts}
-        open={transferOpen}
-        onOpenChange={setTransferOpen}
-      />
-      {canCreateCashDeposit && (
-        <CashDepositSheet account={account} open={depositOpen} onOpenChange={setDepositOpen} />
-      )}
-    </section>
-  );
-}
-
-function CashResults({
-  account,
-  valuation,
-  valuationQuery,
-  settledRows,
-  pendingRows,
-  evidencePartial,
-}: {
-  account: Account;
-  valuation: NonNullable<ValuationLike['data']> | undefined;
-  valuationQuery: ValuationLike;
-  settledRows: Array<{ currency: Currency; amount: number; convertedAmount: number | null }>;
-  pendingRows: PendingCash[];
-  evidencePartial: boolean;
-}) {
-  if (valuationQuery.isPending && !valuation) {
-    return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="正在加载现金">
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
-  }
-  if (valuationQuery.isError && !valuation) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>现金读取失败</AlertTitle>
-        <AlertDescription>当前余额没有更新，请重新加载账户数据。</AlertDescription>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => void valuationQuery.refetch()}
-        >
-          重新加载
-        </Button>
-      </Alert>
-    );
-  }
-  return (
-    <>
-      <Card className="shadow-none">
-        <CardHeader className="gap-2 border-b">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>已结算余额</CardTitle>
-            <Badge variant={evidencePartial ? 'secondary' : 'outline'}>
-              证据完整度：{evidencePartial ? '部分' : '完整'}
-            </Badge>
-          </div>
-          <CardDescription>不会把不同币种直接相加；折算值只有在汇率可用时显示。</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
-          {settledRows.map((row) => (
-            <div key={row.currency} className="rounded-lg border p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">{row.currency}</span>
-                <Badge variant="outline">已结算</Badge>
-              </div>
-              <strong className="mt-3 block font-mono text-lg font-medium">
-                {formatCurrencyAmount(row.amount, row.currency)}
-              </strong>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                本位币折算：
-                {row.convertedAmount === null
-                  ? '不可用'
-                  : formatCurrencyAmount(row.convertedAmount, account.currency)}
-              </span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-      <Card className="shadow-none">
-        <CardHeader className="gap-2 border-b">
-          <CardTitle>待结算应收 / 应付</CardTitle>
-          <CardDescription>
-            只根据账本中明确的未来结算时间展示，不推测缺失的结算时间。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {pendingRows.length === 0 ? (
-            <Empty className="min-h-32 rounded-none border-0 p-6">
-              <EmptyDescription>暂无明确的待结算现金影响。</EmptyDescription>
-            </Empty>
-          ) : (
-            <div className="divide-y">
-              {pendingRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div>
-                    <strong className="block text-sm font-medium">{row.label}</strong>
-                    <span className="text-xs text-muted-foreground">
-                      {row.currency} · 结算于 {formatDate(row.settledAt)}
-                    </span>
-                  </div>
-                  <Badge variant={row.direction === '应收' ? 'default' : 'secondary'}>
-                    {row.direction} {formatCurrencyAmount(row.amount, row.currency)}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </>
   );
 }

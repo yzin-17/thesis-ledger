@@ -34,6 +34,7 @@ import { shouldPollJobs } from '../src/features/strategy/strategy.queries.js';
 import type { BacktestJob, StrategyRecord } from '../src/features/strategy/strategy.types.js';
 import {
   fetchPortfolioValuation,
+  saveCashBalance,
   searchPortfolioInstruments,
 } from '../src/features/portfolio/portfolio.api.js';
 import { portfolioKeys } from '../src/features/portfolio/portfolio.queries.js';
@@ -182,6 +183,21 @@ describe('拆分后的领域请求契约', () => {
     expect(portfolioKeys.valuation('actual', 'account-2')).not.toEqual(
       portfolioKeys.valuation('shadow', 'account-2'),
     );
+  });
+
+  it('现金快照请求携带用户选择的快照时间', async () => {
+    const portfolio = makeClient({});
+    await saveCashBalance('account-1', '2000', 'CNY', '2026-08-20T01:00:00.000Z', portfolio.client);
+
+    const init = portfolio.request.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      accountId: 'account-1',
+      amount: '2000',
+      source: 'manual',
+      currency: 'CNY',
+      capturedAt: '2026-08-20T01:00:00.000Z',
+    });
   });
 
   it('共享 load state 区分初始错误与已有数据的 stale 状态', () => {

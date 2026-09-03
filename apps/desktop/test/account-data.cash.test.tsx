@@ -10,9 +10,19 @@ import {
   cashDepositSuccessDescription,
 } from '../src/features/account-data/AccountDataCashDepositSheet.js';
 import { RecurringCashDeposits } from '../src/features/account-data/AccountDataRecurringCashDeposits.js';
+import {
+  cashRelativeDateLabel,
+  formatCashShortDate,
+  formatSignedCashAmount,
+  pendingCash,
+  RecentCashFlowSection,
+  settledCashFlows,
+} from '../src/features/account-data/AccountDataCashSections.js';
+import type { SettledCashFlowRow } from '../src/features/account-data/AccountDataCashSections.js';
 import { cashTransferErrorMessage } from '../src/features/account-data/AccountDataCashTransferSheet.js';
 import {
   cashFlowCategoryLabel,
+  eventSubjectDetail,
   sourceChannelLabel,
 } from '../src/features/account-data/account-data.helpers.js';
 import {
@@ -136,6 +146,102 @@ describe('账户现金操作', () => {
     );
     const command = createCashFlow.mock.calls[0]?.[0];
     expect(command?.payload).not.toHaveProperty('settledAt');
+  });
+
+  it('现金页读模型只展示明确结算时间并按时间排序', () => {
+    const now = new Date('2026-09-03T00:00:00.000Z');
+    const futureDeposit = {
+      version: 2,
+      eventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      factId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      accountId: cashAccount.id,
+      type: 'CASH_FLOW',
+      revisionAction: 'CREATE',
+      occurredAt: '2026-09-01T00:00:00.000Z',
+      payload: {
+        direction: 'INFLOW',
+        category: 'DEPOSIT',
+        amount: '100',
+        currency: 'CNY',
+        expectedAt: '2026-09-05T00:00:00.000Z',
+        note: '9 月工资',
+      },
+    } as never;
+    const futureWithdrawal = {
+      ...futureDeposit,
+      eventId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      factId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      payload: {
+        ...futureDeposit.payload,
+        direction: 'OUTFLOW',
+        amount: '40',
+        expectedAt: '2026-09-04T00:00:00.000Z',
+        note: undefined,
+      },
+    } as never;
+    const missingSettlement = {
+      ...futureDeposit,
+      eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      factId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      payload: { ...futureDeposit.payload, expectedAt: undefined },
+    } as never;
+
+    const pending = pendingCash([futureDeposit, futureWithdrawal, missingSettlement], now);
+    expect(pending.map((row) => row.id)).toEqual([futureWithdrawal.eventId, futureDeposit.eventId]);
+    expect(pending[1]).toMatchObject({ note: '9 月工资', direction: '应收' });
+
+    const settled = settledCashFlows(
+      [
+        {
+          ...futureDeposit,
+          eventId: '11111111-1111-4111-8111-111111111111',
+          factId: '22222222-2222-4222-8222-222222222222',
+          occurredAt: '2026-09-02T00:00:00.000Z',
+          payload: {
+            ...futureDeposit.payload,
+            expectedAt: undefined,
+            settledAt: '2026-09-02T00:00:00.000Z',
+          },
+        },
+        {
+          ...futureDeposit,
+          eventId: '33333333-3333-4333-8333-333333333333',
+          factId: '44444444-4444-4444-8444-444444444444',
+          occurredAt: '2026-09-01T00:00:00.000Z',
+          payload: {
+            ...futureDeposit.payload,
+            expectedAt: undefined,
+            settledAt: '2026-09-01T00:00:00.000Z',
+          },
+        },
+      ],
+      now,
+    );
+    expect(settled.map((row) => row.settledAt)).toEqual([
+      '2026-09-02T00:00:00.000Z',
+      '2026-09-01T00:00:00.000Z',
+    ]);
+    expect(formatCashShortDate('2026-09-04T00:00:00.000Z')).toBe('09/04');
+    expect(cashRelativeDateLabel('2026-09-04T00:00:00.000Z', now)).toBe('明天');
+    expect(formatSignedCashAmount(100, 'CNY', '应收')).toBe('+¥100.00');
+    expect(formatSignedCashAmount(40, 'CNY', '应付')).toBe('-¥40.00');
+  });
+
+  it('最近流水默认只展示 5 条并提供查看全部入口', () => {
+    const rows: SettledCashFlowRow[] = Array.from({ length: 21 }, (_, index) => ({
+      id: `cash-flow-${index}`,
+      currency: 'CNY',
+      amount: index + 1,
+      direction: 'INFLOW',
+      label: `现金入账 ${index}`,
+      settledAt: `2026-08-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
+    }));
+    const markup = renderToStaticMarkup(<RecentCashFlowSection rows={rows} />);
+
+    expect(markup).toContain('现金入账 0');
+    expect(markup).toContain('现金入账 4');
+    expect(markup).not.toContain('现金入账 5');
+    expect(markup).toContain('查看全部');
   });
 
   it('手动划转提交前读取两端最新 Revision，并生成关联命令', async () => {
@@ -388,9 +494,28 @@ describe('账户现金操作', () => {
     );
   });
 
+  it('现金快照和定期入账计划的提交操作固定在 Sheet footer', () => {
+    const observationSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataCashObservationSheet.tsx', import.meta.url),
+      'utf8',
+    );
+    const recurringSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataRecurringCashDeposits.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(observationSource).toContain('<SheetFooter');
+    expect(observationSource).toContain('overflow-y-auto');
+    expect(observationSource).toContain('记录现金快照');
+    expect(recurringSource).toContain('<SheetFooter');
+    expect(recurringSource).toContain('border-t border-border p-4');
+    expect(recurringSource).toContain('新建定期入账计划');
+    expect(recurringSource).toContain('保存计划');
+  });
+
   it('待结算现金流和现金入账来源使用用户显示名', () => {
     const sectionsSource = readFileSync(
-      new URL('../src/features/account-data/AccountDataSections.tsx', import.meta.url),
+      new URL('../src/features/account-data/AccountDataCashSections.tsx', import.meta.url),
       'utf8',
     );
 
@@ -400,10 +525,28 @@ describe('账户现金操作', () => {
     expect(sourceChannelLabel('desktop-cash-deposit')).toBe('桌面端 · 现金入账');
     expect(sectionsSource).toContain('cashFlowCategoryLabel(event.payload.category)');
     expect(sectionsSource).toContain("if (event.revisionAction === 'VOID') return null;");
-    expect(sectionsSource).toContain(
-      'event.payload.settledAt ?? event.payload.expectedAt ?? event.occurredAt',
-    );
+    expect(sectionsSource).toContain('event.payload.settledAt ?? event.payload.expectedAt ?? null');
     expect(sectionsSource).not.toContain('label: event.payload.category');
+  });
+
+  it('现金入账备注展示在流水明细和待结算列表', () => {
+    const sectionsSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataCashSections.tsx', import.meta.url),
+      'utf8',
+    );
+    const event = {
+      revisionAction: 'CREATE',
+      type: 'CASH_FLOW',
+      payload: { category: 'DEPOSIT', note: '8 月工资' },
+    } as never;
+
+    expect(eventSubjectDetail(event)).toBe('现金入账 · 8 月工资');
+    expect(sectionsSource).toContain('row.note');
+    expect(sectionsSource).toContain('备注：{row.note}');
+    expect(sectionsSource).toContain('formatSignedCashAmount');
+    expect(sectionsSource).toContain('最近流水');
+    expect(sectionsSource).toContain('rows.slice(0, 5)');
+    expect(sectionsSource).toContain('查看全部');
   });
 
   it('现金入账成功后刷新当前账本、审计链和估值', () => {
@@ -542,12 +685,14 @@ describe('账户现金操作', () => {
       'utf8',
     );
 
-    expect(markup).toContain('1 条待确认');
+    expect(markup).toContain('1 条');
+    expect(markup).toContain('待确认');
     expect(markup).toContain('已逾期');
     expect(markup).toContain('已确认历史');
     expect(markup).toContain('实际');
     expect(markup).toContain('10,050');
-    expect(markup).toContain('这是应用内待办提醒');
+    expect(markup).toContain('定期入账');
+    expect(markup).toContain('计划');
     expect(markup).toContain('工资入账 · 2026-08');
     expect(markup).toContain('确认入账');
     expect(markup).toContain('恢复待确认');

@@ -2,7 +2,7 @@
 
 对应 Spec：[`../specs/2026-09-03-cash-snapshot-projection-optimization.md`](../specs/2026-09-03-cash-snapshot-projection-optimization.md)
 
-状态：T1-T5 已完成并验证。
+状态：T1-T6 已完成并验证。
 
 ## 跨任务契约
 
@@ -61,10 +61,23 @@
   - 验证方式：定向回归、typecheck、build、`git diff --check`；浏览器/真实服务证据单独记录。
   - 验证证据：
     - Server build：通过；Desktop build：通过，Vite 仅报告既有 chunk size warning。
-    - `pnpm exec prettier --check`：本任务直接修改的源码、测试和文档通过；已有 dirty 大文件未整体重排。
+    - `pnpm exec prettier --check`：本次新增/修改的 Desktop 源码和测试通过；`apps/server/src/ledger/ledger.service.ts` 保留既有未格式化段落，未为此扩大变更范围。
     - `git diff --check`：通过。
     - `CONTEXT.md`、领域文档、优化 Spec/Task 和现金账户 Spec/Task 已同步。
     - 本轮未执行浏览器、键盘、Compose/真实服务、数据库运行时、迁移部署或外部通知投递验收，不将其作为确定性实现证据。
+
+- [x] T6：为手工现金快照增加可控的 asOf 时间
+  - 覆盖验收标准：AC1、AC7、AC9
+  - 依赖：T3、T4
+  - 涉及范围：现金快照 Drawer、Desktop Portfolio API/Mutation、Portfolio/ Ledger 快照写入链路和测试。
+  - 完成条件：快照时间默认当前、允许过去、拒绝未来；服务端使用输入时间写入 `occurredAt/capturedAt`，提交时间仍作为 `recordedAt`；关闭和重开不残留时间或错误；不把未来资金写成快照。
+  - 验证方式：Desktop UI/API 测试、Server Ledger/Portfolio 测试、两端 typecheck、build 和 `git diff --check`。
+  - 验证证据：
+    - `pnpm exec vitest run test/ledger/services.test.ts`：1 个测试文件、5 个测试通过，覆盖历史快照时间、实际写入时间和未来时间拒绝。
+    - `pnpm exec vitest run test/refactor-contract.test.ts test/account-data.ui.test.tsx test/account-data.cash.test.tsx`：3 个测试文件、42 个测试通过，覆盖快照时间请求、默认/限制入口和现金回归行为。
+    - 现金快照和定期入账计划的提交操作均使用 `SheetFooter`；表单内容区可滚动，关闭后不保留输入和错误状态。
+    - Server/Desktop `pnpm exec tsc -p tsconfig.json --noEmit`：通过；Server `pnpm exec nest build`：通过；Desktop `pnpm exec vite build`：通过，保留既有 chunk size warning。
+    - `git diff --check`：通过。
 
 ## 最终一致性 Review
 
@@ -81,7 +94,7 @@
 
 ### Review 结论
 
-- 结论：T1-T5 已完成；现金快照 replay 边界、统一生效时间、历史兼容和直接消费者已通过确定性验证。
-- 发现的问题：无确定性测试失败或未解决的阻塞问题。
-- 遗留风险：历史数据的有限 fallback 不能保证推断出真实结算时间；本轮未执行浏览器、Compose、真实数据库/服务运行和迁移部署验收。
-- 验证命令与结果：Schema 42/42；Server 定向 5 个文件 48/48；Desktop 定向 2 个文件 19/19；Server/Desktop typecheck、Server/Desktop build、Prettier 和 `git diff --check` 均通过。
+- 结论：T1-T6 已完成，Spec、Task 与实现一致。
+- 发现的问题：无阻塞问题。
+- 遗留风险：浏览器真实交互、Compose/真实服务、数据库运行时和迁移部署验收仍未执行；历史数据 fallback 风险保持不变。
+- 验证命令与结果：T1-T5 证据保留；T6 的 Server/Desktop 测试、typecheck、build 和 `git diff --check` 均已通过。

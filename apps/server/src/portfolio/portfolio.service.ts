@@ -157,8 +157,9 @@ export class PortfolioService {
     amount: string,
     source: 'manual' | 'screenshot' = 'manual',
     currency?: CurrencyV1,
+    capturedAt?: string,
   ) {
-    await this.requireLedger().setCashBalance(accountId, amount, source, currency);
+    await this.requireLedger().setCashBalance(accountId, amount, source, currency, capturedAt);
     return {
       accountId,
       amount,

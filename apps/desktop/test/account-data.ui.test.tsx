@@ -349,9 +349,29 @@ describe('账户数据页面契约', () => {
     expect(positionSource).toContain('清空持仓快照');
 
     const cashMarkup = renderPage('?tab=cash');
-    expect(cashMarkup).toContain('已结算余额');
-    expect(cashMarkup).toContain('待结算应收 / 应付');
+    expect(cashMarkup).toContain('可用现金');
+    expect(cashMarkup).toContain('待结算');
+    expect(cashMarkup).toContain('最近流水');
     expect(cashMarkup).toContain('证据完整度');
-    expect(cashMarkup).toContain('记录现金快照');
+    expect(cashMarkup).not.toContain('待结算应收 / 应付');
+    expect(cashMarkup).not.toContain('记录现金快照');
+    const cashSectionsSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataCashSections.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(cashSectionsSource).toContain('现金入账');
+    expect(cashSectionsSource).toContain('更多现金操作');
+    expect(cashSectionsSource).toContain('记录现金快照');
+    expect(cashSectionsSource).toContain('账户间划转');
+    const cashObservationSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataCashObservationSheet.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(cashObservationSource).toContain('快照时间');
+    expect(cashObservationSource).toContain('cash-observation-captured-at');
+    expect(cashObservationSource).toContain('max={currentLocalDateTime()}');
+    expect(cashObservationSource).toContain('capturedAt: capturedAtIso');
+    expect(cashObservationSource).toContain('setCapturedAt(currentLocalDateTime());');
+    expect(cashObservationSource).toContain('onClick={() => handleOpenChange(false)}');
   });
 });

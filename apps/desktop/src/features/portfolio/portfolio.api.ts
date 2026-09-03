@@ -205,6 +205,7 @@ export const saveCashBalance = (
   accountId: string,
   amount: string,
   currency?: Account['currency'],
+  capturedAt?: string,
   client?: DesktopRequestClient,
 ) =>
   requestDesktopJson<unknown>(
@@ -218,6 +219,7 @@ export const saveCashBalance = (
         amount,
         source: 'manual',
         ...(currency ? { currency } : {}),
+        ...(capturedAt === undefined ? {} : { capturedAt }),
       }),
     },
     client,

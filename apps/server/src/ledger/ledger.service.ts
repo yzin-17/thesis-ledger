@@ -392,9 +392,18 @@ export class LedgerService {
     amount: string,
     source: 'manual' | 'screenshot' = 'manual',
     currency?: CurrencyV1,
+    capturedAt?: string,
   ) {
     nonNegativeDecimalStringSchema.parse(amount);
     const recordedAt = new Date().toISOString();
+    if (capturedAt !== undefined && typeof capturedAt !== 'string')
+      throw new BadRequestException('快照时间格式不正确');
+    const snapshotDate = new Date(capturedAt ?? recordedAt);
+    if (!Number.isFinite(snapshotDate.getTime()))
+      throw new BadRequestException('快照时间格式不正确');
+    if (snapshotDate.getTime() > Date.now())
+      throw new BadRequestException('快照时间不能晚于当前时间');
+    const snapshotAt = snapshotDate.toISOString();
     const result = await this.repository.withAccountWrite(accountId, async (context) => {
       const account = await this.assertAccountWithClient(context.transaction, accountId);
       const cashCurrency = currency ?? currencySchema.parse(account.currency);
@@ -405,7 +414,7 @@ export class LedgerService {
         accountId,
         ledgerRevision: context.nextLedgerRevision.toString(),
         type: 'CASH_BALANCE_OBSERVATION',
-        occurredAt: recordedAt,
+        occurredAt: snapshotAt,
         timePrecision: 'INSTANT',
         sourceTimezone: 'UTC',
         economicOrderKey: `cash-baseline:${recordedAt}`,
@@ -418,8 +427,8 @@ export class LedgerService {
         },
         actorId: source,
         revisionAction: 'CREATE',
-        reason: '保存当前现金余额',
-        payload: { currency: cashCurrency, amount, capturedAt: recordedAt },
+        reason: '保存现金余额快照',
+        payload: { currency: cashCurrency, amount, capturedAt: snapshotAt },
       });
       await this.rebuildWithClient(
         context.transaction,

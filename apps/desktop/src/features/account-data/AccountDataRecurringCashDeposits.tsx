@@ -7,7 +7,6 @@ import { Loader2Icon, MoreHorizontalIcon, PlusIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
 import {
   DropdownMenu,
@@ -16,7 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -78,16 +76,7 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
   const confirmed = occurrences.filter((occurrence) => occurrence.status === 'CONFIRMED');
   const skipped = occurrences.filter((occurrence) => occurrence.status === 'SKIPPED');
 
-  if (!enabled) {
-    return (
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle>定期入账</CardTitle>
-          <CardDescription>仅真实且启用的现金账户支持月度计划。</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  if (!enabled) return null;
 
   const changePlanState = async (
     plan: RecurringCashDepositPlan,
@@ -134,11 +123,11 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
   };
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="recurring-cash-deposit-title">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="flex flex-col gap-3" aria-labelledby="recurring-cash-deposit-title">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id="recurring-cash-deposit-title" className="m-0 text-lg font-semibold">
-            定期入账与待确认
+            定期入账
           </h3>
           <p className="m-0 mt-1 text-sm text-muted-foreground">
             到期只生成待确认记录；确认后才写入现金 Ledger。
@@ -152,231 +141,214 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
           <PlusIcon data-icon="inline-start" />
           新建计划
         </Button>
-      </div>
+      </header>
       {(queries.plans.isError || queries.occurrences.isError) && (
         <Alert variant="destructive">
           <AlertTitle>定期入账读取失败</AlertTitle>
           <AlertDescription>计划或待确认记录未更新，请重试。</AlertDescription>
         </Alert>
       )}
-      {pending.length > 0 && (
-        <Alert>
-          <AlertTitle>有 {pending.length} 条入账待确认</AlertTitle>
-          <AlertDescription>
-            这是应用内待办提醒。请核对实际金额和到账时间；未确认前不会改变现金余额。
-          </AlertDescription>
-        </Alert>
-      )}
       {overdue.length > 0 && (
         <Alert variant="destructive">
           <AlertTitle>有 {overdue.length} 条入账已逾期</AlertTitle>
-          <AlertDescription>这些待确认实例已超过计划时间，确认前仍不会改变现金余额。</AlertDescription>
+          <AlertDescription>
+            这些待确认实例已超过计划时间，确认前仍不会改变现金余额。
+          </AlertDescription>
         </Alert>
       )}
-      <Card className="shadow-none">
-        <CardHeader className="border-b">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <CardTitle>待确认入账</CardTitle>
-              <CardDescription>可修改实际金额和到账时间，也可跳过后恢复。</CardDescription>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Badge variant={pending.length > 0 ? 'default' : 'outline'}>
-                {pending.length} 条待确认
-              </Badge>
-              {overdue.length > 0 && <Badge variant="destructive">{overdue.length} 条已逾期</Badge>}
-            </div>
+      <div className="divide-y border-y">
+        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+          <div>
+            <h4 className="m-0 text-sm font-semibold">待确认</h4>
+            <p className="m-0 mt-1 text-xs text-muted-foreground">
+              核对实际金额和到账时间后再写入 Ledger。
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {pending.length === 0 ? (
-            <Empty className="min-h-32 rounded-none border-0 p-6">
-              <EmptyHeader>
-                <EmptyTitle>暂无待确认入账</EmptyTitle>
-                <EmptyDescription>到期计划会在这里出现，不会自动改变现金余额。</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div className="divide-y">
-              {pending.map((occurrence) => (
-                <div
-                  key={occurrence.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <strong className="block text-sm font-medium">
-                        {occurrence.planName} · {occurrence.periodKey}
-                      </strong>
-                      {isOccurrenceOverdue(occurrence) && <Badge variant="destructive">已逾期</Badge>}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {isOccurrenceOverdue(occurrence) ? '原定' : '计划'}{' '}
-                      {formatDate(occurrence.scheduledFor)} ·{' '}
-                      {formatCurrencyAmount(
-                        Number(occurrence.expectedAmount),
-                        supportedCurrency(occurrence.currency),
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => setOccurrenceAction({ type: 'confirm', occurrence })}
-                    >
-                      确认入账
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setOccurrenceAction({ type: 'skip', occurrence })}
-                    >
-                      跳过
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      {confirmed.length > 0 && (
-        <Card className="shadow-none">
-          <CardHeader className="border-b">
-            <CardTitle>已确认历史</CardTitle>
-            <CardDescription>已确认实例已经写入现金 Ledger。</CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y p-0">
-            {confirmed.map((occurrence) => (
+          <span className="text-sm font-medium text-muted-foreground">{pending.length} 条</span>
+        </div>
+        {pending.length === 0 ? (
+          <div className="py-3 text-sm text-muted-foreground">暂无待确认入账</div>
+        ) : (
+          <div className="divide-y">
+            {pending.map((occurrence) => (
               <div
                 key={occurrence.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-3 py-3"
               >
-                <div>
-                  <strong className="block text-sm font-medium">
-                    {occurrence.planName} · {occurrence.periodKey}
-                  </strong>
-                  <span className="text-xs text-muted-foreground">
-                    实际{' '}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong className="text-sm font-medium">
+                      {occurrence.planName} · {occurrence.periodKey}
+                    </strong>
+                    {isOccurrenceOverdue(occurrence) && <Badge variant="destructive">已逾期</Badge>}
+                  </div>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {isOccurrenceOverdue(occurrence) ? '原定' : '计划'}{' '}
+                    {formatDate(occurrence.scheduledFor)} ·{' '}
                     {formatCurrencyAmount(
-                      Number(occurrence.actualAmount ?? occurrence.expectedAmount),
+                      Number(occurrence.expectedAmount),
                       supportedCurrency(occurrence.currency),
-                    )}{' '}
-                    · 入账 {formatDate(occurrence.occurredAt)}
+                    )}
                   </span>
                 </div>
-                <Badge variant="secondary">已确认</Badge>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setOccurrenceAction({ type: 'confirm', occurrence })}
+                  >
+                    确认入账
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setOccurrenceAction({ type: 'skip', occurrence })}
+                  >
+                    跳过
+                  </Button>
+                </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
-      )}
-      <Card className="shadow-none">
-        <CardHeader className="border-b">
-          <CardTitle>月度计划</CardTitle>
-          <CardDescription>每月日期不存在时自动取月末；暂停期间不会补期。</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {plans.length === 0 ? (
-            <Empty className="min-h-32 rounded-none border-0 p-6">
-              <EmptyDescription>尚未创建定期入账计划。</EmptyDescription>
-            </Empty>
-          ) : (
-            <div className="divide-y">
-              {plans.map((plan) => (
-                <div key={plan.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <strong className="truncate text-sm font-medium">{plan.name}</strong>
-                      <Badge variant={plan.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                        {planStatus(plan.status)}
-                      </Badge>
-                    </div>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      每月 {plan.dayOfMonth} 日 ·{' '}
-                      {formatCurrencyAmount(
-                        Number(plan.expectedAmount),
-                        supportedCurrency(plan.currency),
+          </div>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+          <div>
+            <h4 className="m-0 text-sm font-semibold">计划</h4>
+            <p className="m-0 mt-1 text-xs text-muted-foreground">
+              每月到期后生成待确认记录，不会自动改变现金余额。
+            </p>
+          </div>
+          <span className="text-sm font-medium text-muted-foreground">{plans.length} 个</span>
+        </div>
+        {plans.length === 0 ? (
+          <div className="py-3 text-sm text-muted-foreground">
+            暂无定期入账计划。创建计划后，到期会生成待确认记录。
+          </div>
+        ) : (
+          <div className="divide-y">
+            {plans.map((plan) => (
+              <div key={plan.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong className="truncate text-sm font-medium">{plan.name}</strong>
+                    <Badge variant={plan.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                      {planStatus(plan.status)}
+                    </Badge>
+                  </div>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    每月 {plan.dayOfMonth} 日 ·{' '}
+                    {formatCurrencyAmount(
+                      Number(plan.expectedAmount),
+                      supportedCurrency(plan.currency),
+                    )}
+                    {plan.nextDueAt ? ` · 下次 ${formatDate(plan.nextDueAt)}` : ''}
+                  </span>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`管理计划：${plan.name}`}
+                      >
+                        <MoreHorizontalIcon />
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuGroup>
+                      {plan.status !== 'ENDED' && (
+                        <DropdownMenuItem onClick={() => setEditor({ mode: 'edit', plan })}>
+                          修改计划
+                        </DropdownMenuItem>
                       )}
-                      {plan.nextDueAt ? ` · 下次 ${formatDate(plan.nextDueAt)}` : ''}
+                      {plan.status === 'ACTIVE' && (
+                        <DropdownMenuItem onClick={() => void changePlanState(plan, 'pause')}>
+                          暂停计划
+                        </DropdownMenuItem>
+                      )}
+                      {plan.status === 'PAUSED' && (
+                        <DropdownMenuItem onClick={() => void changePlanState(plan, 'resume')}>
+                          恢复计划
+                        </DropdownMenuItem>
+                      )}
+                      {plan.status !== 'ENDED' && (
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => void changePlanState(plan, 'end')}
+                        >
+                          结束计划
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </div>
+        )}
+        {confirmed.length > 0 && (
+          <>
+            <div className="flex items-center justify-between gap-2 py-3">
+              <h4 className="m-0 text-sm font-semibold">已确认历史</h4>
+              <span className="text-sm font-medium text-muted-foreground">
+                {confirmed.length} 条
+              </span>
+            </div>
+            <div className="divide-y">
+              {confirmed.map((occurrence) => (
+                <div
+                  key={occurrence.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3"
+                >
+                  <div>
+                    <strong className="block text-sm font-medium">
+                      {occurrence.planName} · {occurrence.periodKey}
+                    </strong>
+                    <span className="text-xs text-muted-foreground">
+                      实际{' '}
+                      {formatCurrencyAmount(
+                        Number(occurrence.actualAmount ?? occurrence.expectedAmount),
+                        supportedCurrency(occurrence.currency),
+                      )}{' '}
+                      · 入账 {formatDate(occurrence.occurredAt)}
                     </span>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`管理计划：${plan.name}`}
-                        >
-                          <MoreHorizontalIcon />
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuGroup>
-                        {plan.status !== 'ENDED' && (
-                          <DropdownMenuItem onClick={() => setEditor({ mode: 'edit', plan })}>
-                            修改计划
-                          </DropdownMenuItem>
-                        )}
-                        {plan.status === 'ACTIVE' && (
-                          <DropdownMenuItem onClick={() => void changePlanState(plan, 'pause')}>
-                            暂停计划
-                          </DropdownMenuItem>
-                        )}
-                        {plan.status === 'PAUSED' && (
-                          <DropdownMenuItem onClick={() => void changePlanState(plan, 'resume')}>
-                            恢复计划
-                          </DropdownMenuItem>
-                        )}
-                        {plan.status !== 'ENDED' && (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => void changePlanState(plan, 'end')}
-                          >
-                            结束计划
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Badge variant="secondary">已确认</Badge>
                 </div>
               ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
-      {skipped.length > 0 && (
-        <Card className="shadow-none">
-          <CardHeader className="border-b">
-            <CardTitle>已跳过记录</CardTitle>
-          </CardHeader>
-          <CardContent className="divide-y p-0">
-            {skipped.map((occurrence) => (
-              <div
-                key={occurrence.id}
-                className="flex items-center justify-between gap-3 px-4 py-3"
-              >
-                <span className="text-sm">
-                  {occurrence.planName} · {occurrence.periodKey}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void reopen(occurrence)}
-                >
-                  恢复待确认
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+          </>
+        )}
+        {skipped.length > 0 && (
+          <>
+            <div className="flex items-center justify-between gap-2 py-3">
+              <h4 className="m-0 text-sm font-semibold">已跳过记录</h4>
+              <span className="text-sm font-medium text-muted-foreground">{skipped.length} 条</span>
+            </div>
+            <div className="divide-y">
+              {skipped.map((occurrence) => (
+                <div key={occurrence.id} className="flex items-center justify-between gap-3 py-3">
+                  <span className="text-sm">
+                    {occurrence.planName} · {occurrence.periodKey}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void reopen(occurrence)}
+                  >
+                    恢复待确认
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
       {editor && (
         <PlanEditorSheet
           key={`${editor.mode}:${editor.plan?.id ?? 'new'}`}
@@ -508,7 +480,7 @@ function PlanEditorSheet({
               {error && <FieldError>{error}</FieldError>}
             </FieldGroup>
           </div>
-          <SheetFooter className="border-t bg-popover">
+          <SheetFooter className="shrink-0 flex-row justify-end gap-2 border-t border-border p-4">
             <Button
               type="button"
               variant="outline"

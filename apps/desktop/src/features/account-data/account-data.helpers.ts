@@ -166,6 +166,11 @@ export const eventSubjectDetail = (event: LedgerEventV2): string | null => {
       return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.fromUnits)} → ${formatDecimal(event.payload.toUnits)}`;
     case 'DIVIDEND':
       return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.amount)} ${event.payload.currency}`;
+    case 'CASH_FLOW': {
+      const category = cashFlowCategoryLabel(event.payload.category);
+      const note = event.payload.note?.trim();
+      return note ? `${category} · ${note}` : category;
+    }
     default:
       return null;
   }

@@ -148,7 +148,7 @@ export function PositionObservationContent({
                 <Badge variant="secondary">已记录快照</Badge>
               </td>
               <td className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-background px-3 py-2">
-                <div className="flex flex-wrap justify-end gap-1">
+                <div className="flex gap-1">
                   <Button
                     size="sm"
                     type="button"

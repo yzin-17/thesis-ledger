@@ -52,11 +52,13 @@ export const useSaveCashBalanceMutation = () => {
       accountId,
       amount,
       currency,
+      capturedAt,
     }: {
       accountId: string;
       amount: string;
       currency?: Account['currency'];
-    }) => saveCashBalance(accountId, amount, currency),
+      capturedAt?: string;
+    }) => saveCashBalance(accountId, amount, currency, capturedAt),
     onSuccess: () => invalidatePortfolio(client),
   });
 };

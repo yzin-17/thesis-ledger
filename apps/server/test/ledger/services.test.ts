@@ -144,4 +144,38 @@ describe('Ledger Service', () => {
       }),
     );
   });
+
+  it('现金快照使用历史时间时区分快照时间与实际写入时间，并拒绝未来时间', async () => {
+    const appendRevision = vi.fn(async (_context: unknown, event: unknown) => event);
+    const withAccountWrite = vi.fn(
+      async (_accountId: string, callback: (context: unknown) => unknown) =>
+        callback({
+          transaction: {
+            account: {
+              findUnique: vi.fn(async () => ({ active: true, currency: 'CNY', type: 'cash' })),
+            },
+          },
+          nextLedgerRevision: 1n,
+          nextProjectionGeneration: 1n,
+        }),
+    );
+    const service = new LedgerService({} as never, { appendRevision, withAccountWrite } as never);
+    vi.spyOn(service as never, 'rebuildWithClient' as never).mockResolvedValue(undefined);
+    const capturedAt = '2026-08-20T01:00:00.000Z';
+
+    await service.setCashBalance('account-1', '2000', 'manual', 'CNY', capturedAt);
+
+    expect(appendRevision).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        occurredAt: capturedAt,
+        recordedAt: expect.not.stringContaining(capturedAt),
+        payload: { currency: 'CNY', amount: '2000', capturedAt },
+      }),
+    );
+    await expect(
+      service.setCashBalance('account-1', '2000', 'manual', 'CNY', '2099-01-05T01:00:00.000Z'),
+    ).rejects.toThrow('快照时间不能晚于当前时间');
+    expect(appendRevision).toHaveBeenCalledTimes(1);
+  });
 });
