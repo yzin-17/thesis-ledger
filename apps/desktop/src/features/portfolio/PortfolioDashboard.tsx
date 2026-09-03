@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/ArrowClockwise';
 import type { DesktopNavigationView } from '../../views.js';
 import { MarketDetailDialog } from '../market-detail/MarketDetailDialog.js';
@@ -132,36 +133,15 @@ export function PortfolioDashboard({
       {pageHeader}
       {modeNote}
       <DataStateBanner state={state} onRetry={onRetry} />
-      <div
-        className="flex w-full max-w-md rounded-lg bg-muted p-1"
-        role="tablist"
-        aria-label="组合内容"
+      <Tabs
+        value={portfolioTab}
+        onValueChange={(value) => setPortfolioTab(value as 'overview' | 'trades')}
       >
-        <Button
-          className="flex-1"
-          type="button"
-          variant={portfolioTab === 'overview' ? 'secondary' : 'ghost'}
-          role="tab"
-          aria-selected={portfolioTab === 'overview'}
-          onClick={() => setPortfolioTab('overview')}
-        >
-          组合概览
-        </Button>
-        <Button
-          className="flex-1"
-          type="button"
-          variant={portfolioTab === 'trades' ? 'secondary' : 'ghost'}
-          role="tab"
-          aria-selected={portfolioTab === 'trades'}
-          onClick={() => setPortfolioTab('trades')}
-        >
-          交易
-        </Button>
-      </div>
-      {portfolioTab === 'trades' ? (
-        <PortfolioTradeView mode={mode} accounts={accounts} onReview={onOpenReview} />
-      ) : (
-        <>
+        <TabsList variant="line" className="min-h-11 w-fit">
+          <TabsTrigger value="overview">组合概览</TabsTrigger>
+          <TabsTrigger value="trades">交易</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="mt-0 pt-3">
           <FirstRunOnboarding
             hasAccount={accounts.length > 0}
             hasPosition={hasPosition}
@@ -250,8 +230,11 @@ export function PortfolioDashboard({
               </table>
             </div>
           </section>
-        </>
-      )}
+        </TabsContent>
+        <TabsContent value="trades" className="mt-0 pt-3">
+          <PortfolioTradeView mode={mode} accounts={accounts} onReview={onOpenReview} />
+        </TabsContent>
+      </Tabs>
       {detailPosition && (
         <MarketDetailDialog position={detailPosition} onClose={() => setDetailPosition(null)} />
       )}

@@ -909,8 +909,7 @@ td span {
 }
 
 .form-card,
-.upload-bar,
-.onboarding {
+.upload-bar {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-container);
   background: var(--color-surface-1);
@@ -1155,93 +1154,6 @@ textarea[data-slot='input-group-control']:focus-visible {
 .management {
   margin-top: 24px;
   border-top: 1px solid var(--color-border);
-}
-
-.onboarding {
-  margin: var(--space-module) 0 var(--space-group);
-  padding: var(--space-card);
-}
-
-.onboarding .panel-heading {
-  padding: 0 0 var(--space-group);
-}
-
-.onboarding .panel-heading h2 {
-  font-size: 19px;
-}
-
-.onboarding-progress {
-  margin: var(--space-text) 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.onboarding-steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-border);
-  list-style: none;
-  overflow: hidden;
-}
-
-.onboarding-steps li {
-  min-height: 160px;
-  padding: var(--space-group);
-  background: var(--color-surface-1);
-}
-
-.onboarding-steps li.complete {
-  background: var(--color-surface-2);
-}
-
-.onboarding-steps li.current {
-  box-shadow: inset 0 2px var(--color-border-strong);
-}
-
-.onboarding-steps li > div {
-  margin-top: var(--space-text);
-}
-
-.onboarding-steps strong {
-  display: block;
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.onboarding-steps p {
-  min-height: 40px;
-  margin: var(--space-text) 0 var(--space-group);
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.onboarding-index {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.onboarding-steps li.current .onboarding-index {
-  border-color: var(--color-text-primary);
-  color: var(--color-text-primary);
-  background: var(--color-surface-2);
-}
-
-.onboarding .form-actions {
-  flex-wrap: wrap;
 }
 
 .metrics + .panel {
@@ -1528,8 +1440,6 @@ textarea[data-slot='input-group-control']:focus-visible {
   .form-card,
   .data-state-banner,
   .detail-panel,
-  .onboarding,
-  .onboarding-steps li,
   .module-grid div {
     color: CanvasText;
     background: Canvas;
@@ -1615,10 +1525,6 @@ textarea[data-slot='input-group-control']:focus-visible {
 
   .management-grid {
     grid-template-columns: 1fr;
-  }
-
-  .onboarding-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .review-layout {
@@ -1721,22 +1627,6 @@ textarea[data-slot='input-group-control']:focus-visible {
 
   .upload-bar {
     grid-template-columns: 1fr;
-  }
-
-  .onboarding {
-    padding: var(--space-group);
-  }
-
-  .onboarding-steps {
-    grid-template-columns: 1fr;
-  }
-
-  .onboarding-steps li {
-    min-height: 0;
-  }
-
-  .onboarding-steps p {
-    min-height: 0;
   }
 
   h1,

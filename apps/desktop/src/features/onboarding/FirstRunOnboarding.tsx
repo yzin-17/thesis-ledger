@@ -34,13 +34,29 @@ function OnboardingStep({
   actions: ReactNode;
 }) {
   return (
-    <li className={cn(complete && 'complete', current && 'current')}>
-      <span className="onboarding-index" aria-hidden="true">
+    <li
+      className={cn(
+        'min-h-40 bg-card p-4 forced-colors:bg-[Canvas] forced-colors:text-[CanvasText] forced-colors:border-[ButtonText]',
+        'max-[520px]:min-h-0',
+        complete && 'bg-muted',
+        current && 'shadow-[inset_0_2px_var(--color-border-strong)]',
+      )}
+    >
+      <span
+        className={cn(
+          'grid size-7 place-items-center rounded-full border border-input text-xs font-bold text-secondary-foreground',
+          complete && 'bg-muted',
+          current && 'border-foreground bg-muted text-foreground',
+        )}
+        aria-hidden="true"
+      >
         {complete ? '✓' : number}
       </span>
-      <div>
-        <strong>{title}</strong>
-        <p>{description}</p>
+      <div className="mt-2">
+        <strong className="block text-sm font-[650] text-foreground">{title}</strong>
+        <p className="mt-2 mb-4 min-h-10 max-[520px]:min-h-0 text-xs leading-[1.55] text-secondary-foreground">
+          {description}
+        </p>
         {actions}
       </div>
     </li>
@@ -65,19 +81,26 @@ export function FirstRunOnboarding({
 
   return (
     <section
-      className="onboarding"
+      className="mb-4 rounded-md border bg-card p-6 max-[520px]:p-4 forced-colors:bg-[Canvas] forced-colors:text-[CanvasText] forced-colors:border-[ButtonText]"
       aria-labelledby="onboarding-title"
       data-onboarding-step={currentStep}
     >
-      <div className="panel-heading">
-        <p className="kicker">First Run</p>
-        <h2 id="onboarding-title">四步完成第一次闭环</h2>
-        <p>
+      <div className="pb-4">
+        <p className="mb-2 text-[11px] leading-[1.3] font-[650] tracking-[0.14em] uppercase text-muted-foreground">
+          First Run
+        </p>
+        <h2
+          id="onboarding-title"
+          className="text-[19px] leading-[1.3] font-semibold tracking-[-0.015em]"
+        >
+          四步完成第一次闭环
+        </h2>
+        <p className="mt-2 text-[13px] leading-[1.5] text-muted-foreground">
           按顺序完成账户、持仓、数据源与通知、风险提醒配置。自动化任务可以稍后单独设置；敏感凭证由服务端安全保存，页面不会显示。
         </p>
-        <p className="onboarding-progress">当前步骤 {currentStep} / 4</p>
+        <p className="mt-2 text-xs text-muted-foreground">当前步骤 {currentStep} / 4</p>
       </div>
-      <ol className="onboarding-steps">
+      <ol className="grid grid-cols-4 gap-px overflow-hidden rounded-md border bg-border max-[1024px]:grid-cols-2 max-[520px]:grid-cols-1">
         <OnboardingStep
           number={1}
           complete={hasAccount}
@@ -110,25 +133,14 @@ export function FirstRunOnboarding({
               : '当前支持手动录入；截图导入暂未开放。'
           }
           actions={
-            <div className="form-actions">
-              <Button
-                className="secondary"
-                type="button"
-                variant="outline"
-                onClick={() => onNavigate('position-entry', { step: 'position' })}
-              >
-                手动录入
-              </Button>
-              <Button
-                className="secondary"
-                type="button"
-                variant="outline"
-                disabled
-                onClick={() => onNavigate('position-entry', { step: 'screenshot' })}
-              >
-                截图导入（暂未开放）
-              </Button>
-            </div>
+            <Button
+              className="secondary"
+              type="button"
+              variant="outline"
+              onClick={() => onNavigate('position-entry', { step: 'position' })}
+            >
+              资产录入
+            </Button>
           }
         />
         <OnboardingStep
