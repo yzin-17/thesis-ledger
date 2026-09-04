@@ -19,7 +19,6 @@ const message: NotificationMessage = {
 };
 
 const policy: NotificationPolicy = {
-  channels: { warning: ['feishu'], critical: ['feishu'] },
   cooldownMinutes: 30,
   maxAttempts: 3,
   criticalBypassCooldown: true,
@@ -42,6 +41,19 @@ const redisFixture = () => {
     },
   };
 };
+
+/** 已配置且启用、带有效飞书 webhook 的 notification provider。 */
+const providerConfigFixture = (webhook = providerWebhook) => ({
+  findMany: vi.fn(async () => [
+    {
+      name: 'feishu',
+      type: 'notification',
+      enabled: true,
+      priority: 1,
+      encryptedCredentials: encryptProviderCredential(webhook),
+    },
+  ]),
+});
 
 const riskRule = {
   kind: 'price-below',
@@ -108,6 +120,7 @@ describe('Notification cooldown', () => {
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
     const prisma = {
       notificationDelivery: { upsert },
+      providerConfig: providerConfigFixture(),
     };
     const service = new NotificationService(
       prisma as never,
@@ -148,6 +161,7 @@ describe('Notification cooldown', () => {
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
     const prisma = {
       notificationDelivery: { upsert },
+      providerConfig: providerConfigFixture(),
     };
     const service = new NotificationService(
       prisma as never,
@@ -174,6 +188,7 @@ describe('Notification cooldown', () => {
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
     const prisma = {
       notificationDelivery: { upsert },
+      providerConfig: providerConfigFixture(),
     };
     const service = new NotificationService(
       prisma as never,
@@ -194,6 +209,110 @@ describe('Notification cooldown', () => {
 
     expect(upsert).toHaveBeenCalledTimes(2);
     expect(redis.client.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('Notification provider gating', () => {
+  const enqueueWith = async (providerConfig: unknown) => {
+    const redis = redisFixture();
+    const upsert = vi.fn(async ({ create }: { create: object }) => create);
+    const service = new NotificationService(
+      { notificationDelivery: { upsert }, providerConfig } as never,
+      redis as never,
+      { record: vi.fn() } as never,
+    );
+    const result = await service.enqueue(
+      riskSubject('event-a'),
+      riskMessage('trace-event-a'),
+      policy,
+    );
+    return { result, upsert, redis };
+  };
+
+  it('没有配置通知 provider 时直接跳过入队，不占用 cooldown', async () => {
+    const { result, upsert, redis } = await enqueueWith({ findMany: vi.fn(async () => []) });
+
+    expect(result).toEqual([]);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(redis.client.set).not.toHaveBeenCalled();
+  });
+
+  it('provider 凭据为空时同样跳过入队', async () => {
+    const { result, upsert } = await enqueueWith(providerConfigFixture('   '));
+
+    expect(result).toEqual([]);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('provider 被禁用时不入队', async () => {
+    const findMany = vi.fn(async () => []);
+    const { result, upsert } = await enqueueWith({
+      findMany,
+    });
+
+    expect(result).toEqual([]);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(findMany).toHaveBeenCalledWith({
+      where: { type: 'notification', enabled: true },
+      orderBy: [{ priority: 'asc' }, { name: 'asc' }],
+    });
+  });
+
+  it('没有投递适配器的 Provider 直接跳过，不产生必然失败的投递', async () => {
+    const { result, upsert } = await enqueueWith({
+      findMany: vi.fn(async () => [
+        {
+          name: 'email',
+          type: 'notification',
+          enabled: true,
+          priority: 1,
+          encryptedCredentials: encryptProviderCredential('secret'),
+        },
+      ]),
+    });
+
+    expect(result).toEqual([]);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('渠道可用时正常入队', async () => {
+    const { result, upsert } = await enqueueWith(providerConfigFixture());
+
+    expect(result).toHaveLength(1);
+    expect(upsert).toHaveBeenCalledOnce();
+  });
+
+  it('同一渠道按 Provider 优先级选择一个配置并公开无凭证路由摘要', async () => {
+    const providerConfig = {
+      findMany: vi.fn(async () => [
+        {
+          name: 'lark-webhook',
+          type: 'notification',
+          enabled: true,
+          priority: 1,
+          encryptedCredentials: encryptProviderCredential(providerWebhook),
+        },
+        {
+          name: 'feishu',
+          type: 'notification',
+          enabled: true,
+          priority: 2,
+          encryptedCredentials: encryptProviderCredential(providerWebhook),
+        },
+      ]),
+    };
+    const { result, upsert } = await enqueueWith(providerConfig);
+    const service = new NotificationService({ providerConfig } as never, {} as never, {} as never);
+
+    expect(result).toHaveLength(1);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ channel: 'feishu', provider: 'lark-webhook' }),
+      }),
+    );
+    await expect(service.routing()).resolves.toEqual({
+      routes: [{ channel: 'feishu', provider: 'lark-webhook' }],
+    });
   });
 });
 

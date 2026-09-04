@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { RiskEventTable, RiskNotificationTable } from '../src/features/risk/RiskSections.js';
 import { RiskRuleWorkbench } from '../src/features/risk/RiskRuleWorkbench.js';
@@ -233,6 +233,9 @@ describe('风险中心 AB 交互契约', () => {
     const html = renderToStaticMarkup(
       <RiskNotificationTable
         loadState="ready"
+        routes={[{ channel: 'feishu', provider: 'lark-webhook' }]}
+        routingState="ready"
+        onConfigure={vi.fn()}
         deliveries={[
           {
             id: 'delivery-1',
@@ -246,12 +249,44 @@ describe('风险中心 AB 交互契约', () => {
             lastError: null,
           },
         ]}
-      />
+      />,
     );
 
     expect(html).toContain('飞书 · 风险事件');
+    expect(html).toContain('lark-webhook（飞书）');
     expect(html).toContain('主题 event-1');
     expect(html).not.toContain('事件 undefined');
+  });
+
+  it('没有通知 Provider 时说明不会外发并提供配置入口', () => {
+    const html = renderToStaticMarkup(
+      <RiskNotificationTable
+        loadState="ready"
+        deliveries={[]}
+        routes={[]}
+        routingState="ready"
+        onConfigure={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('尚未配置可用的通知 Provider');
+    expect(html).toContain('风险事件仍会保留，但不会发送外部通知');
+    expect(html).toContain('配置通知 Provider');
+  });
+
+  it('路由读取失败时不误报为未配置', () => {
+    const html = renderToStaticMarkup(
+      <RiskNotificationTable
+        loadState="ready"
+        deliveries={[]}
+        routes={[]}
+        routingState="error"
+        onConfigure={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('通知 Provider 状态暂不可用');
+    expect(html).not.toContain('尚未配置可用的通知 Provider');
   });
 
   it('人工测试结果按规则版本匹配，版本变更后不复用旧结果', () => {

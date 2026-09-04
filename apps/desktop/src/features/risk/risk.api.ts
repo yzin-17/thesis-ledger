@@ -2,6 +2,7 @@ import { requestDesktopJson, type DesktopRequestClient } from '../shared/request
 import type {
   CreateRiskRuleInput,
   NotificationRecord,
+  NotificationRoutingStatus,
   PortfolioMode,
   RiskAuditRecord,
   RiskContext,
@@ -24,6 +25,9 @@ export const fetchRiskEvents = (mode: PortfolioMode, client?: DesktopRequestClie
 
 export const fetchRiskNotifications = (client?: DesktopRequestClient) =>
   requestDesktopJson<NotificationRecord[]>('/notifications', noStore, client);
+
+export const fetchNotificationRouting = (client?: DesktopRequestClient) =>
+  requestDesktopJson<NotificationRoutingStatus>('/notifications/routing', noStore, client);
 
 export const createRiskRule = (input: CreateRiskRuleInput, client?: DesktopRequestClient) =>
   requestDesktopJson<RiskRuleRecord>(

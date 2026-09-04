@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildDailyDigest,
-  channelsForSeverity,
   classifyDeliveryError,
   isQuietTime,
   NotificationService,
@@ -9,7 +8,6 @@ import {
 
 describe('通知策略', () => {
   const policy = {
-    channels: { warning: ['feishu'] },
     quietHours: { start: '22:00', end: '08:00', timezone: 'Asia/Shanghai' },
     cooldownMinutes: 30,
     maxAttempts: 3,
@@ -17,14 +15,6 @@ describe('通知策略', () => {
   it('跨午夜静默时段有效', () =>
     expect(isQuietTime(new Date('2025-01-01T15:00:00Z'), policy)).toBe(true));
   it('白天不静默', () => expect(isQuietTime(new Date('2025-01-01T04:00:00Z'), policy)).toBe(false));
-  it.each(['info', 'warning', 'error', 'critical'] as const)('路由 %s 严重级别', (severity) =>
-    expect(
-      channelsForSeverity(
-        { ...policy, channels: { warning: ['fallback'], [severity]: [severity] } },
-        severity,
-      ),
-    ).toEqual([severity]),
-  );
   it('区分永久错误、重试和最终失败', () => {
     expect(classifyDeliveryError('feishu_http_400:bad', 1, 3).status).toBe('failed');
     expect(classifyDeliveryError('feishu_http_500:oops', 1, 3).status).toBe('retrying');

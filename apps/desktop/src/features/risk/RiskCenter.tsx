@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
 import { RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router';
 
 import type { Account, Portfolio, PortfolioMode } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
@@ -17,7 +18,7 @@ import {
   useScanRiskMutation,
   useTestRiskRuleMutation,
 } from './risk.mutations.js';
-import { useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
+import { useNotificationRoutingQuery, useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
 import { RiskOverview } from './RiskOverview.js';
 import { RiskRuleWorkbench } from './RiskRuleWorkbench.js';
 import { RiskAuditDialog, RiskEventTable, RiskNotificationTable } from './RiskSections.js';
@@ -50,8 +51,10 @@ export function RiskCenter({
   const [auditRule, setAuditRule] = useState<RiskRuleRecord | null>(null);
   const [auditVisible, setAuditVisible] = useState(false);
   const [testRecords, setTestRecords] = useState<Record<string, RiskTestRecord>>({});
+  const navigate = useNavigate();
   const toastManager = useToastManager();
   const riskQueries = useRiskQueries(mode);
+  const notificationRoutingQuery = useNotificationRoutingQuery();
   const auditQuery = useRiskAuditQuery(auditVisible ? (auditRule?.id ?? null) : null);
   const createRuleMutation = useCreateRiskRuleMutation();
   const patchRuleMutation = usePatchRiskRuleMutation();
@@ -61,6 +64,9 @@ export function RiskCenter({
   const rules = riskQueries.rules.data ?? [];
   const events = riskQueries.events.data ?? [];
   const deliveries = riskQueries.notifications.data ?? [];
+  let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
+  if (notificationRoutingQuery.isError) notificationRoutingState = 'error';
+  else if (notificationRoutingQuery.isPending) notificationRoutingState = 'loading';
   const hasRiskData = Object.values(riskQueries).some((query) => query.data !== undefined);
   const loadState = resolveLoadState(
     Object.values(riskQueries),
@@ -94,6 +100,9 @@ export function RiskCenter({
     refetchEvents: riskQueries.events.refetch,
     refetchNotifications: riskQueries.notifications.refetch,
   });
+  const refreshRisk = async () => {
+    await Promise.all([actions.loadRisk(), notificationRoutingQuery.refetch()]);
+  };
 
   useEffect(() => {
     if (!auditVisible) {
@@ -204,7 +213,7 @@ export function RiskCenter({
             variant="outline"
             className="secondary"
             disabled={busyAction !== null}
-            onClick={() => void actions.loadRisk()}
+            onClick={() => void refreshRisk()}
           >
             <RefreshCw data-icon="inline-start" aria-hidden="true" />
             刷新
@@ -220,7 +229,7 @@ export function RiskCenter({
 
       {/* 规则、事件、通知全部为空时，指标卡和表格的 0 值已表达状态，不再叠加“暂无数据”横幅。 */}
       {loadState === 'empty' ? null : (
-        <DataStateBanner state={loadState} onRetry={() => void actions.loadRisk()} />
+        <DataStateBanner state={loadState} onRetry={() => void refreshRisk()} />
       )}
 
       <Tabs value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
@@ -242,7 +251,7 @@ export function RiskCenter({
             lastUpdatedAt={riskUpdatedAt}
             scanning={busyAction === 'scan-risk'}
             onScan={() => void actions.scanRisk()}
-            onRefresh={() => void actions.loadRisk()}
+            onRefresh={() => void refreshRisk()}
             onSelectTab={selectTab}
           />
         </TabsContent>
@@ -275,6 +284,9 @@ export function RiskCenter({
             loadState={loadState}
             deliveries={deliveries}
             statusFilter={notificationStatusFilter}
+            routes={notificationRoutingQuery.data?.routes ?? []}
+            routingState={notificationRoutingState}
+            onConfigure={() => void navigate('/providers')}
           />
         </TabsContent>
       </Tabs>

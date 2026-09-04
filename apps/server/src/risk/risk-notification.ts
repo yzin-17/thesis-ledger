@@ -6,12 +6,6 @@ import type {
 } from '../notifications/notification.service.js';
 
 const notificationPolicy = {
-  channels: {
-    info: ['feishu'],
-    warning: ['feishu'],
-    error: ['feishu'],
-    critical: ['feishu'],
-  },
   cooldownMinutes: 30,
   maxAttempts: 3,
   criticalBypassCooldown: true,

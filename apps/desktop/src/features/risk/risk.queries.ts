@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   fetchRiskAudit,
   fetchRiskEvents,
+  fetchNotificationRouting,
   fetchRiskNotifications,
   fetchRiskRules,
 } from './risk.api.js';
@@ -13,6 +14,7 @@ export const riskKeys = {
   rules: () => [...riskKeys.root, 'rules'] as const,
   events: (mode: PortfolioMode) => [...riskKeys.root, 'events', mode] as const,
   notifications: () => [...riskKeys.root, 'notifications'] as const,
+  notificationRouting: () => [...riskKeys.root, 'notification-routing'] as const,
   audit: (ruleId: string) => [...riskKeys.root, 'audit', ruleId] as const,
 };
 
@@ -37,5 +39,11 @@ export const useRiskQueries = (mode: PortfolioMode) => {
   });
   return { rules, events, notifications };
 };
+
+export const useNotificationRoutingQuery = () =>
+  useQuery({
+    queryKey: riskKeys.notificationRouting(),
+    queryFn: () => fetchNotificationRouting(),
+  });
 
 export const useRiskAuditQuery = (ruleId: string | null) => useQuery(riskAuditQueryOptions(ruleId));

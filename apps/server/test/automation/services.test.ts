@@ -39,9 +39,9 @@ describe('Automation 工作流', () => {
   });
   it('日报、开盘扫描和健康告警保留数据限制', () => {
     const risk = dailyRiskSummary([{ severity: 'warning', triggered: true, status: 'active' }]);
-    expect(dailyDigest({ date: '2025-01-03', events: [], risk, attention: [] })).toMatchObject({
-      channels: ['feishu'],
-    });
+    expect(dailyDigest({ date: '2025-01-03', events: [], risk, attention: [] })).not.toHaveProperty(
+      'channels',
+    );
     expect(
       openingScan({
         asOf: '2025-01-03T01:30:00Z',

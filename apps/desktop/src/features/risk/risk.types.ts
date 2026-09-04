@@ -87,6 +87,15 @@ export interface NotificationRecord {
   lastError: string | null;
 }
 
+export interface NotificationRouteRecord {
+  channel: string;
+  provider: string;
+}
+
+export interface NotificationRoutingStatus {
+  routes: NotificationRouteRecord[];
+}
+
 export interface RiskAuditRecord {
   id: string;
   action: string;

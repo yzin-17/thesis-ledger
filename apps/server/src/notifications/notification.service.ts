@@ -12,11 +12,15 @@ import {
 import { assertAllowedFeishuWebhookUrl } from '../providers/feishu-webhook-security.js';
 
 export interface NotificationPolicy {
-  channels: Partial<Record<Severity, string[]>>;
   quietHours?: { start: string; end: string; timezone: string };
   cooldownMinutes: number;
   maxAttempts: number;
   criticalBypassCooldown?: boolean;
+}
+
+export interface NotificationRoute {
+  channel: string;
+  provider: string;
 }
 
 export interface NotificationMessage {
@@ -46,6 +50,8 @@ export interface NotificationProvider {
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DELIVERY_CLAIM_TTL_MS = 15_000;
+/** 当前唯一实现投递器的渠道；其它渠道在入队阶段就会被跳过，不再产生必然失败的投递记录。 */
+const SUPPORTED_CHANNEL = 'feishu';
 const severityValues = new Set<Severity>(['info', 'warning', 'error', 'critical']);
 
 const storedMessage = (value: unknown): NotificationMessage => {
@@ -69,9 +75,6 @@ const storedMessage = (value: unknown): NotificationMessage => {
     traceId: message.traceId,
   };
 };
-
-export const channelsForSeverity = (policy: NotificationPolicy, severity: Severity) =>
-  policy.channels[severity] ?? policy.channels.warning ?? [];
 
 export const classifyDeliveryError = (detail: string, attempt: number, maxAttempts: number) => {
   const status = Number(detail.match(/_http_(\d{3})/)?.[1]);
@@ -216,7 +219,8 @@ export class NotificationService {
     policy: NotificationPolicy,
     now = new Date(),
   ) {
-    const channels = channelsForSeverity(policy, message.severity);
+    const routes = await this.configuredRoutes();
+    if (routes.length === 0) return [];
     const messageSnapshot: Prisma.InputJsonValue = {
       title: message.title,
       body: message.body,
@@ -232,7 +236,8 @@ export class NotificationService {
       message.severity === 'critical' && policy.criticalBypassCooldown === true;
 
     return Promise.all(
-      channels.map(async (channel) => {
+      routes.map(async (route) => {
+        const { channel } = route;
         const deliveryDedupKey = `${fingerprint}:${subject.id}`;
         const cooldownKey = redisKey('cache', `notification:${channel}:${fingerprint}`);
         const reservationToken = crypto.randomUUID();
@@ -256,7 +261,7 @@ export class NotificationService {
               message: messageSnapshot,
               severity: message.severity,
               channel,
-              provider: channel,
+              provider: route.provider,
               status: 'pending',
               dedupKey: deliveryDedupKey,
               scheduledAt,
@@ -340,6 +345,13 @@ export class NotificationService {
     return results;
   }
 
+  async routing(): Promise<{ routes: NotificationRoute[] }> {
+    const routes = await this.configuredRoutes();
+    return {
+      routes: routes.map(({ channel, provider }) => ({ channel, provider })),
+    };
+  }
+
   async dispatchOne(id: string, now = new Date(), messageOverride?: NotificationMessage) {
     const lockKey = redisKey('lock', `notification-delivery:${id}`);
     const token = crypto.randomUUID();
@@ -355,7 +367,7 @@ export class NotificationService {
         return { skipped: true, reason: '通知当前不可投递' } as const;
 
       try {
-        const provider = await this.resolveProvider(delivery.channel);
+        const provider = await this.resolveProvider(delivery.channel, delivery.provider);
         const message = messageOverride ?? this.messageForDelivery(delivery);
         const result = await this.deliver(id, message, provider);
         return { skipped: false, delivery: result } as const;
@@ -370,32 +382,56 @@ export class NotificationService {
     }
   }
 
-  private async resolveProvider(channel: string): Promise<NotificationProvider> {
-    if (normalizeProviderName(channel) !== 'feishu')
-      throw new Error(`notification_provider_unconfigured:${channel}`);
-
+  /** Provider 配置是通知路由的唯一来源；同一渠道按优先级只选择一个可投递配置。 */
+  private async configuredRoutes() {
     const configs = await this.prisma.providerConfig.findMany({
       where: { type: 'notification', enabled: true },
       orderBy: [{ priority: 'asc' }, { name: 'asc' }],
     });
-    const config = configs.find(
+    const routedChannels = new Set<string>();
+    const routes: Array<NotificationRoute & ReturnType<typeof normalizeProviderCredential>> = [];
+    for (const config of configs) {
+      const channel = normalizeProviderName(config.name);
+      if (
+        channel !== SUPPORTED_CHANNEL ||
+        routedChannels.has(channel) ||
+        !config.encryptedCredentials
+      )
+        continue;
+      try {
+        const credential = normalizeProviderCredential(config.encryptedCredentials);
+        if (!credential.credential.trim()) continue;
+        routedChannels.add(channel);
+        routes.push({ channel, provider: config.name, ...credential });
+      } catch {
+        // 损坏或无法解密的凭证不构成可投递路由，也不向调用方泄露凭证错误细节。
+      }
+    }
+    return routes;
+  }
+
+  private async resolveProvider(
+    channel: string,
+    providerName: string,
+  ): Promise<NotificationProvider> {
+    if (normalizeProviderName(channel) !== SUPPORTED_CHANNEL)
+      throw new Error(`notification_provider_unconfigured:${channel}`);
+
+    const route = (await this.configuredRoutes()).find(
       (candidate) =>
-        normalizeProviderName(candidate.name) === 'feishu' &&
-        Boolean(candidate.encryptedCredentials),
+        candidate.channel === normalizeProviderName(channel) && candidate.provider === providerName,
     );
-    if (config?.encryptedCredentials) {
-      const normalized = normalizeProviderCredential(config.encryptedCredentials);
-      if (normalized.needsRotation) {
+    if (route) {
+      if (route.needsRotation) {
         await this.prisma.providerConfig.update({
-          where: { name: config.name },
-          data: { encryptedCredentials: normalized.payload },
+          where: { name: route.provider },
+          data: { encryptedCredentials: route.payload },
         });
       }
-      const webhook = normalized.credential.trim();
-      if (webhook) return new FeishuWebhookProvider(webhook, config.name);
+      return new FeishuWebhookProvider(route.credential.trim(), route.provider);
     }
 
-    throw new Error('notification_provider_unconfigured:feishu');
+    throw new Error(`notification_provider_unconfigured:${providerName}`);
   }
 
   private messageForDelivery(delivery: { message: unknown }): NotificationMessage {

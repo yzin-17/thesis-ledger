@@ -17,6 +17,11 @@ export class NotificationController {
     return this.notifications.list(status);
   }
 
+  @Get('routing')
+  routing() {
+    return this.notifications.routing();
+  }
+
   @Post(':id/deliver/feishu')
   deliver(@Param('id') id: string, @Body() input: unknown) {
     return this.notifications.dispatchOne(

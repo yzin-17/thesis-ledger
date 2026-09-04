@@ -256,14 +256,15 @@ export class RecurringCashDepositService {
       periods,
       traceId: crypto.randomUUID(),
     });
-    let notificationQueued = true;
+    let notificationQueued = false;
     try {
-      await this.notifications.enqueue(
+      const deliveries = await this.notifications.enqueue(
         notification.subject,
         notification.message,
         recurringCashDepositNotificationPolicy,
         now,
       );
+      notificationQueued = deliveries.some((delivery) => delivery !== null);
     } catch {
       notificationQueued = false;
     }

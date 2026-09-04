@@ -222,7 +222,6 @@ describe('V0.1 核心 E2E', () => {
         traceId: expect.any(String),
       }),
       expect.objectContaining({
-        channels: expect.objectContaining({ warning: ['feishu'] }),
         cooldownMinutes: 30,
         maxAttempts: 3,
         criticalBypassCooldown: true,

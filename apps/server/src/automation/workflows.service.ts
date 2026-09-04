@@ -99,7 +99,6 @@ export const dailyDigest = (input: {
   eventCount: input.events.length,
   risk: input.risk,
   attention: [...input.attention],
-  channels: ['feishu'],
 });
 
 export const investmentDailyReport = (input: {

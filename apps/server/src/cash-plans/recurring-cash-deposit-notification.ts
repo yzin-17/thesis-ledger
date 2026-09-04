@@ -5,12 +5,6 @@ import type {
 } from '../notifications/notification.service.js';
 
 export const recurringCashDepositNotificationPolicy: NotificationPolicy = {
-  channels: {
-    info: ['feishu'],
-    warning: ['feishu'],
-    error: ['feishu'],
-    critical: ['feishu'],
-  },
   cooldownMinutes: 1,
   maxAttempts: 3,
 };

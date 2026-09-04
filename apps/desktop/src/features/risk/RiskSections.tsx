@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { BellOff, CircleAlert } from 'lucide-react';
 import {
   Dialog,
   DialogClose,
@@ -31,6 +33,7 @@ import type {
   RiskEventRecord,
   RiskRuleRecord,
   NotificationRecord,
+  NotificationRouteRecord,
 } from './risk.types.js';
 
 export function RiskEventTable({
@@ -130,15 +133,30 @@ export function RiskNotificationTable({
   loadState,
   deliveries,
   statusFilter,
+  routes,
+  routingState,
+  onConfigure,
 }: {
   loadState: LoadState;
   deliveries: NotificationRecord[];
   statusFilter?: string | null;
+  routes: NotificationRouteRecord[];
+  routingState: 'loading' | 'ready' | 'error';
+  onConfigure: () => void;
 }) {
   const visibleDeliveries = statusFilter
     ? deliveries.filter((delivery) => delivery.status === statusFilter)
     : deliveries;
   const empty = isDataLoaded(loadState) && visibleDeliveries.length === 0;
+  let routingDescription = '正在确认通知 Provider…';
+  if (routingState === 'error') routingDescription = '暂时无法确认当前通知 Provider。';
+  else if (routes.length > 0) {
+    routingDescription = `当前按 Provider 配置投递到：${routes
+      .map((route) => `${route.provider}（${riskChannelLabel(route.channel)}）`)
+      .join('、')}。`;
+  } else if (routingState === 'ready') {
+    routingDescription = '当前没有可投递的通知 Provider。';
+  }
 
   return (
     <section className="panel mt-0">
@@ -147,9 +165,28 @@ export function RiskNotificationTable({
         <p>
           {statusFilter
             ? `当前筛选：${riskStatusLabel(statusFilter)}。`
-            : '通知失败不会回滚已写入的风险事件。'}
+            : `${routingDescription} 通知失败不会回滚已写入的风险事件。`}
         </p>
       </div>
+      {routingState === 'ready' && routes.length === 0 ? (
+        <Alert className="mb-4">
+          <BellOff aria-hidden="true" />
+          <AlertTitle>尚未配置可用的通知 Provider</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-2">
+            <span>风险事件仍会保留，但不会发送外部通知。</span>
+            <Button type="button" size="sm" variant="outline" onClick={onConfigure}>
+              配置通知 Provider
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {routingState === 'error' ? (
+        <Alert className="mb-4">
+          <CircleAlert aria-hidden="true" />
+          <AlertTitle>通知 Provider 状态暂不可用</AlertTitle>
+          <AlertDescription>无法确认当前投递去向，请刷新后重试。</AlertDescription>
+        </Alert>
+      ) : null}
       <div className="table-wrap">
         <table>
           <thead>
@@ -169,7 +206,8 @@ export function RiskNotificationTable({
                 <tr key={delivery.id}>
                   <td>
                     <strong>
-                      {riskChannelLabel(delivery.channel)} · {riskSubjectLabel(delivery.subjectType)}
+                      {riskChannelLabel(delivery.channel)} ·{' '}
+                      {riskSubjectLabel(delivery.subjectType)}
                     </strong>
                     <span>{delivery.lastError ?? `主题 ${delivery.subjectId}`}</span>
                   </td>

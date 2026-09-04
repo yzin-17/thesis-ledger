@@ -223,7 +223,7 @@ const createFixture = () => {
     ),
   };
   const notifications = {
-    enqueue: vi.fn(async () => []),
+    enqueue: vi.fn(async (): Promise<Array<{ id: string } | null>> => []),
   };
   return {
     now,
@@ -306,6 +306,32 @@ describe('定期现金入账计划', () => {
       results: [{ createdCount: 1, notificationQueued: false }],
     });
     expect(fixture.occurrences.size).toBe(1);
+  });
+
+  it('没有可用通知 Provider 时不把空入队结果报告为已排队', async () => {
+    const fixture = createFixture();
+    await fixture.service.create(createPlanInput());
+
+    await expect(
+      fixture.service.materializeDue(new Date('2026-07-31T02:00:00.000Z')),
+    ).resolves.toMatchObject({
+      planCount: 1,
+      results: [{ createdCount: 1, notificationQueued: false }],
+    });
+    expect(fixture.occurrences.size).toBe(1);
+  });
+
+  it('实际产生通知投递后才报告已排队', async () => {
+    const fixture = createFixture();
+    await fixture.service.create(createPlanInput());
+    fixture.notifications.enqueue.mockResolvedValueOnce([{ id: 'delivery-1' }]);
+
+    await expect(
+      fixture.service.materializeDue(new Date('2026-07-31T02:00:00.000Z')),
+    ).resolves.toMatchObject({
+      planCount: 1,
+      results: [{ createdCount: 1, notificationQueued: true }],
+    });
   });
 
   it('确认实例与现金 Ledger 写入共享事务 seam，并支持幂等确认', async () => {
