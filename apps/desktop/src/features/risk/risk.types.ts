@@ -75,6 +75,12 @@ export interface RiskTestRecord {
   testedAt: string;
 }
 
+export interface RiskScanResult {
+  traceId: string;
+  scanId: string;
+  results: Array<{ ruleId: string; eventId?: string; error?: string }>;
+}
+
 export interface NotificationRecord {
   id: string;
   subjectId: string;
@@ -95,6 +101,8 @@ export interface NotificationRouteRecord {
 export interface NotificationRoutingStatus {
   routes: NotificationRouteRecord[];
 }
+
+export type NotificationAvailability = 'available' | 'unconfigured' | 'unknown';
 
 export interface RiskAuditRecord {
   id: string;

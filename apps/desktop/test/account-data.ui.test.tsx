@@ -339,7 +339,8 @@ describe('账户数据页面契约', () => {
     expect(positionMarkup).toContain('sticky right-0');
     expect(positionMarkup).toContain('bg-background');
     expect(positionMarkup).toContain('w-40 min-w-40');
-    expect(positionMarkup).toContain('flex flex-wrap justify-end gap-1');
+    // 操作列改为单行排布：按钮带 shrink-0 + whitespace-nowrap，列宽按内容自适应，不再折行。
+    expect(positionMarkup).toContain('flex gap-1');
     expect(positionMarkup).toContain('h-8');
     expect(positionMarkup).toContain('修改快照');
     expect(positionMarkup).toContain('移除快照');

@@ -29,7 +29,7 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
     <ToastPrimitive.Viewport
       data-slot="toast-viewport"
       className={cn(
-        'pointer-events-none fixed top-4 right-4 layer-toast flex max-h-[calc(100dvh-2rem)] w-[min(360px,calc(100vw-2rem))] flex-col gap-3 overflow-y-auto rounded-2xl outline-none',
+        'pointer-events-none fixed top-4 right-4 layer-toast flex max-h-[calc(100dvh-2rem)] w-[min(360px,calc(100vw-2rem))] flex-col gap-3 overflow-y-auto overflow-x-hidden rounded-2xl outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className,
       )}
       {...props}
@@ -65,7 +65,7 @@ function ToastTitle({ className, ...props }: ToastPrimitive.Title.Props) {
   return (
     <ToastPrimitive.Title
       data-slot="toast-title"
-      className={cn('text-sm font-medium', className)}
+      className={cn('text-sm font-medium break-words', className)}
       {...props}
     />
   );
@@ -75,7 +75,7 @@ function ToastDescription({ className, ...props }: ToastPrimitive.Description.Pr
   return (
     <ToastPrimitive.Description
       data-slot="toast-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-sm text-muted-foreground break-words', className)}
       {...props}
     />
   );

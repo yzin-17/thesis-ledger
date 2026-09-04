@@ -5,11 +5,11 @@ import type { Prisma } from '@prisma/client';
 import { normalizeProviderCredential } from '../platform/credential-security.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
+import { ProviderHealthService } from '../providers/provider-health.service.js';
 import {
-  normalizeProviderName,
-  ProviderHealthService,
-} from '../providers/provider-health.service.js';
-import { assertAllowedFeishuWebhookUrl } from '../providers/feishu-webhook-security.js';
+  assertAllowedFeishuWebhookUrl,
+  detectFeishuWebhookUrl,
+} from '../providers/feishu-webhook-security.js';
 
 export interface NotificationPolicy {
   quietHours?: { start: string; end: string; timezone: string };
@@ -382,7 +382,7 @@ export class NotificationService {
     }
   }
 
-  /** Provider 配置是通知路由的唯一来源；同一渠道按优先级只选择一个可投递配置。 */
+  /** Provider 配置是通知路由的唯一来源；渠道按凭证形态识别，同一渠道按优先级只选择一个可投递配置。 */
   private async configuredRoutes() {
     const configs = await this.prisma.providerConfig.findMany({
       where: { type: 'notification', enabled: true },
@@ -391,18 +391,13 @@ export class NotificationService {
     const routedChannels = new Set<string>();
     const routes: Array<NotificationRoute & ReturnType<typeof normalizeProviderCredential>> = [];
     for (const config of configs) {
-      const channel = normalizeProviderName(config.name);
-      if (
-        channel !== SUPPORTED_CHANNEL ||
-        routedChannels.has(channel) ||
-        !config.encryptedCredentials
-      )
-        continue;
+      if (routedChannels.has(SUPPORTED_CHANNEL) || !config.encryptedCredentials) continue;
       try {
         const credential = normalizeProviderCredential(config.encryptedCredentials);
-        if (!credential.credential.trim()) continue;
-        routedChannels.add(channel);
-        routes.push({ channel, provider: config.name, ...credential });
+        // 渠道只按凭证形态识别，与 Provider 名称无关；名称仅用于展示与按名解析。
+        if (!detectFeishuWebhookUrl(credential.credential.trim())) continue;
+        routedChannels.add(SUPPORTED_CHANNEL);
+        routes.push({ channel: SUPPORTED_CHANNEL, provider: config.name, ...credential });
       } catch {
         // 损坏或无法解密的凭证不构成可投递路由，也不向调用方泄露凭证错误细节。
       }
@@ -414,12 +409,11 @@ export class NotificationService {
     channel: string,
     providerName: string,
   ): Promise<NotificationProvider> {
-    if (normalizeProviderName(channel) !== SUPPORTED_CHANNEL)
+    if (channel !== SUPPORTED_CHANNEL)
       throw new Error(`notification_provider_unconfigured:${channel}`);
 
     const route = (await this.configuredRoutes()).find(
-      (candidate) =>
-        candidate.channel === normalizeProviderName(channel) && candidate.provider === providerName,
+      (candidate) => candidate.channel === channel && candidate.provider === providerName,
     );
     if (route) {
       if (route.needsRotation) {

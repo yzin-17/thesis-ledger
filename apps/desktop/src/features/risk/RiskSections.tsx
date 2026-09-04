@@ -34,7 +34,45 @@ import type {
   RiskRuleRecord,
   NotificationRecord,
   NotificationRouteRecord,
+  NotificationAvailability,
+  PortfolioMode,
 } from './risk.types.js';
+
+export function NotificationProviderNotice({
+  mode,
+  availability,
+  routingState,
+  onConfigure,
+}: {
+  mode: PortfolioMode;
+  availability: NotificationAvailability;
+  routingState: 'loading' | 'ready' | 'error';
+  onConfigure: () => void;
+}) {
+  // 路由仍在确认时不展示横幅，避免把加载中误报为“暂不可用”。
+  if (mode === 'shadow' || routingState === 'loading' || availability === 'available') return null;
+  if (availability === 'unknown') {
+    return (
+      <Alert className="mb-[var(--space-group)]">
+        <CircleAlert aria-hidden="true" />
+        <AlertTitle>通知 Provider 状态暂不可用</AlertTitle>
+        <AlertDescription>风险规则仍可执行，但暂时无法确认通知投递能力。</AlertDescription>
+      </Alert>
+    );
+  }
+  return (
+    <Alert className="mb-[var(--space-group)]">
+      <BellOff aria-hidden="true" />
+      <AlertTitle>尚未配置可用的通知 Provider</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-2">
+        <span>风险规则仍会执行并保留事件，但不会发送外部通知。</span>
+        <Button type="button" size="sm" variant="outline" onClick={onConfigure}>
+          配置通知 Provider
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 export function RiskEventTable({
   loadState,
@@ -135,14 +173,12 @@ export function RiskNotificationTable({
   statusFilter,
   routes,
   routingState,
-  onConfigure,
 }: {
   loadState: LoadState;
   deliveries: NotificationRecord[];
   statusFilter?: string | null;
   routes: NotificationRouteRecord[];
   routingState: 'loading' | 'ready' | 'error';
-  onConfigure: () => void;
 }) {
   const visibleDeliveries = statusFilter
     ? deliveries.filter((delivery) => delivery.status === statusFilter)
@@ -168,25 +204,6 @@ export function RiskNotificationTable({
             : `${routingDescription} 通知失败不会回滚已写入的风险事件。`}
         </p>
       </div>
-      {routingState === 'ready' && routes.length === 0 ? (
-        <Alert className="mb-4">
-          <BellOff aria-hidden="true" />
-          <AlertTitle>尚未配置可用的通知 Provider</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-2">
-            <span>风险事件仍会保留，但不会发送外部通知。</span>
-            <Button type="button" size="sm" variant="outline" onClick={onConfigure}>
-              配置通知 Provider
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {routingState === 'error' ? (
-        <Alert className="mb-4">
-          <CircleAlert aria-hidden="true" />
-          <AlertTitle>通知 Provider 状态暂不可用</AlertTitle>
-          <AlertDescription>无法确认当前投递去向，请刷新后重试。</AlertDescription>
-        </Alert>
-      ) : null}
       <div className="table-wrap">
         <table>
           <thead>

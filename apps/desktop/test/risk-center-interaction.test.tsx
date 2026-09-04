@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { RiskEventTable, RiskNotificationTable } from '../src/features/risk/RiskSections.js';
+import {
+  NotificationProviderNotice,
+  RiskEventTable,
+  RiskNotificationTable,
+} from '../src/features/risk/RiskSections.js';
 import { RiskRuleWorkbench } from '../src/features/risk/RiskRuleWorkbench.js';
 import { toInput, validateDraft } from '../src/features/risk/RiskRuleEditorSheet.js';
 import { isPortfolioScanReady, portfolioDataStatus } from '../src/features/risk/RiskOverview.js';
@@ -9,7 +13,7 @@ import {
   PortfolioModeNote,
   PortfolioModeSwitch,
 } from '../src/features/shared/PortfolioModeSwitch.js';
-import { buildRiskContexts } from '../src/features/risk/risk.actions.js';
+import { buildRiskContexts, riskActionFeedback } from '../src/features/risk/risk.actions.js';
 import {
   formatThreshold,
   riskRuleNeedsAccount,
@@ -235,7 +239,6 @@ describe('风险中心 AB 交互契约', () => {
         loadState="ready"
         routes={[{ channel: 'feishu', provider: 'lark-webhook' }]}
         routingState="ready"
-        onConfigure={vi.fn()}
         deliveries={[
           {
             id: 'delivery-1',
@@ -258,28 +261,20 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).not.toContain('事件 undefined');
   });
 
-  it('没有通知 Provider 时说明不会外发并提供配置入口', () => {
+  it('通知表不内嵌 Provider 缺失提示，提示提升到风险中心主上下文', () => {
     const html = renderToStaticMarkup(
-      <RiskNotificationTable
-        loadState="ready"
-        deliveries={[]}
-        routes={[]}
-        routingState="ready"
-        onConfigure={vi.fn()}
-      />,
+      <RiskNotificationTable loadState="ready" deliveries={[]} routes={[]} routingState="ready" />,
     );
 
-    expect(html).toContain('尚未配置可用的通知 Provider');
-    expect(html).toContain('风险事件仍会保留，但不会发送外部通知');
-    expect(html).toContain('配置通知 Provider');
+    expect(html).not.toContain('尚未配置可用的通知 Provider');
+    expect(html).not.toContain('配置通知 Provider');
   });
 
   it('路由读取失败时不误报为未配置', () => {
     const html = renderToStaticMarkup(
-      <RiskNotificationTable
-        loadState="ready"
-        deliveries={[]}
-        routes={[]}
+      <NotificationProviderNotice
+        mode="actual"
+        availability="unknown"
         routingState="error"
         onConfigure={vi.fn()}
       />,
@@ -287,6 +282,82 @@ describe('风险中心 AB 交互契约', () => {
 
     expect(html).toContain('通知 Provider 状态暂不可用');
     expect(html).not.toContain('尚未配置可用的通知 Provider');
+  });
+
+  it('Provider 缺失提示在风险中心主上下文可见，模拟模式不重复警告', () => {
+    const actual = renderToStaticMarkup(
+      <NotificationProviderNotice
+        mode="actual"
+        availability="unconfigured"
+        routingState="ready"
+        onConfigure={vi.fn()}
+      />,
+    );
+    const shadow = renderToStaticMarkup(
+      <NotificationProviderNotice
+        mode="shadow"
+        availability="unconfigured"
+        routingState="ready"
+        onConfigure={vi.fn()}
+      />,
+    );
+
+    expect(actual).toContain('尚未配置可用的通知 Provider');
+    expect(actual).toContain('配置通知 Provider');
+    expect(shadow).toBe('');
+  });
+
+  it('路由仍在确认时不把加载中误报为状态不可用', () => {
+    const html = renderToStaticMarkup(
+      <NotificationProviderNotice
+        mode="actual"
+        availability="unknown"
+        routingState="loading"
+        onConfigure={vi.fn()}
+      />,
+    );
+
+    expect(html).toBe('');
+  });
+
+  it('风险动作反馈明确区分规则试算、Provider 缺失和模拟模式', () => {
+    expect(riskActionFeedback('test', 'actual', 'unconfigured', 1)).toMatchObject({
+      type: 'warning',
+      description: expect.stringContaining('人工测试只验证规则，不发送通知'),
+    });
+    expect(riskActionFeedback('scan', 'actual', 'unconfigured', 1)).toMatchObject({
+      type: 'warning',
+      description: expect.stringContaining('当前未配置通知 Provider，本次未发送通知'),
+    });
+    expect(riskActionFeedback('scan', 'shadow', 'available', 1)).toMatchObject({
+      type: 'info',
+      description: expect.stringContaining('模拟模式不会发送通知'),
+    });
+  });
+
+  it('风险扫描反馈覆盖已配置、状态未知和无新事件三种结果', () => {
+    expect(riskActionFeedback('scan', 'actual', 'available', 2)).toMatchObject({
+      type: 'success',
+      description: expect.stringContaining('通知已按当前 Provider 配置处理'),
+    });
+    expect(riskActionFeedback('scan', 'actual', 'unknown', 2)).toMatchObject({
+      type: 'warning',
+      description: expect.stringContaining('暂时无法确认通知 Provider 状态'),
+    });
+    expect(riskActionFeedback('scan', 'actual', 'available', 0)).toMatchObject({
+      type: 'success',
+      description: expect.stringContaining('本次扫描未产生新的风险事件'),
+    });
+  });
+
+  it('人工测试反馈在已配置 Provider 时说明是规则试算', () => {
+    expect(riskActionFeedback('test', 'actual', 'available', 1)).toMatchObject({
+      type: 'info',
+      description: expect.stringContaining('人工测试只验证规则，不发送通知'),
+    });
+    expect(riskActionFeedback('test', 'actual', 'available', 1).description).not.toContain(
+      '未配置通知 Provider',
+    );
   });
 
   it('人工测试结果按规则版本匹配，版本变更后不复用旧结果', () => {

@@ -172,6 +172,45 @@ describe('专业 Provider 配置', () => {
     });
   });
 
+  it('连接测试按凭证形态识别渠道，Provider 名称不影响结果', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ code: 0, msg: 'success' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const prisma = {
+        providerConfig: { findUnique: vi.fn(async () => null) },
+      };
+      const service = new ProviderConfigService(
+        prisma as never,
+        createProviderHealthStub() as never,
+      );
+      const draft = {
+        name: '飞书',
+        type: 'notification',
+        priority: 1,
+        capabilities: ['notification'],
+        credentialsRef: 'https://open.feishu.cn/open-apis/bot/v2/hook/test',
+      };
+
+      await expect(service.testDraft(draft)).resolves.toMatchObject({ status: 'healthy' });
+      await expect(
+        service.testDraft({ ...draft, credentialsRef: 'https://example.com/hook' }),
+      ).resolves.toMatchObject({
+        status: 'untested',
+        message: expect.stringContaining('凭证不是受支持的 Feishu/Lark Webhook 地址'),
+      });
+      await expect(service.testDraft({ ...draft, type: 'tushare' })).resolves.toMatchObject({
+        status: 'untested',
+        message: '该类型 Provider 尚未接入连接测试插件',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('可在保存前测试飞书草稿，并在随后保存时保留成功状态', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

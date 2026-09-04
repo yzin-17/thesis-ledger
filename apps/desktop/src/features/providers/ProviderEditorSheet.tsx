@@ -54,7 +54,7 @@ export const ProviderEditorSheet = ({
   onTest: () => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
 }) => {
-  const credentialLabel = providerCredentialLabel(providerDraft.name, providerDraft.type);
+  const credentialLabel = providerCredentialLabel(providerDraft.type);
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent

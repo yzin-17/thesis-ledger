@@ -275,6 +275,44 @@ describe('Notification provider gating', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
+  it('渠道按凭证形态识别，Provider 名称不影响路由', async () => {
+    const { result, upsert } = await enqueueWith({
+      findMany: vi.fn(async () => [
+        {
+          name: '飞书',
+          type: 'notification',
+          enabled: true,
+          priority: 1,
+          encryptedCredentials: encryptProviderCredential(providerWebhook),
+        },
+      ]),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ channel: 'feishu', provider: '飞书' }),
+      }),
+    );
+  });
+
+  it('凭证不是受支持 Webhook 时即使名称命中别名也不形成路由', async () => {
+    const { result, upsert } = await enqueueWith({
+      findMany: vi.fn(async () => [
+        {
+          name: 'feishu',
+          type: 'notification',
+          enabled: true,
+          priority: 1,
+          encryptedCredentials: encryptProviderCredential('https://example.com/not-feishu'),
+        },
+      ]),
+    });
+
+    expect(result).toEqual([]);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('渠道可用时正常入队', async () => {
     const { result, upsert } = await enqueueWith(providerConfigFixture());
 

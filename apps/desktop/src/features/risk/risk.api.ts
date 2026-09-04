@@ -8,6 +8,7 @@ import type {
   RiskContext,
   RiskEventRecord,
   RiskRuleRecord,
+  RiskScanResult,
   RiskTestResult,
 } from './risk.types.js';
 
@@ -80,7 +81,7 @@ export const testRiskRule = (
   );
 
 export const scanRisk = (contexts: RiskContext[], scanId?: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<unknown>(
+  requestDesktopJson<RiskScanResult>(
     '/risk/scan',
     {
       ...noStore,

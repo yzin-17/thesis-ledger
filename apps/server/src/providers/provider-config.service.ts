@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { assertAllowedFeishuWebhookUrl } from './feishu-webhook-security.js';
+import {
+  assertAllowedFeishuWebhookUrl,
+  detectFeishuWebhookUrl,
+} from './feishu-webhook-security.js';
 import {
   encryptProviderCredential,
   normalizeProviderCredential,
@@ -63,17 +66,6 @@ const validate = (input: ProviderConfigInput) => {
     throw new Error('Provider 优先级必须为非负整数');
   if (input.capabilities.length === 0) throw new Error('至少选择一项 Provider 能力');
   return input;
-};
-
-const isFeishuProvider = (name: string, type: string) => {
-  const normalizedName = name
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s]+/g, '-');
-  return (
-    type === 'notification' &&
-    ['feishu', 'feishu-webhook', 'lark', 'lark-webhook'].includes(normalizedName)
-  );
 };
 
 const testFeishuWebhook = async (webhook: string) => {
@@ -290,11 +282,20 @@ export class ProviderConfigService {
         message: '请先配置凭证，再测试连接',
         credentialConfigured: false,
       };
-    if (!isFeishuProvider(input.name, input.type))
+    // 渠道按凭证形态识别，与 Provider 名称无关；非通知类型尚未接入连接测试。
+    if (input.type !== 'notification')
       return {
         name: input.name,
         status: 'untested',
-        message: '当前 Provider 尚未接入连接测试插件',
+        message: '该类型 Provider 尚未接入连接测试插件',
+        credentialConfigured,
+      };
+    if (!detectFeishuWebhookUrl(input.credential))
+      return {
+        name: input.name,
+        status: 'untested',
+        message:
+          '凭证不是受支持的 Feishu/Lark Webhook 地址，无法执行连接测试。请填写 https://open.feishu.cn/open-apis/bot/v2/hook/... 形式的 Webhook 地址。',
         credentialConfigured: true,
       };
 

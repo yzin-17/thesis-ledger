@@ -21,7 +21,12 @@ import {
 import { useNotificationRoutingQuery, useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
 import { RiskOverview } from './RiskOverview.js';
 import { RiskRuleWorkbench } from './RiskRuleWorkbench.js';
-import { RiskAuditDialog, RiskEventTable, RiskNotificationTable } from './RiskSections.js';
+import {
+  NotificationProviderNotice,
+  RiskAuditDialog,
+  RiskEventTable,
+  RiskNotificationTable,
+} from './RiskSections.js';
 import type {
   CreateRiskRuleInput,
   RiskRuleRecord,
@@ -67,6 +72,11 @@ export function RiskCenter({
   let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
   if (notificationRoutingQuery.isError) notificationRoutingState = 'error';
   else if (notificationRoutingQuery.isPending) notificationRoutingState = 'loading';
+  let notificationAvailability: 'available' | 'unconfigured' | 'unknown' = 'available';
+  if (notificationRoutingState !== 'ready') notificationAvailability = 'unknown';
+  else if ((notificationRoutingQuery.data?.routes.length ?? 0) === 0) {
+    notificationAvailability = 'unconfigured';
+  }
   const hasRiskData = Object.values(riskQueries).some((query) => query.data !== undefined);
   const loadState = resolveLoadState(
     Object.values(riskQueries),
@@ -96,6 +106,7 @@ export function RiskCenter({
     deleteRuleMutation,
     testRuleMutation,
     scanRiskMutation,
+    notificationAvailability,
     refetchRules: riskQueries.rules.refetch,
     refetchEvents: riskQueries.events.refetch,
     refetchNotifications: riskQueries.notifications.refetch,
@@ -227,6 +238,13 @@ export function RiskCenter({
         </PortfolioModeNote>
       ) : null}
 
+      <NotificationProviderNotice
+        mode={mode}
+        availability={notificationAvailability}
+        routingState={notificationRoutingState}
+        onConfigure={() => void navigate('/providers')}
+      />
+
       {/* 规则、事件、通知全部为空时，指标卡和表格的 0 值已表达状态，不再叠加“暂无数据”横幅。 */}
       {loadState === 'empty' ? null : (
         <DataStateBanner state={loadState} onRetry={() => void refreshRisk()} />
@@ -286,7 +304,6 @@ export function RiskCenter({
             statusFilter={notificationStatusFilter}
             routes={notificationRoutingQuery.data?.routes ?? []}
             routingState={notificationRoutingState}
-            onConfigure={() => void navigate('/providers')}
           />
         </TabsContent>
       </Tabs>

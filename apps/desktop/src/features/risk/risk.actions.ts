@@ -4,9 +4,11 @@ import type { useToastManager } from '@/components/ui/toast';
 import type { Portfolio } from '../portfolio/portfolio.types.js';
 import type {
   CreateRiskRuleInput,
+  NotificationAvailability,
   PortfolioMode,
   RiskContext,
   RiskRuleRecord,
+  RiskScanResult,
   RiskTestResult,
   UpdateRiskRuleInput,
 } from './risk.types.js';
@@ -61,7 +63,8 @@ type Dependencies = {
   patchRuleMutation: AsyncMutation<{ ruleId: string; patch: UpdateRiskRuleInput }, RiskRuleRecord>;
   deleteRuleMutation: AsyncMutation<{ ruleId: string }, RiskRuleRecord>;
   testRuleMutation: AsyncMutation<{ ruleId: string; contexts: RiskContext[] }, RiskTestResult[]>;
-  scanRiskMutation: AsyncMutation<{ contexts: RiskContext[]; scanId: string }, unknown>;
+  scanRiskMutation: AsyncMutation<{ contexts: RiskContext[]; scanId: string }, RiskScanResult>;
+  notificationAvailability: NotificationAvailability;
   refetchRules: () => Promise<unknown>;
   refetchEvents: () => Promise<unknown>;
   refetchNotifications: () => Promise<unknown>;
@@ -72,6 +75,49 @@ const successToast = (toastManager: ToastManager, title: string, description: st
 
 const errorToast = (toastManager: ToastManager, title: string, description: string) =>
   toastManager.add({ title, description, type: 'error', timeout: 0, priority: 'high' });
+
+export const riskActionFeedback = (
+  action: 'test' | 'scan',
+  mode: PortfolioMode,
+  notificationAvailability: NotificationAvailability,
+  triggeredCount: number,
+) => {
+  if (action === 'test') {
+    const providerNote =
+      notificationAvailability === 'unconfigured' ? ' 当前未配置通知 Provider。' : '';
+    return {
+      type: notificationAvailability === 'unconfigured' ? ('warning' as const) : ('info' as const),
+      description: `${triggeredCount} 个上下文触发。人工测试只验证规则，不发送通知。${providerNote}`,
+    };
+  }
+
+  if (triggeredCount === 0) {
+    return {
+      type: 'success' as const,
+      description: '本次扫描未产生新的风险事件，因此没有通知需要发送。',
+    };
+  }
+  const eventSummary = `${triggeredCount} 个风险事件已写入历史。`;
+  if (mode === 'shadow') {
+    return { type: 'info' as const, description: `${eventSummary} 模拟模式不会发送通知。` };
+  }
+  if (notificationAvailability === 'unconfigured') {
+    return {
+      type: 'warning' as const,
+      description: `${eventSummary} 当前未配置通知 Provider，本次未发送通知。`,
+    };
+  }
+  if (notificationAvailability === 'unknown') {
+    return {
+      type: 'warning' as const,
+      description: `${eventSummary} 暂时无法确认通知 Provider 状态，请在“通知”页签核对。`,
+    };
+  }
+  return {
+    type: 'success' as const,
+    description: `${eventSummary} 通知已按当前 Provider 配置处理，结果可在“通知”页签查看。`,
+  };
+};
 
 export const createRiskActionHandlers = (dependencies: Dependencies) => {
   const {
@@ -85,6 +131,7 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     deleteRuleMutation,
     testRuleMutation,
     scanRiskMutation,
+    notificationAvailability,
     refetchRules,
     refetchEvents,
     refetchNotifications,
@@ -152,11 +199,13 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
         ruleId: rule.id,
         contexts: buildRiskContexts(portfolio, mode),
       });
-      successToast(
-        toastManager,
-        '人工测试完成',
-        `${result.filter((item) => item.triggered).length} 个上下文触发。`,
+      const feedback = riskActionFeedback(
+        'test',
+        mode,
+        notificationAvailability,
+        result.filter((item) => item.triggered).length,
       );
+      toastManager.add({ title: '人工测试完成', ...feedback, timeout: 7000 });
       return result;
     } catch {
       errorToast(toastManager, '人工测试失败', '请确认当前组合有可用数据。');
@@ -170,11 +219,17 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     if (busyAction) return false;
     setBusyAction('scan-risk');
     try {
-      await scanRiskMutation.mutateAsync({
+      const result = await scanRiskMutation.mutateAsync({
         contexts: buildRiskContexts(portfolio, mode),
         scanId: crypto.randomUUID(),
       });
-      successToast(toastManager, '风险扫描已完成', '触发事件已写入历史。');
+      const feedback = riskActionFeedback(
+        'scan',
+        mode,
+        notificationAvailability,
+        result.results.filter((item) => item.eventId).length,
+      );
+      toastManager.add({ title: '风险扫描已完成', ...feedback, timeout: 7000 });
       return true;
     } catch {
       errorToast(toastManager, '风险扫描失败', '请确认当前组合有可用数据。');

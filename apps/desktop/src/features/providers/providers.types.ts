@@ -159,19 +159,8 @@ export const providerCredentialTypeLabels: Record<string, string> = {
   vision: '图像 API Key / Token',
 };
 
-export const providerCredentialLabel = (name: string, type: string) => {
-  const normalizedName = name
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s]+/g, '-');
-  if (
-    type === 'notification' &&
-    ['feishu', 'feishu-webhook', 'lark', 'lark-webhook'].includes(normalizedName)
-  ) {
-    return '飞书 Webhook';
-  }
-  return providerCredentialTypeLabels[type] ?? 'API Key / Token';
-};
+export const providerCredentialLabel = (type: string) =>
+  providerCredentialTypeLabels[type] ?? 'API Key / Token';
 
 export const providerCredentialPlaceholder = (label: string) =>
   label.includes('Webhook') ? '输入 Webhook 地址' : '输入 API Key 或 Token';

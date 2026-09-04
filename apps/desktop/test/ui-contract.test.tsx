@@ -428,7 +428,7 @@ describe('Desktop UI contract - providers and primitives', () => {
       providerCredentialConfiguredAfterSave(undefined, 'https://example.test/hook', false),
     ).toBe(true);
     expect(providerCredentialConfiguredAfterSave(undefined, '', true)).toBe(true);
-    expect(providerCredentialLabel('feishu', 'notification')).toBe('飞书 Webhook');
+    expect(providerCredentialLabel('notification')).toBe('Webhook / Token');
     expect(
       providerDisplayStatus({ enabled: true, health: 'healthy', credentialConfigured: true }),
     ).toEqual({ label: '正常', tone: 'normal' });
