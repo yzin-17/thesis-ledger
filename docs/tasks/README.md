@@ -4,6 +4,7 @@
 
 ## 仍在实施或待完成
 
+- [自动化执行租约与调度幂等加固](2026-09-05-automation-execution-lease-hardening.md)
 - [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
