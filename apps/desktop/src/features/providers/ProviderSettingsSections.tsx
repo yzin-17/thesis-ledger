@@ -9,6 +9,8 @@ import type { LoadState } from '../shared/types.js';
 import {
   automationJobTypeLabel,
   automationRunStatusLabel,
+  dataQualityCodeLabel,
+  dataQualityIssueReason,
   dataQualitySeverityLabel,
   notificationDeliveryStatusLabel,
   notificationErrorCodeLabel,
@@ -43,6 +45,7 @@ export function ProviderTable({
   onEdit,
   onTest,
   onToggle,
+  onCreate,
 }: {
   loadState: LoadState;
   providers: ProviderRecord[];
@@ -54,9 +57,19 @@ export function ProviderTable({
   onEdit: (provider: ProviderRecord) => void;
   onTest: (name: string) => void;
   onToggle: (provider: ProviderRecord) => void;
+  onCreate: () => void;
 }) {
   return (
-    <section className="panel mt-6 border-t-0">
+    <section className="panel">
+      <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2>提供方</h2>
+          <p>编辑、连通性测试与启停；凭证配置后不回显密钥。</p>
+        </div>
+        <Button size="sm" type="button" variant="default" onClick={onCreate}>
+          新增或更新 Provider
+        </Button>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -414,80 +427,101 @@ function SimpleProviderTable({
   );
 }
 
-export function ProviderHistoryTables({
+export function AutomationRunHistoryTable({
   loadState,
   jobs,
   jobHistory,
-  notificationFailures,
-  issues,
 }: {
   loadState: LoadState;
   jobs: AutomationJob[];
   jobHistory: AutomationHistoryRecord[];
-  notificationFailures: NotificationFailureRecord[];
-  issues: ProviderIssueRecord[];
 }) {
   const normalizedState = isDataLoaded(loadState);
   const jobNames = new Map(jobs.map((job) => [job.id, job.name]));
   const automationJobName = (jobId: string) => jobNames.get(jobId) ?? jobId.slice(0, 8);
   return (
-    <>
-      <SimpleProviderTable
-        title="自动化运行历史"
-        description="失败任务和错误摘要可从这里定位，无需直接查数据库。"
-        columns={['任务', '状态', '开始时间', '错误']}
-        emptyColSpan={4}
-        rows={
-          normalizedState
-            ? jobHistory.map((item) => ({
-                id: item.id,
-                cells: [
-                  automationJobName(item.jobId),
-                  automationRunStatusLabel(item.status),
-                  new Date(item.startedAt).toLocaleString('zh-CN'),
-                  item.error ?? '—',
-                ],
-              }))
-            : []
-        }
-      />
-      <SimpleProviderTable
-        title="通知失败"
-        description="只读展示投递失败状态，重试仍通过 Notification API 处理。"
-        columns={['Provider', '状态', '错误']}
-        emptyColSpan={3}
-        rows={
-          normalizedState
-            ? notificationFailures.map((item) => ({
-                id: item.id,
-                cells: [
-                  item.provider,
-                  notificationDeliveryStatusLabel(item.status),
-                  item.lastError ? notificationErrorCodeLabel(item.lastError) : '—',
-                ],
-              }))
-            : []
-        }
-      />
-      <SimpleProviderTable
-        title="开放数据质量问题"
-        description="异常不会静默当作完整数据。"
-        columns={['Provider', '标的', '级别', '问题']}
-        emptyColSpan={4}
-        rows={
-          normalizedState
-            ? issues.map((issue) => ({
+    <SimpleProviderTable
+      title="自动化运行历史"
+      description="失败任务和错误摘要可从这里定位，无需直接查数据库。"
+      columns={['任务', '状态', '开始时间', '错误']}
+      emptyColSpan={4}
+      rows={
+        normalizedState
+          ? jobHistory.map((item) => ({
+              id: item.id,
+              cells: [
+                automationJobName(item.jobId),
+                automationRunStatusLabel(item.status),
+                new Date(item.startedAt).toLocaleString('zh-CN'),
+                item.error ?? '—',
+              ],
+            }))
+          : []
+      }
+    />
+  );
+}
+
+export function NotificationFailuresTable({
+  loadState,
+  notificationFailures,
+}: {
+  loadState: LoadState;
+  notificationFailures: NotificationFailureRecord[];
+}) {
+  const normalizedState = isDataLoaded(loadState);
+  return (
+    <SimpleProviderTable
+      title="通知失败"
+      description="只读展示投递失败状态，重试仍通过 Notification API 处理。"
+      columns={['Provider', '状态', '错误']}
+      emptyColSpan={3}
+      rows={
+        normalizedState
+          ? notificationFailures.map((item) => ({
+              id: item.id,
+              cells: [
+                item.provider,
+                notificationDeliveryStatusLabel(item.status),
+                item.lastError ? notificationErrorCodeLabel(item.lastError) : '—',
+              ],
+            }))
+          : []
+      }
+    />
+  );
+}
+
+export function DataQualityIssuesTable({
+  loadState,
+  issues,
+}: {
+  loadState: LoadState;
+  issues: ProviderIssueRecord[];
+}) {
+  const normalizedState = isDataLoaded(loadState);
+  return (
+    <SimpleProviderTable
+      title="开放数据质量问题"
+      description="异常不会静默当作完整数据。"
+      columns={['Provider', '标的', '级别', '问题']}
+      emptyColSpan={4}
+      rows={
+        normalizedState
+          ? issues.map((issue) => {
+              const reason = dataQualityIssueReason(issue.details);
+              return {
                 id: issue.id,
                 cells: [
                   issue.provider,
                   issue.symbol ?? '全局',
                   dataQualitySeverityLabel(issue.severity),
-                  issue.code,
+                  `${dataQualityCodeLabel(issue.code)}${reason ? `：${reason}` : ''}`,
                 ],
-              }))
-            : []
-        }
-      />
-    </>
+              };
+            })
+          : []
+      }
+    />
   );
 }

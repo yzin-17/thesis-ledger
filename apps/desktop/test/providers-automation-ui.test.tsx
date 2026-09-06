@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import {
   AutomationTable,
-  ProviderHistoryTables,
+  AutomationRunHistoryTable,
+  DataQualityIssuesTable,
+  NotificationFailuresTable,
 } from '../src/features/providers/ProviderSettingsSections.js';
 import { ProviderSettings } from '../src/features/providers/ProviderSettings.js';
 import { Toaster } from '../src/components/ui/toast.js';
@@ -17,6 +19,8 @@ import {
   automationRunStatusLabel,
   automationScheduleLabel,
   type AutomationSchedulePreset,
+  dataQualityCodeLabel,
+  dataQualityIssueReason,
   dataQualitySeverityLabel,
   newAutomationJobDraft,
   notificationDeliveryStatusLabel,
@@ -75,6 +79,16 @@ describe('自动化任务标签映射', () => {
     expect(dataQualitySeverityLabel('error')).toBe('错误');
   });
 
+  it('数据质量问题码给中文标签，未知码保留原文；原因取自 details.message', () => {
+    expect(dataQualityCodeLabel('sync_failed')).toBe('同步失败');
+    expect(dataQualityCodeLabel('stale_bars')).toBe('stale_bars');
+    expect(dataQualityIssueReason({ message: '行情同步失败：DSA 不可用' })).toBe(
+      '行情同步失败：DSA 不可用',
+    );
+    expect(dataQualityIssueReason({ message: '   ' })).toBeNull();
+    expect(dataQualityIssueReason(null)).toBeNull();
+  });
+
   it('通知未配置错误码映射为可读文案，其余原样保留', () => {
     expect(notificationErrorCodeLabel('notification_provider_unconfigured:feishu')).toBe(
       '通知 Provider 未配置',
@@ -129,7 +143,12 @@ describe('自动化任务草稿与提交契约', () => {
 
   it('更新载荷只包含实际变更的字段', () => {
     const current = job();
-    expect(buildUpdateAutomationJobPatch({ ...automationJobDraftFromJob(current), name: '改名' }, current)).toEqual({
+    expect(
+      buildUpdateAutomationJobPatch(
+        { ...automationJobDraftFromJob(current), name: '改名' },
+        current,
+      ),
+    ).toEqual({
       name: '改名',
     });
     expect(
@@ -250,17 +269,21 @@ describe('运行历史与状态表渲染', () => {
       code: 'stale_bars',
       status: 'open',
     },
+    {
+      id: 'issue-2',
+      provider: 'dsa',
+      symbol: '159516.SZ',
+      severity: 'error',
+      code: 'sync_failed',
+      status: 'open',
+      capability: 'bars-1d',
+      details: { message: '行情同步失败：DSA 不可用' },
+    },
   ];
 
   it('运行历史任务列解析任务名，未知任务回退 jobId 前 8 位', () => {
     const markup = renderToStaticMarkup(
-      <ProviderHistoryTables
-        loadState="ready"
-        jobs={[historyJob]}
-        jobHistory={jobHistory}
-        notificationFailures={notificationFailures}
-        issues={issues}
-      />,
+      <AutomationRunHistoryTable loadState="ready" jobs={[historyJob]} jobHistory={jobHistory} />,
     );
 
     expect(markup).toContain('每日估值快照');
@@ -273,19 +296,17 @@ describe('运行历史与状态表渲染', () => {
 
   it('通知失败与数据质量级别展示中文状态', () => {
     const markup = renderToStaticMarkup(
-      <ProviderHistoryTables
-        loadState="ready"
-        jobs={[historyJob]}
-        jobHistory={[]}
-        notificationFailures={notificationFailures}
-        issues={issues}
-      />,
+      <>
+        <NotificationFailuresTable loadState="ready" notificationFailures={notificationFailures} />
+        <DataQualityIssuesTable loadState="ready" issues={issues} />
+      </>,
     );
-
     expect(markup).toContain('重试中');
     expect(markup).toContain('通知 Provider 未配置');
     expect(markup).not.toContain('notification_provider_unconfigured');
     expect(markup).toContain('警告');
+    expect(markup).toContain('同步失败：行情同步失败：DSA 不可用');
+    expect(markup).toContain('stale_bars');
   });
 
   it('健康历史状态列展示中文', () => {
@@ -323,7 +344,7 @@ describe('Provider 页接线', () => {
     expect(refreshButtonSource).toContain('disabled={disabled || refreshing}');
   });
 
-  it('页面渲染包含自动化任务面板、新建入口与刷新按钮', () => {
+  it('页面按风险中心样式拆分三个 Tab，默认展示数据源', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -335,10 +356,11 @@ describe('Provider 页接线', () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain('自动化任务');
-    expect(markup).toContain('新建任务');
     expect(markup).toContain('数据与自动化');
     expect(markup).toContain('刷新 Provider 与自动化');
-    expect(markup).toContain('休市日自动跳过');
+    expect(markup).toContain('数据源');
+    expect(markup).toContain('自动化');
+    expect(markup).toContain('诊断');
+    expect(markup).toContain('>提供方</th>');
   });
 });

@@ -40,6 +40,8 @@ export interface ProviderIssueRecord {
   severity: string;
   code: string;
   status: string;
+  capability?: string;
+  details?: Record<string, unknown> | null;
 }
 
 export interface AutomationJob {
@@ -206,6 +208,21 @@ export const dataQualitySeverityLabels: Record<string, string> = {
 
 export const dataQualitySeverityLabel = (severity: string) =>
   dataQualitySeverityLabels[severity] ?? `其他（${severity}）`;
+
+export const dataQualityCodeLabels: Record<string, string> = {
+  sync_failed: '同步失败',
+};
+
+/** 问题码是机器标识：已知值给中文标签，未知值保留原文便于检索。 */
+export const dataQualityCodeLabel = (code: string) => dataQualityCodeLabels[code] ?? code;
+
+/** 从 details 里提取人类可读的失败原因（写入方约定为 details.message）。 */
+export const dataQualityIssueReason = (details: Record<string, unknown> | null | undefined) => {
+  const message = details?.message;
+  if (typeof message !== 'string') return null;
+  const trimmed = message.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
 
 export const automationSchedulePresets = [
   { value: '0 16 * * 1-5', label: '每个交易日 16:00' },

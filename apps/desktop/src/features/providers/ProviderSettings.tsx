@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
@@ -30,14 +30,19 @@ import {
   type ProviderTestState,
 } from './providers.types.js';
 import {
+  AutomationRunHistoryTable,
   AutomationTable,
+  DataQualityIssuesTable,
   HealthHistoryTable,
-  ProviderHistoryTables,
+  NotificationFailuresTable,
   ProviderTable,
 } from './ProviderSettingsSections.js';
 
+export type ProviderSettingsTab = 'providers' | 'automation' | 'diagnostics';
+
 export function ProviderSettings() {
   const [healthHistoryPage, setHealthHistoryPage] = useState(1);
+  const [tab, setTab] = useState<ProviderSettingsTab>('providers');
   const [providerDraft, setProviderDraft] = useState(newProviderDraft);
   const [providerSheetOpen, setProviderSheetOpen] = useState(false);
   const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
@@ -158,9 +163,6 @@ export function ProviderSettings() {
           </p>
         </div>
         <div className="page-header-actions">
-          <Button type="button" variant="default" onClick={() => actions.openProviderSheet()}>
-            新增或更新 Provider
-          </Button>
           <RefreshIconButton
             label="刷新 Provider 与自动化"
             refreshing={providerRefreshing}
@@ -196,52 +198,76 @@ export function ProviderSettings() {
         onSubmit={(event) => void actions.submitAutomationEditor(event)}
       />
       <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <div className="space-y-6">
-        <ProviderTable
-          loadState={loadState}
-          providers={providers}
-          priorityDrafts={providerPriorityDrafts}
-          testingProviderName={testingProviderName}
-          savingProviderName={savingProviderName}
-          onPriorityChange={(name, value) =>
-            setProviderPriorityDrafts((current) => ({ ...current, [name]: value }))
-          }
-          onPrioritySave={(provider) => void actions.saveProvider(provider)}
-          onEdit={actions.openProviderSheet}
-          onTest={(name) => void actions.test(name)}
-          onToggle={(provider) =>
-            void actions.saveProvider(
-              provider,
-              !provider.enabled,
-              `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
-            )
-          }
-        />
-        <AutomationTable
-          loadState={loadState}
-          jobs={jobs}
-          togglingJobId={togglingJobId}
-          runningJobId={runningJobId}
-          onToggle={(job) => void actions.toggleJob(job)}
-          onEdit={(job) => actions.openAutomationEditor(job)}
-          onRun={(job) => void actions.runJobNow(job)}
-          onDelete={(job) => void actions.deleteJob(job)}
-          onCreate={() => actions.openAutomationEditor()}
-        />
-        <HealthHistoryTable
-          loadState={loadState}
-          history={healthHistory}
-          loading={healthHistoryLoading}
-          onPage={handleHealthPage}
-        />
-        <ProviderHistoryTables
-          loadState={loadState}
-          jobs={jobs}
-          jobHistory={jobHistory}
-          notificationFailures={notificationFailures}
-          issues={issues}
-        />
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as ProviderSettingsTab)}
+      >
+        <TabsList variant="line" className="mb-5 w-full justify-start">
+          <TabsTrigger value="providers">数据源</TabsTrigger>
+          <TabsTrigger value="automation">自动化</TabsTrigger>
+          <TabsTrigger value="diagnostics">诊断</TabsTrigger>
+        </TabsList>
+        <TabsContent value="providers">
+          <div className="space-y-6">
+            <ProviderTable
+              loadState={loadState}
+              providers={providers}
+              priorityDrafts={providerPriorityDrafts}
+              testingProviderName={testingProviderName}
+              savingProviderName={savingProviderName}
+              onPriorityChange={(name, value) =>
+                setProviderPriorityDrafts((current) => ({ ...current, [name]: value }))
+              }
+              onPrioritySave={(provider) => void actions.saveProvider(provider)}
+              onEdit={actions.openProviderSheet}
+              onTest={(name) => void actions.test(name)}
+              onToggle={(provider) =>
+                void actions.saveProvider(
+                  provider,
+                  !provider.enabled,
+                  `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
+                )
+              }
+              onCreate={() => actions.openProviderSheet()}
+            />
+            <HealthHistoryTable
+              loadState={loadState}
+              history={healthHistory}
+              loading={healthHistoryLoading}
+              onPage={handleHealthPage}
+            />
+          </div>
+        </TabsContent>
+        <TabsContent value="automation">
+          <div className="space-y-6">
+            <AutomationTable
+              loadState={loadState}
+              jobs={jobs}
+              togglingJobId={togglingJobId}
+              runningJobId={runningJobId}
+              onToggle={(job) => void actions.toggleJob(job)}
+              onEdit={(job) => actions.openAutomationEditor(job)}
+              onRun={(job) => void actions.runJobNow(job)}
+              onDelete={(job) => void actions.deleteJob(job)}
+              onCreate={() => actions.openAutomationEditor()}
+            />
+            <AutomationRunHistoryTable
+              loadState={loadState}
+              jobs={jobs}
+              jobHistory={jobHistory}
+            />
+          </div>
+        </TabsContent>
+        <TabsContent value="diagnostics">
+          <div className="space-y-6">
+            <NotificationFailuresTable
+              loadState={loadState}
+              notificationFailures={notificationFailures}
+            />
+            <DataQualityIssuesTable loadState={loadState} issues={issues} />
+          </div>
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
