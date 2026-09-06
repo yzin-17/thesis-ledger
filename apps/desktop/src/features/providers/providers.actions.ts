@@ -1,8 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { useToastManager } from '@/components/ui/toast';
+import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
 
 import type {
   AutomationJob,
+  AutomationJobDraft,
+  CreateAutomationJobInput,
   ProviderConnectionTestResult,
   ProviderDraft,
   ProviderDraftTestResult,
@@ -10,6 +13,7 @@ import type {
   ProviderTestEvidence,
   ProviderTestState,
   SaveProviderInput,
+  UpdateAutomationJobInput,
 } from './providers.types.js';
 import { createProviderConnectionHandlers } from './providers.connection-actions.js';
 import { createProviderConfigHandlers } from './providers.config-actions.js';
@@ -46,6 +50,24 @@ export type ProviderActionDependencies = {
   >;
   load: () => Promise<unknown>;
   resetProviderTest: () => void;
+  automationSheetOpen: boolean;
+  automationDraft: AutomationJobDraft;
+  editingAutomationJob: AutomationJob | null;
+  savingAutomationDraft: boolean;
+  runningJobId: string | null;
+  setAutomationSheetOpen: Dispatch<SetStateAction<boolean>>;
+  setAutomationDraft: Dispatch<SetStateAction<AutomationJobDraft>>;
+  setEditingAutomationJob: Dispatch<SetStateAction<AutomationJob | null>>;
+  setSavingAutomationDraft: Dispatch<SetStateAction<boolean>>;
+  setRunningJobId: Dispatch<SetStateAction<string | null>>;
+  createJobMutation: ProviderAsyncMutation<CreateAutomationJobInput, AutomationJob>;
+  updateJobMutation: ProviderAsyncMutation<
+    { jobId: string; patch: UpdateAutomationJobInput },
+    AutomationJob
+  >;
+  deleteJobMutation: ProviderAsyncMutation<string, AutomationJob>;
+  runJobMutation: ProviderAsyncMutation<string, { skipped: boolean; reason?: string }>;
+  confirm: (options: ConfirmDialogOptions) => Promise<boolean>;
 };
 
 export const createProviderActionHandlers = (dependencies: ProviderActionDependencies) => ({

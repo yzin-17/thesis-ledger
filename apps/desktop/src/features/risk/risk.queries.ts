@@ -28,7 +28,12 @@ export const riskAuditQueryOptions = (ruleId: string | null, client?: DesktopReq
 });
 
 export const useRiskQueries = (mode: PortfolioMode) => {
-  const rules = useQuery({ queryKey: riskKeys.rules(), queryFn: () => fetchRiskRules() });
+  // 一次拉取含归档的全量规则，工作台在本地按 archivedAt 分组展示，
+  // 避免切换“显示已归档”时反复请求。
+  const rules = useQuery({
+    queryKey: riskKeys.rules(),
+    queryFn: () => fetchRiskRules({ includeArchived: true }),
+  });
   const events = useQuery({
     queryKey: riskKeys.events(mode),
     queryFn: () => fetchRiskEvents(mode),

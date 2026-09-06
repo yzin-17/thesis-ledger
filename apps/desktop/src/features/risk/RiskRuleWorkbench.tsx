@@ -42,14 +42,15 @@ const toggleRuleLabel = (toggling: boolean, enabled: boolean, needsRepair: boole
 };
 
 const ruleStatusLabel = (rule: RiskRuleRecord) => {
+  if (rule.archivedAt) return '已归档';
   if (rule.needsRepair) return '待修复';
   return rule.enabled ? '启用' : '已停用';
 };
 
 const ruleStatusTone = (rule: RiskRuleRecord) => {
+  if (rule.archivedAt || !rule.enabled) return 'outline' as const;
   if (rule.needsRepair) return 'destructive' as const;
-  if (rule.enabled) return 'secondary' as const;
-  return 'outline' as const;
+  return 'secondary' as const;
 };
 
 const testResultMessage = (result: RiskTestResult) => {
@@ -67,6 +68,7 @@ export function RiskRuleWorkbench({
   onUpdate,
   onToggle,
   onArchive,
+  onRestore,
   onTest,
   testRecords,
   onTestComplete,
@@ -81,6 +83,7 @@ export function RiskRuleWorkbench({
   onUpdate: (ruleId: string, input: CreateRiskRuleInput) => Promise<boolean>;
   onToggle: (rule: RiskRuleRecord) => Promise<boolean>;
   onArchive: (rule: RiskRuleRecord) => Promise<boolean>;
+  onRestore: (rule: RiskRuleRecord) => Promise<boolean>;
   onTest: (rule: RiskRuleRecord) => Promise<RiskTestResult[] | null>;
   testRecords: Record<string, RiskTestRecord>;
   onTestComplete: (rule: RiskRuleRecord, results: RiskTestResult[]) => void;
@@ -90,11 +93,17 @@ export function RiskRuleWorkbench({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RiskRuleRecord | null>(null);
   const [archiveRule, setArchiveRule] = useState<RiskRuleRecord | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  // 用 == null 同时兼容 null 与缺失字段（旧响应），缺字段视为未归档
+  const activeRules = rules.filter((rule) => rule.archivedAt == null);
+  const archivedRules = rules.filter((rule) => rule.archivedAt != null);
+  const visibleRules = showArchived ? rules : activeRules;
 
   useEffect(() => {
-    if (selectedRuleId && rules.some((rule) => rule.id === selectedRuleId)) return;
-    setSelectedRuleId(rules[0]?.id ?? null);
-  }, [rules, selectedRuleId]);
+    if (selectedRuleId && visibleRules.some((rule) => rule.id === selectedRuleId)) return;
+    setSelectedRuleId(activeRules[0]?.id ?? archivedRules[0]?.id ?? null);
+  }, [activeRules, archivedRules, visibleRules, selectedRuleId]);
 
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? null;
   const selectedTestRecord = selectedRule ? riskTestRecordForRule(testRecords, selectedRule) : null;
@@ -133,13 +142,46 @@ export function RiskRuleWorkbench({
     if (archived) setArchiveRule(null);
   };
 
+  const renderRuleItem = (rule: RiskRuleRecord, muted = false) => {
+    const selected = rule.id === selectedRuleId;
+    // 列表空间有限：证券规则显示“标的名 · 代码”（无名称时仅代码）；范围与账户在详情小字中展示
+    const listTarget =
+      rule.scope === 'security'
+        ? [rule.assetName, rule.symbol].filter(Boolean).join(' · ') || '未指定证券'
+        : ruleTargetLabel(rule, accountNameForRule(rule));
+    return (
+      <Button
+        key={rule.id}
+        type="button"
+        variant={selected ? 'secondary' : 'ghost'}
+        className={cn(
+          'h-auto min-h-16 justify-start whitespace-normal px-3 py-2 text-left',
+          muted && 'opacity-60',
+          selected && 'ring-1 ring-border',
+        )}
+        onClick={() => setSelectedRuleId(rule.id)}
+        aria-current={selected ? 'true' : undefined}
+      >
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+          <span className="flex w-full items-center justify-between gap-2">
+            <span className="truncate font-medium">{riskRuleKindLabel(rule.kind)}</span>
+            <Badge variant={ruleStatusTone(rule)}>{ruleStatusLabel(rule)}</Badge>
+          </span>
+          <span className="w-full truncate text-xs text-muted-foreground" title={listTarget}>
+            {listTarget} · v{rule.version}
+          </span>
+        </span>
+      </Button>
+    );
+  };
+
   return (
     <>
       <section className="panel mt-0">
         <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2>规则工作台</h2>
-            <p>规则全局共用；修改、启停和归档都会递增版本并写入审计。</p>
+            <p>规则全局共用；修改、启停、归档和恢复都会递增版本并写入审计。</p>
           </div>
           <Button type="button" disabled={!canCreate} onClick={openCreate}>
             <Plus data-icon="inline-start" aria-hidden="true" />
@@ -163,34 +205,29 @@ export function RiskRuleWorkbench({
             >
               <div className="flex items-center justify-between gap-2 px-2 py-1">
                 <span className="text-xs font-medium text-muted-foreground">全部规则</span>
-                <Badge variant="outline">{rules.length}</Badge>
+                <Badge variant="outline">{activeRules.length}</Badge>
               </div>
-              {rules.map((rule) => {
-                const selected = rule.id === selectedRuleId;
-                return (
+              {activeRules.length === 0 && archivedRules.length > 0 && (
+                <p className="px-2 py-1 text-xs text-muted-foreground">
+                  当前没有活跃规则，仅剩已归档规则。
+                </p>
+              )}
+              {activeRules.map((rule) => renderRuleItem(rule))}
+              {archivedRules.length > 0 && (
+                <div className="mt-auto flex flex-col gap-2 border-t border-border pt-2">
                   <Button
-                    key={rule.id}
                     type="button"
-                    variant={selected ? 'secondary' : 'ghost'}
-                    className={cn(
-                      'h-auto min-h-16 justify-start whitespace-normal px-3 py-2 text-left',
-                      selected && 'ring-1 ring-border',
-                    )}
-                    onClick={() => setSelectedRuleId(rule.id)}
-                    aria-current={selected ? 'true' : undefined}
+                    variant="ghost"
+                    className="h-8 w-full justify-between px-2 py-1 text-xs text-muted-foreground"
+                    aria-expanded={showArchived}
+                    onClick={() => setShowArchived((current) => !current)}
                   >
-                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                      <span className="flex w-full items-center justify-between gap-2">
-                        <span className="truncate font-medium">{riskRuleKindLabel(rule.kind)}</span>
-                        <Badge variant={ruleStatusTone(rule)}>{ruleStatusLabel(rule)}</Badge>
-                      </span>
-                      <span className="w-full truncate text-xs text-muted-foreground">
-                        {ruleTargetLabel(rule, accountNameForRule(rule))} · v{rule.version}
-                      </span>
-                    </span>
+                    {showArchived ? '隐藏已归档' : '显示已归档'}
+                    <Badge variant="outline">{archivedRules.length}</Badge>
                   </Button>
-                );
-              })}
+                  {showArchived && archivedRules.map((rule) => renderRuleItem(rule, true))}
+                </div>
+              )}
             </aside>
 
             <div className="min-w-0 rounded-lg border border-border bg-card p-5">
@@ -204,6 +241,7 @@ export function RiskRuleWorkbench({
                   onEdit={openEdit}
                   onToggle={() => void onToggle(selectedRule)}
                   onArchive={() => setArchiveRule(selectedRule)}
+                  onRestore={() => void onRestore(selectedRule)}
                   onTest={() => void runTest()}
                   onAudit={() => onAudit(selectedRule)}
                 />
@@ -236,7 +274,7 @@ export function RiskRuleWorkbench({
             <AlertDialogTitle>归档风险规则？</AlertDialogTitle>
             <AlertDialogDescription>
               归档“{archiveRule ? riskRuleKindLabel(archiveRule.kind) : ''}
-              ”后会停用规则，但不会删除历史事件和审计记录。
+              ”后会停用并移出默认列表，历史事件和审计记录保留；之后可在“显示已归档”中恢复。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -277,6 +315,7 @@ function RuleDetail({
   onEdit,
   onToggle,
   onArchive,
+  onRestore,
   onTest,
   onAudit,
 }: {
@@ -288,14 +327,17 @@ function RuleDetail({
   onEdit: () => void;
   onToggle: () => void;
   onArchive: () => void;
+  onRestore: () => void;
   onTest: () => void;
   onAudit: () => void;
 }) {
   const testing = busyAction === `test:${rule.id}`;
   const toggling = busyAction === `patch:${rule.id}`;
   const archiving = busyAction === `archive:${rule.id}`;
+  const restoring = busyAction === `restore:${rule.id}`;
   const triggered = testResults.filter((result) => result.triggered).length;
-  const targetLabel = ruleTargetLabel(rule, accountName);
+  const targetLabel = ruleTargetLabel(rule, accountName, rule.assetName);
+  const archived = rule.archivedAt != null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -317,24 +359,21 @@ function RuleDetail({
               这条旧规则缺少账户绑定，编辑并补齐账户和标的后才能恢复。
             </p>
           )}
+          {archived && (
+            <p className="mt-2 mb-0 text-sm text-muted-foreground">
+              这条规则已于 {formatDateTime(rule.archivedAt!)} 归档，不再出现在默认列表中；
+              恢复后会保持停用状态。
+            </p>
+          )}
         </div>
         <span className="text-sm font-medium text-muted-foreground">v{rule.version}</span>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-4 text-sm sm:grid-cols-4">
+      {/* 范围与目标已在标题下方的小字中展示（含标的名），网格只保留不重复的字段 */}
+      <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-4 text-sm">
         <div>
           <dt className="text-xs text-muted-foreground">阈值</dt>
           <dd className="mt-1 font-medium">{formatThreshold(rule.kind, rule.threshold)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">范围</dt>
-          <dd className="mt-1 font-medium">{riskScopeLabel(rule.scope)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">目标</dt>
-          <dd className="mt-1 truncate font-medium" title={targetLabel}>
-            {targetLabel}
-          </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">生效时间</dt>
@@ -343,60 +382,92 @@ function RuleDetail({
       </dl>
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="secondary"
-          disabled={busyAction !== null || rule.needsRepair}
-          onClick={onTest}
-          aria-busy={testing}
-        >
-          {testing && (
-            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-          )}
-          {testing ? '测试中…' : '人工测试'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="secondary"
-          disabled={busyAction !== null}
-          onClick={onEdit}
-        >
-          编辑规则
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="secondary"
-          disabled={busyAction !== null || rule.needsRepair}
-          onClick={onToggle}
-          aria-busy={toggling}
-        >
-          {toggling && (
-            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-          )}
-          {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="secondary"
-          disabled={busyAction !== null}
-          onClick={onArchive}
-          aria-busy={archiving}
-        >
-          归档规则
-        </Button>
-        <Button
-          type="button"
-          variant="link"
-          className="text-button"
-          disabled={busyAction !== null}
-          onClick={onAudit}
-        >
-          查看审计
-        </Button>
+        {archived ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null}
+              onClick={onRestore}
+              aria-busy={restoring}
+            >
+              {restoring && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              {restoring ? '恢复中…' : '恢复规则'}
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="text-button"
+              disabled={busyAction !== null}
+              onClick={onAudit}
+            >
+              查看审计
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null || rule.needsRepair}
+              onClick={onTest}
+              aria-busy={testing}
+            >
+              {testing && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              {testing ? '测试中…' : '人工测试'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null}
+              onClick={onEdit}
+            >
+              编辑规则
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null || rule.needsRepair}
+              onClick={onToggle}
+              aria-busy={toggling}
+            >
+              {toggling && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null}
+              onClick={onArchive}
+              aria-busy={archiving}
+            >
+              {archiving && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              归档规则
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="text-button"
+              disabled={busyAction !== null}
+              onClick={onAudit}
+            >
+              查看审计
+            </Button>
+          </>
+        )}
       </div>
 
       <section className="rounded-lg border border-border p-4" aria-live="polite">

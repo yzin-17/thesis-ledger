@@ -112,10 +112,12 @@ export const ruleTargetLabel = (
     accountId: string | null | undefined;
   },
   accountName?: string,
+  assetName?: string | null,
 ) => {
   if (rule.scope === 'security') {
     const symbol = rule.symbol ?? '未指定证券';
-    return rule.accountId ? `${symbol} · ${accountName ?? '指定账户'}` : symbol;
+    const parts = [symbol, ...(assetName ? [assetName] : [])];
+    return rule.accountId ? `${parts.join(' · ')} · ${accountName ?? '指定账户'}` : parts.join(' · ');
   }
   if (rule.scope === 'account') return rule.accountId ?? '未指定账户';
   return '全组合';
@@ -165,6 +167,75 @@ export const riskEventMode = (event: {
   return null;
 };
 
+const formatRatioPercent = (ratio: number) => `${(ratio * 100).toFixed(2)}%`;
+
+const formatMetricNumber = (value: number) =>
+  value.toLocaleString('zh-CN', { maximumFractionDigits: 4 });
+
+// context.value 是规则触发时与阈值比较的指标。优先读取服务端下发的 metadata.valueMetric
+// 语义标识；存量事件（标识上线前）再按 inputs 里保留的输入反推（costPrice→成本涨跌幅、
+// weight→权重、observations→回撤、rsi/ma/dea/atr→指标值、mainPeak→筹码偏离），
+// 两者都推导不出时以“触发值”兜底。
+const metricValueLabels: Record<string, (value: number) => string> = {
+  distance_to_cost: (value) => `距成本 ${formatRatioPercent(value)}`,
+  weight: (value) => `权重 ${formatRatioPercent(value)}`,
+  drawdown: (value) => `回撤 ${formatRatioPercent(value)}`,
+  rsi: (value) => `RSI ${formatMetricNumber(value)}`,
+  ma_deviation: (value) => `较均线偏离 ${formatMetricNumber(value)}`,
+  macd_dea: (value) => `MACD 差值 ${formatMetricNumber(value)}`,
+  atr: (value) => `ATR ${formatMetricNumber(value)}`,
+  chip_main_peak: (value) => `距筹码峰 ${formatRatioPercent(value)}`,
+};
+
+const riskEventMetadataValueMetric = (context: Record<string, unknown>) => {
+  const metadata = context.metadata;
+  if (typeof metadata !== 'object' || metadata === null) return null;
+  const valueMetric = (metadata as Record<string, unknown>).valueMetric;
+  return typeof valueMetric === 'string' ? valueMetric : null;
+};
+
+const riskEventContextInput = (
+  context: Record<string, unknown> | null | undefined,
+  key: string,
+) => {
+  const inputs = context?.inputs;
+  if (typeof inputs !== 'object' || inputs === null) return undefined;
+  const raw = (inputs as Record<string, unknown>)[key];
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
+};
+
+export const riskEventValueLabel = (context: Record<string, unknown> | null | undefined) => {
+  const value = context?.value;
+  if (!context || typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const valueMetric = riskEventMetadataValueMetric(context);
+  const metricLabel = valueMetric === null ? undefined : metricValueLabels[valueMetric];
+  if (metricLabel) return metricLabel(value);
+  if (riskEventContextInput(context, 'costPrice') !== undefined) {
+    return `距成本 ${formatRatioPercent(value)}`;
+  }
+  if (
+    riskEventContextInput(context, 'weight') !== undefined ||
+    riskEventContextInput(context, 'accountWeight') !== undefined
+  ) {
+    return `权重 ${formatRatioPercent(value)}`;
+  }
+  if (riskEventContextInput(context, 'observations') !== undefined) {
+    return `回撤 ${formatRatioPercent(value)}`;
+  }
+  if (riskEventContextInput(context, 'rsi') !== undefined) return `RSI ${formatMetricNumber(value)}`;
+  if (riskEventContextInput(context, 'ma') !== undefined) {
+    return `较均线偏离 ${formatMetricNumber(value)}`;
+  }
+  if (riskEventContextInput(context, 'dea') !== undefined) {
+    return `MACD 差值 ${formatMetricNumber(value)}`;
+  }
+  if (riskEventContextInput(context, 'atr') !== undefined) return `ATR ${formatMetricNumber(value)}`;
+  if (riskEventContextInput(context, 'mainPeak') !== undefined) {
+    return `距筹码峰 ${formatRatioPercent(value)}`;
+  }
+  return `触发值 ${formatMetricNumber(value)}`;
+};
+
 export const riskModeLabel = (mode: string | null | undefined) => {
   if (mode === 'shadow') return '模拟风险';
   if (mode === 'actual') return '实际风险';
@@ -182,6 +253,14 @@ export const riskSubjectLabel = (subjectType: string) => {
   if (subjectType === 'risk-event') return '风险事件';
   if (subjectType === 'recurring-cash-deposit-plan') return '定期入账计划';
   return `通知主题（${subjectType}）`;
+};
+
+// lastError 存的是服务端错误码原文（如 notification_provider_unconfigured:feishu），
+// 展示层转成可读文案；渠道已在行标题展示，这里不再重复渠道名。未知错误原样保留便于排查。
+export const riskNotificationErrorLabel = (lastError: string | null | undefined) => {
+  if (!lastError) return null;
+  if (/^notification_provider_unconfigured:/u.test(lastError)) return '通知 Provider 未配置';
+  return lastError;
 };
 
 export const riskStatusLabel = (status: string) => {

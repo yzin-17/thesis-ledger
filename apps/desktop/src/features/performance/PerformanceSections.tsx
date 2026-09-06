@@ -458,12 +458,17 @@ export function PerformanceMetrics({
           tone={assetTone}
         />
         <PerformanceKpiCard
-          label="TTWROR"
+          label="时间加权收益率"
           value={ttwrorValue}
           detail={ttwrorDetail}
           tone={undefined}
         />
-        <PerformanceKpiCard label="XIRR" value={xirrValue} detail={xirrDetail} tone={undefined} />
+        <PerformanceKpiCard
+          label="资金加权收益率"
+          value={xirrValue}
+          detail={xirrDetail}
+          tone={undefined}
+        />
       </div>
       {currencyTotals.length > 1 ? (
         <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="分币种总资产">
@@ -493,6 +498,9 @@ export function PerformanceSnapshotTable({
   refreshing,
   onRetry,
   onCompleteDataSetup,
+  onCaptureSnapshot,
+  capturingSnapshot = false,
+  captureDisabled = false,
   groupedByCurrency = false,
 }: {
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
@@ -500,6 +508,9 @@ export function PerformanceSnapshotTable({
   refreshing?: boolean;
   onRetry?: (() => void) | undefined;
   onCompleteDataSetup?: (() => void) | undefined;
+  onCaptureSnapshot?: (() => void) | undefined;
+  capturingSnapshot?: boolean;
+  captureDisabled?: boolean;
   groupedByCurrency?: boolean;
 }) {
   const hasSnapshots = snapshots.length > 0;
@@ -579,11 +590,31 @@ export function PerformanceSnapshotTable({
         aria-live="polite"
       >
         <EmptyTitle>暂无收益历史</EmptyTitle>
-        <EmptyDescription>创建第一个快照后即可查看资产曲线、TTWROR 和 XIRR。</EmptyDescription>
+        <EmptyDescription>创建第一个快照后即可查看资产曲线、时间加权收益率和资金加权收益率。</EmptyDescription>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {onCompleteDataSetup ? (
             <Button type="button" size="sm" onClick={onCompleteDataSetup}>
               完成数据配置
+            </Button>
+          ) : null}
+          {onCaptureSnapshot ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={capturingSnapshot || captureDisabled}
+              aria-busy={capturingSnapshot}
+              title={captureDisabled ? '当前模式暂无可拍摄账户' : undefined}
+              onClick={onCaptureSnapshot}
+            >
+              {capturingSnapshot && (
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              {capturingSnapshot ? '拍摄中…' : '立即拍一个估值快照'}
             </Button>
           ) : null}
           <Button
@@ -597,7 +628,7 @@ export function PerformanceSnapshotTable({
         </div>
         {showCalculationInfo ? (
           <p className="m-0 text-xs text-muted-foreground" role="note">
-            TTWROR 使用完整快照计算，XIRR 还会结合账本的外部现金流。
+            时间加权收益率使用完整快照计算，资金加权收益率还会结合账本的外部现金流。
           </p>
         ) : null}
       </Empty>

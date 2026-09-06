@@ -6,7 +6,7 @@ import type { Account } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
-import { useSavePerformanceTargetsMutation } from './performance.mutations.js';
+import { useCaptureCloseSnapshotsMutation, useSavePerformanceTargetsMutation } from './performance.mutations.js';
 import { usePerformanceQueries } from './performance.queries.js';
 import type { AllocationCategory, Currency, PortfolioMode } from './performance.types.js';
 import {
@@ -126,6 +126,7 @@ export function PerformanceDashboard({
     performanceQueries.allocation,
   ].some((query) => query.isFetching);
   const saveTargetsMutation = useSavePerformanceTargetsMutation();
+  const captureSnapshotsMutation = useCaptureCloseSnapshotsMutation();
 
   const retry = () => {
     void Promise.all([
@@ -162,6 +163,30 @@ export function PerformanceDashboard({
       const message = error instanceof Error ? error.message : '目标保存失败，请稍后重试。';
       setTargetSaveError(message);
       return false;
+    }
+  };
+
+  /** 立即拍摄估值快照跟随当前页面数据模式：模拟模式拍影子账户，实际模式拍实际账户。 */
+  const captureSnapshot = async () => {
+    try {
+      await captureSnapshotsMutation.mutateAsync({
+        accountIds: modeAccounts.map((account) => account.id),
+        capturedAt: new Date().toISOString(),
+      });
+      toastManager.add({
+        title: '估值快照已拍摄',
+        description: '资产走势与收益指标已按最新快照刷新。',
+        type: 'success',
+        timeout: 2800,
+      });
+    } catch (error) {
+      toastManager.add({
+        title: '估值快照拍摄失败',
+        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
     }
   };
 
@@ -235,6 +260,9 @@ export function PerformanceDashboard({
           refreshing={refreshing}
           onRetry={() => void performanceQueries.history.refetch()}
           onCompleteDataSetup={() => onNavigate('providers')}
+          onCaptureSnapshot={() => void captureSnapshot()}
+          capturingSnapshot={captureSnapshotsMutation.isPending}
+          captureDisabled={modeAccounts.length === 0}
         />
         <PerformanceAllocationSection
           loadState={allocationState}

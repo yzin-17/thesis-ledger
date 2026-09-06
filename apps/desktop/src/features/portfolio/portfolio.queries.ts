@@ -55,6 +55,7 @@ export const usePortfolioShellQueries = (mode: PortfolioMode) => {
     accountsReady: !accountsQuery.isPending && !accountsQuery.isError,
     accountsPending: accountsQuery.isPending,
     accountsError: accountsQuery.isError,
+    refreshing: portfolioQuery.isFetching || accountsQuery.isFetching,
     refresh,
   };
 };

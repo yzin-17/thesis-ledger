@@ -1,25 +1,34 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { resolveLoadState } from '../shared/loadState.js';
+import { AutomationEditorSheet } from './AutomationEditorSheet.js';
 import { ProviderEditorSheet } from './ProviderEditorSheet.js';
 import { createProviderActionHandlers } from './providers.actions.js';
 import { useProviderQueries } from './providers.queries.js';
 import {
+  useCreateAutomationJobMutation,
+  useDeleteAutomationJobMutation,
+  useRunAutomationJobMutation,
   useSaveProviderMutation,
   useTestProviderConnectionMutation,
   useTestProviderDraftMutation,
   useToggleAutomationMutation,
+  useUpdateAutomationJobMutation,
 } from './providers.mutations.js';
-import type {
-  AutomationJob,
-  ProviderRecord,
-  ProviderTestEvidence,
-  ProviderTestState,
+import {
+  newAutomationJobDraft,
+  newProviderDraft,
+  type AutomationJob,
+  type AutomationJobDraft,
+  type ProviderRecord,
+  type ProviderTestEvidence,
+  type ProviderTestState,
 } from './providers.types.js';
-import { newProviderDraft } from './providers.types.js';
 import {
   AutomationTable,
   HealthHistoryTable,
@@ -42,12 +51,22 @@ export function ProviderSettings() {
   const [savingProviderDraft, setSavingProviderDraft] = useState(false);
   const [togglingJobId, setTogglingJobId] = useState<string | null>(null);
   const [providerPriorityDrafts, setProviderPriorityDrafts] = useState<Record<string, number>>({});
+  const [automationSheetOpen, setAutomationSheetOpen] = useState(false);
+  const [automationDraft, setAutomationDraft] = useState<AutomationJobDraft>(newAutomationJobDraft);
+  const [editingAutomationJob, setEditingAutomationJob] = useState<AutomationJob | null>(null);
+  const [savingAutomationDraft, setSavingAutomationDraft] = useState(false);
+  const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const toastManager = useToastManager();
+  const { confirm } = useConfirmDialog();
   const providerQueries = useProviderQueries(healthHistoryPage);
   const providerMutation = useSaveProviderMutation();
   const testProviderMutation = useTestProviderConnectionMutation();
   const testProviderDraftMutation = useTestProviderDraftMutation();
   const toggleJobMutation = useToggleAutomationMutation();
+  const createJobMutation = useCreateAutomationJobMutation();
+  const updateJobMutation = useUpdateAutomationJobMutation();
+  const deleteJobMutation = useDeleteAutomationJobMutation();
+  const runJobMutation = useRunAutomationJobMutation();
   const providers: ProviderRecord[] = providerQueries.providers.data ?? [];
   const issues = providerQueries.issues.data ?? [];
   const jobs: AutomationJob[] = providerQueries.jobs.data ?? [];
@@ -108,13 +127,29 @@ export function ProviderSettings() {
     toggleJobMutation,
     load,
     resetProviderTest,
+    automationSheetOpen,
+    automationDraft,
+    editingAutomationJob,
+    savingAutomationDraft,
+    runningJobId,
+    setAutomationSheetOpen,
+    setAutomationDraft,
+    setEditingAutomationJob,
+    setSavingAutomationDraft,
+    setRunningJobId,
+    createJobMutation,
+    updateJobMutation,
+    deleteJobMutation,
+    runJobMutation,
+    confirm,
   });
   const healthHistoryLoading = providerQueries.healthHistory.isFetching;
+  const providerRefreshing = Object.values(providerQueries).some((query) => query.isFetching);
   const handleHealthPage = (page: number) => setHealthHistoryPage(page);
 
   return (
     <section className="module-page" data-provider-sheet-open={String(providerSheetOpen)}>
-      <div className="entry-page-heading">
+      <header className="page-header">
         <div>
           <p className="kicker">Providers</p>
           <h1>数据与自动化</h1>
@@ -122,13 +157,17 @@ export function ProviderSettings() {
             按能力查看 Provider、优先级、健康和额度；凭证只显示配置状态，不回显密钥。
           </p>
         </div>
-        <Button type="button" variant="default" onClick={() => actions.openProviderSheet()}>
-          新增或更新 Provider
-        </Button>
-      </div>
-      <Button className="secondary" type="button" variant="outline" onClick={() => void load()}>
-        刷新 Provider 与自动化
-      </Button>
+        <div className="page-header-actions">
+          <Button type="button" variant="default" onClick={() => actions.openProviderSheet()}>
+            新增或更新 Provider
+          </Button>
+          <RefreshIconButton
+            label="刷新 Provider 与自动化"
+            refreshing={providerRefreshing}
+            onClick={() => void load()}
+          />
+        </div>
+      </header>
       <ProviderEditorSheet
         open={providerSheetOpen}
         editingProviderName={editingProviderName}
@@ -143,6 +182,18 @@ export function ProviderSettings() {
         onClose={actions.closeProviderSheet}
         onTest={() => void actions.testProviderDraft()}
         onSave={(event) => void actions.saveProviderDraft(event)}
+      />
+      <AutomationEditorSheet
+        open={automationSheetOpen}
+        editingJob={editingAutomationJob}
+        draft={automationDraft}
+        saving={savingAutomationDraft}
+        onOpenChange={(open) =>
+          open ? actions.openAutomationEditor() : actions.closeAutomationEditor()
+        }
+        onUpdateDraft={actions.updateAutomationDraft}
+        onClose={actions.closeAutomationEditor}
+        onSubmit={(event) => void actions.submitAutomationEditor(event)}
       />
       <DataStateBanner state={loadState} onRetry={() => void load()} />
       <ProviderTable
@@ -169,7 +220,12 @@ export function ProviderSettings() {
         loadState={loadState}
         jobs={jobs}
         togglingJobId={togglingJobId}
+        runningJobId={runningJobId}
         onToggle={(job) => void actions.toggleJob(job)}
+        onEdit={(job) => actions.openAutomationEditor(job)}
+        onRun={(job) => void actions.runJobNow(job)}
+        onDelete={(job) => void actions.deleteJob(job)}
+        onCreate={() => actions.openAutomationEditor()}
       />
       <HealthHistoryTable
         loadState={loadState}
@@ -179,6 +235,7 @@ export function ProviderSettings() {
       />
       <ProviderHistoryTables
         loadState={loadState}
+        jobs={jobs}
         jobHistory={jobHistory}
         notificationFailures={notificationFailures}
         issues={issues}

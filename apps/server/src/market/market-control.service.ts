@@ -83,7 +83,10 @@ export class MarketControlService {
     return current;
   }
 
-  private async pushToDsa(policy: DesiredProviderPolicy) {
+  private async pushToDsa(
+    policy: DesiredProviderPolicy,
+    allowRebase = true,
+  ): Promise<ReturnType<MarketControlService['recordSyncFailure']>> {
     try {
       const projection = (await this.dsa.applyControlPolicy(policy)) as {
         status?: string;
@@ -127,23 +130,86 @@ export class MarketControlService {
       });
     } catch (error) {
       const lastError = safeError(error);
-      const syncState =
-        error instanceof DsaError && error.code === 'control-rejected' ? 'rejected' : 'pending';
-      return this.prisma.$transaction(async (transaction) => {
-        await transaction.desiredProviderPolicyRevision.update({
-          where: { consumer_revision: { consumer: 'thesis-ledger', revision: policy.revision } },
-          data: { syncState, lastError },
-        });
-        await transaction.desiredProviderPolicy.updateMany({
-          where: { consumer: 'thesis-ledger', revision: policy.revision },
-          data: { syncState, lastError },
-        });
-        return transaction.desiredProviderPolicy.findUniqueOrThrow({
-          where: { consumer: 'thesis-ledger' },
-          include: { history: { orderBy: { revision: 'desc' }, take: 20 } },
-        });
-      });
+      const rejected =
+        error instanceof DsaError &&
+        (error.code === 'control-rejected' || error.code === 'stale-revision');
+      const syncState = rejected ? 'rejected' : 'pending';
+      const failed = await this.recordSyncFailure(policy, syncState, lastError);
+      // 本地策略计数器可能落后于 DSA（例如本地库重建后从 1 重新计数）：
+      // 命中远端 STALE_REVISION 错误码时读取 DSA 当前版本，把本地推进到其之上并重推一次。
+      if (allowRebase && rejected && this.isStaleRevisionError(lastError)) {
+        const rebased = await this.rebaseToDsaRevision(policy);
+        if (rebased) return this.pushToDsa(rebased, false);
+      }
+      return failed;
     }
+  }
+
+  private isStaleRevisionError(lastError: { code: string }) {
+    return lastError.code === 'stale-revision';
+  }
+
+  // 以 DSA 当前 revision 为基线：本地新建一个“远端版本 + 1”的修订（内容保持本地期望），推送由调用方完成
+  private async rebaseToDsaRevision(policy: DesiredProviderPolicy) {
+    try {
+      const effective = (await this.dsa.effectiveControlPolicy()) as {
+        projection?: { desired?: { revision?: number } } | null;
+      };
+      const remoteRevision = effective.projection?.desired?.revision;
+      if (
+        !Number.isInteger(remoteRevision) ||
+        ((remoteRevision as number) <= policy.revision)
+      )
+        return null;
+      const next = this.policyPayload(
+        { enabled: policy.enabled, routes: policy.routes },
+        (remoteRevision as number) + 1,
+      );
+      await this.prisma.desiredProviderPolicy.update({
+        where: { consumer: 'thesis-ledger' },
+        data: {
+          revision: next.revision,
+          enabled: next.enabled,
+          routes: next.routes,
+          syncState: 'pending',
+          lastError: Prisma.JsonNull,
+          syncedAt: null,
+          dsaRevision: null,
+          history: {
+            create: {
+              revision: next.revision,
+              enabled: next.enabled,
+              routes: next.routes,
+              syncState: 'pending',
+            },
+          },
+        },
+      });
+      return next;
+    } catch {
+      return null;
+    }
+  }
+
+  private recordSyncFailure(
+    policy: DesiredProviderPolicy,
+    syncState: 'rejected' | 'pending',
+    lastError: { code: string; message: string },
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.desiredProviderPolicyRevision.update({
+        where: { consumer_revision: { consumer: 'thesis-ledger', revision: policy.revision } },
+        data: { syncState, lastError },
+      });
+      await transaction.desiredProviderPolicy.updateMany({
+        where: { consumer: 'thesis-ledger', revision: policy.revision },
+        data: { syncState, lastError },
+      });
+      return transaction.desiredProviderPolicy.findUniqueOrThrow({
+        where: { consumer: 'thesis-ledger' },
+        include: { history: { orderBy: { revision: 'desc' }, take: 20 } },
+      });
+    });
   }
 
   async applyPolicy(input: unknown) {

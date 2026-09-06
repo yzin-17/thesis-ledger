@@ -7,7 +7,7 @@
 ## 流程
 
 1. 修改 `apps/server/prisma/schema.prisma`。
-2. 以当前最终 schema 重新生成并人工审核 `apps/server/prisma/migrations/20260902000000_fresh_database_baseline/migration.sql`。
+2. 以当前最终 schema 重新生成并人工审核 `apps/server/prisma/migrations/20260905000000_fresh_database_baseline/migration.sql`。
 3. 确认 Prisma 无法表达的 `CHECK`、函数、触发器、扩展、部分索引、Schema marker 和角色权限仍在 baseline 中。
 4. CI 对空 PostgreSQL 数据库执行 baseline，并运行 Prisma validate、Server 定向测试和数据库不变量演练。
 5. Compose 由 PostgreSQL 官方 init 路径执行 baseline；ThesisLedger 不执行数据库初始化或 owner 连接串。

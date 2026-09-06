@@ -4,6 +4,7 @@ import {
   formatRiskEventName,
   type CompleteRiskContext,
   type RiskEvent,
+  type RiskEventMetric,
   type RiskRule,
   type V01RiskContext,
 } from './types.js';
@@ -41,6 +42,7 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
   if (context.price === undefined && rule.kind !== 'position-concentration') return null;
   let value: number;
   let triggered: boolean;
+  let valueMetric: RiskEventMetric | undefined;
   switch (rule.kind) {
     case 'fixed-stop':
     case 'price-below':
@@ -57,6 +59,7 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
       value = context.price! / context.costPrice - 1;
       triggered =
         rule.kind === 'cost-stop' ? value < -Math.abs(rule.threshold) : value > rule.threshold;
+      valueMetric = 'distance_to_cost';
       break;
     }
     case 'position-concentration':
@@ -65,6 +68,7 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
         : (context.weight ?? NaN);
       if (!Number.isFinite(value)) return null;
       triggered = value > rule.threshold;
+      valueMetric = 'weight';
       break;
     default:
       return null;
@@ -95,6 +99,7 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
         ...(context.weight === undefined ? {} : { weight: context.weight }),
         ...(context.accountWeight === undefined ? {} : { accountWeight: context.accountWeight }),
       },
+      ...(valueMetric === undefined ? {} : { metadata: { valueMetric } }),
     },
   };
 };

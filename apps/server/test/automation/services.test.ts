@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { nextCronOccurrence, runWithRetry } from '../../src/automation/automation.service.js';
+import { AutomationRuntimeHandlers } from '../../src/automation/automation-runtime.service.js';
 import {
   dailyDigest,
   dailyRiskSummary,
@@ -94,5 +95,111 @@ describe('自动化基础', () => {
       }),
     ).resolves.toEqual({ result: 'ok', attempts: 3 });
     expect(waits).toEqual([10, 20]);
+  });
+});
+
+describe('风险后台评估', () => {
+  const makePosition = (id: string, symbol: string) => ({
+    id,
+    symbol,
+    accountId: 'account-1',
+    quantity: 100,
+    costPrice: 10,
+    updatedAt: new Date('2026-09-05T00:00:00Z'),
+    asset: { assetType: 'stock' },
+  });
+
+  const makeRuntime = (
+    positionsByMode: Record<string, unknown[]>,
+    riskScan: ReturnType<typeof vi.fn>,
+  ) =>
+    new AutomationRuntimeHandlers(
+      {
+        position: {
+          findMany: vi.fn(async (args: { where: { account: { mode: string } } }) =>
+            positionsByMode[args.where.account.mode],
+          ),
+        },
+        riskEvent: { findMany: vi.fn(async () => []) },
+      } as never,
+      { riskScan } as never,
+      { getQuote: vi.fn(async () => ({ price: 9 })) } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+  it('后台风险评估同批覆盖实际与模拟组合，上下文按模式标记', async () => {
+    const riskScan = vi.fn(async (contexts: Array<{ mode: string }>) => ({
+      traceId: 'trace-1',
+      scanId: 'scan-1',
+      results: contexts.map((context) => ({ ruleId: 'rule-1', eventId: `event-${context.mode}` })),
+    }));
+    const runtime = makeRuntime(
+      {
+        actual: [makePosition('position-actual', '600519.SH')],
+        shadow: [makePosition('position-shadow', '510300.SH')],
+      },
+      riskScan,
+    );
+    const result = (await runtime
+      .for('risk-evaluation')
+      .run(new AbortController().signal, new Date('2026-09-05T02:00:00Z'))) as {
+      contextCount: number;
+      shadow: { contextCount: number; eventCount: number };
+    };
+
+    expect(riskScan).toHaveBeenCalledTimes(2);
+    const actualContexts = riskScan.mock.calls[0]?.[0] as Array<{ mode: string }>;
+    const shadowContexts = riskScan.mock.calls[1]?.[0] as Array<{ mode: string }>;
+    expect(actualContexts[0]?.mode).toBe('actual');
+    expect(shadowContexts[0]?.mode).toBe('shadow');
+    expect(result.contextCount).toBe(1);
+    expect(result.shadow).toMatchObject({ contextCount: 1, eventCount: 1 });
+  });
+
+  it('模拟扫描失败只记录错误，不影响实际模式的监控结果', async () => {
+    const riskScan = vi
+      .fn()
+      .mockResolvedValueOnce({ traceId: 'trace-1', scanId: 'scan-1', results: [] })
+      .mockRejectedValueOnce(new Error('shadow scan failed'));
+    const runtime = makeRuntime(
+      {
+        actual: [makePosition('position-actual', '600519.SH')],
+        shadow: [makePosition('position-shadow', '510300.SH')],
+      },
+      riskScan,
+    );
+    const result = (await runtime
+      .for('risk-evaluation')
+      .run(new AbortController().signal, new Date('2026-09-05T02:00:00Z'))) as {
+      contextCount: number;
+      results: unknown[];
+      shadow: { error: string };
+    };
+
+    expect(result.contextCount).toBe(1);
+    expect(result.results).toEqual([]);
+    expect(result.shadow).toEqual({ error: 'shadow scan failed' });
+  });
+
+  it('日报只统计实际模式事件，模拟事件不进入通知', async () => {
+    const riskEventFindMany = vi.fn(async () => []);
+    const runtime = makeRuntime({}, vi.fn()) as unknown as {
+      prisma: { riskEvent: { findMany: ReturnType<typeof vi.fn> } };
+    };
+    runtime.prisma.riskEvent.findMany = riskEventFindMany;
+    await (
+      runtime as unknown as {
+        for: (type: string) => { run: (signal: AbortSignal, at: Date) => Promise<unknown> };
+      }
+    )
+      .for('daily-digest')
+      .run(new AbortController().signal, new Date('2026-09-05T02:00:00Z'));
+    expect(riskEventFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ mode: 'actual' }),
+      }),
+    );
   });
 });

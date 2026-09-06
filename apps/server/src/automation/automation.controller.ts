@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpException,
+  InternalServerErrorException,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   automationCloseSnapshotsInputSchema,
   automationCloseSyncInputSchema,
@@ -6,6 +18,7 @@ import {
   automationDailyRiskSummaryInputSchema,
   automationDigestInputSchema,
   automationEnabledInputSchema,
+  automationJobTypeSchema,
   automationOpeningScanInputSchema,
   automationPreMarketEventsInputSchema,
   automationRiskPreviewInputSchema,
@@ -15,6 +28,7 @@ import {
   omitUndefinedDeep,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { AutomationRuntimeHandlers } from './automation-runtime.service.js';
 import { AutomationService } from './automation.service.js';
 import { AutomationWorkflowRunner } from './workflow-runner.service.js';
 import {
@@ -34,6 +48,7 @@ export class AutomationController {
     private readonly automations: AutomationService,
     private readonly prisma: PrismaService,
     private readonly workflows: AutomationWorkflowRunner,
+    private readonly handlers: AutomationRuntimeHandlers,
   ) {}
 
   @Post()
@@ -51,10 +66,36 @@ export class AutomationController {
     return this.automations.history(jobId);
   }
 
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() input: unknown) {
+    return this.automations.update(id, input);
+  }
+
   @Patch(':id/enabled')
   setEnabled(@Param('id') id: string, @Body() input: unknown) {
     const body = automationEnabledInputSchema.parse(input);
     return this.prisma.automationJob.update({ where: { id }, data: { enabled: body.enabled } });
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.automations.delete(id);
+  }
+
+  /** 手动立即执行：显式试跑，绕过启停与交易日检查；执行层照常负责锁、运行历史与重试。 */
+  @Post(':id/run')
+  async run(@Param('id') id: string) {
+    const job = await this.prisma.automationJob.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('任务不存在');
+    const handler = this.handlers.for(automationJobTypeSchema.parse(job.type));
+    try {
+      return await this.automations.execute(job.id, handler);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException(
+        error instanceof Error ? error.message : '自动化执行失败',
+      );
+    }
   }
 
   @Post('workflows/pre-market-events')

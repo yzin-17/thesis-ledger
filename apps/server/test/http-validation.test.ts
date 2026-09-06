@@ -37,7 +37,12 @@ describe('HTTP runtime validation', () => {
 
   it('Automation enabled endpoint rejects string booleans', () => {
     const prisma = { automationJob: { update: vi.fn() } };
-    const controller = new AutomationController({} as never, prisma as never, {} as never);
+    const controller = new AutomationController(
+      {} as never,
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
 
     expect(() => controller.setEnabled('job', { enabled: 'true' })).toThrow(z.ZodError);
     expect(prisma.automationJob.update).not.toHaveBeenCalled();

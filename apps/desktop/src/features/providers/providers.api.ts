@@ -6,6 +6,8 @@ import {
 import type {
   AutomationHistoryRecord,
   AutomationJob,
+  AutomationRunNowResult,
+  CreateAutomationJobInput,
   NotificationFailureRecord,
   ProviderConnectionTestResult,
   ProviderDraftTestResult,
@@ -13,6 +15,7 @@ import type {
   ProviderRecord,
   ProviderSaveResult,
   SaveProviderInput,
+  UpdateAutomationJobInput,
 } from './providers.types.js';
 
 const noStore = { cache: 'no-store' as const };
@@ -85,5 +88,43 @@ export const toggleAutomation = (jobId: string, enabled: boolean, client?: Deskt
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ enabled }),
     },
+    client,
+  );
+
+const automationJsonInit = (method: 'POST' | 'PATCH', body: unknown): RequestInit => ({
+  ...noStore,
+  method,
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+export const createAutomationJob = (
+  input: CreateAutomationJobInput,
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<AutomationJob>('/automations', automationJsonInit('POST', input), client);
+
+export const updateAutomationJob = (
+  jobId: string,
+  patch: UpdateAutomationJobInput,
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<AutomationJob>(
+    `/automations/${encodeURIComponent(jobId)}`,
+    automationJsonInit('PATCH', patch),
+    client,
+  );
+
+export const deleteAutomationJob = (jobId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<AutomationJob>(
+    `/automations/${encodeURIComponent(jobId)}`,
+    { ...noStore, method: 'DELETE' },
+    client,
+  );
+
+export const runAutomationJob = (jobId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<AutomationRunNowResult>(
+    `/automations/${encodeURIComponent(jobId)}/run`,
+    { ...noStore, method: 'POST' },
     client,
   );

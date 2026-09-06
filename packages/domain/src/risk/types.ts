@@ -50,6 +50,17 @@ export interface RiskEvaluationContext {
   metadata?: Record<string, string | number | boolean>;
 }
 
+/** `metadata.valueMetric` 的取值：标识 `value` 度量的语义，客户端据此渲染数值标签，不得依赖 inputs 键反推。 */
+export type RiskEventMetric =
+  | 'distance_to_cost'
+  | 'weight'
+  | 'drawdown'
+  | 'rsi'
+  | 'ma_deviation'
+  | 'macd_dea'
+  | 'atr'
+  | 'chip_main_peak';
+
 export interface RiskEvent {
   id: string;
   ruleId: string;

@@ -104,6 +104,31 @@ describe('V0.1 风险规则', () => {
         { symbol: 'x', weight: 0.1, accountWeight: 0.3, accountId: 'account-1', marketTime: 't' },
       )?.triggered,
     ).toBe(true));
+  it('事件 metadata 携带 valueMetric 语义标识供客户端渲染数值标签', () => {
+    const costEvent = evaluateV01Rule(
+      { ...rule, kind: 'cost-stop', threshold: 0.08 },
+      { symbol: 'x', price: 91, costPrice: 100, marketTime: 't' },
+    );
+    expect(costEvent?.context.metadata).toMatchObject({ valueMetric: 'distance_to_cost' });
+
+    const weightEvent = evaluateV01Rule(
+      { ...rule, kind: 'position-concentration', threshold: 0.2 },
+      { symbol: 'x', weight: 0.3, marketTime: 't' },
+    );
+    expect(weightEvent?.context.metadata).toMatchObject({ valueMetric: 'weight' });
+
+    const drawdownEvent = evaluateCompleteRule(
+      { ...rule, kind: 'drawdown', threshold: 0.1 },
+      { symbol: '@portfolio', portfolioValues: [100, 80], marketTime: 't' },
+    );
+    expect(drawdownEvent?.context.metadata).toMatchObject({ valueMetric: 'drawdown' });
+
+    const fixedStopEvent = evaluateV01Rule(
+      { ...rule, kind: 'fixed-stop' },
+      { symbol: 'x', price: 8, marketTime: 't' },
+    );
+    expect(fixedStopEvent?.context.metadata).toBeUndefined();
+  });
 });
 
 describe('完整风险计算', () => {

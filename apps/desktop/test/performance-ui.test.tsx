@@ -8,7 +8,7 @@ import {
   PerformanceSnapshotTable,
 } from '../src/features/performance/PerformanceSections.js';
 import { PortfolioModeSwitch } from '../src/features/shared/PortfolioModeSwitch.js';
-import { fetchPerformanceHistory } from '../src/features/performance/performance.api.js';
+import { captureCloseSnapshots, fetchPerformanceHistory } from '../src/features/performance/performance.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 
 describe('收益分析交互契约', () => {
@@ -228,5 +228,64 @@ describe('收益分析交互契约', () => {
       partial: true,
       missingSymbols: ['600519.SH'],
     });
+  });
+});
+
+describe('一键估值快照契约', () => {
+  const emptyTable = (props: {
+    onCaptureSnapshot?: () => void;
+    capturingSnapshot?: boolean;
+    captureDisabled?: boolean;
+    onCompleteDataSetup?: () => void;
+  }) =>
+    renderToStaticMarkup(
+      <PerformanceSnapshotTable
+        loadState="empty"
+        snapshots={[]}
+        {...props}
+      />,
+    );
+
+  it('空状态提供一键快照按钮，保留完成数据配置入口', () => {
+    const markup = emptyTable({
+      onCaptureSnapshot: () => {},
+      onCompleteDataSetup: () => {},
+    });
+    expect(markup).toContain('立即拍一个估值快照');
+    expect(markup).toContain('完成数据配置');
+    expect(markup).not.toContain('disabled=""');
+  });
+
+  it('拍摄中显示忙碌态，无账户时禁用并提示', () => {
+    const capturing = emptyTable({ onCaptureSnapshot: () => {}, capturingSnapshot: true });
+    expect(capturing).toContain('拍摄中…');
+    expect(capturing).toContain('aria-busy="true"');
+    expect(capturing).toContain('disabled=""');
+
+    const disabled = emptyTable({
+      onCaptureSnapshot: () => {},
+      captureDisabled: true,
+    });
+    expect(disabled).toContain('disabled=""');
+    expect(disabled).toContain('当前模式暂无可拍摄账户');
+
+    expect(emptyTable({})).not.toContain('立即拍一个估值快照');
+  });
+
+  it('一键快照调用收盘快照工作流并携带当前模式账户与时间', async () => {
+    const request = vi.fn(async <T,>(path: string, init?: RequestInit) => {
+      expect(path).toBe('/automations/workflows/close-snapshots');
+      expect(init?.method).toBe('POST');
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        accountIds: ['acc-1', 'acc-2'],
+      });
+      expect(typeof JSON.parse(String(init?.body)).capturedAt).toBe('string');
+      return { capturedAt: '2026-09-06T08:00:00.000Z', snapshots: [] } as T;
+    });
+    await captureCloseSnapshots(
+      { accountIds: ['acc-1', 'acc-2'], capturedAt: new Date().toISOString() },
+      { request } as unknown as DesktopRequestClient,
+    );
+    expect(request).toHaveBeenCalledOnce();
   });
 });

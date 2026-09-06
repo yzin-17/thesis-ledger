@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const baselineSql = readFile(
   new URL(
-    '../../prisma/migrations/20260902000000_fresh_database_baseline/migration.sql',
+    '../../prisma/migrations/20260905000000_fresh_database_baseline/migration.sql',
     import.meta.url,
   ),
   'utf8',
@@ -27,7 +27,7 @@ describe('fresh database current baseline', () => {
       expect(sql).toContain(`CREATE TABLE "${table}"`);
     }
     expect(sql).toContain(
-      'INSERT INTO "SchemaVersion" ("id", "version")\nVALUES (1, \'20260902000000_fresh_database_baseline\')',
+      'INSERT INTO "SchemaVersion" ("id", "version")\nVALUES (1, \'20260905000000_fresh_database_baseline\')',
     );
   });
 

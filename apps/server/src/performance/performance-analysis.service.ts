@@ -227,7 +227,7 @@ export class PerformanceAnalysisService {
     try {
       moneyWeightedReturn = xirr(input.cashFlows);
     } catch (error) {
-      xirrReason = error instanceof Error ? error.message : 'XIRR 无法计算';
+      xirrReason = error instanceof Error ? error.message : '资金加权收益率无法计算';
     }
     return { ttwror: ttwror(input.valuations), xirr: moneyWeightedReturn, xirrReason };
   }

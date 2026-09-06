@@ -19,12 +19,34 @@ import {
   riskRuleNeedsAccount,
   riskRuleScopeOptionsForKind,
   riskTestRecordForRule,
+  riskEventValueLabel,
   riskStatusLabel,
   riskStatusTone,
   riskSubjectLabel,
   rulePreview,
 } from '../src/features/risk/risk.format.js';
 import type { Portfolio } from '../src/features/portfolio/portfolio.types.js';
+
+describe('风险事件数值标签', () => {
+  it('优先读取服务端 valueMetric 语义标识', () => {
+    expect(
+      riskEventValueLabel({ value: 0.15, metadata: { valueMetric: 'distance_to_cost' } }),
+    ).toBe('距成本 15.00%');
+    expect(riskEventValueLabel({ value: 0.25, metadata: { valueMetric: 'weight' } })).toBe(
+      '权重 25.00%',
+    );
+    expect(
+      riskEventValueLabel({ value: 71, metadata: { valueMetric: 'rsi', direction: 'above' } }),
+    ).toBe('RSI 71');
+  });
+
+  it('存量事件按 inputs 反推，未知标识回落触发值', () => {
+    expect(riskEventValueLabel({ value: 0.15, inputs: { costPrice: 100 } })).toBe('距成本 15.00%');
+    expect(
+      riskEventValueLabel({ value: 0.2, metadata: { valueMetric: 'future_metric' } }),
+    ).toBe('触发值 0.2');
+  });
+});
 
 const portfolio: Portfolio = {
   totalMarketValue: 1000,
@@ -187,7 +209,7 @@ describe('风险中心 AB 交互契约', () => {
             ruleId: 'rule-1',
             ruleVersion: 3,
             severity: 'critical',
-            message: '价格低于已触发',
+            message: '159516.SZ · 价格低于 90 已触发',
             symbol: '159516.SZ',
             marketTime: '2026-08-23T01:00:00.000Z',
             evaluatedAt: '2026-08-23T01:01:00.000Z',
@@ -200,6 +222,38 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).toContain('模拟风险');
     expect(html).toContain('v3');
     expect(html).toContain('159516.SZ');
+    // 副标题展示格式化后的触发指标，不再重复标的代码或暴露原始 value=
+    expect(html).toContain('触发值 90');
+    expect(html).not.toContain('value=');
+  });
+
+  it('事件副标题按规则族格式化触发指标', () => {
+    const html = renderToStaticMarkup(
+      <RiskEventTable
+        loadState="ready"
+        events={[
+          {
+            id: 'event-cost-stop',
+            ruleId: 'rule-1',
+            ruleVersion: 2,
+            severity: 'warning',
+            message: '510300.SH · 沪深300ETF华泰柏瑞 · 同花顺 · 成本止损 1% 已触发',
+            symbol: '510300.SH',
+            marketTime: '2026-08-23T01:00:00.000Z',
+            evaluatedAt: '2026-08-23T01:01:00.000Z',
+            context: {
+              value: -0.0268,
+              reference: 0.01,
+              mode: 'actual',
+              inputs: { price: 3.7, costPrice: 3.8 },
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain('距成本 -2.68%');
+    expect(html).not.toContain('510300.SH · 510300.SH');
   });
 
   it('事件模式未知时不回退为实际风险，通知状态保留可辨识语义', () => {
@@ -237,7 +291,10 @@ describe('风险中心 AB 交互契约', () => {
     const html = renderToStaticMarkup(
       <RiskNotificationTable
         loadState="ready"
-        routes={[{ channel: 'feishu', provider: 'lark-webhook' }]}
+        routes={[
+          { channel: 'feishu', provider: 'lark-webhook' },
+          { channel: 'feishu', provider: '飞书' },
+        ]}
         routingState="ready"
         deliveries={[
           {
@@ -251,12 +308,28 @@ describe('风险中心 AB 交互契约', () => {
             scheduledAt: '2026-08-23T01:00:00.000Z',
             lastError: null,
           },
+          {
+            id: 'delivery-2',
+            subjectType: 'risk-event',
+            subjectId: 'event-2',
+            channel: 'feishu',
+            severity: 'warning',
+            status: 'failed',
+            attemptCount: 3,
+            scheduledAt: '2026-08-23T01:00:00.000Z',
+            lastError: 'notification_provider_unconfigured:feishu',
+          },
         ]}
       />,
     );
 
     expect(html).toContain('飞书 · 风险事件');
     expect(html).toContain('lark-webhook（飞书）');
+    // Provider 名称与渠道中文名相同时不追加括号，避免“飞书（飞书）”
+    expect(html).not.toContain('飞书（飞书）');
+    // 错误码转为可读文案（渠道已在行标题展示，不再重复），不展示原始代码
+    expect(html).toContain('通知 Provider 未配置');
+    expect(html).not.toContain('notification_provider_unconfigured');
     expect(html).toContain('主题 event-1');
     expect(html).not.toContain('事件 undefined');
   });
@@ -391,6 +464,8 @@ describe('风险中心 AB 交互契约', () => {
             enabled: false,
             needsRepair: true,
             repairReason: 'account-binding-required',
+            archivedAt: null,
+            assetName: '半导体设备ETF国泰',
             symbol: '159516.SZ',
             accountId: null,
             effectiveAt: '2026-08-23T01:00:00.000Z',
@@ -404,6 +479,7 @@ describe('风险中心 AB 交互契约', () => {
         onUpdate={async () => true}
         onToggle={async () => true}
         onArchive={async () => true}
+        onRestore={async () => true}
         onTest={async () => []}
         testRecords={{}}
         onTestComplete={() => undefined}
@@ -414,5 +490,57 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).toContain('待修复');
     expect(html).toContain('需补齐账户和标的');
     expect(html).toContain('补齐目标后启用');
+    // 列表项为“标的名 · 代码”，悬停 title 保留完整标签
+    expect(html).toContain('半导体设备ETF国泰 · 159516.SZ · v2');
+  });
+
+  it('已归档规则退出默认列表，显示已归档后仅保留恢复和审计', () => {
+    const html = renderToStaticMarkup(
+      <RiskRuleWorkbench
+        rules={[
+          {
+            id: 'rule-archived',
+            version: 3,
+            kind: 'price-below',
+            scope: 'security',
+            severity: 'warning',
+            threshold: 10,
+            enabled: false,
+            needsRepair: false,
+            repairReason: null,
+            archivedAt: '2026-09-05T00:00:00.000Z',
+            assetName: '贵州茅台',
+            symbol: '600519.SH',
+            accountId: null,
+            effectiveAt: '2026-08-23T01:00:00.000Z',
+          },
+        ]}
+        accounts={[]}
+        positions={portfolio.positions}
+        loadState="ready"
+        busyAction={null}
+        onCreate={async () => true}
+        onUpdate={async () => true}
+        onToggle={async () => true}
+        onArchive={async () => true}
+        onRestore={async () => true}
+        onTest={async () => []}
+        testRecords={{}}
+        onTestComplete={() => undefined}
+        onAudit={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('已归档');
+    expect(html).toContain('显示已归档');
+    expect(html).toContain('恢复规则');
+    expect(html).toContain('查看审计');
+    // 标的名展示在标题小字中，网格不再重复“范围/目标”
+    expect(html).toContain('证券 · 600519.SH · 贵州茅台');
+    expect(html).not.toContain('>目标<');
+    expect(html).not.toContain('>范围<');
+    expect(html).not.toContain('>归档规则<');
+    expect(html).not.toContain('>启用规则<');
+    expect(html).not.toContain('>人工测试<');
   });
 });

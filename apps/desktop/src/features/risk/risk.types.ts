@@ -39,6 +39,8 @@ export interface RiskRuleRecord {
   enabled: boolean;
   needsRepair: boolean;
   repairReason: string | null;
+  archivedAt: string | null;
+  assetName?: string | null;
   symbol: string | null;
   accountId: string | null;
   effectiveAt: string;

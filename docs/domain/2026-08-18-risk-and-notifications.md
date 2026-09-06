@@ -2,11 +2,11 @@
 
 ## 责任边界
 
-`RiskRule` 只描述确定性条件，`Rule Evaluation Context` 提供计算所需事实，`RiskEvent` 保存结果，`NotificationDelivery` 负责发送。通知模块和 AI 不得重新计算规则。系统仅用于研究和提醒，不连接券商下单；提醒到达不构成交易执行保证，也不提供实时交易 SLA。
+`RiskRule` 只描述确定性条件，`Rule Evaluation Context` 提供计算所需事实，`RiskEvent` 保存结果，`NotificationDelivery` 负责发送。通知模块和 AI 不得重新计算规则。系统仅用于研究和提醒，不连接券商下单；提醒到达不构成交易执行保证，也不提供实时交易 SLA。后台定时风险评估同批覆盖实际与模拟组合（同一套规则、按模式隔离事件），模拟事件只记录、不发送通知、不进入日报；模拟侧评估失败只记录错误，不影响实际模式监控。
 
 ## 规则版本与作用域
 
-规则包含 `version`、`scope`、`condition`、`parameters`、`severity`、`enabled` 和 `effectiveAt`。创建、修改、启停、归档和人工测试均记录 `RiskRuleAudit`；修改与启停会递增版本，事件保存触发时的 `ruleVersion`。
+规则包含 `version`、`scope`、`condition`、`parameters`、`severity`、`enabled`、`archivedAt` 和 `effectiveAt`。创建、修改、启停、归档、恢复和人工测试均记录 `RiskRuleAudit`；修改、启停、归档和恢复都会递增版本，事件保存触发时的 `ruleVersion`。归档规则写入 `archivedAt` 并保持停用，从规则列表默认隐藏（`includeArchived=true` 可查），扫描永不使用已归档规则；恢复清空 `archivedAt` 后规则保持停用，需手动启用。
 
 - `security` 必须指定 `symbol`，只评估对应证券。
 - `account` 必须指定 `accountId`，只评估对应账户。

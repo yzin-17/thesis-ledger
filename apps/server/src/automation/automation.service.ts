@@ -1,14 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from 'croner';
+import { Prisma } from '@prisma/client';
 import { cnTradingCalendar } from '@thesis-ledger/domain';
 import {
   automationJobSchema,
   automationJobTypeSchema,
+  automationJobUpdateSchema,
   isMarketAutomationJobType,
   type AutomationJobType,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
+import {
+  automationNotificationLogger,
+  enqueueAutomationFailureNotification,
+} from './automation-notification.js';
 
 export const nextCronOccurrence = (cron: string, timezone: string, after = new Date()) => {
   const schedule = new Cron(cron, { timezone, paused: true });
@@ -49,6 +56,7 @@ export class AutomationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly notifications: NotificationService,
   ) {}
 
   create(input: unknown) {
@@ -70,6 +78,48 @@ export class AutomationService {
 
   list() {
     return this.prisma.automationJob.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  async update(id: string, input: unknown) {
+    const patch = automationJobUpdateSchema.parse(input);
+    const job = await this.prisma.automationJob.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('任务不存在');
+
+    const cronChanged = patch.cron !== undefined && patch.cron !== job.cron;
+    const timezoneChanged = patch.timezone !== undefined && patch.timezone !== job.timezone;
+    let nextRunAt: Date | undefined;
+    if (cronChanged || timezoneChanged) {
+      try {
+        nextRunAt = nextCronOccurrence(patch.cron ?? job.cron, patch.timezone ?? job.timezone);
+      } catch {
+        throw new BadRequestException('cron 表达式无效');
+      }
+    }
+
+    return this.prisma.automationJob.update({
+      where: { id },
+      data: {
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.cron !== undefined ? { cron: patch.cron } : {}),
+        ...(patch.timezone !== undefined ? { timezone: patch.timezone } : {}),
+        ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(nextRunAt ? { nextRunAt } : {}),
+      },
+    });
+  }
+
+  async delete(id: string) {
+    const job = await this.prisma.automationJob.findUnique({ where: { id } });
+    if (!job) throw new NotFoundException('任务不存在');
+    const history = await this.prisma.automationRun.findFirst({ where: { jobId: id } });
+    if (history) throw new ConflictException('已有运行历史，请改用停用');
+    try {
+      return await this.prisma.automationJob.delete({ where: { id } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003')
+        throw new ConflictException('已有运行历史，请改用停用');
+      throw error;
+    }
   }
 
   async executeScheduled(jobId: string, handler: AutomationHandler, now = new Date()) {
@@ -110,7 +160,32 @@ export class AutomationService {
         where: { id: jobId },
         data: { lastRunAt: now, nextRunAt },
       });
+      await this.notifySchedulingFailure(job, error);
       throw error;
+    }
+  }
+
+  /** 仅调度路径经过本方法；手动 run-now 直调 execute，不产生失败通知。 */
+  private async notifySchedulingFailure(job: { id: string; name: string }, error: unknown) {
+    try {
+      const run = await this.prisma.automationRun.findFirst({
+        where: { jobId: job.id },
+        orderBy: { startedAt: 'desc' },
+      });
+      await enqueueAutomationFailureNotification(this.notifications, {
+        jobId: job.id,
+        jobName: job.name,
+        runId: run?.id ?? job.id,
+        traceId: run?.traceId ?? job.id,
+        error,
+      });
+    } catch (notificationError) {
+      // 通知准备或入队失败不影响失败状态记录与原始执行错误的抛出。
+      automationNotificationLogger.warn({
+        operation: 'automation.failure_notification_failed',
+        jobId: job.id,
+        reason: notificationError instanceof Error ? notificationError.message : 'unknown',
+      });
     }
   }
 

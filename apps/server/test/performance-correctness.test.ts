@@ -208,6 +208,7 @@ describe('Performance correctness regressions', () => {
 
     const result = await service.summary('a');
     expect(result.xirr).toBeNull();
-    expect(result.xirrReason).toContain('XIRR');
+    // domain 的 XIRR 报错文案已中文化为「资金加权收益率…」（用户可读术语），断言跟随
+    expect(result.xirrReason).toContain('资金加权收益率');
   });
 });

@@ -34,7 +34,8 @@ export class DsaError extends Error {
       | 'invalid-response'
       | 'unauthorized'
       | 'unsupported-capability'
-      | 'control-rejected',
+      | 'control-rejected'
+      | 'stale-revision',
     readonly status?: number,
   ) {
     super(message);
@@ -111,9 +112,11 @@ export class DsaClient {
               ? 'unauthorized'
               : detail?.code === 'unsupported_capability'
                 ? 'unsupported-capability'
-                : response.status === 409 || response.status === 422
-                  ? 'control-rejected'
-                  : 'unavailable';
+                : detail?.code === 'STALE_REVISION'
+                  ? 'stale-revision'
+                  : response.status === 409 || response.status === 422
+                    ? 'control-rejected'
+                    : 'unavailable';
           throw new DsaError(
             detail?.message ?? `DSA Control 返回 ${response.status}`,
             code,

@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { LoaderCircle, RefreshCw } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 
 import type { LoadState } from '../shared/types.js';
 import type {
@@ -34,7 +34,6 @@ export function RiskOverview({
   lastUpdatedAt,
   scanning,
   onScan,
-  onRefresh,
   onSelectTab,
 }: {
   mode: PortfolioMode;
@@ -47,7 +46,6 @@ export function RiskOverview({
   lastUpdatedAt: string | null;
   scanning: boolean;
   onScan: () => void;
-  onRefresh: () => void;
   onSelectTab: (tab: SummaryTab, filter?: string) => void;
 }) {
   const enabledRules = rules.filter((rule) => rule.enabled).length;
@@ -82,16 +80,7 @@ export function RiskOverview({
             )}
             {scanning ? '执行中…' : '立即执行风险规则'}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="secondary"
-            disabled={scanning}
-            onClick={onRefresh}
-          >
-            <RefreshCw data-icon="inline-start" aria-hidden="true" />
-            获取最新风险结果
-          </Button>
+          {/* 全局刷新在页面顶栏，这里不再重复放置刷新按钮 */}
           {portfolioState === 'loading' && (
             <span className="text-xs text-muted-foreground">组合数据准备好后才能扫描。</span>
           )}

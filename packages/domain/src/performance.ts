@@ -85,7 +85,7 @@ export const xirr = (flows: readonly CashFlow[], guess = 0.1): number => {
     !flows.some((flow) => flow.amount < 0) ||
     !flows.some((flow) => flow.amount > 0)
   ) {
-    throw new Error('XIRR 至少需要一笔流入和一笔流出');
+    throw new Error('资金加权收益率至少需要一笔流入和一笔流出');
   }
   const start = new Date(flows[0]!.date).getTime();
   let rate = guess;
@@ -101,7 +101,7 @@ export const xirr = (flows: readonly CashFlow[], guess = 0.1): number => {
     if (Math.abs(next - rate) < 1e-8) return next;
     rate = next;
   }
-  throw new Error('XIRR 未收敛');
+  throw new Error('资金加权收益率未收敛');
 };
 
 export const allocation = (positions: readonly { category: string; marketValue: number }[]) => {

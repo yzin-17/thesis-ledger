@@ -15,9 +15,16 @@ export const evaluatePortfolioRule = (
     const value = currentDrawdown(context.portfolioValues ?? []);
     return value === null
       ? null
-      : completeRiskEvent(rule, context, value, value < -Math.abs(rule.threshold), {
-          observations: context.portfolioValues?.length ?? 0,
-        });
+      : completeRiskEvent(
+          rule,
+          context,
+          value,
+          value < -Math.abs(rule.threshold),
+          {
+            observations: context.portfolioValues?.length ?? 0,
+          },
+          { valueMetric: 'drawdown' },
+        );
   }
   if (rule.kind === 'sector-concentration' || rule.kind === 'asset-concentration') {
     if (!context.positions?.length) return null;

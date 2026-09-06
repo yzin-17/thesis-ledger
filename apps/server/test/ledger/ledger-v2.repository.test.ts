@@ -247,7 +247,7 @@ describe('Ledger V2 不可变持久化', () => {
   it('current baseline 通过触发器禁止 LedgerEvent 修改和删除', async () => {
     const sql = await readFile(
       new URL(
-        '../../prisma/migrations/20260902000000_fresh_database_baseline/migration.sql',
+        '../../prisma/migrations/20260905000000_fresh_database_baseline/migration.sql',
         import.meta.url,
       ),
       'utf8',

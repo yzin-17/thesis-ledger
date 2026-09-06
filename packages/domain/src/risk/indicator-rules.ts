@@ -30,7 +30,7 @@ export const evaluateIndicatorRule = (
       price - ma,
       triggered,
       { price, ma },
-      { direction: targetDirection },
+      { direction: targetDirection, valueMetric: 'ma_deviation' },
     );
   }
   if (rule.kind === 'rsi') {
@@ -43,6 +43,7 @@ export const evaluateIndicatorRule = (
       value,
       targetDirection === 'above' ? value > rule.threshold : value < rule.threshold,
       { rsi: value },
+      { valueMetric: 'rsi' },
     );
   }
   if (rule.kind === 'macd') {
@@ -64,17 +65,24 @@ export const evaluateIndicatorRule = (
       dif - dea,
       triggered,
       { dif, dea },
-      { direction: targetDirection },
+      { direction: targetDirection, valueMetric: 'macd_dea' },
     );
   }
   if (rule.kind === 'atr') {
     const result = ratioThreshold(context.indicators?.atr, context.price, rule.threshold);
     return result === null
       ? null
-      : completeRiskEvent(rule, context, result.ratio, result.triggered, {
-          atr: context.indicators!.atr!,
-          price: context.price!,
-        });
+      : completeRiskEvent(
+          rule,
+          context,
+          result.ratio,
+          result.triggered,
+          {
+            atr: context.indicators!.atr!,
+            price: context.price!,
+          },
+          { valueMetric: 'atr' },
+        );
   }
   if (rule.kind === 'volume') {
     const result = ratioThreshold(

@@ -12,6 +12,7 @@
 - [持仓行情详情共享读模型](2026-08-21-market-detail-read-model.md)
 - [投资组合快照系统](2026-08-28-portfolio-snapshot-system.md)
 - [投资复盘工作台（统一 Trade Projection）](2026-08-28-journal-review-trade-projection.md)
+- [组合范围估值快照（聚合快照）](2026-09-07-portfolio-aggregate-snapshot.md)（Blocked：待捕获方案定案）
 
 ## 实现完成，仍保留验收边界
 
@@ -24,6 +25,7 @@
 - [现金账户资金范围与内部划转](2026-08-30-cash-account-funding-and-transfer.md)
 - [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)
 - [现金页面 UI 优化](2026-09-03-cash-page-ui-optimization.md)
+- [自动化配置台](2026-09-05-automation-console-design.md)（AC5 失败通知未做实机验证；组合范围曲线缺口已拆出独立任务）
 
 “实现完成”只表示代码一致性和已记录的确定性验证完成，不等于真实 Provider、生产数据、设备、浏览器或 Worker 运行时验收已经完成。运行时门禁关闭后，再按 `DOCUMENTATION-GUIDE.md` 归档。
 

@@ -22,7 +22,7 @@ export function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
-  const { state, portfolio, accounts, accountsReady, accountsPending, accountsError, refresh } =
+  const { state, portfolio, accounts, accountsReady, accountsPending, accountsError, refreshing, refresh } =
     usePortfolioShellQueries(portfolioMode);
 
   const navigateTo = (nextView: DesktopNavigationView, options?: NavigationOptions) => {
@@ -65,6 +65,7 @@ export function AppRoutes() {
             mode={portfolioMode}
             onModeChange={setPortfolioMode}
             onRetry={() => void refresh()}
+            refreshing={refreshing}
             onNavigate={navigateTo}
             onOpenReview={(target: PortfolioTradeReviewTarget) => {
               const params = new URLSearchParams({

@@ -31,6 +31,7 @@ export const evaluateChipRule = (
       { price: context.price, mainPeak: context.chip.mainPeak },
       {
         direction: targetDirection,
+        valueMetric: 'chip_main_peak',
         chipEngineVersion: context.chip.engineVersion,
         chipCalculatedAt: context.chip.calculatedAt,
       },

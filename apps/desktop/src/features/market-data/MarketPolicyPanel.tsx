@@ -170,9 +170,11 @@ export function MarketPolicyPanel({
             {saving && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
             )}
-            {saving ? '提交中…' : `提交下一版策略${policy ? `（r${policy.revision + 1}）` : ''}`}
+            {saving
+              ? '提交中…'
+              : `提交下一版策略${policy ? `（当前第 ${policy.revision} 版）` : ''}`}
           </Button>
-          <span className="text-xs text-muted-foreground">同一 revision 的内容冲突会被拒绝。</span>
+          <span className="text-xs text-muted-foreground">同一版本的内容冲突会被拒绝。</span>
         </div>
       </CardContent>
     </Card>

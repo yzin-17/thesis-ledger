@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,14 +13,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import { displayValue, isDataLoaded } from '../shared/display.js';
+import { isDataLoaded } from '../shared/display.js';
 import { EmptyListState, EmptyTableRow } from '../shared/EmptyStates.js';
 import type { LoadState } from '../shared/types.js';
 import {
   formatDateTime,
   riskChannelLabel,
   riskEventMode,
+  riskEventValueLabel,
   riskModeLabel,
+  riskNotificationErrorLabel,
+  riskRuleKindLabel,
   riskSeverityLabel,
   riskSeverityTone,
   riskStatusLabel,
@@ -144,13 +147,13 @@ export function RiskEventRows({
   const visibleEvents = limit === undefined ? events : events.slice(0, limit);
   return visibleEvents.map((event) => {
     const mode = riskEventMode(event);
+    // 标题消息已含标的代码，副标题只展示格式化后的触发指标
+    const valueLabel = riskEventValueLabel(event.context);
     return (
       <tr key={event.id}>
         <td>
           <strong>{event.message}</strong>
-          <span>
-            {event.symbol ?? '组合'} · value={displayValue(event.context.value)}
-          </span>
+          {valueLabel ? <span>{valueLabel}</span> : null}
         </td>
         <td>
           <Badge variant={riskSeverityTone(event.severity)}>
@@ -187,8 +190,14 @@ export function RiskNotificationTable({
   let routingDescription = '正在确认通知 Provider…';
   if (routingState === 'error') routingDescription = '暂时无法确认当前通知 Provider。';
   else if (routes.length > 0) {
+    // Provider 名称与渠道中文名相同时不再追加括号，避免“飞书（飞书）”式重复
     routingDescription = `当前按 Provider 配置投递到：${routes
-      .map((route) => `${route.provider}（${riskChannelLabel(route.channel)}）`)
+      .map((route) => {
+        const channelLabel = riskChannelLabel(route.channel);
+        return channelLabel === route.provider
+          ? channelLabel
+          : `${route.provider}（${channelLabel}）`;
+      })
       .join('、')}。`;
   } else if (routingState === 'ready') {
     routingDescription = '当前没有可投递的通知 Provider。';
@@ -226,7 +235,10 @@ export function RiskNotificationTable({
                       {riskChannelLabel(delivery.channel)} ·{' '}
                       {riskSubjectLabel(delivery.subjectType)}
                     </strong>
-                    <span>{delivery.lastError ?? `主题 ${delivery.subjectId}`}</span>
+                    <span>
+                      {riskNotificationErrorLabel(delivery.lastError) ??
+                        `主题 ${delivery.subjectId}`}
+                    </span>
                   </td>
                   <td>
                     <Badge variant={riskSeverityTone(delivery.severity)}>
@@ -253,6 +265,7 @@ export function RiskNotificationTable({
 export function RiskAuditDialog({
   open,
   rule,
+  accountName,
   audit,
   pending,
   error,
@@ -260,13 +273,14 @@ export function RiskAuditDialog({
 }: {
   open: boolean;
   rule: RiskRuleRecord | null;
+  accountName?: string;
   audit: RiskAuditRecord[];
   pending: boolean;
   error: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const auditDescription = rule
-    ? `${rule.kind} · ${ruleTargetLabel(rule)}`
+    ? `${riskRuleKindLabel(rule.kind)} · ${ruleTargetLabel(rule, accountName, rule.assetName)}`
     : '查看规则版本与操作时间。';
   let content: ReactNode = <EmptyListState />;
   if (pending) content = <p role="status">正在读取审计记录…</p>;
@@ -291,10 +305,7 @@ export function RiskAuditDialog({
                   <dd className="inline">{item.actor ?? '暂无'}</dd>
                 </div>
               </dl>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <AuditSnapshot label="修改前快照" value={before} />
-                <AuditSnapshot label="修改后快照" value={after} />
-              </div>
+              <AuditSnapshots before={before} after={after} />
             </div>
           );
         })}
@@ -328,13 +339,44 @@ function formatAuditSnapshot(snapshot: Record<string, unknown> | null | undefine
   }
 }
 
-function AuditSnapshot({ label, value }: { label: string; value: string | null }) {
+function AuditSnapshot({
+  label,
+  value,
+  open,
+  onToggle,
+}: {
+  label: string;
+  value: string | null;
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <details className="rounded-md border border-border bg-background p-2">
-      <summary className="cursor-pointer text-xs font-medium">{label}</summary>
-      <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-        {value ?? '暂无快照'}
-      </pre>
-    </details>
+    <div className="rounded-md border border-border bg-background p-2">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center gap-1 text-left text-xs font-medium"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span aria-hidden="true">{open ? '▼' : '▶'}</span>
+        {label}
+      </button>
+      {open && (
+        <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+          {value ?? '暂无快照'}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+// 修改前/修改后是一对对照快照，展开状态同步：点任意一个，两个一起展开或收起
+function AuditSnapshots({ before, after }: { before: string | null; after: string | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <AuditSnapshot label="修改前快照" value={before} open={open} onToggle={() => setOpen((current) => !current)} />
+      <AuditSnapshot label="修改后快照" value={after} open={open} onToggle={() => setOpen((current) => !current)} />
+    </div>
   );
 }

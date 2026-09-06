@@ -7,9 +7,15 @@ import { EmptyTableRow } from '../shared/EmptyStates.js';
 import { isDataLoaded } from '../shared/display.js';
 import type { LoadState } from '../shared/types.js';
 import {
+  automationJobTypeLabel,
+  automationRunStatusLabel,
+  dataQualitySeverityLabel,
+  notificationDeliveryStatusLabel,
+  notificationErrorCodeLabel,
   providerCapabilityLabel,
   providerDisplayStatus,
   providerHealthSourceLabel,
+  providerHealthStateLabel,
   providerTypeLabel,
 } from './providers.types.js';
 import type {
@@ -159,29 +165,46 @@ export function ProviderTable({
   );
 }
 
+const runNowLabel = (busy: boolean) => (busy ? '运行中…' : '立即运行');
+
 export function AutomationTable({
   loadState,
   jobs,
   togglingJobId,
+  runningJobId,
   onToggle,
+  onEdit,
+  onRun,
+  onDelete,
+  onCreate,
 }: {
   loadState: LoadState;
   jobs: AutomationJob[];
   togglingJobId: string | null;
+  runningJobId: string | null;
   onToggle: (job: AutomationJob) => void;
+  onEdit: (job: AutomationJob) => void;
+  onRun: (job: AutomationJob) => void;
+  onDelete: (job: AutomationJob) => void;
+  onCreate: () => void;
 }) {
   return (
     <section className="panel">
-      <div className="panel-heading">
-        <h2>自动化任务</h2>
-        <p>启停、下一次运行和失败历史通过同一 API 管理。</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="panel-heading">
+          <h2>自动化任务</h2>
+          <p>启停、编辑与运行历史通过同一 API 管理。</p>
+        </div>
+        <Button size="sm" type="button" variant="default" onClick={onCreate}>
+          新建任务
+        </Button>
       </div>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>任务</th>
-              <th>类型</th>
+              <th>类型（market 类休市日自动跳过）</th>
               <th>下一次运行</th>
               <th>状态</th>
               <th>操作</th>
@@ -194,7 +217,7 @@ export function AutomationTable({
               jobs.map((job) => (
                 <tr key={job.id}>
                   <td>{job.name}</td>
-                  <td>{job.type}</td>
+                  <td>{automationJobTypeLabel(job.type)}</td>
                   <td>
                     {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString('zh-CN') : '未安排'}
                   </td>
@@ -216,6 +239,39 @@ export function AutomationTable({
                         />
                       )}
                       {toggleLabel(togglingJobId === job.id, job.enabled)}
+                    </Button>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => onEdit(job)}
+                    >
+                      编辑
+                    </Button>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      disabled={runningJobId !== null}
+                      aria-busy={runningJobId === job.id}
+                      onClick={() => onRun(job)}
+                    >
+                      {runningJobId === job.id && (
+                        <LoaderCircle
+                          data-icon="inline-start"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {runNowLabel(runningJobId === job.id)}
+                    </Button>
+                    <Button
+                      className="text-button"
+                      size="sm"
+                      variant="link"
+                      onClick={() => onDelete(job)}
+                    >
+                      删除
                     </Button>
                   </td>
                 </tr>
@@ -263,7 +319,7 @@ export function HealthHistoryTable({
               history.items.map((item, index) => (
                 <tr key={`${item.provider}-${item.checkedAt}-${index}`}>
                   <td>{item.provider}</td>
-                  <td>{item.state}</td>
+                  <td>{providerHealthStateLabel(item.state)}</td>
                   <td>{item.latencyMs === null ? '不可用' : `${item.latencyMs} ms`}</td>
                   <td>{new Date(item.checkedAt).toLocaleString('zh-CN')}</td>
                   <td>{providerHealthSourceLabel(item.source)}</td>
@@ -356,16 +412,20 @@ function SimpleProviderTable({
 
 export function ProviderHistoryTables({
   loadState,
+  jobs,
   jobHistory,
   notificationFailures,
   issues,
 }: {
   loadState: LoadState;
+  jobs: AutomationJob[];
   jobHistory: AutomationHistoryRecord[];
   notificationFailures: NotificationFailureRecord[];
   issues: ProviderIssueRecord[];
 }) {
   const normalizedState = isDataLoaded(loadState);
+  const jobNames = new Map(jobs.map((job) => [job.id, job.name]));
+  const automationJobName = (jobId: string) => jobNames.get(jobId) ?? jobId.slice(0, 8);
   return (
     <>
       <SimpleProviderTable
@@ -378,8 +438,8 @@ export function ProviderHistoryTables({
             ? jobHistory.map((item) => ({
                 id: item.id,
                 cells: [
-                  item.jobId,
-                  item.status,
+                  automationJobName(item.jobId),
+                  automationRunStatusLabel(item.status),
                   new Date(item.startedAt).toLocaleString('zh-CN'),
                   item.error ?? '—',
                 ],
@@ -396,7 +456,11 @@ export function ProviderHistoryTables({
           normalizedState
             ? notificationFailures.map((item) => ({
                 id: item.id,
-                cells: [item.provider, item.status, item.lastError ?? '—'],
+                cells: [
+                  item.provider,
+                  notificationDeliveryStatusLabel(item.status),
+                  item.lastError ? notificationErrorCodeLabel(item.lastError) : '—',
+                ],
               }))
             : []
         }
@@ -410,7 +474,12 @@ export function ProviderHistoryTables({
           normalizedState
             ? issues.map((issue) => ({
                 id: issue.id,
-                cells: [issue.provider, issue.symbol ?? '全局', issue.severity, issue.code],
+                cells: [
+                  issue.provider,
+                  issue.symbol ?? '全局',
+                  dataQualitySeverityLabel(issue.severity),
+                  issue.code,
+                ],
               }))
             : []
         }

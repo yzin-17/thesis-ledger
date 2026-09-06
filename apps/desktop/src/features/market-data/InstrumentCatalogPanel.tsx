@@ -39,7 +39,7 @@ export function InstrumentCatalogPanel({
           <div>
             <h2 className="m-0 text-xl font-semibold">标的目录</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              完整快照、generation 与 ACK 由服务端原子切换。
+              完整快照、目录版本与确认回执由服务端原子切换。
             </p>
           </div>
           <Button type="button" variant="outline" onClick={onSync} disabled={disabled || syncing}>
@@ -51,8 +51,10 @@ export function InstrumentCatalogPanel({
         </div>
         <div className="grid gap-3 text-sm sm:grid-cols-2">
           <div className="border border-border p-3">
-            <span className="block text-muted-foreground">当前 generation</span>
-            <strong className="mt-1 block font-mono">{catalog?.generation ?? '—'}</strong>
+            <span className="block text-muted-foreground">目录版本</span>
+            <strong className="mt-1 block font-mono">
+              {catalog?.generation ? `第 ${catalog.generation} 版` : '—'}
+            </strong>
           </div>
           <div className="border border-border p-3">
             <span className="block text-muted-foreground">本地标的数量</span>

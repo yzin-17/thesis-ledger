@@ -610,6 +610,7 @@ CREATE TABLE "RiskRule" (
     "parameters" JSONB,
     "config" JSONB,
     "effectiveAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "archivedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -1660,6 +1661,6 @@ VALUES (
 );
 
 INSERT INTO "SchemaVersion" ("id", "version")
-VALUES (1, '20260902000000_fresh_database_baseline');
+VALUES (1, '20260905000000_fresh_database_baseline');
 
 COMMIT;

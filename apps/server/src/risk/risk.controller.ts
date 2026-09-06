@@ -18,8 +18,8 @@ export class RiskController {
   constructor(private readonly risk: RiskService) {}
 
   @Get('rules')
-  rules() {
-    return this.risk.listRules();
+  rules(@Query('includeArchived') includeArchived?: string) {
+    return this.risk.listRules(includeArchived === 'true');
   }
 
   @Post('rules')
@@ -41,6 +41,11 @@ export class RiskController {
   @Delete('rules/:id')
   archive(@Param('id') id: string) {
     return this.risk.archiveRule(id);
+  }
+
+  @Post('rules/:id/restore')
+  restore(@Param('id') id: string) {
+    return this.risk.restoreRule(id);
   }
 
   @Post('rules/:id/test')

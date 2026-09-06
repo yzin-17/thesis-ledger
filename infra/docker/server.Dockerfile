@@ -1,5 +1,13 @@
 FROM node:24-alpine AS build
 ENV CI=true
+# registry.npmjs.org 在本机网络下 TLS 握手间歇性被重置（ECONNRESET），corepack 下载
+# pnpm 本体或 pnpm 拉包任何一次命中都会让构建失败；corepack 取 pnpm 与 pnpm 拉包
+# 统一走 npmmirror。lockfile 只记录 integrity 摘要、不含 registry 地址，换源不影响
+# --frozen-lockfile 校验。disturl 让 node-gyp（node-pty 无 arm64 prebuild，需现场
+# 编译）从 npmmirror 的 node 发行版镜像取 headers，避免 nodejs.org 被重置。
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+    npm_config_registry=https://registry.npmmirror.com \
+    npm_config_disturl=https://npmmirror.com/mirrors/node
 RUN apk add --no-cache g++ make python3
 RUN corepack enable
 WORKDIR /workspace

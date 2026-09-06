@@ -363,4 +363,161 @@ describe('风险事件与通知解耦', () => {
       ]),
     ).resolves.toMatchObject({ results: [{ ruleId: rule.id, eventId: 'label-fallback-event' }] });
   });
+
+  it('规则列表附带 Asset 标的名', async () => {
+    const rule = {
+      id: 'rule-name',
+      version: 1,
+      kind: 'price-below',
+      scope: 'security',
+      severity: 'warning',
+      threshold: 10,
+      enabled: true,
+      symbol: '600519.SH',
+      accountId: null,
+      archivedAt: null,
+    };
+    const prisma = {
+      riskRule: { findMany: vi.fn(async () => [rule]) },
+      asset: { findMany: vi.fn(async () => [{ symbol: '600519.SH', name: '贵州茅台' }]) },
+    };
+    const rules = await new RiskService(prisma as never, {} as never).listRules();
+    expect(rules).toEqual([expect.objectContaining({ symbol: '600519.SH', assetName: '贵州茅台' })]);
+    expect(prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { symbol: { in: ['600519.SH'] } } }),
+    );
+  });
+
+  it('归档写入 archivedAt、记录 archive 审计，并从默认列表排除', async () => {
+    const stored = {
+      id: 'rule-archive',
+      version: 1,
+      kind: 'price-below',
+      scope: 'security',
+      severity: 'warning',
+      threshold: 10,
+      enabled: true,
+      symbol: '600519.SH',
+      accountId: null,
+      archivedAt: null,
+      effectiveAt: new Date('2025-01-01T00:00:00Z'),
+    };
+    const transaction = {
+      riskRule: {
+        findUniqueOrThrow: vi.fn(async () => stored),
+        update: vi.fn(async () => ({
+          ...stored,
+          version: 2,
+          enabled: false,
+          archivedAt: new Date('2026-09-05T00:00:00Z'),
+        })),
+      },
+      riskRuleAudit: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
+      riskRule: { findMany: vi.fn(async () => []) },
+    };
+    const service = new RiskService(prisma as never, {} as never);
+    const archived = await service.archiveRule('rule-archive');
+    expect(archived).toMatchObject({ enabled: false, archivedAt: expect.any(Date) });
+    expect(transaction.riskRule.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ enabled: false, archivedAt: expect.any(Date) }),
+      }),
+    );
+    expect(transaction.riskRuleAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'archive', actor: 'local-user' }),
+      }),
+    );
+
+    await service.listRules();
+    expect(prisma.riskRule.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { archivedAt: null } }),
+    );
+    await service.listRules(true);
+    expect(prisma.riskRule.findMany).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ where: expect.anything() }),
+    );
+  });
+
+  it('恢复清空 archivedAt 并记录 restore 审计，未归档规则不可恢复', async () => {
+    const stored = {
+      id: 'rule-restore',
+      version: 2,
+      kind: 'price-below',
+      scope: 'security',
+      severity: 'warning',
+      threshold: 10,
+      enabled: false,
+      symbol: '600519.SH',
+      accountId: null,
+      archivedAt: new Date('2026-09-05T00:00:00Z') as Date | null,
+      effectiveAt: new Date('2025-01-01T00:00:00Z'),
+    };
+    const transaction = {
+      riskRule: {
+        findUniqueOrThrow: vi.fn(async () => stored),
+        update: vi.fn(async () => ({ ...stored, version: 3, archivedAt: null })),
+      },
+      riskRuleAudit: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
+    };
+    const service = new RiskService(prisma as never, {} as never);
+    const restored = await service.restoreRule('rule-restore');
+    expect(restored).toMatchObject({ version: 3, archivedAt: null });
+    expect(transaction.riskRule.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ archivedAt: null }) }),
+    );
+    expect(transaction.riskRuleAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'restore' }),
+      }),
+    );
+
+    const notArchived = { ...stored, archivedAt: null };
+    transaction.riskRule.findUniqueOrThrow.mockImplementation(async () => notArchived);
+    await expect(service.restoreRule('rule-restore')).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining('未归档'),
+    });
+  });
+
+  it('已归档规则禁止编辑更新', async () => {
+    const stored = {
+      id: 'rule-archived-edit',
+      version: 2,
+      kind: 'price-below',
+      scope: 'security',
+      severity: 'warning',
+      threshold: 10,
+      enabled: false,
+      symbol: '600519.SH',
+      accountId: null,
+      archivedAt: new Date('2026-09-05T00:00:00Z'),
+      condition: null,
+      parameters: null,
+      config: null,
+      effectiveAt: new Date('2025-01-01T00:00:00Z'),
+    };
+    const transaction = {
+      riskRule: {
+        findUniqueOrThrow: vi.fn(async () => stored),
+        update: vi.fn(),
+      },
+      riskRuleAudit: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
+    };
+    await expect(
+      new RiskService(prisma as never, {} as never).updateRule('rule-archived-edit', {
+        threshold: 20,
+      }),
+    ).rejects.toMatchObject({ status: 400, message: expect.stringContaining('归档') });
+    expect(transaction.riskRule.update).not.toHaveBeenCalled();
+  });
 });

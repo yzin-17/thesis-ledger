@@ -35,8 +35,8 @@ export class RiskService {
     return this.rules.createRule(input);
   }
 
-  listRules() {
-    return this.rules.listRules();
+  listRules(includeArchived = false) {
+    return this.rules.listRules(includeArchived);
   }
 
   updateRule(id: string, input: unknown) {
@@ -45,6 +45,10 @@ export class RiskService {
 
   archiveRule(id: string) {
     return this.rules.archiveRule(id);
+  }
+
+  restoreRule(id: string) {
+    return this.rules.restoreRule(id);
   }
 
   audit(id: string) {

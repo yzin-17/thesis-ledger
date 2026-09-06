@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = '20260902000000_fresh_database_baseline';
+export const CURRENT_SCHEMA_VERSION = '20260905000000_fresh_database_baseline';
 
 type SchemaVersionRow = { version?: unknown };
 

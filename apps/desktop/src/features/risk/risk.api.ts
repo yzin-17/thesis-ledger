@@ -14,8 +14,15 @@ import type {
 
 const noStore = { cache: 'no-store' as const };
 
-export const fetchRiskRules = (client?: DesktopRequestClient) =>
-  requestDesktopJson<RiskRuleRecord[]>('/risk/rules', noStore, client);
+export const fetchRiskRules = (
+  options: { includeArchived?: boolean } = {},
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<RiskRuleRecord[]>(
+    `/risk/rules${options.includeArchived ? '?includeArchived=true' : ''}`,
+    noStore,
+    client,
+  );
 
 export const fetchRiskEvents = (mode: PortfolioMode, client?: DesktopRequestClient) =>
   requestDesktopJson<RiskEventRecord[]>(
@@ -60,6 +67,16 @@ export const deleteRiskRule = (ruleId: string, client?: DesktopRequestClient) =>
     {
       ...noStore,
       method: 'DELETE',
+    },
+    client,
+  );
+
+export const restoreRiskRule = (ruleId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<RiskRuleRecord>(
+    `/risk/rules/${encodeURIComponent(ruleId)}/restore`,
+    {
+      ...noStore,
+      method: 'POST',
     },
     client,
   );

@@ -168,3 +168,8 @@ export interface SavePerformanceTargetsInput {
   accountId?: string;
   targets: Record<string, number>;
 }
+
+export interface CaptureCloseSnapshotsInput {
+  accountIds: string[];
+  capturedAt: string;
+}

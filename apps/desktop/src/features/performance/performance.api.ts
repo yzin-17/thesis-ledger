@@ -13,6 +13,7 @@ import type {
   PortfolioMode,
   PerformanceQueryOptions,
   SavePerformanceTargetsInput,
+  CaptureCloseSnapshotsInput,
   SnapshotRecord,
 } from './performance.types.js';
 
@@ -340,6 +341,21 @@ export const savePerformanceTargets = (
 ) =>
   requestDesktopJson<unknown>(
     '/performance/targets',
+    {
+      ...noStore,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+    client,
+  );
+
+export const captureCloseSnapshots = (
+  input: CaptureCloseSnapshotsInput,
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<{ capturedAt: string; snapshots: unknown[] }>(
+    '/automations/workflows/close-snapshots',
     {
       ...noStore,
       method: 'POST',

@@ -72,7 +72,7 @@ try {
     ]),
   );
   const restored = JSON.parse(counts);
-  if (restored.schemaVersion !== '20260902000000_fresh_database_baseline')
+  if (restored.schemaVersion !== '20260905000000_fresh_database_baseline')
     throw new Error(`恢复库 Schema marker 异常: ${counts}`);
 
   console.log(

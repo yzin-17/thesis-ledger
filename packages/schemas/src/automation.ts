@@ -35,3 +35,11 @@ export const automationJobSchema = z.object({
   retry: z.object({ maxAttempts: z.number().int().min(1), backoffMs: z.number().int().positive() }),
   lockTtlMs: z.number().int().positive(),
 });
+
+/** 任务类型创建后绑定运行时处理器，不可更新；retry/lockTtl 不对外暴露编辑。 */
+export const automationJobUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  cron: z.string().min(5).optional(),
+  timezone: z.string().min(1).optional(),
+  enabled: z.boolean().optional(),
+});

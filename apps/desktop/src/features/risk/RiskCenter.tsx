@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
-import { RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 import type { Account, Portfolio, PortfolioMode } from '../portfolio/portfolio.types.js';
@@ -10,11 +8,13 @@ import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import type { LoadState } from '../shared/types.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { createRiskActionHandlers } from './risk.actions.js';
 import {
   useCreateRiskRuleMutation,
   useDeleteRiskRuleMutation,
   usePatchRiskRuleMutation,
+  useRestoreRiskRuleMutation,
   useScanRiskMutation,
   useTestRiskRuleMutation,
 } from './risk.mutations.js';
@@ -64,6 +64,7 @@ export function RiskCenter({
   const createRuleMutation = useCreateRiskRuleMutation();
   const patchRuleMutation = usePatchRiskRuleMutation();
   const deleteRuleMutation = useDeleteRiskRuleMutation();
+  const restoreRuleMutation = useRestoreRiskRuleMutation();
   const testRuleMutation = useTestRiskRuleMutation();
   const scanRiskMutation = useScanRiskMutation();
   const rules = riskQueries.rules.data ?? [];
@@ -78,6 +79,7 @@ export function RiskCenter({
     notificationAvailability = 'unconfigured';
   }
   const hasRiskData = Object.values(riskQueries).some((query) => query.data !== undefined);
+  const riskRefreshing = Object.values(riskQueries).some((query) => query.isFetching);
   const loadState = resolveLoadState(
     Object.values(riskQueries),
     hasRiskData,
@@ -104,6 +106,7 @@ export function RiskCenter({
     createRuleMutation,
     patchRuleMutation,
     deleteRuleMutation,
+    restoreRuleMutation,
     testRuleMutation,
     scanRiskMutation,
     notificationAvailability,
@@ -167,6 +170,10 @@ export function RiskCenter({
     }
   };
 
+  const auditAccountName = auditRule?.accountId
+    ? accounts.find((account) => account.id === auditRule.accountId)?.name
+    : undefined;
+
   const createRule = (input: CreateRiskRuleInput) => actions.createRule(input);
   const invalidateTestRecord = (ruleId: string) => {
     setTestRecords((current) => {
@@ -219,22 +226,18 @@ export function RiskCenter({
         </div>
         <div className="page-header-actions">
           <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="风险范围" />
-          <Button
-            type="button"
-            variant="outline"
-            className="secondary"
+          <RefreshIconButton
+            label="刷新风险数据"
+            refreshing={riskRefreshing}
             disabled={busyAction !== null}
             onClick={() => void refreshRisk()}
-          >
-            <RefreshCw data-icon="inline-start" aria-hidden="true" />
-            刷新
-          </Button>
+          />
         </div>
       </header>
 
       {mode === 'shadow' ? (
         <PortfolioModeNote>
-          仅用于研究和模拟，不代表实际资产风险，也不会触发实际通知。
+          模拟组合用于研究和纸面跟踪：后台会与实际组合同批评估并记录事件，但不发送任何通知，也不代表实际资产风险。
         </PortfolioModeNote>
       ) : null}
 
@@ -269,7 +272,6 @@ export function RiskCenter({
             lastUpdatedAt={riskUpdatedAt}
             scanning={busyAction === 'scan-risk'}
             onScan={() => void actions.scanRisk()}
-            onRefresh={() => void refreshRisk()}
             onSelectTab={selectTab}
           />
         </TabsContent>
@@ -285,6 +287,7 @@ export function RiskCenter({
             onUpdate={updateRule}
             onToggle={toggleRule}
             onArchive={actions.archiveRule}
+            onRestore={actions.restoreRule}
             onTest={actions.testRule}
             onTestComplete={saveTestRecord}
             onAudit={openAudit}
@@ -311,6 +314,7 @@ export function RiskCenter({
       <RiskAuditDialog
         open={auditVisible}
         rule={auditRule}
+        {...(auditAccountName ? { accountName: auditAccountName } : {})}
         audit={auditQuery.data ?? []}
         pending={auditQuery.isPending || auditQuery.isFetching}
         error={auditQuery.isError}

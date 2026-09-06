@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowClockwiseIcon } from '@phosphor-icons/react/ArrowClockwise';
+import { RefreshCw } from 'lucide-react';
 import type { DesktopNavigationView } from '../../views.js';
 import { MarketDetailDialog } from '../market-detail/MarketDetailDialog.js';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import type { PortfolioMode, Position, Portfolio, Account } from './portfolio.types.js';
 import type { LoadState } from '../shared/types.js';
 import type { OnboardingNavigationOptions } from '../onboarding/onboarding.types.js';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { money } from '../shared/display.js';
 import { EmptyTableRow } from '../shared/EmptyStates.js';
 import {
@@ -32,6 +33,7 @@ export function PortfolioDashboard({
   mode,
   onModeChange,
   onRetry,
+  refreshing = false,
   onNavigate,
   onOpenReview,
 }: {
@@ -41,6 +43,7 @@ export function PortfolioDashboard({
   mode: PortfolioMode;
   onModeChange: (mode: PortfolioMode) => void;
   onRetry: () => void;
+  refreshing?: boolean;
   onNavigate: (view: DesktopNavigationView, options?: OnboardingNavigationOptions) => void;
   onOpenReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
@@ -75,10 +78,7 @@ export function PortfolioDashboard({
       </div>
       <div className="page-header-actions">
         <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="估值范围" />
-        <Button className="secondary" type="button" variant="outline" onClick={onRetry}>
-          <ArrowClockwiseIcon />
-          刷新
-        </Button>
+        <RefreshIconButton label="刷新组合数据" refreshing={refreshing} onClick={onRetry} />
       </div>
     </header>
   );
@@ -102,7 +102,7 @@ export function PortfolioDashboard({
           description="请确认 ThesisLedger Server 与数据服务正在运行。"
         >
           <Button type="button" variant="default" onClick={onRetry}>
-            <ArrowClockwiseIcon />
+            <RefreshCw />
             重新加载
           </Button>
         </StatePanel>

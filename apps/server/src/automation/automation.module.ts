@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RecurringCashDepositModule } from '../cash-plans/recurring-cash-deposit.module.js';
 import { MarketModule } from '../market/market.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import { PerformanceModule } from '../performance/performance.module.js';
 import { ProviderModule } from '../providers/provider.module.js';
 import { PortfolioModule } from '../portfolio/portfolio.module.js';
@@ -14,6 +15,7 @@ import { AutomationWorkflowRunner } from './workflow-runner.service.js';
 @Module({
   imports: [
     MarketModule,
+    NotificationsModule,
     PerformanceModule,
     RiskModule,
     ProviderModule,

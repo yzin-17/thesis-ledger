@@ -46,6 +46,8 @@ export interface AutomationJob {
   id: string;
   name: string;
   type: string;
+  cron: string;
+  timezone: string;
   enabled: boolean;
   nextRunAt: string | null;
 }
@@ -57,6 +59,33 @@ export interface AutomationHistoryRecord {
   startedAt: string;
   error: string | null;
 }
+
+export interface CreateAutomationJobInput {
+  id: string;
+  name: string;
+  type: string;
+  cron: string;
+  timezone: string;
+  enabled: boolean;
+  retry: { maxAttempts: number; backoffMs: number };
+  lockTtlMs: number;
+}
+
+export type UpdateAutomationJobInput = Partial<Pick<AutomationJob, 'name' | 'cron' | 'enabled'>>;
+
+export type AutomationRunNowResult = {
+  skipped: boolean;
+  reason?: string;
+  output?: unknown;
+};
+
+export type AutomationJobDraft = {
+  name: string;
+  type: string;
+  schedulePreset: AutomationSchedulePreset;
+  cron: string;
+  enabled: boolean;
+};
 
 export interface NotificationFailureRecord {
   id: string;
@@ -125,6 +154,91 @@ export const providerCapabilityLabel = (capability: string) =>
   providerCapabilityOptions.find((item) => item.value === capability)?.label ??
   `其他（${capability}）`;
 
+export const automationJobTypeLabels: Record<string, string> = {
+  'market-sync': '市场数据同步',
+  'risk-evaluation': '风险评估',
+  'daily-digest': '每日摘要',
+  snapshot: '估值快照',
+  backup: '数据备份',
+  'provider-health': 'Provider 健康检查',
+  'cash-deposit-materialization': '定期入账生成',
+};
+
+export const automationJobTypeLabel = (type: string) =>
+  automationJobTypeLabels[type] ?? `其他（${type}）`;
+
+export const automationRunStatusLabels: Record<string, string> = {
+  running: '运行中',
+  succeeded: '成功',
+  failed: '失败',
+};
+
+export const automationRunStatusLabel = (status: string) =>
+  automationRunStatusLabels[status] ?? `其他（${status}）`;
+
+export const providerHealthStateLabels: Record<string, string> = {
+  healthy: '健康',
+  degraded: '降级',
+  down: '宕机',
+};
+
+export const providerHealthStateLabel = (state: string) =>
+  providerHealthStateLabels[state] ?? `其他（${state}）`;
+
+export const notificationDeliveryStatusLabels: Record<string, string> = {
+  pending: '待投递',
+  retrying: '重试中',
+  delivered: '已送达',
+  failed: '失败',
+};
+
+export const notificationDeliveryStatusLabel = (status: string) =>
+  notificationDeliveryStatusLabels[status] ?? `其他（${status}）`;
+
+export const notificationErrorCodeLabel = (errorCode: string) =>
+  errorCode.startsWith('notification_provider_unconfigured') ? '通知 Provider 未配置' : errorCode;
+
+export const dataQualitySeverityLabels: Record<string, string> = {
+  info: '提示',
+  warning: '警告',
+  error: '错误',
+};
+
+export const dataQualitySeverityLabel = (severity: string) =>
+  dataQualitySeverityLabels[severity] ?? `其他（${severity}）`;
+
+export const automationSchedulePresets = [
+  { value: '0 16 * * 1-5', label: '每个交易日 16:00' },
+  { value: '0 9 * * 1-5', label: '每个工作日 09:00' },
+] as const;
+
+export const AUTOMATION_SCHEDULE_CUSTOM = 'custom';
+
+export type AutomationSchedulePreset =
+  | (typeof automationSchedulePresets)[number]['value']
+  | typeof AUTOMATION_SCHEDULE_CUSTOM;
+
+export const automationScheduleLabel = (preset: AutomationSchedulePreset) =>
+  automationSchedulePresets.find((item) => item.value === preset)?.label ?? '自定义';
+
+export const automationJobDraftFromJob = (job: AutomationJob): AutomationJobDraft => ({
+  name: job.name,
+  type: job.type,
+  schedulePreset: automationSchedulePresets.some((preset) => preset.value === job.cron)
+    ? (job.cron as AutomationSchedulePreset)
+    : AUTOMATION_SCHEDULE_CUSTOM,
+  cron: job.cron,
+  enabled: job.enabled,
+});
+
+export const newAutomationJobDraft = (type = 'snapshot'): AutomationJobDraft => ({
+  name: automationJobTypeLabel(type),
+  type,
+  schedulePreset: automationSchedulePresets[0].value,
+  cron: automationSchedulePresets[0].value,
+  enabled: true,
+});
+
 export type ProviderStatusTone = 'normal' | 'error' | 'warning' | 'neutral';
 
 export interface ProviderStatusInput {
@@ -192,7 +306,7 @@ export const providerCredentialConfiguredAfterSave = (
 ) => responseValue ?? (Boolean(submittedCredential) || currentValue === true);
 
 export const newProviderDraft = () => ({
-  name: 'feishu',
+  name: '',
   type: 'notification',
   capabilities: ['notification'],
   credentialsRef: '',

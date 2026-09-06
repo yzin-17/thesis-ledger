@@ -677,6 +677,7 @@ model RiskRule {
   parameters    Json?
   config        Json?
   effectiveAt   DateTime               @default(now())
+  archivedAt    DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   events        RiskEvent[]

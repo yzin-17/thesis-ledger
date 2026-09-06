@@ -62,6 +62,7 @@ type Dependencies = {
   createRuleMutation: AsyncMutation<CreateRiskRuleInput, RiskRuleRecord>;
   patchRuleMutation: AsyncMutation<{ ruleId: string; patch: UpdateRiskRuleInput }, RiskRuleRecord>;
   deleteRuleMutation: AsyncMutation<{ ruleId: string }, RiskRuleRecord>;
+  restoreRuleMutation: AsyncMutation<{ ruleId: string }, RiskRuleRecord>;
   testRuleMutation: AsyncMutation<{ ruleId: string; contexts: RiskContext[] }, RiskTestResult[]>;
   scanRiskMutation: AsyncMutation<{ contexts: RiskContext[]; scanId: string }, RiskScanResult>;
   notificationAvailability: NotificationAvailability;
@@ -129,6 +130,7 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     createRuleMutation,
     patchRuleMutation,
     deleteRuleMutation,
+    restoreRuleMutation,
     testRuleMutation,
     scanRiskMutation,
     notificationAvailability,
@@ -177,10 +179,33 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     setBusyAction(`archive:${rule.id}`);
     try {
       await deleteRuleMutation.mutateAsync({ ruleId: rule.id });
-      successToast(toastManager, '规则已归档', '规则已停用，历史事件与审计记录保留。');
+      successToast(
+        toastManager,
+        '规则已归档',
+        '规则已移出列表，历史事件与审计记录保留；可在“显示已归档”中恢复。',
+      );
       return true;
     } catch {
       errorToast(toastManager, '规则归档失败', '请稍后重试。');
+      return false;
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const restoreRule = async (rule: RiskRuleRecord) => {
+    if (busyAction) return false;
+    setBusyAction(`restore:${rule.id}`);
+    try {
+      await restoreRuleMutation.mutateAsync({ ruleId: rule.id });
+      successToast(
+        toastManager,
+        '规则已恢复',
+        '规则已回到列表并保持停用，确认无误后可手动启用。',
+      );
+      return true;
+    } catch {
+      errorToast(toastManager, '规则恢复失败', '请稍后重试。');
       return false;
     } finally {
       setBusyAction(null);
@@ -239,5 +264,5 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     }
   };
 
-  return { loadRisk, createRule, patchRule, archiveRule, testRule, scanRisk };
+  return { loadRisk, createRule, patchRule, archiveRule, restoreRule, testRule, scanRisk };
 };

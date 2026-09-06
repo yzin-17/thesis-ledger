@@ -30,13 +30,39 @@ export class RiskRuleService {
     });
   }
 
-  listRules() {
-    return this.prisma.riskRule.findMany({ orderBy: { createdAt: 'asc' } });
+  async listRules(includeArchived = false) {
+    const rules = await this.prisma.riskRule.findMany({
+      orderBy: { createdAt: 'asc' },
+      ...(includeArchived ? {} : { where: { archivedAt: null } }),
+    });
+    return this.withAssetNames(rules);
+  }
+
+  // 证券规则的 symbol 只有代码，展示层需要 Asset.name 作为标的名
+  private async withAssetNames<T extends { symbol: string | null }>(rules: T[]) {
+    const symbols = [
+      ...new Set(rules.map((rule) => rule.symbol).filter((symbol): symbol is string => !!symbol)),
+    ];
+    if (symbols.length === 0) return rules.map((rule) => ({ ...rule, assetName: null }));
+    const assets = await this.prisma.asset.findMany({
+      where: { symbol: { in: symbols } },
+      select: { symbol: true, name: true },
+    });
+    const names = new Map(assets.map((asset) => [asset.symbol, asset.name]));
+    return rules.map((rule) => ({
+      ...rule,
+      assetName: rule.symbol ? (names.get(rule.symbol) ?? null) : null,
+    }));
   }
 
   listEnabledRules() {
     return this.prisma.riskRule.findMany({
-      where: { enabled: true, needsRepair: false, effectiveAt: { lte: new Date() } },
+      where: {
+        enabled: true,
+        needsRepair: false,
+        archivedAt: null,
+        effectiveAt: { lte: new Date() },
+      },
     });
   }
 
@@ -52,6 +78,8 @@ export class RiskRuleService {
       (input as Record<string, unknown>).enabled === true;
     return this.prisma.$transaction(async (transaction) => {
       const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
+      if (stored.archivedAt)
+        throw new BadRequestException('规则已归档，请先恢复后再编辑或启停');
       const mergedInput = {
         kind: stored.kind,
         scope: stored.scope,
@@ -113,13 +141,41 @@ export class RiskRuleService {
       const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
       const updated = await transaction.riskRule.update({
         where: { id },
-        data: { enabled: false, version: { increment: 1 } },
+        data: {
+          enabled: false,
+          // 重复归档保留首次归档时间，便于审计追溯
+          ...(stored.archivedAt ? {} : { archivedAt: new Date() }),
+          version: { increment: 1 },
+        },
       });
       await transaction.riskRuleAudit.create({
         data: {
           ruleId: id,
           ruleVersion: updated.version,
-          action: 'delete',
+          action: 'archive',
+          actor: 'local-user',
+          before: this.snapshot(stored),
+          after: this.snapshot(updated),
+        },
+      });
+      return updated;
+    });
+  }
+
+  restoreRule(id: string) {
+    return this.prisma.$transaction(async (transaction) => {
+      const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
+      if (!stored.archivedAt) throw new BadRequestException('规则未归档，无需恢复');
+      // 恢复后规则回到工作台列表并保持停用，由用户确认后再手动启用
+      const updated = await transaction.riskRule.update({
+        where: { id },
+        data: { archivedAt: null, version: { increment: 1 } },
+      });
+      await transaction.riskRuleAudit.create({
+        data: {
+          ruleId: id,
+          ruleVersion: updated.version,
+          action: 'restore',
           actor: 'local-user',
           before: this.snapshot(stored),
           after: this.snapshot(updated),
