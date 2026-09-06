@@ -1,8 +1,9 @@
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetTitle } from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -67,128 +68,139 @@ export const AutomationEditorSheet = ({
       <SheetContent
         side="right"
         aria-describedby="automation-form-description"
-        className="h-[100dvh] w-[560px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
+        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
       >
-        <div className="panel-heading">
-          <SheetTitle>{editingJob ? '编辑自动化任务' : '新建自动化任务'}</SheetTitle>
-          <SheetDescription id="automation-form-description">
-            任务类型创建后不可修改；有运行历史的任务无法删除，可改用停用。
-          </SheetDescription>
-        </div>
-        <form
-          key={editingJob?.id ?? 'new-automation-job'}
-          className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
-          onSubmit={onSubmit}
-        >
-          <div className="grid gap-1.5 text-xs text-muted-foreground">
-            <span>任务类型</span>
-            <Select
-              value={draft.type}
-              disabled={Boolean(editingJob)}
-              onValueChange={(value) =>
-                value && onUpdateDraft((current) => applyTypeChange(current, value, Boolean(editingJob)))
-              }
-            >
-              <SelectTrigger aria-label="任务类型" className="w-full">
-                <SelectValue>{automationJobTypeLabel(draft.type)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {automationJobTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {automationJobTypeLabel(type)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+          <div className="shrink-0">
+            <SheetTitle>{editingJob ? '编辑自动化任务' : '新建自动化任务'}</SheetTitle>
+            <SheetDescription id="automation-form-description">
+              任务类型创建后不可修改；有运行历史的任务无法删除，可改用停用。
+            </SheetDescription>
           </div>
-          <div className="grid gap-1.5 text-xs text-muted-foreground">
-            <span>名称</span>
-            <Input
-              aria-label="任务名称"
-              value={draft.name}
-              onChange={(event) =>
-                onUpdateDraft((current) => ({ ...current, name: event.target.value }))
-              }
-              required
-              maxLength={80}
-            />
-          </div>
-          <div className="grid gap-1.5 text-xs text-muted-foreground">
-            <span>执行时间</span>
-            <Select
-              value={draft.schedulePreset}
-              onValueChange={(value) =>
-                value &&
-                onUpdateDraft((current) => ({
-                  ...current,
-                  schedulePreset: value,
-                  cron: value === AUTOMATION_SCHEDULE_CUSTOM ? current.cron : value,
-                }))
-              }
-            >
-              <SelectTrigger aria-label="执行时间" className="w-full">
-                <SelectValue>{automationScheduleLabel(draft.schedulePreset)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {automationSchedulePresets.map((preset) => (
-                    <SelectItem key={preset.value} value={preset.value}>
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value={AUTOMATION_SCHEDULE_CUSTOM}>自定义</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          {customCron && (
-            <div className="grid gap-1.5 text-xs text-muted-foreground">
-              <span>Cron 表达式</span>
-              <Input
-                aria-label="Cron 表达式"
-                value={draft.cron}
-                onChange={(event) =>
-                  onUpdateDraft((current) => ({ ...current, cron: event.target.value }))
-                }
-                placeholder="分 时 日 月 周，例如 0 16 * * 1-5"
-                required
-                minLength={5}
-              />
+          <form
+            key={editingJob?.id ?? 'new-automation-job'}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            onSubmit={onSubmit}
+          >
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="automation-job-type">任务类型</FieldLabel>
+                  <Select
+                    value={draft.type}
+                    disabled={Boolean(editingJob)}
+                    onValueChange={(value) =>
+                      value &&
+                      onUpdateDraft((current) =>
+                        applyTypeChange(current, value, Boolean(editingJob)),
+                      )
+                    }
+                  >
+                    <SelectTrigger id="automation-job-type" className="w-full">
+                      <SelectValue>{automationJobTypeLabel(draft.type)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {automationJobTypes.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {automationJobTypeLabel(type)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="automation-job-name">名称</FieldLabel>
+                  <Input
+                    id="automation-job-name"
+                    value={draft.name}
+                    onChange={(event) =>
+                      onUpdateDraft((current) => ({ ...current, name: event.target.value }))
+                    }
+                    required
+                    maxLength={80}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="automation-job-schedule">执行时间</FieldLabel>
+                  <Select
+                    value={draft.schedulePreset}
+                    onValueChange={(value) =>
+                      value &&
+                      onUpdateDraft((current) => ({
+                        ...current,
+                        schedulePreset: value,
+                        cron: value === AUTOMATION_SCHEDULE_CUSTOM ? current.cron : value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="automation-job-schedule" className="w-full">
+                      <SelectValue>{automationScheduleLabel(draft.schedulePreset)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {automationSchedulePresets.map((preset) => (
+                          <SelectItem key={preset.value} value={preset.value}>
+                            {preset.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={AUTOMATION_SCHEDULE_CUSTOM}>自定义</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {customCron && (
+                  <Field>
+                    <FieldLabel htmlFor="automation-job-cron">Cron 表达式</FieldLabel>
+                    <Input
+                      id="automation-job-cron"
+                      value={draft.cron}
+                      onChange={(event) =>
+                        onUpdateDraft((current) => ({ ...current, cron: event.target.value }))
+                      }
+                      placeholder="分 时 日 月 周，例如 0 16 * * 1-5"
+                      required
+                      minLength={5}
+                    />
+                  </Field>
+                )}
+                <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+                  <div>
+                    <p className="m-0 text-sm font-medium">启用任务</p>
+                    <p className="field-hint">停用后不再按计划自动执行，可随时重新启用。</p>
+                  </div>
+                  <Switch
+                    variant="risk"
+                    aria-label="启用任务"
+                    checked={draft.enabled}
+                    onCheckedChange={(checked) =>
+                      onUpdateDraft((current) => ({ ...current, enabled: checked }))
+                    }
+                  >
+                    <SwitchThumb variant="risk" aria-hidden="true" />
+                  </Switch>
+                </div>
+              </FieldGroup>
             </div>
-          )}
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">启用</span>
-            <Switch
-              variant="risk"
-              aria-label="启用任务"
-              checked={draft.enabled}
-              onCheckedChange={(checked) =>
-                onUpdateDraft((current) => ({ ...current, enabled: checked }))
-              }
-            >
-              <SwitchThumb variant="risk" aria-hidden="true" />
-            </Switch>
-          </div>
-          <div className="form-actions">
-            <Button
-              className="secondary"
-              type="button"
-              variant="outline"
-              disabled={saving}
-              onClick={onClose}
-            >
-              取消
-            </Button>
-            <Button disabled={saving} aria-busy={saving} type="submit" variant="default">
-              {saving && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-              )}
-              {submitLabel(saving, Boolean(editingJob))}
-            </Button>
-          </div>
-        </form>
+            <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={onClose}
+              >
+                取消
+              </Button>
+              <Button disabled={saving} aria-busy={saving} type="submit">
+                {saving && (
+                  <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                )}
+                {submitLabel(saving, Boolean(editingJob))}
+              </Button>
+            </SheetFooter>
+          </form>
+        </div>
       </SheetContent>
     </Sheet>
   );

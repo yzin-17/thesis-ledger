@@ -56,7 +56,7 @@ export function ProviderTable({
   onToggle: (provider: ProviderRecord) => void;
 }) {
   return (
-    <section className="panel">
+    <section className="panel mt-6 border-t-0">
       <div className="table-wrap">
         <table>
           <thead>
@@ -76,11 +76,15 @@ export function ProviderTable({
               providers.map((provider) => {
                 const status = providerDisplayStatus(provider);
                 const priority = priorityDrafts[provider.name] ?? provider.priority;
+                // 类型标签与能力列重复时不重复展示（如通知 Provider 的「通知」）
+                const typeLabel = providerTypeLabel(provider.type);
+                const capabilityLabels: string[] = provider.capabilities.map(providerCapabilityLabel);
+                const showTypeLabel = !capabilityLabels.includes(typeLabel);
                 return (
                   <tr key={provider.name}>
                     <td className="text-left first:text-left">
                       <strong>{provider.name}</strong>
-                      <span>{providerTypeLabel(provider.type)}</span>
+                      {showTypeLabel ? <span>{typeLabel}</span> : null}
                     </td>
                     <td className="text-left">
                       {provider.capabilities.map(providerCapabilityLabel).join(' · ')}
@@ -190,8 +194,8 @@ export function AutomationTable({
 }) {
   return (
     <section className="panel">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="panel-heading">
+      <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
+        <div>
           <h2>自动化任务</h2>
           <p>启停、编辑与运行历史通过同一 API 管理。</p>
         </div>

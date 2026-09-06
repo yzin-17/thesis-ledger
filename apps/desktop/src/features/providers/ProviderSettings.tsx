@@ -196,50 +196,52 @@ export function ProviderSettings() {
         onSubmit={(event) => void actions.submitAutomationEditor(event)}
       />
       <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <ProviderTable
-        loadState={loadState}
-        providers={providers}
-        priorityDrafts={providerPriorityDrafts}
-        testingProviderName={testingProviderName}
-        savingProviderName={savingProviderName}
-        onPriorityChange={(name, value) =>
-          setProviderPriorityDrafts((current) => ({ ...current, [name]: value }))
-        }
-        onPrioritySave={(provider) => void actions.saveProvider(provider)}
-        onEdit={actions.openProviderSheet}
-        onTest={(name) => void actions.test(name)}
-        onToggle={(provider) =>
-          void actions.saveProvider(
-            provider,
-            !provider.enabled,
-            `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
-          )
-        }
-      />
-      <AutomationTable
-        loadState={loadState}
-        jobs={jobs}
-        togglingJobId={togglingJobId}
-        runningJobId={runningJobId}
-        onToggle={(job) => void actions.toggleJob(job)}
-        onEdit={(job) => actions.openAutomationEditor(job)}
-        onRun={(job) => void actions.runJobNow(job)}
-        onDelete={(job) => void actions.deleteJob(job)}
-        onCreate={() => actions.openAutomationEditor()}
-      />
-      <HealthHistoryTable
-        loadState={loadState}
-        history={healthHistory}
-        loading={healthHistoryLoading}
-        onPage={handleHealthPage}
-      />
-      <ProviderHistoryTables
-        loadState={loadState}
-        jobs={jobs}
-        jobHistory={jobHistory}
-        notificationFailures={notificationFailures}
-        issues={issues}
-      />
+      <div className="space-y-6">
+        <ProviderTable
+          loadState={loadState}
+          providers={providers}
+          priorityDrafts={providerPriorityDrafts}
+          testingProviderName={testingProviderName}
+          savingProviderName={savingProviderName}
+          onPriorityChange={(name, value) =>
+            setProviderPriorityDrafts((current) => ({ ...current, [name]: value }))
+          }
+          onPrioritySave={(provider) => void actions.saveProvider(provider)}
+          onEdit={actions.openProviderSheet}
+          onTest={(name) => void actions.test(name)}
+          onToggle={(provider) =>
+            void actions.saveProvider(
+              provider,
+              !provider.enabled,
+              `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
+            )
+          }
+        />
+        <AutomationTable
+          loadState={loadState}
+          jobs={jobs}
+          togglingJobId={togglingJobId}
+          runningJobId={runningJobId}
+          onToggle={(job) => void actions.toggleJob(job)}
+          onEdit={(job) => actions.openAutomationEditor(job)}
+          onRun={(job) => void actions.runJobNow(job)}
+          onDelete={(job) => void actions.deleteJob(job)}
+          onCreate={() => actions.openAutomationEditor()}
+        />
+        <HealthHistoryTable
+          loadState={loadState}
+          history={healthHistory}
+          loading={healthHistoryLoading}
+          onPage={handleHealthPage}
+        />
+        <ProviderHistoryTables
+          loadState={loadState}
+          jobs={jobs}
+          jobHistory={jobHistory}
+          notificationFailures={notificationFailures}
+          issues={issues}
+        />
+      </div>
     </section>
   );
 }

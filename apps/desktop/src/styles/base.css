@@ -561,13 +561,14 @@ h3 {
   color: var(--color-negative) !important;
 }
 
-.panel {
-  border-top: 1px solid var(--color-border);
-}
-
 /* 放入 base 层：未分层样式会压过 Tailwind 工具类，导致 panel-heading 上的
-   flex / justify-between 等布局类全部失效（如规则工作台标题的右侧按钮）。 */
+   flex / justify-between 等布局类全部失效（如规则工作台标题的右侧按钮）。
+   .panel 同理：迁入后 border-t-0 等工具类才能覆盖首个面板的顶线。 */
 @layer base {
+  .panel {
+    border-top: 1px solid var(--color-border);
+  }
+
   .panel-heading {
     display: block;
     padding: var(--space-group) 0;
