@@ -1,7 +1,7 @@
 # 组合范围估值快照（聚合快照）Spec
 
-日期：2026-09-07　状态：**待定案（存在未决 Blocking 问题，禁止实施）**
-任务文档：[`../tasks/2026-09-07-portfolio-aggregate-snapshot.md`](../tasks/2026-09-07-portfolio-aggregate-snapshot.md)
+日期：2026-09-07　状态：已定案（2026-09-07 用户确认候选 A），实施中
+任务文档：[`../tasks/2026-09-07-portfolio-aggregate-snapshot.md`](../archive/tasks/2026-09-07-portfolio-aggregate-snapshot.md)
 来源：自动化配置台实施验收（[`2026-09-05-automation-console-design.md`](2026-09-05-automation-console-design.md) 未决问题第三条）中发现的缺口，按用户要求立项跟踪。
 
 ## 背景与问题
@@ -37,11 +37,11 @@
 
 ## 对外行为或接口变化
 
-随定案确定：候选 A 扩展 `close-snapshots` 请求契约并新增聚合快照输出；候选 B 不改契约；候选 C 无接口变化但改变查询语义。
+定案为候选 A 的最小形态：**不扩展请求契约**（`{ accountIds, capturedAt }` 不变）。工作流在逐账户拍摄后，按请求内出现的数据模式各追加一次组合聚合快照（`capture(undefined, capturedAt, mode)`，组合 investment-only 口径，fx/baseCurrency 取 capture 默认值）；契约与桌面端零改动。
 
 ## 数据、状态或兼容性影响
 
-- 候选 A/B：每次捕获新增 `accountId = null` 的 `PortfolioSnapshot` 行（按模式区分）；既有逐账户快照与历史数据不受影响。
+- 每次捕获按出现的数据模式新增 1..2 条 `accountId = null` 的组合聚合 `PortfolioSnapshot` 行；既有逐账户快照与历史数据不受影响，桌面端零改动。
 - 候选 C：无新增写入，但组合曲线的历史可见性取决于逐账户快照的存在时点。
 
 ## 测试策略
@@ -59,17 +59,18 @@
 
 ### Blocking
 
-1. 采用候选 A / B / C 中的哪个方案？
-2. 组合聚合快照的模式范围：actual 与 shadow 各一份，还是跟随请求上下文单一模式？
-3. fxMerge / baseCurrency 在聚合捕获中的取值语义（与页面默认视图展示一致）。
+无（2026-09-07 定案）：
+1. 采用候选 A（工作流追加组合聚合捕获），契约不变；
+2. 模式范围 = 请求内账户出现的数据模式集合，每种模式各一份组合聚合快照；
+3. fx/baseCurrency 取 `performance.capture` 默认值（组合曲线按快照回放，不依赖捕获时的 fx 选项）。
 
 ### Non-blocking
 
 无。
 
-## 验收标准（草案，定案后冻结并同步任务文档）
+## 验收标准（已冻结）
 
-- AC1（草案）：收益页默认「全部账户」视图在快照捕获后资产曲线出现数据点。
-- AC2（草案）：单账户曲线与影子/实际模式过滤行为与现状一致。
-- AC3（草案）：调度 close-snapshots 路径按定案产出组合范围可见数据（如定案含调度路径）。
-- AC4（草案）：服务端与桌面端测试全绿，dev 栈实测通过。
+- AC1：收益页默认「全部账户」视图在快照捕获后，组合资产曲线出现数据点（无需选择具体账户）。
+- AC2：单账户曲线与影子/实际模式过滤行为与现状一致；未知账户 id 仍被跳过。
+- AC3：调度 close-snapshots 路径与手动一键快照共用同一工作流，均按定案产出组合聚合快照。
+- AC4：服务端与桌面端测试全绿，dev 栈实测组合曲线点亮。

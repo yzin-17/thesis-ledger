@@ -1,7 +1,7 @@
 # 自动化配置台 Spec（Automation Console）
 
 日期：2026-09-05　状态：已实施完成（T1–T8；遗留验收边界见任务文档 Review 结论）
-任务文档：[`../tasks/2026-09-05-automation-console-design.md`](../tasks/2026-09-05-automation-console-design.md)（本文由同日拷问定案的设计文档按文档规范升级而来，定案决策保留于「设计方案 · 已定案决策」）
+任务文档：[`../tasks/2026-09-05-automation-console-design.md`](../archive/tasks/2026-09-05-automation-console-design.md)（本文由同日拷问定案的设计文档按文档规范升级而来，定案决策保留于「设计方案 · 已定案决策」）
 
 ## 背景与问题
 
@@ -196,7 +196,7 @@
 
 - 失败通知的冷却/投递重试参数未单独定案，默认沿用现有风险通知策略（cooldownMinutes 30、maxAttempts 3）；影响边界仅为失败通知的重复频率与投递重试次数。
 - 收益页一键快照在当前模式无账户时的表现未单独定案，默认禁用按钮；影响边界仅为空状态按钮的可用性。
-- （2026-09-06 实测发现）收益页默认"全部账户"视图的组合资产曲线按既有读模型语义只读取 `accountId` 为空的聚合快照，本 Spec 设计的逐账户拍摄不会点亮该视图的曲线；选择具体账户后曲线正常出现数据点。默认维持逐账户拍摄不变。**已立项跟踪：见 [`2026-09-07-portfolio-aggregate-snapshot.md`](2026-09-07-portfolio-aggregate-snapshot.md)（待定案）。**
+- （2026-09-06 实测发现）收益页默认"全部账户"视图的组合资产曲线按既有读模型语义只读取 `accountId` 为空的聚合快照，本 Spec 设计的逐账户拍摄不会点亮该视图的曲线；选择具体账户后曲线正常出现数据点。默认维持逐账户拍摄不变。**已立项跟踪并实施完成：见 [`2026-09-07-portfolio-aggregate-snapshot.md`](2026-09-07-portfolio-aggregate-snapshot.md)（2026-09-07 定案候选 A：close-snapshots 按模式追加组合聚合快照）。**
 
 ## 验收标准
 

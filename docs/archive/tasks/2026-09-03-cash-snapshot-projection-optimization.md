@@ -1,6 +1,6 @@
 # 现金快照与现金流投影优化实施任务
 
-对应 Spec：[`../specs/2026-09-03-cash-snapshot-projection-optimization.md`](../specs/2026-09-03-cash-snapshot-projection-optimization.md)
+对应 Spec：[`../specs/2026-09-03-cash-snapshot-projection-optimization.md`](../../specs/2026-09-03-cash-snapshot-projection-optimization.md)
 
 状态：T1-T6 已完成并验证。
 

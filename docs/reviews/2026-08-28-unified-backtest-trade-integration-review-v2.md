@@ -47,7 +47,7 @@ Portfolio / Journal / AI Review
 - `apps/server/src/backtest/backtest.service.ts` 的 `localWorker` 在进程内调用引擎，直接接收 bars 和 `initialCash: number`，没有 BullMQ 或 `worker_threads` 回测实现；
 - `packages/domain/src/backtest-engine.ts`、`backtest.ts`、`backtest-analytics.ts` 仍以 JavaScript `number` 为主；
 - `packages/schemas/src/strategy.ts` 仍是 `strategySchemaV1`；
-- `docs/tasks/2026-08-25-strategy-lab-workbench.md` 的 V1 T1–T8 已完成；
+- `docs/archive/tasks/2026-08-25-strategy-lab-workbench.md`（已归档）的 V1 T1–T8 已完成；
 - 交易系统 T1–T17 及返工任务已完成并有本地证据；
 - 此前统一回测 V2 的正式 Spec/Task 已按本复核版创建，当前 SSOT 为对应 Spec/Task；上一版 12 项仅作为重排前的历史基线。
 

@@ -1,6 +1,6 @@
 # 自动标的目录就绪实施任务
 
-对应 Spec：[`../specs/2026-09-02-automatic-catalog-readiness.md`](../specs/2026-09-02-automatic-catalog-readiness.md)
+对应 Spec：[`../specs/2026-09-02-automatic-catalog-readiness.md`](../../specs/2026-09-02-automatic-catalog-readiness.md)
 
 ## 任务
 

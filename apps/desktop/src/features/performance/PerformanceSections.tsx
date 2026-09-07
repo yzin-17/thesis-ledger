@@ -109,10 +109,10 @@ const signedPercent = (value: number) => {
 type SnapshotRange = '1M' | '3M' | 'YTD' | '1Y' | 'ALL';
 
 const snapshotRangeOptions: Array<{ value: SnapshotRange; label: string }> = [
-  { value: '1M', label: '1M' },
-  { value: '3M', label: '3M' },
-  { value: 'YTD', label: 'YTD' },
-  { value: '1Y', label: '1Y' },
+  { value: '1M', label: '近1月' },
+  { value: '3M', label: '近3月' },
+  { value: 'YTD', label: '年初至今' },
+  { value: '1Y', label: '近1年' },
   { value: 'ALL', label: '全部' },
 ];
 

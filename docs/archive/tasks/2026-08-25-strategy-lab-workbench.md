@@ -1,6 +1,6 @@
 # 策略实验工作台交互优化实施任务
 
-对应规格：[`../specs/2026-08-25-strategy-lab-workbench.md`](../specs/2026-08-25-strategy-lab-workbench.md)
+对应规格：[`../specs/2026-08-25-strategy-lab-workbench.md`](../../specs/2026-08-25-strategy-lab-workbench.md)
 
 ## 执行约束
 

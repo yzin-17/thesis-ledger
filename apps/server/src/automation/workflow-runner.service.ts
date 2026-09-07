@@ -32,7 +32,7 @@ export class AutomationWorkflowRunner {
     };
   }
 
-  /** 估值快照按账户自身的数据模式拍摄：模拟账户拍影子快照，实际账户拍实际快照。 */
+  /** 估值快照按账户自身的数据模式拍摄；每种出现的数据模式再追加一次组合聚合快照，点亮「全部账户」视图。 */
   async closeSnapshots(input: { accountIds: readonly string[]; capturedAt: string }) {
     const accounts = await this.prisma.account.findMany({
       where: { id: { in: [...input.accountIds] } },
@@ -41,11 +41,18 @@ export class AutomationWorkflowRunner {
     const accountModes = new Map(accounts.map((account) => [account.id, account.mode]));
     const capturedAt = new Date(input.capturedAt);
     const snapshots = [];
+    const modes = new Set<string>();
     for (const accountId of input.accountIds) {
       const mode = accountModes.get(accountId);
       if (!mode) continue;
+      modes.add(mode);
       snapshots.push(
         await this.performance.capture(accountId, capturedAt, mode === 'shadow' ? 'shadow' : 'actual'),
+      );
+    }
+    for (const mode of modes) {
+      snapshots.push(
+        await this.performance.capture(undefined, capturedAt, mode === 'shadow' ? 'shadow' : 'actual'),
       );
     }
     return { capturedAt: input.capturedAt, snapshots };

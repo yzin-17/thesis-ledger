@@ -2,7 +2,7 @@
 
 > 日期：2026-09-02  
 > 状态：Completed  
-> 对应 Spec：[`2026-09-02-full-repo-architecture-hardening`](../specs/2026-09-02-full-repo-architecture-hardening.md)
+> 对应 Spec：[`2026-09-02-full-repo-architecture-hardening`](../../specs/2026-09-02-full-repo-architecture-hardening.md)
 
 ## 1. 执行原则
 

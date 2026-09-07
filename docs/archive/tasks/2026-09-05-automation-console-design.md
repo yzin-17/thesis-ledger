@@ -1,6 +1,6 @@
 # 自动化配置台实施任务
 
-关联 Spec：[`../specs/2026-09-05-automation-console-design.md`](../specs/2026-09-05-automation-console-design.md)
+关联 Spec：[`../specs/2026-09-05-automation-console-design.md`](../../specs/2026-09-05-automation-console-design.md)
 
 ## 实施任务
 
@@ -166,7 +166,9 @@
 - 评审遗留（待用户指认归属后补登记，当前未修）：risk 归档/恢复、market-control STALE_REVISION rebase 机制本身、收益指标中文化、组合页 ghost 刷新、`newProviderDraft` 默认名改动、`automation-runtime.service.ts` 行为新增（risk-evaluation 模拟组合后台扫描、daily-digest actual 过滤）——以上均无 Spec 记录。
 - 按钮贴线修复（用户反馈）：「自动化任务」面板的「新建任务」按钮原被放在 `.panel-heading` 外层的 flex 容器里，吃不到标题自带的上内边距而贴住面板顶线；改为仓库既有模式——flex 工具类直接加在 `.panel-heading` 上（与规则工作台「新建规则」一致），按钮距顶线恢复 16px 内边距，DOM 实测 17px。
 - 标题间距修复（用户反馈「抽屉标题和输入框之间」）：footer 化重构时误删了字段外围的 `form-card` 边框盒，标题与输入框之间只剩无边界的空隙显得突兀；已恢复卡片容器（滚动区内 `form-card` 包裹字段，footer 钉底不变），浏览器目检确认。
+- 模拟模式提示条排版修复（用户反馈「模拟账号下排版混乱」）：`PortfolioModeNote` 的 `.mode-note` 带 `-8px` 上边距，隐含假设其跟随带 16px 下边距的 `.page-header`（风险中心/组合页满足）；收益分析页是自定义 flex 页头（无下边距），提示条被拉上去与页头描述文字重叠。根修：`.mode-note` 负上边距改为 0（三处使用统一为 16px 下边距，风险/组合页仅下移 8px），浏览器目检收益/风险两页确认。
 - 数据质量问题列中文化（用户反馈「问题为什么是英文文案」）：「开放数据质量问题」的问题列原样渲染机器码（sync_failed），且写入时 details 里的中文失败原因被丢弃。修复：桌面新增 `dataQualityCodeLabel`（sync_failed→同步失败，未知码保留原文便于检索）与 `dataQualityIssueReason`（提取 details.message），问题单元格渲染为「同步失败：DSA 不可用」式文案；`ProviderIssueRecord` 补 capability/details 字段（服务端 list 本就返回，无需改服务端）。浏览器目检诊断 Tab 确认。
+- 走势范围按钮中文化（用户反馈）：资产走势时间范围标签 `1M/3M/YTD/1Y` → 「近1月/近3月/年初至今/近1年」（`全部` 原本就是中文）；范围值内部标识不变，仅改展示标签。
 - 抽屉重写对齐划转（用户反馈「参考账户间现金划转」）：自动化编辑器整体改为现金划转抽屉的结构——标题行 `shrink-0`（弃用 panel-heading 盒）、字段改用 `FieldGroup/Field/FieldLabel` 组件（htmlFor/id 关联，弃用手写 grid 标签与 aria-label）、宽度对齐 `w-[520px]`、启用行保留规则编辑器的带框卡片模式、滚动区与 `SheetFooter`（`border-t p-0 pt-4` 钉底）类名与划转逐字一致；form-card 边框盒移除（与划转一致的字段裸排）。
 - 按钮入 footer（用户反馈，指认「抽屉对齐」主要指此）：自动化编辑器的取消/提交按钮原跟在表单流里，改为抽屉通行的固定 footer 模式（照现金入账抽屉）：SheetContent 改 `overflow-hidden` + form `flex min-h-0 flex-1 flex-col`，字段区独立滚动（`-mx-1 -my-1 flex-1 overflow-y-auto px-1 py-1`），`SheetFooter`（`shrink-0 flex-row justify-end border-t p-0 pt-4`）钉在底部，原生表单校验（required/长度）不受影响；同时弃用 form-card 边框盒，与现金抽屉的字段裸排样式一致。DOM 实测 footer 距抽屉底部 24px（p-6）且随内容高度固定。
 - 抽屉对齐（用户反馈）：自动化任务编辑器 Sheet 与其他抽屉不一致——宽度 560px 与同页 Provider 抽屉（620px）不齐，启用行是无边框的裸标签。修复：宽度统一为 `w-[620px]`；启用行改为规则工作台编辑器的带框卡片模式（`rounded-md border p-3` + `text-sm` 标题「启用任务」+ `field-hint` 提示 + risk 开关）。

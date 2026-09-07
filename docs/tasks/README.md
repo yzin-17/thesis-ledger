@@ -12,7 +12,6 @@
 - [持仓行情详情共享读模型](2026-08-21-market-detail-read-model.md)
 - [投资组合快照系统](2026-08-28-portfolio-snapshot-system.md)
 - [投资复盘工作台（统一 Trade Projection）](2026-08-28-journal-review-trade-projection.md)
-- [组合范围估值快照（聚合快照）](2026-09-07-portfolio-aggregate-snapshot.md)（Blocked：待捕获方案定案）
 
 ## 实现完成，仍保留验收边界
 
@@ -25,7 +24,6 @@
 - [现金账户资金范围与内部划转](2026-08-30-cash-account-funding-and-transfer.md)
 - [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)
 - [现金页面 UI 优化](2026-09-03-cash-page-ui-optimization.md)
-- [自动化配置台](2026-09-05-automation-console-design.md)（AC5 失败通知未做实机验证；组合范围曲线缺口已拆出独立任务）
 
 “实现完成”只表示代码一致性和已记录的确定性验证完成，不等于真实 Provider、生产数据、设备、浏览器或 Worker 运行时验收已经完成。运行时门禁关闭后，再按 `DOCUMENTATION-GUIDE.md` 归档。
 
@@ -38,6 +36,6 @@
 
 ## 已归档
 
-已完成的 V0.1–V1.0 阶段任务、market-data v1.2 已完成专项、architecture improvement、Fresh Database Baseline、历史工作区迁移，以及被新方案取代或已完成运行时验收的专项任务位于 [`../archive/tasks/`](../archive/tasks/)。其中包括旧 Journal 交互基线、收益快照自动化和 Docker 构建缓存重试任务。
+已完成的 V0.1–V1.0 阶段任务、market-data v1.2 已完成专项、architecture improvement、Fresh Database Baseline、历史工作区迁移，以及被新方案取代或已完成运行时验收的专项任务位于 [`../archive/tasks/`](../archive/tasks/)。其中包括旧 Journal 交互基线、收益快照自动化和 Docker 构建缓存重试任务；2026-09-07 归档批次：策略实验工作台、目录自动就绪、全仓架构加固、现金快照投影优化、通知 Provider 路由、自动化配置台、组合聚合快照。
 
 新功能必须成对创建：`docs/specs/YYYY-MM-DD-<topic>.md` 与 `docs/tasks/YYYY-MM-DD-<topic>.md`。主题任务文件使用 `YYYY-MM-DD-<topic>.md` 命名；`README.md` 仅作为目录入口。

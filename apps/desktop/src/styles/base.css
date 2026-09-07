@@ -811,7 +811,9 @@ td span {
 }
 
 .mode-note {
-  margin: -8px 0 16px;
+  /* 不用负上边距：该提示在收益分析页跟随的是无下边距的自定义页头，
+     负值会把提示拉上去与页头描述文字重叠。 */
+  margin: 0 0 16px;
   color: var(--color-text-secondary);
   font-size: 13px;
 }

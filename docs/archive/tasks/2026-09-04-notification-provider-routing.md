@@ -1,6 +1,6 @@
 # 通知 Provider 路由与交互任务
 
-关联 Spec：[`../specs/2026-09-04-notification-provider-routing.md`](../specs/2026-09-04-notification-provider-routing.md)
+关联 Spec：[`../specs/2026-09-04-notification-provider-routing.md`](../../specs/2026-09-04-notification-provider-routing.md)
 
 ## 实施任务
 

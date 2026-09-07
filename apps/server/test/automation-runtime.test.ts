@@ -543,7 +543,7 @@ describe('AutomationService failure notification', () => {
 });
 
 describe('AutomationWorkflowRunner closeSnapshots', () => {
-  it('估值快照按账户自身的数据模式拍摄，未知账户跳过', async () => {
+  it('逐账户拍摄后按出现的数据模式追加组合聚合快照，未知账户跳过', async () => {
     const capturedAt = '2026-09-06T08:00:00.000Z';
     const prisma = {
       account: {
@@ -553,7 +553,7 @@ describe('AutomationWorkflowRunner closeSnapshots', () => {
         ]),
       },
     };
-    const performance = { capture: vi.fn(async (id: string) => ({ accountId: id })) };
+    const performance = { capture: vi.fn(async (id: string | undefined) => ({ accountId: id })) };
     const runner = new AutomationWorkflowRunner(
       {} as never,
       performance as never,
@@ -566,7 +566,7 @@ describe('AutomationWorkflowRunner closeSnapshots', () => {
       capturedAt,
     });
 
-    expect(performance.capture).toHaveBeenCalledTimes(2);
+    expect(performance.capture).toHaveBeenCalledTimes(4);
     expect(performance.capture).toHaveBeenCalledWith(
       'acc-actual',
       new Date(capturedAt),
@@ -577,7 +577,9 @@ describe('AutomationWorkflowRunner closeSnapshots', () => {
       new Date(capturedAt),
       'shadow',
     );
-    expect(result.snapshots).toHaveLength(2);
+    expect(performance.capture).toHaveBeenCalledWith(undefined, new Date(capturedAt), 'actual');
+    expect(performance.capture).toHaveBeenCalledWith(undefined, new Date(capturedAt), 'shadow');
+    expect(result.snapshots).toHaveLength(4);
     expect(result.capturedAt).toBe(capturedAt);
   });
 });
