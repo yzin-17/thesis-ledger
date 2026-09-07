@@ -5,6 +5,7 @@ import {
   chipDistributionSchemaV1,
   fundNavSchemaV1,
   fundNavHistorySchemaV1,
+  fundHoldingsSchemaV1,
   indicatorSchemaV1,
   quoteSchemaV1,
   fxRatesResponseSchemaV1,
@@ -15,6 +16,7 @@ import {
   type FxRatesResponseV1,
   type FundNavV1,
   type FundNavHistoryV1,
+  type FundHoldingsV1,
   type IndicatorV1,
   type QuoteV1,
 } from '@thesis-ledger/schemas';
@@ -341,6 +343,40 @@ export class MarketService {
             })),
           );
         }
+      }),
+    );
+  }
+
+  async getFundHoldings(
+    input: string,
+    options: { refresh?: boolean } = {},
+  ): Promise<FundHoldingsV1> {
+    const symbol = input.trim().toUpperCase();
+    if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
+    const key = redisKey('cache', `fund-holdings:${symbol}`);
+    if (!options.refresh) {
+      const cached = await this.redis.client.get(key);
+      if (cached)
+        return fundHoldingsSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+    }
+    return this.singleFlight(`fund-holdings:${symbol}`, () =>
+      this.withDistributedLock(`fund-holdings:${symbol}`, async () => {
+        if (!options.refresh) {
+          const cached = await this.redis.client.get(key);
+          if (cached)
+            return fundHoldingsSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+        }
+        const raw = await this.dsa.get<Record<string, unknown>>(
+          `/api/v1/thesis-ledger/market/fund-holdings?symbol=${encodeURIComponent(symbol)}`,
+        );
+        const holdings = fundHoldingsSchemaV1.parse({
+          ...raw,
+          version: 1,
+          fundSymbol: symbol,
+          servedFromCache: false,
+        });
+        await this.redis.client.set(key, JSON.stringify(holdings), 'EX', 86_400);
+        return holdings;
       }),
     );
   }

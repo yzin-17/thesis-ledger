@@ -8,6 +8,7 @@ import { isDataLoaded } from '../shared/display.js';
 import type { LoadState } from '../shared/types.js';
 import {
   automationJobTypeLabel,
+  automationOutputSummary,
   automationRunStatusLabel,
   dataQualityCodeLabel,
   dataQualityIssueReason,
@@ -91,7 +92,8 @@ export function ProviderTable({
                 const priority = priorityDrafts[provider.name] ?? provider.priority;
                 // 类型标签与能力列重复时不重复展示（如通知 Provider 的「通知」）
                 const typeLabel = providerTypeLabel(provider.type);
-                const capabilityLabels: string[] = provider.capabilities.map(providerCapabilityLabel);
+                const capabilityLabels: string[] =
+                  provider.capabilities.map(providerCapabilityLabel);
                 const showTypeLabel = !capabilityLabels.includes(typeLabel);
                 return (
                   <tr key={provider.name}>
@@ -233,7 +235,14 @@ export function AutomationTable({
             ) : (
               jobs.map((job) => (
                 <tr key={job.id}>
-                  <td>{job.name}</td>
+                  <td>
+                    {job.name}
+                    {job.managed ? (
+                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        系统任务
+                      </span>
+                    ) : null}
+                  </td>
                   <td>{automationJobTypeLabel(job.type)}</td>
                   <td>
                     {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString('zh-CN') : '未安排'}
@@ -282,14 +291,16 @@ export function AutomationTable({
                       )}
                       {runNowLabel(runningJobId === job.id)}
                     </Button>
-                    <Button
-                      className="text-button"
-                      size="sm"
-                      variant="link"
-                      onClick={() => onDelete(job)}
-                    >
-                      删除
-                    </Button>
+                    {!job.managed ? (
+                      <Button
+                        className="text-button"
+                        size="sm"
+                        variant="link"
+                        onClick={() => onDelete(job)}
+                      >
+                        删除
+                      </Button>
+                    ) : null}
                   </td>
                 </tr>
               ))
@@ -443,8 +454,8 @@ export function AutomationRunHistoryTable({
     <SimpleProviderTable
       title="自动化运行历史"
       description="失败任务和错误摘要可从这里定位，无需直接查数据库。"
-      columns={['任务', '状态', '开始时间', '错误']}
-      emptyColSpan={4}
+      columns={['任务', '状态', '开始时间', '运行结果', '错误']}
+      emptyColSpan={5}
       rows={
         normalizedState
           ? jobHistory.map((item) => ({
@@ -453,6 +464,7 @@ export function AutomationRunHistoryTable({
                 automationJobName(item.jobId),
                 automationRunStatusLabel(item.status),
                 new Date(item.startedAt).toLocaleString('zh-CN'),
+                automationOutputSummary(item.output),
                 item.error ?? '—',
               ],
             }))

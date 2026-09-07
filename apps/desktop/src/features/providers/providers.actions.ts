@@ -4,6 +4,7 @@ import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
 
 import type {
   AutomationJob,
+  AutomationRunNowResult,
   AutomationJobDraft,
   CreateAutomationJobInput,
   ProviderConnectionTestResult,
@@ -66,7 +67,7 @@ export type ProviderActionDependencies = {
     AutomationJob
   >;
   deleteJobMutation: ProviderAsyncMutation<string, AutomationJob>;
-  runJobMutation: ProviderAsyncMutation<string, { skipped: boolean; reason?: string }>;
+  runJobMutation: ProviderAsyncMutation<string, AutomationRunNowResult>;
   confirm: (options: ConfirmDialogOptions) => Promise<boolean>;
 };
 

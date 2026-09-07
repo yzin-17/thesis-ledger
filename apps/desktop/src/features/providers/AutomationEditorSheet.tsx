@@ -3,7 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -22,6 +28,12 @@ import {
   automationSchedulePresets,
 } from './providers.types.js';
 import type { AutomationJob, AutomationJobDraft } from './providers.types.js';
+
+const managedValuationTypes = new Set([
+  'valuation-intraday-sample',
+  'snapshot-close-estimate',
+  'snapshot-official-reconcile',
+]);
 
 const submitLabel = (saving: boolean, editing: boolean) => {
   if (saving) return '保存中…';
@@ -101,11 +113,13 @@ export const AutomationEditorSheet = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {automationJobTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {automationJobTypeLabel(type)}
-                          </SelectItem>
-                        ))}
+                        {automationJobTypes
+                          .filter((type) => Boolean(editingJob) || !managedValuationTypes.has(type))
+                          .map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {automationJobTypeLabel(type)}
+                            </SelectItem>
+                          ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -115,6 +129,7 @@ export const AutomationEditorSheet = ({
                   <Input
                     id="automation-job-name"
                     value={draft.name}
+                    disabled={editingJob?.managed === true}
                     onChange={(event) =>
                       onUpdateDraft((current) => ({ ...current, name: event.target.value }))
                     }
@@ -184,17 +199,16 @@ export const AutomationEditorSheet = ({
               </FieldGroup>
             </div>
             <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={saving}
-                onClick={onClose}
-              >
+              <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
                 取消
               </Button>
               <Button disabled={saving} aria-busy={saving} type="submit">
                 {saving && (
-                  <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                  <LoaderCircle
+                    data-icon="inline-start"
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
                 )}
                 {submitLabel(saving, Boolean(editingJob))}
               </Button>

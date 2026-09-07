@@ -9,6 +9,8 @@ import { MarketService } from '../market/market.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { performanceRelationWhere, performanceSnapshotWhere } from './performance-account-scope.js';
 import { PerformanceDataService } from './performance-data.service.js';
+import { PerformanceSnapshotRevisionRepository } from './performance-snapshot-revision.repository.js';
+import { valueSnapshotPosition } from './performance-snapshot-position-valuation.js';
 import {
   fxResponseFields,
   partialSnapshot,
@@ -22,23 +24,41 @@ import {
   type PerformanceFxOptions,
   type PerformanceSnapshot,
   type PortfolioMode,
+  type SnapshotCaptureContext,
 } from './performance-types.js';
+
+const shanghaiDate = (value: Date) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+
+const dateOnly = (value: Date) => new Date(`${shanghaiDate(value)}T00:00:00.000Z`);
 
 @Injectable()
 export class PerformanceSnapshotService {
+  private readonly revisions: PerformanceSnapshotRevisionRepository;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly market: MarketService,
     private readonly data: PerformanceDataService,
-  ) {}
+  ) {
+    this.revisions = new PerformanceSnapshotRevisionRepository(prisma);
+  }
 
   async capture(
     accountId?: string,
     capturedAt = new Date(),
     mode: PortfolioMode = 'actual',
     options: PerformanceFxOptions = {},
+    context: SnapshotCaptureContext = {},
   ) {
     const captureOptions = { ...options, fxMerge: options.fxMerge ?? true };
+    const valuationDate = context.valuationDate ?? dateOnly(capturedAt);
+    const valuationDateKey = shanghaiDate(valuationDate);
     await this.assertCurrencyScope(accountId, mode, captureOptions);
     const accountWhere = performanceRelationWhere(mode, accountId);
     const [positions, ledger, accountCurrencyMap] = await Promise.all([
@@ -55,54 +75,12 @@ export class PerformanceSnapshotService {
       'CNY';
     const resolvedCaptureOptions = { ...captureOptions, baseCurrency };
     const valued = await Promise.all(
-      positions.map(async (position) => {
+      positions.map((position) => {
         const currency =
           supportedCurrency(position.asset.currency) ??
           accountCurrencyMap.get(position.accountId) ??
           baseCurrency;
-        try {
-          if (position.asset.assetType === 'fund' || /\.OF$/.test(position.symbol)) {
-            const nav = await this.market.getFundNav(position.symbol, { allowStale: false });
-            return {
-              symbol: position.symbol,
-              quantity: Number(position.quantity),
-              costPrice: Number(position.costPrice),
-              assetType: position.asset.assetType,
-              currency,
-              marketValue: Number(position.quantity) * nav.unitNav,
-              nativeCostValue: Number(position.quantity) * Number(position.costPrice),
-              provider: nav.provider,
-              stale: nav.freshness === 'stale',
-              freshness: nav.freshness,
-            };
-          }
-          const quote = await this.market.getQuote(position.symbol, { allowStale: false });
-          return {
-            symbol: position.symbol,
-            quantity: Number(position.quantity),
-            costPrice: Number(position.costPrice),
-            assetType: position.asset.assetType,
-            currency,
-            marketValue: Number(position.quantity) * quote.price,
-            nativeCostValue: Number(position.quantity) * Number(position.costPrice),
-            provider: quote.provider,
-            stale: quote.stale,
-            freshness: quote.freshness,
-          };
-        } catch (error) {
-          return {
-            symbol: position.symbol,
-            quantity: Number(position.quantity),
-            costPrice: Number(position.costPrice),
-            assetType: position.asset.assetType,
-            currency,
-            marketValue: null,
-            nativeCostValue: Number(position.quantity) * Number(position.costPrice),
-            provider: 'unavailable',
-            stale: true,
-            error: error instanceof Error ? error.message : '行情不可用',
-          };
-        }
+        return valueSnapshotPosition(this.market, position, currency, valuationDateKey, context);
       }),
     );
     const cashBalances = projectCashBalances(ledger, capturedAt);
@@ -197,38 +175,61 @@ export class PerformanceSnapshotService {
       fx: fx.meta,
       dataQuality: { partial, missingSymbols, missingCurrencies },
     };
-    const snapshotDelegate = this.prisma.portfolioSnapshot as unknown as {
-      findMany?: (args: unknown) => Promise<Array<{ payload: unknown }>>;
-      findFirst?: (args: unknown) => Promise<{ payload: unknown } | null>;
-    };
-    const existingSnapshots =
-      typeof snapshotDelegate.findMany === 'function'
-        ? await snapshotDelegate.findMany({ where: { accountId: accountId ?? null, capturedAt } })
-        : [
-            await snapshotDelegate.findFirst?.({
-              where: { accountId: accountId ?? null, capturedAt },
-            }),
-          ].filter(
-            (snapshot): snapshot is { payload: unknown } =>
-              snapshot !== null && snapshot !== undefined,
-          );
-    const existing = existingSnapshots.find((snapshot) => {
-      const existingPayload = snapshot.payload;
-      return typeof existingPayload !== 'object' ||
-        existingPayload === null ||
-        !('mode' in existingPayload)
-        ? mode === 'actual'
-        : (existingPayload as { mode?: unknown }).mode === mode;
-    });
-    if (existing) return existing;
-    return this.prisma.portfolioSnapshot.create({
+    const scope = accountId ? 'account' : 'portfolio';
+    const source = context.source ?? 'DAILY_CLOSE';
+    const valuationBasis = context.valuationBasis ?? 'ESTIMATED';
+    const scopeId = accountId ?? 'all';
+    const eventSuffix =
+      source === 'DAILY_CLOSE' ? '' : `:${source}:${context.sourceRef ?? capturedAt.toISOString()}`;
+    const slotKey = `${scope}:${scopeId}:${mode}:${valuationDateKey}${eventSuffix}`;
+    const defaultKeyTime = source === 'DAILY_CLOSE' ? valuationDateKey : capturedAt.toISOString();
+    const idempotencyKey =
+      context.idempotencyKey ??
+      `${source.toLowerCase()}:${scope}:${scopeId}:${mode}:${defaultKeyTime}:${valuationBasis.toLowerCase()}`;
+    const pricedCoverage =
+      context.pricedCoverage ??
+      (valued.length === 0 ? 1 : (valued.length - missingSymbols.length) / valued.length);
+    const disclosureCoverage = context.disclosureCoverage ?? 1;
+    let valuationStatus: 'UNAVAILABLE' | 'PARTIAL' | 'COMPLETE' = 'COMPLETE';
+    if (pricedCoverage === 0 && valued.length > 0) valuationStatus = 'UNAVAILABLE';
+    else if (partial) valuationStatus = 'PARTIAL';
+    if (valuationBasis === 'OFFICIAL' && valuationStatus !== 'COMPLETE') {
+      throw new Error('正式估值所需行情、净值或汇率尚未齐备');
+    }
+    return this.revisions.appendCurrent({
+      slotKey,
+      idempotencyKey,
+      valuationBasis,
       data: {
         ...(accountId ? { accountId } : {}),
+        scope,
+        mode,
+        slotKey,
         capturedAt,
+        valuationDate,
+        source,
+        ...(context.sourceRef ? { sourceRef: context.sourceRef } : {}),
+        valuationBasis,
+        status: 'VALID',
+        valuationStatus,
         marketValue: knownMarketValue,
         costValue,
         cashValue,
-        payload,
+        totalValue: knownMarketValue + cashValue,
+        baseCurrency,
+        disclosureCoverage,
+        pricedCoverage,
+        idempotencyKey,
+        payloadVersion: 2,
+        payload: {
+          ...payload,
+          snapshotAt: capturedAt.toISOString(),
+          valuationDate: valuationDateKey,
+          source,
+          valuationBasis,
+          disclosureCoverage,
+          pricedCoverage,
+        },
       },
     });
   }
@@ -247,6 +248,7 @@ export class PerformanceSnapshotService {
     const snapshots = (await this.prisma.portfolioSnapshot.findMany({
       where: {
         ...performanceSnapshotWhere(accountId, useAccountSnapshots, mode),
+        source: 'DAILY_CLOSE',
         ...(start || end
           ? {
               capturedAt: {
@@ -259,7 +261,8 @@ export class PerformanceSnapshotService {
       include: { account: { select: { currency: true } } },
       orderBy: { capturedAt: 'asc' },
     })) as Array<PerformanceSnapshot & { account?: { currency?: string | null } | null }>;
-    const filtered = snapshots
+    const filtered = this.revisions
+      .current(snapshots)
       .filter((snapshot) => snapshotMode(snapshot) === mode)
       .map((snapshot) => {
         const payload = snapshotPayload(snapshot.payload);
@@ -417,6 +420,51 @@ export class PerformanceSnapshotService {
       });
     }
     return merged;
+  }
+
+  async list(filters: {
+    accountId?: string;
+    scope?: 'account' | 'portfolio';
+    mode?: PortfolioMode;
+    source?: 'DAILY_CLOSE' | 'TRANSACTION' | 'IMPORT' | 'SYSTEM';
+    valuationBasis?: 'ESTIMATED' | 'OFFICIAL';
+    start?: string;
+    end?: string;
+  }) {
+    return this.revisions.list(filters);
+  }
+
+  async detail(id: string) {
+    return this.revisions.detail(id);
+  }
+
+  async reconcileOfficial(limit = 100) {
+    const estimates = await this.revisions.pendingEstimates(limit);
+    const reconciled: string[] = [];
+    const pending: Array<{ snapshotId: string; reason: string }> = [];
+    for (const estimate of estimates) {
+      try {
+        const snapshot = await this.capture(
+          estimate.accountId ?? undefined,
+          estimate.capturedAt,
+          estimate.mode === 'shadow' ? 'shadow' : 'actual',
+          { fxMerge: true, baseCurrency: estimate.baseCurrency as Currency },
+          {
+            source: 'DAILY_CLOSE',
+            sourceRef: `reconcile:${estimate.id}`,
+            valuationBasis: 'OFFICIAL',
+            valuationDate: estimate.valuationDate,
+          },
+        );
+        reconciled.push(snapshot.id);
+      } catch (error) {
+        pending.push({
+          snapshotId: estimate.id,
+          reason: error instanceof Error ? error.message : '正式数据尚未齐备',
+        });
+      }
+    }
+    return { scanned: estimates.length, reconciled, pending };
   }
 
   private async assertCurrencyScope(

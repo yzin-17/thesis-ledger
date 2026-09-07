@@ -6,9 +6,15 @@ import type { Account } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
-import { useCaptureCloseSnapshotsMutation, useSavePerformanceTargetsMutation } from './performance.mutations.js';
+import { useSavePerformanceTargetsMutation } from './performance.mutations.js';
 import { usePerformanceQueries } from './performance.queries.js';
-import type { AllocationCategory, Currency, PortfolioMode } from './performance.types.js';
+import type {
+  AllocationCategory,
+  Currency,
+  PerformanceSeriesInterval,
+  PerformanceSeriesRange,
+  PortfolioMode,
+} from './performance.types.js';
 import {
   PerformanceAccountSelector,
   PerformanceAllocationSection,
@@ -30,6 +36,8 @@ export function PerformanceDashboard({
   const [accountId, setAccountId] = useState('');
   const [fxMerge, setFxMerge] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState<Currency>('CNY');
+  const [seriesRange, setSeriesRange] = useState<PerformanceSeriesRange>('1Y');
+  const [seriesInterval, setSeriesInterval] = useState<PerformanceSeriesInterval>('1d');
   const [targetSaveError, setTargetSaveError] = useState<string | null>(null);
   const toastManager = useToastManager();
   const modeAccounts = useMemo(
@@ -43,7 +51,14 @@ export function PerformanceDashboard({
   const canMergeFx = mixedCurrencies && !accountId;
   const effectiveFxMerge = canMergeFx && fxMerge;
   const queryOptions = { fxMerge: effectiveFxMerge, baseCurrency };
-  const performanceQueries = usePerformanceQueries(mode, accountId, true, queryOptions);
+  const performanceQueries = usePerformanceQueries(
+    mode,
+    accountId,
+    true,
+    queryOptions,
+    seriesRange,
+    seriesInterval,
+  );
 
   useEffect(() => {
     if (accountId && !modeAccounts.some((account) => account.id === accountId)) setAccountId('');
@@ -60,6 +75,12 @@ export function PerformanceDashboard({
       setBaseCurrency('CNY');
     }
   }, [mixedCurrencies]);
+
+  useEffect(() => {
+    const available = performanceQueries.series.data?.availableIntervals;
+    if (!available || available.includes(seriesInterval)) return;
+    setSeriesInterval(performanceQueries.series.data?.defaultInterval ?? available[0] ?? '1d');
+  }, [performanceQueries.series.data, seriesInterval]);
 
   const snapshots = performanceQueries.history.data ?? [];
   const summary = !performanceQueries.summary.isError
@@ -91,6 +112,7 @@ export function PerformanceDashboard({
   const currentPnlRate = currentPnl !== null && currentCost > 0 ? currentPnl / currentCost : null;
   const scopeHasData = [
     performanceQueries.history,
+    performanceQueries.series,
     performanceQueries.summary,
     performanceQueries.layers,
     performanceQueries.targets,
@@ -99,6 +121,7 @@ export function PerformanceDashboard({
     !scopeHasData &&
     [
       performanceQueries.history,
+      performanceQueries.series,
       performanceQueries.summary,
       performanceQueries.layers,
       performanceQueries.targets,
@@ -107,6 +130,12 @@ export function PerformanceDashboard({
     [performanceQueries.history],
     performanceQueries.history.data !== undefined,
     performanceQueries.history.data !== undefined && snapshots.length === 0,
+  );
+  const seriesState = resolveLoadState(
+    [performanceQueries.series],
+    performanceQueries.series.data !== undefined,
+    performanceQueries.series.data !== undefined &&
+      performanceQueries.series.data.points.length === 0,
   );
   const allocationState = resolveLoadState(
     [
@@ -120,17 +149,18 @@ export function PerformanceDashboard({
   );
   const refreshing = [
     performanceQueries.history,
+    performanceQueries.series,
     performanceQueries.summary,
     performanceQueries.layers,
     performanceQueries.targets,
     performanceQueries.allocation,
   ].some((query) => query.isFetching);
   const saveTargetsMutation = useSavePerformanceTargetsMutation();
-  const captureSnapshotsMutation = useCaptureCloseSnapshotsMutation();
 
   const retry = () => {
     void Promise.all([
       performanceQueries.history.refetch(),
+      performanceQueries.series.refetch(),
       performanceQueries.summary.refetch(),
       performanceQueries.layers.refetch(),
       performanceQueries.targets.refetch(),
@@ -163,30 +193,6 @@ export function PerformanceDashboard({
       const message = error instanceof Error ? error.message : '目标保存失败，请稍后重试。';
       setTargetSaveError(message);
       return false;
-    }
-  };
-
-  /** 立即拍摄估值快照跟随当前页面数据模式：模拟模式拍影子账户，实际模式拍实际账户。 */
-  const captureSnapshot = async () => {
-    try {
-      await captureSnapshotsMutation.mutateAsync({
-        accountIds: modeAccounts.map((account) => account.id),
-        capturedAt: new Date().toISOString(),
-      });
-      toastManager.add({
-        title: '估值快照已拍摄',
-        description: '资产走势与收益指标已按最新快照刷新。',
-        type: 'success',
-        timeout: 2800,
-      });
-    } catch (error) {
-      toastManager.add({
-        title: '估值快照拍摄失败',
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
     }
   };
 
@@ -252,17 +258,29 @@ export function PerformanceDashboard({
           />
         </div>
         <PerformanceSnapshotTable
-          loadState={historyState}
+          loadState={
+            !accountId && mixedCurrencies && !effectiveFxMerge ? historyState : seriesState
+          }
           snapshots={snapshots}
+          series={performanceQueries.series.data}
+          range={seriesRange}
+          interval={seriesInterval}
+          onRangeChange={(nextRange, defaultInterval) => {
+            setSeriesRange(nextRange);
+            setSeriesInterval(defaultInterval);
+          }}
+          onIntervalChange={setSeriesInterval}
           groupedByCurrency={
             !accountId && mixedCurrencies && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
           }
           refreshing={refreshing}
-          onRetry={() => void performanceQueries.history.refetch()}
+          onRetry={() =>
+            void Promise.all([
+              performanceQueries.history.refetch(),
+              performanceQueries.series.refetch(),
+            ])
+          }
           onCompleteDataSetup={() => onNavigate('providers')}
-          onCaptureSnapshot={() => void captureSnapshot()}
-          capturingSnapshot={captureSnapshotsMutation.isPending}
-          captureDisabled={modeAccounts.length === 0}
         />
         <PerformanceAllocationSection
           loadState={allocationState}

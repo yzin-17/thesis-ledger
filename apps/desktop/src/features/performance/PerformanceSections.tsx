@@ -1,8 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,13 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AlertTriangle, LoaderCircle, Plus } from 'lucide-react';
 import { normalizeAllocationCategory, normalizeAllocationTargets } from '@thesis-ledger/domain';
 
 import type { Account } from '../portfolio/portfolio.types.js';
 import { money } from '../shared/display.js';
-import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import type {
   AllocationCategory,
   PerformanceAllocationRecord,
@@ -34,6 +31,8 @@ import type {
   SnapshotRecord,
   Currency,
 } from './performance.types.js';
+
+export { PerformanceSnapshotTable } from './PerformanceTrendSection.js';
 
 const ALL_ACCOUNTS_VALUE = '__all_accounts__';
 const CATEGORY_ORDER: AllocationCategory[] = ['stock', 'etf', 'fund', 'index', 'cash'];
@@ -104,99 +103,6 @@ const signedMoney = (value: number, currency?: Currency) =>
 const signedPercent = (value: number) => {
   const formatted = `${Math.abs(value * 100).toFixed(2)}%`;
   return value >= 0 ? `+${formatted}` : `-${formatted}`;
-};
-
-type SnapshotRange = '1M' | '3M' | 'YTD' | '1Y' | 'ALL';
-
-const snapshotRangeOptions: Array<{ value: SnapshotRange; label: string }> = [
-  { value: '1M', label: '近1月' },
-  { value: '3M', label: '近3月' },
-  { value: 'YTD', label: '年初至今' },
-  { value: '1Y', label: '近1年' },
-  { value: 'ALL', label: '全部' },
-];
-
-const snapshotsForRange = (snapshots: SnapshotRecord[], range: SnapshotRange) => {
-  if (range === 'ALL' || snapshots.length === 0) return snapshots;
-  const anchor = new Date(snapshots.at(-1)?.capturedAt ?? '');
-  if (Number.isNaN(anchor.getTime())) return snapshots;
-  const cutoff = new Date(anchor);
-  if (range === 'YTD') {
-    cutoff.setMonth(0, 1);
-    cutoff.setHours(0, 0, 0, 0);
-  } else {
-    let months = 12;
-    if (range === '1M') months = 1;
-    else if (range === '3M') months = 3;
-    cutoff.setMonth(cutoff.getMonth() - months);
-  }
-  return snapshots.filter((snapshot) => new Date(snapshot.capturedAt) >= cutoff);
-};
-
-const PerformanceHistoryChart = ({ snapshots }: { snapshots: SnapshotRecord[] }) => {
-  const values = snapshots.map(snapshotValue);
-  const width = 640;
-  const height = 220;
-  const padding = { top: 18, right: 18, bottom: 28, left: 18 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const valueRange = Math.max(maxValue - minValue, 1);
-  const points = values.map((value, index) => {
-    let x = padding.left + (index / (snapshots.length - 1)) * chartWidth;
-    if (snapshots.length === 1) x = padding.left + chartWidth / 2;
-    const y = padding.top + (1 - (value - minValue) / valueRange) * chartHeight;
-    return { x, y };
-  });
-  const pointsValue = points.map((point) => `${point.x},${point.y}`).join(' ');
-  const first = snapshots[0];
-  const last = snapshots.at(-1);
-
-  return (
-    <div className="rounded-lg bg-muted/30 px-3 py-3" aria-label="资产走势">
-      <svg
-        className="h-52 w-full text-primary"
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="快照资产价值走势"
-      >
-        <line
-          x1={padding.left}
-          x2={width - padding.right}
-          y1={height - padding.bottom}
-          y2={height - padding.bottom}
-          className="stroke-border"
-          strokeWidth="1"
-        />
-        <polyline
-          points={pointsValue}
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="3"
-        />
-        {points.map((point, index) => (
-          <circle
-            key={`${snapshots[index]?.id ?? index}`}
-            cx={point.x}
-            cy={point.y}
-            r="4"
-            fill="currentColor"
-          />
-        ))}
-      </svg>
-      <div className="flex justify-between gap-3 text-xs text-muted-foreground">
-        <span>{first ? formatDate(first.capturedAt) : '尚无数据时点'}</span>
-        <span>
-          {last
-            ? `${formatDate(last.capturedAt)} · ${formatMoney(snapshotValue(last), last.currency)}`
-            : ''}
-        </span>
-      </div>
-    </div>
-  );
 };
 
 export function PerformanceAccountSelector({
@@ -489,181 +395,6 @@ export function PerformanceMetrics({
         </div>
       ) : null}
     </>
-  );
-}
-
-export function PerformanceSnapshotTable({
-  loadState,
-  snapshots,
-  refreshing,
-  onRetry,
-  onCompleteDataSetup,
-  onCaptureSnapshot,
-  capturingSnapshot = false,
-  captureDisabled = false,
-  groupedByCurrency = false,
-}: {
-  loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
-  snapshots: SnapshotRecord[];
-  refreshing?: boolean;
-  onRetry?: (() => void) | undefined;
-  onCompleteDataSetup?: (() => void) | undefined;
-  onCaptureSnapshot?: (() => void) | undefined;
-  capturingSnapshot?: boolean;
-  captureDisabled?: boolean;
-  groupedByCurrency?: boolean;
-}) {
-  const hasSnapshots = snapshots.length > 0;
-  const [range, setRange] = useState<SnapshotRange>('ALL');
-  const [showCalculationInfo, setShowCalculationInfo] = useState(false);
-  const visibleSnapshots = useMemo(() => snapshotsForRange(snapshots, range), [snapshots, range]);
-  let content: ReactNode;
-  if (loadState === 'loading' && !hasSnapshots) {
-    content = <Skeleton className="h-52 w-full rounded-lg" aria-label="资产走势加载中" />;
-  } else if (groupedByCurrency && hasSnapshots && visibleSnapshots.length > 0) {
-    const groups = new Map<string, SnapshotRecord[]>();
-    for (const snapshot of visibleSnapshots) {
-      const currency = snapshot.currency ?? '未知币种';
-      const current = groups.get(currency) ?? [];
-      current.push(snapshot);
-      groups.set(currency, current);
-    }
-    content = (
-      <div className="grid gap-3 lg:grid-cols-2">
-        {[...groups.entries()].map(([currency, group]) => (
-          <div key={currency} className="rounded-lg bg-muted/20 p-3">
-            <p className="m-0 mb-2 text-sm font-medium">{currency} 资产走势</p>
-            <PerformanceHistoryChart snapshots={group} />
-          </div>
-        ))}
-      </div>
-    );
-  } else if (hasSnapshots && visibleSnapshots.length > 0) {
-    content = (
-      <>
-        <PerformanceHistoryChart snapshots={visibleSnapshots} />
-        <details className="mt-3 rounded-lg bg-muted/20 px-3 py-2 text-sm">
-          <summary className="cursor-pointer text-muted-foreground">查看快照明细</summary>
-          <div className="table-wrap mt-2">
-            <table>
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>市值</th>
-                  <th>成本</th>
-                  <th>现金</th>
-                  <th>质量</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleSnapshots.map((snapshot) => (
-                  <tr key={snapshot.id}>
-                    <td>{formatDate(snapshot.capturedAt)}</td>
-                    <td>{formatMoney(snapshot.marketValue, snapshot.currency)}</td>
-                    <td>{formatMoney(snapshot.costValue, snapshot.currency)}</td>
-                    <td>{formatMoney(snapshot.cashValue, snapshot.currency)}</td>
-                    <td>
-                      {snapshot.partial ? (
-                        <Badge variant="destructive">缺行情</Badge>
-                      ) : (
-                        <Badge variant="secondary">完整</Badge>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      </>
-    );
-  } else if (hasSnapshots) {
-    content = (
-      <Empty className="min-h-20 rounded-lg border-0 bg-muted/30 px-4 py-6" aria-live="polite">
-        <EmptyDescription>该时间范围暂无快照。</EmptyDescription>
-      </Empty>
-    );
-  } else {
-    content = (
-      <Empty
-        className="min-h-[176px] items-start justify-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-5 py-6 text-left"
-        aria-live="polite"
-      >
-        <EmptyTitle>暂无收益历史</EmptyTitle>
-        <EmptyDescription>创建第一个快照后即可查看资产曲线、时间加权收益率和资金加权收益率。</EmptyDescription>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {onCompleteDataSetup ? (
-            <Button type="button" size="sm" onClick={onCompleteDataSetup}>
-              完成数据配置
-            </Button>
-          ) : null}
-          {onCaptureSnapshot ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={capturingSnapshot || captureDisabled}
-              aria-busy={capturingSnapshot}
-              title={captureDisabled ? '当前模式暂无可拍摄账户' : undefined}
-              onClick={onCaptureSnapshot}
-            >
-              {capturingSnapshot && (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
-              )}
-              {capturingSnapshot ? '拍摄中…' : '立即拍一个估值快照'}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            onClick={() => setShowCalculationInfo((current) => !current)}
-          >
-            了解收益计算
-          </Button>
-        </div>
-        {showCalculationInfo ? (
-          <p className="m-0 text-xs text-muted-foreground" role="note">
-            时间加权收益率使用完整快照计算，资金加权收益率还会结合账本的外部现金流。
-          </p>
-        ) : null}
-      </Empty>
-    );
-  }
-  return (
-    <section className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-xl font-semibold tracking-tight">资产走势</h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">市值、现金和数据时点按快照回放。</p>
-        </div>
-        {hasSnapshots ? (
-          <ToggleGroup
-            value={[range]}
-            aria-label="收益走势时间范围"
-            onValueChange={(value) => {
-              const nextRange = value[0] as SnapshotRange | undefined;
-              if (nextRange) setRange(nextRange);
-            }}
-          >
-            {snapshotRangeOptions.map((option) => (
-              <ToggleGroupItem key={option.value} value={option.value} aria-label={option.label}>
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        ) : null}
-        {refreshing ? <Badge variant="secondary">正在更新</Badge> : null}
-      </div>
-      {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
-        <DataStateBanner state={loadState} onRetry={onRetry} />
-      ) : null}
-      {content}
-    </section>
   );
 }
 

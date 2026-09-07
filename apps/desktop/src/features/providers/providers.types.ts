@@ -52,6 +52,8 @@ export interface AutomationJob {
   timezone: string;
   enabled: boolean;
   nextRunAt: string | null;
+  systemKey?: string | null;
+  managed?: boolean;
 }
 
 export interface AutomationHistoryRecord {
@@ -60,6 +62,7 @@ export interface AutomationHistoryRecord {
   status: string;
   startedAt: string;
   error: string | null;
+  output?: unknown;
 }
 
 export interface CreateAutomationJobInput {
@@ -160,7 +163,9 @@ export const automationJobTypeLabels: Record<string, string> = {
   'market-sync': '市场数据同步',
   'risk-evaluation': '风险评估',
   'daily-digest': '每日摘要',
-  snapshot: '估值快照',
+  'valuation-intraday-sample': '盘中估值采样',
+  'snapshot-close-estimate': '盘后估值预估',
+  'snapshot-official-reconcile': '正式净值校准',
   backup: '数据备份',
   'provider-health': 'Provider 健康检查',
   'cash-deposit-materialization': '定期入账生成',
@@ -177,6 +182,25 @@ export const automationRunStatusLabels: Record<string, string> = {
 
 export const automationRunStatusLabel = (status: string) =>
   automationRunStatusLabels[status] ?? `其他（${status}）`;
+
+export const automationOutputSummary = (output: unknown) => {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return '—';
+  const result = output as Record<string, unknown>;
+  if (typeof result.sampled === 'number') {
+    const disclosure = Number(result.disclosureCoverage);
+    const priced = Number(result.pricedCoverage);
+    if (Number.isFinite(disclosure) && Number.isFinite(priced)) {
+      return `生成 ${result.sampled} 个账户估值点，披露覆盖 ${(disclosure * 100).toFixed(1)}%，可定价覆盖 ${(priced * 100).toFixed(1)}%`;
+    }
+    return `生成 ${result.sampled} 个账户估值点`;
+  }
+  if (Array.isArray(result.snapshots)) return `生成 ${result.snapshots.length} 个快照`;
+  if (typeof result.scanned === 'number' && Array.isArray(result.reconciled)) {
+    const pending = Array.isArray(result.pending) ? result.pending.length : 0;
+    return `扫描 ${result.scanned} 个槽位，正式化 ${result.reconciled.length} 个，待补齐 ${pending} 个`;
+  }
+  return '已记录运行结果';
+};
 
 export const providerHealthStateLabels: Record<string, string> = {
   healthy: '健康',
@@ -226,14 +250,15 @@ export const dataQualityIssueReason = (details: Record<string, unknown> | null |
 
 export const automationSchedulePresets = [
   { value: '0 16 * * 1-5', label: '每个交易日 16:00' },
+  { value: '* * * * 1-5', label: '工作日每分钟（交易时段内）' },
+  { value: '30 6 * * *', label: '每天 06:30' },
   { value: '0 9 * * 1-5', label: '每个工作日 09:00' },
 ] as const;
 
 export const AUTOMATION_SCHEDULE_CUSTOM = 'custom';
 
 export type AutomationSchedulePreset =
-  | (typeof automationSchedulePresets)[number]['value']
-  | typeof AUTOMATION_SCHEDULE_CUSTOM;
+  (typeof automationSchedulePresets)[number]['value'] | typeof AUTOMATION_SCHEDULE_CUSTOM;
 
 export const automationScheduleLabel = (preset: AutomationSchedulePreset) =>
   automationSchedulePresets.find((item) => item.value === preset)?.label ?? '自定义';
@@ -248,7 +273,7 @@ export const automationJobDraftFromJob = (job: AutomationJob): AutomationJobDraf
   enabled: job.enabled,
 });
 
-export const newAutomationJobDraft = (type = 'snapshot'): AutomationJobDraft => ({
+export const newAutomationJobDraft = (type = 'market-sync'): AutomationJobDraft => ({
   name: automationJobTypeLabel(type),
   type,
   schedulePreset: automationSchedulePresets[0].value,

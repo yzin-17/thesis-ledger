@@ -2,8 +2,16 @@ import type { FormEvent } from 'react';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 
 import type { ProviderActionDependencies, ProviderToastManager } from './providers.actions.js';
-import type { AutomationJob, AutomationJobDraft, CreateAutomationJobInput } from './providers.types.js';
-import { automationJobDraftFromJob, newAutomationJobDraft } from './providers.types.js';
+import type {
+  AutomationJob,
+  AutomationJobDraft,
+  CreateAutomationJobInput,
+} from './providers.types.js';
+import {
+  automationJobDraftFromJob,
+  automationOutputSummary,
+  newAutomationJobDraft,
+} from './providers.types.js';
 
 export const apiErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof ThesisLedgerApiError && error.payload?.message) {
@@ -146,6 +154,7 @@ export const createProviderAutomationHandlers = ({
       } else {
         toastManager.add({
           title: `${job.name} 已执行完成`,
+          description: automationOutputSummary(result.output),
           type: 'success',
           timeout: 2800,
         });

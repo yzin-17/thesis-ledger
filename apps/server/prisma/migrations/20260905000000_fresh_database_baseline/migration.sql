@@ -440,13 +440,53 @@ CREATE TABLE "LedgerEvent" (
 CREATE TABLE "PortfolioSnapshot" (
     "id" UUID NOT NULL,
     "accountId" UUID,
+    "scope" TEXT NOT NULL,
+    "mode" TEXT NOT NULL DEFAULT 'actual',
+    "slotKey" TEXT NOT NULL,
     "capturedAt" TIMESTAMP(3) NOT NULL,
+    "valuationDate" DATE NOT NULL,
+    "source" TEXT NOT NULL,
+    "sourceRef" TEXT,
+    "valuationBasis" TEXT NOT NULL,
+    "revision" INTEGER NOT NULL DEFAULT 1,
+    "supersedesSnapshotId" UUID,
+    "status" TEXT NOT NULL DEFAULT 'VALID',
+    "valuationStatus" TEXT NOT NULL,
+    "invalidatedAt" TIMESTAMP(3),
+    "invalidatedReason" TEXT,
     "marketValue" DECIMAL(24,8) NOT NULL,
     "costValue" DECIMAL(24,8) NOT NULL,
     "cashValue" DECIMAL(24,8) NOT NULL,
+    "totalValue" DECIMAL(24,8),
+    "baseCurrency" TEXT NOT NULL,
+    "disclosureCoverage" DECIMAL(10,8) NOT NULL DEFAULT 1,
+    "pricedCoverage" DECIMAL(10,8) NOT NULL DEFAULT 1,
+    "idempotencyKey" TEXT NOT NULL,
+    "payloadVersion" INTEGER NOT NULL DEFAULT 2,
     "payload" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PortfolioSnapshot_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "AccountValuationPoint" (
+    "id" BIGSERIAL NOT NULL,
+    "accountId" UUID NOT NULL,
+    "mode" TEXT NOT NULL DEFAULT 'actual',
+    "at" TIMESTAMP(3) NOT NULL,
+    "baseCurrency" TEXT NOT NULL,
+    "marketValue" DECIMAL(24,8) NOT NULL,
+    "cashValue" DECIMAL(24,8) NOT NULL,
+    "totalValue" DECIMAL(24,8) NOT NULL,
+    "valuationBasis" TEXT NOT NULL,
+    "disclosureCoverage" DECIMAL(10,8) NOT NULL DEFAULT 1,
+    "pricedCoverage" DECIMAL(10,8) NOT NULL DEFAULT 1,
+    "dataQuality" TEXT NOT NULL,
+    "evidence" JSONB NOT NULL,
+    "sourceSnapshotId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AccountValuationPoint_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -910,6 +950,8 @@ CREATE TABLE "AutomationJob" (
     "lockTtlMs" INTEGER NOT NULL,
     "lastRunAt" TIMESTAMP(3),
     "nextRunAt" TIMESTAMP(3),
+    "systemKey" TEXT,
+    "managed" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "AutomationJob_pkey" PRIMARY KEY ("id")
 );
@@ -1161,7 +1203,15 @@ CREATE UNIQUE INDEX "LedgerEvent_supersedesEventId_key" ON "LedgerEvent"("supers
 CREATE INDEX "PortfolioSnapshot_capturedAt_idx" ON "PortfolioSnapshot"("capturedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PortfolioSnapshot_accountId_capturedAt_key" ON "PortfolioSnapshot"("accountId", "capturedAt");
+CREATE UNIQUE INDEX "PortfolioSnapshot_slotKey_revision_key" ON "PortfolioSnapshot"("slotKey", "revision");
+CREATE UNIQUE INDEX "PortfolioSnapshot_supersedesSnapshotId_key" ON "PortfolioSnapshot"("supersedesSnapshotId");
+CREATE UNIQUE INDEX "PortfolioSnapshot_idempotencyKey_key" ON "PortfolioSnapshot"("idempotencyKey");
+CREATE INDEX "PortfolioSnapshot_scope_accountId_mode_valuationDate_idx" ON "PortfolioSnapshot"("scope", "accountId", "mode", "valuationDate");
+CREATE INDEX "PortfolioSnapshot_source_valuationDate_idx" ON "PortfolioSnapshot"("source", "valuationDate");
+CREATE UNIQUE INDEX "AccountValuationPoint_accountId_mode_at_baseCurrency_key" ON "AccountValuationPoint"("accountId", "mode", "at", "baseCurrency");
+CREATE INDEX "AccountValuationPoint_mode_at_idx" ON "AccountValuationPoint"("mode", "at");
+CREATE INDEX "AccountValuationPoint_sourceSnapshotId_idx" ON "AccountValuationPoint"("sourceSnapshotId");
+CREATE UNIQUE INDEX "AutomationJob_systemKey_key" ON "AutomationJob"("systemKey");
 
 -- CreateIndex
 CREATE INDEX "TargetAllocation_scope_accountId_active_idx" ON "TargetAllocation"("scope", "accountId", "active");
@@ -1423,6 +1473,26 @@ ALTER TABLE "LedgerEvent" ADD CONSTRAINT "LedgerEvent_supersedesEventId_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "PortfolioSnapshot" ADD CONSTRAINT "PortfolioSnapshot_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PortfolioSnapshot" ADD CONSTRAINT "PortfolioSnapshot_supersedesSnapshotId_fkey" FOREIGN KEY ("supersedesSnapshotId") REFERENCES "PortfolioSnapshot"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "AccountValuationPoint" ADD CONSTRAINT "AccountValuationPoint_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "AccountValuationPoint" ADD CONSTRAINT "AccountValuationPoint_sourceSnapshotId_fkey" FOREIGN KEY ("sourceSnapshotId") REFERENCES "PortfolioSnapshot"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "PortfolioSnapshot"
+  ADD CONSTRAINT "PortfolioSnapshot_scope_account_check"
+  CHECK (("scope" = 'account' AND "accountId" IS NOT NULL) OR ("scope" = 'portfolio' AND "accountId" IS NULL)),
+  ADD CONSTRAINT "PortfolioSnapshot_mode_check" CHECK ("mode" IN ('actual', 'shadow')),
+  ADD CONSTRAINT "PortfolioSnapshot_source_check" CHECK ("source" IN ('DAILY_CLOSE', 'TRANSACTION', 'IMPORT', 'SYSTEM')),
+  ADD CONSTRAINT "PortfolioSnapshot_valuationBasis_check" CHECK ("valuationBasis" IN ('ESTIMATED', 'OFFICIAL')),
+  ADD CONSTRAINT "PortfolioSnapshot_status_check" CHECK ("status" IN ('VALID', 'INVALID')),
+  ADD CONSTRAINT "PortfolioSnapshot_valuationStatus_check" CHECK ("valuationStatus" IN ('COMPLETE', 'PARTIAL', 'UNAVAILABLE')),
+  ADD CONSTRAINT "PortfolioSnapshot_revision_check" CHECK ("revision" > 0),
+  ADD CONSTRAINT "PortfolioSnapshot_disclosureCoverage_check" CHECK ("disclosureCoverage" BETWEEN 0 AND 1),
+  ADD CONSTRAINT "PortfolioSnapshot_pricedCoverage_check" CHECK ("pricedCoverage" BETWEEN 0 AND 1);
+ALTER TABLE "AccountValuationPoint"
+  ADD CONSTRAINT "AccountValuationPoint_mode_check" CHECK ("mode" IN ('actual', 'shadow')),
+  ADD CONSTRAINT "AccountValuationPoint_valuationBasis_check" CHECK ("valuationBasis" IN ('ESTIMATED', 'OFFICIAL')),
+  ADD CONSTRAINT "AccountValuationPoint_dataQuality_check" CHECK ("dataQuality" IN ('COMPLETE', 'PARTIAL', 'LOW_COVERAGE', 'UNAVAILABLE')),
+  ADD CONSTRAINT "AccountValuationPoint_disclosureCoverage_check" CHECK ("disclosureCoverage" BETWEEN 0 AND 1),
+  ADD CONSTRAINT "AccountValuationPoint_pricedCoverage_check" CHECK ("pricedCoverage" BETWEEN 0 AND 1);
 
 -- AddForeignKey
 ALTER TABLE "MarketBar" ADD CONSTRAINT "MarketBar_symbol_fkey" FOREIGN KEY ("symbol") REFERENCES "Asset"("symbol") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1659,6 +1729,26 @@ VALUES (
   300000,
   CURRENT_TIMESTAMP
 );
+
+INSERT INTO "AutomationJob" (
+  "id", "name", "type", "cron", "timezone", "enabled", "retryPolicy", "lockTtlMs", "nextRunAt", "systemKey", "managed"
+)
+VALUES
+  (
+    '00000000-0000-4000-8000-000000000011', '盘中估值采样', 'valuation-intraday-sample',
+    '* * * * 1-5', 'Asia/Shanghai', TRUE, '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
+    300000, CURRENT_TIMESTAMP, 'valuation-intraday-sample', TRUE
+  ),
+  (
+    '00000000-0000-4000-8000-000000000012', '盘后估值预估', 'snapshot-close-estimate',
+    '0 16 * * 1-5', 'Asia/Shanghai', TRUE, '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
+    300000, CURRENT_TIMESTAMP, 'snapshot-close-estimate', TRUE
+  ),
+  (
+    '00000000-0000-4000-8000-000000000013', '正式净值校准', 'snapshot-official-reconcile',
+    '30 6 * * *', 'Asia/Shanghai', TRUE, '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
+    300000, CURRENT_TIMESTAMP, 'snapshot-official-reconcile', TRUE
+  );
 
 INSERT INTO "SchemaVersion" ("id", "version")
 VALUES (1, '20260905000000_fresh_database_baseline');

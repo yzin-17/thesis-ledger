@@ -4,11 +4,46 @@ import { portfolioModeSchema } from './api.js';
 export const allocationCategorySchema = z.enum(['stock', 'etf', 'fund', 'index', 'cash']);
 export type AllocationCategory = z.infer<typeof allocationCategorySchema>;
 
-export const performanceSnapshotCaptureInputSchema = z.object({
-  accountId: z.uuid().optional(),
-  capturedAt: z.iso.datetime({ offset: true }).optional(),
-  mode: portfolioModeSchema.optional(),
-});
+export const performanceSeriesRangeSchema = z.enum([
+  '1D',
+  '5D',
+  '1M',
+  '3M',
+  'YTD',
+  '1Y',
+  '5Y',
+  'ALL',
+]);
+export type PerformanceSeriesRange = z.infer<typeof performanceSeriesRangeSchema>;
+
+export const performanceSeriesIntervalSchema = z.enum(['1min', '1h', '1d', '1w', '1mo', '1y']);
+export type PerformanceSeriesInterval = z.infer<typeof performanceSeriesIntervalSchema>;
+
+export const performanceSeriesQuerySchema = z
+  .object({
+    scope: z.enum(['account', 'portfolio']).default('portfolio'),
+    accountId: z.uuid().optional(),
+    range: performanceSeriesRangeSchema.default('1Y'),
+    interval: performanceSeriesIntervalSchema.default('1d'),
+    mode: portfolioModeSchema.default('actual'),
+    baseCurrency: z.enum(['CNY', 'HKD', 'USD']).default('CNY'),
+  })
+  .superRefine((value, context) => {
+    if (value.scope === 'account' && !value.accountId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['accountId'],
+        message: '账户范围必须提供 accountId',
+      });
+    }
+    if (value.scope === 'portfolio' && value.accountId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['accountId'],
+        message: '组合范围不能提供 accountId',
+      });
+    }
+  });
 
 export const performanceCalculateInputSchema = z.object({
   valuations: z.array(

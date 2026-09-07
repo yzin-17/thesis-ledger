@@ -100,7 +100,9 @@ describe('Performance correctness regressions', () => {
       },
       ledgerEvent: { findMany: vi.fn(async () => []) },
       portfolioSnapshot: {
+        findUnique: vi.fn(async () => null),
         findMany: vi.fn(async () => []),
+        findFirst: vi.fn(async () => null),
         create,
       },
     };

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { cnTradingCalendar } from '@thesis-ledger/domain';
 import {
@@ -14,6 +19,7 @@ import { AutomationController } from '../src/automation/automation.controller.js
 import { AutomationWorkflowRunner } from '../src/automation/workflow-runner.service.js';
 import {
   AutomationService,
+  managedValuationJobs,
   nextCronOccurrence,
   type AutomationHandler,
 } from '../src/automation/automation.service.js';
@@ -53,7 +59,9 @@ describe('Automation job types', () => {
       'market-sync',
       'risk-evaluation',
       'daily-digest',
-      'snapshot',
+      'valuation-intraday-sample',
+      'snapshot-close-estimate',
+      'snapshot-official-reconcile',
       'backup',
       'provider-health',
       'cash-deposit-materialization',
@@ -61,7 +69,9 @@ describe('Automation job types', () => {
     expect(isMarketAutomationJobType('market-sync')).toBe(true);
     expect(isMarketAutomationJobType('risk-evaluation')).toBe(true);
     expect(isMarketAutomationJobType('daily-digest')).toBe(true);
-    expect(isMarketAutomationJobType('snapshot')).toBe(true);
+    expect(isMarketAutomationJobType('valuation-intraday-sample')).toBe(true);
+    expect(isMarketAutomationJobType('snapshot-close-estimate')).toBe(true);
+    expect(isMarketAutomationJobType('snapshot-official-reconcile')).toBe(false);
     expect(isMarketAutomationJobType('backup')).toBe(false);
     expect(isMarketAutomationJobType('provider-health')).toBe(false);
     expect(isMarketAutomationJobType('cash-deposit-materialization')).toBe(false);
@@ -169,7 +179,11 @@ describe('AutomationService scheduled execution', () => {
           }),
       ),
     };
-    const service = new AutomationService(prisma as never, redis as never, notificationsFixture() as never);
+    const service = new AutomationService(
+      prisma as never,
+      redis as never,
+      notificationsFixture() as never,
+    );
     const now = new Date('2026-08-20T12:05:00Z');
 
     const first = service.executeScheduled(stored.id, handler, now);
@@ -199,7 +213,11 @@ describe('AutomationService scheduled execution', () => {
       },
     };
     const handler: AutomationHandler = { type: 'market-sync', run: vi.fn() };
-    const service = new AutomationService(prisma as never, redisFixture() as never, notificationsFixture() as never);
+    const service = new AutomationService(
+      prisma as never,
+      redisFixture() as never,
+      notificationsFixture() as never,
+    );
     const now = new Date('2026-02-20T01:00:00Z');
 
     await expect(service.executeScheduled(stored.id, handler, now)).resolves.toMatchObject({
@@ -216,7 +234,45 @@ describe('AutomationService scheduled execution', () => {
 
 describe('AutomationService update and delete', () => {
   const serviceFor = (prisma: object) =>
-    new AutomationService(prisma as never, redisFixture() as never, notificationsFixture() as never);
+    new AutomationService(
+      prisma as never,
+      redisFixture() as never,
+      notificationsFixture() as never,
+    );
+
+  it('自动化中心初始化三个不可重名的系统估值任务', async () => {
+    const upsert = vi.fn(
+      async (input: { where: { systemKey: string }; create: { managed: boolean } }) => input,
+    );
+    const service = serviceFor({ automationJob: { upsert } });
+
+    await service.ensureManagedValuationJobs();
+
+    expect(upsert).toHaveBeenCalledTimes(3);
+    expect(upsert.mock.calls.map(([input]) => input.where.systemKey)).toEqual(
+      managedValuationJobs.map((definition) => definition.systemKey),
+    );
+    expect(upsert.mock.calls.every(([input]) => input.create.managed === true)).toBe(true);
+  });
+
+  it('系统估值任务可改计划和启停，但不可改名或删除', async () => {
+    const stored = { ...job('snapshot-close-estimate'), managed: true };
+    const update = vi.fn(async ({ data }: { data: object }) => ({ ...stored, ...data }));
+    const remove = vi.fn();
+    const service = serviceFor({
+      automationJob: { findUnique: vi.fn(async () => stored), update, delete: remove },
+      automationRun: { findFirst: vi.fn() },
+    });
+
+    await expect(service.update(stored.id, { enabled: false })).resolves.toMatchObject({
+      enabled: false,
+    });
+    await expect(service.update(stored.id, { name: '改名' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(service.delete(stored.id)).rejects.toBeInstanceOf(ConflictException);
+    expect(remove).not.toHaveBeenCalled();
+  });
 
   it('update 仅传 cron 时按新 cron 重算 nextRunAt', async () => {
     const stored = job();
@@ -360,7 +416,11 @@ describe('AutomationService manual execution (run-now)', () => {
       type: 'provider-health',
       run: vi.fn(async () => ({ ok: true })),
     };
-    const service = new AutomationService(prisma as never, redisFixture() as never, notificationsFixture() as never);
+    const service = new AutomationService(
+      prisma as never,
+      redisFixture() as never,
+      notificationsFixture() as never,
+    );
 
     await expect(service.execute(stored.id, handler)).resolves.toMatchObject({
       skipped: false,
@@ -376,10 +436,17 @@ describe('AutomationService manual execution (run-now)', () => {
   });
 
   it('手动执行不受交易日检查限制', async () => {
-    const stored = job('snapshot');
+    const stored = job('snapshot-close-estimate');
     const prisma = runPrisma(stored);
-    const handler: AutomationHandler = { type: 'snapshot', run: vi.fn(async () => ({ ok: true })) };
-    const service = new AutomationService(prisma as never, redisFixture() as never, notificationsFixture() as never);
+    const handler: AutomationHandler = {
+      type: 'snapshot-close-estimate',
+      run: vi.fn(async () => ({ ok: true })),
+    };
+    const service = new AutomationService(
+      prisma as never,
+      redisFixture() as never,
+      notificationsFixture() as never,
+    );
 
     // 2026-02-20 为春节休市日
     await expect(
@@ -392,7 +459,11 @@ describe('AutomationService manual execution (run-now)', () => {
     const stored = { ...job(), enabled: false };
     const prisma = { automationJob: { findUniqueOrThrow: vi.fn(async () => stored) } };
     const handler: AutomationHandler = { type: 'provider-health', run: vi.fn() };
-    const service = new AutomationService(prisma as never, redisFixture() as never, notificationsFixture() as never);
+    const service = new AutomationService(
+      prisma as never,
+      redisFixture() as never,
+      notificationsFixture() as never,
+    );
 
     await expect(service.executeScheduled(stored.id, handler)).resolves.toMatchObject({
       skipped: true,
@@ -571,14 +642,30 @@ describe('AutomationWorkflowRunner closeSnapshots', () => {
       'acc-actual',
       new Date(capturedAt),
       'actual',
+      {},
+      { source: 'DAILY_CLOSE', valuationBasis: 'ESTIMATED' },
     );
     expect(performance.capture).toHaveBeenCalledWith(
       'acc-shadow',
       new Date(capturedAt),
       'shadow',
+      {},
+      { source: 'DAILY_CLOSE', valuationBasis: 'ESTIMATED' },
     );
-    expect(performance.capture).toHaveBeenCalledWith(undefined, new Date(capturedAt), 'actual');
-    expect(performance.capture).toHaveBeenCalledWith(undefined, new Date(capturedAt), 'shadow');
+    expect(performance.capture).toHaveBeenCalledWith(
+      undefined,
+      new Date(capturedAt),
+      'actual',
+      {},
+      { source: 'DAILY_CLOSE', valuationBasis: 'ESTIMATED' },
+    );
+    expect(performance.capture).toHaveBeenCalledWith(
+      undefined,
+      new Date(capturedAt),
+      'shadow',
+      {},
+      { source: 'DAILY_CLOSE', valuationBasis: 'ESTIMATED' },
+    );
     expect(result.snapshots).toHaveLength(4);
     expect(result.capturedAt).toBe(capturedAt);
   });

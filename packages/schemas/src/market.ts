@@ -154,6 +154,48 @@ export const fundNavHistorySchemaV1 = z.array(fundNavSchemaV1).superRefine((poin
   }
 });
 
+export const fundHoldingSchemaV1 = z.object({
+  symbol: z.string().min(1),
+  name: z.string().min(1),
+  weight: finite.min(0).max(1),
+});
+
+export const fundHoldingsSchemaV1 = z
+  .object({
+    version: z.literal(1),
+    fundSymbol: z.string().regex(/^\d{6}\.OF$/),
+    reportPeriod: z.string().regex(/^\d{4}-Q[1-4]$/),
+    disclosureDate: isoDate,
+    provider: z.string().min(1),
+    fetchedAt: isoDate,
+    evidenceVersion: z.string().min(1),
+    fallbackUsed: z.boolean().optional(),
+    servedFromCache: z.boolean().optional(),
+    holdings: z.array(fundHoldingSchemaV1),
+  })
+  .superRefine((value, context) => {
+    const total = value.holdings.reduce((sum, holding) => sum + holding.weight, 0);
+    if (total > 1.000001) {
+      context.addIssue({
+        code: 'custom',
+        path: ['holdings'],
+        message: '基金披露持仓权重合计不能超过 1',
+      });
+    }
+    const symbols = new Set<string>();
+    value.holdings.forEach((holding, index) => {
+      if (symbols.has(holding.symbol)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['holdings', index, 'symbol'],
+          message: '基金持仓代码不能重复',
+        });
+      }
+      symbols.add(holding.symbol);
+    });
+  });
+export type FundHoldingsV1 = z.infer<typeof fundHoldingsSchemaV1>;
+
 export const controlEnvelopeSchema = z.object({
   contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),

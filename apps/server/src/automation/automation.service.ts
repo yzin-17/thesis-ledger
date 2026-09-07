@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron } from 'croner';
 import { Prisma } from '@prisma/client';
 import { cnTradingCalendar } from '@thesis-ledger/domain';
@@ -51,6 +56,36 @@ export interface AutomationHandler {
   run(signal: AbortSignal, scheduledAt: Date): Promise<unknown>;
 }
 
+export const managedValuationJobs = [
+  {
+    id: '00000000-0000-4000-8000-000000000011',
+    systemKey: 'valuation-intraday-sample',
+    name: '盘中估值采样',
+    type: 'valuation-intraday-sample',
+    cron: '* * * * 1-5',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000012',
+    systemKey: 'snapshot-close-estimate',
+    name: '盘后估值预估',
+    type: 'snapshot-close-estimate',
+    cron: '0 16 * * 1-5',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000013',
+    systemKey: 'snapshot-official-reconcile',
+    name: '正式净值校准',
+    type: 'snapshot-official-reconcile',
+    cron: '30 6 * * *',
+  },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  systemKey: string;
+  name: string;
+  type: AutomationJobType;
+  cron: string;
+}>;
+
 @Injectable()
 export class AutomationService {
   constructor(
@@ -58,6 +93,24 @@ export class AutomationService {
     private readonly redis: RedisService,
     private readonly notifications: NotificationService,
   ) {}
+
+  async ensureManagedValuationJobs() {
+    for (const definition of managedValuationJobs) {
+      await this.prisma.automationJob.upsert({
+        where: { systemKey: definition.systemKey },
+        create: {
+          ...definition,
+          timezone: 'Asia/Shanghai',
+          enabled: true,
+          retryPolicy: { maxAttempts: 3, backoffMs: 1000 },
+          lockTtlMs: 300_000,
+          nextRunAt: nextCronOccurrence(definition.cron, 'Asia/Shanghai'),
+          managed: true,
+        },
+        update: { managed: true },
+      });
+    }
+  }
 
   create(input: unknown) {
     const job = automationJobSchema.parse(input);
@@ -84,6 +137,8 @@ export class AutomationService {
     const patch = automationJobUpdateSchema.parse(input);
     const job = await this.prisma.automationJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('任务不存在');
+    if (job.managed && patch.name !== undefined)
+      throw new BadRequestException('系统估值任务名称和类型不可修改');
 
     const cronChanged = patch.cron !== undefined && patch.cron !== job.cron;
     const timezoneChanged = patch.timezone !== undefined && patch.timezone !== job.timezone;
@@ -111,6 +166,7 @@ export class AutomationService {
   async delete(id: string) {
     const job = await this.prisma.automationJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('任务不存在');
+    if (job.managed) throw new ConflictException('系统估值任务不能删除，可改用停用');
     const history = await this.prisma.automationRun.findFirst({ where: { jobId: id } });
     if (history) throw new ConflictException('已有运行历史，请改用停用');
     try {

@@ -8,7 +8,10 @@ import {
   PerformanceSnapshotTable,
 } from '../src/features/performance/PerformanceSections.js';
 import { PortfolioModeSwitch } from '../src/features/shared/PortfolioModeSwitch.js';
-import { captureCloseSnapshots, fetchPerformanceHistory } from '../src/features/performance/performance.api.js';
+import {
+  fetchPerformanceHistory,
+  fetchPerformanceSeries,
+} from '../src/features/performance/performance.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 
 describe('收益分析交互契约', () => {
@@ -231,61 +234,123 @@ describe('收益分析交互契约', () => {
   });
 });
 
-describe('一键估值快照契约', () => {
-  const emptyTable = (props: {
-    onCaptureSnapshot?: () => void;
-    capturingSnapshot?: boolean;
-    captureDisabled?: boolean;
-    onCompleteDataSetup?: () => void;
-  }) =>
+describe('自动估值快照入口契约', () => {
+  const emptyTable = (props: { onCompleteDataSetup?: () => void }) =>
     renderToStaticMarkup(
       <PerformanceSnapshotTable
         loadState="empty"
         snapshots={[]}
+        range="1Y"
+        interval="1d"
+        onRangeChange={vi.fn()}
+        onIntervalChange={vi.fn()}
         {...props}
       />,
     );
 
-  it('空状态提供一键快照按钮，保留完成数据配置入口', () => {
-    const markup = emptyTable({
-      onCaptureSnapshot: () => {},
-      onCompleteDataSetup: () => {},
-    });
-    expect(markup).toContain('立即拍一个估值快照');
+  it('空状态说明等待自动快照，并保留数据配置入口', () => {
+    const markup = emptyTable({ onCompleteDataSetup: () => {} });
+    expect(markup).toContain('自动估值快照生成后');
     expect(markup).toContain('完成数据配置');
-    expect(markup).not.toContain('disabled=""');
+    expect(markup).not.toContain('立即拍一个估值快照');
   });
 
-  it('拍摄中显示忙碌态，无账户时禁用并提示', () => {
-    const capturing = emptyTable({ onCaptureSnapshot: () => {}, capturingSnapshot: true });
-    expect(capturing).toContain('拍摄中…');
-    expect(capturing).toContain('aria-busy="true"');
-    expect(capturing).toContain('disabled=""');
-
-    const disabled = emptyTable({
-      onCaptureSnapshot: () => {},
-      captureDisabled: true,
-    });
-    expect(disabled).toContain('disabled=""');
-    expect(disabled).toContain('当前模式暂无可拍摄账户');
-
-    expect(emptyTable({})).not.toContain('立即拍一个估值快照');
-  });
-
-  it('一键快照调用收盘快照工作流并携带当前模式账户与时间', async () => {
-    const request = vi.fn(async <T,>(path: string, init?: RequestInit) => {
-      expect(path).toBe('/automations/workflows/close-snapshots');
-      expect(init?.method).toBe('POST');
-      expect(JSON.parse(String(init?.body))).toMatchObject({
-        accountIds: ['acc-1', 'acc-2'],
-      });
-      expect(typeof JSON.parse(String(init?.body)).capturedAt).toBe('string');
-      return { capturedAt: '2026-09-06T08:00:00.000Z', snapshots: [] } as T;
-    });
-    await captureCloseSnapshots(
-      { accountIds: ['acc-1', 'acc-2'], capturedAt: new Date().toISOString() },
-      { request } as unknown as DesktopRequestClient,
+  it('已有快照时同样不提供手动拍摄入口', () => {
+    const markup = renderToStaticMarkup(
+      <PerformanceSnapshotTable
+        loadState="ready"
+        snapshots={[
+          {
+            id: 'snapshot-1',
+            capturedAt: '2026-09-07T08:00:00.000Z',
+            marketValue: 100,
+            costValue: 90,
+            cashValue: 10,
+            currency: 'CNY',
+          },
+        ]}
+        range="1Y"
+        interval="1d"
+        onRangeChange={vi.fn()}
+        onIntervalChange={vi.fn()}
+      />,
     );
-    expect(request).toHaveBeenCalledOnce();
+    expect(markup).not.toContain('立即拍一个估值快照');
+  });
+
+  it('走势序列保留估值口径、覆盖率和可用粒度', async () => {
+    const request = vi.fn(
+      async <T,>() =>
+        ({
+          currency: 'CNY',
+          availableIntervals: ['1d', '1w', '1mo'],
+          defaultInterval: '1d',
+          dataQuality: 'LOW_COVERAGE',
+          historyStart: '2026-09-01T08:00:00.000Z',
+          points: [
+            {
+              at: '2026-09-01T08:00:00.000Z',
+              value: '110',
+              currency: 'CNY',
+              valuationBasis: 'ESTIMATED',
+              disclosureCoverage: 0.14,
+              pricedCoverage: 0.08,
+              dataQuality: 'LOW_COVERAGE',
+              sourceSnapshotId: 'snapshot-1',
+            },
+          ],
+        }) as T,
+    );
+
+    const result = await fetchPerformanceSeries('actual', undefined, '1Y', '1d', 'CNY', {
+      request,
+    } as unknown as DesktopRequestClient);
+
+    expect(result.points[0]).toMatchObject({
+      value: 110,
+      valuationBasis: 'ESTIMATED',
+      disclosureCoverage: 0.14,
+      pricedCoverage: 0.08,
+    });
+    expect(result.availableIntervals).toEqual(['1d', '1w', '1mo']);
+  });
+
+  it('走势图暴露独立区间粒度控件和键盘读点入口', () => {
+    const markup = renderToStaticMarkup(
+      <PerformanceSnapshotTable
+        loadState="ready"
+        snapshots={[]}
+        series={{
+          range: '1Y',
+          interval: '1d',
+          currency: 'CNY',
+          availableIntervals: ['1d', '1w', '1mo'],
+          defaultInterval: '1d',
+          dataQuality: 'COMPLETE',
+          historyStart: '2026-09-01T08:00:00.000Z',
+          points: [
+            {
+              at: '2026-09-01T08:00:00.000Z',
+              value: 110,
+              currency: 'CNY',
+              valuationBasis: 'OFFICIAL',
+              disclosureCoverage: 1,
+              pricedCoverage: 1,
+              dataQuality: 'COMPLETE',
+              sourceSnapshotId: 'snapshot-1',
+            },
+          ],
+        }}
+        range="1Y"
+        interval="1d"
+        onRangeChange={vi.fn()}
+        onIntervalChange={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="走势区间"');
+    expect(markup).toContain('aria-label="走势粒度"');
+    expect(markup).toContain('role="application"');
+    expect(markup).toContain('可使用左右方向键逐点查看');
   });
 });

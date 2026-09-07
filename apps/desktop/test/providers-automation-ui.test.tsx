@@ -40,8 +40,8 @@ import type {
 
 const job = (overrides: Partial<AutomationJob> = {}): AutomationJob => ({
   id: '00000000-0000-4000-8000-000000000001',
-  name: '每日估值快照',
-  type: 'snapshot',
+  name: '市场数据同步',
+  type: 'market-sync',
   cron: '0 16 * * 1-5',
   timezone: 'Asia/Shanghai',
   enabled: true,
@@ -50,11 +50,13 @@ const job = (overrides: Partial<AutomationJob> = {}): AutomationJob => ({
 });
 
 describe('自动化任务标签映射', () => {
-  it('七种任务类型、运行状态、健康与投递状态均有中文名且未知值兜底', () => {
+  it('任务类型、运行状态、健康与投递状态均有中文名且未知值兜底', () => {
     expect(automationJobTypeLabel('market-sync')).toBe('市场数据同步');
     expect(automationJobTypeLabel('risk-evaluation')).toBe('风险评估');
     expect(automationJobTypeLabel('daily-digest')).toBe('每日摘要');
-    expect(automationJobTypeLabel('snapshot')).toBe('估值快照');
+    expect(automationJobTypeLabel('valuation-intraday-sample')).toBe('盘中估值采样');
+    expect(automationJobTypeLabel('snapshot-close-estimate')).toBe('盘后估值预估');
+    expect(automationJobTypeLabel('snapshot-official-reconcile')).toBe('正式净值校准');
     expect(automationJobTypeLabel('backup')).toBe('数据备份');
     expect(automationJobTypeLabel('provider-health')).toBe('Provider 健康检查');
     expect(automationJobTypeLabel('cash-deposit-materialization')).toBe('定期入账生成');
@@ -104,10 +106,10 @@ describe('自动化任务标签映射', () => {
 });
 
 describe('自动化任务草稿与提交契约', () => {
-  it('新建草稿默认估值快照并带交易日预设', () => {
+  it('新建草稿默认市场同步并带交易日预设', () => {
     expect(newAutomationJobDraft()).toEqual({
-      name: '估值快照',
-      type: 'snapshot',
+      name: '市场数据同步',
+      type: 'market-sync',
       schedulePreset: '0 16 * * 1-5',
       cron: '0 16 * * 1-5',
       enabled: true,
@@ -117,8 +119,8 @@ describe('自动化任务草稿与提交契约', () => {
   it('编辑草稿从任务预填，未命中预设的 cron 回退自定义', () => {
     const draft = automationJobDraftFromJob(job({ cron: '30 15 * * *', enabled: false }));
     expect(draft).toEqual({
-      name: '每日估值快照',
-      type: 'snapshot',
+      name: '市场数据同步',
+      type: 'market-sync',
       schedulePreset: AUTOMATION_SCHEDULE_CUSTOM,
       cron: '30 15 * * *',
       enabled: false,
@@ -131,8 +133,8 @@ describe('自动化任务草稿与提交契约', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
     expect(payload).toMatchObject({
-      name: '估值快照',
-      type: 'snapshot',
+      name: '市场数据同步',
+      type: 'market-sync',
       cron: '0 16 * * 1-5',
       timezone: 'Asia/Shanghai',
       enabled: true,
@@ -168,7 +170,8 @@ describe('自动化编辑器 Sheet 契约', () => {
   );
 
   it('创建与编辑共用表单，编辑模式禁用任务类型', () => {
-    expect(source).toContain('automationJobTypes.map');
+    expect(source).toContain('managedValuationTypes');
+    expect(source).toContain('.map((type) =>');
     expect(source).toContain('disabled={Boolean(editingJob)}');
     expect(source).toContain('创建任务');
     expect(source).toContain('保存修改');
@@ -191,7 +194,13 @@ describe('自动化任务表渲染', () => {
         loadState="ready"
         jobs={[
           job({ type: 'market-sync', name: '市场数据同步任务' }),
-          job({ id: '00000000-0000-4000-8000-000000000002', enabled: false }),
+          job({
+            id: '00000000-0000-4000-8000-000000000002',
+            type: 'snapshot-close-estimate',
+            name: '盘后估值预估',
+            enabled: false,
+            managed: true,
+          }),
         ]}
         togglingJobId={null}
         runningJobId={null}
@@ -206,12 +215,13 @@ describe('自动化任务表渲染', () => {
     expect(markup).toContain('新建任务');
     expect(markup).toContain('休市日自动跳过');
     expect(markup).toContain('市场数据同步');
-    expect(markup).toContain('估值快照');
+    expect(markup).toContain('盘后估值预估');
+    expect(markup).toContain('系统任务');
     expect(markup).toContain('编辑');
     expect(markup).toContain('立即运行');
     expect(markup).toContain('删除');
     expect(markup).not.toContain('market-sync');
-    expect(markup).not.toContain('>snapshot<');
+    expect(markup).not.toContain('>snapshot-close-estimate<');
   });
 
   it('运行中的任务显示忙碌态', () => {
@@ -243,6 +253,7 @@ describe('运行历史与状态表渲染', () => {
       status: 'succeeded',
       startedAt: '2026-09-05T08:00:00.000Z',
       error: null,
+      output: { sampled: 3, disclosureCoverage: 0.8, pricedCoverage: 0.6 },
     },
     {
       id: 'run-2',
@@ -286,7 +297,8 @@ describe('运行历史与状态表渲染', () => {
       <AutomationRunHistoryTable loadState="ready" jobs={[historyJob]} jobHistory={jobHistory} />,
     );
 
-    expect(markup).toContain('每日估值快照');
+    expect(markup).toContain('市场数据同步');
+    expect(markup).toContain('生成 3 个账户估值点');
     expect(markup).toContain('missing-');
     expect(markup).not.toContain('missing-job-id');
     expect(markup).toContain('成功');

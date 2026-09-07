@@ -4,7 +4,9 @@ export const automationJobTypes = [
   'market-sync',
   'risk-evaluation',
   'daily-digest',
-  'snapshot',
+  'valuation-intraday-sample',
+  'snapshot-close-estimate',
+  'snapshot-official-reconcile',
   'backup',
   'provider-health',
   'cash-deposit-materialization',
@@ -17,7 +19,8 @@ export const marketAutomationJobTypes = [
   'market-sync',
   'risk-evaluation',
   'daily-digest',
-  'snapshot',
+  'valuation-intraday-sample',
+  'snapshot-close-estimate',
 ] as const satisfies readonly AutomationJobType[];
 
 const marketAutomationJobTypeSet = new Set<AutomationJobType>(marketAutomationJobTypes);
@@ -34,6 +37,8 @@ export const automationJobSchema = z.object({
   enabled: z.boolean(),
   retry: z.object({ maxAttempts: z.number().int().min(1), backoffMs: z.number().int().positive() }),
   lockTtlMs: z.number().int().positive(),
+  systemKey: z.string().min(1).optional(),
+  managed: z.boolean().optional().default(false),
 });
 
 /** 任务类型创建后绑定运行时处理器，不可更新；retry/lockTtl 不对外暴露编辑。 */

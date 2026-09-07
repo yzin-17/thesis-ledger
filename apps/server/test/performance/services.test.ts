@@ -48,7 +48,12 @@ describe('Ledger Snapshot 与收益摘要', () => {
       position: { findMany: positionFindMany },
       ledgerEvent: { findMany: ledgerFindMany },
       account: { findMany: vi.fn(async () => []) },
-      portfolioSnapshot: { findMany: vi.fn(async () => []), create },
+      portfolioSnapshot: {
+        findUnique: vi.fn(async () => null),
+        findFirst: vi.fn(async () => null),
+        findMany: vi.fn(async () => []),
+        create,
+      },
     };
 
     const result = await new PerformanceService(prisma as never, {} as never).capture(
@@ -128,7 +133,11 @@ describe('Ledger Snapshot 与收益摘要', () => {
           cashFlowEvent({ id: 'deposit', accountId: accountA, amount: 1000 }),
         ]),
       },
-      portfolioSnapshot: { findFirst: vi.fn(async () => null), create: snapshot },
+      portfolioSnapshot: {
+        findUnique: vi.fn(async () => null),
+        findFirst: vi.fn(async () => null),
+        create: snapshot,
+      },
     };
     const market = {
       getQuote: vi.fn(async () => ({ price: 12, provider: 'dsa', stale: false })),
@@ -324,6 +333,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
         ]),
       },
       portfolioSnapshot: {
+        findUnique: vi.fn(async () => null),
         findFirst: vi.fn(async () => null),
         create: vi.fn(async ({ data }: { data: object }) => data),
       },
@@ -350,7 +360,11 @@ describe('Ledger Snapshot 与收益摘要', () => {
           }),
         ]),
       },
-      portfolioSnapshot: { findFirst: vi.fn(async () => null), create: snapshot },
+      portfolioSnapshot: {
+        findUnique: vi.fn(async () => null),
+        findFirst: vi.fn(async () => null),
+        create: snapshot,
+      },
     };
 
     const result = await new PerformanceService(prisma as never, {} as never).capture(

@@ -1,37 +1,73 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   omitUndefinedDeep,
   performanceAllocationInputSchema,
   performanceCalculateInputSchema,
-  performanceSnapshotCaptureInputSchema,
   performanceTargetsInputSchema,
+  performanceSeriesQuerySchema,
   currencySchema,
 } from '@thesis-ledger/schemas';
 import { PerformanceService } from './performance.service.js';
+import { PerformanceValuationSeriesService } from './performance-valuation-series.service.js';
 
 const parseFxMerge = (value?: string) => value === 'true';
 const parseBaseCurrency = (value?: string) => currencySchema.parse(value ?? 'CNY');
 
 @Controller('performance')
 export class PerformanceController {
-  constructor(private readonly performance: PerformanceService) {}
+  constructor(
+    private readonly performance: PerformanceService,
+    private readonly valuationSeries: PerformanceValuationSeriesService,
+  ) {}
 
-  @Post('snapshots')
-  capture(
-    @Body() input: unknown,
-    @Query('fxMerge') fxMerge?: string,
+  @Get('series')
+  series(
+    @Query('scope') scope?: string,
+    @Query('accountId') accountId?: string,
+    @Query('range') range?: string,
+    @Query('interval') interval?: string,
+    @Query('mode') mode?: string,
     @Query('baseCurrency') baseCurrency?: string,
   ) {
-    const body = performanceSnapshotCaptureInputSchema.parse(input);
-    return this.performance.capture(
-      body.accountId,
-      body.capturedAt ? new Date(body.capturedAt) : undefined,
-      body.mode ?? 'actual',
-      {
-        ...(fxMerge === undefined ? {} : { fxMerge: parseFxMerge(fxMerge) }),
-        ...(baseCurrency === undefined ? {} : { baseCurrency: parseBaseCurrency(baseCurrency) }),
-      },
-    );
+    const input = performanceSeriesQuerySchema.parse({
+      ...(scope ? { scope } : {}),
+      ...(accountId ? { accountId } : {}),
+      ...(range ? { range } : {}),
+      ...(interval ? { interval } : {}),
+      ...(mode ? { mode } : {}),
+      ...(baseCurrency ? { baseCurrency } : {}),
+    });
+    const { accountId: parsedAccountId, ...required } = input;
+    return this.valuationSeries.series({
+      ...required,
+      ...(parsedAccountId ? { accountId: parsedAccountId } : {}),
+    });
+  }
+
+  @Get('snapshots')
+  snapshots(
+    @Query('accountId') accountId?: string,
+    @Query('scope') scope?: 'account' | 'portfolio',
+    @Query('mode') mode?: 'actual' | 'shadow',
+    @Query('source') source?: 'DAILY_CLOSE' | 'TRANSACTION' | 'IMPORT' | 'SYSTEM',
+    @Query('valuationBasis') valuationBasis?: 'ESTIMATED' | 'OFFICIAL',
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ) {
+    return this.performance.snapshots({
+      ...(accountId ? { accountId } : {}),
+      ...(scope ? { scope } : {}),
+      ...(mode ? { mode } : {}),
+      ...(source ? { source } : {}),
+      ...(valuationBasis ? { valuationBasis } : {}),
+      ...(start ? { start } : {}),
+      ...(end ? { end } : {}),
+    });
+  }
+
+  @Get('snapshots/:id')
+  snapshot(@Param('id') id: string) {
+    return this.performance.snapshot(id);
   }
 
   @Get('history')

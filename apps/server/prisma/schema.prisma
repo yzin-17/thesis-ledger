@@ -42,29 +42,30 @@ model SchemaVersion {
 }
 
 model Account {
-  id                 String                       @id @default(uuid()) @db.Uuid
-  name               String
-  institution        String?
-  type               String
-  mode               String                       @default("actual")
-  currency           String                       @default("CNY")
-  active             Boolean                      @default(true)
-  createdAt          DateTime                     @default(now())
-  updatedAt          DateTime                     @updatedAt
-  positions          Position[]
-  ledger             LedgerEvent[]
-  snapshots          PortfolioSnapshot[]
-  importDrafts       ImportDraft[]
-  riskRules          RiskRule[]
-  riskPositionStates RiskPositionState[]
-  tradePlans         TradePlan[]
-  ledgerState        AccountLedgerState?
-  costStrategies     AccountCostStrategyVersion[]
-  baselineBatches    BaselineObservationBatch[]
-  trades             Trade[]
-  cashBalances       CashBalance[]
-  cashSettlements    CashSettlement[]
-  cashDepositPlans   RecurringCashDepositPlan[]
+  id                     String                           @id @default(uuid()) @db.Uuid
+  name                   String
+  institution            String?
+  type                   String
+  mode                   String                           @default("actual")
+  currency               String                           @default("CNY")
+  active                 Boolean                          @default(true)
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  positions              Position[]
+  ledger                 LedgerEvent[]
+  snapshots              PortfolioSnapshot[]
+  valuationPoints        AccountValuationPoint[]
+  importDrafts           ImportDraft[]
+  riskRules              RiskRule[]
+  riskPositionStates     RiskPositionState[]
+  tradePlans             TradePlan[]
+  ledgerState            AccountLedgerState?
+  costStrategies         AccountCostStrategyVersion[]
+  baselineBatches        BaselineObservationBatch[]
+  trades                 Trade[]
+  cashBalances           CashBalance[]
+  cashSettlements        CashSettlement[]
+  cashDepositPlans       RecurringCashDepositPlan[]
   cashDepositOccurrences RecurringCashDepositOccurrence[]
 
   @@index([active])
@@ -469,32 +470,32 @@ model BaselineObservationBatch {
 }
 
 model LedgerEvent {
-  id                   String         @id @default(uuid()) @db.Uuid
-  accountId            String         @db.Uuid
-  type                 String
-  occurredAt           DateTime?
-  externalId           String?
-  sourceRowId          String?
-  createdAt            DateTime       @default(now())
-  factId               String?        @db.Uuid
-  ledgerRevision       BigInt?
-  timePrecision        String?
-  sourceTimezone       String?
-  economicOrderKey     String?
-  recordedAt           DateTime       @default(now())
-  projectionGeneration BigInt?
-  payloadVersion       Int?
-  payload              Json?
-  sourceCategory       String?
-  sourceChannel        String?
-  actorId              String?
-  revisionAction       String?
-  supersedesEventId    String?        @db.Uuid
-  reason               String?
-  account              Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  journalEntries       JournalEntry[]
-  supersedesEvent      LedgerEvent?   @relation("LedgerRevisionChain", fields: [supersedesEventId], references: [id], onDelete: Restrict)
-  laterRevisions       LedgerEvent[]  @relation("LedgerRevisionChain")
+  id                     String                           @id @default(uuid()) @db.Uuid
+  accountId              String                           @db.Uuid
+  type                   String
+  occurredAt             DateTime?
+  externalId             String?
+  sourceRowId            String?
+  createdAt              DateTime                         @default(now())
+  factId                 String?                          @db.Uuid
+  ledgerRevision         BigInt?
+  timePrecision          String?
+  sourceTimezone         String?
+  economicOrderKey       String?
+  recordedAt             DateTime                         @default(now())
+  projectionGeneration   BigInt?
+  payloadVersion         Int?
+  payload                Json?
+  sourceCategory         String?
+  sourceChannel          String?
+  actorId                String?
+  revisionAction         String?
+  supersedesEventId      String?                          @db.Uuid
+  reason                 String?
+  account                Account                          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  journalEntries         JournalEntry[]
+  supersedesEvent        LedgerEvent?                     @relation("LedgerRevisionChain", fields: [supersedesEventId], references: [id], onDelete: Restrict)
+  laterRevisions         LedgerEvent[]                    @relation("LedgerRevisionChain")
   cashDepositOccurrences RecurringCashDepositOccurrence[]
 
   @@unique([accountId, sourceChannel, externalId])
@@ -507,17 +508,66 @@ model LedgerEvent {
 }
 
 model PortfolioSnapshot {
-  id          String   @id @default(uuid()) @db.Uuid
-  accountId   String?  @db.Uuid
-  capturedAt  DateTime
-  marketValue Decimal  @db.Decimal(24, 8)
-  costValue   Decimal  @db.Decimal(24, 8)
-  cashValue   Decimal  @db.Decimal(24, 8)
-  payload     Json
-  account     Account? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  id                   String                  @id @default(uuid()) @db.Uuid
+  accountId            String?                 @db.Uuid
+  scope                String
+  mode                 String                  @default("actual")
+  slotKey              String
+  capturedAt           DateTime
+  valuationDate        DateTime                @db.Date
+  source               String
+  sourceRef            String?
+  valuationBasis       String
+  revision             Int                     @default(1)
+  supersedesSnapshotId String?                 @unique @db.Uuid
+  status               String                  @default("VALID")
+  valuationStatus      String
+  invalidatedAt        DateTime?
+  invalidatedReason    String?
+  marketValue          Decimal                 @db.Decimal(24, 8)
+  costValue            Decimal                 @db.Decimal(24, 8)
+  cashValue            Decimal                 @db.Decimal(24, 8)
+  totalValue           Decimal?                @db.Decimal(24, 8)
+  baseCurrency         String
+  disclosureCoverage   Decimal                 @default(1) @db.Decimal(10, 8)
+  pricedCoverage       Decimal                 @default(1) @db.Decimal(10, 8)
+  idempotencyKey       String                  @unique
+  payloadVersion       Int                     @default(2)
+  payload              Json
+  createdAt            DateTime                @default(now())
+  account              Account?                @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  supersedes           PortfolioSnapshot?      @relation("SnapshotRevision", fields: [supersedesSnapshotId], references: [id], onDelete: Restrict)
+  supersededBy         PortfolioSnapshot?      @relation("SnapshotRevision")
+  valuationPoints      AccountValuationPoint[]
 
-  @@unique([accountId, capturedAt])
+  @@unique([slotKey, revision])
+  @@index([scope, accountId, mode, valuationDate])
+  @@index([source, valuationDate])
   @@index([capturedAt])
+}
+
+model AccountValuationPoint {
+  id                 BigInt             @id @default(autoincrement())
+  accountId          String             @db.Uuid
+  mode               String             @default("actual")
+  at                 DateTime
+  baseCurrency       String
+  marketValue        Decimal            @db.Decimal(24, 8)
+  cashValue          Decimal            @db.Decimal(24, 8)
+  totalValue         Decimal            @db.Decimal(24, 8)
+  valuationBasis     String
+  disclosureCoverage Decimal            @default(1) @db.Decimal(10, 8)
+  pricedCoverage     Decimal            @default(1) @db.Decimal(10, 8)
+  dataQuality        String
+  evidence           Json
+  sourceSnapshotId   String?            @db.Uuid
+  createdAt          DateTime           @default(now())
+  account            Account            @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  sourceSnapshot     PortfolioSnapshot? @relation(fields: [sourceSnapshotId], references: [id], onDelete: SetNull)
+
+  @@unique([accountId, mode, at, baseCurrency])
+  @@index([mode, at])
+  @@index([sourceSnapshotId])
 }
 
 model TargetAllocation {
@@ -794,22 +844,22 @@ model NotificationDelivery {
 }
 
 model RecurringCashDepositPlan {
-  id             String   @id @default(uuid()) @db.Uuid
-  accountId      String   @db.Uuid
+  id             String                           @id @default(uuid()) @db.Uuid
+  accountId      String                           @db.Uuid
   name           String
-  expectedAmount Decimal  @db.Decimal(38, 18)
+  expectedAmount Decimal                          @db.Decimal(38, 18)
   currency       String
   dayOfMonth     Int
-  timezone       String   @default("Asia/Shanghai")
+  timezone       String                           @default("Asia/Shanghai")
   startPeriod    String
-  status         String   @default("ACTIVE")
+  status         String                           @default("ACTIVE")
   nextDueAt      DateTime?
-  version        Int      @default(1)
+  version        Int                              @default(1)
   pausedAt       DateTime?
   endedAt        DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  account        Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  account        Account                          @relation(fields: [accountId], references: [id], onDelete: Restrict)
   occurrences    RecurringCashDepositOccurrence[]
 
   @@index([accountId, status])
@@ -817,28 +867,28 @@ model RecurringCashDepositPlan {
 }
 
 model RecurringCashDepositOccurrence {
-  id             String   @id @default(uuid()) @db.Uuid
-  planId         String   @db.Uuid
-  accountId      String   @db.Uuid
+  id             String                   @id @default(uuid()) @db.Uuid
+  planId         String                   @db.Uuid
+  accountId      String                   @db.Uuid
   periodKey      String
   planName       String
   scheduledFor   DateTime
-  expectedAmount Decimal  @db.Decimal(38, 18)
+  expectedAmount Decimal                  @db.Decimal(38, 18)
   currency       String
-  status         String   @default("PENDING")
-  actualAmount   Decimal? @db.Decimal(38, 18)
+  status         String                   @default("PENDING")
+  actualAmount   Decimal?                 @db.Decimal(38, 18)
   occurredAt     DateTime?
-  ledgerEventId  String?  @db.Uuid
-  ledgerFactId   String?  @db.Uuid
-  version        Int      @default(1)
+  ledgerEventId  String?                  @db.Uuid
+  ledgerFactId   String?                  @db.Uuid
+  version        Int                      @default(1)
   skippedReason  String?
   confirmedAt    DateTime?
   skippedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
   plan           RecurringCashDepositPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
-  account        Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  ledgerEvent    LedgerEvent? @relation(fields: [ledgerEventId], references: [id], onDelete: Restrict)
+  account        Account                  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  ledgerEvent    LedgerEvent?             @relation(fields: [ledgerEventId], references: [id], onDelete: Restrict)
 
   @@unique([planId, periodKey])
   @@index([accountId, status, scheduledFor])
@@ -1005,6 +1055,8 @@ model AutomationJob {
   lockTtlMs   Int
   lastRunAt   DateTime?
   nextRunAt   DateTime?
+  systemKey   String?         @unique
+  managed     Boolean         @default(false)
   runs        AutomationRun[]
 }
 

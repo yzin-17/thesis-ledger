@@ -12,8 +12,11 @@ import type {
   PerformanceTargetsResponse,
   PortfolioMode,
   PerformanceQueryOptions,
+  PerformanceSeriesInterval,
+  PerformanceSeriesPoint,
+  PerformanceSeriesRange,
+  PerformanceSeriesResponse,
   SavePerformanceTargetsInput,
-  CaptureCloseSnapshotsInput,
   SnapshotRecord,
 } from './performance.types.js';
 
@@ -106,6 +109,66 @@ const snapshotRecord = (value: unknown): SnapshotRecord => {
     partial: payload.partial === true || quality.partial === true,
     missingSymbols,
     ...(currency ? { currency } : {}),
+  };
+};
+
+const seriesPoint = (value: unknown): PerformanceSeriesPoint => {
+  const record = asRecord(value);
+  const basis = record.valuationBasis === 'OFFICIAL' ? 'OFFICIAL' : 'ESTIMATED';
+  const quality = record.dataQuality;
+  const dataQuality =
+    quality === 'PARTIAL' || quality === 'LOW_COVERAGE' || quality === 'UNAVAILABLE'
+      ? quality
+      : 'COMPLETE';
+  return {
+    at: stringValue(record.at, ''),
+    value: numberValue(record.value),
+    currency: currencyValue(record.currency) ?? 'CNY',
+    valuationBasis: basis,
+    disclosureCoverage: numberValue(record.disclosureCoverage),
+    pricedCoverage: numberValue(record.pricedCoverage),
+    dataQuality,
+    sourceSnapshotId: typeof record.sourceSnapshotId === 'string' ? record.sourceSnapshotId : null,
+  };
+};
+
+const seriesResponse = (
+  value: unknown,
+  requestedRange: PerformanceSeriesRange,
+  requestedInterval: PerformanceSeriesInterval,
+): PerformanceSeriesResponse => {
+  const record = asRecord(value);
+  const intervalValues = new Set<PerformanceSeriesInterval>([
+    '1min',
+    '1h',
+    '1d',
+    '1w',
+    '1mo',
+    '1y',
+  ]);
+  const availableIntervals = Array.isArray(record.availableIntervals)
+    ? record.availableIntervals.filter(
+        (item): item is PerformanceSeriesInterval =>
+          typeof item === 'string' && intervalValues.has(item as PerformanceSeriesInterval),
+      )
+    : [];
+  const defaultInterval = intervalValues.has(record.defaultInterval as PerformanceSeriesInterval)
+    ? (record.defaultInterval as PerformanceSeriesInterval)
+    : requestedInterval;
+  const points = Array.isArray(record.points) ? record.points.map(seriesPoint) : [];
+  const quality = record.dataQuality;
+  return {
+    range: requestedRange,
+    interval: requestedInterval,
+    currency: currencyValue(record.currency) ?? 'CNY',
+    availableIntervals,
+    defaultInterval,
+    dataQuality:
+      quality === 'PARTIAL' || quality === 'LOW_COVERAGE' || quality === 'UNAVAILABLE'
+        ? quality
+        : 'COMPLETE',
+    historyStart: typeof record.historyStart === 'string' ? record.historyStart : null,
+    points,
   };
 };
 
@@ -270,6 +333,29 @@ export function fetchPerformanceHistory(
   ).then((records) => records.map(snapshotRecord));
 }
 
+export function fetchPerformanceSeries(
+  mode: PortfolioMode,
+  accountId: string | undefined,
+  range: PerformanceSeriesRange,
+  interval: PerformanceSeriesInterval,
+  baseCurrency: Currency,
+  client?: DesktopRequestClient,
+) {
+  const params = new URLSearchParams({
+    scope: accountId ? 'account' : 'portfolio',
+    range,
+    interval,
+    mode,
+    baseCurrency,
+  });
+  if (accountId) params.set('accountId', accountId);
+  return requestDesktopJson<unknown>(
+    `/performance/series?${params.toString()}`,
+    noStore,
+    client,
+  ).then((value) => seriesResponse(value, range, interval));
+}
+
 export function fetchPerformanceSummary(
   mode: PortfolioMode,
   accountId?: string,
@@ -341,21 +427,6 @@ export const savePerformanceTargets = (
 ) =>
   requestDesktopJson<unknown>(
     '/performance/targets',
-    {
-      ...noStore,
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
-
-export const captureCloseSnapshots = (
-  input: CaptureCloseSnapshotsInput,
-  client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<{ capturedAt: string; snapshots: unknown[] }>(
-    '/automations/workflows/close-snapshots',
     {
       ...noStore,
       method: 'POST',

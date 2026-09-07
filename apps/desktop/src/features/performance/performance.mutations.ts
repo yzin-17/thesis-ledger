@@ -1,10 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { captureCloseSnapshots, savePerformanceTargets } from './performance.api.js';
+import { savePerformanceTargets } from './performance.api.js';
 import { performanceKeys } from './performance.queries.js';
-import type {
-  CaptureCloseSnapshotsInput,
-  SavePerformanceTargetsInput,
-} from './performance.types.js';
+import type { SavePerformanceTargetsInput } from './performance.types.js';
 
 export const useSavePerformanceTargetsMutation = () => {
   const client = useQueryClient();
@@ -13,16 +10,6 @@ export const useSavePerformanceTargetsMutation = () => {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: performanceKeys.targetsRoot });
       void client.invalidateQueries({ queryKey: performanceKeys.allocationRoot });
-    },
-  });
-};
-
-export const useCaptureCloseSnapshotsMutation = () => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CaptureCloseSnapshotsInput) => captureCloseSnapshots(input),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: performanceKeys.root });
     },
   });
 };

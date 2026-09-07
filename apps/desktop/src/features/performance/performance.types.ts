@@ -59,6 +59,32 @@ export interface SnapshotRecord {
   currency?: Currency;
 }
 
+export type PerformanceSeriesRange = '1D' | '5D' | '1M' | '3M' | 'YTD' | '1Y' | '5Y' | 'ALL';
+export type PerformanceSeriesInterval = '1min' | '1h' | '1d' | '1w' | '1mo' | '1y';
+export type PerformanceSeriesDataQuality = 'COMPLETE' | 'PARTIAL' | 'LOW_COVERAGE' | 'UNAVAILABLE';
+
+export interface PerformanceSeriesPoint {
+  at: string;
+  value: number;
+  currency: Currency;
+  valuationBasis: 'ESTIMATED' | 'OFFICIAL';
+  disclosureCoverage: number;
+  pricedCoverage: number;
+  dataQuality: PerformanceSeriesDataQuality;
+  sourceSnapshotId: string | null;
+}
+
+export interface PerformanceSeriesResponse {
+  range: PerformanceSeriesRange;
+  interval: PerformanceSeriesInterval;
+  currency: Currency;
+  availableIntervals: PerformanceSeriesInterval[];
+  defaultInterval: PerformanceSeriesInterval;
+  dataQuality: PerformanceSeriesDataQuality;
+  historyStart: string | null;
+  points: PerformanceSeriesPoint[];
+}
+
 export interface PerformanceAllocationRecord {
   category: AllocationCategory;
   value: number;
@@ -167,9 +193,4 @@ export interface SavePerformanceTargetsInput {
   scope: 'account' | 'portfolio';
   accountId?: string;
   targets: Record<string, number>;
-}
-
-export interface CaptureCloseSnapshotsInput {
-  accountIds: string[];
-  capturedAt: string;
 }

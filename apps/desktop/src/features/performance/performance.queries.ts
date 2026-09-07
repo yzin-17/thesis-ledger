@@ -4,6 +4,7 @@ import {
   fetchPerformanceAllocation,
   fetchPerformanceHistory,
   fetchPerformanceLayers,
+  fetchPerformanceSeries,
   fetchPerformanceSummary,
   fetchPerformanceTargets,
 } from './performance.api.js';
@@ -12,6 +13,8 @@ import type {
   PerformanceAllocationResponse,
   PerformanceDataQuality,
   PerformanceQueryOptions,
+  PerformanceSeriesInterval,
+  PerformanceSeriesRange,
   PortfolioMode,
 } from './performance.types.js';
 
@@ -34,6 +37,22 @@ export const performanceKeys = {
       mode,
       accountId,
       options.fxMerge,
+      options.baseCurrency,
+    ] as const,
+  series: (
+    mode: PortfolioMode,
+    accountId: string,
+    range: PerformanceSeriesRange,
+    interval: PerformanceSeriesInterval,
+    options: PerformanceQueryOptions,
+  ) =>
+    [
+      ...performanceKeys.root,
+      'series',
+      mode,
+      accountId,
+      range,
+      interval,
       options.baseCurrency,
     ] as const,
   summary: (
@@ -101,10 +120,24 @@ export const usePerformanceQueries = (
   accountId: string,
   enabled = true,
   options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
+  seriesRange: PerformanceSeriesRange = '1Y',
+  seriesInterval: PerformanceSeriesInterval = '1d',
 ) => {
   const history = useQuery({
     queryKey: performanceKeys.history(mode, accountId, options),
     queryFn: () => fetchPerformanceHistory(mode, accountId || undefined, options),
+    enabled,
+  });
+  const series = useQuery({
+    queryKey: performanceKeys.series(mode, accountId, seriesRange, seriesInterval, options),
+    queryFn: () =>
+      fetchPerformanceSeries(
+        mode,
+        accountId || undefined,
+        seriesRange,
+        seriesInterval,
+        options.baseCurrency,
+      ),
     enabled,
   });
   const summary = useQuery({
@@ -186,5 +219,5 @@ export const usePerformanceQueries = (
     },
     enabled: enabled && !allocationUnavailable && layers.data !== undefined && targets.isFetched,
   });
-  return { history, summary, layers, targets, allocation, quality, allocationUnavailable };
+  return { series, history, summary, layers, targets, allocation, quality, allocationUnavailable };
 };

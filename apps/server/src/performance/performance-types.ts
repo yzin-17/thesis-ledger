@@ -1,8 +1,24 @@
 import type { CurrencyV1 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
-import { supportedCurrency, type FxConversionMeta, type FxConversionMode, type FxConversionOptions } from '../market/fx-conversion.js';
+import {
+  supportedCurrency,
+  type FxConversionMeta,
+  type FxConversionMode,
+  type FxConversionOptions,
+} from '../market/fx-conversion.js';
 
 export type PortfolioMode = 'actual' | 'shadow';
+export type SnapshotSource = 'DAILY_CLOSE' | 'TRANSACTION' | 'IMPORT' | 'SYSTEM';
+export type SnapshotValuationBasis = 'ESTIMATED' | 'OFFICIAL';
+export type SnapshotCaptureContext = {
+  source?: SnapshotSource;
+  sourceRef?: string;
+  valuationBasis?: SnapshotValuationBasis;
+  valuationDate?: Date;
+  idempotencyKey?: string;
+  disclosureCoverage?: number;
+  pricedCoverage?: number;
+};
 export type Currency = CurrencyV1;
 export type PerformanceFxOptions = FxConversionOptions;
 export type PerformanceFxMeta = FxConversionMeta;
@@ -22,6 +38,13 @@ export type PerformanceSnapshot = {
   costValue?: unknown;
   cashValue: unknown;
   payload: unknown;
+  slotKey?: string;
+  revision?: number;
+  source?: SnapshotSource;
+  valuationBasis?: SnapshotValuationBasis;
+  status?: 'VALID' | 'INVALID';
+  disclosureCoverage?: unknown;
+  pricedCoverage?: unknown;
   currency?: Currency;
   estimated?: boolean;
   conversionMode?: FxConversionMode;

@@ -6,7 +6,11 @@ import { PerformanceDataService } from './performance-data.service.js';
 import { PerformanceLayerService } from './performance-layer.service.js';
 import { PerformanceSnapshotService } from './performance-snapshot.service.js';
 import { PerformanceTargetService } from './performance-target.service.js';
-import type { PerformanceFxOptions, PortfolioMode } from './performance-types.js';
+import type {
+  PerformanceFxOptions,
+  PortfolioMode,
+  SnapshotCaptureContext,
+} from './performance-types.js';
 
 @Injectable()
 export class PerformanceService {
@@ -38,8 +42,17 @@ export class PerformanceService {
     capturedAt = new Date(),
     mode: PortfolioMode = 'actual',
     options: PerformanceFxOptions = {},
+    context: SnapshotCaptureContext = {},
   ) {
-    return this.snapshotService.capture(accountId, capturedAt, mode, options);
+    return this.snapshotService.capture(accountId, capturedAt, mode, options, context);
+  }
+
+  snapshots(filters: Parameters<PerformanceSnapshotService['list']>[0]) {
+    return this.snapshotService.list(filters);
+  }
+
+  snapshot(id: string) {
+    return this.snapshotService.detail(id);
   }
 
   history(

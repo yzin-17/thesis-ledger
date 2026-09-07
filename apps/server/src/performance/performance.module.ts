@@ -8,6 +8,7 @@ import { PerformanceLayerService } from './performance-layer.service.js';
 import { PerformanceService } from './performance.service.js';
 import { PerformanceSnapshotService } from './performance-snapshot.service.js';
 import { PerformanceTargetService } from './performance-target.service.js';
+import { PerformanceValuationSeriesService } from './performance-valuation-series.service.js';
 
 @Module({
   imports: [MarketModule, PortfolioModule],
@@ -19,7 +20,8 @@ import { PerformanceTargetService } from './performance-target.service.js';
     PerformanceAnalysisService,
     PerformanceTargetService,
     PerformanceService,
+    PerformanceValuationSeriesService,
   ],
-  exports: [PerformanceService],
+  exports: [PerformanceService, PerformanceSnapshotService, PerformanceValuationSeriesService],
 })
 export class PerformanceModule {}

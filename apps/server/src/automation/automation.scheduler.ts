@@ -19,8 +19,9 @@ export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly handlers: AutomationRuntimeHandlers,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     if (loadConfig().environment === 'test') return;
+    await this.automations.ensureManagedValuationJobs();
     this.timer = setInterval(() => void this.runDue(), AUTOMATION_POLL_INTERVAL_MS);
     this.timer.unref?.();
     this.startupTimer = setTimeout(() => void this.runDue(), 0);

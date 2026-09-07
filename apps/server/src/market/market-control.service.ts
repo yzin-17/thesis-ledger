@@ -21,6 +21,7 @@ const defaultRoutes = {
   },
   FUND_NAV: { MUTUAL_FUND: ['akshare', 'efinance'] },
   FUND_NAV_HISTORY: { MUTUAL_FUND: ['akshare', 'efinance'] },
+  FUND_HOLDINGS: { MUTUAL_FUND: ['akshare'] },
   CHIP_SUMMARY: { STOCK: ['akshare'] },
 } as const;
 
@@ -156,10 +157,7 @@ export class MarketControlService {
         projection?: { desired?: { revision?: number } } | null;
       };
       const remoteRevision = effective.projection?.desired?.revision;
-      if (
-        !Number.isInteger(remoteRevision) ||
-        ((remoteRevision as number) <= policy.revision)
-      )
+      if (!Number.isInteger(remoteRevision) || (remoteRevision as number) <= policy.revision)
         return null;
       const next = this.policyPayload(
         { enabled: policy.enabled, routes: policy.routes },

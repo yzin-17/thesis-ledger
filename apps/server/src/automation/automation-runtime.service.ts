@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { automationJobTypes, type AutomationJobType } from '@thesis-ledger/schemas';
 import { RecurringCashDepositService } from '../cash-plans/recurring-cash-deposit.service.js';
+import { PerformanceSnapshotService } from '../performance/performance-snapshot.service.js';
+import { PerformanceValuationSeriesService } from '../performance/performance-valuation-series.service.js';
 import { MarketService } from '../market/market.service.js';
 import { DataExportService } from '../platform/data-export.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -22,6 +24,8 @@ export class AutomationRuntimeHandlers {
     private readonly providerHealth: ProviderHealthService,
     private readonly dataExport: DataExportService,
     private readonly recurringCashDeposits: RecurringCashDepositService,
+    @Optional() private readonly valuationSeries?: PerformanceValuationSeriesService,
+    @Optional() private readonly snapshots?: PerformanceSnapshotService,
   ) {}
 
   for(type: AutomationJobType): AutomationHandler {
@@ -98,15 +102,30 @@ export class AutomationRuntimeHandlers {
             .map((event) => event.message),
         });
       }),
-      snapshot: this.handler('snapshot', async (_signal, scheduledAt) => {
-        const accounts = await this.prisma.account.findMany({
-          where: investmentAccountWhere('actual'),
-          select: { id: true },
-        });
-        return this.workflows.closeSnapshots({
-          accountIds: accounts.map((account) => account.id),
-          capturedAt: scheduledAt.toISOString(),
-        });
+      'valuation-intraday-sample': this.handler(
+        'valuation-intraday-sample',
+        async (_signal, scheduledAt) => {
+          if (!this.valuationSeries) throw new Error('盘中估值服务未配置');
+          return this.valuationSeries.sample(scheduledAt, 'actual', 'CNY');
+        },
+      ),
+      'snapshot-close-estimate': this.handler(
+        'snapshot-close-estimate',
+        async (_signal, scheduledAt) => {
+          const accounts = await this.prisma.account.findMany({
+            where: investmentAccountWhere('actual'),
+            select: { id: true },
+          });
+          return this.workflows.closeSnapshots({
+            accountIds: accounts.map((account) => account.id),
+            capturedAt: scheduledAt.toISOString(),
+            valuationBasis: 'ESTIMATED',
+          });
+        },
+      ),
+      'snapshot-official-reconcile': this.handler('snapshot-official-reconcile', async () => {
+        if (!this.snapshots) throw new Error('快照校准服务未配置');
+        return this.snapshots.reconcileOfficial(100);
       }),
       backup: this.handler('backup', async () => this.dataExport.exportAccount()),
       'provider-health': this.handler('provider-health', async () => ({
