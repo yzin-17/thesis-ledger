@@ -12,6 +12,7 @@ import { AccountDataPage } from '../src/features/account-data/AccountDataPage.js
 import { chargeCategoryLabel } from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
 import { AccountManagementSection } from '../src/features/portfolio/PortfolioManagementSections.js';
+import { shouldAutoOpenEmptyAccountForm } from '../src/features/portfolio/PortfolioManagement.js';
 import type { PortfolioManagementViewProps } from '../src/features/portfolio/PortfolioManagementView.types.js';
 import { portfolioKeys } from '../src/features/portfolio/portfolio.queries.js';
 
@@ -225,6 +226,31 @@ describe('账户数据页面契约', () => {
     expect(formMarkup).toContain('返回账户设置');
     expect(formMarkup).toContain('账户名称');
     expect(formMarkup).toContain('data-slot="sheet-footer"');
+  });
+
+  it('空账户只在每次打开账户 Drawer 时自动进入一次创建表单', () => {
+    const emptyAccountState = {
+      step: 'account' as const,
+      accountsReady: true,
+      managedAccountsLoaded: true,
+      managedAccountCount: 0,
+      accountFormInline: true,
+      accountManagerOpen: true,
+    };
+
+    expect(shouldAutoOpenEmptyAccountForm({ ...emptyAccountState, alreadyAutoOpened: false })).toBe(
+      true,
+    );
+    expect(shouldAutoOpenEmptyAccountForm({ ...emptyAccountState, alreadyAutoOpened: true })).toBe(
+      false,
+    );
+    expect(
+      shouldAutoOpenEmptyAccountForm({
+        ...emptyAccountState,
+        accountManagerOpen: false,
+        alreadyAutoOpened: false,
+      }),
+    ).toBe(false);
   });
 
   it('账户查询尚未完成时保留加载语义，空账户时引导账户设置', () => {

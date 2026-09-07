@@ -37,11 +37,11 @@ export const createAccountActionHandlers = ({
         ...(editingAccount?.id ? { accountId: editingAccount.id } : {}),
         input,
       });
+      await loadManagedAccounts();
       formElement.reset();
       setEditingAccount(null);
       markDirty(false);
       setAccountSheetOpen(false);
-      await loadManagedAccounts();
       onSaved();
       toastManager.add({
         title: isEditing ? '账户已更新' : '账户已创建',

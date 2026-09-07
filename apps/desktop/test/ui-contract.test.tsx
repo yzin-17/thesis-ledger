@@ -296,6 +296,9 @@ describe('Desktop UI contract - providers and primitives', () => {
     const emptyDateTimeMarkup = renderToStaticMarkup(
       <DateInput type="datetime-local" value="" onChange={vi.fn()} />,
     );
+    const monthMarkup = renderToStaticMarkup(
+      <DateInput type="month" name="plan-start" value="2026-09" onChange={vi.fn()} />,
+    );
 
     expect(dateMarkup).toContain('>2026-09-02</span>');
     expect(dateMarkup).toContain('type="date"');
@@ -312,6 +315,19 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(dateTimeMarkup).toContain('step="60"');
     expect(dateTimeMarkup).toContain('aria-invalid="true"');
     expect(emptyDateTimeMarkup).toContain('>YYYY-MM-DD HH:mm</span>');
+    expect(monthMarkup).toContain('>2026-09</span>');
+    expect(monthMarkup).toContain('type="month"');
+    expect(monthMarkup).toContain('name="plan-start"');
+  });
+
+  it('all native date-like inputs use the shared date input', () => {
+    const rawDateInputPattern =
+      /<(?:Input|input)\b(?:(?!\/>)[\s\S])*?\btype=["'](?:date|datetime-local|month)["']/g;
+    const rawDateInputs = readDesktopSource(desktopSourceDirectory).flatMap(
+      (source) => source.match(rawDateInputPattern) ?? [],
+    );
+
+    expect(rawDateInputs).toEqual([]);
   });
 
   it('风险 Switch 使用圆形滑块并收窄内外间隙', () => {

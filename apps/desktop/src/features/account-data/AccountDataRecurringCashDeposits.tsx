@@ -469,7 +469,7 @@ function PlanEditorSheet({
               {editor.mode === 'create' && (
                 <Field>
                   <FieldLabel htmlFor="cash-plan-start">开始月份</FieldLabel>
-                  <Input
+                  <DateInput
                     id="cash-plan-start"
                     type="month"
                     value={startPeriod}

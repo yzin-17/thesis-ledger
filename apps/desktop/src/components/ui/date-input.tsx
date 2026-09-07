@@ -4,7 +4,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-type DateInputType = 'date' | 'datetime-local';
+type DateInputType = 'date' | 'datetime-local' | 'month';
 
 export type DateInputProps = Omit<React.ComponentPropsWithoutRef<typeof Input>, 'type'> & {
   type: DateInputType;
@@ -12,10 +12,14 @@ export type DateInputProps = Omit<React.ComponentPropsWithoutRef<typeof Input>, 
 
 const dateInputDisplayValue = (value: DateInputProps['value'], type: DateInputType) => {
   const inputValue = value == null ? '' : String(value);
-  if (!inputValue) return type === 'date' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm';
+  if (!inputValue) {
+    if (type === 'month') return 'YYYY-MM';
+    if (type === 'date') return 'YYYY-MM-DD';
+    return 'YYYY-MM-DD HH:mm';
+  }
 
   const [date, time] = inputValue.split('T');
-  if (type === 'date') return date;
+  if (type !== 'datetime-local') return date;
   return time ? `${date} ${time.slice(0, 5)}` : date;
 };
 

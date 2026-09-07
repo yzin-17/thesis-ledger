@@ -17,6 +17,30 @@ import { createPortfolioActionHandlers } from './portfolio.actions.js';
 import { usePortfolioInstrumentSearch } from './portfolio.instrument-search.js';
 import { PortfolioManagementView } from './PortfolioManagementView.js';
 
+export const shouldAutoOpenEmptyAccountForm = ({
+  step,
+  accountsReady,
+  managedAccountsLoaded,
+  managedAccountCount,
+  accountFormInline,
+  accountManagerOpen,
+  alreadyAutoOpened,
+}: {
+  step: 'account' | 'position';
+  accountsReady: boolean;
+  managedAccountsLoaded: boolean;
+  managedAccountCount: number;
+  accountFormInline: boolean;
+  accountManagerOpen: boolean | undefined;
+  alreadyAutoOpened: boolean;
+}) =>
+  step === 'account' &&
+  accountsReady &&
+  managedAccountsLoaded &&
+  managedAccountCount === 0 &&
+  (!accountFormInline || accountManagerOpen !== false) &&
+  !alreadyAutoOpened;
+
 export function PortfolioManagement({
   accounts,
   positions,
@@ -84,6 +108,7 @@ export function PortfolioManagement({
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [manualAssetType, setManualAssetType] = useState<HeldAssetType>('stock');
   const instrumentSelectionInProgress = useRef(false);
+  const emptyAccountFormAutoOpened = useRef(false);
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const managedAccountsQuery = useManagedAccountsQuery(step === 'account' && accountsReady);
@@ -175,13 +200,19 @@ export function PortfolioManagement({
   };
   useEffect(() => {
     if (
-      step === 'account' &&
-      accountsReady &&
-      managedAccountsLoaded &&
-      managedAccounts.length === 0 &&
-      (!accountFormInline || accountManagerOpen !== false)
+      !shouldAutoOpenEmptyAccountForm({
+        step,
+        accountsReady,
+        managedAccountsLoaded,
+        managedAccountCount: managedAccounts.length,
+        accountFormInline,
+        accountManagerOpen,
+        alreadyAutoOpened: emptyAccountFormAutoOpened.current,
+      })
     )
-      setAccountSheetOpen(true);
+      return;
+    emptyAccountFormAutoOpened.current = true;
+    setAccountSheetOpen(true);
   }, [
     accountFormInline,
     accountManagerOpen,
@@ -193,6 +224,7 @@ export function PortfolioManagement({
 
   useEffect(() => {
     if (!accountFormInline || accountManagerOpen !== false) return;
+    emptyAccountFormAutoOpened.current = false;
     setAccountSheetOpen(false);
     setEditingAccount(null);
     setDirty(false);

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import {
   InputGroup,
@@ -79,6 +81,8 @@ export function PositionFields({
   | 'setInstrumentSearchOpen'
   | 'handleInstrumentQueryChange'
 >) {
+  const [occurredAt, setOccurredAt] = useState(() => toLocalDatetimeInputValue(new Date()));
+
   return (
     <>
       <div className="grid gap-1.5">
@@ -194,11 +198,12 @@ export function PositionFields({
         </div>
         <div className="grid gap-1.5 text-xs text-muted-foreground">
           <span>发生时间</span>
-          <Input
+          <DateInput
             aria-label="发生时间"
             name="occurredAt"
             type="datetime-local"
-            defaultValue={toLocalDatetimeInputValue(new Date())}
+            value={occurredAt}
+            onChange={(event) => setOccurredAt(event.target.value)}
           />
           <span>快照实际观察的时间，默认为保存时刻。</span>
         </div>
