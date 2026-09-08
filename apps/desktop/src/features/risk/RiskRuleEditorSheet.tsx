@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Combobox } from '@base-ui/react/combobox';
 import { Button } from '@/components/ui/button';
@@ -12,12 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CheckIcon, ChevronDownIcon, LoaderCircle } from 'lucide-react';
 
-import type { Account, Position } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account, type Position } from '../portfolio/portfolio.types.js';
 import type {
   CreateRiskRuleInput,
   RiskRuleRecord,
@@ -345,6 +352,7 @@ export function RiskRuleEditorSheet({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (pending) return;
     const nextErrors = validateDraft(draft, rule?.scope ?? null);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -356,20 +364,29 @@ export function RiskRuleEditorSheet({
     void handleSubmit(event);
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty: JSON.stringify(draft) !== JSON.stringify(draftFromRule(rule)),
+    busy: pending,
+    onOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent
         side="right"
         aria-describedby="risk-rule-editor-description"
-        className="h-[100dvh] min-h-0 w-[680px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+        size="form"
+        className="h-[100dvh] min-h-0 overflow-hidden p-6"
       >
-        <div className="shrink-0">
+        <SheetHeader>
           <SheetTitle>{editing ? '编辑风险规则' : '新建风险规则'}</SheetTitle>
           <SheetDescription id="risk-rule-editor-description">
             规则只负责确定性判断；保存后会记录版本和审计信息。
           </SheetDescription>
-        </div>
-        <form className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" onSubmit={handleFormSubmit}>
+        </SheetHeader>
+        <form className="flex min-h-0 min-w-0 flex-1 flex-col gap-6" onSubmit={handleFormSubmit}>
           <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
             <FieldGroup>
               <Field invalid={Boolean(errors.kind)}>
@@ -510,8 +527,14 @@ export function RiskRuleEditorSheet({
                       >
                         <SelectValue placeholder={securityAccountPlaceholder}>
                           {(value: string | null) =>
-                            accounts.find((account) => account.id === value)?.name ??
-                            securityAccountPlaceholder
+                            (() => {
+                              const selectedAccount = accounts.find(
+                                (account) => account.id === value,
+                              );
+                              return selectedAccount
+                                ? accountDisplayLabel(selectedAccount)
+                                : securityAccountPlaceholder;
+                            })()
                           }
                         </SelectValue>
                       </SelectTrigger>
@@ -522,7 +545,7 @@ export function RiskRuleEditorSheet({
                           )}
                           {selectableAccounts.map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name}
+                              {accountDisplayLabel(account)}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -628,7 +651,14 @@ export function RiskRuleEditorSheet({
                     >
                       <SelectValue placeholder="选择账户">
                         {(value: string | null) =>
-                          accounts.find((account) => account.id === value)?.name ?? '选择账户'
+                          (() => {
+                            const selectedAccount = accounts.find(
+                              (account) => account.id === value,
+                            );
+                            return selectedAccount
+                              ? accountDisplayLabel(selectedAccount)
+                              : '选择账户';
+                          })()
                         }
                       </SelectValue>
                     </SelectTrigger>
@@ -636,7 +666,7 @@ export function RiskRuleEditorSheet({
                       <SelectGroup>
                         {selectableAccounts.map((account) => (
                           <SelectItem key={account.id} value={account.id}>
-                            {account.name}
+                            {accountDisplayLabel(account)}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -726,7 +756,7 @@ export function RiskRuleEditorSheet({
               type="button"
               variant="outline"
               disabled={pending}
-              onClick={() => onOpenChange(false)}
+              onClick={() => void requestClose(false)}
             >
               取消
             </Button>

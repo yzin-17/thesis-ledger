@@ -1,13 +1,37 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
 import {
+  compatibleProviders,
   routeCandidates,
   routeDefinitions,
   routeLabel,
+  updateRouteRole,
   type MarketPolicy,
   type ProviderManifest,
 } from './market-data.types.js';
+
+const NONE = '__none__';
+
+const providerName = (providers: readonly ProviderManifest[], providerId: string | undefined) =>
+  providers.find((provider) => provider.providerId === providerId)?.displayName ??
+  providerId ??
+  '未配置';
+
+const saveLabel = (saving: boolean, policy: MarketPolicy | null) => {
+  if (saving) return '提交中…';
+  if (policy) return `提交下一版策略（当前第 ${policy.revision} 版）`;
+  return '提交下一版策略';
+};
 
 export function MarketPolicyPanel({
   policy,
@@ -24,73 +48,43 @@ export function MarketPolicyPanel({
   onChange: (policy: MarketPolicy) => void;
   onSave: () => void;
 }) {
-  const updateRoute = (capability: string, instrumentType: string, providerId: string) => {
-    if (!policy) return;
-    const current = routeCandidates(policy, capability, instrumentType);
-    const next = current.includes(providerId)
-      ? current.filter((candidate) => candidate !== providerId)
-      : [...current, providerId];
-    onChange({
-      ...policy,
-      routes: {
-        ...policy.routes,
-        [capability]: { ...policy.routes[capability], [instrumentType]: next },
-      },
-    });
-  };
-
-  const moveRoute = (
-    capability: string,
-    instrumentType: string,
-    providerId: string,
-    direction: -1 | 1,
-  ) => {
-    if (!policy) return;
-    const candidates = [...routeCandidates(policy, capability, instrumentType)];
-    const index = candidates.indexOf(providerId);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= candidates.length) return;
-    [candidates[index], candidates[target]] = [candidates[target]!, candidates[index]!];
-    onChange({
-      ...policy,
-      routes: {
-        ...policy.routes,
-        [capability]: { ...policy.routes[capability], [instrumentType]: candidates },
-      },
-    });
-  };
-
   return (
     <Card>
       <CardContent className="space-y-5 p-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="m-0 text-xl font-semibold">Provider 路由策略</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              每个能力/标的类型独立排序；数据记录不会混用字段。
+              为每类数据指定主数据源和一个备用数据源；备用仅在主源不可用时接管完整结果。
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <input
+          <div className="flex items-center gap-3 text-sm">
+            <span>启用路由</span>
+            <Switch
+              variant="risk"
               aria-label="启用路由"
-              type="checkbox"
               checked={policy?.enabled ?? false}
               disabled={disabled || !policy}
-              onChange={(event) => policy && onChange({ ...policy, enabled: event.target.checked })}
-            />
-            <span>启用路由</span>
+              onCheckedChange={(checked) => policy && onChange({ ...policy, enabled: checked })}
+            >
+              <SwitchThumb variant="risk" />
+            </Switch>
           </div>
         </div>
         {policy ? (
-          <div className="divide-y border-y border-border">
+          <div className="divide-y rounded-lg border border-border">
             {routeDefinitions.map(([capability, instrumentType]) => {
-              const candidates = routeCandidates(policy, capability, instrumentType);
+              const [primary, fallback] = routeCandidates(policy, capability, instrumentType);
+              const compatible = compatibleProviders(providers, capability, instrumentType);
+              const fallbackOptions = compatible.filter(
+                (provider) => provider.providerId !== primary,
+              );
               return (
                 <div
                   key={`${capability}:${instrumentType}`}
-                  className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-center"
+                  className="grid gap-4 p-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
                 >
-                  <div>
+                  <div className="self-center">
                     <strong className="block text-sm font-medium">
                       {routeLabel(capability, instrumentType)}
                     </strong>
@@ -98,60 +92,79 @@ export function MarketPolicyPanel({
                       {capability} / {instrumentType}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {providers.map((provider) => {
-                      const routeIndex = candidates.indexOf(provider.providerId);
-                      return (
-                        <div key={provider.providerId} className="flex items-center gap-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <input
-                              aria-label={`${provider.displayName} 路由`}
-                              type="checkbox"
-                              checked={routeIndex >= 0}
-                              disabled={disabled}
-                              onChange={() =>
-                                updateRoute(capability, instrumentType, provider.providerId)
-                              }
-                            />
-                            <span>
-                              {routeIndex >= 0 ? `${routeIndex + 1}. ` : ''}
+                  <div className="space-y-1.5">
+                    <span className="block text-xs font-medium text-muted-foreground">
+                      主数据源
+                    </span>
+                    <Select
+                      value={primary ?? NONE}
+                      disabled={disabled}
+                      onValueChange={(value) =>
+                        onChange(
+                          updateRouteRole(
+                            policy,
+                            capability,
+                            instrumentType,
+                            'primary',
+                            value === NONE ? null : value,
+                          ),
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        aria-label={`${routeLabel(capability, instrumentType)} 主数据源`}
+                      >
+                        <SelectValue>{providerName(providers, primary)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false}>
+                        <SelectGroup>
+                          <SelectItem value={NONE}>未配置</SelectItem>
+                          {compatible.map((provider) => (
+                            <SelectItem key={provider.providerId} value={provider.providerId}>
                               {provider.displayName}
-                            </span>
-                          </div>
-                          {routeIndex >= 0 && (
-                            <span className="flex gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                disabled={disabled || routeIndex === 0}
-                                aria-label={`${provider.displayName} 上移`}
-                                onClick={() =>
-                                  moveRoute(capability, instrumentType, provider.providerId, -1)
-                                }
-                              >
-                                ↑
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                disabled={disabled || routeIndex === candidates.length - 1}
-                                aria-label={`${provider.displayName} 下移`}
-                                onClick={() =>
-                                  moveRoute(capability, instrumentType, provider.providerId, 1)
-                                }
-                              >
-                                ↓
-                              </Button>
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {providers.length === 0 && (
-                      <span className="text-sm text-muted-foreground">Provider 状态不可用</span>
-                    )}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="block text-xs font-medium text-muted-foreground">
+                      备用数据源
+                    </span>
+                    <Select
+                      value={fallback ?? NONE}
+                      disabled={disabled || !primary}
+                      onValueChange={(value) =>
+                        onChange(
+                          updateRouteRole(
+                            policy,
+                            capability,
+                            instrumentType,
+                            'fallback',
+                            value === NONE ? null : value,
+                          ),
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        aria-label={`${routeLabel(capability, instrumentType)} 备用数据源`}
+                      >
+                        <SelectValue>{providerName(providers, fallback)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false}>
+                        <SelectGroup>
+                          <SelectItem value={NONE}>不设备用</SelectItem>
+                          {fallbackOptions.map((provider) => (
+                            <SelectItem key={provider.providerId} value={provider.providerId}>
+                              {provider.displayName}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               );
@@ -170,11 +183,9 @@ export function MarketPolicyPanel({
             {saving && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
             )}
-            {saving
-              ? '提交中…'
-              : `提交下一版策略${policy ? `（当前第 ${policy.revision} 版）` : ''}`}
+            {saveLabel(saving, policy)}
           </Button>
-          <span className="text-xs text-muted-foreground">同一版本的内容冲突会被拒绝。</span>
+          <span className="text-xs text-muted-foreground">保存后由 DSA 原子应用新的主备顺序。</span>
         </div>
       </CardContent>
     </Card>

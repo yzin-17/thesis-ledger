@@ -6,9 +6,9 @@ export const createDefaultStrategySchema = (name = '我的第一条策略'): Str
   name,
   status: 'draft',
   description: '',
-  universe: { symbols: ['600519.SH'], asOf: new Date().toISOString() },
-  entrySignals: [{ indicator: 'close', operator: 'gt', value: 10 }],
-  exitSignals: [{ indicator: 'close', operator: 'lt', value: 9 }],
+  universe: { symbols: [], asOf: new Date().toISOString() },
+  entrySignals: [{ indicator: 'close', operator: 'gt', value: '' }],
+  exitSignals: [{ indicator: 'close', operator: 'lt', value: '' }],
   stopLoss: { type: 'fixed', value: 0.1 },
   sizing: { type: 'weight', value: 0.5 },
   execution: { price: 'close', tPlusOne: true, lotSize: 100 },
@@ -19,7 +19,6 @@ export const createDefaultStrategySchema = (name = '我的第一条策略'): Str
     slippageRate: 0.001,
   },
   riskConstraints: [],
-  benchmark: '000300.SH',
 });
 
 export const schemaFromVersion = (version: StrategyVersion | null, fallbackName?: string) => {

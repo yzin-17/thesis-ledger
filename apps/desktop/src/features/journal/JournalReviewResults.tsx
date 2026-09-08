@@ -169,12 +169,12 @@ export function RawEvidenceSheet({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[min(100vw,48rem)] overflow-y-auto">
+      <SheetContent size="detail" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
-        <pre className="mx-4 overflow-x-auto rounded-lg border bg-muted/20 p-4 text-xs leading-5 whitespace-pre-wrap">
+        <pre className="overflow-x-auto rounded-lg border bg-muted/20 p-4 text-xs leading-5 whitespace-pre-wrap">
           {JSON.stringify(value, null, 2)}
         </pre>
       </SheetContent>

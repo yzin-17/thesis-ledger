@@ -13,16 +13,10 @@ import {
 } from '@/components/ui/select';
 import { LoaderCircle } from 'lucide-react';
 
-import type { Account } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
 import { EmptyListState } from '../shared/EmptyStates.js';
 import type { LoadState } from '../shared/types.js';
 import type { ImportDraftRecord, ImportRow } from './import.types.js';
-
-export const accountTypeLabel = (type: Account['type']) => {
-  if (type === 'fund') return '基金';
-  if (type === 'cash') return '现金';
-  return '证券';
-};
 
 export const importSourceLabel = (source: ImportDraftRecord['source']) => {
   if (source === 'alipay') return '支付宝';
@@ -65,15 +59,17 @@ export function ScreenshotImportUpload({
         >
           <SelectTrigger aria-label="账户" className="w-full">
             <SelectValue placeholder="选择账户">
-              {accounts.find((account) => account.id === accountId)?.name ?? '选择账户'}
+              {(() => {
+                const selectedAccount = accounts.find((account) => account.id === accountId);
+                return selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户';
+              })()}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
               {accounts.map((account) => (
                 <SelectItem key={account.id} value={account.id}>
-                  {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                  {accountTypeLabel(account.type)}
+                  {accountDisplayLabel(account)}
                 </SelectItem>
               ))}
             </SelectGroup>

@@ -498,11 +498,20 @@ describe('Strategy 任务行为契约', () => {
         ],
       }),
     ).resolves.toBe(true);
-    expect(fetchBarsMutation.mutateAsync).toHaveBeenCalledWith('new-symbol');
+    expect(fetchBarsMutation.mutateAsync).toHaveBeenCalledWith({
+      symbol: 'new-symbol',
+      period: expect.objectContaining({
+        start: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
+        end: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
+      }),
+    });
     expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         strategyVersionId: 'version-3',
-        period: { start: '2025-01-01', end: '2025-01-31' },
+        period: {
+          start: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
+          end: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
+        },
         initialCash: 100_000,
         strategy: { universe: { symbols: ['new-symbol'] } },
       }),
@@ -510,9 +519,134 @@ describe('Strategy 任务行为契约', () => {
     expect(runMutation.mutateAsync).toHaveBeenCalledWith('job-2');
   });
 
+  it('Strategy 入队成功后不等待后台启动，先返回以关闭配置弹窗', async () => {
+    let resolveRun!: (job: BacktestJob) => void;
+    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
+    const queueMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-background' } as BacktestJob),
+    };
+    const runMutation = {
+      mutateAsync: vi.fn(
+        () =>
+          new Promise<BacktestJob>((resolve) => {
+            resolveRun = resolve;
+          }),
+      ),
+    };
+    const load = vi.fn().mockResolvedValue(undefined);
+    const toastManager = { add: vi.fn() };
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: '{}',
+      busyAction: null,
+      setBusyAction: vi.fn(),
+      toastManager,
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation,
+      queueMutation,
+      runMutation,
+      cancelMutation: { mutateAsync: vi.fn() },
+      load,
+    });
+
+    await expect(
+      handlers.startBacktest(
+        { id: 'version-1', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
+        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
+      ),
+    ).resolves.toBe(true);
+    expect(runMutation.mutateAsync).toHaveBeenCalledWith('job-background');
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(toastManager.add).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: '回测已启动' }),
+    );
+
+    resolveRun({ id: 'job-background' } as BacktestJob);
+    await vi.waitFor(() =>
+      expect(toastManager.add).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '回测已启动' }),
+      ),
+    );
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('Strategy 行情尚未准备好时也立即返回，准备完成后才入队', async () => {
+    let resolveBars!: (bars: unknown[]) => void;
+    const fetchBarsMutation = {
+      mutateAsync: vi.fn(
+        () =>
+          new Promise<unknown[]>((resolve) => {
+            resolveBars = resolve;
+          }),
+      ),
+    };
+    const queueMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-after-bars' } as BacktestJob),
+    };
+    const setBusyAction = vi.fn();
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: '{}',
+      busyAction: null,
+      setBusyAction,
+      toastManager: { add: vi.fn() },
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation,
+      queueMutation,
+      runMutation: { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-after-bars' }) },
+      cancelMutation: { mutateAsync: vi.fn() },
+      load: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(
+      handlers.startBacktest(
+        { id: 'version-bars', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
+        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
+      ),
+    ).resolves.toBe(true);
+    expect(queueMutation.mutateAsync).not.toHaveBeenCalled();
+
+    resolveBars([{ date: '2026-01-01' }]);
+    await vi.waitFor(() => expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(setBusyAction).toHaveBeenLastCalledWith(null));
+  });
+
+  it('后台行情失败或为空时反馈错误并释放 busy，不产生未处理拒绝', async () => {
+    const setBusyAction = vi.fn();
+    const toastManager = { add: vi.fn() };
+    const queueMutation = { mutateAsync: vi.fn() };
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: '{}',
+      busyAction: null,
+      setBusyAction,
+      toastManager,
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation: { mutateAsync: vi.fn().mockRejectedValue(new Error('bars unavailable')) },
+      queueMutation,
+      runMutation: { mutateAsync: vi.fn() },
+      cancelMutation: { mutateAsync: vi.fn() },
+      load: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(
+      handlers.startBacktest(
+        { id: 'version-failed-bars', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
+        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
+      ),
+    ).resolves.toBe(true);
+    await vi.waitFor(() =>
+      expect(toastManager.add).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '回测排队失败' }),
+      ),
+    );
+    expect(queueMutation.mutateAsync).not.toHaveBeenCalled();
+    expect(setBusyAction).toHaveBeenLastCalledWith(null);
+  });
+
   it('Strategy 启动失败保留排队任务并清理 busy 状态，资金和日期无效时不请求 bars', async () => {
     const setBusyAction = vi.fn();
-    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([]) };
+    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
     const queueMutation = {
       mutateAsync: vi.fn().mockResolvedValue({ id: 'job-3' } as BacktestJob),
     };
@@ -544,11 +678,13 @@ describe('Strategy 任务行为契约', () => {
       ),
     ).resolves.toBe(true);
     expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1);
-    expect(toastManager.add).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: '回测启动失败',
-        description: expect.stringContaining('队列'),
-      }),
+    await vi.waitFor(() =>
+      expect(toastManager.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: '回测启动失败',
+          description: expect.stringContaining('队列'),
+        }),
+      ),
     );
     expect(setBusyAction).toHaveBeenLastCalledWith(null);
   });
@@ -556,11 +692,15 @@ describe('Strategy 任务行为契约', () => {
   it('Strategy bars 网络异常不会继续排队，HTTP 错误仍回退为空 bars', async () => {
     const networkRequest = vi.fn().mockRejectedValue(new Error('network down'));
     const networkClient = { request: networkRequest } as unknown as DesktopRequestClient;
-    await expect(fetchStrategyBars('600519', networkClient)).rejects.toThrow('network down');
+    const input = {
+      symbol: '600519',
+      period: { start: '2026-01-01', end: '2026-01-31' },
+    };
+    await expect(fetchStrategyBars(input, networkClient)).rejects.toThrow('network down');
 
     const httpRequest = vi.fn().mockRejectedValue(new ThesisLedgerApiError(503, null));
     const httpClient = { request: httpRequest } as unknown as DesktopRequestClient;
-    await expect(fetchStrategyBars('600519', httpClient)).resolves.toEqual([]);
+    await expect(fetchStrategyBars(input, httpClient)).resolves.toEqual([]);
 
     const queueMutation = { mutateAsync: vi.fn().mockResolvedValue({} as BacktestJob) };
     const handlers = createStrategyActionHandlers({
@@ -579,6 +719,54 @@ describe('Strategy 任务行为契约', () => {
     const strategy = { id: 'strategy-1', versions: [{ id: 'version-1' }] } as StrategyRecord;
     await handlers.queue(strategy);
     expect(queueMutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('Strategy 行情请求携带用户选择的回测区间', async () => {
+    const request = vi.fn().mockResolvedValue([
+      {
+        version: 1,
+        symbol: '510300.SH',
+        timeframe: '1d',
+        timestamp: '2025-09-08T00:00:00+00:00',
+        open: 4.43,
+        high: 4.45,
+        low: 4.4,
+        close: 4.44,
+        volume: 1_000,
+        provider: 'akshare',
+        fetchedAt: '2026-09-08T00:00:00Z',
+        freshness: 'unknown',
+        fallbackUsed: false,
+        servedFromCache: false,
+      },
+    ]);
+    const client = { request } as unknown as DesktopRequestClient;
+
+    const bars = await fetchStrategyBars(
+      {
+        symbol: '510300.SH',
+        period: { start: '2025-09-08', end: '2026-09-08' },
+      },
+      client,
+    );
+
+    expect(request).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/market/510300.SH/bars?timeframe=1d&start=2025-09-08&end=2026-09-08&limit=365',
+      ),
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+    expect(bars).toEqual([
+      {
+        symbol: '510300.SH',
+        date: '2025-09-08',
+        open: 4.43,
+        high: 4.45,
+        low: 4.4,
+        close: 4.44,
+        volume: 1_000,
+      },
+    ]);
   });
 
   it('Strategy 任务取消调用 Mutation、刷新列表并清理 busy 状态', async () => {
@@ -612,5 +800,57 @@ describe('Strategy 任务行为契约', () => {
     expect(shouldPollJobs([{ status: 'running' }])).toBe(true);
     expect(shouldPollJobs([{ status: 'succeeded' }, { status: 'cancelled' }])).toBe(false);
     expect(shouldPollJobs([])).toBe(false);
+  });
+
+  it('Strategy 回测使用版本数据截止时间并透传基准行情', async () => {
+    const fetchBarsMutation = {
+      mutateAsync: vi
+        .fn()
+        .mockImplementation(async (input: { symbol: string }) => [
+          { symbol: input.symbol, date: '2025-01-01' },
+        ]),
+    };
+    const queueMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-4' }) };
+    const runMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-4' }) };
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: '{}',
+      busyAction: null,
+      setBusyAction: vi.fn(),
+      toastManager: { add: vi.fn() },
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation,
+      queueMutation,
+      runMutation,
+      cancelMutation: { mutateAsync: vi.fn() },
+      load: vi.fn().mockResolvedValue(undefined),
+    });
+    await expect(
+      handlers.startBacktest(
+        {
+          id: 'version-4',
+          version: 4,
+          schema: {
+            universe: { symbols: ['A'], asOf: '2025-01-01T00:00:00Z' },
+            benchmark: 'B',
+          },
+        },
+        { period: { start: '2025-01-01', end: '2025-01-02' }, initialCash: 1000 },
+      ),
+    ).resolves.toBe(true);
+    expect(fetchBarsMutation.mutateAsync).toHaveBeenNthCalledWith(1, {
+      symbol: 'A',
+      period: { start: '2025-01-01', end: '2025-01-02' },
+    });
+    expect(fetchBarsMutation.mutateAsync).toHaveBeenNthCalledWith(2, {
+      symbol: 'B',
+      period: { start: '2025-01-01', end: '2025-01-02' },
+    });
+    expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataAsOf: '2025-01-01T00:00:00Z',
+        benchmarkBars: [{ symbol: 'B', date: '2025-01-01' }],
+      }),
+    );
   });
 });

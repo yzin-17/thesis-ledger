@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import {
   createExecutionCommandSchemaV2,
   moveExecutionAccountCommandSchemaV2,
@@ -199,42 +200,45 @@ export class LedgerCommandService {
   }
 
   async createExecution(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = createExecutionCommandSchemaV2.parse(rawCommand);
-    const result = await this.repository.withAccountWrite<SingleExecutionMutation>(
-      command.accountId,
-      async (context) => {
-        const desired = this.createExecutionEvent(command, context.nextLedgerRevision);
-        const replay = await this.findIdempotentReplay(context, desired);
-        if (replay)
-          return {
-            value: {
-              event: replay.event,
-              replay: true,
-              projectionGeneration: replay.projectionGeneration,
-            },
-            advanceRevision: false,
-          };
-        await this.assertExecutionWriteAllowed(context, desired);
+    return (await this.createExecutionWithEffect(rawCommand)).response;
+  }
 
-        const event = await this.repository.appendRevision(context, desired);
-        await rebuildLedgerProjection(
-          context.transaction,
-          context.accountId,
-          'AVG',
-          context.nextProjectionGeneration,
-        );
+  async createExecutionWithEffect<T = undefined>(
+    rawCommand: unknown,
+    effect?: (transaction: Prisma.TransactionClient, event: LedgerEventV2) => Promise<T>,
+  ): Promise<{ response: LedgerCommandResponseV2; effectResult: T | undefined }> {
+    const command = createExecutionCommandSchemaV2.parse(rawCommand);
+    const result = await this.repository.withAccountWrite<
+      SingleExecutionMutation & { effectResult: T | undefined }
+    >(command.accountId, async (context) => {
+      const desired = this.createExecutionEvent(command, context.nextLedgerRevision);
+      const replay = await this.findIdempotentReplay(context, desired);
+      if (replay)
         return {
-          value: { event, replay: false },
-          advanceRevision: true,
+          value: {
+            event: replay.event,
+            replay: true,
+            projectionGeneration: replay.projectionGeneration,
+            effectResult: undefined,
+          },
+          advanceRevision: false,
         };
-      },
-    );
-    return this.singleResponse(
-      result.value.event,
-      result,
-      result.value.replay,
-      result.value.projectionGeneration,
-    );
+      await this.assertExecutionWriteAllowed(context, desired);
+
+      const event = await this.repository.appendRevision(context, desired);
+      const effectResult = effect ? await effect(context.transaction, event) : undefined;
+      await this.rebuildProjection(context);
+      return { value: { event, replay: false, effectResult }, advanceRevision: true };
+    });
+    return {
+      response: this.singleResponse(
+        result.value.event,
+        result,
+        result.value.replay,
+        result.value.projectionGeneration,
+      ),
+      effectResult: result.value.effectResult,
+    };
   }
 
   async replaceExecution(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
@@ -299,18 +303,8 @@ export class LedgerCommandService {
         assertExpectedRevision(targetContext, command.expectedTargetLedgerRevision);
         const sourceEvent = await this.repository.appendRevision(sourceContext, sourceVoid);
         const targetEvent = await this.repository.appendRevision(targetContext, targetCreate);
-        await rebuildLedgerProjection(
-          sourceContext.transaction,
-          sourceContext.accountId,
-          'AVG',
-          sourceContext.nextProjectionGeneration,
-        );
-        await rebuildLedgerProjection(
-          targetContext.transaction,
-          targetContext.accountId,
-          'AVG',
-          targetContext.nextProjectionGeneration,
-        );
+        await this.rebuildProjection(sourceContext);
+        await this.rebuildProjection(targetContext);
         return {
           value: {
             events: [sourceEvent, targetEvent],
@@ -384,12 +378,7 @@ export class LedgerCommandService {
 
         assertExpectedRevision(context, command.expectedLedgerRevision);
         const event = await this.repository.appendRevision(context, desired);
-        await rebuildLedgerProjection(
-          context.transaction,
-          context.accountId,
-          'AVG',
-          context.nextProjectionGeneration,
-        );
+        await this.rebuildProjection(context);
         return {
           value: { event, replay: false },
           advanceRevision: true,
@@ -595,5 +584,14 @@ export class LedgerCommandService {
       affectedSymbols: symbol === undefined ? [] : [symbol],
       idempotentReplay,
     };
+  }
+
+  private async rebuildProjection(context: AccountLedgerWriteContext) {
+    await rebuildLedgerProjection(
+      context.transaction,
+      context.accountId,
+      'AVG',
+      context.nextProjectionGeneration,
+    );
   }
 }

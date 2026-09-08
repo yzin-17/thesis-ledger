@@ -3,8 +3,11 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const app = await readFile(resolve(root, 'apps/desktop/src/ui/App.tsx'), 'utf8');
-const styles = await readFile(resolve(root, 'apps/desktop/src/ui/styles.css'), 'utf8');
+const app = await readFile(resolve(root, 'apps/desktop/src/app/AppShell.tsx'), 'utf8');
+const styles = (await Promise.all(['base.css', 'tokens.css'].map((file) =>
+  readFile(resolve(root, 'apps/desktop/src/styles', file), 'utf8'),
+))).join('\n');
+const states = await readFile(resolve(root, 'apps/desktop/src/features/shared/DesktopPrimitives.tsx'), 'utf8');
 const mobile = await readFile(resolve(root, 'apps/mobile/src/index.ts'), 'utf8');
 const electron = await readFile(resolve(root, 'apps/desktop/electron/main.cjs'), 'utf8');
 
@@ -33,7 +36,7 @@ const semanticColor = (name) => {
 
 const checks = [
   ['Desktop 导航有 aria-label', /aria-label=\{label\}/u.test(app)],
-  ['Desktop 当前导航有 aria-current', /aria-current=\{view === item/u.test(app)],
+  ['Desktop 当前导航有 aria-current', /<NavLink/u.test(app) && /className=\{\(\{ isActive \}\)/u.test(app)],
   ['真实按钮使用 focus-visible 轮廓', /button:focus-visible/u.test(styles)],
   ['输入控件使用 focus-visible 轮廓', /input:focus-visible/u.test(styles)],
   ['Desktop 有 800px 响应式断点', /@media \(max-width: 800px\)/u.test(styles)],
@@ -42,7 +45,7 @@ const checks = [
   ['Desktop release 窗口允许小屏垂直空间', /minHeight:\s*520/u.test(electron)],
   ['动画支持 reduced-motion', /prefers-reduced-motion: reduce/u.test(styles)],
   ['高对比度模式保留系统颜色和焦点', /@media \(forced-colors: active\)/u.test(styles)],
-  ['统一状态提示使用 status region', /role="status"/u.test(app)],
+  ['统一状态提示使用 status region', /role="status"/u.test(states)],
   [
     'Mobile 定义五类数据状态',
     /'loading' \| 'ready' \| 'empty' \| 'error' \| 'stale'/u.test(mobile),

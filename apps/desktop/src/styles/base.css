@@ -412,16 +412,6 @@ textarea:focus-visible {
   display: none;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-card);
-  margin-bottom: var(--space-group);
-  padding-bottom: var(--space-card);
-  border-bottom: 1px solid var(--color-border);
-}
-
 .kicker {
   margin: 0 0 var(--space-text);
   color: var(--color-text-muted);
@@ -439,13 +429,15 @@ p {
   overflow-wrap: anywhere;
 }
 
-h1 {
-  margin: 0;
-  color: var(--color-text-primary);
-  font-size: clamp(28px, 3vw, 34px);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.12;
+@layer base {
+  h1 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: clamp(28px, 3vw, 34px);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+  }
 }
 
 h2,
@@ -800,16 +792,6 @@ td span {
   max-width: 1200px;
 }
 
-.module-page h1 {
-  font-size: clamp(28px, 3vw, 34px);
-}
-
-.page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .mode-note {
   /* 不用负上边距：该提示在收益分析页跟随的是无下边距的自定义页头，
      负值会把提示拉上去与页头描述文字重叠。 */
@@ -857,11 +839,6 @@ td span {
 @media (max-width: 720px) {
   .entry-page-heading,
   .entry-context,
-  .page-header-actions {
-    grid-template-columns: 1fr;
-    display: grid;
-  }
-
   .entry-page-heading {
     gap: 12px;
   }
@@ -1568,10 +1545,6 @@ textarea[data-slot='input-group-control']:focus-visible {
   .content {
     padding: 26px 22px 60px;
   }
-
-  .page-header {
-    align-items: flex-end;
-  }
 }
 
 @media (max-width: 520px) {
@@ -1607,7 +1580,9 @@ textarea[data-slot='input-group-control']:focus-visible {
   }
 
   .sidebar nav {
-    grid-template-columns: repeat(8, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(44px, 1fr);
+    overflow-x: auto;
   }
 
   .nav-item {
@@ -1626,22 +1601,8 @@ textarea[data-slot='input-group-control']:focus-visible {
     padding: 22px 16px 92px;
   }
 
-  .page-header {
-    display: grid;
-    gap: var(--space-group);
-  }
-
-  .page-header .secondary {
-    justify-self: start;
-  }
-
   .upload-bar {
     grid-template-columns: 1fr;
-  }
-
-  h1,
-  .module-page h1 {
-    font-size: 30px;
   }
 
   .detail-panel {

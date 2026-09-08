@@ -1,9 +1,16 @@
+import type { ReactNode } from 'react';
 import { SearchIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { JournalLegacyReviewCandidate, JournalReviewCandidate } from './journal.types.js';
@@ -49,6 +56,7 @@ export function ReviewCandidateList({
   endDate = '',
   onStartDateChange,
   onEndDateChange,
+  emptyActions,
 }: {
   candidates: JournalReviewCandidate[];
   legacyItems?: JournalLegacyReviewCandidate[] | undefined;
@@ -62,6 +70,7 @@ export function ReviewCandidateList({
   endDate?: string;
   onStartDateChange?: (value: string) => void;
   onEndDateChange?: (value: string) => void;
+  emptyActions?: ReactNode;
 }) {
   const normalizedFilter = filter.trim().toUpperCase();
   const visibleCandidates = normalizedFilter
@@ -78,13 +87,14 @@ export function ReviewCandidateList({
     );
   } else if (visibleCandidates.length === 0) {
     content = (
-      <Empty className="min-h-48 border-0 p-6">
+      <Empty className="min-h-36 border-0 px-6 py-8">
         <EmptyHeader>
           <EmptyTitle>{normalizedFilter ? '没有匹配交易' : '暂无已平仓交易'}</EmptyTitle>
           <EmptyDescription>
             {normalizedFilter ? '换一个标的代码试试。' : emptyDescription}
           </EmptyDescription>
         </EmptyHeader>
+        {emptyActions && <EmptyContent>{emptyActions}</EmptyContent>}
       </Empty>
     );
   } else {
@@ -129,8 +139,8 @@ export function ReviewCandidateList({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Card className="min-w-0 shadow-none">
-        <CardHeader className="gap-3 border-b">
+      <Card size="sm" className="min-w-0 shadow-none">
+        <CardHeader className="gap-4 border-b">
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle>已平仓交易</CardTitle>
@@ -138,22 +148,22 @@ export function ReviewCandidateList({
             </div>
             <Badge variant="outline">{candidates.length} 笔</Badge>
           </div>
-          <div className="relative block">
-            <span className="sr-only">按标的筛选</span>
-            <SearchIcon
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              value={filter}
-              onChange={(event) => onFilterChange(event.target.value)}
-              className="pl-9"
-              placeholder="搜索标的代码"
-              aria-label="按标的筛选"
-            />
-          </div>
-          {(onStartDateChange || onEndDateChange) && (
-            <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(10rem,14rem)_minmax(10rem,14rem)] lg:items-end">
+            <div className="relative block">
+              <span className="sr-only">按标的筛选</span>
+              <SearchIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                value={filter}
+                onChange={(event) => onFilterChange(event.target.value)}
+                className="pl-9"
+                placeholder="搜索标的代码"
+                aria-label="按标的筛选"
+              />
+            </div>
+            {onStartDateChange && (
               <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                 <span>开始日期</span>
                 <DateInput
@@ -163,6 +173,8 @@ export function ReviewCandidateList({
                   aria-label="按开始日期筛选"
                 />
               </div>
+            )}
+            {onEndDateChange && (
               <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                 <span>结束日期</span>
                 <DateInput
@@ -172,8 +184,8 @@ export function ReviewCandidateList({
                   aria-label="按结束日期筛选"
                 />
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-2">{content}</CardContent>
       </Card>

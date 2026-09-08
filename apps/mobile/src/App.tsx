@@ -66,8 +66,12 @@ export function MobileApp() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>THESISLEDGER MOBILE</Text>
-            <Text style={styles.title}>只读投资组合</Text>
+            <Text style={styles.eyebrow}>
+              {screen === 'portfolio' ? 'PORTFOLIO' : 'RISK CENTER'}
+            </Text>
+            <Text accessibilityRole="header" style={styles.title}>
+              {screen === 'portfolio' ? '投资组合' : '风险事件'}
+            </Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -167,7 +171,7 @@ export function MobileApp() {
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.refreshText}>重新读取</Text>
+          <Text style={styles.refreshText}>刷新数据</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

@@ -6,6 +6,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
@@ -26,18 +27,17 @@ import {
   PositionOverviewMenu,
   StandardPositionContent,
 } from './PortfolioPositionObservation.js';
-import type { Account, Position } from './portfolio.types.js';
+import {
+  accountDisplayLabel,
+  accountTypeLabel,
+  type Account,
+  type Position,
+} from './portfolio.types.js';
 import type { PortfolioManagementViewProps } from './PortfolioManagementView.types.js';
 
 const accountToggleLabel = (busy: boolean, active: boolean) => {
   if (busy) return active ? '停用中…' : '启用中…';
   return active ? '停用' : '重新启用';
-};
-
-const accountTypeLabel = (type: Account['type']) => {
-  if (type === 'fund') return '基金';
-  if (type === 'cash') return '现金';
-  return '证券';
 };
 
 const accountSaveLabel = (busy: boolean, editing: boolean) => {
@@ -92,12 +92,12 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
         data-account-manager-view={accountFormInline ? 'list' : undefined}
       >
         {accountFormInline && (
-          <div className="panel-heading">
+          <SheetHeader className="mb-6">
             <SheetTitle>账户设置</SheetTitle>
             <SheetDescription id="account-manager-description">
               账户是成交、持仓快照和现金快照的容器。
             </SheetDescription>
-          </div>
+          </SheetHeader>
         )}
         <div
           className={cn('flex items-center justify-between gap-4', !accountFormInline && 'mt-6')}
@@ -123,6 +123,8 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                   {account.name}
                   <small>
                     {(account.institution || '未填写机构') +
+                      ' · ' +
+                      accountTypeLabel(account.type) +
                       ' · ' +
                       (account.mode === 'shadow' ? '模拟' : '实际') +
                       ' · ' +
@@ -191,7 +193,8 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
           <SheetContent
             side="right"
             aria-describedby="account-form-description"
-            className="h-[100dvh] min-h-0 w-[620px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+            size="form"
+            className="h-[100dvh] min-h-0 overflow-hidden p-6"
           >
             <AccountFormContent {...props} />
           </SheetContent>
@@ -209,8 +212,8 @@ function AccountFormContent({
   const descriptionId = inline ? 'account-manager-description' : 'account-form-description';
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-      <div className="panel-heading shrink-0">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+      <div className="shrink-0">
         <div className="flex items-start gap-1.5">
           {inline && (
             <Button
@@ -223,21 +226,21 @@ function AccountFormContent({
               <ArrowLeft data-icon="inline-start" aria-hidden="true" />
             </Button>
           )}
-          <div className="min-w-0">
+          <SheetHeader className="min-w-0 flex-1 shrink">
             <SheetTitle>{editingAccount ? '编辑账户' : '创建账户'}</SheetTitle>
             <SheetDescription id={descriptionId}>
               账户是持仓的容器；类型、模式和币种在出现 Ledger 事件后锁定。
             </SheetDescription>
-          </div>
+          </SheetHeader>
         </div>
       </div>
       <form
         key={editingAccount?.id ?? 'new-account'}
-        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
         onChange={() => markDirty()}
         onSubmit={(event) => void submitAccount(event)}
       >
-        <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+        <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto px-1 py-1">
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="account-name">账户名称</FieldLabel>
@@ -298,7 +301,7 @@ function AccountFormContent({
             </Field>
           </FieldGroup>
         </div>
-        <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+        <SheetFooter>
           <Button type="button" variant="outline" onClick={() => setAccountSheetOpen(false)}>
             取消
           </Button>
@@ -498,10 +501,11 @@ function PositionEntrySheet(props: PortfolioManagementViewProps) {
       <SheetContent
         side="right"
         aria-describedby="position-form-description"
-        className="h-[100dvh] min-h-0 w-[620px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+        size="form"
+        className="h-[100dvh] min-h-0 overflow-hidden p-6"
       >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="panel-heading shrink-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
             <SheetTitle>
               {positionSheetHeading(entrySheetMode, editing, calibrationMode)}
             </SheetTitle>
@@ -510,7 +514,7 @@ function PositionEntrySheet(props: PortfolioManagementViewProps) {
                 ? '这会记录持仓快照，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
                 : '录入账户当前实际持仓，用于初始化或核对持仓数据。'}
             </SheetDescription>
-          </div>
+          </SheetHeader>
           {entrySheetMode === 'cash' && selectedAccount?.type !== 'cash' ? (
             <CashBalanceForm {...props} />
           ) : (
@@ -530,11 +534,11 @@ function CashBalanceForm({
 }: PortfolioManagementViewProps) {
   return (
     <form
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
       onChange={() => markDirty()}
       onSubmit={(event) => void submitCashBalance(event)}
     >
-      <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+      <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto px-1 py-1">
         <h3>现金余额</h3>
         <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
         <div className="grid gap-1.5 text-xs text-muted-foreground">
@@ -550,7 +554,7 @@ function CashBalanceForm({
           />
         </div>
       </div>
-      <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+      <SheetFooter>
         <Button
           type="submit"
           variant="default"
@@ -603,12 +607,12 @@ function PositionForm(props: PortfolioManagementViewProps) {
   } = props;
   return (
     <form
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
       onChange={() => markDirty()}
       onSubmit={(event) => void submitPosition(event)}
       key={editing?.id ?? 'new'}
     >
-      <div className="form-card min-h-0 w-full max-w-none flex-1 content-start overflow-y-auto">
+      <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto px-1 py-1">
         <AccountField
           accounts={accounts}
           entryAccountLocked={entryAccountLocked}
@@ -657,7 +661,7 @@ function PositionForm(props: PortfolioManagementViewProps) {
           />
         )}
       </div>
-      <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+      <SheetFooter>
         <Button
           className="secondary"
           type="button"
@@ -758,14 +762,15 @@ function AccountField({
         onValueChange={(value) => void handleAccountChange(value)}
       >
         <SelectTrigger aria-label="账户" className="w-full">
-          <SelectValue placeholder="选择账户">{selectedAccount?.name ?? '选择账户'}</SelectValue>
+          <SelectValue placeholder="选择账户">
+            {selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户'}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
             {accounts.map((account) => (
               <SelectItem key={account.id} value={account.id}>
-                {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                {accountTypeLabel(account.type)} · {account.mode === 'shadow' ? '模拟' : '实际'}
+                {accountDisplayLabel(account)}
               </SelectItem>
             ))}
           </SelectGroup>

@@ -9,6 +9,7 @@ export type CurrencyV1 = z.infer<typeof currencySchema>;
 
 export const provenanceSchema = z.object({
   provider: z.string().min(1),
+  upstreamSource: z.string().min(1).optional(),
   sourceUrl: z.url().optional(),
   marketTime: isoDate,
   fetchedAt: isoDate,
@@ -77,6 +78,7 @@ export const barSchemaV1 = z
     volume: finite.nonnegative(),
     amount: finite.nonnegative(),
     provider: z.string().min(1),
+    upstreamSource: z.string().min(1).optional(),
     fetchedAt: isoDate.default(() => new Date().toISOString()),
     freshness: freshnessSchema.default('unknown'),
     fallbackUsed: z.boolean().default(false),
@@ -222,6 +224,15 @@ export const providerManifestSchema = z.object({
   enabled: z.boolean(),
   credentialConfigured: z.boolean(),
   requiresCredential: z.boolean().optional(),
+  origin: z.enum(['dsa']).optional(),
+  upstreamSources: z
+    .array(
+      z.object({
+        sourceId: z.string().min(1),
+        displayName: z.string().min(1),
+      }),
+    )
+    .optional(),
   updatedAt: isoDate.nullable().optional(),
 });
 

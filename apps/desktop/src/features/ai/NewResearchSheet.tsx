@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -24,37 +25,15 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { LoaderCircle } from 'lucide-react';
 import { fetchAccounts, fetchPortfolioValuation } from '../portfolio/portfolio.api.js';
 import { portfolioKeys } from '../portfolio/portfolio.queries.js';
-import type { Account } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
 import { fetchStrategies } from '../strategy/strategy.api.js';
 import { strategyKeys } from '../strategy/strategy.queries.js';
 import type { StrategyRecord } from '../strategy/strategy.types.js';
 import { useToastManager } from '@/components/ui/toast';
 import { useCreateAiRunMutation } from './ai.mutations.js';
 import { useAiCapabilitiesQuery } from './ai.queries.js';
+import { researchQuestionTemplates } from './ai.templates.js';
 import type { AiResearchScope, AiRunResult, StartResearchInput } from './ai.types.js';
-
-const templates = [
-  {
-    id: 'primary-risks',
-    label: '主要风险',
-    question: '请说明当前最主要的风险，并列出支持证据、反例和数据缺口。',
-  },
-  {
-    id: 'recent-changes',
-    label: '近期变化',
-    question: '请比较最近一个观察窗口与此前状态，说明发生了哪些重要变化。',
-  },
-  {
-    id: 'counter-evidence',
-    label: '反方证据',
-    question: '请主动寻找不支持当前投资假设的证据，并说明假设最脆弱的部分。',
-  },
-  {
-    id: 'stress-scenario',
-    label: '情景压力',
-    question: '请在明确假设下分析不利情景，并说明哪些结论无法由现有数据支持。',
-  },
-] as const;
 
 const scopeOptions: Array<{ value: AiResearchScope; label: string }> = [
   { value: 'portfolio', label: '全组合' },
@@ -239,16 +218,27 @@ export function NewResearchSheet({
     }
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty:
+      question !== initialQuestion ||
+      scope !== 'portfolio' ||
+      Boolean(accountId || symbol || strategyVersionId || templateId),
+    busy: mutation.isPending,
+    onOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[min(100vw,38.75rem)] overflow-y-auto">
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent side="right" size="form" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>新建研究</SheetTitle>
           <SheetDescription>
             选择真实研究对象并描述需要回答的问题。研究只读取授权数据，不会修改账本或生成订单。
           </SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col gap-5 px-4 pb-4">
+        <div className="flex flex-col gap-6">
           <FieldGroup>
             <Field>
               <FieldLabel>研究范围</FieldLabel>
@@ -284,7 +274,7 @@ export function NewResearchSheet({
                     <SelectGroup>
                       {accounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
-                          {account.name} · {account.currency}
+                          {accountDisplayLabel(account)}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -322,7 +312,7 @@ export function NewResearchSheet({
                       <SelectGroup>
                         {accounts.map((account) => (
                           <SelectItem key={account.id} value={account.id}>
-                            {account.name} · {account.currency}
+                            {accountDisplayLabel(account)}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -443,7 +433,7 @@ export function NewResearchSheet({
               <p className="text-xs text-muted-foreground">点击后仍可编辑，不会自动提交。</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {templates.map((template) => (
+              {researchQuestionTemplates.map((template) => (
                 <Button
                   key={template.id}
                   type="button"

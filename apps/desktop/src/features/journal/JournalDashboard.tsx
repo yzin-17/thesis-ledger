@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -6,17 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DateInput } from '@/components/ui/date-input';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoaderCircle, SlidersHorizontal } from 'lucide-react';
 import { useToastManager } from '@/components/ui/toast';
+import { cn } from '@/lib/utils';
 
 import type { Account } from '../portfolio/portfolio.types.js';
 import { AdvancedJsonSheet } from './AdvancedJsonSheet.js';
@@ -24,6 +18,11 @@ import { EvidenceEditorSheet } from './EvidenceEditorSheet.js';
 import { ManualReviewForm } from './ManualReviewForm.js';
 import { PeriodReviewResult, SingleReviewResult } from './JournalReviewResults.js';
 import { ReviewCandidateList } from './ReviewCandidateList.js';
+import { JournalAccountSelector } from './JournalAccountSelector.js';
+import {
+  JournalReviewEmptyActions,
+  JournalReviewSelectionPrompt,
+} from './JournalSingleEmptyState.js';
 import {
   useBehaviorAnalysisMutation,
   useBehaviorExplanationMutation,
@@ -420,6 +419,9 @@ export function JournalDashboard({
       return trade ? [trade] : [];
     });
   const periodWindowInvalid = periodWindow.start >= periodWindow.end;
+  const singleWorkspaceVisible = Boolean(
+    candidates.length > 0 || selectedCandidate || currentSingleTrade || manualOpen,
+  );
 
   const singleAnalysis = useSingleTradeAnalysisMutation();
   const periodAnalysis = useBehaviorAnalysisMutation();
@@ -576,11 +578,12 @@ export function JournalDashboard({
   if (accountState) {
     return (
       <section className="module-page flex flex-col gap-6">
-        <p className="kicker">Journal Review</p>
-        <h1>投资复盘</h1>
-        <p className="page-description">
-          先计算计划、执行和行为事实，再交给 AI 做有证据边界的解释；只读研究，不写入 Ledger。
-        </p>
+        <PageHeader
+          className="mb-0"
+          eyebrow="INVESTMENT JOURNAL"
+          title="投资复盘"
+          description="回顾交易计划与执行，结合证据总结经验。"
+        />
         {accountState}
       </section>
     );
@@ -591,37 +594,18 @@ export function JournalDashboard({
 
   return (
     <section className="module-page flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <p className="kicker">Journal Review</p>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1>投资复盘</h1>
-            <p className="page-description">
-              先计算计划、执行和行为事实，再交给 AI
-              做有证据边界的解释；反事实结果会明确假设，不会写入 Ledger 或生成订单。
-            </p>
-          </div>
-          <div className="flex min-w-56 flex-col gap-2">
-            <span className="text-sm font-medium">复盘账户</span>
-            <Select value={accountId} onValueChange={(value) => value && selectAccount(value)}>
-              <SelectTrigger aria-label="复盘账户">
-                <SelectValue placeholder="选择账户">
-                  {selectedAccount?.name ?? '选择账户'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        className="mb-0"
+        eyebrow="INVESTMENT JOURNAL"
+        title="投资复盘"
+        description="回顾交易计划与执行，结合证据总结经验。"
+      />
+
+      <JournalAccountSelector
+        accounts={accounts}
+        value={accountId}
+        onValueChange={selectAccount}
+      />
 
       <Tabs
         value={tab}
@@ -633,7 +617,7 @@ export function JournalDashboard({
           if (value === 'period') setTab('period');
         }}
       >
-        <TabsList variant="line" className="w-full justify-start">
+        <TabsList variant="line" className="w-full">
           <TabsTrigger value="single">单笔复盘</TabsTrigger>
           <TabsTrigger value="period">周期复盘</TabsTrigger>
         </TabsList>
@@ -654,7 +638,12 @@ export function JournalDashboard({
               </Button>
             </Alert>
           )}
-          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(18rem,25rem)_minmax(0,1fr)]">
+          <div
+            className={cn(
+              'grid min-w-0 gap-4',
+              singleWorkspaceVisible && 'xl:grid-cols-[minmax(18rem,25rem)_minmax(0,1fr)]',
+            )}
+          >
             <ReviewCandidateList
               candidates={candidates}
               legacyItems={candidateQuery.data?.legacyItems}
@@ -675,153 +664,154 @@ export function JournalDashboard({
               }}
               onSelect={selectCandidate}
               loading={candidateQuery.isPending}
-            />
-            <div className="flex min-w-0 flex-col gap-4">
-              {selectedCandidate && !currentSingleTrade ? (
-                <Card className="shadow-none">
-                  <CardHeader>
-                    <CardTitle>该复盘对象的证据不足</CardTitle>
-                    <CardDescription>
-                      当前投影没有足够的确定性事实，不能把缺失字段当作零值继续计算。
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">
-                      缺少：{selectedCandidate.missingEvidence.join('、') || '已实现净收益'}。
-                    </p>
-                    {selectedCandidate.excludedReasons.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedCandidate.excludedReasons.map((reason) => (
-                          <Badge key={reason} variant="outline">
-                            {reason}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : currentSingleTrade ? (
-                <>
-                  <EvidenceSummary
-                    candidate={selectedCandidate}
-                    trade={currentSingleTrade}
-                    temporaryEvidence={evidenceDraft}
-                    onEdit={() => setEvidenceOpen(true)}
+              emptyActions={
+                candidates.length === 0 && !candidateQuery.isPending ? (
+                  <JournalReviewEmptyActions
+                    onManualReview={() => setManualOpen(true)}
+                    onAdvancedJson={() => {
+                      setAdvancedMode('single');
+                      setAdvancedOpen(true);
+                    }}
                   />
+                ) : undefined
+              }
+            />
+            {singleWorkspaceVisible && (
+              <div className="flex min-w-0 flex-col gap-4">
+                {selectedCandidate && !currentSingleTrade ? (
                   <Card className="shadow-none">
-                    <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
-                      <div>
-                        <p className="font-medium">准备好后开始计算确定性事实</p>
-                        <p className="text-sm text-muted-foreground">
-                          不会创建订单，也不会修改 Ledger。
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => {
-                            setAdvancedMode('single');
-                            setAdvancedOpen(true);
-                          }}
-                        >
-                          高级 JSON
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => void startSingleReview()}
-                          disabled={singleAnalysis.isPending}
-                        >
-                          {singleAnalysis.isPending && (
-                            <LoaderCircle
-                              data-icon="inline-start"
-                              className="animate-spin"
-                              aria-hidden="true"
-                            />
-                          )}
-                          {singleAnalysis.isPending ? '计算中…' : '开始复盘'}
-                        </Button>
-                      </div>
+                    <CardHeader>
+                      <CardTitle>该复盘对象的证据不足</CardTitle>
+                      <CardDescription>
+                        当前投影没有足够的确定性事实，不能把缺失字段当作零值继续计算。
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        缺少：{selectedCandidate.missingEvidence.join('、') || '已实现净收益'}。
+                      </p>
+                      {selectedCandidate.excludedReasons.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCandidate.excludedReasons.map((reason) => (
+                            <Badge key={reason} variant="outline">
+                              {reason}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                  {singleAnalysis.isError && (
-                    <Alert variant="destructive">
-                      <AlertTitle>确定性复盘失败</AlertTitle>
-                      <AlertDescription>
-                        {errorMessage(singleAnalysis.error, '分析接口暂时不可用。')}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {singleResult && (
-                    <SingleReviewResult
-                      trade={currentSingleTrade}
+                ) : currentSingleTrade ? (
+                  <>
+                    <EvidenceSummary
                       candidate={selectedCandidate}
-                      result={singleResult}
-                      aiRun={singleAiRun}
-                      aiPending={singleExplanation.isPending}
-                      aiError={
-                        singleExplanation.isError
-                          ? new Error(errorMessage(singleExplanation.error, 'Provider 不可用。'))
-                          : null
-                      }
-                      onExplain={() => {
-                        if (!currentSingleTrade || !singleResult) return;
-                        void singleExplanation
-                          .mutateAsync({
-                            trade: currentSingleTrade,
-                            result: singleResult,
-                            ...(selectedCandidate ? { sources: selectedCandidate.sources } : {}),
-                          })
-                          .then(async (run) => {
-                            setSingleAiRun(run);
-                            await persistReviewSnapshot(currentSingleTrade, {
-                              ...singleResult,
-                              aiRun: run,
-                            });
-                          })
-                          .catch(() => undefined);
-                      }}
+                      trade={currentSingleTrade}
+                      temporaryEvidence={evidenceDraft}
+                      onEdit={() => setEvidenceOpen(true)}
                     />
-                  )}
-                </>
-              ) : (
-                <Card className="shadow-none">
-                  <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-                    <CardTitle>选择一笔已平仓交易</CardTitle>
-                    <CardDescription>
-                      先核对证据，再开始确定性复盘。没有候选时可以手动输入。
-                    </CardDescription>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      <Button type="button" onClick={() => setManualOpen((open) => !open)}>
-                        {manualOpen ? '收起手动复盘' : '手动复盘'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
+                    <Card className="shadow-none">
+                      <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+                        <div>
+                          <p className="font-medium">准备好后开始计算确定性事实</p>
+                          <p className="text-sm text-muted-foreground">
+                            不会创建订单，也不会修改 Ledger。
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setAdvancedMode('single');
+                              setAdvancedOpen(true);
+                            }}
+                          >
+                            高级 JSON
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => void startSingleReview()}
+                            disabled={singleAnalysis.isPending}
+                          >
+                            {singleAnalysis.isPending && (
+                              <LoaderCircle
+                                data-icon="inline-start"
+                                className="animate-spin"
+                                aria-hidden="true"
+                              />
+                            )}
+                            {singleAnalysis.isPending ? '计算中…' : '开始复盘'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    {singleAnalysis.isError && (
+                      <Alert variant="destructive">
+                        <AlertTitle>确定性复盘失败</AlertTitle>
+                        <AlertDescription>
+                          {errorMessage(singleAnalysis.error, '分析接口暂时不可用。')}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    {singleResult && (
+                      <SingleReviewResult
+                        trade={currentSingleTrade}
+                        candidate={selectedCandidate}
+                        result={singleResult}
+                        aiRun={singleAiRun}
+                        aiPending={singleExplanation.isPending}
+                        aiError={
+                          singleExplanation.isError
+                            ? new Error(errorMessage(singleExplanation.error, 'Provider 不可用。'))
+                            : null
+                        }
+                        onExplain={() => {
+                          if (!currentSingleTrade || !singleResult) return;
+                          void singleExplanation
+                            .mutateAsync({
+                              trade: currentSingleTrade,
+                              result: singleResult,
+                              ...(selectedCandidate ? { sources: selectedCandidate.sources } : {}),
+                            })
+                            .then(async (run) => {
+                              setSingleAiRun(run);
+                              await persistReviewSnapshot(currentSingleTrade, {
+                                ...singleResult,
+                                aiRun: run,
+                              });
+                            })
+                            .catch(() => undefined);
+                        }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {!manualOpen && (
+                      <JournalReviewSelectionPrompt
+                        onManualReview={() => setManualOpen(true)}
+                        onAdvancedJson={() => {
                           setAdvancedMode('single');
                           setAdvancedOpen(true);
                         }}
-                      >
-                        高级 JSON
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {manualOpen && !currentSingleTrade && (
-                <ManualReviewForm
-                  onSubmit={(trade) => {
-                    setManualTrade(trade);
-                    setSelectedCandidate(null);
-                    setEvidenceDraft({});
-                    setSingleResult(null);
-                    setSingleAiRun(null);
-                  }}
-                  onCancel={() => setManualOpen(false)}
-                />
-              )}
-            </div>
+                      />
+                    )}
+                  </>
+                )}
+                {manualOpen && !currentSingleTrade && (
+                  <ManualReviewForm
+                    onSubmit={(trade) => {
+                      setManualTrade(trade);
+                      setSelectedCandidate(null);
+                      setEvidenceDraft({});
+                      setSingleResult(null);
+                      setSingleAiRun(null);
+                    }}
+                    onCancel={() => setManualOpen(false)}
+                  />
+                )}
+              </div>
+            )}
           </div>
           {currentSingleTrade && (
             <EvidenceEditorSheet

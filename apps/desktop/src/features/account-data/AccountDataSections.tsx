@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { MoreHorizontalIcon } from 'lucide-react';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 
 import type { Account, Position } from '../portfolio/portfolio.types.js';
 import type { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
@@ -37,6 +38,7 @@ import {
   type ExecutionEvent,
 } from './account-data.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
+import { RecurringFundInvestments } from './AccountDataRecurringFundInvestments.js';
 
 type QueryLike = {
   data: { events: LedgerEventV2[]; ledgerRevision: string } | undefined;
@@ -149,6 +151,7 @@ export function TransactionSection({
           </AlertDescription>
         </Alert>
       )}
+      <RecurringFundInvestments account={account} />
     </section>
   );
 }
@@ -224,7 +227,9 @@ function TransactionResults({
             <th className="px-4 py-3 font-medium">金额/数量</th>
             <th className="px-4 py-3 font-medium">来源</th>
             <th className="px-4 py-3 font-medium">状态</th>
-            <th className="px-4 py-3 text-right font-medium">操作</th>
+            <StickyTableActionHeader className="px-4 py-3 font-medium">
+              操作
+            </StickyTableActionHeader>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -303,7 +308,7 @@ function TransactionRow({
       <td className="px-4 py-3 align-top">
         <Badge variant={revisionBadgeVariant(event)}>{revisionLabel(event)}</Badge>
       </td>
-      <td className="px-4 py-3 align-top">
+      <StickyTableActionCell className="px-4 py-3 align-top">
         <div className="flex flex-wrap justify-end gap-1">
           {execution && (
             <>
@@ -360,7 +365,7 @@ function TransactionRow({
             查看修正链
           </Button>
         </div>
-      </td>
+      </StickyTableActionCell>
     </tr>
   );
 }

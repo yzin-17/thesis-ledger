@@ -5,6 +5,10 @@ import { cn } from '@/lib/utils';
 
 import { EmptyTableRow } from '../shared/EmptyStates.js';
 import { isDataLoaded } from '../shared/display.js';
+import {
+  StickyTableActionCell,
+  StickyTableActionHeader,
+} from '../shared/StickyTableActions.js';
 import type { LoadState } from '../shared/types.js';
 import {
   automationJobTypeLabel,
@@ -80,7 +84,7 @@ export function ProviderTable({
               <th className="text-center">优先级</th>
               <th className="text-center">状态</th>
               <th className="text-center">凭证</th>
-              <th className="text-center">操作</th>
+              <StickyTableActionHeader className="text-center">操作</StickyTableActionHeader>
             </tr>
           </thead>
           <tbody>
@@ -126,7 +130,7 @@ export function ProviderTable({
                     <td className="text-left">
                       {provider.credentialConfigured ? '已配置' : '未配置'}
                     </td>
-                    <td className="text-left">
+                    <StickyTableActionCell className="text-left">
                       <Button
                         className="text-button"
                         size="sm"
@@ -172,7 +176,7 @@ export function ProviderTable({
                         )}
                         {toggleLabel(savingProviderName === provider.name, provider.enabled)}
                       </Button>
-                    </td>
+                    </StickyTableActionCell>
                   </tr>
                 );
               })
@@ -226,7 +230,7 @@ export function AutomationTable({
               <th>类型（market 类休市日自动跳过）</th>
               <th>下一次运行</th>
               <th>状态</th>
-              <th>操作</th>
+              <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>
           </thead>
           <tbody>
@@ -248,7 +252,7 @@ export function AutomationTable({
                     {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString('zh-CN') : '未安排'}
                   </td>
                   <td>{job.enabled ? '启用' : '停用'}</td>
-                  <td>
+                  <StickyTableActionCell>
                     <Button
                       className="text-button"
                       size="sm"
@@ -301,7 +305,7 @@ export function AutomationTable({
                         删除
                       </Button>
                     ) : null}
-                  </td>
+                  </StickyTableActionCell>
                 </tr>
               ))
             )}

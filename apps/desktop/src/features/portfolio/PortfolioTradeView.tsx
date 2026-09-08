@@ -18,7 +18,8 @@ import {
   usePortfolioTradesQuery,
   type PortfolioTradeLifecycle,
 } from './portfolio-trade.queries.js';
-import type { Account, PortfolioMode } from './portfolio.types.js';
+import { accountDisplayLabel, type Account, type PortfolioMode } from './portfolio.types.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 
 const formatDateTime = (value: string | null) =>
   value ? new Date(value).toLocaleString('zh-CN') : '—';
@@ -84,7 +85,7 @@ export function PortfolioTradeView({
           >
             <SelectTrigger aria-label="交易账户范围" className="w-full bg-background">
               <SelectValue placeholder="全部账户">
-                {selectedAccount?.name ?? '全部账户'}
+                {selectedAccount ? accountDisplayLabel(selectedAccount) : '全部账户'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -94,7 +95,7 @@ export function PortfolioTradeView({
                   .filter((account) => account.mode === mode)
                   .map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name}
+                      {accountDisplayLabel(account)}
                     </SelectItem>
                   ))}
               </SelectGroup>
@@ -170,7 +171,7 @@ export function PortfolioTradeView({
                 <th>数量</th>
                 <th>净实现盈亏</th>
                 <th>状态</th>
-                <th>操作</th>
+                <StickyTableActionHeader>操作</StickyTableActionHeader>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +179,6 @@ export function PortfolioTradeView({
                 <tr key={trade.id}>
                   <td>
                     <strong>{trade.symbol}</strong>
-                    <span className="font-mono text-xs text-muted-foreground">{trade.id}</span>
                   </td>
                   <td>{accountName(accounts, trade.accountId)}</td>
                   <td>
@@ -201,7 +201,7 @@ export function PortfolioTradeView({
                       {trade.excludedReasons.length > 0 && <Badge variant="outline">需复核</Badge>}
                     </div>
                   </td>
-                  <td>
+                  <StickyTableActionCell>
                     <Button
                       type="button"
                       size="sm"
@@ -211,7 +211,7 @@ export function PortfolioTradeView({
                     >
                       查看详情
                     </Button>
-                  </td>
+                  </StickyTableActionCell>
                 </tr>
               ))}
             </tbody>

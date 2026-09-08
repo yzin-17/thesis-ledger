@@ -1,4 +1,6 @@
-import { renderToStaticMarkup } from 'react-dom/server';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import type { ReactNode } from 'react';
+import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -27,6 +29,9 @@ import {
 } from '../src/features/risk/risk.format.js';
 import type { Portfolio } from '../src/features/portfolio/portfolio.types.js';
 
+const renderToStaticMarkup = (node: ReactNode) =>
+  renderMarkup(<ConfirmDialogProvider>{node}</ConfirmDialogProvider>);
+
 describe('风险事件数值标签', () => {
   it('优先读取服务端 valueMetric 语义标识', () => {
     expect(
@@ -42,9 +47,9 @@ describe('风险事件数值标签', () => {
 
   it('存量事件按 inputs 反推，未知标识回落触发值', () => {
     expect(riskEventValueLabel({ value: 0.15, inputs: { costPrice: 100 } })).toBe('距成本 15.00%');
-    expect(
-      riskEventValueLabel({ value: 0.2, metadata: { valueMetric: 'future_metric' } }),
-    ).toBe('触发值 0.2');
+    expect(riskEventValueLabel({ value: 0.2, metadata: { valueMetric: 'future_metric' } })).toBe(
+      '触发值 0.2',
+    );
   });
 });
 
@@ -287,6 +292,12 @@ describe('风险中心 AB 交互契约', () => {
     expect(riskSubjectLabel('recurring-cash-deposit-plan')).toBe('定期入账计划');
   });
 
+  it('事件表不重复绘制页签基线', () => {
+    const html = renderToStaticMarkup(<RiskEventTable loadState="ready" events={[]} />);
+
+    expect(html).toContain('panel mt-0 border-t-0');
+  });
+
   it('通知表使用 subject 字段并显示可识别的主题标签', () => {
     const html = renderToStaticMarkup(
       <RiskNotificationTable
@@ -330,8 +341,32 @@ describe('风险中心 AB 交互契约', () => {
     // 错误码转为可读文案（渠道已在行标题展示，不再重复），不展示原始代码
     expect(html).toContain('通知 Provider 未配置');
     expect(html).not.toContain('notification_provider_unconfigured');
-    expect(html).toContain('主题 event-1');
+    expect(html).not.toContain('主题 event-1');
+    expect(html).toContain('border-t-0');
     expect(html).not.toContain('事件 undefined');
+  });
+
+  it('规则工作台不重复绘制页签基线', () => {
+    const html = renderToStaticMarkup(
+      <RiskRuleWorkbench
+        rules={[]}
+        accounts={[]}
+        positions={[]}
+        loadState="ready"
+        busyAction={null}
+        onCreate={vi.fn(async () => true)}
+        onUpdate={vi.fn(async () => true)}
+        onToggle={vi.fn(async () => true)}
+        onArchive={vi.fn(async () => true)}
+        onRestore={vi.fn(async () => true)}
+        onTest={vi.fn(async () => [])}
+        testRecords={{}}
+        onTestComplete={vi.fn()}
+        onAudit={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('panel mt-0 border-t-0');
   });
 
   it('通知表不内嵌 Provider 缺失提示，提示提升到风险中心主上下文', () => {

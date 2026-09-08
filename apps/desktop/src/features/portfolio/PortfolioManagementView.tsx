@@ -18,9 +18,7 @@ export function PortfolioManagementView(props: PortfolioManagementViewProps) {
   } = props;
   let sectionClassName = 'management';
   if (step === 'account') {
-    sectionClassName = accountFormInline
-      ? 'module-page flex min-h-0 flex-1 flex-col'
-      : 'module-page';
+    sectionClassName = accountFormInline ? 'flex min-h-0 flex-1 flex-col' : 'module-page';
   } else if (embedded) sectionClassName = 'flex flex-col gap-4';
 
   return (

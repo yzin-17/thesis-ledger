@@ -1,3 +1,4 @@
+import { validateTargetDraft, type TargetRow } from './performance.target-draft.js';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,11 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, LoaderCircle, Plus } from 'lucide-react';
+import { AlertTriangle, Plus } from 'lucide-react';
 import { normalizeAllocationCategory, normalizeAllocationTargets } from '@thesis-ledger/domain';
 
-import type { Account } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
+import { PerformanceTargetActions } from './PerformanceTargetActions.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { money } from '../shared/display.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import type {
   AllocationCategory,
   PerformanceAllocationRecord,
@@ -174,14 +178,16 @@ export function PerformanceAccountSelector({
             }}
           >
             <SelectTrigger aria-label="账户" className="w-full sm:w-72">
-              <SelectValue>{selectedAccount?.name ?? '全部账户'}</SelectValue>
+              <SelectValue>
+                {selectedAccount ? accountDisplayLabel(selectedAccount) : '全部账户'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectItem value={ALL_ACCOUNTS_VALUE}>全部账户</SelectItem>
                 {modeAccounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
-                    {account.name} · {account.currency}
+                    {accountDisplayLabel(account)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -512,6 +518,12 @@ export function PerformanceAllocationSection({
   const weightsUnavailable = dataQuality.partial || allocationUnavailable || fxBlocked;
   const [editingTargets, setEditingTargets] = useState(false);
   const [draftRows, setDraftRows] = useState<TargetRow[]>([]);
+  const requestClose = useDraftCloseGuard({
+    open: editingTargets,
+    draft: draftRows,
+    busy: Boolean(targetSaving),
+    onOpenChange: setEditingTargets,
+  });
   const beginEdit = () => {
     const existingRows = rowsFromTargets(targets);
     const existingCategories = new Set(
@@ -523,29 +535,7 @@ export function PerformanceAllocationSection({
     setDraftRows([...existingRows, ...currentRows]);
     setEditingTargets(true);
   };
-  const validation = useMemo(() => {
-    const categories = draftRows.map((row) => normalizeAllocationCategory(row.category));
-    const duplicate = categories.some(
-      (category, index) => category !== null && categories.indexOf(category) !== index,
-    );
-    const unknown = categories.some((category) => category === null);
-    const invalidNumber = draftRows.some(
-      (row) => row.percent === null || !Number.isFinite(row.percent) || row.percent < 0,
-    );
-    const total = draftRows.reduce(
-      (sum, row) => sum + (row.percent !== null && Number.isFinite(row.percent) ? row.percent : 0),
-      0,
-    );
-    const totalValid = Math.abs(total - 100) < 0.001;
-    return {
-      duplicate,
-      unknown,
-      invalidNumber,
-      total,
-      totalValid,
-      valid: draftRows.length > 0 && !duplicate && !unknown && !invalidNumber && totalValid,
-    };
-  }, [draftRows]);
+  const validation = useMemo(() => validateTargetDraft(draftRows), [draftRows]);
   const updateDraftRow = (id: string, patch: Partial<TargetRow>) => {
     setDraftRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
@@ -553,7 +543,7 @@ export function PerformanceAllocationSection({
     setDraftRows((current) => current.filter((row) => row.id !== id));
   };
   const saveDraft = async () => {
-    if (!validation.valid) return;
+    if (!validation.valid || targetSaving) return;
     const nextTargets = {} as Record<AllocationCategory, number>;
     for (const row of draftRows) {
       const category = normalizeAllocationCategory(row.category);
@@ -611,9 +601,9 @@ export function PerformanceAllocationSection({
           variant={editingTargets ? 'ghost' : 'outline'}
           size="sm"
           className="shrink-0"
-          disabled={editDisabled}
+          disabled={editDisabled || targetSaving}
           onClick={() => {
-            if (editingTargets) setEditingTargets(false);
+            if (editingTargets) void requestClose(false);
             else beginEdit();
           }}
         >
@@ -724,7 +714,7 @@ export function PerformanceAllocationSection({
                   <th>当前权重</th>
                   <th>目标权重</th>
                   <th>权重偏差</th>
-                  <th>调整</th>
+                  <StickyTableActionHeader>调整</StickyTableActionHeader>
                 </tr>
               </thead>
               <tbody>
@@ -794,7 +784,9 @@ export function PerformanceAllocationSection({
                         )}
                       </td>
                       <td>{formatWeight(weightsUnavailable ? null : row.weightGap)}</td>
-                      <td className={`font-medium ${adjustment.className}`}>{adjustment.text}</td>
+                      <StickyTableActionCell className={`font-medium ${adjustment.className}`}>
+                        {adjustment.text}
+                      </StickyTableActionCell>
                     </tr>
                   );
                 })}
@@ -812,20 +804,37 @@ export function PerformanceAllocationSection({
           </EmptyDescription>
         </Empty>
       )}
-      {editingTargets && validation.unknown ? (
+      {editingTargets &&
+      draftRows.some(
+        (draft) =>
+          !rows.some((row) => row.category === normalizeAllocationCategory(draft.category)) ||
+          allocationUnavailable ||
+          fxBlocked,
+      ) ? (
         <div className="mt-3 rounded-lg bg-muted/30 p-3">
-          <p className="m-0 text-xs text-destructive">旧分类需要重新选择后才能保存。</p>
+          <p className="m-0 text-xs text-destructive">
+            {validation.unknown ? '旧分类需要重新选择后才能保存。' : '设置分类与目标权重。'}
+          </p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {draftRows
-              .filter((draft) => normalizeAllocationCategory(draft.category) === null)
+              .filter(
+                (draft) =>
+                  !rows.some(
+                    (row) => row.category === normalizeAllocationCategory(draft.category),
+                  ) ||
+                  allocationUnavailable ||
+                  fxBlocked,
+              )
               .map((draft) => (
                 <div key={draft.id} className="flex items-center gap-2">
                   <Select
-                    value=""
+                    value={normalizeAllocationCategory(draft.category) ?? ''}
                     onValueChange={(value) => updateDraftRow(draft.id, { category: value ?? '' })}
                   >
                     <SelectTrigger className="min-w-0 flex-1">
-                      <SelectValue placeholder={draft.category || '选择分类'} />
+                      <SelectValue placeholder={draft.category || '选择分类'}>
+                        {CATEGORY_LABELS[draft.category as AllocationCategory] ?? draft.category}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -844,7 +853,7 @@ export function PerformanceAllocationSection({
                     max="100"
                     step="0.01"
                     value={draft.percent ?? ''}
-                    aria-label="旧分类目标权重百分比"
+                    aria-label={`${CATEGORY_LABELS[draft.category as AllocationCategory] ?? '旧分类'}目标权重百分比`}
                     onChange={(event) => {
                       const value = event.target.value;
                       updateDraftRow(draft.id, { percent: value === '' ? null : Number(value) });
@@ -889,31 +898,12 @@ export function PerformanceAllocationSection({
               <p className="m-0 mt-1 text-xs text-destructive">{targetSaveError}</p>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setEditingTargets(false)}
-            >
-              取消
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!validation.valid || targetSaving}
-              onClick={() => void saveDraft()}
-            >
-              {targetSaving ? (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
-              ) : null}
-              保存目标
-            </Button>
-          </div>
+          <PerformanceTargetActions
+            saving={Boolean(targetSaving)}
+            valid={validation.valid}
+            onCancel={() => void requestClose(false)}
+            onSave={() => void saveDraft()}
+          />
           <Button
             type="button"
             variant="link"
@@ -929,8 +919,6 @@ export function PerformanceAllocationSection({
     </section>
   );
 }
-
-type TargetRow = { id: string; category: string; percent: number | null };
 
 const rowsFromTargets = (targets: Record<string, number> | undefined): TargetRow[] => {
   const known = new Map<AllocationCategory, number>();

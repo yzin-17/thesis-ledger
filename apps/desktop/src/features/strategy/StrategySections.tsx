@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+export {
+  BacktestSetupDialog,
+  defaultBacktestPeriod,
+  backtestPeriodPresets,
+} from './BacktestSetupDialog.js';
+import { useMemo, useState } from 'react';
 import { Eye, LoaderCircle, Play, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -7,14 +12,10 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EmptyListState, EmptyTableRow } from '../shared/EmptyStates.js';
-import { DateInput } from '@/components/ui/date-input';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import {
   Progress,
   ProgressIndicator,
@@ -22,15 +23,20 @@ import {
   ProgressTrack,
 } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { money, displayValue, isDataLoaded } from '../shared/display.js';
+import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { Metric } from '../shared/DesktopPrimitives.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { schemaAsOf, schemaSymbols, latestVersion } from './strategy.schema.js';
-import type {
-  BacktestJob,
-  BacktestSetupInput,
-  StrategyRecord,
-  StrategyVersion,
-} from './strategy.types.js';
+import type { BacktestJob, StrategyRecord, StrategyVersion } from './strategy.types.js';
 
 export const jobStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
@@ -40,16 +46,32 @@ export const jobStatusLabel = (status: string) => {
     failed: '失败',
     cancelled: '已取消',
   };
-  return labels[status] ?? '未知状态';
+  return labels[status] ?? `未知状态（${status}）`;
 };
 
 export const jobStatusVariant = (
   status: string,
 ): 'default' | 'secondary' | 'destructive' | 'outline' => {
-  if (status === 'succeeded') return 'default';
+  if (status === 'succeeded') return 'secondary';
   if (status === 'failed') return 'destructive';
   if (status === 'running') return 'secondary';
   return 'outline';
+};
+
+export const formatBacktestDataAsOf = (value: unknown) =>
+  typeof value === 'string' ? formatDateTime(value, '未知') : '未知';
+
+const backtestWarningKey = (value: string) => value.trim().replace(/[。；;]+$/u, '');
+
+export const uniqueBacktestWarnings = (...values: unknown[]) => {
+  const warnings = values.flatMap((value) => (Array.isArray(value) ? value.map(String) : []));
+  const seen = new Set<string>();
+  return warnings.filter((warning) => {
+    const key = backtestWarningKey(warning);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 const strategyStatusLabel = (status: unknown) => {
@@ -66,22 +88,23 @@ const strategyStatusVariant = (status: unknown): 'default' | 'secondary' | 'outl
   return 'outline';
 };
 
-const formatTime = (value: unknown) => {
-  if (typeof value !== 'string') return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
-};
-
 const jobPeriod = (job: BacktestJob) => {
-  if (job.period) return job.period;
+  if (job.period)
+    return {
+      start: formatDateOnly(job.period.start),
+      end: formatDateOnly(job.period.end),
+    };
   if (job.periodStart || job.periodEnd)
-    return { start: job.periodStart ?? '—', end: job.periodEnd ?? '—' };
+    return {
+      start: formatDateOnly(job.periodStart),
+      end: formatDateOnly(job.periodEnd),
+    };
   const inputPeriod = job.input?.period;
   if (inputPeriod && typeof inputPeriod === 'object' && !Array.isArray(inputPeriod)) {
     const period = inputPeriod as { start?: unknown; end?: unknown };
     return {
-      start: typeof period.start === 'string' ? period.start : '—',
-      end: typeof period.end === 'string' ? period.end : '—',
+      start: typeof period.start === 'string' ? formatDateOnly(period.start) : '—',
+      end: typeof period.end === 'string' ? formatDateOnly(period.end) : '—',
     };
   }
   return { start: '—', end: '—' };
@@ -109,6 +132,7 @@ export function StrategyLibrary({
   onEdit: (strategy: StrategyRecord, version: StrategyVersion) => void;
   onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
 }) {
+  const [selectedVersionIds, setSelectedVersionIds] = useState<Record<string, string>>({});
   const sortedStrategies = useMemo(
     () =>
       [...strategies].sort((left, right) =>
@@ -117,13 +141,20 @@ export function StrategyLibrary({
     [strategies],
   );
   return (
-    <section className="panel" aria-labelledby="strategy-library-title">
+    <section className="panel border-t-0" aria-labelledby="strategy-library-title">
       <div className="panel-heading flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="strategy-library-title">策略库</h2>
           <p>每次保存都会生成不可变的新版本；回测始终绑定到你选择的版本。</p>
         </div>
-        <span className="text-xs text-muted-foreground">{strategies.length} 条策略</span>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-xs text-muted-foreground">{strategies.length} 条策略</span>
+          {sortedStrategies.length > 0 && (
+            <Button type="button" size="sm" onClick={onCreate}>
+              新建策略
+            </Button>
+          )}
+        </div>
       </div>
       {isDataLoaded(loadState) && sortedStrategies.length === 0 ? (
         <EmptyListState
@@ -142,48 +173,99 @@ export function StrategyLibrary({
                 <th>状态</th>
                 <th>更新时间</th>
                 <th>最近回测</th>
-                <th>操作</th>
+                <StickyTableActionHeader>操作</StickyTableActionHeader>
               </tr>
             </thead>
             <tbody>
               {sortedStrategies.map((strategy) => {
-                const version = latestVersion(strategy.versions);
+                const latest = latestVersion(strategy.versions);
+                const selectedVersionId = selectedVersionIds[strategy.id] ?? latest?.id;
+                const version =
+                  strategy.versions.find((candidate) => candidate.id === selectedVersionId) ??
+                  latest;
                 const status = version?.schema?.status ?? strategy.status;
                 const recentJob = jobs.find((job) => job.strategyVersionId === version?.id);
                 const symbols = version?.schema ? schemaSymbols(version.schema) : [];
+                const symbolSummary = `${symbols[0] ?? '未配置标的'}${
+                  symbols.length > 1 ? ` 等 ${symbols.length} 个` : ''
+                }`;
+                const firstSymbol = symbols[0];
+                const description = strategy.description?.trim();
+                let strategySummary = symbolSummary;
+                if (description) {
+                  strategySummary =
+                    firstSymbol && description.startsWith(firstSymbol)
+                      ? description
+                      : `${symbolSummary} · ${description}`;
+                }
                 return (
                   <tr key={strategy.id}>
-                    <td>
-                      <strong>{strategy.name}</strong>
-                      <span>
-                        {symbols[0] ?? '未配置标的'}
-                        {symbols.length > 1 ? ` 等 ${symbols.length} 个` : ''}
-                        {strategy.description ? ` · ${strategy.description}` : ''}
+                    <td className="min-w-0">
+                      <strong className="max-w-80 truncate" title={strategy.name}>
+                        {strategy.name}
+                      </strong>
+                      <span className="max-w-80 truncate" title={strategySummary}>
+                        {strategySummary}
                       </span>
                     </td>
                     <td>
                       <strong>{version ? `v${version.version}` : '—'}</strong>
-                      <span>{version?.schema ? schemaAsOf(version.schema) : '无 Schema'}</span>
+                      <span>
+                        {version?.schema
+                          ? formatDateTime(schemaAsOf(version.schema), '未知')
+                          : '无 Schema'}
+                      </span>
+                      {strategy.versions.length > 1 && (
+                        <Select
+                          value={version?.id}
+                          onValueChange={(value) =>
+                            value &&
+                            setSelectedVersionIds((current) => ({
+                              ...current,
+                              [strategy.id]: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            className="mt-1 w-full"
+                            aria-label="选择策略版本"
+                          >
+                            <SelectValue>已选 v{version?.version ?? '?'}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {[...strategy.versions]
+                                .sort((left, right) => right.version - left.version)
+                                .map((candidate) => (
+                                  <SelectItem key={candidate.id} value={candidate.id}>
+                                    v{candidate.version}
+                                  </SelectItem>
+                                ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </td>
                     <td>
                       <Badge variant={strategyStatusVariant(status)}>
                         {strategyStatusLabel(status)}
                       </Badge>
                     </td>
-                    <td>{formatTime(version?.createdAt ?? strategy.updatedAt)}</td>
+                    <td>{formatDateTime(version?.createdAt ?? strategy.updatedAt)}</td>
                     <td>
                       {recentJob ? (
                         <>
                           <Badge variant={jobStatusVariant(recentJob.status)}>
                             {jobStatusLabel(recentJob.status)}
                           </Badge>
-                          <span>{formatTime(recentJob.createdAt)}</span>
+                          <span>{formatDateTime(recentJob.createdAt)}</span>
                         </>
                       ) : (
                         <span>暂无回测</span>
                       )}
                     </td>
-                    <td>
+                    <StickyTableActionCell>
                       <div className="flex flex-wrap justify-end gap-1">
                         <Button
                           size="sm"
@@ -209,7 +291,7 @@ export function StrategyLibrary({
                           开始回测
                         </Button>
                       </div>
-                    </td>
+                    </StickyTableActionCell>
                   </tr>
                 );
               })}
@@ -230,6 +312,7 @@ export function StrategyJobs({
   onRun,
   onCancel,
   onViewResult,
+  onOpenLibrary,
 }: {
   jobs: BacktestJob[];
   strategies: StrategyRecord[];
@@ -238,6 +321,7 @@ export function StrategyJobs({
   onRun: (jobId: string) => void;
   onCancel: (jobId: string) => void;
   onViewResult: (job: BacktestJob) => void;
+  onOpenLibrary?: () => void;
 }) {
   const strategyForJob = (job: BacktestJob) =>
     strategies.find((strategy) =>
@@ -246,7 +330,7 @@ export function StrategyJobs({
   const versionForJob = (job: BacktestJob) =>
     strategyForJob(job)?.versions.find((version) => version.id === job.strategyVersionId);
   return (
-    <section className="panel" aria-labelledby="strategy-jobs-title">
+    <section className="panel border-t-0" aria-labelledby="strategy-jobs-title">
       <div className="panel-heading">
         <h2 id="strategy-jobs-title">回测任务</h2>
         <p>任务状态会自动刷新；排队失败或启动失败都保留在这里，方便重试。</p>
@@ -260,15 +344,30 @@ export function StrategyJobs({
               <th>状态</th>
               <th>进度</th>
               <th>创建时间</th>
-              <th>操作</th>
+              <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>
           </thead>
           <tbody>
             {jobs.length === 0 ? (
-              <EmptyTableRow
-                colSpan={6}
-                label={isDataLoaded(loadState) ? '暂无回测任务' : '正在加载任务…'}
-              />
+              <tr>
+                <td className="p-0 text-center hover:bg-transparent" colSpan={6}>
+                  {isDataLoaded(loadState) ? (
+                    <div className="flex flex-col items-center gap-3 p-5">
+                      <EmptyListState
+                        title="还没有回测任务"
+                        description="先选择策略版本发起回测，任务完成后结果会保存在这里。"
+                      />
+                      {onOpenLibrary && (
+                        <Button type="button" variant="outline" onClick={onOpenLibrary}>
+                          返回策略库
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-5 text-sm text-muted-foreground">正在加载任务…</div>
+                  )}
+                </td>
+              </tr>
             ) : (
               jobs.map((job) => {
                 const strategy = strategyForJob(job);
@@ -285,9 +384,6 @@ export function StrategyJobs({
                           ? `${strategy.name} · v${version?.version ?? '?'}`
                           : `版本 ${job.strategyVersionId.slice(0, 8)}`}
                       </strong>
-                      <span>
-                        {job.id.slice(0, 8)} · {job.engineVersion ?? '引擎待分配'}
-                      </span>
                     </td>
                     <td>
                       <strong>
@@ -312,11 +408,11 @@ export function StrategyJobs({
                           </ProgressTrack>
                         </Progress>
                       ) : (
-                        <span>{job.status === 'succeeded' ? '100%' : '—'}</span>
+                        <span>{job.status === 'succeeded' ? '已完成' : '—'}</span>
                       )}
                     </td>
-                    <td>{formatTime(job.createdAt)}</td>
-                    <td>
+                    <td>{formatDateTime(job.createdAt)}</td>
+                    <StickyTableActionCell>
                       <div className="flex flex-wrap justify-end gap-1">
                         {job.status === 'queued' && (
                           <Button
@@ -349,7 +445,7 @@ export function StrategyJobs({
                           </Button>
                         )}
                       </div>
-                    </td>
+                    </StickyTableActionCell>
                   </tr>
                 );
               })
@@ -361,134 +457,16 @@ export function StrategyJobs({
   );
 }
 
-export function BacktestSetupDialog({
-  open,
-  strategy,
-  version,
-  busy,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean;
-  strategy: StrategyRecord | null;
-  version: StrategyVersion | null;
-  busy: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (setup: BacktestSetupInput) => Promise<boolean>;
-}) {
-  const [period, setPeriod] = useState({ start: '2025-01-01', end: '2025-01-31' });
-  const [initialCash, setInitialCash] = useState('100000');
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (open) {
-      setPeriod({ start: '2025-01-01', end: '2025-01-31' });
-      setInitialCash('100000');
-      setError(null);
-    }
-  }, [open, version?.id]);
-  const symbols = version?.schema ? schemaSymbols(version.schema) : [];
-  const submit = async () => {
-    const cash = Number(initialCash);
-    if (!period.start || !period.end || period.start > period.end) {
-      setError('请选择有效的回测日期区间。');
-      return;
-    }
-    if (!Number.isFinite(cash) || cash <= 0) {
-      setError('初始资金必须大于 0。');
-      return;
-    }
-    setError(null);
-    const succeeded = await onSubmit({ period, initialCash: cash });
-    if (!succeeded) return;
-    onOpenChange(false);
-  };
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-64px)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>开始回测</DialogTitle>
-          <DialogDescription>
-            回测会读取所选版本的 Schema；排队成功后自动启动任务。
-          </DialogDescription>
-        </DialogHeader>
-        <FieldGroup>
-          <div className="rounded-md border border-border bg-muted/30 p-3">
-            <p className="text-sm font-medium">
-              {strategy?.name ?? '未知策略'} · v{version?.version ?? '?'}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              首个标的：{symbols[0] ?? '未配置'} · 数据时点：
-              {version?.schema ? schemaAsOf(version.schema) : '未知'}
-            </p>
-          </div>
-          {symbols.length > 1 && (
-            <Alert>
-              <AlertTitle>多标的策略</AlertTitle>
-              <AlertDescription>
-                当前回测只会使用首个标的 {symbols[0]}，其余标的不会进入本次任务。
-              </AlertDescription>
-            </Alert>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field invalid={Boolean(error && error.includes('日期'))}>
-              <FieldLabel htmlFor="backtest-start">开始日期</FieldLabel>
-              <DateInput
-                id="backtest-start"
-                type="date"
-                value={period.start}
-                onChange={(event) =>
-                  setPeriod((current) => ({ ...current, start: event.target.value }))
-                }
-              />
-            </Field>
-            <Field invalid={Boolean(error && error.includes('日期'))}>
-              <FieldLabel htmlFor="backtest-end">结束日期</FieldLabel>
-              <DateInput
-                id="backtest-end"
-                type="date"
-                value={period.end}
-                onChange={(event) =>
-                  setPeriod((current) => ({ ...current, end: event.target.value }))
-                }
-              />
-            </Field>
-          </div>
-          <Field invalid={Boolean(error && error.includes('资金'))}>
-            <FieldLabel htmlFor="backtest-cash">初始资金</FieldLabel>
-            <Input
-              id="backtest-cash"
-              type="number"
-              min="1"
-              step="1000"
-              value={initialCash}
-              onChange={(event) => setInitialCash(event.target.value)}
-            />
-            <FieldDescription>单位：人民币；服务端未提供时默认 100,000。</FieldDescription>
-          </Field>
-          {error && <FieldError>{error}</FieldError>}
-        </FieldGroup>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button type="button" disabled={busy || !version} onClick={() => void submit()}>
-            {busy && (
-              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-            )}
-            {busy ? '准备中…' : '开始回测'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function StrategyResultDialog({
   job,
+  strategy,
+  version,
   open,
   onOpenChange,
 }: {
   job: BacktestJob | null;
+  strategy?: StrategyRecord | null;
+  version?: StrategyVersion | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -505,96 +483,215 @@ export function StrategyResultDialog({
     ? (result.trades as Array<Record<string, unknown>>)
     : [];
   const metricValue = (key: string) =>
-    typeof metrics?.[key] === 'number' ? `${(metrics[key] * 100).toFixed(2)}%` : '暂无';
+    typeof metrics?.[key] === 'number' ? `${(metrics[key] * 100).toFixed(2)}%` : '不可用';
+  const rejectedOrders = Array.isArray(result?.rejectedOrders) ? result.rejectedOrders : [];
+  const totalFees =
+    typeof metrics?.fees === 'number'
+      ? metrics.fees
+      : trades.reduce((sum, trade) => sum + (typeof trade.fees === 'number' ? trade.fees : 0), 0);
+  const hasFeeData = typeof metrics?.fees === 'number' || trades.some((trade) => 'fees' in trade);
+  const drawdown = equityCurve.map((point, index) => {
+    const peak = Math.max(...equityCurve.slice(0, index + 1).map((item) => item.value));
+    return { date: point.date, value: peak > 0 ? point.value / peak - 1 : 0 };
+  });
+  const warnings = uniqueBacktestWarnings(job?.warnings, result?.warnings);
+  const benchmark =
+    result?.benchmark && typeof result.benchmark === 'object'
+      ? (result.benchmark as Record<string, unknown>)
+      : null;
+  const benchmarkValue = (key: string) =>
+    typeof benchmark?.[key] === 'number' ? `${(benchmark[key] * 100).toFixed(2)}%` : '不可用';
+  const seriesPoints = (series: Array<{ value: number }>) => {
+    if (series.length === 0) return '';
+    const values = series.map((point) => point.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    return series
+      .map((point, index) => {
+        const x = (index / Math.max(series.length - 1, 1)) * 100;
+        const y = 100 - ((point.value - min) / span) * 100;
+        return `${x},${y}`;
+      })
+      .join(' ');
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-48px)] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>回测结果 · {job?.id.slice(0, 8) ?? '未知任务'}</DialogTitle>
-          <DialogDescription>结果保留引擎版本、数据时点、成本模型和复现字段。</DialogDescription>
+      <DialogContent className="max-h-[calc(100dvh-48px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-4xl">
+        <DialogHeader className="pr-10">
+          <DialogTitle>
+            回测结果 · {strategy?.name ?? '未知策略'} · v{version?.version ?? '?'}
+          </DialogTitle>
+          <DialogDescription>
+            标的：{version?.schema ? (schemaSymbols(version.schema)[0] ?? '不可用') : '不可用'} ·
+            区间：
+            {job ? `${jobPeriod(job).start} 至 ${jobPeriod(job).end}` : '不可用'}
+          </DialogDescription>
         </DialogHeader>
-        {!job || !result ? (
-          <p className="empty-state">任务尚未生成结果。</p>
-        ) : (
-          <Tabs defaultValue="summary">
-            <TabsList variant="line" className="w-full justify-start">
-              <TabsTrigger value="summary">摘要</TabsTrigger>
-              <TabsTrigger value="equity">权益数据</TabsTrigger>
-              <TabsTrigger value="trades">交易明细</TabsTrigger>
-              <TabsTrigger value="repro">复现信息</TabsTrigger>
-            </TabsList>
-            <TabsContent value="summary" className="grid gap-5 pt-4">
-              <div className="metrics">
-                <Metric
-                  label="最终资产"
-                  value={
-                    typeof result.finalValue === 'number' ? money.format(result.finalValue) : '暂无'
-                  }
+        <div data-testid="backtest-result-scroll" className="min-h-0 overflow-y-auto">
+          {!job || !result ? (
+            <p className="empty-state">任务尚未生成结果。</p>
+          ) : (
+            <Tabs defaultValue="summary">
+              <TabsList variant="line" className="w-full">
+                <TabsTrigger value="summary">摘要</TabsTrigger>
+                <TabsTrigger value="equity">权益数据</TabsTrigger>
+                <TabsTrigger value="trades">交易明细</TabsTrigger>
+                <TabsTrigger value="repro">复现信息</TabsTrigger>
+              </TabsList>
+              <TabsContent value="summary" className="grid gap-5 pt-4">
+                <div className="metrics">
+                  <Metric
+                    label="最终资产"
+                    value={
+                      typeof result.finalValue === 'number'
+                        ? money.format(result.finalValue)
+                        : '暂无'
+                    }
+                  />
+                  <Metric label="累计收益" value={metricValue('cumulativeReturn')} />
+                  <Metric label="最大回撤" value={metricValue('maxDrawdown')} tone="negative" />
+                  <Metric label="交易胜率" value={metricValue('tradeWinRate')} />
+                </div>
+                <div className="module-grid">
+                  <div>
+                    <span>权益曲线</span>
+                    <strong>{equityCurve.length} 个数据点</strong>
+                  </div>
+                  <div>
+                    <span>交易明细</span>
+                    <strong>{trades.length} 笔</strong>
+                  </div>
+                  <div>
+                    <span>引擎</span>
+                    <strong>
+                      {displayValue(result.engineVersion ?? job.engineVersion ?? '未知')}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>数据时点</span>
+                    <strong>{formatBacktestDataAsOf(result.dataAsOf ?? job.dataAsOf)}</strong>
+                  </div>
+                </div>
+                {warnings.length > 0 && (
+                  <Alert>
+                    <AlertTitle>运行提示</AlertTitle>
+                    <AlertDescription>{warnings.join('；')}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border border-border p-3">
+                    <p className="text-sm font-medium">数据完整性</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {result.completeness && typeof result.completeness === 'object'
+                        ? (result.completeness as { complete?: unknown }).complete === true
+                          ? '完整'
+                          : '存在缺失数据'
+                        : '不可用'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border p-3">
+                    <p className="text-sm font-medium">拒单</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {rejectedOrders.length > 0 ? `${rejectedOrders.length} 笔` : '0 笔'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border p-3">
+                    <p className="text-sm font-medium">费用 / 换手</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {hasFeeData ? money.format(totalFees) : '费用不可用'} ·{' '}
+                      {typeof metrics?.turnover === 'number'
+                        ? money.format(metrics.turnover)
+                        : '换手不可用'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border p-3">
+                    <p className="text-sm font-medium">基准比较</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {benchmark
+                        ? `策略 ${benchmarkValue('strategyReturn')} · 基准 ${benchmarkValue('benchmarkReturn')} · 超额 ${benchmarkValue('excessReturn')}`
+                        : '不可用（基准行情缺失）'}
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="equity" className="pt-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <figure className="rounded-md border border-border p-3">
+                    <svg
+                      viewBox="0 0 100 100"
+                      role="img"
+                      aria-label="权益曲线"
+                      className="h-40 w-full"
+                      preserveAspectRatio="none"
+                    >
+                      <polyline
+                        points={seriesPoints(equityCurve)}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    </svg>
+                    <figcaption className="text-xs text-muted-foreground">
+                      权益曲线，共 {equityCurve.length} 个数据点。
+                    </figcaption>
+                  </figure>
+                  <figure className="rounded-md border border-border p-3">
+                    <svg
+                      viewBox="0 0 100 100"
+                      role="img"
+                      aria-label="回撤曲线"
+                      className="h-40 w-full"
+                      preserveAspectRatio="none"
+                    >
+                      <polyline
+                        points={seriesPoints(drawdown)}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    </svg>
+                    <figcaption className="text-xs text-muted-foreground">
+                      回撤曲线，最大回撤 {metricValue('maxDrawdown')}。
+                    </figcaption>
+                  </figure>
+                </div>
+                <ResultTable
+                  headers={['日期', '组合价值']}
+                  rows={equityCurve
+                    .slice(-100)
+                    .map((point) => [formatDateOnly(point.date), money.format(point.value)])}
                 />
-                <Metric label="累计收益" value={metricValue('cumulativeReturn')} />
-                <Metric label="最大回撤" value={metricValue('maxDrawdown')} tone="negative" />
-                <Metric label="交易胜率" value={metricValue('tradeWinRate')} />
-              </div>
-              <div className="module-grid">
-                <div>
-                  <span>权益曲线</span>
-                  <strong>{equityCurve.length} 个数据点</strong>
-                </div>
-                <div>
-                  <span>交易明细</span>
-                  <strong>{trades.length} 笔</strong>
-                </div>
-                <div>
-                  <span>引擎</span>
-                  <strong>
-                    {displayValue(result.engineVersion ?? job.engineVersion ?? '未知')}
-                  </strong>
-                </div>
-                <div>
-                  <span>数据时点</span>
-                  <strong>{displayValue(result.dataAsOf ?? job.dataAsOf ?? '未知')}</strong>
-                </div>
-              </div>
-              {Array.isArray(job.warnings) && job.warnings.length > 0 && (
-                <Alert>
-                  <AlertTitle>运行提示</AlertTitle>
-                  <AlertDescription>
-                    {job.warnings.map((warning) => String(warning)).join('；')}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </TabsContent>
-            <TabsContent value="equity" className="pt-4">
-              <ResultTable
-                headers={['日期', '组合价值']}
-                rows={equityCurve
-                  .slice(-100)
-                  .map((point) => [point.date, money.format(point.value)])}
-              />
-            </TabsContent>
-            <TabsContent value="trades" className="pt-4">
-              <ResultTable
-                headers={['日期', '方向', '数量', '价格', '原因']}
-                rows={trades.map((trade) => [
-                  displayValue(trade.date ?? '—'),
-                  displayValue(trade.side ?? '—'),
-                  displayValue(trade.quantity ?? '—'),
-                  displayValue(trade.price ?? '—'),
-                  displayValue(trade.reason ?? '—'),
-                ])}
-              />
-            </TabsContent>
-            <TabsContent value="repro" className="grid gap-3 pt-4">
-              <ReproField label="策略版本" value={job.strategyVersionId} />
-              <ReproField
-                label="引擎版本"
-                value={job.engineVersion ?? result.engineVersion ?? '未知'}
-              />
-              <ReproField label="数据时点" value={job.dataAsOf ?? result.dataAsOf ?? '未知'} />
-              <ReproField label="结果校验和" value={job.resultChecksum ?? '未返回'} />
-            </TabsContent>
-          </Tabs>
-        )}
+              </TabsContent>
+              <TabsContent value="trades" className="pt-4">
+                <ResultTable
+                  headers={['日期', '方向', '数量', '价格', '原因']}
+                  rows={trades.map((trade) => [
+                    typeof trade.date === 'string' ? formatDateOnly(trade.date) : '—',
+                    displayValue(trade.side ?? '—'),
+                    displayValue(trade.quantity ?? '—'),
+                    displayValue(trade.price ?? '—'),
+                    displayValue(trade.reason ?? '—'),
+                  ])}
+                />
+              </TabsContent>
+              <TabsContent value="repro" className="grid gap-3 pt-4">
+                <ReproField label="策略版本" value={job.strategyVersionId} />
+                <ReproField
+                  label="引擎版本"
+                  value={job.engineVersion ?? result.engineVersion ?? '未知'}
+                />
+                <ReproField
+                  label="数据时点"
+                  value={formatBacktestDataAsOf(job.dataAsOf ?? result.dataAsOf)}
+                />
+                <ReproField label="结果校验和" value={job.resultChecksum ?? '未返回'} />
+              </TabsContent>
+            </Tabs>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

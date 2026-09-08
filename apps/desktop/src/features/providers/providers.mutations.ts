@@ -55,9 +55,8 @@ export const useToggleAutomationMutation = () => {
   });
 };
 
-const invalidateAutomationJobs = (client: QueryClient) => {
-  void client.invalidateQueries({ queryKey: providerKeys.jobs() });
-};
+const invalidateAutomationJobs = (client: QueryClient) =>
+  client.invalidateQueries({ queryKey: providerKeys.jobs() });
 
 export const useCreateAutomationJobMutation = () => {
   const client = useQueryClient();
@@ -88,9 +87,10 @@ export const useRunAutomationJobMutation = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => runAutomationJob(jobId),
-    onSuccess: () => {
-      invalidateAutomationJobs(client);
-      void client.invalidateQueries({ queryKey: providerKeys.jobHistory() });
-    },
+    onSuccess: () =>
+      Promise.all([
+        invalidateAutomationJobs(client),
+        client.invalidateQueries({ queryKey: providerKeys.jobHistory() }),
+      ]),
   });
 };

@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { AlertTriangle } from 'lucide-react';
+import { PageHeader } from '../shared/PageHeader.js';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { NewResearchSheet } from './NewResearchSheet.js';
 import { AiRunDetail } from './AiRunDetail.js';
 import { AiRunList } from './AiRunList.js';
@@ -16,7 +27,27 @@ import {
 } from './ai.queries.js';
 import type { AiRunFilterStatus, AiRunRecord, AiRunResult, AiToolCall } from './ai.types.js';
 
+function AiRunsUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Empty className="min-h-[28rem] rounded-md border bg-card p-6">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <AlertTriangle aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>暂时无法读取研究任务</EmptyTitle>
+        <EmptyDescription>已有研究不会受到影响，请稍后重新加载。</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button type="button" variant="outline" onClick={onRetry}>
+          重新加载
+        </Button>
+      </EmptyContent>
+    </Empty>
+  );
+}
+
 export function AiChat() {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<AiRunFilterStatus>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newResearchOpen, setNewResearchOpen] = useState(false);
@@ -115,6 +146,7 @@ export function AiChat() {
   const detail = selectedRun && detailQuery.data?.id === selectedRun.id ? detailQuery.data : null;
   let providerLabel = 'Provider 检查中';
   let providerVariant: 'outline' | 'secondary' | 'destructive' = 'secondary';
+  let providerActionLabel: string | null = null;
   if (capabilitiesQuery.data) {
     const hasError = capabilitiesQuery.data.providers.some(
       (provider) => provider.state === 'error',
@@ -125,67 +157,92 @@ export function AiChat() {
     } else if (hasError) {
       providerLabel = 'Provider 异常';
       providerVariant = 'destructive';
+      providerActionLabel = '检查 Provider';
     } else {
       providerLabel = 'Provider 未配置';
+      providerActionLabel = '配置 Provider';
     }
   } else if (capabilitiesQuery.isError) {
     providerLabel = 'Provider 检查失败';
     providerVariant = 'destructive';
+    providerActionLabel = '检查 Provider';
   }
+  const showInitialEmpty = filter === 'all' && loadState === 'empty';
+  const showWorkspaceError = filter === 'all' && loadState === 'error';
+  const showHeaderCreate = runs.length > 0 || filter !== 'all' || loadState === 'error';
+
   return (
-    <section className="module-page flex flex-col gap-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1>研究助手</h1>
-          <p className="page-description">基于已授权数据生成可追溯结论，不会修改账本或生成订单。</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1">
-          <Badge variant={providerVariant}>{providerLabel}</Badge>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void refresh()}
-            disabled={runsQuery.isFetching || detailQuery.isFetching}
-          >
-            <RefreshCw
-              data-icon="inline-start"
-              className={runsQuery.isFetching ? 'animate-spin' : undefined}
+    <section className="module-page flex flex-col gap-6">
+      <PageHeader
+        className="mb-0"
+        eyebrow="RESEARCH ASSISTANT"
+        title="研究助手"
+        description="围绕投资问题展开研究，结论保留来源与数据缺口。"
+        actions={
+          <>
+            <RefreshIconButton
+              label="刷新研究任务与当前详情"
+              refreshing={runsQuery.isFetching || detailQuery.isFetching}
+              onClick={() => void refresh()}
             />
-            刷新
+            {showHeaderCreate && (
+              <Button type="button" size="sm" onClick={() => openNewResearch()}>
+                新建研究
+              </Button>
+            )}
+          </>
+        }
+      />
+      <div data-ai-provider-status className="-mt-2 flex flex-wrap items-center gap-2">
+        <Badge variant={providerVariant}>{providerLabel}</Badge>
+        {providerActionLabel && (
+          <Button type="button" size="sm" onClick={() => void navigate('/providers')}>
+            {providerActionLabel}
           </Button>
-          <Button type="button" size="sm" onClick={() => openNewResearch()}>
-            新建研究
-          </Button>
-        </div>
-      </header>
-      <div className="grid min-h-[34rem] gap-4 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
-        <AiRunList
-          runs={runs}
-          selectedId={selectedId}
-          filter={filter}
-          loadState={loadState}
-          onFilterChange={setFilter}
-          onSelect={setSelectedId}
-          onRefresh={() => void refresh()}
-          onCreate={() => openNewResearch()}
-          hasMore={Boolean(runsPage?.hasMore)}
-          onLoadMore={() => {
-            if (runsPage?.nextCursor) setCursor(runsPage.nextCursor);
-          }}
-          isLoadingMore={runsQuery.isFetching && Boolean(cursor)}
-        />
+        )}
+      </div>
+      {showWorkspaceError ? (
+        <AiRunsUnavailable onRetry={() => void runsQuery.refetch()} />
+      ) : showInitialEmpty ? (
         <AiRunDetail
-          run={selectedRun}
-          detail={detail}
-          isLoading={Boolean(selectedId) && detailQuery.isPending}
-          detailError={detailQuery.isError}
+          run={null}
+          detail={null}
+          isLoading={false}
+          detailError={false}
           onEvidence={() => setEvidenceOpen(true)}
           onRetry={(run) => openNewResearch(run.question ?? '', run.id)}
           onDetailRetry={() => void detailQuery.refetch()}
-          onCreate={() => openNewResearch()}
+          onCreate={openNewResearch}
         />
-      </div>
+      ) : (
+        <div className="grid gap-5 lg:min-h-[32rem] lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]">
+          <AiRunList
+            runs={runs}
+            selectedId={selectedId}
+            filter={filter}
+            loadState={loadState}
+            onFilterChange={setFilter}
+            onSelect={setSelectedId}
+            onRefresh={() => void refresh()}
+            hasMore={Boolean(runsPage?.hasMore)}
+            onLoadMore={() => {
+              if (runsPage?.nextCursor) setCursor(runsPage.nextCursor);
+            }}
+            isLoadingMore={runsQuery.isFetching && Boolean(cursor)}
+          />
+          <AiRunDetail
+            run={selectedRun}
+            detail={detail}
+            isLoading={loadState === 'loading' || (Boolean(selectedId) && detailQuery.isPending)}
+            detailError={detailQuery.isError}
+            onEvidence={() => setEvidenceOpen(true)}
+            onRetry={(run) => openNewResearch(run.question ?? '', run.id)}
+            onDetailRetry={() => void detailQuery.refetch()}
+            onCreate={openNewResearch}
+            emptyState={filter === 'all' ? 'first-run' : 'filtered'}
+          />
+        </div>
+      )}
       {selectedRun && (
         <EvidenceChainSheet
           open={evidenceOpen}
@@ -214,18 +271,6 @@ export function AiChat() {
         retryOfRunId={retryOfRunId}
         onCreated={handleCreated}
       />
-      {runsQuery.isError && runs.length > 0 && (
-        <p className="text-xs text-muted-foreground" role="status">
-          研究任务列表更新失败，保留最近一次成功数据。
-          <button
-            type="button"
-            className="ml-1 underline underline-offset-4"
-            onClick={() => void runsQuery.refetch()}
-          >
-            重试
-          </button>
-        </p>
-      )}
     </section>
   );
 }

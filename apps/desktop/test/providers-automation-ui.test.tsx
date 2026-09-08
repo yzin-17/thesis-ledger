@@ -336,9 +336,9 @@ describe('Provider 页接线', () => {
     'utf8',
   );
 
-  it('页面头部使用标准 page-header 结构并包含 ghost 刷新按钮', () => {
-    expect(settingsSource).toContain('<header className="page-header">');
-    expect(settingsSource).toContain('page-header-actions');
+  it('页面头部使用共享页头并包含刷新按钮', () => {
+    expect(settingsSource).toContain('<PageHeader');
+    expect(settingsSource).toContain('DATA & AUTOMATION');
     expect(settingsSource).not.toContain('entry-page-heading');
     expect(settingsSource).toContain('<RefreshIconButton');
     expect(settingsSource).toContain('label="刷新 Provider 与自动化"');
@@ -374,5 +374,7 @@ describe('Provider 页接线', () => {
     expect(markup).toContain('自动化');
     expect(markup).toContain('诊断');
     expect(markup).toContain('>提供方</th>');
+    expect(settingsSource).toContain('<TabsList variant="line" className="w-full">');
+    expect(settingsSource).not.toContain('className="mb-5 w-full"');
   });
 });

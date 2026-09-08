@@ -6,7 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { LoaderCircle } from 'lucide-react';
@@ -76,16 +82,15 @@ export function AuditSheet({
       : undefined;
   return (
     <Sheet open={Boolean(target)} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] w-[720px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
-      >
-        <SheetTitle>
-          {target?.type === 'POSITION_BASELINE_OBSERVATION' ? '持仓快照修正链' : '成交修正链'}
-        </SheetTitle>
-        <SheetDescription>
-          当前列表只计有效版本；这里展示同一事实的录入、更正、作废、恢复全部审计记录。
-        </SheetDescription>
+      <SheetContent side="right" size="form" className="h-[100dvh] overflow-auto p-6">
+        <SheetHeader>
+          <SheetTitle>
+            {target?.type === 'POSITION_BASELINE_OBSERVATION' ? '持仓快照修正链' : '成交修正链'}
+          </SheetTitle>
+          <SheetDescription>
+            当前列表只计有效版本；这里展示同一事实的录入、更正、作废、恢复全部审计记录。
+          </SheetDescription>
+        </SheetHeader>
         <AuditResults
           query={query}
           chain={chain}
@@ -99,7 +104,7 @@ export function AuditSheet({
           onRestoreTransfer={onRestoreTransfer}
         />
         {query.isError && query.data && (
-          <Alert className="mt-4">
+          <Alert>
             <AlertTitle>审计链可能陈旧</AlertTitle>
             <AlertDescription>当前显示上次成功读取的审计结果。</AlertDescription>
           </Alert>
@@ -134,7 +139,7 @@ function AuditResults({
 }) {
   if (query.isPending && !query.data) {
     return (
-      <div className="mt-5 flex flex-col gap-3" aria-busy="true">
+      <div className="flex flex-col gap-3" aria-busy="true">
         <Skeleton className="h-20 w-full" />
         <Skeleton className="h-20 w-full" />
       </div>
@@ -142,7 +147,7 @@ function AuditResults({
   }
   if (query.isError && !query.data) {
     return (
-      <Alert className="mt-5" variant="destructive">
+      <Alert variant="destructive">
         <AlertTitle>审计链读取失败</AlertTitle>
         <AlertDescription>无法读取当前成交的修正历史。</AlertDescription>
         <Button type="button" variant="outline" size="sm" onClick={() => void query.refetch()}>
@@ -153,13 +158,13 @@ function AuditResults({
   }
   if (chain.length === 0) {
     return (
-      <Empty className="mt-5 min-h-48 rounded-xl border bg-card p-8">
+      <Empty className="min-h-48 rounded-xl border bg-card p-8">
         <EmptyDescription>当前事实没有可显示的修正链。</EmptyDescription>
       </Empty>
     );
   }
   return (
-    <div className="mt-5 flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       {chain.map((event) => {
         const childExists = chain.some(
           (candidate) => candidate.supersedesEventId === event.eventId,
@@ -381,14 +386,16 @@ export function CorrectionReasonSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[440px] max-w-[calc(100%-16px)] p-6">
-        <SheetTitle>{action === 'void' ? '作废成交' : '恢复成交'}</SheetTitle>
-        <SheetDescription>
-          {action === 'void'
-            ? '作废会生成一条作废版本，不会从历史中删除事实。'
-            : '恢复会生成一条恢复版本，原作废记录和本次原因仍会保留。'}
-        </SheetDescription>
-        <form className="mt-5 flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+      <SheetContent side="right" size="compact" className="p-6">
+        <SheetHeader>
+          <SheetTitle>{action === 'void' ? '作废成交' : '恢复成交'}</SheetTitle>
+          <SheetDescription>
+            {action === 'void'
+              ? '作废会生成一条作废版本，不会从历史中删除事实。'
+              : '恢复会生成一条恢复版本，原作废记录和本次原因仍会保留。'}
+          </SheetDescription>
+        </SheetHeader>
+        <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           <Field>
             <FieldLabel htmlFor="correction-reason">原因</FieldLabel>
             <Textarea

@@ -15,6 +15,7 @@ import { AccountManagementSection } from '../src/features/portfolio/PortfolioMan
 import { shouldAutoOpenEmptyAccountForm } from '../src/features/portfolio/PortfolioManagement.js';
 import type { PortfolioManagementViewProps } from '../src/features/portfolio/PortfolioManagementView.types.js';
 import { portfolioKeys } from '../src/features/portfolio/portfolio.queries.js';
+import { accountDisplayLabel } from '../src/features/portfolio/portfolio.types.js';
 
 const account = {
   id: 'account-1',
@@ -36,6 +37,16 @@ const cashAccount = {
   id: 'account-cash',
   name: '现金账户',
   type: 'cash' as const,
+  mode: 'actual' as const,
+  currency: 'CNY' as const,
+  active: true,
+};
+
+const fundAccount = {
+  id: 'account-fund',
+  name: '支付宝',
+  institution: '支付宝',
+  type: 'fund' as const,
   mode: 'actual' as const,
   currency: 'CNY' as const,
   active: true,
@@ -100,11 +111,11 @@ const renderInlineAccountManager = (accountSheetOpen: boolean) => {
   const noop = () => undefined;
   const asyncNoop = async () => undefined;
   const props = {
-    accounts: [account],
+    accounts: [account, fundAccount],
     positions: [],
     step: 'account',
     accountFormInline: true,
-    managedAccounts: [account],
+    managedAccounts: [account, fundAccount],
     onAccountEntry: undefined,
     selectedAccount: account,
     entryAccountLocked: false,
@@ -158,6 +169,13 @@ const renderInlineAccountManager = (accountSheetOpen: boolean) => {
   );
 };
 
+describe('账户显示', () => {
+  it('所有账户选择器使用账户名、账户类型、币种和模式的固定顺序', () => {
+    expect(accountDisplayLabel(fundAccount)).toBe('支付宝 · 基金 · CNY · 实际');
+    expect(accountDisplayLabel(shadowAccount)).toBe('模拟证券账户 · 证券 · CNY · 模拟');
+  });
+});
+
 describe('账户数据页面契约', () => {
   it('默认进入成交记录，并由账户下拉承载实际/模拟隔离信息', () => {
     const markup = renderPage();
@@ -166,19 +184,22 @@ describe('账户数据页面契约', () => {
       'utf8',
     );
 
-    expect(markup).toContain('资产录入');
+    expect(markup).toContain('账户数据');
     expect(markup).toContain('持仓');
     expect(markup).toContain('成交记录');
     expect(markup).toContain('现金');
     expect(markup).toContain('录入成交');
     expect(markup).toMatch(/<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/);
-    expect(markup).toContain('实际证券账户 · 测试机构 · CNY · 实际');
+    expect(markup).toContain('实际证券账户 · 证券 · CNY · 实际');
     expect(markup).not.toContain('账本模式');
     expect(markup).not.toContain('data-selected-account-id');
-    expect(pageSource).toContain("account.mode === 'shadow' ? '模拟' : '实际'");
+    expect(pageSource).toContain('accountDisplayLabel(selectedAccount)');
     expect(markup).toContain('data-active');
     expect(pageSource).toMatch(/const selectAccount[\s\S]*?setCashTransferAction\(null\)/);
     expect(pageSource).toMatch(/const selectTab[\s\S]*?setCashTransferAction\(null\)/);
+
+    const fundMarkup = renderPage('', [fundAccount], false);
+    expect(fundMarkup).toContain('支付宝 · 基金 · CNY · 实际');
   });
 
   it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {
@@ -188,8 +209,8 @@ describe('账户数据页面契约', () => {
       'utf8',
     );
 
-    expect(markup).toContain('现金账户 · CNY · 实际');
-    expect(markup).toContain('现金账户支持现金入账、账户划转和定期入账。');
+    expect(markup).toContain('现金账户 · 现金 · CNY · 实际');
+    expect(markup).toContain('管理现金入账、账户划转和定期入账。');
     expect(markup).toContain('现金');
     expect(markup).not.toContain('持仓');
     expect(markup).not.toContain('成交记录');
@@ -220,6 +241,8 @@ describe('账户数据页面契约', () => {
     expect(listMarkup).not.toContain('data-slot="sheet-content"');
     expect(listMarkup).toContain('data-account-manager-view="list"');
     expect(listMarkup).toContain('账户设置');
+    expect(listMarkup).toContain('测试机构 · 证券 · 实际 · CNY');
+    expect(listMarkup).toContain('支付宝 · 基金 · 实际 · CNY');
 
     expect(formMarkup).not.toContain('data-slot="sheet-content"');
     expect(formMarkup).toContain('data-account-manager-view="form"');
@@ -255,7 +278,7 @@ describe('账户数据页面契约', () => {
 
   it('账户查询尚未完成时保留加载语义，空账户时引导账户设置', () => {
     const loadingMarkup = renderPage('', [account], false);
-    expect(loadingMarkup).toContain('资产录入');
+    expect(loadingMarkup).toContain('账户数据');
     expect(loadingMarkup).toContain('aria-busy="true"');
 
     const emptyMarkup = renderPage('', []);
@@ -364,7 +387,9 @@ describe('账户数据页面契约', () => {
     expect(positionMarkup).toContain('已记录快照');
     expect(positionMarkup).toContain('sticky right-0');
     expect(positionMarkup).toContain('bg-background');
-    expect(positionMarkup).toContain('w-40 min-w-40');
+    expect(positionMarkup).toContain('w-40');
+    expect(positionMarkup).toContain('min-w-40');
+    expect(positionMarkup).toContain('data-sticky-table-action="cell"');
     // 操作列改为单行排布：按钮带 shrink-0 + whitespace-nowrap，列宽按内容自适应，不再折行。
     expect(positionMarkup).toContain('flex gap-1');
     expect(positionMarkup).toContain('h-8');
@@ -399,6 +424,6 @@ describe('账户数据页面契约', () => {
     expect(cashObservationSource).toContain('max={currentLocalDateTime()}');
     expect(cashObservationSource).toContain('capturedAt: capturedAtIso');
     expect(cashObservationSource).toContain('setCapturedAt(currentLocalDateTime());');
-    expect(cashObservationSource).toContain('onClick={() => handleOpenChange(false)}');
+    expect(cashObservationSource).toContain('onClick={() => void requestClose(false)}');
   });
 });

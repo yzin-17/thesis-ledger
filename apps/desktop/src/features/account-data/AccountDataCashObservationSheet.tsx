@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useToastManager } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Loader2Icon } from 'lucide-react';
@@ -46,6 +48,7 @@ export function CashObservationSheet({
   onSaved: () => void;
 }) {
   const toastManager = useToastManager();
+  const [dirty, setDirty] = useState(false);
   const mutation = useSaveCashBalanceMutation();
   const [amount, setAmount] = useState('0');
   const [currency, setCurrency] = useState<Currency>(account.currency);
@@ -54,6 +57,7 @@ export function CashObservationSheet({
 
   useEffect(() => {
     if (!open) return;
+    setDirty(false);
     setAmount('0');
     setCurrency(account.currency);
     setCapturedAt(currentLocalDateTime());
@@ -62,6 +66,7 @@ export function CashObservationSheet({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (mutation.isPending) return;
     if (!isNonNegativeDecimal(amount)) {
       setError('现金余额必须是大于或等于 0 的数字。');
       return;
@@ -102,6 +107,7 @@ export function CashObservationSheet({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setDirty(false);
     if (!nextOpen) {
       setAmount('0');
       setCurrency(account.currency);
@@ -111,21 +117,27 @@ export function CashObservationSheet({
     onOpenChange(nextOpen);
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty,
+    busy: mutation.isPending,
+    onOpenChange: handleOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="shrink-0">
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
             <SheetTitle>记录现金快照</SheetTitle>
             <SheetDescription>
               填写该余额对应的时间；默认当前时间，不能填写未来时间。
             </SheetDescription>
-          </div>
+          </SheetHeader>
           <form
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            onChangeCapture={() => setDirty(true)}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(event) => void submit(event)}
           >
             <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
@@ -135,7 +147,10 @@ export function CashObservationSheet({
                   <Select
                     value={currency}
                     onValueChange={(value) => {
-                      if (isCurrency(value)) setCurrency(value);
+                      if (isCurrency(value)) {
+                        setDirty(true);
+                        setCurrency(value);
+                      }
                     }}
                   >
                     <SelectTrigger id="cash-observation-currency" className="w-full">
@@ -180,8 +195,8 @@ export function CashObservationSheet({
                 )}
               </FieldGroup>
             </div>
-            <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={() => void requestClose(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={mutation.isPending}>

@@ -6,6 +6,7 @@ import type {
   BacktestSetupInput,
   CreateStrategyInput,
   CreateStrategyVersionInput,
+  FetchStrategyBarsInput,
   QueueBacktestInput,
   StrategyRecord,
   StrategySchema,
@@ -25,7 +26,7 @@ type Dependencies = {
   toastManager: ToastManager;
   createMutation: AsyncMutation<CreateStrategyInput, StrategyRecord>;
   createVersionMutation?: AsyncMutation<CreateStrategyVersionInput, StrategyVersion>;
-  fetchBarsMutation: AsyncMutation<string, unknown[]>;
+  fetchBarsMutation: AsyncMutation<FetchStrategyBarsInput, unknown[]>;
   queueMutation: AsyncMutation<QueueBacktestInput, BacktestJob>;
   runMutation: AsyncMutation<string, BacktestJob>;
   cancelMutation: AsyncMutation<string, BacktestJob>;
@@ -47,6 +48,15 @@ const symbolsFromSchema = (schema: StrategySchema) => {
   return universe.symbols.filter((symbol): symbol is string => typeof symbol === 'string');
 };
 
+const benchmarkFromSchema = (schema: StrategySchema) =>
+  typeof schema.benchmark === 'string' && schema.benchmark.trim() ? schema.benchmark : null;
+
+const dataAsOfFromSchema = (schema: StrategySchema) => {
+  const universe = schema.universe;
+  if (!isRecord(universe) || typeof universe.asOf !== 'string') return new Date().toISOString();
+  return universe.asOf;
+};
+
 const errorToast = (toastManager: ToastManager, title: string, description: string) => {
   toastManager.add({
     title,
@@ -57,8 +67,29 @@ const errorToast = (toastManager: ToastManager, title: string, description: stri
   });
 };
 
+const refreshSavedStrategy = async (load: Dependencies['load'], toastManager: ToastManager) => {
+  try {
+    await load();
+    return true;
+  } catch {
+    errorToast(
+      toastManager,
+      '保存已完成，列表刷新失败',
+      '请使用页面刷新按钮重新读取，无需重复保存。',
+    );
+    return false;
+  }
+};
+
 const validDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+
+const defaultBacktestPeriod = () => {
+  const end = new Date();
+  const start = new Date(end);
+  start.setFullYear(start.getFullYear() - 1);
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+};
 
 export const validateBacktestSetup = (setup: BacktestSetupInput) => {
   if (!validDate(setup.period.start) || !validDate(setup.period.end)) {
@@ -94,6 +125,30 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     cancelMutation,
     load,
   } = dependencies;
+  let backgroundPreparationVersionId: string | null = null;
+
+  const refreshStrategyData = () => {
+    void load().catch(() => undefined);
+  };
+
+  const launchQueuedBacktest = (jobId: string) => {
+    void runMutation.mutateAsync(jobId).then(
+      () => {
+        toastManager.add({ title: '回测已启动', type: 'success', timeout: 2800 });
+        refreshStrategyData();
+      },
+      () => {
+        toastManager.add({
+          title: '回测启动失败',
+          description: '任务仍保留在队列中，可在回测任务中重试。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+        refreshStrategyData();
+      },
+    );
+  };
 
   const createStrategy = async (eventOrInput: FormEvent<HTMLFormElement> | CreateStrategyInput) => {
     if ('preventDefault' in eventOrInput) eventOrInput.preventDefault();
@@ -105,13 +160,13 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
           ? { name, schema: { ...parseSchemaText(schemaText), name } }
           : { ...eventOrInput, schema: { ...eventOrInput.schema, name: eventOrInput.name } };
       await createMutation.mutateAsync(input);
+      if (!(await refreshSavedStrategy(load, toastManager))) return true;
       toastManager.add({
         title: '策略已创建',
         description: '策略 v1 已保存，旧版本不会被覆盖。',
         type: 'success',
         timeout: 2800,
       });
-      await load();
       return true;
     } catch {
       errorToast(toastManager, '策略创建失败', '请检查策略配置或服务连接。');
@@ -126,13 +181,13 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     setBusyAction(`create-version:${strategyId}`);
     try {
       await createVersionMutation.mutateAsync({ strategyId, schema });
+      if (!(await refreshSavedStrategy(load, toastManager))) return true;
       toastManager.add({
         title: '新版本已保存',
         description: '原有版本保持不变。',
         type: 'success',
         timeout: 2800,
       });
-      await load();
       return true;
     } catch {
       errorToast(toastManager, '版本保存失败', '请检查策略配置或服务连接。');
@@ -142,66 +197,87 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     }
   };
 
-  const startBacktest = async (version: StrategyVersion, setup: BacktestSetupInput) => {
-    if (busyAction) return false;
+  const startBacktest = (version: StrategyVersion, setup: BacktestSetupInput): Promise<boolean> => {
+    if (busyAction || backgroundPreparationVersionId) return Promise.resolve(false);
     const setupError = validateBacktestSetup(setup);
     if (setupError) {
       errorToast(toastManager, '回测配置无效', setupError);
-      return false;
+      return Promise.resolve(false);
     }
     const schema = version.schema;
     if (!schema) {
       errorToast(toastManager, '回测排队失败', '当前版本缺少可执行 Schema，请重新加载策略。');
-      return false;
+      return Promise.resolve(false);
     }
     const symbol = symbolsFromSchema(schema)[0];
     if (!symbol) {
       errorToast(toastManager, '回测排队失败', '策略版本至少需要一个标的。');
-      return false;
+      return Promise.resolve(false);
     }
+    backgroundPreparationVersionId = version.id;
     setBusyAction(`queue:${version.id}`);
-    try {
-      const bars = await fetchBarsMutation.mutateAsync(symbol);
-      const queueInput: QueueBacktestInput = {
-        id: crypto.randomUUID(),
-        strategyVersionId: version.id,
-        status: 'queued',
-        period: setup.period,
-        ...(setup.inSampleEnd ? { inSampleEnd: setup.inSampleEnd } : {}),
-        dataAsOf: new Date().toISOString(),
-        warnings:
-          symbolsFromSchema(schema).length > 1 ? ['仅使用策略版本中的首个标的进行回测'] : [],
-        strategy: schema,
-        bars,
-        initialCash: setup.initialCash,
-      };
-      const queuedJob = await queueMutation.mutateAsync(queueInput);
-      toastManager.add({
-        title: '回测已排队',
-        description: '正在启动回测任务。',
-        type: 'success',
-        timeout: 2800,
-      });
+    toastManager.add({
+      title: '正在后台准备回测',
+      description: '完成后会出现在回测任务列表。',
+      type: 'success',
+      timeout: 2800,
+    });
+    void (async () => {
       try {
-        await runMutation.mutateAsync(queuedJob.id ?? queueInput.id);
-        toastManager.add({ title: '回测已启动', type: 'success', timeout: 2800 });
-      } catch {
+        const bars = await fetchBarsMutation.mutateAsync({ symbol, period: setup.period });
+        if (!Array.isArray(bars) || bars.length === 0) {
+          errorToast(toastManager, '回测排队失败', '主标的没有可用行情，无法发起回测。');
+          return;
+        }
+        const benchmark = benchmarkFromSchema(schema);
+        let benchmarkBars: unknown[] = [];
+        let benchmarkWarning: string | null = null;
+        if (benchmark && benchmark === symbol) {
+          benchmarkBars = bars;
+        } else if (benchmark) {
+          try {
+            benchmarkBars = await fetchBarsMutation.mutateAsync({
+              symbol: benchmark,
+              period: setup.period,
+            });
+          } catch {
+            benchmarkWarning = '基准行情不可用，已跳过基准比较。';
+          }
+          if (benchmarkBars.length === 0) benchmarkWarning = '基准行情不可用，已跳过基准比较。';
+        }
+        const queueInput: QueueBacktestInput = {
+          id: crypto.randomUUID(),
+          strategyVersionId: version.id,
+          status: 'queued',
+          period: setup.period,
+          ...(setup.inSampleEnd ? { inSampleEnd: setup.inSampleEnd } : {}),
+          dataAsOf: dataAsOfFromSchema(schema),
+          warnings: [
+            ...(symbolsFromSchema(schema).length > 1 ? ['仅使用策略版本中的首个标的进行回测'] : []),
+            ...(benchmarkWarning ? [benchmarkWarning] : []),
+          ],
+          strategy: schema,
+          bars,
+          ...(benchmarkBars.length > 0 ? { benchmarkBars } : {}),
+          initialCash: setup.initialCash,
+        };
+        const queuedJob = await queueMutation.mutateAsync(queueInput);
         toastManager.add({
-          title: '回测启动失败',
-          description: '任务仍保留在队列中，可在回测任务中重试。',
-          type: 'error',
-          timeout: 0,
-          priority: 'high',
+          title: '回测已排队',
+          description: '任务已进入回测任务，正在后台启动。',
+          type: 'success',
+          timeout: 2800,
         });
+        launchQueuedBacktest(queuedJob.id ?? queueInput.id);
+        refreshStrategyData();
+      } catch {
+        errorToast(toastManager, '回测排队失败', '请检查策略配置、市场数据和服务连接。');
+      } finally {
+        backgroundPreparationVersionId = null;
+        setBusyAction(null);
       }
-      await load();
-      return true;
-    } catch {
-      errorToast(toastManager, '回测排队失败', '请检查策略配置、市场数据和服务连接。');
-      return false;
-    } finally {
-      setBusyAction(null);
-    }
+    })();
+    return Promise.resolve(true);
   };
 
   const queue = async (strategy: StrategyRecord) => {
@@ -220,7 +296,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     return startBacktest(
       { ...version, schema },
       {
-        period: { start: '2025-01-01', end: '2025-01-31' },
+        period: defaultBacktestPeriod(),
         initialCash: 100_000,
       },
     );

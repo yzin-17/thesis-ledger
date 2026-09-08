@@ -1,7 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
-  barSchemaV1,
   chipDistributionSchemaV1,
   fundNavSchemaV1,
   fundNavHistorySchemaV1,
@@ -23,52 +22,22 @@ import {
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
+import { MarketBarCache, resolveEffectiveBars } from './market-bar-cache.js';
+
+export { resolveEffectiveBars } from './market-bar-cache.js';
 
 const fundSymbolPattern = /^\d{6}\.OF$/;
-const freshnessRank: Record<BarV1['freshness'], number> = {
-  live: 0,
-  delayed: 1,
-  unknown: 2,
-  stale: 3,
-};
-
-export const resolveEffectiveBars = (rawBars: readonly BarInputV1[]): BarV1[] => {
-  const selected = new Map<string, { bar: BarV1; index: number }>();
-  rawBars.forEach((raw, index) => {
-    const bar = barSchemaV1.parse(raw);
-    const existing = selected.get(bar.timestamp);
-    if (!existing) {
-      selected.set(bar.timestamp, { bar, index });
-      return;
-    }
-    const fallbackDelta = Number(bar.fallbackUsed) - Number(existing.bar.fallbackUsed);
-    const freshnessDelta = freshnessRank[bar.freshness] - freshnessRank[existing.bar.freshness];
-    const fetchedDelta =
-      new Date(existing.bar.fetchedAt).getTime() - new Date(bar.fetchedAt).getTime();
-    const providerDelta = bar.provider.localeCompare(existing.bar.provider);
-    if (
-      fallbackDelta < 0 ||
-      (fallbackDelta === 0 && freshnessDelta < 0) ||
-      (fallbackDelta === 0 && freshnessDelta === 0 && fetchedDelta < 0) ||
-      (fallbackDelta === 0 &&
-        freshnessDelta === 0 &&
-        fetchedDelta === 0 &&
-        (index < existing.index || (index === existing.index && providerDelta < 0)))
-    )
-      selected.set(bar.timestamp, { bar, index });
-  });
-  return [...selected.values()]
-    .map(({ bar }) => bar)
-    .sort((left, right) => left.timestamp.localeCompare(right.timestamp));
-};
-
 @Injectable()
 export class MarketService {
+  private readonly barCache: MarketBarCache;
+
   constructor(
     private readonly dsa: DsaClient,
     private readonly redis: RedisService,
     @Optional() private readonly prisma?: PrismaService,
-  ) {}
+  ) {
+    this.barCache = new MarketBarCache(redis, prisma);
+  }
 
   private readonly flights = new Map<string, Promise<unknown>>();
 
@@ -384,48 +353,59 @@ export class MarketService {
   async getBars(
     input: string,
     timeframe: '1m' | '1d',
-    range?: { start?: string; end?: string },
+    range?: { start?: string; end?: string; limit?: number },
     options: { allowStale?: boolean; refresh?: boolean } = {},
   ): Promise<BarV1[]> {
     const { symbol } = normalizeSymbol(input);
-    const bars = await this.singleFlight(
-      `bars:${symbol}:${timeframe}:${range?.start ?? ''}:${range?.end ?? ''}`,
-      () =>
-        this.withDistributedLock(
-          `bars:${symbol}:${timeframe}:${range?.start ?? ''}:${range?.end ?? ''}`,
-          async () => {
-            const query = new URLSearchParams({ symbol, timeframe });
-            if (range?.start) query.set('start', range.start);
-            if (range?.end) query.set('end', range.end);
-            try {
-              const raw = await this.dsa.get<unknown[]>(
-                `/api/v1/thesis-ledger/market/bars?${query.toString()}`,
-              );
-              const fetchedAt = new Date().toISOString();
-              return resolveEffectiveBars(
-                raw.map((bar) => ({
-                  ...(bar as Record<string, unknown>),
-                  version: 1,
-                  symbol,
-                  timeframe,
-                  fetchedAt:
-                    typeof (bar as Record<string, unknown>).fetchedAt === 'string'
-                      ? (bar as Record<string, unknown>).fetchedAt
-                      : fetchedAt,
-                  freshness:
-                    typeof (bar as Record<string, unknown>).freshness === 'string'
-                      ? (bar as Record<string, unknown>).freshness
-                      : 'unknown',
-                  servedFromCache: false,
-                })) as BarInputV1[],
-              );
-            } catch (error) {
-              const stored = await this.readStoredBars(symbol, timeframe, range);
-              if (stored.length > 0) return stored;
-              throw error;
-            }
-          },
-        ),
+    const cacheKey = this.barCache.key(symbol, timeframe, range);
+    if (!options.refresh) {
+      const cached = await this.barCache.read(cacheKey);
+      if (cached) {
+        if (options.allowStale === false && cached.some((bar) => bar.freshness === 'stale'))
+          throw new Error('Bar 行情陈旧，当前操作要求新鲜行情');
+        return cached;
+      }
+    }
+    const bars = await this.singleFlight(cacheKey, () =>
+      this.withDistributedLock(cacheKey, async () => {
+        if (!options.refresh) {
+          const cached = await this.barCache.read(cacheKey);
+          if (cached) return cached;
+        }
+        const query = new URLSearchParams({ symbol, timeframe });
+        if (range?.start) query.set('start', range.start);
+        if (range?.end) query.set('end', range.end);
+        if (range?.limit) query.set('limit', String(range.limit));
+        try {
+          const raw = await this.dsa.get<unknown[]>(
+            `/api/v1/thesis-ledger/market/bars?${query.toString()}`,
+          );
+          const fetchedAt = new Date().toISOString();
+          const resolved = resolveEffectiveBars(
+            raw.map((bar) => ({
+              ...(bar as Record<string, unknown>),
+              version: 1,
+              symbol,
+              timeframe,
+              fetchedAt:
+                typeof (bar as Record<string, unknown>).fetchedAt === 'string'
+                  ? (bar as Record<string, unknown>).fetchedAt
+                  : fetchedAt,
+              freshness:
+                typeof (bar as Record<string, unknown>).freshness === 'string'
+                  ? (bar as Record<string, unknown>).freshness
+                  : 'unknown',
+              servedFromCache: false,
+            })) as BarInputV1[],
+          );
+          await this.barCache.record(cacheKey, resolved, range);
+          return resolved;
+        } catch (error) {
+          const stored = await this.readStoredBars(symbol, timeframe, range);
+          if (stored.length > 0) return stored;
+          throw error;
+        }
+      }),
     );
     if (options.allowStale === false && bars.some((bar) => bar.freshness === 'stale'))
       throw new Error('Bar 行情陈旧，当前操作要求新鲜行情');
@@ -471,6 +451,7 @@ export class MarketService {
         volume: Number(bar.volume),
         amount: Number(bar.amount),
         provider: bar.provider,
+        upstreamSource: bar.upstreamSource ?? undefined,
         fetchedAt: bar.fetchedAt.toISOString(),
         freshness: 'stale',
         fallbackUsed: bar.fallbackUsed,

@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { Toaster } from '../src/components/ui/toast.js';
 import { JournalDashboard } from '../src/features/journal/JournalDashboard.js';
 import {
@@ -86,7 +87,9 @@ const renderJournal = (node: ReactNode) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
-      <Toaster>{node}</Toaster>
+      <Toaster>
+        <ConfirmDialogProvider>{node}</ConfirmDialogProvider>
+      </Toaster>
     </QueryClientProvider>,
   );
 };
@@ -96,7 +99,11 @@ describe('投资复盘工作台 UI 契约', () => {
     const markup = renderJournal(<JournalDashboard accounts={[account]} accountsReady={false} />);
     expect(markup).toContain('单笔复盘');
     expect(markup).toContain('周期复盘');
-    expect(markup).toContain('选择一笔已平仓交易');
+    expect(markup).toMatch(/<\/header>[\s\S]*复盘账户[\s\S]*role="tablist"/);
+    expect(markup).not.toMatch(/<header[\s\S]*复盘账户[\s\S]*<\/header>/);
+    expect(markup).toContain('flex-1 flex-col gap-2 sm:flex-row');
+    expect(markup).not.toContain('sm:w-80');
+    expect(markup).not.toContain('选择一笔已平仓交易');
     expect(markup).not.toContain('CompletedTrade JSON');
     expect(markup).not.toContain('AI Behavior Review');
   });
@@ -114,10 +121,12 @@ describe('投资复盘工作台 UI 契约', () => {
         filter=""
         onFilterChange={vi.fn()}
         emptyDescription="当前窗口没有交易。"
+        emptyActions={<button type="button">手动复盘</button>}
       />,
     );
     expect(candidates).toContain('暂无已平仓交易');
     expect(candidates).toContain('当前窗口没有交易');
+    expect(candidates).toContain('手动复盘');
   });
 
   it('以中文展示候选完整度、行为三态和反事实假设', () => {

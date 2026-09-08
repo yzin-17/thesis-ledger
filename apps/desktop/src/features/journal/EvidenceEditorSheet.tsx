@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -84,16 +85,24 @@ export function EvidenceEditorSheet({
     onOpenChange(false);
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty: fields.some(({ key }) => draft[key] !== toInputValue(value[key])),
+    busy: false,
+    onOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[min(100vw,32rem)] overflow-y-auto">
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent size="compact" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>补充本次复盘证据</SheetTitle>
           <SheetDescription>
             {candidate.symbol} 的临时补充只参与本次计算，不会回写 TradePlan、Journal 或 Ledger。
           </SheetDescription>
         </SheetHeader>
-        <div className="px-4">
+        <div className="min-w-0">
           <FieldGroup>
             {fields.map(({ key, label, description }) => (
               <Field key={key} invalid={Boolean(errors[key])}>
@@ -112,7 +121,7 @@ export function EvidenceEditorSheet({
           </FieldGroup>
         </div>
         <SheetFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => void requestClose(false)}>
             取消
           </Button>
           <Button type="button" onClick={save}>

@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,10 @@ import {
 import { FirstRunOnboarding } from '../onboarding/FirstRunOnboarding.js';
 import { useOnboardingStatusQuery } from '../onboarding/onboarding.queries.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import {
+  StickyTableActionCell,
+  StickyTableActionHeader,
+} from '../shared/StickyTableActions.js';
 import { PortfolioTradeView } from './PortfolioTradeView.js';
 import type { PortfolioTradeReviewTarget } from './PortfolioTradeDetailSheet.js';
 
@@ -68,19 +73,21 @@ export function PortfolioDashboard({
     ) : null;
 
   const pageHeader = (
-    <header className="page-header">
-      <div>
-        <p className="kicker">组合总览</p>
-        <h1>{portfolio ? money.format(portfolio.totalMarketValue) : '投资组合'}</h1>
-        {portfolio && (
-          <p className="as-of">数据时点 {new Date(portfolio.valuedAt).toLocaleString('zh-CN')}</p>
-        )}
-      </div>
-      <div className="page-header-actions">
-        <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="估值范围" />
-        <RefreshIconButton label="刷新组合数据" refreshing={refreshing} onClick={onRetry} />
-      </div>
-    </header>
+    <PageHeader
+      eyebrow="PORTFOLIO"
+      title="投资组合"
+      description={
+        portfolio
+          ? `数据时点 ${new Date(portfolio.valuedAt).toLocaleString('zh-CN')}`
+          : '查看持仓、交易与资产表现。'
+      }
+      actions={
+        <>
+          <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="估值范围" />
+          <RefreshIconButton label="刷新组合数据" refreshing={refreshing} onClick={onRetry} />
+        </>
+      }
+    />
   );
 
   if (state === 'loading') {
@@ -137,7 +144,7 @@ export function PortfolioDashboard({
         value={portfolioTab}
         onValueChange={(value) => setPortfolioTab(value as 'overview' | 'trades')}
       >
-        <TabsList variant="line" className="min-h-11 w-fit">
+        <TabsList variant="line">
           <TabsTrigger value="overview">组合概览</TabsTrigger>
           <TabsTrigger value="trades">交易</TabsTrigger>
         </TabsList>
@@ -149,7 +156,11 @@ export function PortfolioDashboard({
             hasRiskRule={onboardingStatus.hasRiskRule}
             onNavigate={onNavigate}
           />
-          <section className="metrics" aria-label="组合关键指标">
+          <section
+            className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2 xl:grid-cols-4"
+            aria-label="组合关键指标"
+          >
+            <Metric label="总资产" value={money.format(portfolio!.totalMarketValue)} />
             <Metric label="持仓成本" value={money.format(portfolio!.totalCost)} />
             <Metric
               label="累计浮盈亏"
@@ -162,7 +173,7 @@ export function PortfolioDashboard({
               {...(largest ? { detail: money.format(largest.marketValue ?? 0) } : {})}
             />
           </section>
-          <section className="panel">
+          <section className="panel mt-8 border-t-0">
             <div className="panel-heading">
               <div>
                 <h2>当前持仓</h2>
@@ -179,7 +190,7 @@ export function PortfolioDashboard({
                     <th>市值</th>
                     <th>浮盈亏</th>
                     <th>状态</th>
-                    <th>操作</th>
+                    <StickyTableActionHeader>操作</StickyTableActionHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -212,7 +223,7 @@ export function PortfolioDashboard({
                               {position.stale ? '陈旧' : '最新'}
                             </Badge>
                           </td>
-                          <td>
+                          <StickyTableActionCell>
                             <Button
                               className="text-button"
                               size="sm"
@@ -222,7 +233,7 @@ export function PortfolioDashboard({
                             >
                               行情详情
                             </Button>
-                          </td>
+                          </StickyTableActionCell>
                         </tr>
                       ))
                   )}

@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDateTime } from '@/lib/date-display';
 import {
   Sheet,
   SheetContent,
@@ -71,20 +72,20 @@ export function EvidenceChainSheet({
   const renderToolCalls = () => {
     if (toolCallsLoading)
       return (
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+        <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
           正在加载 Tool 审计记录…
         </p>
       );
     if (toolCallsError)
       return (
-        <p className="rounded-lg border border-dashed p-4 text-sm text-destructive">
+        <p className="rounded-md border border-border p-4 text-sm text-destructive">
           Tool 审计记录读取失败，请稍后重试。
         </p>
       );
     if (uncitedToolCalls.length === 0)
       return (
         <div className="flex flex-col gap-2">
-          <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
             当前证据没有未关联的 Tool 调用。
           </p>
           {renderLoadMore()}
@@ -114,9 +115,9 @@ export function EvidenceChainSheet({
               )}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
                 {call.durationMs !== undefined && <span>耗时 {call.durationMs} ms</span>}
-                {call.marketTime && <span>市场时间 {call.marketTime}</span>}
-                {call.availableAt && <span>可用时间 {call.availableAt}</span>}
-                {call.fetchedAt && <span>抓取时间 {call.fetchedAt}</span>}
+                {call.marketTime && <span>市场时间 {formatDateTime(call.marketTime)}</span>}
+                {call.availableAt && <span>可用时间 {formatDateTime(call.availableAt)}</span>}
+                {call.fetchedAt && <span>抓取时间 {formatDateTime(call.fetchedAt)}</span>}
               </div>
             </CardContent>
           </Card>
@@ -127,12 +128,12 @@ export function EvidenceChainSheet({
   };
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[min(100vw,42rem)] overflow-y-auto">
+      <SheetContent side="right" size="form" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>来源链</SheetTitle>
           <SheetDescription>按研究结论拆分证据引用，并展示对应的只读 Tool 审计。</SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col gap-4 px-4 pb-6">
+        <div className="flex flex-col gap-6">
           {evidence.length === 0 && (
             <Card className="shadow-none">
               <CardContent className="pt-6 text-sm text-muted-foreground">
@@ -168,24 +169,32 @@ export function EvidenceChainSheet({
                     <dl className="mt-2 grid gap-1 text-muted-foreground sm:grid-cols-2">
                       <div>
                         <dt className="inline">观察时间：</dt>
-                        <dd className="inline text-foreground">{citation.observedAt}</dd>
+                        <dd className="inline text-foreground">
+                          {formatDateTime(citation.observedAt)}
+                        </dd>
                       </div>
                       {citation.marketTime && (
                         <div>
                           <dt className="inline">市场时间：</dt>
-                          <dd className="inline text-foreground">{citation.marketTime}</dd>
+                          <dd className="inline text-foreground">
+                            {formatDateTime(citation.marketTime)}
+                          </dd>
                         </div>
                       )}
                       {citation.availableAt && (
                         <div>
                           <dt className="inline">可用时间：</dt>
-                          <dd className="inline text-foreground">{citation.availableAt}</dd>
+                          <dd className="inline text-foreground">
+                            {formatDateTime(citation.availableAt)}
+                          </dd>
                         </div>
                       )}
                       {citation.fetchedAt && (
                         <div>
                           <dt className="inline">抓取时间：</dt>
-                          <dd className="inline text-foreground">{citation.fetchedAt}</dd>
+                          <dd className="inline text-foreground">
+                            {formatDateTime(citation.fetchedAt)}
+                          </dd>
                         </div>
                       )}
                     </dl>

@@ -20,6 +20,7 @@ export interface BacktestWorker {
       period: { start: string; end: string };
       dataAsOf: string;
       bars: BacktestBar[];
+      benchmarkBars?: BacktestBar[];
       initialCash: number;
       inSampleEnd?: string;
     },
@@ -50,12 +51,25 @@ const localWorker: BacktestWorker = {
       end: input.period.end,
       dataAsOf: input.dataAsOf,
       initialCash: input.initialCash,
+      ...(input.benchmarkBars === undefined ? {} : { benchmarkBars: input.benchmarkBars }),
       ...(input.inSampleEnd === undefined ? {} : { inSampleEnd: input.inSampleEnd }),
       engineVersion: 'thesis-ledger-engine-v1',
     });
     if (signal.aborted) throw new Error('回测已取消');
     return Promise.resolve(result);
   },
+};
+
+const normalizeBacktestBars = (value: unknown): BacktestBar[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((bar) => {
+    if (!bar || typeof bar !== 'object' || Array.isArray(bar)) return bar as BacktestBar;
+    const record = bar as Record<string, unknown>;
+    if (typeof record.date === 'string' || typeof record.timestamp !== 'string') {
+      return record as unknown as BacktestBar;
+    }
+    return { ...record, date: record.timestamp.slice(0, 10) } as unknown as BacktestBar;
+  });
 };
 
 @Injectable()
@@ -111,8 +125,29 @@ export class BacktestService {
     const job = backtestJobSchema.parse(input);
     if (hasStaleMarketData(job) && !explicitlyAllowsStale(input))
       throw new BadRequestException('回测默认拒绝陈旧或部分市场数据，请显式允许后重试');
-    const persistedInput = { ...(job as typeof job & { strategy?: unknown }) };
+    const persistedInput = { ...(job as Record<string, unknown>) };
     delete persistedInput.strategy;
+    if (Array.isArray(persistedInput.bars)) {
+      persistedInput.bars = normalizeBacktestBars(persistedInput.bars);
+    }
+    if (Array.isArray(persistedInput.benchmarkBars)) {
+      persistedInput.benchmarkBars = normalizeBacktestBars(persistedInput.benchmarkBars);
+    }
+    const strategyVersionRepository = (
+      this.prisma as unknown as {
+        strategyVersion?: {
+          findUnique?: (args: { where: { id: string } }) => Promise<{ schema?: unknown } | null>;
+        };
+      }
+    ).strategyVersion;
+    const selectedVersion = await strategyVersionRepository?.findUnique?.({
+      where: { id: job.strategyVersionId },
+    });
+    let dataAsOf = job.dataAsOf;
+    if (selectedVersion?.schema !== undefined) {
+      const parsedSchema = strategySchemaV1.parse(selectedVersion.schema);
+      dataAsOf = parsedSchema.universe.asOf;
+    }
     return this.prisma.backtestJob.create({
       data: {
         id: job.id,
@@ -120,8 +155,8 @@ export class BacktestService {
         status: 'queued',
         periodStart: new Date(job.period.start),
         periodEnd: new Date(job.period.end),
-        dataAsOf: new Date(job.dataAsOf),
-        input: persistedInput as Prisma.InputJsonValue,
+        dataAsOf: new Date(dataAsOf),
+        input: { ...persistedInput, dataAsOf },
         warnings: job.warnings,
       },
     });
@@ -151,6 +186,7 @@ export class BacktestService {
       dataVersion?: string;
       provider?: string;
       parameters?: Record<string, unknown>;
+      benchmarkBars?: BacktestBar[];
     };
     const versionedStrategy =
       job.strategyVersion && 'schema' in job.strategyVersion
@@ -178,7 +214,10 @@ export class BacktestService {
         {
           jobId: id,
           strategy: versionedStrategy,
-          bars: input.bars ?? [],
+          bars: normalizeBacktestBars(input.bars),
+          ...(input.benchmarkBars === undefined
+            ? {}
+            : { benchmarkBars: normalizeBacktestBars(input.benchmarkBars) }),
           initialCash: input.initialCash ?? 100_000,
           period: {
             start: job.periodStart.toISOString().slice(0, 10),

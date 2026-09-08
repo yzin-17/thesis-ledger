@@ -116,14 +116,16 @@ describe('风险后台评估', () => {
     new AutomationRuntimeHandlers(
       {
         position: {
-          findMany: vi.fn(async (args: { where: { account: { mode: string } } }) =>
-            positionsByMode[args.where.account.mode],
+          findMany: vi.fn(
+            async (args: { where: { account: { mode: string } } }) =>
+              positionsByMode[args.where.account.mode],
           ),
         },
         riskEvent: { findMany: vi.fn(async () => []) },
       } as never,
       { riskScan } as never,
       { getQuote: vi.fn(async () => ({ price: 9 })) } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

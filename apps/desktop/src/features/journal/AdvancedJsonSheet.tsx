@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -56,9 +57,17 @@ export function AdvancedJsonSheet({
     onOpenChange(false);
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty: text !== JSON.stringify(value, null, 2),
+    busy: false,
+    onOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[min(100vw,48rem)] overflow-y-auto">
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent size="detail" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>高级 JSON 入口</SheetTitle>
           <SheetDescription>
@@ -66,7 +75,7 @@ export function AdvancedJsonSheet({
             仅参与本次只读复盘，不会自动写入 Ledger。
           </SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col gap-3 px-4">
+        <div className="flex flex-col gap-3">
           {error && (
             <Alert variant="destructive">
               <AlertTitle>输入无效</AlertTitle>
@@ -85,7 +94,7 @@ export function AdvancedJsonSheet({
           />
         </div>
         <SheetFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => void requestClose(false)}>
             取消
           </Button>
           <Button type="button" onClick={apply}>

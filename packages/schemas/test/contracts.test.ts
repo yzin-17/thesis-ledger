@@ -7,6 +7,7 @@ import {
   fundNavHistorySchemaV1,
   marketDetailRequestSchema,
   marketDetailResponseSchema,
+  providerManifestSchema,
   catalogDeltaSchema,
   strategySchemaV1,
   ledgerEventSchemaV1,
@@ -137,6 +138,38 @@ describe('行情契约', () => {
         freshness: 'live',
       }),
     ).toMatchObject({ price: 11 }));
+  it('保留 Provider 与实际上游来源', () => {
+    const quote = quoteSchemaV1.parse({
+      version: 1,
+      symbol: '600519.SH',
+      open: 10,
+      high: 12,
+      low: 9,
+      price: 11,
+      previousClose: 10,
+      volume: 1,
+      amount: 11,
+      stale: false,
+      provider: 'akshare',
+      upstreamSource: 'tencent',
+      marketTime: time,
+      fetchedAt: time,
+      freshness: 'live',
+    });
+    const provider = providerManifestSchema.parse({
+      providerId: 'akshare',
+      displayName: 'AKShare',
+      version: 1,
+      capabilities: { DAILY_BAR: ['STOCK'] },
+      configured: true,
+      enabled: true,
+      credentialConfigured: false,
+      origin: 'dsa',
+      upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经' }],
+    });
+    expect(quote).toMatchObject({ provider: 'akshare', upstreamSource: 'tencent' });
+    expect(provider.upstreamSources?.[0]?.displayName).toBe('腾讯财经');
+  });
   it('拒绝非法 OHLC', () =>
     expect(() =>
       quoteSchemaV1.parse({
@@ -436,6 +469,18 @@ describe('策略契约', () => {
     const parsed = strategySchemaV1.parse(base);
     expect(parsed.universe.filterRef).toBe('沪深300@2025');
     expect(parsed.entryCondition).toMatchObject({ all: expect.any(Array) });
+  });
+
+  it('允许不配置基准，并拒绝空白信号值', () => {
+    const withoutBenchmark: Partial<typeof base> = { ...base };
+    delete withoutBenchmark.benchmark;
+    expect(strategySchemaV1.parse(withoutBenchmark)).not.toHaveProperty('benchmark');
+    expect(() =>
+      strategySchemaV1.parse({
+        ...withoutBenchmark,
+        entrySignals: [{ ...base.entrySignals[0], value: '' }],
+      }),
+    ).toThrow('不能为空');
   });
 
   it('拒绝反向有效期', () =>

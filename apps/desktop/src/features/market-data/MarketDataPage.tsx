@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { PageHeader } from '../shared/PageHeader.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
+import { useToastManager } from '@/components/ui/toast';
+import { Metric } from '../shared/DesktopPrimitives.js';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InstrumentCatalogPanel } from './InstrumentCatalogPanel.js';
 import { MarketPolicyPanel } from './MarketPolicyPanel.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { MarketProviderPanel } from './MarketProviderPanel.js';
+import { MarketCachePanel } from './MarketCachePanel.js';
 import {
   useCatalogSyncMutation,
   useClearMarketProviderCredentialMutation,
@@ -27,9 +30,9 @@ import type { MarketPolicy, ProviderManifest } from './market-data.types.js';
 export function MarketDataPage() {
   const queryClient = useQueryClient();
   const { confirm } = useConfirmDialog();
-  const { policy, providers, catalog } = useMarketDataQueries();
+  const { policy, providers, catalog, dailyBarCache } = useMarketDataQueries();
   const marketDataRefreshing =
-    policy.isFetching || providers.isFetching || catalog.isFetching;
+    policy.isFetching || providers.isFetching || catalog.isFetching || dailyBarCache.isFetching;
   const savePolicy = useSaveMarketPolicyMutation();
   const saveProvider = useSaveMarketProviderMutation();
   const clearCredential = useClearMarketProviderCredentialMutation();
@@ -41,7 +44,16 @@ export function MarketDataPage() {
   const [policyDraft, setPolicyDraft] = useState<MarketPolicy | null>(null);
   const [providerDrafts, setProviderDrafts] = useState<ProviderManifest[]>([]);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const toastManager = useToastManager();
+  const [message, setErrorMessage] = useState<string | null>(null);
+  const setMessage = useCallback(
+    (next: { type: 'success' | 'error'; text: string } | null) => {
+      setErrorMessage(next?.type === 'error' ? next.text : null);
+      if (next?.type === 'success')
+        toastManager.add({ title: next.text, type: 'success', timeout: 2800 });
+    },
+    [toastManager],
+  );
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [catalogJobId, setCatalogJobId] = useState<string | null>(null);
   const [submittedSearch, setSubmittedSearch] = useState('');
@@ -67,15 +79,12 @@ export function MarketDataPage() {
       setMessage({ type: 'error', text: '标的目录同步任务失败，请稍后重试。' });
       setCatalogJobId(null);
     }
-  }, [catalogJob.data, catalogJobId, queryClient]);
+  }, [catalogJob.data, catalogJobId, queryClient, setMessage]);
 
   const instrumentSearch = useInstrumentSearchQuery(submittedSearch);
-  const loadState =
-    policy.isError || providers.isError || catalog.isError
-      ? 'degraded'
-      : policy.isPending || providers.isPending || catalog.isPending
-        ? 'loading'
-        : 'ready';
+  let loadState: 'degraded' | 'loading' | 'ready' = 'ready';
+  if (policy.isError || providers.isError || catalog.isError) loadState = 'degraded';
+  else if (policy.isPending || providers.isPending || catalog.isPending) loadState = 'loading';
   const controlsDisabled = loadState !== 'ready' || busyAction !== null;
   const configuredProviderCount = useMemo(
     () => providerDrafts.filter((provider) => provider.configured && provider.enabled).length,
@@ -256,23 +265,29 @@ export function MarketDataPage() {
     }
   };
 
+  let policySyncLabel = '等待策略数据';
+  if (policyDraft?.syncState === 'applied') policySyncLabel = '已同步';
+  else if (policyDraft?.syncState === 'pending') policySyncLabel = '等待同步';
+  else if (policyDraft) policySyncLabel = '需要检查';
+
   return (
     <section className="module-page" aria-labelledby="market-data-title">
-      <header className="page-header">
-        <div>
-          <p className="kicker">Market Data & Instrument Center</p>
-          <h1 id="market-data-title">市场数据与标的中心</h1>
-          <p className="page-description">管理 DSA Provider、路由策略、目录同步与已确认的投资标的。</p>
-        </div>
-        <div className="page-header-actions">
-          <RefreshIconButton
-            label="刷新市场数据状态"
-            refreshing={marketDataRefreshing}
-            disabled={busyAction !== null}
-            onClick={() => void refresh()}
-          />
-        </div>
-      </header>
+      <PageHeader
+        titleId="market-data-title"
+        eyebrow="MARKET DATA"
+        title="市场数据"
+        description="管理行情来源、数据优先级与标的目录。"
+        actions={
+          <>
+            <RefreshIconButton
+              label="刷新市场数据状态"
+              refreshing={marketDataRefreshing}
+              disabled={busyAction !== null}
+              onClick={() => void refresh()}
+            />
+          </>
+        }
+      />
 
       {loadState === 'degraded' && (
         <Alert variant="destructive">
@@ -283,60 +298,39 @@ export function MarketDataPage() {
         </Alert>
       )}
       {message && (
-        <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-          <AlertDescription>{message.text}</AlertDescription>
+        <Alert variant="destructive">
+          <AlertDescription>{message}</AlertDescription>
         </Alert>
       )}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <p className="kicker">控制策略</p>
-            <strong className="mt-2 block text-2xl font-semibold">
-              {policyDraft ? `第 ${policyDraft.revision} 版` : '—'}
-            </strong>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {policyDraft?.syncState === 'applied'
-                ? '已同步到 DSA'
-                : policyDraft?.syncState === 'pending'
-                  ? '等待同步'
-                  : '需要检查'}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="kicker">数据 Provider</p>
-            <strong className="mt-2 block text-2xl font-semibold">
-              {configuredProviderCount}/{providerDrafts.length || 2}
-            </strong>
-            <p className="mt-1 text-sm text-muted-foreground">已启用且已配置凭证</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="kicker">标的目录</p>
-            <strong className="mt-2 block text-2xl font-semibold">
-              {catalog.data?.generation ? `第 ${catalog.data.generation} 版` : '—'}
-            </strong>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {catalog.data?.instrumentCount
-                ? `${catalog.data.instrumentCount} 个本地标的`
-                : '由 DSA 快照驱动'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-        <MarketPolicyPanel
-          policy={policyDraft}
-          providers={providerDrafts}
-          disabled={controlsDisabled}
-          saving={savePolicy.isPending}
-          onChange={setPolicyDraft}
-          onSave={() => void handleSavePolicy()}
+      <section className="metrics mt-6" aria-label="市场数据概况">
+        <Metric
+          label="控制策略"
+          value={policyDraft ? `第 ${policyDraft.revision} 版` : '—'}
+          detail={policySyncLabel}
         />
+        <Metric
+          label="数据源"
+          value={providers.data ? `${configuredProviderCount}/${providerDrafts.length}` : '—'}
+          detail="已启用且已配置"
+        />
+        <Metric
+          label="日线缓存"
+          value={dailyBarCache.data ? dailyBarCache.data.barCount.toLocaleString('zh-CN') : '—'}
+          detail={
+            dailyBarCache.data
+              ? `${dailyBarCache.data.symbolCount.toLocaleString('zh-CN')} 个标的`
+              : '等待缓存数据'
+          }
+        />
+        <Metric
+          label="标的目录"
+          value={catalog.data ? `第 ${catalog.data.generation} 版` : '—'}
+          detail={catalog.data ? `${catalog.data.instrumentCount} 个本地标的` : '等待目录数据'}
+        />
+      </section>
+
+      <div className="mt-10">
         <MarketProviderPanel
           providers={providerDrafts}
           credentials={credentials}
@@ -353,7 +347,24 @@ export function MarketDataPage() {
         />
       </div>
 
+      <div className="mt-6">
+        <MarketPolicyPanel
+          policy={policyDraft}
+          providers={providerDrafts}
+          disabled={controlsDisabled}
+          saving={savePolicy.isPending}
+          onChange={setPolicyDraft}
+          onSave={() => void handleSavePolicy()}
+        />
+      </div>
+
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <MarketCachePanel
+          cache={dailyBarCache.data ?? null}
+          providers={providerDrafts}
+          loading={dailyBarCache.isPending}
+          error={dailyBarCache.isError}
+        />
         <InstrumentCatalogPanel
           catalog={catalogJob.data ?? catalog.data ?? null}
           disabled={controlsDisabled}

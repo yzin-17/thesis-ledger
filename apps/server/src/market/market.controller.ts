@@ -49,10 +49,12 @@ export class MarketController {
     @Query('timeframe') timeframe: '1m' | '1d' = '1d',
     @Query('start') start?: string,
     @Query('end') end?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.market.getBars(symbol, timeframe, {
       ...(start ? { start } : {}),
       ...(end ? { end } : {}),
+      ...(limit ? { limit: Number(limit) } : {}),
     });
   }
   @Get(':symbol/indicators/:name') indicator(

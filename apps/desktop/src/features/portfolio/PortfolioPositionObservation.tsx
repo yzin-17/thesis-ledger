@@ -18,6 +18,10 @@ import { LoaderCircle, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { money } from '../shared/display.js';
+import {
+  StickyTableActionCell,
+  StickyTableActionHeader,
+} from '../shared/StickyTableActions.js';
 import { assetQuantityUnit, type Position } from './portfolio.types.js';
 
 export function PositionOverviewMenu({
@@ -105,9 +109,9 @@ export function PositionObservationContent({
             <th className="px-4 py-3 font-medium">记录类型</th>
             <th className="px-4 py-3 font-medium">来源</th>
             <th className="px-4 py-3 font-medium">快照状态</th>
-            <th className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-muted px-3 py-3 text-right font-medium">
+            <StickyTableActionHeader className="w-40 px-3 py-3 font-medium">
               操作
-            </th>
+            </StickyTableActionHeader>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -147,7 +151,7 @@ export function PositionObservationContent({
               <td className="px-4 py-3">
                 <Badge variant="secondary">已记录快照</Badge>
               </td>
-              <td className="sticky right-0 z-10 w-40 min-w-40 border-l border-border bg-background px-3 py-2">
+              <StickyTableActionCell className="w-40 px-3 py-2">
                 <div className="flex gap-1">
                   <Button
                     size="sm"
@@ -176,7 +180,7 @@ export function PositionObservationContent({
                     {busyAction === `remove:${position.id}` ? '移除中…' : '移除快照'}
                   </Button>
                 </div>
-              </td>
+              </StickyTableActionCell>
             </tr>
           ))}
         </tbody>

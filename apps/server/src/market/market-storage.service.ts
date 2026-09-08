@@ -63,6 +63,7 @@ export class MarketStorageService {
             close: bar.close,
             volume: bar.volume,
             amount: bar.amount,
+            upstreamSource: bar.upstreamSource ?? null,
             fetchedAt: new Date(bar.fetchedAt),
             freshness: bar.freshness,
             fallbackUsed: bar.fallbackUsed,
@@ -78,6 +79,7 @@ export class MarketStorageService {
             volume: bar.volume,
             amount: bar.amount,
             provider: bar.provider || provider,
+            upstreamSource: bar.upstreamSource ?? null,
             fetchedAt: new Date(bar.fetchedAt),
             freshness: bar.freshness,
             fallbackUsed: bar.fallbackUsed,
@@ -242,12 +244,40 @@ export class MarketStorageService {
         volume: Number(bar.volume),
         amount: Number(bar.amount),
         provider: bar.provider,
+        upstreamSource: bar.upstreamSource ?? undefined,
         fetchedAt: bar.fetchedAt.toISOString(),
         freshness: 'stale',
         fallbackUsed: bar.fallbackUsed,
         servedFromCache: true,
       })),
     );
+  }
+
+  async dailyBarCacheStatus() {
+    const where = { timeframe: '1d' } as const;
+    const [barCount, symbols, latestMarketBar, latestWrite, sources] = await Promise.all([
+      this.prisma.marketBar.count({ where }),
+      this.prisma.marketBar.groupBy({ by: ['symbol'], where }),
+      this.prisma.marketBar.findFirst({ where, orderBy: { timestamp: 'desc' } }),
+      this.prisma.marketBar.findFirst({ where, orderBy: { fetchedAt: 'desc' } }),
+      this.prisma.marketBar.groupBy({
+        by: ['provider', 'upstreamSource'],
+        where,
+        _count: { _all: true },
+        orderBy: { _count: { provider: 'desc' } },
+      }),
+    ]);
+    return {
+      barCount,
+      symbolCount: symbols.length,
+      latestMarketDate: latestMarketBar?.timestamp.toISOString() ?? null,
+      updatedAt: latestWrite?.fetchedAt.toISOString() ?? null,
+      sources: sources.map((source) => ({
+        provider: source.provider,
+        upstreamSource: source.upstreamSource,
+        count: source._count._all,
+      })),
+    };
   }
 
   private ensureAsset(bar: BarV1) {

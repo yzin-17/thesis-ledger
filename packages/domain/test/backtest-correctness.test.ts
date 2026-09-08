@@ -137,4 +137,137 @@ describe('Backtest correctness regressions', () => {
     });
     expect(result.metrics.turnover).toBe(1_000);
   });
+
+  it('updates a trailing stop peak before evaluating the drawdown', () => {
+    const currentStrategy = strategy({
+      stopLoss: { type: 'trailing', value: 0.1 },
+      entrySignals: [{ indicator: 'close', operator: 'gt', value: 9 }],
+    });
+    const result = run(currentStrategy, [
+      bar('A', '2025-01-01', 10),
+      bar('A', '2025-01-02', 12),
+      bar('A', '2025-01-03', 10.8),
+    ]);
+    expect(
+      result.trades.map((trade) => ({ date: trade.date, side: trade.side, reason: trade.reason })),
+    ).toEqual([
+      { date: '2025-01-01', side: 'buy', reason: 'signal' },
+      { date: '2025-01-03', side: 'sell', reason: 'stop' },
+    ]);
+  });
+
+  it('does not trigger an ATR stop until fourteen true ranges are available', () => {
+    const currentStrategy = strategy({
+      stopLoss: { type: 'atr', value: 1 },
+      entrySignals: [{ indicator: 'close', operator: 'gt', value: 9 }],
+    });
+    const bars = [
+      bar('A', '2025-01-01', 10),
+      ...Array.from({ length: 12 }, (_, index) =>
+        bar('A', `2025-01-${String(index + 2).padStart(2, '0')}`, 10),
+      ),
+      bar('A', '2025-01-14', 8.9),
+    ];
+    const result = run(currentStrategy, bars);
+    expect(result.trades.filter((trade) => trade.reason === 'stop')).toHaveLength(0);
+    expect(result.warnings).toContain('ATR 止损样本不足，未触发');
+  });
+
+  it('uses a fourteen-period ATR distance once enough history exists', () => {
+    const currentStrategy = strategy({
+      stopLoss: { type: 'atr', value: 1 },
+      entrySignals: [{ indicator: 'close', operator: 'gt', value: 9 }],
+    });
+    const bars = [
+      bar('A', '2025-01-01', 10),
+      ...Array.from({ length: 13 }, (_, index) =>
+        bar('A', `2025-01-${String(index + 2).padStart(2, '0')}`, 10),
+      ),
+      bar('A', '2025-01-15', 8.9),
+      bar('A', '2025-01-16', 8.5),
+    ];
+    const result = run(currentStrategy, bars);
+    expect(result.trades.find((trade) => trade.side === 'sell')).toMatchObject({
+      date: '2025-01-15',
+      reason: 'stop',
+    });
+  });
+
+  it('activates a trailing take profit only after the holding has been profitable', () => {
+    const currentStrategy = strategy({
+      stopLoss: { type: 'fixed', value: 0.5 },
+      takeProfit: { type: 'trailing', value: 0.1 },
+      entrySignals: [{ indicator: 'close', operator: 'gt', value: 9 }],
+    });
+    const result = run(currentStrategy, [
+      bar('A', '2025-01-01', 10),
+      bar('A', '2025-01-02', 9.5),
+      bar('A', '2025-01-03', 12),
+      bar('A', '2025-01-04', 10.8),
+    ]);
+    expect(result.trades.find((trade) => trade.side === 'sell')).toMatchObject({
+      date: '2025-01-04',
+      reason: 'takeprofit',
+    });
+  });
+
+  it('sizes risk positions from risk budget divided by the stop distance', () => {
+    const currentStrategy = strategy({
+      stopLoss: { type: 'fixed', value: 0.1 },
+      sizing: { type: 'risk', value: 0.01 },
+      entrySignals: [{ indicator: 'close', operator: 'gt', value: 9 }],
+    });
+    const result = run(currentStrategy, [bar('A', '2025-01-01', 100)]);
+    expect(result.trades.find((trade) => trade.side === 'buy')).toMatchObject({
+      quantity: 20,
+      price: 100,
+    });
+  });
+
+  it('rejects a risk position when no positive stop distance can be calculated', () => {
+    const currentStrategy = strategy({
+      stopLoss: { type: 'fixed', value: 0 },
+      sizing: { type: 'risk', value: 0.01 },
+      entrySignals: [{ indicator: 'close', operator: 'gt', value: 9 }],
+    });
+    const result = run(currentStrategy, [bar('A', '2025-01-01', 100)]);
+    expect(result.trades).toHaveLength(0);
+    expect(result.rejectedOrders[0]?.reason).toBe('缺少可计算的止损距离');
+  });
+
+  it('continues the main backtest and explains when benchmark bars are unavailable', () => {
+    const result = run(strategy({ benchmark: 'B' }), [
+      bar('A', '2025-01-01', 10),
+      bar('A', '2025-01-02', 10),
+    ]);
+    expect(result.finalValue).toBeGreaterThan(0);
+    expect(result.warnings).toContain('基准行情不可用，已跳过基准比较');
+  });
+
+  it('aligns benchmark comparison by shared dates and filters symbol and point-in-time data', () => {
+    const benchmarkBars: BacktestBar[] = [
+      bar('B', '2025-01-01', 10),
+      bar('B', '2025-01-02', 11),
+      bar('B', '2025-01-03', 10),
+      { ...bar('B', '2025-01-04', 20), availableAt: '2025-03-01T00:00:00Z' },
+      bar('OTHER', '2025-01-02', 100),
+    ];
+    const aligned = runBacktestWithBenchmark(benchmarkBars);
+    expect(aligned.benchmark).toMatchObject({
+      strategyReturn: expect.any(Number),
+      benchmarkReturn: expect.any(Number),
+      excessReturn: expect.any(Number),
+    });
+  });
 });
+
+const runBacktestWithBenchmark = (benchmarkBars: BacktestBar[]) =>
+  runBacktest({
+    strategy: strategy({ benchmark: 'B' }),
+    bars: [bar('A', '2025-01-01', 10), bar('A', '2025-01-02', 11), bar('A', '2025-01-03', 12)],
+    start: '2025-01-01',
+    end: '2025-01-03',
+    dataAsOf: '2025-02-01T00:00:00Z',
+    initialCash: 20_000,
+    benchmarkBars,
+  });

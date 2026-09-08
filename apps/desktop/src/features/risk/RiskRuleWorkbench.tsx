@@ -177,7 +177,7 @@ export function RiskRuleWorkbench({
 
   return (
     <>
-      <section className="panel mt-0">
+      <section className="panel mt-0 border-t-0">
         <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2>规则工作台</h2>

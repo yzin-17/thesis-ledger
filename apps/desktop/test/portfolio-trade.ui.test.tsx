@@ -65,6 +65,7 @@ describe('Portfolio Trade UI 契约', () => {
     expect(markup).toContain('实际账户');
     expect(markup).toContain('已结束');
     expect(markup).toContain('查看详情');
+    expect(markup).not.toContain(trade.id);
     expect(markup).not.toContain('编辑 Trade');
   });
 });

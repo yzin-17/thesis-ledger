@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { AiRunDetail } from '../src/features/ai/AiRunDetail.js';
 import { AiRunList } from '../src/features/ai/AiRunList.js';
 import { findCitationToolCall } from '../src/features/ai/EvidenceChainSheet.js';
+import { researchQuestionTemplates } from '../src/features/ai/ai.templates.js';
 import type { AiRunDetail as AiRunDetailRecord, AiRunRecord } from '../src/features/ai/ai.types.js';
 
 const run: AiRunRecord = {
@@ -63,7 +65,6 @@ describe('研究工作台 UI 契约', () => {
         onFilterChange={vi.fn()}
         onSelect={vi.fn()}
         onRefresh={vi.fn()}
-        onCreate={vi.fn()}
       />,
     );
     expect(markup).toContain('当前组合最主要的风险是什么？');
@@ -71,6 +72,68 @@ describe('研究工作台 UI 契约', () => {
     expect(markup).toContain('已完成');
     expect(markup).toContain('aria-current="true"');
     expect(markup).toContain('overflow-y-hidden');
+  });
+
+  it('无历史任务时只保留一个主要创建入口，并提供三个可编辑问题模板', () => {
+    const markup = renderToStaticMarkup(
+      <AiRunDetail
+        run={null}
+        detail={null}
+        isLoading={false}
+        onEvidence={vi.fn()}
+        onRetry={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    );
+    expect(markup.match(/新建研究/g)).toHaveLength(1);
+    expect(markup).toContain('justify-start');
+    expect(markup).not.toContain('min-h-[30rem]');
+    expect(markup).not.toContain('查看问题模板');
+    for (const template of researchQuestionTemplates.slice(0, 3)) {
+      expect(markup).toContain(template.label);
+      expect(markup).toContain(`使用“${template.label}”问题模板`);
+    }
+    expect(markup).not.toContain(researchQuestionTemplates[3].label);
+  });
+
+  it('筛选为空时保留筛选导航且不重复提供创建按钮', () => {
+    const listMarkup = renderToStaticMarkup(
+      <AiRunList
+        runs={[]}
+        selectedId={null}
+        filter="failed"
+        loadState="empty"
+        onFilterChange={vi.fn()}
+        onSelect={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+    const detailMarkup = renderToStaticMarkup(
+      <AiRunDetail
+        run={null}
+        detail={null}
+        isLoading={false}
+        emptyState="filtered"
+        onEvidence={vi.fn()}
+        onRetry={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    );
+    expect(listMarkup).toContain('当前筛选没有任务');
+    expect(listMarkup).not.toContain('新建研究');
+    expect(detailMarkup).toContain('没有可显示的研究详情');
+    expect(detailMarkup).not.toContain('可以先问');
+  });
+
+  it('页面复用共享刷新入口，并在 Provider 不可执行时提供配置入口', () => {
+    const source = readFileSync(new URL('../src/features/ai/AiChat.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('<RefreshIconButton');
+    expect(source).not.toContain('<RefreshCw');
+    expect(source).toContain("navigate('/providers')");
+    expect(source).toContain('providerActionLabel');
+    expect(source).toContain('data-ai-provider-status');
+    expect(source).toContain('<Button type="button" size="sm"');
+    expect(source).not.toContain('<Settings2');
   });
 
   it('详情按结论、风险、证据和未知项顺序展示', () => {

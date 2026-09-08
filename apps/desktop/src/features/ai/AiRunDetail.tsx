@@ -1,10 +1,25 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, BookOpen, CircleDot, RotateCcw } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BookOpen, CircleDot, RotateCcw, Search } from 'lucide-react';
+import { researchQuestionTemplates } from './ai.templates.js';
 import type { AiRunDetail as AiRunDetailRecord, AiRunRecord } from './ai.types.js';
 import {
   checkpointLabel,
@@ -28,7 +43,7 @@ const formatNumber = (value: number | string | null | undefined) => {
 function RunMetadata({ run }: { run: AiRunRecord }) {
   return (
     <section
-      className="rounded-lg border bg-muted/20 p-3 text-sm"
+      className="rounded-md border bg-muted/20 p-3 text-sm"
       aria-labelledby="ai-run-metadata-title"
     >
       <h3 id="ai-run-metadata-title" className="font-medium">
@@ -153,19 +168,19 @@ function ResultView({ run, onEvidence }: { run: AiRunRecord; onEvidence: () => v
         </CardContent>
       </Card>
       <Card className="shadow-none">
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div>
-            <CardTitle>关键证据</CardTitle>
-            <CardDescription>{evidence.length} 个证据主张，均应可下钻到来源。</CardDescription>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={onEvidence}>
-            <BookOpen data-icon="inline-start" />
-            查看来源链
-          </Button>
+        <CardHeader>
+          <CardTitle>关键证据</CardTitle>
+          <CardDescription>{evidence.length} 个证据主张，均应可下钻到来源。</CardDescription>
+          <CardAction className="max-sm:col-start-1 max-sm:row-start-3 max-sm:mt-2 max-sm:justify-self-start">
+            <Button type="button" variant="outline" size="sm" onClick={onEvidence}>
+              <BookOpen data-icon="inline-start" />
+              查看来源链
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {evidence.map((item) => (
-            <div key={item.claim} className="rounded-lg border bg-muted/20 p-3 text-sm">
+            <div key={item.claim} className="rounded-md border bg-muted/20 p-3 text-sm">
               <p className="font-medium">{item.claim}</p>
               <p className="mt-1 text-xs text-muted-foreground">{item.citations.length} 条引用</p>
             </div>
@@ -220,6 +235,7 @@ export function AiRunDetail({
   onRetry,
   onDetailRetry,
   onCreate,
+  emptyState = 'first-run',
 }: {
   run: AiRunRecord | null;
   detail: AiRunDetailRecord | null;
@@ -228,11 +244,12 @@ export function AiRunDetail({
   onEvidence: () => void;
   onRetry: (run: AiRunRecord) => void;
   onDetailRetry?: () => void;
-  onCreate: () => void;
+  onCreate: (question?: string) => void;
+  emptyState?: 'first-run' | 'filtered';
 }) {
   if (!run && isLoading) {
     return (
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-6" aria-busy="true">
+      <div className="flex flex-col gap-4 rounded-md border bg-card p-6" aria-busy="true">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-5 w-1/3" />
         <Skeleton className="h-48 w-full" />
@@ -241,21 +258,59 @@ export function AiRunDetail({
     );
   }
   if (!run) {
+    if (emptyState === 'filtered') {
+      return (
+        <Empty className="min-h-72 rounded-md border bg-card p-6">
+          <EmptyHeader>
+            <EmptyTitle>没有可显示的研究详情</EmptyTitle>
+            <EmptyDescription>切换左侧状态并选择任务，或从标题区新建研究。</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      );
+    }
     return (
-      <Empty className="min-h-[28rem] rounded-xl bg-card">
-        <EmptyHeader>
-          <EmptyTitle>从一次研究开始</EmptyTitle>
-          <EmptyDescription>
-            提出一个明确问题，选择真实研究对象，结果会保留证据和数据缺口。
-          </EmptyDescription>
-        </EmptyHeader>
-        <div className="flex flex-wrap justify-center gap-2">
-          <Button type="button" onClick={onCreate}>
-            创建第一次研究
-          </Button>
-          <Button type="button" variant="outline" onClick={onCreate}>
-            查看问题模板
-          </Button>
+      <Empty className="items-stretch justify-start rounded-none p-0 text-left">
+        <div className="grid w-full max-w-4xl gap-6 md:grid-cols-[minmax(0,1fr)_minmax(16rem,0.8fr)] md:items-start">
+          <div className="flex flex-col items-start gap-5">
+            <EmptyHeader className="items-start">
+              <EmptyMedia variant="icon">
+                <Search aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>从第一个问题开始</EmptyTitle>
+              <EmptyDescription className="max-w-md text-left">
+                选择组合、账户、持仓或策略展开研究。结论会保留来源、风险和数据缺口。
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="items-start">
+              <Button type="button" onClick={() => onCreate()}>
+                新建研究
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                研究只读取已授权数据，不会修改账本或生成订单。
+              </p>
+            </EmptyContent>
+          </div>
+          <Card size="sm" className="shadow-none">
+            <CardHeader>
+              <CardTitle>可以先问</CardTitle>
+              <CardDescription>选择模板后仍可编辑，不会直接开始研究。</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              {researchQuestionTemplates.slice(0, 3).map((template) => (
+                <Button
+                  key={template.id}
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-between"
+                  aria-label={`使用“${template.label}”问题模板`}
+                  onClick={() => onCreate(template.question)}
+                >
+                  {template.label}
+                  <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </Empty>
     );
@@ -265,9 +320,9 @@ export function AiRunDetail({
   const context = current.context;
   return (
     <article className="flex min-h-0 flex-col gap-4" aria-live="polite">
-      <header className="rounded-xl border bg-card p-5">
+      <header className="rounded-md border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="mb-2 text-xs text-muted-foreground">
               {context ? scopeLabel(context.scope) : '上下文未记录'} · {contextSummary(context)}
             </p>

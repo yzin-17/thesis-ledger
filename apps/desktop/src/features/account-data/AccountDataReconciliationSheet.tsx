@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { LoaderCircle } from 'lucide-react';
@@ -95,14 +101,13 @@ export function ReconciliationSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] w-[720px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
-      >
-        <SheetTitle>持仓快照对账</SheetTitle>
-        <SheetDescription>
-          展示确定性匹配依据、覆盖数量、剩余量和冲突；只有最后的确认按钮会写入账本。
-        </SheetDescription>
+      <SheetContent side="right" size="form" className="h-[100dvh] overflow-auto p-6">
+        <SheetHeader>
+          <SheetTitle>持仓快照对账</SheetTitle>
+          <SheetDescription>
+            展示确定性匹配依据、覆盖数量、剩余量和冲突；只有最后的确认按钮会写入账本。
+          </SheetDescription>
+        </SheetHeader>
         <ReconciliationResults
           query={query}
           selectedCandidateId={selectedCandidateId}
@@ -147,7 +152,7 @@ function ReconciliationResults({
 }) {
   if (query.isPending && !query.data) {
     return (
-      <div className="mt-5 flex flex-col gap-3" aria-busy="true">
+      <div className="flex flex-col gap-3" aria-busy="true">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -155,7 +160,7 @@ function ReconciliationResults({
   }
   if (query.isError && !query.data) {
     return (
-      <Alert className="mt-5" variant="destructive">
+      <Alert variant="destructive">
         <AlertTitle>对账候选读取失败</AlertTitle>
         <AlertDescription>无法计算当前账户的确定性匹配。</AlertDescription>
         <Button type="button" variant="outline" size="sm" onClick={() => void query.refetch()}>
@@ -166,7 +171,7 @@ function ReconciliationResults({
   }
   const candidates = query.data?.candidates ?? [];
   return (
-    <div className="mt-5 flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       {candidates.length > 0 ? (
         candidates.map((candidate) => (
           <ReconciliationCandidate

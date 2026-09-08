@@ -1,4 +1,6 @@
-import { renderToStaticMarkup } from 'react-dom/server';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import type { ReactNode } from 'react';
+import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -13,6 +15,9 @@ import {
   fetchPerformanceSeries,
 } from '../src/features/performance/performance.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
+
+const renderToStaticMarkup = (node: ReactNode) =>
+  renderMarkup(<ConfirmDialogProvider>{node}</ConfirmDialogProvider>);
 
 describe('收益分析交互契约', () => {
   it('混合币种时提示选择单账户并保留模式账户列表', () => {

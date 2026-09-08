@@ -3,7 +3,7 @@ import { z } from 'zod';
 const signal = z.object({
   indicator: z.string().min(1),
   operator: z.enum(['gt', 'gte', 'lt', 'lte', 'crossesAbove', 'crossesBelow']),
-  value: z.union([z.number(), z.string()]),
+  value: z.union([z.number(), z.string().min(1, '信号值不能为空')]),
 });
 
 const signalExpression: z.ZodTypeAny = z.lazy(() =>
@@ -57,7 +57,7 @@ export const strategySchemaV1 = z.object({
     slippageRate: z.number().nonnegative(),
   }),
   riskConstraints: z.array(z.object({ kind: z.string(), threshold: z.number() })),
-  benchmark: z.string().min(1),
+  benchmark: z.string().min(1).optional(),
 });
 
 export const backtestJobSchema = z

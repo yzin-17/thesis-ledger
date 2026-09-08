@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { dataSourceDisplay } from '../market-data/market-data.types.js';
 import {
   isRetryableMarketDetailSection,
   marketDetailSectionTitle,
@@ -42,10 +43,17 @@ const renderReadyOrEmpty = (section: MarketDetailSection, ready: ReactNode, empt
 const retryProps = (section: MarketDetailSection, onRetry: () => void) =>
   isRetryableMarketDetailSection(section) ? { onRetry } : {};
 
-const providerOf = (data: unknown) =>
-  data && typeof data === 'object' && typeof (data as { provider?: unknown }).provider === 'string'
-    ? String((data as { provider: string }).provider)
-    : '来源未知';
+const providerOf = (data: unknown) => {
+  if (!data || typeof data !== 'object') return '来源未知';
+  const record: unknown = Array.isArray(data) ? data.at(-1) : data;
+  if (!record || typeof record !== 'object') return '来源未知';
+  const source = record as { provider?: unknown; upstreamSource?: unknown };
+  if (typeof source.provider !== 'string') return '来源未知';
+  return dataSourceDisplay(
+    source.provider,
+    typeof source.upstreamSource === 'string' ? source.upstreamSource : null,
+  );
+};
 
 export const MarketDetailNotice = ({
   title,
@@ -233,7 +241,7 @@ export const BarsSection = ({
               <div key={bar.timestamp}>
                 <span>{new Date(bar.timestamp).toLocaleDateString('zh-CN')}</span>
                 <strong>{number.format(bar.close)}</strong>
-                <small>{bar.provider}</small>
+                <small>{dataSourceDisplay(bar.provider, bar.upstreamSource)}</small>
               </div>
             ))}
           </div>

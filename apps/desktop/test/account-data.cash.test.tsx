@@ -448,7 +448,7 @@ describe('账户现金操作', () => {
     expect(source).toContain("setNote('')");
     expect(source).toContain("setError('')");
     expect(source).toContain('if (!nextOpen) resetForm();');
-    expect(source).toContain('onOpenChange={handleOpenChange}');
+    expect(source).toContain('requestClose(nextOpen)');
   });
 
   it('现金入账 Sheet 使用实际到账字段，并在关闭后清理状态且不泄露错误', () => {
@@ -487,7 +487,7 @@ describe('账户现金操作', () => {
     expect(source).toContain('commandId,');
     expect(source).toContain('commandIdRef.current = null;');
     expect(source).toContain('if (!nextOpen) resetForm();');
-    expect(source).toContain('onOpenChange={handleOpenChange}');
+    expect(source).toContain('requestClose(nextOpen)');
     expect(source).not.toContain('submissionError.message');
     expect(cashDepositErrorMessage(new Error('ThesisLedger API 500: internal error'))).toBe(
       '现金入账失败，请稍后重试。',
@@ -508,7 +508,7 @@ describe('账户现金操作', () => {
     expect(observationSource).toContain('overflow-y-auto');
     expect(observationSource).toContain('记录现金快照');
     expect(recurringSource).toContain('<SheetFooter');
-    expect(recurringSource).toContain('border-t border-border p-4');
+    expect(recurringSource).not.toMatch(/<SheetFooter className=/);
     expect(recurringSource).toContain('新建定期入账计划');
     expect(recurringSource).toContain('保存计划');
   });

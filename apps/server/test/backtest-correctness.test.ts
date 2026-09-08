@@ -114,4 +114,95 @@ describe('Backtest service correctness regressions', () => {
     const storedInput = create.mock.calls[0]?.[0].data.input as Record<string, unknown>;
     expect(storedInput).not.toHaveProperty('strategy');
   });
+
+  it('normalizes Market Bar timestamps before persisting backtest input', async () => {
+    const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
+    const service = new BacktestService({ backtestJob: { create } } as never);
+
+    await service.queue({
+      id: '11111111-1111-4111-8111-111111111121',
+      strategyVersionId: '11111111-1111-4111-8111-111111111116',
+      status: 'queued',
+      period: { start: '2025-01-01', end: '2025-01-02' },
+      dataAsOf: '2025-01-03T00:00:00Z',
+      warnings: [],
+      bars: [
+        {
+          symbol: '600519.SH',
+          timestamp: '2025-01-02T00:00:00+00:00',
+          open: 10,
+          high: 11,
+          low: 9,
+          close: 10.5,
+          volume: 100,
+        },
+      ],
+    });
+
+    expect(create.mock.calls[0]?.[0].data.input).toMatchObject({
+      bars: [
+        expect.objectContaining({
+          symbol: '600519.SH',
+          date: '2025-01-02',
+          close: 10.5,
+        }),
+      ],
+    });
+  });
+
+  it('persists the selected version data cutoff and forwards benchmark bars to the worker', async () => {
+    const selectedVersion = {
+      schema: savedStrategy,
+      version: 4,
+      schemaVersion: 1,
+    };
+    const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
+    const service = new BacktestService({
+      strategyVersion: { findUnique: vi.fn(async () => selectedVersion) },
+      backtestJob: { create },
+    } as never);
+    await service.queue({
+      id: '11111111-1111-4111-8111-111111111120',
+      strategyVersionId: '11111111-1111-4111-8111-111111111116',
+      status: 'queued',
+      period: { start: '2025-01-01', end: '2025-01-02' },
+      dataAsOf: '2026-01-01T00:00:00Z',
+      warnings: [],
+      bars: [],
+      benchmarkBars: [{ symbol: '000300.SH', date: '2025-01-01', close: 10 }],
+    });
+    expect(create.mock.calls[0]?.[0].data.dataAsOf).toEqual(new Date(savedStrategy.universe.asOf));
+    expect(create.mock.calls[0]?.[0].data.input).toMatchObject({
+      dataAsOf: savedStrategy.universe.asOf,
+      benchmarkBars: [{ symbol: '000300.SH' }],
+    });
+
+    const job = {
+      ...createJob(),
+      input: {
+        bars: [],
+        benchmarkBars: [{ symbol: '000300.SH', date: '2025-01-01', close: 10 }],
+        initialCash: 1_000,
+      },
+    };
+    const updates: Array<Record<string, unknown>> = [];
+    const prisma = {
+      backtestJob: {
+        findUnique: vi.fn(async () => job),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          updates.push(data);
+          return { ...job, ...data };
+        }),
+      },
+    };
+    const worker = { id: 'benchmark-worker', run: vi.fn(async () => ({ returns: [] })) };
+    await new BacktestService(prisma as never).run(job.id, worker as never);
+    expect(worker.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        benchmarkBars: [{ symbol: '000300.SH', date: '2025-01-01', close: 10 }],
+      }),
+      expect.any(AbortSignal),
+    );
+    expect(updates.at(-1)).toMatchObject({ status: 'succeeded' });
+  });
 });

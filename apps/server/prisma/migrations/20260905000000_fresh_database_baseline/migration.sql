@@ -798,6 +798,69 @@ CREATE TABLE "RecurringCashDepositOccurrence" (
 );
 
 -- CreateTable
+CREATE TABLE "RecurringFundInvestmentPlan" (
+    "id" UUID NOT NULL,
+    "accountId" UUID NOT NULL,
+    "name" TEXT NOT NULL,
+    "symbol" TEXT NOT NULL,
+    "fundName" TEXT NOT NULL,
+    "expectedAmount" DECIMAL(38,18) NOT NULL,
+    "currency" TEXT NOT NULL,
+    "dayOfMonth" INTEGER NOT NULL,
+    "timezone" TEXT NOT NULL DEFAULT 'Asia/Shanghai',
+    "startPeriod" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "nextDueAt" TIMESTAMP(3),
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "pausedAt" TIMESTAMP(3),
+    "endedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "RecurringFundInvestmentPlan_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "RecurringFundInvestmentPlan_amount_check" CHECK ("expectedAmount" > 0),
+    CONSTRAINT "RecurringFundInvestmentPlan_day_check" CHECK ("dayOfMonth" BETWEEN 1 AND 31),
+    CONSTRAINT "RecurringFundInvestmentPlan_version_check" CHECK ("version" > 0),
+    CONSTRAINT "RecurringFundInvestmentPlan_timezone_check" CHECK ("timezone" = 'Asia/Shanghai'),
+    CONSTRAINT "RecurringFundInvestmentPlan_start_period_check" CHECK ("startPeriod" ~ '^\d{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT "RecurringFundInvestmentPlan_status_check" CHECK ("status" IN ('ACTIVE','PAUSED','ENDED'))
+);
+
+-- CreateTable
+CREATE TABLE "RecurringFundInvestmentOccurrence" (
+    "id" UUID NOT NULL,
+    "planId" UUID NOT NULL,
+    "accountId" UUID NOT NULL,
+    "periodKey" TEXT NOT NULL,
+    "planName" TEXT NOT NULL,
+    "symbol" TEXT NOT NULL,
+    "fundName" TEXT NOT NULL,
+    "scheduledFor" TIMESTAMP(3) NOT NULL,
+    "expectedAmount" DECIMAL(38,18) NOT NULL,
+    "currency" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "actualQuantity" DECIMAL(38,18),
+    "unitPrice" DECIMAL(38,18),
+    "commission" DECIMAL(38,18),
+    "occurredAt" TIMESTAMP(3),
+    "ledgerEventId" UUID,
+    "ledgerFactId" UUID,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "skippedReason" TEXT,
+    "confirmedAt" TIMESTAMP(3),
+    "skippedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "RecurringFundInvestmentOccurrence_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_amount_check" CHECK ("expectedAmount" > 0),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_quantity_check" CHECK ("actualQuantity" IS NULL OR "actualQuantity" > 0),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_unit_price_check" CHECK ("unitPrice" IS NULL OR "unitPrice" > 0),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_commission_check" CHECK ("commission" IS NULL OR "commission" > 0),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_version_check" CHECK ("version" > 0),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_period_key_check" CHECK ("periodKey" ~ '^\d{4}-(0[1-9]|1[0-2])$'),
+    CONSTRAINT "RecurringFundInvestmentOccurrence_status_check" CHECK ("status" IN ('PENDING','CONFIRMED','SKIPPED'))
+);
+
+-- CreateTable
 CREATE TABLE "Strategy" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -1322,6 +1385,27 @@ CREATE INDEX "RecurringCashDepositOccurrence_ledgerEventId_idx" ON "RecurringCas
 CREATE UNIQUE INDEX "RecurringCashDepositOccurrence_planId_periodKey_key" ON "RecurringCashDepositOccurrence"("planId", "periodKey");
 
 -- CreateIndex
+CREATE INDEX "RecurringFundInvestmentPlan_accountId_status_idx" ON "RecurringFundInvestmentPlan"("accountId", "status");
+
+-- CreateIndex
+CREATE INDEX "RecurringFundInvestmentPlan_status_nextDueAt_idx" ON "RecurringFundInvestmentPlan"("status", "nextDueAt");
+
+-- CreateIndex
+CREATE INDEX "RecurringFundInvestmentPlan_symbol_idx" ON "RecurringFundInvestmentPlan"("symbol");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecurringFundInvestmentOccurrence_planId_periodKey_key" ON "RecurringFundInvestmentOccurrence"("planId", "periodKey");
+
+-- CreateIndex
+CREATE INDEX "RecurringFundInvestmentOccurrence_accountId_status_scheduledFor_idx" ON "RecurringFundInvestmentOccurrence"("accountId", "status", "scheduledFor");
+
+-- CreateIndex
+CREATE INDEX "RecurringFundInvestmentOccurrence_status_scheduledFor_idx" ON "RecurringFundInvestmentOccurrence"("status", "scheduledFor");
+
+-- CreateIndex
+CREATE INDEX "RecurringFundInvestmentOccurrence_ledgerEventId_idx" ON "RecurringFundInvestmentOccurrence"("ledgerEventId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "StrategyVersion_strategyId_version_key" ON "StrategyVersion"("strategyId", "version");
 
 -- CreateIndex
@@ -1534,6 +1618,21 @@ ALTER TABLE "RecurringCashDepositOccurrence" ADD CONSTRAINT "RecurringCashDeposi
 ALTER TABLE "RecurringCashDepositOccurrence" ADD CONSTRAINT "RecurringCashDepositOccurrence_ledgerEventId_fkey" FOREIGN KEY ("ledgerEventId") REFERENCES "LedgerEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "RecurringFundInvestmentPlan" ADD CONSTRAINT "RecurringFundInvestmentPlan_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RecurringFundInvestmentPlan" ADD CONSTRAINT "RecurringFundInvestmentPlan_symbol_fkey" FOREIGN KEY ("symbol") REFERENCES "Asset"("symbol") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RecurringFundInvestmentOccurrence" ADD CONSTRAINT "RecurringFundInvestmentOccurrence_planId_fkey" FOREIGN KEY ("planId") REFERENCES "RecurringFundInvestmentPlan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RecurringFundInvestmentOccurrence" ADD CONSTRAINT "RecurringFundInvestmentOccurrence_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RecurringFundInvestmentOccurrence" ADD CONSTRAINT "RecurringFundInvestmentOccurrence_ledgerEventId_fkey" FOREIGN KEY ("ledgerEventId") REFERENCES "LedgerEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "StrategyVersion" ADD CONSTRAINT "StrategyVersion_strategyId_fkey" FOREIGN KEY ("strategyId") REFERENCES "Strategy"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1728,6 +1827,23 @@ VALUES (
   '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
   300000,
   CURRENT_TIMESTAMP
+);
+
+INSERT INTO "AutomationJob" (
+  "id", "name", "type", "cron", "timezone", "enabled", "retryPolicy", "lockTtlMs", "nextRunAt", "systemKey", "managed"
+)
+VALUES (
+  '00000000-0000-4000-8000-000000000014',
+  '基金定投待确认生成',
+  'fund-investment-materialization',
+  '0 9 * * *',
+  'Asia/Shanghai',
+  TRUE,
+  '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
+  300000,
+  CURRENT_TIMESTAMP,
+  'fund-investment-materialization',
+  TRUE
 );
 
 INSERT INTO "AutomationJob" (

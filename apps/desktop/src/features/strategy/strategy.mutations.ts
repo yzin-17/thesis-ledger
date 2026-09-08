@@ -11,6 +11,7 @@ import { strategyKeys } from './strategy.queries.js';
 import type {
   CreateStrategyInput,
   CreateStrategyVersionInput,
+  FetchStrategyBarsInput,
   QueueBacktestInput,
 } from './strategy.types.js';
 
@@ -43,7 +44,7 @@ export const useQueueBacktestMutation = () => {
 
 export const useFetchStrategyBarsMutation = () =>
   useMutation({
-    mutationFn: (symbol: string) => fetchStrategyBars(symbol),
+    mutationFn: (input: FetchStrategyBarsInput) => fetchStrategyBars(input),
   });
 
 export const useRunBacktestMutation = () => {

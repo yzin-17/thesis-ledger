@@ -3,6 +3,7 @@ import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { InstrumentService } from './instrument.service.js';
 import { MarketControlService } from './market-control.service.js';
+import { MarketStorageService } from './market-storage.service.js';
 
 @Controller('market-data')
 export class MarketDataController {
@@ -11,6 +12,7 @@ export class MarketDataController {
     private readonly instruments: InstrumentService,
     private readonly dsa: DsaClient,
     @Optional() private readonly catalogReadiness?: CatalogReadinessService,
+    @Optional() private readonly storage?: MarketStorageService,
   ) {}
 
   private readiness() {
@@ -35,6 +37,13 @@ export class MarketDataController {
 
   @Get('providers') providers() {
     return this.control.providers();
+  }
+
+  @Get('cache/daily-bars') dailyBarCacheStatus() {
+    if (!this.storage) {
+      return { barCount: 0, symbolCount: 0, latestMarketDate: null, updatedAt: null, sources: [] };
+    }
+    return this.storage.dailyBarCacheStatus();
   }
 
   @Post('providers/:providerId/config') saveProvider(

@@ -20,8 +20,18 @@ export interface ProviderManifest {
   enabled: boolean;
   credentialConfigured: boolean;
   requiresCredential?: boolean;
+  origin?: 'dsa';
+  upstreamSources?: Array<{ sourceId: string; displayName: string }>;
   updatedAt?: string | null;
   health?: { scopes?: Array<{ state?: string; circuit?: string; errorCode?: string | null }> };
+}
+
+export interface DailyBarCacheStatus {
+  barCount: number;
+  symbolCount: number;
+  latestMarketDate: string | null;
+  updatedAt: string | null;
+  sources: Array<{ provider: string; upstreamSource: string | null; count: number }>;
 }
 
 export interface CatalogStatus {
@@ -65,10 +75,69 @@ export const routeLabel = (capability: string, instrumentType: string) =>
 export const providerDisplay = (provider: ProviderManifest) =>
   `${provider.displayName} (${provider.providerId})`;
 
+export const compatibleProviders = (
+  providers: readonly ProviderManifest[],
+  capability: string,
+  instrumentType: string,
+) =>
+  providers.filter(
+    (provider) =>
+      provider.configured &&
+      provider.enabled &&
+      provider.capabilities[capability]?.includes(instrumentType),
+  );
+
+export const updateRouteRole = (
+  policy: MarketPolicy,
+  capability: string,
+  instrumentType: string,
+  role: 'primary' | 'fallback',
+  providerId: string | null,
+): MarketPolicy => {
+  const [currentPrimary, currentFallback] = routeCandidates(policy, capability, instrumentType);
+  let next: string[] = [];
+  if (role === 'primary' && providerId) {
+    next = [providerId];
+    if (currentFallback && currentFallback !== providerId) next.push(currentFallback);
+  } else if (role === 'fallback' && currentPrimary) {
+    next = [currentPrimary];
+    if (providerId && providerId !== currentPrimary) next.push(providerId);
+  }
+  return {
+    ...policy,
+    routes: {
+      ...policy.routes,
+      [capability]: { ...policy.routes[capability], [instrumentType]: next },
+    },
+  };
+};
+
+export const upstreamSourceDisplay = (source: string | null | undefined) => {
+  if (source === 'eastmoney') return '东方财富';
+  if (source === 'sina') return '新浪财经';
+  if (source === 'tencent') return '腾讯财经';
+  return source ?? null;
+};
+
+export const dataSourceDisplay = (
+  providerId: string,
+  upstreamSource?: string | null,
+  providers: readonly ProviderManifest[] = [],
+) => {
+  const provider = providers.find((item) => item.providerId === providerId);
+  let providerName = provider?.displayName ?? providerId;
+  if (!provider && providerId === 'akshare') providerName = 'AKShare';
+  else if (!provider && providerId === 'tencent') providerName = '腾讯财经';
+  const upstreamName = upstreamSourceDisplay(upstreamSource);
+  return upstreamName && upstreamName !== providerName
+    ? `${providerName} · ${upstreamName}`
+    : providerName;
+};
+
 export const providerHealthLabel = (provider: ProviderManifest) => {
   const scopes = provider.health?.scopes ?? [];
   if (scopes.some((scope) => scope.circuit === 'open')) return '熔断';
   if (scopes.some((scope) => scope.state === 'degraded')) return '降级';
   if (scopes.some((scope) => scope.state === 'healthy')) return '健康';
-  return provider.credentialConfigured ? '待检查' : '未配置';
+  return provider.configured ? '待检查' : '未配置';
 };

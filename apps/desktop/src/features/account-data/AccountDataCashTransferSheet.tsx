@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,10 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetFooter, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useToastManager } from '@/components/ui/toast';
 
-import type { Account } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
 import { currentLocalDateTime, errorCode } from './account-data.helpers.js';
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
 
@@ -38,6 +39,7 @@ export function CashTransferSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const toastManager = useToastManager();
+  const [dirty, setDirty] = useState(false);
   const mutations = useCashOperationsMutations(account.id, account.mode);
   const [direction, setDirection] = useState<'out' | 'in'>('out');
   const [counterpartyId, setCounterpartyId] = useState('');
@@ -63,6 +65,7 @@ export function CashTransferSheet({
   }, [counterparties, counterpartyId, open]);
 
   const resetForm = () => {
+    setDirty(false);
     setDirection('out');
     setCounterpartyId('');
     setAmount('');
@@ -72,12 +75,14 @@ export function CashTransferSheet({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setDirty(false);
     if (!nextOpen) resetForm();
     onOpenChange(nextOpen);
   };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (mutations.transfer.isPending) return;
     setError('');
     const numericAmount = Number(amount);
     if (!counterpartyId) {
@@ -112,25 +117,39 @@ export function CashTransferSheet({
     }
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty,
+    busy: mutations.transfer.isPending,
+    onOpenChange: handleOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="shrink-0">
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
             <SheetTitle>账户间现金划转</SheetTitle>
-          </div>
+          </SheetHeader>
           <form
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            onChangeCapture={() => setDirty(true)}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(formEvent) => void submit(formEvent)}
           >
             <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="cash-transfer-direction">当前账户方向</FieldLabel>
-                  <Select value={direction} onValueChange={(value) => value && setDirection(value)}>
+                  <Select
+                    value={direction}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setDirty(true);
+                        setDirection(value);
+                      }
+                    }}
+                  >
                     <SelectTrigger id="cash-transfer-direction" className="w-full">
                       <SelectValue>
                         {direction === 'out' ? `从 ${account.name} 转出` : `转入 ${account.name}`}
@@ -148,7 +167,12 @@ export function CashTransferSheet({
                   <FieldLabel htmlFor="cash-transfer-counterparty">对方账户</FieldLabel>
                   <Select
                     value={counterpartyId || null}
-                    onValueChange={(value) => value && setCounterpartyId(value)}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setDirty(true);
+                        setCounterpartyId(value);
+                      }
+                    }}
                   >
                     <SelectTrigger
                       id="cash-transfer-counterparty"
@@ -160,7 +184,7 @@ export function CashTransferSheet({
                           const selected = counterparties.find(
                             (candidate) => candidate.id === counterpartyId,
                           );
-                          return selected ? `${selected.name} · ${selected.currency}` : '';
+                          return selected ? accountDisplayLabel(selected) : '';
                         })()}
                       </SelectValue>
                     </SelectTrigger>
@@ -168,7 +192,7 @@ export function CashTransferSheet({
                       <SelectGroup>
                         {counterparties.map((candidate) => (
                           <SelectItem key={candidate.id} value={candidate.id}>
-                            {candidate.name} · {candidate.currency}
+                            {accountDisplayLabel(candidate)}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -211,11 +235,11 @@ export function CashTransferSheet({
                 )}
               </FieldGroup>
             </div>
-            <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleOpenChange(false)}
+                onClick={() => void requestClose(false)}
                 disabled={mutations.transfer.isPending}
               >
                 取消

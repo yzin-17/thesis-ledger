@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useToastManager } from '@/components/ui/toast';
 
@@ -198,21 +199,14 @@ export function PerformanceDashboard({
 
   return (
     <section className="module-page performance-page w-full">
-      <header className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="kicker text-[10px]">收益表现</p>
-          <h1>收益分析</h1>
-          <p className="m-0 mt-2 max-w-3xl text-sm text-muted-foreground">
-            基于历史快照计算收益，不触发自动交易。
-          </p>
-        </div>
-        <PortfolioModeSwitch
-          mode={mode}
-          onModeChange={onModeChange}
-          ariaLabel="收益范围"
-          className="shrink-0 pt-1"
-        />
-      </header>
+      <PageHeader
+        eyebrow="PERFORMANCE"
+        title="收益分析"
+        description="查看资产走势、历史收益与配置目标。"
+        actions={
+          <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="收益范围" />
+        }
+      />
       {mode === 'shadow' ? (
         <PortfolioModeNote>当前收益只计算模拟账户，结果仅用于研究。</PortfolioModeNote>
       ) : null}

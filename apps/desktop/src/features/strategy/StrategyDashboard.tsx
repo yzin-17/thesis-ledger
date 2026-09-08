@@ -1,10 +1,10 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
 import type { LoadState } from '../shared/types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import {
   useCancelBacktestMutation,
   useCreateStrategyMutation,
@@ -53,6 +53,7 @@ export function StrategyDashboard() {
   const cancelMutation = useCancelBacktestMutation();
   const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
   const jobs: BacktestJob[] = jobsQuery.data ?? [];
+  const strategyRefreshing = strategiesQuery.isFetching || jobsQuery.isFetching;
   let loadState: LoadState = 'loading';
   if (strategiesQuery.isError || jobsQuery.isError) {
     loadState = strategies.length || jobs.length ? 'stale' : 'error';
@@ -97,40 +98,33 @@ export function StrategyDashboard() {
   };
 
   const selectedJob = resultJob ? (jobs.find((job) => job.id === resultJob.id) ?? resultJob) : null;
+  const selectedStrategy = selectedJob
+    ? strategies.find((candidate) =>
+        candidate.versions.some(
+          (candidateVersion) => candidateVersion.id === selectedJob.strategyVersionId,
+        ),
+      )
+    : null;
+  const selectedVersion = selectedStrategy?.versions.find(
+    (candidate) => candidate.id === selectedJob?.strategyVersionId,
+  );
   return (
     <section className="module-page">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="kicker">Strategy Lab</p>
-          <h1>策略实验</h1>
-          <p className="page-description">
-            用版本化 Schema
-            记录策略假设，配置可复现的回测，并保留数据时点、引擎版本、成本和偏差提示。
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2 pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={loadState === 'loading'}
+      <PageHeader
+        eyebrow="STRATEGY LAB"
+        title="策略实验"
+        description="创建投资策略，通过历史回测评估表现。"
+        actions={
+          <RefreshIconButton
+            label="刷新策略与回测任务"
+            refreshing={strategyRefreshing}
             onClick={() => void load()}
-          >
-            <RefreshCw data-icon="inline-start" />
-            刷新
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setEditorSelection({ mode: 'create', strategy: null, version: null })}
-          >
-            新建策略
-          </Button>
-        </div>
-      </div>
+          />
+        }
+      />
       <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-        <TabsList variant="line" className="w-full justify-start">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList variant="line" className="w-full">
           <TabsTrigger value="library">策略库</TabsTrigger>
           <TabsTrigger value="jobs">
             回测任务{jobs.length > 0 ? ` (${jobs.length})` : ''}
@@ -156,6 +150,7 @@ export function StrategyDashboard() {
             onRun={(jobId) => void actions.run(jobId)}
             onCancel={(jobId) => void actions.cancel(jobId)}
             onViewResult={setResultJob}
+            onOpenLibrary={() => setActiveTab('library')}
           />
         </TabsContent>
       </Tabs>
@@ -187,6 +182,8 @@ export function StrategyDashboard() {
       />
       <StrategyResultDialog
         job={selectedJob}
+        strategy={selectedStrategy ?? null}
+        version={selectedVersion ?? null}
         open={resultJob !== null}
         onOpenChange={(open) => {
           if (!open) setResultJob(null);

@@ -122,6 +122,7 @@ type Holding = {
   entryPrice: number;
   entryFees: number;
   boughtAt: string;
+  peakDecisionPrice: number;
 };
 type PendingOrder = {
   symbol: string;
@@ -284,6 +285,8 @@ export const runBacktest = (input: {
   const latestCloseBySymbol = new Map<string, number>();
   const pendingOrders = new Map<string, PendingOrder>();
   const barsByDate = new Map<string, BacktestBar[]>();
+  const trueRangesBySymbol = new Map<string, number[]>();
+  const atrBySymbol = new Map<string, number | undefined>();
   for (const bar of bars) {
     const dailyBars = barsByDate.get(bar.date) ?? [];
     dailyBars.push(bar);
@@ -292,6 +295,21 @@ export const runBacktest = (input: {
 
   let cash = input.initialCash;
   let previousValue = input.initialCash;
+
+  const addTrueRange = (bar: BacktestBar, previousBar: BacktestBar | undefined) => {
+    if (!previousBar) return undefined;
+    const trueRange = Math.max(
+      bar.high - bar.low,
+      Math.abs(bar.high - (bar.previousClose ?? previousBar.close)),
+      Math.abs(bar.low - (bar.previousClose ?? previousBar.close)),
+    );
+    const ranges = trueRangesBySymbol.get(bar.symbol) ?? [];
+    ranges.push(trueRange);
+    if (ranges.length > 14) ranges.shift();
+    trueRangesBySymbol.set(bar.symbol, ranges);
+    if (ranges.length < 14) return undefined;
+    return ranges.reduce((sum, value) => sum + value, 0) / ranges.length;
+  };
 
   const portfolioValue = (prices: ReadonlyMap<string, number>) =>
     cash +
@@ -303,19 +321,46 @@ export const runBacktest = (input: {
       0,
     );
 
-  const buy = (bar: BacktestBar, price: number, valuationPrices: ReadonlyMap<string, number>) => {
+  const decisionPriceFor = (bar: BacktestBar) =>
+    strategy.execution.price === 'open' ? bar.open : bar.close;
+
+  const buy = (
+    bar: BacktestBar,
+    price: number,
+    valuationPrices: ReadonlyMap<string, number>,
+    atr: number | undefined,
+  ) => {
     if (holdings.has(bar.symbol)) return;
     const currentValue = portfolioValue(valuationPrices);
-    const budget =
-      strategy.sizing.type === 'fixed'
-        ? strategy.sizing.value
-        : strategy.sizing.type === 'weight'
-          ? cash * strategy.sizing.value
-          : cash * Math.min(strategy.sizing.value, 1);
+    let budget = strategy.sizing.value;
+    let riskDistance: number | undefined;
+    if (strategy.sizing.type === 'weight') {
+      budget = cash * strategy.sizing.value;
+    } else if (strategy.sizing.type === 'risk') {
+      if (strategy.stopLoss.type === 'fixed' || strategy.stopLoss.type === 'trailing') {
+        riskDistance = price * strategy.stopLoss.value;
+      } else if (atr !== undefined) {
+        riskDistance = atr * strategy.stopLoss.value;
+      }
+      if (riskDistance === undefined || riskDistance <= 0) {
+        rejectedOrders.push({
+          symbol: bar.symbol,
+          side: 'buy',
+          quantity: 0,
+          price,
+          date: bar.date,
+          reason: '缺少可计算的止损距离',
+        });
+        return;
+      }
+      budget = (currentValue * strategy.sizing.value) / riskDistance;
+    }
+    const quantityBudget =
+      strategy.sizing.type === 'risk' ? budget : budget / Math.max(price, 0.000001);
     const decision = simulateAStockExecution(
       {
         side: 'buy',
-        quantity: budget / Math.max(price, 0.000001),
+        quantity: quantityBudget,
         price,
         previousClose: bar.previousClose ?? price,
         tradingDate: bar.date,
@@ -345,6 +390,7 @@ export const runBacktest = (input: {
         entryPrice: decision.fillPrice,
         entryFees: decision.fees,
         boughtAt: bar.date,
+        peakDecisionPrice: price,
       });
       trades.push({
         symbol: bar.symbol,
@@ -448,11 +494,17 @@ export const runBacktest = (input: {
       if (bar.dividend && bar.dividend > 0) cash += holding.quantity * bar.dividend;
     }
 
+    for (const bar of dailyBars) {
+      const previousBar = previousBarBySymbol.get(bar.symbol);
+      atrBySymbol.set(bar.symbol, addTrueRange(bar, previousBar));
+    }
+
     if (strategy.execution.price === 'nextOpen') {
       for (const bar of dailyBars) {
         const pending = pendingOrders.get(bar.symbol);
         if (!pending || bar.suspended) continue;
-        if (pending.side === 'buy') buy(bar, bar.open, valuationPrices);
+        if (pending.side === 'buy')
+          buy(bar, bar.open, valuationPrices, atrBySymbol.get(bar.symbol));
         else sell(bar, bar.open, pending.reason);
         pendingOrders.delete(bar.symbol);
       }
@@ -461,21 +513,48 @@ export const runBacktest = (input: {
     for (const bar of dailyBars) {
       const previousBar = previousBarBySymbol.get(bar.symbol);
       const holding = holdings.get(bar.symbol);
-      const decisionPrice = strategy.execution.price === 'open' ? bar.open : bar.close;
+      const decisionPrice = decisionPriceFor(bar);
+      const atr = atrBySymbol.get(bar.symbol);
+      if (
+        strategy.stopLoss.type === 'atr' &&
+        atr === undefined &&
+        !warnings.includes('ATR 止损样本不足，未触发')
+      ) {
+        warnings.push('ATR 止损样本不足，未触发');
+      }
       if (holding) {
+        holding.peakDecisionPrice = Math.max(holding.peakDecisionPrice, decisionPrice);
         let reason: BacktestTrade['reason'] | null = null;
         if (
           strategy.stopLoss.type === 'fixed' &&
           decisionPrice <= holding.entryPrice * (1 - strategy.stopLoss.value)
-        )
+        ) {
           reason = 'stop';
-        if (
+        } else if (
+          strategy.stopLoss.type === 'trailing' &&
+          decisionPrice <= holding.peakDecisionPrice * (1 - strategy.stopLoss.value)
+        ) {
+          reason = 'stop';
+        } else if (
+          strategy.stopLoss.type === 'atr' &&
+          atr !== undefined &&
+          decisionPrice <= holding.entryPrice - atr * strategy.stopLoss.value
+        ) {
+          reason = 'stop';
+        } else if (
           strategy.takeProfit?.type === 'fixed' &&
           decisionPrice >= holding.entryPrice * (1 + strategy.takeProfit.value)
-        )
+        ) {
           reason = 'takeprofit';
-        if (matchesSignals(bar, previousBar, strategy.exitSignals, strategy.exitCondition))
+        } else if (
+          strategy.takeProfit?.type === 'trailing' &&
+          holding.peakDecisionPrice > holding.entryPrice &&
+          decisionPrice <= holding.peakDecisionPrice * (1 - strategy.takeProfit.value)
+        ) {
+          reason = 'takeprofit';
+        } else if (matchesSignals(bar, previousBar, strategy.exitSignals, strategy.exitCondition)) {
           reason = 'signal';
+        }
         if (bar.date === input.end && reason === null) reason = 'end';
         if (reason) {
           if (strategy.execution.price === 'nextOpen') {
@@ -493,7 +572,7 @@ export const runBacktest = (input: {
           if (!pendingOrders.has(bar.symbol))
             pendingOrders.set(bar.symbol, { symbol: bar.symbol, side: 'buy', reason: 'signal' });
         } else {
-          buy(bar, decisionPrice, valuationPrices);
+          buy(bar, decisionPrice, valuationPrices, atr);
         }
       }
       previousBarBySymbol.set(bar.symbol, bar);
@@ -555,20 +634,34 @@ export const runBacktest = (input: {
       ),
     );
   }
-  if (input.benchmarkBars?.length) {
+  if (strategy.benchmark && !input.benchmarkBars?.length) {
+    warnings.push('基准行情不可用，已跳过基准比较');
+  } else if (input.benchmarkBars?.length) {
     const benchmark = input.benchmarkBars.filter(
-      (bar) => bar.date >= input.start && bar.date <= input.end,
+      (bar) =>
+        bar.symbol === strategy.benchmark &&
+        bar.date >= input.start &&
+        bar.date <= input.end &&
+        (!bar.availableAt || bar.availableAt <= input.dataAsOf),
     );
-    if (benchmark.length < 2) warnings.push('benchmark 数据不足');
+    const strategyValues = new Map(equityCurve.map((point) => [point.date, point.value]));
+    const benchmarkValues = new Map(benchmark.map((bar) => [bar.date, bar.close]));
+    const commonDates = [...strategyValues.keys()]
+      .filter((date) => benchmarkValues.has(date))
+      .sort();
+    if (commonDates.length < 2) warnings.push('benchmark 数据不足');
     else {
-      const benchmarkReturns = benchmark.slice(1).map((bar, index) => {
-        const previous = benchmark[index]?.close ?? bar.close;
-        return previous === 0 ? 0 : bar.close / previous - 1;
+      const strategyReturns = commonDates.slice(1).map((date, index) => {
+        const previous = strategyValues.get(commonDates[index]!) ?? 0;
+        const current = strategyValues.get(date) ?? previous;
+        return previous === 0 ? 0 : current / previous - 1;
       });
-      result.benchmark = compareBenchmark(
-        returns.slice(1, benchmarkReturns.length + 1),
-        benchmarkReturns,
-      );
+      const benchmarkReturns = commonDates.slice(1).map((date, index) => {
+        const previous = benchmarkValues.get(commonDates[index]!) ?? 0;
+        const current = benchmarkValues.get(date) ?? previous;
+        return previous === 0 ? 0 : current / previous - 1;
+      });
+      result.benchmark = compareBenchmark(strategyReturns, benchmarkReturns);
     }
   }
   return result;

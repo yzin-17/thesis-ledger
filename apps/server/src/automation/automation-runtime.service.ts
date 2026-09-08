@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { automationJobTypes, type AutomationJobType } from '@thesis-ledger/schemas';
 import { RecurringCashDepositService } from '../cash-plans/recurring-cash-deposit.service.js';
+import { RecurringFundInvestmentService } from '../fund-plans/recurring-fund-investment.service.js';
 import { PerformanceSnapshotService } from '../performance/performance-snapshot.service.js';
 import { PerformanceValuationSeriesService } from '../performance/performance-valuation-series.service.js';
 import { MarketService } from '../market/market.service.js';
@@ -24,6 +25,7 @@ export class AutomationRuntimeHandlers {
     private readonly providerHealth: ProviderHealthService,
     private readonly dataExport: DataExportService,
     private readonly recurringCashDeposits: RecurringCashDepositService,
+    private readonly recurringFundInvestments: RecurringFundInvestmentService,
     @Optional() private readonly valuationSeries?: PerformanceValuationSeriesService,
     @Optional() private readonly snapshots?: PerformanceSnapshotService,
   ) {}
@@ -134,6 +136,10 @@ export class AutomationRuntimeHandlers {
       'cash-deposit-materialization': this.handler(
         'cash-deposit-materialization',
         async (_signal, scheduledAt) => this.recurringCashDeposits.materializeDue(scheduledAt),
+      ),
+      'fund-investment-materialization': this.handler(
+        'fund-investment-materialization',
+        async (_signal, scheduledAt) => this.recurringFundInvestments.materializeDue(scheduledAt),
       ),
     } satisfies Record<AutomationJobType, AutomationHandler>;
 

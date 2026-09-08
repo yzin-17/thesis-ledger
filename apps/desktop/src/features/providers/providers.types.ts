@@ -169,6 +169,7 @@ export const automationJobTypeLabels: Record<string, string> = {
   backup: '数据备份',
   'provider-health': 'Provider 健康检查',
   'cash-deposit-materialization': '定期入账生成',
+  'fund-investment-materialization': '基金定投待确认生成',
 };
 
 export const automationJobTypeLabel = (type: string) =>

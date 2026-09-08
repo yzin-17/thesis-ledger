@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -13,17 +19,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import type { Position, Account } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account, type Position } from '../portfolio/portfolio.types.js';
 
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
 import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
 import { ScreenshotImportReview } from './ScreenshotImportReview.js';
-
-const accountTypeLabel = (type: Account['type']) => {
-  if (type === 'fund') return '基金';
-  if (type === 'cash') return '现金';
-  return '证券';
-};
 
 export function ImportReview({
   accounts,
@@ -271,15 +271,14 @@ function ImportPositionPage({
           >
             <SelectTrigger aria-label="当前账户" className="w-full">
               <SelectValue placeholder="选择账户">
-                {selectedAccount?.name ?? '选择账户'}
+                {selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 {accounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
-                    {account.name} · {account.institution || '未填写机构'} · {account.currency} ·{' '}
-                    {accountTypeLabel(account.type)} · {account.mode === 'shadow' ? '模拟' : '实际'}
+                    {accountDisplayLabel(account)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -333,14 +332,15 @@ function ImportPositionPage({
         <SheetContent
           side="right"
           aria-describedby="screenshot-import-description"
-          className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] gap-0 overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
+          size="form"
+          className="h-[100dvh] overflow-auto p-6"
         >
-          <div className="panel-heading">
+          <SheetHeader>
             <SheetTitle>截图导入</SheetTitle>
             <SheetDescription id="screenshot-import-description">
               上传不会直接修改持仓；请在提交前完成代码、数量和成本价审核。
             </SheetDescription>
-          </div>
+          </SheetHeader>
           <ScreenshotImportReview
             accounts={accounts}
             initialAccountId={accountId}

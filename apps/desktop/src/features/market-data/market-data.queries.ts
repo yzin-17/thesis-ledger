@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   fetchCatalogJob,
   fetchCatalogStatus,
+  fetchDailyBarCacheStatus,
   fetchMarketPolicy,
   fetchMarketProviders,
   searchMarketInstruments,
@@ -13,6 +14,7 @@ export const marketDataKeys = {
   policy: () => [...marketDataKeys.root, 'policy'] as const,
   providers: () => [...marketDataKeys.root, 'providers'] as const,
   catalog: () => [...marketDataKeys.root, 'catalog'] as const,
+  dailyBarCache: () => [...marketDataKeys.root, 'daily-bar-cache'] as const,
   catalogJob: (jobId: string) => [...marketDataKeys.catalog(), 'job', jobId] as const,
   search: (query: string) => [...marketDataKeys.root, 'instruments', query] as const,
 };
@@ -24,7 +26,11 @@ export const useMarketDataQueries = () => {
     queryFn: fetchMarketProviders,
   });
   const catalog = useQuery({ queryKey: marketDataKeys.catalog(), queryFn: fetchCatalogStatus });
-  return { policy, providers, catalog };
+  const dailyBarCache = useQuery({
+    queryKey: marketDataKeys.dailyBarCache(),
+    queryFn: fetchDailyBarCacheStatus,
+  });
+  return { policy, providers, catalog, dailyBarCache };
 };
 
 const terminalCatalogState = (status: CatalogStatus | undefined) =>

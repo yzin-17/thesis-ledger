@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
@@ -14,12 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import type { Account } from '../portfolio/portfolio.types.js';
-import type { Position } from '../portfolio/portfolio.types.js';
+import { accountDisplayLabel, type Account, type Position } from '../portfolio/portfolio.types.js';
 import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
 import { useRemovePortfolioPositionMutation } from '../portfolio/portfolio.mutations.js';
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
@@ -47,13 +53,6 @@ import type {
   ExecutionEvent,
   VoidEvent,
 } from './account-data.types.js';
-
-function accountDisplayLabel(account: Account) {
-  const modeLabel = account.mode === 'shadow' ? '模拟' : '实际';
-  const institutionLabel =
-    account.institution && account.institution !== account.name ? ` · ${account.institution}` : '';
-  return `${account.name}${institutionLabel} · ${account.currency} · ${modeLabel}`;
-}
 
 export function AccountDataPage({
   accounts,
@@ -335,6 +334,7 @@ export function AccountDataPage({
   if (accountsError && accounts.length === 0) {
     return (
       <AccountDataFrame>
+        <PageHeader className="mb-0" eyebrow="ACCOUNT DATA" title="账户数据" />
         <Alert variant="destructive">
           <AlertTitle>账户读取失败</AlertTitle>
           <AlertDescription>无法打开账户数据。请检查服务状态后重试。</AlertDescription>
@@ -351,12 +351,12 @@ export function AccountDataPage({
   if (accounts.length === 0) {
     return (
       <AccountDataFrame>
-        <div className="flex flex-col gap-2">
-          <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
-          <p className="m-0 max-w-2xl text-sm leading-6 text-muted-foreground">
-            先创建一个账户，再录入真实成交或记录持仓快照。
-          </p>
-        </div>
+        <PageHeader
+          className="mb-0"
+          eyebrow="ACCOUNT DATA"
+          title="账户数据"
+          description="先创建一个账户，再录入成交、持仓或现金。"
+        />
         <PortfolioManagement
           accounts={accounts}
           positions={[]}
@@ -374,14 +374,16 @@ export function AccountDataPage({
 
   return (
     <AccountDataFrame>
-      <div className="min-w-0">
-        <h1 className="m-0 text-3xl font-semibold tracking-tight">资产录入</h1>
-        <p className="m-0 mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          {isCashAccount
-            ? '现金账户支持现金入账、账户划转和定期入账。'
-            : '真实成交是主录入入口；持仓和现金只记录快照，不会伪造成交。'}
-        </p>
-      </div>
+      <PageHeader
+        className="mb-0"
+        eyebrow="ACCOUNT DATA"
+        title="账户数据"
+        description={
+          isCashAccount
+            ? '管理现金入账、账户划转和定期入账。'
+            : '录入真实成交，管理持仓与现金快照。'
+        }
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Field className="min-w-0 flex-1 sm:flex-row sm:items-center sm:gap-3">
@@ -418,7 +420,7 @@ export function AccountDataPage({
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => void selectTab(value as AccountDataTab)}>
-        <TabsList variant="line" className="min-h-11 w-fit">
+        <TabsList variant="line">
           {!isCashAccount && <TabsTrigger value="positions">持仓</TabsTrigger>}
           {!isCashAccount && <TabsTrigger value="transactions">成交记录</TabsTrigger>}
           <TabsTrigger value="cash">现金</TabsTrigger>
@@ -569,15 +571,14 @@ export function AccountDataPage({
           void closeImport(open);
         }}
       >
-        <SheetContent
-          side="right"
-          className="h-[100dvh] w-[900px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
-        >
-          <SheetTitle>持仓快照导入草稿</SheetTitle>
-          <SheetDescription>
-            上传只创建可审阅草稿；原始证据、来源行、重复和冲突状态会保留，提交前不会写入持仓。
-          </SheetDescription>
-          <div className="mt-4 min-h-0">
+        <SheetContent side="right" size="detail" className="h-[100dvh] overflow-auto p-6">
+          <SheetHeader>
+            <SheetTitle>持仓快照导入草稿</SheetTitle>
+            <SheetDescription>
+              上传只创建可审阅草稿；原始证据、来源行、重复和冲突状态会保留，提交前不会写入持仓。
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0">
             <ScreenshotImportReview
               accounts={accounts}
               initialAccountId={selectedAccount.id}
@@ -598,7 +599,8 @@ export function AccountDataPage({
         <SheetContent
           side="right"
           aria-describedby="account-manager-description"
-          className="h-[100dvh] min-h-0 w-[720px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+          size="form"
+          className="h-[100dvh] min-h-0 overflow-hidden p-6"
         >
           <PortfolioManagement
             accounts={accounts}
@@ -634,7 +636,7 @@ function AccountDataFrame({ children }: { children: React.ReactNode }) {
 function AccountDataLoading() {
   return (
     <AccountDataFrame>
-      <Skeleton className="h-8 w-32" />
+      <PageHeader className="mb-0" eyebrow="ACCOUNT DATA" title="账户数据" />
       <Skeleton className="h-24 w-full" />
       <Skeleton className="h-96 w-full" />
     </AccountDataFrame>

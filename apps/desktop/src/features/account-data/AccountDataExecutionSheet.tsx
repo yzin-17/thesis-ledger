@@ -14,7 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { LoaderCircle } from 'lucide-react';
@@ -215,7 +221,8 @@ export function ExecutionFormSheet({
       : undefined;
     let settlementTiming: { expectedAt?: string; settledAt?: string } = {};
     if (settlementAt) {
-      if (new Date(settlementAt).getTime() > Date.now()) settlementTiming = { expectedAt: settlementAt };
+      if (new Date(settlementAt).getTime() > Date.now())
+        settlementTiming = { expectedAt: settlementAt };
       else settlementTiming = { settledAt: settlementAt };
     }
     const payload = {
@@ -288,21 +295,18 @@ export function ExecutionFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={close}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[680px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="shrink-0">
+      <SheetContent side="right" size="form" className="h-[100dvh] min-h-0 overflow-hidden p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
             <SheetTitle>{editingEvent ? '更正成交' : '录入成交'}</SheetTitle>
             <SheetDescription>
               {editingEvent
                 ? '更正会生成新的 REPLACE 版本，原始成交和原因仍可在修正链中审计。'
                 : '录入真实 BUY/SELL 事实；提交使用稳定客户端命令 ID，重复重放不会重复写入。'}
             </SheetDescription>
-          </div>
+          </SheetHeader>
           <form
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(event) => void submit(event)}
           >
             <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">

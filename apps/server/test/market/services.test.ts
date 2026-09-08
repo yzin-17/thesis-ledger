@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MarketService } from '../../src/market/market.service.js';
+import { MarketController } from '../../src/market/market.controller.js';
 import { MarketStorageService } from '../../src/market/market-storage.service.js';
 import { DataQualityService } from '../../src/quality/data-quality.service.js';
 
@@ -213,6 +214,173 @@ describe('行情缓存', () => {
       symbol: '600519.SH',
       provider: 'dsa-fork',
       engineVersion: 'fixture',
+    });
+  });
+
+  it('日线接口把回测区间和数量上限透传给 DSA', async () => {
+    const dsa = { get: vi.fn(async () => []) };
+    const service = new MarketService(dsa as never, {} as never);
+    const controller = new MarketController(service, {} as never, {} as never);
+
+    await controller.bars('510300.SH', '1d', '2025-09-08', '2026-09-08', '365');
+
+    expect(dsa.get).toHaveBeenCalledWith(
+      '/api/v1/thesis-ledger/market/bars?symbol=510300.SH&timeframe=1d&start=2025-09-08&end=2026-09-08&limit=365',
+    );
+  });
+
+  it('日线相同范围命中本地缓存并把实际上游来源持久化', async () => {
+    const values = new Map<string, string>();
+    const timestamp = '2025-01-01T00:00:00Z';
+    const dsa = {
+      get: vi.fn(async () => [
+        {
+          timestamp,
+          open: 10,
+          high: 11,
+          low: 9,
+          close: 10,
+          volume: 1,
+          amount: 10,
+          provider: 'akshare',
+          upstreamSource: 'tencent',
+        },
+      ]),
+    };
+    const set = vi.fn(async (key: string, value: string, mode: string) => {
+      if (mode === 'EX') values.set(key, value);
+      return 'OK';
+    });
+    const redis = {
+      client: {
+        get: vi.fn(async (key: string) => values.get(key) ?? null),
+        set,
+        eval: vi.fn(async () => 0),
+      },
+    };
+    const upsertBar = vi.fn(async () => ({}));
+    const prisma = {
+      asset: { upsert: vi.fn(async () => ({})) },
+      marketBar: { upsert: upsertBar },
+      $transaction: vi.fn(async (operations: unknown[]) => Promise.all(operations)),
+    };
+    const service = new MarketService(dsa as never, redis as never, prisma as never);
+    const range = { start: '2025-01-01', end: '2025-01-31', limit: 30 };
+
+    const first = await service.getBars('600519.SH', '1d', range);
+    const second = await service.getBars('600519.SH', '1d', range);
+
+    expect(dsa.get).toHaveBeenCalledTimes(1);
+    expect(first[0]).toMatchObject({ servedFromCache: false, upstreamSource: 'tencent' });
+    expect(second[0]).toMatchObject({ servedFromCache: true, upstreamSource: 'tencent' });
+    expect(upsertBar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ upstreamSource: 'tencent' }),
+      }),
+    );
+  });
+
+  it('日线缓存不可用时仍返回 DSA 结果', async () => {
+    const timestamp = '2025-01-01T00:00:00Z';
+    const dsa = {
+      get: vi.fn(async () => [
+        {
+          timestamp,
+          open: 10,
+          high: 11,
+          low: 9,
+          close: 10,
+          volume: 1,
+          amount: 10,
+          provider: 'akshare',
+        },
+      ]),
+    };
+    const redis = {
+      client: {
+        get: vi.fn(async () => {
+          throw new Error('redis unavailable');
+        }),
+        set: vi.fn(async () => {
+          throw new Error('redis unavailable');
+        }),
+      },
+    };
+    const prisma = {
+      asset: {
+        upsert: vi.fn(async () => {
+          throw new Error('database unavailable');
+        }),
+      },
+    };
+    const service = new MarketService(dsa as never, redis as never, prisma as never);
+
+    await expect(service.getBars('600519.SH', '1d')).resolves.toMatchObject([
+      { provider: 'akshare', servedFromCache: false },
+    ]);
+    expect(dsa.get).toHaveBeenCalledOnce();
+  });
+
+  it('要求新鲜行情时拒绝缓存中的 stale 日线', async () => {
+    const redis = {
+      client: {
+        get: vi.fn(async () =>
+          JSON.stringify([
+            {
+              version: 1,
+              symbol: '600519.SH',
+              timeframe: '1d',
+              timestamp: '2025-01-01T00:00:00Z',
+              open: 10,
+              high: 11,
+              low: 9,
+              close: 10,
+              volume: 1,
+              amount: 10,
+              provider: 'akshare',
+              fetchedAt: '2025-01-01T00:00:01Z',
+              freshness: 'stale',
+              fallbackUsed: false,
+              servedFromCache: false,
+            },
+          ]),
+        ),
+      },
+    };
+    const dsa = { get: vi.fn() };
+    const service = new MarketService(dsa as never, redis as never);
+
+    await expect(
+      service.getBars('600519.SH', '1d', undefined, { allowStale: false }),
+    ).rejects.toThrow('Bar 行情陈旧');
+    expect(dsa.get).not.toHaveBeenCalled();
+  });
+
+  it('汇总本地日线缓存规模和真实来源', async () => {
+    const groupBy = vi
+      .fn()
+      .mockResolvedValueOnce([{ symbol: '510300.SH' }, { symbol: '600519.SH' }])
+      .mockResolvedValueOnce([
+        { provider: 'akshare', upstreamSource: 'tencent', _count: { _all: 243 } },
+      ]);
+    const prisma = {
+      marketBar: {
+        count: vi.fn(async () => 243),
+        groupBy,
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce({ timestamp: new Date('2026-09-08T00:00:00Z') })
+          .mockResolvedValueOnce({ fetchedAt: new Date('2026-09-08T09:00:00Z') }),
+      },
+    };
+    const service = new MarketStorageService(prisma as never, {} as never, {} as never);
+
+    await expect(service.dailyBarCacheStatus()).resolves.toEqual({
+      barCount: 243,
+      symbolCount: 2,
+      latestMarketDate: '2026-09-08T00:00:00.000Z',
+      updatedAt: '2026-09-08T09:00:00.000Z',
+      sources: [{ provider: 'akshare', upstreamSource: 'tencent', count: 243 }],
     });
   });
 

@@ -27,6 +27,11 @@ export interface BacktestJobResult {
   metrics?: Record<string, unknown>;
   equityCurve?: Array<{ date: string; value: number }>;
   trades?: Array<Record<string, unknown>>;
+  rejectedOrders?: Array<Record<string, unknown>>;
+  warnings?: unknown;
+  completeness?: Record<string, unknown>;
+  benchmark?: Record<string, unknown>;
+  analytics?: Record<string, unknown>;
   engineVersion?: string;
   dataAsOf?: string;
   metadata?: Record<string, unknown>;
@@ -71,6 +76,11 @@ export interface BacktestSetupInput {
   inSampleEnd?: string;
 }
 
+export interface FetchStrategyBarsInput {
+  symbol: string;
+  period: { start: string; end: string };
+}
+
 export interface QueueBacktestInput {
   id: string;
   strategyVersionId: string;
@@ -81,6 +91,7 @@ export interface QueueBacktestInput {
   warnings: string[];
   strategy: StrategySchema;
   bars: unknown[];
+  benchmarkBars?: unknown[];
   initialCash: number;
   allowStale?: boolean;
 }

@@ -67,6 +67,8 @@ model Account {
   cashSettlements        CashSettlement[]
   cashDepositPlans       RecurringCashDepositPlan[]
   cashDepositOccurrences RecurringCashDepositOccurrence[]
+  fundInvestmentPlans    RecurringFundInvestmentPlan[]
+  fundInvestmentOccurrences RecurringFundInvestmentOccurrence[]
 
   @@index([active])
 }
@@ -112,6 +114,7 @@ model Asset {
   bars                        MarketBar[]
   fundNavPoints               FundNavPoint[]
   instrumentAssetAssociations InstrumentAssetAssociation[]
+  recurringInvestmentPlans   RecurringFundInvestmentPlan[]
 }
 
 model FundNavPoint {
@@ -497,6 +500,7 @@ model LedgerEvent {
   supersedesEvent        LedgerEvent?                     @relation("LedgerRevisionChain", fields: [supersedesEventId], references: [id], onDelete: Restrict)
   laterRevisions         LedgerEvent[]                    @relation("LedgerRevisionChain")
   cashDepositOccurrences RecurringCashDepositOccurrence[]
+  fundInvestmentOccurrences RecurringFundInvestmentOccurrence[]
 
   @@unique([accountId, sourceChannel, externalId])
   @@unique([supersedesEventId])
@@ -594,6 +598,7 @@ model MarketBar {
   volume       Decimal  @db.Decimal(30, 8)
   amount       Decimal  @db.Decimal(30, 8)
   provider     String
+  upstreamSource String?
   fetchedAt    DateTime @default(now())
   freshness    String   @default("unknown")
   fallbackUsed Boolean  @default(false)
@@ -889,6 +894,67 @@ model RecurringCashDepositOccurrence {
   plan           RecurringCashDepositPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
   account        Account                  @relation(fields: [accountId], references: [id], onDelete: Restrict)
   ledgerEvent    LedgerEvent?             @relation(fields: [ledgerEventId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, periodKey])
+  @@index([accountId, status, scheduledFor])
+  @@index([status, scheduledFor])
+  @@index([ledgerEventId])
+}
+
+model RecurringFundInvestmentPlan {
+  id             String                              @id @default(uuid()) @db.Uuid
+  accountId      String                              @db.Uuid
+  name           String
+  symbol         String
+  fundName       String
+  expectedAmount Decimal                             @db.Decimal(38, 18)
+  currency       String
+  dayOfMonth     Int
+  timezone       String                              @default("Asia/Shanghai")
+  startPeriod    String
+  status         String                              @default("ACTIVE")
+  nextDueAt      DateTime?
+  version        Int                                 @default(1)
+  pausedAt       DateTime?
+  endedAt        DateTime?
+  createdAt      DateTime                            @default(now())
+  updatedAt      DateTime                            @updatedAt
+  account        Account                             @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  asset          Asset                               @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  occurrences    RecurringFundInvestmentOccurrence[]
+
+  @@index([accountId, status])
+  @@index([status, nextDueAt])
+  @@index([symbol])
+}
+
+model RecurringFundInvestmentOccurrence {
+  id             String                      @id @default(uuid()) @db.Uuid
+  planId         String                      @db.Uuid
+  accountId      String                      @db.Uuid
+  periodKey      String
+  planName       String
+  symbol         String
+  fundName       String
+  scheduledFor   DateTime
+  expectedAmount Decimal                     @db.Decimal(38, 18)
+  currency       String
+  status         String                      @default("PENDING")
+  actualQuantity Decimal?                    @db.Decimal(38, 18)
+  unitPrice      Decimal?                    @db.Decimal(38, 18)
+  commission     Decimal?                    @db.Decimal(38, 18)
+  occurredAt     DateTime?
+  ledgerEventId  String?                     @db.Uuid
+  ledgerFactId   String?                     @db.Uuid
+  version        Int                         @default(1)
+  skippedReason  String?
+  confirmedAt    DateTime?
+  skippedAt      DateTime?
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  plan           RecurringFundInvestmentPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  account        Account                     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  ledgerEvent    LedgerEvent?                @relation(fields: [ledgerEventId], references: [id], onDelete: Restrict)
 
   @@unique([planId, periodKey])
   @@index([accountId, status, scheduledFor])

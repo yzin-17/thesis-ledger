@@ -65,6 +65,7 @@ describe('Automation job types', () => {
       'backup',
       'provider-health',
       'cash-deposit-materialization',
+      'fund-investment-materialization',
     ]);
     expect(isMarketAutomationJobType('market-sync')).toBe(true);
     expect(isMarketAutomationJobType('risk-evaluation')).toBe(true);
@@ -75,6 +76,7 @@ describe('Automation job types', () => {
     expect(isMarketAutomationJobType('backup')).toBe(false);
     expect(isMarketAutomationJobType('provider-health')).toBe(false);
     expect(isMarketAutomationJobType('cash-deposit-materialization')).toBe(false);
+    expect(isMarketAutomationJobType('fund-investment-materialization')).toBe(false);
   });
 });
 
@@ -88,11 +90,33 @@ describe('Automation runtime handlers', () => {
       {} as never,
       {} as never,
       { materializeDue } as never,
+      { materializeDue: vi.fn() } as never,
     );
     const scheduledAt = new Date('2026-08-31T01:00:00.000Z');
 
     await expect(
       handlers.for('cash-deposit-materialization').run(new AbortController().signal, scheduledAt),
+    ).resolves.toEqual({ planCount: 1, results: [] });
+    expect(materializeDue).toHaveBeenCalledWith(scheduledAt);
+  });
+
+  it('基金定投 handler 使用调度时刻生成待确认记录', async () => {
+    const materializeDue = vi.fn(async () => ({ planCount: 1, results: [] }));
+    const handlers = new AutomationRuntimeHandlers(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { materializeDue: vi.fn() } as never,
+      { materializeDue } as never,
+    );
+    const scheduledAt = new Date('2026-09-08T01:00:00.000Z');
+
+    await expect(
+      handlers
+        .for('fund-investment-materialization')
+        .run(new AbortController().signal, scheduledAt),
     ).resolves.toEqual({ planCount: 1, results: [] });
     expect(materializeDue).toHaveBeenCalledWith(scheduledAt);
   });

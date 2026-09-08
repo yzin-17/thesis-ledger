@@ -61,6 +61,26 @@ const readDesktopSource = (directory: string): string[] =>
   });
 
 describe('Desktop UI contract - onboarding and portfolio', () => {
+  it('所有账户选择入口复用统一账户显示格式', () => {
+    const accountSelectorFiles = [
+      '../src/features/account-data/AccountDataPage.tsx',
+      '../src/features/account-data/AccountDataCashTransferSheet.tsx',
+      '../src/features/ai/NewResearchSheet.tsx',
+      '../src/features/import/ImportReview.tsx',
+      '../src/features/import/ScreenshotImportSections.tsx',
+      '../src/features/journal/JournalAccountSelector.tsx',
+      '../src/features/performance/PerformanceSections.tsx',
+      '../src/features/portfolio/PortfolioManagementSections.tsx',
+      '../src/features/portfolio/PortfolioTradeView.tsx',
+      '../src/features/risk/RiskRuleEditorSheet.tsx',
+    ];
+
+    for (const file of accountSelectorFiles) {
+      const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+      expect(source, file).toContain('accountDisplayLabel');
+    }
+  });
+
   it('uses the shared alert dialog for business confirmations', () => {
     const sources = readDesktopSource(desktopSourceDirectory);
     expect(sources.some((source) => source.includes('window.confirm'))).toBe(false);
@@ -76,6 +96,17 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     expect(confirmDialogSource).toContain('<AlertDialogClose');
     expect(confirmDialogSource).toContain('variant="outline"');
     expect(confirmDialogSource).toContain("variant={request.options.variant ?? 'default'}");
+  });
+
+  it('keeps line tabs free of full-width separator lines', () => {
+    const tabsSource = readFileSync(
+      new URL('../src/components/ui/tabs.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(tabsSource).not.toContain('rounded-none border-b border-border bg-transparent');
+    expect(tabsSource).toContain('[&>.panel]:border-t-0');
+    expect(tabsSource).toContain('[&>div:first-child>.panel:first-child]:border-t-0');
   });
 
   it('normalizes legacy health history arrays while supporting paginated responses', () => {

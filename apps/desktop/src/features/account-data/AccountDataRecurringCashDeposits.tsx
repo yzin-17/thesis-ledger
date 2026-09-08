@@ -53,10 +53,7 @@ const planStatus = (status: RecurringCashDepositPlan['status']) => {
   return '已结束';
 };
 
-const isOccurrenceOverdue = (
-  occurrence: RecurringCashDepositOccurrence,
-  now = new Date(),
-) => {
+const isOccurrenceOverdue = (occurrence: RecurringCashDepositOccurrence, now = new Date()) => {
   if (occurrence.status !== 'PENDING') return false;
   const scheduledAt = new Date(occurrence.scheduledFor).getTime();
   return !Number.isNaN(scheduledAt) && scheduledAt <= now.getTime();
@@ -78,10 +75,7 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
 
   if (!enabled) return null;
 
-  const changePlanState = async (
-    plan: RecurringCashDepositPlan,
-    action: PlanStateAction,
-  ) => {
+  const changePlanState = async (plan: RecurringCashDepositPlan, action: PlanStateAction) => {
     try {
       await mutations.changePlanState.mutateAsync({
         id: plan.id,
@@ -422,21 +416,18 @@ function PlanEditorSheet({
   };
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden sm:max-w-[calc(100%-16px)]"
-      >
-        <SheetHeader className="border-b">
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
+        <SheetHeader>
           <SheetTitle>
             {editor.mode === 'create' ? '新建定期入账计划' : '修改定期入账计划'}
           </SheetTitle>
           <SheetDescription>到期仅生成待确认记录，不会自动写入现金余额。</SheetDescription>
         </SheetHeader>
         <form
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col gap-6"
           onSubmit={(formEvent) => void submit(formEvent)}
         >
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="cash-plan-name">计划名称</FieldLabel>
@@ -480,7 +471,7 @@ function PlanEditorSheet({
               {error && <FieldError>{error}</FieldError>}
             </FieldGroup>
           </div>
-          <SheetFooter className="shrink-0 flex-row justify-end gap-2 border-t border-border p-4">
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -545,11 +536,8 @@ function OccurrenceActionSheet({
   };
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden sm:max-w-[calc(100%-16px)]"
-      >
-        <SheetHeader className="border-b">
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
+        <SheetHeader>
           <SheetTitle>{action.type === 'confirm' ? '确认实际入账' : '跳过本期入账'}</SheetTitle>
           <SheetDescription>
             {occurrence.planName} · {occurrence.periodKey} · 计划{' '}
@@ -560,10 +548,10 @@ function OccurrenceActionSheet({
           </SheetDescription>
         </SheetHeader>
         <form
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col gap-6"
           onSubmit={(formEvent) => void submit(formEvent)}
         >
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
             <FieldGroup>
               {action.type === 'confirm' ? (
                 <>
@@ -601,7 +589,7 @@ function OccurrenceActionSheet({
               {error && <FieldError>{error}</FieldError>}
             </FieldGroup>
           </div>
-          <SheetFooter className="border-t bg-popover">
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"

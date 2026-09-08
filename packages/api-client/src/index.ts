@@ -18,6 +18,10 @@ import {
   recurringCashDepositOccurrencesResponseSchema,
   recurringCashDepositPlanSchema,
   recurringCashDepositPlansResponseSchema,
+  recurringFundInvestmentOccurrenceSchema,
+  recurringFundInvestmentOccurrencesResponseSchema,
+  recurringFundInvestmentPlanSchema,
+  recurringFundInvestmentPlansResponseSchema,
   tradeCloseSliceQueryResponseSchemaV2,
   tradeDetailResponseSchemaV2,
   tradeListResponseSchemaV2,
@@ -68,6 +72,11 @@ import {
   type RecurringCashDepositOccurrence,
   type RecurringCashDepositPlan,
   type UpdateRecurringCashDepositPlan,
+  type ConfirmRecurringFundInvestmentOccurrence,
+  type CreateRecurringFundInvestmentPlan,
+  type RecurringFundInvestmentOccurrence,
+  type RecurringFundInvestmentPlan,
+  type UpdateRecurringFundInvestmentPlan,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -139,6 +148,11 @@ export type {
   RecurringCashDepositOccurrence,
   RecurringCashDepositPlan,
   UpdateRecurringCashDepositPlan,
+  ConfirmRecurringFundInvestmentOccurrence,
+  CreateRecurringFundInvestmentPlan,
+  RecurringFundInvestmentOccurrence,
+  RecurringFundInvestmentPlan,
+  UpdateRecurringFundInvestmentPlan,
 } from '@thesis-ledger/schemas';
 
 export type { JournalLegacyReviewCandidate } from '@thesis-ledger/schemas';
@@ -300,6 +314,83 @@ export class ThesisLedgerApiClient {
       ),
   };
 
+  readonly fundInvestments = {
+    getPlans: (
+      params: { accountId?: string; status?: 'ACTIVE' | 'PAUSED' | 'ENDED' } = {},
+    ): Promise<RecurringFundInvestmentPlan[]> =>
+      this.requestParsed(
+        `/fund-investment-plans${queryString(params)}`,
+        recurringFundInvestmentPlansResponseSchema,
+      ),
+    createPlan: (input: CreateRecurringFundInvestmentPlan): Promise<RecurringFundInvestmentPlan> =>
+      this.postParsed('/fund-investment-plans', input, recurringFundInvestmentPlanSchema),
+    updatePlan: (
+      id: string,
+      input: UpdateRecurringFundInvestmentPlan,
+    ): Promise<RecurringFundInvestmentPlan> =>
+      this.patchParsed(
+        `/fund-investment-plans/${encodeURIComponent(id)}`,
+        input,
+        recurringFundInvestmentPlanSchema,
+      ),
+    pausePlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
+      this.postParsed(
+        `/fund-investment-plans/${encodeURIComponent(id)}/pause`,
+        { expectedVersion },
+        recurringFundInvestmentPlanSchema,
+      ),
+    resumePlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
+      this.postParsed(
+        `/fund-investment-plans/${encodeURIComponent(id)}/resume`,
+        { expectedVersion },
+        recurringFundInvestmentPlanSchema,
+      ),
+    endPlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
+      this.postParsed(
+        `/fund-investment-plans/${encodeURIComponent(id)}/end`,
+        { expectedVersion },
+        recurringFundInvestmentPlanSchema,
+      ),
+    getOccurrences: (
+      params: {
+        accountId?: string;
+        planId?: string;
+        status?: 'PENDING' | 'CONFIRMED' | 'SKIPPED';
+      } = {},
+    ): Promise<RecurringFundInvestmentOccurrence[]> =>
+      this.requestParsed(
+        `/fund-investment-occurrences${queryString(params)}`,
+        recurringFundInvestmentOccurrencesResponseSchema,
+      ),
+    confirmOccurrence: (
+      id: string,
+      input: ConfirmRecurringFundInvestmentOccurrence,
+    ): Promise<RecurringFundInvestmentOccurrence> =>
+      this.postParsed(
+        `/fund-investment-occurrences/${encodeURIComponent(id)}/confirm`,
+        input,
+        recurringFundInvestmentOccurrenceSchema,
+      ),
+    skipOccurrence: (
+      id: string,
+      input: { expectedVersion: number; reason: string },
+    ): Promise<RecurringFundInvestmentOccurrence> =>
+      this.postParsed(
+        `/fund-investment-occurrences/${encodeURIComponent(id)}/skip`,
+        input,
+        recurringFundInvestmentOccurrenceSchema,
+      ),
+    reopenOccurrence: (
+      id: string,
+      expectedVersion: number,
+    ): Promise<RecurringFundInvestmentOccurrence> =>
+      this.postParsed(
+        `/fund-investment-occurrences/${encodeURIComponent(id)}/reopen`,
+        { expectedVersion },
+        recurringFundInvestmentOccurrenceSchema,
+      ),
+  };
+
   readonly risk = {
     getEvents: (
       params: { mode?: 'actual' | 'shadow'; cursor?: string; limit?: number; t?: number } = {},
@@ -366,17 +457,13 @@ export class ThesisLedgerApiClient {
       this.postParsed('/ledger/cash-flows/void', command, ledgerCommandResponseSchemaV2),
     restoreCashFlow: (command: RestoreCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
       this.postParsed('/ledger/cash-flows/restore', command, ledgerCommandResponseSchemaV2),
-    createCashTransfer: (
-      command: CreateCashTransferCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
+    createCashTransfer: (command: CreateCashTransferCommandV2): Promise<LedgerCommandResponseV2> =>
       this.postParsed('/ledger/cash-transfers', command, ledgerCommandResponseSchemaV2),
     replaceCashTransfer: (
       command: ReplaceCashTransferCommandV2,
     ): Promise<LedgerCommandResponseV2> =>
       this.postParsed('/ledger/cash-transfers/replace', command, ledgerCommandResponseSchemaV2),
-    voidCashTransfer: (
-      command: VoidCashTransferCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
+    voidCashTransfer: (command: VoidCashTransferCommandV2): Promise<LedgerCommandResponseV2> =>
       this.postParsed('/ledger/cash-transfers/void', command, ledgerCommandResponseSchemaV2),
     restoreCashTransfer: (
       command: RestoreCashTransferCommandV2,

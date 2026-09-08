@@ -1,7 +1,15 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -54,23 +62,30 @@ export const ProviderEditorSheet = ({
   onTest: () => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
 }) => {
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: providerDraft,
+    busy: savingProviderDraft || providerTestState === 'testing',
+    onOpenChange: (nextOpen) => (nextOpen ? onOpenChange(true) : onClose()),
+  });
   const credentialLabel = providerCredentialLabel(providerDraft.type);
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent
         side="right"
         aria-describedby="provider-form-description"
-        className="h-[100dvh] w-[620px] max-w-[calc(100%-16px)] overflow-auto p-6 sm:max-w-[calc(100%-16px)]"
+        size="form"
+        className="h-[100dvh] overflow-auto p-6"
       >
-        <div className="panel-heading">
+        <SheetHeader>
           <SheetTitle>{editingProviderName ? '更新 Provider' : '新增或更新 Provider'}</SheetTitle>
           <SheetDescription id="provider-form-description">
             凭证用于连接 Provider；已配置凭证不会回显，编辑时留空保存不会删除当前凭证。
           </SheetDescription>
-        </div>
+        </SheetHeader>
         <form
           key={editingProviderName ?? 'new-provider'}
-          className="form-card min-h-0 w-full max-w-none content-start overflow-auto"
+          className="grid min-h-0 w-full max-w-none content-start gap-6 overflow-auto"
           onSubmit={onSave}
         >
           <div className="grid gap-1.5 text-xs text-muted-foreground">
@@ -184,13 +199,13 @@ export const ProviderEditorSheet = ({
           {credentialLabel === '飞书 Webhook' && (
             <p className="form-help">测试连接会发送一条“ThesisLedger 连接测试”通知。</p>
           )}
-          <div className="form-actions">
+          <SheetFooter>
             <Button
               className="secondary"
               type="button"
               variant="outline"
               disabled={savingProviderDraft}
-              onClick={onClose}
+              onClick={() => void requestClose(false)}
             >
               取消
             </Button>
@@ -225,7 +240,7 @@ export const ProviderEditorSheet = ({
               )}
               {saveProviderLabel(savingProviderDraft, Boolean(editingProviderName))}
             </Button>
-          </div>
+          </SheetFooter>
         </form>
       </SheetContent>
     </Sheet>

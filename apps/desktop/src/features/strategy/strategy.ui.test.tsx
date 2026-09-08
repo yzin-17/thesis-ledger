@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -7,12 +8,30 @@ import {
   normalizeSingleSymbol,
   signalIndicatorOptions,
 } from './StrategyEditorSheet.js';
-import { StrategyJobs, StrategyLibrary, jobStatusLabel } from './StrategySections.js';
+import {
+  StrategyJobs,
+  StrategyLibrary,
+  formatBacktestDataAsOf,
+  jobStatusLabel,
+  uniqueBacktestWarnings,
+} from './StrategySections.js';
 import {
   createDefaultStrategySchema,
   schemaFromVersion,
   schemaSymbols,
 } from './strategy.schema.js';
+import {
+  fractionToPercent,
+  hasUnappliedJson,
+  percentToFraction,
+  shouldApplyAdvancedJson,
+  sizingDefaultValue,
+  sizingFieldDescription,
+  sizingFieldLabel,
+  stopLossDefaultValue,
+  stopLossFieldDescription,
+  stopLossFieldLabel,
+} from './strategy.formats.js';
 import { validateBacktestSetup } from './strategy.actions.js';
 import type { BacktestJob, StrategyRecord } from './strategy.types.js';
 
@@ -37,7 +56,48 @@ const job: BacktestJob = {
 };
 
 describe('策略实验工作台 UI 契约', () => {
-  it('策略库空态提供创建 CTA，非空态展示版本、状态和最近任务', () => {
+  it('页面头部使用共享刷新图标按钮并绑定两个策略查询的刷新状态', () => {
+    const source = readFileSync(new URL('./StrategyDashboard.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain("import { RefreshIconButton } from '../shared/RefreshIconButton.js';");
+    expect(source).toContain('<RefreshIconButton');
+    expect(source).toContain('label="刷新策略与回测任务"');
+    expect(source).toContain('refreshing={strategyRefreshing}');
+    expect(source).not.toContain("from 'lucide-react'");
+  });
+
+  it('回测弹窗说明后台准备行情与任务进度位置', () => {
+    const source = readFileSync(new URL('./BacktestSetupDialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('提交后将在后台准备行情并启动任务，进度可在回测任务中查看。');
+    expect(source).not.toContain('排队成功后将在后台启动任务');
+  });
+
+  it('回测数据时点仅接受字符串，非法值显示未知', () => {
+    expect(formatBacktestDataAsOf('2026-09-08T09:31:12.039Z')).toMatch(/2026\/09\/08/);
+    expect(formatBacktestDataAsOf({ at: '2026-09-08T09:31:12.039Z' })).toBe('未知');
+    expect(formatBacktestDataAsOf(null)).toBe('未知');
+  });
+
+  it('回测结果对任务和引擎返回的重复提示去重', () => {
+    expect(uniqueBacktestWarnings(['基准行情不可用。'], ['基准行情不可用', '数据不完整'])).toEqual([
+      '基准行情不可用。',
+      '数据不完整',
+    ]);
+  });
+
+  it('回测结果关闭按钮位于独立于内容滚动区的固定弹窗层', () => {
+    const source = readFileSync(new URL('./StrategySections.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain(
+      'max-h-[calc(100dvh-48px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-4xl',
+    );
+    expect(source).toContain('data-testid="backtest-result-scroll"');
+    expect(source).toContain('className="min-h-0 overflow-y-auto"');
+    expect(source).not.toContain('max-h-[calc(100dvh-48px)] overflow-y-auto sm:max-w-4xl');
+  });
+
+  it('策略库空态只提供首条策略 CTA，非空态在标题行提供新建入口', () => {
     const emptyHtml = renderToStaticMarkup(
       <StrategyLibrary
         strategies={[]}
@@ -50,10 +110,16 @@ describe('策略实验工作台 UI 契约', () => {
       />,
     );
     expect(emptyHtml).toContain('创建第一条策略');
+    expect(emptyHtml).not.toContain('新建策略');
 
     const readyHtml = renderToStaticMarkup(
       <StrategyLibrary
-        strategies={[strategy]}
+        strategies={[
+          {
+            ...strategy,
+            description: '这是一段足够长的策略描述，用来确认列表会截断展示而不会撑宽整张表格。',
+          },
+        ]}
         jobs={[{ ...job, status: 'succeeded', progress: 100 }]}
         loadState="ready"
         busyAction={null}
@@ -66,11 +132,14 @@ describe('策略实验工作台 UI 契约', () => {
     expect(readyHtml).toContain('v1');
     expect(readyHtml).toContain('已完成');
     expect(readyHtml).toContain('开始回测');
+    expect(readyHtml).toContain('新建策略');
+    expect(readyHtml).toContain('max-w-80 truncate');
+    expect(readyHtml).toContain('title="未配置标的 · 这是一段足够长的策略描述');
   });
 
   it('任务表使用中文状态、运行进度和可重试操作', () => {
     expect(jobStatusLabel('queued')).toBe('排队中');
-    expect(jobStatusLabel('unknown')).toBe('未知状态');
+    expect(jobStatusLabel('unknown')).toBe('未知状态（unknown）');
     const html = renderToStaticMarkup(
       <StrategyJobs
         jobs={[job]}
@@ -85,6 +154,39 @@ describe('策略实验工作台 UI 契约', () => {
     expect(html).toContain('运行中');
     expect(html).toContain('45%');
     expect(html).toContain('取消');
+    expect(html).toContain('<td><strong>可复现策略 · v1</strong></td>');
+
+    const terminalHtml = renderToStaticMarkup(
+      <StrategyJobs
+        jobs={[{ ...job, status: 'succeeded', progress: 100 }]}
+        strategies={[strategy]}
+        loadState="ready"
+        busyAction={null}
+        onRun={vi.fn()}
+        onCancel={vi.fn()}
+        onViewResult={vi.fn()}
+      />,
+    );
+    expect(terminalHtml).toContain('已完成');
+    expect(terminalHtml).not.toContain('100%');
+  });
+
+  it('回测任务空态只引导返回策略库', () => {
+    const html = renderToStaticMarkup(
+      <StrategyJobs
+        jobs={[]}
+        strategies={[]}
+        loadState="ready"
+        busyAction={null}
+        onRun={vi.fn()}
+        onCancel={vi.fn()}
+        onViewResult={vi.fn()}
+        onOpenLibrary={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('返回策略库');
+    expect(html).not.toContain('创建策略');
   });
 
   it('编辑 Schema 会同步父策略名称，回测 Dialog 使用精确版本的首个标的', () => {
@@ -170,5 +272,43 @@ describe('策略实验工作台 UI 契约', () => {
     expect(
       validateBacktestSetup({ period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 0 }),
     ).toContain('初始资金');
+  });
+
+  it('新建策略不预填具体标的或价格阈值，比例显示与存储转换一致', () => {
+    const emptySchema = createDefaultStrategySchema();
+    expect(emptySchema.universe).toMatchObject({ symbols: [] });
+    expect(Array.isArray(emptySchema.entrySignals)).toBe(true);
+    expect((emptySchema.entrySignals as Array<Record<string, unknown>>)[0]).toMatchObject({
+      value: '',
+    });
+    expect((emptySchema.exitSignals as Array<Record<string, unknown>>)[0]).toMatchObject({
+      value: '',
+    });
+    expect(fractionToPercent(0.125)).toBe('12.5');
+    expect(percentToFraction('12.5')).toBeCloseTo(0.125);
+    expect(stopLossFieldLabel('atr')).toBe('ATR 倍数');
+    expect(stopLossDefaultValue('fixed')).toBe(0.1);
+    expect(stopLossDefaultValue('trailing')).toBe(0.1);
+    expect(stopLossDefaultValue('atr')).toBe(2);
+    expect(stopLossFieldDescription('fixed')).toContain('0–100%');
+    expect(stopLossFieldDescription('atr')).toContain('ATR 倍数');
+    expect(sizingFieldLabel('fixed')).toBe('固定投入金额');
+    expect(sizingDefaultValue('fixed')).toBe(10_000);
+    expect(sizingDefaultValue('weight')).toBe(0.5);
+    expect(sizingDefaultValue('risk')).toBe(0.01);
+    expect(sizingFieldDescription('weight')).toContain('0–100%');
+    expect(sizingFieldDescription('risk')).toContain('0–100%');
+    expect(hasUnappliedJson('{"name":"changed"}', { name: 'original' })).toBe(true);
+    expect(
+      hasUnappliedJson(JSON.stringify({ name: 'original' }, null, 2), { name: 'original' }),
+    ).toBe(false);
+    expect(
+      shouldApplyAdvancedJson('advanced', 'common', JSON.stringify({ name: 'original' }, null, 2), {
+        name: 'original',
+      }),
+    ).toBe(false);
+    expect(
+      shouldApplyAdvancedJson('advanced', 'common', '{"name":"changed"}', { name: 'original' }),
+    ).toBe(true);
   });
 });

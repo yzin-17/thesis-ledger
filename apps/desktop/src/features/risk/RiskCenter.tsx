@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
@@ -216,24 +217,22 @@ export function RiskCenter({
 
   return (
     <section className="module-page">
-      <header className="page-header">
-        <div>
-          <p className="kicker">Risk Center</p>
-          <h1>风险中心</h1>
-          <p className="page-description">
-            规则负责确定性判断；提醒仅用于辅助研究，不代表交易执行保证。事件保留规则版本、数据时间和触发上下文。
-          </p>
-        </div>
-        <div className="page-header-actions">
-          <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="风险范围" />
-          <RefreshIconButton
-            label="刷新风险数据"
-            refreshing={riskRefreshing}
-            disabled={busyAction !== null}
-            onClick={() => void refreshRisk()}
-          />
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="RISK CENTER"
+        title="风险中心"
+        description="设置监控规则，查看风险事件与通知记录。"
+        actions={
+          <>
+            <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="风险范围" />
+            <RefreshIconButton
+              label="刷新风险数据"
+              refreshing={riskRefreshing}
+              disabled={busyAction !== null}
+              onClick={() => void refreshRisk()}
+            />
+          </>
+        }
+      />
 
       {mode === 'shadow' ? (
         <PortfolioModeNote>
@@ -254,7 +253,7 @@ export function RiskCenter({
       )}
 
       <Tabs value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
-        <TabsList variant="line" className="mb-5 w-full justify-start">
+        <TabsList variant="line" className="mb-4 w-full">
           <TabsTrigger value="overview">总览</TabsTrigger>
           <TabsTrigger value="rules">规则</TabsTrigger>
           <TabsTrigger value="events">事件</TabsTrigger>

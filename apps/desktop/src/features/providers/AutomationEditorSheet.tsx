@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -8,6 +9,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
@@ -74,24 +76,31 @@ export const AutomationEditorSheet = ({
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) => {
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: draft,
+    busy: saving,
+    onOpenChange: (nextOpen) => (nextOpen ? onOpenChange(true) : onClose()),
+  });
   const customCron = draft.schedulePreset === AUTOMATION_SCHEDULE_CUSTOM;
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent
         side="right"
         aria-describedby="automation-form-description"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
+        size="compact"
+        className="h-[100dvh] min-h-0 overflow-hidden p-6"
       >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="shrink-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
             <SheetTitle>{editingJob ? '编辑自动化任务' : '新建自动化任务'}</SheetTitle>
             <SheetDescription id="automation-form-description">
               任务类型创建后不可修改；有运行历史的任务无法删除，可改用停用。
             </SheetDescription>
-          </div>
+          </SheetHeader>
           <form
             key={editingJob?.id ?? 'new-automation-job'}
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={onSubmit}
           >
             <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
@@ -198,8 +207,13 @@ export const AutomationEditorSheet = ({
                 </div>
               </FieldGroup>
             </div>
-            <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
-              <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void requestClose(false)}
+              >
                 取消
               </Button>
               <Button disabled={saving} aria-busy={saving} type="submit">

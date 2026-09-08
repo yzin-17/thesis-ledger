@@ -100,7 +100,7 @@ export function RiskEventTable({
   const empty = isDataLoaded(loadState) && visibleEvents.length === 0;
 
   return (
-    <section className="panel mt-0">
+    <section className="panel mt-0 border-t-0">
       <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2>{title}</h2>
@@ -204,7 +204,7 @@ export function RiskNotificationTable({
   }
 
   return (
-    <section className="panel mt-0">
+    <section className="panel mt-0 border-t-0">
       <div className="panel-heading">
         <h2>通知状态</h2>
         <p>
@@ -235,10 +235,9 @@ export function RiskNotificationTable({
                       {riskChannelLabel(delivery.channel)} ·{' '}
                       {riskSubjectLabel(delivery.subjectType)}
                     </strong>
-                    <span>
-                      {riskNotificationErrorLabel(delivery.lastError) ??
-                        `主题 ${delivery.subjectId}`}
-                    </span>
+                    {riskNotificationErrorLabel(delivery.lastError) ? (
+                      <span>{riskNotificationErrorLabel(delivery.lastError)}</span>
+                    ) : null}
                   </td>
                   <td>
                     <Badge variant={riskSeverityTone(delivery.severity)}>

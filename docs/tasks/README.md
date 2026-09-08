@@ -24,6 +24,9 @@
 - [现金账户资金范围与内部划转](2026-08-30-cash-account-funding-and-transfer.md)
 - [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)
 - [现金页面 UI 优化](2026-09-03-cash-page-ui-optimization.md)
+- [ETF 日线独立备用源](2026-09-08-etf-daily-independent-fallback.md)
+- [日线缓存与 Provider 主备路由](2026-09-08-market-data-cache-and-provider-routing.md)
+- [基金定投计划](2026-09-08-recurring-fund-investment.md)
 
 “实现完成”只表示代码一致性和已记录的确定性验证完成，不等于真实 Provider、生产数据、设备、浏览器或 Worker 运行时验收已经完成。运行时门禁关闭后，再按 `DOCUMENTATION-GUIDE.md` 归档。
 

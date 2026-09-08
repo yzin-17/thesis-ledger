@@ -55,6 +55,17 @@ export interface Account {
   active?: boolean;
 }
 
+export const accountTypeLabel = (type: Account['type']) => {
+  if (type === 'fund') return '基金';
+  if (type === 'cash') return '现金';
+  return '证券';
+};
+
+export const accountDisplayLabel = (account: Account) =>
+  `${account.name} · ${accountTypeLabel(account.type)} · ${account.currency} · ${
+    account.mode === 'shadow' ? '模拟' : '实际'
+  }`;
+
 export interface Position {
   id: string;
   accountId: string;

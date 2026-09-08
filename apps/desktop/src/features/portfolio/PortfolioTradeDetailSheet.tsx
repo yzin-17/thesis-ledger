@@ -12,6 +12,10 @@ import type { TradeDetailResponseV2, TradeSummaryResponseV2 } from '@thesis-ledg
 import type { ReactNode } from 'react';
 import { usePortfolioTradeQuery } from './portfolio-trade.queries.js';
 import type { Account, PortfolioMode } from './portfolio.types.js';
+import {
+  StickyTableActionCell,
+  StickyTableActionHeader,
+} from '../shared/StickyTableActions.js';
 
 export type PortfolioTradeReviewTarget = {
   accountId: string;
@@ -76,7 +80,7 @@ function TradeDetailContent({
   onReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 px-4 pb-6">
+    <div className="flex flex-col gap-6">
       <Card className="shadow-none">
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -125,13 +129,13 @@ function TradeDetailContent({
             不把不同币种静默合并，外汇转换证据在组合估值层单独展示。
           </p>
           {detail.excludedReasons.length > 0 && (
-            <div className="rounded-md border border-dashed border-border p-3 text-xs">
+            <div className="rounded-md border border-border p-3 text-xs">
               <p className="m-0 font-medium">默认统计排除原因</p>
               <p className="m-0 mt-1 text-muted-foreground">{detail.excludedReasons.join('、')}</p>
             </div>
           )}
           {(detail.issues.length > 0 || detail.costIssues.length > 0) && (
-            <div className="rounded-md border border-dashed border-border p-3 text-xs">
+            <div className="rounded-md border border-border p-3 text-xs">
               <p className="m-0 font-medium">需要复核的投影问题</p>
               <p className="m-0 mt-1 text-muted-foreground">
                 {[...detail.issues, ...detail.costIssues].join('、')}
@@ -149,7 +153,7 @@ function TradeDetailContent({
           <p className="m-0 mt-1 text-xs text-muted-foreground">每个建仓事实及其剩余成本。</p>
         </div>
         {detail.entryLegs.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
             暂无建仓成交。
           </p>
         ) : (
@@ -192,7 +196,7 @@ function TradeDetailContent({
           </p>
         </div>
         {detail.baselineComponents.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
             暂无快照组成。
           </p>
         ) : (
@@ -233,7 +237,7 @@ function TradeDetailContent({
           </p>
         </div>
         {detail.closeSlices.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
             暂无真实卖出片段。
           </p>
         ) : (
@@ -246,7 +250,7 @@ function TradeDetailContent({
                 <th className="px-3 py-2">数量</th>
                 <th className="px-3 py-2">剩余数量</th>
                 <th className="px-3 py-2">净实现盈亏</th>
-                <th className="px-3 py-2">操作</th>
+                <StickyTableActionHeader className="px-3 py-2">操作</StickyTableActionHeader>
               </tr>
             </thead>
             <tbody>
@@ -260,7 +264,7 @@ function TradeDetailContent({
                   <td className="px-3 py-2 font-mono">{slice.quantity}</td>
                   <td className="px-3 py-2 font-mono">{slice.remainingQuantityAfter}</td>
                   <td className="px-3 py-2 font-mono">{formatDecimal(slice.netRealizedPnl)}</td>
-                  <td className="px-3 py-2">
+                  <StickyTableActionCell className="px-3 py-2">
                     <Button
                       type="button"
                       size="sm"
@@ -277,7 +281,7 @@ function TradeDetailContent({
                     >
                       减仓复盘
                     </Button>
-                  </td>
+                  </StickyTableActionCell>
                 </tr>
               ))}
             </tbody>
@@ -364,7 +368,7 @@ export function PortfolioTradeDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-4xl">
+      <SheetContent side="right" size="detail" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{trade ? `${trade.symbol} · Trade 详情` : 'Trade 详情'}</SheetTitle>
           <SheetDescription>
@@ -372,7 +376,7 @@ export function PortfolioTradeDetailSheet({
           </SheetDescription>
         </SheetHeader>
         {detailQuery.isPending && (
-          <p className="px-4 text-sm text-muted-foreground" role="status">
+          <p className="text-sm text-muted-foreground" role="status">
             正在读取 Trade 详情…
           </p>
         )}

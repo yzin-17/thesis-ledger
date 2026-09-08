@@ -1,3 +1,4 @@
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Loader2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import {
   SheetContent,
   SheetFooter,
   SheetDescription,
+  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useToastManager } from '@/components/ui/toast';
@@ -22,7 +24,8 @@ import {
 } from './account-data.helpers.js';
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
 
-export const cashDepositErrorMessage = (_error: unknown) => '现金入账失败，请稍后重试。';
+export const cashDepositErrorMessage: (error: unknown) => string = () =>
+  '现金入账失败，请稍后重试。';
 
 export const cashDepositSuccessDescription = (currency: Account['currency'], isFuture: boolean) =>
   isFuture ? '已列入待结算，到账后计入余额。' : `${currency} 现金余额已更新。`;
@@ -40,6 +43,7 @@ export function CashDepositSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const toastManager = useToastManager();
+  const [dirty, setDirty] = useState(false);
   const mutations = useCashOperationsMutations(account.id, account.mode);
   const [amount, setAmount] = useState('');
   const [occurredAt, setOccurredAt] = useState(currentLocalDateTime);
@@ -49,6 +53,7 @@ export function CashDepositSheet({
 
   useEffect(() => {
     if (!open) return;
+    setDirty(false);
     setAmount('');
     setOccurredAt(currentLocalDateTime());
     setNote('');
@@ -57,6 +62,7 @@ export function CashDepositSheet({
   }, [account.id, open]);
 
   const resetForm = () => {
+    setDirty(false);
     setAmount('');
     setOccurredAt(currentLocalDateTime());
     setNote('');
@@ -65,12 +71,14 @@ export function CashDepositSheet({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setDirty(false);
     if (!nextOpen) resetForm();
     onOpenChange(nextOpen);
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (mutations.deposit.isPending) return;
     setError('');
     const normalizedAmount = amount.trim();
     if (!isPositiveDecimal(normalizedAmount)) {
@@ -107,21 +115,27 @@ export function CashDepositSheet({
     }
   };
 
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty,
+    busy: mutations.deposit.isPending,
+    onOpenChange: handleOpenChange,
+  });
+
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden p-6 sm:max-w-[calc(100%-16px)]"
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-          <div className="shrink-0">
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
             <SheetTitle>现金入账</SheetTitle>
             <SheetDescription>
               填写实际到账的金额和时间。未来时间会先显示在待结算资金中。
             </SheetDescription>
-          </div>
+          </SheetHeader>
           <form
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            onChangeCapture={() => setDirty(true)}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(formEvent) => void submit(formEvent)}
           >
             <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
@@ -162,11 +176,11 @@ export function CashDepositSheet({
                 )}
               </FieldGroup>
             </div>
-            <SheetFooter className="shrink-0 flex-row justify-end border-t border-border p-0 pt-4">
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleOpenChange(false)}
+                onClick={() => void requestClose(false)}
                 disabled={mutations.deposit.isPending}
               >
                 取消

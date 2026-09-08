@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useState } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
@@ -154,22 +155,20 @@ export function ProviderSettings() {
 
   return (
     <section className="module-page" data-provider-sheet-open={String(providerSheetOpen)}>
-      <header className="page-header">
-        <div>
-          <p className="kicker">Providers</p>
-          <h1>数据与自动化</h1>
-          <p className="page-description">
-            按能力查看 Provider、优先级、健康和额度；凭证只显示配置状态，不回显密钥。
-          </p>
-        </div>
-        <div className="page-header-actions">
-          <RefreshIconButton
-            label="刷新 Provider 与自动化"
-            refreshing={providerRefreshing}
-            onClick={() => void load()}
-          />
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="DATA & AUTOMATION"
+        title="数据与自动化"
+        description="管理数据源、连接状态和自动化任务。"
+        actions={
+          <>
+            <RefreshIconButton
+              label="刷新 Provider 与自动化"
+              refreshing={providerRefreshing}
+              onClick={() => void load()}
+            />
+          </>
+        }
+      />
       <ProviderEditorSheet
         open={providerSheetOpen}
         editingProviderName={editingProviderName}
@@ -198,11 +197,8 @@ export function ProviderSettings() {
         onSubmit={(event) => void actions.submitAutomationEditor(event)}
       />
       <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value as ProviderSettingsTab)}
-      >
-        <TabsList variant="line" className="mb-5 w-full justify-start">
+      <Tabs value={tab} onValueChange={(value) => setTab(value as ProviderSettingsTab)}>
+        <TabsList variant="line" className="w-full">
           <TabsTrigger value="providers">数据源</TabsTrigger>
           <TabsTrigger value="automation">自动化</TabsTrigger>
           <TabsTrigger value="diagnostics">诊断</TabsTrigger>
@@ -251,11 +247,7 @@ export function ProviderSettings() {
               onDelete={(job) => void actions.deleteJob(job)}
               onCreate={() => actions.openAutomationEditor()}
             />
-            <AutomationRunHistoryTable
-              loadState={loadState}
-              jobs={jobs}
-              jobHistory={jobHistory}
-            />
+            <AutomationRunHistoryTable loadState={loadState} jobs={jobs} jobHistory={jobHistory} />
           </div>
         </TabsContent>
         <TabsContent value="diagnostics">

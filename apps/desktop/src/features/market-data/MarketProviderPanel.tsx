@@ -2,12 +2,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
 import {
   providerDisplay,
   providerHealthLabel,
   type ProviderManifest,
 } from './market-data.types.js';
+
+const credentialLabel = (provider: ProviderManifest) => {
+  if (!provider.requiresCredential) return '无需凭证';
+  if (provider.credentialConfigured) return '凭证已配置';
+  return '未配置凭证';
+};
 
 export function MarketProviderPanel({
   providers,
@@ -35,14 +42,14 @@ export function MarketProviderPanel({
   return (
     <Card>
       <CardContent className="space-y-5 p-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="m-0 text-xl font-semibold">Provider 配置</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              凭证只写入 DSA；留空保存会保留已存凭证。
+              自动列出 DSA 当前支持的数据源；凭证只写入 DSA，留空保存会保留已存凭证。
             </p>
           </div>
-          <Badge variant="outline">Control Token</Badge>
+          <Badge variant="outline">DSA 注册表</Badge>
         </div>
         <div className="space-y-4">
           {providers.map((provider) => (
@@ -50,31 +57,44 @@ export function MarketProviderPanel({
               key={provider.providerId}
               className="space-y-3 border-b border-border pb-4 last:border-b-0 last:pb-0"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <strong className="block text-sm font-medium">{providerDisplay(provider)}</strong>
-                  <span className="text-xs text-muted-foreground">
-                    {!provider.requiresCredential
-                      ? '无需凭证'
-                      : provider.credentialConfigured
-                        ? '凭证已配置'
-                        : '未配置凭证'}
-                  </span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    健康：{providerHealthLabel(provider)}
-                  </span>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong className="text-sm font-medium">{providerDisplay(provider)}</strong>
+                    <Badge variant="secondary">DSA 提供</Badge>
+                    <Badge variant={provider.updatedAt ? 'outline' : 'ghost'}>
+                      {provider.updatedAt ? '手动配置' : 'DSA 默认'}
+                    </Badge>
+                    <Badge variant="outline">{providerHealthLabel(provider)}</Badge>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{credentialLabel(provider)}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(provider.capabilities).map(([capability, instrumentTypes]) => (
+                      <Badge key={capability} variant="outline">
+                        {capability} · {instrumentTypes.join('/')}
+                      </Badge>
+                    ))}
+                  </div>
+                  {(provider.upstreamSources?.length ?? 0) > 0 && (
+                    <p className="m-0 text-xs text-muted-foreground">
+                      上游通道：
+                      {provider.upstreamSources?.map((source) => source.displayName).join('、')}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <input
+                  <span>启用</span>
+                  <Switch
+                    variant="risk"
                     aria-label={`${provider.displayName} 启用`}
-                    type="checkbox"
                     checked={provider.enabled}
                     disabled={disabled}
-                    onChange={(event) =>
-                      onProviderChange({ ...provider, enabled: event.target.checked })
+                    onCheckedChange={(checked) =>
+                      onProviderChange({ ...provider, enabled: checked })
                     }
-                  />
-                  <span>启用</span>
+                  >
+                    <SwitchThumb variant="risk" />
+                  </Switch>
                 </div>
               </div>
               {provider.requiresCredential && (
@@ -102,7 +122,7 @@ export function MarketProviderPanel({
                       aria-hidden="true"
                     />
                   )}
-                  保存配置
+                  保存设置
                 </Button>
                 <Button
                   type="button"

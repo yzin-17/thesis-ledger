@@ -101,19 +101,16 @@ export function CashTransferCorrectionSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="h-[100dvh] min-h-0 w-[520px] max-w-[calc(100%-16px)] overflow-hidden sm:max-w-[calc(100%-16px)]"
-      >
-        <SheetHeader className="border-b">
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
+        <SheetHeader>
           <SheetTitle>{labels.title}</SheetTitle>
           <SheetDescription>该操作始终同时更新划转两端，并保留完整版本链。</SheetDescription>
         </SheetHeader>
         <form
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col gap-6"
           onSubmit={(formEvent) => void submit(formEvent)}
         >
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
             <FieldGroup>
               {mode === 'replace' && (
                 <>
@@ -159,7 +156,7 @@ export function CashTransferCorrectionSheet({
               {error && <FieldError>{error}</FieldError>}
             </FieldGroup>
           </div>
-          <SheetFooter className="border-t bg-popover">
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
