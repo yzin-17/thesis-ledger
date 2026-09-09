@@ -218,6 +218,7 @@ describe('Portfolio table contract', () => {
     expect(html).toContain('按今日收益排序，当前未排序，点击按降序排列');
     expect(html).toContain('按未实现盈亏排序，当前未排序，点击按降序排列');
     expect(html).toContain('按市值降序');
+    expect(html.match(/lucide-chevrons-up-down/g)).toHaveLength(2);
   });
 
   it('兼容并映射 Portfolio API 的每日变化字段', async () => {

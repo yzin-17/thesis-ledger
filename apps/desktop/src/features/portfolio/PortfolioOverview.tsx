@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronUpIcon, ChevronsUpDownIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { Metric } from '../shared/DesktopPrimitives.js';
@@ -107,16 +107,17 @@ function SortablePositionHeader({
   onSort: (key: PortfolioPositionSortKey) => void;
 }) {
   const active = sort.key === sortKey;
-  let Icon: typeof ChevronDownIcon | undefined;
   let ariaSort: 'none' | 'ascending' | 'descending' = 'none';
   let status = '当前未排序，点击按降序排列';
   if (active) {
-    Icon = sort.direction === 'asc' ? ChevronUpIcon : ChevronDownIcon;
     ariaSort = sort.direction === 'asc' ? 'ascending' : 'descending';
     if (isDefault) status = '当前为默认降序，点击进入排序循环';
     else if (sort.direction === 'asc') status = '当前升序，点击恢复默认排序';
     else status = '当前降序，点击切换为升序';
   }
+  let SortIcon = ChevronsUpDownIcon;
+  if (active && sort.direction === 'asc') SortIcon = ChevronUpIcon;
+  else if (active) SortIcon = ChevronDownIcon;
   return (
     <th scope="col" aria-sort={ariaSort}>
       <Button
@@ -132,7 +133,10 @@ function SortablePositionHeader({
         onClick={() => onSort(sortKey)}
       >
         {label}
-        {Icon ? <Icon aria-hidden="true" className="size-3.5" /> : null}
+        <SortIcon
+          aria-hidden="true"
+          className={cn('size-3.5', !active && 'text-muted-foreground/60')}
+        />
       </Button>
     </th>
   );
