@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   quantStatsAnalytics,
@@ -10,6 +10,8 @@ import {
 import { backtestJobSchema, strategySchemaV1 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { explicitlyAllowsStale, hasStaleMarketData } from '../market/freshness.js';
+import { BacktestQueueService } from './backtest-queue.service.js';
+import { backtestJobSummarySelect, toBacktestJobSummary } from './backtest-summary.js';
 
 export interface BacktestWorker {
   readonly id: string;
@@ -33,6 +35,11 @@ export interface BacktestAnalyticsWorker {
   run(input: { returns: number[]; periodsPerYear?: number }): Promise<unknown>;
 }
 
+export interface BacktestExecutionAttempt {
+  attempt: number;
+  maxAttempts: number;
+}
+
 const localAnalyticsWorker: BacktestAnalyticsWorker = {
   id: 'quantstats-local-v1',
   run(input) {
@@ -40,7 +47,7 @@ const localAnalyticsWorker: BacktestAnalyticsWorker = {
   },
 };
 
-const localWorker: BacktestWorker = {
+export const localWorker: BacktestWorker = {
   id: 'thesis-ledger-engine-v1',
   run(input, signal) {
     if (signal.aborted) throw new Error('回测已取消');
@@ -76,7 +83,10 @@ const normalizeBacktestBars = (value: unknown): BacktestBar[] => {
 export class BacktestService {
   private readonly activeControllers = new Map<string, AbortController>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly queueService?: BacktestQueueService,
+  ) {}
 
   async createStrategy(name: string, schema: unknown, description?: string) {
     const parsed = strategySchemaV1.parse(schema);
@@ -148,7 +158,7 @@ export class BacktestService {
       const parsedSchema = strategySchemaV1.parse(selectedVersion.schema);
       dataAsOf = parsedSchema.universe.asOf;
     }
-    return this.prisma.backtestJob.create({
+    const created = await this.prisma.backtestJob.create({
       data: {
         id: job.id,
         strategyVersionId: job.strategyVersionId,
@@ -160,24 +170,42 @@ export class BacktestService {
         warnings: job.warnings,
       },
     });
+    return this.queueService?.ensureEnqueued(created.id) ?? created;
   }
 
   listJobs() {
     return this.prisma.backtestJob.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
   }
 
+  async listJobSummaries() {
+    const jobs = await this.prisma.backtestJob.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: backtestJobSummarySelect,
+    });
+    return jobs.map(toBacktestJobSummary);
+  }
+
   status(id: string) {
     return this.prisma.backtestJob.findUnique({ where: { id } });
   }
 
-  async run(id: string, worker = localWorker) {
+  async run(id: string, worker?: BacktestWorker, execution?: BacktestExecutionAttempt) {
+    if (!worker && this.queueService) return this.queueService.ensureEnqueued(id);
+    const selectedWorker = worker ?? localWorker;
     const job = await this.prisma.backtestJob.findUnique({
       where: { id },
       include: { strategyVersion: true },
     });
     if (!job) throw new NotFoundException('回测任务不存在');
     if (['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;
-    if (job.status !== 'queued') return job;
+    if (!execution && job.status !== 'queued') return job;
+    if (execution && job.cancelRequestedAt) {
+      return this.prisma.backtestJob.update({
+        where: { id },
+        data: { status: 'cancelled', progress: 100, finishedAt: new Date() },
+      });
+    }
 
     const input = (job.input ?? {}) as {
       bars?: BacktestBar[];
@@ -188,29 +216,53 @@ export class BacktestService {
       parameters?: Record<string, unknown>;
       benchmarkBars?: BacktestBar[];
     };
-    const versionedStrategy =
-      job.strategyVersion && 'schema' in job.strategyVersion
-        ? strategySchemaV1.parse(job.strategyVersion.schema)
-        : undefined;
-    if (!versionedStrategy && worker === localWorker) {
-      throw new BadRequestException('策略版本缺少可执行 schema');
-    }
-
-    try {
-      await this.prisma.backtestJob.update({
-        where: { id, status: 'queued' },
-        data: { status: 'running', progress: 5, startedAt: new Date(), engineVersion: worker.id },
+    if (execution) {
+      const claimed = await this.prisma.backtestJob.updateMany({
+        where: {
+          id,
+          status: { in: ['queued', 'running'] },
+          executionAttempt: { lt: execution.attempt },
+          cancelRequestedAt: null,
+        },
+        data: {
+          status: 'running',
+          progress: 5,
+          executionAttempt: execution.attempt,
+          startedAt: job.startedAt ?? new Date(),
+          engineVersion: selectedWorker.id,
+          errorCode: null,
+          errorSummary: null,
+        },
       });
-    } catch (error) {
-      const current = await this.prisma.backtestJob.findUnique({ where: { id } });
-      if (current && current.status !== 'queued') return current;
-      throw error;
-    }
+      if (claimed.count !== 1) return this.prisma.backtestJob.findUnique({ where: { id } });
+    } else
+      try {
+        await this.prisma.backtestJob.update({
+          where: { id, status: 'queued' },
+          data: {
+            status: 'running',
+            progress: 5,
+            startedAt: new Date(),
+            engineVersion: selectedWorker.id,
+          },
+        });
+      } catch (error) {
+        const current = await this.prisma.backtestJob.findUnique({ where: { id } });
+        if (current && current.status !== 'queued') return current;
+        throw error;
+      }
 
     const controller = new AbortController();
     this.activeControllers.set(id, controller);
     try {
-      const result = await worker.run(
+      const versionedStrategy =
+        job.strategyVersion && 'schema' in job.strategyVersion
+          ? strategySchemaV1.parse(job.strategyVersion.schema)
+          : undefined;
+      if (!versionedStrategy && selectedWorker === localWorker) {
+        throw new BadRequestException('策略版本缺少可执行 schema');
+      }
+      const result = await selectedWorker.run(
         {
           jobId: id,
           strategy: versionedStrategy,
@@ -229,7 +281,17 @@ export class BacktestService {
         controller.signal,
       );
       const current = await this.prisma.backtestJob.findUnique({ where: { id } });
-      if (controller.signal.aborted || current?.status === 'cancelled') return current ?? job;
+      if (
+        controller.signal.aborted ||
+        current?.status === 'cancelled' ||
+        current?.cancelRequestedAt
+      ) {
+        if (!current || current.status === 'cancelled') return current ?? job;
+        return this.prisma.backtestJob.update({
+          where: { id },
+          data: { status: 'cancelled', progress: 100, finishedAt: new Date() },
+        });
+      }
       const enrichedResult =
         result && typeof result === 'object'
           ? {
@@ -258,6 +320,42 @@ export class BacktestService {
       const resultChecksum = createHash('sha256')
         .update(JSON.stringify(enrichedResult))
         .digest('hex');
+      if (execution) {
+        const committed = await this.prisma.backtestJob.updateMany({
+          where: {
+            id,
+            status: 'running',
+            executionAttempt: execution.attempt,
+            cancelRequestedAt: null,
+          },
+          data: {
+            status: 'succeeded',
+            progress: 100,
+            finishedAt: new Date(),
+            result: enrichedResult as object,
+            resultChecksum,
+          },
+        });
+        if (committed.count === 0) {
+          const latest = await this.prisma.backtestJob.findUnique({ where: { id } });
+          if (
+            latest?.status === 'running' &&
+            latest.executionAttempt === execution.attempt &&
+            latest.cancelRequestedAt
+          ) {
+            await this.prisma.backtestJob.updateMany({
+              where: {
+                id,
+                status: 'running',
+                executionAttempt: execution.attempt,
+                cancelRequestedAt: { not: null },
+              },
+              data: { status: 'cancelled', progress: 100, finishedAt: new Date() },
+            });
+          }
+        }
+        return this.prisma.backtestJob.findUnique({ where: { id } });
+      }
       return this.prisma.backtestJob.update({
         where: { id },
         data: {
@@ -270,7 +368,57 @@ export class BacktestService {
       });
     } catch (error) {
       const current = await this.prisma.backtestJob.findUnique({ where: { id } });
-      if (current?.status === 'cancelled') return current;
+      if (current?.status === 'cancelled' || current?.cancelRequestedAt) {
+        if (current.status === 'cancelled') return current;
+        return this.prisma.backtestJob.update({
+          where: { id },
+          data: { status: 'cancelled', progress: 100, finishedAt: new Date() },
+        });
+      }
+      const deterministicInputError =
+        error instanceof BadRequestException ||
+        (error instanceof Error && error.name === 'ZodError');
+      if (execution && deterministicInputError) {
+        const errorSummary = '回测任务的策略版本或输入不再可执行。';
+        await this.prisma.backtestJob.updateMany({
+          where: { id, status: 'running', executionAttempt: execution.attempt },
+          data: {
+            status: 'failed',
+            progress: 100,
+            finishedAt: new Date(),
+            errorCode: 'backtest_input_invalid',
+            errorSummary,
+          },
+        });
+        throw Object.assign(new Error(errorSummary), { unrecoverable: true });
+      }
+      if (execution && execution.attempt < execution.maxAttempts) {
+        await this.prisma.backtestJob.updateMany({
+          where: { id, status: 'running', executionAttempt: execution.attempt },
+          data: {
+            status: 'queued',
+            progress: 0,
+            errorCode: 'worker_attempt_failed',
+            errorSummary:
+              error instanceof Error ? error.message.slice(0, 500) : '回测 Worker 执行失败',
+          },
+        });
+        throw error;
+      }
+      if (execution) {
+        await this.prisma.backtestJob.updateMany({
+          where: { id, status: 'running', executionAttempt: execution.attempt },
+          data: {
+            status: 'failed',
+            progress: 100,
+            finishedAt: new Date(),
+            errorCode: 'worker_attempts_exhausted',
+            errorSummary:
+              error instanceof Error ? error.message.slice(0, 500) : '回测 Worker 执行失败',
+          },
+        });
+        throw error;
+      }
       return this.prisma.backtestJob.update({
         where: { id },
         data: {
@@ -286,6 +434,7 @@ export class BacktestService {
   }
 
   async cancel(id: string) {
+    if (this.queueService) return this.queueService.cancel(id);
     const job = await this.prisma.backtestJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('回测任务不存在');
     if (['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;

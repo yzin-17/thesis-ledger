@@ -14,7 +14,8 @@ import {
   useRunBacktestMutation,
 } from './strategy.mutations.js';
 import { createStrategyActionHandlers } from './strategy.actions.js';
-import { useStrategyQueries } from './strategy.queries.js';
+import { useBacktestJobQuery, useStrategyQueries } from './strategy.queries.js';
+import { useBacktestJobEvents } from './strategy.events.js';
 import { StrategyEditorSheet } from './StrategyEditorSheet.js';
 import {
   BacktestSetupDialog,
@@ -23,7 +24,7 @@ import {
   StrategyResultDialog,
 } from './StrategySections.js';
 import type {
-  BacktestJob,
+  BacktestJobSummary,
   BacktestSetupInput,
   StrategyRecord,
   StrategySchema,
@@ -42,9 +43,11 @@ export function StrategyDashboard() {
   const [activeTab, setActiveTab] = useState('library');
   const [editorSelection, setEditorSelection] = useState<EditorSelection | null>(null);
   const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
-  const [resultJob, setResultJob] = useState<BacktestJob | null>(null);
+  const [resultJobId, setResultJobId] = useState<string | null>(null);
   const toastManager = useToastManager();
   const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
+  const resultJobQuery = useBacktestJobQuery(resultJobId);
+  useBacktestJobEvents();
   const createMutation = useCreateStrategyMutation();
   const createVersionMutation = useCreateStrategyVersionMutation();
   const queueMutation = useQueueBacktestMutation();
@@ -52,7 +55,7 @@ export function StrategyDashboard() {
   const runMutation = useRunBacktestMutation();
   const cancelMutation = useCancelBacktestMutation();
   const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
-  const jobs: BacktestJob[] = jobsQuery.data ?? [];
+  const jobs: BacktestJobSummary[] = jobsQuery.data ?? [];
   const strategyRefreshing = strategiesQuery.isFetching || jobsQuery.isFetching;
   let loadState: LoadState = 'loading';
   if (strategiesQuery.isError || jobsQuery.isError) {
@@ -97,7 +100,7 @@ export function StrategyDashboard() {
     return succeeded;
   };
 
-  const selectedJob = resultJob ? (jobs.find((job) => job.id === resultJob.id) ?? resultJob) : null;
+  const selectedJob = resultJobQuery.data ?? null;
   const selectedStrategy = selectedJob
     ? strategies.find((candidate) =>
         candidate.versions.some(
@@ -149,7 +152,7 @@ export function StrategyDashboard() {
             busyAction={busyAction}
             onRun={(jobId) => void actions.run(jobId)}
             onCancel={(jobId) => void actions.cancel(jobId)}
-            onViewResult={setResultJob}
+            onViewResult={(job) => setResultJobId(job.id)}
             onOpenLibrary={() => setActiveTab('library')}
           />
         </TabsContent>
@@ -184,9 +187,9 @@ export function StrategyDashboard() {
         job={selectedJob}
         strategy={selectedStrategy ?? null}
         version={selectedVersion ?? null}
-        open={resultJob !== null}
+        open={resultJobId !== null}
         onOpenChange={(open) => {
-          if (!open) setResultJob(null);
+          if (!open) setResultJobId(null);
         }}
       />
     </section>

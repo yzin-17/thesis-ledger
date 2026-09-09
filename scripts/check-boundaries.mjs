@@ -48,6 +48,9 @@ async function inspect(path) {
   );
   const file = relative(root, path).replaceAll('\\', '/');
   for (const specifier of imports) {
+    if (specifier === 'bullmq' && !file.startsWith('apps/server/src/backtest/')) {
+      violations.push(`${file} -> ${specifier} (BullMQ adapter must remain in backtest boundary)`);
+    }
     if (!specifier.startsWith('.')) continue;
     const target = relative(root, resolve(dirname(path), specifier)).replaceAll('\\', '/');
     if (

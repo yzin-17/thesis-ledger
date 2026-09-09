@@ -2,6 +2,7 @@ import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
 import type {
   BacktestJob,
+  BacktestJobSummary,
   CreateStrategyVersionInput,
   CreateStrategyInput,
   FetchStrategyBarsInput,
@@ -49,7 +50,14 @@ export const fetchStrategies = (client?: DesktopRequestClient) =>
   requestDesktopJson<StrategyRecord[]>('/backtests/strategies', undefined, client);
 
 export const fetchBacktestJobs = (client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJob[]>('/backtests/jobs', undefined, client);
+  requestDesktopJson<BacktestJobSummary[]>('/backtests/jobs/summary', undefined, client);
+
+export const fetchBacktestJob = (jobId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<BacktestJob>(
+    `/backtests/jobs/${encodeURIComponent(jobId)}`,
+    undefined,
+    client,
+  );
 
 export const createStrategy = (input: CreateStrategyInput, client?: DesktopRequestClient) =>
   requestDesktopJson<StrategyRecord>(

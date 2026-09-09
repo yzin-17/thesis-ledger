@@ -8,6 +8,7 @@ allowBuilds:
   '@prisma/engines': true
   electron-winstaller: true
   esbuild: true
+  msgpackr-extract: false
   node-pty: true
   prisma: true
   unrs-resolver: true

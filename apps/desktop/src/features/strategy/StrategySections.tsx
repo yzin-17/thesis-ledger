@@ -36,7 +36,12 @@ import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { Metric } from '../shared/DesktopPrimitives.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { schemaAsOf, schemaSymbols, latestVersion } from './strategy.schema.js';
-import type { BacktestJob, StrategyRecord, StrategyVersion } from './strategy.types.js';
+import type {
+  BacktestJob,
+  BacktestJobSummary,
+  StrategyRecord,
+  StrategyVersion,
+} from './strategy.types.js';
 
 export const jobStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
@@ -88,7 +93,13 @@ const strategyStatusVariant = (status: unknown): 'default' | 'secondary' | 'outl
   return 'outline';
 };
 
-const jobPeriod = (job: BacktestJob) => {
+const backtestJobInput = (job: BacktestJobSummary | BacktestJob) => {
+  const candidate: unknown = 'input' in job ? job.input : null;
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+  return candidate as Record<string, unknown>;
+};
+
+const jobPeriod = (job: BacktestJobSummary) => {
   if (job.period)
     return {
       start: formatDateOnly(job.period.start),
@@ -99,7 +110,8 @@ const jobPeriod = (job: BacktestJob) => {
       start: formatDateOnly(job.periodStart),
       end: formatDateOnly(job.periodEnd),
     };
-  const inputPeriod = job.input?.period;
+  const input = backtestJobInput(job);
+  const inputPeriod = input?.period;
   if (inputPeriod && typeof inputPeriod === 'object' && !Array.isArray(inputPeriod)) {
     const period = inputPeriod as { start?: unknown; end?: unknown };
     return {
@@ -110,8 +122,10 @@ const jobPeriod = (job: BacktestJob) => {
   return { start: '—', end: '—' };
 };
 
-const jobCash = (job: BacktestJob) => {
-  const value = job.input?.initialCash;
+const jobCash = (job: BacktestJobSummary) => {
+  if (typeof job.initialCash === 'number') return money.format(job.initialCash);
+  const input = backtestJobInput(job);
+  const value = input?.initialCash;
   return typeof value === 'number' ? money.format(value) : '默认资金';
 };
 
@@ -125,7 +139,7 @@ export function StrategyLibrary({
   onBacktest,
 }: {
   strategies: StrategyRecord[];
-  jobs: BacktestJob[];
+  jobs: BacktestJobSummary[];
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   busyAction: string | null;
   onCreate: () => void;
@@ -314,13 +328,13 @@ export function StrategyJobs({
   onViewResult,
   onOpenLibrary,
 }: {
-  jobs: BacktestJob[];
+  jobs: BacktestJobSummary[];
   strategies: StrategyRecord[];
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   busyAction: string | null;
   onRun: (jobId: string) => void;
   onCancel: (jobId: string) => void;
-  onViewResult: (job: BacktestJob) => void;
+  onViewResult: (job: BacktestJobSummary) => void;
   onOpenLibrary?: () => void;
 }) {
   const strategyForJob = (job: BacktestJob) =>
@@ -393,8 +407,9 @@ export function StrategyJobs({
                     </td>
                     <td>
                       <Badge variant={jobStatusVariant(job.status)}>
-                        {jobStatusLabel(job.status)}
+                        {job.cancelRequestedAt ? '正在取消' : jobStatusLabel(job.status)}
                       </Badge>
+                      {job.errorSummary && <span>{job.errorSummary}</span>}
                       {Array.isArray(job.warnings) && job.warnings.length > 0 && (
                         <span>{job.warnings.length} 条提示</span>
                       )}

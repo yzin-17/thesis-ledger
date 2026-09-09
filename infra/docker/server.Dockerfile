@@ -11,7 +11,7 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm --filter @thesis-ledger/server prisma generate
+RUN pnpm --filter @thesis-ledger/server exec prisma generate
 RUN pnpm --filter @thesis-ledger/server... build
 RUN pnpm --filter @thesis-ledger/server deploy --prod /tmp/server-runtime --legacy
 

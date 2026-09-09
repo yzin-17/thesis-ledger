@@ -28,13 +28,23 @@ import {
   cancelBacktest,
   createStrategy,
   createStrategyVersion,
+  fetchBacktestJob,
+  fetchBacktestJobs,
   fetchStrategyBars,
   queueBacktest,
   runBacktest,
 } from '../src/features/strategy/strategy.api.js';
 import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
-import { shouldPollJobs } from '../src/features/strategy/strategy.queries.js';
-import type { BacktestJob, StrategyRecord } from '../src/features/strategy/strategy.types.js';
+import { jobFallbackInterval, shouldPollJobs } from '../src/features/strategy/strategy.queries.js';
+import {
+  applyBacktestJobSummaryEvent,
+  createBacktestEventConnection,
+} from '../src/features/strategy/strategy.events.js';
+import type {
+  BacktestJob,
+  BacktestJobSummary,
+  StrategyRecord,
+} from '../src/features/strategy/strategy.types.js';
 import {
   fetchPortfolioValuation,
   saveCashBalance,
@@ -493,7 +503,7 @@ describe('Strategy 任务行为契约', () => {
     );
   });
 
-  it('Strategy 回测只使用版本 Schema，按版本号排序并将 Dialog 参数传入队列后自动运行', async () => {
+  it('Strategy 回测只使用版本 Schema，按版本号排序并由服务端入队', async () => {
     const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
     const queueMutation = {
       mutateAsync: vi.fn().mockResolvedValue({ id: 'job-2' } as BacktestJob),
@@ -540,23 +550,15 @@ describe('Strategy 任务行为契约', () => {
         strategy: { universe: { symbols: ['new-symbol'] } },
       }),
     );
-    expect(runMutation.mutateAsync).toHaveBeenCalledWith('job-2');
+    expect(runMutation.mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('Strategy 入队成功后不等待后台启动，先返回以关闭配置弹窗', async () => {
-    let resolveRun!: (job: BacktestJob) => void;
+  it('Strategy 入队成功后不再由 Desktop 触发运行接口', async () => {
     const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
     const queueMutation = {
       mutateAsync: vi.fn().mockResolvedValue({ id: 'job-background' } as BacktestJob),
     };
-    const runMutation = {
-      mutateAsync: vi.fn(
-        () =>
-          new Promise<BacktestJob>((resolve) => {
-            resolveRun = resolve;
-          }),
-      ),
-    };
+    const runMutation = { mutateAsync: vi.fn() };
     const load = vi.fn().mockResolvedValue(undefined);
     const toastManager = { add: vi.fn() };
     const handlers = createStrategyActionHandlers({
@@ -579,19 +581,11 @@ describe('Strategy 任务行为契约', () => {
         { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
       ),
     ).resolves.toBe(true);
-    expect(runMutation.mutateAsync).toHaveBeenCalledWith('job-background');
+    expect(runMutation.mutateAsync).not.toHaveBeenCalled();
     expect(load).toHaveBeenCalledTimes(1);
     expect(toastManager.add).not.toHaveBeenCalledWith(
       expect.objectContaining({ title: '回测已启动' }),
     );
-
-    resolveRun({ id: 'job-background' } as BacktestJob);
-    await vi.waitFor(() =>
-      expect(toastManager.add).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '回测已启动' }),
-      ),
-    );
-    expect(load).toHaveBeenCalledTimes(2);
   });
 
   it('Strategy 行情尚未准备好时也立即返回，准备完成后才入队', async () => {
@@ -668,7 +662,7 @@ describe('Strategy 任务行为契约', () => {
     expect(setBusyAction).toHaveBeenLastCalledWith(null);
   });
 
-  it('Strategy 启动失败保留排队任务并清理 busy 状态，资金和日期无效时不请求 bars', async () => {
+  it('Strategy 服务端入队后不依赖运行接口，资金和日期无效时不请求 bars', async () => {
     const setBusyAction = vi.fn();
     const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
     const queueMutation = {
@@ -702,14 +696,7 @@ describe('Strategy 任务行为契约', () => {
       ),
     ).resolves.toBe(true);
     expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1);
-    await vi.waitFor(() =>
-      expect(toastManager.add).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '回测启动失败',
-          description: expect.stringContaining('队列'),
-        }),
-      ),
-    );
+    expect(toastManager.add).toHaveBeenCalledWith(expect.objectContaining({ title: '回测已排队' }));
     expect(setBusyAction).toHaveBeenLastCalledWith(null);
   });
 
@@ -824,6 +811,59 @@ describe('Strategy 任务行为契约', () => {
     expect(shouldPollJobs([{ status: 'running' }])).toBe(true);
     expect(shouldPollJobs([{ status: 'succeeded' }, { status: 'cancelled' }])).toBe(false);
     expect(shouldPollJobs([])).toBe(false);
+    expect(jobFallbackInterval([{ status: 'queued' }])).toBe(30_000);
+    expect(jobFallbackInterval([{ status: 'failed' }])).toBe(false);
+  });
+
+  it('Strategy 摘要与详情使用分离接口，SSE 更新按任务 id 合并缓存', async () => {
+    const summaryClient = makeClient([]);
+    await fetchBacktestJobs(summaryClient.client);
+    expect(summaryClient.request).toHaveBeenCalledWith('/backtests/jobs/summary', undefined);
+
+    const detailClient = makeClient({ id: 'job/1' });
+    await fetchBacktestJob('job/1', detailClient.client);
+    expect(detailClient.request).toHaveBeenCalledWith('/backtests/jobs/job%2F1', undefined);
+
+    const existing = [{ id: 'job-1', status: 'queued' }] as BacktestJobSummary[];
+    expect(
+      applyBacktestJobSummaryEvent(existing, {
+        id: 'job-1',
+        strategyVersionId: 'version-1',
+        status: 'running',
+      }),
+    ).toEqual([{ id: 'job-1', strategyVersionId: 'version-1', status: 'running' }]);
+  });
+
+  it('Strategy 多个订阅者共享一个 SSE 连接并在最后退订时关闭', () => {
+    const source = {
+      onopen: null as ((event: Event) => void) | null,
+      addEventListener: vi.fn(),
+      close: vi.fn(),
+    };
+    const createSource = vi.fn(() => source);
+    const connection = createBacktestEventConnection(createSource);
+    const firstOpen = vi.fn();
+    const secondOpen = vi.fn();
+
+    const unsubscribeFirst = connection.subscribe({
+      onOpen: firstOpen,
+      onUpdate: vi.fn(),
+      onInvalid: vi.fn(),
+    });
+    const unsubscribeSecond = connection.subscribe({
+      onOpen: secondOpen,
+      onUpdate: vi.fn(),
+      onInvalid: vi.fn(),
+    });
+    source.onopen?.(new Event('open'));
+
+    expect(createSource).toHaveBeenCalledOnce();
+    expect(firstOpen).toHaveBeenCalledOnce();
+    expect(secondOpen).toHaveBeenCalledOnce();
+    unsubscribeFirst();
+    expect(source.close).not.toHaveBeenCalled();
+    unsubscribeSecond();
+    expect(source.close).toHaveBeenCalledOnce();
   });
 
   it('Strategy 回测使用版本数据截止时间并透传基准行情', async () => {

@@ -38,7 +38,7 @@ export interface BacktestJobResult {
   [key: string]: unknown;
 }
 
-export interface BacktestJob {
+export interface BacktestJobSummary {
   id: string;
   strategyVersionId: string;
   status: BacktestJobStatus | (string & {});
@@ -52,11 +52,21 @@ export interface BacktestJob {
   updatedAt?: string;
   startedAt?: string;
   finishedAt?: string;
+  cancelRequestedAt?: string | null;
+  executionAttempt?: number;
+  dispatchedAt?: string | null;
+  errorCode?: string | null;
+  errorSummary?: string | null;
   engineVersion?: string | null;
   resultChecksum?: string | null;
+  initialCash?: number | null;
+  warnings?: unknown;
+}
+
+export interface BacktestJob extends BacktestJobSummary {
+  inSampleEnd?: string;
   input?: Record<string, unknown> | null;
   result?: BacktestJobResult | null;
-  warnings?: unknown;
 }
 
 export interface CreateStrategyInput {

@@ -11,6 +11,9 @@ export class RedisService implements OnModuleDestroy {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
   });
+  constructor() {
+    this.client.on('error', () => undefined);
+  }
   async ping() {
     if (this.client.status === 'wait') await this.client.connect();
     return this.client.ping();

@@ -59,6 +59,15 @@ const waitForHealth = async () => {
   throw new Error('临时 E2E Server 未在 60 秒内健康');
 };
 
+const waitForBacktestTerminal = async (jobId) => {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const job = await request(`/backtests/jobs/${jobId}?t=${Date.now()}`);
+    if (['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;
+    await sleep(1_000);
+  }
+  throw new Error('回测任务未在 60 秒内进入终态');
+};
+
 const serverPort = await waitForFreePort(apiPort);
 const webhookMessages = [];
 let webhookFailuresRemaining = 1;
@@ -83,6 +92,7 @@ const webhookUrl = `http://host.docker.internal:${webhookAddress.port}`;
 
 let databaseCreated = false;
 let serverContainerId = '';
+let workerContainerId = '';
 try {
   compose(['exec', '-T', 'postgres', 'createdb', '-U', 'thesis_ledger', databaseName]);
   databaseCreated = true;
@@ -102,6 +112,18 @@ try {
     'server',
   ]);
   await waitForHealth();
+  workerContainerId = compose([
+    'run',
+    '-d',
+    '--no-deps',
+    '-e',
+    `DATABASE_URL=postgresql://thesis_ledger:thesis_ledger@postgres:5432/${databaseName}`,
+    '-e',
+    'REDIS_URL=redis://redis:6379',
+    'server',
+    'node',
+    'apps/server/dist/src/backtest/backtest-worker.main.js',
+  ]);
 
   await request('/providers/config', {
     method: 'POST',
@@ -388,7 +410,8 @@ try {
       initialCash: 100_000,
     }),
   });
-  const backtestResult = await request(`/backtests/jobs/${backtestJob.id}/run`, { method: 'POST' });
+  await request(`/backtests/jobs/${backtestJob.id}/run`, { method: 'POST' });
+  const backtestResult = await waitForBacktestTerminal(backtestJob.id);
   if (backtestResult.status !== 'succeeded')
     throw new Error(`回测未成功: ${backtestResult.status}`);
 
@@ -445,6 +468,13 @@ try {
   );
 } finally {
   webhookServer.close();
+  if (workerContainerId) {
+    try {
+      execFileSync('docker', ['rm', '-f', workerContainerId], { cwd: root, stdio: 'ignore' });
+    } catch {
+      // Keep cleanup best-effort so the original E2E failure is not masked.
+    }
+  }
   if (serverContainerId) {
     try {
       execFileSync('docker', ['rm', '-f', serverContainerId], { cwd: root, stdio: 'ignore' });

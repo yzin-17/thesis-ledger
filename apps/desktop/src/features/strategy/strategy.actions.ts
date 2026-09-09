@@ -131,25 +131,6 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     void load().catch(() => undefined);
   };
 
-  const launchQueuedBacktest = (jobId: string) => {
-    void runMutation.mutateAsync(jobId).then(
-      () => {
-        toastManager.add({ title: '回测已启动', type: 'success', timeout: 2800 });
-        refreshStrategyData();
-      },
-      () => {
-        toastManager.add({
-          title: '回测启动失败',
-          description: '任务仍保留在队列中，可在回测任务中重试。',
-          type: 'error',
-          timeout: 0,
-          priority: 'high',
-        });
-        refreshStrategyData();
-      },
-    );
-  };
-
   const createStrategy = async (eventOrInput: FormEvent<HTMLFormElement> | CreateStrategyInput) => {
     if ('preventDefault' in eventOrInput) eventOrInput.preventDefault();
     if (busyAction) return false;
@@ -261,14 +242,13 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
           ...(benchmarkBars.length > 0 ? { benchmarkBars } : {}),
           initialCash: setup.initialCash,
         };
-        const queuedJob = await queueMutation.mutateAsync(queueInput);
+        await queueMutation.mutateAsync(queueInput);
         toastManager.add({
           title: '回测已排队',
           description: '任务已进入回测任务，正在后台启动。',
           type: 'success',
           timeout: 2800,
         });
-        launchQueuedBacktest(queuedJob.id ?? queueInput.id);
         refreshStrategyData();
       } catch {
         errorToast(toastManager, '回测排队失败', '请检查策略配置、市场数据和服务连接。');

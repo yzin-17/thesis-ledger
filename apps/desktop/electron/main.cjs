@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell } = require('electron');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
+const { pipeUpstreamResponse } = require('./api-proxy.cjs');
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const apiBaseUrl = (process.env.THESIS_LEDGER_API_URL || 'http://127.0.0.1:3000').replace(
@@ -32,16 +33,19 @@ const startAppServer = async () => {
     const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
     if (requestUrl.pathname.startsWith('/api/')) {
       try {
+        const abortController = new AbortController();
         const upstream = await fetch(`${apiBaseUrl}${requestUrl.pathname}${requestUrl.search}`, {
           method: request.method,
           headers: request.headers,
           body: ['GET', 'HEAD'].includes(request.method || 'GET') ? undefined : request,
           duplex: 'half',
+          signal: abortController.signal,
         });
-        response.writeHead(upstream.status, Object.fromEntries(upstream.headers.entries()));
-        response.end(Buffer.from(await upstream.arrayBuffer()));
+        pipeUpstreamResponse(upstream, response, () => abortController.abort());
       } catch (error) {
-        writeError(response, 502, `ThesisLedger API unavailable: ${error.message}`);
+        if (!response.headersSent) {
+          writeError(response, 502, `ThesisLedger API unavailable: ${error.message}`);
+        }
       }
       return;
     }
