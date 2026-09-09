@@ -13,7 +13,7 @@ import { ProviderSettings } from '../features/providers/ProviderSettings.js';
 import { RiskCenter } from '../features/risk/RiskCenter.js';
 import { StrategyDashboard } from '../features/strategy/StrategyDashboard.js';
 import { MarketDataPage } from '../features/market-data/MarketDataPage.js';
-import type { PortfolioTradeReviewTarget } from '../features/portfolio/PortfolioTradeDetailSheet.js';
+import type { PortfolioTradeReviewTarget } from '../features/portfolio/portfolio-trade.types.js';
 
 type ImportStep = 'account' | 'position' | 'screenshot';
 type NavigationOptions = { step?: ImportStep };

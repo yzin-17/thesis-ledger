@@ -74,6 +74,52 @@ describe('shared API contracts', () => {
     });
   });
 
+  it('保留持仓和组合的每日变化口径', () => {
+    const result = portfolioValuationResponseSchema.parse({
+      positions: [
+        {
+          id: '00000000-0000-4000-8000-000000000002',
+          accountId,
+          symbol: '600519.SH',
+          quantity: 10,
+          costPrice: 100,
+          marketPrice: 110,
+          previousClose: 108,
+          marketValue: 1100,
+          costValue: 1000,
+          pnl: 100,
+          pnlRatio: 0.1,
+          dailyPnl: 20,
+          dailyReturn: 0.0185185185,
+          baseDailyPnl: 20,
+          stale: false,
+        },
+      ],
+      cashValue: 0,
+      cashByAccount: [{ accountId, amount: 0 }],
+      totalCost: 1000,
+      totalMarketValue: 1100,
+      totalPnl: 100,
+      dailyChange: {
+        pnl: 20,
+        returnRate: 0.0185185185,
+        partial: false,
+        missingSymbols: [],
+        basis: 'PREVIOUS_CLOSE_CURRENT_HOLDINGS',
+      },
+      partial: false,
+      mode: 'actual',
+      valuedAt: '2026-09-09T00:00:00.000Z',
+    });
+
+    expect(result.positions[0]).toMatchObject({ previousClose: 108, dailyPnl: 20 });
+    expect(result.dailyChange).toMatchObject({
+      pnl: 20,
+      returnRate: 0.0185185185,
+      partial: false,
+    });
+  });
+
   it('rejects malformed risk event lists instead of accepting partial DTOs', () => {
     expect(riskEventsResponseSchema.safeParse([{ id: 'event-only' }]).success).toBe(false);
   });
@@ -112,6 +158,7 @@ describe('shared API contracts', () => {
       accountId,
       accountMode: 'actual',
       symbol: '600519.SH',
+      assetName: '贵州茅台',
       lifecycle: 'ACTIVE',
       exitProgress: 'NONE',
       endEvidence: 'UNKNOWN',
@@ -140,8 +187,8 @@ describe('shared API contracts', () => {
         items: [trade],
         nextCursor: null,
         projectionGenerations: { [accountId]: '2' },
-      }).items[0]?.remainingQuantity,
-    ).toBe('100');
+      }).items[0],
+    ).toMatchObject({ assetName: '贵州茅台', remainingQuantity: '100' });
     expect(
       tradeListResponseSchemaV2.safeParse({
         accountId,

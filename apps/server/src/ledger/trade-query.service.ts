@@ -20,6 +20,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 
 const tradeDetailInclude = {
+  asset: { select: { name: true } },
   entryLegs: true,
   baselineComponents: true,
   corporateActions: true,
@@ -108,6 +109,7 @@ const mapSummary = (trade: PersistedTrade): TradeListResponseV2['items'][number]
   accountId: trade.accountId,
   accountMode: trade.accountMode,
   symbol: trade.symbol,
+  assetName: trade.asset.name,
   lifecycle: trade.lifecycle,
   exitProgress: trade.exitProgress,
   endEvidence: trade.endEvidence,

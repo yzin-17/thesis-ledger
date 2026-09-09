@@ -294,7 +294,13 @@ describe('运行历史与状态表渲染', () => {
 
   it('运行历史任务列解析任务名，未知任务回退 jobId 前 8 位', () => {
     const markup = renderToStaticMarkup(
-      <AutomationRunHistoryTable loadState="ready" jobs={[historyJob]} jobHistory={jobHistory} />,
+      <AutomationRunHistoryTable
+        loadState="ready"
+        jobs={[historyJob]}
+        history={{ items: jobHistory, page: 2, pageSize: 20, total: 45, totalPages: 3 }}
+        loading={false}
+        onPage={() => {}}
+      />,
     );
 
     expect(markup).toContain('市场数据同步');
@@ -304,6 +310,33 @@ describe('运行历史与状态表渲染', () => {
     expect(markup).toContain('成功');
     expect(markup).toContain('失败');
     expect(markup).toContain('行情接口超时');
+    expect(markup).toContain('第 2 / 3 页，共 45 条');
+    expect(markup).toContain('aria-label="自动化运行历史分页"');
+    expect(markup).toContain('上一页');
+    expect(markup).toContain('下一页');
+  });
+
+  it('运行历史在首页、末页和请求中正确禁用分页按钮', () => {
+    const renderHistory = (page: number, loading: boolean) =>
+      renderToStaticMarkup(
+        <AutomationRunHistoryTable
+          loadState="ready"
+          jobs={[historyJob]}
+          history={{ items: jobHistory, page, pageSize: 20, total: 45, totalPages: 3 }}
+          loading={loading}
+          onPage={() => {}}
+        />,
+      );
+
+    const firstPage = renderHistory(1, false);
+    const lastPage = renderHistory(3, false);
+    const loadingPage = renderHistory(2, true);
+
+    expect(firstPage).toMatch(/<button[^>]*disabled=""[^>]*>上一页<\/button>/);
+    expect(firstPage).not.toMatch(/<button[^>]*disabled=""[^>]*>下一页<\/button>/);
+    expect(lastPage).toMatch(/<button[^>]*disabled=""[^>]*>下一页<\/button>/);
+    expect(loadingPage).toMatch(/<button[^>]*disabled=""[^>]*>上一页<\/button>/);
+    expect(loadingPage).toMatch(/<button[^>]*disabled=""[^>]*>下一页<\/button>/);
   });
 
   it('通知失败与数据质量级别展示中文状态', () => {

@@ -22,6 +22,7 @@ import {
   useUpdateAutomationJobMutation,
 } from './providers.mutations.js';
 import {
+  AUTOMATION_HISTORY_PAGE_SIZE,
   newAutomationJobDraft,
   newProviderDraft,
   type AutomationJob,
@@ -43,6 +44,7 @@ export type ProviderSettingsTab = 'providers' | 'automation' | 'diagnostics';
 
 export function ProviderSettings() {
   const [healthHistoryPage, setHealthHistoryPage] = useState(1);
+  const [automationHistoryPage, setAutomationHistoryPage] = useState(1);
   const [tab, setTab] = useState<ProviderSettingsTab>('providers');
   const [providerDraft, setProviderDraft] = useState(newProviderDraft);
   const [providerSheetOpen, setProviderSheetOpen] = useState(false);
@@ -64,7 +66,7 @@ export function ProviderSettings() {
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const toastManager = useToastManager();
   const { confirm } = useConfirmDialog();
-  const providerQueries = useProviderQueries(healthHistoryPage);
+  const providerQueries = useProviderQueries(healthHistoryPage, automationHistoryPage);
   const providerMutation = useSaveProviderMutation();
   const testProviderMutation = useTestProviderConnectionMutation();
   const testProviderDraftMutation = useTestProviderDraftMutation();
@@ -83,7 +85,13 @@ export function ProviderSettings() {
     total: 0,
     totalPages: 0,
   };
-  const jobHistory = providerQueries.jobHistory.data ?? [];
+  const jobHistory = providerQueries.jobHistory.data ?? {
+    items: [],
+    page: automationHistoryPage,
+    pageSize: AUTOMATION_HISTORY_PAGE_SIZE,
+    total: 0,
+    totalPages: 0,
+  };
   const notificationFailures = providerQueries.notificationFailures.data ?? [];
   const hasProviderData = Object.values(providerQueries).some((query) => query.data !== undefined);
   const loadState = resolveLoadState(
@@ -94,7 +102,7 @@ export function ProviderSettings() {
       issues.length === 0 &&
       jobs.length === 0 &&
       healthHistory.items.length === 0 &&
-      jobHistory.length === 0 &&
+      jobHistory.items.length === 0 &&
       notificationFailures.length === 0,
   );
   const load = async () => {
@@ -152,6 +160,7 @@ export function ProviderSettings() {
   const healthHistoryLoading = providerQueries.healthHistory.isFetching;
   const providerRefreshing = Object.values(providerQueries).some((query) => query.isFetching);
   const handleHealthPage = (page: number) => setHealthHistoryPage(page);
+  const handleAutomationHistoryPage = (page: number) => setAutomationHistoryPage(page);
 
   return (
     <section className="module-page" data-provider-sheet-open={String(providerSheetOpen)}>
@@ -247,7 +256,13 @@ export function ProviderSettings() {
               onDelete={(job) => void actions.deleteJob(job)}
               onCreate={() => actions.openAutomationEditor()}
             />
-            <AutomationRunHistoryTable loadState={loadState} jobs={jobs} jobHistory={jobHistory} />
+            <AutomationRunHistoryTable
+              loadState={loadState}
+              jobs={jobs}
+              history={jobHistory}
+              loading={providerQueries.jobHistory.isFetching}
+              onPage={handleAutomationHistoryPage}
+            />
           </div>
         </TabsContent>
         <TabsContent value="diagnostics">

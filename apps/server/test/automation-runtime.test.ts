@@ -19,10 +19,88 @@ import { AutomationController } from '../src/automation/automation.controller.js
 import { AutomationWorkflowRunner } from '../src/automation/workflow-runner.service.js';
 import {
   AutomationService,
+  DEFAULT_AUTOMATION_HISTORY_PAGE_SIZE,
+  MAX_AUTOMATION_HISTORY_PAGE_SIZE,
   managedValuationJobs,
   nextCronOccurrence,
   type AutomationHandler,
 } from '../src/automation/automation.service.js';
+
+describe('Automation history pagination', () => {
+  it('按任务过滤并只读取请求页，使用稳定倒序', async () => {
+    const count = vi.fn(async () => 45);
+    const findMany = vi.fn(async () => [{ id: 'run-21' }]);
+    const service = new AutomationService(
+      { automationRun: { count, findMany } } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.history('job-1', 2, 20)).resolves.toEqual({
+      items: [{ id: 'run-21' }],
+      page: 2,
+      pageSize: 20,
+      total: 45,
+      totalPages: 3,
+    });
+    expect(count).toHaveBeenCalledWith({ where: { jobId: 'job-1' } });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { jobId: 'job-1' },
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      skip: 20,
+      take: 20,
+    });
+  });
+
+  it('限制单页数量并把越界页回落到最后一页', async () => {
+    const findMany = vi.fn(async () => []);
+    const service = new AutomationService(
+      { automationRun: { count: vi.fn(async () => 201), findMany } } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.history(undefined, 99, 500)).resolves.toMatchObject({
+      page: 3,
+      pageSize: MAX_AUTOMATION_HISTORY_PAGE_SIZE,
+      total: 201,
+      totalPages: 3,
+    });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {}, skip: 200, take: MAX_AUTOMATION_HISTORY_PAGE_SIZE }),
+    );
+  });
+
+  it('空历史和非法数字使用安全默认值', async () => {
+    const findMany = vi.fn(async () => []);
+    const service = new AutomationService(
+      { automationRun: { count: vi.fn(async () => 0), findMany } } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.history(undefined, Number.NaN, 0)).resolves.toEqual({
+      items: [],
+      page: 1,
+      pageSize: DEFAULT_AUTOMATION_HISTORY_PAGE_SIZE,
+      total: 0,
+      totalPages: 0,
+    });
+  });
+
+  it('Controller 不把非法查询参数传给服务', () => {
+    const automations = { history: vi.fn() };
+    const controller = new AutomationController(
+      automations as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    controller.history('job-1', 'not-a-page', '-3');
+    expect(automations.history).toHaveBeenCalledWith('job-1', undefined, undefined);
+  });
+});
 
 describe('Automation cron', () => {
   it('单值小时只匹配指定小时', () => {

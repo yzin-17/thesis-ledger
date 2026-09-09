@@ -1,10 +1,11 @@
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
 import {
+  AUTOMATION_HISTORY_PAGE_SIZE,
+  normalizeAutomationHistory,
   normalizeProviderHealthHistory,
   PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
 } from './providers.types.js';
 import type {
-  AutomationHistoryRecord,
   AutomationJob,
   AutomationRunNowResult,
   CreateAutomationJobInput,
@@ -42,8 +43,18 @@ export const fetchProviderHealthHistory = async (page: number, client?: DesktopR
   return normalizeProviderHealthHistory(payload, page, PROVIDER_HEALTH_HISTORY_PAGE_SIZE);
 };
 
-export const fetchAutomationHistory = (client?: DesktopRequestClient) =>
-  requestDesktopJson<AutomationHistoryRecord[]>('/automations/history', noStore, client);
+export const fetchAutomationHistory = async (page: number, client?: DesktopRequestClient) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(AUTOMATION_HISTORY_PAGE_SIZE),
+  });
+  const payload = await requestDesktopJson<unknown>(
+    `/automations/history?${params.toString()}`,
+    noStore,
+    client,
+  );
+  return normalizeAutomationHistory(payload, page, AUTOMATION_HISTORY_PAGE_SIZE);
+};
 
 export const fetchNotificationFailures = (client?: DesktopRequestClient) =>
   requestDesktopJson<NotificationFailureRecord[]>('/notifications?status=failed', noStore, client);
@@ -101,8 +112,7 @@ const automationJsonInit = (method: 'POST' | 'PATCH', body: unknown): RequestIni
 export const createAutomationJob = (
   input: CreateAutomationJobInput,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<AutomationJob>('/automations', automationJsonInit('POST', input), client);
+) => requestDesktopJson<AutomationJob>('/automations', automationJsonInit('POST', input), client);
 
 export const updateAutomationJob = (
   jobId: string,

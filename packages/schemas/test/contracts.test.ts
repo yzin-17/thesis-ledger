@@ -165,10 +165,13 @@ describe('行情契约', () => {
       enabled: true,
       credentialConfigured: false,
       origin: 'dsa',
+      markets: ['CN'],
+      configurationMode: 'control',
       upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经' }],
     });
     expect(quote).toMatchObject({ provider: 'akshare', upstreamSource: 'tencent' });
     expect(provider.upstreamSources?.[0]?.displayName).toBe('腾讯财经');
+    expect(provider).toMatchObject({ markets: ['CN'] });
   });
   it('拒绝非法 OHLC', () =>
     expect(() =>

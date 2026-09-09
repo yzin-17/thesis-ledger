@@ -14,11 +14,12 @@ export const providerKeys = {
   issues: () => [...providerKeys.root, 'issues'] as const,
   jobs: () => [...providerKeys.root, 'automations'] as const,
   healthHistory: (page: number) => [...providerKeys.root, 'health-history', page] as const,
-  jobHistory: () => [...providerKeys.root, 'automation-history'] as const,
+  jobHistory: (page?: number) =>
+    [...providerKeys.root, 'automation-history', ...(page === undefined ? [] : [page])] as const,
   notificationFailures: () => [...providerKeys.root, 'notification-failures'] as const,
 };
 
-export const useProviderQueries = (healthHistoryPage: number) => ({
+export const useProviderQueries = (healthHistoryPage: number, automationHistoryPage: number) => ({
   providers: useQuery({
     queryKey: providerKeys.providers(),
     queryFn: () => fetchProviders(),
@@ -36,8 +37,9 @@ export const useProviderQueries = (healthHistoryPage: number) => ({
     queryFn: () => fetchProviderHealthHistory(healthHistoryPage),
   }),
   jobHistory: useQuery({
-    queryKey: providerKeys.jobHistory(),
-    queryFn: () => fetchAutomationHistory(),
+    queryKey: providerKeys.jobHistory(automationHistoryPage),
+    queryFn: () => fetchAutomationHistory(automationHistoryPage),
+    placeholderData: (previous) => previous,
   }),
   notificationFailures: useQuery({
     queryKey: providerKeys.notificationFailures(),

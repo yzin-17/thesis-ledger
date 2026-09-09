@@ -23,6 +23,7 @@ const tradeSummaryShape = {
   accountId: z.uuid(),
   accountMode: tradeModeSchema,
   symbol: z.string().trim().min(1),
+  assetName: z.string().trim().min(1).optional(),
   lifecycle: tradeLifecycleSchema,
   exitProgress: tradeExitProgressSchema,
   endEvidence: tradeEndEvidenceSchema,

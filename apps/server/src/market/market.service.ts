@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
   chipDistributionSchemaV1,
@@ -23,13 +23,20 @@ import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketBarCache, resolveEffectiveBars } from './market-bar-cache.js';
+import {
+  historicalSeriesFreshSeconds,
+  MARKET_CACHE_POLICIES,
+  MarketResultCache,
+} from './market-result-cache.js';
 
 export { resolveEffectiveBars } from './market-bar-cache.js';
 
 const fundSymbolPattern = /^\d{6}\.OF$/;
 @Injectable()
 export class MarketService {
+  private readonly logger = new Logger(MarketService.name);
   private readonly barCache: MarketBarCache;
+  private readonly resultCache: MarketResultCache;
 
   constructor(
     private readonly dsa: DsaClient,
@@ -37,6 +44,7 @@ export class MarketService {
     @Optional() private readonly prisma?: PrismaService,
   ) {
     this.barCache = new MarketBarCache(redis, prisma);
+    this.resultCache = new MarketResultCache(redis);
   }
 
   private readonly flights = new Map<string, Promise<unknown>>();
@@ -145,8 +153,13 @@ export class MarketService {
           const serialized = JSON.stringify(quote);
           await this.redis.client
             .multi()
-            .set(freshKey, serialized, 'EX', 15)
-            .set(lastValidKey, serialized, 'EX', 86_400)
+            .set(freshKey, serialized, 'EX', MARKET_CACHE_POLICIES.realtimeQuote.freshSeconds)
+            .set(
+              lastValidKey,
+              serialized,
+              'EX',
+              MARKET_CACHE_POLICIES.realtimeQuote.lastValidSeconds,
+            )
             .exec();
           return quote;
         } catch (error) {
@@ -230,90 +243,127 @@ export class MarketService {
     const symbol = input.trim().toUpperCase();
     if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
     const limit = Math.min(Math.max(range.limit ?? 365, 1), 3650);
-    const flightKey = `fund-nav-history:${symbol}:${range.start ?? ''}:${range.end ?? ''}:${limit}`;
-    return this.singleFlight(flightKey, () =>
-      this.withDistributedLock(flightKey, async () => {
-        const query = new URLSearchParams({ symbol, limit: String(limit) });
-        if (range.start) query.set('start', range.start);
-        if (range.end) query.set('end', range.end);
-        try {
-          const raw = await this.dsa.get<unknown[]>(
-            `/api/v1/thesis-ledger/market/fund-nav/history?${query.toString()}`,
-          );
-          const points = fundNavHistorySchemaV1.parse(raw);
-          if (this.prisma && options.persistIdentity !== false && points.length > 0) {
-            await this.prisma.$transaction([
-              this.prisma.asset.upsert({
-                where: { symbol },
-                update: {},
-                create: {
-                  symbol,
-                  name: symbol,
-                  market: 'OF',
-                  assetType: 'fund',
-                  currency: 'CNY',
-                  identityStatus: 'provider',
-                  identitySource: 'dsa-fund-nav',
-                },
-              }),
-              ...points.map((point) =>
-                this.prisma!.fundNavPoint.upsert({
-                  where: { symbol_navDate: { symbol, navDate: new Date(point.navDate) } },
-                  update: {
-                    unitNav: point.unitNav,
-                    provider: point.provider,
-                    fetchedAt: new Date(point.fetchedAt),
-                    freshness: point.freshness,
-                    fallbackUsed: point.fallbackUsed ?? false,
-                  },
-                  create: {
-                    symbol,
-                    navDate: new Date(point.navDate),
-                    unitNav: point.unitNav,
-                    provider: point.provider,
-                    fetchedAt: new Date(point.fetchedAt),
-                    freshness: point.freshness,
-                    fallbackUsed: point.fallbackUsed ?? false,
-                  },
-                }),
-              ),
-            ]);
-          }
-          return points;
-        } catch (error) {
-          if (!this.prisma) throw error;
-          const stored = await this.prisma.fundNavPoint.findMany({
-            where: {
-              symbol,
-              ...(range.start || range.end
-                ? {
-                    navDate: {
-                      ...(range.start ? { gte: new Date(range.start) } : {}),
-                      ...(range.end ? { lte: new Date(range.end) } : {}),
-                    },
-                  }
-                : {}),
+    const cacheKey = `fund-nav-history:${symbol}:${range.start ?? ''}:${range.end ?? ''}:${limit}`;
+    const parse = (value: unknown) => fundNavHistorySchemaV1.parse(value);
+    const markCached = (points: FundNavHistoryV1) =>
+      parse(points.map((point) => ({ ...point, servedFromCache: true })));
+    const markStale = (points: FundNavHistoryV1) =>
+      parse(
+        points.map((point) => ({
+          ...point,
+          freshness: 'stale',
+          servedFromCache: true,
+        })),
+      );
+    if (!options.refresh) {
+      const cached = await this.resultCache.readFresh(cacheKey, parse, markCached);
+      if (cached) return cached;
+    }
+    try {
+      return await this.singleFlight(cacheKey, () =>
+        this.withDistributedLock(cacheKey, () =>
+          this.resultCache.transform({
+            key: cacheKey,
+            refresh: options.refresh === true,
+            parse,
+            markCached,
+            markStale,
+            policy: {
+              freshSeconds: historicalSeriesFreshSeconds(range.end),
+              lastValidSeconds: MARKET_CACHE_POLICIES.fundNavHistoryLastValidSeconds,
             },
-            orderBy: { navDate: 'desc' },
-            take: limit,
-          });
-          if (stored.length === 0) throw error;
-          return fundNavHistorySchemaV1.parse(
-            stored.reverse().map((point) => ({
-              version: 1,
-              symbol: point.symbol,
-              unitNav: Number(point.unitNav),
-              navDate: point.navDate.toISOString(),
-              provider: point.provider,
-              fetchedAt: point.fetchedAt.toISOString(),
-              freshness: 'stale',
-              fallbackUsed: point.fallbackUsed,
-              servedFromCache: true,
-            })),
-          );
-        }
-      }),
-    );
+            load: async () => {
+              const query = new URLSearchParams({ symbol, limit: String(limit) });
+              if (range.start) query.set('start', range.start);
+              if (range.end) query.set('end', range.end);
+              const raw = await this.dsa.get<unknown[]>(
+                `/api/v1/thesis-ledger/market/fund-nav/history?${query.toString()}`,
+              );
+              const points = parse(
+                raw.map((point) => ({
+                  ...(point as Record<string, unknown>),
+                  servedFromCache: false,
+                })),
+              );
+              if (this.prisma && options.persistIdentity !== false && points.length > 0) {
+                try {
+                  await this.prisma.$transaction([
+                    this.prisma.asset.upsert({
+                      where: { symbol },
+                      update: {},
+                      create: {
+                        symbol,
+                        name: symbol,
+                        market: 'OF',
+                        assetType: 'fund',
+                        currency: 'CNY',
+                        identityStatus: 'provider',
+                        identitySource: 'dsa-fund-nav',
+                      },
+                    }),
+                    ...points.map((point) =>
+                      this.prisma!.fundNavPoint.upsert({
+                        where: { symbol_navDate: { symbol, navDate: new Date(point.navDate) } },
+                        update: {
+                          unitNav: point.unitNav,
+                          provider: point.provider,
+                          fetchedAt: new Date(point.fetchedAt),
+                          freshness: point.freshness,
+                          fallbackUsed: point.fallbackUsed ?? false,
+                        },
+                        create: {
+                          symbol,
+                          navDate: new Date(point.navDate),
+                          unitNav: point.unitNav,
+                          provider: point.provider,
+                          fetchedAt: new Date(point.fetchedAt),
+                          freshness: point.freshness,
+                          fallbackUsed: point.fallbackUsed ?? false,
+                        },
+                      }),
+                    ),
+                  ]);
+                } catch (error) {
+                  this.logger.warn(`基金净值历史持久化失败: ${String(error)}`);
+                }
+              }
+              return points;
+            },
+          }),
+        ),
+      );
+    } catch (error) {
+      if (!this.prisma) throw error;
+      const stored = await this.prisma.fundNavPoint.findMany({
+        where: {
+          symbol,
+          ...(range.start || range.end
+            ? {
+                navDate: {
+                  ...(range.start ? { gte: new Date(range.start) } : {}),
+                  ...(range.end ? { lte: new Date(range.end) } : {}),
+                },
+              }
+            : {}),
+        },
+        orderBy: { navDate: 'desc' },
+        take: limit,
+      });
+      if (stored.length === 0) throw error;
+      return parse(
+        stored.reverse().map((point) => ({
+          version: 1,
+          symbol: point.symbol,
+          unitNav: Number(point.unitNav),
+          navDate: point.navDate.toISOString(),
+          provider: point.provider,
+          fetchedAt: point.fetchedAt.toISOString(),
+          freshness: 'stale',
+          fallbackUsed: point.fallbackUsed,
+          servedFromCache: true,
+        })),
+      );
+    }
   }
 
   async getFundHoldings(
@@ -460,43 +510,6 @@ export class MarketService {
     );
   }
 
-  private async cachedTransform<T>(
-    key: string,
-    refresh: boolean,
-    parse: (value: unknown) => T,
-    load: () => Promise<T>,
-    markStale: (value: T) => T,
-  ): Promise<T> {
-    const client = this.redis?.client;
-    if (!client) return load();
-
-    const freshKey = redisKey('cache', `${key}:fresh`);
-    const lastValidKey = redisKey('cache', `${key}:last-valid`);
-    const cached = await client.get(freshKey);
-    if (cached && !refresh) return parse(JSON.parse(cached));
-
-    try {
-      const value = await load();
-      await client
-        .multi()
-        .set(freshKey, JSON.stringify(value), 'EX', 60)
-        .set(lastValidKey, JSON.stringify(value), 'EX', 86_400)
-        .exec();
-      return value;
-    } catch (error) {
-      const lastValid = await client.get(lastValidKey);
-      if (lastValid) return markStale(parse(JSON.parse(lastValid)));
-      throw error;
-    }
-  }
-
-  private async readFreshCache<T>(key: string, parse: (value: unknown) => T): Promise<T | null> {
-    const client = this.redis?.client;
-    if (!client) return null;
-    const cached = await client.get(redisKey('cache', `${key}:fresh`));
-    return cached ? parse(JSON.parse(cached)) : null;
-  }
-
   async getIndicator(
     input: string,
     name: 'MA' | 'MACD' | 'RSI' | 'ATR',
@@ -506,17 +519,21 @@ export class MarketService {
     const refresh = options.refresh === true;
     const key = `indicator:${symbol}:${name}`;
     const parse = (value: unknown) => indicatorSchemaV1.parse(value);
+    const markCached = (value: IndicatorV1) =>
+      indicatorSchemaV1.parse({ ...value, servedFromCache: true });
     if (!refresh) {
-      const cached = await this.readFreshCache(key, parse);
+      const cached = await this.resultCache.readFresh(key, parse, markCached);
       if (cached) return cached;
     }
     return this.singleFlight(key, () =>
       this.withDistributedLock(key, () =>
-        this.cachedTransform(
+        this.resultCache.transform({
           key,
           refresh,
           parse,
-          async () => {
+          markCached,
+          policy: MARKET_CACHE_POLICIES.indicator,
+          load: async () => {
             const raw = await this.dsa.get<Record<string, unknown>>(
               `/api/v1/thesis-ledger/market/indicators/${name.toLowerCase()}?symbol=${encodeURIComponent(symbol)}&timeframe=1d`,
             );
@@ -526,10 +543,12 @@ export class MarketService {
               symbol,
               name,
               provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+              servedFromCache: false,
             });
           },
-          (value) => indicatorSchemaV1.parse({ ...value, fallbackUsed: true }),
-        ),
+          markStale: (value) =>
+            indicatorSchemaV1.parse({ ...value, fallbackUsed: true, servedFromCache: true }),
+        }),
       ),
     );
   }
@@ -539,17 +558,21 @@ export class MarketService {
     const refresh = options.refresh === true;
     const key = `chip:${symbol}`;
     const parse = (value: unknown) => chipDistributionSchemaV1.parse(value);
+    const markCached = (value: ChipDistributionV1) =>
+      chipDistributionSchemaV1.parse({ ...value, servedFromCache: true });
     if (!refresh) {
-      const cached = await this.readFreshCache(key, parse);
+      const cached = await this.resultCache.readFresh(key, parse, markCached);
       if (cached) return cached;
     }
     return this.singleFlight(key, () =>
       this.withDistributedLock(key, () =>
-        this.cachedTransform(
+        this.resultCache.transform({
           key,
           refresh,
           parse,
-          async () => {
+          markCached,
+          policy: MARKET_CACHE_POLICIES.chipSummary,
+          load: async () => {
             const raw = await this.dsa.get<Record<string, unknown>>(
               `/api/v1/thesis-ledger/market/chip?symbol=${encodeURIComponent(symbol)}`,
             );
@@ -558,10 +581,16 @@ export class MarketService {
               version: 1,
               symbol,
               provider: typeof raw.provider === 'string' ? raw.provider : 'dsa-fork',
+              servedFromCache: false,
             });
           },
-          (value) => chipDistributionSchemaV1.parse({ ...value, fallbackUsed: true }),
-        ),
+          markStale: (value) =>
+            chipDistributionSchemaV1.parse({
+              ...value,
+              fallbackUsed: true,
+              servedFromCache: true,
+            }),
+        }),
       ),
     );
   }

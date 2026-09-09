@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 import { fetchRiskAudit, fetchRiskEvents } from '../src/features/risk/risk.api.js';
 import { riskAuditQueryOptions, riskKeys } from '../src/features/risk/risk.queries.js';
-import { fetchProviderHealthHistory } from '../src/features/providers/providers.api.js';
+import {
+  fetchAutomationHistory,
+  fetchProviderHealthHistory,
+} from '../src/features/providers/providers.api.js';
 import { providerKeys } from '../src/features/providers/providers.queries.js';
 import {
   fetchPerformanceHistory,
@@ -113,6 +116,27 @@ describe('拆分后的领域请求契约', () => {
     expect(page.page).toBe(1);
     expect(page.items).toHaveLength(1);
     expect(providerKeys.healthHistory(1)).not.toEqual(providerKeys.healthHistory(2));
+  });
+
+  it('自动化运行历史按页请求、隔离缓存并兼容旧数组响应', async () => {
+    const records = Array.from({ length: 21 }, (_, index) => ({
+      id: `run-${index + 1}`,
+      jobId: 'job-1',
+      status: 'succeeded',
+      startedAt: '2026-09-09T00:00:00.000Z',
+      error: null,
+    }));
+    const { client, request } = makeClient(records);
+    const page = await fetchAutomationHistory(2, client);
+
+    expect(request).toHaveBeenCalledWith(
+      '/automations/history?page=2&pageSize=20',
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+    expect(page).toMatchObject({ page: 2, pageSize: 20, total: 21, totalPages: 2 });
+    expect(page.items).toHaveLength(1);
+    expect(providerKeys.jobHistory(1)).not.toEqual(providerKeys.jobHistory(2));
+    expect(providerKeys.jobHistory(1).slice(0, -1)).toEqual(providerKeys.jobHistory());
   });
 
   it('Performance 查询 key 包含 mode 和 account，Import key 包含 account', async () => {

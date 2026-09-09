@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { assetMarketsByTradingMarket, openTradingMarketsAt } from '@thesis-ledger/domain';
 import type {
   FundHoldingsV1,
   PerformanceSeriesInterval,
@@ -129,11 +130,57 @@ export class PerformanceValuationSeriesService {
     private readonly market: MarketService,
   ) {}
 
-  async sample(at = new Date(), mode: PortfolioMode = 'actual', baseCurrency: Currency = 'CNY') {
+  private openAssetMarkets(at: Date) {
+    const markets = openTradingMarketsAt(at);
+    return {
+      markets,
+      assetMarkets: markets.flatMap((market) => assetMarketsByTradingMarket[market]),
+    };
+  }
+
+  private samplingAccountWhere(mode: PortfolioMode, assetMarkets: readonly string[]) {
+    return {
+      ...investmentAccountWhere(mode),
+      positions: {
+        some: {
+          quantity: { gt: 0 },
+          asset: { market: { in: [...assetMarkets] } },
+        },
+      },
+    };
+  }
+
+  async scheduledSamplingGate(at = new Date(), mode: PortfolioMode = 'actual') {
+    const { markets, assetMarkets } = this.openAssetMarkets(at);
+    if (markets.length === 0) {
+      return { allowed: false, reason: '当前没有处于常规交易时段的支持市场' } as const;
+    }
+    const account = await this.prisma.account.findFirst({
+      where: this.samplingAccountWhere(mode, assetMarkets),
+      select: { id: true },
+    });
+    if (!account) {
+      return {
+        allowed: false,
+        reason: `当前开放市场（${markets.join('/')}）没有实际持仓`,
+      } as const;
+    }
+    return { allowed: true, markets } as const;
+  }
+
+  async sample(
+    at = new Date(),
+    mode: PortfolioMode = 'actual',
+    baseCurrency: Currency = 'CNY',
+    options: { marketGate?: boolean } = {},
+  ) {
     const sampledAt = new Date(at);
     sampledAt.setUTCSeconds(0, 0);
+    const openMarkets = options.marketGate ? this.openAssetMarkets(at) : undefined;
     const accounts = await this.prisma.account.findMany({
-      where: investmentAccountWhere(mode),
+      where: openMarkets
+        ? this.samplingAccountWhere(mode, openMarkets.assetMarkets)
+        : investmentAccountWhere(mode),
       select: { id: true },
     });
     const sampled = [];
@@ -207,6 +254,7 @@ export class PerformanceValuationSeriesService {
       disclosureCoverage,
       pricedCoverage,
       partial: sampled.some((point) => point.dataQuality !== 'COMPLETE'),
+      ...(openMarkets ? { openMarkets: openMarkets.markets } : {}),
     };
   }
 

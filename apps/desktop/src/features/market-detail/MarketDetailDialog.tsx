@@ -5,12 +5,11 @@ import type {
   MarketDetailResponse,
   MarketDetailSection,
 } from '@thesis-ledger/api-client';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { requestMarketDetail } from './market-detail.api.js';
@@ -259,103 +258,114 @@ function MarketDetailDialogContent({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         aria-describedby="market-detail-description"
-        className="detail-panel max-h-[calc(100dvh-64px)] max-w-[calc(100%-2rem)] overflow-auto sm:max-w-[1200px]"
-        showCloseButton={false}
+        className="flex max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]"
       >
-        <div className="review-heading">
-          <div>
-            <p className="kicker">持仓行情详情</p>
-            <DialogTitle id="market-detail-title">
-              {position.asset.name} · {position.symbol}
-            </DialogTitle>
-          </div>
-          <DialogClose render={<Button className="secondary" type="button" variant="outline" />}>
-            关闭
-          </DialogClose>
-        </div>
-        <DialogDescription id="market-detail-description" className="sr-only">
-          查看该持仓的数量、成本和按资产能力加载的市场数据。
-        </DialogDescription>
-        <div className="detail-metrics" data-market-detail-position-context>
-          <DetailMetric label="持仓数量" value={`${number.format(position.quantity)} ${unit}`} />
-          <DetailMetric label="持仓成本" value={money.format(position.costPrice)} />
-          <DetailMetric
-            label="持仓盈亏"
-            value={position.pnl === null ? '—' : money.format(position.pnl)}
-          />
-        </div>
-        {queryNotice}
-        {loading ? <MarketDetailLoadingSections /> : null}
-        {stale ? (
-          <MarketDetailNotice
-            state="stale"
-            title={refreshing ? '正在刷新行情详情' : '行情详情可能陈旧'}
-            description={staleDescription}
-            onRetry={onRetryAll}
-          />
-        ) : null}
-        {retryError ? (
-          <p className="notice" role="alert">
-            {retryError}
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-14 text-left">
+          <p className="m-0 text-xs font-medium tracking-[0.16em] text-muted-foreground">
+            持仓行情
           </p>
-        ) : null}
-        {visibleDetail ? (
-          <>
-            {sectionIsVisible(quoteSection) ? (
-              <QuoteSection
-                section={quoteSection}
-                onRetry={() => void onRetrySection('quote')}
-                retrying={retrying === 'quote'}
-              />
-            ) : null}
-            {sectionIsVisible(barsSection) ? (
-              <BarsSection
-                section={barsSection}
-                onRetry={() => void onRetrySection('bars')}
-                retrying={retrying === 'bars'}
-              />
-            ) : null}
-            {indicatorCapabilities.length > 0 ? (
-              <IndicatorSection
-                detail={visibleDetail}
-                capabilities={indicatorCapabilities}
-                onRetry={(capability) => void onRetrySection(capability)}
-                retrying={retrying}
-              />
-            ) : null}
-            {sectionIsVisible(chipSection) ? (
-              <ChipSection
-                section={chipSection}
-                onRetry={() => void onRetrySection('chip')}
-                retrying={retrying === 'chip'}
-              />
-            ) : null}
-            {sectionIsVisible(fundNavSection) ? (
-              <FundNavSection
-                section={fundNavSection}
-                onRetry={() => void onRetrySection('fund-nav')}
-                retrying={retrying === 'fund-nav'}
-              />
-            ) : null}
-            {sectionIsVisible(fundNavHistorySection) ? (
-              <FundNavHistorySection
-                section={fundNavHistorySection}
-                onRetry={() => void onRetrySection('fund-nav-history')}
-                retrying={retrying === 'fund-nav-history'}
-              />
-            ) : null}
-            {visibleDetail.capabilities.unsupported.length > 0 ? (
-              <details className="notice" data-market-detail-capabilities>
-                <summary>数据可用性</summary>
-                <p>
-                  当前未提供：
-                  {visibleDetail.capabilities.unsupported.map(marketDetailSectionTitle).join('、')}
-                  。 不支持的能力不会触发 Provider 请求。
-                </p>
-              </details>
-            ) : null}
-          </>
-        ) : null}
+          <DialogTitle id="market-detail-title" className="text-lg font-semibold">
+            {position.asset.name} · {position.symbol}
+          </DialogTitle>
+          <DialogDescription id="market-detail-description" className="sr-only">
+            查看该持仓的数量、成本和按资产能力加载的市场数据。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5">
+          <div
+            className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px"
+            data-market-detail-position-context
+          >
+            <DetailMetric label="持仓数量" value={`${number.format(position.quantity)} ${unit}`} />
+            <DetailMetric label="持仓成本" value={money.format(position.costPrice)} />
+            <DetailMetric
+              label="持仓盈亏"
+              value={position.pnl === null ? '—' : money.format(position.pnl)}
+            />
+          </div>
+          {queryNotice}
+          {loading ? <MarketDetailLoadingSections /> : null}
+          {stale ? (
+            <MarketDetailNotice
+              state="stale"
+              title={refreshing ? '正在刷新行情详情' : '行情详情可能陈旧'}
+              description={staleDescription}
+              onRetry={onRetryAll}
+            />
+          ) : null}
+          {retryError ? (
+            <p
+              className="m-0 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+              role="alert"
+            >
+              {retryError}
+            </p>
+          ) : null}
+          {visibleDetail ? (
+            <>
+              {sectionIsVisible(quoteSection) ? (
+                <QuoteSection
+                  section={quoteSection}
+                  onRetry={() => void onRetrySection('quote')}
+                  retrying={retrying === 'quote'}
+                />
+              ) : null}
+              {sectionIsVisible(barsSection) ? (
+                <BarsSection
+                  section={barsSection}
+                  onRetry={() => void onRetrySection('bars')}
+                  retrying={retrying === 'bars'}
+                />
+              ) : null}
+              {indicatorCapabilities.length > 0 ? (
+                <IndicatorSection
+                  detail={visibleDetail}
+                  capabilities={indicatorCapabilities}
+                  onRetry={(capability) => void onRetrySection(capability)}
+                  retrying={retrying}
+                />
+              ) : null}
+              {sectionIsVisible(chipSection) ? (
+                <ChipSection
+                  section={chipSection}
+                  onRetry={() => void onRetrySection('chip')}
+                  retrying={retrying === 'chip'}
+                />
+              ) : null}
+              {sectionIsVisible(fundNavSection) ? (
+                <FundNavSection
+                  section={fundNavSection}
+                  onRetry={() => void onRetrySection('fund-nav')}
+                  retrying={retrying === 'fund-nav'}
+                />
+              ) : null}
+              {sectionIsVisible(fundNavHistorySection) ? (
+                <FundNavHistorySection
+                  section={fundNavHistorySection}
+                  onRetry={() => void onRetrySection('fund-nav-history')}
+                  retrying={retrying === 'fund-nav-history'}
+                />
+              ) : null}
+              {visibleDetail.capabilities.unsupported.length > 0 ? (
+                <details
+                  className="rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground"
+                  data-market-detail-capabilities
+                >
+                  <summary className="cursor-pointer font-medium text-foreground">
+                    数据可用性
+                  </summary>
+                  <p className="mb-0 mt-2">
+                    当前未提供：
+                    {visibleDetail.capabilities.unsupported
+                      .map(marketDetailSectionTitle)
+                      .join('、')}
+                    。不支持的能力不会触发数据源请求。
+                  </p>
+                </details>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );

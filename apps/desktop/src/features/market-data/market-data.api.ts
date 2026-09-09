@@ -1,10 +1,5 @@
 import { getDesktopApiClient } from '../../shared/api/client.js';
-import type {
-  CatalogStatus,
-  DailyBarCacheStatus,
-  MarketPolicy,
-  ProviderManifest,
-} from './market-data.types.js';
+import type { CatalogStatus, MarketPolicy, ProviderManifest } from './market-data.types.js';
 
 const api = () => getDesktopApiClient();
 
@@ -13,8 +8,6 @@ export const fetchMarketProviders = async () =>
   (await api().request<{ providers?: ProviderManifest[] }>('/market-data/providers')).providers ??
   [];
 export const fetchCatalogStatus = () => api().request<CatalogStatus>('/market-data/catalog/status');
-export const fetchDailyBarCacheStatus = () =>
-  api().request<DailyBarCacheStatus>('/market-data/cache/daily-bars');
 export const fetchCatalogJob = (jobId: string) =>
   api().request<CatalogStatus>(`/market-data/catalog/jobs/${encodeURIComponent(jobId)}`);
 

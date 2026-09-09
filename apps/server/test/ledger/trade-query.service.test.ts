@@ -20,6 +20,7 @@ const makeTrade = (input: {
     accountId,
     accountMode: input.accountMode ?? 'actual',
     symbol: 'AAPL.US',
+    asset: { name: '苹果公司' },
     lifecycle: 'ACTIVE',
     exitProgress: 'NONE',
     endEvidence: 'UNKNOWN',
@@ -131,6 +132,7 @@ describe('Trade 查询 API 服务', () => {
     const first = await harness.service.list({ accountId: accountA, mode: 'actual', limit: 1 });
     expect(first.items).toHaveLength(1);
     expect(first.items[0]?.accountId).toBe(accountA);
+    expect(first.items[0]?.assetName).toBe('苹果公司');
     expect(first.nextCursor).toEqual(expect.any(String));
 
     harness.generations.set(accountA, '2');
@@ -156,6 +158,7 @@ describe('Trade 查询 API 服务', () => {
     const detail = await harness.service.get(accountA, 'trade-detail');
     expect(detail).toMatchObject({
       id: 'trade-detail',
+      assetName: '苹果公司',
       sourceQuantity: '10',
       entryLegs: [{ price: '100.00', rawCost: '1000' }],
     });

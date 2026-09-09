@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -27,11 +27,16 @@ const providerName = (providers: readonly ProviderManifest[], providerId: string
   providerId ??
   '未配置';
 
-const saveLabel = (saving: boolean, policy: MarketPolicy | null) => {
-  if (saving) return '提交中…';
-  if (policy) return `提交下一版策略（当前第 ${policy.revision} 版）`;
-  return '提交下一版策略';
+const providerOptionLabel = (provider: ProviderManifest) => {
+  const states: string[] = [];
+  if (!provider.configured) states.push('未配置');
+  if (!provider.enabled) states.push('已停用');
+  return states.length > 0
+    ? `${provider.displayName} · ${states.join('、')}`
+    : provider.displayName;
 };
+
+const saveLabel = (saving: boolean) => (saving ? '保存中…' : '保存路由策略');
 
 export function MarketPolicyPanel({
   policy,
@@ -50,13 +55,13 @@ export function MarketPolicyPanel({
 }) {
   return (
     <Card>
-      <CardContent className="space-y-5 p-6">
+      <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="m-0 text-xl font-semibold">Provider 路由策略</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-1">
+            <CardTitle>路由策略</CardTitle>
+            <CardDescription>
               为每类数据指定主数据源和一个备用数据源；备用仅在主源不可用时接管完整结果。
-            </p>
+            </CardDescription>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span>启用路由</span>
@@ -71,6 +76,8 @@ export function MarketPolicyPanel({
             </Switch>
           </div>
         </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5">
         {policy ? (
           <div className="divide-y rounded-lg border border-border">
             {routeDefinitions.map(([capability, instrumentType]) => {
@@ -92,7 +99,7 @@ export function MarketPolicyPanel({
                       {capability} / {instrumentType}
                     </span>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="flex flex-col gap-1.5">
                     <span className="block text-xs font-medium text-muted-foreground">
                       主数据源
                     </span>
@@ -122,14 +129,14 @@ export function MarketPolicyPanel({
                           <SelectItem value={NONE}>未配置</SelectItem>
                           {compatible.map((provider) => (
                             <SelectItem key={provider.providerId} value={provider.providerId}>
-                              {provider.displayName}
+                              {providerOptionLabel(provider)}
                             </SelectItem>
                           ))}
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="flex flex-col gap-1.5">
                     <span className="block text-xs font-medium text-muted-foreground">
                       备用数据源
                     </span>
@@ -159,7 +166,7 @@ export function MarketPolicyPanel({
                           <SelectItem value={NONE}>不设备用</SelectItem>
                           {fallbackOptions.map((provider) => (
                             <SelectItem key={provider.providerId} value={provider.providerId}>
-                              {provider.displayName}
+                              {providerOptionLabel(provider)}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -183,9 +190,9 @@ export function MarketPolicyPanel({
             {saving && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
             )}
-            {saveLabel(saving, policy)}
+            {saveLabel(saving)}
           </Button>
-          <span className="text-xs text-muted-foreground">保存后由 DSA 原子应用新的主备顺序。</span>
+          <span className="text-xs text-muted-foreground">保存后自动应用新的主备顺序。</span>
         </div>
       </CardContent>
     </Card>

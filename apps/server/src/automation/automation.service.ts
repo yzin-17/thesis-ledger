@@ -53,8 +53,16 @@ export const runWithRetry = async <T>(
 
 export interface AutomationHandler {
   readonly type: AutomationJobType;
-  run(signal: AbortSignal, scheduledAt: Date): Promise<unknown>;
+  scheduledGate?(
+    scheduledAt: Date,
+  ): Promise<{ allowed: true } | { allowed: false; reason: string }>;
+  run(signal: AbortSignal, scheduledAt: Date, trigger?: 'manual' | 'scheduled'): Promise<unknown>;
 }
+
+export const DEFAULT_AUTOMATION_HISTORY_PAGE_SIZE = 20;
+export const MAX_AUTOMATION_HISTORY_PAGE_SIZE = 100;
+const LEGACY_INTRADAY_VALUATION_CRON = '* * * * 1-5';
+export const INTRADAY_VALUATION_CRON = '* * * * *';
 
 export const managedValuationJobs = [
   {
@@ -62,7 +70,7 @@ export const managedValuationJobs = [
     systemKey: 'valuation-intraday-sample',
     name: '盘中估值采样',
     type: 'valuation-intraday-sample',
-    cron: '* * * * 1-5',
+    cron: INTRADAY_VALUATION_CRON,
   },
   {
     id: '00000000-0000-4000-8000-000000000012',
@@ -96,7 +104,7 @@ export class AutomationService {
 
   async ensureManagedValuationJobs() {
     for (const definition of managedValuationJobs) {
-      await this.prisma.automationJob.upsert({
+      const provisioned = await this.prisma.automationJob.upsert({
         where: { systemKey: definition.systemKey },
         create: {
           ...definition,
@@ -109,6 +117,19 @@ export class AutomationService {
         },
         update: { managed: true },
       });
+      if (
+        definition.systemKey === 'valuation-intraday-sample' &&
+        provisioned.cron === LEGACY_INTRADAY_VALUATION_CRON &&
+        provisioned.timezone === 'Asia/Shanghai'
+      ) {
+        await this.prisma.automationJob.update({
+          where: { id: provisioned.id },
+          data: {
+            cron: INTRADAY_VALUATION_CRON,
+            nextRunAt: nextCronOccurrence(INTRADAY_VALUATION_CRON, provisioned.timezone),
+          },
+        });
+      }
     }
   }
 
@@ -186,7 +207,16 @@ export class AutomationService {
     if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
 
     const nextRunAt = nextCronOccurrence(job.cron, job.timezone, now);
-    if (isMarketAutomationJobType(type)) {
+    if (handler.scheduledGate) {
+      const gate = await handler.scheduledGate(now);
+      if (!gate.allowed) {
+        await this.prisma.automationJob.update({
+          where: { id: jobId },
+          data: { nextRunAt },
+        });
+        return { skipped: true, reason: gate.reason } as const;
+      }
+    } else if (isMarketAutomationJobType(type)) {
       const tradingDay = cnTradingCalendar.status(now);
       if (!tradingDay.open) {
         await this.prisma.automationJob.update({
@@ -204,7 +234,7 @@ export class AutomationService {
     }
 
     try {
-      const result = await this.execute(jobId, handler, now);
+      const result = await this.execute(jobId, handler, now, 'scheduled');
       if (result.skipped) return result;
       await this.prisma.automationJob.update({
         where: { id: jobId },
@@ -245,7 +275,12 @@ export class AutomationService {
     }
   }
 
-  async execute(jobId: string, handler: AutomationHandler, scheduledAt = new Date()) {
+  async execute(
+    jobId: string,
+    handler: AutomationHandler,
+    scheduledAt = new Date(),
+    trigger: 'manual' | 'scheduled' = 'manual',
+  ) {
     const job = await this.prisma.automationJob.findUniqueOrThrow({ where: { id: jobId } });
     const type = automationJobTypeSchema.parse(job.type);
     if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
@@ -266,7 +301,7 @@ export class AutomationService {
             where: { id: run.id },
             data: { attempt },
           });
-        return handler.run(AbortSignal.timeout(job.lockTtlMs), scheduledAt);
+        return handler.run(AbortSignal.timeout(job.lockTtlMs), scheduledAt, trigger);
       }, retry);
       const output = execution.result;
       await this.prisma.automationRun.update({
@@ -295,11 +330,28 @@ export class AutomationService {
     }
   }
 
-  history(jobId?: string) {
-    return this.prisma.automationRun.findMany({
-      ...(jobId ? { where: { jobId } } : {}),
-      orderBy: { startedAt: 'desc' },
-      take: 200,
+  async history(jobId?: string, page?: number, pageSize?: number) {
+    const requestedPage = Number.isInteger(page) && page && page > 0 ? page : 1;
+    const requestedPageSize =
+      Number.isInteger(pageSize) && pageSize && pageSize > 0
+        ? Math.min(pageSize, MAX_AUTOMATION_HISTORY_PAGE_SIZE)
+        : DEFAULT_AUTOMATION_HISTORY_PAGE_SIZE;
+    const where = jobId ? { jobId } : {};
+    const total = await this.prisma.automationRun.count({ where });
+    const totalPages = Math.ceil(total / requestedPageSize);
+    const currentPage = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);
+    const items = await this.prisma.automationRun.findMany({
+      where,
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      skip: (currentPage - 1) * requestedPageSize,
+      take: requestedPageSize,
     });
+    return {
+      items,
+      page: currentPage,
+      pageSize: requestedPageSize,
+      total,
+      totalPages,
+    };
   }
 }

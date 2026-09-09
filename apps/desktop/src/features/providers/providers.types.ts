@@ -65,6 +65,16 @@ export interface AutomationHistoryRecord {
   output?: unknown;
 }
 
+export type AutomationHistoryPage = {
+  items: AutomationHistoryRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export const AUTOMATION_HISTORY_PAGE_SIZE = 20;
+
 export interface CreateAutomationJobInput {
   id: string;
   name: string;
@@ -390,6 +400,50 @@ export const normalizeProviderHealthHistory = (
 
   const response = value as Partial<ProviderHealthHistoryPage>;
   const items = value.items as ProviderHealthHistoryRecord[];
+  const responsePageSize =
+    typeof response.pageSize === 'number' && response.pageSize > 0 ? response.pageSize : pageSize;
+  const total =
+    typeof response.total === 'number' && response.total >= 0 ? response.total : items.length;
+  let totalPages = response.totalPages;
+  if (typeof totalPages !== 'number' || totalPages < 0) {
+    totalPages = total === 0 ? 0 : Math.ceil(total / responsePageSize);
+  }
+  const page = typeof response.page === 'number' && response.page > 0 ? response.page : safePage;
+
+  return { items, page, pageSize: responsePageSize, total, totalPages };
+};
+
+export const normalizeAutomationHistory = (
+  value: unknown,
+  requestedPage: number,
+  pageSize: number,
+): AutomationHistoryPage => {
+  const safePage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  if (Array.isArray(value)) {
+    const total = value.length;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+    const page = totalPages === 0 ? 1 : Math.min(safePage, totalPages);
+    const start = (page - 1) * pageSize;
+    return {
+      items: value.slice(start, start + pageSize) as AutomationHistoryRecord[],
+      page,
+      pageSize,
+      total,
+      totalPages,
+    };
+  }
+
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('items' in value) ||
+    !Array.isArray(value.items)
+  ) {
+    throw new Error('自动化运行历史响应格式无效');
+  }
+
+  const response = value as Partial<AutomationHistoryPage>;
+  const items = value.items as AutomationHistoryRecord[];
   const responsePageSize =
     typeof response.pageSize === 'number' && response.pageSize > 0 ? response.pageSize : pageSize;
   const total =

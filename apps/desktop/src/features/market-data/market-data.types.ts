@@ -21,17 +21,11 @@ export interface ProviderManifest {
   credentialConfigured: boolean;
   requiresCredential?: boolean;
   origin?: 'dsa';
+  markets?: string[];
+  configurationMode?: 'control' | 'built_in' | 'dsa_environment';
   upstreamSources?: Array<{ sourceId: string; displayName: string }>;
   updatedAt?: string | null;
   health?: { scopes?: Array<{ state?: string; circuit?: string; errorCode?: string | null }> };
-}
-
-export interface DailyBarCacheStatus {
-  barCount: number;
-  symbolCount: number;
-  latestMarketDate: string | null;
-  updatedAt: string | null;
-  sources: Array<{ provider: string; upstreamSource: string | null; count: number }>;
 }
 
 export interface CatalogStatus {
@@ -79,13 +73,7 @@ export const compatibleProviders = (
   providers: readonly ProviderManifest[],
   capability: string,
   instrumentType: string,
-) =>
-  providers.filter(
-    (provider) =>
-      provider.configured &&
-      provider.enabled &&
-      provider.capabilities[capability]?.includes(instrumentType),
-  );
+) => providers.filter((provider) => provider.capabilities[capability]?.includes(instrumentType));
 
 export const updateRouteRole = (
   policy: MarketPolicy,

@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { dataSourceDisplay } from '../market-data/market-data.types.js';
+import { IndicatorValueChart, MarketPriceChart } from './MarketDetailCharts.js';
 import {
   isRetryableMarketDetailSection,
   marketDetailSectionTitle,
@@ -87,11 +88,11 @@ export const MarketDetailNotice = ({
 export const MarketDetailLoadingSections = () => (
   <div className="grid gap-4" data-market-detail-loading aria-label="行情分段加载中">
     {['行情数据', '技术指标', '资产专属数据'].map((label) => (
-      <section key={label} className="panel" aria-busy="true">
-        <div className="panel-heading">
+      <section key={label} className="grid gap-3 border-t border-border pt-4" aria-busy="true">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h3>{label}</h3>
-            <p>正在加载该分段数据。</p>
+            <h3 className="m-0 text-sm font-medium">{label}</h3>
+            <p className="mb-0 mt-1 text-xs text-muted-foreground">正在加载该分段数据。</p>
           </div>
           <Badge className="tag" variant="secondary">
             加载中
@@ -112,10 +113,12 @@ export const DetailMetric = ({
   value: string;
   detail?: string;
 }) => (
-  <div className="metric">
-    <span>{label}</span>
-    <strong>{value}</strong>
-    {detail ? <small>{detail}</small> : null}
+  <div className="bg-card p-4">
+    <span className="block text-xs text-muted-foreground">{label}</span>
+    <strong className="mt-1 block text-xl font-semibold tracking-tight tabular-nums">
+      {value}
+    </strong>
+    {detail ? <small className="mt-1 block text-xs text-muted-foreground">{detail}</small> : null}
   </div>
 );
 
@@ -169,10 +172,14 @@ const SectionHeading = ({
   onRetry?: () => void;
   retrying: boolean;
 }) => (
-  <div className="panel-heading">
+  <div className="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h3>{marketDetailSectionTitle(capability)}</h3>
-      {sectionIsDataReady(section) ? <p>数据来自 {providerOf(section.data)}</p> : null}
+      <h3 className="m-0 text-sm font-medium">{marketDetailSectionTitle(capability)}</h3>
+      {sectionIsDataReady(section) ? (
+        <p className="mb-0 mt-1 text-xs text-muted-foreground">
+          数据来自 {providerOf(section.data)}
+        </p>
+      ) : null}
     </div>
     <SectionStatus section={section} {...(onRetry ? { onRetry } : {})} retrying={retrying} />
   </div>
@@ -189,7 +196,7 @@ export const QuoteSection = ({
 }) => {
   const quote = section.data as QuoteV1 | undefined;
   return (
-    <section className="panel" data-market-detail-section="quote">
+    <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="quote">
       <SectionHeading
         capability="quote"
         section={section}
@@ -199,7 +206,7 @@ export const QuoteSection = ({
       {renderReadyOrEmpty(
         section,
         quote ? (
-          <div className="detail-metrics">
+          <div className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px">
             <DetailMetric label="实时价" value={money.format(quote.price)} />
             <DetailMetric label="涨跌前收" value={money.format(quote.previousClose)} />
             <DetailMetric
@@ -226,7 +233,7 @@ export const BarsSection = ({
 }) => {
   const bars = (section.data as BarV1[] | undefined) ?? [];
   return (
-    <section className="panel" data-market-detail-section="bars">
+    <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="bars">
       <SectionHeading
         capability="bars"
         section={section}
@@ -235,17 +242,7 @@ export const BarsSection = ({
       />
       {renderReadyOrEmpty(
         section,
-        bars.length > 0 ? (
-          <div className="bar-strip">
-            {bars.slice(-10).map((bar) => (
-              <div key={bar.timestamp}>
-                <span>{new Date(bar.timestamp).toLocaleDateString('zh-CN')}</span>
-                <strong>{number.format(bar.close)}</strong>
-                <small>{dataSourceDisplay(bar.provider, bar.upstreamSource)}</small>
-              </div>
-            ))}
-          </div>
-        ) : null,
+        bars.length > 0 ? <MarketPriceChart bars={bars} /> : null,
         <p className="empty-inline">当前没有可用日线。</p>,
       )}
     </section>
@@ -275,30 +272,31 @@ export const IndicatorSection = ({
   const renderIndicator = ({ capability, section }: (typeof sections)[number]) => {
     const indicator = section.data as IndicatorV1 | undefined;
     return (
-      <div key={capability}>
-        <span>{capability.slice('indicator:'.length)}</span>
-        <SectionStatus
-          section={section}
-          {...retryProps(section, () => onRetry(capability))}
-          retrying={retrying === capability}
-          {...(allUnavailable ? { showErrorMessage: false } : {})}
-        />
+      <div key={capability} className="grid min-w-0 gap-3 rounded-lg border border-border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm font-medium">{capability.slice('indicator:'.length)}</span>
+          <SectionStatus
+            section={section}
+            {...retryProps(section, () => onRetry(capability))}
+            retrying={retrying === capability}
+            {...(allUnavailable ? { showErrorMessage: false } : {})}
+          />
+        </div>
         {indicator && sectionIsDataReady(section) ? (
-          <strong>
-            {Object.entries(indicator.values)
-              .map(([key, value]) => `${key} ${Array.isArray(value) ? value.join(', ') : value}`)
-              .join(' · ')}
-          </strong>
+          <IndicatorValueChart indicator={indicator} />
         ) : null}
       </div>
     );
   };
   return (
-    <section className="panel" data-market-detail-section="indicators">
-      <div className="panel-heading">
+    <section
+      className="grid gap-3 border-t border-border pt-4"
+      data-market-detail-section="indicators"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3>技术指标</h3>
-          <p>MA、MACD、RSI 共享日线依赖。</p>
+          <h3 className="m-0 text-sm font-medium">技术指标</h3>
+          <p className="mb-0 mt-1 text-xs text-muted-foreground">MA、MACD、RSI 共享日线依赖。</p>
         </div>
         {!allUnavailable && firstFailure ? (
           <SectionStatus
@@ -313,7 +311,9 @@ export const IndicatorSection = ({
           {firstFailure?.section.error?.message ?? '技术指标暂时不可用。'}
         </p>
       ) : null}
-      <div className="indicator-grid">{sections.map(renderIndicator)}</div>
+      {!allUnavailable ? (
+        <div className="grid gap-3 lg:grid-cols-2">{sections.map(renderIndicator)}</div>
+      ) : null}
     </section>
   );
 };
@@ -329,7 +329,7 @@ export const ChipSection = ({
 }) => {
   const chip = section.data as ChipDistributionV1 | undefined;
   return (
-    <section className="panel" data-market-detail-section="chip">
+    <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="chip">
       <SectionHeading
         capability="chip"
         section={section}
@@ -339,7 +339,7 @@ export const ChipSection = ({
       {renderReadyOrEmpty(
         section,
         chip ? (
-          <div className="detail-metrics">
+          <div className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px">
             <DetailMetric label="平均成本" value={money.format(chip.averageCost)} />
             <DetailMetric label="获利比例" value={`${(chip.profitRatio * 100).toFixed(2)}%`} />
             <DetailMetric label="集中度" value={`${(chip.concentration * 100).toFixed(2)}%`} />
@@ -362,7 +362,10 @@ export const FundNavSection = ({
 }) => {
   const nav = section.data as FundNavV1 | undefined;
   return (
-    <section className="panel" data-market-detail-section="fund-nav">
+    <section
+      className="grid gap-3 border-t border-border pt-4"
+      data-market-detail-section="fund-nav"
+    >
       <SectionHeading
         capability="fund-nav"
         section={section}
@@ -372,7 +375,7 @@ export const FundNavSection = ({
       {renderReadyOrEmpty(
         section,
         nav ? (
-          <div className="detail-metrics">
+          <div className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px">
             <DetailMetric label="单位净值" value={number.format(nav.unitNav)} />
             <DetailMetric
               label="净值日期"
@@ -401,7 +404,10 @@ export const FundNavHistorySection = ({
 }) => {
   const history = (section.data as FundNavHistoryV1 | undefined) ?? [];
   return (
-    <section className="panel" data-market-detail-section="fund-nav-history">
+    <section
+      className="grid gap-3 border-t border-border pt-4"
+      data-market-detail-section="fund-nav-history"
+    >
       <SectionHeading
         capability="fund-nav-history"
         section={section}

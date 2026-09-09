@@ -2,14 +2,14 @@ import { PageHeader } from '../shared/PageHeader.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { useToastManager } from '@/components/ui/toast';
-import { Metric } from '../shared/DesktopPrimitives.js';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InstrumentCatalogPanel } from './InstrumentCatalogPanel.js';
 import { MarketPolicyPanel } from './MarketPolicyPanel.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { MarketProviderPanel } from './MarketProviderPanel.js';
-import { MarketCachePanel } from './MarketCachePanel.js';
+import { MarketDataSectionTabs } from './MarketDataSectionTabs.js';
 import {
   useCatalogSyncMutation,
   useClearMarketProviderCredentialMutation,
@@ -30,9 +30,8 @@ import type { MarketPolicy, ProviderManifest } from './market-data.types.js';
 export function MarketDataPage() {
   const queryClient = useQueryClient();
   const { confirm } = useConfirmDialog();
-  const { policy, providers, catalog, dailyBarCache } = useMarketDataQueries();
-  const marketDataRefreshing =
-    policy.isFetching || providers.isFetching || catalog.isFetching || dailyBarCache.isFetching;
+  const { policy, providers, catalog } = useMarketDataQueries();
+  const marketDataRefreshing = policy.isFetching || providers.isFetching || catalog.isFetching;
   const savePolicy = useSaveMarketPolicyMutation();
   const saveProvider = useSaveMarketProviderMutation();
   const clearCredential = useClearMarketProviderCredentialMutation();
@@ -70,7 +69,7 @@ export function MarketDataPage() {
     const result = catalogJob.data;
     if (!catalogJobId || !result) return;
     if (result.acknowledged) {
-      setMessage({ type: 'success', text: `标的目录已同步至第 ${result.generation} 版快照。` });
+      setMessage({ type: 'success', text: '标的目录已同步。' });
       setCatalogJobId(null);
       void queryClient.invalidateQueries({ queryKey: marketDataKeys.catalog() });
       return;
@@ -86,10 +85,13 @@ export function MarketDataPage() {
   if (policy.isError || providers.isError || catalog.isError) loadState = 'degraded';
   else if (policy.isPending || providers.isPending || catalog.isPending) loadState = 'loading';
   const controlsDisabled = loadState !== 'ready' || busyAction !== null;
-  const configuredProviderCount = useMemo(
-    () => providerDrafts.filter((provider) => provider.configured && provider.enabled).length,
-    [providerDrafts],
-  );
+  const routeProviderSummary = useMemo(() => {
+    return {
+      total: providerDrafts.length,
+      configured: providerDrafts.filter((provider) => provider.configured && provider.enabled)
+        .length,
+    };
+  }, [providerDrafts]);
 
   const refresh = async () => {
     setMessage(null);
@@ -101,7 +103,6 @@ export function MarketDataPage() {
     setBusyAction('policy-save');
     setMessage(null);
     try {
-      // 版本与同步状态由上方“控制策略”卡片展示，不再重复提示
       setPolicyDraft(await savePolicy.mutateAsync(policyDraft));
     } catch (error) {
       setMessage({
@@ -195,7 +196,7 @@ export function MarketDataPage() {
     if (
       !(await confirm({
         title: `移除 ${provider.displayName}？`,
-        description: '该操作会从所有市场数据路由中移除 Provider，并生成新的策略版本。',
+        description: '该操作会从所有市场数据路由中移除 Provider，并更新路由策略。',
         confirmLabel: '移除 Provider',
         cancelLabel: '取消',
         variant: 'destructive',
@@ -233,7 +234,7 @@ export function MarketDataPage() {
       if (result.status === 'failed' || result.status === 'timeout') {
         setMessage({ type: 'error', text: '标的目录同步任务失败，请稍后重试。' });
       } else if (result.acknowledged) {
-        setMessage({ type: 'success', text: `标的目录已同步至第 ${result.generation} 版快照。` });
+        setMessage({ type: 'success', text: '标的目录已同步。' });
         await queryClient.invalidateQueries({ queryKey: marketDataKeys.catalog() });
       } else if (result.id) {
         setCatalogJobId(result.id);
@@ -303,84 +304,65 @@ export function MarketDataPage() {
         </Alert>
       )}
 
-      <section className="metrics mt-6" aria-label="市场数据概况">
-        <Metric
-          label="控制策略"
-          value={policyDraft ? `第 ${policyDraft.revision} 版` : '—'}
-          detail={policySyncLabel}
-        />
-        <Metric
-          label="数据源"
-          value={providers.data ? `${configuredProviderCount}/${providerDrafts.length}` : '—'}
-          detail="已启用且已配置"
-        />
-        <Metric
-          label="日线缓存"
-          value={dailyBarCache.data ? dailyBarCache.data.barCount.toLocaleString('zh-CN') : '—'}
-          detail={
-            dailyBarCache.data
-              ? `${dailyBarCache.data.symbolCount.toLocaleString('zh-CN')} 个标的`
-              : '等待缓存数据'
-          }
-        />
-        <Metric
-          label="标的目录"
-          value={catalog.data ? `第 ${catalog.data.generation} 版` : '—'}
-          detail={catalog.data ? `${catalog.data.instrumentCount} 个本地标的` : '等待目录数据'}
-        />
+      <section className="mt-5 flex flex-wrap items-center gap-2" aria-label="市场数据概况">
+        <Badge variant="outline">路由状态：{policySyncLabel}</Badge>
+        <Badge variant="outline">
+          {providers.data
+            ? `${routeProviderSummary.configured}/${routeProviderSummary.total} 个数据源可用`
+            : '等待数据源状态'}
+        </Badge>
+        <Badge variant="outline">
+          {typeof catalog.data?.instrumentCount === 'number'
+            ? `${catalog.data.instrumentCount.toLocaleString('zh-CN')} 个本地标的`
+            : '等待标的目录'}
+        </Badge>
       </section>
 
-      <div className="mt-10">
-        <MarketProviderPanel
-          providers={providerDrafts}
-          credentials={credentials}
-          disabled={controlsDisabled}
-          busyAction={busyAction}
-          onProviderChange={replaceProvider}
-          onCredentialChange={(providerId, value) =>
-            setCredentials((current) => ({ ...current, [providerId]: value }))
-          }
-          onSave={(provider) => void handleSaveProvider(provider)}
-          onTest={(provider) => void handleTestProvider(provider)}
-          onClearCredential={(provider) => void handleClearCredential(provider)}
-          onRemove={(provider) => void handleRemoveProvider(provider)}
-        />
-      </div>
-
-      <div className="mt-6">
-        <MarketPolicyPanel
-          policy={policyDraft}
-          providers={providerDrafts}
-          disabled={controlsDisabled}
-          saving={savePolicy.isPending}
-          onChange={setPolicyDraft}
-          onSave={() => void handleSavePolicy()}
-        />
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <MarketCachePanel
-          cache={dailyBarCache.data ?? null}
-          providers={providerDrafts}
-          loading={dailyBarCache.isPending}
-          error={dailyBarCache.isError}
-        />
-        <InstrumentCatalogPanel
-          catalog={catalogJob.data ?? catalog.data ?? null}
-          disabled={controlsDisabled}
-          syncing={syncCatalog.isPending || Boolean(catalogJobId)}
-          searchBusy={instrumentSearch.isFetching}
-          searchResults={instrumentSearch.data ?? []}
-          confirmingId={
-            busyAction?.startsWith('instrument-confirm:')
-              ? busyAction.slice('instrument-confirm:'.length)
-              : null
-          }
-          onSync={() => void handleSyncCatalog()}
-          onSearch={setSubmittedSearch}
-          onConfirm={(instrument) => void handleConfirmInstrument(instrument)}
-        />
-      </div>
+      <MarketDataSectionTabs
+        providerPanel={
+          <MarketProviderPanel
+            providers={providerDrafts}
+            credentials={credentials}
+            disabled={controlsDisabled}
+            busyAction={busyAction}
+            onProviderChange={replaceProvider}
+            onCredentialChange={(providerId, value) =>
+              setCredentials((current) => ({ ...current, [providerId]: value }))
+            }
+            onSave={(provider) => void handleSaveProvider(provider)}
+            onTest={(provider) => void handleTestProvider(provider)}
+            onClearCredential={(provider) => void handleClearCredential(provider)}
+            onRemove={(provider) => void handleRemoveProvider(provider)}
+          />
+        }
+        policyPanel={
+          <MarketPolicyPanel
+            policy={policyDraft}
+            providers={providerDrafts}
+            disabled={controlsDisabled}
+            saving={savePolicy.isPending}
+            onChange={setPolicyDraft}
+            onSave={() => void handleSavePolicy()}
+          />
+        }
+        catalogPanel={
+          <InstrumentCatalogPanel
+            catalog={catalogJob.data ?? catalog.data ?? null}
+            disabled={controlsDisabled}
+            syncing={syncCatalog.isPending || Boolean(catalogJobId)}
+            searchBusy={instrumentSearch.isFetching}
+            searchResults={instrumentSearch.data ?? []}
+            confirmingId={
+              busyAction?.startsWith('instrument-confirm:')
+                ? busyAction.slice('instrument-confirm:'.length)
+                : null
+            }
+            onSync={() => void handleSyncCatalog()}
+            onSearch={setSubmittedSearch}
+            onConfirm={(instrument) => void handleConfirmInstrument(instrument)}
+          />
+        }
+      />
     </section>
   );
 }

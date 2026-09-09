@@ -35,6 +35,7 @@
 | T12 | 已完成 | 服务端专用命令、物化 Trade/账本查询、审计重放、稳定游标和旧引用解析已实现并通过定向测试与本地 Docker 验证。 |
 | T13/T13-R1/T13-R2/T13-R3 | 已完成（本地环境） | 账户数据三页签、成交主录入、修正链、观察校准、ImportDraft/对账入口、页面信息层级收敛、持仓表操作列固定及两个行级操作直显均已通过桌面测试和本地浏览器非写入检查。 |
 | T14–T15 | 已完成（本地环境） | 投资组合 Trade 只读读模型和 Journal 统一 Trade Projection 已通过代码、测试、本地 Compose 和本地浏览器列表/详情/响应式验收。 |
+| T14-R1 | 实现完成，运行态复核待补 | 名称字段、中文列表与分组详情已通过定向测试和宽屏双主题浏览器检查；当前本地 Server 仍为旧运行版本，真实名称响应和窄屏证据待更新后补验。 |
 | T16–T17 | T16、T17 已完成（本地环境） | 影子差异/切换门禁、迁移手册、全量本地回归和最终一致性 Review 已完成；正式发布环境事项不属于当前任务范围。 |
 | T18：交易规则能力元数据验证 | 未完成 | 当前 Desktop 仅能以 `UNVERIFIED` 状态执行通用数量和价格校验；Provider/DSA 能力元数据的版本、范围和真实运行时证据尚未完成。 |
 
@@ -213,6 +214,14 @@
   - 运行时结果：新应用镜像和 34 条 migration 部署到本地 Compose 后，`/api/v1/portfolio/trades` 与 Trade 详情接口均可读取当前持久化投影；实际账户、ACTIVE/ENDED、Baseline 估算和排除原因均按十进制字符串返回。
   - 浏览器验收结果：本地 Vite `/portfolio` 已通过交易页签、账户/标的/生命周期筛选、实际/模拟隔离、进行中/余额观察结束详情、Journal 复盘跳转和 390×844 响应式检查；页面无横向溢出，表格使用局部滚动，控制台无 error/warning，未执行写入型浏览器操作。
 
+- [ ] **T14-R1：收敛投资组合交易列表与详情体验**
+  - 覆盖验收标准：AC-UI-9、AC-UI-10、AC-UI-11、AC-UI-12、AC-UI-13。
+  - 依赖：T14。
+  - 涉及范围：Trade API 的标的名称字段、投资组合交易列表、交易详情 Dialog、面向用户的状态映射和对应 Server、Schema、Desktop 测试。
+  - 完成条件：列表展示标的名称与代码、结果数量概览和清除筛选入口；详情由 Sheet 改为固定标题的居中 Dialog，并按概览、持仓构成、证据与技术信息分组；用户默认视图不再暴露英文标题、算法名和内部枚举；筛选、分页、模式和复盘行为保持不变。
+  - 验证方式：Server Trade 查询测试、Schema API contract、Desktop 组件测试、类型检查、构建和定向静态检查；浏览器检查筛选、打开关闭详情、复盘入口、宽窄屏和双主题。
+  - 当前证据：Server Trade 查询 3 项、Schema API contract 6 项、Desktop 交易与行情详情 5 项测试通过；Server、Schemas、Desktop 与 API Client typecheck、Desktop build、定向 ESLint、依赖边界和文件尺寸 ratchet 通过。真实宽屏页面已确认结果概览、清除筛选、居中详情、三个中文分组、问题翻译、复盘入口及浅色/深色主题；当前本地 Server 尚未更新到本轮代码，列表按兼容路径显示“标的名称暂不可用”，因此真实 `assetName` 响应和窄屏证据待补，本任务暂不勾选。
+
 - [x] **T15：迁移 Journal 到统一 Trade Projection**
   - 涉及范围：完整 Trade/Close Slice 复盘、TradePlan、统计、Projection Fingerprint、旧候选和 AI/Journal 快照。
   - 完成条件：Journal 不再自行从 Ledger 拼装；完整 Trade 胜率与 Close Slice 指标分离；旧候选按 SELL 事实 ID 确定性迁移，歧义保留 legacy；相关投影变化能标记过期。
@@ -258,7 +267,7 @@
 
 ## 最终一致性 Review
 
-- [x] Spec 当前范围内的全部验收标准均有实现和本地证据
+- [ ] Spec 新增的 T14-R1 已有实现与宽屏证据，真实标的名称响应和窄屏证据待补
 - [x] 所有已勾选任务均有验证证据
 - [x] 返工没有引入超出 Spec 的新范围
 - [x] 测试、迁移、配置和文档已同步更新
@@ -266,7 +275,7 @@
 
 ### Review 结论
 
-- 结论：本轮 Standards + Spec 一致性 Review 已完成；T2、T3-R1、T5、T5-R1、T6、T6-R1、T6-R2、T6-R3、T6-R4、T7、T8、T9、T10、T11、T12、T13、T13-R1、T13-R2、T13-R3、T14、T15、T16、T17 与 T17-R1 已完成并通过代码、测试和本地运行态验证。T18 仍未完成，当前本地任务保留交易规则能力元数据的运行时验收缺口；正式发布环境明确不在范围内。
+- 结论：原有 Standards + Spec 一致性 Review 结论保持；新增 T14-R1 的实现、定向测试与宽屏双主题验收已完成，但当前本地 Server 仍为旧运行版本，真实标的名称响应和独立窄屏证据待补，因此 T14-R1 暂不勾选。T18 仍保留交易规则能力元数据的运行时验收缺口；正式发布环境明确不在范围内。
 - 发现的问题：T10 发现的后续 Baseline 绝对成本重复累加已修复为检查点重估；`db:integration` 的两个既有 Position 不一致已通过核心重建修复；R-FX-01 已通过原币分桶和独立 FX Conversion View 修复；旧 `projectCompletedTrades` 路径及重复 fixture 已删除，当前完整性检查为 healthy；R-STD-02 已修复为 TanStack Query mutation，Journal 快照保存成功后会失效候选查询；R-STD-03 已为 PortfolioTradeView 的两个 Select 补齐 SelectGroup；R-STD-04 已将 AccountDataExecutionSheet 的表单网格改为 FieldGroup/Field 组合；R-STD-05 已将底部操作区的 border-t 改为 Separator；R-STD-06/07 与 R-SPEC-01 已在 T17-R1 中修复，R-SPEC-02 已通过回归断言确认是误报，R-SPEC-03 确认为独立既有范围。R-CODE-01 已完成结构评估：`ImportService` 保留为组合 Facade，`PerformanceService` 暂不拆分，触发条件已记录。
 - 遗留风险：T18“交易规则能力元数据验证与运行时验收”仍未完成；当前实现只能以 `UNVERIFIED` 状态执行通用数量和价格校验，不能宣称交易规则能力已验证。除此之外，当前 Spec 范围内没有未处理的阻断项。正式发布环境事项已明确列为范围外；本轮 Docker smoke 使用临时隔离数据库，不修改开发持久卷。完整 `pnpm format` 仍报告 2 个本轮未修改的基线文件格式差异（`apps/server/test/ai/research-executor.test.ts`、`docs/reviews/2026-08-26-doc-governance-followup.md`），不将无关文件纳入本轮变更。
 - 验证命令与结果：domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/104 个测试、mobile 1 个测试文件/7 个测试通过；server typecheck/build、Prisma schema validate、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、`git diff --check`、固定快照 diff/switch gate 和 Docker 隔离迁移 smoke 均通过；本次 T13-R1/T13-R2/T13-R3 的 Desktop 浏览器布局检查和文件尺寸 ratchet 也已通过。

@@ -1852,7 +1852,7 @@ INSERT INTO "AutomationJob" (
 VALUES
   (
     '00000000-0000-4000-8000-000000000011', '盘中估值采样', 'valuation-intraday-sample',
-    '* * * * 1-5', 'Asia/Shanghai', TRUE, '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
+    '* * * * *', 'Asia/Shanghai', TRUE, '{"maxAttempts":3,"backoffMs":1000}'::jsonb,
     300000, CURRENT_TIMESTAMP, 'valuation-intraday-sample', TRUE
   ),
   (

@@ -21,11 +21,16 @@ const nullableNumberValue = (value: unknown): number | null | undefined => {
 
 const noStore = { cache: 'no-store' as const };
 
-const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
+type PortfolioValuationWithDailyChange = PortfolioValuationResponse & {
+  dailyChange?: Portfolio['dailyChange'];
+};
+
+const normalizePortfolio = (value: PortfolioValuationWithDailyChange): Portfolio => ({
   totalMarketValue: value.totalMarketValue,
   totalCost: value.totalCost,
   totalPnl: value.totalPnl,
   cashValue: value.cashValue,
+  ...(value.dailyChange ? { dailyChange: value.dailyChange } : {}),
   mode: value.mode,
   partial: value.partial,
   valuedAt: value.valuedAt,
@@ -37,10 +42,16 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
     const assetType = heldAssetType(position.asset?.assetType);
     const updatedAt = typeof position.updatedAt === 'string' ? position.updatedAt : undefined;
     const currency = currencyValue(position.currency);
+    const marketPrice = nullableNumberValue(position.marketPrice);
+    const previousClose = nullableNumberValue(position.previousClose);
     const baseMarketValue = nullableNumberValue(position.baseMarketValue);
     const baseCostValue =
       typeof position.baseCostValue === 'number' ? position.baseCostValue : undefined;
     const basePnl = nullableNumberValue(position.basePnl);
+    const pnlRatio = nullableNumberValue(position.pnlRatio);
+    const dailyPnl = nullableNumberValue(position.dailyPnl);
+    const dailyReturn = nullableNumberValue(position.dailyReturn);
+    const baseDailyPnl = nullableNumberValue(position.baseDailyPnl);
     return {
       id: position.id,
       accountId: position.accountId,
@@ -50,6 +61,12 @@ const normalizePortfolio = (value: PortfolioValuationResponse): Portfolio => ({
       marketValue: position.marketValue,
       pnl: position.pnl,
       stale: position.stale,
+      ...(marketPrice === undefined ? {} : { marketPrice }),
+      ...(previousClose === undefined ? {} : { previousClose }),
+      ...(pnlRatio === undefined ? {} : { pnlRatio }),
+      ...(dailyPnl === undefined ? {} : { dailyPnl }),
+      ...(dailyReturn === undefined ? {} : { dailyReturn }),
+      ...(baseDailyPnl === undefined ? {} : { baseDailyPnl }),
       ...(updatedAt === undefined ? {} : { updatedAt }),
       ...(currency ? { currency } : {}),
       ...(baseMarketValue === undefined ? {} : { baseMarketValue }),

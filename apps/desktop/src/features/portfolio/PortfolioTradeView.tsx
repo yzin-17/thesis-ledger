@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -12,26 +13,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { TradeSummaryResponseV2 } from '@thesis-ledger/api-client';
-import { PortfolioTradeDetailSheet } from './PortfolioTradeDetailSheet.js';
-import type { PortfolioTradeReviewTarget } from './PortfolioTradeDetailSheet.js';
+import { PortfolioTradeDetailDialog } from './PortfolioTradeDetailDialog.js';
+import type { PortfolioTradeReviewTarget } from './portfolio-trade.types.js';
 import {
   usePortfolioTradesQuery,
   type PortfolioTradeLifecycle,
 } from './portfolio-trade.queries.js';
 import { accountDisplayLabel, type Account, type PortfolioMode } from './portfolio.types.js';
+import {
+  formatTradeDateTime,
+  tradeExitProgressLabel,
+  tradeLifecycleFilterLabel,
+  tradeLifecycleLabel,
+} from './portfolio-trade.display.js';
+import { EmptyListState } from '../shared/EmptyStates.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
-
-const formatDateTime = (value: string | null) =>
-  value ? new Date(value).toLocaleString('zh-CN') : '—';
-
-const lifecycleLabel = (value: TradeSummaryResponseV2['lifecycle']) =>
-  value === 'ACTIVE' ? '进行中' : '已结束';
-
-const exitProgressLabel = (value: TradeSummaryResponseV2['exitProgress']) => {
-  if (value === 'FULL') return '全部平仓';
-  if (value === 'PARTIAL') return '部分平仓';
-  return '未平仓';
-};
 
 const accountName = (accounts: Account[], accountId: string) =>
   accounts.find((account) => account.id === accountId)?.name ?? accountId;
@@ -57,18 +53,29 @@ export function PortfolioTradeView({
   });
   const trades = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
   const selectedAccount = accounts.find((account) => account.id === accountId);
+  const activeCount = trades.filter((trade) => trade.lifecycle === 'ACTIVE').length;
+  const endedCount = trades.length - activeCount;
+  const reviewCount = trades.filter(
+    (trade) =>
+      trade.excludedReasons.length > 0 || trade.issues.length > 0 || trade.costIssues.length > 0,
+  ).length;
+  const hasFilters = Boolean(accountId || symbol.trim() || lifecycle !== 'ALL');
+
+  const clearFilters = () => {
+    setAccountId('');
+    setSymbol('');
+    setLifecycle('ALL');
+  };
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="portfolio-trades-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="kicker">Trade Projection</p>
           <h2 id="portfolio-trades-title" className="m-0 text-xl font-semibold">
             交易周期
           </h2>
           <p className="m-0 mt-1 max-w-2xl text-sm text-muted-foreground">
-            这里只读展示统一 Trade
-            Projection。实际账户与模拟账户隔离，持仓快照、平仓片段和证据来源均可追溯。
+            只读查看统一交易投影。实际账户与模拟账户隔离，持仓快照、平仓记录和证据来源均可追溯。
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => void query.refetch()}>
@@ -76,7 +83,28 @@ export function PortfolioTradeView({
         </Button>
       </div>
 
-      <div className="grid gap-3 rounded-lg border border-border bg-muted/10 p-3 md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_10rem]">
+      {query.isSuccess ? (
+        <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border px-4 py-3 text-sm">
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">已加载</dt>
+            <dd className="m-0 font-semibold tabular-nums">{trades.length}</dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">进行中</dt>
+            <dd className="m-0 font-semibold tabular-nums">{activeCount}</dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">已结束</dt>
+            <dd className="m-0 font-semibold tabular-nums">{endedCount}</dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">需复核</dt>
+            <dd className="m-0 font-semibold tabular-nums">{reviewCount}</dd>
+          </div>
+        </dl>
+      ) : null}
+
+      <div className="grid gap-3 rounded-lg border border-border bg-muted/10 p-3 md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_10rem_auto]">
         <div className="flex flex-col gap-1 text-xs font-medium">
           账户范围
           <Select
@@ -115,9 +143,7 @@ export function PortfolioTradeView({
           生命周期
           <Select value={lifecycle} onValueChange={(value) => value && setLifecycle(value)}>
             <SelectTrigger aria-label="交易生命周期" className="w-full bg-background">
-              <SelectValue>
-                {lifecycle === 'ACTIVE' ? '进行中' : lifecycle === 'ENDED' ? '已结束' : '全部'}
-              </SelectValue>
+              <SelectValue>{tradeLifecycleFilterLabel(lifecycle)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -128,13 +154,22 @@ export function PortfolioTradeView({
             </SelectContent>
           </Select>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="self-end"
+          disabled={!hasFilters}
+          onClick={clearFilters}
+        >
+          清除筛选
+        </Button>
       </div>
 
       {query.isError && (
         <Alert variant="destructive">
           <AlertTitle>交易列表读取失败</AlertTitle>
           <AlertDescription>
-            当前 Trade Projection 未能读取，请检查服务状态后重试。
+            当前交易投影未能读取，请检查服务状态后重试。
             <Button
               type="button"
               size="sm"
@@ -148,17 +183,19 @@ export function PortfolioTradeView({
         </Alert>
       )}
       {query.isPending && (
-        <p
-          className="rounded-md border border-dashed p-4 text-sm text-muted-foreground"
-          role="status"
-        >
-          正在读取交易周期…
-        </p>
+        <div className="grid gap-2" role="status" aria-label="正在读取交易周期">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
       )}
       {query.isSuccess && trades.length === 0 && (
-        <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          当前账户范围没有符合筛选条件的 Trade。
-        </p>
+        <EmptyListState
+          className="rounded-lg border border-dashed py-8"
+          title={hasFilters ? '没有匹配的交易周期' : '暂无交易周期'}
+          description={
+            hasFilters ? '调整或清除筛选后再查看。' : '录入成交后，交易周期会显示在这里。'
+          }
+        />
       )}
       {trades.length > 0 && (
         <div className="table-wrap">
@@ -178,13 +215,16 @@ export function PortfolioTradeView({
               {trades.map((trade) => (
                 <tr key={trade.id}>
                   <td>
-                    <strong>{trade.symbol}</strong>
+                    <strong>{trade.assetName ?? trade.symbol}</strong>
+                    <span className="text-xs text-muted-foreground">
+                      {trade.assetName ? trade.symbol : '标的名称暂不可用'}
+                    </span>
                   </td>
                   <td>{accountName(accounts, trade.accountId)}</td>
                   <td>
-                    <span>{formatDateTime(trade.openedAt)}</span>
+                    <span>{formatTradeDateTime(trade.openedAt)}</span>
                     <span className="text-xs text-muted-foreground">
-                      {formatDateTime(trade.closedAt)}
+                      {formatTradeDateTime(trade.closedAt)}
                     </span>
                   </td>
                   <td>
@@ -196,8 +236,8 @@ export function PortfolioTradeView({
                   <td className="font-mono">{trade.netRealizedPnl ?? '—'}</td>
                   <td>
                     <div className="flex flex-wrap gap-1">
-                      <Badge variant="secondary">{lifecycleLabel(trade.lifecycle)}</Badge>
-                      <Badge variant="outline">{exitProgressLabel(trade.exitProgress)}</Badge>
+                      <Badge variant="secondary">{tradeLifecycleLabel(trade.lifecycle)}</Badge>
+                      <Badge variant="outline">{tradeExitProgressLabel(trade.exitProgress)}</Badge>
                       {trade.excludedReasons.length > 0 && <Badge variant="outline">需复核</Badge>}
                     </div>
                   </td>
@@ -230,7 +270,7 @@ export function PortfolioTradeView({
           </Button>
         </div>
       )}
-      <PortfolioTradeDetailSheet
+      <PortfolioTradeDetailDialog
         trade={selectedTrade}
         accounts={accounts}
         mode={mode}

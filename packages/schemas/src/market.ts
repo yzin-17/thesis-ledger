@@ -110,6 +110,7 @@ export const indicatorSchemaV1 = z.object({
   values: z.record(z.string(), z.union([z.number(), z.array(z.number())])),
   provider: z.string().min(1),
   fallbackUsed: z.boolean().optional(),
+  servedFromCache: z.boolean().optional(),
   engineVersion: z.string().min(1),
 });
 
@@ -128,6 +129,7 @@ export const chipDistributionSchemaV1 = z.object({
   concentration: finite.min(0).max(1),
   provider: z.string().min(1),
   fallbackUsed: z.boolean().optional(),
+  servedFromCache: z.boolean().optional(),
   engineVersion: z.string().min(1),
   calculatedAt: isoDate,
 });
@@ -225,6 +227,8 @@ export const providerManifestSchema = z.object({
   credentialConfigured: z.boolean(),
   requiresCredential: z.boolean().optional(),
   origin: z.enum(['dsa']).optional(),
+  markets: z.array(z.string().min(1)).optional(),
+  configurationMode: z.enum(['control', 'built_in', 'dsa_environment']).optional(),
   upstreamSources: z
     .array(
       z.object({

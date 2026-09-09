@@ -42,6 +42,11 @@ import {
   weeklyStrategyReview,
 } from './workflows.service.js';
 
+const parsePositiveInteger = (value?: string) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
+
 @Controller('automations')
 export class AutomationController {
   constructor(
@@ -62,8 +67,16 @@ export class AutomationController {
   }
 
   @Get('history')
-  history(@Query('jobId') jobId?: string) {
-    return this.automations.history(jobId);
+  history(
+    @Query('jobId') jobId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.automations.history(
+      jobId,
+      parsePositiveInteger(page),
+      parsePositiveInteger(pageSize),
+    );
   }
 
   @Patch(':id')

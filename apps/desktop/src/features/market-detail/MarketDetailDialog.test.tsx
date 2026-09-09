@@ -23,6 +23,7 @@ vi.mock('@/components/ui/dialog', () => {
     DialogClose: Close,
     DialogContent: Content,
     DialogDescription: Description,
+    DialogHeader: Content,
     DialogTitle: Title,
   };
 });
@@ -78,7 +79,7 @@ const readyIndicator = (name: 'MA' | 'MACD' | 'RSI') => ({
   timeframe: '1d' as const,
   marketTime: time,
   calculatedAt: time,
-  values: { value: 1 },
+  values: name === 'MA' ? { ma5: [100, 101, 102], ma10: [99, 100, 101] } : { value: 1 },
   provider: 'fixture',
   engineVersion: 'fixture',
 });
@@ -104,7 +105,46 @@ describe('MarketDetailDialog UI contract', () => {
         },
         sections: {
           quote: { capability: 'quote', status: 'ready', data: readyQuote },
-          bars: { capability: 'bars', status: 'empty', data: [] },
+          bars: {
+            capability: 'bars',
+            status: 'ready',
+            data: [
+              {
+                version: 1,
+                symbol: '600519.SH',
+                timeframe: '1d',
+                timestamp: '2026-08-20T00:00:00.000Z',
+                open: 99,
+                high: 102,
+                low: 98,
+                close: 100,
+                volume: 100,
+                amount: 10_000,
+                provider: 'fixture',
+                fetchedAt: time,
+                freshness: 'delayed',
+                fallbackUsed: false,
+                servedFromCache: false,
+              },
+              {
+                version: 1,
+                symbol: '600519.SH',
+                timeframe: '1d',
+                timestamp: time,
+                open: 100,
+                high: 106,
+                low: 99,
+                close: 105,
+                volume: 120,
+                amount: 12_600,
+                provider: 'fixture',
+                fetchedAt: time,
+                freshness: 'delayed',
+                fallbackUsed: false,
+                servedFromCache: false,
+              },
+            ],
+          },
           'indicator:MA': {
             capability: 'indicator:MA',
             status: 'ready',
@@ -137,6 +177,9 @@ describe('MarketDetailDialog UI contract', () => {
     expect(html).toContain('持仓数量');
     expect(html).toContain('实时价');
     expect(html).toContain('技术指标');
+    expect(html).toContain('data-market-price-chart="true"');
+    expect(html).toContain('data-market-indicator-chart="trend"');
+    expect(html).toContain('data-market-indicator-chart="values"');
     expect(html).toContain('data-market-detail-section="chip"');
     expect(html).toContain('重试');
     expect(html).toContain('数据可用性');

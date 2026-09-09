@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LoaderCircle } from 'lucide-react';
 import type { CatalogStatus, InstrumentResult } from './market-data.types.js';
@@ -34,13 +34,11 @@ export function InstrumentCatalogPanel({
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-6">
+      <CardHeader>
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="m-0 text-xl font-semibold">标的目录</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              完整快照、目录版本与确认回执由服务端原子切换。
-            </p>
+          <div className="flex flex-col gap-1">
+            <CardTitle>标的目录</CardTitle>
+            <CardDescription>同步并确认可用于持仓关联的标的。</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={onSync} disabled={disabled || syncing}>
             {syncing && (
@@ -49,21 +47,20 @@ export function InstrumentCatalogPanel({
             {syncing ? '同步中…' : '同步目录'}
           </Button>
         </div>
-        <div className="grid gap-3 text-sm sm:grid-cols-2">
-          <div className="border border-border p-3">
-            <span className="block text-muted-foreground">目录版本</span>
-            <strong className="mt-1 block font-mono">
-              {catalog?.generation ? `第 ${catalog.generation} 版` : '—'}
-            </strong>
-          </div>
-          <div className="border border-border p-3">
-            <span className="block text-muted-foreground">本地标的数量</span>
-            <strong className="mt-1 block font-mono">{catalog?.instrumentCount ?? '—'}</strong>
-          </div>
-        </div>
-        <form className="space-y-3" onSubmit={submit}>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <p className="m-0 text-sm text-muted-foreground">
+          已收录{' '}
+          <strong className="font-mono text-base font-semibold text-foreground">
+            {typeof catalog?.instrumentCount === 'number'
+              ? catalog.instrumentCount.toLocaleString('zh-CN')
+              : '—'}
+          </strong>{' '}
+          个本地标的
+        </p>
+        <form className="flex flex-col gap-3" onSubmit={submit}>
           <span className="block text-sm font-medium">搜索已同步标的</span>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               aria-label="搜索已同步标的"
               value={searchText}

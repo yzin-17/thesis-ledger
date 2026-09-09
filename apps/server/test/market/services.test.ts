@@ -131,6 +131,71 @@ describe('行情缓存', () => {
     expect(lockKeys[0]).toContain('2025-01-31');
     expect(lockKeys[0]).toContain(':5');
   });
+  it('基金净值历史相同范围的普通请求命中新鲜缓存', async () => {
+    const values = new Map<string, string>();
+    const ttls = new Map<string, number>();
+    const points = [
+      {
+        version: 1,
+        symbol: '000001.OF',
+        unitNav: 1.1,
+        navDate: '2025-01-01T00:00:00Z',
+        provider: 'akshare',
+        fetchedAt: '2025-01-01T00:00:01Z',
+        freshness: 'delayed',
+      },
+    ];
+    const refreshedPoints = [{ ...points[0]!, unitNav: 1.2 }];
+    const dsa = {
+      get: vi
+        .fn()
+        .mockResolvedValueOnce(points)
+        .mockResolvedValueOnce(refreshedPoints)
+        .mockRejectedValueOnce(new Error('upstream unavailable')),
+    };
+    const redis = {
+      client: {
+        get: vi.fn(async (key: string) => values.get(key) ?? null),
+        set: vi.fn(async () => 'OK'),
+        eval: vi.fn(async () => 0),
+        multi: () => {
+          const writes: Array<[string, string, number]> = [];
+          const chain = {
+            set: (key: string, value: string, _mode: string, ttl: number) => {
+              writes.push([key, value, ttl]);
+              return chain;
+            },
+            exec: async () => {
+              for (const [key, value, ttl] of writes) {
+                values.set(key, value);
+                ttls.set(key, ttl);
+              }
+            },
+          };
+          return chain;
+        },
+      },
+    };
+    const service = new MarketService(dsa as never, redis as never);
+    const range = { start: '2025-01-01', end: '2025-01-31', limit: 5 };
+
+    const first = await service.getFundNavHistory('000001.OF', range);
+    const second = await service.getFundNavHistory('000001.OF', range);
+    const refreshed = await service.getFundNavHistory('000001.OF', range, { refresh: true });
+    const fallback = await service.getFundNavHistory('000001.OF', range, { refresh: true });
+
+    expect(first[0]?.servedFromCache).not.toBe(true);
+    expect(second[0]?.servedFromCache).toBe(true);
+    expect(refreshed[0]).toMatchObject({ unitNav: 1.2, servedFromCache: false });
+    expect(fallback[0]).toMatchObject({
+      unitNav: 1.2,
+      freshness: 'stale',
+      servedFromCache: true,
+    });
+    expect(dsa.get).toHaveBeenCalledTimes(3);
+    const freshEntry = [...ttls.entries()].find(([key]) => key.endsWith(':fresh'));
+    expect(freshEntry?.[1]).toBe(30 * 86_400);
+  });
   it('基金净值历史不同范围不会合并 single-flight', async () => {
     const points = [
       {
@@ -215,6 +280,59 @@ describe('行情缓存', () => {
       provider: 'dsa-fork',
       engineVersion: 'fixture',
     });
+  });
+
+  it('筹码摘要在十五分钟窗口内不重复请求 DSA', async () => {
+    const values = new Map<string, string>();
+    const ttls = new Map<string, number>();
+    const timestamp = '2025-01-01T00:00:00Z';
+    const dsa = {
+      get: vi.fn(async () => ({
+        buckets: [{ price: 10, weight: 1 }],
+        averageCost: 10,
+        mainPeak: 10,
+        profitRatio: 0.5,
+        range70: [9, 11],
+        range90: [8, 12],
+        concentration: 0.4,
+        engineVersion: 'fixture',
+        provider: 'akshare',
+        calculatedAt: timestamp,
+      })),
+    };
+    const redis = {
+      client: {
+        get: vi.fn(async (key: string) => values.get(key) ?? null),
+        set: vi.fn(async () => 'OK'),
+        eval: vi.fn(async () => 0),
+        multi: () => {
+          const writes: Array<[string, string, number]> = [];
+          const chain = {
+            set: (key: string, value: string, _mode: string, ttl: number) => {
+              writes.push([key, value, ttl]);
+              return chain;
+            },
+            exec: async () => {
+              for (const [key, value, ttl] of writes) {
+                values.set(key, value);
+                ttls.set(key, ttl);
+              }
+            },
+          };
+          return chain;
+        },
+      },
+    };
+    const service = new MarketService(dsa as never, redis as never);
+
+    const first = await service.getChip('600519');
+    const second = await service.getChip('600519');
+
+    expect(first.servedFromCache).not.toBe(true);
+    expect(second.servedFromCache).toBe(true);
+    expect(dsa.get).toHaveBeenCalledOnce();
+    const freshEntry = [...ttls.entries()].find(([key]) => key.endsWith(':fresh'));
+    expect(freshEntry?.[1]).toBe(15 * 60);
   });
 
   it('日线接口把回测区间和数量上限透传给 DSA', async () => {

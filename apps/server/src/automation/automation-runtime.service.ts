@@ -106,10 +106,14 @@ export class AutomationRuntimeHandlers {
       }),
       'valuation-intraday-sample': this.handler(
         'valuation-intraday-sample',
-        async (_signal, scheduledAt) => {
+        async (_signal, scheduledAt, trigger) => {
           if (!this.valuationSeries) throw new Error('盘中估值服务未配置');
-          return this.valuationSeries.sample(scheduledAt, 'actual', 'CNY');
+          return this.valuationSeries.sample(scheduledAt, 'actual', 'CNY', {
+            marketGate: trigger === 'scheduled',
+          });
         },
+        async (scheduledAt) =>
+          this.valuationSeries?.scheduledSamplingGate(scheduledAt, 'actual') ?? { allowed: true },
       ),
       'snapshot-close-estimate': this.handler(
         'snapshot-close-estimate',
@@ -148,8 +152,12 @@ export class AutomationRuntimeHandlers {
     return handlers;
   }
 
-  private handler(type: AutomationJobType, run: AutomationHandler['run']): AutomationHandler {
-    return { type, run };
+  private handler(
+    type: AutomationJobType,
+    run: AutomationHandler['run'],
+    scheduledGate?: AutomationHandler['scheduledGate'],
+  ): AutomationHandler {
+    return { type, run, ...(scheduledGate ? { scheduledGate } : {}) };
   }
 
   // 风险评估上下文按模式构建：实际与模拟组合的后台扫描共用同一套规则评估

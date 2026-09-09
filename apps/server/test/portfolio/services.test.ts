@@ -364,6 +364,110 @@ describe('账户与组合', () => {
       partial: true,
     });
     expect(result.positions[2]).toMatchObject({ marketValue: null, stale: true });
+    expect(result.dailyChange).toMatchObject({
+      pnl: null,
+      returnRate: null,
+      partial: true,
+      missingSymbols: ['600519.SH', '000001.SZ', '510300.SH'],
+    });
+  });
+
+  it('按当前持仓与昨收计算今日收益金额和收益率', async () => {
+    const positions = [
+      {
+        id: '1',
+        symbol: '600519.SH',
+        quantity: 100,
+        costPrice: 10,
+        asset: { name: 'A', currency: 'CNY' },
+      },
+      {
+        id: '2',
+        symbol: '000001.SZ',
+        quantity: 200,
+        costPrice: 5,
+        asset: { name: 'B', currency: 'CNY' },
+      },
+    ];
+    const prisma = { position: { findMany: vi.fn(async () => positions) } };
+    const market = {
+      getQuote: vi.fn(async (symbol: string) => ({
+        price: symbol === '600519.SH' ? 12 : 4.5,
+        previousClose: symbol === '600519.SH' ? 10 : 5,
+        stale: false,
+        freshness: 'live',
+      })),
+    };
+
+    const result = await new PortfolioService(prisma as never, market as never).value();
+
+    expect(result.positions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          symbol: '600519.SH',
+          previousClose: 10,
+          dailyPnl: 200,
+          baseDailyPnl: 200,
+        }),
+        expect.objectContaining({
+          symbol: '000001.SZ',
+          previousClose: 5,
+          dailyPnl: -100,
+          baseDailyPnl: -100,
+        }),
+      ]),
+    );
+    expect(result.positions[0]!.dailyReturn).toBeCloseTo(0.2);
+    expect(result.positions[1]!.dailyReturn).toBeCloseTo(-0.1);
+    expect(result.dailyChange).toEqual({
+      pnl: 100,
+      returnRate: 0.05,
+      partial: false,
+      missingSymbols: [],
+      basis: 'PREVIOUS_CLOSE_CURRENT_HOLDINGS',
+    });
+  });
+
+  it('场外基金使用上一有效净值计算今日收益', async () => {
+    const prisma = {
+      position: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'fund',
+            symbol: '000001.OF',
+            quantity: 1000,
+            costPrice: 1,
+            asset: { name: '测试基金', currency: 'CNY' },
+          },
+        ]),
+      },
+    };
+    const market = {
+      getFundNav: vi.fn(async () => ({
+        unitNav: 1.05,
+        navDate: '2026-09-09T00:00:00.000Z',
+        freshness: 'delayed',
+      })),
+      getFundNavHistory: vi.fn(async () => [
+        { unitNav: 1.05, navDate: '2026-09-09T00:00:00.000Z' },
+        { unitNav: 0.9, navDate: '2026-09-06T00:00:00.000Z' },
+        { unitNav: 1, navDate: '2026-09-08T00:00:00.000Z' },
+      ]),
+    };
+
+    const result = await new PortfolioService(prisma as never, market as never).value();
+
+    expect(market.getFundNavHistory).toHaveBeenCalledWith(
+      '000001.OF',
+      { limit: 2 },
+      { persistIdentity: false },
+    );
+    expect(result.positions[0]).toMatchObject({
+      previousClose: 1,
+      dailyPnl: 50,
+    });
+    expect(result.positions[0]!.dailyReturn).toBeCloseTo(0.05);
+    expect(result.dailyChange).toMatchObject({ pnl: 50, returnRate: 0.05, partial: false });
   });
 
   it('组合估值不直接相加不同币种现金，并可通过 FX View 汇总', async () => {

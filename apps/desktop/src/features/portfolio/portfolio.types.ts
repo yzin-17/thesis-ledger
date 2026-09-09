@@ -72,8 +72,14 @@ export interface Position {
   symbol: string;
   quantity: number;
   costPrice: number;
+  marketPrice?: number | null;
+  previousClose?: number | null;
   marketValue: number | null;
   pnl: number | null;
+  pnlRatio?: number | null;
+  dailyPnl?: number | null;
+  dailyReturn?: number | null;
+  baseDailyPnl?: number | null;
   stale: boolean;
   updatedAt?: string;
   source?: string;
@@ -89,6 +95,13 @@ export interface Portfolio {
   totalCost: number;
   totalPnl: number;
   cashValue: number;
+  dailyChange?: {
+    pnl: number | null;
+    returnRate: number | null;
+    partial: boolean;
+    missingSymbols: string[];
+    basis: 'PREVIOUS_CLOSE_CURRENT_HOLDINGS';
+  };
   mode: PortfolioMode;
   partial: boolean;
   valuedAt: string;

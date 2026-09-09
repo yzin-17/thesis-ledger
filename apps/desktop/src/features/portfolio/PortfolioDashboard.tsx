@@ -1,35 +1,23 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw } from 'lucide-react';
 import type { DesktopNavigationView } from '../../views.js';
 import { MarketDetailDialog } from '../market-detail/MarketDetailDialog.js';
-import { cn } from '@/lib/utils';
 
 import type { PortfolioMode, Position, Portfolio, Account } from './portfolio.types.js';
 import type { LoadState } from '../shared/types.js';
 import type { OnboardingNavigationOptions } from '../onboarding/onboarding.types.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
-import { money } from '../shared/display.js';
-import { EmptyTableRow } from '../shared/EmptyStates.js';
-import {
-  Metric,
-  StatePanel,
-  DataStateBanner,
-  DashboardSkeleton,
-} from '../shared/DesktopPrimitives.js';
+import { StatePanel, DataStateBanner, DashboardSkeleton } from '../shared/DesktopPrimitives.js';
 
 import { FirstRunOnboarding } from '../onboarding/FirstRunOnboarding.js';
 import { useOnboardingStatusQuery } from '../onboarding/onboarding.queries.js';
 import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
-import {
-  StickyTableActionCell,
-  StickyTableActionHeader,
-} from '../shared/StickyTableActions.js';
 import { PortfolioTradeView } from './PortfolioTradeView.js';
-import type { PortfolioTradeReviewTarget } from './PortfolioTradeDetailSheet.js';
+import type { PortfolioTradeReviewTarget } from './portfolio-trade.types.js';
+import { PortfolioPositionTable, PortfolioSummary } from './PortfolioOverview.js';
 
 export function PortfolioDashboard({
   state,
@@ -52,13 +40,6 @@ export function PortfolioDashboard({
   onNavigate: (view: DesktopNavigationView, options?: OnboardingNavigationOptions) => void;
   onOpenReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
-  const largest = useMemo(
-    () =>
-      [...(portfolio?.positions ?? [])].sort(
-        (a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0),
-      )[0],
-    [portfolio],
-  );
   const [detailPosition, setDetailPosition] = useState<Position | null>(null);
   const [portfolioTab, setPortfolioTab] = useState<'overview' | 'trades'>('overview');
   const hasPosition = (portfolio?.positions.length ?? 0) > 0;
@@ -156,91 +137,8 @@ export function PortfolioDashboard({
             hasRiskRule={onboardingStatus.hasRiskRule}
             onNavigate={onNavigate}
           />
-          <section
-            className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2 xl:grid-cols-4"
-            aria-label="组合关键指标"
-          >
-            <Metric label="总资产" value={money.format(portfolio!.totalMarketValue)} />
-            <Metric label="持仓成本" value={money.format(portfolio!.totalCost)} />
-            <Metric
-              label="累计浮盈亏"
-              value={money.format(portfolio!.totalPnl)}
-              tone={portfolio!.totalPnl >= 0 ? 'positive' : 'negative'}
-            />
-            <Metric
-              label="最大持仓"
-              value={largest?.asset.name ?? '—'}
-              {...(largest ? { detail: money.format(largest.marketValue ?? 0) } : {})}
-            />
-          </section>
-          <section className="panel mt-8 border-t-0">
-            <div className="panel-heading">
-              <div>
-                <h2>当前持仓</h2>
-                <p>{portfolio!.positions.length} 个标的，按市值排序</p>
-              </div>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>标的</th>
-                    <th>数量</th>
-                    <th>成本价</th>
-                    <th>市值</th>
-                    <th>浮盈亏</th>
-                    <th>状态</th>
-                    <StickyTableActionHeader>操作</StickyTableActionHeader>
-                  </tr>
-                </thead>
-                <tbody>
-                  {portfolio!.positions.length === 0 ? (
-                    <EmptyTableRow colSpan={7} />
-                  ) : (
-                    [...portfolio!.positions]
-                      .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
-                      .map((position) => (
-                        <tr key={position.id}>
-                          <td>
-                            <strong>{position.asset.name}</strong>
-                            <span>{position.symbol}</span>
-                          </td>
-                          <td>{position.quantity}</td>
-                          <td>{money.format(position.costPrice)}</td>
-                          <td>
-                            {position.marketValue === null
-                              ? '—'
-                              : money.format(position.marketValue)}
-                          </td>
-                          <td className={cn((position.pnl ?? 0) >= 0 ? 'positive' : 'negative')}>
-                            {position.pnl === null ? '—' : money.format(position.pnl)}
-                          </td>
-                          <td>
-                            <Badge
-                              className={cn('tag', position.stale && 'warning')}
-                              variant="secondary"
-                            >
-                              {position.stale ? '陈旧' : '最新'}
-                            </Badge>
-                          </td>
-                          <StickyTableActionCell>
-                            <Button
-                              className="text-button"
-                              size="sm"
-                              type="button"
-                              variant="link"
-                              onClick={() => setDetailPosition(position)}
-                            >
-                              行情详情
-                            </Button>
-                          </StickyTableActionCell>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <PortfolioSummary portfolio={portfolio!} />
+          <PortfolioPositionTable portfolio={portfolio!} onSelectPosition={setDetailPosition} />
         </TabsContent>
         <TabsContent value="trades" className="mt-0 pt-3">
           <PortfolioTradeView mode={mode} accounts={accounts} onReview={onOpenReview} />

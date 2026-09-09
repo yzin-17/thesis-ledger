@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LoaderCircle } from 'lucide-react';
@@ -5,10 +6,7 @@ import { cn } from '@/lib/utils';
 
 import { EmptyTableRow } from '../shared/EmptyStates.js';
 import { isDataLoaded } from '../shared/display.js';
-import {
-  StickyTableActionCell,
-  StickyTableActionHeader,
-} from '../shared/StickyTableActions.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import type { LoadState } from '../shared/types.js';
 import {
   automationJobTypeLabel,
@@ -26,7 +24,7 @@ import {
   providerTypeLabel,
 } from './providers.types.js';
 import type {
-  AutomationHistoryRecord,
+  AutomationHistoryPage,
   AutomationJob,
   NotificationFailureRecord,
   ProviderHealthHistoryPage,
@@ -401,12 +399,14 @@ function SimpleProviderTable({
   columns,
   rows,
   emptyColSpan,
+  footer,
 }: {
   title: string;
   description: string;
   columns: string[];
   rows: Array<{ id: string; cells: string[] }>;
   emptyColSpan: number;
+  footer?: ReactNode;
 }) {
   return (
     <section className="panel">
@@ -438,6 +438,7 @@ function SimpleProviderTable({
           </tbody>
         </table>
       </div>
+      {footer}
     </section>
   );
 }
@@ -445,11 +446,15 @@ function SimpleProviderTable({
 export function AutomationRunHistoryTable({
   loadState,
   jobs,
-  jobHistory,
+  history,
+  loading,
+  onPage,
 }: {
   loadState: LoadState;
   jobs: AutomationJob[];
-  jobHistory: AutomationHistoryRecord[];
+  history: AutomationHistoryPage;
+  loading: boolean;
+  onPage: (page: number) => void;
 }) {
   const normalizedState = isDataLoaded(loadState);
   const jobNames = new Map(jobs.map((job) => [job.id, job.name]));
@@ -460,9 +465,41 @@ export function AutomationRunHistoryTable({
       description="失败任务和错误摘要可从这里定位，无需直接查数据库。"
       columns={['任务', '状态', '开始时间', '运行结果', '错误']}
       emptyColSpan={5}
+      footer={
+        history.total > 0 ? (
+          <nav
+            className="mt-3 flex flex-wrap items-center justify-between gap-3"
+            aria-label="自动化运行历史分页"
+          >
+            <p className="m-0 text-sm text-muted-foreground">
+              第 {history.page} / {history.totalPages} 页，共 {history.total} 条
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                disabled={loadState === 'loading' || loading || history.page <= 1}
+                onClick={() => onPage(history.page - 1)}
+              >
+                上一页
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                disabled={loadState === 'loading' || loading || history.page >= history.totalPages}
+                onClick={() => onPage(history.page + 1)}
+              >
+                下一页
+              </Button>
+            </div>
+          </nav>
+        ) : null
+      }
       rows={
         normalizedState
-          ? jobHistory.map((item) => ({
+          ? history.items.map((item) => ({
               id: item.id,
               cells: [
                 automationJobName(item.jobId),

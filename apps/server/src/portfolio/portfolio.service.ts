@@ -17,8 +17,9 @@ import {
   investmentAccountRelationWhere,
   investmentAccountWhere,
 } from './investment-account-scope.js';
+import { calculatePortfolioDailyChange } from './portfolio-daily-change.js';
+import { valuePortfolioPosition } from './portfolio-position-valuation.js';
 
-const isFundSymbol = (symbol: string) => /^\d{6}\.OF$/.test(symbol);
 const isZeroDecimal = (value: string) => /^0(?:\.0+)?$/.test(value);
 
 type PositionAssetType = 'stock' | 'etf' | 'fund';
@@ -252,68 +253,11 @@ export class PortfolioService {
     const valuedAt = new Date();
     const valued = await Promise.all(
       positions.map(async (position) => {
-        const quantity = Number(position.quantity);
-        const costPrice = Number(position.costPrice);
         const currency =
           supportedCurrency(position.asset?.currency) ??
           accountCurrencyMap.get(position.accountId) ??
           baseCurrency;
-        try {
-          if (isFundSymbol(position.symbol)) {
-            if (typeof (this.market as { getFundNav?: unknown }).getFundNav !== 'function')
-              throw new Error('基金净值能力未配置');
-            const nav = await (
-              this.market as unknown as {
-                getFundNav: (symbol: string) => Promise<{ unitNav: number; freshness: string }>;
-              }
-            ).getFundNav(position.symbol);
-            const marketValue = roundMoney(quantity * nav.unitNav);
-            const costValue = roundMoney(quantity * costPrice);
-            return {
-              ...position,
-              quantity,
-              costPrice,
-              currency,
-              marketPrice: nav.unitNav,
-              marketValue,
-              costValue,
-              pnl: roundMoney(marketValue - costValue),
-              pnlRatio: costValue === 0 ? null : marketValue / costValue - 1,
-              stale: nav.freshness === 'stale',
-              freshness: nav.freshness,
-            };
-          }
-          const quote = await this.market.getQuote(position.symbol);
-          const marketValue = roundMoney(quantity * quote.price);
-          const costValue = roundMoney(quantity * costPrice);
-          return {
-            ...position,
-            quantity,
-            costPrice,
-            currency,
-            marketPrice: quote.price,
-            marketValue,
-            costValue,
-            pnl: roundMoney(marketValue - costValue),
-            pnlRatio: costValue === 0 ? null : marketValue / costValue - 1,
-            stale: quote.stale,
-            freshness: quote.freshness,
-          };
-        } catch (error) {
-          return {
-            ...position,
-            quantity,
-            costPrice,
-            currency,
-            marketPrice: null,
-            marketValue: null,
-            costValue: roundMoney(quantity * costPrice),
-            pnl: null,
-            pnlRatio: null,
-            stale: true,
-            error: error instanceof Error ? error.message : '行情不可用',
-          };
-        }
+        return valuePortfolioPosition(position, currency, this.market);
       }),
     );
 
@@ -382,20 +326,31 @@ export class PortfolioService {
       if (valuationOptions.fxMerge !== true && currency !== baseCurrency) return null;
       return convertAmount(amount, currency, fx);
     };
-    const valuedWithBase = valued.map((item) => {
+    const valuedRows = valued.map((item) => {
       const baseMarketValue =
         item.marketValue === null ? null : convertToBase(item.marketValue, item.currency);
       const baseCostValue = convertToBase(item.costValue, item.currency);
+      const baseDailyPnl =
+        item.dailyPnl === null ? null : convertToBase(item.dailyPnl, item.currency);
+      const basePreviousMarketValue =
+        item.previousClose === null
+          ? null
+          : convertToBase(roundMoney(item.quantity * item.previousClose), item.currency);
       return {
-        ...item,
-        baseMarketValue,
-        baseCostValue,
-        basePnl:
-          baseMarketValue === null || baseCostValue === null
-            ? null
-            : baseMarketValue - baseCostValue,
+        position: {
+          ...item,
+          baseMarketValue,
+          baseCostValue,
+          baseDailyPnl,
+          basePnl:
+            baseMarketValue === null || baseCostValue === null
+              ? null
+              : baseMarketValue - baseCostValue,
+        },
+        daily: { symbol: item.symbol, baseDailyPnl, basePreviousMarketValue },
       };
     });
+    const valuedWithBase = valuedRows.map((row) => row.position);
     const cashByAccount = [...cashByAccountAmounts.entries()].map(([id, amounts]) => {
       const accountBaseCurrency = accountCurrencyMap.get(id) ?? baseCurrency;
       const aggregate = aggregateWithScope(amounts, accountBaseCurrency);
@@ -439,6 +394,7 @@ export class PortfolioService {
       !marketAggregate.complete ||
       !costAggregate.complete ||
       !cashAggregate.complete;
+    const dailyChange = calculatePortfolioDailyChange(valuedRows.map((row) => row.daily));
     return {
       positions: valuedWithBase,
       cashValue: roundMoney(cashAggregate.knownValue),
@@ -447,6 +403,7 @@ export class PortfolioService {
       totalCost: roundMoney(costAggregate.knownValue),
       totalMarketValue: roundMoney(marketAggregate.knownValue + cashAggregate.knownValue),
       totalPnl: roundMoney(valuedWithBase.reduce((sum, item) => sum + (item.basePnl ?? 0), 0)),
+      dailyChange,
       partial,
       mode,
       baseCurrency,
