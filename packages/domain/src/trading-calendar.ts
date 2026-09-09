@@ -16,6 +16,11 @@ export interface TradingSessionStatus {
   reason: TradingDayReason | 'outside-session';
 }
 
+export interface TradingSessionWindow {
+  start: number;
+  end: number;
+}
+
 export interface TradingCalendar {
   readonly market: TradingMarket;
   readonly timezone: string;
@@ -23,6 +28,7 @@ export interface TradingCalendar {
   sessionStatus(date: Date | string): TradingSessionStatus;
   isTradingDay(date: Date | string): boolean;
   isTradingSession(date: Date | string): boolean;
+  sessionsForDate(date: Date | string): readonly TradingSessionWindow[];
 }
 
 interface LocalDateTime {
@@ -200,6 +206,13 @@ class ExchangeTradingCalendar implements TradingCalendar {
       open,
       reason: open ? 'open' : 'outside-session',
     };
+  }
+
+  sessionsForDate(date: Date | string): readonly TradingSessionWindow[] {
+    const day = this.status(date);
+    if (!day.open) return [];
+    const local = localDateTime(date, this.timezone);
+    return this.definition.shortenedSessions?.get(local.date) ?? this.definition.sessions;
   }
 
   isTradingDay(date: Date | string) {

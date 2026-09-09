@@ -3,7 +3,9 @@ import type { Prisma } from '@prisma/client';
 export const backtestJobSummarySelect = {
   id: true,
   strategyVersionId: true,
+  mode: true,
   status: true,
+  stage: true,
   progress: true,
   periodStart: true,
   periodEnd: true,
@@ -20,6 +22,8 @@ export const backtestJobSummarySelect = {
   finishedAt: true,
   engineVersion: true,
   resultChecksum: true,
+  snapshotId: true,
+  diagnostics: true,
   input: true,
 } satisfies Prisma.BacktestJobSelect;
 
@@ -33,10 +37,22 @@ export type BacktestJobSummary = Omit<BacktestJobSummaryRecord, 'input'> & {
 
 export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): BacktestJobSummary => {
   const { input, ...summary } = record;
-  const initialCash =
-    input && typeof input === 'object' && !Array.isArray(input) && 'initialCash' in input
-      ? Number(input.initialCash)
-      : Number.NaN;
+  let initialCashValue: unknown;
+  if (input && typeof input === 'object' && !Array.isArray(input) && 'initialCash' in input) {
+    initialCashValue = input.initialCash;
+  } else if (input && typeof input === 'object' && !Array.isArray(input) && 'runConfig' in input) {
+    const runConfig = input.runConfig as {
+      baseCurrency?: 'CNY' | 'HKD' | 'USD';
+      initialCash?: Partial<Record<'CNY' | 'HKD' | 'USD', string>>;
+    };
+    const initialCash = runConfig.initialCash;
+    if (runConfig.baseCurrency && initialCash?.[runConfig.baseCurrency] !== undefined) {
+      initialCashValue = initialCash[runConfig.baseCurrency];
+    } else {
+      initialCashValue = Object.values(initialCash ?? {}).find((amount) => amount !== undefined);
+    }
+  }
+  const initialCash = Number(initialCashValue);
   Reflect.deleteProperty(summary, 'result');
   return {
     ...summary,

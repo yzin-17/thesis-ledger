@@ -2,7 +2,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { PortfolioDashboard } from '../src/features/portfolio/PortfolioDashboard.js';
+import {
+  nextPortfolioPositionSort,
+  PortfolioSummary,
+  sortPortfolioPositions,
+} from '../src/features/portfolio/PortfolioOverview.js';
 import { fetchPortfolioValuation } from '../src/features/portfolio/portfolio.api.js';
+import type { Position } from '../src/features/portfolio/portfolio.types.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 
 const text = (html: string) =>
@@ -12,6 +18,102 @@ const text = (html: string) =>
     .trim();
 
 describe('Portfolio table contract', () => {
+  it('同一列点击三次后恢复默认市值降序', () => {
+    const first = nextPortfolioPositionSort(null, 'dailyPnl');
+    const second = nextPortfolioPositionSort(first, 'dailyPnl');
+    const third = nextPortfolioPositionSort(second, 'dailyPnl');
+
+    expect(first).toEqual({ key: 'dailyPnl', direction: 'desc' });
+    expect(second).toEqual({ key: 'dailyPnl', direction: 'asc' });
+    expect(third).toBeNull();
+  });
+
+  it('按市值、今日收益和未实现盈亏排序，并将不可用值置底', () => {
+    const positions = [
+      {
+        id: 'position-a',
+        accountId: 'account-a',
+        symbol: 'A',
+        quantity: 1,
+        costPrice: 10,
+        marketValue: 100,
+        pnl: 5,
+        dailyPnl: -2,
+        stale: false,
+        asset: { name: 'A' },
+      },
+      {
+        id: 'position-b',
+        accountId: 'account-b',
+        symbol: 'B',
+        quantity: 1,
+        costPrice: 10,
+        marketValue: 200,
+        pnl: -10,
+        dailyPnl: 8,
+        stale: false,
+        asset: { name: 'B' },
+      },
+      {
+        id: 'position-c',
+        accountId: 'account-c',
+        symbol: 'C',
+        quantity: 1,
+        costPrice: 10,
+        marketValue: null,
+        pnl: null,
+        dailyPnl: null,
+        stale: true,
+        asset: { name: 'C' },
+      },
+    ] satisfies Position[];
+
+    expect(
+      sortPortfolioPositions(positions, { key: 'marketValue', direction: 'desc' }).map(
+        (position) => position.symbol,
+      ),
+    ).toEqual(['B', 'A', 'C']);
+    expect(
+      sortPortfolioPositions(positions, { key: 'dailyPnl', direction: 'desc' }).map(
+        (position) => position.symbol,
+      ),
+    ).toEqual(['B', 'A', 'C']);
+    expect(
+      sortPortfolioPositions(positions, { key: 'pnl', direction: 'asc' }).map(
+        (position) => position.symbol,
+      ),
+    ).toEqual(['B', 'A', 'C']);
+  });
+
+  it('使用组合级累计字段，不把当前持仓未实现盈亏直接改名', () => {
+    const html = renderToStaticMarkup(
+      <PortfolioSummary
+        portfolio={{
+          totalMarketValue: 104,
+          totalCost: 80,
+          totalPnl: 24,
+          unrealizedPnl: 24,
+          unrealizedPnlRatio: 0.3,
+          realizedPnl: 4,
+          realizedPnlRatio: 0.2,
+          cumulativePnl: 28,
+          cumulativePnlRatio: 0.28,
+          cashValue: 0,
+          mode: 'actual',
+          partial: false,
+          valuedAt: '2026-09-09T00:00:00.000Z',
+          positions: [],
+        }}
+      />,
+    );
+
+    expect(html).toContain('+¥28.00');
+    expect(html).toContain('+28.00% · 已实现 + 未实现');
+    expect(html).toContain('+¥4.00');
+    expect(html).toContain('来自已卖出交易');
+    expect(html).not.toContain('最大持仓');
+  });
+
   it('keeps row cells aligned with the seven semantic headers', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -37,6 +139,12 @@ describe('Portfolio table contract', () => {
             totalMarketValue: 14880,
             totalCost: 14500,
             totalPnl: 380,
+            unrealizedPnl: 380,
+            unrealizedPnlRatio: 380 / 14500,
+            realizedPnl: 0,
+            realizedPnlRatio: null,
+            cumulativePnl: 380,
+            cumulativePnlRatio: 380 / 14500,
             cashValue: 0,
             dailyChange: {
               pnl: 80,
@@ -88,7 +196,7 @@ describe('Portfolio table contract', () => {
       '现价',
       '市值',
       '今日收益',
-      '累计收益',
+      '未实现盈亏',
       '状态',
       '操作',
     ]);
@@ -101,8 +209,15 @@ describe('Portfolio table contract', () => {
     expect(cells[5]).toContain('+2.62%');
     expect(cells[6]).toContain('最新');
     expect(cells[7]).toContain('行情详情');
-    expect(html).toContain('今日持仓收益');
-    expect(html).toContain('按当前持仓与上一价格估算');
+    expect(html).toContain('今日收益');
+    expect(html).toContain('累计盈亏');
+    expect(html).toContain('已实现盈亏');
+    expect(html).not.toContain('最大持仓');
+    expect(html).toContain('较上一交易日');
+    expect(html).toContain('按市值排序，当前为默认降序，点击进入排序循环');
+    expect(html).toContain('按今日收益排序，当前未排序，点击按降序排列');
+    expect(html).toContain('按未实现盈亏排序，当前未排序，点击按降序排列');
+    expect(html).toContain('按市值降序');
   });
 
   it('兼容并映射 Portfolio API 的每日变化字段', async () => {
@@ -134,6 +249,12 @@ describe('Portfolio table contract', () => {
           totalCost: 14500,
           totalMarketValue: 14880,
           totalPnl: 380,
+          unrealizedPnl: 380,
+          unrealizedPnlRatio: 380 / 14500,
+          realizedPnl: 0,
+          realizedPnlRatio: null,
+          cumulativePnl: 380,
+          cumulativePnlRatio: 380 / 14500,
           dailyChange: {
             pnl: 80,
             returnRate: 0.005405,

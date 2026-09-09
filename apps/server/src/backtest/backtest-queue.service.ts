@@ -82,6 +82,7 @@ export class BacktestQueueService {
         job.status === 'queued'
           ? {
               status: 'cancelled',
+              stage: 'cancelled',
               progress: 100,
               cancelRequestedAt: now,
               finishedAt: now,

@@ -11,8 +11,13 @@ import {
 import {
   StrategyJobs,
   StrategyLibrary,
+  backtestStageLabel,
+  completenessLabel,
+  formatBacktestMetric,
   formatBacktestDataAsOf,
   jobStatusLabel,
+  tradeReasonLabel,
+  tradeSideLabel,
   uniqueBacktestWarnings,
 } from './StrategySections.js';
 import {
@@ -171,6 +176,45 @@ describe('策略实验工作台 UI 契约', () => {
     expect(terminalHtml).not.toContain('100%');
   });
 
+  it('回测阶段和交易枚举只在展示层转换为中文', () => {
+    expect(backtestStageLabel('snapshot-finalized')).toBe('快照已完成');
+    expect(backtestStageLabel('artifact-read')).toBe('其他阶段');
+    expect(tradeSideLabel('buy')).toBe('买入');
+    expect(tradeSideLabel('sell')).toBe('卖出');
+    expect(tradeReasonLabel('signal')).toBe('信号触发');
+    expect(tradeReasonLabel('risk')).toBe('风险规则触发');
+  });
+
+  it('V2 失败任务展示阶段、执行次数和快照重试入口', () => {
+    const html = renderToStaticMarkup(
+      <StrategyJobs
+        jobs={[
+          {
+            ...job,
+            mode: 'V2',
+            status: 'failed',
+            stage: 'artifact-read',
+            executionAttempt: 2,
+            errorSummary: 'Artifact 校验失败',
+          },
+        ]}
+        strategies={[strategy]}
+        loadState="ready"
+        busyAction={null}
+        onRun={vi.fn()}
+        onCancel={vi.fn()}
+        onRetry={vi.fn()}
+        onViewResult={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('阶段：其他阶段');
+    expect(html).toContain('执行次数：2');
+    expect(html).toContain('行情文件校验失败');
+    expect(html).not.toContain('Artifact 校验失败');
+    expect(html).toContain('重试');
+  });
+
   it('回测任务空态只引导返回策略库', () => {
     const html = renderToStaticMarkup(
       <StrategyJobs
@@ -260,6 +304,18 @@ describe('策略实验工作台 UI 契约', () => {
     expect(resultJob.engineVersion).toBe('engine-v1');
     expect(resultJob.resultChecksum).toBe('checksum');
     expect(resultJob.result).toMatchObject({ finalValue: 101_000 });
+  });
+
+  it('V2 结果展示指标可用性、NAV 拒绝与复现元数据', () => {
+    expect(formatBacktestMetric({ status: 'available', value: '0.125' })).toBe('12.50%');
+    expect(
+      formatBacktestMetric({ status: 'unavailable', reason: 'INSUFFICIENT_RETURN_SAMPLES' }),
+    ).toBe('不可用：INSUFFICIENT_RETURN_SAMPLES');
+    expect(formatBacktestMetric({ status: 'available', value: '1.5' }, false)).toBe('1.5');
+    expect(completenessLabel('partial')).toBe('部分完整');
+    const source = readFileSync(new URL('./StrategySections.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('NAV {rejectedNavRequests.length} 笔');
+    expect(source).toContain('result.snapshotId');
   });
 
   it('回测配置拒绝反向日期和非正资金', () => {

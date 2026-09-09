@@ -10,6 +10,7 @@ import {
 } from '../../src/ai/ai.service.js';
 import { AccountsService } from '../../src/portfolio/accounts.service.js';
 import { PortfolioService } from '../../src/portfolio/portfolio.service.js';
+import { TradeQueryService } from '../../src/ledger/trade-query.service.js';
 import { RiskService } from '../../src/risk/risk.service.js';
 import { cashFlowEvent, fixtureUuid } from '../ledger/ledger-event-fixtures.js';
 
@@ -426,6 +427,113 @@ describe('账户与组合', () => {
       missingSymbols: [],
       basis: 'PREVIOUS_CLOSE_CURRENT_HOLDINGS',
     });
+  });
+
+  it('使用 Trade Close Slice 计算已实现与累计盈亏，不把未实现盈亏改名', async () => {
+    const positions = [
+      {
+        id: 'position-after-partial-sell',
+        symbol: '600519.SH',
+        quantity: 8,
+        costPrice: 10,
+        asset: { name: 'A', currency: 'CNY' },
+      },
+    ];
+    const prisma = {
+      account: {
+        findMany: vi.fn(async () => [{ id: accountA, currency: 'CNY' }]),
+      },
+      position: { findMany: vi.fn(async () => positions) },
+      ledgerEvent: { findMany: vi.fn(async () => []) },
+      trade: {
+        findMany: vi.fn(async () => [
+          {
+            closeSlices: [
+              {
+                currency: 'CNY',
+                quantity: '2',
+                netRealizedPnl: '4',
+                costEstimated: false,
+                allocations: [{ originalCost: '20', allocatedBuyCharges: [] }],
+              },
+            ],
+          },
+        ]),
+      },
+    };
+    const market = {
+      getQuote: vi.fn(async () => ({
+        price: 13,
+        previousClose: 12,
+        stale: false,
+        freshness: 'live',
+      })),
+    };
+
+    const result = await new PortfolioService(
+      prisma as never,
+      market as never,
+      undefined,
+      undefined,
+      new TradeQueryService(prisma as never),
+    ).value();
+
+    expect(result).toMatchObject({
+      totalCost: 80,
+      totalPnl: 24,
+      unrealizedPnl: 24,
+      unrealizedPnlRatio: 0.3,
+      realizedPnl: 4,
+      realizedPnlRatio: 0.2,
+      cumulativePnl: 28,
+      cumulativePnlRatio: 0.28,
+    });
+  });
+
+  it('已实现盈亏包含已清仓币种，并沿用组合 FX 视图转换', async () => {
+    const prisma = {
+      account: {
+        findMany: vi.fn(async () => [{ id: accountA, currency: 'CNY' }]),
+      },
+      position: { findMany: vi.fn(async () => []) },
+      ledgerEvent: { findMany: vi.fn(async () => []) },
+      trade: {
+        findMany: vi.fn(async () => [
+          {
+            closeSlices: [
+              {
+                currency: 'HKD',
+                quantity: '10',
+                netRealizedPnl: '100',
+                costEstimated: false,
+                allocations: [{ originalCost: '1000', allocatedBuyCharges: [] }],
+              },
+            ],
+          },
+        ]),
+      },
+    };
+    const market = {
+      getFxRates: vi.fn(async ({ asOf }: { asOf: string }) => fxResponse(asOf)),
+    };
+
+    const result = await new PortfolioService(
+      prisma as never,
+      market as never,
+      undefined,
+      undefined,
+      new TradeQueryService(prisma as never),
+    ).value(accountA, 'actual', { fxMerge: true, baseCurrency: 'CNY' });
+
+    expect(result).toMatchObject({
+      realizedPnl: 92,
+      realizedPnlRatio: 0.1,
+      cumulativePnl: 92,
+      cumulativePnlRatio: 0.1,
+    });
+    expect(market.getFxRates).toHaveBeenCalledWith(
+      expect.objectContaining({ currencies: expect.arrayContaining(['CNY', 'HKD']) }),
+    );
   });
 
   it('场外基金使用上一有效净值计算今日收益', async () => {

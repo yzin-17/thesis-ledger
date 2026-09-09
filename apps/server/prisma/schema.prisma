@@ -991,7 +991,10 @@ model StrategyVersion {
 model BacktestJob {
   id                String          @id @default(uuid()) @db.Uuid
   strategyVersionId String          @db.Uuid
+  mode              String          @default("V1")
+  idempotencyKey    String?
   status            String
+  stage             String?
   progress          Int             @default(0)
   periodStart       DateTime
   periodEnd         DateTime
@@ -1010,9 +1013,14 @@ model BacktestJob {
   finishedAt        DateTime?
   engineVersion     String?
   resultChecksum    String?
+  snapshotId        String?
+  snapshotManifest  Json?
+  runConfig         Json?
+  diagnostics       Json?
   strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
 
   @@index([status, createdAt])
+  @@unique([strategyVersionId, idempotencyKey])
 }
 
 model JournalEntry {

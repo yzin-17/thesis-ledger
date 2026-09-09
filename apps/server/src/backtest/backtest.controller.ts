@@ -33,6 +33,31 @@ export class BacktestController {
     return this.backtests.queue(body);
   }
 
+  @Post('runs')
+  createRun(@Body() body: unknown) {
+    return this.backtests.createRun(body);
+  }
+
+  @Post('runs/:id/cancel')
+  cancelRun(@Param('id') id: string) {
+    return this.backtests.cancel(id);
+  }
+
+  @Post('runs/:id/retry')
+  retryRun(@Param('id') id: string) {
+    return this.backtests.retryRun(id);
+  }
+
+  @Post('runs/:id/run')
+  runV2(@Param('id') id: string) {
+    return this.backtests.runV2(id);
+  }
+
+  @Get('runs/:id')
+  runStatus(@Param('id') id: string) {
+    return this.backtests.status(id);
+  }
+
   @Post('jobs/:id/cancel')
   cancel(@Param('id') id: string) {
     return this.backtests.cancel(id);

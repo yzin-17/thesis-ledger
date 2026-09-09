@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "2",
+  "name": "多源均线策略",
+  "signalSources": [
+    {
+      "id": "execution",
+      "asset": { "symbol": "600519.SH", "market": "CN", "assetType": "stock" },
+      "timeframe": "1d",
+      "series": ["close", "volume"]
+    },
+    {
+      "id": "benchmark",
+      "asset": { "symbol": "000300.SH", "market": "CN", "assetType": "etf" },
+      "timeframe": "1d",
+      "series": ["close"]
+    }
+  ],
+  "executionInstrument": { "symbol": "600519.SH", "market": "CN", "assetType": "stock" },
+  "primaryTimeframe": "1d",
+  "entry": {
+    "type": "compare",
+    "operator": "gt",
+    "left": {
+      "type": "indicator",
+      "name": "MA",
+      "input": { "type": "series", "sourceId": "execution", "field": "close" },
+      "params": { "period": 5 }
+    },
+    "right": { "type": "constant", "value": "10" }
+  },
+  "exit": { "type": "positionState", "field": "isOpen" },
+  "sizing": { "type": "fixedAmount", "amount": "10000" },
+  "risk": [{ "type": "fixedStop", "percent": "0.1" }],
+  "execution": {
+    "mode": "exchange",
+    "orderType": "market",
+    "timeInForce": "DAY",
+    "timing": "nextEligibleBarOpen"
+  },
+  "cost": { "commissionRate": "0.0003", "slippageRate": "0.001" }
+}

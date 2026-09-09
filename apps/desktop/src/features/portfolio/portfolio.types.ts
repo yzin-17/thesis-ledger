@@ -94,6 +94,12 @@ export interface Portfolio {
   totalMarketValue: number;
   totalCost: number;
   totalPnl: number;
+  unrealizedPnl?: number | null;
+  unrealizedPnlRatio?: number | null;
+  realizedPnl?: number | null;
+  realizedPnlRatio?: number | null;
+  cumulativePnl?: number | null;
+  cumulativePnlRatio?: number | null;
   cashValue: number;
   dailyChange?: {
     pnl: number | null;

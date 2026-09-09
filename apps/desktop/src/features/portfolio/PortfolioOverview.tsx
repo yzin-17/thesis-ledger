@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import { useState } from 'react';
 
 import { Metric } from '../shared/DesktopPrimitives.js';
 import { EmptyTableRow } from '../shared/EmptyStates.js';
@@ -39,6 +41,103 @@ const tone = (value: number | null | undefined) => {
 const positionBaseMarketValue = (position: Position) =>
   position.baseMarketValue ?? position.marketValue;
 
+export type PortfolioPositionSortKey = 'marketValue' | 'dailyPnl' | 'pnl';
+type PortfolioPositionSortDirection = 'asc' | 'desc';
+
+export type PortfolioPositionSort = {
+  key: PortfolioPositionSortKey;
+  direction: PortfolioPositionSortDirection;
+};
+
+export type PortfolioPositionSortState = PortfolioPositionSort | null;
+
+const defaultPositionSort: PortfolioPositionSort = {
+  key: 'marketValue',
+  direction: 'desc',
+};
+
+const positionSortLabels: Record<PortfolioPositionSortKey, string> = {
+  marketValue: '市值',
+  dailyPnl: '今日收益',
+  pnl: '未实现盈亏',
+};
+
+const positionSortValue = (position: Position, key: PortfolioPositionSortKey) => {
+  if (key === 'marketValue') return positionBaseMarketValue(position);
+  if (key === 'dailyPnl') return position.baseDailyPnl ?? position.dailyPnl ?? null;
+  return position.basePnl ?? position.pnl;
+};
+
+export const sortPortfolioPositions = (
+  positions: readonly Position[],
+  sort: PortfolioPositionSort = defaultPositionSort,
+) =>
+  [...positions].sort((left, right) => {
+    const leftValue = positionSortValue(left, sort.key);
+    const rightValue = positionSortValue(right, sort.key);
+    if (leftValue === null || leftValue === undefined) {
+      return rightValue === null || rightValue === undefined ? 0 : 1;
+    }
+    if (rightValue === null || rightValue === undefined) return -1;
+    const comparison = leftValue - rightValue;
+    if (comparison === 0) return 0;
+    return sort.direction === 'asc' ? comparison : -comparison;
+  });
+
+export const nextPortfolioPositionSort = (
+  current: PortfolioPositionSortState,
+  key: PortfolioPositionSortKey,
+): PortfolioPositionSortState => {
+  if (current === null || current.key !== key) return { key, direction: 'desc' };
+  if (current.direction === 'desc') return { key, direction: 'asc' };
+  return null;
+};
+
+function SortablePositionHeader({
+  label,
+  sortKey,
+  sort,
+  isDefault,
+  onSort,
+}: {
+  label: string;
+  sortKey: PortfolioPositionSortKey;
+  sort: PortfolioPositionSort;
+  isDefault: boolean;
+  onSort: (key: PortfolioPositionSortKey) => void;
+}) {
+  const active = sort.key === sortKey;
+  let Icon: typeof ChevronDownIcon | undefined;
+  let ariaSort: 'none' | 'ascending' | 'descending' = 'none';
+  let status = '当前未排序，点击按降序排列';
+  if (active) {
+    Icon = sort.direction === 'asc' ? ChevronUpIcon : ChevronDownIcon;
+    ariaSort = sort.direction === 'asc' ? 'ascending' : 'descending';
+    if (isDefault) status = '当前为默认降序，点击进入排序循环';
+    else if (sort.direction === 'asc') status = '当前升序，点击恢复默认排序';
+    else status = '当前降序，点击切换为升序';
+  }
+  return (
+    <th scope="col" aria-sort={ariaSort}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={cn(
+          'h-auto min-h-0 gap-1 px-0 text-xs font-semibold hover:bg-transparent',
+          active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+        )}
+        aria-label={`按${label}排序，${status}`}
+        title={`按${label}排序`}
+        onClick={() => onSort(sortKey)}
+      >
+        {label}
+        {Icon ? <Icon aria-hidden="true" className="size-3.5" /> : null}
+      </Button>
+    </th>
+  );
+}
+
 const positionWeight = (position: Position, totalValue: number) => {
   const value = positionBaseMarketValue(position);
   if (value === null || totalValue <= 0) return null;
@@ -72,29 +171,19 @@ const dailyMetric = (portfolio: Portfolio): MetricPresentation => {
   const dailyTone = tone(daily.pnl);
   return {
     value: formatSignedMoney(daily.pnl, portfolio.baseCurrency),
-    detail: `${formatSignedPercent(daily.returnRate)} · 按当前持仓与上一价格估算`,
+    detail: `${formatSignedPercent(daily.returnRate)} · 较上一交易日`,
     ...(dailyTone ? { tone: dailyTone } : {}),
   };
 };
 
 export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
-  const sortedPositions = [...portfolio.positions].sort(
-    (left, right) => (positionBaseMarketValue(right) ?? 0) - (positionBaseMarketValue(left) ?? 0),
-  );
-  const largest = sortedPositions[0];
   const currency = portfolio.baseCurrency ?? 'CNY';
   const securitiesValue = portfolio.totalMarketValue - portfolio.cashValue;
-  const cumulativeReturn =
-    portfolio.totalCost > 0 ? portfolio.totalPnl / portfolio.totalCost : null;
-  const cumulativeTone = tone(portfolio.totalPnl);
-  const largestValue = largest ? positionBaseMarketValue(largest) : null;
-  const largestWeight = largest ? positionWeight(largest, portfolio.totalMarketValue) : null;
   const daily = dailyMetric(portfolio);
-  let largestDetail: string | undefined;
-  if (largestValue !== null && largestValue !== undefined) {
-    largestDetail = formatMoney(largestValue, currency);
-    if (largestWeight !== null) largestDetail += ` · 仓位 ${formatPercent(largestWeight)}`;
-  }
+  const cumulativePnl = portfolio.cumulativePnl ?? null;
+  const cumulativeTone = tone(cumulativePnl);
+  const realizedPnl = portfolio.realizedPnl ?? null;
+  const realizedTone = tone(realizedPnl);
   return (
     <section
       className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2 xl:grid-cols-4"
@@ -106,25 +195,26 @@ export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
         detail={`证券 ${formatMoney(securitiesValue, currency)} · 现金 ${formatMoney(portfolio.cashValue, currency)}`}
       />
       <Metric
-        label="今日持仓收益"
+        label="今日收益"
         value={daily.value}
         detail={daily.detail}
         {...(daily.tone ? { tone: daily.tone } : {})}
       />
       <Metric
-        label="累计浮盈亏"
-        value={formatSignedMoney(portfolio.totalPnl, currency)}
+        label="累计盈亏"
+        value={cumulativePnl === null ? '—' : formatSignedMoney(cumulativePnl, currency)}
         detail={
-          cumulativeReturn === null
-            ? '暂无可用持仓成本'
-            : `${formatSignedPercent(cumulativeReturn)} · 相对持仓成本`
+          portfolio.cumulativePnlRatio === null || portfolio.cumulativePnlRatio === undefined
+            ? '已实现 + 未实现暂不可用'
+            : `${formatSignedPercent(portfolio.cumulativePnlRatio)} · 已实现 + 未实现`
         }
         {...(cumulativeTone ? { tone: cumulativeTone } : {})}
       />
       <Metric
-        label="最大持仓"
-        value={largest?.asset.name ?? '—'}
-        {...(largestDetail ? { detail: largestDetail } : {})}
+        label="已实现盈亏"
+        value={realizedPnl === null ? '—' : formatSignedMoney(realizedPnl, currency)}
+        detail={realizedPnl === null ? '已卖出交易成本暂不可完整确认' : '来自已卖出交易'}
+        {...(realizedTone ? { tone: realizedTone } : {})}
       />
     </section>
   );
@@ -137,15 +227,21 @@ export function PortfolioPositionTable({
   portfolio: Portfolio;
   onSelectPosition: (position: Position) => void;
 }) {
-  const sortedPositions = [...portfolio.positions].sort(
-    (left, right) => (positionBaseMarketValue(right) ?? 0) - (positionBaseMarketValue(left) ?? 0),
-  );
+  const [sort, setSort] = useState<PortfolioPositionSortState>(null);
+  const effectiveSort = sort ?? defaultPositionSort;
+  const sortedPositions = sortPortfolioPositions(portfolio.positions, effectiveSort);
+  const handleSort = (key: PortfolioPositionSortKey) => {
+    setSort((current) => nextPortfolioPositionSort(current, key));
+  };
   return (
     <section className="panel mt-8 border-t-0">
       <div className="panel-heading">
         <div>
           <h2>当前持仓</h2>
-          <p>{portfolio.positions.length} 个标的，按市值排序</p>
+          <p>
+            {portfolio.positions.length} 个标的，按{positionSortLabels[effectiveSort.key]}
+            {effectiveSort.direction === 'desc' ? '降序' : '升序'}
+          </p>
         </div>
       </div>
       <div className="table-wrap">
@@ -155,9 +251,27 @@ export function PortfolioPositionTable({
               <th>标的</th>
               <th>持有</th>
               <th>现价</th>
-              <th>市值</th>
-              <th>今日收益</th>
-              <th>累计收益</th>
+              <SortablePositionHeader
+                label="市值"
+                sortKey="marketValue"
+                sort={effectiveSort}
+                isDefault={sort === null}
+                onSort={handleSort}
+              />
+              <SortablePositionHeader
+                label="今日收益"
+                sortKey="dailyPnl"
+                sort={effectiveSort}
+                isDefault={sort === null}
+                onSort={handleSort}
+              />
+              <SortablePositionHeader
+                label="未实现盈亏"
+                sortKey="pnl"
+                sort={effectiveSort}
+                isDefault={sort === null}
+                onSort={handleSort}
+              />
               <th>状态</th>
               <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>

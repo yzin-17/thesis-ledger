@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Combobox } from '@base-ui/react/combobox';
 import { debounce } from 'es-toolkit';
 import { CheckIcon, ChevronDownIcon, LoaderCircle, SearchIcon } from 'lucide-react';
-import { strategySchemaV1 } from '@thesis-ledger/schemas';
+import { strategySchemaV1, strategySchemaV2 } from '@thesis-ledger/schemas';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -40,6 +40,7 @@ import type { InstrumentResult } from '../market-data/market-data.types.js';
 import { schemaFromVersion, schemaName } from './strategy.schema.js';
 import { hasUnappliedJson, shouldApplyAdvancedJson } from './strategy.formats.js';
 import { StrategyRiskExecutionFields } from './StrategyRiskExecutionFields.js';
+import { StrategyV2Summary, isV2StrategySchema } from './StrategyV2Summary.js';
 import type { StrategyRecord, StrategySchema, StrategyVersion } from './strategy.types.js';
 
 import { SignalEditor, type Signal } from './StrategySignalEditor.js';
@@ -344,10 +345,12 @@ export function StrategyEditorSheet({
       setJsonError('JSON 格式无效，请检查括号、逗号和字符串引号。');
       return false;
     }
-    const validated = strategySchemaV1.safeParse(parsed);
+    const validated = (isV2StrategySchema(parsed) ? strategySchemaV2 : strategySchemaV1).safeParse(
+      parsed,
+    );
     if (!validated.success) {
       const issue = validated.error.issues[0];
-      setJsonError(`${issue?.path.join('.') || 'Schema'}：${issue?.message ?? 'Schema 校验失败'}`);
+      setJsonError(`${issue?.path.join('.') || '配置'}：${issue?.message ?? '策略配置校验失败'}`);
       return false;
     }
     const next = normalizeSingleSymbol(validated.data);
@@ -378,14 +381,13 @@ export function StrategyEditorSheet({
   const submit = () => {
     if (activeTab === 'advanced' && !applyJson()) return;
     const candidate = activeTab === 'advanced' ? parseJson(jsonText) : draft;
-    const validated = strategySchemaV1.safeParse(
-      candidate ? normalizeSingleSymbol(candidate) : draft,
-    );
+    const normalizedCandidate = candidate ? normalizeSingleSymbol(candidate) : draft;
+    const validated = (
+      isV2StrategySchema(normalizedCandidate) ? strategySchemaV2 : strategySchemaV1
+    ).safeParse(normalizedCandidate);
     if (!validated.success) {
       const issue = validated.error.issues[0];
-      setSchemaError(
-        `${issue?.path.join('.') || 'Schema'}：${issue?.message ?? 'Schema 校验失败'}`,
-      );
+      setSchemaError(`${issue?.path.join('.') || '配置'}：${issue?.message ?? '策略配置校验失败'}`);
       return;
     }
     onSave(validated.data);
@@ -424,6 +426,9 @@ export function StrategyEditorSheet({
               </TabsList>
               <TabsContent value="common" className="mt-0">
                 <FieldGroup>
+                  {isV2StrategySchema(draft) && (
+                    <StrategyV2Summary schema={draft} editable onChange={updateDraft} />
+                  )}
                   <Field invalid={Boolean(schemaError && schemaError.startsWith('name'))}>
                     <FieldLabel htmlFor="strategy-name">策略名称</FieldLabel>
                     <Input
@@ -434,7 +439,7 @@ export function StrategyEditorSheet({
                       placeholder="例如：均线突破"
                     />
                     <FieldDescription>
-                      {canEditName ? '名称会同步写入 Schema。' : '编辑已有策略时名称保持不变。'}
+                      {canEditName ? '名称会同步写入策略配置。' : '编辑已有策略时名称保持不变。'}
                     </FieldDescription>
                     {schemaError?.startsWith('name') && <FieldError>{schemaError}</FieldError>}
                   </Field>
@@ -450,318 +455,331 @@ export function StrategyEditorSheet({
                       placeholder="记录这条策略的假设和适用范围"
                     />
                   </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field>
-                      <FieldLabel>状态</FieldLabel>
-                      <Select
-                        value={typeof draft.status === 'string' ? draft.status : 'draft'}
-                        onValueChange={(value) =>
-                          value && updateDraft(updateRecord(draft, 'status', value))
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue>
-                            {selectLabel(
-                              draft.status,
-                              {
-                                draft: '草稿',
-                                active: '启用',
-                                archived: '归档',
-                              },
-                              '草稿',
-                            )}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="draft">草稿</SelectItem>
-                            <SelectItem value="active">启用</SelectItem>
-                            <SelectItem value="archived">归档</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="strategy-benchmark">基准</FieldLabel>
-                      <Combobox.Root
-                        items={benchmarkItems}
-                        value={selectedBenchmark}
-                        inputValue={benchmarkQuery}
-                        autoHighlight
-                        filter={null}
-                        itemToStringLabel={(option) => option.label}
-                        itemToStringValue={(option) => option.value}
-                        onOpenChange={(nextOpen) => {
-                          setBenchmarkOpen(nextOpen);
-                          if (nextOpen) setBenchmarkQuery('');
-                        }}
-                        onInputValueChange={(value) => setBenchmarkQuery(value)}
-                        onValueChange={(option) => {
-                          if (option) {
-                            updateDraft(updateRecord(draft, 'benchmark', option.value));
-                            setBenchmarkOpen(false);
-                            setBenchmarkQuery(option.label);
+                  {!isV2StrategySchema(draft) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel>状态</FieldLabel>
+                        <Select
+                          value={typeof draft.status === 'string' ? draft.status : 'draft'}
+                          onValueChange={(value) =>
+                            value && updateDraft(updateRecord(draft, 'status', value))
                           }
-                        }}
-                      >
-                        <InputGroup className="h-9" aria-busy={benchmarkSearchBusy}>
-                          <Combobox.Input
-                            id="strategy-benchmark"
-                            data-slot="input-group-control"
-                            className="h-9 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 pr-1 text-sm text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0"
-                            placeholder="搜索标的名称或代码"
-                            aria-label="搜索基准"
-                            aria-busy={benchmarkSearchBusy}
-                          />
-                          {benchmarkSearchBusy && (
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              {selectLabel(
+                                draft.status,
+                                {
+                                  draft: '草稿',
+                                  active: '启用',
+                                  archived: '归档',
+                                },
+                                '草稿',
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="draft">草稿</SelectItem>
+                              <SelectItem value="active">启用</SelectItem>
+                              <SelectItem value="archived">归档</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="strategy-benchmark">基准</FieldLabel>
+                        <Combobox.Root
+                          items={benchmarkItems}
+                          value={selectedBenchmark}
+                          inputValue={benchmarkQuery}
+                          autoHighlight
+                          filter={null}
+                          itemToStringLabel={(option) => option.label}
+                          itemToStringValue={(option) => option.value}
+                          onOpenChange={(nextOpen) => {
+                            setBenchmarkOpen(nextOpen);
+                            if (nextOpen) setBenchmarkQuery('');
+                          }}
+                          onInputValueChange={(value) => setBenchmarkQuery(value)}
+                          onValueChange={(option) => {
+                            if (option) {
+                              updateDraft(updateRecord(draft, 'benchmark', option.value));
+                              setBenchmarkOpen(false);
+                              setBenchmarkQuery(option.label);
+                            }
+                          }}
+                        >
+                          <InputGroup className="h-9" aria-busy={benchmarkSearchBusy}>
+                            <Combobox.Input
+                              id="strategy-benchmark"
+                              data-slot="input-group-control"
+                              className="h-9 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 pr-1 text-sm text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0"
+                              placeholder="搜索标的名称或代码"
+                              aria-label="搜索基准"
+                              aria-busy={benchmarkSearchBusy}
+                            />
+                            {benchmarkSearchBusy && (
+                              <InputGroupAddon align="inline-end">
+                                <LoaderCircle className="animate-spin" aria-hidden="true" />
+                              </InputGroupAddon>
+                            )}
                             <InputGroupAddon align="inline-end">
-                              <LoaderCircle className="animate-spin" aria-hidden="true" />
+                              <ChevronDownIcon aria-hidden="true" />
                             </InputGroupAddon>
-                          )}
-                          <InputGroupAddon align="inline-end">
-                            <ChevronDownIcon aria-hidden="true" />
-                          </InputGroupAddon>
-                        </InputGroup>
-                        <Combobox.Portal>
-                          <Combobox.Positioner
-                            className="layer-popover"
-                            side="bottom"
-                            align="start"
-                            sideOffset={4}
-                          >
-                            <Combobox.Popup
-                              aria-label="基准选项"
-                              className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+                          </InputGroup>
+                          <Combobox.Portal>
+                            <Combobox.Positioner
+                              className="layer-popover"
+                              side="bottom"
+                              align="start"
+                              sideOffset={4}
                             >
-                              <Combobox.List className="max-h-72 overflow-auto p-1">
-                                {benchmarkSearchBusy && (
-                                  <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
-                                    正在搜索标的…
-                                  </Combobox.Status>
-                                )}
-                                {!benchmarkSearchBusy &&
-                                  benchmarkSearchActive &&
-                                  benchmarkSearch.isError && (
-                                    <Combobox.Status className="px-3 py-2 text-sm text-destructive">
-                                      标的搜索失败，请稍后重试。
+                              <Combobox.Popup
+                                aria-label="基准选项"
+                                className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+                              >
+                                <Combobox.List className="max-h-72 overflow-auto p-1">
+                                  {benchmarkSearchBusy && (
+                                    <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
+                                      正在搜索标的…
                                     </Combobox.Status>
                                   )}
-                                <Combobox.Group>
-                                  {benchmarkItems.map((option, index) => (
-                                    <Combobox.Item
-                                      key={option.value}
-                                      value={option}
-                                      index={index}
-                                      className="relative flex w-full cursor-default items-center rounded-sm px-3 py-2 pr-9 text-left text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                                    >
-                                      <span className="truncate">
-                                        {option.label}（{option.value}）
-                                      </span>
-                                      <Combobox.ItemIndicator className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-                                        <CheckIcon aria-hidden="true" />
-                                      </Combobox.ItemIndicator>
-                                    </Combobox.Item>
-                                  ))}
-                                </Combobox.Group>
-                                {!benchmarkSearchBusy &&
-                                  !benchmarkSearch.isError &&
-                                  benchmarkSearchActive &&
-                                  benchmarkItems.length === 0 && (
-                                    <Combobox.Empty className="px-3 py-2 text-sm text-muted-foreground">
-                                      没有匹配的标的
-                                    </Combobox.Empty>
-                                  )}
-                              </Combobox.List>
-                            </Combobox.Popup>
-                          </Combobox.Positioner>
-                        </Combobox.Portal>
-                      </Combobox.Root>
-                      <FieldDescription>
-                        打开时默认展示常用指数；输入名称或代码可搜索已同步目录中的全部标的。
-                      </FieldDescription>
-                    </Field>
-                  </div>
-                  <Separator />
-                  <div>
-                    <h3 className="text-sm font-semibold">标的范围</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      每条策略只配置一个标的，回测将使用当前选中的标的。
-                    </p>
-                  </div>
-                  <Field>
-                    <FieldLabel htmlFor="strategy-symbol-search">标的</FieldLabel>
-                    <Combobox.Root<BenchmarkOption>
-                      items={symbolItems}
-                      value={selectedSymbolOption}
-                      inputValue={symbolQuery}
-                      autoHighlight
-                      filter={null}
-                      isItemEqualToValue={(item, value) => item.value === value.value}
-                      itemToStringLabel={(option) => option.label}
-                      itemToStringValue={(option) => option.value}
-                      onOpenChange={(nextOpen) => {
-                        setSymbolOpen(nextOpen);
-                        setSymbolQuery('');
-                      }}
-                      onInputValueChange={(value) => setSymbolQuery(value)}
-                      onValueChange={(option) => {
-                        updateDraft(
-                          updateNested(draft, 'universe', 'symbols', option ? [option.value] : []),
-                        );
-                        setSymbolOpen(false);
-                        setSymbolQuery('');
-                      }}
-                    >
-                      <InputGroup className="h-9" aria-busy={symbolSearchBusy}>
-                        <Combobox.Input
-                          id="strategy-symbol-search"
-                          data-slot="input-group-control"
-                          className="h-9 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 text-sm text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0"
-                          placeholder="搜索并选择标的"
-                          aria-label="搜索并选择标的"
-                          aria-busy={symbolSearchBusy}
-                        />
-                        {symbolSearchBusy && (
-                          <InputGroupAddon align="inline-end">
-                            <LoaderCircle className="animate-spin" aria-hidden="true" />
-                          </InputGroupAddon>
-                        )}
-                        <InputGroupAddon align="inline-end">
-                          <SearchIcon aria-hidden="true" />
-                        </InputGroupAddon>
-                      </InputGroup>
-                      <Combobox.Portal>
-                        <Combobox.Positioner
-                          className="layer-popover"
-                          side="bottom"
-                          align="start"
-                          sideOffset={4}
+                                  {!benchmarkSearchBusy &&
+                                    benchmarkSearchActive &&
+                                    benchmarkSearch.isError && (
+                                      <Combobox.Status className="px-3 py-2 text-sm text-destructive">
+                                        标的搜索失败，请稍后重试。
+                                      </Combobox.Status>
+                                    )}
+                                  <Combobox.Group>
+                                    {benchmarkItems.map((option, index) => (
+                                      <Combobox.Item
+                                        key={option.value}
+                                        value={option}
+                                        index={index}
+                                        className="relative flex w-full cursor-default items-center rounded-sm px-3 py-2 pr-9 text-left text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                                      >
+                                        <span className="truncate">
+                                          {option.label}（{option.value}）
+                                        </span>
+                                        <Combobox.ItemIndicator className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
+                                          <CheckIcon aria-hidden="true" />
+                                        </Combobox.ItemIndicator>
+                                      </Combobox.Item>
+                                    ))}
+                                  </Combobox.Group>
+                                  {!benchmarkSearchBusy &&
+                                    !benchmarkSearch.isError &&
+                                    benchmarkSearchActive &&
+                                    benchmarkItems.length === 0 && (
+                                      <Combobox.Empty className="px-3 py-2 text-sm text-muted-foreground">
+                                        没有匹配的标的
+                                      </Combobox.Empty>
+                                    )}
+                                </Combobox.List>
+                              </Combobox.Popup>
+                            </Combobox.Positioner>
+                          </Combobox.Portal>
+                        </Combobox.Root>
+                        <FieldDescription>
+                          打开时默认展示常用指数；输入名称或代码可搜索已同步目录中的全部标的。
+                        </FieldDescription>
+                      </Field>
+                    </div>
+                  )}
+                  {!isV2StrategySchema(draft) && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="text-sm font-semibold">标的范围</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          每条策略只配置一个标的，回测将使用当前选中的标的。
+                        </p>
+                      </div>
+                      <Field>
+                        <FieldLabel htmlFor="strategy-symbol-search">标的</FieldLabel>
+                        <Combobox.Root<BenchmarkOption>
+                          items={symbolItems}
+                          value={selectedSymbolOption}
+                          inputValue={symbolQuery}
+                          autoHighlight
+                          filter={null}
+                          isItemEqualToValue={(item, value) => item.value === value.value}
+                          itemToStringLabel={(option) => option.label}
+                          itemToStringValue={(option) => option.value}
+                          onOpenChange={(nextOpen) => {
+                            setSymbolOpen(nextOpen);
+                            setSymbolQuery('');
+                          }}
+                          onInputValueChange={(value) => setSymbolQuery(value)}
+                          onValueChange={(option) => {
+                            updateDraft(
+                              updateNested(
+                                draft,
+                                'universe',
+                                'symbols',
+                                option ? [option.value] : [],
+                              ),
+                            );
+                            setSymbolOpen(false);
+                            setSymbolQuery('');
+                          }}
                         >
-                          <Combobox.Popup
-                            aria-label="标的搜索结果"
-                            className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
-                          >
-                            <Combobox.List className="max-h-72 overflow-auto p-1">
-                              {!symbolSearchActive && (
-                                <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
-                                  输入名称或代码开始搜索
-                                </Combobox.Status>
-                              )}
-                              {symbolSearchBusy && (
-                                <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
-                                  正在搜索标的…
-                                </Combobox.Status>
-                              )}
-                              {!symbolSearchBusy && symbolSearchActive && symbolSearch.isError && (
-                                <Combobox.Status className="px-3 py-2 text-sm text-destructive">
-                                  标的搜索失败，请稍后重试。
-                                </Combobox.Status>
-                              )}
-                              <Combobox.Group>
-                                {symbolItems.map((option, index) => (
-                                  <Combobox.Item
-                                    key={option.value}
-                                    value={option}
-                                    index={index}
-                                    className="relative flex w-full cursor-default items-center rounded-sm px-3 py-2 pr-9 text-left text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                                  >
-                                    <span className="truncate">
-                                      {option.label}（{option.value}）
-                                    </span>
-                                    <Combobox.ItemIndicator className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-                                      <CheckIcon aria-hidden="true" />
-                                    </Combobox.ItemIndicator>
-                                  </Combobox.Item>
-                                ))}
-                              </Combobox.Group>
-                              {!symbolSearchBusy &&
-                                !symbolSearch.isError &&
-                                symbolSearchActive &&
-                                symbolItems.length === 0 && (
-                                  <Combobox.Empty className="px-3 py-2 text-sm text-muted-foreground">
-                                    没有匹配的标的
-                                  </Combobox.Empty>
-                                )}
-                            </Combobox.List>
-                          </Combobox.Popup>
-                        </Combobox.Positioner>
-                      </Combobox.Portal>
-                    </Combobox.Root>
-                    <FieldDescription>输入名称或代码搜索并选择标的。</FieldDescription>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="strategy-as-of">数据时点</FieldLabel>
-                    <DateInput
-                      id="strategy-as-of"
-                      type="datetime-local"
-                      value={toDateTimeLocal(universe.asOf)}
-                      onChange={(event) =>
-                        updateDraft(
-                          updateNested(
-                            draft,
-                            'universe',
-                            'asOf',
-                            toIsoDateTime(event.target.value),
-                          ),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Separator />
-                  <SignalEditor
-                    label="入场信号"
-                    signals={entrySignals}
-                    onChange={(index, field, value) =>
-                      updateDraft(updateSignal(draft, 'entrySignals', index, field, value))
-                    }
-                    onAdd={() =>
-                      updateDraft(
-                        updateRecord(draft, 'entrySignals', [
-                          ...entrySignals,
-                          { indicator: 'close', operator: 'gt', value: 0 },
-                        ]),
-                      )
-                    }
-                    onRemove={(index) =>
-                      updateDraft(
-                        updateRecord(
-                          draft,
-                          'entrySignals',
-                          entrySignals.filter((_, signalIndex) => signalIndex !== index),
-                        ),
-                      )
-                    }
-                  />
-                  <SignalEditor
-                    label="离场信号"
-                    signals={exitSignals}
-                    onChange={(index, field, value) =>
-                      updateDraft(updateSignal(draft, 'exitSignals', index, field, value))
-                    }
-                    onAdd={() =>
-                      updateDraft(
-                        updateRecord(draft, 'exitSignals', [
-                          ...exitSignals,
-                          { indicator: 'close', operator: 'lt', value: 0 },
-                        ]),
-                      )
-                    }
-                    onRemove={(index) =>
-                      updateDraft(
-                        updateRecord(
-                          draft,
-                          'exitSignals',
-                          exitSignals.filter((_, signalIndex) => signalIndex !== index),
-                        ),
-                      )
-                    }
-                  />
-                  <StrategyRiskExecutionFields draft={draft} onChange={updateDraft} />
+                          <InputGroup className="h-9" aria-busy={symbolSearchBusy}>
+                            <Combobox.Input
+                              id="strategy-symbol-search"
+                              data-slot="input-group-control"
+                              className="h-9 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 text-sm text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0"
+                              placeholder="搜索并选择标的"
+                              aria-label="搜索并选择标的"
+                              aria-busy={symbolSearchBusy}
+                            />
+                            {symbolSearchBusy && (
+                              <InputGroupAddon align="inline-end">
+                                <LoaderCircle className="animate-spin" aria-hidden="true" />
+                              </InputGroupAddon>
+                            )}
+                            <InputGroupAddon align="inline-end">
+                              <SearchIcon aria-hidden="true" />
+                            </InputGroupAddon>
+                          </InputGroup>
+                          <Combobox.Portal>
+                            <Combobox.Positioner
+                              className="layer-popover"
+                              side="bottom"
+                              align="start"
+                              sideOffset={4}
+                            >
+                              <Combobox.Popup
+                                aria-label="标的搜索结果"
+                                className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+                              >
+                                <Combobox.List className="max-h-72 overflow-auto p-1">
+                                  {!symbolSearchActive && (
+                                    <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
+                                      输入名称或代码开始搜索
+                                    </Combobox.Status>
+                                  )}
+                                  {symbolSearchBusy && (
+                                    <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
+                                      正在搜索标的…
+                                    </Combobox.Status>
+                                  )}
+                                  {!symbolSearchBusy &&
+                                    symbolSearchActive &&
+                                    symbolSearch.isError && (
+                                      <Combobox.Status className="px-3 py-2 text-sm text-destructive">
+                                        标的搜索失败，请稍后重试。
+                                      </Combobox.Status>
+                                    )}
+                                  <Combobox.Group>
+                                    {symbolItems.map((option, index) => (
+                                      <Combobox.Item
+                                        key={option.value}
+                                        value={option}
+                                        index={index}
+                                        className="relative flex w-full cursor-default items-center rounded-sm px-3 py-2 pr-9 text-left text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                                      >
+                                        <span className="truncate">
+                                          {option.label}（{option.value}）
+                                        </span>
+                                        <Combobox.ItemIndicator className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
+                                          <CheckIcon aria-hidden="true" />
+                                        </Combobox.ItemIndicator>
+                                      </Combobox.Item>
+                                    ))}
+                                  </Combobox.Group>
+                                  {!symbolSearchBusy &&
+                                    !symbolSearch.isError &&
+                                    symbolSearchActive &&
+                                    symbolItems.length === 0 && (
+                                      <Combobox.Empty className="px-3 py-2 text-sm text-muted-foreground">
+                                        没有匹配的标的
+                                      </Combobox.Empty>
+                                    )}
+                                </Combobox.List>
+                              </Combobox.Popup>
+                            </Combobox.Positioner>
+                          </Combobox.Portal>
+                        </Combobox.Root>
+                        <FieldDescription>输入名称或代码搜索并选择标的。</FieldDescription>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="strategy-as-of">数据时点</FieldLabel>
+                        <DateInput
+                          id="strategy-as-of"
+                          type="datetime-local"
+                          value={toDateTimeLocal(universe.asOf)}
+                          onChange={(event) =>
+                            updateDraft(
+                              updateNested(
+                                draft,
+                                'universe',
+                                'asOf',
+                                toIsoDateTime(event.target.value),
+                              ),
+                            )
+                          }
+                        />
+                      </Field>
+                      <Separator />
+                      <SignalEditor
+                        label="入场信号"
+                        signals={entrySignals}
+                        onChange={(index, field, value) =>
+                          updateDraft(updateSignal(draft, 'entrySignals', index, field, value))
+                        }
+                        onAdd={() =>
+                          updateDraft(
+                            updateRecord(draft, 'entrySignals', [
+                              ...entrySignals,
+                              { indicator: 'close', operator: 'gt', value: 0 },
+                            ]),
+                          )
+                        }
+                        onRemove={(index) =>
+                          updateDraft(
+                            updateRecord(
+                              draft,
+                              'entrySignals',
+                              entrySignals.filter((_, signalIndex) => signalIndex !== index),
+                            ),
+                          )
+                        }
+                      />
+                      <SignalEditor
+                        label="离场信号"
+                        signals={exitSignals}
+                        onChange={(index, field, value) =>
+                          updateDraft(updateSignal(draft, 'exitSignals', index, field, value))
+                        }
+                        onAdd={() =>
+                          updateDraft(
+                            updateRecord(draft, 'exitSignals', [
+                              ...exitSignals,
+                              { indicator: 'close', operator: 'lt', value: 0 },
+                            ]),
+                          )
+                        }
+                        onRemove={(index) =>
+                          updateDraft(
+                            updateRecord(
+                              draft,
+                              'exitSignals',
+                              exitSignals.filter((_, signalIndex) => signalIndex !== index),
+                            ),
+                          )
+                        }
+                      />
+                      <StrategyRiskExecutionFields draft={draft} onChange={updateDraft} />
+                    </>
+                  )}
                 </FieldGroup>
               </TabsContent>
               <TabsContent value="advanced" className="mt-0">
                 <Field invalid={Boolean(jsonError)}>
-                  <FieldLabel htmlFor="strategy-json">Strategy Schema JSON</FieldLabel>
+                  <FieldLabel htmlFor="strategy-json">策略配置 JSON</FieldLabel>
                   <Textarea
                     id="strategy-json"
                     value={jsonText}

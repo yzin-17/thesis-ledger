@@ -26,6 +26,7 @@ import {
   tradeDetailResponseSchemaV2,
   tradeListResponseSchemaV2,
   tradeReferenceResolveResponseSchemaV2,
+  backtestRunResponseSchemaV2,
   type ApiErrorResponse,
   type CreateBaselineObservationBatchCommandV2,
   type CreateCashFlowCommandV2,
@@ -77,6 +78,8 @@ import {
   type RecurringFundInvestmentOccurrence,
   type RecurringFundInvestmentPlan,
   type UpdateRecurringFundInvestmentPlan,
+  type BacktestRunCreateV2,
+  type BacktestRunResponseV2,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -153,6 +156,8 @@ export type {
   RecurringFundInvestmentOccurrence,
   RecurringFundInvestmentPlan,
   UpdateRecurringFundInvestmentPlan,
+  BacktestRunCreateV2,
+  BacktestRunResponseV2,
 } from '@thesis-ledger/schemas';
 
 export type { JournalLegacyReviewCandidate } from '@thesis-ledger/schemas';
@@ -553,6 +558,17 @@ export class ThesisLedgerApiClient {
       command: RestoreBaselineReconciliationCommandV2,
     ): Promise<LedgerCommandResponseV2> =>
       this.postParsed('/ledger/reconciliations/restore', command, ledgerCommandResponseSchemaV2),
+  };
+
+  readonly backtests = {
+    createRun: (input: BacktestRunCreateV2): Promise<BacktestRunResponseV2> =>
+      this.postParsed('/backtests/runs', input, backtestRunResponseSchemaV2),
+    getRun: (runId: string): Promise<BacktestRunResponseV2> =>
+      this.requestParsed(`/backtests/runs/${encodeURIComponent(runId)}`, backtestRunResponseSchemaV2),
+    cancelRun: (runId: string): Promise<BacktestRunResponseV2> =>
+      this.postParsed(`/backtests/runs/${encodeURIComponent(runId)}/cancel`, {}, backtestRunResponseSchemaV2),
+    retryRun: (runId: string): Promise<BacktestRunResponseV2> =>
+      this.postParsed(`/backtests/runs/${encodeURIComponent(runId)}/retry`, {}, backtestRunResponseSchemaV2),
   };
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {

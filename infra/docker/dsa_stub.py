@@ -17,6 +17,153 @@ PRICES = {
     "000001.SZ": 11.68,
 }
 
+BACKTEST_V2_CAPABILITIES = {
+    "version": 2,
+    "provider": "dsa-fixture",
+    "generatedAt": "2026-09-09T00:00:00+00:00",
+    "capabilities": [
+        {
+            "market": "CN",
+            "instrumentType": "STOCK",
+            "timeframe": "1d",
+            "kind": "base",
+            "status": "supported",
+            "provider": "dsa-fixture",
+            "providerRevision": "cn-2026-1",
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+            "freshness": "live",
+            "quality": "complete",
+            "completeness": "complete",
+            "timezone": "Asia/Shanghai",
+        },
+        {
+            "market": "HK",
+            "instrumentType": "STOCK",
+            "timeframe": "1d",
+            "kind": "base",
+            "status": "supported",
+            "provider": "dsa-fixture",
+            "providerRevision": "hk-2026-1",
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+            "freshness": "live",
+            "quality": "complete",
+            "completeness": "complete",
+            "timezone": "Asia/Hong_Kong",
+        },
+        {
+            "market": "US",
+            "instrumentType": "ETF",
+            "timeframe": "1d",
+            "kind": "base",
+            "status": "supported",
+            "provider": "dsa-fixture",
+            "providerRevision": "us-2026-1",
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+            "freshness": "live",
+            "quality": "complete",
+            "completeness": "complete",
+            "timezone": "America/New_York",
+        },
+        {
+            "market": "CN",
+            "instrumentType": "NAV_FUND",
+            "timeframe": "1d",
+            "kind": "base",
+            "status": "supported",
+            "provider": "dsa-fixture",
+            "providerRevision": "nav-2026-1",
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+            "freshness": "delayed",
+            "quality": "complete",
+            "completeness": "complete",
+            "timezone": "Asia/Shanghai",
+        },
+    ],
+    "calendars": [
+        {
+            "market": "CN",
+            "timezone": "Asia/Shanghai",
+            "provider": "dsa-fixture",
+            "providerRevision": "cn-calendar-2026-1",
+            "availableAt": "2026-01-02T00:00:00+00:00",
+            "sessions": [
+                {"startMinute": 570, "endMinute": 690},
+                {"startMinute": 780, "endMinute": 900},
+            ],
+            "sessionOverrides": [],
+            "holidays": ["2026-10-01", "2026-10-02"],
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+        },
+        {
+            "market": "HK",
+            "timezone": "Asia/Hong_Kong",
+            "provider": "dsa-fixture",
+            "providerRevision": "hk-calendar-2026-1",
+            "availableAt": "2026-01-02T00:00:00+00:00",
+            "sessions": [
+                {"startMinute": 570, "endMinute": 720},
+                {"startMinute": 780, "endMinute": 960},
+            ],
+            "sessionOverrides": [
+                {"date": "2026-12-24", "sessions": [{"startMinute": 570, "endMinute": 780}]},
+            ],
+            "holidays": ["2026-10-01"],
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+        },
+        {
+            "market": "US",
+            "timezone": "America/New_York",
+            "provider": "dsa-fixture",
+            "providerRevision": "us-calendar-2026-1",
+            "availableAt": "2026-01-02T00:00:00+00:00",
+            "sessions": [{"startMinute": 570, "endMinute": 960}],
+            "sessionOverrides": [
+                {"date": "2026-11-27", "sessions": [{"startMinute": 570, "endMinute": 780}]},
+            ],
+            "holidays": ["2026-12-25"],
+            "range": {"start": "2026-01-01", "end": "2026-12-31"},
+        },
+    ],
+    "instrumentFacts": [],
+    "fx": {"status": "unavailable", "facts": [], "reason": "fixture omitted FX"},
+    "corporateActions": {
+        "status": "supported",
+        "facts": [
+            {
+                "symbol": "600519.SH",
+                "market": "CN",
+                "instrumentType": "STOCK",
+                "type": "CASH_DIVIDEND",
+                "cashAmount": "1.00",
+                "currency": "CNY",
+                "occurredAt": "2026-06-30T00:00:00+00:00",
+                "availableAt": "2026-07-01T00:00:00+00:00",
+                "provider": "dsa-fixture",
+                "providerRevision": "ca-2026-1",
+            }
+        ],
+    },
+    "nav": {
+        "status": "supported",
+        "facts": [
+            {
+                "symbol": "110011.OF",
+                "market": "CN",
+                "instrumentType": "NAV_FUND",
+                "nav": "1.2500",
+                "valuationDate": "2026-09-08",
+                "occurredAt": "2026-09-08T07:00:00+00:00",
+                "availableAt": "2026-09-09T01:00:00+00:00",
+                "provider": "dsa-fixture",
+                "providerRevision": "nav-2026-1",
+                "freshness": "delayed",
+                "quality": "complete",
+                "status": "supported",
+            }
+        ],
+    },
+}
+
 CONTROL_PROVIDERS = {
     "akshare": {
         "providerId": "akshare",
@@ -145,6 +292,11 @@ def capabilities() -> dict[str, object]:
         },
         "unsupported": ["bars:1m", "indicator:ATR", "chip:distribution"],
     }
+
+
+@router.get("/v2/capabilities", dependencies=[Depends(require_token)])
+def backtest_v2_capabilities() -> dict[str, object]:
+    return BACKTEST_V2_CAPABILITIES
 
 
 @router.post("/control/handshake", dependencies=[Depends(require_control_token)])

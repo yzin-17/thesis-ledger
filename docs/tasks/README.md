@@ -5,6 +5,8 @@
 ## 仍在实施或待完成
 
 - [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
+- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（T00 已完成，受统一回测 V2 前置门禁阻塞）
+- [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
 - [市场数据 v1.2 closure-11：最终追踪 Review](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md)

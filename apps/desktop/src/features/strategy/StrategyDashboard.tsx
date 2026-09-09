@@ -7,11 +7,14 @@ import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import {
   useCancelBacktestMutation,
+  useCancelBacktestV2Mutation,
   useCreateStrategyMutation,
   useCreateStrategyVersionMutation,
   useFetchStrategyBarsMutation,
   useQueueBacktestMutation,
   useRunBacktestMutation,
+  useRunBacktestV2Mutation,
+  useRetryBacktestV2Mutation,
 } from './strategy.mutations.js';
 import { createStrategyActionHandlers } from './strategy.actions.js';
 import { useBacktestJobQuery, useStrategyQueries } from './strategy.queries.js';
@@ -54,6 +57,9 @@ export function StrategyDashboard() {
   const fetchBarsMutation = useFetchStrategyBarsMutation();
   const runMutation = useRunBacktestMutation();
   const cancelMutation = useCancelBacktestMutation();
+  const runV2Mutation = useRunBacktestV2Mutation();
+  const cancelV2Mutation = useCancelBacktestV2Mutation();
+  const retryV2Mutation = useRetryBacktestV2Mutation();
   const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
   const jobs: BacktestJobSummary[] = jobsQuery.data ?? [];
   const strategyRefreshing = strategiesQuery.isFetching || jobsQuery.isFetching;
@@ -78,6 +84,9 @@ export function StrategyDashboard() {
     queueMutation,
     runMutation,
     cancelMutation,
+    runV2Mutation,
+    cancelV2Mutation,
+    retryV2Mutation,
     load,
   });
 
@@ -114,7 +123,7 @@ export function StrategyDashboard() {
   return (
     <section className="module-page">
       <PageHeader
-        eyebrow="STRATEGY LAB"
+        eyebrow="策略实验室"
         title="策略实验"
         description="创建投资策略，通过历史回测评估表现。"
         actions={
@@ -150,8 +159,9 @@ export function StrategyDashboard() {
             strategies={strategies}
             loadState={loadState}
             busyAction={busyAction}
-            onRun={(jobId) => void actions.run(jobId)}
-            onCancel={(jobId) => void actions.cancel(jobId)}
+            onRun={(job) => void actions.run(job.id, job.mode)}
+            onCancel={(job) => void actions.cancel(job.id, job.mode)}
+            onRetry={(jobId) => void actions.retry(jobId)}
             onViewResult={(job) => setResultJobId(job.id)}
             onOpenLibrary={() => setActiveTab('library')}
           />

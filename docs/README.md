@@ -6,11 +6,11 @@
 
 ## 当前文档
 
-全站体验统一规划：[规格](specs/2026-09-08-ui-interaction-consistency.md) · [实施任务](tasks/2026-09-08-ui-interaction-consistency.md)（实施中）。
+全站体验统一规划：[规格](specs/2026-09-08-ui-interaction-consistency.md) · [实施任务](tasks/2026-09-08-ui-interaction-consistency.md)（实施中）。组合概览收益指标语义统一：[规格](specs/2026-09-09-portfolio-pnl-metrics.md) · [实施任务](tasks/2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）。策略风险规则与 AI 多模型优化：[规格](specs/2026-09-09-strategy-risk-ai-optimization.md) · [实施任务](tasks/2026-09-09-strategy-risk-ai-optimization.md)（受统一回测 V2 前置门禁阻塞）。
 
 | 目录 | 用途与主要入口 |
 | --- | --- |
-| [`specs/`](specs/) | 当前产品、领域和功能规格。主要入口：[ThesisLedger V1 产品范围](specs/2026-08-18-thesis-ledger-product-v1.md)、[统一回测系统 V2](specs/2026-08-28-unified-backtest-v2.md)、[投资组合快照系统](specs/2026-08-28-portfolio-snapshot-system.md)、[市场数据与标的中心 v1.2](specs/2026-08-18-market-data-provider-spec-v1.2.md)、[ETF 日线独立备用源](specs/2026-09-08-etf-daily-independent-fallback.md)、[日线缓存与 Provider 主备路由](specs/2026-09-08-market-data-cache-and-provider-routing.md)、[交易与成交记录系统](specs/2026-08-26-trade-execution-ledger-system.md)、[基金定投计划](specs/2026-09-08-recurring-fund-investment.md)、[投资复盘工作台（统一 Trade Projection）](specs/2026-08-28-journal-review-trade-projection.md)、[现金页面 UI 优化](specs/2026-09-03-cash-page-ui-optimization.md) |
+| [`specs/`](specs/) | 当前产品、领域和功能规格。主要入口：[ThesisLedger V1 产品范围](specs/2026-08-18-thesis-ledger-product-v1.md)、[统一回测系统 V2](specs/2026-08-28-unified-backtest-v2.md)、[策略驱动风险规则与 AI 多模型优化](specs/2026-09-09-strategy-risk-ai-optimization.md)、[组合概览收益指标语义统一](specs/2026-09-09-portfolio-pnl-metrics.md)、[投资组合快照系统](specs/2026-08-28-portfolio-snapshot-system.md)、[市场数据与标的中心 v1.2](specs/2026-08-18-market-data-provider-spec-v1.2.md)、[ETF 日线独立备用源](specs/2026-09-08-etf-daily-independent-fallback.md)、[日线缓存与 Provider 主备路由](specs/2026-09-08-market-data-cache-and-provider-routing.md)、[交易与成交记录系统](specs/2026-08-26-trade-execution-ledger-system.md)、[基金定投计划](specs/2026-09-08-recurring-fund-investment.md)、[投资复盘工作台（统一 Trade Projection）](specs/2026-08-28-journal-review-trade-projection.md)、[现金页面 UI 优化](specs/2026-09-03-cash-page-ui-optimization.md) |
 | [`tasks/`](tasks/) | 当前实施任务和仍需运行时验收的任务；入口见 [`tasks/README.md`](tasks/README.md)，完成态历史见 [`archive/tasks/`](archive/tasks/) |
 | [`architecture/`](architecture/) | 当前跨仓边界、实现结构和兼容性。主要入口：[DSA 能力与主仓边界审计](architecture/2026-08-18-dsa-capability-audit.md)、[市场数据 v1.2 实施说明](architecture/2026-08-18-market-data-provider-v1-2-implementation.md)、[版本与兼容矩阵](architecture/version-matrix.md) |
 | [`domain/`](domain/) | Ledger、Trade、收益、风险、策略、回测、Journal、Provider 和自动化等稳定领域说明 |

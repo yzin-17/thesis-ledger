@@ -1,17 +1,19 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   quantStatsAnalytics,
   runBacktest,
   type BacktestBar,
   type BacktestStrategy,
 } from '@thesis-ledger/domain';
-import { backtestJobSchema, strategySchemaV1 } from '@thesis-ledger/schemas';
+import { backtestJobSchema, strategySchemaV1, strategySchemaV2 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { explicitlyAllowsStale, hasStaleMarketData } from '../market/freshness.js';
 import { BacktestQueueService } from './backtest-queue.service.js';
 import { backtestJobSummarySelect, toBacktestJobSummary } from './backtest-summary.js';
+import { BacktestV2RunService } from './backtest-v2-run.js';
+import type { BacktestV2Runner } from './backtest-v2-run.js';
 
 export interface BacktestWorker {
   readonly id: string;
@@ -34,6 +36,9 @@ export interface BacktestAnalyticsWorker {
   readonly id: string;
   run(input: { returns: number[]; periodsPerYear?: number }): Promise<unknown>;
 }
+
+/** V2 Runner boundary: no bars, strategy object, or online data provider is exposed. */
+export type { BacktestV2Runner, BacktestV2SnapshotBuilder } from './backtest-v2-run.js';
 
 export interface BacktestExecutionAttempt {
   attempt: number;
@@ -86,9 +91,38 @@ export class BacktestService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly queueService?: BacktestQueueService,
+    @Optional() private readonly v2Runs?: BacktestV2RunService,
   ) {}
 
+  private static isV2Strategy(value: unknown): boolean {
+    return Boolean(
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      (value as Record<string, unknown>).schemaVersion === '2',
+    );
+  }
+
   async createStrategy(name: string, schema: unknown, description?: string) {
+    if (BacktestService.isV2Strategy(schema)) {
+      const parsed = strategySchemaV2.parse(schema);
+      return this.prisma.strategy.create({
+        data: {
+          name,
+          description: description ?? parsed.description ?? null,
+          status: 'draft',
+          schemaVersion: 2,
+          versions: {
+            create: {
+              version: 1,
+              schemaVersion: 2,
+              schema: parsed as Prisma.InputJsonValue,
+            },
+          },
+        },
+        include: { versions: true },
+      });
+    }
     const parsed = strategySchemaV1.parse(schema);
     return this.prisma.strategy.create({
       data: {
@@ -109,6 +143,21 @@ export class BacktestService {
   }
 
   async createVersion(strategyId: string, schema: unknown) {
+    if (BacktestService.isV2Strategy(schema)) {
+      const parsed = strategySchemaV2.parse(schema);
+      const latest = await this.prisma.strategyVersion.aggregate({
+        where: { strategyId },
+        _max: { version: true },
+      });
+      return this.prisma.strategyVersion.create({
+        data: {
+          strategyId,
+          version: (latest._max.version ?? 0) + 1,
+          schemaVersion: 2,
+          schema: parsed as Prisma.InputJsonValue,
+        },
+      });
+    }
     const parsed = strategySchemaV1.parse(schema);
     const latest = await this.prisma.strategyVersion.aggregate({
       where: { strategyId },
@@ -122,6 +171,11 @@ export class BacktestService {
         schema: parsed as Prisma.InputJsonValue,
       },
     });
+  }
+
+  async createRun(input: unknown) {
+    if (!this.v2Runs) throw new BadRequestException('V2 Run 服务未配置');
+    return this.v2Runs.createRun(input);
   }
 
   listStrategies() {
@@ -192,6 +246,13 @@ export class BacktestService {
 
   async run(id: string, worker?: BacktestWorker, execution?: BacktestExecutionAttempt) {
     if (!worker && this.queueService) return this.queueService.ensureEnqueued(id);
+    if (execution) {
+      const modeProbe = await this.prisma.backtestJob.findUnique({
+        where: { id },
+        select: { mode: true },
+      });
+      if (modeProbe?.mode === 'V2') return this.runV2(id, undefined, execution);
+    }
     const selectedWorker = worker ?? localWorker;
     const job = await this.prisma.backtestJob.findUnique({
       where: { id },
@@ -433,15 +494,35 @@ export class BacktestService {
     }
   }
 
+  async runV2(id: string, runner?: BacktestV2Runner, execution?: BacktestExecutionAttempt) {
+    if (!this.v2Runs) throw new BadRequestException('V2 Run 服务未配置');
+    return this.v2Runs.runV2(id, runner, execution);
+  }
+
+  async retryRun(id: string) {
+    if (!this.v2Runs) throw new BadRequestException('V2 Run 服务未配置');
+    return this.v2Runs.retryRun(id);
+  }
+
   async cancel(id: string) {
-    if (this.queueService) return this.queueService.cancel(id);
+    const modeProbe = await this.prisma.backtestJob.findUnique({
+      where: { id },
+      select: { mode: true },
+    });
+    if (this.queueService) {
+      const cancelled = await this.queueService.cancel(id);
+      if (modeProbe?.mode === 'V2') this.v2Runs?.abortActiveRun(id);
+      return cancelled;
+    }
     const job = await this.prisma.backtestJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('回测任务不存在');
     if (['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;
     this.activeControllers.get(id)?.abort();
-    return this.prisma.backtestJob.update({
+    const cancelled = await this.prisma.backtestJob.update({
       where: { id },
       data: { status: 'cancelled', cancelRequestedAt: new Date(), finishedAt: new Date() },
     });
+    if (modeProbe?.mode === 'V2') this.v2Runs?.abortActiveRun(id);
+    return cancelled;
   }
 }

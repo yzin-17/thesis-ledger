@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "2",
+  "name": "CN NAV 日频策略",
+  "signalSources": [
+    {
+      "id": "nav",
+      "asset": { "symbol": "110011.OF", "market": "CN", "assetType": "fund" },
+      "timeframe": "1d",
+      "series": ["nav"]
+    }
+  ],
+  "executionInstrument": { "symbol": "110011.OF", "market": "CN", "assetType": "fund" },
+  "primaryTimeframe": "1d",
+  "entry": {
+    "type": "compare",
+    "operator": "gt",
+    "left": { "type": "series", "sourceId": "nav", "field": "nav" },
+    "right": { "type": "constant", "value": "1" }
+  },
+  "exit": { "type": "positionState", "field": "isOpen" },
+  "sizing": { "type": "fixedAmount", "amount": "1000" },
+  "risk": [],
+  "execution": {
+    "mode": "nav",
+    "requestTypes": ["subscribe", "redeem"],
+    "timing": "nextAvailableNav"
+  },
+  "cost": { "commissionRate": "0", "slippageRate": "0" }
+}

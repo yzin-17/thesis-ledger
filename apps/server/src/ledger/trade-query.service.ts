@@ -18,6 +18,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
+import { summarizeTradeRealizedPnl, type TradeRealizedPnlSummary } from './trade-realized-pnl.js';
 
 const tradeDetailInclude = {
   asset: { select: { name: true } },
@@ -302,6 +303,30 @@ const generationConflict = () =>
 @Injectable()
 export class TradeQueryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async realizedPnl(
+    accountIds: readonly string[],
+    mode: 'actual' | 'shadow' = 'actual',
+  ): Promise<TradeRealizedPnlSummary> {
+    const scopedAccountIds = [...new Set(accountIds)].filter((accountId) => accountId.length > 0);
+    if (scopedAccountIds.length === 0) return summarizeTradeRealizedPnl([]);
+
+    const trades = await this.prisma.trade.findMany({
+      where: { accountId: { in: scopedAccountIds }, accountMode: mode },
+      select: {
+        closeSlices: {
+          select: {
+            currency: true,
+            quantity: true,
+            netRealizedPnl: true,
+            costEstimated: true,
+            allocations: { select: { originalCost: true, allocatedBuyCharges: true } },
+          },
+        },
+      },
+    });
+    return summarizeTradeRealizedPnl(trades.flatMap((trade) => trade.closeSlices));
+  }
 
   async list(rawQuery: unknown): Promise<TradeListResponseV2> {
     const query = tradeListQuerySchemaV2.parse(rawQuery);

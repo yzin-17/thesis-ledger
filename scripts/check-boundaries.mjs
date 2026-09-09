@@ -7,6 +7,7 @@ const violations = [];
 const serverLedgerPrefix = 'apps/server/src/ledger/';
 const serverImportsPrefix = 'apps/server/src/imports/';
 const serverProvidersPrefix = 'apps/server/src/providers/';
+const serverBacktestPrefix = 'apps/server/src/backtest/';
 const forbiddenServerFeatureDependencies = [
   [serverLedgerPrefix, serverImportsPrefix, 'ledger must not depend on imports adapter'],
   [
@@ -29,6 +30,25 @@ const forbiddenServerFeatureDependencies = [
     'apps/server/src/notifications/',
     'apps/server/src/cash-plans/',
     'notification outbox must not depend on cash plan callers',
+  ],
+  [serverBacktestPrefix, serverLedgerPrefix, 'backtest must not depend on real ledger facts'],
+  [serverBacktestPrefix, 'apps/server/src/portfolio/', 'backtest must not read portfolio projection'],
+  [serverBacktestPrefix, 'apps/server/src/journal/', 'backtest must not write journal projection'],
+  [serverLedgerPrefix, serverBacktestPrefix, 'real ledger must not consume backtest results'],
+  [
+    'apps/server/src/portfolio/',
+    serverBacktestPrefix,
+    'portfolio projection must not consume backtest results',
+  ],
+  [
+    'apps/server/src/journal/',
+    serverBacktestPrefix,
+    'journal projection must not consume backtest results',
+  ],
+  [
+    'apps/server/src/ai/',
+    serverBacktestPrefix,
+    'general AI research must not consume backtest results directly',
   ],
 ];
 

@@ -1,6 +1,8 @@
 export * from './market.js';
 export * from './portfolio.js';
 export * from './strategy.js';
+export * from './backtest-v2.js';
+export * from './backtest-indicators.js';
 export * from './automation.js';
 export * from './ai.js';
 export * from './research.js';
@@ -16,4 +18,5 @@ export * from './performance.js';
 export * from './recurring-cash-deposit.js';
 export * from './recurring-fund-investment.js';
 export * from './exact-optional.js';
+export * from './backtest-data.js';
 export { isDateOnly } from './temporal.js';

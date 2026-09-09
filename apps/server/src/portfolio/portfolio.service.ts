@@ -12,6 +12,7 @@ import {
   type FxConversionOptions,
 } from '../market/fx-conversion.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { TradeQueryService } from '../ledger/trade-query.service.js';
 import { InstrumentService } from '../market/instrument.service.js';
 import {
   investmentAccountRelationWhere,
@@ -74,6 +75,7 @@ export class PortfolioService {
     private readonly market: MarketService,
     @Optional() private readonly ledger?: LedgerService,
     @Optional() private readonly instruments?: InstrumentService,
+    @Optional() private readonly trades?: TradeQueryService,
   ) {}
 
   private requireLedger() {
@@ -247,6 +249,18 @@ export class PortfolioService {
       this.listPositions(accountId, mode),
       this.accountCurrencies(accountId, mode),
     ]);
+    const realizedAccountIds = accountId
+      ? [accountId]
+      : [...accountCurrencyMap.keys()].filter((key) => !key.startsWith('__currency-'));
+    const realizedSummary = this.trades
+      ? await this.trades.realizedPnl(realizedAccountIds, mode)
+      : {
+          hasClosedTrades: false,
+          complete: false,
+          missingCurrencies: [],
+          pnl: [],
+          cost: [],
+        };
     const baseCurrency =
       options.baseCurrency ?? (accountId ? accountCurrencyMap.get(accountId) : undefined) ?? 'CNY';
     const valuationOptions = { ...options, fxMerge: options.fxMerge ?? true, baseCurrency };
@@ -290,6 +304,11 @@ export class PortfolioService {
       ...new Set([
         ...valued.map((item) => item.currency),
         ...cashAmounts.map((item) => item.currency),
+        ...realizedSummary.pnl.map((item) => item.currency),
+        ...realizedSummary.cost.map((item) => item.currency),
+        ...realizedSummary.missingCurrencies
+          .map((currency) => supportedCurrency(currency))
+          .filter((currency): currency is CurrencyV1 => currency !== undefined),
       ]),
     ] as CurrencyV1[];
     const fx = await resolveFx(this.market, currencies, valuationOptions, valuedAt, 'current-rate');
@@ -322,6 +341,8 @@ export class PortfolioService {
       cashAmounts.map(({ currency, amount }) => ({ currency, amount })),
       baseCurrency,
     );
+    const realizedPnlAggregate = aggregateWithScope(realizedSummary.pnl, baseCurrency);
+    const realizedCostAggregate = aggregateWithScope(realizedSummary.cost, baseCurrency);
     const convertToBase = (amount: number, currency: CurrencyV1) => {
       if (valuationOptions.fxMerge !== true && currency !== baseCurrency) return null;
       return convertAmount(amount, currency, fx);
@@ -395,6 +416,30 @@ export class PortfolioService {
       !costAggregate.complete ||
       !cashAggregate.complete;
     const dailyChange = calculatePortfolioDailyChange(valuedRows.map((row) => row.daily));
+    const totalPnl = roundMoney(valuedWithBase.reduce((sum, item) => sum + (item.basePnl ?? 0), 0));
+    const unrealizedComplete = valuedRows.every((row) => row.position.basePnl !== null);
+    const unrealizedPnl = unrealizedComplete ? totalPnl : null;
+    const unrealizedCost = costAggregate.complete ? roundMoney(costAggregate.knownValue) : null;
+    const realizedComplete =
+      realizedSummary.complete && realizedPnlAggregate.complete && realizedCostAggregate.complete;
+    const realizedPnl = realizedComplete ? roundMoney(realizedPnlAggregate.knownValue) : null;
+    const realizedCost = realizedComplete ? roundMoney(realizedCostAggregate.knownValue) : null;
+    const realizedPnlRatio =
+      realizedPnl !== null && realizedCost !== null && realizedCost > 0
+        ? realizedPnl / realizedCost
+        : null;
+    const cumulativePnl =
+      unrealizedPnl !== null && realizedPnl !== null
+        ? roundMoney(unrealizedPnl + realizedPnl)
+        : null;
+    const cumulativeCost =
+      unrealizedCost !== null && realizedCost !== null
+        ? roundMoney(unrealizedCost + realizedCost)
+        : null;
+    const cumulativePnlRatio =
+      cumulativePnl !== null && cumulativeCost !== null && cumulativeCost > 0
+        ? cumulativePnl / cumulativeCost
+        : null;
     return {
       positions: valuedWithBase,
       cashValue: roundMoney(cashAggregate.knownValue),
@@ -402,7 +447,16 @@ export class PortfolioService {
       cashByCurrency,
       totalCost: roundMoney(costAggregate.knownValue),
       totalMarketValue: roundMoney(marketAggregate.knownValue + cashAggregate.knownValue),
-      totalPnl: roundMoney(valuedWithBase.reduce((sum, item) => sum + (item.basePnl ?? 0), 0)),
+      totalPnl,
+      unrealizedPnl,
+      unrealizedPnlRatio:
+        unrealizedPnl !== null && unrealizedCost !== null && unrealizedCost > 0
+          ? unrealizedPnl / unrealizedCost
+          : null,
+      realizedPnl,
+      realizedPnlRatio,
+      cumulativePnl,
+      cumulativePnlRatio,
       dailyChange,
       partial,
       mode,

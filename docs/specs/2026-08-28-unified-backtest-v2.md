@@ -63,7 +63,7 @@
 ### 策略研究和界面
 
 - 不支持 Risk Based sizing、Trailing Stop、ATR Stop、组合风险预算、CVaR 或 Risk Parity。
-- 不支持 Parameter Sweep、Grid/Random Search、Walk-forward、训练/验证/测试切分或 AI Strategy Assistant。
+- 不支持 Parameter Sweep、Grid/Random Search、Walk-forward、训练/验证/测试切分或 AI Strategy Assistant；这些后续增量由 [`策略驱动风险规则与 AI 多模型优化规格`](2026-09-09-strategy-risk-ai-optimization.md) 负责，并以本 V2 能力通过为前置门禁。
 - 不建设通用 Trade Projection Adapter 或回测与真实 Trade 的统一持久化表；V2 结果使用最小 `BacktestTrade`。
 - 不提供 Server 草稿自动保存、草稿协同、版本 Diff 或完整三栏 Builder 发布门禁。
 

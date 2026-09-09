@@ -74,6 +74,12 @@ export const portfolioValuationResponseSchema = z.object({
   totalCost: z.number().finite(),
   totalMarketValue: z.number().finite(),
   totalPnl: z.number().finite(),
+  unrealizedPnl: z.number().finite().nullable(),
+  unrealizedPnlRatio: z.number().finite().nullable(),
+  realizedPnl: z.number().finite().nullable(),
+  realizedPnlRatio: z.number().finite().nullable(),
+  cumulativePnl: z.number().finite().nullable(),
+  cumulativePnlRatio: z.number().finite().nullable(),
   dailyChange: z
     .object({
       pnl: z.number().finite().nullable(),

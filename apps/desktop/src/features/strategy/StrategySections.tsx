@@ -66,6 +66,110 @@ export const jobStatusVariant = (
 export const formatBacktestDataAsOf = (value: unknown) =>
   typeof value === 'string' ? formatDateTime(value, '未知') : '未知';
 
+export const decimalNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (value && typeof value === 'object' && 'amount' in value) {
+    return decimalNumber((value as { amount?: unknown }).amount);
+  }
+  return null;
+};
+
+export const metricNumber = (value: unknown) => {
+  if (value && typeof value === 'object' && 'status' in value) {
+    const metric = value as { status?: unknown; value?: unknown };
+    return metric.status === 'available' ? decimalNumber(metric.value) : null;
+  }
+  return decimalNumber(value);
+};
+
+export const completenessLabel = (value: unknown) => {
+  if (value === 'complete') return '完整';
+  if (value === 'partial') return '部分完整';
+  if (value === 'unavailable') return '不可用';
+  if (value && typeof value === 'object') {
+    return (value as { complete?: unknown }).complete === true ? '完整' : '存在缺失数据';
+  }
+  return '不可用';
+};
+
+export const formatBacktestMetric = (metric: unknown, percent = true) => {
+  const value = metricNumber(metric);
+  if (value !== null) return percent ? `${(value * 100).toFixed(2)}%` : String(value);
+  if (metric && typeof metric === 'object' && 'reason' in metric) {
+    return `不可用：${displayValue((metric as { reason?: unknown }).reason)}`;
+  }
+  return '不可用';
+};
+
+export const backtestStageLabel = (stage: unknown) => {
+  const labels: Record<string, string> = {
+    queued: '排队中',
+    'snapshot-finalized': '快照已完成',
+    running: '运行中',
+    'persisting-result': '正在保存结果',
+    succeeded: '已完成',
+    failed: '失败',
+    cancelled: '已取消',
+    snapshot: '准备快照',
+    prepare: '准备数据',
+    run: '执行回测',
+    finalize: '整理结果',
+  };
+  if (typeof stage !== 'string' || !stage.trim()) return '未配置';
+  return labels[stage] ?? '其他阶段';
+};
+
+const localizeBacktestMessage = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const message = value.trim();
+  if (/^Artifact not found:/iu.test(message)) {
+    return message.replace(/^Artifact not found:/iu, '行情文件缺失：');
+  }
+  if (/^Artifact is corrupt/iu.test(message)) {
+    return message.replace(/^Artifact is corrupt/iu, '行情文件损坏');
+  }
+  if (/invalid parquet magic/iu.test(message)) return '行情文件格式无效。';
+  if (/content hash mismatch/iu.test(message)) return '行情文件内容校验和不匹配。';
+  if (/no space left on device/iu.test(message)) return '存储空间不足。';
+  const translated = message
+    .replace(/\bArtifact\b/gu, '行情文件')
+    .replace(/\bSnapshot\b/gu, '快照')
+    .replace(/\bRun\b/gu, '任务');
+  const normalized = translated.replace(/行情文件\s+/u, '行情文件');
+  return /[\u4e00-\u9fff]/u.test(normalized) ? normalized : '任务执行失败，请查看诊断码。';
+};
+
+export const tradeSideLabel = (side: unknown) => {
+  if (side === 'buy') return '买入';
+  if (side === 'sell') return '卖出';
+  return typeof side === 'string' && side ? '未知方向' : '未配置';
+};
+
+export const tradeReasonLabel = (reason: unknown) => {
+  const labels: Record<string, string> = {
+    signal: '信号触发',
+    risk: '风险规则触发',
+    fixedStop: '固定止损',
+    fixedTakeProfit: '固定止盈',
+    maxHoldingPeriod: '最大持有期',
+  };
+  if (typeof reason !== 'string' || !reason) return '未配置';
+  return labels[reason] ?? '其他原因';
+};
+
+const diagnosticText = (value: unknown) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const diagnostic = value as { code?: unknown; message?: unknown };
+  const code = typeof diagnostic.code === 'string' ? diagnostic.code : null;
+  const message = localizeBacktestMessage(diagnostic.message);
+  if (code && message) return `${code}：${message}`;
+  return message ?? code;
+};
+
 const backtestWarningKey = (value: string) => value.trim().replace(/[。；;]+$/u, '');
 
 export const uniqueBacktestWarnings = (...values: unknown[]) => {
@@ -325,6 +429,7 @@ export function StrategyJobs({
   busyAction,
   onRun,
   onCancel,
+  onRetry,
   onViewResult,
   onOpenLibrary,
 }: {
@@ -332,8 +437,9 @@ export function StrategyJobs({
   strategies: StrategyRecord[];
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   busyAction: string | null;
-  onRun: (jobId: string) => void;
-  onCancel: (jobId: string) => void;
+  onRun: (job: BacktestJobSummary) => void;
+  onCancel: (job: BacktestJobSummary) => void;
+  onRetry?: (jobId: string) => void;
   onViewResult: (job: BacktestJobSummary) => void;
   onOpenLibrary?: () => void;
 }) {
@@ -390,6 +496,8 @@ export function StrategyJobs({
                 const progress =
                   typeof job.progress === 'number' ? Math.max(0, Math.min(100, job.progress)) : 0;
                 const terminal = ['succeeded', 'failed', 'cancelled'].includes(job.status);
+                const diagnostic = diagnosticText(job.diagnostics);
+                const errorSummary = localizeBacktestMessage(job.errorSummary);
                 return (
                   <tr key={job.id}>
                     <td>
@@ -409,7 +517,12 @@ export function StrategyJobs({
                       <Badge variant={jobStatusVariant(job.status)}>
                         {job.cancelRequestedAt ? '正在取消' : jobStatusLabel(job.status)}
                       </Badge>
-                      {job.errorSummary && <span>{job.errorSummary}</span>}
+                      {errorSummary && <span>{errorSummary}</span>}
+                      {diagnostic && diagnostic !== errorSummary && <span>{diagnostic}</span>}
+                      {job.stage && <span>阶段：{backtestStageLabel(job.stage)}</span>}
+                      {(job.executionAttempt ?? job.attempt) !== undefined && (
+                        <span>执行次数：{job.executionAttempt ?? job.attempt}</span>
+                      )}
                       {Array.isArray(job.warnings) && job.warnings.length > 0 && (
                         <span>{job.warnings.length} 条提示</span>
                       )}
@@ -435,7 +548,7 @@ export function StrategyJobs({
                             variant="outline"
                             disabled={busyAction !== null}
                             aria-busy={busyAction === `run:${job.id}`}
-                            onClick={() => onRun(job.id)}
+                            onClick={() => onRun(job)}
                           >
                             <Play data-icon="inline-start" />
                             {busyAction === `run:${job.id}` ? '启动中…' : '重试运行'}
@@ -447,7 +560,7 @@ export function StrategyJobs({
                             variant="ghost"
                             disabled={busyAction !== null}
                             aria-busy={busyAction === `cancel:${job.id}`}
-                            onClick={() => onCancel(job.id)}
+                            onClick={() => onCancel(job)}
                           >
                             <X data-icon="inline-start" />
                             取消
@@ -457,6 +570,18 @@ export function StrategyJobs({
                           <Button size="sm" variant="ghost" onClick={() => onViewResult(job)}>
                             <Eye data-icon="inline-start" />
                             查看结果
+                          </Button>
+                        )}
+                        {job.mode === 'V2' && job.status === 'failed' && onRetry && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busyAction !== null}
+                            aria-busy={busyAction === `retry:${job.id}`}
+                            onClick={() => onRetry(job.id)}
+                          >
+                            <Play data-icon="inline-start" />
+                            {busyAction === `retry:${job.id}` ? '重试中…' : '重试'}
                           </Button>
                         )}
                       </div>
@@ -491,20 +616,45 @@ export function StrategyResultDialog({
     result?.metrics && typeof result.metrics === 'object'
       ? (result.metrics as Record<string, unknown>)
       : null;
+  const isV2Result = result?.schemaVersion === '2';
   const equityCurve = Array.isArray(result?.equityCurve)
-    ? (result.equityCurve as Array<{ date: string; value: number }>)
+    ? result.equityCurve.flatMap((point) => {
+        if (!point || typeof point !== 'object') return [];
+        const value = point as { date?: unknown; occurredAt?: unknown; value?: unknown };
+        const date = typeof value.date === 'string' ? value.date : value.occurredAt;
+        const number = decimalNumber(value.value);
+        return typeof date === 'string' && number !== null ? [{ date, value: number }] : [];
+      })
     : [];
   const trades = Array.isArray(result?.trades)
     ? (result.trades as Array<Record<string, unknown>>)
     : [];
-  const metricValue = (key: string) =>
-    typeof metrics?.[key] === 'number' ? `${(metrics[key] * 100).toFixed(2)}%` : '不可用';
+  const metricValue = (key: string, v2Key = key, percent = true) => {
+    const metric = metrics?.[isV2Result ? v2Key : key];
+    return formatBacktestMetric(metric, percent);
+  };
   const rejectedOrders = Array.isArray(result?.rejectedOrders) ? result.rejectedOrders : [];
+  const rejectedNavRequests = Array.isArray(result?.rejectedNavRequests)
+    ? result.rejectedNavRequests
+    : [];
   const totalFees =
-    typeof metrics?.fees === 'number'
-      ? metrics.fees
-      : trades.reduce((sum, trade) => sum + (typeof trade.fees === 'number' ? trade.fees : 0), 0);
-  const hasFeeData = typeof metrics?.fees === 'number' || trades.some((trade) => 'fees' in trade);
+    metricNumber(metrics?.fees) !== null
+      ? metricNumber(metrics?.fees)!
+      : trades.reduce((sum, trade) => {
+          if (typeof trade.fees === 'number') return sum + trade.fees;
+          if (!Array.isArray(trade.charges)) return sum;
+          const charges = trade.charges as unknown[];
+          return (
+            sum +
+            charges.reduce<number>(
+              (chargeSum, charge) => chargeSum + (decimalNumber(charge) ?? 0),
+              0,
+            )
+          );
+        }, 0);
+  const hasFeeData =
+    metricNumber(metrics?.fees) !== null ||
+    trades.some((trade) => 'fees' in trade || Array.isArray(trade.charges));
   const drawdown = equityCurve.map((point, index) => {
     const peak = Math.max(...equityCurve.slice(0, index + 1).map((item) => item.value));
     return { date: point.date, value: peak > 0 ? point.value / peak - 1 : 0 };
@@ -514,8 +664,13 @@ export function StrategyResultDialog({
     result?.benchmark && typeof result.benchmark === 'object'
       ? (result.benchmark as Record<string, unknown>)
       : null;
-  const benchmarkValue = (key: string) =>
-    typeof benchmark?.[key] === 'number' ? `${(benchmark[key] * 100).toFixed(2)}%` : '不可用';
+  const benchmarkValue = (key: string) => formatBacktestMetric(benchmark?.[key]);
+  const benchmarkSummary = () => {
+    if (!benchmark) return '不可用（基准行情缺失）';
+    if (isV2Result) return `基准收益 ${benchmarkValue('totalReturn')}`;
+    return `策略 ${benchmarkValue('strategyReturn')} · 基准 ${benchmarkValue('benchmarkReturn')} · 超额 ${benchmarkValue('excessReturn')}`;
+  };
+  const finalValue = decimalNumber(result?.finalValue) ?? equityCurve.at(-1)?.value ?? null;
   const seriesPoints = (series: Array<{ value: number }>) => {
     if (series.length === 0) return '';
     const values = series.map((point) => point.value);
@@ -558,15 +713,22 @@ export function StrategyResultDialog({
                 <div className="metrics">
                   <Metric
                     label="最终资产"
-                    value={
-                      typeof result.finalValue === 'number'
-                        ? money.format(result.finalValue)
-                        : '暂无'
-                    }
+                    value={finalValue !== null ? money.format(finalValue) : '暂无'}
                   />
-                  <Metric label="累计收益" value={metricValue('cumulativeReturn')} />
+                  <Metric label="累计收益" value={metricValue('cumulativeReturn', 'totalReturn')} />
                   <Metric label="最大回撤" value={metricValue('maxDrawdown')} tone="negative" />
-                  <Metric label="交易胜率" value={metricValue('tradeWinRate')} />
+                  <Metric label="交易胜率" value={metricValue('tradeWinRate', 'winRate')} />
+                  {isV2Result && <Metric label="年化收益" value={metricValue('cagr')} />}
+                  {isV2Result && <Metric label="波动率" value={metricValue('volatility')} />}
+                  {isV2Result && (
+                    <Metric label="夏普比率" value={metricValue('sharpe', 'sharpe', false)} />
+                  )}
+                  {isV2Result && (
+                    <Metric
+                      label="利润因子"
+                      value={metricValue('profitFactor', 'profitFactor', false)}
+                    />
+                  )}
                 </div>
                 <div className="module-grid">
                   <div>
@@ -598,35 +760,27 @@ export function StrategyResultDialog({
                   <div className="rounded-md border border-border p-3">
                     <p className="text-sm font-medium">数据完整性</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {result.completeness && typeof result.completeness === 'object'
-                        ? (result.completeness as { complete?: unknown }).complete === true
-                          ? '完整'
-                          : '存在缺失数据'
-                        : '不可用'}
+                      {completenessLabel(result.completeness)}
                     </p>
                   </div>
                   <div className="rounded-md border border-border p-3">
                     <p className="text-sm font-medium">拒单</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {rejectedOrders.length > 0 ? `${rejectedOrders.length} 笔` : '0 笔'}
+                      场内 {rejectedOrders.length} 笔 · NAV {rejectedNavRequests.length} 笔
                     </p>
                   </div>
                   <div className="rounded-md border border-border p-3">
                     <p className="text-sm font-medium">费用 / 换手</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {hasFeeData ? money.format(totalFees) : '费用不可用'} ·{' '}
-                      {typeof metrics?.turnover === 'number'
-                        ? money.format(metrics.turnover)
+                      {metricNumber(metrics?.turnover) !== null
+                        ? money.format(metricNumber(metrics?.turnover)!)
                         : '换手不可用'}
                     </p>
                   </div>
                   <div className="rounded-md border border-border p-3">
                     <p className="text-sm font-medium">基准比较</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {benchmark
-                        ? `策略 ${benchmarkValue('strategyReturn')} · 基准 ${benchmarkValue('benchmarkReturn')} · 超额 ${benchmarkValue('excessReturn')}`
-                        : '不可用（基准行情缺失）'}
-                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">{benchmarkSummary()}</p>
                   </div>
                 </div>
               </TabsContent>
@@ -684,11 +838,13 @@ export function StrategyResultDialog({
                 <ResultTable
                   headers={['日期', '方向', '数量', '价格', '原因']}
                   rows={trades.map((trade) => [
-                    typeof trade.date === 'string' ? formatDateOnly(trade.date) : '—',
-                    displayValue(trade.side ?? '—'),
-                    displayValue(trade.quantity ?? '—'),
-                    displayValue(trade.price ?? '—'),
-                    displayValue(trade.reason ?? '—'),
+                    typeof (trade.closedAt ?? trade.date) === 'string'
+                      ? formatDateOnly(String(trade.closedAt ?? trade.date))
+                      : '—',
+                    tradeSideLabel(trade.side ?? (trade.closedAt ? 'sell' : null)),
+                    displayValue(trade.quantity ?? trade.exitQuantity ?? '—'),
+                    displayValue(trade.price ?? decimalNumber(trade.exitValue) ?? '—'),
+                    tradeReasonLabel(trade.reason ?? trade.closeReason),
                   ])}
                 />
               </TabsContent>
@@ -703,6 +859,11 @@ export function StrategyResultDialog({
                   value={formatBacktestDataAsOf(job.dataAsOf ?? result.dataAsOf)}
                 />
                 <ReproField label="结果校验和" value={job.resultChecksum ?? '未返回'} />
+                <ReproField label="数据快照" value={result.snapshotId ?? '未返回'} />
+                <ReproField label="市场规则版本" value={result.marketRuleVersion ?? '未返回'} />
+                <ReproField label="日历版本" value={result.calendarVersion ?? '未返回'} />
+                <ReproField label="聚合版本" value={result.aggregationVersion ?? '未返回'} />
+                <ReproField label="内容哈希" value={result.contentHash ?? '未返回'} />
               </TabsContent>
             </Tabs>
           )}

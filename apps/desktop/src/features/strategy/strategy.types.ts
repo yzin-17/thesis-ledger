@@ -1,7 +1,10 @@
+import type { BacktestResultV2, RunConfig, StrategySchemaV2 } from '@thesis-ledger/schemas';
+
 export type StrategyStatus = 'draft' | 'active' | 'archived';
 export type BacktestJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export type StrategySchema = Record<string, unknown>;
+export type V2StrategySchema = StrategySchemaV2;
 
 export interface StrategyVersion {
   id: string;
@@ -41,6 +44,7 @@ export interface BacktestJobResult {
 export interface BacktestJobSummary {
   id: string;
   strategyVersionId: string;
+  mode?: 'V1' | 'V2';
   status: BacktestJobStatus | (string & {});
   progress?: number | null;
   period?: { start: string; end: string };
@@ -54,11 +58,15 @@ export interface BacktestJobSummary {
   finishedAt?: string;
   cancelRequestedAt?: string | null;
   executionAttempt?: number;
+  attempt?: number;
+  stage?: string | null;
+  diagnostics?: unknown;
   dispatchedAt?: string | null;
   errorCode?: string | null;
   errorSummary?: string | null;
   engineVersion?: string | null;
   resultChecksum?: string | null;
+  snapshotId?: string | null;
   initialCash?: number | null;
   warnings?: unknown;
 }
@@ -66,7 +74,7 @@ export interface BacktestJobSummary {
 export interface BacktestJob extends BacktestJobSummary {
   inSampleEnd?: string;
   input?: Record<string, unknown> | null;
-  result?: BacktestJobResult | null;
+  result?: BacktestJobResult | BacktestResultV2 | null;
 }
 
 export interface CreateStrategyInput {
@@ -84,6 +92,8 @@ export interface BacktestSetupInput {
   period: { start: string; end: string };
   initialCash: number;
   inSampleEnd?: string;
+  dataAsOf?: string;
+  baseCurrency?: 'CNY' | 'HKD' | 'USD';
 }
 
 export interface FetchStrategyBarsInput {
@@ -104,4 +114,10 @@ export interface QueueBacktestInput {
   benchmarkBars?: unknown[];
   initialCash: number;
   allowStale?: boolean;
+}
+
+export interface QueueBacktestV2Input {
+  strategyVersionId: string;
+  runConfig: RunConfig;
+  idempotencyKey: string;
 }

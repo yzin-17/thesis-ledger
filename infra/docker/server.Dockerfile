@@ -25,5 +25,7 @@ COPY --from=build /workspace/apps/server/dist ./apps/server/dist
 RUN ./node_modules/.bin/prisma generate --schema=/app/prisma/schema.prisma
 # Compose 在启动时执行 Prisma migration；确保生产运行时保留 CLI 和生成客户端。
 RUN test -x /app/node_modules/.bin/prisma
+# V2 Snapshot/Artifact 默认写入 /app/var/backtest；提前交给非 root 运行用户。
+RUN mkdir -p /app/var/backtest && chown -R thesis:thesis /app/var
 USER thesis
 CMD ["node", "apps/server/dist/src/main.js"]

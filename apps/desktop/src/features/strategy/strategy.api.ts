@@ -7,6 +7,7 @@ import type {
   CreateStrategyInput,
   FetchStrategyBarsInput,
   QueueBacktestInput,
+  QueueBacktestV2Input,
   StrategyRecord,
 } from './strategy.types.js';
 
@@ -108,9 +109,12 @@ export const fetchStrategyBars = async (
   }
 };
 
-export const queueBacktest = (input: QueueBacktestInput, client?: DesktopRequestClient) =>
+export const queueBacktest = (
+  input: QueueBacktestInput | QueueBacktestV2Input,
+  client?: DesktopRequestClient,
+) =>
   requestDesktopJson<BacktestJob>(
-    '/backtests/jobs',
+    'runConfig' in input ? '/backtests/runs' : '/backtests/jobs',
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -134,5 +138,26 @@ export const cancelBacktest = (jobId: string, client?: DesktopRequestClient) =>
     {
       method: 'POST',
     },
+    client,
+  );
+
+export const runBacktestV2 = (runId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<BacktestJob>(
+    `/backtests/runs/${encodeURIComponent(runId)}/run`,
+    { method: 'POST' },
+    client,
+  );
+
+export const cancelBacktestV2 = (runId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<BacktestJob>(
+    `/backtests/runs/${encodeURIComponent(runId)}/cancel`,
+    { method: 'POST' },
+    client,
+  );
+
+export const retryBacktestV2 = (runId: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<BacktestJob>(
+    `/backtests/runs/${encodeURIComponent(runId)}/retry`,
+    { method: 'POST' },
     client,
   );

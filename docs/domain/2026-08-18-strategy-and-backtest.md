@@ -50,3 +50,5 @@ V2 不支持 Limit Order、Partial Fill、GTC、做空、融资、衍生品、�
 任何回测都必须明确数据来源、数据时点、完整度和限制。决策时只使用当时已经可用的数据；缺失历史成分、公司行动、分钟数据或 Provider 能力时必须保留 warning/unavailable，不得静默缩小 universe 或用当前数据补历史事实。
 
 可复现结果至少固定 StrategyVersion、RunConfig、DataSnapshot、规则/聚合版本、引擎版本和结果 checksum。当前 V1 的历史结果按原契约保留；V2 不通过长期双写或隐式 V1→V2 转换制造第二套兼容真源。
+
+T13 的离线门禁进一步固定这一边界：跨仓 fixture 只验证 capability/support matrix 和 Golden scenario；V1 盘点脚本只读识别 `BacktestJob`/旧队列引用，未取得数据库快照时不得声称可以执行 Contract。隔离审计、性能 workload 和运行态缺口见 [`统一回测 V2 T13 性能与功能基线`](../benchmarks/2026-09-09-unified-backtest-v2-t13.md)。

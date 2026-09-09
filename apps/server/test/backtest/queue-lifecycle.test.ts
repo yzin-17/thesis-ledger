@@ -65,7 +65,7 @@ describe('Backtest BullMQ 生命周期', () => {
 
     const result = await service.cancel(state.id);
 
-    expect(result).toMatchObject({ status: 'cancelled', progress: 100 });
+    expect(result).toMatchObject({ status: 'cancelled', stage: 'cancelled', progress: 100 });
     expect(queue.remove).toHaveBeenCalledWith(state.id);
     expect(events.publishJob).toHaveBeenCalledWith(state.id);
   });

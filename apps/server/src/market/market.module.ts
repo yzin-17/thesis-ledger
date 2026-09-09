@@ -12,6 +12,7 @@ import { MarketStorageService } from './market-storage.service.js';
 import { MarketController } from './market.controller.js';
 import { MarketDetailService } from './market-detail.service.js';
 import { MarketService } from './market.service.js';
+import { BacktestBarAggregationService } from './backtest-bar-aggregation.service.js';
 
 @Module({
   imports: [QualityModule, DsaModule],
@@ -26,6 +27,7 @@ import { MarketService } from './market.service.js';
     InstrumentAssociationService,
     InstrumentService,
     MarketControlService,
+    BacktestBarAggregationService,
   ],
   exports: [
     MarketService,
@@ -36,6 +38,7 @@ import { MarketService } from './market.service.js';
     InstrumentSearchService,
     InstrumentAssociationService,
     MarketControlService,
+    BacktestBarAggregationService,
   ],
 })
 export class MarketModule {}

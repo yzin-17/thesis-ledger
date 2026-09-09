@@ -6,8 +6,24 @@ import type {
   ProviderManifest,
   CurrencyV1,
   FxRatesResponseV1,
+  BacktestCapabilities,
+  BacktestDailyBar,
+  BacktestMinuteBar,
+  BacktestCalendarResponse,
+  BacktestCorporateActionsResponse,
+  BacktestInstrumentFactsResponse,
+  BacktestInstrumentType,
+  BacktestMarket,
 } from '@thesis-ledger/schemas';
-import { fxRatesResponseSchemaV1 } from '@thesis-ledger/schemas';
+import {
+  backtestCalendarResponseSchema,
+  backtestDailyBarSchema,
+  backtestCapabilitiesSchema,
+  backtestCorporateActionsResponseSchema,
+  backtestInstrumentFactsResponseSchema,
+  backtestMinuteBarSchema,
+  fxRatesResponseSchemaV1,
+} from '@thesis-ledger/schemas';
 import { loadConfig } from '../../platform/config.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
 
@@ -145,6 +161,76 @@ export class DsaClient {
       contractVersion?: number;
       capabilities?: Record<string, unknown>;
     }>('/api/v1/thesis-ledger/capabilities', 1);
+  }
+
+  backtestCapabilities(): Promise<BacktestCapabilities> {
+    return this.get<unknown>('/api/v1/thesis-ledger/v2/capabilities', 1).then((raw) =>
+      backtestCapabilitiesSchema.parse(raw),
+    );
+  }
+
+  backtestCalendar(input: {
+    market: BacktestMarket;
+    start: string;
+    end: string;
+    dataAsOf: string;
+  }): Promise<BacktestCalendarResponse> {
+    const params = new URLSearchParams(input);
+    return this.get<unknown>(`/api/v1/thesis-ledger/v2/calendar?${params.toString()}`, 1).then(
+      (raw) => backtestCalendarResponseSchema.parse(raw),
+    );
+  }
+
+  backtestInstrumentFacts(input: {
+    symbol: string;
+    market: BacktestMarket;
+    instrumentType: BacktestInstrumentType;
+    dataAsOf: string;
+  }): Promise<BacktestInstrumentFactsResponse> {
+    const params = new URLSearchParams(input);
+    return this.get<unknown>(
+      `/api/v1/thesis-ledger/v2/instrument-facts?${params.toString()}`,
+      1,
+    ).then((raw) => backtestInstrumentFactsResponseSchema.parse(raw));
+  }
+
+  backtestCorporateActions(input: {
+    symbol: string;
+    market: BacktestMarket;
+    instrumentType: BacktestInstrumentType;
+    start: string;
+    end: string;
+    dataAsOf: string;
+  }): Promise<BacktestCorporateActionsResponse> {
+    const params = new URLSearchParams(input);
+    return this.get<unknown>(
+      `/api/v1/thesis-ledger/v2/corporate-actions?${params.toString()}`,
+      1,
+    ).then((raw) => backtestCorporateActionsResponseSchema.parse(raw));
+  }
+
+  backtestBars(input: {
+    symbol: string;
+    timeframe: '1m' | '1d';
+    start?: string;
+    end?: string;
+    limit?: number;
+  }): Promise<(BacktestMinuteBar | BacktestDailyBar)[]> {
+    const params = new URLSearchParams({
+      symbol: input.symbol,
+      timeframe: input.timeframe,
+      limit: String(input.limit ?? 10_000),
+    });
+    if (input.start) params.set('start', input.start);
+    if (input.end) params.set('end', input.end);
+    return this.get<unknown[]>(`/api/v1/thesis-ledger/v2/market/bars?${params.toString()}`, 1).then(
+      (raw) =>
+        raw.map((item) =>
+          input.timeframe === '1m'
+            ? backtestMinuteBarSchema.parse(item)
+            : backtestDailyBarSchema.parse(item),
+        ),
+    );
   }
 
   fxRates(input: {

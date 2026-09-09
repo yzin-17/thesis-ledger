@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/lib/date-display';
 import { schemaSymbols, schemaAsOf } from './strategy.schema.js';
 import type { BacktestSetupInput, StrategyRecord, StrategyVersion } from './strategy.types.js';
+import { StrategyV2Summary, isV2StrategySchema } from './StrategyV2Summary.js';
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -100,6 +101,9 @@ export function BacktestSetupDialog({
               {version?.schema ? formatDateTime(schemaAsOf(version.schema), '未知') : '未知'}
             </p>
           </div>
+          {version?.schema && isV2StrategySchema(version.schema) && (
+            <StrategyV2Summary schema={version.schema} />
+          )}
           {symbols.length > 1 && (
             <Alert>
               <AlertTitle>多标的策略</AlertTitle>

@@ -1,4 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
+import { runConfigSchemaV2 } from '@thesis-ledger/schemas';
 import type { useToastManager } from '@/components/ui/toast';
 
 import type {
@@ -8,6 +9,7 @@ import type {
   CreateStrategyVersionInput,
   FetchStrategyBarsInput,
   QueueBacktestInput,
+  QueueBacktestV2Input,
   StrategyRecord,
   StrategySchema,
   StrategyVersion,
@@ -27,9 +29,12 @@ type Dependencies = {
   createMutation: AsyncMutation<CreateStrategyInput, StrategyRecord>;
   createVersionMutation?: AsyncMutation<CreateStrategyVersionInput, StrategyVersion>;
   fetchBarsMutation: AsyncMutation<FetchStrategyBarsInput, unknown[]>;
-  queueMutation: AsyncMutation<QueueBacktestInput, BacktestJob>;
+  queueMutation: AsyncMutation<QueueBacktestInput | QueueBacktestV2Input, BacktestJob>;
   runMutation: AsyncMutation<string, BacktestJob>;
   cancelMutation: AsyncMutation<string, BacktestJob>;
+  runV2Mutation?: AsyncMutation<string, BacktestJob>;
+  cancelV2Mutation?: AsyncMutation<string, BacktestJob>;
+  retryV2Mutation?: AsyncMutation<string, BacktestJob>;
   load: () => Promise<unknown>;
 };
 
@@ -53,8 +58,53 @@ const benchmarkFromSchema = (schema: StrategySchema) =>
 
 const dataAsOfFromSchema = (schema: StrategySchema) => {
   const universe = schema.universe;
-  if (!isRecord(universe) || typeof universe.asOf !== 'string') return new Date().toISOString();
-  return universe.asOf;
+  const candidate = isRecord(universe) && typeof universe.asOf === 'string' ? universe.asOf : '';
+  const parsed = Date.parse(candidate);
+  return Number.isFinite(parsed) ? candidate : new Date().toISOString();
+};
+
+const normalizedDataAsOf = (value: string) => {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString();
+};
+
+const isV2Strategy = (
+  schema: StrategySchema,
+): schema is StrategySchema & {
+  schemaVersion: '2';
+  executionInstrument: { market: 'CN' | 'HK' | 'US' };
+} => schema.schemaVersion === '2' && isRecord(schema.executionInstrument);
+
+export const runConfigForV2 = (
+  schema: StrategySchema,
+  setup: BacktestSetupInput,
+): QueueBacktestV2Input['runConfig'] => {
+  const instrument = schema.executionInstrument as { market: 'CN' | 'HK' | 'US' };
+  let currency: 'CNY' | 'HKD' | 'USD' = 'USD';
+  let timezone = 'America/New_York';
+  if (instrument.market === 'CN') {
+    currency = 'CNY';
+    timezone = 'Asia/Shanghai';
+  } else if (instrument.market === 'HK') {
+    currency = 'HKD';
+    timezone = 'Asia/Hong_Kong';
+  }
+  const candidate = {
+    startDate: setup.period.start,
+    endDate: setup.period.end,
+    dataAsOf: normalizedDataAsOf(setup.dataAsOf ?? dataAsOfFromSchema(schema)),
+    baseCurrency: setup.baseCurrency ?? currency,
+    initialCash: { [currency]: String(setup.initialCash) },
+    valuationPolicy: {
+      baseTimezone: timezone,
+      dailyValuationTime: '16:00',
+      pricePolicy: 'latestAvailable',
+      fxPolicy: 'latestAvailable',
+    },
+  };
+  const parsed = runConfigSchemaV2.safeParse(candidate);
+  if (!parsed.success) throw new Error('backtest-run-config-v2');
+  return parsed.data;
 };
 
 const errorToast = (toastManager: ToastManager, title: string, description: string) => {
@@ -126,6 +176,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     load,
   } = dependencies;
   let backgroundPreparationVersionId: string | null = null;
+  let backgroundPreparationIdempotencyKey: string | null = null;
 
   const refreshStrategyData = () => {
     void load().catch(() => undefined);
@@ -190,12 +241,14 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
       errorToast(toastManager, '回测排队失败', '当前版本缺少可执行 Schema，请重新加载策略。');
       return Promise.resolve(false);
     }
+    const v2 = isV2Strategy(schema);
     const symbol = symbolsFromSchema(schema)[0];
-    if (!symbol) {
+    if (!v2 && !symbol) {
       errorToast(toastManager, '回测排队失败', '策略版本至少需要一个标的。');
       return Promise.resolve(false);
     }
     backgroundPreparationVersionId = version.id;
+    backgroundPreparationIdempotencyKey = crypto.randomUUID();
     setBusyAction(`queue:${version.id}`);
     toastManager.add({
       title: '正在后台准备回测',
@@ -205,6 +258,25 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     });
     void (async () => {
       try {
+        if (v2) {
+          const idempotencyKey = backgroundPreparationIdempotencyKey;
+          if (!idempotencyKey) throw new Error('backtest-idempotency');
+          const v2Input: QueueBacktestV2Input = {
+            strategyVersionId: version.id,
+            runConfig: runConfigForV2(schema, setup),
+            idempotencyKey,
+          };
+          await queueMutation.mutateAsync(v2Input);
+          toastManager.add({
+            title: '回测已排队',
+            description: '任务已提交，服务端将按策略版本读取所需数据。',
+            type: 'success',
+            timeout: 2800,
+          });
+          refreshStrategyData();
+          return;
+        }
+        if (!symbol) return;
         const bars = await fetchBarsMutation.mutateAsync({ symbol, period: setup.period });
         if (!Array.isArray(bars) || bars.length === 0) {
           errorToast(toastManager, '回测排队失败', '主标的没有可用行情，无法发起回测。');
@@ -254,6 +326,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
         errorToast(toastManager, '回测排队失败', '请检查策略配置、市场数据和服务连接。');
       } finally {
         backgroundPreparationVersionId = null;
+        backgroundPreparationIdempotencyKey = null;
         setBusyAction(null);
       }
     })();
@@ -282,11 +355,15 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     );
   };
 
-  const run = async (jobId: string) => {
+  const run = async (jobId: string, mode: 'V1' | 'V2' = 'V1') => {
     if (busyAction) return;
     setBusyAction(`run:${jobId}`);
     try {
-      await runMutation.mutateAsync(jobId);
+      if (mode === 'V2' && dependencies.runV2Mutation) {
+        await dependencies.runV2Mutation.mutateAsync(jobId);
+      } else {
+        await runMutation.mutateAsync(jobId);
+      }
       toastManager.add({ title: '回测已启动', type: 'success', timeout: 2800 });
       await load();
     } catch {
@@ -296,11 +373,15 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     }
   };
 
-  const cancel = async (jobId: string) => {
+  const cancel = async (jobId: string, mode: 'V1' | 'V2' = 'V1') => {
     if (busyAction) return;
     setBusyAction(`cancel:${jobId}`);
     try {
-      await cancelMutation.mutateAsync(jobId);
+      if (mode === 'V2' && dependencies.cancelV2Mutation) {
+        await dependencies.cancelV2Mutation.mutateAsync(jobId);
+      } else {
+        await cancelMutation.mutateAsync(jobId);
+      }
       toastManager.add({ title: '回测已取消', type: 'success', timeout: 2800 });
       await load();
     } catch {
@@ -310,5 +391,19 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     }
   };
 
-  return { createStrategy, createVersion, startBacktest, queue, run, cancel };
+  const retry = async (jobId: string) => {
+    if (busyAction || !dependencies.retryV2Mutation) return;
+    setBusyAction(`retry:${jobId}`);
+    try {
+      await dependencies.retryV2Mutation.mutateAsync(jobId);
+      toastManager.add({ title: '回测已重新排队', type: 'success', timeout: 2800 });
+      await load();
+    } catch {
+      errorToast(toastManager, '回测重试失败', '请检查任务状态、快照和服务连接。');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  return { createStrategy, createVersion, startBacktest, queue, run, cancel, retry };
 };

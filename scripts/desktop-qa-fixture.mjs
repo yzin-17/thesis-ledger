@@ -138,11 +138,23 @@ const portfolio = () => {
     (sum, position) => sum + position.quantity * position.costPrice,
     0,
   );
+  const unrealizedPnl = totalMarketValue - totalCost;
+  const unrealizedPnlRatio = totalCost > 0 ? unrealizedPnl / totalCost : null;
   return {
+    cashValue: 0,
+    cashByAccount: [],
     totalMarketValue,
     totalCost,
-    totalPnl: totalMarketValue - totalCost,
+    totalPnl: unrealizedPnl,
+    unrealizedPnl,
+    unrealizedPnlRatio,
+    realizedPnl: 0,
+    realizedPnlRatio: null,
+    cumulativePnl: unrealizedPnl,
+    cumulativePnlRatio: unrealizedPnlRatio,
     partial: stale,
+    mode: 'actual',
+    baseCurrency: 'CNY',
     valuedAt: now,
     positions: nextPositions,
   };

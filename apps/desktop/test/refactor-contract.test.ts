@@ -26,13 +26,16 @@ import type {
 } from '../src/features/journal/journal.types.js';
 import {
   cancelBacktest,
+  cancelBacktestV2,
   createStrategy,
   createStrategyVersion,
   fetchBacktestJob,
   fetchBacktestJobs,
   fetchStrategyBars,
   queueBacktest,
+  retryBacktestV2,
   runBacktest,
+  runBacktestV2,
 } from '../src/features/strategy/strategy.api.js';
 import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
 import { jobFallbackInterval, shouldPollJobs } from '../src/features/strategy/strategy.queries.js';
@@ -43,6 +46,7 @@ import {
 import type {
   BacktestJob,
   BacktestJobSummary,
+  QueueBacktestV2Input,
   StrategyRecord,
 } from '../src/features/strategy/strategy.types.js';
 import {
@@ -503,6 +507,54 @@ describe('Strategy 任务行为契约', () => {
     );
   });
 
+  it('Strategy V2 Run 只提交 RunConfig，并使用独立运行生命周期接口', async () => {
+    const client = makeClient({ id: 'run-v2' });
+    const input: QueueBacktestV2Input = {
+      strategyVersionId: 'version-v2',
+      idempotencyKey: 'run-key-1',
+      runConfig: {
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+        dataAsOf: '2026-02-01T00:00:00Z',
+        baseCurrency: 'CNY',
+        initialCash: { CNY: '100000' },
+        valuationPolicy: {
+          baseTimezone: 'Asia/Shanghai',
+          dailyValuationTime: '16:00',
+          pricePolicy: 'latestAvailable',
+          fxPolicy: 'latestAvailable',
+        },
+      },
+    };
+
+    await queueBacktest(input, client.client);
+    await runBacktestV2('run/1', client.client);
+    await cancelBacktestV2('run/1', client.client);
+    await retryBacktestV2('run/1', client.client);
+
+    expect(client.request).toHaveBeenNthCalledWith(
+      1,
+      '/backtests/runs',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
+    );
+    expect(JSON.stringify(input)).not.toContain('bars');
+    expect(client.request).toHaveBeenNthCalledWith(
+      2,
+      '/backtests/runs/run%2F1/run',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(client.request).toHaveBeenNthCalledWith(
+      3,
+      '/backtests/runs/run%2F1/cancel',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(client.request).toHaveBeenNthCalledWith(
+      4,
+      '/backtests/runs/run%2F1/retry',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('Strategy 回测只使用版本 Schema，按版本号排序并由服务端入队', async () => {
     const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
     const queueMutation = {
@@ -627,6 +679,53 @@ describe('Strategy 任务行为契约', () => {
     resolveBars([{ date: '2026-01-01' }]);
     await vi.waitFor(() => expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(setBusyAction).toHaveBeenLastCalledWith(null));
+  });
+
+  it('Strategy V2 提交不读取 Desktop bars，且并发双击复用一次提交生命周期', async () => {
+    const fetchBarsMutation = { mutateAsync: vi.fn() };
+    const queueMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'run-v2' } as BacktestJob),
+    };
+    const handlers = createStrategyActionHandlers({
+      name: '',
+      schemaText: '{}',
+      busyAction: null,
+      setBusyAction: vi.fn(),
+      toastManager: { add: vi.fn() },
+      createMutation: { mutateAsync: vi.fn() },
+      fetchBarsMutation,
+      queueMutation,
+      runMutation: { mutateAsync: vi.fn() },
+      cancelMutation: { mutateAsync: vi.fn() },
+      load: vi.fn().mockResolvedValue(undefined),
+    });
+    const version = {
+      id: 'version-v2',
+      version: 2,
+      schema: {
+        schemaVersion: '2',
+        executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
+      },
+    };
+    const setup = {
+      period: { start: '2026-01-01', end: '2026-01-31' },
+      initialCash: 100_000,
+      dataAsOf: '2026-02-01T00:00:00Z',
+    };
+
+    const firstSubmit = handlers.startBacktest(version, setup);
+    const duplicateSubmit = handlers.startBacktest(version, setup);
+    await expect(firstSubmit).resolves.toBe(true);
+    await expect(duplicateSubmit).resolves.toBe(false);
+    await vi.waitFor(() => expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1));
+    expect(fetchBarsMutation.mutateAsync).not.toHaveBeenCalled();
+    expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        strategyVersionId: 'version-v2',
+        idempotencyKey: expect.any(String),
+        runConfig: expect.objectContaining({ initialCash: { CNY: '100000' } }),
+      }),
+    );
   });
 
   it('后台行情失败或为空时反馈错误并释放 busy，不产生未处理拒绝', async () => {
