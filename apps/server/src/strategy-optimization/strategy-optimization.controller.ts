@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
+import { RiskService } from '../risk/risk.service.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
 import { StrategyOptimizationService } from './strategy-optimization.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
@@ -14,6 +15,7 @@ export class StrategyOptimizationController {
     private readonly optimization: StrategyOptimizationService,
     private readonly reads: StrategyOptimizationReadService,
     private readonly riskApplications: StrategyRiskApplicationService,
+    private readonly risk: RiskService,
   ) {}
 
   @Get('capabilities')
@@ -70,7 +72,7 @@ export class StrategyOptimizationController {
 
   @Post('risk-applications/:id/evaluate')
   evaluateRiskApplication(@Param('id') id: string) {
-    return this.riskApplications.evaluate(id);
+    return this.risk.evaluateStrategyApplication(id);
   }
 
   @Post('experiments')

@@ -25,6 +25,7 @@ export type StoredRule = {
   sourcePlanId?: string | null;
   condition?: unknown;
   parameters?: unknown;
+  config?: unknown;
 };
 
 export type ParsedScan = {

@@ -25,6 +25,10 @@ export type RiskNotificationInput = {
   };
   accountId?: string;
   symbol?: string;
+  policy?: {
+    enabled?: boolean;
+    cooldownMinutes?: number;
+  };
 };
 
 export const buildRiskNotification = (
@@ -56,7 +60,7 @@ export const enqueueRiskNotificationIfNeeded = async (
   notifications: NotificationService,
   input: RiskNotificationInput & { mode: 'actual' | 'shadow'; created: boolean },
 ) => {
-  if (input.mode === 'shadow') return;
+  if (input.mode === 'shadow' || input.policy?.enabled === false) return;
   if (
     !input.created &&
     !(await notifications.subjectDeliveryStatus({ type: 'risk-event', id: input.eventId }))
@@ -64,5 +68,10 @@ export const enqueueRiskNotificationIfNeeded = async (
   )
     return;
   const notification = buildRiskNotification(input);
-  await notifications.enqueue(notification.subject, notification.message, notificationPolicy);
+  await notifications.enqueue(notification.subject, notification.message, {
+    ...notificationPolicy,
+    ...(input.policy?.cooldownMinutes === undefined
+      ? {}
+      : { cooldownMinutes: Math.max(0, Math.floor(input.policy.cooldownMinutes)) }),
+  });
 };

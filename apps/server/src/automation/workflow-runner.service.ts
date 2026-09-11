@@ -74,7 +74,10 @@ export class AutomationWorkflowRunner {
     return { capturedAt: input.capturedAt, snapshots };
   }
 
-  riskScan(contexts: unknown[]) {
-    return this.risk.scan(contexts);
+  riskScan(contexts: unknown[], evaluatedAt?: string, includeStrategyRules = true) {
+    return this.risk.scan(contexts, {
+      ...(evaluatedAt ? { evaluatedAt: new Date(evaluatedAt) } : {}),
+      includeStrategyRules,
+    });
   }
 }
