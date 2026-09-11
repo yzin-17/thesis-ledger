@@ -93,6 +93,32 @@ export class StrategyOptimizationReadService {
     `);
   }
 
+  private usageNote(experiment: ExperimentRow, attempts: AttemptRow[]) {
+    const routes = Array.isArray(experiment.modelConfig) ? experiment.modelConfig : [];
+    const summaries = routes.flatMap((routeValue) => {
+      const route = toRecord(routeValue);
+      if (typeof route.provider !== 'string' || typeof route.model !== 'string') return [];
+      const modelKey = `${route.provider}:${route.model}`;
+      const modelAttempts = attempts.filter((attempt) => attempt.modelKey === modelKey);
+      const inputTokens = modelAttempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0);
+      const outputTokens = modelAttempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0);
+      const durationMs = modelAttempts.reduce((sum, attempt) => sum + (attempt.durationMs ?? 0), 0);
+      const costUnknown =
+        route.costStatus === 'unknown' ||
+        modelAttempts.some((attempt) => toRecord(attempt.modelMetadata).costStatus === 'unknown');
+      const cost = modelAttempts.reduce((sum, attempt) => {
+        if (attempt.cost === null) return sum;
+        const value = Number(attempt.cost.toString());
+        return Number.isFinite(value) ? sum + value : sum;
+      }, 0);
+      const costText = costUnknown ? '费用未知' : `费用 ${cost.toFixed(6)}`;
+      return [
+        `${modelKey}：${modelAttempts.length} 次，Token ${inputTokens}/${outputTokens}，耗时 ${(durationMs / 1000).toFixed(1)}s，${costText}`,
+      ];
+    });
+    return summaries.length > 0 ? ` 模型调用：${summaries.join('；')}。` : '';
+  }
+
   async compare(id: string) {
     const { experiment, candidates, attempts } = await this.get(id);
     const ranked = candidates
@@ -109,7 +135,7 @@ export class StrategyOptimizationReadService {
       baseline: { runRefs: experiment.baselineRunRefs, metrics: experiment.baselineMetrics },
       candidates: ranked,
       attempts,
-      note: '排序仅使用 Server 真实回测的 validation 指标；AI 自述指标不会进入评分。',
+      note: `排序仅使用 Server 真实回测的 validation 指标；AI 自述指标不会进入评分。${this.usageNote(experiment, attempts)}`,
     };
   }
 }
