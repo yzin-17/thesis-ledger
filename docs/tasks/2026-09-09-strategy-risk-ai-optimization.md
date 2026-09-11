@@ -441,7 +441,7 @@
 
 **完成条件：**仓库内契约、迁移、V2 集成、安全与 CI 门禁全部有证据且无未解释失败；外部 Provider、在线行情和人工浏览器验证未具备环境时保持部署能力受限，不得伪报通过，也不反向否定仓库实现完成度。
 
-**验证证据：**PR #38 代码 head CI #428 / workflow run `34644770023` 已全绿；最终文档 head 仍需再次执行完整 PR CI 后合并。
+**验证证据：**PR #38 代码 head CI #428 / workflow run `34644770023` 已全绿；最终文档 HEAD `009c59b0056178cc6f2a902684dd908e85feb999` 的 PR CI #430 / workflow run `34645792807` 同样为 `completed / success`，随后 squash merge 为 `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`，合并后 `main` CI #431 / workflow run `34647495457` 成功。
 
 ### T15：完成增量发布、回退开关与文档收敛
 
@@ -459,13 +459,13 @@
 2. 验证迁移发布和回退/关闭方案；不在回退时删除正式版本、来源审计或真实账本。
 3. 按 A 规则生成、B 自动实验顺序开放能力；未完成的市场或外部门禁在 UI 和发布说明中明确。
 4. 把已实现的当前边界更新到验证记录；V2 原文只保留后续规格链接，不回写虚假的历史完成状态。
-5. 核对全部 AC 的证据映射、相对链接与任务计数；PR #35/#36/#37/#38、`main` CI #412、PostgreSQL Service E2E 与部署门禁分开记录。
+5. 核对全部 AC 的证据映射、相对链接与任务计数；PR #35/#36/#37/#38、PR #38 最终 CI #430、merge commit `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`、`main` CI #431、PostgreSQL Service E2E 与部署门禁分开记录。
 
-**验证方式：**能力开关与回退证据、文档链接/状态一致性、最终 AC 对照、迁移和发布证据审查；本次文档提交后再次执行完整 PR CI。
+**验证方式：**能力开关与回退证据、文档链接/状态一致性、最终 AC 对照、迁移和发布证据审查；PR #38 最终文档 HEAD 与合并后 `main` CI 已完成验证。
 
 **完成条件：**文档与实际开放能力一致；全部首版任务完成条件都有仓库证据，外部限制有清晰披露。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 最终 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md)；PR #38 最终 CI #430 / workflow run `34645792807` 与合并后 `main` CI #431 / workflow run `34647495457` 均为 `completed / success`。
 
 ## 4. 必须覆盖的测试矩阵
 
@@ -611,7 +611,7 @@ pnpm exec prettier --check \
 - PR #37：二次 Review 收口；已 squash merge，`main` commit 为 `b935fe1eed01abe97192c0a5e2c9d224c80623b7`；合并后 `main` CI #412（workflow run `34624796882`）为 `completed / success`。
 - PR #38：最终严格 Review 收口，补齐 crash-safe Optimization step、采纳幂等/并发、多模型 telemetry、RiskApplication Diff、分钟策略 1m capability fail-closed 与真正的 PostgreSQL service-level E2E。
 - PR #38 代码 HEAD `7a41c7776ce6742d923315756fc1238d79fe003a` 的 CI #428（workflow run `34644770023`）中，quality、contracts-and-guardrails、mobile-android-native 全部 `success`，desktop-packages 按 PR 条件正常 `skipped`。
-- 本次 T15 文档提交后还必须以包含 Task/Verification 的最终 PR #38 CI 全绿作为合并证据；不能用 #428 冒充后续文档 head 的最终 CI。
+- PR #38 最终文档 HEAD `009c59b0056178cc6f2a902684dd908e85feb999` 的 CI #430（workflow run `34645792807`）为 `completed / success`；随后 squash merge 为 `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`，合并后 `main` CI #431（workflow run `34647495457`）同样为 `completed / success`。
 
 部署能力边界保持独立：
 
@@ -647,7 +647,7 @@ pnpm exec prettier --check \
 
 ### Review 结论
 
-- 结论：**T00–T15 = 16/16 仓库实现完成**。PR #38 在 T15 文档提交后仍需最终 PR CI 全绿、squash merge，并确认新的 `main` push CI 全绿后才完成仓库发布动作。
+- 结论：**T00–T15 = 16/16 仓库实现完成**。PR #38 最终文档 HEAD 已通过 CI #430，已 squash merge 为 `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`，合并后的 `main` CI #431 也已成功，仓库发布动作完成。
 - PostgreSQL 证据：Migration matrix、direct-SQL database smoke 和独立 service-level E2E 均已实际运行；Service E2E 使用真实 PostgreSQL/Prisma/服务事务，Provider/Backtest 仅作为外部边界替身。
 - 恢复与幂等证据：Optimization Provider 前 attempt 持久化、unknown_outcome 禁止自动二次请求、succeeded round 经 reconciler 重扫不重复调用；正式采纳同 key 并发/响应丢失重试返回同一正式版本。
 - UI 证据：多模型 usage/cost/status/failure 与 RiskApplication Diff 已直接展示；采纳策略仍不自动升级风险应用。
