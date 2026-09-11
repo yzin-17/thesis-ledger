@@ -78,6 +78,9 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   const [validationEnd, setValidationEnd] = useState(daysAgo(91));
   const [endDate, setEndDate] = useState(daysAgo(1));
   const [initialCash, setInitialCash] = useState('100000');
+  const [maxAiCalls, setMaxAiCalls] = useState('6');
+  const [maxBacktestRuns, setMaxBacktestRuns] = useState('20');
+  const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');
   const [executionModelJson, setExecutionModelJson] = useState('');
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
   const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
@@ -176,7 +179,11 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
           test: { start: addDays(validationEnd, 1), end: endDate },
         },
         runConfig,
-        budget: { maxAiCalls: 6, maxBacktestRuns: 20, maxDurationSeconds: 1_800 },
+        budget: {
+          maxAiCalls: Number(maxAiCalls),
+          maxBacktestRuns: Number(maxBacktestRuns),
+          maxDurationSeconds: Number(maxDurationSeconds),
+        },
         maxRounds: 2,
         idempotencyKey: crypto.randomUUID(),
       };
@@ -284,7 +291,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             </label>
             <label className="space-y-1 text-sm">
               <span className="text-muted-foreground">优化目标</span>
-              <Select value={objective} onValueChange={(value) => value && setObjective(value as typeof objective)}>
+              <Select value={objective} onValueChange={(value) => value && setObjective(value)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="balanced">收益 / 回撤平衡</SelectItem>
@@ -320,6 +327,12 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <Input type="date" value={validationEnd} onChange={(event) => setValidationEnd(event.target.value)} aria-label="验证集结束" />
             <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} aria-label="测试集结束" />
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">AI 调用上限</span><Input type="number" min="1" max="30" value={maxAiCalls} onChange={(event) => setMaxAiCalls(event.target.value)} /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">回测运行上限</span><Input type="number" min="2" max="100" value={maxBacktestRuns} onChange={(event) => setMaxBacktestRuns(event.target.value)} /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">最长计算（秒）</span><Input type="number" min="30" max="86400" value={maxDurationSeconds} onChange={(event) => setMaxDurationSeconds(event.target.value)} /></label>
+          </div>
+          <p className="text-xs text-muted-foreground">预算为服务端硬上限；达到调用、回测、费用或时长上限后停止创建新工作。</p>
           <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">初始资金（{currency}）</span><Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} /></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">执行模型 JSON（可选）</span><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></label>

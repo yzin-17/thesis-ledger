@@ -9,6 +9,7 @@ import {
 import { BacktestService } from '../backtest/backtest.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
+  optimizationRemainingDurationMs,
   optimizationSha256,
   toRecord,
   type EvaluationSummary,
@@ -79,11 +80,14 @@ export class StrategyOptimizationRunService {
       SET "aiCallsUsed"="aiCallsUsed"+${aiCalls}, "backtestRunsUsed"="backtestRunsUsed"+${runs},
           "costUsed"="costUsed"+${estimatedCost}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL
+        AND EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "createdAt"))
+          <= COALESCE(NULLIF("budget"->>'maxDurationSeconds', '')::int, 1800)
         AND "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int)
         AND "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int)
         AND (("budget"->>'maxCost') IS NULL OR "costUsed"+${estimatedCost} <= (("budget"->>'maxCost')::decimal))
     `);
-    if (updated !== 1) throw new BadRequestException('优化实验预算已耗尽或实验已取消');
+    if (updated !== 1)
+      throw new BadRequestException('优化实验预算或最长运行时长已耗尽，或实验已取消');
   }
 
   async reconcileCost(id: string, estimated: number, actual: number) {
@@ -116,6 +120,12 @@ export class StrategyOptimizationRunService {
     `);
   }
 
+  requestTimeoutMs(experiment: ExperimentRow, ceilingMs: number) {
+    const remaining = optimizationRemainingDurationMs(experiment);
+    if (remaining <= 0) throw new BadRequestException('优化实验最长运行时长已耗尽');
+    return Math.max(1, Math.min(ceilingMs, remaining));
+  }
+
   private async waitForRun(id: string, timeoutMs = 180_000): Promise<BacktestJob> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -143,7 +153,7 @@ export class StrategyOptimizationRunService {
     if (run.status === 'queued') await this.backtests.runV2(run.id);
     const terminal = ['succeeded', 'failed', 'cancelled'].includes(run.status)
       ? run
-      : await this.waitForRun(run.id);
+      : await this.waitForRun(run.id, this.requestTimeoutMs(experiment, 180_000));
     if (terminal.status !== 'succeeded')
       throw new Error(
         `V2 Run ${terminal.id} ${terminal.status}: ${terminal.errorSummary ?? terminal.errorCode ?? 'unknown'}`,

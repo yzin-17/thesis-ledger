@@ -150,7 +150,7 @@ export const applyOptimizationProposal = (
 ): StrategySchemaV2 => {
   const allowed = new Set(allowedParameterIds);
   const byId = new Map(descriptors.map((descriptor) => [descriptor.parameterId, descriptor]));
-  const next = structuredClone(baseline) as StrategySchemaV2;
+  const next = structuredClone(baseline);
   for (const change of proposal.changes) {
     if (!allowed.has(change.parameterId))
       throw new BadRequestException(`参数未授权: ${change.parameterId}`);
@@ -168,7 +168,7 @@ export const applyOptimizationProposal = (
       (next.cost as unknown as Record<string, unknown>)[descriptor.target.field] = change.value;
     }
   }
-  return strategySchemaV2.parse(next) as StrategySchemaV2;
+  return strategySchemaV2.parse(next);
 };
 
 export const proposalDiff = (

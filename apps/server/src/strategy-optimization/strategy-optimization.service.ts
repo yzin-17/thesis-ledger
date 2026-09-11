@@ -12,7 +12,7 @@ import { AiProviderRegistry } from '../ai/provider-registry.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { StrategyOptimizationCandidateService } from './strategy-optimization-candidate.service.js';
 import {
-  asJson,
+  optimizationAttemptFailureStatus,
   optimizationFeatureEnabled,
   optimizationSha256,
   redactOptimizationError,
@@ -232,10 +232,21 @@ export class StrategyOptimizationService implements OnModuleInit {
         experimentId: experiment.id,
         modelKey,
         attempt: round,
-        status: 'failed',
+        status: optimizationAttemptFailureStatus(error),
         error: redactOptimizationError(error),
       });
     }
+  }
+
+  private async bestValidationScore(experimentId: string, modelKey: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ metrics: unknown }>>(Prisma.sql`
+      SELECT "metrics" FROM "OptimizationCandidate"
+      WHERE "experimentId"=${experimentId}::uuid AND "modelKey"=${modelKey} AND "validationStatus"='valid'
+    `);
+    return rows.reduce((best, row) => {
+      const score = toRecord(toRecord(row.metrics).validation).score;
+      return typeof score === 'number' ? Math.max(best, score) : best;
+    }, Number.NEGATIVE_INFINITY);
   }
 
   private async processModelRounds(
@@ -245,9 +256,14 @@ export class StrategyOptimizationService implements OnModuleInit {
     const descriptors = describeStrategyParameters(baseline.strategy);
     const routes = experiment.modelConfig as Array<{ provider: string; model: string }>;
     for (const route of routes) {
+      const modelKey = `${route.provider}:${route.model}`;
+      let bestScore = Number.NEGATIVE_INFINITY;
       for (let round = 1; round <= experiment.maxRounds; round += 1) {
         await this.processRound(experiment, baseline, descriptors, route, round);
         if (await this.cancelled(experiment.id)) return;
+        const currentBest = await this.bestValidationScore(experiment.id, modelKey);
+        if (round > 1 && currentBest <= bestScore) break;
+        bestScore = Math.max(bestScore, currentBest);
       }
     }
   }

@@ -158,7 +158,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
             </label>
             <label className="space-y-1 text-sm">
               <span className="text-muted-foreground">生效周期</span>
-              <Select value={cycleMode} onValueChange={(value) => value && setCycleMode(value as typeof cycleMode)}>
+              <Select value={cycleMode} onValueChange={(value) => value && setCycleMode(value)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="existingAndFuture">当前及未来持仓周期</SelectItem>

@@ -139,7 +139,7 @@ export class StrategyOptimizationCandidateService {
           ),
           tools: [],
         },
-        AbortSignal.timeout(60_000),
+        AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
       );
       const proposal = optimizationProposalSchema.parse(completion.content);
       await this.prisma.aiRun.update({

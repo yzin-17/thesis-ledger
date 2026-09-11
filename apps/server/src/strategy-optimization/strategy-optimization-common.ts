@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { canonicalStrategyMonitoringJson } from '@thesis-ledger/domain';
 
 export type ExperimentRow = {
@@ -96,6 +96,21 @@ export const toRecord = (value: unknown): Record<string, unknown> =>
     : {};
 
 export const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
+
+export const optimizationRemainingDurationMs = (
+  input: Pick<ExperimentRow, 'createdAt' | 'budget'>,
+  now = Date.now(),
+) => {
+  const raw = toRecord(input.budget).maxDurationSeconds;
+  const maxSeconds =
+    typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 1_800;
+  return Math.max(0, maxSeconds * 1_000 - (now - input.createdAt.getTime()));
+};
+
+export const optimizationAttemptFailureStatus = (error: unknown) => {
+  const name = error instanceof Error ? error.name : '';
+  return name === 'AbortError' || name === 'TimeoutError' ? 'unknown_outcome' : 'failed';
+};
 
 export const redactOptimizationError = (error: unknown) =>
   (error instanceof Error ? error.message : String(error))
