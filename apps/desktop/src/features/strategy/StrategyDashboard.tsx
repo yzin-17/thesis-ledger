@@ -20,6 +20,7 @@ import { createStrategyActionHandlers } from './strategy.actions.js';
 import { useBacktestJobQuery, useStrategyQueries } from './strategy.queries.js';
 import { useBacktestJobEvents } from './strategy.events.js';
 import { StrategyEditorSheet } from './StrategyEditorSheet.js';
+import { StrategyOptimizationWorkspace } from './StrategyOptimizationWorkspace.js';
 import {
   BacktestSetupDialog,
   StrategyJobs,
@@ -125,7 +126,7 @@ export function StrategyDashboard() {
       <PageHeader
         eyebrow="策略实验室"
         title="策略实验"
-        description="创建投资策略，通过历史回测评估表现。"
+        description="创建投资策略，通过历史回测评估表现，并将验证后的策略衔接到风险监控与 AI 参数优化。"
         actions={
           <RefreshIconButton
             label="刷新策略与回测任务"
@@ -141,6 +142,7 @@ export function StrategyDashboard() {
           <TabsTrigger value="jobs">
             回测任务{jobs.length > 0 ? ` (${jobs.length})` : ''}
           </TabsTrigger>
+          <TabsTrigger value="optimization">优化与风险</TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="mt-0">
           <StrategyLibrary
@@ -165,6 +167,9 @@ export function StrategyDashboard() {
             onViewResult={(job) => setResultJobId(job.id)}
             onOpenLibrary={() => setActiveTab('library')}
           />
+        </TabsContent>
+        <TabsContent value="optimization" className="mt-0">
+          <StrategyOptimizationWorkspace strategies={strategies} />
         </TabsContent>
       </Tabs>
       <StrategyEditorSheet
