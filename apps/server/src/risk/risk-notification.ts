@@ -28,6 +28,7 @@ export type RiskNotificationInput = {
   policy?: {
     enabled?: boolean;
     cooldownMinutes?: number;
+    channels?: string[];
   };
 };
 
@@ -61,6 +62,8 @@ export const enqueueRiskNotificationIfNeeded = async (
   input: RiskNotificationInput & { mode: 'actual' | 'shadow'; created: boolean },
 ) => {
   if (input.mode === 'shadow' || input.policy?.enabled === false) return;
+  // 当前 NotificationService 唯一可投递渠道为 feishu；策略应用显式移除该渠道时不入队。
+  if (input.policy?.channels && !input.policy.channels.includes('feishu')) return;
   if (
     !input.created &&
     !(await notifications.subjectDeliveryStatus({ type: 'risk-event', id: input.eventId }))
