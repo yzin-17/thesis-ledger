@@ -128,10 +128,11 @@ const riskRule = (
       costBasisPolicy: 'account-projection-average-cost-including-known-fees',
     };
   }
-  const holdingPeriods = risk.periods;
+  const holdingPeriods =
+    'periods' in risk && typeof risk.periods === 'number' ? risk.periods : undefined;
   if (
     risk.type === 'maxHoldingPeriod' &&
-    typeof holdingPeriods === 'number' &&
+    holdingPeriods !== undefined &&
     Number.isInteger(holdingPeriods) &&
     holdingPeriods > 0
   ) {
