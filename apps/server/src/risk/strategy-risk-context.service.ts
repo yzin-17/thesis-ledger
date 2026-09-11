@@ -274,6 +274,72 @@ export class StrategyRiskContextService {
     });
   }
 
+  private async derivedExchangeValues(
+    symbol: string,
+    timeframe: DerivedBacktestBar['timeframe'],
+    market: TradingMarket,
+    source: StrategyRiskPositionTradeContext,
+    evaluatedAt: Date,
+    requiresHoldingPeriods: boolean,
+  ) {
+    const bars = await this.derivedBars(symbol, timeframe, market, evaluatedAt);
+    const bar = bars.at(-1);
+    const holdingPeriods =
+      requiresHoldingPeriods && source.trade?.openedAt && bar
+        ? Math.max(
+            0,
+            (
+              await this.derivedBars(
+                symbol,
+                timeframe,
+                market,
+                evaluatedAt,
+                source.trade.openedAt,
+              )
+            ).length - 1,
+          )
+        : undefined;
+    return {
+      price: bar?.close,
+      occurredAt: bar?.occurredAt,
+      availableAt: bar?.availableAt,
+      holdingPeriods,
+    };
+  }
+
+  private async directExchangeValues(
+    symbol: string,
+    timeframe: '1m' | '1d',
+    market: TradingMarket,
+    source: StrategyRiskPositionTradeContext,
+    evaluatedAt: Date,
+    requiresHoldingPeriods: boolean,
+  ) {
+    const bars = await this.directBars(symbol, timeframe, market, evaluatedAt);
+    const bar = bars.at(-1);
+    const holdingPeriods =
+      requiresHoldingPeriods && source.trade?.openedAt && bar
+        ? Math.max(
+            0,
+            (
+              await this.directBars(
+                symbol,
+                timeframe,
+                market,
+                evaluatedAt,
+                source.trade.openedAt,
+              )
+            ).length - 1,
+          )
+        : undefined;
+    return {
+      price: bar?.close.toString(),
+      occurredAt: bar?.timestamp.toISOString(),
+      availableAt: bar?.fetchedAt.toISOString(),
+      holdingPeriods,
+    };
+  }
+
   private async exchangeContext(
     symbol: string,
     target: StrategyRiskTarget,
@@ -282,46 +348,28 @@ export class StrategyRiskContextService {
   ): Promise<StrategyRiskActualContext> {
     const market = this.tradingMarket(target);
     if (!market) throw new BadRequestException('策略风险应用缺少可识别的交易市场');
-    const derived = isDerivedTimeframe(target.primaryTimeframe);
-    const latestBars = derived
-      ? await this.derivedBars(symbol, target.primaryTimeframe, market, evaluatedAt)
-      : target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d'
-        ? await this.directBars(symbol, target.primaryTimeframe, market, evaluatedAt)
-        : [];
-    const bar = latestBars.at(-1);
 
-    let holdingPeriods: number | undefined;
-    if (target.requiresHoldingPeriods && source.trade?.openedAt && bar) {
-      const holdingBars = derived
-        ? await this.derivedBars(
+    const values = isDerivedTimeframe(target.primaryTimeframe)
+      ? await this.derivedExchangeValues(
+          symbol,
+          target.primaryTimeframe,
+          market,
+          source,
+          evaluatedAt,
+          target.requiresHoldingPeriods === true,
+        )
+      : target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d'
+        ? await this.directExchangeValues(
             symbol,
-            target.primaryTimeframe as DerivedBacktestBar['timeframe'],
+            target.primaryTimeframe,
             market,
+            source,
             evaluatedAt,
-            source.trade.openedAt,
+            target.requiresHoldingPeriods === true,
           )
-        : await this.directBars(
-            symbol,
-            target.primaryTimeframe as '1m' | '1d',
-            market,
-            evaluatedAt,
-            source.trade.openedAt,
-          );
-      holdingPeriods = Math.max(0, holdingBars.length - 1);
-    }
+        : {};
 
     const base = this.baseContext(source);
-    const price = bar?.close.toString();
-    const occurredAt = 'occurredAt' in (bar ?? {})
-      ? (bar as DerivedBacktestBar).occurredAt
-      : bar
-        ? bar.timestamp.toISOString()
-        : undefined;
-    const availableAt = 'availableAt' in (bar ?? {})
-      ? (bar as DerivedBacktestBar).availableAt
-      : bar
-        ? bar.fetchedAt.toISOString()
-        : undefined;
     return {
       ...(base.positionId ? { positionId: base.positionId } : {}),
       ...(base.tradeId ? { tradeId: base.tradeId } : {}),
@@ -329,10 +377,10 @@ export class StrategyRiskContextService {
       context: {
         ...(base.quantity ? { quantity: base.quantity } : {}),
         ...(base.averageCost ? { averageCost: base.averageCost } : {}),
-        ...(price ? { price } : {}),
-        ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
-        ...(occurredAt ? { occurredAt } : {}),
-        ...(availableAt ? { availableAt } : {}),
+        ...(values.price ? { price: values.price } : {}),
+        ...(values.holdingPeriods === undefined ? {} : { holdingPeriods: values.holdingPeriods }),
+        ...(values.occurredAt ? { occurredAt: values.occurredAt } : {}),
+        ...(values.availableAt ? { availableAt: values.availableAt } : {}),
       },
     };
   }
