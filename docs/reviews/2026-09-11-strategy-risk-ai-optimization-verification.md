@@ -3,7 +3,7 @@
 > 日期：2026-09-11  
 > 对应任务：`2026-09-09-strategy-risk-ai-optimization`  
 > 实施 PR：#35、#36、#37、#38  
-> 状态：T00–T15 仓库实现与仓库级验证已收口；PR #37 已合并且 `main` CI #412 成功，PR #38 负责最终严格 Review 收口；部署能力门禁单独记录
+> 状态：T00–T15 仓库实现、仓库级验证与发布动作已收口；PR #38 已 squash merge，`main` CI #431 成功；部署能力门禁单独记录
 
 ## 当前实现基线
 
@@ -105,7 +105,7 @@ PR #38 代码 HEAD `7a41c7776ce6742d923315756fc1238d79fe003a` 的 CI #428（work
 - `mobile-android-native`：Android debug native build `success`；
 - `desktop-packages`：按现有 PR workflow 条件正常 `skipped`。
 
-T15 文档修订提交后必须以包含本文档的最终 PR #38 CI 为合并证据；#428 证明功能代码 head 已全绿，不提前冒充最终文档 head 的 CI。
+最终文档 HEAD `009c59b0056178cc6f2a902684dd908e85feb999` 的 PR CI #430（workflow run `34645792807`）为 `completed / success`。PR #38 随后 squash merge，merge commit 为 `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`；合并后的 `main` CI #431（workflow run `34647495457`）同样为 `completed / success`。至此 PR #38 的代码、文档、合并与 main 发布动作均已形成完整证据链。
 
 ## 部署能力门禁
 
@@ -119,7 +119,8 @@ T15 文档修订提交后必须以包含本文档的最终 PR #38 CI 为合并�
 
 ## 最终收口状态
 
-- T00–T15 的仓库实现、定向测试、PostgreSQL Service E2E 与仓库 CI 门禁均已形成证据链；
+- T00–T15 的仓库实现、定向测试、PostgreSQL Service E2E、最终 PR CI、squash merge 与 `main` CI 均已形成证据链；
 - PR #37 已 squash merge，merge commit `b935fe1eed01abe97192c0a5e2c9d224c80623b7`，`main` CI #412 / workflow run `34624796882` 已成功；
-- PR #38 代码 head CI #428 / workflow run `34644770023` 已全绿；本文档提交后仍需以 PR #38 最终文档 head 的全绿 CI 作为合并依据；
+- PR #38 最终文档 HEAD `009c59b0056178cc6f2a902684dd908e85feb999` 的 CI #430 / workflow run `34645792807` 已成功；随后 squash merge 为 `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`，`main` CI #431 / workflow run `34647495457` 已成功；
+- 结论：**T00–T15 = 16/16，仓库实现、验证与发布动作全部完成**；
 - 真实外部 AI Provider、在线 CN/HK/US Stock/ETF + CN NAV、Desktop 人工视觉/键盘/focus 继续作为部署能力门禁，不以 fixture 或仓库 CI 冒充。
