@@ -18,7 +18,7 @@ export class StrategyOptimizationController {
 
   @Get('capabilities')
   capabilities() {
-    return this.optimization.capabilities();
+    return this.reads.capabilities();
   }
 
   @Get('strategies/:strategyVersionId/parameters')
@@ -80,17 +80,17 @@ export class StrategyOptimizationController {
 
   @Get('experiments')
   listExperiments(@Query() query: unknown) {
-    return this.optimization.list(listExperimentsQuery.parse(query).limit);
+    return this.reads.list(listExperimentsQuery.parse(query).limit);
   }
 
   @Get('experiments/:id')
   experiment(@Param('id') id: string) {
-    return this.optimization.get(id);
+    return this.reads.get(id);
   }
 
   @Get('experiments/:id/compare')
   compare(@Param('id') id: string) {
-    return this.optimization.compare(id);
+    return this.reads.compare(id);
   }
 
   @Post('experiments/:id/clone')
