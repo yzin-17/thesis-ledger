@@ -35,6 +35,13 @@ export type StrategyRiskActualContext = {
   };
 };
 
+type ExchangeValues = {
+  price?: string;
+  holdingPeriods?: number;
+  occurredAt?: string;
+  availableAt?: string;
+};
+
 const timeframeMinutes = (timeframe: string) => {
   const matched = timeframe.match(/^(1|5|15|30|60)m$/u);
   return matched ? Number(matched[1]) : null;
@@ -174,7 +181,6 @@ export class StrategyRiskContextService {
     if (minutes !== null) return new Date(timestamp.getTime() + minutes * 60_000);
     if (timeframe !== '1d' || !market) return null;
     const calendar = tradingCalendars[market];
-    // Daily Bar 的 ISO 日期是交易日身份；不能把 UTC 零点直接转市场时区，否则 US 会落到前一天。
     const tradingDate = timestamp.toISOString().slice(0, 10);
     const localNoon = utcForLocalMinute(tradingDate, 12 * 60, calendar.timezone);
     const sessions = calendar.sessionsForDate(localNoon);
@@ -281,7 +287,7 @@ export class StrategyRiskContextService {
     source: StrategyRiskPositionTradeContext,
     evaluatedAt: Date,
     requiresHoldingPeriods: boolean,
-  ) {
+  ): Promise<ExchangeValues> {
     const bars = await this.derivedBars(symbol, timeframe, market, evaluatedAt);
     const bar = bars.at(-1);
     const holdingPeriods =
@@ -300,10 +306,8 @@ export class StrategyRiskContextService {
           )
         : undefined;
     return {
-      price: bar?.close,
-      occurredAt: bar?.occurredAt,
-      availableAt: bar?.availableAt,
-      holdingPeriods,
+      ...(bar ? { price: bar.close, occurredAt: bar.occurredAt, availableAt: bar.availableAt } : {}),
+      ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
     };
   }
 
@@ -314,7 +318,7 @@ export class StrategyRiskContextService {
     source: StrategyRiskPositionTradeContext,
     evaluatedAt: Date,
     requiresHoldingPeriods: boolean,
-  ) {
+  ): Promise<ExchangeValues> {
     const bars = await this.directBars(symbol, timeframe, market, evaluatedAt);
     const bar = bars.at(-1);
     const holdingPeriods =
@@ -333,10 +337,14 @@ export class StrategyRiskContextService {
           )
         : undefined;
     return {
-      price: bar?.close.toString(),
-      occurredAt: bar?.timestamp.toISOString(),
-      availableAt: bar?.fetchedAt.toISOString(),
-      holdingPeriods,
+      ...(bar
+        ? {
+            price: bar.close.toString(),
+            occurredAt: bar.timestamp.toISOString(),
+            availableAt: bar.fetchedAt.toISOString(),
+          }
+        : {}),
+      ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
     };
   }
 
@@ -349,25 +357,26 @@ export class StrategyRiskContextService {
     const market = this.tradingMarket(target);
     if (!market) throw new BadRequestException('策略风险应用缺少可识别的交易市场');
 
-    const values = isDerivedTimeframe(target.primaryTimeframe)
-      ? await this.derivedExchangeValues(
-          symbol,
-          target.primaryTimeframe,
-          market,
-          source,
-          evaluatedAt,
-          target.requiresHoldingPeriods === true,
-        )
-      : target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d'
-        ? await this.directExchangeValues(
-            symbol,
-            target.primaryTimeframe,
-            market,
-            source,
-            evaluatedAt,
-            target.requiresHoldingPeriods === true,
-          )
-        : {};
+    let values: ExchangeValues = {};
+    if (isDerivedTimeframe(target.primaryTimeframe)) {
+      values = await this.derivedExchangeValues(
+        symbol,
+        target.primaryTimeframe,
+        market,
+        source,
+        evaluatedAt,
+        target.requiresHoldingPeriods === true,
+      );
+    } else if (target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d') {
+      values = await this.directExchangeValues(
+        symbol,
+        target.primaryTimeframe,
+        market,
+        source,
+        evaluatedAt,
+        target.requiresHoldingPeriods === true,
+      );
+    }
 
     const base = this.baseContext(source);
     return {
