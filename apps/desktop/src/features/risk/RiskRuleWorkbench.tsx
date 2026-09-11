@@ -394,11 +394,7 @@ function RuleDetail({
               aria-busy={restoring}
             >
               {restoring && (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
               )}
               {restoring ? '恢复中…' : '恢复规则'}
             </Button>
@@ -423,11 +419,7 @@ function RuleDetail({
               aria-busy={testing}
             >
               {testing && (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
               )}
               {testing ? '测试中…' : '人工测试'}
             </Button>
@@ -449,11 +441,7 @@ function RuleDetail({
               aria-busy={toggling}
             >
               {toggling && (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
               )}
               {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
             </Button>
@@ -466,11 +454,7 @@ function RuleDetail({
               aria-busy={archiving}
             >
               {archiving && (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
               )}
               归档规则
             </Button>

@@ -6,7 +6,7 @@ import {
 } from './trading-calendar.js';
 import { DecimalValue } from './decimal.js';
 
-export type BacktestBarQuality = 'complete' | 'partial' | 'suspended' | 'unknown';
+export type BacktestBarQuality = 'complete' | 'partial' | 'suspended' | 'stale' | 'unknown';
 export type BacktestBarCompleteness = 'complete' | 'partial' | 'unavailable';
 
 export interface BacktestMinuteBar {
@@ -20,11 +20,11 @@ export interface BacktestMinuteBar {
   low: string;
   close: string;
   volume: string;
-  amount?: string;
+  amount?: string | undefined;
   provider?: string;
   providerRevision?: string;
-  quality?: BacktestBarQuality;
-  suspended?: boolean;
+  quality?: BacktestBarQuality | undefined;
+  suspended?: boolean | undefined;
 }
 
 export interface DerivedBacktestBar {
@@ -176,7 +176,9 @@ const aggregateBucket = (
   const isTail = bucket.end > localInstant(lastInput.occurredAt, calendar.timezone).minute + 1;
   let quality: BacktestBarQuality = 'complete';
   if (bars.some((bar) => bar.suspended || bar.quality === 'suspended')) quality = 'suspended';
-  else if (missingMinutes > 0) quality = 'partial';
+  else if (bars.some((bar) => bar.quality === 'stale')) quality = 'stale';
+  else if (bars.some((bar) => bar.quality === 'unknown')) quality = 'unknown';
+  else if (missingMinutes > 0 || bars.some((bar) => bar.quality === 'partial')) quality = 'partial';
   const amount = bars.reduce(
     (sum, bar) => sum.plus(bar.amount ?? DecimalValue.from(bar.close).times(bar.volume)),
     DecimalValue.from('0'),
