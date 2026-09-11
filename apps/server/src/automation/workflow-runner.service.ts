@@ -74,7 +74,7 @@ export class AutomationWorkflowRunner {
     return { capturedAt: input.capturedAt, snapshots };
   }
 
-  riskScan(contexts: unknown[]) {
-    return this.risk.scan(contexts);
+  riskScan(contexts: unknown[], evaluatedAt?: string) {
+    return this.risk.scan(evaluatedAt ? { contexts, evaluatedAt } : contexts);
   }
 }
