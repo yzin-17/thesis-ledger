@@ -1,0 +1,43 @@
+name: Temporary Strategy Orchestrator Trim
+on:
+  push:
+    branches: [feat/strategy-risk-ai-optimization-20260911]
+permissions:
+  contents: write
+jobs:
+  trim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/strategy-risk-ai-optimization-20260911
+      - name: Trim duplicated read methods
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('apps/server/src/strategy-optimization/strategy-optimization.service.ts')
+          text = path.read_text()
+          text = text.replace('  type AttemptRow,\n', '')
+          rules = [
+              (r'\n  capabilities\(\) \{.*?\n  \}\n\n  private async formalStrategyVersion', '\n  private async formalStrategyVersion'),
+              (r'\n  private attempts\(id: string\) \{.*?\n  \}\n\n  async get\(id: string\) \{.*?\n  \}\n\n  async list\(limit = 30\) \{.*?\n  \}\n\n  async create', '\n  async create'),
+              (r'\n  async compare\(id: string\) \{.*?\n  \}\n\n  private async eligibleFinalCandidates', '\n  private async eligibleFinalCandidates'),
+          ]
+          for pattern, replacement in rules:
+              text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'expected one match for {pattern}, got {count}')
+          path.write_text(text)
+          PY
+          lines=$(wc -l < apps/server/src/strategy-optimization/strategy-optimization.service.ts)
+          echo "orchestrator lines: $lines"
+          test "$lines" -le 600
+      - name: Commit split
+        run: |
+          rm .github/workflows/tmp-strategy-orchestrator-trim.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: keep optimization orchestrator focused"
+          git push origin HEAD:feat/strategy-risk-ai-optimization-20260911
