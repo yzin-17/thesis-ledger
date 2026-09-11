@@ -1,0 +1,105 @@
+name: Temporary Strategy Experiment Clone Completion V2
+
+on:
+  push:
+    branches:
+      - feat/strategy-risk-ai-optimization-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/strategy-risk-ai-optimization-20260911
+      - name: Implement exposure-aware clone
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path); text = p.read_text()
+              if old not in text: raise SystemExit(f'missing snippet in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          p = Path('packages/schemas/src/strategy-optimization.ts'); text = p.read_text()
+          marker = 'export const optimizationFinalizeSchema = z\n'
+          block = """export const optimizationExperimentCloneSchema = z\n  .object({ idempotencyKey: z.string().trim().min(1).max(200) })\n  .strict();\n\n"""
+          if block not in text:
+              if marker not in text: raise SystemExit('schema marker missing')
+              text = text.replace(marker, block + marker, 1)
+          old = 'export type OptimizationExperimentCreate = z.infer<typeof optimizationExperimentCreateSchema>;'
+          new = old + '\nexport type OptimizationExperimentClone = z.infer<typeof optimizationExperimentCloneSchema>;'
+          if 'export type OptimizationExperimentClone' not in text:
+              if old not in text: raise SystemExit('schema type marker missing')
+              text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          replace(
+            'apps/server/src/strategy-optimization/strategy-optimization.service.ts',
+            '  optimizationAdoptSchema,\n  optimizationExperimentCreateSchema,',
+            '  optimizationAdoptSchema,\n  optimizationExperimentCloneSchema,\n  optimizationExperimentCreateSchema,',
+          )
+          p = Path('apps/server/src/strategy-optimization/strategy-optimization.service.ts'); text = p.read_text()
+          marker = '  async cancel(id: string) {'
+          block = '''  async clone(id: string, input: unknown) {\n    this.assertEnabled();\n    const parsed = optimizationExperimentCloneSchema.parse(input);\n    const previous = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`\n      SELECT * FROM "OptimizationExperiment" WHERE "idempotencyKey"=${parsed.idempotencyKey} LIMIT 1\n    `);\n    if (previous[0]) return previous[0];\n    const source = await this.experiment(id);\n    const cloneId = randomUUID();\n    const inheritedExposure = source.testExposedAt\n      ? { ...toRecord(source.exposure), inheritedFromExperimentId: source.id, inheritedTestExposure: true, inheritedAt: new Date().toISOString() }\n      : { inheritedFromExperimentId: source.id, inheritedTestExposure: false };\n    const rows = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`\n      INSERT INTO "OptimizationExperiment" (\n        "id", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",\n        "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds",\n        "idempotencyKey", "testExposedAt", "exposure", "updatedAt"\n      ) VALUES (\n        ${cloneId}::uuid, ${source.baselineStrategyVersionId}::uuid, 'queued', 'preparing',\n        ${JSON.stringify(source.objective)}::jsonb, ${JSON.stringify(source.allowedParameterIds)}::jsonb,\n        ${JSON.stringify(source.split)}::jsonb, ${JSON.stringify(source.runConfig)}::jsonb,\n        ${source.dataFingerprint}, ${JSON.stringify(source.modelConfig)}::jsonb,\n        ${JSON.stringify(source.budget)}::jsonb, ${source.maxRounds}, ${parsed.idempotencyKey},\n        ${source.testExposedAt}, ${JSON.stringify(inheritedExposure)}::jsonb, CURRENT_TIMESTAMP\n      ) RETURNING *\n    `);\n    const created = rows[0];\n    if (!created) throw new Error('克隆实验创建失败');\n    void this.process(created.id).catch(() => undefined);\n    return created;\n  }\n\n'''
+          if block not in text:
+              if marker not in text: raise SystemExit('service marker missing')
+              text = text.replace(marker, block + marker, 1)
+          p.write_text(text)
+
+          p = Path('apps/server/src/strategy-optimization/strategy-optimization.controller.ts'); text = p.read_text()
+          marker = "  @Post('experiments/:id/cancel')\n  cancel(@Param('id') id: string) {\n    return this.optimization.cancel(id);\n  }\n"
+          block = "  @Post('experiments/:id/clone')\n  clone(@Param('id') id: string, @Body() body: unknown) {\n    return this.optimization.clone(id, body);\n  }\n\n"
+          if block not in text:
+              if marker not in text: raise SystemExit('controller marker missing')
+              text = text.replace(marker, block + marker, 1)
+          p.write_text(text)
+
+          p = Path('apps/desktop/src/features/strategy/strategy-optimization.api.ts'); text = p.read_text()
+          marker = 'export const cancelOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>\n'
+          block = '''export const cloneOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>\n  jsonPost<OptimizationExperimentSummary>(\n    `/strategy-optimization/experiments/${encodeURIComponent(id)}/clone`,\n    { idempotencyKey: crypto.randomUUID() },\n    client,\n  );\n\n'''
+          if block not in text:
+              if marker not in text: raise SystemExit('api marker missing')
+              text = text.replace(marker, block + marker, 1)
+          p.write_text(text)
+
+          p = Path('apps/desktop/src/features/strategy/StrategyOptimizationExperimentPanel.tsx'); text = p.read_text()
+          if 'cloneOptimizationExperiment,' not in text:
+              text = text.replace('  cancelOptimizationExperiment,\n  createOptimizationExperiment,', '  cancelOptimizationExperiment,\n  cloneOptimizationExperiment,\n  createOptimizationExperiment,', 1)
+          marker = '''  const cancelMutation = useMutation({\n    mutationFn: (id: string) => cancelOptimizationExperiment(id),\n    onSuccess: invalidate,\n  });\n'''
+          block = marker + '''  const cloneMutation = useMutation({\n    mutationFn: (id: string) => cloneOptimizationExperiment(id),\n    onSuccess: async (experiment) => {\n      setSelectedExperimentId(experiment.id);\n      setFeedback(experiment.testExposedAt\n        ? '实验已克隆；源实验测试集已暴露，新实验继承暴露状态，不视为新的独立验证。'\n        : '实验已克隆，并继承相同模型、参数、数据切分与预算配置。');\n      await invalidate();\n    },\n    onError: (error) => setFeedback(error instanceof Error ? error.message : '克隆实验失败'),\n  });\n'''
+          if 'const cloneMutation = useMutation' not in text:
+              if marker not in text: raise SystemExit('panel mutation marker missing')
+              text = text.replace(marker, block, 1)
+          old = '<Button size="sm" variant="outline" onClick={() => setSelectedExperimentId(experiment.id)}>查看</Button>\n                {!settledStatuses.has(experiment.status) ?'
+          new = '<Button size="sm" variant="outline" onClick={() => setSelectedExperimentId(experiment.id)}>查看</Button>\n                <Button size="sm" variant="outline" disabled={cloneMutation.isPending} onClick={() => cloneMutation.mutate(experiment.id)}>克隆</Button>\n                {!settledStatuses.has(experiment.status) ?'
+          if '>克隆</Button>' not in text:
+              if old not in text: raise SystemExit('panel clone button marker missing')
+              text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          p = Path('packages/schemas/test/strategy-optimization.test.ts'); text = p.read_text()
+          if 'optimizationExperimentCloneSchema,' not in text:
+              text = text.replace('  optimizationExperimentCreateSchema,\n  optimizationProposalSchema,', '  optimizationExperimentCloneSchema,\n  optimizationExperimentCreateSchema,\n  optimizationProposalSchema,', 1)
+          marker = "\n  it('reserves symmetric model work and final verification before starting', () => {"
+          block = '''\n  it('keeps experiment clone input narrow and cannot reset exposure', () => {\n    expect(optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1' })).toEqual({ idempotencyKey: 'clone-1' });\n    expect(() => optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1', resetExposure: true })).toThrow();\n  });\n'''
+          if "keeps experiment clone input narrow" not in text:
+              if marker not in text: raise SystemExit('test marker missing')
+              text = text.replace(marker, block + marker, 1)
+          p.write_text(text)
+          PY
+      - name: Commit and remove temporary workflows
+        shell: bash
+        run: |
+          rm -f .github/workflows/tmp-strategy-experiment-clone.yml .github/workflows/tmp-strategy-experiment-clone-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: inherit exposure when cloning optimization experiments"
+          git push origin HEAD:feat/strategy-risk-ai-optimization-20260911
