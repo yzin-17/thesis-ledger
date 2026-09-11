@@ -65,6 +65,9 @@ export type AttemptRow = {
   status: string;
   proposal: unknown;
   error: string | null;
+  startedAt: Date | null;
+  leaseUntil: Date | null;
+  completedAt: Date | null;
   createdAt: Date;
   inputTokens: number | null;
   outputTokens: number | null;

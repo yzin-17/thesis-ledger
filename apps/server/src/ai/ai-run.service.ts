@@ -7,6 +7,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
 import { PrismaService } from '../platform/prisma.service.js';
+import { recoverStaleAiRuns } from './ai-run-recovery.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
 import { AiProviderRegistry, completeWithFallback } from './provider-registry.js';
 
@@ -374,29 +375,8 @@ export class AiRunService {
     });
   }
 
-  async recoverStaleRuns(now = new Date(), maxAttempts = 3) {
-    const stale = await this.prisma.aiRun.updateMany({
-      where: { status: 'running', leaseUntil: { lt: now }, executionAttempt: { lt: maxAttempts } },
-      data: {
-        status: 'queued',
-        claimedAt: null,
-        leaseUntil: null,
-        errorCode: 'worker_lease_expired',
-        errorSummary: '执行 Worker 租约已过期，任务已重新排队',
-      },
-    });
-    const exhausted = await this.prisma.aiRun.updateMany({
-      where: { status: 'running', leaseUntil: { lt: now }, executionAttempt: { gte: maxAttempts } },
-      data: {
-        status: 'failed',
-        claimedAt: null,
-        leaseUntil: null,
-        errorCode: 'worker_lease_exhausted',
-        errorSummary: '执行 Worker 多次租约过期，已停止自动重试',
-        completedAt: now,
-      },
-    });
-    return { requeued: stale.count, failed: exhausted.count };
+  recoverStaleRuns(now = new Date(), maxAttempts = 3) {
+    return recoverStaleAiRuns(this.prisma, now, maxAttempts);
   }
 
   /** Server runtime only; callers must derive audit facts from actual execution. */

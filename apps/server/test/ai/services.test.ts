@@ -76,6 +76,45 @@ describe('AI 运行审计', () => {
     await service.resume('run-2');
     expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'run-2' } }));
   });
+
+  it('过期 Optimization AiRun 标记 unknown outcome，不能进入 Research 自动重试', async () => {
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 });
+    const service = new AiRunService({ aiRun: { updateMany } } as never);
+    const now = new Date('2026-09-12T00:00:00.000Z');
+
+    await expect(service.recoverStaleRuns(now)).resolves.toEqual({
+      requeued: 0,
+      failed: 1,
+      optimizationUnknown: 1,
+    });
+    expect(updateMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'running',
+          promptVersion: 'strategy-optimization-v1',
+          leaseUntil: { lt: now },
+        }),
+        data: expect.objectContaining({
+          status: 'failed',
+          errorCode: 'optimization_unknown_outcome',
+        }),
+      }),
+    );
+    expect(updateMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          promptVersion: { not: 'strategy-optimization-v1' },
+        }),
+      }),
+    );
+  });
+
   it('列表只向客户端暴露脱敏后的 Provider fallback 摘要', async () => {
     const service = new AiRunService({
       aiRun: {

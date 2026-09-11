@@ -7,7 +7,6 @@ import {
   type StrategyParameterDescriptor,
   type StrategySchemaV2,
 } from '@thesis-ledger/schemas';
-import { AiRunService } from '../ai/ai-run.service.js';
 import { AiProviderRegistry } from '../ai/provider-registry.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
@@ -19,21 +18,35 @@ import {
   type ExperimentRow,
   type StrategyVersionRecord,
 } from './strategy-optimization-common.js';
-import {
-  isRetriableOptimizationNetworkError,
-  optimizationModelConcurrency,
-} from './strategy-optimization-concurrency.js';
+import { optimizationModelConcurrency } from './strategy-optimization-concurrency.js';
 import {
   applyOptimizationProposal,
   proposalDiff,
 } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 
+type ProviderRoute = { provider: string; model: string };
+type OptimizationStepRow = {
+  id: string;
+  experimentId: string;
+  modelKey: string;
+  aiRunId: string | null;
+  attempt: number;
+  status: string;
+  proposal: unknown;
+  error: string | null;
+  startedAt: Date | null;
+  leaseUntil: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+};
+
+const stepError = (message: string) => new Error(message);
+
 @Injectable()
 export class StrategyOptimizationCandidateService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly aiRuns: AiRunService,
     private readonly providers: AiProviderRegistry,
     private readonly runs: StrategyOptimizationRunService,
   ) {}
@@ -83,11 +96,207 @@ export class StrategyOptimizationCandidateService {
     ];
   }
 
+  private async step(experimentId: string, modelKey: string, round: number) {
+    const rows = await this.prisma.$queryRaw<OptimizationStepRow[]>(Prisma.sql`
+      SELECT * FROM "OptimizationAttempt"
+      WHERE "experimentId"=${experimentId}::uuid AND "modelKey"=${modelKey} AND "attempt"=${round}
+      LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
+  private async assertNoUnknownOutcome(experimentId: string, modelKey: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; attempt: number }>>(Prisma.sql`
+      SELECT "id", "attempt" FROM "OptimizationAttempt"
+      WHERE "experimentId"=${experimentId}::uuid AND "modelKey"=${modelKey} AND "status"='unknown_outcome'
+      ORDER BY "attempt" ASC LIMIT 1
+    `);
+    const blocked = rows[0];
+    if (blocked)
+      throw stepError(
+        `模型 ${modelKey} 第 ${blocked.attempt} 轮结果为 unknown_outcome；禁止自动再次请求 Provider，需显式恢复`,
+      );
+  }
+
+  private async reserveStep(experimentId: string, modelKey: string, round: number) {
+    await this.assertNoUnknownOutcome(experimentId, modelKey);
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "OptimizationAttempt" ("experimentId", "modelKey", "attempt", "status")
+      VALUES (${experimentId}::uuid, ${modelKey}, ${round}, 'reserved')
+      ON CONFLICT ("experimentId", "modelKey", "attempt") DO NOTHING
+    `);
+    const current = await this.step(experimentId, modelKey, round);
+    if (!current) throw stepError('优化步骤预留失败');
+    return current;
+  }
+
+  private async markUnknownOutcome(step: OptimizationStepRow, error: unknown, durationMs?: number) {
+    const summary = redactOptimizationError(error);
+    const rows = await this.prisma.$queryRaw<Array<{ aiRunId: string | null }>>(Prisma.sql`
+      UPDATE "OptimizationAttempt"
+      SET "status"='unknown_outcome', "error"=${summary}, "leaseUntil"=NULL, "completedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${step.id}::uuid AND "status"='running'
+      RETURNING "aiRunId"
+    `);
+    const aiRunId = rows[0]?.aiRunId ?? step.aiRunId;
+    if (aiRunId) {
+      await this.prisma.aiRun.updateMany({
+        where: { id: aiRunId, status: 'running' },
+        data: {
+          status: 'failed',
+          errorCode: 'optimization_unknown_outcome',
+          errorSummary: summary,
+          completedAt: new Date(),
+          claimedAt: null,
+          leaseUntil: null,
+          ...(durationMs === undefined ? {} : { durationMs }),
+        },
+      });
+    }
+  }
+
+  private async markKnownFailure(step: OptimizationStepRow, error: unknown, durationMs?: number) {
+    const summary = redactOptimizationError(error);
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE "OptimizationAttempt"
+      SET "status"='failed', "error"=${summary}, "leaseUntil"=NULL, "completedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${step.id}::uuid AND "status"='running'
+    `);
+    if (step.aiRunId) {
+      await this.prisma.aiRun.updateMany({
+        where: { id: step.aiRunId, status: 'running' },
+        data: {
+          status: 'failed',
+          errorCode: 'optimization_proposal_failed',
+          errorSummary: summary,
+          completedAt: new Date(),
+          claimedAt: null,
+          leaseUntil: null,
+          ...(durationMs === undefined ? {} : { durationMs }),
+        },
+      });
+    }
+  }
+
+  private async recoverExpiredRunningStep(step: OptimizationStepRow) {
+    if (step.status !== 'running') return false;
+    if (!step.leaseUntil || step.leaseUntil.getTime() >= Date.now()) return false;
+    await this.markUnknownOutcome(
+      step,
+      new Error('优化 Provider 调用租约已过期；外部请求是否完成未知，禁止自动重试'),
+    );
+    return true;
+  }
+
+  private async claimStep(input: {
+    step: OptimizationStepRow;
+    experiment: ExperimentRow;
+    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 };
+    route: ProviderRoute;
+    inputTokenReservation: number;
+    outputTokenReservation: number;
+    estimatedCost: number;
+  }) {
+    const now = new Date();
+    const requestTimeout = this.runs.requestTimeoutMs(input.experiment, 60_000);
+    const leaseUntil = new Date(now.getTime() + requestTimeout + 30_000);
+    return this.prisma.$transaction(async (transaction) => {
+      const claimed = await transaction.$queryRaw<OptimizationStepRow[]>(Prisma.sql`
+        UPDATE "OptimizationAttempt"
+        SET "status"='running', "startedAt"=${now}, "leaseUntil"=${leaseUntil}, "error"=NULL
+        WHERE "id"=${input.step.id}::uuid AND "status"='reserved'
+        RETURNING *
+      `);
+      const running = claimed[0];
+      if (!running) return null;
+      await this.runs.reserveBudget(
+        input.experiment.id,
+        {
+          aiCalls: 1,
+          inputTokens: input.inputTokenReservation,
+          outputTokens: input.outputTokenReservation,
+          estimatedCost: input.estimatedCost,
+        },
+        transaction,
+      );
+      const aiRun = await transaction.aiRun.create({
+        data: {
+          provider: input.route.provider,
+          model: input.route.model,
+          promptVersion: 'strategy-optimization-v1',
+          status: 'running',
+          startedAt: now,
+          claimedAt: now,
+          leaseUntil,
+          executionAttempt: 1,
+          context: asJson({ scope: 'strategy', strategyVersionId: input.baseline.id }),
+          modelMetadata: asJson({
+            optimizationExperimentId: input.experiment.id,
+            requestedProvider: input.route.provider,
+            requestedModel: input.route.model,
+            round: input.step.attempt,
+            fallbackUsed: false,
+          }),
+          question: `优化策略 ${input.baseline.strategy.name}`,
+        },
+      });
+      await transaction.$executeRaw(Prisma.sql`
+        UPDATE "OptimizationAttempt" SET "aiRunId"=${aiRun.id}::uuid WHERE "id"=${input.step.id}::uuid
+      `);
+      return { ...running, aiRunId: aiRun.id, leaseUntil };
+    });
+  }
+
+  private async claimedOrCachedStep(input: {
+    experiment: ExperimentRow;
+    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 };
+    route: ProviderRoute;
+    modelKey: string;
+    round: number;
+    inputTokenReservation: number;
+    outputTokenReservation: number;
+    estimatedCost: number;
+  }) {
+    let current = await this.reserveStep(input.experiment.id, input.modelKey, input.round);
+    if (current.status === 'succeeded') {
+      if (!current.aiRunId) throw stepError('已完成优化步骤缺少 AiRun');
+      return {
+        cached: true as const,
+        step: current,
+        proposal: optimizationProposalSchema.parse(current.proposal),
+      };
+    }
+    if (current.status === 'unknown_outcome')
+      throw stepError('优化步骤结果未知，禁止自动再次请求 Provider');
+    if (current.status === 'failed') throw stepError('优化步骤已失败，禁止自动重试');
+    if (await this.recoverExpiredRunningStep(current))
+      throw stepError('优化步骤租约过期且结果未知，禁止自动重试');
+    if (current.status === 'running') throw stepError('优化步骤正在由其他 Worker 执行');
+    const claimed = await this.claimStep({
+      step: current,
+      experiment: input.experiment,
+      baseline: input.baseline,
+      route: input.route,
+      inputTokenReservation: input.inputTokenReservation,
+      outputTokenReservation: input.outputTokenReservation,
+      estimatedCost: input.estimatedCost,
+    });
+    if (claimed) return { cached: false as const, step: claimed };
+    current = (await this.step(input.experiment.id, input.modelKey, input.round)) ?? current;
+    if (current.status === 'succeeded' && current.aiRunId)
+      return {
+        cached: true as const,
+        step: current,
+        proposal: optimizationProposalSchema.parse(current.proposal),
+      };
+    throw stepError('优化步骤未取得执行权，不会重复请求 Provider');
+  }
+
   async generateProposal(
     experiment: ExperimentRow,
     baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
     descriptors: StrategyParameterDescriptor[],
-    route: { provider: string; model: string },
+    route: ProviderRoute,
     round: number,
   ) {
     const modelKey = `${route.provider}:${route.model}`;
@@ -101,31 +310,23 @@ export class StrategyOptimizationCandidateService {
       typeof inputRate === 'number' && typeof outputRate === 'number'
         ? (inputTokenReservation * inputRate + outputTokenReservation * outputRate) / 1_000
         : 0;
-    await this.runs.reserveBudget(experiment.id, {
-      aiCalls: 1,
-      inputTokens: inputTokenReservation,
-      outputTokens: outputTokenReservation,
+    const prepared = await this.claimedOrCachedStep({
+      experiment,
+      baseline,
+      route,
+      modelKey,
+      round,
+      inputTokenReservation,
+      outputTokenReservation,
       estimatedCost,
     });
-    const aiRun = await this.aiRuns.start(
-      route.provider,
-      route.model,
-      'strategy-optimization-v1',
-      { scope: 'strategy', strategyVersionId: baseline.id },
-      {
-        optimizationExperimentId: experiment.id,
-        requestedProvider: route.provider,
-        requestedModel: route.model,
-        round,
-      },
-      `优化策略 ${baseline.strategy.name}`,
-    );
+    if (prepared.cached)
+      return { proposal: prepared.proposal, aiRunId: prepared.step.aiRunId!, modelKey };
     return this.completeProposal(
       experiment,
       route,
-      round,
       modelKey,
-      aiRun.id,
+      prepared.step,
       estimatedCost,
       messages,
       inputTokenReservation,
@@ -133,18 +334,21 @@ export class StrategyOptimizationCandidateService {
     );
   }
 
-  private async requestProviderCompletion(
+  private async completeProposal(
     experiment: ExperimentRow,
-    route: { provider: string; model: string },
+    route: ProviderRoute,
     modelKey: string,
+    step: OptimizationStepRow,
+    estimatedCost: number,
     messages: unknown[],
     inputTokenReservation: number,
     outputTokenReservation: number,
-    estimatedCost: number,
   ) {
     const provider = this.providers.strict(route.provider, route.model);
-    const complete = () =>
-      optimizationModelConcurrency.withSlot(modelKey, () =>
+    const startedAt = Date.now();
+    let providerResponded = false;
+    try {
+      const completion = await optimizationModelConcurrency.withSlot(modelKey, () =>
         provider.complete(
           {
             model: route.model,
@@ -155,49 +359,15 @@ export class StrategyOptimizationCandidateService {
           AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
         ),
       );
-    try {
-      return { provider, completion: await complete(), retryCount: 0 };
-    } catch (error) {
-      if (!isRetriableOptimizationNetworkError(error)) throw error;
-      await this.runs.reserveBudget(experiment.id, {
-        aiCalls: 1,
-        inputTokens: inputTokenReservation,
-        outputTokens: outputTokenReservation,
-        estimatedCost,
-      });
-      return { provider, completion: await complete(), retryCount: 1 };
-    }
-  }
-
-  private async completeProposal(
-    experiment: ExperimentRow,
-    route: { provider: string; model: string },
-    round: number,
-    modelKey: string,
-    aiRunId: string,
-    estimatedCost: number,
-    messages: unknown[],
-    inputTokenReservation: number,
-    outputTokenReservation: number,
-  ) {
-    const startedAt = Date.now();
-    try {
-      const { provider, completion, retryCount } = await this.requestProviderCompletion(
-        experiment,
-        route,
-        modelKey,
-        messages,
-        inputTokenReservation,
-        outputTokenReservation,
-        estimatedCost,
-      );
+      providerResponded = true;
+      const durationMs = Date.now() - startedAt;
       await this.prisma.aiRun.update({
-        where: { id: aiRunId },
+        where: { id: step.aiRunId! },
         data: {
           inputTokens: completion.inputTokens,
           outputTokens: completion.outputTokens,
           cost: completion.cost,
-          durationMs: Date.now() - startedAt,
+          durationMs,
           modelMetadata: asJson({
             optimizationExperimentId: experiment.id,
             requestedProvider: route.provider,
@@ -207,8 +377,8 @@ export class StrategyOptimizationCandidateService {
             costStatus: completion.costKnown === false ? 'unknown' : 'known',
             ...(completion.costCurrency ? { costCurrency: completion.costCurrency } : {}),
             ...(completion.pricingVersion ? { pricingVersion: completion.pricingVersion } : {}),
-            round,
-            retryCount,
+            round: step.attempt,
+            retryCount: 0,
             fallbackUsed: false,
           }),
         },
@@ -222,18 +392,28 @@ export class StrategyOptimizationCandidateService {
       );
       await this.runs.reconcileCost(experiment.id, estimatedCost, completion.cost);
       const proposal = optimizationProposalSchema.parse(completion.content);
-      await this.prisma.aiRun.update({
-        where: { id: aiRunId },
-        data: { status: 'succeeded', result: asJson(proposal), completedAt: new Date() },
+      await this.prisma.$transaction(async (transaction) => {
+        await transaction.aiRun.update({
+          where: { id: step.aiRunId! },
+          data: {
+            status: 'succeeded',
+            result: asJson(proposal),
+            completedAt: new Date(),
+            claimedAt: null,
+            leaseUntil: null,
+          },
+        });
+        await transaction.$executeRaw(Prisma.sql`
+          UPDATE "OptimizationAttempt"
+          SET "status"='succeeded', "proposal"=${JSON.stringify(proposal)}::jsonb,
+              "error"=NULL, "leaseUntil"=NULL, "completedAt"=CURRENT_TIMESTAMP
+          WHERE "id"=${step.id}::uuid AND "status"='running'
+        `);
       });
-      return { proposal, aiRunId, modelKey };
+      return { proposal, aiRunId: step.aiRunId!, modelKey };
     } catch (error) {
-      await this.aiRuns.fail(
-        aiRunId,
-        'optimization_proposal_failed',
-        redactOptimizationError(error),
-        Date.now() - startedAt,
-      );
+      if (providerResponded) await this.markKnownFailure(step, error, Date.now() - startedAt);
+      else await this.markUnknownOutcome(step, error, Date.now() - startedAt);
       throw error;
     }
   }
@@ -247,12 +427,13 @@ export class StrategyOptimizationCandidateService {
     proposal?: OptimizationProposal;
     error?: string;
   }) {
+    if (!['failed', 'unknown_outcome'].includes(input.status)) return;
     await this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "OptimizationAttempt" ("experimentId", "modelKey", "aiRunId", "attempt", "status", "proposal", "error")
-      VALUES (${input.experimentId}::uuid, ${input.modelKey}, ${input.aiRunId ?? null}::uuid, ${input.attempt}, ${input.status},
-        ${input.proposal ? JSON.stringify(input.proposal) : null}::jsonb, ${input.error ?? null})
-      ON CONFLICT ("experimentId", "modelKey", "attempt") DO UPDATE SET
-        "status"=EXCLUDED."status", "proposal"=EXCLUDED."proposal", "error"=EXCLUDED."error", "aiRunId"=EXCLUDED."aiRunId"
+      UPDATE "OptimizationAttempt"
+      SET "status"=${input.status}, "error"=${input.error ?? null}, "leaseUntil"=NULL,
+          "completedAt"=CURRENT_TIMESTAMP
+      WHERE "experimentId"=${input.experimentId}::uuid AND "modelKey"=${input.modelKey}
+        AND "attempt"=${input.attempt} AND "status"='reserved'
     `);
   }
 

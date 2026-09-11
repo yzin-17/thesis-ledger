@@ -49,6 +49,7 @@ type RiskPreview = {
 };
 
 const featureEnabled = () => process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 'false';
+const minuteStrategyTimeframes = new Set(['1m', '5m', '15m', '30m', '60m']);
 const sha256 = (value: unknown) =>
   createHash('sha256').update(canonicalStrategyMonitoringJson(value)).digest('hex');
 
@@ -80,6 +81,14 @@ export class StrategyRiskApplicationService {
       ...version,
       strategy: strategySchemaV2.parse(version.schema) as StrategySchemaV2,
     };
+  }
+
+  private async assertAutomaticRuntimeCapability(strategyVersionId: string) {
+    const version = await this.strategyVersion(strategyVersionId);
+    if (!minuteStrategyTimeframes.has(version.strategy.primaryTimeframe)) return;
+    throw new BadRequestException(
+      `分钟级策略风险监控当前不可启用：${version.strategy.primaryTimeframe} 依赖持续 1m MarketBar，但默认 market-sync 仅自动同步 1d；请先提供稳定 1m 自动同步能力`,
+    );
   }
 
   async monitoringPlan(strategyVersionId: string) {
@@ -238,7 +247,13 @@ export class StrategyRiskApplicationService {
     const parsed = riskApplicationCreateSchema.parse(input);
     const existing = await this.store.findByIdempotencyKey(parsed.idempotencyKey);
     if (existing) return existing;
-    const preview = await this.preview(parsed);
+    if (parsed.enabled) await this.assertAutomaticRuntimeCapability(parsed.strategyVersionId);
+    const preview = await this.preview({
+      strategyVersionId: parsed.strategyVersionId,
+      accountId: parsed.accountId,
+      symbol: parsed.symbol,
+      cycleMode: parsed.cycleMode,
+    });
     this.validatePreview(preview, parsed.previewHash);
     try {
       return await this.createTransaction(randomUUID(), parsed, preview);
@@ -292,7 +307,10 @@ export class StrategyRiskApplicationService {
   async update(id: string, input: unknown) {
     this.assertEnabled();
     const parsed = riskApplicationUpdateSchema.parse(input);
-    return this.updateTransaction(id, await this.get(id), parsed);
+    const current = await this.get(id);
+    if (parsed.enabled === true && !current.enabled)
+      await this.assertAutomaticRuntimeCapability(current.strategyVersionId);
+    return this.updateTransaction(id, current, parsed);
   }
 
   async upgradePreview(id: string, targetStrategyVersionId: string) {
@@ -377,6 +395,7 @@ export class StrategyRiskApplicationService {
     const current = await this.get(id);
     if (current.revision !== parsed.expectedRevision)
       throw new BadRequestException('风险应用已被其他操作更新，请刷新后重试');
+    if (current.enabled) await this.assertAutomaticRuntimeCapability(parsed.targetStrategyVersionId);
     const preview = await this.upgradePreview(id, parsed.targetStrategyVersionId);
     this.validatePreview(preview, parsed.previewHash);
     return this.upgradeTransaction(id, current, parsed, preview);

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isRetriableOptimizationNetworkError,
-  OptimizationModelConcurrencyGate,
-} from '../../src/strategy-optimization/strategy-optimization-concurrency.js';
+import { OptimizationModelConcurrencyGate } from '../../src/strategy-optimization/strategy-optimization-concurrency.js';
 
 const deferred = () => {
   let resolve!: () => void;
@@ -42,14 +39,5 @@ describe('optimization model concurrency', () => {
     a2.resolve();
     b1.resolve();
     await Promise.all([second, third]);
-  });
-
-  it('retries only clear network transport errors, not timeout ambiguity', () => {
-    expect(isRetriableOptimizationNetworkError(new TypeError('fetch failed'))).toBe(true);
-    expect(isRetriableOptimizationNetworkError(new Error('ECONNRESET'))).toBe(true);
-    const timeout = new Error('timed out');
-    timeout.name = 'TimeoutError';
-    expect(isRetriableOptimizationNetworkError(timeout)).toBe(false);
-    expect(isRetriableOptimizationNetworkError(new Error('invalid json'))).toBe(false);
   });
 });
