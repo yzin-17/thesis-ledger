@@ -47,8 +47,9 @@ const localDateTime = (value: Date, timezone: string) => {
 };
 
 const utcAtLocalMinute = (date: string, minute: number, timezone: string) => {
-  const [year, month, day] = date.split('-').map(Number);
-  let candidate = new Date(Date.UTC(year!, month! - 1, day!, Math.floor(minute / 60), minute % 60));
+  const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
+  if (![year, month, day].every(Number.isInteger)) throw new Error(`Invalid date: ${date}`);
+  let candidate = new Date(Date.UTC(year, month - 1, day, Math.floor(minute / 60), minute % 60));
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const rendered = localDateTime(candidate, timezone);
     const renderedUtc = Date.UTC(
@@ -58,7 +59,7 @@ const utcAtLocalMinute = (date: string, minute: number, timezone: string) => {
       Math.floor(rendered.minute / 60),
       rendered.minute % 60,
     );
-    const wantedUtc = Date.UTC(year!, month! - 1, day!, Math.floor(minute / 60), minute % 60);
+    const wantedUtc = Date.UTC(year, month - 1, day, Math.floor(minute / 60), minute % 60);
     candidate = new Date(candidate.getTime() - (renderedUtc - wantedUtc));
     if (rendered.date === date && rendered.minute === minute) break;
   }
