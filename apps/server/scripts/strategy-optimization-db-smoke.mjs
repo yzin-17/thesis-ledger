@@ -27,7 +27,7 @@ const cleanup = async () => {
 };
 
 try {
-  const tables = await prisma.$queryRaw<Array<{ name: string | null }>>(Prisma.sql`
+  const tables = await prisma.$queryRaw(Prisma.sql`
     SELECT unnest(ARRAY[
       to_regclass('"StrategyRiskApplication"')::text,
       to_regclass('"OptimizationExperiment"')::text,
@@ -130,7 +130,7 @@ try {
     )
   `);
 
-  const row = await prisma.$queryRaw<Array<{ candidateCount: bigint; adoptionCount: bigint }>>(Prisma.sql`
+  const row = await prisma.$queryRaw(Prisma.sql`
     SELECT
       (SELECT COUNT(*) FROM "OptimizationCandidate" WHERE "experimentId"=${experimentId}::uuid) AS "candidateCount",
       (SELECT COUNT(*) FROM "OptimizationAdoption" WHERE "experimentId"=${experimentId}::uuid) AS "adoptionCount"
