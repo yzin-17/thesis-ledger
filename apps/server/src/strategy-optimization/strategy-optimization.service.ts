@@ -23,6 +23,7 @@ import {
   type StrategyVersionRecord,
 } from './strategy-optimization-common.js';
 import { describeStrategyParameters } from './strategy-optimization-parameters.js';
+import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
 
@@ -34,6 +35,7 @@ export class StrategyOptimizationService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly providers: AiProviderRegistry,
     private readonly candidateService: StrategyOptimizationCandidateService,
+    private readonly reads: StrategyOptimizationReadService,
     private readonly runs: StrategyOptimizationRunService,
     private readonly riskApplications: StrategyRiskApplicationService,
   ) {}
@@ -483,7 +485,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       for (const candidate of candidates)
         await this.finalCandidate(testingExperiment, candidate, fingerprint);
       await this.completeFinalization(id, parsed.candidateIds, parsed.selectedCandidateId);
-      return this.compare(id);
+      return this.reads.compare(id);
     } catch (error) {
       await this.releaseFinalizationForRetry(id, error);
       throw error;
