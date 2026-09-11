@@ -4,8 +4,18 @@ import { optimizationAttemptFailureStatus, optimizationRemainingDurationMs } fro
 describe('strategy optimization duration budget', () => {
   it('uses maxDurationSeconds as a hard elapsed-time budget', () => {
     const createdAt = new Date('2026-09-11T00:00:00.000Z');
-    expect(optimizationRemainingDurationMs({ createdAt, budget: { maxDurationSeconds: 120 } }, createdAt.getTime() + 30_000)).toBe(90_000);
-    expect(optimizationRemainingDurationMs({ createdAt, budget: { maxDurationSeconds: 120 } }, createdAt.getTime() + 121_000)).toBe(0);
+    expect(optimizationRemainingDurationMs({ createdAt, pausedDurationMs: 0, budget: { maxDurationSeconds: 120 } }, createdAt.getTime() + 30_000)).toBe(90_000);
+    expect(optimizationRemainingDurationMs({ createdAt, pausedDurationMs: 0, budget: { maxDurationSeconds: 120 } }, createdAt.getTime() + 121_000)).toBe(0);
+  });
+
+  it('does not count the user finalization wait against compute duration', () => {
+    const createdAt = new Date('2026-09-11T00:00:00.000Z');
+    expect(
+      optimizationRemainingDurationMs(
+        { createdAt, pausedDurationMs: 300_000, budget: { maxDurationSeconds: 120 } },
+        createdAt.getTime() + 330_000,
+      ),
+    ).toBe(90_000);
   });
 
   it('marks timeout and abort ambiguity as unknown_outcome', () => {

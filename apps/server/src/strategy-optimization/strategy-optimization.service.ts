@@ -359,6 +359,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       UPDATE "OptimizationExperiment"
       SET "status"='testing', "stage"='testing', "lockedCandidateIds"=${JSON.stringify(candidateIds)}::jsonb,
           "selectedCandidateId"=${selectedCandidateId}::uuid, "leaseUntil"=${new Date(Date.now() + 3_600_000)},
+          "pausedDurationMs"="pausedDurationMs" + GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "updatedAt")) * 1000))::int,
           "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${experiment.id}::uuid AND "stage"='awaiting_finalization' AND "cancelRequestedAt" IS NULL
     `);
@@ -424,8 +425,10 @@ export class StrategyOptimizationService implements OnModuleInit {
     const candidates = await this.eligibleFinalCandidates(id, parsed.candidateIds);
     await this.lockFinalization(experiment, parsed.candidateIds, parsed.selectedCandidateId);
     try {
-      const fingerprint = await this.finalBaseline(experiment);
-      for (const candidate of candidates) await this.finalCandidate(experiment, candidate, fingerprint);
+      const testingExperiment = await this.experiment(id);
+      const fingerprint = await this.finalBaseline(testingExperiment);
+      for (const candidate of candidates)
+        await this.finalCandidate(testingExperiment, candidate, fingerprint);
       await this.completeFinalization(id, parsed.candidateIds, parsed.selectedCandidateId);
       return this.compare(id);
     } catch (error) {

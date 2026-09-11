@@ -78,7 +78,6 @@ export class StrategyRiskApplicationService {
   }
 
   async monitoringPlan(strategyVersionId: string) {
-    this.assertEnabled();
     const version = await this.strategyVersion(strategyVersionId);
     const strategyHash = sha256(version.strategy);
     const plan = compileStrategyMonitoringPlan(

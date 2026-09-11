@@ -80,8 +80,8 @@ export class StrategyOptimizationRunService {
       SET "aiCallsUsed"="aiCallsUsed"+${aiCalls}, "backtestRunsUsed"="backtestRunsUsed"+${runs},
           "costUsed"="costUsed"+${estimatedCost}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL
-        AND EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "createdAt"))
-          <= COALESCE(NULLIF("budget"->>'maxDurationSeconds', '')::int, 1800)
+        AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "createdAt")) * 1000 - "pausedDurationMs")
+          <= COALESCE(NULLIF("budget"->>'maxDurationSeconds', '')::int, 1800) * 1000
         AND "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int)
         AND "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int)
         AND (("budget"->>'maxCost') IS NULL OR "costUsed"+${estimatedCost} <= (("budget"->>'maxCost')::decimal))

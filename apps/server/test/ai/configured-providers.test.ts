@@ -28,7 +28,7 @@ describe('configured AI providers', () => {
       { id: 'alpha', baseUrl: 'https://one.example/v1', apiKey: 'a', models: ['a1'] },
       { id: 'alpha', baseUrl: 'https://two.example/v1', apiKey: 'b', models: ['a2'] },
     ]) });
-    expect(() => createConfiguredAiProviders(config)).toThrow(/Provider id 必须唯一/);
+    expect(() => createConfiguredAiProviders(config)).toThrow(/AI_PROVIDER_CONFIGS_JSON 配置无效/);
   });
 
   it('keeps the legacy single-provider configuration compatible', () => {

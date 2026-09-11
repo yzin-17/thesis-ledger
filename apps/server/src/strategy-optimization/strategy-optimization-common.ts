@@ -18,6 +18,7 @@ export type ExperimentRow = {
   maxRounds: number;
   aiCallsUsed: number;
   backtestRunsUsed: number;
+  pausedDurationMs: number;
   costUsed: Prisma.Decimal;
   baselineRunRefs: unknown;
   baselineMetrics: unknown;
@@ -98,13 +99,14 @@ export const toRecord = (value: unknown): Record<string, unknown> =>
 export const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
 export const optimizationRemainingDurationMs = (
-  input: Pick<ExperimentRow, 'createdAt' | 'budget'>,
+  input: Pick<ExperimentRow, 'createdAt' | 'pausedDurationMs' | 'budget'>,
   now = Date.now(),
 ) => {
   const raw = toRecord(input.budget).maxDurationSeconds;
   const maxSeconds =
     typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 1_800;
-  return Math.max(0, maxSeconds * 1_000 - (now - input.createdAt.getTime()));
+  const activeElapsedMs = Math.max(0, now - input.createdAt.getTime() - input.pausedDurationMs);
+  return Math.max(0, maxSeconds * 1_000 - activeElapsedMs);
 };
 
 export const optimizationAttemptFailureStatus = (error: unknown) => {
