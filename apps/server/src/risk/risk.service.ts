@@ -86,12 +86,14 @@ export class RiskService {
     const rules = await this.rules.listEnabledRules();
     const traceId = crypto.randomUUID();
     const evaluatedAt = this.scanEvaluationTime(input, parsed);
+    const includeStrategyRules = this.includeStrategyRules(input);
     const results: Array<{ ruleId: string; eventId?: string; error?: string }> = [];
 
     for (const stored of rules) {
       try {
         if (stored.sourcePlanId) {
-          await this.evaluateStrategyStoredRule(stored, evaluatedAt, scanId, traceId, results);
+          if (includeStrategyRules)
+            await this.evaluateStrategyStoredRule(stored, evaluatedAt, scanId, traceId, results);
           continue;
         }
         for (const { candidate, event } of this.evaluateStoredRule(stored, parsed)) {
@@ -219,6 +221,11 @@ export class RiskService {
         error: `风险已记录，通知排队失败：${notificationError instanceof Error ? notificationError.message : '未知错误'}`,
       });
     }
+  }
+
+  private includeStrategyRules(input: unknown) {
+    if (input === null || typeof input !== 'object' || Array.isArray(input)) return true;
+    return (input as Record<string, unknown>).includeStrategyRules !== false;
   }
 
   private scanEvaluationTime(input: unknown, scan: ParsedScan) {
