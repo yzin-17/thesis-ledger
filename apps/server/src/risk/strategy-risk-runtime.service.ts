@@ -76,11 +76,11 @@ export class StrategyRiskRuntimeService {
   private async target(symbol: string, timeframe: string) {
     const asset = await this.prisma.asset.findUnique({
       where: { symbol },
-      select: { assetType: true },
+      select: { assetType: true, market: true },
     });
     if (!asset) throw new NotFoundException('策略风险应用标的不存在');
     return {
-      executionInstrument: { symbol, assetType: asset.assetType },
+      executionInstrument: { symbol, assetType: asset.assetType, market: asset.market },
       primaryTimeframe: timeframe,
     };
   }
