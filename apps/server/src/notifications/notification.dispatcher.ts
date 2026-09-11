@@ -14,7 +14,7 @@ export class NotificationDispatcher implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly notifications: NotificationService,
-    private readonly prisma: PrismaService,
+    private readonly prisma?: PrismaService,
   ) {}
 
   onModuleInit() {
@@ -31,6 +31,7 @@ export class NotificationDispatcher implements OnModuleInit, OnModuleDestroy {
   }
 
   private cancelSupersededStrategyRiskDeliveries() {
+    if (!this.prisma) return Promise.resolve(0);
     return this.prisma.$executeRaw(Prisma.sql`
       UPDATE "NotificationDelivery" AS delivery
       SET "status"='cancelled',
