@@ -10,6 +10,7 @@ import {
 } from '@thesis-ledger/domain';
 import {
   riskApplicationCreateSchema,
+  riskApplicationNotificationSchema,
   riskApplicationPreviewInputSchema,
   riskApplicationUpdateSchema,
   riskApplicationUpgradeSchema,
@@ -62,6 +63,10 @@ export class StrategyRiskApplicationService {
 
   private assertEnabled() {
     if (!featureEnabled()) throw new BadRequestException('策略来源风险监控当前已关闭');
+  }
+
+  private notification(value: unknown) {
+    return riskApplicationNotificationSchema.parse(value ?? {});
   }
 
   private async strategyVersion(
@@ -208,6 +213,7 @@ export class StrategyRiskApplicationService {
         symbol: parsed.symbol,
         revision: 1,
         enabled: parsed.enabled,
+        severity: parsed.notification.severity,
         plan: preview.plan,
       });
       await this.store.audit(transaction, {
@@ -250,7 +256,7 @@ export class StrategyRiskApplicationService {
     input: ReturnType<typeof riskApplicationUpdateSchema.parse>,
   ) {
     const enabled = input.enabled ?? current.enabled;
-    const notification = input.notification ?? current.notification;
+    const notification = input.notification ?? this.notification(current.notification);
     const enabledChanged = enabled !== current.enabled;
     return this.prisma.$transaction(async (transaction) => {
       if (enabled && !current.enabled)
@@ -268,6 +274,7 @@ export class StrategyRiskApplicationService {
       });
       await this.store.syncFrozenRuleState(transaction, id, {
         enabled,
+        severity: notification.severity,
         revision: updated.revision,
         enabledChanged,
       });
@@ -334,6 +341,7 @@ export class StrategyRiskApplicationService {
     input: ReturnType<typeof riskApplicationUpgradeSchema.parse>,
     preview: RiskPreview,
   ) {
+    const notification = this.notification(current.notification);
     return this.prisma.$transaction(async (transaction) => {
       await this.store.archiveFrozenRules(transaction, id);
       const updated = await this.store.replacePlan(transaction, {
@@ -348,6 +356,7 @@ export class StrategyRiskApplicationService {
         symbol: current.symbol,
         revision: updated.revision,
         enabled: current.enabled,
+        severity: notification.severity,
         plan: preview.plan,
       });
       await this.store.audit(transaction, {
