@@ -20,6 +20,8 @@ export interface AiProviderMetadata {
   health?: AiProviderHealth;
   costPer1kInput?: number;
   costPer1kOutput?: number;
+  costCurrency?: string;
+  pricingVersion?: string;
 }
 
 export interface AiTool {
@@ -34,9 +36,18 @@ export interface AiProvider {
   readonly models: readonly string[];
   readonly metadata?: AiProviderMetadata;
   complete(
-    input: { model: string; messages: unknown[]; tools: string[] },
+    input: { model: string; messages: unknown[]; tools: string[]; maxOutputTokens?: number },
     signal: AbortSignal,
-  ): Promise<{ content: unknown; inputTokens: number; outputTokens: number; cost: number }>;
+  ): Promise<{
+    content: unknown;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+    costKnown?: boolean;
+    costCurrency?: string;
+    pricingVersion?: string;
+    actualModel?: string;
+  }>;
 }
 
 export interface PromptTemplate {

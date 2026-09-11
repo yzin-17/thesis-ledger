@@ -15,6 +15,7 @@ import { PortfolioModule } from './portfolio/portfolio.module.js';
 import { ProviderModule } from './providers/provider.module.js';
 import { QualityModule } from './quality/quality.module.js';
 import { RiskModule } from './risk/risk.module.js';
+import { StrategyOptimizationModule } from './strategy-optimization/strategy-optimization.module.js';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { RiskModule } from './risk/risk.module.js';
     JournalModule,
     AiModule,
     AutomationModule,
+    StrategyOptimizationModule,
   ],
 })
 export class AppModule {}

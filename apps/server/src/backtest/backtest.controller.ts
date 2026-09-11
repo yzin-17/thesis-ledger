@@ -91,6 +91,11 @@ export class BacktestController {
 
   @Get('strategies')
   strategies() {
-    return this.backtests.listStrategies();
+    return this.backtests.listStrategies().then((strategies) =>
+      strategies.map((strategy) => ({
+        ...strategy,
+        versions: strategy.versions.filter((version) => version.version > 0),
+      })),
+    );
   }
 }
