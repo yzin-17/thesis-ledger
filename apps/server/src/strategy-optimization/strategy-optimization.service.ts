@@ -501,6 +501,26 @@ export class StrategyOptimizationService implements OnModuleInit {
     return rows[0] ?? null;
   }
 
+  private async candidateAdoption(candidateId: string) {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ formalStrategyVersionId: string; idempotencyKey: string }>
+    >(Prisma.sql`
+      SELECT "formalStrategyVersionId", "idempotencyKey" FROM "OptimizationAdoption"
+      WHERE "candidateId"=${candidateId}::uuid LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
+  private async replayAdoption(formalStrategyVersionId: string) {
+    const formal = await this.prisma.strategyVersion.findUnique({
+      where: { id: formalStrategyVersionId },
+    });
+    return {
+      strategyVersion: formal,
+      monitoringPlan: formal ? await this.riskApplications.monitoringPlan(formal.id) : null,
+    };
+  }
+
   private async adoptableCandidate(id: string, candidateId: string) {
     const rows = await this.prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationCandidate" WHERE "experimentId"=${id}::uuid AND "id"=${candidateId}::uuid LIMIT 1
@@ -552,10 +572,10 @@ export class StrategyOptimizationService implements OnModuleInit {
     this.assertEnabled();
     const parsed = optimizationAdoptSchema.parse(input);
     const previous = await this.previousAdoption(parsed.idempotencyKey);
-    if (previous) {
-      const formal = await this.prisma.strategyVersion.findUnique({ where: { id: previous.formalStrategyVersionId } });
-      return { strategyVersion: formal, monitoringPlan: formal ? await this.riskApplications.monitoringPlan(formal.id) : null };
-    }
+    if (previous) return this.replayAdoption(previous.formalStrategyVersionId);
+    const alreadyAdopted = await this.candidateAdoption(parsed.candidateId);
+    if (alreadyAdopted)
+      throw new BadRequestException('该候选已经被正式采纳；请复用原采纳结果，不要创建新的采纳意图');
     const experiment = await this.experiment(id);
     if (experiment.status !== 'succeeded' || experiment.stage !== 'completed')
       throw new BadRequestException('实验尚未完成封存测试');
@@ -564,12 +584,25 @@ export class StrategyOptimizationService implements OnModuleInit {
     const candidate = await this.adoptableCandidate(id, parsed.candidateId);
     if (candidate.executionHash !== parsed.candidateHash)
       throw new BadRequestException('候选执行哈希已变化，必须重新验证');
-    const formal = await this.formalizeCandidate(
-      id,
-      candidate,
-      parsed.expectedStrategyVersion,
-      parsed.idempotencyKey,
-    );
+    let formal;
+    try {
+      formal = await this.formalizeCandidate(
+        id,
+        candidate,
+        parsed.expectedStrategyVersion,
+        parsed.idempotencyKey,
+      );
+    } catch (error) {
+      const concurrentSameIntent = await this.previousAdoption(parsed.idempotencyKey);
+      if (concurrentSameIntent)
+        return this.replayAdoption(concurrentSameIntent.formalStrategyVersionId);
+      const concurrentCandidate = await this.candidateAdoption(parsed.candidateId);
+      if (concurrentCandidate)
+        throw new BadRequestException('该候选已经被另一个采纳意图正式采纳');
+      if ((error as { code?: string }).code === 'P2002')
+        throw new BadRequestException('正式策略已经发布新版本，请刷新 expectedStrategyVersion 后重试');
+      throw error;
+    }
     const [monitoringPlan, baselinePlan] = await Promise.all([
       this.riskApplications.monitoringPlan(formal.id),
       this.riskApplications.monitoringPlan(experiment.baselineStrategyVersionId),
