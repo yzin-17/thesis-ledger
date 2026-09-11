@@ -135,7 +135,7 @@ describe('统一策略风险运行时', () => {
     expect(result.results).toEqual([]);
   });
 
-  it('策略上下文只读取已在评价时点可用的 MarketBar，不依赖实时 quote', async () => {
+  it('策略上下文只读取已在评价时点闭合且可用的 MarketBar，不依赖实时 quote', async () => {
     const prisma = {
       account: { findUnique: vi.fn(async () => ({ active: true })) },
       position: {
@@ -149,11 +149,11 @@ describe('统一策略风险运行时', () => {
         findFirst: vi.fn(async () => ({ id: 'trade-1', openedAt: new Date('2026-09-01T00:00:00.000Z') })),
       },
       marketBar: {
-        findFirst: vi.fn(async () => ({
+        findMany: vi.fn(async () => [{
           close: { toString: () => '92' },
           timestamp: new Date('2026-09-10T08:00:00.000Z'),
           fetchedAt: new Date('2026-09-10T08:01:00.000Z'),
-        })),
+        }]),
         count: vi.fn(async () => 2),
       },
     };
@@ -162,11 +162,11 @@ describe('统一策略风险运行时', () => {
     const actual = await service.load(
       accountId,
       '600519.SH',
-      { executionInstrument: { symbol: '600519.SH', assetType: 'stock' }, primaryTimeframe: '1d' },
+      { executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '1d' },
       evaluatedAt,
     );
 
-    expect(prisma.marketBar.findFirst).toHaveBeenCalledWith({
+    expect(prisma.marketBar.findMany).toHaveBeenCalledWith({
       where: {
         symbol: '600519.SH',
         timeframe: '1d',
@@ -174,8 +174,50 @@ describe('统一策略风险运行时', () => {
         fetchedAt: { lte: evaluatedAt },
       },
       orderBy: [{ timestamp: 'desc' }, { fetchedAt: 'desc' }],
+      take: 32,
     });
     expect(actual.context).toMatchObject({ price: '92', averageCost: '100', holdingPeriods: 1 });
+  });
+
+  it('日线盘中已有当日数据时仍回退到上一根已闭合日线', async () => {
+    const intraday = new Date('2026-09-11T06:00:00.000Z');
+    const prisma = {
+      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      position: {
+        findUnique: vi.fn(async () => ({
+          id: 'position-1',
+          quantity: { toString: () => '100' },
+          costPrice: { toString: () => '100' },
+        })),
+      },
+      trade: { findFirst: vi.fn(async () => null) },
+      marketBar: {
+        findMany: vi.fn(async () => [
+          {
+            close: { toString: () => '80' },
+            timestamp: new Date('2026-09-11T00:00:00.000Z'),
+            fetchedAt: new Date('2026-09-11T05:30:00.000Z'),
+          },
+          {
+            close: { toString: () => '95' },
+            timestamp: new Date('2026-09-10T00:00:00.000Z'),
+            fetchedAt: new Date('2026-09-10T08:01:00.000Z'),
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+    };
+    const service = new StrategyRiskContextService(prisma as never);
+
+    const actual = await service.load(
+      accountId,
+      '600519.SH',
+      { executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '1d' },
+      intraday,
+    );
+
+    expect(actual.context.price).toBe('95');
+    expect(actual.context.occurredAt).toBe('2026-09-10T00:00:00.000Z');
   });
 
   it('策略 fixedStop 在等于阈值时仍按 V2 Monitoring 语义触发', async () => {
@@ -192,7 +234,7 @@ describe('统一策略风险运行时', () => {
           notification: { enabled: true, cooldownMinutes: 60 },
         },
       ]),
-      asset: { findUnique: vi.fn(async () => ({ assetType: 'stock' })) },
+      asset: { findUnique: vi.fn(async () => ({ assetType: 'stock', market: 'CN' })) },
     };
     const contexts = {
       load: vi.fn(async () => ({
