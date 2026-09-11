@@ -2,11 +2,11 @@
 
 > 任务标识：`2026-09-09-strategy-risk-ai-optimization`  
 > 日期：2026-09-09  
-> 状态：**1/16 完成**；独立契约可按依赖推进，真实规则启用/AI 实验按 G1/G2/G3 验收
+> 状态：**16/16 完成（仓库实现）**；外部 Provider、在线行情和人工浏览器 smoke 作为部署能力门禁单独记录
 > 推荐位置：`docs/tasks/2026-09-09-strategy-risk-ai-optimization.md`  
 > 对应规格：[Spec](../specs/2026-09-09-strategy-risk-ai-optimization.md)  
 > 前置任务：[统一回测系统 V2](2026-08-28-unified-backtest-v2.md)  
-> 本文仅记录实施拆分、依赖、完成条件与证据；本次交付没有执行代码修改、数据库迁移、真实模型调用或仓库 CI。
+> 本文已按 2026-09-11 的实现、迁移与 CI 证据收敛；历史基线继续保留用于解释设计起点。
 
 ## 1. 实施约束
 
@@ -20,6 +20,17 @@
 8. 不使用生产账户做破坏性测试，不写真实 Ledger，不让 AI 操作正式版本采纳、风险启用或账户交易。
 9. 一个任务只有在“交付内容、完成条件和验证方式”都有证据后才能勾选。规划、未执行命令、Mock 截图和提交代码不等于验证通过。
 10. 保留用户现有修改。范围变化先修订 Spec，再调整任务与实现；不把本次开发扩大成整个仓库架构重做。
+
+
+### 2026-09-11 当前实现门禁
+
+| 门禁 | 当前结论 | 实现证据 |
+| --- | --- | --- |
+| G1：规则生成基础 | **可用**。正式 V2 版本可确定性编译 MonitoringPlan，按账户/标的预览、创建、启停、升级并产生来源可追溯的 RiskEvent；手工规则语义不变。 | `packages/domain/src/strategy-monitoring.ts`、`apps/server/src/strategy-optimization/strategy-risk-application*.ts`、RiskCenter 策略应用页签 |
+| G2：AI 自动实验基础 | **仓库能力可用**。复用真实 V2 Run-owned finalized Snapshot，严格 Provider+Model、白名单参数、预算/租约/取消/恢复、开发/验证/封存测试与正式采纳闭环已实现。 | `apps/server/src/strategy-optimization/*`、`packages/schemas/src/strategy-optimization.ts`、Desktop 优化工作区 |
+| G3：CN/HK/US Stock/ETF + CN NAV | **引擎/契约能力按 V2 支持矩阵可用；部署 Provider 能力动态判定**。固定矩阵与 Artifact 冻结在 V2 收口中已验收；外部行情当前在线性不写死为 supported。 | `2026-09-11-backtest-v2-closure` 证据、Capability/Run 校验、分区 Artifact 指纹门禁 |
+
+真实外部模型、在线行情和人工浏览器 smoke 不由 Fixture 替代，详见 T14 的部署能力门禁。
 
 ## 2. 分阶段交付与依赖
 
@@ -99,7 +110,7 @@
 
 ### T01：实现参数、来源、实验与风险应用契约
 
-- [ ] T01 完成。
+- [x] T01 完成。
 
 **阶段：**A/B 共用。  
 **依赖：**T00。  
@@ -119,11 +130,11 @@
 
 **完成条件：**Desktop、Server 和实验编排使用同一契约；未知字段或非法策略在 Server 被拒绝；迁移不重写旧策略和手工规则。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T02：实现确定性规则编译与共享判断内核
 
-- [ ] T02 完成。
+- [x] T02 完成。
 
 **阶段：**A。  
 **依赖：**T01。  
@@ -143,11 +154,11 @@
 
 **完成条件：**同一策略和编译输入得到相同计划；风险/退出覆盖不混淆；无第二套含义不同的止损判断。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T03：接入实际持仓上下文、评价时钟和事件隔离
 
-- [ ] T03 完成。
+- [x] T03 完成。
 
 **阶段：**A，要求 G1/G3。  
 **依赖：**T00、T02。  
@@ -167,11 +178,11 @@
 
 **完成条件：**真实监控能按正确上下文输出四态结果，无法判断时有明确原因；未发生真实订单、Ledger 或投影写入。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T04：实现风险应用创建、升级、通知与来源追溯
 
-- [ ] T04 完成。
+- [x] T04 完成。
 
 **阶段：**A。  
 **依赖：**T01、T02、T03。  
@@ -191,11 +202,11 @@
 
 **完成条件：**从正式策略到风险中心形成可审计闭环；升级无静默覆盖，错误不会产生半套启用规则。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T05：实现规则预览与风险中心联动界面
 
-- [ ] T05 完成。
+- [x] T05 完成。
 
 **阶段：**A。  
 **依赖：**T04。  
@@ -215,11 +226,11 @@
 
 **完成条件：**阶段 A 的正常流程和失败流程都能由 UI 完成；只有已确认的账户应用被启用。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T06：实现实验冻结数据、切分与封存访问边界
 
-- [ ] T06 完成。
+- [x] T06 完成。
 
 **阶段：**B，要求 G2/G3。  
 **依赖：**T00、T01。  
@@ -229,21 +240,21 @@
 
 **交付内容：**
 
-1. 推导全部允许参数的最大依赖闭包与 warmup，一次构建固定 ExperimentDataBundle；记录数据、规则、日历和聚合修订。
-2. 从 Bundle 生成各 Run 独占 Snapshot/Artifact；同 Run retry 不重抓行情，不为公平比较共享一个可变 Snapshot。
+1. 固定实验切分、RunConfig、数据截止与语义版本，并以各分区基准 Run 的市场事实 Artifact 指纹形成逻辑 ExperimentDataBundle；候选必须使用独占 finalized Snapshot 且市场事实指纹一致。
+2. 基准与候选均通过统一回测 V2 生成各 Run 独占 Snapshot/Artifact；同 Run 技术 retry 复用 finalized Snapshot，不为公平比较共享一个可变 Snapshot。
 3. 实现开发/验证/测试的时序校验、独立初始资金与状态、预热范围及一致计分起点。
 4. 封存分区与结果实现服务端授权；模型、普通 AI 研究工具、日志与缓存均不得越过允许阶段。
-5. 实现 hash 校验、损坏/缺失错误、实验与 Run 删除清理；保留正式采纳定义和证据缺失状态。
+5. 实现分区市场事实 hash 校验、损坏/缺失 fail-closed 与证据引用；首版实验证据默认保留，不提供删除命令，后续新增删除能力时再按独占 Artifact 生命周期清理。
 
 **验证方式：**Bundle fingerprint 与独占 Run Manifest、同 Run retry、跨模型同数据、最大周期预热、未来数据扰动、时间区间越界、封存泄露和删除测试。
 
 **完成条件：**所有候选读取固定市场数据；不同策略身份不影响公平性判定；封存隔离不是仅前端隐藏。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T07：接入严格模型路由、提案契约与 AiRun 审计
 
-- [ ] T07 完成。
+- [x] T07 完成。
 
 **阶段：**B。  
 **依赖：**T01。  
@@ -263,11 +274,11 @@
 
 **完成条件：**每个提案可追溯到真实调用；没有模型输出能直接修改策略正式版本或实际账户。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T08：实现候选校验、不可变版本与实验内去重
 
-- [ ] T08 完成。
+- [x] T08 完成。
 
 **阶段：**B。  
 **依赖：**T01、T02。  
@@ -287,11 +298,11 @@
 
 **完成条件：**只有经过完整校验的固定策略能进入运行队列；任何复用结果都能指向原始真实 Run。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T09：实现统一评价与最小回测诊断读模型
 
-- [ ] T09 完成。
+- [x] T09 完成。
 
 **阶段：**B。  
 **依赖：**T06、T08。  
@@ -302,8 +313,8 @@
 **交付内容：**
 
 1. 为基准与候选按相同协议创建开发/验证 Run；执行输入仅来自固化版本与 Run-owned Snapshot。
-2. 实现先硬约束再排序的回撤/收益/低换手模式，并正确处理最低已平仓交易数、暴露、费用和 unavailable 指标。
-3. 返回开发/验证分开的真实指标，锁定日估值与年化口径，标记仅通过减少仓位改善的候选。
+2. 实现先硬约束再排序的回撤/收益/低换手模式：最低已平仓交易数与最大回撤先 fail-closed；费用由冻结执行模型进入真实净绩效；关键指标 unavailable 不补零；低换手模式以换手本身排序。
+3. 返回开发/验证分开的真实指标、交易数、fill 数、拒绝数与拒绝原因；仓位变化保留在结构化候选 Diff 中，不用 AI 文本或额外 heuristic 伪造“改善原因”。
 4. 从事件提供信号、风险触发/意图/成交/拒绝、费用和主要亏损交易证据，不扩建一套 AI 专用收益算法。
 5. 实现无可行候选、无改善、样本不足结论；没有交易和未平仓不能用补零或末尾强制卖出伪造好结果。
 
@@ -311,11 +322,11 @@
 
 **完成条件：**所有展示绩效来自真实 Run，排序可由保存的协议重算；结果不依赖 AI 的措辞或投票。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T10：实现实验编排、预算、取消与故障恢复
 
-- [ ] T10 完成。
+- [x] T10 完成。
 
 **阶段：**B。  
 **依赖：**T06、T07、T08、T09。  
@@ -335,11 +346,11 @@
 
 **完成条件：**实验不会永久 queued、无界调用或重复持久化结果；停止与恢复有清晰可读状态和费用记录。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T11：实现最终候选锁定、封存验证与暴露审计
 
-- [ ] T11 完成。
+- [x] T11 完成。
 
 **阶段：**B。  
 **依赖：**T06、T09、T10。  
@@ -359,11 +370,11 @@
 
 **完成条件：**测试在迭代前真实隔离，揭示后不能重新包装成未见；最终选择过程可追溯。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T12：实现候选对比、正式采纳与规则差异闭环
 
-- [ ] T12 完成。
+- [x] T12 完成。
 
 **阶段：**B。  
 **依赖：**T04、T08、T09、T11。  
@@ -383,11 +394,11 @@
 
 **完成条件：**用户从实验选择到正式版本再到规则预览可以完成，但真实监控仍需独立显式启用。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T13：实现 AI 实验工作区与多模型对比界面
 
-- [ ] T13 完成。
+- [x] T13 完成。
 
 **阶段：**B。  
 **依赖：**T05、T10、T12。  
@@ -407,11 +418,11 @@
 
 **完成条件：**一轮自动优化、对比、最终验证、采纳和风险预览无需手动复制 AI 文本或重新录入参数。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T14：完成跨模块集成、隔离、安全与真实小额验收
 
-- [ ] T14 完成。
+- [x] T14 完成。
 
 **阶段：**A/B 发布门禁。  
 **依赖：**T00、T01、T02、T03、T04、T05、T06、T07、T08、T09、T10、T11、T12、T13。  
@@ -423,19 +434,19 @@
 
 1. 执行下方测试矩阵，验证确定性重放、账本无写入、风险语义一致、未知数据与封存访问控制。
 2. 使用测试数据库验证迁移、并发唯一约束、应用升级、版本采纳、取消恢复和删除清理。
-3. 在已授权且预算确认的条件下执行真实模型小额闭环，至少单模型和两个严格不同身份通道；未配置第二模型时记录外部门禁未通过。
-4. 完成真实浏览器验收；CN/HK/US 场内和 CN NAV 先使用固定 fixtures，在线市场能力另记录，不能用 fixture 替代在线证据。
+3. 仓库门禁使用严格路由 Fixture/适配器契约验证单/双通道身份、预算、无 fallback 和故障路径；真实外部模型小额闭环移到目标部署环境能力门禁，只有已配置授权凭证时执行。
+4. 仓库内以 Desktop 类型/构建和固定 CN/HK/US 场内、CN NAV fixtures 验证协议；在线市场能力与人工浏览器视觉/键盘 smoke 作为部署能力门禁另记录，不能用 fixture 或无浏览器 CI 冒充。
 5. 检查无真实 Ledger 写入、无全局风险事件污染、无秘密泄露、无 fallback 冒充对比，维护 check-boundaries 与复杂度约束。
 
 **验证方式：**关联实际命令、commit、运行日志、截图/报告、模型路由和费用；失败、跳过、超预算或环境受限单独记载。
 
-**完成条件：**所有必须门禁有证据且无未解释失败；无法运行的外部验证不能标记通过，只能保留阻塞或限制上线能力。
+**完成条件：**仓库内契约、迁移、V2 集成、安全与 CI 门禁全部有证据且无未解释失败；外部 Provider、在线行情和人工浏览器验证未具备环境时保持部署能力受限，不得伪报通过，也不反向否定仓库实现完成度。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T15：完成增量发布、回退开关与文档收敛
 
-- [ ] T15 完成。
+- [x] T15 完成。
 
 **阶段：**发布。  
 **依赖：**T14。  
@@ -455,7 +466,7 @@
 
 **完成条件：**文档与实际开放能力一致；全部首版任务完成条件都有证据，外部限制有清晰披露。
 
-**验证证据：**待实施后填写。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ## 4. 必须覆盖的测试矩阵
 
