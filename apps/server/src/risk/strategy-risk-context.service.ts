@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  aggregateMinuteBars,
   tradingCalendars,
   tradingMarketForAssetMarket,
+  type BacktestMinuteBar,
+  type DerivedBacktestBar,
   type TradingMarket,
 } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -9,6 +12,7 @@ import { PrismaService } from '../platform/prisma.service.js';
 export type StrategyRiskTarget = {
   executionInstrument: { symbol: string; assetType: string; market?: string };
   primaryTimeframe: string;
+  requiresHoldingPeriods?: boolean;
 };
 
 export type StrategyRiskPositionTradeContext = {
@@ -30,25 +34,19 @@ export type StrategyRiskActualContext = {
   };
 };
 
+type StoredBar = Awaited<ReturnType<PrismaService['marketBar']['findFirst']>> extends infer Row
+  ? NonNullable<Row>
+  : never;
+
 const timeframeMinutes = (timeframe: string) => {
   const matched = timeframe.match(/^(1|5|15|30|60)m$/u);
   return matched ? Number(matched[1]) : null;
 };
 
-const localDateKey = (value: Date, timeZone: string) => {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
-      .formatToParts(value)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
-};
+const isDerivedTimeframe = (
+  timeframe: string,
+): timeframe is DerivedBacktestBar['timeframe'] =>
+  timeframe === '5m' || timeframe === '15m' || timeframe === '30m' || timeframe === '60m';
 
 const utcForLocalMinute = (date: string, minute: number, timeZone: string) => {
   const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
@@ -126,6 +124,7 @@ export class StrategyRiskContextService {
     symbol: string,
     source: StrategyRiskPositionTradeContext,
     evaluatedAt: Date,
+    requiresHoldingPeriods: boolean,
   ): Promise<StrategyRiskActualContext> {
     const nav = await this.prisma.fundNavPoint.findFirst({
       where: {
@@ -136,7 +135,7 @@ export class StrategyRiskContextService {
       orderBy: [{ navDate: 'desc' }, { fetchedAt: 'desc' }],
     });
     const holdingPeriods =
-      source.trade?.openedAt && nav
+      requiresHoldingPeriods && source.trade?.openedAt && nav
         ? await this.prisma.fundNavPoint.count({
             where: {
               symbol,
@@ -181,7 +180,99 @@ export class StrategyRiskContextService {
     const sessions = calendar.sessionsForDate(timestamp);
     const end = sessions.at(-1)?.end;
     if (end === undefined) return null;
-    return utcForLocalMinute(localDateKey(timestamp, calendar.timezone), end, calendar.timezone);
+    const tradingDate = timestamp.toISOString().slice(0, 10);
+    return utcForLocalMinute(tradingDate, end, calendar.timezone);
+  }
+
+  private effectiveBars(rows: StoredBar[]) {
+    const seen = new Set<number>();
+    const result: StoredBar[] = [];
+    for (const row of rows) {
+      const timestamp = row.timestamp.getTime();
+      if (seen.has(timestamp)) continue;
+      seen.add(timestamp);
+      result.push(row);
+    }
+    return result.sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime());
+  }
+
+  private async storedBars(
+    symbol: string,
+    timeframe: '1m' | '1d',
+    evaluatedAt: Date,
+    start?: Date,
+    take?: number,
+  ) {
+    const rows = await this.prisma.marketBar.findMany({
+      where: {
+        symbol,
+        timeframe,
+        timestamp: {
+          ...(start ? { gte: start } : {}),
+          lte: evaluatedAt,
+        },
+        fetchedAt: { lte: evaluatedAt },
+      },
+      orderBy: [
+        { timestamp: start ? 'asc' : 'desc' },
+        { fallbackUsed: 'asc' },
+        { fetchedAt: 'desc' },
+        { provider: 'asc' },
+      ],
+      ...(take ? { take } : {}),
+    });
+    return this.effectiveBars(rows);
+  }
+
+  private minuteInputs(rows: StoredBar[], market: TradingMarket): BacktestMinuteBar[] {
+    return rows.map((row) => ({
+      symbol: row.symbol,
+      market,
+      timeframe: '1m',
+      occurredAt: row.timestamp.toISOString(),
+      availableAt: row.fetchedAt.toISOString(),
+      open: row.open.toString(),
+      high: row.high.toString(),
+      low: row.low.toString(),
+      close: row.close.toString(),
+      volume: row.volume.toString(),
+      amount: row.amount.toString(),
+      provider: row.provider,
+      quality: row.freshness === 'stale' ? 'stale' : 'complete',
+    }));
+  }
+
+  private async derivedBars(
+    symbol: string,
+    timeframe: DerivedBacktestBar['timeframe'],
+    market: TradingMarket,
+    evaluatedAt: Date,
+    start?: Date,
+  ) {
+    const rows = await this.storedBars(symbol, '1m', evaluatedAt, start, start ? undefined : 1000);
+    return aggregateMinuteBars(this.minuteInputs(rows, market), timeframe, {
+      calendar: tradingCalendars[market],
+      includePartialTail: false,
+    }).filter(
+      (bar) =>
+        bar.completeness === 'complete' &&
+        new Date(bar.occurredAt) <= evaluatedAt &&
+        new Date(bar.availableAt) <= evaluatedAt,
+    );
+  }
+
+  private async directBars(
+    symbol: string,
+    timeframe: '1m' | '1d',
+    market: TradingMarket,
+    evaluatedAt: Date,
+    start?: Date,
+  ) {
+    const rows = await this.storedBars(symbol, timeframe, evaluatedAt, start, start ? undefined : 64);
+    return rows.filter((row) => {
+      const completedAt = this.completedAt(row.timestamp, timeframe, market);
+      return completedAt !== null && completedAt <= evaluatedAt;
+    });
   }
 
   private async exchangeContext(
@@ -191,32 +282,47 @@ export class StrategyRiskContextService {
     evaluatedAt: Date,
   ): Promise<StrategyRiskActualContext> {
     const market = this.tradingMarket(target);
-    const bars = await this.prisma.marketBar.findMany({
-      where: {
-        symbol,
-        timeframe: target.primaryTimeframe,
-        timestamp: { lte: evaluatedAt },
-        fetchedAt: { lte: evaluatedAt },
-      },
-      orderBy: [{ timestamp: 'desc' }, { fetchedAt: 'desc' }],
-      take: 32,
-    });
-    const bar = bars.find((candidate) => {
-      const completedAt = this.completedAt(candidate.timestamp, target.primaryTimeframe, market);
-      return completedAt !== null && completedAt <= evaluatedAt;
-    });
-    const holdingPeriods =
-      source.trade?.openedAt && bar
-        ? await this.prisma.marketBar.count({
-            where: {
-              symbol,
-              timeframe: target.primaryTimeframe,
-              timestamp: { gte: source.trade.openedAt, lte: bar.timestamp },
-              fetchedAt: { lte: evaluatedAt },
-            },
-          })
-        : undefined;
+    if (!market) throw new BadRequestException('策略风险应用缺少可识别的交易市场');
+    const derived = isDerivedTimeframe(target.primaryTimeframe);
+    const latestBars = derived
+      ? await this.derivedBars(symbol, target.primaryTimeframe, market, evaluatedAt)
+      : target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d'
+        ? await this.directBars(symbol, target.primaryTimeframe, market, evaluatedAt)
+        : [];
+    const bar = latestBars.at(-1);
+
+    let holdingPeriods: number | undefined;
+    if (target.requiresHoldingPeriods && source.trade?.openedAt && bar) {
+      const holdingBars = derived
+        ? await this.derivedBars(
+            symbol,
+            target.primaryTimeframe as DerivedBacktestBar['timeframe'],
+            market,
+            evaluatedAt,
+            source.trade.openedAt,
+          )
+        : await this.directBars(
+            symbol,
+            target.primaryTimeframe as '1m' | '1d',
+            market,
+            evaluatedAt,
+            source.trade.openedAt,
+          );
+      holdingPeriods = Math.max(0, holdingBars.length - 1);
+    }
+
     const base = this.baseContext(source);
+    const price = bar?.close.toString();
+    const occurredAt = 'occurredAt' in (bar ?? {})
+      ? (bar as DerivedBacktestBar).occurredAt
+      : bar
+        ? bar.timestamp.toISOString()
+        : undefined;
+    const availableAt = 'availableAt' in (bar ?? {})
+      ? (bar as DerivedBacktestBar).availableAt
+      : bar
+        ? bar.fetchedAt.toISOString()
+        : undefined;
     return {
       ...(base.positionId ? { positionId: base.positionId } : {}),
       ...(base.tradeId ? { tradeId: base.tradeId } : {}),
@@ -224,16 +330,10 @@ export class StrategyRiskContextService {
       context: {
         ...(base.quantity ? { quantity: base.quantity } : {}),
         ...(base.averageCost ? { averageCost: base.averageCost } : {}),
-        ...(bar ? { price: bar.close.toString() } : {}),
-        ...(holdingPeriods === undefined
-          ? {}
-          : { holdingPeriods: Math.max(0, holdingPeriods - 1) }),
-        ...(bar
-          ? {
-              occurredAt: bar.timestamp.toISOString(),
-              availableAt: bar.fetchedAt.toISOString(),
-            }
-          : {}),
+        ...(price ? { price } : {}),
+        ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
+        ...(occurredAt ? { occurredAt } : {}),
+        ...(availableAt ? { availableAt } : {}),
       },
     };
   }
@@ -247,7 +347,12 @@ export class StrategyRiskContextService {
     await this.assertTarget(accountId, symbol, target);
     const source = await this.loadPositionTrade(accountId, symbol);
     if (target.executionInstrument.assetType === 'fund')
-      return this.fundContext(symbol, source, evaluatedAt);
+      return this.fundContext(
+        symbol,
+        source,
+        evaluatedAt,
+        target.requiresHoldingPeriods === true,
+      );
     return this.exchangeContext(symbol, target, source, evaluatedAt);
   }
 }
