@@ -122,24 +122,24 @@ const compareValue = (left: string | number, right: string | number) =>
 const multipleOfStep = (value: string | number, min: string | number, step: string | number) => {
   const delta = DecimalValue.from(String(value)).minus(String(min));
   if (delta.isNegative()) return false;
-  // Parameter steps in this feature are deliberately low-scale. Exact DecimalValue
-  // division plus integer-string validation avoids IEEE-754 rounding.
   const units = delta.dividedBy(String(step), 16).toString();
   return /^\d+$/.test(units);
 };
 
 const validateParameterValue = (descriptor: StrategyParameterDescriptor, value: string | number) => {
-  if (descriptor.valueType === 'integer' && (!Number.isInteger(value) || typeof value !== 'number')) {
+  if (descriptor.valueType === 'integer' && (typeof value !== 'number' || !Number.isInteger(value))) {
     throw new BadRequestException(`${descriptor.parameterId} 必须是整数`);
   }
   const range = descriptor.optimizationRange ?? descriptor.schemaRange;
-  if (range) {
-    if (compareValue(value, range.min) < 0 || compareValue(value, range.max) > 0)
-      throw new BadRequestException(`${descriptor.parameterId} 超出授权范围`);
-    const step = 'step' in range ? range.step : undefined;
-    if (step !== undefined && !multipleOfStep(value, range.min, step))
-      throw new BadRequestException(`${descriptor.parameterId} 不符合授权步长`);
-  }
+  if (!range) return;
+  if (compareValue(value, range.min) < 0 || compareValue(value, range.max) > 0)
+    throw new BadRequestException(`${descriptor.parameterId} 超出授权范围`);
+  const step =
+    'step' in range && (typeof range.step === 'string' || typeof range.step === 'number')
+      ? range.step
+      : undefined;
+  if (step !== undefined && !multipleOfStep(value, range.min, step))
+    throw new BadRequestException(`${descriptor.parameterId} 不符合授权步长`);
 };
 
 export const applyOptimizationProposal = (
