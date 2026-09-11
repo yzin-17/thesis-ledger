@@ -16,8 +16,11 @@ import {
   createStrategyRiskApplication,
   fetchStrategyRiskApplications,
   previewStrategyRiskApplication,
+  previewStrategyRiskApplicationUpgrade,
   updateStrategyRiskApplication,
+  upgradeStrategyRiskApplication,
   type RiskApplicationPreview,
+  type RiskApplicationUpgradePreview,
 } from './strategy-optimization.api.js';
 import type { StrategyRecord } from './strategy.types.js';
 
@@ -47,6 +50,12 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
     'existingAndFuture',
   );
   const [preview, setPreview] = useState<RiskApplicationPreview | null>(null);
+  const [upgradePreview, setUpgradePreview] = useState<{
+    applicationId: string;
+    targetStrategyVersionId: string;
+    targetVersion: number;
+    preview: RiskApplicationUpgradePreview;
+  } | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const selected = versions.find((entry) => entry.version.id === strategyVersionId) ?? versions[0];
   const parsed = selected?.version.schema ? strategySchemaV2.safeParse(selected.version.schema) : null;
@@ -100,6 +109,38 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
       await queryClient.invalidateQueries({ queryKey: riskApplicationKey });
     },
     onError: (error) => setFeedback(error instanceof Error ? error.message : '更新风险应用失败'),
+  });
+
+  const upgradePreviewMutation = useMutation({
+    mutationFn: (input: {
+      applicationId: string;
+      targetStrategyVersionId: string;
+      targetVersion: number;
+    }) => previewStrategyRiskApplicationUpgrade(input.applicationId, input.targetStrategyVersionId),
+    onSuccess: (result, input) => {
+      setUpgradePreview({ ...input, preview: result });
+      setFeedback(null);
+    },
+    onError: (error) =>
+      setFeedback(error instanceof Error ? error.message : '风险应用升级预览失败'),
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: () => {
+      if (!upgradePreview) throw new Error('请先生成升级预览');
+      return upgradeStrategyRiskApplication(upgradePreview.applicationId, {
+        expectedRevision: upgradePreview.preview.currentRevision,
+        targetStrategyVersionId: upgradePreview.targetStrategyVersionId,
+        previewHash: upgradePreview.preview.previewHash,
+        idempotencyKey: crypto.randomUUID(),
+      });
+    },
+    onSuccess: async (application) => {
+      setUpgradePreview(null);
+      setFeedback(`风险应用已升级到新策略版本，当前修订 r${application.revision}。`);
+      await queryClient.invalidateQueries({ queryKey: riskApplicationKey });
+    },
+    onError: (error) => setFeedback(error instanceof Error ? error.message : '升级风险应用失败'),
   });
 
   if (versions.length === 0) {
@@ -221,25 +262,77 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
             <CardDescription>策略来源、应用修订与启用状态保持可追溯。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {applications.data.map((application) => (
-              <div key={application.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-                <div>
-                  <div className="font-medium">{application.symbol} · r{application.revision}</div>
-                  <div className="text-xs text-muted-foreground">plan {application.planHash.slice(0, 12)} · {application.plan.rules.length} 条规则</div>
+            {applications.data.map((application) => {
+              const source = versions.find((entry) => entry.version.id === application.strategyVersionId);
+              const latest = source?.strategy.versions
+                .filter((version) => version.version > 0 && version.schemaVersion === 2)
+                .sort((left, right) => right.version - left.version)[0];
+              const canUpgrade = Boolean(latest && latest.version > (source?.version.version ?? 0));
+              const currentUpgrade =
+                upgradePreview?.applicationId === application.id ? upgradePreview : null;
+              return (
+                <div key={application.id} className="space-y-3 rounded-md border p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{application.symbol} · r{application.revision}</span>
+                        <Badge variant="outline">{source ? `${source.strategy.name} · v${source.version.version}` : '策略来源'}</Badge>
+                        {canUpgrade && latest ? <Badge variant="outline">可升级至 v{latest.version}</Badge> : null}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">plan {application.planHash.slice(0, 12)} · {application.plan.rules.length} 条规则</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={application.enabled ? 'default' : 'outline'}>{application.enabled ? '实际监控中' : '已停用'}</Badge>
+                      {canUpgrade && latest ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={upgradePreviewMutation.isPending}
+                          onClick={() =>
+                            upgradePreviewMutation.mutate({
+                              applicationId: application.id,
+                              targetStrategyVersionId: latest.id,
+                              targetVersion: latest.version,
+                            })
+                          }
+                        >
+                          预览升级
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={toggleMutation.isPending}
+                        onClick={() => toggleMutation.mutate({ id: application.id, revision: application.revision, enabled: !application.enabled })}
+                      >
+                        {application.enabled ? '停用实际监控' : '启用实际监控'}
+                      </Button>
+                    </div>
+                  </div>
+                  {currentUpgrade ? (
+                    <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+                      <div className="text-sm font-medium">升级到 v{currentUpgrade.targetVersion} 的规则差异</div>
+                      {currentUpgrade.preview.diff
+                        .filter((item) => item.change !== 'unchanged')
+                        .map((item) => (
+                          <div key={item.sourceKey} className="text-xs text-muted-foreground">
+                            {item.change === 'added' ? '新增' : item.change === 'removed' ? '移除' : '修改'} · {item.sourceKey}
+                          </div>
+                        ))}
+                      {currentUpgrade.preview.diff.every((item) => item.change === 'unchanged') ? (
+                        <div className="text-xs text-muted-foreground">监控规则内容没有变化，但来源版本仍会形成新的应用修订。</div>
+                      ) : null}
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" disabled={upgradeMutation.isPending} onClick={() => upgradeMutation.mutate()}>
+                          {upgradeMutation.isPending ? '升级中…' : '确认升级'}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setUpgradePreview(null)}>取消</Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={application.enabled ? 'default' : 'outline'}>{application.enabled ? '已启用' : '已停用'}</Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={toggleMutation.isPending}
-                    onClick={() => toggleMutation.mutate({ id: application.id, revision: application.revision, enabled: !application.enabled })}
-                  >
-                    {application.enabled ? '停用' : '启用'}
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}

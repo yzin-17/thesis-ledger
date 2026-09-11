@@ -70,6 +70,16 @@ export type RiskApplicationPreview = {
   context: Record<string, unknown>;
 };
 
+export type RiskApplicationUpgradePreview = RiskApplicationPreview & {
+  currentRevision: number;
+  diff: Array<{
+    sourceKey: string;
+    before: MonitoringPlan['rules'][number] | null;
+    after: MonitoringPlan['rules'][number] | null;
+    change: 'added' | 'removed' | 'changed' | 'unchanged';
+  }>;
+};
+
 export type StrategyRiskApplication = {
   id: string;
   strategyVersionId: string;
@@ -230,5 +240,32 @@ export const updateStrategyRiskApplication = (
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
     },
+    client,
+  );
+
+export const previewStrategyRiskApplicationUpgrade = (
+  id: string,
+  targetStrategyVersionId: string,
+  client?: DesktopRequestClient,
+) =>
+  jsonPost<RiskApplicationUpgradePreview>(
+    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}/upgrade-preview`,
+    { targetStrategyVersionId },
+    client,
+  );
+
+export const upgradeStrategyRiskApplication = (
+  id: string,
+  input: {
+    expectedRevision: number;
+    targetStrategyVersionId: string;
+    previewHash: string;
+    idempotencyKey: string;
+  },
+  client?: DesktopRequestClient,
+) =>
+  jsonPost<StrategyRiskApplication>(
+    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}/upgrade`,
+    input,
     client,
   );

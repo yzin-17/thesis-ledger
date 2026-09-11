@@ -22,6 +22,7 @@ import {
 import { useNotificationRoutingQuery, useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
 import { RiskOverview } from './RiskOverview.js';
 import { RiskRuleWorkbench } from './RiskRuleWorkbench.js';
+import { StrategyRiskApplicationsSection } from './StrategyRiskApplicationsSection.js';
 import {
   NotificationProviderNotice,
   RiskAuditDialog,
@@ -35,7 +36,7 @@ import type {
   RiskTestResult,
 } from './risk.types.js';
 
-type RiskTab = 'overview' | 'rules' | 'events' | 'notifications';
+type RiskTab = 'overview' | 'rules' | 'strategy-applications' | 'events' | 'notifications';
 
 export function RiskCenter({
   accounts,
@@ -256,6 +257,7 @@ export function RiskCenter({
         <TabsList variant="line" className="mb-4 w-full">
           <TabsTrigger value="overview">总览</TabsTrigger>
           <TabsTrigger value="rules">规则</TabsTrigger>
+          <TabsTrigger value="strategy-applications">策略应用</TabsTrigger>
           <TabsTrigger value="events">事件</TabsTrigger>
           <TabsTrigger value="notifications">通知</TabsTrigger>
         </TabsList>
@@ -290,6 +292,12 @@ export function RiskCenter({
             onTest={actions.testRule}
             onTestComplete={saveTestRecord}
             onAudit={openAudit}
+          />
+        </TabsContent>
+        <TabsContent value="strategy-applications">
+          <StrategyRiskApplicationsSection
+            accounts={accounts}
+            onOpenStrategy={() => void navigate('/strategy?tab=optimization')}
           />
         </TabsContent>
         <TabsContent value="events">

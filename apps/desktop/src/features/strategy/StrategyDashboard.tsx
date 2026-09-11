@@ -1,5 +1,6 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
 import type { LoadState } from '../shared/types.js';
@@ -43,11 +44,17 @@ type EditorSelection = {
 type BacktestSelection = { strategy: StrategyRecord; version: StrategyVersion };
 
 export function StrategyDashboard() {
+  const location = useLocation();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('library');
   const [editorSelection, setEditorSelection] = useState<EditorSelection | null>(null);
   const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
   const [resultJobId, setResultJobId] = useState<string | null>(null);
+  useEffect(() => {
+    const requested = new URLSearchParams(location.search).get('tab');
+    if (requested === 'library' || requested === 'jobs' || requested === 'optimization')
+      setActiveTab(requested);
+  }, [location.search]);
   const toastManager = useToastManager();
   const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
   const resultJobQuery = useBacktestJobQuery(resultJobId);
