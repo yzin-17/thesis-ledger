@@ -375,8 +375,28 @@ export class AiRunService {
   }
 
   async recoverStaleRuns(now = new Date(), maxAttempts = 3) {
+    const optimizationUnknown = await this.prisma.aiRun.updateMany({
+      where: {
+        status: 'running',
+        promptVersion: 'strategy-optimization-v1',
+        leaseUntil: { lt: now },
+      },
+      data: {
+        status: 'failed',
+        claimedAt: null,
+        leaseUntil: null,
+        errorCode: 'optimization_unknown_outcome',
+        errorSummary: '优化 Provider 调用租约已过期，外部结果未知；禁止自动重新请求 Provider',
+        completedAt: now,
+      },
+    });
     const stale = await this.prisma.aiRun.updateMany({
-      where: { status: 'running', leaseUntil: { lt: now }, executionAttempt: { lt: maxAttempts } },
+      where: {
+        status: 'running',
+        promptVersion: { not: 'strategy-optimization-v1' },
+        leaseUntil: { lt: now },
+        executionAttempt: { lt: maxAttempts },
+      },
       data: {
         status: 'queued',
         claimedAt: null,
@@ -386,7 +406,12 @@ export class AiRunService {
       },
     });
     const exhausted = await this.prisma.aiRun.updateMany({
-      where: { status: 'running', leaseUntil: { lt: now }, executionAttempt: { gte: maxAttempts } },
+      where: {
+        status: 'running',
+        promptVersion: { not: 'strategy-optimization-v1' },
+        leaseUntil: { lt: now },
+        executionAttempt: { gte: maxAttempts },
+      },
       data: {
         status: 'failed',
         claimedAt: null,
@@ -396,7 +421,11 @@ export class AiRunService {
         completedAt: now,
       },
     });
-    return { requeued: stale.count, failed: exhausted.count };
+    return {
+      requeued: stale.count,
+      failed: exhausted.count + optimizationUnknown.count,
+      optimizationUnknown: optimizationUnknown.count,
+    };
   }
 
   /** Server runtime only; callers must derive audit facts from actual execution. */
