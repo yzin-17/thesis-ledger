@@ -72,7 +72,7 @@ jobs:
           pnpm --filter @thesis-ledger/schemas build
           pnpm --filter @thesis-ledger/shared build
           pnpm --filter @thesis-ledger/domain build
-          pnpm --filter @thesis-ledger/server exec vitest run test/strategy-optimization/strategy-optimization-postgres.integration.test.ts
+          pnpm --filter @thesis-ledger/server exec vitest run test/strategy-optimization/strategy-optimization-postgres*.integration.test.ts
         env:
           RUN_STRATEGY_OPTIMIZATION_POSTGRES_E2E: '1'
       - name: Contract tests
