@@ -72,6 +72,10 @@ export interface ArtifactStore {
 
 const PARQUET_MAGIC = Buffer.from('PAR1');
 
+type ParquetStreamBatch = {
+  intoIPCStream(): Uint8Array;
+};
+
 function openDiskBlob(path: string): Promise<Blob> {
   if (typeof nodeFs.openAsBlob !== 'function') {
     throw new Error('LocalArtifactStore requires a Node.js runtime with fs.openAsBlob support');
@@ -105,23 +109,50 @@ function tableFromRows(rows: readonly ArtifactRow[]): ArrowTable {
 }
 
 function normalizeValue(value: unknown): ArtifactScalar {
-  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
     return value;
   }
+  if (typeof value === 'bigint') return value.toString();
   if (value instanceof Date) return value.toISOString();
-  return String(value);
+  if (value instanceof Uint8Array) return Buffer.from(value).toString('base64');
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new Error('Unsupported artifact scalar value');
+  return serialized;
 }
 
-async function* streamRows(parquetFile: ParquetFile, options?: ArtifactReadOptions): AsyncIterable<ArtifactRow> {
+function isParquetStreamBatch(value: unknown): value is ParquetStreamBatch {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.intoIPCStream === 'function';
+}
+
+async function* streamRows(
+  parquetFile: ParquetFile,
+  options?: ArtifactReadOptions,
+): AsyncIterable<ArtifactRow> {
   const stream = await parquetFile.stream(options);
   const reader = stream.getReader();
   try {
     while (true) {
       const next = await reader.read();
       if (next.done) break;
-      const table = tableFromIPC(next.value.intoIPCStream());
+      const batch: unknown = next.value;
+      if (!isParquetStreamBatch(batch)) {
+        throw new Error('Parquet stream returned an invalid record batch');
+      }
+      const table = tableFromIPC(batch.intoIPCStream());
       for (const row of table) {
-        yield Object.fromEntries(Object.entries(row as Record<string, unknown>).map(([key, value]) => [key, normalizeValue(value)]));
+        yield Object.fromEntries(
+          Object.entries(row as Record<string, unknown>).map(([key, value]) => [
+            key,
+            normalizeValue(value),
+          ]),
+        );
       }
     }
   } finally {
@@ -139,14 +170,16 @@ export class LocalArtifactStore implements ArtifactStore {
     const root = resolve(this.rootDirectory);
     const path = resolve(root, key);
     const rel = relative(root, path);
-    if (rel.startsWith('..') || isAbsolute(rel)) throw new Error(`Artifact key escapes store: ${key}`);
+    if (rel.startsWith('..') || isAbsolute(rel))
+      throw new Error(`Artifact key escapes store: ${key}`);
     return path;
   }
 
   private async validateFile(ref: ArtifactRef): Promise<string> {
     const path = this.pathFor(ref.key);
     const info = await stat(path).catch((error: unknown) => {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ArtifactNotFoundError(ref.key);
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+        throw new ArtifactNotFoundError(ref.key);
       throw error;
     });
     if (info.size !== ref.sizeBytes || info.size < PARQUET_MAGIC.length * 2) {
@@ -163,9 +196,13 @@ export class LocalArtifactStore implements ArtifactStore {
       await handle.close();
     }
     const hash = createHash('sha256');
-    for await (const chunk of createReadStream(path)) hash.update(chunk);
+    for await (const chunk of createReadStream(path)) {
+      if (!Buffer.isBuffer(chunk)) throw new Error('Artifact stream returned a non-buffer chunk');
+      hash.update(chunk);
+    }
     const actual = hash.digest('hex');
-    if (actual !== ref.contentHash) throw new ArtifactCorruptionError(ref.key, 'content hash mismatch');
+    if (actual !== ref.contentHash)
+      throw new ArtifactCorruptionError(ref.key, 'content hash mismatch');
     return path;
   }
 
@@ -201,7 +238,10 @@ export class LocalArtifactStore implements ArtifactStore {
     };
   }
 
-  async openRead(ref: ArtifactRef, options?: ArtifactReadOptions): Promise<AsyncIterable<ArtifactRow>> {
+  async openRead(
+    ref: ArtifactRef,
+    options?: ArtifactReadOptions,
+  ): Promise<AsyncIterable<ArtifactRow>> {
     const path = await this.validateFile(ref);
     const file = await ParquetFile.fromFile(await openDiskBlob(path));
     return (async function* readAndFree(): AsyncIterable<ArtifactRow> {
