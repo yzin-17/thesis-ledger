@@ -1,3 +1,4 @@
+import { DecimalValue } from '../decimal.js';
 import { trailingStopTriggered } from './statistics.js';
 import {
   completeRiskEvent,
@@ -43,6 +44,17 @@ const copiedComparisonOperator = (rule: RiskRule) => {
   return raw === 'lte' || raw === 'gte' ? raw : null;
 };
 
+const costReturnComparison = (context: V01RiskContext, rule: RiskRule) => {
+  const price = DecimalValue.from(String(context.price));
+  const costPrice = DecimalValue.from(String(context.costPrice));
+  const value = price.dividedBy(costPrice).minus('1');
+  if (rule.kind === 'cost-stop') {
+    const boundary = DecimalValue.from(String(Math.abs(rule.threshold))).times('-1');
+    return value.compareTo(boundary);
+  }
+  return value.compareTo(String(rule.threshold));
+};
+
 export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEvent | null => {
   if (context.price === undefined && rule.kind !== 'position-concentration') return null;
   let value: number;
@@ -62,12 +74,12 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
     case 'take-profit': {
       if (context.costPrice === undefined || context.costPrice <= 0) return null;
       value = context.price! / context.costPrice - 1;
+      const comparison = costReturnComparison(context, rule);
       const copiedOperator = copiedComparisonOperator(rule);
       if (rule.kind === 'cost-stop') {
-        const boundary = -Math.abs(rule.threshold);
-        triggered = copiedOperator === 'lte' ? value <= boundary : value < boundary;
+        triggered = copiedOperator === 'lte' ? comparison <= 0 : comparison < 0;
       } else {
-        triggered = copiedOperator === 'gte' ? value >= rule.threshold : value > rule.threshold;
+        triggered = copiedOperator === 'gte' ? comparison >= 0 : comparison > 0;
       }
       valueMetric = 'distance_to_cost';
       break;
