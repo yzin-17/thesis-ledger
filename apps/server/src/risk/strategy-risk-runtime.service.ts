@@ -29,13 +29,19 @@ export type StrategyRiskRuntimeEvaluation = {
   evaluation: StrategyMonitoringEvaluation;
   candidate?: EvaluationCandidate;
   event?: RiskEvent;
-  notification: { enabled: boolean; cooldownMinutes: number };
+  notification: {
+    enabled: boolean;
+    cooldownMinutes: number;
+    severity: RiskEvent['severity'];
+    channels: string[];
+  };
 };
 
 const toRecord = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+const severityValues = new Set<RiskEvent['severity']>(['info', 'warning', 'error', 'critical']);
 
 @Injectable()
 export class StrategyRiskRuntimeService {
@@ -58,12 +64,20 @@ export class StrategyRiskRuntimeService {
 
   private notification(application: StrategyRiskApplicationRuntimeRow) {
     const value = toRecord(application.notification);
+    const severity = severityValues.has(value.severity as RiskEvent['severity'])
+      ? (value.severity as RiskEvent['severity'])
+      : 'warning';
+    const channels = Array.isArray(value.channels)
+      ? value.channels.filter((item): item is string => typeof item === 'string')
+      : ['feishu'];
     return {
       enabled: value.enabled !== false,
       cooldownMinutes:
         typeof value.cooldownMinutes === 'number' && Number.isFinite(value.cooldownMinutes)
           ? Math.max(0, Math.floor(value.cooldownMinutes))
           : 60,
+      severity,
+      channels,
     };
   }
 
