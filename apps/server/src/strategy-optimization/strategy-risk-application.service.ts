@@ -248,7 +248,12 @@ export class StrategyRiskApplicationService {
     const existing = await this.store.findByIdempotencyKey(parsed.idempotencyKey);
     if (existing) return existing;
     if (parsed.enabled) await this.assertAutomaticRuntimeCapability(parsed.strategyVersionId);
-    const preview = await this.preview(parsed);
+    const preview = await this.preview({
+      strategyVersionId: parsed.strategyVersionId,
+      accountId: parsed.accountId,
+      symbol: parsed.symbol,
+      cycleMode: parsed.cycleMode,
+    });
     this.validatePreview(preview, parsed.previewHash);
     try {
       return await this.createTransaction(randomUUID(), parsed, preview);
