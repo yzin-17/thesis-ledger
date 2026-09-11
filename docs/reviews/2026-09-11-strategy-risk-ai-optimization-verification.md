@@ -27,4 +27,6 @@
 
 ## CI 证据
 
-最终证据在 PR #35 收口后补充。
+- PR CI #314 已通过 Secret scan、Migration matrix 与 Contract tests；质量链在构建阶段暴露两个严格类型问题：多 Provider 数组推断过窄，以及 V2 策略解析结果需要显式收窄。
+- 上述两个类型边界已在 `44ff8775d3e8051cc0f2761199422e8578a1f035` 修复，没有放宽 ESLint、TypeScript 或复杂度门禁。
+- 当前重新触发完整 PR CI；最终通过记录与主分支回归结果在收口后补充。
