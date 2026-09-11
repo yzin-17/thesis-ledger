@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
@@ -101,7 +102,16 @@ export class StrategyOptimizationCandidateService {
       },
       `优化策略 ${baseline.strategy.name}`,
     );
-    return this.completeProposal(experiment, baseline, descriptors, route, round, modelKey, aiRun.id, estimatedCost);
+    return this.completeProposal(
+      experiment,
+      baseline,
+      descriptors,
+      route,
+      round,
+      modelKey,
+      aiRun.id,
+      estimatedCost,
+    );
   }
 
   private async completeProposal(
@@ -120,7 +130,13 @@ export class StrategyOptimizationCandidateService {
       const completion = await provider.complete(
         {
           model: route.model,
-          messages: await this.prompt(experiment, baseline.strategy, descriptors, modelKey, round),
+          messages: await this.prompt(
+            experiment,
+            baseline.strategy,
+            descriptors,
+            modelKey,
+            round,
+          ),
           tools: [],
         },
         AbortSignal.timeout(60_000),
@@ -186,7 +202,10 @@ export class StrategyOptimizationCandidateService {
     return Math.min(min._min.version ?? 0, 0) - 1;
   }
 
-  private async createCandidateVersion(baseline: StrategyVersionRecord, strategy: StrategySchemaV2) {
+  private async createCandidateVersion(
+    baseline: StrategyVersionRecord,
+    strategy: StrategySchemaV2,
+  ) {
     return this.prisma.strategyVersion.create({
       data: {
         strategyId: baseline.strategyId,
@@ -218,7 +237,7 @@ export class StrategyOptimizationCandidateService {
     const count = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
       SELECT COUNT(*)::bigint AS "count" FROM "OptimizationCandidate" WHERE "experimentId"=${experiment.id}::uuid
     `);
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const rows = await this.prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
       INSERT INTO "OptimizationCandidate" (
         "id", "experimentId", "candidateNumber", "modelKey", "candidateStrategyVersionId", "executionHash",
@@ -298,7 +317,10 @@ export class StrategyOptimizationCandidateService {
       strategy,
       executionHash,
     );
-    return { candidate: await this.evaluateCandidate(experiment, candidate), duplicate: false };
+    return {
+      candidate: await this.evaluateCandidate(experiment, candidate),
+      duplicate: false,
+    };
   }
 
   validateAuthorizedParameters(
