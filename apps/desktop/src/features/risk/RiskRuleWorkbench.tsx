@@ -1,200 +1,308 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArchiveIcon, PlayIcon, PlusIcon, RotateCcwIcon } from 'lucide-react';
-import type { RiskEvaluationResponseV1, RiskRuleV1 } from '@thesis-ledger/api-client';
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToastManager } from '@/components/ui/toast';
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
+import { LoaderCircle, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+import type { Account, Position } from '../portfolio/portfolio.types.js';
+import { isDataLoaded } from '../shared/display.js';
+import type { LoadState } from '../shared/types.js';
+import type {
+  CreateRiskRuleInput,
+  RiskRuleRecord,
+  RiskTestRecord,
+  RiskTestResult,
+} from './risk.types.js';
 import {
+  formatDateTime,
+  formatThreshold,
   riskRuleKindLabel,
   riskScopeLabel,
   riskSeverityLabel,
   riskSeverityTone,
-  ruleStatusLabel,
-  ruleStatusTone,
-} from './risk.labels.js';
+  riskTestRecordForRule,
+  ruleTargetLabel,
+} from './risk.format.js';
 import { RiskRuleEditorSheet } from './RiskRuleEditorSheet.js';
-import {
-  useArchiveRiskRuleMutation,
-  usePatchRiskRuleMutation,
-  useRestoreRiskRuleMutation,
-  useTestRiskRuleMutation,
-} from './risk.mutations.js';
-import { useRiskAuditQuery, useRiskRulesQuery } from './risk.queries.js';
-import type { Account, RiskRuleDraft } from './risk.types.js';
-import { riskRuleDraftFromRule } from './risk.utils.js';
-import { cn } from '@/lib/utils';
 
-const formatDateTime = (value: string | null | undefined) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN');
+const toggleRuleLabel = (toggling: boolean, enabled: boolean, needsRepair: boolean) => {
+  if (toggling) return '更新中…';
+  if (needsRepair) return '补齐目标后启用';
+  return enabled ? '停用规则' : '启用规则';
 };
 
-const formatThreshold = (kind: RiskRuleV1['kind'], threshold: RiskRuleV1['threshold']) => {
-  if (kind === 'STOP_LOSS' || kind === 'TAKE_PROFIT' || kind === 'DRAWDOWN_LIMIT')
-    return `${threshold}%`;
-  if (kind === 'POSITION_LIMIT' || kind === 'SINGLE_POSITION_LIMIT') return `${threshold}%`;
-  return threshold;
+const ruleStatusLabel = (rule: RiskRuleRecord) => {
+  if (rule.archivedAt) return '已归档';
+  if (rule.needsRepair) return '待修复';
+  return rule.enabled ? '启用' : '已停用';
 };
 
-const ruleTargetLabel = (rule: RiskRuleV1, accountName: string, assetName?: string | null) => {
-  if (rule.scope === 'PORTFOLIO') return accountName;
-  return assetName ?? rule.symbol ?? '未绑定标的';
+const ruleStatusTone = (rule: RiskRuleRecord) => {
+  if (rule.archivedAt || !rule.enabled) return 'outline' as const;
+  if (rule.needsRepair) return 'destructive' as const;
+  return 'secondary' as const;
 };
 
-const auditActionLabel = (action: string) => {
-  const labels: Record<string, string> = {
-    CREATED: '创建',
-    UPDATED: '更新',
-    ENABLED: '启用',
-    DISABLED: '停用',
-    ARCHIVED: '归档',
-    RESTORED: '恢复',
-    TESTED: '测试',
-  };
-  return labels[action] ?? action;
+const testResultMessage = (result: RiskTestResult) => {
+  if (result.message) return result.message;
+  return result.triggered ? '已触发' : '未触发';
 };
 
-const actorLabel = (actor: string) => {
-  if (actor === 'desktop') return '桌面端';
-  if (actor === 'system') return '系统';
-  return actor;
-};
-
-function StatusDot({ status }: { status: RiskEvaluationResponseV1['status'] }) {
-  const className =
-    status === 'TRIGGERED'
-      ? 'bg-destructive'
-      : status === 'OK'
-        ? 'bg-foreground'
-        : status === 'STALE'
-          ? 'bg-amber-500'
-          : 'bg-muted-foreground';
-  return <span className={cn('inline-block size-2 rounded-full', className)} />;
-}
-
-function AuditList({ ruleId }: { ruleId: string }) {
-  const auditQuery = useRiskAuditQuery(ruleId);
-  if (auditQuery.isLoading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-14 w-full" />
-        ))}
-      </div>
-    );
-  }
-  if (auditQuery.isError) {
-    return <p className="text-sm text-destructive">{auditQuery.error.message}</p>;
-  }
-  if (!auditQuery.data?.length) {
-    return <p className="text-sm text-muted-foreground">暂无审计记录。</p>;
-  }
-  return (
-    <div className="space-y-2">
-      {auditQuery.data.map((item) => (
-        <div key={item.id} className="rounded-lg border p-3 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-medium">{auditActionLabel(item.action)}</span>
-            <span className="text-xs text-muted-foreground">{formatDateTime(item.occurredAt)}</span>
-          </div>
-          <p className="mt-1 mb-0 text-xs text-muted-foreground">
-            {actorLabel(item.actor)} · v{item.version}
-          </p>
-          {item.summary ? <p className="mt-2 mb-0 text-sm">{item.summary}</p> : null}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TestResultList({ results }: { results: RiskEvaluationResponseV1[] }) {
-  if (!results.length) {
-    return <p className="text-sm text-muted-foreground">运行测试后会在这里显示逐规则结果。</p>;
-  }
-  return (
-    <div className="space-y-2">
-      {results.map((result) => (
-        <div key={`${result.ruleId}:${result.evaluatedAt}`} className="rounded-lg border p-3 text-sm">
-          <div className="flex items-center gap-2">
-            <StatusDot status={result.status} />
-            <span className="font-medium">{result.message}</span>
-          </div>
-          <p className="mt-1 mb-0 text-xs text-muted-foreground">
-            {result.currentValue === null ? '当前值不可用' : `当前值 ${result.currentValue}`} ·{' '}
-            {formatDateTime(result.evaluatedAt)}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function RuleList({
+export function RiskRuleWorkbench({
   rules,
   accounts,
-  selectedRuleId,
-  onSelect,
+  positions,
+  loadState,
+  busyAction,
+  onCreate,
+  onUpdate,
+  onToggle,
+  onArchive,
+  onRestore,
+  onTest,
+  testRecords,
+  onTestComplete,
+  onAudit,
 }: {
-  rules: RiskRuleV1[];
+  rules: RiskRuleRecord[];
   accounts: Account[];
-  selectedRuleId: string | null;
-  onSelect: (ruleId: string) => void;
+  positions: Position[];
+  loadState: LoadState;
+  busyAction: string | null;
+  onCreate: (input: CreateRiskRuleInput) => Promise<boolean>;
+  onUpdate: (ruleId: string, input: CreateRiskRuleInput) => Promise<boolean>;
+  onToggle: (rule: RiskRuleRecord) => Promise<boolean>;
+  onArchive: (rule: RiskRuleRecord) => Promise<boolean>;
+  onRestore: (rule: RiskRuleRecord) => Promise<boolean>;
+  onTest: (rule: RiskRuleRecord) => Promise<RiskTestResult[] | null>;
+  testRecords: Record<string, RiskTestRecord>;
+  onTestComplete: (rule: RiskRuleRecord, results: RiskTestResult[]) => void;
+  onAudit: (rule: RiskRuleRecord) => void;
 }) {
-  if (!rules.length) {
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(rules[0]?.id ?? null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<RiskRuleRecord | null>(null);
+  const [archiveRule, setArchiveRule] = useState<RiskRuleRecord | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  // 用 == null 同时兼容 null 与缺失字段（旧响应），缺字段视为未归档
+  const activeRules = rules.filter((rule) => rule.archivedAt == null);
+  const archivedRules = rules.filter((rule) => rule.archivedAt != null);
+  const visibleRules = showArchived ? rules : activeRules;
+
+  useEffect(() => {
+    if (selectedRuleId && visibleRules.some((rule) => rule.id === selectedRuleId)) return;
+    setSelectedRuleId(activeRules[0]?.id ?? archivedRules[0]?.id ?? null);
+  }, [activeRules, archivedRules, visibleRules, selectedRuleId]);
+
+  const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? null;
+  const selectedTestRecord = selectedRule ? riskTestRecordForRule(testRecords, selectedRule) : null;
+  const canCreate = busyAction === null;
+  const empty = isDataLoaded(loadState) && rules.length === 0;
+  const accountNameForRule = (rule: RiskRuleRecord) =>
+    rule.accountId ? accounts.find((account) => account.id === rule.accountId)?.name : undefined;
+  const selectedAccountName = selectedRule ? accountNameForRule(selectedRule) : undefined;
+
+  const openCreate = () => {
+    setEditingRule(null);
+    setEditorOpen(true);
+  };
+
+  const openEdit = () => {
+    if (!selectedRule) return;
+    setEditingRule(selectedRule);
+    setEditorOpen(true);
+  };
+
+  const submitEditor = async (input: CreateRiskRuleInput) => {
+    if (editingRule) return onUpdate(editingRule.id, input);
+    return onCreate(input);
+  };
+
+  const runTest = async () => {
+    if (!selectedRule) return;
+    const result = await onTest(selectedRule);
+    if (!result) return;
+    onTestComplete(selectedRule, result);
+  };
+
+  const confirmArchive = async () => {
+    if (!archiveRule) return;
+    const archived = await onArchive(archiveRule);
+    if (archived) setArchiveRule(null);
+  };
+
+  const renderRuleItem = (rule: RiskRuleRecord, muted = false) => {
+    const selected = rule.id === selectedRuleId;
+    // 列表空间有限：证券规则显示“标的名 · 代码”（无名称时仅代码）；范围与账户在详情小字中展示
+    const listTarget =
+      rule.scope === 'security'
+        ? [rule.assetName, rule.symbol].filter(Boolean).join(' · ') || '未指定证券'
+        : ruleTargetLabel(rule, accountNameForRule(rule));
     return (
-      <Empty className="border">
-        <EmptyHeader>
-          <EmptyTitle>暂无风险规则</EmptyTitle>
-          <EmptyDescription>创建第一条规则后，可在这里测试、启停和审计。</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <Button
+        key={rule.id}
+        type="button"
+        variant={selected ? 'secondary' : 'ghost'}
+        className={cn(
+          'h-auto min-h-16 justify-start whitespace-normal px-3 py-2 text-left',
+          muted && 'opacity-60',
+          selected && 'ring-1 ring-border',
+        )}
+        onClick={() => setSelectedRuleId(rule.id)}
+        aria-current={selected ? 'true' : undefined}
+      >
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+          <span className="flex w-full items-center justify-between gap-2">
+            <span className="truncate font-medium">{riskRuleKindLabel(rule.kind)}</span>
+            <Badge variant={ruleStatusTone(rule)}>{ruleStatusLabel(rule)}</Badge>
+          </span>
+          <span className="w-full truncate text-xs text-muted-foreground" title={listTarget}>
+            {listTarget} · v{rule.version}
+          </span>
+        </span>
+      </Button>
     );
-  }
+  };
+
   return (
-    <div className="space-y-2">
-      {rules.map((rule) => {
-        const accountName = accounts.find((account) => account.id === rule.accountId)?.name ?? '未知账户';
-        return (
-          <button
-            key={rule.id}
-            type="button"
-            className={cn(
-              'w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50',
-              selectedRuleId === rule.id && 'border-foreground bg-muted/40',
-            )}
-            onClick={() => onSelect(rule.id)}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{riskRuleKindLabel(rule.kind)}</span>
-                  <Badge variant={ruleStatusTone(rule)}>{ruleStatusLabel(rule)}</Badge>
-                </div>
-                <p className="mt-1 mb-0 truncate text-xs text-muted-foreground">
-                  {riskScopeLabel(rule.scope)} · {ruleTargetLabel(rule, accountName, rule.assetName)}
-                </p>
+    <>
+      <section className="panel mt-0 border-t-0">
+        <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2>规则工作台</h2>
+            <p>规则全局共用；修改、启停、归档和恢复都会递增版本并写入审计。</p>
+          </div>
+          <Button type="button" disabled={!canCreate} onClick={openCreate}>
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            新建规则
+          </Button>
+        </div>
+
+        {empty ? (
+          <Empty className="min-h-40 rounded-lg border border-dashed p-8">
+            <EmptyTitle>还没有风险规则</EmptyTitle>
+            <EmptyDescription>创建第一条规则后，它会在这里集中管理。</EmptyDescription>
+            <Button type="button" onClick={openCreate}>
+              创建第一条规则
+            </Button>
+          </Empty>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)]">
+            <aside
+              className="flex min-h-64 flex-col gap-2 rounded-lg border border-border bg-card p-2"
+              aria-label="风险规则列表"
+            >
+              <div className="flex items-center justify-between gap-2 px-2 py-1">
+                <span className="text-xs font-medium text-muted-foreground">全部规则</span>
+                <Badge variant="outline">{activeRules.length}</Badge>
               </div>
-              <Badge variant={riskSeverityTone(rule.severity)}>
-                {riskSeverityLabel(rule.severity)}
-              </Badge>
+              {activeRules.length === 0 && archivedRules.length > 0 && (
+                <p className="px-2 py-1 text-xs text-muted-foreground">
+                  当前没有活跃规则，仅剩已归档规则。
+                </p>
+              )}
+              {activeRules.map((rule) => renderRuleItem(rule))}
+              {archivedRules.length > 0 && (
+                <div className="mt-auto flex flex-col gap-2 border-t border-border pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 w-full justify-between px-2 py-1 text-xs text-muted-foreground"
+                    aria-expanded={showArchived}
+                    onClick={() => setShowArchived((current) => !current)}
+                  >
+                    {showArchived ? '隐藏已归档' : '显示已归档'}
+                    <Badge variant="outline">{archivedRules.length}</Badge>
+                  </Button>
+                  {showArchived && archivedRules.map((rule) => renderRuleItem(rule, true))}
+                </div>
+              )}
+            </aside>
+
+            <div className="min-w-0 rounded-lg border border-border bg-card p-5">
+              {selectedRule ? (
+                <RuleDetail
+                  rule={selectedRule}
+                  {...(selectedAccountName ? { accountName: selectedAccountName } : {})}
+                  testResults={selectedTestRecord?.results ?? []}
+                  testTime={selectedTestRecord?.testedAt ?? null}
+                  busyAction={busyAction}
+                  onEdit={openEdit}
+                  onToggle={() => void onToggle(selectedRule)}
+                  onArchive={() => setArchiveRule(selectedRule)}
+                  onRestore={() => void onRestore(selectedRule)}
+                  onTest={() => void runTest()}
+                  onAudit={() => onAudit(selectedRule)}
+                />
+              ) : (
+                <Empty className="min-h-40 border-0 p-8">
+                  <EmptyDescription>选择一条规则查看详情。</EmptyDescription>
+                </Empty>
+              )}
             </div>
-          </button>
-        );
-      })}
-    </div>
+          </div>
+        )}
+      </section>
+
+      <RiskRuleEditorSheet
+        open={editorOpen}
+        rule={editingRule}
+        accounts={accounts}
+        positions={positions}
+        pending={busyAction === 'create-rule' || busyAction === `patch:${editingRule?.id ?? ''}`}
+        onOpenChange={setEditorOpen}
+        onSubmit={submitEditor}
+      />
+
+      <AlertDialog
+        open={Boolean(archiveRule)}
+        onOpenChange={(open) => !open && setArchiveRule(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>归档风险规则？</AlertDialogTitle>
+            <AlertDialogDescription>
+              归档“{archiveRule ? riskRuleKindLabel(archiveRule.kind) : ''}
+              ”后会停用并移出默认列表，历史事件和审计记录保留；之后可在“显示已归档”中恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose
+              render={<Button type="button" variant="outline" className="secondary" />}
+            >
+              取消
+            </AlertDialogClose>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={busyAction === `archive:${archiveRule?.id ?? ''}`}
+              aria-busy={busyAction === `archive:${archiveRule?.id ?? ''}`}
+              onClick={() => void confirmArchive()}
+            >
+              {busyAction === `archive:${archiveRule?.id ?? ''}` && (
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              {busyAction === `archive:${archiveRule?.id ?? ''}` ? '归档中…' : '确认归档'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -202,6 +310,7 @@ function RuleDetail({
   rule,
   accountName,
   testResults,
+  testTime,
   busyAction,
   onEdit,
   onToggle,
@@ -210,9 +319,10 @@ function RuleDetail({
   onTest,
   onAudit,
 }: {
-  rule: RiskRuleV1;
-  accountName: string;
-  testResults: RiskEvaluationResponseV1[];
+  rule: RiskRuleRecord;
+  accountName?: string;
+  testResults: RiskTestResult[];
+  testTime: string | null;
   busyAction: string | null;
   onEdit: () => void;
   onToggle: () => void;
@@ -227,8 +337,7 @@ function RuleDetail({
   const restoring = busyAction === `restore:${rule.id}`;
   const triggered = testResults.filter((result) => result.triggered).length;
   const targetLabel = ruleTargetLabel(rule, accountName, rule.assetName);
-  const archivedAt = rule.archivedAt;
-  const archived = archivedAt != null;
+  const archived = rule.archivedAt != null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -252,7 +361,7 @@ function RuleDetail({
           )}
           {archived && (
             <p className="mt-2 mb-0 text-sm text-muted-foreground">
-              这条规则已于 {formatDateTime(archivedAt)} 归档，不再出现在默认列表中；
+              这条规则已于 {formatDateTime(rule.archivedAt!)} 归档，不再出现在默认列表中；
               恢复后会保持停用状态。
             </p>
           )}
@@ -260,6 +369,7 @@ function RuleDetail({
         <span className="text-sm font-medium text-muted-foreground">v{rule.version}</span>
       </div>
 
+      {/* 范围与目标已在标题下方的小字中展示（含标的名），网格只保留不重复的字段 */}
       <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-4 text-sm">
         <div>
           <dt className="text-xs text-muted-foreground">阈值</dt>
@@ -273,284 +383,126 @@ function RuleDetail({
 
       <div className="flex flex-wrap gap-2">
         {archived ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="secondary"
-            disabled={restoring || rule.needsRepair}
-            onClick={onRestore}
-          >
-            <RotateCcwIcon className="size-4" />
-            恢复规则
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null}
+              onClick={onRestore}
+              aria-busy={restoring}
+            >
+              {restoring && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              {restoring ? '恢复中…' : '恢复规则'}
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="text-button"
+              disabled={busyAction !== null}
+              onClick={onAudit}
+            >
+              查看审计
+            </Button>
+          </>
         ) : (
           <>
-            <Button type="button" variant="outline" onClick={onEdit}>
-              编辑规则
-            </Button>
-            <Button type="button" variant="outline" disabled={toggling} onClick={onToggle}>
-              {rule.enabled ? '停用' : '启用'}
-            </Button>
-            <Button type="button" variant="outline" disabled={testing} onClick={onTest}>
-              <PlayIcon className="size-4" />
-              测试规则
-            </Button>
-            <Button type="button" variant="outline" onClick={onAudit}>
-              查看审计
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null || rule.needsRepair}
+              onClick={onTest}
+              aria-busy={testing}
+            >
+              {testing && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              {testing ? '测试中…' : '人工测试'}
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="text-destructive hover:text-destructive"
-              disabled={archiving}
-              onClick={onArchive}
+              className="secondary"
+              disabled={busyAction !== null}
+              onClick={onEdit}
             >
-              <ArchiveIcon className="size-4" />
-              归档
+              编辑规则
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null || rule.needsRepair}
+              onClick={onToggle}
+              aria-busy={toggling}
+            >
+              {toggling && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="secondary"
+              disabled={busyAction !== null}
+              onClick={onArchive}
+              aria-busy={archiving}
+            >
+              {archiving && (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
+              归档规则
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="text-button"
+              disabled={busyAction !== null}
+              onClick={onAudit}
+            >
+              查看审计
             </Button>
           </>
         )}
       </div>
 
-      {testResults.length > 0 ? (
-        <div className="rounded-lg border p-4">
-          <p className="m-0 text-sm font-medium">最近一次测试：{triggered} 条触发</p>
-          <div className="mt-3">
-            <TestResultList results={testResults} />
+      <section className="rounded-lg border border-border p-4" aria-live="polite">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="m-0 text-sm font-semibold">最近一次人工测试</h4>
+            <p className="mt-1 mb-0 text-xs text-muted-foreground">
+              {testTime ? `测试时间：${formatDateTime(testTime)}` : '尚未测试；结果会保留在此处。'}
+            </p>
           </div>
+          {testResults.length > 0 && (
+            <Badge variant={triggered > 0 ? 'destructive' : 'secondary'}>{triggered} 个触发</Badge>
+          )}
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function RiskRuleWorkbench({ accounts }: { accounts: Account[] }) {
-  const toast = useToastManager();
-  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
-  const [includeArchived, setIncludeArchived] = useState(false);
-  const [severity, setSeverity] = useState<string>('all');
-  const [status, setStatus] = useState<string>('active');
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingDraft, setEditingDraft] = useState<RiskRuleDraft | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, RiskEvaluationResponseV1[]>>({});
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const rulesQuery = useRiskRulesQuery({ includeArchived });
-  const patchMutation = usePatchRiskRuleMutation();
-  const archiveMutation = useArchiveRiskRuleMutation();
-  const restoreMutation = useRestoreRiskRuleMutation();
-  const testMutation = useTestRiskRuleMutation();
-
-  const rules = useMemo(() => {
-    const rows = rulesQuery.data ?? [];
-    return rows.filter((rule) => {
-      if (severity !== 'all' && rule.severity !== severity) return false;
-      if (status === 'enabled' && !rule.enabled) return false;
-      if (status === 'disabled' && rule.enabled) return false;
-      if (status === 'active' && rule.archivedAt != null) return false;
-      return true;
-    });
-  }, [rulesQuery.data, severity, status]);
-
-  useEffect(() => {
-    if (!rules.length) {
-      setSelectedRuleId(null);
-      return;
-    }
-    if (!selectedRuleId || !rules.some((rule) => rule.id === selectedRuleId)) {
-      setSelectedRuleId(rules[0]?.id ?? null);
-    }
-  }, [rules, selectedRuleId]);
-
-  const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? null;
-  const selectedAccountName =
-    accounts.find((account) => account.id === selectedRule?.accountId)?.name ?? '未知账户';
-
-  const openCreate = () => {
-    setEditingDraft(null);
-    setEditorOpen(true);
-  };
-
-  const openEdit = () => {
-    if (!selectedRule) return;
-    setEditingDraft(riskRuleDraftFromRule(selectedRule));
-    setEditorOpen(true);
-  };
-
-  const handleToggle = async () => {
-    if (!selectedRule) return;
-    setBusyAction(`patch:${selectedRule.id}`);
-    try {
-      await patchMutation.mutateAsync({ id: selectedRule.id, enabled: !selectedRule.enabled });
-    } catch (error) {
-      toast.show({
-        title: '更新风险规则失败',
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleArchive = async () => {
-    if (!selectedRule) return;
-    setBusyAction(`archive:${selectedRule.id}`);
-    try {
-      await archiveMutation.mutateAsync(selectedRule.id);
-    } catch (error) {
-      toast.show({
-        title: '归档风险规则失败',
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleRestore = async () => {
-    if (!selectedRule) return;
-    setBusyAction(`restore:${selectedRule.id}`);
-    try {
-      await restoreMutation.mutateAsync(selectedRule.id);
-    } catch (error) {
-      toast.show({
-        title: '恢复风险规则失败',
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleTest = async () => {
-    if (!selectedRule) return;
-    setBusyAction(`test:${selectedRule.id}`);
-    try {
-      const response = await testMutation.mutateAsync(selectedRule.id);
-      setTestResults((current) => ({ ...current, [selectedRule.id]: response }));
-    } catch (error) {
-      toast.show({
-        title: '测试风险规则失败',
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  return (
-    <div className="grid gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="m-0 text-lg font-semibold">风险规则</h2>
-          <p className="mt-1 mb-0 text-sm text-muted-foreground">
-            管理止损、止盈、回撤和仓位约束，并保留规则测试与审计记录。
+        {testResults.length === 0 ? (
+          <p className="mt-4 mb-0 text-sm text-muted-foreground">
+            点击“人工测试”后查看当前组合上下文的判断结果。
           </p>
-        </div>
-        <Button type="button" onClick={openCreate}>
-          <PlusIcon className="size-4" />
-          新建规则
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={severity} onValueChange={setSeverity}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="全部严重度" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部严重度</SelectItem>
-            <SelectItem value="INFO">提示</SelectItem>
-            <SelectItem value="WARNING">警告</SelectItem>
-            <SelectItem value="CRITICAL">严重</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="全部状态" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">未归档</SelectItem>
-            <SelectItem value="all">全部状态</SelectItem>
-            <SelectItem value="enabled">已启用</SelectItem>
-            <SelectItem value="disabled">已停用</SelectItem>
-          </SelectContent>
-        </Select>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Checkbox checked={includeArchived} onCheckedChange={(checked) => setIncludeArchived(checked === true)} />
-          包含已归档
-        </label>
-      </div>
-
-      {rulesQuery.isLoading ? (
-        <div className="grid gap-3 lg:grid-cols-[320px_1fr]">
-          <Skeleton className="h-72 w-full" />
-          <Skeleton className="h-72 w-full" />
-        </div>
-      ) : rulesQuery.isError ? (
-        <Card>
-          <CardContent className="p-6 text-sm text-destructive">{rulesQuery.error.message}</CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <Card>
-            <CardContent className="p-3">
-              <RuleList
-                rules={rules}
-                accounts={accounts}
-                selectedRuleId={selectedRuleId}
-                onSelect={setSelectedRuleId}
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              {selectedRule ? (
-                <Tabs defaultValue="rule">
-                  <TabsList>
-                    <TabsTrigger value="rule">规则</TabsTrigger>
-                    <TabsTrigger value="audit">审计</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="rule" className="pt-4">
-                    <RuleDetail
-                      rule={selectedRule}
-                      accountName={selectedAccountName}
-                      testResults={testResults[selectedRule.id] ?? []}
-                      busyAction={busyAction}
-                      onEdit={openEdit}
-                      onToggle={() => void handleToggle()}
-                      onArchive={() => void handleArchive()}
-                      onRestore={() => void handleRestore()}
-                      onTest={() => void handleTest()}
-                      onAudit={() => undefined}
-                    />
-                  </TabsContent>
-                  <TabsContent value="audit" className="pt-4">
-                    <AuditList ruleId={selectedRule.id} />
-                  </TabsContent>
-                </Tabs>
-              ) : (
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyTitle>选择一条风险规则</EmptyTitle>
-                    <EmptyDescription>在左侧选择规则后查看详细配置。</EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <RiskRuleEditorSheet
-        accounts={accounts}
-        initialDraft={editingDraft}
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-      />
+        ) : (
+          <div className="mt-4 flex flex-col gap-2">
+            {testResults.slice(0, 6).map((result, index) => (
+              <div
+                key={result.id ?? `${rule.id}-test-${index}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm"
+              >
+                <span>{testResultMessage(result)}</span>
+                <Badge variant={result.triggered ? 'destructive' : 'secondary'}>
+                  {result.triggered ? '触发' : '未触发'}
+                </Badge>
+              </div>
+            ))}
+            {testResults.length > 6 && <p className="field-hint">仅展示前 6 条结果。</p>}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
