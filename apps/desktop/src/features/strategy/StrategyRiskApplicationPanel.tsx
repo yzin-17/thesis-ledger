@@ -4,6 +4,7 @@ import { strategySchemaV2 } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FieldLabel } from '@/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -165,7 +166,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-3">
-            <label className="space-y-1 text-sm">
+            <FieldLabel className="space-y-1 text-sm">
               <span className="text-muted-foreground">策略版本</span>
               <Select
                 value={strategyVersionId}
@@ -185,8 +186,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   ))}
                 </SelectContent>
               </Select>
-            </label>
-            <label className="space-y-1 text-sm">
+            </FieldLabel>
+            <FieldLabel className="space-y-1 text-sm">
               <span className="text-muted-foreground">实际账户</span>
               <Select value={accountId} onValueChange={(value) => value && setAccountId(value)}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="选择账户" /></SelectTrigger>
@@ -196,8 +197,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   ))}
                 </SelectContent>
               </Select>
-            </label>
-            <label className="space-y-1 text-sm">
+            </FieldLabel>
+            <FieldLabel className="space-y-1 text-sm">
               <span className="text-muted-foreground">生效周期</span>
               <Select value={cycleMode} onValueChange={(value) => value && setCycleMode(value)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -206,7 +207,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   <SelectItem value="nextPositionCycle">仅下一持仓周期</SelectItem>
                 </SelectContent>
               </Select>
-            </label>
+            </FieldLabel>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">执行标的 {symbol || '—'}</Badge>
