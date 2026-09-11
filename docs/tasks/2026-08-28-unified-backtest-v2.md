@@ -4,9 +4,11 @@
 
 后续增量：[`策略驱动风险规则与 AI 多模型优化实施任务`](2026-09-09-strategy-risk-ai-optimization.md)；该任务不重复认领本任务尚未完成的 V2 引擎能力。
 
+T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-09-10-backtest-historical-execution-rule-facts.md)。已取消全部历史证据通过 T0 的总门禁；按运行需要确认输入/模型，契约、Provider、Snapshot、执行、披露分别验证，再做真实闭环。本文 T0–T12 的既有完成记录不代表新增模型已实现。
+
 > 任务标识：`2026-08-28-unified-backtest-v2`
 > 状态：实施中，13/14 完成
-> 当前阶段：T0–T12 已完成；进入 T13 跨仓集成、隔离、迁移、性能与最终一致性验收
+> 当前阶段：T0–T12 保留原交付范围的本地完成记录；固定 CN 股票日频真实闭环、重放、账户隔离、Artifact 恢复及 Browser 展示已通过，但完整市场/资产/周期真实能力仍待验证；V2 T13 未完成。
 
 ## 执行约束
 
@@ -140,6 +142,7 @@
   - 验证证据：
     - 计算：新增 raw/adjusted Series 与 MA/EMA/RSI/MACD/ATR/VWAP/Highest/Lowest，使用 `DecimalValue` 并传播输入最大 `availableAt`；ATR gap 和 MACD output selector 具有 Golden 测试。
     - 时间：跨 Source/周期/市场按绝对时间取 `availableAt <= evaluationAt` 的最新值；公司行动复用 T2 单一契约，以显式 knowledge time 生成 adjusted 历史窗口，raw 执行价不变。
+    - Runner 集成：实际 Exchange Runner 在每个 evaluation tick 仅使用已经生效且当时已知的冻结公司行动重建 adjusted 指标输入；现金分红的 OHLC 复权统一引用 close，直接 Series、成交与风险继续使用 raw 值。
     - warmup：从嵌套 AST 递归推导 required lookback，检查 startDate 前紧邻连续可用点；不足/中断显式 `unavailable`，startDate 前点不输出运行结果。
     - 主代理验证：Schemas 126 tests passed；Domain 126 tests passed；两包 typecheck 和目标 ESLint：通过。
 
@@ -201,6 +204,7 @@
   - 验证证据：
     - 深模块：`VersionedExecutionRules` 接受版本化 Calendar、Instrument、Order、Price、Position/Cash Settlement 和 statutory charge 事实，输出稳定 `RULE_REJECTED` reason code、规则版本与 Calendar/Instrument provenance。
     - 事实适配：`tradingCalendarFromFact` 从冻结 DSA Calendar Fact 建立时区、Session、节假日和范围语义；三市场 lot/tick、价格限制、停牌/可交易、持仓/现金结算和 Decimal 市场收费由输入事实驱动。
+    - Runner 集成：Instrument Artifact 冻结显式 `executionRules` 内容及 supported/unavailable 状态；实际 Exchange Runner 校验规则版本与运行区间后，将价格限制、结算和法定收费传入 `VersionedExecutionRules`，缺失时不使用默认常量。
     - V1 隔离：`simulateAStockExecution` 改为对新深模块的兼容适配，保留既有 V1 行为，不再自行执行涨跌幅、T+1、lot 和法定收费判断。
     - 主代理验证：Domain 126 tests passed（含 CN/HK/US Golden、Session/节假日、停牌、lot/tick、价格、结算、收费和 provenance）；Domain typecheck 与目标 ESLint：通过。
 
@@ -260,6 +264,7 @@
     - `backtest-sizing.ts` 以 Decimal 实现四种 sizing、lotSize 规范化、Target Weight buy/sell/none、正反向 FX 与实际消费事实的 `availableAt`；`backtest-risk.ts` 仅在完成 tick 上实现 Fixed Stop、Fixed Take Profit、Max Holding Period level condition，并产出稳定 Risk TargetIntent。
     - `backtest-sizing-risk-adapter.ts` 将 sizing/risk 接入 T5 `SimulationExecutionPort`，分别驱动 T8 Exchange 下一可用开盘和 T9 CN NAV subscribe/redeem request；NAV 不经过 Exchange Order。
     - `backtest-corporate-actions.ts` 将 T2 cash dividend/split/reverse split 事实按时点、标的、币种和 runId 幂等接入 T6 SimulationLedger；raw 执行与 adjusted signal 分离，未知行动和 NAV Fund 显式拒绝。
+    - 实际路径回归：拆股与现金分红导致的 raw 价格跳变不再产生虚假 MA 信号；尚未获知或尚未生效的公司行动不改变此前信号，Ledger 的分红现金与拆股数量/单位成本仍由公司行动端口唯一更新。
     - 主代理验证：T10 定向测试通过；Domain 22 files / 201 tests 与 typecheck 通过，`git diff --check` 通过。
 
 - [x] T11：实现 BacktestTrade、Benchmark 与基础 Analytics
@@ -302,7 +307,7 @@
     - 验证通过：Domain 22 files / 203 tests、Schemas 12 files / 130 tests、API Client 1 file / 10 tests、Server 64 files / 473 tests、Desktop 定向 2 files / 49 tests；Domain/Server/Desktop typecheck、Server/Desktop build、Prisma validate 与 `git diff --check` 通过。Desktop build 仅有既有的大 chunk warning。
     - 浏览器 smoke：本地 `http://localhost:5173/strategy` 实测通过。使用合法 V2 JSON 在不保存数据的前提下切换到 V2 可视化编辑器，确认 `Signal Sources`、Execution Instrument、Primary timeframe、Sizing、Risk、Execution、Cost 与能力边界均可见；`390×844` 下页面与 Dialog `scrollWidth === clientWidth`，无横向溢出，关闭后 overlay 正常消失；浏览器控制台无 warning/error。当前 Server 部分数据源不可用时，页面按既有契约显示“数据可能陈旧”，未冒充完整实时运行态验收。
 
-- [x] T13：完成跨仓集成、隔离门禁、迁移、性能与最终一致性 Review
+- [ ] T13：完成跨仓集成、隔离门禁、迁移、性能与最终一致性 Review
   - 覆盖验收标准：AC1–AC30。
   - 依赖：T0–T12。
   - 涉及仓库：thesis-ledger、daily-stock-analysis、thesis-ledger-infra（仅在所需环境配置变更时）。
@@ -342,7 +347,17 @@
     - 真实成功 Run：Run `fab50622-0c77-44c7-b16d-9f0ecbed43f2` succeeded，产生 1 个 fill，checksum `505553f668690e43`；Worker 实跑峰值约 122 MiB / 7.748 GiB（1.54%），Server 约 120.6 MiB。
     - 最终账户隔离：本次真实回测即时前后哈希严格一致：`AccountLedgerState` 1=`4e7acffd...`、`JournalEntry` 0=`d41d8c...`、`LedgerEvent` 1=`31d6eae...`、`PortfolioSnapshot` 9=`78dd2f7a...`、`Trade` 1=`9d4e545...`。较早 `PortfolioSnapshot` 基线曾受后台运行时更新影响，但本次即时前后快照严格一致。
     - 运行态资源证据：最终阶段 BuildKit cache prune 回收 21.83 GB（早期另一次回收 22.06 GB），仅删除可重建缓存，不含镜像、容器或卷；已有受控 Artifact 空间不足、缺失、损坏、只读和清理恢复证据保留。
-    - 最终限制与结论：T13 验收条件已由跨仓测试、真实迁移、运行态故障恢复、账户隔离和 RSS 证据覆盖，现勾选 T13。真实成功结果 `completeness=partial`，必须展示“可卖持仓不足”警告；本次策略因快速退出遇到 CN T+1，结果证明买入成交闭环，不证明闭合卖出交易或完整收益闭环。
+    - 最终限制与结论：历史运行证据仍为 `completeness=partial`，且未证明闭合卖出交易或完整收益闭环；结合 2026-09-10 复核发现的 R01–R10，T13 保持未完成。
+    - 2026-09-10 R02–R04 增量修复：实际 Runner 已按 `sourceId + field` 构建和读取 Series；warmup Bar 不再进入交易评价 tick；跨标的信号策略改由 Execution Instrument 的 `primaryTimeframe` 和 raw 完成价评价风险。`packages/domain` 22 files / 204 tests、Server V2 定向 3 files / 6 tests、Domain/Server typecheck 通过；新增 CN T+1 跨标的买入、风险卖出和闭合 Trade 回归。
+    - 2026-09-10 R09 增量修复：DSA V2 现金分红只接受除权除息日作为经济生效时间；只有公告日或登记日的行不再产出 `CASH_DIVIDEND`，并将 coverage 标记为不完整。DSA ThesisLedger Contract、V2 dependencies、Provider runtime 与 AKShare timeout 共 52 tests 通过，`fundamental_adapter.py` pycompile 通过。仓库级 `scripts/ci_gate.sh` 的语法、flake8 和本地确定性检查通过；全量离线测试为 5836 passed / 5 failed，失败位于 config registry、intelligence、provider cache 与 YFinance TTM 日期断言，均不经过本轮修改的 V2 normalize seam，未将仓库门禁记为通过。
+    - 2026-09-10 R10 增量修复：DSA calendar fact 先校验 exchange-calendars 首末 session 覆盖；完全早于、部分越界或超出末端的请求返回 unavailable，只有完全覆盖范围才生成 holidays。新增 service 与 HTTP contract 回归；DSA ThesisLedger Contract、V2 dependencies、Provider runtime 与 AKShare timeout 共 53 tests 通过，修改文件 flake8、pycompile 与 diff-check 通过。R01、R05–R08 及真实 Provider/Docker 重验仍未完成。
+    - 2026-09-10 R05 增量修复：公司行动允许 `availableAt < occurredAt` 表达先公告后生效，Simulation 保留原始知识时间，并在知识已可用且经济事件已生效后才入账；任何公司行动拒绝都会以稳定错误码进入 warning，并把结果 `completeness` 降为 `unavailable`。DSA 生产端经济生效时间回归 1 test、Domain 22 files / 205 tests、Server 65 files / 478 tests、Domain/Server typecheck、目标 ESLint 通过。R01、R06–R08 及真实 Provider/Docker 重验仍未完成。
+    - 2026-09-10 R06 增量修复：Instrument Fact 契约新增冻结执行规则内容及 supported/unavailable 状态；Snapshot Builder 强制校验规则版本和完整 warmup/运行区间，实际 Exchange Runner 从 Artifact 消费价格限制、结算和法定收费。同一行情切换规则版本可产生不同拒绝结果，规则缺失不再静默退回常量。Schemas 13 files / 135 tests、Server 65 files / 478 tests、DSA Contract/V2 dependencies 25 tests、Schemas/Server typecheck、目标 ESLint、DSA pycompile 与两仓 `git diff --check` 通过；DSA `api/thesis_ledger.py` 全文件 flake8 仍仅有 6 个本轮前已存在的问题。R01、R07–R08 及真实 Provider/Docker 重验仍未完成。
+    - 2026-09-10 R07 增量修复：实际 Exchange Runner 改为在每个评价时点按冻结公司行动的生效时间与知识时间重建 adjusted Series，再计算 Indicator；成交、直接 Series 与风险仍消费 raw price。拆股、现金分红、已公告未生效和晚到知识均有回归，现金分红的非 close 价格字段统一引用 close 复权因子。Domain 22 files / 207 tests、Server 66 files / 480 tests、Domain/Server typecheck、目标 ESLint、Prettier 与 `git diff --check` 通过。R01、R08 及真实 Provider/Docker 重验仍未完成。
+    - 2026-09-10 R08 增量修复：实际 Exchange Runner 在下一可执行开盘时点使用 `SimulationLedger` 总权益定仓，纳入 settled/unsettled Cash、持仓市值、费用扣减和冻结估值 FX；执行币种已结算现金仍只作为成交可支付性约束，未与总权益混用。缺失或不完整的价格/FX 会使权益事实显式 unavailable。新增现金 5,000 加持仓市值 5,000 的 50% `targetWeight` Runner 回归，确认不会错误减仓至 250 股，并覆盖未结算现金、多币种、部分结算持仓和费用。Server 67 files / 483 tests、Server typecheck、目标 ESLint、Prettier、boundaries 与 `git diff --check` 通过。R01 及真实 Provider/Docker 重验仍未完成。
+    - 2026-09-10 R01 增量修复：实际 Exchange Runner 新增独立 `PortfolioValuation` 阶段，按冻结 Calendar 的交易日及 `PortfolioValuationPolicy.dailyValuationTime` 生成每日估值时点；同一时点先处理公司行动、成交和结算，再使用当时已可用的收盘价格与 FX 计算完整权益序列。价格或 FX 缺失时显式 unavailable，不再以现金回退冒充完整权益；年化频率由 Calendar 产生的实际估值间隔推导，不再按市场和信号周期硬编码。新增 `10,000 → 12,500 → 7,500 → 10,000` Runner 回归，保留 40% 峰谷回撤并确认末 Bar 使用收盘 10 而非开盘 20；同时覆盖跨周末年化、未平仓、价格及 FX 缺失。Domain 22 files / 207 tests、Server 68 files / 486 tests、Domain/Server typecheck 与定向 ESLint 通过。R01–R10 的本地代码修复均已完成，真实 Provider/Docker 重验仍未完成。
+    - 2026-09-10 当前版本真实运行态复验：DSA、Server、Worker 已重建并替换，三个容器与 PostgreSQL、Redis 均 healthy；Server/Worker 使用同一镜像及共享 `thesis-ledger-backtest-data`。真实 Run `145d7946-296a-4323-a1f7-f7676ee453ae` 获取到 68 条 `600519.SH` raw bar 后，因 DSA Instrument Fact 明确返回 `executionRules.status=unavailable`，在 Snapshot Builder 阶段以 `failed/DATA_UNAVAILABLE` 收敛，未进入 Worker。运行前后 `AccountLedgerState`、`JournalEntry`、`LedgerEvent`、`PortfolioSnapshot`、`Trade` 计数与内容哈希严格一致。当前阻塞已确认是缺少覆盖历史区间的版本化价格限制、法定收费与结算规则事实；未得到闭合买卖、完整权益曲线和完整度结果，T13 保持未勾选。详细证据见性能与功能基线报告。
+    - 2026-09-11 T4 固定场景复验：固定 CN 股票真实闭环、同 finalized Snapshot 重放、账户隔离、execution Artifact 缺失/恢复及临时 Desktop Vite 5174 上的模型确认、成功结果与失败详情 Browser 展示均已通过；该局部证据不覆盖完整目标市场、资产与周期，因此 T13 保持未勾选。详细证据见性能与功能基线报告及规则增量 Task。
 
 ## 验收标准映射
 
@@ -379,22 +394,30 @@
 | AC29 | T13 | T3、T12 |
 | AC30 | T0、T12 | T13 |
 
+## 2026-09-10 文档范围调整与待实施差异
+
+- 产品目标改为可信、可复现的策略研究；保留全部目标市场/资产/周期。费用、持仓与资金约束、NAV 生命周期、信息时间、公司行为和账户隔离仍必需。
+- 历史原件/客户协议/提现档案退出普通回测前置；原失败与测试记录保持发生时的结论，不视为已通过。
+- 增量 T1 负责可冻结模型契约，T2 负责事实区间，T3.1 负责按需冻结，T3.2 负责模型执行，T3.3 负责披露；T0 只确认首个运行输入与配置，T4 只提供最小真实验收证据。
+- 2026-09-10 当时源码仍拒绝 executionRules unavailable，尚未具备新的配置与按需校验；当时记录的真实 Run 失败，没有闭合交易或完整权益序列。该阶段 T13 未勾选且没有成功运行证据；后续状态见 T4 最新复验。
+- 完整 CN/HK/US 股票与 ETF、国内场外基金及分钟能力不移出范围。原 T2/T7–T9 的局部完成证据保留；未接入数据、未证明成功的市场/资产场景须在对应能力补齐后进入 T13，不能只用 CN 股票闭环宣称全目标完成。
+
 ## 最终一致性 Review
 
-- [x] Spec 中的全部验收标准均有对应实现
-- [x] 所有已勾选任务均有验证证据
-- [x] 所有任务依赖均已满足且无错误阻塞关系
-- [x] 跨任务接口、类型和命名保持一致
-- [x] 不存在未定义实现契约、占位描述或与 Spec 已决策事项冲突的实现
+- [ ] Spec 中的全部验收标准均有对应实现
+- [ ] 所有已勾选任务均有验证证据
+- [ ] 所有任务依赖均已满足且无错误阻塞关系
+- [ ] 跨任务接口、类型和命名保持一致
+- [ ] 不存在未定义实现契约、占位描述或与 Spec 已决策事项冲突的实现
 - [x] 实现未超出 Spec 声明的范围
-- [x] 测试策略、测试实现与验证结果一致
-- [x] 测试与文档已同步更新
-- [x] 必要实施 Step 均已验证；未获提交授权，当前变更保持未提交
-- [x] 未发现实现、Spec 与任务文档之间的不一致
+- [ ] 测试策略、测试实现与验证结果一致
+- [ ] 测试与文档已同步更新
+- [ ] 必要实施 Step 均已验证；未获提交授权，当前变更保持未提交
+- [ ] 未发现实现、Spec 与任务文档之间的不一致
 
 ### Review 结论
 
-- 结论：完成；T13 已勾选。跨仓、迁移、共享快照卷、真实 Run、取消/重试恢复、账户即时前后隔离、性能与故障恢复证据均已归档。
-- 发现的问题：真实成功结果仍为 `completeness=partial`，必须展示“可卖持仓不足”；CN T+1 导致快速退出策略未形成闭合卖出交易，因此不得宣称完整交易闭环或完整收益闭环。
-- 遗留风险：ETF、NAV、FX、拆分及未接入市场仍保持显式不支持；未来扩展这些范围必须重新执行对应 Provider/PIT、Golden、隔离和真实运行态验收。
-- 验证命令与结果：Server 65 files/477 tests、Schemas 13 files/134 tests、DSA 23 tests、Server typecheck、目标 ESLint、boundaries、compose-contract、性能 spike/digest、故障恢复、Markdown Prettier 与 `git diff --check` 均通过。
+- 结论：Blocked；R01–R10 已完成本地代码修复与验证，固定 CN 股票日频的成功纵向链路、重放、隔离和 Artifact 恢复也已成立，但完整目标市场/资产/周期及 V2 T13 门禁尚未通过，T13 不得勾选。
+- 发现的问题：固定 CN 股票日频的模型确认、成功结果和失败详情 Browser 已通过；仍缺完整目标范围的 Provider/运行验收，真实结果为 `completeness=partial`，因此 T13 不勾选。
+- 遗留风险：AI 候选评价需验证所选标的/周期的研究运行及模型，不依赖全部历史档案；ETF、NAV、FX、拆分及未接入市场仍属目标内未接入/待验证能力，不能以当前 unavailable 宣称产品永久不支持。
+- 验证命令与结果：R01 历史证据为 Domain 207 tests、Server 486 tests、Domain/Server typecheck 与定向 ESLint；T4 最新复验为 Snapshot Builder/模型快照 13 tests、Server build、boundaries、真实成功 Run、同 Snapshot 重放、账户隔离及 Artifact 缺失/恢复通过。in-app Browser 已在独立 5174 临时实例完成模型确认、成功结果和失败详情展示；CI 未重跑。

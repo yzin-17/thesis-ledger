@@ -27,15 +27,28 @@ const stableSerialize = (value: unknown): string => {
 
 export const numericExpressionKey = (expression: NumericExpression) => stableSerialize(expression);
 
+export const sourceSeriesKey = (sourceId: string, field: BacktestSeries['field']) =>
+  `${sourceId}:${field}`;
+
 export const getSeries = (
-  collection: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>> | undefined,
+  collection:
+    ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>> | undefined,
   sourceId: string,
+  field?: BacktestSeries['field'],
 ) => {
   if (collection && typeof (collection as ReadonlyMap<string, BacktestSeries>).get === 'function') {
-    return (collection as ReadonlyMap<string, BacktestSeries>).get(sourceId);
+    const values = collection as ReadonlyMap<string, BacktestSeries>;
+    const exact = field === undefined ? undefined : values.get(sourceSeriesKey(sourceId, field));
+    if (exact) return exact;
+    const legacy = values.get(sourceId);
+    return field === undefined || legacy?.field === field ? legacy : undefined;
   }
   if (!collection) return undefined;
-  return (collection as Readonly<Record<string, BacktestSeries>>)[sourceId];
+  const values = collection as Readonly<Record<string, BacktestSeries>>;
+  const exact = field === undefined ? undefined : values[sourceSeriesKey(sourceId, field)];
+  if (exact) return exact;
+  const legacy = values[sourceId];
+  return field === undefined || legacy?.field === field ? legacy : undefined;
 };
 
 const unavailable = (occurredAt: string, reason: string): UnavailableEvaluation => ({
@@ -81,7 +94,7 @@ export const evaluateNumericExpression = (
     };
   }
   if (expression.type === 'series') {
-    const series = getSeries(context.sourceSeries, expression.sourceId);
+    const series = getSeries(context.sourceSeries, expression.sourceId, expression.field);
     if (!series) return unavailable(occurredAt, `未知 Source: ${expression.sourceId}`);
     const aligned = alignSeriesAt(series, [occurredAt])[0];
     return aligned?.point
@@ -110,14 +123,31 @@ const evaluateNumericBoolean = (
     const comparison = DecimalValue.from(left.value).compareTo(right.value);
     let result: boolean;
     switch (expression.operator) {
-      case 'eq': result = comparison === 0; break;
-      case 'neq': result = comparison !== 0; break;
-      case 'gt': result = comparison > 0; break;
-      case 'gte': result = comparison >= 0; break;
-      case 'lt': result = comparison < 0; break;
-      case 'lte': result = comparison <= 0; break;
+      case 'eq':
+        result = comparison === 0;
+        break;
+      case 'neq':
+        result = comparison !== 0;
+        break;
+      case 'gt':
+        result = comparison > 0;
+        break;
+      case 'gte':
+        result = comparison >= 0;
+        break;
+      case 'lt':
+        result = comparison < 0;
+        break;
+      case 'lte':
+        result = comparison <= 0;
+        break;
     }
-    return { status: 'available', value: result, occurredAt, availableAt: maxAvailableAt([left, right]) };
+    return {
+      status: 'available',
+      value: result,
+      occurredAt,
+      availableAt: maxAvailableAt([left, right]),
+    };
   }
   const previousLeft = context.previousNumeric?.get(numericExpressionKey(expression.left));
   const previousRight = context.previousNumeric?.get(numericExpressionKey(expression.right));
@@ -126,9 +156,10 @@ const evaluateNumericBoolean = (
   }
   const currentComparison = DecimalValue.from(left.value).compareTo(right.value);
   const previousComparison = DecimalValue.from(previousLeft.value).compareTo(previousRight.value);
-  const crossed = expression.direction === 'above'
-    ? previousComparison <= 0 && currentComparison > 0
-    : previousComparison >= 0 && currentComparison < 0;
+  const crossed =
+    expression.direction === 'above'
+      ? previousComparison <= 0 && currentComparison > 0
+      : previousComparison >= 0 && currentComparison < 0;
   return {
     status: 'available',
     value: crossed,
@@ -145,20 +176,32 @@ export const evaluateBooleanExpression = (
   if (expression.type === 'positionState') {
     const position = context.positionState;
     if (!position) return unavailable(occurredAt, 'PositionState unavailable');
-    return { status: 'available', value: position.isOpen, occurredAt, availableAt: position.availableAt };
+    return {
+      status: 'available',
+      value: position.isOpen,
+      occurredAt,
+      availableAt: position.availableAt,
+    };
   }
   if (expression.type === 'not') {
     const value = evaluateBooleanExpression(expression.expression, context);
     return value.status === 'available' ? { ...value, value: !value.value } : value;
   }
   if (expression.type === 'all' || expression.type === 'any') {
-    const values = expression.conditions.map((condition) => evaluateBooleanExpression(condition, context));
+    const values = expression.conditions.map((condition) =>
+      evaluateBooleanExpression(condition, context),
+    );
     const unavailableValue = values.find((value) => value.status === 'unavailable');
     if (unavailableValue) return unavailableValue;
     const availableValues = values as AvailableEvaluation<boolean>[];
     const booleans = availableValues.map((value) => value.value);
     const result = expression.type === 'all' ? booleans.every(Boolean) : booleans.some(Boolean);
-    return { status: 'available', value: result, occurredAt, availableAt: maxAvailableAt(availableValues) };
+    return {
+      status: 'available',
+      value: result,
+      occurredAt,
+      availableAt: maxAvailableAt(availableValues),
+    };
   }
   return evaluateNumericBoolean(expression, context);
 };

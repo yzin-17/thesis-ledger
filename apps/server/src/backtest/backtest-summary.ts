@@ -1,4 +1,6 @@
 import type { Prisma } from '@prisma/client';
+import type { ExecutionModelDisclosure } from '@thesis-ledger/schemas';
+import { withBacktestModelDisclosure } from './backtest-model-disclosure.js';
 
 export const backtestJobSummarySelect = {
   id: true,
@@ -33,10 +35,11 @@ type BacktestJobSummaryRecord = Prisma.BacktestJobGetPayload<{
 
 export type BacktestJobSummary = Omit<BacktestJobSummaryRecord, 'input'> & {
   initialCash: number | null;
+  executionModelDisclosure?: ExecutionModelDisclosure;
 };
 
 export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): BacktestJobSummary => {
-  const { input, ...summary } = record;
+  const { input, ...summary } = withBacktestModelDisclosure(record);
   let initialCashValue: unknown;
   if (input && typeof input === 'object' && !Array.isArray(input) && 'initialCash' in input) {
     initialCashValue = input.initialCash;

@@ -55,6 +55,45 @@ export const tradingCalendarFactSchema = z.object({
   range: dataRangeSchema,
 });
 
+const executionRuleChargeSchema = z
+  .object({
+    code: z.string().min(1),
+    side: z.enum(['buy', 'sell', 'both']),
+    rate: nonNegativeDecimalStringSchema,
+    minimum: nonNegativeDecimalStringSchema.nullable(),
+  })
+  .strict();
+
+const supportedExecutionRuleSnapshotSchema = z
+  .object({
+    status: z.literal('supported'),
+    version: z.string().min(1),
+    range: z.object({ start: isoDate, end: isoDate }).strict(),
+    price: z
+      .object({
+        reference: z.literal('previousClose'),
+        maxUpRatio: nonNegativeDecimalStringSchema.nullable(),
+        maxDownRatio: nonNegativeDecimalStringSchema.nullable(),
+      })
+      .strict(),
+    positionSettlement: z
+      .object({ sellableAfterTradingDays: z.number().int().nonnegative() })
+      .strict(),
+    cashSettlement: z
+      .object({
+        buyDebitAfterTradingDays: z.number().int().nonnegative(),
+        sellCreditAfterTradingDays: z.number().int().nonnegative(),
+      })
+      .strict(),
+    statutoryCharges: z.array(executionRuleChargeSchema),
+  })
+  .strict();
+
+export const executionRuleSnapshotSchema = z.discriminatedUnion('status', [
+  supportedExecutionRuleSnapshotSchema,
+  z.object({ status: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+]);
+
 export const instrumentFactSchema = z.object({
   symbol: z.string().min(1),
   market: backtestMarketSchema,
@@ -63,6 +102,7 @@ export const instrumentFactSchema = z.object({
   lotSize: positiveDecimalStringSchema,
   tickSize: positiveDecimalStringSchema,
   tradable: z.boolean(),
+  executionRules: executionRuleSnapshotSchema,
   provider: z.string().min(1),
   providerRevision: z.string().min(1),
   occurredAt: isoDateTime,
@@ -165,8 +205,50 @@ export const backtestInstrumentFactsResponseSchema = z
   .object({
     ...dependencyResponseShape,
     facts: z.array(instrumentFactSchema),
+    missingInputs: z
+      .array(
+        z.strictObject({
+          field: z.string().min(1),
+          category: z.enum(['criticalFact', 'modelAssumption']),
+          range: z.strictObject({ start: isoDate, end: isoDate }),
+          provider: z.string().min(1),
+          reason: z.string().min(1),
+        }),
+      )
+      .optional(),
   })
   .strict();
+
+export const backtestInstrumentFactsRequestSchema = z
+  .strictObject({
+    symbol: z.string().min(1),
+    market: backtestMarketSchema,
+    instrumentType: backtestInstrumentTypeSchema,
+    start: isoDate,
+    end: isoDate,
+    executionStart: isoDate,
+    executionEnd: isoDate,
+    dataAsOf: isoDateTime,
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.start > value.executionStart ||
+      value.executionStart > value.executionEnd ||
+      value.executionEnd > value.end
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['executionStart'],
+        message: '事实范围必须包含有效的执行范围',
+      });
+    }
+    const dataAsOf = Date.parse(value.dataAsOf);
+    if (Number.isFinite(dataAsOf) && value.end > new Date(dataAsOf).toISOString().slice(0, 10)) {
+      ctx.addIssue({ code: 'custom', path: ['end'], message: '事实范围不能晚于 dataAsOf' });
+    }
+  });
+
+export type BacktestInstrumentFactsRequest = z.infer<typeof backtestInstrumentFactsRequestSchema>;
 
 export const backtestCorporateActionsResponseSchema = z
   .object({
@@ -262,6 +344,7 @@ export type DataCapability = z.infer<typeof dataCapabilitySchema>;
 export type BacktestCapabilities = z.infer<typeof backtestCapabilitiesSchema>;
 export type TradingCalendarFact = z.infer<typeof tradingCalendarFactSchema>;
 export type InstrumentFact = z.infer<typeof instrumentFactSchema>;
+export type ExecutionRuleSnapshot = z.infer<typeof executionRuleSnapshotSchema>;
 export type BacktestFxFact = z.infer<typeof backtestFxFactSchema>;
 export type CorporateActionFact = z.infer<typeof corporateActionFactSchema>;
 export type BacktestNavFact = z.infer<typeof backtestNavFactSchema>;

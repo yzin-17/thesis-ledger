@@ -5,6 +5,7 @@ import {
   createSimulationEvent,
   evaluateBooleanExpression,
   evaluateSignalAt,
+  sourceSeriesKey,
   type SimulationEngineInput,
 } from '../src/index.js';
 
@@ -90,6 +91,30 @@ describe('deterministic simulation events', () => {
     expect(result.rejects).toMatchObject([
       { code: 'FUTURE_DATA', ruleVersion: 'simulation-time-v1' },
     ]);
+  });
+
+  it('evaluates distinct fields declared by the same signal source', () => {
+    const open = { ...sourceSeries([point('2025-01-01', '10')]), field: 'open' as const };
+    const close = { ...sourceSeries([point('2025-01-01', '11')]), field: 'close' as const };
+    const context = {
+      tick: { occurredAt: '2025-01-01T00:00:00Z' },
+      sourceSeries: new Map([
+        [sourceSeriesKey('price', 'open'), { ...open, sourceId: 'price' }],
+        [sourceSeriesKey('price', 'close'), { ...close, sourceId: 'price' }],
+      ]),
+    };
+
+    expect(
+      evaluateBooleanExpression(
+        {
+          type: 'compare',
+          operator: 'gt',
+          left: { type: 'series', sourceId: 'price', field: 'close' },
+          right: { type: 'series', sourceId: 'price', field: 'open' },
+        },
+        context,
+      ),
+    ).toMatchObject({ status: 'available', value: true });
   });
 
   it('evaluates only the declared primary timeframe clock', () => {

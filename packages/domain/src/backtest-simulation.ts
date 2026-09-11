@@ -191,6 +191,10 @@ export interface SimulationEngineInput {
   corporateActions?: readonly BacktestCorporateActionFact[];
   corporateActionPort?: CorporateActionPort;
   risk?: (context: SimulationExpressionContext) => BooleanEvaluation;
+  portfolioValuation?: {
+    ticks: readonly SimulationTick[];
+    valueAt: (tick: SimulationTick) => void;
+  };
   execution?: SimulationExecutionPort;
 }
 
@@ -418,7 +422,7 @@ const futureFactForUnavailable = (
   for (const numeric of numericExpressionsIn(expression)) {
     let series: BacktestSeries | undefined;
     if (numeric.type === 'series') {
-      series = getSeries(context.sourceSeries, numeric.sourceId);
+      series = getSeries(context.sourceSeries, numeric.sourceId, numeric.field);
     } else if (numeric.type === 'indicator') {
       series = getSeries(context.indicatorSeries, numericExpressionKey(numeric));
     }
@@ -678,7 +682,10 @@ const processFillEvent = (state: SimulationOrchestratorState, event: SimulationE
       runId: state.input.runId,
       sequence: state.sequence++,
       type: item.type,
-      phase: 'NavConfirmationSettlement',
+      phase:
+        item.payload.kind === 'position'
+          ? 'SessionSettlementState'
+          : 'NavConfirmationSettlement',
       occurredAt: item.occurredAt,
       availableAt: item.availableAt,
       payload: item.payload,
@@ -695,6 +702,13 @@ const processCashSettlementEvent = (state: SimulationOrchestratorState, event: S
   };
   state.mutations.push(mutation);
   state.input.execution?.onMutation?.(mutation);
+};
+
+const processPortfolioValuationEvent = (
+  state: SimulationOrchestratorState,
+  event: SimulationEvent,
+) => {
+  state.input.portfolioValuation?.valueAt(event.payload as SimulationTick);
 };
 
 const processCorporateActionEvent = (
@@ -744,6 +758,7 @@ const processSimulationEvent = (state: SimulationOrchestratorState, event: Simul
   if (event.type === 'orderValidation') return processOrderValidationEvent(state, event);
   if (event.type === 'simulationFill') return processFillEvent(state, event);
   if (event.type === 'cashSettlement') return processCashSettlementEvent(state, event);
+  if (event.type === 'portfolioValuation') return processPortfolioValuationEvent(state, event);
 };
 
 export class DeterministicSimulationEngine {
@@ -782,19 +797,34 @@ export class DeterministicSimulationEngine {
         }),
       );
     }
+    for (const tick of input.portfolioValuation?.ticks ?? []) {
+      state.queue.enqueue(
+        createSimulationEvent({
+          runId: input.runId,
+          sequence: state.sequence++,
+          type: 'portfolioValuation',
+          phase: 'PortfolioValuation',
+          occurredAt: tick.occurredAt,
+          availableAt: tick.availableAt ?? tick.occurredAt,
+          payload: tick,
+        }),
+      );
+    }
     const corporateActions = [...(input.corporateActions ?? [])].sort((left, right) =>
       corporateActionEventId(left, input.runId).localeCompare(
         corporateActionEventId(right, input.runId),
       ),
     );
     for (const fact of corporateActions) {
+      const processingAt =
+        instant(fact.occurredAt) >= instant(fact.availableAt) ? fact.occurredAt : fact.availableAt;
       const event = createSimulationEvent({
         runId: input.runId,
         sequence: state.sequence++,
         type: 'corporateAction',
         phase: 'CorporateAction',
         occurredAt: fact.occurredAt,
-        availableAt: fact.availableAt,
+        availableAt: processingAt,
         payload: fact,
       });
       state.queue.enqueue({ ...event, eventId: corporateActionEventId(fact, input.runId) });

@@ -2,13 +2,14 @@
 
 > 任务标识：`2026-08-28-unified-backtest-v2`  
 > 日期：2026-08-28  
-> 状态：已评审，待实施  
+> 状态：已有实现与局部验证，T13 未完成；2026-09-10 收敛研究回测范围
 > 范围基线：[`统一回测系统与交易系统任务衔接 Review（复核版）`](../reviews/2026-08-28-unified-backtest-trade-integration-review-v2.md)  
 > 对应任务：[`统一回测系统 V2 实施任务`](../tasks/2026-08-28-unified-backtest-v2.md)
+> T13 当前阻塞解决增量：[`回测执行规则与研究假设 Spec`](2026-09-10-backtest-historical-execution-rule-facts.md)
 
 ## 背景与问题
 
-当前回测能力仍以 V1 策略 Schema、单标的日线 Bar 和进程内引擎为主。回测任务可以直接携带 bars 和数值型初始资金，Server 尚未以冻结数据快照作为运行输入；市场规则主要集中在 A 股模拟函数中，跨市场、跨时区和跨周期语义不完整。
+2026-08-28 立项时，回测能力以 V1 策略 Schema、单标的日线 Bar 和进程内引擎为主。回测任务可以直接携带 bars 和数值型初始资金，Server 尚未以冻结数据快照作为运行输入；市场规则主要集中在 A 股模拟函数中，跨市场、跨时区和跨周期语义不完整。
 
 当前仓库已经落地另一套交易与成交记录系统。它以不可变 `LedgerEventV2` 为真实账户唯一经济事实源，并重建 `Position`、`Trade`、`Cash` 和 `FX Conversion View`，同时支持实际账户与影子账户、账户级 `Projection Generation`、修正链和 Journal 事实引用。
 
@@ -22,6 +23,8 @@
 本 Spec 定义一个独立的回测模拟事实域：共享稳定的基础契约和纯计算规则，但不共享真实账户事实、持久化投影或用户复盘写入路径。
 
 ## 目标
+
+在明确的数据范围和执行假设下，提供可信、可复现的策略研究回测，服务于策略验证、风险规则联动及后续 AI 策略优化。
 
 - 支持中国内地、香港、美国的 Stock 和 ETF；支持中国内地 NAV Fund；不支持香港或美国 NAV Fund。
 - Stock/ETF 支持 `1d/60m/30m/15m/5m/1m`；CN NAV Fund 只支持日频。
@@ -39,6 +42,8 @@
 ## 非目标
 
 ### 真实交易与账户事实
+
+- 普通回测不要求客户级历史交易精确复演；不以逐证券逐日全量公告、完整结算规则档案、客户收费协议/优惠还原作为前置，不建设来源审计平台或研究/审计双模式。
 
 - 不写入、更新或删除真实账户 `LedgerEventV2`。
 - 不使用交易系统 `actual/shadow` 账户承载回测。
@@ -63,20 +68,22 @@
 ### 策略研究和界面
 
 - 不支持 Risk Based sizing、Trailing Stop、ATR Stop、组合风险预算、CVaR 或 Risk Parity。
-- 不支持 Parameter Sweep、Grid/Random Search、Walk-forward、训练/验证/测试切分或 AI Strategy Assistant；这些后续增量由 [`策略驱动风险规则与 AI 多模型优化规格`](2026-09-09-strategy-risk-ai-optimization.md) 负责，并以本 V2 能力通过为前置门禁。
+- 不支持 Parameter Sweep、Grid/Random Search、Walk-forward、训练/验证/测试切分或 AI Strategy Assistant；这些后续增量由 [`策略驱动风险规则与 AI 多模型优化规格`](2026-09-09-strategy-risk-ai-optimization.md) 负责，按其 G1/G2/G3 对实际使用的契约、目标标的与运行能力分别验收，不等待全市场回测或完整历史档案通过。
 - 不建设通用 Trade Projection Adapter 或回测与真实 Trade 的统一持久化表；V2 结果使用最小 `BacktestTrade`。
 - 不提供 Server 草稿自动保存、草稿协同、版本 Diff 或完整三栏 Builder 发布门禁。
 
 ## 现状与约束
 
-### 现有回测能力
+### 立项基线（2026-08-28，保留历史背景）
+
+以下 V1 描述是立项基线，不代表当前实现。2026-09-10 本地已有 StrategySchemaV2、Snapshot、Exchange/NAV Runner 和冻结规则读取；现有局部验证与最新真实失败见对应 Task/T13。研究模型与按需门禁尚待增量实现，不能由文档声明为可用。
 
 - 当前策略契约为 `strategySchemaV1`，使用 `universe.symbols`、`entrySignals/exitSignals`、`risk` sizing 和 `open/close/nextOpen` 执行时点。
 - 当前领域引擎使用 `BacktestBar`、`BacktestStrategy`、`BacktestTrade` 和 `BacktestResult`，金额、数量、价格和指标主要使用 JavaScript `number`。
 - 当前 Server 回测任务把 bars 和 `initialCash` 作为 Job input 保存，进程内 Worker 直接调用引擎；没有 Snapshot 驱动的输入边界。
 - 当前 Strategy Lab V1 已完成创建策略、创建版本、回测配置、任务列表和结果展示；这些任务不重开，V2 以新 Schema 和新运行契约承接。
 
-### 现有交易系统能力
+### 立项时交易系统约束
 
 - `LedgerEventV2` 是真实账户唯一经济事实源，金额、数量、价格、费用和 Revision 使用十进制字符串或十进制领域值。
 - 真实账户投影包含 Position、Trade、Cash、待结算明细和独立 FX Conversion View；Trade Projection 只表达 `actual/shadow` 账户模式。
@@ -85,7 +92,7 @@
 
 ### 跨仓和工程约束
 
-- DSA 负责 Bar、NAV、FX、公司行动、Trading Calendar、Instrument Facts 和 Provider capability；不负责回测 Snapshot 或 Artifact 生命周期。
+- DSA 负责 Bar、NAV、FX、公司行动、Trading Calendar、Instrument Facts 和 Provider capability；其原生回测是分析建议评估，不负责本项目订单、持仓、资金模拟或 Snapshot/Artifact 生命周期。
 - thesis-ledger Server 负责 StrategyVersion、Run、Snapshot、Artifact、Simulation Runtime、Result 和复现元数据。
 - Desktop 负责策略配置、运行控制和结果展示，不准备或上传完整 bars。
 - `Asset.symbol` 是当前账本和资产关系的稳定业务键；Instrument 只负责搜索和身份确认，V2 不引入第二套账本资产身份。
@@ -132,6 +139,8 @@ V2 不共享：
 - 真实账户成本策略 Revision。
 
 ### 2. 市场、资产和周期支持矩阵
+
+下表是产品目标，保持原有市场/资产/周期范围。源码契约/fixture 覆盖不代表真实 Provider 已接入，真实验证以 T13 各场景证据为准；当前首个 CN 股票日频成功复验仍未完成，HK/US、ETF、NAV、FX、拆分及分钟路径按各自缺口保留未实现/待验证状态，不改成产品不支持。
 
 | 市场 | Stock | ETF | NAV Fund |
 | --- | --- | --- | --- |
@@ -318,7 +327,7 @@ occurredAt  = 事实发生时间
 availableAt = 引擎最早可以消费的时间
 ```
 
-引擎推进到 `t` 时只能消费 `availableAt <= t` 的事实。Indicator、公司行动、NAV、FX、Benchmark 和派生 Bar 不能提前可用；warmup 不足返回显式 unavailable，不用零值、前值或未来值填充。
+引擎推进到 `t` 时只能消费 `availableAt <= t` 的事实。公司行动的 `availableAt` 表示知识最早可用时间，`occurredAt` 表示经济生效时间；允许先公告后生效，但只能在两者都不晚于 `t` 时入账。Indicator、公司行动、NAV、FX、Benchmark 和派生 Bar 不能提前可用；warmup 不足返回显式 unavailable，不用零值、前值或未来值填充。
 
 Snapshot Builder 必须从 StrategyVersion AST 和 RunConfig 推导数据依赖闭包：`SignalSources + ExecutionInstrument + Benchmark + required FX + CorporateActions + Calendar + InstrumentFacts + derived timeframe base data + warmup data`。Indicator/lookback 所需的 `startDate` 之前数据可以进入 Snapshot 并参与计算，但 Signal、Order、Trade、Equity 和指标结果从 `startDate` 开始输出；依赖闭包或 warmup 无法满足时必须显式 unavailable/failed，不静默缩短窗口。
 
@@ -482,7 +491,7 @@ interface PortfolioValuationPolicy {
 
 ### 8. ExecutionRules 与场内执行
 
-V2 在回测域建设 `ExecutionRules` 深模块，接收共享 TradingCalendar、Instrument Facts、数据 capability 和版本化规则事实，返回：
+V2 复用回测域 `ExecutionRules`，接收共享 TradingCalendar、Instrument Facts、数据 capability 和已冻结的规则事实或显式研究模型，返回：
 
 ```text
 TradingEligibility
@@ -493,6 +502,8 @@ CashSettlement
 ```
 
 具体规则不得只用客户端硬编码的 `tPlusOne` 或 A 股 10% 限制表达。规则至少覆盖：交易日历、时区、Session、停牌、可买卖、lotSize、tickSize、适用价格限制、持仓可卖时间、资金结算时间和标的个体约束。
+
+Snapshot 必须冻结本次运行实际使用的数据和规则模型，包括来源、版本、适用范围、简化假设、价格限制、持仓可卖、资金占用/再投资及费用。允许明确预设或用户配置，目标区间内重要变化按需有限分段；不冒充历史已验证事实。Runner 只消费冻结输入，版本不匹配、必要覆盖不足、关键价格/公司行为/交易约束缺失仍失败；与计算无关的原件档案缺失不阻塞。不得由缺 K 线推断停牌或前填撮合。三类缺失、F1–F6 与待实施门禁调整以[执行规则增量 Spec](2026-09-10-backtest-historical-execution-rule-facts.md)为准；现有代码仍按 unavailable 拒绝，文档不代表实现已放行。
 
 ExchangeExecution 只支持：
 
@@ -508,7 +519,7 @@ full fill or reject
 - 信号在事实可用后生成 TargetIntent，订单在下一个符合规则的 Bar 开盘尝试；
 - DAY 订单在目标交易日因停牌、价格、现金、持仓或资格失败时 Reject，不跨日保留；
 - 不检查盘口、成交量和 Partial Fill；
-- 成交使用 raw price，加 StrategyVersion 配置的滑点/佣金；法定税费、交易费和市场侧收费由版本化 ExecutionRules 决定，不在 Strategy Cost 中重复配置；
+- 成交使用 raw price，加 StrategyVersion 配置的滑点/佣金；法定税费、交易费和市场侧收费由冻结 ExecutionRules 模型决定，明确是否已含在佣金内，不重复扣费；保留最低收费、费用币种及统一 Decimal/Money 舍入与扣收粒度；
 - `minimumCommission` 如配置必须使用 Execution Instrument 币种；
 - 不支持 Limit、GTC、算法订单、成交量参与率或复杂流动性模型；
 - 只支持多头，不支持做空、融资和保证金。
@@ -570,7 +581,7 @@ cash dividend
 split
 ```
 
-场内执行使用 raw price，Indicator 使用由公司行动事实派生的 adjusted Series。分红进入原币种现金，拆分调整数量和单位成本；同一公司行动不得重复计入复权收益和 Ledger。影响持仓或信号但不在支持范围内的公司行动必须显式失败或使结果不可发布。
+场内执行使用 raw price，Indicator 使用由公司行动事实派生的 adjusted Series。Runner 在每个评价时点只纳入 `occurredAt <= evaluationAt` 且 `availableAt <= evaluationAt` 的公司行动，并为该时点重建指标输入；已公告但尚未生效、尚未获知或后来追加的行动不得改写此前指标与信号。现金分红对各价格字段使用同一 close 参考因子，成交和风险价格仍保持 raw。分红进入原币种现金，拆分调整数量和单位成本；同一公司行动不得重复计入复权收益和 Ledger。影响持仓或信号但不在支持范围内的公司行动必须显式失败或使结果不可发布。
 
 ### 11. BacktestResult 与基础分析
 
@@ -805,7 +816,7 @@ Reproducibility metadata
 - **AC11：** 相同 StrategyVersion、RunConfig、Snapshot、规则/聚合版本和引擎版本重跑得到相同事件序列、成交、权益和 resultChecksum。
 - **AC12：** SimulationLedger 使用封闭初始资金、分币种 settled/unsettled Cash 和 Position；无外部入金/出金，不生成真实 CASH_FLOW。
 - **AC13：** FX 只用于估值；无执行币种现金时交易被拒绝，不生成 FX Order；缺失 FX 时原币结果保留，本位币结果明确 unavailable/partial。
-- **AC14：** 回测内部 `ExecutionRules` 覆盖交易日历、时区、Session、交易资格、订单、价格、持仓结算和资金结算，并保存规则版本。
+- **AC14：** 回测内部 `ExecutionRules` 覆盖交易日历、时区、Session、交易资格、订单、价格、持仓可卖、资金占用与再投资，并冻结来源、版本、适用范围及研究假设；佣金/适用税费、最低额、币种、舍入及必要日期分段可复现。关键输入缺失阻止运行，无关审计档案缺失不阻塞，不把模型配置冒充历史事实。
 - **AC15：** ExchangeExecution 只支持 `Market + DAY + nextEligibleBarOpen + full fill or reject`；Risk 只在已完成 evaluation tick 触发并在下一 eligible open 执行，不实现 intrabar stop；CN/HK/US Stock/ETF 的停牌、lot/tick、价格规则和费用均有确定性结果。
 - **AC16：** NavExecution 只支持中国内地 NAV Fund 日频，并覆盖 cutoff、valuation date、NAV availableAt、confirmation、share availability、现金结算和费用。
 - **AC17：** Fixed Amount、Percent of Equity、Fixed Quantity、Target Weight、Fixed Stop、Fixed Take Profit 和 Max Holding Period 语义可运行；Risk Based、Trailing Stop、ATR Stop 不可配置。

@@ -33,7 +33,11 @@ export class LocalSnapshotRunner implements BacktestV2Runner {
 
   async run(input: Parameters<BacktestV2Runner['run']>[0], signal: AbortSignal) {
     if (signal.aborted) throw new Error('回测已取消');
-    const manifest = await this.snapshots.retry(input.runId);
+    const initialManifest = await this.snapshots.retry(input.runId);
+    const manifest =
+      initialManifest.executionModel || initialManifest.manifestVersion === 'snapshot-manifest-v2'
+        ? await this.snapshots.replay(input.runId)
+        : initialManifest;
     if (
       manifest.contentHash !== input.snapshotRef.contentHash ||
       input.snapshotRef.snapshotId !== manifest.contentHash
@@ -91,6 +95,14 @@ export class LocalSnapshotRunner implements BacktestV2Runner {
       aggregationVersion: manifest.aggregationVersion,
       contentHash: manifest.contentHash,
       completeness: vertical.analytics.completeness,
+      ...(runConfig.executionModel && manifest.executionModel
+        ? {
+            executionModelDisclosure: {
+              model: runConfig.executionModel,
+              contentHash: manifest.executionModel.contentHash,
+            },
+          }
+        : {}),
       warnings: [
         ...vertical.analytics.warnings,
         ...vertical.rejects.map((reject) => reject.reason),

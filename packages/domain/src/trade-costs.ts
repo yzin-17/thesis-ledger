@@ -103,7 +103,12 @@ const selectStrategyRevision = (trade: TradeProjection, options: TradeCostProjec
       trade.symbol,
     );
 
-  const boundary = trade.openedAt ?? trade.earliestEvidenceAt;
+  const hasUserOpeningBoundary = trade.evidenceSources.some(
+    (source) => source.kind === 'OPENING_BOUNDARY_ASSERTION',
+  );
+  const boundary = hasUserOpeningBoundary
+    ? trade.earliestEvidenceAt
+    : (trade.openedAt ?? trade.earliestEvidenceAt);
   if (boundary === null) return ordered[0]!;
   const effectiveRevision = ordered.filter((revision) => revision.effectiveAt <= boundary).at(-1);
   if (!effectiveRevision)

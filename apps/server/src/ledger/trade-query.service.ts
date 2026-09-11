@@ -219,6 +219,7 @@ const mapDetail = (trade: PersistedTrade): TradeDetailResponseV2 =>
       kind: evidence.kind as
         | 'EXECUTION'
         | 'BASELINE_OBSERVATION'
+        | 'OPENING_BOUNDARY_ASSERTION'
         | 'BASELINE_RECONCILIATION'
         | 'CORPORATE_ACTION'
         | 'DIVIDEND',

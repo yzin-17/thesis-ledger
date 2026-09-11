@@ -234,6 +234,52 @@ describe('core ledger projection', () => {
     );
   });
 
+  it('建仓时间补录事件可被现金投影读取但不产生现金操作', () => {
+    const assertion = storedV2Event({
+      id: 'opening-boundary-cash-ignored',
+      accountId,
+      type: 'TRADE_OPENING_BOUNDARY_ASSERTION',
+      occurredAt: '2026-08-01T00:00:00.000Z',
+      payload: {
+        symbol: 'AAPL.US',
+        tradeId: 'trade:trade-projection-v1:account-actual:AAPL.US:baseline-1',
+        baselineFactId: '22222222-2222-4222-8222-222222222222',
+      },
+    }) as StoredCashEvent;
+
+    expect(projectCashMaterialization([assertion])).toEqual({ balances: [], settlements: [] });
+  });
+
+  it('建仓时间补录事件不产生 Position 或 Cash 物化结果', async () => {
+    const assertion = storedV2Event({
+      id: 'opening-boundary-core-ignored',
+      accountId,
+      type: 'TRADE_OPENING_BOUNDARY_ASSERTION',
+      occurredAt: '2026-08-01T00:00:00.000Z',
+      payload: {
+        symbol: 'AAPL.US',
+        tradeId: 'trade:trade-projection-v1:account-actual:AAPL.US:baseline-1',
+        baselineFactId: '33333333-3333-4333-8333-333333333333',
+      },
+    }) as StoredCashEvent;
+    const client = fakeCoreClient([assertion]);
+
+    const result = await rebuildCoreProjections(client as never, accountId, {
+      method: 'AVG',
+      projectionGeneration: 7n,
+      now: new Date('2026-08-03T00:00:00.000Z'),
+    });
+
+    expect(result).toMatchObject({
+      positions: [],
+      tradeCount: 0,
+      cashBalanceCount: 0,
+      cashSettlementCount: 0,
+    });
+    expect(client.position.create).not.toHaveBeenCalled();
+    expect(client.cashBalance.create).not.toHaveBeenCalled();
+  });
+
   it('未来外部入账在结算前只进入待结算应收', () => {
     const futureDeposit: StoredCashEvent = {
       id: '11111111-1111-4111-8111-111111111111',

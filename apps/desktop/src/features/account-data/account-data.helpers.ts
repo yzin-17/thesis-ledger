@@ -86,6 +86,7 @@ const sourceChannelLabels: Record<string, string> = {
   manual: '桌面端 · 资产录入',
   'desktop-account-data': '桌面端 · 资产录入',
   'desktop-account-data-reconciliation': '桌面端 · 快照对账',
+  'desktop-trade-opening-boundary': '桌面端 · 建仓时间补录',
   'desktop-cash-deposit': '桌面端 · 现金入账',
   'desktop-cash-transfer': '桌面端 · 资金划转',
   'recurring-cash-deposit': '服务端 · 周期存款',
@@ -108,6 +109,7 @@ export const eventTypeLabel = (event: LedgerEventV2) => {
   if (event.type === 'BUY_EXECUTION') return '买入成交';
   if (event.type === 'SELL_EXECUTION') return '卖出成交';
   if (event.type === 'POSITION_BASELINE_OBSERVATION') return '持仓快照';
+  if (event.type === 'TRADE_OPENING_BOUNDARY_ASSERTION') return '建仓时间补录';
   if (event.type === 'CASH_BALANCE_OBSERVATION') return '现金快照';
   if (event.type === 'BASELINE_RECONCILIATION') return '快照对账';
   if (event.type === 'BONUS_SHARE') return '送股';
@@ -138,6 +140,7 @@ export const eventSymbol = (event: LedgerEventV2): string | null => {
     case 'BUY_EXECUTION':
     case 'SELL_EXECUTION':
     case 'POSITION_BASELINE_OBSERVATION':
+    case 'TRADE_OPENING_BOUNDARY_ASSERTION':
     case 'BASELINE_RECONCILIATION':
     case 'BONUS_SHARE':
     case 'SPLIT':
@@ -157,6 +160,8 @@ export const eventSubjectDetail = (event: LedgerEventV2): string | null => {
       const cost = averageCost !== undefined ? ` · ${formatDecimal(averageCost)} ${currency}` : '';
       return `${eventTypeLabel(event)} · ${formatDecimal(quantity)}${cost}`;
     }
+    case 'TRADE_OPENING_BOUNDARY_ASSERTION':
+      return `${eventTypeLabel(event)} · ${formatDate(event.occurredAt)}`;
     case 'BASELINE_RECONCILIATION':
       return `${eventTypeLabel(event)} · ${formatDecimal(event.payload.coveredQuantity)} · ${formatDecimal(event.payload.coveredCost)}`;
     case 'BONUS_SHARE':

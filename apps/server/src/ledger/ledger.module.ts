@@ -8,6 +8,7 @@ import { LedgerQueryService } from './ledger-query.service.js';
 import { LedgerV2Repository } from './ledger-v2.repository.js';
 import { LedgerService } from './ledger.service.js';
 import { TradeQueryService } from './trade-query.service.js';
+import { TradeOpeningBoundaryCommandService } from './trade-opening-boundary-command.service.js';
 
 @Module({
   controllers: [LedgerController],
@@ -18,6 +19,7 @@ import { TradeQueryService } from './trade-query.service.js';
     CashLedgerCommandService,
     LedgerQueryService,
     TradeQueryService,
+    TradeOpeningBoundaryCommandService,
     BaselineImportService,
     BaselineReconciliationService,
   ],
@@ -28,6 +30,7 @@ import { TradeQueryService } from './trade-query.service.js';
     CashLedgerCommandService,
     LedgerQueryService,
     TradeQueryService,
+    TradeOpeningBoundaryCommandService,
     BaselineImportService,
     BaselineReconciliationService,
   ],

@@ -39,6 +39,7 @@ export const ledgerEventTypesV2 = [
   'BUY_EXECUTION',
   'SELL_EXECUTION',
   'POSITION_BASELINE_OBSERVATION',
+  'TRADE_OPENING_BOUNDARY_ASSERTION',
   'CASH_BALANCE_OBSERVATION',
   'BASELINE_RECONCILIATION',
   'BONUS_SHARE',
@@ -72,6 +73,21 @@ const positionBaselinePayloadSchema = z
     currency: currencyCodeSchema,
     costIncludesFees: z.enum(['INCLUDES_FEES', 'EXCLUDES_FEES', 'UNKNOWN']),
     capturedAt: z.iso.datetime().optional(),
+  })
+  .strict();
+
+const tradeOpeningBoundaryAssertionPayloadSchema = z
+  .object({
+    symbol: z.string().trim().min(1),
+    tradeId: z.string().trim().min(1).max(255),
+    baselineFactId: z.uuid(),
+  })
+  .strict();
+
+const tradeOpeningBoundaryAssertionCommandPayloadSchema = z
+  .object({
+    symbol: z.string().trim().min(1),
+    baselineFactId: z.uuid(),
   })
   .strict();
 
@@ -247,6 +263,7 @@ const payloadEventsSchema = z.discriminatedUnion('type', [
   revisionedEvent('BUY_EXECUTION', executionPayloadSchema),
   revisionedEvent('SELL_EXECUTION', executionPayloadSchema),
   revisionedEvent('POSITION_BASELINE_OBSERVATION', positionBaselinePayloadSchema),
+  revisionedEvent('TRADE_OPENING_BOUNDARY_ASSERTION', tradeOpeningBoundaryAssertionPayloadSchema),
   revisionedEvent('CASH_BALANCE_OBSERVATION', cashBalancePayloadSchema),
   revisionedEvent('BASELINE_RECONCILIATION', baselineReconciliationPayloadSchema),
   revisionedEvent('BONUS_SHARE', bonusSharePayloadSchema),
@@ -352,6 +369,21 @@ export const createExecutionCommandSchemaV2 = withCommandTimePrecision(
     })
     .strict(),
 );
+
+export const createTradeOpeningBoundaryAssertionCommandSchemaV2 = z
+  .object({
+    command: z.literal('CREATE_TRADE_OPENING_BOUNDARY_ASSERTION'),
+    accountId: z.uuid(),
+    occurredAt: z.iso.datetime(),
+    timePrecision: z.literal('INSTANT'),
+    sourceTimezone: z.string().trim().min(1).max(100),
+    economicOrderKey: z.string().trim().min(1).max(255),
+    payload: tradeOpeningBoundaryAssertionCommandPayloadSchema,
+    source: ledgerCommandSourceSchemaV2,
+    actorId: z.string().trim().min(1).max(255),
+    reason: z.string().trim().min(1).max(1000),
+  })
+  .strict();
 
 const executionCorrectionBaseShapeV2 = {
   ...executionCommandBaseShapeV2,
@@ -601,6 +633,9 @@ export type CashTransferMetadataV2 = z.infer<typeof cashTransferMetadataSchemaV2
 export type LedgerCommandErrorCodeV2 = (typeof ledgerCommandErrorCodesV2)[number];
 export type LedgerCommandErrorV2 = z.infer<typeof ledgerCommandErrorSchemaV2>;
 export type CreateExecutionCommandV2 = z.infer<typeof createExecutionCommandSchemaV2>;
+export type CreateTradeOpeningBoundaryAssertionCommandV2 = z.infer<
+  typeof createTradeOpeningBoundaryAssertionCommandSchemaV2
+>;
 export type ReplaceExecutionCommandV2 = z.infer<typeof replaceExecutionCommandSchemaV2>;
 export type VoidExecutionCommandV2 = z.infer<typeof voidExecutionCommandSchemaV2>;
 export type RestoreExecutionCommandV2 = z.infer<typeof restoreExecutionCommandSchemaV2>;

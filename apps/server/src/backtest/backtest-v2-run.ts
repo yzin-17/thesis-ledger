@@ -83,7 +83,11 @@ export class BacktestV2RunService {
     return true;
   }
 
-  private async persistUnavailable(request: BacktestRunCreateV2, message: string) {
+  private async persistUnavailable(
+    request: BacktestRunCreateV2,
+    message: string,
+    causeCode?: string,
+  ) {
     const runId = randomUUID();
     const { runConfig } = request;
     const data = {
@@ -106,7 +110,7 @@ export class BacktestV2RunService {
       warnings: [message],
       errorCode: 'DATA_UNAVAILABLE',
       errorSummary: message,
-      diagnostics: { code: 'DATA_UNAVAILABLE', message, path: ['snapshot'] },
+      diagnostics: { code: causeCode ?? 'DATA_UNAVAILABLE', message, path: ['snapshot'] },
       finishedAt: new Date(),
     };
     try {
@@ -184,6 +188,9 @@ export class BacktestV2RunService {
       return this.persistUnavailable(
         request,
         error instanceof Error ? error.message : 'Snapshot Builder 不可用',
+        error instanceof Error && 'code' in error && typeof error.code === 'string'
+          ? error.code
+          : undefined,
       );
     }
 

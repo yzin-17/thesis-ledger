@@ -60,6 +60,46 @@ describe('backtest data contracts', () => {
     ).not.toThrow();
   });
 
+  it('requires an explicit supported or unavailable execution-rule snapshot', () => {
+    const fact = {
+      symbol: '600519.SH',
+      market: 'CN',
+      instrumentType: 'STOCK',
+      currency: 'CNY',
+      lotSize: '100',
+      tickSize: '0.01',
+      tradable: true,
+      provider: 'fixture',
+      providerRevision: 'instrument-v1',
+      occurredAt: '2026-01-01T00:00:00Z',
+      availableAt: '2026-01-01T00:00:00Z',
+    };
+    const response = {
+      version: 2,
+      status: 'supported',
+      provider: 'fixture',
+      providerRevision: 'instrument-v1',
+      coverage: { start: null, end: null, complete: true },
+      facts: [fact],
+    };
+
+    expect(() => backtestInstrumentFactsResponseSchema.parse(response)).toThrow();
+    expect(() =>
+      backtestInstrumentFactsResponseSchema.parse({
+        ...response,
+        facts: [
+          {
+            ...fact,
+            executionRules: {
+              status: 'unavailable',
+              reason: '历史规则覆盖不完整',
+            },
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
   it('requires Calendar knowledge time and preserves date-specific sessions', () => {
     const parsed = backtestCapabilitiesSchema.parse({
       version: 2,

@@ -32,6 +32,7 @@ import {
   type CreateCashFlowCommandV2,
   type CreateCashTransferCommandV2,
   type CreateExecutionCommandV2,
+  type CreateTradeOpeningBoundaryAssertionCommandV2,
   type CreateImportDraftRevisionCommandV2,
   type MoveExecutionAccountCommandV2,
   type ReplaceExecutionCommandV2,
@@ -117,6 +118,7 @@ export type {
   RestoreCashTransferCommandV2,
   CashTransferCommandV2,
   CreateExecutionCommandV2,
+  CreateTradeOpeningBoundaryAssertionCommandV2,
   ReplaceExecutionCommandV2,
   VoidExecutionCommandV2,
   RestoreExecutionCommandV2,
@@ -239,6 +241,15 @@ export class ThesisLedgerApiClient {
         '/portfolio/trades/resolve-reference',
         request,
         tradeReferenceResolveResponseSchemaV2,
+      ),
+    createTradeOpeningBoundary: (
+      tradeId: string,
+      command: CreateTradeOpeningBoundaryAssertionCommandV2,
+    ): Promise<LedgerCommandResponseV2> =>
+      this.postParsed(
+        `/portfolio/trades/${encodeURIComponent(tradeId)}/opening-boundary`,
+        command,
+        ledgerCommandResponseSchemaV2,
       ),
   };
 

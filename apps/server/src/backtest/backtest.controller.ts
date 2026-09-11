@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Sse } from '@nestjs/common';
 import { z } from 'zod';
 import { BacktestService } from './backtest.service.js';
 import { BacktestEventService } from './backtest-event.service.js';
+import { withBacktestModelDisclosure } from './backtest-model-disclosure.js';
 
 const createStrategyHttpSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -35,7 +36,7 @@ export class BacktestController {
 
   @Post('runs')
   createRun(@Body() body: unknown) {
-    return this.backtests.createRun(body);
+    return this.backtests.createRun(body).then(withBacktestModelDisclosure);
   }
 
   @Post('runs/:id/cancel')
@@ -55,7 +56,7 @@ export class BacktestController {
 
   @Get('runs/:id')
   runStatus(@Param('id') id: string) {
-    return this.backtests.status(id);
+    return this.backtests.status(id).then(withBacktestModelDisclosure);
   }
 
   @Post('jobs/:id/cancel')
@@ -85,7 +86,7 @@ export class BacktestController {
 
   @Get('jobs/:id')
   status(@Param('id') id: string) {
-    return this.backtests.status(id);
+    return this.backtests.status(id).then(withBacktestModelDisclosure);
   }
 
   @Get('strategies')

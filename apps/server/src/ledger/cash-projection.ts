@@ -337,6 +337,15 @@ const normalizeLedgerEventV2 = (event: ParsedLedgerEventV2): LedgerEventV2 => {
       ...normalizeRevisionFields(supersedesEventId, reason),
     };
   }
+  if (event.type === 'TRADE_OPENING_BOUNDARY_ASSERTION') {
+    const { source, payload, supersedesEventId, reason, ...base } = event;
+    return {
+      ...base,
+      source: normalizeEventSource(source),
+      payload,
+      ...normalizeRevisionFields(supersedesEventId, reason),
+    };
+  }
   if (event.type === 'BONUS_SHARE') {
     const { source, payload, supersedesEventId, reason, ...base } = event;
     return {

@@ -4,6 +4,7 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 
 import { strategyRequiredLookback } from '@thesis-ledger/domain';
 import type { RunConfig, StrategySchemaV2, Timeframe } from '@thesis-ledger/schemas';
+import { backtestExecutionModelSchema, runConfigSchemaV2, validateStrategyRunConfig } from '@thesis-ledger/schemas';
 
 import {
   ArtifactNotFoundError,
@@ -46,6 +47,7 @@ export interface SnapshotDependencyClosure {
 
 export interface SnapshotManifest {
   manifestVersion: string;
+  executionModel?: { schemaVersion: 'execution-model-v1'; id: string; version: string; contentHash: string; artifactKey: string };
   runId: string;
   strategyVersionId: string;
   strategyVersionHash: string;
@@ -224,7 +226,7 @@ export function deriveSnapshotDependencyClosure(strategy: StrategySchemaV2, runC
     baseTimeframe(strategy.primaryTimeframe),
   );
   const lookbackPeriods = strategyRequiredLookback(
-    strategy as unknown as Parameters<typeof strategyRequiredLookback>[0],
+    strategy,
   ).required;
   const datasets = deriveDatasets(strategy, sources, dependencyInstruments, requiredFx);
   return {
@@ -243,13 +245,33 @@ export function deriveSnapshotDependencyClosure(strategy: StrategySchemaV2, runC
 }
 
 export function buildSnapshotManifest(input: SnapshotBuildInput): SnapshotManifest {
+  const model = input.runConfig.executionModel;
+  if (model) {
+    const config = runConfigSchemaV2.parse(input.runConfig);
+    const validation = validateStrategyRunConfig(input.strategy, config);
+    if (!validation.valid) throw new SnapshotIntegrityError(validation.errors.map((error) => error.message).join('; '));
+    for (const segment of model.segments) {
+      if (segment.source.kind !== 'historicalFact' && Date.parse(segment.source.configuredAt) > Date.now()) {
+        throw new SnapshotIntegrityError('模型 configuredAt 晚于冻结时刻');
+      }
+    }
+    if (input.versions?.manifestVersion && input.versions.manifestVersion !== 'snapshot-manifest-v2') {
+      throw new SnapshotIntegrityError('研究模型需要 snapshot-manifest-v2');
+    }
+  } else if (input.versions?.manifestVersion === 'snapshot-manifest-v2') {
+    throw new SnapshotIntegrityError('snapshot-manifest-v2 必须显式携带研究模型');
+  }
   const closure = deriveSnapshotDependencyClosure(input.strategy, input.runConfig);
   const warmupStartDate = subtractDays(
     input.runConfig.startDate,
     closure.lookbackPeriods * 2 + WARMUP_CALENDAR_BUFFER_DAYS,
   );
   return {
-    manifestVersion: input.versions?.manifestVersion ?? 'snapshot-manifest-v1',
+    manifestVersion: input.versions?.manifestVersion ?? (model ? 'snapshot-manifest-v2' : 'snapshot-manifest-v1'),
+    ...(model ? { executionModel: {
+      schemaVersion: model.schemaVersion, id: model.id, version: model.version,
+      contentHash: hashCanonicalManifest(model), artifactKey: `${input.runId}/metadata/execution-model.parquet`,
+    } } : {}),
     runId: input.runId,
     strategyVersionId: input.strategyVersionId,
     strategyVersionHash: input.strategyVersionHash,
@@ -292,7 +314,7 @@ export function finalizeSnapshotManifest(manifest: SnapshotManifest, artifacts: 
 }
 
 function canonicalBuildingIdentity(manifest: SnapshotManifest): string {
-  const { artifacts: _artifacts, contentHash: _contentHash, status: _status, ...identity } = manifest;
+  const identity = Object.fromEntries(Object.entries(manifest).filter(([key]) => !['artifacts', 'contentHash', 'status'].includes(key)));
   return canonicalizeManifest(identity);
 }
 
@@ -385,6 +407,7 @@ export class LocalSnapshotStore {
       if (!artifact.key.startsWith(`${runId}/`)) throw new SnapshotIntegrityError('Artifact does not belong to run');
       await this.artifacts.inspect(artifact);
     }
+    await this.validateExecutionModelArtifacts(manifest, artifacts);
     const finalized = finalizeSnapshotManifest(manifest, artifacts);
     try {
       await this.writeManifest(resolve(this.runDirectory(runId), 'finalized.json'), finalized, true);
@@ -427,7 +450,31 @@ export class LocalSnapshotStore {
   async replay(runId: string): Promise<SnapshotManifest> {
     const manifest = await this.retry(runId);
     for (const artifact of manifest.artifacts) await this.artifacts.inspect(artifact);
+    await this.validateExecutionModelArtifacts(manifest, manifest.artifacts);
     return manifest;
+  }
+
+  private async validateExecutionModelArtifacts(manifest: SnapshotManifest, artifacts: readonly ArtifactRef[]): Promise<void> {
+    if (!manifest.executionModel && manifest.manifestVersion !== 'snapshot-manifest-v2') return;
+    const descriptor = manifest.executionModel;
+    if (!descriptor || manifest.manifestVersion !== 'snapshot-manifest-v2') throw new SnapshotIntegrityError('模型与 Manifest 版本不一致');
+    const ref = artifacts.find((artifact) => artifact.key === descriptor.artifactKey);
+    const metadata = artifacts.find((artifact) => artifact.key === `${manifest.runId}/metadata/snapshot-metadata.parquet`);
+    if (!ref || !metadata) throw new SnapshotIntegrityError('模型或配置 Artifact 缺失');
+    const modelRows = [];
+    for await (const row of await this.artifacts.openRead(ref)) modelRows.push(row);
+    if (modelRows.length !== 1 || typeof modelRows[0]?.model !== 'string') throw new SnapshotIntegrityError('模型 Artifact 结构无效');
+    const model = backtestExecutionModelSchema.parse(JSON.parse(modelRows[0].model));
+    if (hashCanonicalManifest(model) !== descriptor.contentHash || model.id !== descriptor.id || model.version !== descriptor.version || model.schemaVersion !== descriptor.schemaVersion) {
+      throw new SnapshotIntegrityError('模型内容哈希或版本不一致');
+    }
+    const metadataRows = [];
+    for await (const row of await this.artifacts.openRead(metadata)) metadataRows.push(row);
+    if (metadataRows.length !== 1 || typeof metadataRows[0]?.runConfig !== 'string') throw new SnapshotIntegrityError('模型配置元数据缺失');
+    const config = runConfigSchemaV2.parse(JSON.parse(metadataRows[0].runConfig));
+    if (!config.executionModel || deriveRunConfigChecksum(config) !== manifest.runConfigChecksum || hashCanonicalManifest(config.executionModel) !== descriptor.contentHash) {
+      throw new SnapshotIntegrityError('模型与冻结 RunConfig 不一致');
+    }
   }
 
   async deleteRun(runId: string): Promise<void> {

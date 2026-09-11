@@ -1,4 +1,6 @@
 import type {
+  CreateTradeOpeningBoundaryAssertionCommandV2,
+  LedgerCommandResponseV2,
   ThesisLedgerApiClient,
   TradeDetailResponseV2,
   TradeListQueryV2,
@@ -9,7 +11,7 @@ import { getDesktopApiClient } from '../../shared/api/client.js';
 
 export type PortfolioTradeClient = Pick<
   ThesisLedgerApiClient['portfolio'],
-  'getTrades' | 'getTrade'
+  'getTrades' | 'getTrade' | 'createTradeOpeningBoundary'
 >;
 
 const defaultPortfolioClient = () => getDesktopApiClient().portfolio;
@@ -25,3 +27,9 @@ export const fetchPortfolioTrade = (
   mode: 'actual' | 'shadow',
   client: Pick<PortfolioTradeClient, 'getTrade'> = defaultPortfolioClient(),
 ): Promise<TradeDetailResponseV2> => client.getTrade(accountId, tradeId, mode);
+
+export const createPortfolioTradeOpeningBoundary = (
+  tradeId: string,
+  command: CreateTradeOpeningBoundaryAssertionCommandV2,
+  client: Pick<PortfolioTradeClient, 'createTradeOpeningBoundary'> = defaultPortfolioClient(),
+): Promise<LedgerCommandResponseV2> => client.createTradeOpeningBoundary(tradeId, command);

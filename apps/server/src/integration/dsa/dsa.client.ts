@@ -12,6 +12,7 @@ import type {
   BacktestCalendarResponse,
   BacktestCorporateActionsResponse,
   BacktestInstrumentFactsResponse,
+  BacktestInstrumentFactsRequest,
   BacktestInstrumentType,
   BacktestMarket,
 } from '@thesis-ledger/schemas';
@@ -21,6 +22,7 @@ import {
   backtestCapabilitiesSchema,
   backtestCorporateActionsResponseSchema,
   backtestInstrumentFactsResponseSchema,
+  backtestInstrumentFactsRequestSchema,
   backtestMinuteBarSchema,
   fxRatesResponseSchemaV1,
 } from '@thesis-ledger/schemas';
@@ -181,13 +183,10 @@ export class DsaClient {
     );
   }
 
-  backtestInstrumentFacts(input: {
-    symbol: string;
-    market: BacktestMarket;
-    instrumentType: BacktestInstrumentType;
-    dataAsOf: string;
-  }): Promise<BacktestInstrumentFactsResponse> {
-    const params = new URLSearchParams(input);
+  backtestInstrumentFacts(
+    input: BacktestInstrumentFactsRequest,
+  ): Promise<BacktestInstrumentFactsResponse> {
+    const params = new URLSearchParams(backtestInstrumentFactsRequestSchema.parse(input));
     return this.get<unknown>(
       `/api/v1/thesis-ledger/v2/instrument-facts?${params.toString()}`,
       1,

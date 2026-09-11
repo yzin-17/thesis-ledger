@@ -17,6 +17,8 @@ import { formatDateTime } from '@/lib/date-display';
 import { schemaSymbols, schemaAsOf } from './strategy.schema.js';
 import type { BacktestSetupInput, StrategyRecord, StrategyVersion } from './strategy.types.js';
 import { StrategyV2Summary, isV2StrategySchema } from './StrategyV2Summary.js';
+import { BacktestModelConfiguration } from './BacktestModelConfiguration.js';
+import type { BacktestExecutionModel } from '@thesis-ledger/schemas';
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -59,11 +61,15 @@ export function BacktestSetupDialog({
   const [period, setPeriod] = useState(defaultBacktestPeriod);
   const [initialCash, setInitialCash] = useState('100000');
   const [error, setError] = useState<string | null>(null);
+  const [modelText, setModelText] = useState('');
+  const [executionModel, setExecutionModel] = useState<BacktestExecutionModel>();
   useEffect(() => {
     if (open) {
       setPeriod(defaultBacktestPeriod());
       setInitialCash('100000');
       setError(null);
+      setModelText('');
+      setExecutionModel(undefined);
     }
   }, [open, version?.id]);
   const symbols = version?.schema ? schemaSymbols(version.schema) : [];
@@ -78,7 +84,15 @@ export function BacktestSetupDialog({
       return;
     }
     setError(null);
-    const succeeded = await onSubmit({ period, initialCash: cash });
+    if (modelText.trim() && !executionModel) {
+      setError('请校验并确认执行模型的范围与假设。');
+      return;
+    }
+    const succeeded = await onSubmit({
+      period,
+      initialCash: cash,
+      ...(executionModel ? { executionModel } : {}),
+    });
     if (!succeeded) return;
     onOpenChange(false);
   };
@@ -161,6 +175,17 @@ export function BacktestSetupDialog({
             />
             <FieldDescription>单位：人民币；服务端未提供时默认 100,000。</FieldDescription>
           </Field>
+          {version?.schema && isV2StrategySchema(version.schema) && (
+            <BacktestModelConfiguration
+              text={modelText}
+              confirmed={Boolean(executionModel)}
+              onChange={(text) => {
+                setModelText(text);
+                setExecutionModel(undefined);
+              }}
+              onConfirm={setExecutionModel}
+            />
+          )}
           {error && <FieldError>{error}</FieldError>}
         </FieldGroup>
         <DialogFooter>

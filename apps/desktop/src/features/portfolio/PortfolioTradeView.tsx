@@ -246,7 +246,7 @@ export function PortfolioTradeView({
                       type="button"
                       size="sm"
                       variant="link"
-                      className="h-auto p-0"
+                      className="text-button"
                       onClick={() => setSelectedTrade(trade)}
                     >
                       查看详情

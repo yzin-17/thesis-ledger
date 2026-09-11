@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "execution-model-v1",
+  "id": "cn-nav-fund-contract-fixture",
+  "version": "1",
+  "scope": {
+    "symbol": "FUND.CN",
+    "market": "CN",
+    "instrumentType": "NAV_FUND",
+    "currency": "CNY",
+    "timezone": "Asia/Shanghai",
+    "range": { "start": "2026-09-08", "end": "2026-09-15" }
+  },
+  "segments": [
+    {
+      "id": "nav-contract",
+      "range": { "start": "2026-09-08", "end": "2026-09-15" },
+      "source": {
+        "kind": "researchPreset",
+        "revision": "1",
+        "configuredAt": "2026-09-10T00:00:00+08:00",
+        "description": "NAV 费用适用契约的受控测试配置，不代表 Provider 事实或生产预设",
+        "references": ["docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md"]
+      },
+      "assumptions": [
+        "申购金额为不含费用的申请本金，申购费另加；赎回费基数为确认份额乘确认 NAV 的费前赎回款",
+        "申购费与赎回费均逐申请独立应用费率和最低额，并在确认时按 CNY 两位小数 half-up 扣收"
+      ],
+      "fees": null,
+      "execution": {
+        "mode": "nav",
+        "calendarMarket": "CN",
+        "cutoffLocalTime": "14:00",
+        "cutoffBoundary": "atOrAfterNextTradingDay",
+        "navDate": "acceptedApplicationTradingDate",
+        "navAvailability": "providerAvailableAt",
+        "reserveCashAt": "orderAccepted",
+        "subscriptionDebitAt": "confirmation",
+        "confirmationAfterTradingDays": 1,
+        "sellableAfterConfirmationTradingDays": 1,
+        "redemptionReinvestableAfterConfirmationTradingDays": 2,
+        "subscriptionFee": {
+          "treatment": "charged",
+          "side": "buy",
+          "basis": "subscriptionApplicationAmount",
+          "currency": "CNY",
+          "rate": "0.01",
+          "minimum": { "kind": "none" },
+          "rounding": { "mode": "halfUp", "decimalPlaces": 2 },
+          "collection": "perApplication",
+          "collectedAt": "confirmation"
+        },
+        "redemptionFee": {
+          "treatment": "charged",
+          "side": "sell",
+          "basis": "redemptionGrossProceeds",
+          "currency": "CNY",
+          "rate": "0.01",
+          "minimum": { "kind": "none" },
+          "rounding": { "mode": "halfUp", "decimalPlaces": 2 },
+          "collection": "perApplication",
+          "collectedAt": "confirmation"
+        }
+      }
+    }
+  ]
+}

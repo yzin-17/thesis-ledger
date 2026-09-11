@@ -312,6 +312,42 @@ describe('ThesisLedgerApiClient', () => {
     );
   });
 
+  it('typed Trade 建仓时间补录使用 URL 目标路径并校验命令响应', async () => {
+    const response = {
+      eventIds: ['00000000-0000-4000-8000-000000000003'],
+      factIds: ['00000000-0000-4000-8000-000000000004'],
+      ledgerRevisions: { [accountId]: '2' },
+      projectionGenerations: { [accountId]: '2' },
+      affectedSymbols: ['AAPL.US'],
+      idempotentReplay: false,
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+
+    await expect(
+      client.portfolio.createTradeOpeningBoundary('trade:account:AAPL.US:baseline-1', {
+        command: 'CREATE_TRADE_OPENING_BOUNDARY_ASSERTION',
+        accountId,
+        occurredAt: '2026-08-26T02:30:00.000Z',
+        timePrecision: 'INSTANT',
+        sourceTimezone: 'Asia/Shanghai',
+        economicOrderKey: 'opening-boundary-1',
+        payload: {
+          symbol: 'AAPL.US',
+          baselineFactId: '00000000-0000-4000-8000-000000000004',
+        },
+        source: { category: 'MANUAL', channel: 'desktop', externalId: 'opening-boundary-1' },
+        actorId: 'user-1',
+        reason: '券商历史账单显示首次买入时间',
+      }),
+    ).resolves.toEqual(response);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(
+      '/portfolio/trades/trade%3Aaccount%3AAAPL.US%3Abaseline-1/opening-boundary',
+    );
+  });
+
   it('通过共享 API Client 请求行情详情并保留 AbortSignal', async () => {
     const detail = {
       version: 1,

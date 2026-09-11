@@ -203,6 +203,33 @@ describe('VersionedExecutionRules 拒绝与追踪', () => {
     ).toMatchObject({ reasonCode: 'INSUFFICIENT_POSITION' });
   });
 
+  it('按 tick halfUp 计算涨跌停边界并保留最小价差', () => {
+    const rules = new VersionedExecutionRules(
+      facts('CN', {
+        price: {
+          reference: 'previousClose',
+          maxUpRatio: '0.1',
+          maxDownRatio: '0.1',
+          rounding: 'halfUpToTick',
+          minimumDistanceTicks: 1,
+          minimumPriceTicks: 1,
+        },
+      }),
+    );
+    expect(
+      rules.evaluate(order('CN', { rawPrice: '11.06', previousClose: '10.05' })),
+    ).toMatchObject({ accepted: true });
+    expect(
+      rules.evaluate(order('CN', { rawPrice: '11.07', previousClose: '10.05' })),
+    ).toMatchObject({ accepted: false, reasonCode: 'PRICE_LIMIT' });
+    expect(
+      rules.evaluate(order('CN', { rawPrice: '9.05', previousClose: '10.05' })),
+    ).toMatchObject({ accepted: true });
+    expect(
+      rules.evaluate(order('CN', { rawPrice: '9.04', previousClose: '10.05' })),
+    ).toMatchObject({ accepted: false, reasonCode: 'PRICE_LIMIT' });
+  });
+
   it('法定费用与最低费用使用 Decimal 计算且保留币种', () => {
     const configured = facts('HK', {
       statutoryCharges: [

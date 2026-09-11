@@ -27,6 +27,12 @@ export interface ExchangeSizingAdapterConfig {
   exchangeInputForOrder: (
     order: ExchangeOrderRequest,
   ) => Omit<ExchangeMarketSimulationInput, 'order'>;
+  reserveCashForOrder?: (
+    order: ExchangeOrderRequest,
+    plan: Extract<ExchangePlan, { status: 'filled' }>,
+  ) =>
+    | { accepted: true }
+    | { accepted: false; code: string; reason: string; inputFacts?: readonly string[] };
 }
 
 export interface ExchangeSizingAdapter {
@@ -101,6 +107,31 @@ export const createExchangeSizingAdapter = (
         reason: plan.reject.reason,
         ruleVersion: plan.reject.ruleVersion,
         inputFacts: plan.reject.inputFacts,
+      };
+    }
+    const reservation = config.reserveCashForOrder?.(order as ExchangeOrderRequest, plan);
+    if (reservation && !reservation.accepted) {
+      const code = reservation.code === 'INSUFFICIENT_CASH' ? 'INSUFFICIENT_CASH' : 'RULE_REJECTED';
+      const rejected: ExchangePlan = {
+        status: 'rejected',
+        reject: {
+          rejectionId: `${order.orderId}:reject:${code}`,
+          orderId: order.orderId,
+          code,
+          reason: reservation.reason,
+          ruleVersion: plan.ruleTrace.ruleVersion,
+          occurredAt: plan.fill.occurredAt,
+          availableAt: plan.fill.availableAt,
+          inputFacts: [...(reservation.inputFacts ?? [])].sort(),
+        },
+      };
+      plansByOrder.set(order.orderId, rejected);
+      return {
+        accepted: false as const,
+        code,
+        reason: reservation.reason,
+        ruleVersion: plan.ruleTrace.ruleVersion,
+        ...(reservation.inputFacts === undefined ? {} : { inputFacts: reservation.inputFacts }),
       };
     }
     return { accepted: true as const, ruleVersion: plan.ruleTrace.ruleVersion };

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { TradeSummaryResponseV2 } from '@thesis-ledger/api-client';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PortfolioTradeDetailTabs } from './PortfolioTradeDetailSections.js';
+import { PortfolioTradeOpeningBoundarySheet } from './PortfolioTradeOpeningBoundarySheet.js';
 import { usePortfolioTradeQuery } from './portfolio-trade.queries.js';
 import type { PortfolioTradeReviewTarget } from './portfolio-trade.types.js';
 import type { Account, PortfolioMode } from './portfolio.types.js';
@@ -31,6 +33,7 @@ export function PortfolioTradeDetailDialog({
   onOpenChange: (open: boolean) => void;
   onReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
+  const [openingBoundaryOpen, setOpeningBoundaryOpen] = useState(false);
   const accountId = trade?.accountId ?? '';
   const detailQuery = usePortfolioTradeQuery(
     accountId,
@@ -39,9 +42,13 @@ export function PortfolioTradeDetailDialog({
     open && Boolean(trade),
   );
   const title = trade?.assetName ?? trade?.symbol ?? '交易周期';
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setOpeningBoundaryOpen(false);
+    onOpenChange(nextOpen);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         aria-describedby="trade-detail-description"
         className="flex max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]"
@@ -78,11 +85,19 @@ export function PortfolioTradeDetailDialog({
             </div>
           ) : null}
           {detailQuery.data ? (
-            <PortfolioTradeDetailTabs
-              detail={detailQuery.data}
-              accountLabel={accountName(accounts, detailQuery.data.accountId)}
-              onReview={onReview}
-            />
+            <>
+              <PortfolioTradeDetailTabs
+                detail={detailQuery.data}
+                accountLabel={accountName(accounts, detailQuery.data.accountId)}
+                onReview={onReview}
+                onSupplementOpening={() => setOpeningBoundaryOpen(true)}
+              />
+              <PortfolioTradeOpeningBoundarySheet
+                detail={detailQuery.data}
+                open={openingBoundaryOpen}
+                onOpenChange={setOpeningBoundaryOpen}
+              />
+            </>
           ) : null}
         </div>
       </DialogContent>

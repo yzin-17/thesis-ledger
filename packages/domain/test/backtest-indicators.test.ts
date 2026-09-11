@@ -194,6 +194,51 @@ describe('backtest Series and Indicator domain', () => {
     );
   });
 
+  it('does not adjust history before an announced corporate action becomes effective', () => {
+    const input = series([point('2025-01-01', '100'), point('2025-01-02', '100')]);
+    const action = {
+      symbol: '600519.SH',
+      market: 'CN' as const,
+      assetType: 'stock' as const,
+      occurredAt: '2025-01-03T00:00:00Z',
+      availableAt: '2025-01-01T00:00:00Z',
+      type: 'CASH_DIVIDEND' as const,
+      cashAmount: '10',
+    };
+
+    expect(buildSeriesVariantsAt(input, [action], '2025-01-02T00:00:00Z').adjusted.points).toEqual(
+      input.points,
+    );
+    expect(
+      buildSeriesVariantsAt(input, [action], '2025-01-03T00:00:00Z').adjusted.points.map(
+        (item) => item.value,
+      ),
+    ).toEqual(['90', '90']);
+  });
+
+  it('uses close prices as the cash-dividend adjustment reference for other price fields', () => {
+    const openSeries = {
+      ...series([point('2025-01-01', '80'), point('2025-01-02', '90')]),
+      field: 'open' as const,
+    };
+    const closePoints = [point('2025-01-01', '100'), point('2025-01-02', '90')];
+    const action = {
+      symbol: '600519.SH',
+      market: 'CN' as const,
+      assetType: 'stock' as const,
+      occurredAt: '2025-01-02T00:00:00Z',
+      availableAt: '2025-01-02T00:00:00Z',
+      type: 'CASH_DIVIDEND' as const,
+      cashAmount: '10',
+    };
+
+    expect(
+      buildSeriesVariantsAt(openSeries, [action], '2025-01-02T00:00:00Z', {
+        cashDividendReferencePoints: closePoints,
+      }).adjusted.points.map((item) => item.value),
+    ).toEqual(['72', '90']);
+  });
+
   it('only applies corporate actions with the same market and asset type', () => {
     const input = series([point('2025-01-01', '100'), point('2025-01-02', '50')]);
     const action = {

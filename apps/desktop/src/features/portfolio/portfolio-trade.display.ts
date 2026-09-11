@@ -50,6 +50,10 @@ const exclusionLabels: Record<string, string> = {
   NET_PNL_UNAVAILABLE: '净实现盈亏暂不可用',
 };
 
+const algorithmVersionLabels: Record<string, string> = {
+  'trade-projection-v1': '交易投影 V1',
+};
+
 const displayLabels = (values: string[], labels: Record<string, string>, fallback: string) =>
   values.map((value) => labels[value] ?? fallback);
 
@@ -58,6 +62,9 @@ export const tradeIssueLabels = (detail: TradeDetailResponseV2) =>
 
 export const tradeExclusionLabels = (values: string[]) =>
   displayLabels(values, exclusionLabels, '暂不纳入默认统计');
+
+export const tradeAlgorithmVersionLabel = (value: string) =>
+  algorithmVersionLabels[value] ?? '未识别算法版本';
 
 export const tradeBatchScopeLabel = (value: 'FULL' | 'PARTIAL') =>
   value === 'FULL' ? '完整快照' : '部分快照';
@@ -73,10 +80,16 @@ export const evidenceKindLabel = (
 ) => {
   if (value === 'EXECUTION') return '成交记录';
   if (value === 'BASELINE_OBSERVATION') return '持仓快照';
+  if (value === 'OPENING_BOUNDARY_ASSERTION') return '用户补录建仓时间';
   if (value === 'BASELINE_RECONCILIATION') return '快照对账';
   if (value === 'CORPORATE_ACTION') return '公司行动';
   return '分红记录';
 };
+
+export const canSupplementTradeOpeningBoundary = (detail: TradeDetailResponseV2) =>
+  detail.openedAt === null &&
+  detail.entryLegs.length === 0 &&
+  detail.baselineComponents.some((component) => component.quantity !== '0');
 
 const sourceCategoryLabels: Record<
   TradeDetailResponseV2['evidenceSources'][number]['source']['category'],

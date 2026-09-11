@@ -91,6 +91,17 @@ const baseline = (
     { eventId: id, factId: id, occurredAt },
   );
 
+const openingBoundary = (id: string, occurredAt: string) =>
+  event(
+    'TRADE_OPENING_BOUNDARY_ASSERTION',
+    {
+      symbol: 'AAPL.US',
+      tradeId: 'trade:trade-projection-v1:account-actual:AAPL.US:baseline-1',
+      baselineFactId: 'baseline-1',
+    },
+    { eventId: id, factId: id, occurredAt },
+  );
+
 const strategy = (
   method: TradeCostMethod,
   effectiveAt = '2025-12-31',
@@ -169,6 +180,23 @@ describe('Trade Cost Projection 成本与收益守恒', () => {
     );
 
     expect(trades.map((trade) => trade.costStrategyRevision?.method)).toEqual(['AVG', 'FIFO']);
+  });
+
+  it('用户补录建仓时间不改变 Baseline 成本策略的证据时间边界', () => {
+    const trade = projectCosts(
+      [
+        baseline('baseline-1', '100', '2026-01-02', '10'),
+        openingBoundary('opening-1', '2026-01-01'),
+      ],
+      [strategy('AVG', '2026-01-02')],
+    )[0]!;
+
+    expect(trade.openedAt).toBe('2026-01-01');
+    expect(trade.costStrategyRevision?.method).toBe('AVG');
+    expect(trade.baselineComponents[0]).toMatchObject({
+      rawCost: '1000',
+      remainingCost: '1000',
+    });
   });
 
   it('公司行动只改变可消耗数量，不增加来源总成本', () => {

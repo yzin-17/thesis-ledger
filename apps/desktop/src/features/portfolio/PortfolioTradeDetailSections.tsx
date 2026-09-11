@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import {
   corporateActionLabel,
+  canSupplementTradeOpeningBoundary,
   evidenceKindLabel,
   evidenceSourceLabel,
   formatTradeDateTime,
   formatTradeDecimal,
+  tradeAlgorithmVersionLabel,
   tradeBatchScopeLabel,
   tradeCompletenessLabel,
   tradeEndEvidenceLabel,
@@ -83,11 +85,16 @@ function TradeOverview({
   detail,
   accountLabel,
   onReview,
+  onSupplementOpening,
 }: {
   detail: TradeDetailResponseV2;
   accountLabel: string;
   onReview: (target: PortfolioTradeReviewTarget) => void;
+  onSupplementOpening?: () => void;
 }) {
+  const openingWasSupplemented = detail.evidenceSources.some(
+    (source) => source.kind === 'OPENING_BOUNDARY_ASSERTION',
+  );
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -101,22 +108,30 @@ function TradeOverview({
           </div>
           <p className="m-0 text-xs text-muted-foreground">
             {accountLabel} · {detail.accountMode === 'shadow' ? '模拟账户' : '实际账户'} ·{' '}
-            {formatTradeDateTime(detail.openedAt)} 至 {formatTradeDateTime(detail.closedAt)}
+            {formatTradeDateTime(detail.openedAt)}
+            {openingWasSupplemented ? '（用户补录）' : ''} 至 {formatTradeDateTime(detail.closedAt)}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            onReview({
-              accountId: detail.accountId,
-              tradeId: detail.id,
-              reviewObjectType: 'TRADE_CYCLE',
-            })
-          }
-        >
-          完整交易复盘
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {onSupplementOpening && canSupplementTradeOpeningBoundary(detail) ? (
+            <Button type="button" variant="outline" onClick={onSupplementOpening}>
+              补录建仓时间
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              onReview({
+                accountId: detail.accountId,
+                tradeId: detail.id,
+                reviewObjectType: 'TRADE_CYCLE',
+              })
+            }
+          >
+            完整交易复盘
+          </Button>
+        </div>
       </div>
       <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <DetailMetric label="来源数量" value={detail.sourceQuantity} />
@@ -316,7 +331,8 @@ function EvidenceList({
 }
 
 function TradeEvidence({ detail }: { detail: TradeDetailResponseV2 }) {
-  const rawIssues = [...detail.issues, ...detail.costIssues];
+  const issueDescriptions = tradeIssueLabels(detail);
+  const exclusionDescriptions = tradeExclusionLabels(detail.excludedReasons);
   return (
     <div className="grid gap-4">
       <section className="grid gap-3 md:grid-cols-3" aria-label="交易附属证据">
@@ -352,18 +368,20 @@ function TradeEvidence({ detail }: { detail: TradeDetailResponseV2 }) {
           </div>
           <div>
             <dt>算法版本</dt>
-            <dd className="m-0 font-mono text-foreground">{detail.algorithmVersion}</dd>
-          </div>
-          <div>
-            <dt>原始统计排除代码</dt>
-            <dd className="m-0 break-all font-mono text-foreground">
-              {detail.excludedReasons.join('、') || '无'}
+            <dd className="m-0 text-foreground">
+              {tradeAlgorithmVersionLabel(detail.algorithmVersion)}
             </dd>
           </div>
           <div>
-            <dt>原始问题代码</dt>
-            <dd className="m-0 break-all font-mono text-foreground">
-              {rawIssues.join('、') || '无'}
+            <dt>统计排除原因</dt>
+            <dd className="m-0 break-all text-foreground">
+              {exclusionDescriptions.join('、') || '无'}
+            </dd>
+          </div>
+          <div>
+            <dt>问题说明</dt>
+            <dd className="m-0 break-all text-foreground">
+              {issueDescriptions.join('、') || '无'}
             </dd>
           </div>
         </dl>
@@ -376,10 +394,12 @@ export function PortfolioTradeDetailTabs({
   detail,
   accountLabel,
   onReview,
+  onSupplementOpening,
 }: {
   detail: TradeDetailResponseV2;
   accountLabel: string;
   onReview: (target: PortfolioTradeReviewTarget) => void;
+  onSupplementOpening?: () => void;
 }) {
   return (
     <Tabs defaultValue="overview">
@@ -389,7 +409,12 @@ export function PortfolioTradeDetailTabs({
         <TabsTrigger value="evidence">证据与技术信息</TabsTrigger>
       </TabsList>
       <TabsContent value="overview" className="pt-4">
-        <TradeOverview detail={detail} accountLabel={accountLabel} onReview={onReview} />
+        <TradeOverview
+          detail={detail}
+          accountLabel={accountLabel}
+          onReview={onReview}
+          {...(onSupplementOpening === undefined ? {} : { onSupplementOpening })}
+        />
       </TabsContent>
       <TabsContent value="positions" className="grid gap-5 pt-4">
         <EntryLegs detail={detail} />

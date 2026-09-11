@@ -7,14 +7,21 @@ import type {
   BacktestInstrumentType,
   BacktestMarket,
 } from '@thesis-ledger/schemas';
+import { runConfigSchemaV2, validateStrategyRunConfig } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import {
   buildSnapshotManifest,
+  canonicalizeManifest,
+  hashCanonicalManifest,
   LocalSnapshotStore,
   type SnapshotManifest,
 } from './backtest-snapshot.js';
-import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
+import type { ArtifactPutInput, ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import type { BacktestV2SnapshotBuilder } from './backtest-v2-run.js';
+import {
+  BacktestMarketRulesUnavailableError,
+  requireFrozenExecutionRules,
+} from './backtest-market-rules.js';
 
 type DatasetInput = SnapshotManifest['dependencyClosure']['datasets'][number];
 
@@ -186,29 +193,70 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
   ) {}
 
   async build(input: Parameters<BacktestV2SnapshotBuilder['build']>[0]) {
+    if (input.runConfig.executionModel) {
+      input = structuredClone(input);
+      input.runConfig = runConfigSchemaV2.parse(input.runConfig);
+      const validation = validateStrategyRunConfig(input.strategy, input.runConfig);
+      if (!validation.valid)
+        throw new BacktestMarketRulesUnavailableError(
+          validation.errors.map((error) => error.message).join('; '),
+        );
+    }
+    const putArtifact = (artifact: Omit<ArtifactPutInput, 'key'> & { key: string }) =>
+      this.snapshots.putArtifact(input.runId, {
+        ...artifact,
+        ...(input.runConfig.executionModel ? { artifactId: hashCanonicalManifest(artifact) } : {}),
+      });
+    const manifest = buildSnapshotManifest({
+      ...input,
+      quality: { completeness: 'complete', warnings: [] },
+    });
+    const existing = await this.snapshots.load(input.runId, true);
+    if (existing?.status === 'finalized') {
+      await this.snapshots.startBuild(input);
+      const manifest = await this.snapshots.replay(input.runId);
+      return {
+        manifest,
+        snapshotRef: { snapshotId: manifest.contentHash!, contentHash: manifest.contentHash! },
+        artifactRefs: manifest.artifacts,
+      };
+    }
     if (input.runConfig.endDate > input.runConfig.dataAsOf.slice(0, 10)) {
       throw new Error('RunConfig endDate 不能晚于 dataAsOf');
     }
     const capabilities = await this.dsa.backtestCapabilities();
     const artifacts: ArtifactRef[] = [];
     try {
-      const manifest = buildSnapshotManifest({
-        ...input,
-        quality: { completeness: 'complete', warnings: [] },
-      });
       const building = await this.snapshots.startBuild(input);
       artifacts.push(
-        await this.snapshots.putArtifact(input.runId, {
+        await putArtifact({
           key: 'metadata/snapshot-metadata.parquet',
           rows: [
             {
               kind: 'snapshot-metadata',
-              strategy: JSON.stringify(input.strategy),
-              runConfig: JSON.stringify(input.runConfig),
+              strategy: input.runConfig.executionModel
+                ? canonicalizeManifest(input.strategy)
+                : JSON.stringify(input.strategy),
+              runConfig: input.runConfig.executionModel
+                ? canonicalizeManifest(input.runConfig)
+                : JSON.stringify(input.runConfig),
             },
           ],
         }),
       );
+      if (input.runConfig.executionModel) {
+        artifacts.push(
+          await putArtifact({
+            key: 'metadata/execution-model.parquet',
+            rows: [
+              {
+                kind: 'execution-model',
+                model: canonicalizeManifest(input.runConfig.executionModel),
+              },
+            ],
+          }),
+        );
+      }
       const datasets = manifest.dependencyClosure.datasets.filter((dataset) =>
         [
           'signal',
@@ -271,21 +319,66 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
             false,
           );
           rows = result.rows;
+          if (
+            input.runConfig.executionModel &&
+            dataset.instrument === input.runConfig.executionModel.scope.market &&
+            rows.some((row) => row.timezone !== input.runConfig.executionModel!.scope.timezone)
+          ) {
+            throw new BacktestMarketRulesUnavailableError('冻结 Calendar 时区与研究模型不一致');
+          }
           artifactName = `${dataset.purpose}/${dataset.instrument}.parquet`;
         } else if (
           dataset.purpose === 'instrumentFacts' &&
           typeof this.dsa.backtestInstrumentFacts === 'function'
         ) {
           const instrument = dependencyInstrument(dataset.instrument);
+          const response = await this.dsa.backtestInstrumentFacts({
+            ...instrument,
+            start: manifest.dateRange.warmupStartDate,
+            end: manifest.dateRange.endDate,
+            executionStart: manifest.dateRange.startDate,
+            executionEnd: manifest.dateRange.endDate,
+            dataAsOf: input.runConfig.dataAsOf,
+          });
+          if (response.status === 'unavailable') {
+            throw new BacktestMarketRulesUnavailableError(
+              response.reason ?? `缺少标的历史事实: ${instrument.symbol}`,
+            );
+          }
+          const model = input.runConfig.executionModel;
+          if (
+            model &&
+            dataset.instrument === manifest.dependencyClosure.executionInstrument &&
+            response.facts.some(
+              (fact) =>
+                fact.symbol !== model.scope.symbol ||
+                fact.market !== model.scope.market ||
+                fact.instrumentType !== model.scope.instrumentType ||
+                fact.currency !== model.scope.currency,
+            )
+          ) {
+            throw new BacktestMarketRulesUnavailableError(
+              'Provider 标的事实与研究模型适用范围不一致',
+            );
+          }
           const result = rowsFromDependencyResponse(
-            await this.dsa.backtestInstrumentFacts({
-              ...instrument,
-              dataAsOf: input.runConfig.dataAsOf,
-            }),
+            response,
             dataset,
             input.runConfig.dataAsOf,
             false,
           );
+          const usesSelectedExecutionModel =
+            model && dataset.instrument === manifest.dependencyClosure.executionInstrument;
+          if (!usesSelectedExecutionModel) {
+            requireFrozenExecutionRules(
+              response.facts[0]!.executionRules,
+              manifest.marketRuleVersion,
+              {
+                start: manifest.dateRange.warmupStartDate,
+                end: manifest.dateRange.endDate,
+              },
+            );
+          }
           rows = result.rows;
           artifactName = `${dataset.purpose}/${instrument.market}-${instrument.symbol}.parquet`;
         } else if (
@@ -313,14 +406,14 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
         }
         if (emptyEvidence) {
           artifacts.push(
-            await this.snapshots.putArtifact(input.runId, {
+            await putArtifact({
               key: `metadata/empty-${dataset.purpose}-${artifactName.replaceAll('/', '-')}`,
               rows: [emptyEvidence],
             }),
           );
           continue;
         }
-        const artifact = await this.snapshots.putArtifact(input.runId, {
+        const artifact = await putArtifact({
           key: artifactName,
           rows,
         });

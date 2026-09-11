@@ -93,6 +93,13 @@ const baseline = (
     { eventId: id, factId: id, accountId, occurredAt, economicOrderKey: id },
   );
 
+const openingBoundary = (id: string, tradeId: string, baselineFactId: string, occurredAt: string) =>
+  event(
+    'TRADE_OPENING_BOUNDARY_ASSERTION',
+    { symbol: 'AAPL.US', tradeId, baselineFactId },
+    { eventId: id, factId: id, accountId: 'account-actual', occurredAt, economicOrderKey: id },
+  );
+
 const projection = (
   events: readonly LedgerEventV2[],
   accountModeByAccountId: Record<string, 'actual' | 'shadow'> = { 'account-actual': 'actual' },
@@ -290,6 +297,41 @@ describe('Trade Projection 领域引擎', () => {
     });
     expect(trade.entryLegs[0]?.remainingQuantity).toBe('20');
     expect(trade.evidenceSources.map((source) => source.kind)).toContain('BASELINE_RECONCILIATION');
+  });
+
+  it('为 Baseline-only Trade 应用用户补录建仓时间但保留基线证据边界', () => {
+    const tradeId = 'trade:trade-projection-v1:account-actual:AAPL.US:baseline-1';
+    const trade = projection([
+      baseline('baseline-1', '100', '2026-01-02', '10'),
+      openingBoundary('opening-assertion-1', tradeId, 'baseline-1', '2026-01-01'),
+    ])[0]!;
+
+    expect(trade).toMatchObject({
+      id: tradeId,
+      openedAt: '2026-01-01',
+      earliestEvidenceAt: '2026-01-02',
+      remainingQuantity: '100',
+      completeness: 'PARTIAL',
+    });
+    expect(trade.issues).not.toContain('MISSING_OPENING_BOUNDARY');
+    expect(trade.entryLegs).toEqual([]);
+    expect(trade.baselineComponents[0]?.factId).toBe('baseline-1');
+    expect(trade.evidenceSources.map((source) => source.kind)).toEqual([
+      'OPENING_BOUNDARY_ASSERTION',
+      'BASELINE_OBSERVATION',
+    ]);
+  });
+
+  it('忽略晚于最早证据或指向不存在基线的建仓时间补录', () => {
+    const tradeId = 'trade:trade-projection-v1:account-actual:AAPL.US:baseline-1';
+    const result = projection([
+      baseline('baseline-1', '100', '2026-01-02', '10'),
+      openingBoundary('late-assertion', tradeId, 'baseline-1', '2026-01-03'),
+      openingBoundary('missing-baseline-assertion', tradeId, 'baseline-missing', '2026-01-01'),
+    ]);
+
+    expect(result[0]?.openedAt).toBeNull();
+    expect(result[0]?.issues).toContain('MISSING_OPENING_BOUNDARY');
   });
 
   it('基线数量小于已知持仓时保留数量冲突，不静默减少持仓', () => {

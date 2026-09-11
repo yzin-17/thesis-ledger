@@ -31,8 +31,22 @@ import {
   rowFor,
   rowsForPurpose,
   signalArtifactFor,
+  sourceSeriesKey,
   stringField,
 } from './backtest-v2-execution-shared.js';
+import {
+  calculateNavExecutionModelFee,
+  ExecutionModelUnavailableError,
+  navLocalDate,
+  resolveExecutionModelSegment,
+  tradingDateAfter,
+  tradingSessionStartAt,
+  type FrozenExecutionModel,
+  type FrozenNavExecutionModelSegment,
+} from '@thesis-ledger/domain';
+
+const laterTime = (left: string, right: string) =>
+  Date.parse(left) >= Date.parse(right) ? left : right;
 export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVerticalResult => {
   const instrument = input.strategy.executionInstrument;
   if (
@@ -45,6 +59,7 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
   const calendarRow = rowFor(rowsForPurpose(input.rows, 'calendar'), (row) => row.market === 'CN');
   const calendar = tradingCalendarFromFact(calendarFact(calendarRow));
   const ledgerConfig = initialLedgerConfig(input.strategy, input.runConfig);
+  const executionModel = input.runConfig.executionModel;
   const navFacts = rowsForPurpose(input.rows, 'nav').map((row): CnNavFact => ({
     symbol: stringField(row, 'symbol'),
     market: 'CN',
@@ -67,6 +82,7 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
     calendarVersion: input.calendarVersion,
     cutoffLocalTime: '15:00',
     timeframe: '1d',
+    ...(executionModel ? { executionModel, dataAsOf: input.runConfig.dataAsOf } : {}),
   });
   const sourceSeries = new Map<string, BacktestSeries>();
   for (const source of input.strategy.signalSources) {
@@ -88,7 +104,7 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
         },
       ];
     });
-    sourceSeries.set(source.id, {
+    sourceSeries.set(sourceSeriesKey(source.id, 'nav'), {
       sourceId: source.id,
       symbol: source.asset.symbol,
       market: source.asset.market,
@@ -279,7 +295,49 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
       });
       continue;
     }
-    const schedule = expectedCutoffSchedule(intent.occurredAt, calendar, '15:00');
+    let modelSegment: FrozenNavExecutionModelSegment | undefined;
+    if (executionModel) {
+      try {
+        const selected = resolveExecutionModelSegment<FrozenNavExecutionModelSegment>(
+          executionModel as FrozenExecutionModel & {
+            segments: readonly FrozenNavExecutionModelSegment[];
+          },
+          {
+            expectedVersion: executionModel.version,
+            symbol: intent.executionSymbol,
+            market: 'CN',
+            instrumentType: 'NAV_FUND',
+            currency: 'CNY',
+            evaluatedAt: intent.occurredAt,
+            dataAsOf: input.runConfig.dataAsOf,
+          },
+        );
+        if (selected.execution.mode !== 'nav') {
+          rejects.push({
+            orderId: request.requestId,
+            reason: 'Exchange 执行模型不能用于 NAV',
+            code: 'RULE_REJECTED',
+            occurredAt: intent.occurredAt,
+          });
+          continue;
+        }
+        modelSegment = selected;
+      } catch (error) {
+        if (!(error instanceof ExecutionModelUnavailableError)) throw error;
+        rejects.push({
+          orderId: request.requestId,
+          reason: error.message,
+          code: 'RULE_REJECTED',
+          occurredAt: intent.occurredAt,
+        });
+        continue;
+      }
+    }
+    const schedule = expectedCutoffSchedule(
+      intent.occurredAt,
+      calendar,
+      modelSegment?.execution.cutoffLocalTime ?? '15:00',
+    );
     const priced = schedule
       ? navFacts.find(
           (candidate) =>
@@ -298,6 +356,19 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
     }
     pendingSide = intent.side;
     const availableAt = priced.availableAt;
+    const confirmationAt = modelSegment
+      ? laterTime(
+          availableAt,
+          tradingSessionStartAt(
+            calendar,
+            tradingDateAfter(
+              calendar,
+              schedule.valuationDate,
+              modelSegment.execution.confirmationAfterTradingDays,
+            ) ?? schedule.valuationDate,
+          ) ?? availableAt,
+        )
+      : availableAt;
     events.push({
       phase: 0,
       availableAt: request.availableAt,
@@ -305,7 +376,7 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
     });
     events.push({
       phase: 1,
-      availableAt: schedule.cutoffAt,
+      availableAt: laterTime(request.availableAt, schedule.cutoffAt),
       event: {
         type: 'cutoff',
         payload: {
@@ -332,56 +403,110 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
     });
     events.push({
       phase: 3,
-      availableAt,
+      availableAt: confirmationAt,
       event: {
         type: 'confirmation',
         payload: {
           eventId: `${request.requestId}:confirmation`,
           requestId: request.requestId,
-          occurredAt: availableAt,
-          availableAt,
+          occurredAt: confirmationAt,
+          availableAt: confirmationAt,
         },
       },
     });
+    let fee = DecimalValue.from(request.fee ?? '0');
+    if (modelSegment) {
+      const gross =
+        request.requestType === 'subscribe'
+          ? DecimalValue.from(request.amount ?? '0')
+          : DecimalValue.from(request.shares ?? '0').times(priced.nav);
+      fee = DecimalValue.from(
+        calculateNavExecutionModelFee(
+          request.requestType === 'subscribe'
+            ? modelSegment.execution.subscriptionFee
+            : modelSegment.execution.redemptionFee,
+          {
+            code: request.requestType === 'subscribe' ? 'subscriptionFee' : 'redemptionFee',
+            side: request.requestType === 'subscribe' ? 'buy' : 'sell',
+            basis:
+              request.requestType === 'subscribe'
+                ? 'subscriptionApplicationAmount'
+                : 'redemptionGrossProceeds',
+            gross: gross.toString(),
+            currency: 'CNY',
+          },
+        ).amount,
+      );
+    }
     const cash =
       request.requestType === 'subscribe'
         ? DecimalValue.from(request.amount ?? '0')
-            .plus(request.fee ?? '0')
+            .plus(fee)
             .toString()
         : DecimalValue.from(request.shares ?? '0')
             .times(priced.nav)
-            .minus(request.fee ?? '0')
+            .minus(fee)
             .toString();
     if (request.requestType === 'subscribe') {
+      const shareAvailableAt = modelSegment
+        ? laterTime(
+            confirmationAt,
+            tradingSessionStartAt(
+              calendar,
+              tradingDateAfter(
+                calendar,
+                navLocalDate(confirmationAt, calendar.timezone) ?? schedule.valuationDate,
+                modelSegment.execution.sellableAfterConfirmationTradingDays,
+              ) ?? schedule.valuationDate,
+            ) ?? confirmationAt,
+          )
+        : availableAt;
       const shares = DecimalValue.from(request.amount ?? '0')
         .dividedBy(priced.nav)
         .toString();
       events.push({
         phase: 4,
-        availableAt,
+        availableAt: shareAvailableAt,
         event: {
           type: 'shareAvailable',
           payload: {
             eventId: `${request.requestId}:shares`,
             requestId: request.requestId,
             shares,
-            occurredAt: availableAt,
-            availableAt,
+            occurredAt: shareAvailableAt,
+            availableAt: shareAvailableAt,
           },
         },
       });
     }
+    const redemptionCashAt =
+      request.requestType === 'redeem' && modelSegment
+        ? laterTime(
+            confirmationAt,
+            tradingSessionStartAt(
+              calendar,
+              tradingDateAfter(
+                calendar,
+                navLocalDate(confirmationAt, calendar.timezone) ?? schedule.valuationDate,
+                modelSegment.execution
+                  .redemptionReinvestableAfterConfirmationTradingDays,
+              ) ?? schedule.valuationDate,
+          ) ?? confirmationAt,
+        )
+        : availableAt;
+    const subscriptionCashAt =
+      request.requestType === 'subscribe' && modelSegment ? confirmationAt : availableAt;
     events.push({
       phase: 5,
-      availableAt,
+      availableAt: request.requestType === 'subscribe' ? subscriptionCashAt : redemptionCashAt,
       event: {
         type: request.requestType === 'subscribe' ? 'cashSettlement' : 'redemptionCash',
         payload: {
           eventId: `${request.requestId}:cash`,
           requestId: request.requestId,
           amount: cash,
-          occurredAt: availableAt,
-          availableAt,
+          occurredAt: request.requestType === 'subscribe' ? subscriptionCashAt : redemptionCashAt,
+          availableAt: request.requestType === 'subscribe' ? subscriptionCashAt : redemptionCashAt,
         },
       },
     });
@@ -458,6 +583,9 @@ export const runCnNavVertical = (input: BacktestVerticalInput): ExchangeVertical
     aggregationVersion: input.aggregationVersion,
     baseCurrency: input.runConfig.baseCurrency,
     periodsPerYear: 252,
+    unavailableReasons: executionModel
+      ? rejects.map((reject) => `${reject.code}:${reject.reason}`)
+      : [],
     trades: trades.trades,
     equityCurve: [
       {

@@ -1,4 +1,10 @@
-import type { BacktestResultV2, RunConfig, StrategySchemaV2 } from '@thesis-ledger/schemas';
+import type {
+  BacktestExecutionModel,
+  ExecutionModelDisclosure,
+  BacktestResultV2,
+  RunConfig,
+  StrategySchemaV2,
+} from '@thesis-ledger/schemas';
 
 export type StrategyStatus = 'draft' | 'active' | 'archived';
 export type BacktestJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -42,6 +48,7 @@ export interface BacktestJobResult {
 }
 
 export interface BacktestJobSummary {
+  executionModelDisclosure?: ExecutionModelDisclosure;
   id: string;
   strategyVersionId: string;
   mode?: 'V1' | 'V2';
@@ -89,6 +96,7 @@ export interface CreateStrategyVersionInput {
 }
 
 export interface BacktestSetupInput {
+  executionModel?: BacktestExecutionModel;
   period: { start: string; end: string };
   initialCash: number;
   inSampleEnd?: string;

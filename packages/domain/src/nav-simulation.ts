@@ -1,4 +1,11 @@
 import { DecimalValue } from './decimal.js';
+import {
+  calculateNavExecutionModelFee,
+  ExecutionModelUnavailableError,
+  resolveExecutionModelSegment,
+  type FrozenNavExecutionModelSegment,
+  type FrozenExecutionModel,
+} from './backtest-execution-model.js';
 import { SimulationLedger, type SimulationExecutionInstrument } from './simulation-ledger.js';
 
 export * from './nav-simulation-contracts.js';
@@ -25,6 +32,7 @@ import {
   navEventTimeReason,
   navLocalDate,
   navTime,
+  tradingDateAfter,
 } from './nav-simulation-rules.js';
 import {
   ledgerRejectCode,
@@ -38,6 +46,7 @@ interface InternalRequest extends CnNavRequestState {
   fillAvailableAt?: string;
   sharesAvailable?: boolean;
   cashSettled?: boolean;
+  executionModelSegment?: FrozenNavExecutionModelSegment;
 }
 
 const toPublicRequestState = (value: InternalRequest): CnNavRequestState => {
@@ -47,6 +56,7 @@ const toPublicRequestState = (value: InternalRequest): CnNavRequestState => {
   delete request.fillAvailableAt;
   delete request.sharesAvailable;
   delete request.cashSettled;
+  delete request.executionModelSegment;
   return request;
 };
 
@@ -195,10 +205,76 @@ export class CnNavSimulation {
     }
     let requested: DecimalValue;
     let fee: DecimalValue;
+    let executionModelSegment: FrozenNavExecutionModelSegment | undefined;
+    if (this.config.executionModel) {
+      if (!this.config.dataAsOf) {
+        return this.reject(
+          request.eventId,
+          'RULE_REJECTED',
+          'execution-model-v1 缺少 dataAsOf',
+          request.requestId,
+        );
+      }
+      if (this.config.executionModel.scope.timezone !== this.timezone) {
+        return this.reject(
+          request.eventId,
+          'RULE_REJECTED',
+          '执行模型时区与 NAV 日历不一致',
+          request.requestId,
+        );
+      }
+      try {
+        const segment = resolveExecutionModelSegment<FrozenNavExecutionModelSegment>(
+          this.config.executionModel as FrozenExecutionModel & {
+            segments: readonly FrozenNavExecutionModelSegment[];
+          },
+          {
+          expectedVersion: this.config.executionModel.version,
+          symbol: request.executionSymbol,
+          market: 'CN',
+          instrumentType: 'NAV_FUND',
+          currency: 'CNY',
+          evaluatedAt: request.requestAt,
+          dataAsOf: this.config.dataAsOf,
+          },
+        );
+        if (segment.execution.mode !== 'nav') {
+          return this.reject(
+            request.eventId,
+            'RULE_REJECTED',
+            'Exchange 执行模型不能用于 NAV',
+            request.requestId,
+          );
+        }
+        executionModelSegment = segment;
+      } catch (error) {
+        if (error instanceof ExecutionModelUnavailableError) {
+          return this.reject(request.eventId, 'RULE_REJECTED', error.message, request.requestId);
+        }
+        throw error;
+      }
+    }
     try {
       requested = requestAmount(request);
-      fee = parse(request.fee ?? '0', 'NAV 费用');
+      if (executionModelSegment && request.requestType === 'subscribe') {
+        fee = DecimalValue.from(
+          calculateNavExecutionModelFee(executionModelSegment.execution.subscriptionFee, {
+            code: 'subscriptionFee',
+            side: 'buy',
+            basis: 'subscriptionApplicationAmount',
+            gross: requested.toString(),
+            currency: 'CNY',
+          }).amount,
+        );
+      } else if (executionModelSegment) {
+        fee = DecimalValue.from('0');
+      } else {
+        fee = parse(request.fee ?? '0', 'NAV 费用');
+      }
     } catch (error) {
+      if (error instanceof ExecutionModelUnavailableError) {
+        return this.reject(request.eventId, 'RULE_REJECTED', error.message, request.requestId);
+      }
       return this.reject(
         request.eventId,
         'INVALID_AMOUNT',
@@ -216,18 +292,34 @@ export class CnNavSimulation {
     }
     if (request.requestType === 'subscribe') {
       const cashNeeded = requested.plus(fee);
-      const available = DecimalValue.from(this.ledger.availableCash('CNY')).minus(
-        this.reservedSubscribeCash,
-      );
-      if (available.compareTo(cashNeeded) < 0) {
-        return this.reject(
-          request.eventId,
-          'INSUFFICIENT_CASH',
-          '申购只能使用已有 CNY 已结算现金',
-          request.requestId,
+      if (executionModelSegment) {
+        const reservation = this.ledger.reserveCash(
+          `${request.requestId}:cash-reservation`,
+          'CNY',
+          cashNeeded.toString(),
         );
+        if (!reservation.accepted) {
+          return this.reject(
+            request.eventId,
+            reservation.code === 'INSUFFICIENT_CASH' ? 'INSUFFICIENT_CASH' : 'RULE_REJECTED',
+            reservation.reason,
+            request.requestId,
+          );
+        }
+      } else {
+        const available = DecimalValue.from(this.ledger.availableCash('CNY')).minus(
+          this.reservedSubscribeCash,
+        );
+        if (available.compareTo(cashNeeded) < 0) {
+          return this.reject(
+            request.eventId,
+            'INSUFFICIENT_CASH',
+            '申购只能使用已有 CNY 已结算现金',
+            request.requestId,
+          );
+        }
+        this.reservedSubscribeCash = this.reservedSubscribeCash.plus(cashNeeded);
       }
-      this.reservedSubscribeCash = this.reservedSubscribeCash.plus(cashNeeded);
     } else {
       const availableShares = DecimalValue.from(
         this.ledger.snapshot().position.settledQuantity,
@@ -255,6 +347,7 @@ export class CnNavSimulation {
         : { requestedShares: requested.toString() }),
       sharesAvailable: false,
       cashSettled: false,
+      ...(executionModelSegment === undefined ? {} : { executionModelSegment }),
     });
     return this.applied(request.eventId, request.requestId);
   }
@@ -294,7 +387,7 @@ export class CnNavSimulation {
     const expected = expectedCutoffSchedule(
       request.requestAt,
       this.config.calendar,
-      this.config.cutoffLocalTime,
+      request.executionModelSegment?.execution.cutoffLocalTime ?? this.config.cutoffLocalTime,
     );
     if (
       !expected ||
@@ -388,12 +481,54 @@ export class CnNavSimulation {
       );
     }
     const fillId = `nav-fill:${request.requestId}`;
-    const fee = request.fee;
     const nav = DecimalValue.from(request.nav);
     const quantity =
       request.requestType === 'subscribe'
         ? DecimalValue.from(request.requestedAmount!).dividedBy(nav)
         : DecimalValue.from(request.requestedShares!);
+    const confirmationDate =
+      event.confirmationDate ?? navLocalDate(event.occurredAt, this.timezone);
+    if (!confirmationDate) {
+      return this.reject(event.eventId, 'INVALID_TIME', '确认日期无效', event.requestId);
+    }
+    if (request.executionModelSegment) {
+      const valuationDate = request.valuationDate;
+      const earliestDate = valuationDate
+        ? tradingDateAfter(
+            this.config.calendar,
+            valuationDate,
+            request.executionModelSegment.execution.confirmationAfterTradingDays,
+          )
+        : undefined;
+      if (!earliestDate || confirmationDate < earliestDate) {
+        return this.reject(
+          event.eventId,
+          'NAV_DELAYED',
+          `确认不得早于 ${earliestDate ?? '模型规定日期'}`,
+          event.requestId,
+        );
+      }
+    }
+    let fee = DecimalValue.from(request.fee);
+    if (request.executionModelSegment && request.requestType === 'redeem') {
+      try {
+        fee = DecimalValue.from(
+          calculateNavExecutionModelFee(request.executionModelSegment.execution.redemptionFee, {
+            code: 'redemptionFee',
+            side: 'sell',
+            basis: 'redemptionGrossProceeds',
+            gross: quantity.times(nav).toString(),
+            currency: 'CNY',
+          }).amount,
+        );
+      } catch (error) {
+        if (error instanceof ExecutionModelUnavailableError) {
+          return this.reject(event.eventId, 'RULE_REJECTED', error.message, event.requestId);
+        }
+        throw error;
+      }
+      request.fee = fee.toString();
+    }
     const fillResult = this.ledger.applyFill(
       {
         eventId: fillId,
@@ -402,28 +537,40 @@ export class CnNavSimulation {
         side: request.requestType === 'subscribe' ? 'buy' : 'sell',
         quantity: quantity.toString(),
         price: nav.toString(),
-        charges: [{ amount: fee, currency: 'CNY' }],
+        charges: [{ amount: fee.toString(), currency: 'CNY' }],
         currency: 'CNY',
         occurredAt: request.navOccurredAt,
         availableAt: event.availableAt,
+        ...(request.requestType === 'subscribe'
+          ? { cashDebit: request.requestedAmount! }
+          : {}),
+        ...(request.executionModelSegment && request.requestType === 'subscribe'
+          ? { cashReservationId: `${request.requestId}:cash-reservation` }
+          : {}),
       },
       evaluationAt,
     );
     if (!fillResult.applied) {
       const code = ledgerRejectCode(fillResult);
-      if (request.requestType === 'subscribe')
-        this.reservedSubscribeCash = this.reservedSubscribeCash.minus(
-          DecimalValue.from(request.requestedAmount!).plus(fee),
-        );
-      else this.reservedRedeemShares = this.reservedRedeemShares.minus(quantity);
+      if (request.requestType === 'subscribe') {
+        if (request.executionModelSegment) {
+          this.ledger.releaseCash(`${request.requestId}:cash-reservation`);
+        } else {
+          this.reservedSubscribeCash = this.reservedSubscribeCash.minus(
+            DecimalValue.from(request.requestedAmount!).plus(fee),
+          );
+        }
+      } else this.reservedRedeemShares = this.reservedRedeemShares.minus(quantity);
       request.status = 'rejected';
       request.reason = fillResult.reason;
       return this.reject(event.eventId, code, fillResult.reason, event.requestId);
     }
     if (request.requestType === 'subscribe') {
-      this.reservedSubscribeCash = this.reservedSubscribeCash.minus(
-        DecimalValue.from(request.requestedAmount!).plus(fee),
-      );
+      if (!request.executionModelSegment) {
+        this.reservedSubscribeCash = this.reservedSubscribeCash.minus(
+          DecimalValue.from(request.requestedAmount!).plus(fee),
+        );
+      }
       request.confirmedShares = quantity.toString();
       request.expectedCashSettlement = DecimalValue.from(request.requestedAmount!)
         .plus(fee)
@@ -464,6 +611,27 @@ export class CnNavSimulation {
       navTime(event.availableAt) < navTime(request.fillAvailableAt)
     ) {
       return this.reject(event.eventId, 'NAV_DELAYED', '份额可用不能早于确认', event.requestId);
+    }
+    if (request.executionModelSegment) {
+      const confirmationDate = request.confirmationAt
+        ? navLocalDate(request.confirmationAt, this.timezone)
+        : undefined;
+      const earliestDate = confirmationDate
+        ? tradingDateAfter(
+            this.config.calendar,
+            confirmationDate,
+            request.executionModelSegment.execution.sellableAfterConfirmationTradingDays,
+          )
+        : undefined;
+      const eventDate = navLocalDate(event.occurredAt, this.timezone);
+      if (!earliestDate || !eventDate || eventDate < earliestDate) {
+        return this.reject(
+          event.eventId,
+          'NAV_DELAYED',
+          `份额不得早于 ${earliestDate ?? '模型规定日期'} 可用`,
+          event.requestId,
+        );
+      }
     }
     if (request.sharesAvailable)
       return this.reject(event.eventId, 'DUPLICATE_EVENT', '份额可用事件已经应用', event.requestId);
@@ -533,6 +701,28 @@ export class CnNavSimulation {
     ) {
       return this.reject(event.eventId, 'NAV_DELAYED', '现金结算不能早于确认', event.requestId);
     }
+    if (request.executionModelSegment && redemption) {
+      const confirmationDate = request.confirmationAt
+        ? navLocalDate(request.confirmationAt, this.timezone)
+        : undefined;
+      const earliestDate = confirmationDate
+        ? tradingDateAfter(
+            this.config.calendar,
+            confirmationDate,
+            request.executionModelSegment.execution
+              .redemptionReinvestableAfterConfirmationTradingDays,
+          )
+        : undefined;
+      const eventDate = navLocalDate(event.occurredAt, this.timezone);
+      if (!earliestDate || !eventDate || eventDate < earliestDate) {
+        return this.reject(
+          event.eventId,
+          'NAV_DELAYED',
+          `赎回款不得早于 ${earliestDate ?? '模型规定日期'} 可再投资`,
+          event.requestId,
+        );
+      }
+    }
     if (request.cashSettled)
       return this.reject(event.eventId, 'DUPLICATE_EVENT', '现金结算事件已经应用', event.requestId);
     let amount: DecimalValue;
@@ -600,11 +790,15 @@ export class CnNavSimulation {
         event.requestId,
       );
     }
-    if (request.requestType === 'subscribe')
-      this.reservedSubscribeCash = this.reservedSubscribeCash.minus(
-        DecimalValue.from(request.requestedAmount!).plus(request.fee),
-      );
-    else this.reservedRedeemShares = this.reservedRedeemShares.minus(request.requestedShares!);
+    if (request.requestType === 'subscribe') {
+      if (request.executionModelSegment) {
+        this.ledger.releaseCash(`${request.requestId}:cash-reservation`);
+      } else {
+        this.reservedSubscribeCash = this.reservedSubscribeCash.minus(
+          DecimalValue.from(request.requestedAmount!).plus(request.fee),
+        );
+      }
+    } else this.reservedRedeemShares = this.reservedRedeemShares.minus(request.requestedShares!);
     request.status = 'cancelled';
     request.reason = event.reason ?? '请求已取消';
     return this.applied(event.eventId, event.requestId);

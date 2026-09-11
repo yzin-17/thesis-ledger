@@ -94,6 +94,51 @@ describe('SimulationLedger', () => {
     expect(ledger.snapshot().cash.USD).toMatchObject({ settled: '72.8', unsettled: '0' });
   });
 
+  it('uses the requested gross amount for amount-based fills with fractional units', () => {
+    const ledger = new SimulationLedger({
+      executionInstrument: {
+        symbol: 'FUND.CN',
+        market: 'CN',
+        assetType: 'fund',
+        currency: 'CNY',
+      },
+      baseCurrency: 'CNY',
+      initialCash: { CNY: '1000' },
+    });
+    expect(ledger.reserveCash('nav-1:cash-reservation', 'CNY', '12.12')).toMatchObject({
+      accepted: true,
+    });
+    expect(
+      ledger.applyFill({
+        eventId: 'nav-1:fill',
+        fillId: 'nav-1:fill',
+        executionSymbol: 'FUND.CN',
+        side: 'buy',
+        quantity: '0.9230769230769230769230769230769230769231',
+        price: '13',
+        cashDebit: '12',
+        charges: [{ amount: '0.12', currency: 'CNY' }],
+        currency: 'CNY',
+        occurredAt: '2026-09-08T01:30:00Z',
+        availableAt: '2026-09-08T01:30:00Z',
+        cashReservationId: 'nav-1:cash-reservation',
+      }),
+    ).toMatchObject({ applied: true });
+    expect(ledger.snapshot().cash.CNY).toMatchObject({ settled: '1000', unsettled: '-12.12' });
+    expect(
+      ledger.applySettlement({
+        eventId: 'nav-1:settlement',
+        sourceEventId: 'nav-1:fill',
+        kind: 'both',
+        symbol: 'FUND.CN',
+        currency: 'CNY',
+        occurredAt: '2026-09-09T01:30:00Z',
+        availableAt: '2026-09-09T01:30:00Z',
+      }),
+    ).toMatchObject({ applied: true });
+    expect(ledger.snapshot().cash.CNY).toMatchObject({ settled: '987.88', unsettled: '0' });
+  });
+
   it('rejects another instrument, wrong currency and future events without creating FX orders', () => {
     const ledger = new SimulationLedger({ ...config, initialCash: { CNY: '1000' } });
     expect(ledger.applyFill({ ...buy(), executionSymbol: 'MSFT.US' })).toMatchObject({

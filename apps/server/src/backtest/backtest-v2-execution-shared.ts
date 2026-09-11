@@ -13,6 +13,7 @@ import {
   aggregateMinuteBars,
   evaluateIndicator,
   numericExpressionKey,
+  sourceSeriesKey,
   CnNavSimulation,
   expectedCutoffSchedule,
   navRequestFromTargetIntent,
@@ -36,7 +37,12 @@ import {
   type BacktestMinuteBar,
   type TradingCalendar,
 } from '@thesis-ledger/domain';
-import type { RunConfig, StrategySchemaV2 } from '@thesis-ledger/schemas';
+import {
+  executionRuleSnapshotSchema,
+  type ExecutionRuleSnapshot,
+  type RunConfig,
+  type StrategySchemaV2,
+} from '@thesis-ledger/schemas';
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 
 export type RowsByArtifact = ReadonlyMap<string, readonly ArtifactRow[]>;
@@ -208,6 +214,7 @@ const executionBars = (rows: readonly Record<string, unknown>[]) => {
           : stringField(row, 'availableAt'),
       previousCloseAvailableAt,
       open: stringField(row, 'open'),
+      close: stringField(row, 'close'),
       previousClose,
       status: row.quality === 'suspended' ? ('unavailable' as const) : ('available' as const),
       suspended: row.suspended === true,
@@ -240,6 +247,9 @@ const instrumentFact = (row: ArtifactRow): ExecutionInstrumentFact => ({
   occurredAt: stringField(row, 'occurredAt'),
   availableAt: stringField(row, 'availableAt'),
 });
+
+const executionRuleSnapshot = (row: ArtifactRow): ExecutionRuleSnapshot =>
+  executionRuleSnapshotSchema.parse(parseJson(row.executionRules, 'Execution rules'));
 
 const toCorporateAction = (row: ArtifactRow): BacktestCorporateActionFact => {
   const result: BacktestCorporateActionFact = {
@@ -295,7 +305,8 @@ const indicatorSeriesFor = (
     indicatorSeriesFor(expression.input, sourceSeries, output);
     const inputSeries =
       expression.input.type === 'series'
-        ? sourceSeries.get(expression.input.sourceId)
+        ? (sourceSeries.get(sourceSeriesKey(expression.input.sourceId, expression.input.field)) ??
+          sourceSeries.get(expression.input.sourceId))
         : output.get(numericExpressionKey(expression.input));
     if (!inputSeries) return;
     const indicator = evaluateIndicator(expression.name, inputSeries.points, expression.params, {
@@ -353,6 +364,7 @@ export {
   aggregateMinuteBars,
   evaluateIndicator,
   numericExpressionKey,
+  sourceSeriesKey,
   CnNavSimulation,
   expectedCutoffSchedule,
   navRequestFromTargetIntent,
@@ -381,6 +393,7 @@ export type {
 
 export {
   calendarFact,
+  executionRuleSnapshot,
   executionBars,
   fxRatesFrom,
   indicatorSeriesFor,

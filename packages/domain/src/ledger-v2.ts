@@ -10,6 +10,7 @@ export type LedgerEventTypeV2 =
   | 'BUY_EXECUTION'
   | 'SELL_EXECUTION'
   | 'POSITION_BASELINE_OBSERVATION'
+  | 'TRADE_OPENING_BOUNDARY_ASSERTION'
   | 'CASH_BALANCE_OBSERVATION'
   | 'BASELINE_RECONCILIATION'
   | 'BONUS_SHARE'
@@ -109,6 +110,11 @@ export interface LedgerEventPayloadByTypeV2 {
   BUY_EXECUTION: ExecutionPayloadV2;
   SELL_EXECUTION: ExecutionPayloadV2;
   POSITION_BASELINE_OBSERVATION: PositionBaselineObservationPayloadV2;
+  TRADE_OPENING_BOUNDARY_ASSERTION: {
+    symbol: string;
+    tradeId: string;
+    baselineFactId: string;
+  };
   CASH_BALANCE_OBSERVATION: CashBalanceObservationPayloadV2;
   BASELINE_RECONCILIATION: BaselineReconciliationPayloadV2;
   BONUS_SHARE: BonusSharePayloadV2;

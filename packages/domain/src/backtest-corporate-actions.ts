@@ -122,9 +122,6 @@ const validateTimes = (
   if (![occurredAt, availableAt, evaluation].every(Number.isFinite)) {
     return reject(eventId, 'INVALID_TIME', '公司行动时间无效');
   }
-  if (availableAt < occurredAt) {
-    return reject(eventId, 'INVALID_TIME', 'availableAt 不能早于 occurredAt');
-  }
   if (availableAt > evaluation || occurredAt > evaluation) {
     return reject(eventId, 'FUTURE_DATA', '公司行动 fact 尚未达到 evaluationAt');
   }

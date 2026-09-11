@@ -1,17 +1,22 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
+  createTradeOpeningBoundaryAssertionCommandSchemaV2,
   tradeListQuerySchemaV2,
   tradeModeQuerySchemaV2,
   tradeReferenceResolveRequestSchemaV2,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { TradeQueryService } from '../ledger/trade-query.service.js';
+import { TradeOpeningBoundaryCommandService } from '../ledger/trade-opening-boundary-command.service.js';
 
 const accountIdSchema = z.uuid();
 
 @Controller('portfolio/trades')
 export class TradeController {
-  constructor(private readonly trades: TradeQueryService) {}
+  constructor(
+    private readonly trades: TradeQueryService,
+    private readonly openingBoundaries: TradeOpeningBoundaryCommandService,
+  ) {}
 
   @Get()
   list(@Query() query: Record<string, string | undefined>) {
@@ -21,6 +26,14 @@ export class TradeController {
   @Post('resolve-reference')
   resolveReference(@Body() request: unknown) {
     return this.trades.resolveReference(tradeReferenceResolveRequestSchemaV2.parse(request));
+  }
+
+  @Post(':tradeId/opening-boundary')
+  createOpeningBoundary(@Param('tradeId') tradeId: string, @Body() request: unknown) {
+    return this.openingBoundaries.createOpeningBoundary(
+      tradeId,
+      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse(request),
+    );
   }
 
   @Get(':tradeId')

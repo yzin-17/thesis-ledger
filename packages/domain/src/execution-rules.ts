@@ -6,6 +6,7 @@ import type {
   TradingSessionStatus,
   TradingSessionWindow,
 } from './trading-calendar.js';
+import type { FrozenExchangeExecutionModelSegment } from './backtest-execution-model.js';
 
 export type ExecutionSide = 'buy' | 'sell';
 export type ExecutionRuleRejectCode =
@@ -69,6 +70,9 @@ export interface ExecutionRuleFacts {
     reference: 'previousClose';
     maxUpRatio?: string;
     maxDownRatio?: string;
+    rounding?: 'halfUpToTick';
+    minimumDistanceTicks?: number;
+    minimumPriceTicks?: number;
   };
   positionSettlement: { sellableAfterTradingDays: number };
   cashSettlement: {
@@ -121,6 +125,7 @@ export interface ExecutionRuleRejection {
 export interface ExecutionRuleAcceptance {
   accepted: true;
   normalizedQuantity: string;
+  normalizedPrice?: string;
   trace: ExecutionRuleTrace;
 }
 
@@ -238,6 +243,32 @@ const isTickAligned = (value: DecimalValue, tick: DecimalValue) => {
   return value.dividedBy(tick, 0).times(tick).compareTo(value) === 0;
 };
 
+const roundedLimit = (
+  reference: DecimalValue,
+  ratio: string,
+  tick: DecimalValue,
+  direction: 'up' | 'down',
+  minimumDistanceTicks?: number,
+) => {
+  const multiplier =
+    direction === 'up'
+      ? DecimalValue.from('1').plus(ratio)
+      : DecimalValue.from('1').minus(ratio);
+  let limit = reference.times(multiplier).dividedBy(tick, 0).times(tick);
+  if (minimumDistanceTicks !== undefined) {
+    const minimumDistance = tick.times(minimumDistanceTicks.toString());
+    const minimumLimit =
+      direction === 'up' ? reference.plus(minimumDistance) : reference.minus(minimumDistance);
+    if (
+      (direction === 'up' && limit.compareTo(minimumLimit) < 0) ||
+      (direction === 'down' && limit.compareTo(minimumLimit) > 0)
+    ) {
+      limit = minimumLimit;
+    }
+  }
+  return limit;
+};
+
 const dateAfterTradingDays = (
   calendar: TradingCalendar,
   tradingDate: string,
@@ -291,6 +322,13 @@ export class VersionedExecutionRules {
         throw new Error('价格限制比例不能为负数');
       }
     }
+    if (facts.price.rounding === 'halfUpToTick') {
+      for (const ticks of [facts.price.minimumDistanceTicks, facts.price.minimumPriceTicks]) {
+        if (ticks !== undefined && (!Number.isInteger(ticks) || ticks < 1)) {
+          throw new Error('价格限制 tick 参数必须为正整数');
+        }
+      }
+    }
     for (const charge of facts.statutoryCharges) {
       if (DecimalValue.from(charge.rate).isNegative()) throw new Error('市场费率不能为负数');
       if (charge.minimum !== undefined && DecimalValue.from(charge.minimum).isNegative()) {
@@ -309,6 +347,47 @@ export class VersionedExecutionRules {
 
   get instrumentCurrency() {
     return this.facts.instrument.currency;
+  }
+
+  get instrumentFact() {
+    return this.facts.instrument;
+  }
+
+  /** Builds an execution-only rules view without reusing legacy charges. */
+  withExecutionModel(
+    segment: FrozenExchangeExecutionModelSegment,
+    ruleVersion = `execution-model-v1:${segment.id}`,
+  ) {
+    if (segment.execution.calendarMarket !== this.facts.instrument.market) {
+      throw new Error('执行模型日历市场与标的不一致');
+    }
+    if (segment.fees.currency !== this.facts.instrument.currency) {
+      throw new Error('执行模型费用币种与标的不一致');
+    }
+    const price =
+      segment.execution.price.kind === 'dailyLimit'
+        ? {
+            reference: 'previousClose' as const,
+            maxUpRatio: segment.execution.price.maxUpRatio,
+            maxDownRatio: segment.execution.price.maxDownRatio,
+            rounding: 'halfUpToTick' as const,
+            minimumDistanceTicks: segment.execution.price.minimumDistanceTicks,
+            minimumPriceTicks: segment.execution.price.minimumPriceTicks,
+          }
+        : { reference: 'previousClose' as const };
+    return new VersionedExecutionRules({
+      ...this.facts,
+      version: ruleVersion,
+      price,
+      positionSettlement: {
+        sellableAfterTradingDays: segment.execution.sellableAfterTradingDays,
+      },
+      cashSettlement: {
+        buyDebitAfterTradingDays: segment.execution.buyDebitAt === 'fill' ? 0 : 0,
+        sellCreditAfterTradingDays: segment.execution.saleReinvestableAfterTradingDays,
+      },
+      statutoryCharges: [],
+    });
   }
 
   private trace(evaluatedAt: string): ExecutionRuleTrace {
@@ -393,21 +472,57 @@ export class VersionedExecutionRules {
     if (normalizedQuantity === '0') {
       return this.reject(input, 'INVALID_QUANTITY', '数量不足最小交易单位');
     }
-    if (!isTickAligned(rawPrice, DecimalValue.from(this.facts.instrument.tickSize))) {
+    const tick = DecimalValue.from(this.facts.instrument.tickSize);
+    const normalizedPrice = this.normalizePrice(rawPrice);
+    if (!isTickAligned(normalizedPrice, tick)) {
       return this.reject(input, 'INVALID_TICK', '价格不符合最小变动单位', normalizedQuantity);
     }
-    if (!rawPrice.isPositive() || !previousClose.isPositive()) {
+    if (!normalizedPrice.isPositive() || !previousClose.isPositive()) {
       return this.reject(input, 'PRICE_LIMIT', '价格和前收盘价必须为正数', normalizedQuantity);
     }
-    const change = rawPrice.minus(previousClose).dividedBy(previousClose);
-    if (this.facts.price.maxUpRatio && change.compareTo(this.facts.price.maxUpRatio) > 0) {
-      return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
-    }
+    const minimumPriceTicks = this.facts.price.minimumPriceTicks;
     if (
-      this.facts.price.maxDownRatio &&
-      change.compareTo(DecimalValue.from(this.facts.price.maxDownRatio).times('-1')) < 0
+      minimumPriceTicks !== undefined &&
+      normalizedPrice.compareTo(tick.times(minimumPriceTicks.toString())) < 0
     ) {
-      return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
+      return this.reject(input, 'PRICE_LIMIT', '价格低于规则最低 tick', normalizedQuantity);
+    }
+    if (this.facts.price.rounding === 'halfUpToTick') {
+      if (this.facts.price.maxUpRatio) {
+        const upperLimit = roundedLimit(
+          previousClose,
+          this.facts.price.maxUpRatio,
+          tick,
+          'up',
+          this.facts.price.minimumDistanceTicks,
+        );
+        if (normalizedPrice.compareTo(upperLimit) > 0) {
+          return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
+        }
+      }
+      if (this.facts.price.maxDownRatio) {
+        const lowerLimit = roundedLimit(
+          previousClose,
+          this.facts.price.maxDownRatio,
+          tick,
+          'down',
+          this.facts.price.minimumDistanceTicks,
+        );
+        if (normalizedPrice.compareTo(lowerLimit) < 0) {
+          return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
+        }
+      }
+    } else {
+      const change = normalizedPrice.minus(previousClose).dividedBy(previousClose);
+      if (this.facts.price.maxUpRatio && change.compareTo(this.facts.price.maxUpRatio) > 0) {
+        return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
+      }
+      if (
+        this.facts.price.maxDownRatio &&
+        change.compareTo(DecimalValue.from(this.facts.price.maxDownRatio).times('-1')) < 0
+      ) {
+        return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
+      }
     }
     if (input.side === 'sell') {
       const available = DecimalValue.from(input.availableQuantity ?? '0');
@@ -430,7 +545,22 @@ export class VersionedExecutionRules {
         }
       }
     }
-    return { accepted: true, normalizedQuantity, trace };
+    return {
+      accepted: true,
+      normalizedQuantity,
+      ...(this.facts.price.rounding === 'halfUpToTick'
+        ? { normalizedPrice: normalizedPrice.toString() }
+        : {}),
+      trace,
+    };
+  }
+
+  normalizePrice(value: string | DecimalValue) {
+    const price = DecimalValue.from(value);
+    if (this.facts.price.rounding !== 'halfUpToTick') return price;
+    return price
+      .dividedBy(this.facts.instrument.tickSize, 0)
+      .times(this.facts.instrument.tickSize);
   }
 
   settlementDates(side: ExecutionSide, tradingDate: string): SettlementDates {

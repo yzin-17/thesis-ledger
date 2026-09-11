@@ -65,6 +65,7 @@ export interface BacktestAnalyticsInput extends BacktestAnalyticsMetadata {
     prices: readonly BacktestBenchmarkPoint[];
     fxToBase?: readonly BacktestFxPoint[];
   };
+  unavailableReasons?: readonly string[];
 }
 
 export interface BacktestAnalyticsResult {
@@ -421,6 +422,7 @@ const turnoverMetric = (
 
 export const buildBacktestAnalytics = (input: BacktestAnalyticsInput): BacktestAnalyticsResult => {
   const warnings: string[] = [];
+  warnings.push(...(input.unavailableReasons ?? []));
   const equityCurve = normalizedEquity(input, warnings);
   const drawdown = drawdowns(equityCurve);
   const tradeMetrics = tradeMetricRecord(input.trades);
@@ -440,7 +442,7 @@ export const buildBacktestAnalytics = (input: BacktestAnalyticsInput): BacktestA
     warnings.push('BENCHMARK_UNAVAILABLE');
   }
   let completeness: BacktestAnalyticsResult['completeness'] = 'complete';
-  if (equityCurve.length === 0) {
+  if (equityCurve.length === 0 || (input.unavailableReasons?.length ?? 0) > 0) {
     completeness = 'unavailable';
   } else if (
     warnings.length > 0 ||

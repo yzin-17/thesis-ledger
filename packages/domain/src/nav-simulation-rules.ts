@@ -41,7 +41,7 @@ export const navLocalClock = (value: string, timezone: string) => {
   return `${parts.hour}:${parts.minute}:${parts.second}`;
 };
 
-const nextTradingDate = (calendar: TradingCalendar, date: string) => {
+export const nextTradingDate = (calendar: TradingCalendar, date: string) => {
   const cursor = new Date(`${date}T12:00:00Z`);
   if (!Number.isFinite(cursor.getTime())) return undefined;
   for (let index = 0; index < 370; index += 1) {
@@ -50,6 +50,20 @@ const nextTradingDate = (calendar: TradingCalendar, date: string) => {
     if (calendar.isTradingDay(`${candidate}T12:00:00Z`)) return candidate;
   }
   return undefined;
+};
+
+export const tradingDateAfter = (
+  calendar: TradingCalendar,
+  date: string,
+  tradingDays: number,
+) => {
+  if (!Number.isInteger(tradingDays) || tradingDays < 0) return undefined;
+  let current = date;
+  for (let index = 0; index < tradingDays; index += 1) {
+    current = nextTradingDate(calendar, current) ?? '';
+    if (!current) return undefined;
+  }
+  return current;
 };
 
 const localTimestamp = (date: string, clock: string, timezone: string) => {
@@ -93,6 +107,16 @@ const localTimestamp = (date: string, clock: string, timezone: string) => {
     candidate = new Date(candidate.getTime() + target - rendered);
   }
   return undefined;
+};
+
+export const tradingSessionStartAt = (calendar: TradingCalendar, date: string) => {
+  const firstSession = calendar.sessionsForDate(`${date}T12:00:00Z`)[0];
+  if (!firstSession) return undefined;
+  const hours = Math.floor(firstSession.start / 60)
+    .toString()
+    .padStart(2, '0');
+  const minutes = (firstSession.start % 60).toString().padStart(2, '0');
+  return localTimestamp(date, `${hours}:${minutes}`, calendar.timezone);
 };
 
 const clockSeconds = (value: string) => {

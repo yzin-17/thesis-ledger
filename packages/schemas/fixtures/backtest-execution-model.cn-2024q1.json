@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "execution-model-v1",
+  "id": "cn-600519-research-2024q1",
+  "version": "1",
+  "scope": {
+    "symbol": "600519.SH",
+    "market": "CN",
+    "instrumentType": "STOCK",
+    "currency": "CNY",
+    "timezone": "Asia/Shanghai",
+    "range": { "start": "2024-01-02", "end": "2024-03-29" }
+  },
+  "segments": [
+    {
+      "id": "2024q1",
+      "range": { "start": "2024-01-02", "end": "2024-03-29" },
+      "source": {
+        "kind": "researchPreset",
+        "revision": "1",
+        "configuredAt": "2026-09-10T23:49:39+08:00",
+        "description": "首个场景的显式研究模型；契约用例，不是 Provider 事实或已启用生产预设",
+        "references": [
+          "docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md",
+          "docs/benchmarks/2026-09-10-backtest-historical-execution-rule-source-matrix.md"
+        ]
+      },
+      "assumptions": [
+        "佣金双向成交额0.0003，每笔最低CNY 5，包含监管费与经手费",
+        "印花税卖出0.0005，过户费双向0.00001；本模型不设最低额",
+        "每笔每项应用最低额后以CNY两位小数halfUp舍入，再求和",
+        "持仓成交后第一个交易日可卖，成交扣款，卖出成交款当日可再投资",
+        "仅在事实确认适用普通A股价格限制时使用10%模型；历史身份及可交易性未知必须阻止运行"
+      ],
+      "fees": {
+        "currency": "CNY",
+        "rounding": { "mode": "halfUp", "decimalPlaces": 2 },
+        "collection": "perFillPerCharge",
+        "commission": {
+          "treatment": "charged",
+          "side": "both",
+          "basis": "turnover",
+          "currency": "CNY",
+          "rate": "0.0003",
+          "minimum": { "kind": "amount", "amount": "5" }
+        },
+        "stampDuty": {
+          "treatment": "charged",
+          "side": "sell",
+          "basis": "turnover",
+          "currency": "CNY",
+          "rate": "0.0005",
+          "minimum": { "kind": "none" }
+        },
+        "transferFee": {
+          "treatment": "charged",
+          "side": "both",
+          "basis": "turnover",
+          "currency": "CNY",
+          "rate": "0.00001",
+          "minimum": { "kind": "none" }
+        },
+        "regulatoryFee": {
+          "treatment": "includedInCommission",
+          "reason": "研究佣金采用含规费口径"
+        },
+        "handlingFee": { "treatment": "includedInCommission", "reason": "研究佣金采用含规费口径" }
+      },
+      "execution": {
+        "mode": "exchange",
+        "calendarMarket": "CN",
+        "reserveCashAt": "orderAccepted",
+        "buyDebitAt": "fill",
+        "sellableAfterTradingDays": 1,
+        "saleReinvestableAfterTradingDays": 0,
+        "price": {
+          "kind": "dailyLimit",
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.1",
+          "maxDownRatio": "0.1",
+          "rounding": "halfUpToTick",
+          "minimumDistanceTicks": 1,
+          "minimumPriceTicks": 1
+        }
+      }
+    }
+  ]
+}

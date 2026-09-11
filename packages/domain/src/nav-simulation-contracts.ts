@@ -1,4 +1,5 @@
 import type { TradingCalendar } from './trading-calendar.js';
+import type { FrozenExecutionModel } from './backtest-execution-model.js';
 import type {
   SimulationExecutionInstrument,
   SimulationLedgerConfig,
@@ -32,6 +33,8 @@ export interface CnNavSimulationConfig {
   calendarVersion: string;
   cutoffLocalTime: string;
   timeframe: '1d' | '60m' | '30m' | '15m' | '5m' | '1m';
+  executionModel?: FrozenExecutionModel;
+  dataAsOf?: string;
 }
 
 export interface CnNavRequest {

@@ -151,6 +151,7 @@ export const tradeEvidenceSourceResponseSchemaV2 = z
     kind: z.enum([
       'EXECUTION',
       'BASELINE_OBSERVATION',
+      'OPENING_BOUNDARY_ASSERTION',
       'BASELINE_RECONCILIATION',
       'CORPORATE_ACTION',
       'DIVIDEND',

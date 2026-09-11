@@ -1,4 +1,11 @@
 import { DecimalValue } from './decimal.js';
+import {
+  calculateExecutionModelFees,
+  ExecutionModelUnavailableError,
+  resolveExecutionModelSegment,
+  type FrozenExchangeExecutionModelSegment,
+  type FrozenExecutionModel,
+} from './backtest-execution-model.js';
 import type { BacktestCurrency } from './backtest-v2.js';
 import type {
   ExecutionRuleDecision,
@@ -75,7 +82,7 @@ export interface ExchangeChargeBreakdown {
   code: string;
   amount: string;
   currency: ExecutionRuleFacts['instrument']['currency'];
-  source: 'strategy' | 'executionRules';
+  source: 'strategy' | 'executionRules' | 'executionModel';
 }
 
 export interface ExchangeFillPlan {
@@ -85,6 +92,7 @@ export interface ExchangeFillPlan {
   chargeBreakdown: readonly ExchangeChargeBreakdown[];
   settlement: ExchangeSettlementPlan;
   ruleTrace: ExecutionRuleTrace;
+  cashReservation?: { reservationId: string; amount: string; currency: BacktestCurrency };
 }
 
 export interface ExchangeRejectPlan {
@@ -102,6 +110,8 @@ export interface ExchangeMarketSimulationInput {
   account: ExchangeAccountFacts;
   costs: ExchangeCostModel;
   order: ExchangeOrderRequest;
+  executionModel?: FrozenExecutionModel;
+  dataAsOf?: string;
 }
 
 class InvalidExchangeTimeError extends Error {}
@@ -223,9 +233,10 @@ const calculateStrategyCharges = (
   input: ExchangeMarketSimulationInput,
   bar: ExchangeBarFact,
   quantity: string,
+  rawPrice = bar.open,
 ): ReturnType<typeof strategyCharges> | ExchangeRejectPlan => {
   try {
-    return strategyCharges(input.costs, input.order.side, bar.open, quantity, input.currency);
+    return strategyCharges(input.costs, input.order.side, rawPrice, quantity, input.currency);
   } catch (error) {
     return rejectPlan(
       input,
@@ -275,8 +286,9 @@ const prepareBar = (
 const evaluateAtBar = (
   input: ExchangeMarketSimulationInput,
   bar: ExchangeBarFact,
+  rules: VersionedExecutionRules,
 ): ExecutionRuleDecision | ExchangeRejectPlan => {
-  const decision = input.rules.evaluate({
+  const decision = rules.evaluate({
     symbol: input.order.executionSymbol,
     market: input.order.market,
     side: input.order.side,
@@ -408,8 +420,15 @@ export class ExchangeMarketSimulation {
     try {
       return this.planInternal(input);
     } catch (error) {
-      if (!(error instanceof InvalidExchangeTimeError)) throw error;
-      return rejectPlan(input, 'RULE_REJECTED', '输入时间事实无效', ['time.invalid']);
+      if (error instanceof InvalidExchangeTimeError) {
+        return rejectPlan(input, 'RULE_REJECTED', '输入时间事实无效', ['time.invalid']);
+      }
+      if (error instanceof ExecutionModelUnavailableError) {
+        return rejectPlan(input, 'RULE_REJECTED', error.message, [
+          `executionModel=${input.executionModel?.id ?? 'missing'}`,
+        ]);
+      }
+      throw error;
     }
   }
 
@@ -417,30 +436,98 @@ export class ExchangeMarketSimulation {
     const preparation = prepareBar(input);
     if (isRejectPlan(preparation)) return preparation;
     const { bar } = preparation;
-    const decision = evaluateAtBar(input, bar);
+    let rules = input.rules;
+    let modelSegment: FrozenExchangeExecutionModelSegment | undefined;
+    if (input.executionModel) {
+      if (!input.dataAsOf) {
+        return rejectPlan(input, 'RULE_REJECTED', 'execution-model-v1 缺少 dataAsOf', [
+          'executionModel.dataAsOf=missing',
+        ], bar.openedAt);
+      }
+      const segment = resolveExecutionModelSegment<FrozenExchangeExecutionModelSegment>(
+        input.executionModel as FrozenExecutionModel & {
+          segments: readonly FrozenExchangeExecutionModelSegment[];
+        },
+        {
+        expectedVersion: input.executionModel.version,
+        symbol: input.order.executionSymbol,
+        market: input.order.market,
+        instrumentType: input.rules.instrumentFact.instrumentType,
+        currency: input.currency,
+        evaluatedAt: bar.openedAt,
+        dataAsOf: input.dataAsOf,
+        },
+      );
+      if (segment.execution.mode !== 'exchange') {
+        return rejectPlan(input, 'RULE_REJECTED', 'NAV 执行模型不能用于 Exchange', [
+          `executionModel.segment=${segment.id}`,
+        ], bar.openedAt);
+      }
+      modelSegment = segment;
+      rules = input.rules.withExecutionModel(
+        segment,
+        `execution-model-v1:${input.executionModel.id}:${input.executionModel.version}:${segment.id}`,
+      );
+    }
+    const decision = evaluateAtBar(input, bar, rules);
     if (isRuleReject(decision)) return decision;
-    const costs = calculateStrategyCharges(input, bar, decision.normalizedQuantity);
-    if (isRejectPlan(costs)) return costs;
-    const statutory = input.rules.statutoryCharges(input.order.side, costs.turnover.toString());
-    const chargeBreakdown: ExchangeChargeBreakdown[] = [
-      ...(input.costs.commissionRate !== '0' ||
-      (input.costs.minimumCommission?.amount !== undefined &&
-        input.costs.minimumCommission.amount !== '0')
-        ? [
-            {
-              code: 'STRATEGY_COMMISSION',
-              amount: costs.commission.toString(),
-              currency: input.currency,
-              source: 'strategy' as const,
-            },
-          ]
-        : []),
-      ...statutory.map((charge) => ({ ...charge, source: 'executionRules' as const })),
-    ];
+    const initialCosts = calculateStrategyCharges(
+      input,
+      bar,
+      decision.normalizedQuantity,
+      (decision.accepted ? decision.normalizedPrice : undefined) ?? bar.open,
+    );
+    if (isRejectPlan(initialCosts)) return initialCosts;
+    let costs = initialCosts;
+    if (modelSegment && modelSegment.execution.price.kind === 'dailyLimit') {
+      const roundedPrice = rules.normalizePrice(costs.price);
+      const priceDecision = evaluateAtBar(
+        input,
+        { ...bar, open: roundedPrice.toString() },
+        rules,
+      );
+      if (isRuleReject(priceDecision)) return priceDecision;
+      costs = {
+        ...costs,
+        price: roundedPrice,
+        turnover: roundedPrice.times(decision.normalizedQuantity),
+      };
+    }
+    const modelCharges = modelSegment
+      ? calculateExecutionModelFees(modelSegment.fees, {
+          side: input.order.side,
+          turnover: costs.turnover.toString(),
+          currency: input.currency,
+        })
+      : undefined;
+    const statutory = modelSegment
+      ? []
+      : input.rules.statutoryCharges(input.order.side, costs.turnover.toString());
+    const chargeBreakdown: ExchangeChargeBreakdown[] = modelSegment
+      ? modelCharges!.charges.map((charge) => ({ ...charge, source: 'executionModel' as const }))
+      : [
+          ...(input.costs.commissionRate !== '0' ||
+          (input.costs.minimumCommission?.amount !== undefined &&
+            input.costs.minimumCommission.amount !== '0')
+            ? [
+                {
+                  code: 'STRATEGY_COMMISSION',
+                  amount: costs.commission.toString(),
+                  currency: input.currency,
+                  source: 'strategy' as const,
+                },
+              ]
+            : []),
+          ...statutory.map((charge) => ({ ...charge, source: 'executionRules' as const })),
+        ];
     const charges = [...chargeBreakdown.map(({ amount, currency }) => ({ amount, currency }))];
     const cashRequired = costs.turnover
-      .plus(costs.commission)
-      .plus(statutory.reduce((total, charge) => total.plus(charge.amount), DecimalValue.from('0')));
+      .plus(
+        modelCharges?.total ??
+          costs.commission
+            .plus(statutory.reduce((total, charge) => total.plus(charge.amount), DecimalValue.from('0')))
+            .toString(),
+      );
     if (
       input.order.side === 'buy' &&
       DecimalValue.from(input.account.settledCash).compareTo(cashRequired) < 0
@@ -454,7 +541,7 @@ export class ExchangeMarketSimulation {
       );
     }
     const targetDay = input.calendar.status(bar.openedAt);
-    const settlement = input.rules.settlementDates(input.order.side, targetDay.date);
+    const settlement = rules.settlementDates(input.order.side, targetDay.date);
     const fill: SimulationFillRecord = {
       fillId: `${input.order.orderId}:fill`,
       orderId: input.order.orderId,
@@ -478,6 +565,9 @@ export class ExchangeMarketSimulation {
       currency: input.currency,
       occurredAt: fill.occurredAt,
       availableAt: fill.availableAt,
+      ...(modelSegment && input.order.side === 'buy'
+        ? { cashReservationId: `${input.order.orderId}:cash-reservation` }
+        : {}),
     };
     const ledgerSettlements = buildLedgerSettlements(input, ledgerFill, settlement);
     const settlementAvailableAt = ledgerSettlements.reduce(
@@ -502,6 +592,15 @@ export class ExchangeMarketSimulation {
         ledgerSettlements,
       },
       ruleTrace: decision.trace,
+      ...(modelSegment && input.order.side === 'buy'
+        ? {
+            cashReservation: {
+              reservationId: `${input.order.orderId}:cash-reservation`,
+              amount: cashRequired.toString(),
+              currency: input.currency,
+            },
+          }
+        : {}),
     };
   }
 }

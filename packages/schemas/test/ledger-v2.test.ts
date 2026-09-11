@@ -4,6 +4,7 @@ import {
   createCashFlowCommandSchemaV2,
   createCashTransferCommandSchemaV2,
   createExecutionCommandSchemaV2,
+  createTradeOpeningBoundaryAssertionCommandSchemaV2,
   cashFlowPayloadSchemaV2,
   decimalStringSchema,
   legacyMigratedCashTransferEventSchemaV2,
@@ -69,6 +70,23 @@ describe('LedgerEvent V2 契约', () => {
       price: '205.30',
       expectedAt: '2026-08-27T02:30:00.000Z',
     });
+  });
+
+  it('接受精确建仓时间补录事件并保留目标快照引用', () => {
+    const parsed = ledgerEventEnvelopeSchemaV2.parse({
+      ...baseEnvelope,
+      type: 'TRADE_OPENING_BOUNDARY_ASSERTION',
+      revisionAction: 'CREATE',
+      reason: '券商历史账单显示首次买入时间',
+      payload: {
+        symbol: 'AAPL.US',
+        tradeId: 'trade:trade-projection-v1:account-actual:AAPL.US:baseline-1',
+        baselineFactId: baseEnvelope.factId,
+      },
+    });
+
+    expect(parsed.type).toBe('TRADE_OPENING_BOUNDARY_ASSERTION');
+    expect(parsed.payload).toMatchObject({ baselineFactId: baseEnvelope.factId });
   });
 
   it('接受日期级精度和明确经济排序键', () => {
@@ -387,6 +405,50 @@ describe('成交命令契约', () => {
         idempotentReplay: false,
       }).ledgerRevisions[baseEnvelope.accountId],
     ).toBe('9007199254740993');
+  });
+});
+
+describe('建仓时间补录命令契约', () => {
+  const command = {
+    command: 'CREATE_TRADE_OPENING_BOUNDARY_ASSERTION' as const,
+    accountId: baseEnvelope.accountId,
+    occurredAt: baseEnvelope.occurredAt,
+    timePrecision: 'INSTANT' as const,
+    sourceTimezone: baseEnvelope.sourceTimezone,
+    economicOrderKey: 'opening-boundary-1',
+    payload: {
+      symbol: 'AAPL.US',
+      baselineFactId: baseEnvelope.factId,
+    },
+    source: baseEnvelope.source,
+    actorId: baseEnvelope.actorId,
+    reason: '券商历史账单显示首次买入时间',
+  };
+
+  it('接受精确时间和补录依据', () => {
+    expect(createTradeOpeningBoundaryAssertionCommandSchemaV2.parse(command)).toMatchObject({
+      command: 'CREATE_TRADE_OPENING_BOUNDARY_ASSERTION',
+      timePrecision: 'INSTANT',
+    });
+  });
+
+  it('拒绝日期精度、缺少原因或客户端传入 tradeId', () => {
+    expect(() =>
+      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse({
+        ...command,
+        timePrecision: 'DATE',
+        occurredAt: '2026-08-26',
+      }),
+    ).toThrow();
+    expect(() =>
+      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse({ ...command, reason: '' }),
+    ).toThrow();
+    expect(() =>
+      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse({
+        ...command,
+        payload: { ...command.payload, tradeId: 'client-controlled-trade' },
+      }),
+    ).toThrow();
   });
 });
 

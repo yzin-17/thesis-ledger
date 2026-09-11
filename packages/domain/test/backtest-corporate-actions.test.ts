@@ -69,6 +69,49 @@ const seedPosition = (target: SimulationLedger) => {
 };
 
 describe('backtest corporate actions', () => {
+  it('waits until the economic effective time for an action announced in advance', () => {
+    const target = ledger();
+    seedPosition(target);
+    const announcedEarly = fact({
+      occurredAt: '2025-01-10T00:00:00Z',
+      availableAt: '2025-01-03T00:00:00Z',
+    });
+    const result = new DeterministicSimulationEngine().run({
+      runId: 'run-announced-early',
+      strategy: {
+        executionInstrument: instrument,
+        primaryTimeframe: '1d',
+        entry: {
+          type: 'compare',
+          operator: 'lt',
+          left: { type: 'constant', value: '1' },
+          right: { type: 'constant', value: '0' },
+        },
+        exit: {
+          type: 'compare',
+          operator: 'lt',
+          left: { type: 'constant', value: '1' },
+          right: { type: 'constant', value: '0' },
+        },
+      },
+      ticks: [{ occurredAt: '2025-01-03T00:00:00Z' }, { occurredAt: '2025-01-10T00:00:00Z' }],
+      sourceSeries: new Map(),
+      corporateActions: [announcedEarly],
+      corporateActionPort: createCorporateActionPort(target, instrument, 'run-announced-early'),
+    });
+
+    expect(result.corporateActionResults).toHaveLength(1);
+    expect(result.corporateActionResults[0]).toMatchObject({ applied: true, published: true });
+    expect(result.corporateActionResults[0]).toMatchObject({
+      mutation: { fact: { availableAt: announcedEarly.availableAt } },
+    });
+    expect(result.events.find((event) => event.type === 'corporateAction')).toMatchObject({
+      occurredAt: announcedEarly.occurredAt,
+      availableAt: announcedEarly.occurredAt,
+    });
+    expect(target.snapshot().cash.CNY.unsettled).toBe('10');
+  });
+
   it('applies dividend once, rejects future facts, and retries by stable event id', () => {
     const target = ledger();
     seedPosition(target);

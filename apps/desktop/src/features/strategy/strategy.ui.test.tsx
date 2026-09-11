@@ -196,6 +196,7 @@ describe('策略实验工作台 UI 契约', () => {
             stage: 'artifact-read',
             executionAttempt: 2,
             errorSummary: 'Artifact 校验失败',
+            diagnostics: { code: 'DATA_UNAVAILABLE', message: 'Artifact 校验失败' },
           },
         ]}
         strategies={[strategy]}
@@ -211,6 +212,8 @@ describe('策略实验工作台 UI 契约', () => {
     expect(html).toContain('阶段：其他阶段');
     expect(html).toContain('执行次数：2');
     expect(html).toContain('行情文件校验失败');
+    expect(html).toContain('DATA_UNAVAILABLE');
+    expect(html).toContain('查看失败详情');
     expect(html).not.toContain('Artifact 校验失败');
     expect(html).toContain('重试');
   });

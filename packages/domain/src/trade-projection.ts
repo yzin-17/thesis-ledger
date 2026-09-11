@@ -39,6 +39,7 @@ export type TradeProjectionIssueCode =
 export type TradeEvidenceSourceKind =
   | 'EXECUTION'
   | 'BASELINE_OBSERVATION'
+  | 'OPENING_BOUNDARY_ASSERTION'
   | 'BASELINE_RECONCILIATION'
   | 'CORPORATE_ACTION'
   | 'DIVIDEND';
@@ -302,8 +303,9 @@ const addEvidence = (
   trade: MutableTrade,
   event: Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
   kind: TradeEvidenceSourceKind,
+  updateEarliest = true,
 ) => {
-  updateEarliestEvidenceAt(trade, event.occurredAt);
+  if (updateEarliest) updateEarliestEvidenceAt(trade, event.occurredAt);
   if (event.occurredAt === null) addIssue(trade, 'UNKNOWN_TIME');
   if (
     trade.evidenceSources.some((source) => source.eventId === event.eventId && source.kind === kind)
@@ -494,6 +496,31 @@ const processBaseline = (input: {
     if (event.payload.averageCost === undefined) addIssue(trade, 'BASELINE_COST_UNKNOWN');
   }
   return trade;
+};
+
+const processOpeningBoundaryAssertion = (input: {
+  event: Extract<
+    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    { type: 'TRADE_OPENING_BOUNDARY_ASSERTION' }
+  >;
+  trades: MutableTrade[];
+}) => {
+  const { event, trades } = input;
+  const trade = trades.find((candidate) => candidate.id === event.payload.tradeId);
+  if (!trade || event.occurredAt === null) return;
+  if (trade.earliestEvidenceAt !== null && event.occurredAt > trade.earliestEvidenceAt) return;
+  const hasBaseline = trade.sources.some(
+    (source) =>
+      source.source === 'BASELINE_COMPONENT' &&
+      source.factId === event.payload.baselineFactId &&
+      source.quantity.isPositive(),
+  );
+  const hasEntryLeg = trade.sources.some((source) => source.source === 'ENTRY_LEG');
+  if (!hasBaseline || hasEntryLeg) return;
+  addEvidence(trade, event, 'OPENING_BOUNDARY_ASSERTION', false);
+  trade.openingBoundaryKnown = true;
+  trade.openedAt = event.occurredAt;
+  trade.issues.delete('MISSING_OPENING_BOUNDARY');
 };
 
 const processSell = (input: {
@@ -769,6 +796,10 @@ const projectGroup = (input: {
     Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
     { type: 'BASELINE_RECONCILIATION' }
   >[] = [];
+  const pendingOpeningBoundaryAssertions: Extract<
+    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    { type: 'TRADE_OPENING_BOUNDARY_ASSERTION' }
+  >[] = [];
   let current: MutableTrade | undefined;
   for (const event of events) {
     if (event.accountId !== accountId) continue;
@@ -804,6 +835,10 @@ const projectGroup = (input: {
       if (trade) tradesByBaselineFact.set(event.factId, trade);
       continue;
     }
+    if (event.type === 'TRADE_OPENING_BOUNDARY_ASSERTION') {
+      pendingOpeningBoundaryAssertions.push(event);
+      continue;
+    }
     if (event.type === 'BONUS_SHARE' || event.type === 'SPLIT' || event.type === 'MERGE') {
       current = processCorporateAction({ event, current });
       continue;
@@ -816,6 +851,8 @@ const projectGroup = (input: {
       pendingReconciliations.push(event);
     }
   }
+  for (const event of pendingOpeningBoundaryAssertions.sort(compareRevision))
+    processOpeningBoundaryAssertion({ event, trades });
   for (const event of pendingReconciliations)
     processReconciliation({ event, tradesByBaselineFact });
   return trades.map(finalizeTrade);

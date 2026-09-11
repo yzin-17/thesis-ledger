@@ -8,6 +8,7 @@ import { NotificationController } from '../src/notifications/notification.contro
 import { ApiExceptionFilter } from '../src/platform/api-exception.filter.js';
 import { DataQualityController } from '../src/quality/data-quality.controller.js';
 import { LedgerController } from '../src/ledger/ledger.controller.js';
+import { TradeController } from '../src/portfolio/trade.controller.js';
 
 const malformed = (operation: () => unknown) => {
   try {
@@ -95,6 +96,16 @@ describe('HTTP runtime validation', () => {
 
     expect(() => controller.createExecution({ command: 'CREATE_EXECUTION' })).toThrow(z.ZodError);
     expect(commands.createExecution).not.toHaveBeenCalled();
+  });
+
+  it('Trade 建仓时间补录在进入服务前拒绝 malformed body', () => {
+    const service = { createOpeningBoundary: vi.fn() };
+    const controller = new TradeController({} as never, service as never);
+
+    expect(() =>
+      controller.createOpeningBoundary('trade-id', { command: 'CREATE_EXECUTION' }),
+    ).toThrow(z.ZodError);
+    expect(service.createOpeningBoundary).not.toHaveBeenCalled();
   });
 
   it('Ledger 查询在 Controller 层拒绝非法 Revision，避免把字符串直接交给数据库', () => {

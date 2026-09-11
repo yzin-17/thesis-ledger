@@ -68,6 +68,9 @@ export interface SimulationLedgerFill {
   currency: BacktestCurrency;
   occurredAt: string;
   availableAt: string;
+  /** Gross cash amount for amount-based fills such as NAV subscriptions. */
+  cashDebit?: string;
+  cashReservationId?: string;
 }
 
 export interface SimulationSettlement {
@@ -119,6 +122,14 @@ export interface RejectedLedgerMutation {
 }
 
 export type LedgerMutationResult = AppliedLedgerMutation | RejectedLedgerMutation;
+
+export type CashReservationResult =
+  | { accepted: true; reservationId: string; amount: string; currency: BacktestCurrency }
+  | {
+      accepted: false;
+      code: 'DUPLICATE_EVENT' | 'INSUFFICIENT_CASH' | 'CURRENCY_MISMATCH' | 'INVALID_AMOUNT';
+      reason: string;
+    };
 
 export class SimulationLedgerError extends Error {
   constructor(
@@ -192,6 +203,11 @@ export class SimulationLedger {
 
   private readonly appliedFills = new Set<string>();
 
+  private readonly cashReservations = new Map<
+    string,
+    { amount: DecimalValue; currency: BacktestCurrency }
+  >();
+
   private positionCostBasis: DecimalValue;
 
   private readonly position: SimulationPosition;
@@ -247,7 +263,45 @@ export class SimulationLedger {
   availableCash(currency: BacktestCurrency) {
     const balance = this.cashBalances[currency];
     const pendingDebit = this.pendingDebits[currency];
-    return DecimalValue.from(balance.settled).minus(pendingDebit).toString();
+    const reserved = [...this.cashReservations.values()]
+      .filter((reservation) => reservation.currency === currency)
+      .reduce((total, reservation) => total.plus(reservation.amount), DecimalValue.from('0'));
+    return DecimalValue.from(balance.settled).minus(pendingDebit).minus(reserved).toString();
+  }
+
+  reserveCash(
+    reservationId: string,
+    currency: BacktestCurrency,
+    amount: string,
+  ): CashReservationResult {
+    if (this.cashReservations.has(reservationId)) {
+      return { accepted: false, code: 'DUPLICATE_EVENT', reason: '现金占款标识已经存在' };
+    }
+    if (currency !== this.position.currency) {
+      return { accepted: false, code: 'CURRENCY_MISMATCH', reason: '现金占款币种与执行标的不一致' };
+    }
+    let value: DecimalValue;
+    try {
+      value = parseAmount(amount, '现金占款');
+    } catch (error) {
+      return {
+        accepted: false,
+        code: 'INVALID_AMOUNT',
+        reason: error instanceof Error ? error.message : '现金占款金额无效',
+      };
+    }
+    if (!value.isPositive()) {
+      return { accepted: false, code: 'INVALID_AMOUNT', reason: '现金占款金额必须为正数' };
+    }
+    if (DecimalValue.from(this.availableCash(currency)).compareTo(value) < 0) {
+      return { accepted: false, code: 'INSUFFICIENT_CASH', reason: '可用现金不足，不能重复占款' };
+    }
+    this.cashReservations.set(reservationId, { amount: value, currency });
+    return { accepted: true, reservationId, amount: value.toString(), currency };
+  }
+
+  releaseCash(reservationId: string) {
+    return this.cashReservations.delete(reservationId);
   }
 
   applyEvent(event: SimulationLedgerEvent, evaluationAt?: string): LedgerMutationResult {
@@ -357,6 +411,7 @@ export class SimulationLedger {
         dividend.occurredAt,
         dividend.availableAt,
         evaluationAt,
+        true,
       );
       if (availability) return availability;
       this.assertFillIdentity(dividend);
@@ -398,6 +453,7 @@ export class SimulationLedger {
         split.occurredAt,
         split.availableAt,
         evaluationAt,
+        true,
       );
       if (availability) return availability;
       this.assertFillIdentity(split);
@@ -431,9 +487,27 @@ export class SimulationLedger {
     price: DecimalValue,
     charges: DecimalValue,
   ): LedgerMutationResult {
-    const gross = quantity.times(price);
+    const gross =
+      fill.cashDebit === undefined
+        ? quantity.times(price)
+        : parseAmount(fill.cashDebit, '成交扣款');
+    if (!gross.isPositive()) {
+      return this.rejection(fill.eventId, 'INVALID_AMOUNT', '成交扣款必须为正数');
+    }
     const debit = gross.plus(charges);
-    if (DecimalValue.from(this.availableCash(fill.currency)).compareTo(debit) < 0) {
+    if (fill.cashReservationId !== undefined) {
+      const reservation = this.cashReservations.get(fill.cashReservationId);
+      if (!reservation) {
+        return this.rejection(fill.eventId, 'SETTLEMENT_SOURCE_NOT_FOUND', '成交缺少现金占款');
+      }
+      if (reservation.currency !== fill.currency) {
+        return this.rejection(fill.eventId, 'CURRENCY_MISMATCH', '现金占款币种与成交不一致');
+      }
+      if (reservation.amount.compareTo(debit) < 0) {
+        return this.rejection(fill.eventId, 'INSUFFICIENT_CASH', '现金占款不足以覆盖成交扣款');
+      }
+      this.cashReservations.delete(fill.cashReservationId);
+    } else if (DecimalValue.from(this.availableCash(fill.currency)).compareTo(debit) < 0) {
       return this.rejection(fill.eventId, 'INSUFFICIENT_CASH', '执行币种已结算现金不足');
     }
     this.pendingDebits[fill.currency] = this.pendingDebits[fill.currency].plus(debit);
@@ -512,6 +586,7 @@ export class SimulationLedger {
     occurredAt: string,
     availableAt: string,
     evaluationAt: string,
+    allowKnowledgeBeforeOccurrence = false,
   ): RejectedLedgerMutation | undefined {
     const occurred = Date.parse(occurredAt);
     const available = Date.parse(availableAt);
@@ -519,7 +594,7 @@ export class SimulationLedger {
     if (![occurred, available, evaluation].every(Number.isFinite)) {
       return this.rejection(eventId, 'INVALID_TIME', 'Simulation Event 时间无效');
     }
-    if (available < occurred) {
+    if (!allowKnowledgeBeforeOccurrence && available < occurred) {
       return this.rejection(eventId, 'INVALID_TIME', 'availableAt 不能早于 occurredAt');
     }
     if (occurred > evaluation) {

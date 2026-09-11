@@ -1,5 +1,9 @@
 # 统一回测 V2 T13 性能与功能基线
 
+> 2026-09-11 当前结论：固定 CN 股票日频场景已完成真实买卖闭环、同 Snapshot 重放、账户隔离、Artifact 缺失/恢复复验及 Browser 三条展示链路；Provider `executionRules.unavailable` 已由显式研究模型边界有界收敛。该局部证据不覆盖完整目标市场、资产与周期，因此 V2 T13 保持未完成。下文按阶段保留原测试、失败与“可勾选”等当时判断，当前状态以末尾最新复验及本说明为准。
+>
+> 普通回测已改为可信、可复现的策略研究。客户级历史凭证、收费协议与提现档案不再是前置，但关键价格、公司行为、持仓/现金约束仍需齐备；固定 CN 股票日频场景的新模型与按需门禁已实现并取得真实运行及 Browser 局部证据，但完整目标市场、资产、周期及其浏览器展示仍待验收，不能把历史失败改写为通过。见[规则增量 Spec](../specs/2026-09-10-backtest-historical-execution-rule-facts.md)与[Task](../tasks/2026-09-10-backtest-historical-execution-rule-facts.md)。已有 CN 日频局部证据不代表完整目标市场/资产/周期。
+
 ## 范围
 
 本报告先记录 T13 第一阶段可在本地、无数据库和无真实 Provider 条件下复现的基线，随后补充真实 Worker、Docker、DSA Provider、数据库迁移与账户隔离运行态证据。两类证据分别标注，不以离线 workload 替代真实运行态结论。
@@ -114,3 +118,25 @@
 - 本次真实回测即时前后哈希严格一致：`AccountLedgerState` 1=`4e7acffd...`、`JournalEntry` 0=`d41d8c...`、`LedgerEvent` 1=`31d6eae...`、`PortfolioSnapshot` 9=`78dd2f7a...`、`Trade` 1=`9d4e545...`。较早的 `PortfolioSnapshot` 基线曾因后台运行时更新变化，但本次即时前后快照严格一致。
 - 真实成功结果 `completeness=partial`，必须展示“可卖持仓不足”警告；策略快速退出遇到 CN T+1，证据证明买入成交闭环，不证明闭合卖出交易或完整收益闭环。
 - 最终 T13 结论：跨仓 Golden/capability、隔离、迁移、共享 snapshot volume、取消、崩溃后 retry、Artifact 故障恢复、性能与 RSS 证据已覆盖，T13 可勾选。未支持范围仍需未来单独完成 Provider/PIT 与真实运行态验收。
+
+## R01–R10 后当前版本真实运行态复验（2026-09-10）
+
+- 在不删除 volume、不清理业务数据的前提下重建并替换 DSA、Server、Worker。DSA 当前镜像 ID 为 `30a5e24076cd`，Server/Worker 共享镜像 ID `c3d7dc60e09a`；三个容器及 PostgreSQL、Redis 均为 `healthy`。Server/Worker 均挂载同一个 `thesis-ledger-backtest-data:/app/var/backtest`。
+- 当前工作树同时存在未完成的 `trade-opening-boundary` 改动，其 Server build 出现独立 TypeScript 错误。为避免修改或回退该组用户改动，本次 Server/Worker 镜像从隔离临时上下文构建：保留统一回测 V2 当前改动，只排除该未完成改动。DSA 镜像直接从当前 DSA 工作树构建。
+- 新建真实验收策略版本 `4b01aa1c-6efb-465f-aaf0-f256e6f5c530`，标的为 `600519.SH`、CN STOCK、1d，固定买入 100 股，并以 `holdingPeriods >= 1` 作为退出条件，避免把买入当日的 CN T+1 拒绝误当作闭合交易。
+- Run `145d7946-296a-4323-a1f7-f7676ee453ae` 使用 `2024-01-02` 至 `2024-03-29` 和 `dataAsOf=2026-09-10T16:55:00+08:00`。真实 DSA 已返回 68 条 raw bar，但 Instrument Fact 中 `executionRules.status=unavailable`，原因为“缺少覆盖请求历史区间的价格限制、法定收费与结算规则事实”。Server 因此在 Snapshot Builder 阶段以 `failed/DATA_UNAVAILABLE` 收敛，`snapshotId=null`，未投递 Worker，也未生成可用于检验闭合买卖、完整权益曲线或结果完整度的 Result。
+- 该失败证明 R02/R06 的缺事实失败关闭已在真实运行态生效，但不构成成功纵向验收。当前版本的主要阻塞已从“旧镜像未重验”收敛为“DSA 没有可覆盖请求历史区间的版本化执行规则事实”；在完成必要事实、显式规则模型及对应成功复验前，T13 继续保持未完成；客户级档案已不作为前置。
+- 运行前后真实账户表计数与内容哈希严格一致：`AccountLedgerState` 1=`a94d31146c81beadea002de6b6a7099d`、`JournalEntry` 0=`d41d8cd98f00b204e9800998ecf8427e`、`LedgerEvent` 1=`985f08030a316f3a9b3958dcddd4211f`、`PortfolioSnapshot` 15=`9159bebb442980239e412abfe2aa9af7`、`Trade` 1=`52355a08eee0f7efdd0e906af5d4509f`。这证明本次失败路径没有污染真实账户，但不能替代成功 Run 的隔离验收。
+
+## T4 固定场景真实闭环复验（2026-09-11）
+
+- 环境：DSA 镜像 `30a5e24076cd`；Server/Worker 同镜像 `bcae3816afa9`，共享 `thesis-ledger-backtest-data:/app/var/backtest`；PostgreSQL、Redis、DSA、Server、Worker 最终均为 `healthy`。未执行 migration、volume/数据删除或缓存清理。
+- 实现缺口与定向验证：Builder 仅在执行标的已有完整、显式研究模型时，以模型替代 Provider 内嵌 execution rules 门禁；其他关键事实保护不变。Snapshot Builder/模型快照 2 文件、13 项测试、Server build 及 boundaries 通过。
+- 真实 Run：`runId=40f04c1f-12a5-4456-8413-c435f0292eed`，`snapshotId=8d8d15f58f9f24a2cbbb75d43872e4cd409b2a5270d12d3c4c1921034b3f3523`，`resultChecksum=d15e188e03109748`。模型哈希为 `0b6ac70a935bf63b1a79b1358ce5853624dce4892d6cc03d26a0565b953a5cdf`，Instrument Facts/Bar Artifact 哈希分别为 `3ca395e617ee8afebf5a160d26cb1457efdce2c664875d0ba2a88c5e4db07f17` 与 `fd9300bb7ca209ce5365556e1fe7e6166932d02ed6cdae39c90f1dcfd256d412`。
+- 成交与权益：结果 `succeeded/completeness=partial`，买入 1 次、卖出 1 次、闭合交易 1 个、日权益点 58 个。同一 finalized Snapshot 在 Worker 内直接重放得到相同 snapshotId、checksum、2 个 fill 和 1 个闭合交易。
+- 成功运行隔离：前后只读指纹完全一致，`AccountLedgerState` 1=`4e7acffda11e61457079412943ba3cf5`、`JournalEntry` 0=`d41d8cd98f00b204e9800998ecf8427e`、`LedgerEvent` 1=`31d6eae0cb2c43bc9216aef03d02b111`、`PortfolioSnapshot` 15=`178a8bfc3d5f119a7d17231ca35cf5be`、`Trade` 1=`9d4e545b32c08d21784cd59d75edeaa1`。
+- 故障恢复：execution Artifact 临时缺失时连续两次重放均稳定失败为 `ARTIFACT_NOT_FOUND`；恢复文件后重放 checksum 回到 `d15e188e03109748`，fillCount=2。未重启服务。
+- 浏览器复验：保持原有 healthy 服务和 `[::1]:5173` 监听不变，以 `pnpm --filter @thesis-ledger/desktop dev --host 0.0.0.0 --port 5174 --strictPort` 启动临时 Desktop Vite；in-app Browser 成功打开 `http://127.0.0.1:5174/strategy` 并连接现有 API。固定 fixture JSON 成功解析，范围、来源、版本和假设可见，显式确认后显示“已确认执行模型”。
+- 成功与失败披露：真实成功结果显示 `completeness=partial`、模型哈希 `0b6ac70a935bf63b1a79b1358ce5853624dce4892d6cc03d26a0565b953a5cdf`、58 个权益点、1 笔闭合交易、`resultChecksum=d15e188e03109748` 与 snapshotId `8d8d15f58f9f24a2cbbb75d43872e4cd409b2a5270d12d3c4c1921034b3f3523`。失败 Run `145d7946-296a-4323-a1f7-f7676ee453ae` 的详情显示 `DATA_UNAVAILABLE`、缺少覆盖历史区间的规则事实及 `snapshot` 路径；页面时间与只读 API 记录精确对应。
+- 进程边界：Browser 验证后已关闭临时标签并停止 5174 Vite，端口不再监听；原 5173 进程未重启或中断，也未修改业务代码、服务配置或数据。
+- 当前结论：固定 CN 股票场景的 T4 运行态与 Browser 三链路证据均已完整，T4 已勾选；完整目标市场、资产与周期仍未全部通过，V2 T13 保持未勾选。

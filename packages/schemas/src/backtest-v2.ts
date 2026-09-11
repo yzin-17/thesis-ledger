@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import {
+  backtestExecutionModelSchema,
+  executionModelRunIssues,
+  executionModelDisclosureSchema,
+} from './backtest-execution-model.js';
+import {
   decimalStringSchema,
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
@@ -511,9 +516,15 @@ export const runConfigSchemaV2 = z
     baseCurrency: backtestCurrencySchema,
     initialCash: initialCashSchema,
     valuationPolicy: portfolioValuationPolicySchema,
+    executionModel: backtestExecutionModelSchema.optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
+    if (value.executionModel) {
+      for (const error of executionModelRunIssues(value.executionModel, value)) {
+        issue(ctx, ['executionModel', ...error.path], error.message);
+      }
+    }
     if (value.startDate > value.endDate)
       issue(ctx, ['endDate'], 'startDate 必须早于或等于 endDate');
     if (
@@ -571,6 +582,7 @@ export const backtestRunResponseSchemaV2 = z
     snapshotId: z.string().trim().min(1).nullable().optional(),
     errorCode: z.string().trim().min(1).nullable().optional(),
     errorSummary: z.string().nullable().optional(),
+    executionModelDisclosure: executionModelDisclosureSchema.optional(),
   })
   .passthrough();
 export type BacktestRunResponseV2 = z.infer<typeof backtestRunResponseSchemaV2>;
@@ -670,6 +682,7 @@ export const backtestResultSchemaV2 = z
     contentHash: z.string().trim().min(1),
     resultChecksum: z.string().trim().min(1),
     completeness: z.enum(['complete', 'partial', 'unavailable']),
+    executionModelDisclosure: executionModelDisclosureSchema.optional(),
     warnings: z.array(z.string()),
     rejectedOrders: z.array(rejectedBacktestOrderSchema),
     rejectedNavRequests: z.array(rejectedBacktestOrderSchema).optional(),
@@ -720,9 +733,9 @@ export type BacktestErrorCode = (typeof backtestErrorCodes)[number];
 export const backtestErrorSchemaV2 = backtestErrorSchema;
 
 export interface StrategyRunConfigValidationError {
-  code: 'INSUFFICIENT_CASH';
+  code: 'INSUFFICIENT_CASH' | 'INVALID_SCHEMA';
   message: string;
-  path: ['runConfig', 'initialCash', BacktestCurrency];
+  path: (string | number)[];
 }
 
 export interface StrategyRunConfigValidationResult {
@@ -741,12 +754,23 @@ export const validateStrategyRunConfig = (
 ): StrategyRunConfigValidationResult => {
   const executionCurrency = currencyForMarket[strategy.executionInstrument.market];
   const amount = runConfig.initialCash[executionCurrency];
-  if (amount !== undefined && decimalIsPositive(amount)) {
-    return { valid: true, errors: [] };
-  }
+  const errors: StrategyRunConfigValidationError[] = runConfig.executionModel
+    ? executionModelRunIssues(
+        runConfig.executionModel,
+        runConfig,
+        strategy.executionInstrument,
+      ).map((error) => ({
+        code: 'INVALID_SCHEMA',
+        path: ['runConfig', 'executionModel', ...error.path],
+        message: error.message,
+      }))
+    : [];
+  if (amount !== undefined && decimalIsPositive(amount))
+    return { valid: errors.length === 0, errors };
   return {
     valid: false,
     errors: [
+      ...errors,
       {
         code: 'INSUFFICIENT_CASH',
         path: ['runConfig', 'initialCash', executionCurrency],

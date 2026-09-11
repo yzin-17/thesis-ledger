@@ -67,6 +67,7 @@ const actionFactor = (
   point: BacktestSeriesPoint,
   action: CorporateActionForSeries,
   points: readonly BacktestSeriesPoint[],
+  cashDividendReferencePoints: readonly BacktestSeriesPoint[],
 ) => {
   if (time(action.occurredAt) <= time(point.occurredAt)) return DecimalValue.from('1');
   if (action.type === 'SPLIT' || action.type === 'REVERSE_SPLIT') {
@@ -74,7 +75,7 @@ const actionFactor = (
   }
   const cashAmount = action.cashAmount;
   if (cashAmount === undefined) throw new Error('现金分红缺少 cashAmount');
-  const previous = [...points]
+  const previous = [...cashDividendReferencePoints]
     .filter(
       (candidate) =>
         candidate.value !== undefined && time(candidate.occurredAt) < time(action.occurredAt),
@@ -96,6 +97,7 @@ export const buildSeriesVariantsAt = (
   series: Omit<BacktestSeries, 'adjusted'> & { adjusted?: boolean },
   actions: readonly CorporateActionForSeries[],
   evaluationAt: string,
+  options: { cashDividendReferencePoints?: readonly BacktestSeriesPoint[] } = {},
 ): SeriesVariants => {
   const evaluationTime = time(evaluationAt);
   const raw: BacktestSeries = {
@@ -112,7 +114,10 @@ export const buildSeriesVariantsAt = (
       };
     }),
   };
-  const knownActions = actions.filter((action) => time(action.availableAt) <= evaluationTime);
+  const knownActions = actions.filter(
+    (action) =>
+      time(action.availableAt) <= evaluationTime && time(action.occurredAt) <= evaluationTime,
+  );
   const adjustedPoints = raw.points.map((point) => {
     if (point.value === undefined || point.status === 'unavailable') return point;
     const applicable = knownActions.filter(
@@ -122,7 +127,15 @@ export const buildSeriesVariantsAt = (
         action.assetType === series.assetType,
     );
     const factor = applicable.reduce(
-      (current, action) => current.times(actionFactor(point, action, raw.points)),
+      (current, action) =>
+        current.times(
+          actionFactor(
+            point,
+            action,
+            raw.points,
+            options.cashDividendReferencePoints ?? raw.points,
+          ),
+        ),
       DecimalValue.from('1'),
     );
     return copyPoint(point, DecimalValue.from(point.value).times(factor).toString());

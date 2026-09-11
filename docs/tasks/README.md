@@ -5,7 +5,7 @@
 ## 仍在实施或待完成
 
 - [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
-- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（T00 已完成，受统一回测 V2 前置门禁阻塞）
+- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（T00 已完成，按 G1/G2/G3 推进，真实运行待验收）
 - [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
@@ -22,7 +22,7 @@
 - [巨型组件拆分与请求层统一](2026-08-23-large-component-split.md)
 - [风险中心 AB 组合交互](2026-08-23-risk-center-interaction.md)
 - [研究助手任务工作台](2026-08-25-ai-research-workbench.md)
-- [策略实验工作台](2026-08-25-strategy-lab-workbench.md)
+- [策略实验工作台](../archive/tasks/2026-08-25-strategy-lab-workbench.md)（已归档，保留历史证据入口）
 - [现金账户资金范围与内部划转](2026-08-30-cash-account-funding-and-transfer.md)
 - [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)
 - [现金页面 UI 优化](2026-09-03-cash-page-ui-optimization.md)

@@ -36,6 +36,13 @@ import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { Metric } from '../shared/DesktopPrimitives.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { schemaAsOf, schemaSymbols, latestVersion } from './strategy.schema.js';
+import {
+  BacktestRunDisclosure,
+  completenessLabel,
+  diagnosticText,
+  localizeBacktestMessage,
+} from './BacktestModelDisclosure.js';
+export { completenessLabel } from './BacktestModelDisclosure.js';
 import type {
   BacktestJob,
   BacktestJobSummary,
@@ -86,16 +93,6 @@ export const metricNumber = (value: unknown) => {
   return decimalNumber(value);
 };
 
-export const completenessLabel = (value: unknown) => {
-  if (value === 'complete') return '完整';
-  if (value === 'partial') return '部分完整';
-  if (value === 'unavailable') return '不可用';
-  if (value && typeof value === 'object') {
-    return (value as { complete?: unknown }).complete === true ? '完整' : '存在缺失数据';
-  }
-  return '不可用';
-};
-
 export const formatBacktestMetric = (metric: unknown, percent = true) => {
   const value = metricNumber(metric);
   if (value !== null) return percent ? `${(value * 100).toFixed(2)}%` : String(value);
@@ -123,26 +120,6 @@ export const backtestStageLabel = (stage: unknown) => {
   return labels[stage] ?? '其他阶段';
 };
 
-const localizeBacktestMessage = (value: unknown) => {
-  if (typeof value !== 'string' || !value.trim()) return null;
-  const message = value.trim();
-  if (/^Artifact not found:/iu.test(message)) {
-    return message.replace(/^Artifact not found:/iu, '行情文件缺失：');
-  }
-  if (/^Artifact is corrupt/iu.test(message)) {
-    return message.replace(/^Artifact is corrupt/iu, '行情文件损坏');
-  }
-  if (/invalid parquet magic/iu.test(message)) return '行情文件格式无效。';
-  if (/content hash mismatch/iu.test(message)) return '行情文件内容校验和不匹配。';
-  if (/no space left on device/iu.test(message)) return '存储空间不足。';
-  const translated = message
-    .replace(/\bArtifact\b/gu, '行情文件')
-    .replace(/\bSnapshot\b/gu, '快照')
-    .replace(/\bRun\b/gu, '任务');
-  const normalized = translated.replace(/行情文件\s+/u, '行情文件');
-  return /[\u4e00-\u9fff]/u.test(normalized) ? normalized : '任务执行失败，请查看诊断码。';
-};
-
 export const tradeSideLabel = (side: unknown) => {
   if (side === 'buy') return '买入';
   if (side === 'sell') return '卖出';
@@ -159,15 +136,6 @@ export const tradeReasonLabel = (reason: unknown) => {
   };
   if (typeof reason !== 'string' || !reason) return '未配置';
   return labels[reason] ?? '其他原因';
-};
-
-const diagnosticText = (value: unknown) => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const diagnostic = value as { code?: unknown; message?: unknown };
-  const code = typeof diagnostic.code === 'string' ? diagnostic.code : null;
-  const message = localizeBacktestMessage(diagnostic.message);
-  if (code && message) return `${code}：${message}`;
-  return message ?? code;
 };
 
 const backtestWarningKey = (value: string) => value.trim().replace(/[。；;]+$/u, '');
@@ -496,7 +464,7 @@ export function StrategyJobs({
                 const progress =
                   typeof job.progress === 'number' ? Math.max(0, Math.min(100, job.progress)) : 0;
                 const terminal = ['succeeded', 'failed', 'cancelled'].includes(job.status);
-                const diagnostic = diagnosticText(job.diagnostics);
+                const diagnostic = localizeBacktestMessage(diagnosticText(job.diagnostics));
                 const errorSummary = localizeBacktestMessage(job.errorSummary);
                 return (
                   <tr key={job.id}>
@@ -518,6 +486,13 @@ export function StrategyJobs({
                         {job.cancelRequestedAt ? '正在取消' : jobStatusLabel(job.status)}
                       </Badge>
                       {errorSummary && <span>{errorSummary}</span>}
+                      {job.errorCode && <span>{job.errorCode}</span>}
+                      {job.executionModelDisclosure && (
+                        <span>
+                          已选模型：{job.executionModelDisclosure.model.id} ·{' '}
+                          {job.executionModelDisclosure.model.version}
+                        </span>
+                      )}
                       {diagnostic && diagnostic !== errorSummary && <span>{diagnostic}</span>}
                       {job.stage && <span>阶段：{backtestStageLabel(job.stage)}</span>}
                       {(job.executionAttempt ?? job.attempt) !== undefined && (
@@ -566,10 +541,10 @@ export function StrategyJobs({
                             取消
                           </Button>
                         )}
-                        {job.status === 'succeeded' && (
+                        {(job.status === 'succeeded' || job.status === 'failed') && (
                           <Button size="sm" variant="ghost" onClick={() => onViewResult(job)}>
                             <Eye data-icon="inline-start" />
-                            查看结果
+                            {job.status === 'failed' ? '查看失败详情' : '查看结果'}
                           </Button>
                         )}
                         {job.mode === 'V2' && job.status === 'failed' && onRetry && (
@@ -699,6 +674,7 @@ export function StrategyResultDialog({
           </DialogDescription>
         </DialogHeader>
         <div data-testid="backtest-result-scroll" className="min-h-0 overflow-y-auto">
+          {job && <BacktestRunDisclosure job={job} />}
           {!job || !result ? (
             <p className="empty-state">任务尚未生成结果。</p>
           ) : (

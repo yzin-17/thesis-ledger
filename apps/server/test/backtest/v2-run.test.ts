@@ -3,6 +3,7 @@ import { strategySchemaV2, runConfigSchemaV2, type StrategySchemaV2 } from '@the
 import { BacktestService } from '../../src/backtest/backtest.service.js';
 import { BacktestV2RunService } from '../../src/backtest/backtest-v2-run.js';
 import { buildSnapshotManifest, finalizeSnapshotManifest } from '../../src/backtest/backtest-snapshot.js';
+import { BacktestMarketRulesUnavailableError } from '../../src/backtest/backtest-market-rules.js';
 
 const strategy = strategySchemaV2.parse({
   schemaVersion: '2',
@@ -44,6 +45,13 @@ function prismaFor() {
 }
 
 describe('V2 Server Run boundary', () => {
+  it('保留规则不可用的原始原因和诊断码，不进入队列', async () => {
+    const prisma = prismaFor();
+    const reason = '600519.SH 2024-01-02..2024-03-29 historical trading status unavailable';
+    const builder = { build: vi.fn().mockRejectedValue(new BacktestMarketRulesUnavailableError(reason)) };
+    const service = new BacktestV2RunService(prisma as never, undefined, undefined, builder);
+    expect(await service.createRun(request)).toMatchObject({ status: 'failed', errorCode: 'DATA_UNAVAILABLE', errorSummary: reason, diagnostics: { code: 'MARKET_RULES_UNAVAILABLE', message: reason } });
+  });
   it('rejects Desktop bars and records unavailable when no Snapshot Builder is configured', async () => {
     const prisma = prismaFor();
     const service = new BacktestService(prisma as never, undefined, new BacktestV2RunService(prisma as never));

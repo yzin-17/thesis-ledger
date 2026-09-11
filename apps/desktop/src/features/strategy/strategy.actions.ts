@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { runConfigSchemaV2 } from '@thesis-ledger/schemas';
+import { runConfigForV2 } from './strategy.run-config.js';
+export { runConfigForV2 } from './strategy.run-config.js';
 import type { useToastManager } from '@/components/ui/toast';
 
 import type {
@@ -63,49 +64,12 @@ const dataAsOfFromSchema = (schema: StrategySchema) => {
   return Number.isFinite(parsed) ? candidate : new Date().toISOString();
 };
 
-const normalizedDataAsOf = (value: string) => {
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString();
-};
-
 const isV2Strategy = (
   schema: StrategySchema,
 ): schema is StrategySchema & {
   schemaVersion: '2';
   executionInstrument: { market: 'CN' | 'HK' | 'US' };
 } => schema.schemaVersion === '2' && isRecord(schema.executionInstrument);
-
-export const runConfigForV2 = (
-  schema: StrategySchema,
-  setup: BacktestSetupInput,
-): QueueBacktestV2Input['runConfig'] => {
-  const instrument = schema.executionInstrument as { market: 'CN' | 'HK' | 'US' };
-  let currency: 'CNY' | 'HKD' | 'USD' = 'USD';
-  let timezone = 'America/New_York';
-  if (instrument.market === 'CN') {
-    currency = 'CNY';
-    timezone = 'Asia/Shanghai';
-  } else if (instrument.market === 'HK') {
-    currency = 'HKD';
-    timezone = 'Asia/Hong_Kong';
-  }
-  const candidate = {
-    startDate: setup.period.start,
-    endDate: setup.period.end,
-    dataAsOf: normalizedDataAsOf(setup.dataAsOf ?? dataAsOfFromSchema(schema)),
-    baseCurrency: setup.baseCurrency ?? currency,
-    initialCash: { [currency]: String(setup.initialCash) },
-    valuationPolicy: {
-      baseTimezone: timezone,
-      dailyValuationTime: '16:00',
-      pricePolicy: 'latestAvailable',
-      fxPolicy: 'latestAvailable',
-    },
-  };
-  const parsed = runConfigSchemaV2.safeParse(candidate);
-  if (!parsed.success) throw new Error('backtest-run-config-v2');
-  return parsed.data;
-};
 
 const errorToast = (toastManager: ToastManager, title: string, description: string) => {
   toastManager.add({
@@ -266,7 +230,16 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
             runConfig: runConfigForV2(schema, setup),
             idempotencyKey,
           };
-          await queueMutation.mutateAsync(v2Input);
+          const job = await queueMutation.mutateAsync(v2Input);
+          if (job.status === 'failed') {
+            errorToast(
+              toastManager,
+              '回测失败',
+              `${job.errorCode ?? 'DATA_UNAVAILABLE'}：${job.errorSummary ?? '服务端未提供具体原因'}`,
+            );
+            refreshStrategyData();
+            return;
+          }
           toastManager.add({
             title: '回测已排队',
             description: '任务已提交，服务端将按策略版本读取所需数据。',
@@ -322,8 +295,12 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
           timeout: 2800,
         });
         refreshStrategyData();
-      } catch {
-        errorToast(toastManager, '回测排队失败', '请检查策略配置、市场数据和服务连接。');
+      } catch (error) {
+        errorToast(
+          toastManager,
+          '回测排队失败',
+          error instanceof Error ? error.message : '请检查策略配置、市场数据和服务连接。',
+        );
       } finally {
         backgroundPreparationVersionId = null;
         backgroundPreparationIdempotencyKey = null;
