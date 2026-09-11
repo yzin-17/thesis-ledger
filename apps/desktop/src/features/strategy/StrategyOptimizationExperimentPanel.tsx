@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { runConfigSchemaV2, strategySchemaV2, type OptimizationExperimentCreate } from '@thesis-ledger/schemas';
+import {
+  runConfigSchemaV2,
+  strategySchemaV2,
+  type OptimizationExperimentCreate,
+} from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +31,8 @@ import {
 import type { StrategyRecord } from './strategy.types.js';
 
 const optimizationKey = ['desktop', 'strategy', 'optimization'] as const;
-const terminalStatuses = new Set(['succeeded', 'failed', 'cancelled']);
+const settledStatuses = new Set(['awaiting_finalization', 'succeeded', 'failed', 'cancelled']);
+const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 const daysAgo = (days: number) => {
@@ -40,16 +45,17 @@ const addDays = (dateOnly: string, days: number) => {
   date.setUTCDate(date.getUTCDate() + days);
   return isoDate(date);
 };
-const metricText = (candidate: OptimizationCandidate) => {
-  const validation = candidate.metrics?.validation;
+const validationMetricText = (candidate: OptimizationCandidate) => {
+  const validation = candidate.metrics.validation;
   if (!validation || typeof validation !== 'object') return '验证指标不可用';
   const value = validation as Record<string, unknown>;
-  const parts = [
+  return [
     typeof value.totalReturn === 'string' ? `收益 ${value.totalReturn}` : null,
     typeof value.maxDrawdown === 'string' ? `回撤 ${value.maxDrawdown}` : null,
     typeof value.tradeCount === 'number' ? `交易 ${value.tradeCount}` : null,
-  ].filter(Boolean);
-  return parts.join(' · ') || '验证指标不可用';
+  ]
+    .filter(Boolean)
+    .join(' · ') || '验证指标不可用';
 };
 
 export function StrategyOptimizationExperimentPanel({ strategies }: { strategies: StrategyRecord[] }) {
@@ -92,7 +98,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
     queryKey: [...optimizationKey, 'experiments'],
     queryFn: () => fetchOptimizationExperiments(),
     refetchInterval: (query) =>
-      query.state.data?.some((item) => !terminalStatuses.has(item.status)) ? 3_000 : false,
+      query.state.data?.some((item) => !settledStatuses.has(item.status)) ? 3_000 : false,
   });
   const compare = useQuery({
     queryKey: [...optimizationKey, 'compare', selectedExperimentId],
@@ -100,7 +106,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
     enabled: Boolean(selectedExperimentId),
     refetchInterval: (query) => {
       const status = query.state.data?.experiment.status;
-      return status && !terminalStatuses.has(status) ? 3_000 : false;
+      return status && !settledStatuses.has(status) ? 3_000 : false;
     },
   });
 
@@ -109,17 +115,24 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   }, [experiments.data, selectedExperimentId]);
   useEffect(() => {
     if (parameters.data?.length && selectedParameters.length === 0)
-      setSelectedParameters(parameters.data.filter((item) => item.optimizationRange).map((item) => item.parameterId));
+      setSelectedParameters(
+        parameters.data.filter((item) => item.optimizationRange).map((item) => item.parameterId),
+      );
   }, [parameters.data, selectedParameters.length]);
   useEffect(() => {
     const providers = capabilities.data?.providers ?? [];
     if (providers.length > 0 && selectedModels.length === 0)
-      setSelectedModels(providers.slice(0, Math.min(2, providers.length)).map((item) => `${item.provider}:${item.model}`));
+      setSelectedModels(
+        providers.slice(0, Math.min(2, providers.length)).map((item) => `${item.provider}:${item.model}`),
+      );
   }, [capabilities.data?.providers, selectedModels.length]);
 
   const selectedVersion = versions.find((entry) => entry.version.id === strategyVersionId) ?? versions[0];
-  const strategy = selectedVersion?.version.schema ? strategySchemaV2.safeParse(selectedVersion.version.schema) : null;
-  const currency = strategy?.success ? strategy.data.executionInstrument.currency : 'CNY';
+  const parsedStrategy = selectedVersion?.version.schema
+    ? strategySchemaV2.safeParse(selectedVersion.version.schema)
+    : null;
+  const market = parsedStrategy?.success ? parsedStrategy.data.executionInstrument.market : 'CN';
+  const currency = currencyByMarket[market];
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: optimizationKey });
@@ -127,15 +140,17 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   };
 
   const createMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => {
       if (!strategyVersionId) throw new Error('请选择策略版本');
       if (selectedModels.length === 0) throw new Error('至少选择一个模型');
       if (selectedParameters.length === 0) throw new Error('至少授权一个参数');
-      const routes = selectedModels.map((key) => {
+      const models = selectedModels.map((key) => {
         const separator = key.indexOf(':');
         return { provider: key.slice(0, separator), model: key.slice(separator + 1) };
       });
-      const executionModel = executionModelJson.trim() ? (JSON.parse(executionModelJson) as unknown) : undefined;
+      const executionModel = executionModelJson.trim()
+        ? (JSON.parse(executionModelJson) as unknown)
+        : undefined;
       const runConfig = runConfigSchemaV2.parse({
         startDate,
         endDate,
@@ -152,7 +167,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
       });
       const input: OptimizationExperimentCreate = {
         strategyVersionId,
-        models: routes,
+        models,
         allowedParameterIds: selectedParameters,
         objective: { mode: objective, minClosedTrades: 1 },
         split: {
@@ -161,7 +176,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
           test: { start: addDays(validationEnd, 1), end: endDate },
         },
         runConfig,
-        budget: { maxAiCalls: 6, maxBacktestRuns: 20, maxDurationSeconds: 1800 },
+        budget: { maxAiCalls: 6, maxBacktestRuns: 20, maxDurationSeconds: 1_800 },
         maxRounds: 2,
         idempotencyKey: crypto.randomUUID(),
       };
@@ -169,18 +184,17 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
     },
     onSuccess: async (experiment) => {
       setSelectedExperimentId(experiment.id);
-      setFeedback('实验已创建。开发集与验证集会先运行，测试集保持封存。');
+      setFeedback('实验已创建。开发集与验证集先运行，测试集保持封存。');
       await invalidate();
     },
     onError: (error) => setFeedback(error instanceof Error ? error.message : '创建优化实验失败'),
   });
-
   const cancelMutation = useMutation({
     mutationFn: (id: string) => cancelOptimizationExperiment(id),
     onSuccess: invalidate,
   });
   const finalizeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => {
       if (!selectedExperimentId || !preselectedCandidateId || lockedCandidateIds.length === 0)
         throw new Error('请选择进入封存测试的候选，并预选最终候选');
       return finalizeOptimizationExperiment(selectedExperimentId, {
@@ -196,7 +210,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
     onError: (error) => setFeedback(error instanceof Error ? error.message : '封存测试失败'),
   });
   const adoptMutation = useMutation({
-    mutationFn: async (candidate: OptimizationCandidate) => {
+    mutationFn: (candidate: OptimizationCandidate) => {
       if (!selectedExperimentId) throw new Error('未选择实验');
       const baseline = versions.find(
         (entry) => entry.version.id === compare.data?.experiment.baselineStrategyVersionId,
@@ -219,7 +233,11 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
 
   const toggleModel = (key: string) =>
     setSelectedModels((current) =>
-      current.includes(key) ? current.filter((item) => item !== key) : current.length < 3 ? [...current, key] : current,
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : current.length < 3
+          ? [...current, key]
+          : current,
     );
   const toggleParameter = (id: string) =>
     setSelectedParameters((current) =>
@@ -239,18 +257,27 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
       <Card>
         <CardHeader>
           <CardTitle>AI 策略优化</CardTitle>
-          <CardDescription>AI 只负责提出白名单参数候选；排名、硬约束和最终结果只使用真实 V2 回测。</CardDescription>
+          <CardDescription>AI 只提出白名单参数候选；排名、硬约束和最终结果只使用真实 V2 回测。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!capabilities.data?.aiOptimizationEnabled ? <p className="text-sm text-muted-foreground">AI 优化功能当前已关闭。</p> : null}
+          {!capabilities.data?.aiOptimizationEnabled ? (
+            <p className="text-sm text-muted-foreground">AI 优化功能当前已关闭。</p>
+          ) : null}
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="space-y-1 text-sm">
               <span className="text-muted-foreground">基线策略版本</span>
-              <Select value={strategyVersionId} onValueChange={(value) => value && setStrategyVersionId(value)}>
+              <Select
+                value={strategyVersionId}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setStrategyVersionId(value);
+                  setSelectedParameters([]);
+                }}
+              >
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {versions.map(({ strategy: record, version }) => (
-                    <SelectItem key={version.id} value={version.id}>{record.name} · v{version.version}</SelectItem>
+                  {versions.map(({ strategy, version }) => (
+                    <SelectItem key={version.id} value={version.id}>{strategy.name} · v{version.version}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -269,11 +296,13 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             </label>
           </div>
           <div className="space-y-2">
-            <div className="text-sm text-muted-foreground">模型（最多 3 个，严格 Provider + Model，不自动 fallback）</div>
+            <div className="text-sm text-muted-foreground">模型（最多 3 个；严格 Provider + Model，不自动 fallback）</div>
             <div className="flex flex-wrap gap-2">
               {(capabilities.data?.providers ?? []).map((route) => {
                 const key = `${route.provider}:${route.model}`;
-                return <Button key={key} type="button" size="sm" variant={selectedModels.includes(key) ? 'default' : 'outline'} onClick={() => toggleModel(key)}>{key}</Button>;
+                return (
+                  <Button key={key} type="button" size="sm" variant={selectedModels.includes(key) ? 'default' : 'outline'} onClick={() => toggleModel(key)}>{key}</Button>
+                );
               })}
             </div>
           </div>
@@ -281,9 +310,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <div className="text-sm text-muted-foreground">允许 AI 修改的参数</div>
             <div className="flex flex-wrap gap-2">
               {(parameters.data ?? []).map((parameter) => (
-                <Button key={parameter.parameterId} type="button" size="sm" variant={selectedParameters.includes(parameter.parameterId) ? 'default' : 'outline'} onClick={() => toggleParameter(parameter.parameterId)} disabled={!parameter.optimizationRange}>
-                  {parameter.label}
-                </Button>
+                <Button key={parameter.parameterId} type="button" size="sm" variant={selectedParameters.includes(parameter.parameterId) ? 'default' : 'outline'} disabled={!parameter.optimizationRange} onClick={() => toggleParameter(parameter.parameterId)}>{parameter.label}</Button>
               ))}
             </div>
           </div>
@@ -295,9 +322,9 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
           </div>
           <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">初始资金（{currency}）</span><Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} /></label>
-            <label className="space-y-1 text-sm"><span className="text-muted-foreground">执行模型 JSON（可选；需要研究模型的市场请填写）</span><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">执行模型 JSON（可选）</span><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></label>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button disabled={createMutation.isPending || !capabilities.data?.aiOptimizationEnabled} onClick={() => createMutation.mutate()}>{createMutation.isPending ? '创建中…' : '创建优化实验'}</Button>
             {feedback ? <span className="text-sm text-muted-foreground">{feedback}</span> : null}
           </div>
@@ -308,10 +335,14 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         <CardHeader><CardTitle>实验记录</CardTitle><CardDescription>实验可恢复、可取消；测试集在用户锁定候选前不会运行。</CardDescription></CardHeader>
         <CardContent className="space-y-2">
           {(experiments.data ?? []).map((experiment) => (
-            <button key={experiment.id} type="button" className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left hover:bg-muted/40" onClick={() => setSelectedExperimentId(experiment.id)}>
+            <div key={experiment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
               <div><div className="font-medium">{experiment.stage}</div><div className="text-xs text-muted-foreground">AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · 成本 {String(experiment.costUsed)}</div></div>
-              <div className="flex items-center gap-2"><Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>{experiment.status}</Badge>{!terminalStatuses.has(experiment.status) ? <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); cancelMutation.mutate(experiment.id); }}>取消</Button> : null}</div>
-            </button>
+              <div className="flex items-center gap-2">
+                <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>{experiment.status}</Badge>
+                <Button size="sm" variant="outline" onClick={() => setSelectedExperimentId(experiment.id)}>查看</Button>
+                {!settledStatuses.has(experiment.status) ? <Button size="sm" variant="outline" onClick={() => cancelMutation.mutate(experiment.id)}>取消</Button> : null}
+              </div>
+            </div>
           ))}
           {experiments.data?.length === 0 ? <p className="text-sm text-muted-foreground">暂无优化实验。</p> : null}
         </CardContent>
@@ -321,13 +352,21 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         <Card>
           <CardHeader><CardTitle>多模型候选对比</CardTitle><CardDescription>{compare.data.note}</CardDescription></CardHeader>
           <CardContent className="space-y-3">
-            {compare.data.experiment.testExposedAt ? <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">测试集已揭示。若改选原预选候选之外的方案，采纳时会显式记录测试暴露。</div> : null}
+            {compare.data.experiment.testExposedAt ? <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">测试集已揭示。改选原预选候选之外的方案会显式记录测试暴露。</div> : null}
             {compare.data.candidates.map((candidate) => (
               <div key={candidate.id} className="rounded-md border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-medium">候选 {candidate.candidateNumber} · {candidate.modelKey}</div><div className="text-xs text-muted-foreground">{metricText(candidate)} · score {candidate.validationScore ?? '—'}</div></div><Badge variant={candidate.validationStatus.includes('valid') ? 'default' : 'outline'}>{candidate.validationStatus}</Badge></div>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><div className="font-medium">候选 {candidate.candidateNumber} · {candidate.modelKey}</div><div className="text-xs text-muted-foreground">{validationMetricText(candidate)} · score {candidate.validationScore ?? '—'}</div></div>
+                  <Badge variant={candidate.validationStatus.includes('valid') ? 'default' : 'outline'}>{candidate.validationStatus}</Badge>
+                </div>
                 <div className="mt-2 text-xs text-muted-foreground">{candidate.diff.map((item) => `${String(item.label ?? item.parameterId)}: ${String(item.before)} → ${String(item.after)}`).join('；') || '无参数变化'}</div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {compare.data.experiment.stage === 'awaiting_finalization' && candidate.validationStatus === 'valid' ? <><Button size="sm" variant={lockedCandidateIds.includes(candidate.id) ? 'default' : 'outline'} onClick={() => toggleLockedCandidate(candidate.id)}>进入封存测试</Button><Button size="sm" variant={preselectedCandidateId === candidate.id ? 'default' : 'outline'} onClick={() => { setPreselectedCandidateId(candidate.id); if (!lockedCandidateIds.includes(candidate.id)) toggleLockedCandidate(candidate.id); }}>预选最终候选</Button></> : null}
+                  {compare.data.experiment.stage === 'awaiting_finalization' && candidate.validationStatus === 'valid' ? (
+                    <>
+                      <Button size="sm" variant={lockedCandidateIds.includes(candidate.id) ? 'default' : 'outline'} onClick={() => toggleLockedCandidate(candidate.id)}>进入封存测试</Button>
+                      <Button size="sm" variant={preselectedCandidateId === candidate.id ? 'default' : 'outline'} onClick={() => { setPreselectedCandidateId(candidate.id); if (!lockedCandidateIds.includes(candidate.id)) toggleLockedCandidate(candidate.id); }}>预选最终候选</Button>
+                    </>
+                  ) : null}
                   {compare.data.experiment.status === 'succeeded' && candidate.validationStatus === 'test_valid' ? <Button size="sm" disabled={adoptMutation.isPending} onClick={() => adoptMutation.mutate(candidate)}>采纳为正式版本</Button> : null}
                 </div>
               </div>
