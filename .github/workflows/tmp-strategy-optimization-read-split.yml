@@ -1,0 +1,171 @@
+name: Temporary Strategy Optimization Read Split
+
+on:
+  push:
+    branches:
+      - feat/strategy-risk-ai-optimization-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/strategy-risk-ai-optimization-20260911
+      - name: Split read responsibilities
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          service_path = Path('apps/server/src/strategy-optimization/strategy-optimization.service.ts')
+          service = service_path.read_text()
+          service = service.replace('  type AttemptRow,\n', '')
+
+          patterns = [
+            r"\n  capabilities\(\) \{.*?\n  \}\n\n  private async formalStrategyVersion",
+            r"\n  private attempts\(id: string\) \{.*?\n  \}\n\n  async get\(id: string\) \{.*?\n  \}\n\n  async list\(limit = 30\) \{.*?\n  \}\n\n  async create",
+            r"\n  async compare\(id: string\) \{.*?\n  \}\n\n  private async eligibleFinalCandidates",
+          ]
+          replacements = [
+            '\n  private async formalStrategyVersion',
+            '\n  async create',
+            '\n  private async eligibleFinalCandidates',
+          ]
+          for pattern, replacement in zip(patterns, replacements):
+            service, count = re.subn(pattern, replacement, service, count=1, flags=re.S)
+            if count != 1:
+              raise SystemExit(f'failed to split service pattern: {pattern}')
+          service_path.write_text(service)
+
+          read_path = Path('apps/server/src/strategy-optimization/strategy-optimization-read.service.ts')
+          read_path.write_text("""import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { AiProviderRegistry } from '../ai/provider-registry.js';
+import { PrismaService } from '../platform/prisma.service.js';
+import {
+  toRecord,
+  type AttemptRow,
+  type CandidateRow,
+  type ExperimentRow,
+} from './strategy-optimization-common.js';
+import { describeStrategyParameters } from './strategy-optimization-parameters.js';
+
+@Injectable()
+export class StrategyOptimizationReadService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly providers: AiProviderRegistry,
+  ) {}
+
+  capabilities() {
+    return {
+      riskApplicationsEnabled: process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 'false',
+      aiOptimizationEnabled: process.env.STRATEGY_AI_OPTIMIZATION_ENABLED !== 'false',
+      providers: this.providers.list().flatMap((provider) => {
+        const costKnown =
+          typeof provider.metadata?.costPer1kInput === 'number' &&
+          typeof provider.metadata?.costPer1kOutput === 'number';
+        return provider.models.map((model) => ({
+          provider: provider.id,
+          model,
+          costStatus: costKnown ? ('known' as const) : ('unknown' as const),
+          ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
+          ...(provider.metadata?.pricingVersion ? { pricingVersion: provider.metadata.pricingVersion } : {}),
+        }));
+      }),
+    };
+  }
+
+  async parameters(strategyVersionId: string) {
+    const version = await this.prisma.strategyVersion.findUnique({ where: { id: strategyVersionId } });
+    if (!version) throw new NotFoundException('策略版本不存在');
+    if (version.schemaVersion !== 2 || version.version <= 0)
+      throw new BadRequestException('只有正式 V2 策略版本可以配置优化参数');
+    return describeStrategyParameters(strategySchemaV2.parse(version.schema) as StrategySchemaV2);
+  }
+
+  async experiment(id: string) {
+    const rows = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
+      SELECT * FROM "OptimizationExperiment"
+      WHERE "id"=${id}::uuid AND "ownerKey"='local-user' LIMIT 1
+    `);
+    const row = rows[0];
+    if (!row) throw new NotFoundException('优化实验不存在');
+    return row;
+  }
+
+  candidates(id: string) {
+    return this.prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
+      SELECT * FROM "OptimizationCandidate"
+      WHERE "experimentId"=${id}::uuid ORDER BY "candidateNumber" ASC
+    `);
+  }
+
+  attempts(id: string) {
+    return this.prisma.$queryRaw<AttemptRow[]>(Prisma.sql`
+      SELECT * FROM "OptimizationAttempt"
+      WHERE "experimentId"=${id}::uuid ORDER BY "createdAt" ASC, "id" ASC
+    `);
+  }
+
+  async get(id: string) {
+    const experiment = await this.experiment(id);
+    const [candidates, attempts] = await Promise.all([this.candidates(id), this.attempts(id)]);
+    return { experiment, candidates, attempts };
+  }
+
+  async list(limit = 30) {
+    const bounded = Math.max(1, Math.min(limit, 100));
+    return this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
+      SELECT * FROM "OptimizationExperiment" WHERE "ownerKey"='local-user'
+      ORDER BY "createdAt" DESC, "id" DESC LIMIT ${bounded}
+    `);
+  }
+
+  async compare(id: string) {
+    const { experiment, candidates, attempts } = await this.get(id);
+    const ranked = candidates
+      .map((candidate) => {
+        const validation = toRecord(candidate.metrics).validation;
+        const score = toRecord(validation).score;
+        return { ...candidate, validationScore: typeof score === 'number' ? score : null };
+      })
+      .sort((left, right) => (right.validationScore ?? -Infinity) - (left.validationScore ?? -Infinity));
+    return {
+      experiment,
+      baseline: { runRefs: experiment.baselineRunRefs, metrics: experiment.baselineMetrics },
+      candidates: ranked,
+      attempts,
+      note: '排序仅使用 Server 真实回测的 validation 指标；AI 自述指标不会进入评分。',
+    };
+  }
+}
+""")
+
+          controller_path = Path('apps/server/src/strategy-optimization/strategy-optimization.controller.ts')
+          controller = controller_path.read_text()
+          controller = controller.replace('return this.optimization.capabilities();', 'return this.reads.capabilities();')
+          controller = controller.replace('return this.optimization.list(listExperimentsQuery.parse(query).limit);', 'return this.reads.list(listExperimentsQuery.parse(query).limit);')
+          controller = controller.replace('return this.optimization.get(id);', 'return this.reads.get(id);')
+          controller = controller.replace('return this.optimization.compare(id);', 'return this.reads.compare(id);')
+          controller_path.write_text(controller)
+          PY
+      - name: Verify split and commit
+        shell: bash
+        run: |
+          lines=$(wc -l < apps/server/src/strategy-optimization/strategy-optimization.service.ts)
+          echo "strategy-optimization.service.ts lines=$lines"
+          test "$lines" -le 600
+          rm .github/workflows/tmp-strategy-optimization-read-split.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: split optimization read responsibilities"
+          git push origin HEAD:feat/strategy-risk-ai-optimization-20260911
