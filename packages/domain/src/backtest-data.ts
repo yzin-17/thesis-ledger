@@ -103,20 +103,21 @@ const localInstant = (value: string, timeZone: string): LocalInstant => {
 };
 
 const utcForLocalMinute = (date: string, minute: number, timeZone: string): Date => {
-  const [year, month, day] = date.split('-').map(Number);
+  const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
+  if (![year, month, day].every(Number.isInteger)) throw new Error(`无效本地日期: ${date}`);
   const hour = Math.floor(minute / 60);
   const localMinute = minute % 60;
-  let candidate = new Date(Date.UTC(year!, month! - 1, day!, hour, localMinute));
+  let candidate = new Date(Date.UTC(year, month - 1, day, hour, localMinute));
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const rendered = localInstant(candidate.toISOString(), timeZone);
     const renderedUtc = Date.UTC(
-      year!,
-      month! - 1,
-      day!,
+      year,
+      month - 1,
+      day,
       Math.floor(rendered.minute / 60),
       rendered.minute % 60,
     );
-    const wantedUtc = Date.UTC(year!, month! - 1, day!, hour, localMinute);
+    const wantedUtc = Date.UTC(year, month - 1, day, hour, localMinute);
     const offset = renderedUtc - wantedUtc;
     if (offset === 0) return candidate;
     candidate = new Date(candidate.getTime() - offset);
