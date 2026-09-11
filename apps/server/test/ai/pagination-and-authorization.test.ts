@@ -86,9 +86,10 @@ describe('AI 研究分页与上下文授权', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('租约过期按重试上限重新排队或进入失败终态', async () => {
+  it('租约过期按任务类型和重试上限进入正确恢复路径', async () => {
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 2 })
       .mockResolvedValueOnce({ count: 1 });
     const service = new AiRunService({ aiRun: { updateMany } } as never);
@@ -97,12 +98,25 @@ describe('AI 研究分页与上下文授权', () => {
     ).resolves.toEqual({
       requeued: 2,
       failed: 1,
+      optimizationUnknown: 0,
     });
     expect(updateMany.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({ where: expect.objectContaining({ status: 'running' }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'running',
+          promptVersion: 'strategy-optimization-v1',
+        }),
+      }),
     );
     expect(updateMany.mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({
+        where: expect.objectContaining({ promptVersion: { not: 'strategy-optimization-v1' } }),
+        data: expect.objectContaining({ errorCode: 'worker_lease_expired' }),
+      }),
+    );
+    expect(updateMany.mock.calls[2]?.[0]).toEqual(
+      expect.objectContaining({
+        where: expect.objectContaining({ promptVersion: { not: 'strategy-optimization-v1' } }),
         data: expect.objectContaining({ errorCode: 'worker_lease_exhausted' }),
       }),
     );
