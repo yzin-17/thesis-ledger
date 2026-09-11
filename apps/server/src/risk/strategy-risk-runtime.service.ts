@@ -87,7 +87,11 @@ export class StrategyRiskRuntimeService {
       throw new BadRequestException('策略风险规则修订已经失效，请刷新后重试');
   }
 
-  private async target(symbol: string, timeframe: string) {
+  private async target(
+    symbol: string,
+    timeframe: string,
+    requiresHoldingPeriods: boolean,
+  ) {
     const asset = await this.prisma.asset.findUnique({
       where: { symbol },
       select: { assetType: true, market: true },
@@ -96,6 +100,7 @@ export class StrategyRiskRuntimeService {
     return {
       executionInstrument: { symbol, assetType: asset.assetType, market: asset.market },
       primaryTimeframe: timeframe,
+      requiresHoldingPeriods,
     };
   }
 
@@ -205,7 +210,11 @@ export class StrategyRiskRuntimeService {
     const actual = await this.contexts.load(
       application.accountId,
       application.symbol,
-      await this.target(application.symbol, rule.evaluationTimeframe),
+      await this.target(
+        application.symbol,
+        rule.evaluationTimeframe,
+        rule.metric === 'holdingPeriods',
+      ),
       evaluatedAt,
     );
     const evaluation =
