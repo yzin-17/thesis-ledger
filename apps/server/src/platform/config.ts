@@ -19,6 +19,8 @@ const configSchema = z.object({
   AI_MODEL: z.string().trim().min(1).optional(),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   AI_FIXTURE_ENABLED: z.enum(['true', 'false']).default('false'),
+  STRATEGY_RISK_APPLICATIONS_ENABLED: z.enum(['true', 'false']).default('true'),
+  STRATEGY_AI_OPTIMIZATION_ENABLED: z.enum(['true', 'false']).default('true'),
   PROJECTION_READ_MODE: z.enum(['legacy', 'shadow', 'unified']).default('unified'),
   PROJECTION_SWITCH_STAGE: z
     .enum(['trade-query', 'account-data', 'portfolio', 'journal'])
@@ -53,6 +55,8 @@ export const parseConfig = (environment: Record<string, string | undefined>) => 
     aiModel: parsed.data.AI_MODEL,
     aiTimeoutMs: parsed.data.AI_TIMEOUT_MS,
     aiFixtureEnabled: parsed.data.AI_FIXTURE_ENABLED === 'true',
+    strategyRiskApplicationsEnabled: parsed.data.STRATEGY_RISK_APPLICATIONS_ENABLED === 'true',
+    strategyAiOptimizationEnabled: parsed.data.STRATEGY_AI_OPTIMIZATION_ENABLED === 'true',
     projectionReadMode: parsed.data.PROJECTION_READ_MODE,
     projectionSwitchStage: parsed.data.PROJECTION_SWITCH_STAGE,
   };

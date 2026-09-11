@@ -51,6 +51,16 @@ export class AiProviderRegistry {
     return fallback;
   }
 
+  /** Optimization experiments must never silently substitute another provider or model. */
+  strict(providerId: string, model: string) {
+    const provider = this.providers.get(providerId);
+    if (!provider) throw new Error(`AI Provider 未配置: ${providerId}`);
+    if (!provider.models.includes(model))
+      throw new Error(`AI Provider ${providerId} 不支持模型 ${model}`);
+    if (provider.metadata?.health === 'down') throw new Error(`AI Provider 不可用: ${providerId}`);
+    return provider;
+  }
+
   candidates(model: string, preferred?: string) {
     return [...this.providers.values()]
       .filter((provider) => provider.models.includes(model))

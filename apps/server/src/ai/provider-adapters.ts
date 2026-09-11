@@ -77,14 +77,13 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 }
 
-const parseResearchMarker = (messages: unknown[]) => {
+const parseMarker = (messages: unknown[], marker: string) => {
   const user = messages.find((message) => {
     const record = asRecord(message);
-    return record?.role === 'user' && typeof record.content === 'string';
+    return record?.role === 'user' && typeof record.content === 'string' && record.content.includes(marker);
   });
   const text = asRecord(user)?.content;
   if (typeof text !== 'string') return null;
-  const marker = 'RESEARCH_REQUEST_JSON:';
   const index = text.indexOf(marker);
   if (index < 0) return null;
   try {
@@ -92,6 +91,25 @@ const parseResearchMarker = (messages: unknown[]) => {
   } catch {
     return null;
   }
+};
+
+const parseResearchMarker = (messages: unknown[]) => parseMarker(messages, 'RESEARCH_REQUEST_JSON:');
+const parseOptimizationMarker = (messages: unknown[]) =>
+  parseMarker(messages, 'OPTIMIZATION_REQUEST_JSON:');
+
+const fixtureOptimizationProposal = (marker: Record<string, unknown>) => {
+  const authorized = Array.isArray(marker.authorizedParameters) ? marker.authorizedParameters : [];
+  const first = authorized.map(asRecord).find((item): item is Record<string, unknown> => item !== null);
+  if (!first || typeof first.parameterId !== 'string') throw new Error('Fixture 优化请求缺少授权参数');
+  const range = asRecord(first.optimizationRange) ?? asRecord(first.schemaRange);
+  const candidateValue = range?.min ?? first.currentValue;
+  if (typeof candidateValue !== 'string' && typeof candidateValue !== 'number')
+    throw new Error('Fixture 优化参数缺少可用取值');
+  return {
+    changes: [{ parameterId: first.parameterId, value: candidateValue }],
+    reason: 'Fixture Provider 选择授权范围内的确定性候选值，用于验证优化编排闭环。',
+    evidenceRefs: [],
+  };
 };
 
 export class FixtureAiProvider implements AiProvider {
@@ -103,6 +121,15 @@ export class FixtureAiProvider implements AiProvider {
   ) {}
 
   complete(input: CompletionInput) {
+    const optimization = parseOptimizationMarker(input.messages);
+    if (optimization) {
+      return Promise.resolve({
+        content: fixtureOptimizationProposal(optimization),
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
+      });
+    }
     const marker = parseResearchMarker(input.messages);
     const evidence = Array.isArray(marker?.evidence) ? marker.evidence : [];
     const citations = evidence.flatMap((entry) => {
