@@ -128,7 +128,13 @@ const riskRule = (
       costBasisPolicy: 'account-projection-average-cost-including-known-fees',
     };
   }
-  if (risk.type === 'maxHoldingPeriod' && Number.isInteger(risk.periods) && risk.periods > 0) {
+  const holdingPeriods = risk.periods;
+  if (
+    risk.type === 'maxHoldingPeriod' &&
+    typeof holdingPeriods === 'number' &&
+    Number.isInteger(holdingPeriods) &&
+    holdingPeriods > 0
+  ) {
     return {
       sourceKey: `risk:${index}:maxHoldingPeriod`,
       sourceRiskIndex: index,
@@ -137,7 +143,7 @@ const riskRule = (
       label: '最大持有周期',
       metric: 'holdingPeriods',
       operator: 'gte',
-      threshold: String(risk.periods),
+      threshold: String(holdingPeriods),
       evaluationTimeframe: timeframe,
       costBasisPolicy: 'account-projection-average-cost-including-known-fees',
     };
