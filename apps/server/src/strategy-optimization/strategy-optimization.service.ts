@@ -18,7 +18,6 @@ import {
   optimizationSha256,
   redactOptimizationError,
   toRecord,
-  type AttemptRow,
   type CandidateRow,
   type ExperimentRow,
   type StrategyVersionRecord,
@@ -47,25 +46,6 @@ export class StrategyOptimizationService implements OnModuleInit {
     if (!optimizationFeatureEnabled()) throw new BadRequestException('AI 策略优化当前已关闭');
   }
 
-  capabilities() {
-    return {
-      riskApplicationsEnabled: process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 'false',
-      aiOptimizationEnabled: optimizationFeatureEnabled(),
-      providers: this.providers.list().flatMap((provider) => {
-        const costKnown =
-          typeof provider.metadata?.costPer1kInput === 'number' &&
-          typeof provider.metadata?.costPer1kOutput === 'number';
-        return provider.models.map((model) => ({
-          provider: provider.id,
-          model,
-          costStatus: costKnown ? ('known' as const) : ('unknown' as const),
-          ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
-          ...(provider.metadata?.pricingVersion ? { pricingVersion: provider.metadata.pricingVersion } : {}),
-        }));
-      }),
-    };
-  }
-
   private async formalStrategyVersion(id: string) {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException('策略版本不存在');
@@ -86,26 +66,6 @@ export class StrategyOptimizationService implements OnModuleInit {
   private candidates(id: string) {
     return this.prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationCandidate" WHERE "experimentId"=${id}::uuid ORDER BY "candidateNumber" ASC
-    `);
-  }
-
-  private attempts(id: string) {
-    return this.prisma.$queryRaw<AttemptRow[]>(Prisma.sql`
-      SELECT * FROM "OptimizationAttempt" WHERE "experimentId"=${id}::uuid ORDER BY "createdAt" ASC, "id" ASC
-    `);
-  }
-
-  async get(id: string) {
-    const experiment = await this.experiment(id);
-    const [candidates, attempts] = await Promise.all([this.candidates(id), this.attempts(id)]);
-    return { experiment, candidates, attempts };
-  }
-
-  async list(limit = 30) {
-    const bounded = Math.max(1, Math.min(limit, 100));
-    return this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
-      SELECT * FROM "OptimizationExperiment" WHERE "ownerKey"='local-user'
-      ORDER BY "createdAt" DESC, "id" DESC LIMIT ${bounded}
     `);
   }
 
@@ -389,24 +349,6 @@ export class StrategyOptimizationService implements OnModuleInit {
       ORDER BY "createdAt" ASC LIMIT 10
     `);
     rows.forEach((row) => void this.process(row.id).catch(() => undefined));
-  }
-
-  async compare(id: string) {
-    const { experiment, candidates, attempts } = await this.get(id);
-    const ranked = candidates
-      .map((candidate) => {
-        const validation = toRecord(candidate.metrics).validation;
-        const score = toRecord(validation).score;
-        return { ...candidate, validationScore: typeof score === 'number' ? score : null };
-      })
-      .sort((left, right) => (right.validationScore ?? -Infinity) - (left.validationScore ?? -Infinity));
-    return {
-      experiment,
-      baseline: { runRefs: experiment.baselineRunRefs, metrics: experiment.baselineMetrics },
-      candidates: ranked,
-      attempts,
-      note: '排序仅使用 Server 真实回测的 validation 指标；AI 自述指标不会进入评分。',
-    };
   }
 
   private async eligibleFinalCandidates(id: string, candidateIds: string[]) {
