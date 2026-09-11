@@ -66,6 +66,11 @@ export type AttemptRow = {
   proposal: unknown;
   error: string | null;
   createdAt: Date;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cost: Prisma.Decimal | null;
+  durationMs: number | null;
+  modelMetadata: unknown;
 };
 
 export type StrategyVersionRecord = {
