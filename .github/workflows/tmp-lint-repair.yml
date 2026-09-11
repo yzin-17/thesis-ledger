@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/backtest-v2-closure-20260911
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
@@ -24,37 +25,84 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Apply narrow archivedAt lint fix
+      - name: Apply typed boundary repairs
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('apps/desktop/src/features/risk/RiskRuleWorkbench.tsx')
-          text = path.read_text(encoding='utf-8')
+          import subprocess
+
+          risk_path = Path('apps/desktop/src/features/risk/RiskRuleWorkbench.tsx')
+          baseline = subprocess.check_output(
+              ['git', 'show', '811a1f466d55e1c514b53af09dfe5d68d98021a7:apps/desktop/src/features/risk/RiskRuleWorkbench.tsx'],
+              text=True,
+          )
           old_decl = '  const archived = rule.archivedAt != null;\n'
           new_decl = '  const archivedAt = rule.archivedAt;\n  const archived = archivedAt != null;\n'
-          if new_decl not in text:
-              if text.count(old_decl) != 1:
-                  raise SystemExit(f'archived declaration anchor count: {text.count(old_decl)}')
-              text = text.replace(old_decl, new_decl, 1)
+          if baseline.count(old_decl) != 1:
+              raise SystemExit(f'archived declaration anchor count: {baseline.count(old_decl)}')
+          baseline = baseline.replace(old_decl, new_decl, 1)
           old_use = 'formatDateTime(rule.archivedAt!)'
-          new_use = 'formatDateTime(archivedAt)'
-          if new_use not in text:
-              if text.count(old_use) != 1:
-                  raise SystemExit(f'archived use anchor count: {text.count(old_use)}')
-              text = text.replace(old_use, new_use, 1)
-          path.write_text(text, encoding='utf-8')
+          if baseline.count(old_use) != 1:
+              raise SystemExit(f'archived use anchor count: {baseline.count(old_use)}')
+          baseline = baseline.replace(old_use, 'formatDateTime(archivedAt)', 1)
+          risk_path.write_text(baseline, encoding='utf-8')
+
+          domain_path = Path('packages/domain/src/backtest-data.ts')
+          text = domain_path.read_text(encoding='utf-8')
+          replacements = [
+              (
+                  "export type BacktestBarQuality = 'complete' | 'partial' | 'suspended' | 'unknown';",
+                  "export type BacktestBarQuality = 'complete' | 'partial' | 'suspended' | 'stale' | 'unknown';",
+              ),
+              ('  amount?: string;\n', '  amount?: string | undefined;\n'),
+              ('  quality?: BacktestBarQuality;\n', '  quality?: BacktestBarQuality | undefined;\n'),
+              ('  suspended?: boolean;\n', '  suspended?: boolean | undefined;\n'),
+              (
+                  "  let quality: BacktestBarQuality = 'complete';\n"
+                  "  if (bars.some((bar) => bar.suspended || bar.quality === 'suspended')) quality = 'suspended';\n"
+                  "  else if (missingMinutes > 0) quality = 'partial';\n",
+                  "  let quality: BacktestBarQuality = 'complete';\n"
+                  "  if (bars.some((bar) => bar.suspended || bar.quality === 'suspended')) quality = 'suspended';\n"
+                  "  else if (bars.some((bar) => bar.quality === 'stale')) quality = 'stale';\n"
+                  "  else if (bars.some((bar) => bar.quality === 'unknown')) quality = 'unknown';\n"
+                  "  else if (missingMinutes > 0 || bars.some((bar) => bar.quality === 'partial')) quality = 'partial';\n",
+              ),
+          ]
+          for old, new in replacements:
+              if old == new or new in text:
+                  continue
+              if text.count(old) != 1:
+                  raise SystemExit(f'domain anchor count for {old!r}: {text.count(old)}')
+              text = text.replace(old, new, 1)
+          domain_path.write_text(text, encoding='utf-8')
+
+          test_path = Path('packages/domain/test/backtest-data.test.ts')
+          test_text = test_path.read_text(encoding='utf-8')
+          old_quality = "    quality: 'complete' | 'partial' | 'suspended' | 'unknown';"
+          new_quality = "    quality: 'complete' | 'partial' | 'suspended' | 'stale' | 'unknown';"
+          if new_quality not in test_text:
+              if test_text.count(old_quality) != 1:
+                  raise SystemExit(f'test quality anchor count: {test_text.count(old_quality)}')
+              test_text = test_text.replace(old_quality, new_quality, 1)
+          marker = "  it('does not merge CN morning and afternoon windows', () => {"
+          case = """  it('propagates stale source quality into derived bars', () => {\n    const result = aggregateMinuteBars(\n      [\n        bar('2026-09-08T01:30:00.000Z', { quality: 'stale' }),\n        bar('2026-09-08T01:31:00.000Z'),\n        bar('2026-09-08T01:32:00.000Z'),\n        bar('2026-09-08T01:33:00.000Z'),\n        bar('2026-09-08T01:34:00.000Z'),\n      ],\n      '5m',\n    );\n    expect(result[0]).toMatchObject({ quality: 'stale', completeness: 'partial' });\n  });\n\n"""
+          if case not in test_text:
+              if test_text.count(marker) != 1:
+                  raise SystemExit(f'test insertion marker count: {test_text.count(marker)}')
+              test_text = test_text.replace(marker, case + marker, 1)
+          test_path.write_text(test_text, encoding='utf-8')
           PY
-          pnpm exec prettier --write apps/desktop/src/features/risk/RiskRuleWorkbench.tsx
           git diff --check
-      - name: Commit narrow repair
+      - name: Commit typed boundary repairs
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add apps/desktop/src/features/risk/RiskRuleWorkbench.tsx
-          git commit -m "fix: narrow archived risk rule timestamp"
+          git add apps/desktop/src/features/risk/RiskRuleWorkbench.tsx packages/domain/src/backtest-data.ts packages/domain/test/backtest-data.test.ts
+          git commit -m "fix: align backtest bar type boundaries"
           git push origin HEAD:fix/backtest-v2-closure-20260911
-      - name: Validate lint and complexity
+      - name: Validate build lint tests and complexity
         run: |
           pnpm lint
+          pnpm --filter @thesis-ledger/domain test
           pnpm guardrails:complexity
