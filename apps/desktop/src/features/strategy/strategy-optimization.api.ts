@@ -60,11 +60,28 @@ export type OptimizationCandidate = {
   validationScore?: number | null;
 };
 
+export type OptimizationAttempt = {
+  id: string;
+  experimentId: string;
+  modelKey: string;
+  aiRunId?: string | null;
+  attempt: number;
+  status: string;
+  proposal?: unknown;
+  error?: string | null;
+  createdAt: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  cost?: string | number | null;
+  durationMs?: number | null;
+  modelMetadata?: Record<string, unknown> | null;
+};
+
 export type OptimizationCompare = {
   experiment: OptimizationExperimentSummary;
   baseline: { runRefs: Record<string, string>; metrics: Record<string, unknown> };
   candidates: OptimizationCandidate[];
-  attempts: Array<Record<string, unknown>>;
+  attempts: OptimizationAttempt[];
   note: string;
 };
 
@@ -94,6 +111,13 @@ export type RiskApplicationUpgradePreview = RiskApplicationPreview & {
   diff: RiskRuleDiff[];
 };
 
+export type StrategyRiskNotification = {
+  enabled: boolean;
+  cooldownMinutes: number;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  channels: Array<'feishu'>;
+};
+
 export type StrategyRiskApplication = {
   id: string;
   strategyVersionId: string;
@@ -104,7 +128,7 @@ export type StrategyRiskApplication = {
   plan: MonitoringPlan;
   cycleMode: string;
   enabled: boolean;
-  notification: { enabled?: boolean; cooldownMinutes?: number };
+  notification: StrategyRiskNotification;
   coverage: MonitoringPlan['coverage'];
   createdAt: string;
   updatedAt: string;
@@ -162,7 +186,7 @@ export const fetchOptimizationExperiment = (id: string, client?: DesktopRequestC
   requestDesktopJson<{
     experiment: OptimizationExperimentSummary;
     candidates: OptimizationCandidate[];
-    attempts: Array<Record<string, unknown>>;
+    attempts: OptimizationAttempt[];
   }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}`, { cache: 'no-store' }, client);
 
 export const fetchOptimizationCompare = (id: string, client?: DesktopRequestClient) =>
@@ -239,7 +263,7 @@ export const createStrategyRiskApplication = (
     previewHash: string;
     idempotencyKey: string;
     enabled: boolean;
-    notification: { enabled: boolean; cooldownMinutes: number };
+    notification: StrategyRiskNotification;
   },
   client?: DesktopRequestClient,
 ) => jsonPost<StrategyRiskApplication>('/strategy-optimization/risk-applications', input, client);
@@ -265,7 +289,7 @@ export const updateStrategyRiskApplication = (
   input: {
     expectedRevision: number;
     enabled?: boolean;
-    notification?: { enabled: boolean; cooldownMinutes: number };
+    notification?: StrategyRiskNotification;
   },
   client?: DesktopRequestClient,
 ) =>
