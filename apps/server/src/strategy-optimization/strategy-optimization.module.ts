@@ -9,7 +9,6 @@ import { StrategyOptimizationRunService } from './strategy-optimization-run.serv
 import { StrategyOptimizationService } from './strategy-optimization.service.js';
 import { StrategyRiskApplicationStoreService } from './strategy-risk-application-store.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
-import { StrategyRiskEvaluationStoreService } from './strategy-risk-evaluation-store.service.js';
 
 @Module({
   imports: [AiModule, BacktestModule, RiskModule],
@@ -19,7 +18,6 @@ import { StrategyRiskEvaluationStoreService } from './strategy-risk-evaluation-s
     StrategyOptimizationRunService,
     StrategyOptimizationCandidateService,
     StrategyRiskApplicationStoreService,
-    StrategyRiskEvaluationStoreService,
     StrategyRiskApplicationService,
     StrategyOptimizationService,
   ],
