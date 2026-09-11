@@ -75,8 +75,9 @@ export class AutomationWorkflowRunner {
   }
 
   riskScan(contexts: unknown[], evaluatedAt?: string, includeStrategyRules = true) {
-    return this.risk.scan(
-      evaluatedAt ? { contexts, evaluatedAt, includeStrategyRules } : { contexts, includeStrategyRules },
-    );
+    return this.risk.scan(contexts, {
+      ...(evaluatedAt ? { evaluatedAt: new Date(evaluatedAt) } : {}),
+      includeStrategyRules,
+    });
   }
 }
