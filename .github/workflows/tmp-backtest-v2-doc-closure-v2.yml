@@ -30,6 +30,7 @@ jobs:
           pnpm --filter @thesis-ledger/schemas build
           pnpm --filter @thesis-ledger/domain build
           pnpm --filter @thesis-ledger/api-client build
+          pnpm --filter @thesis-ledger/server prisma generate
       - name: Targeted acceptance tests
         run: |
           pnpm --filter @thesis-ledger/schemas exec vitest run test/backtest-v2-t13-golden.test.ts test/backtest-v2-t13-matrix.test.ts
