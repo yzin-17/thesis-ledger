@@ -20,6 +20,10 @@ import {
   type StrategyVersionRecord,
 } from './strategy-optimization-common.js';
 import {
+  isRetriableOptimizationNetworkError,
+  optimizationModelConcurrency,
+} from './strategy-optimization-concurrency.js';
+import {
   applyOptimizationProposal,
   proposalDiff,
 } from './strategy-optimization-parameters.js';
@@ -129,6 +133,42 @@ export class StrategyOptimizationCandidateService {
     );
   }
 
+  private async requestProviderCompletion(
+    experiment: ExperimentRow,
+    route: { provider: string; model: string },
+    modelKey: string,
+    messages: unknown[],
+    inputTokenReservation: number,
+    outputTokenReservation: number,
+    estimatedCost: number,
+  ) {
+    const provider = this.providers.strict(route.provider, route.model);
+    const complete = () =>
+      optimizationModelConcurrency.withSlot(modelKey, () =>
+        provider.complete(
+          {
+            model: route.model,
+            messages,
+            tools: [],
+            maxOutputTokens: outputTokenReservation,
+          },
+          AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
+        ),
+      );
+    try {
+      return { provider, completion: await complete(), retryCount: 0 };
+    } catch (error) {
+      if (!isRetriableOptimizationNetworkError(error)) throw error;
+      await this.runs.reserveBudget(experiment.id, {
+        aiCalls: 1,
+        inputTokens: inputTokenReservation,
+        outputTokens: outputTokenReservation,
+        estimatedCost,
+      });
+      return { provider, completion: await complete(), retryCount: 1 };
+    }
+  }
+
   private async completeProposal(
     experiment: ExperimentRow,
     route: { provider: string; model: string },
@@ -142,15 +182,14 @@ export class StrategyOptimizationCandidateService {
   ) {
     const startedAt = Date.now();
     try {
-      const provider = this.providers.strict(route.provider, route.model);
-      const completion = await provider.complete(
-        {
-          model: route.model,
-          messages,
-          tools: [],
-          maxOutputTokens: outputTokenReservation,
-        },
-        AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
+      const { provider, completion, retryCount } = await this.requestProviderCompletion(
+        experiment,
+        route,
+        modelKey,
+        messages,
+        inputTokenReservation,
+        outputTokenReservation,
+        estimatedCost,
       );
       await this.prisma.aiRun.update({
         where: { id: aiRunId },
@@ -169,6 +208,7 @@ export class StrategyOptimizationCandidateService {
             ...(completion.costCurrency ? { costCurrency: completion.costCurrency } : {}),
             ...(completion.pricingVersion ? { pricingVersion: completion.pricingVersion } : {}),
             round,
+            retryCount,
             fallbackUsed: false,
           }),
         },
