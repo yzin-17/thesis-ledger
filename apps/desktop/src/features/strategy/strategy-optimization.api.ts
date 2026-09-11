@@ -82,14 +82,16 @@ export type RiskApplicationPreview = {
   context: Record<string, unknown>;
 };
 
+export type RiskRuleDiff = {
+  sourceKey: string;
+  before: MonitoringPlan['rules'][number] | null;
+  after: MonitoringPlan['rules'][number] | null;
+  change: 'added' | 'removed' | 'changed' | 'unchanged';
+};
+
 export type RiskApplicationUpgradePreview = RiskApplicationPreview & {
   currentRevision: number;
-  diff: Array<{
-    sourceKey: string;
-    before: MonitoringPlan['rules'][number] | null;
-    after: MonitoringPlan['rules'][number] | null;
-    change: 'added' | 'removed' | 'changed' | 'unchanged';
-  }>;
+  diff: RiskRuleDiff[];
 };
 
 export type StrategyRiskApplication = {
@@ -106,6 +108,16 @@ export type StrategyRiskApplication = {
   coverage: MonitoringPlan['coverage'];
   createdAt: string;
   updatedAt: string;
+};
+
+export type AdoptionRiskApplicationDiff = {
+  applicationId: string;
+  accountId: string;
+  symbol: string;
+  currentStrategyVersionId: string;
+  currentRevision: number;
+  enabled: boolean;
+  diff: RiskRuleDiff[];
 };
 
 const jsonPost = <T>(path: string, body: unknown, client?: DesktopRequestClient) =>
@@ -205,6 +217,7 @@ export const adoptOptimizationCandidate = (
     strategyVersion: { id: string; version: number };
     monitoringPlan: MonitoringPlan;
     riskApplicationEnabled: boolean;
+    riskApplicationDiffs: AdoptionRiskApplicationDiff[];
   }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt`, input, client);
 
 export const previewStrategyRiskApplication = (
@@ -249,7 +262,11 @@ export const fetchStrategyRiskApplications = (
 
 export const updateStrategyRiskApplication = (
   id: string,
-  input: { expectedRevision: number; enabled?: boolean },
+  input: {
+    expectedRevision: number;
+    enabled?: boolean;
+    notification?: { enabled: boolean; cooldownMinutes: number };
+  },
   client?: DesktopRequestClient,
 ) =>
   requestDesktopJson<StrategyRiskApplication>(
