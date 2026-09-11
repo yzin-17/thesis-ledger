@@ -55,7 +55,7 @@ export class AutomationRuntimeHandlers {
             mode,
             marketTime,
           );
-          const result = await this.workflows.riskScan(contexts, marketTime);
+          const result = await this.workflows.riskScan(contexts, marketTime, mode === 'actual');
           return { result, contextCount: contexts.length, missingSymbols };
         };
         // 实际与模拟组合同批后台评估；shadow 只记事件不发通知（服务端跳过），
