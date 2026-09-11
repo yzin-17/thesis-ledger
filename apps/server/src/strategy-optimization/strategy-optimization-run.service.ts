@@ -29,6 +29,19 @@ const metricValue = (result: BacktestResultV2, aliases: string[]) => {
   return undefined;
 };
 
+const executionDiagnostics = (result: BacktestResultV2) => {
+  const rejected = [...result.rejectedOrders, ...(result.rejectedNavRequests ?? [])];
+  const rejectionReasons = rejected.reduce<Record<string, number>>((counts, item) => {
+    counts[item.reasonCode] = (counts[item.reasonCode] ?? 0) + 1;
+    return counts;
+  }, {});
+  return {
+    fillCount: result.simulationFills.length,
+    rejectedOrderCount: rejected.length,
+    ...(Object.keys(rejectionReasons).length > 0 ? { rejectionReasons } : {}),
+  };
+};
+
 const invalidSummary = (
   runId: string,
   result: BacktestResultV2,
@@ -38,6 +51,7 @@ const invalidSummary = (
   status: 'invalid',
   completeness: result.completeness,
   tradeCount: result.trades.length,
+  ...executionDiagnostics(result),
   reason,
 });
 
@@ -46,7 +60,7 @@ const drawdownMagnitude = (value: string) => {
   return parsed.isNegative() ? DecimalValue.from('0').minus(parsed) : parsed;
 };
 
-const calculateScore = (
+export const calculateOptimizationScore = (
   mode: unknown,
   totalReturn: string,
   maxDrawdown: string,
@@ -57,7 +71,7 @@ const calculateScore = (
   const turnoverNumber = turnover ? Number(turnover) : 0;
   if (mode === 'return') return returnNumber;
   if (mode === 'drawdown') return -drawdownNumber;
-  if (mode === 'lowTurnover') return returnNumber - turnoverNumber;
+  if (mode === 'lowTurnover') return -turnoverNumber;
   return returnNumber - drawdownNumber - turnoverNumber * 0.05;
 };
 
@@ -254,10 +268,11 @@ export class StrategyOptimizationRunService {
       status: 'valid',
       completeness: result.completeness,
       tradeCount: result.trades.length,
+      ...executionDiagnostics(result),
       totalReturn,
       maxDrawdown,
       ...(turnover ? { turnover } : {}),
-      score: calculateScore(objective.mode, totalReturn, maxDrawdown, turnover),
+      score: calculateOptimizationScore(objective.mode, totalReturn, maxDrawdown, turnover),
     };
   }
 
