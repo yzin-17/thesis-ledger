@@ -217,6 +217,7 @@ export const optimizationExperimentCreateSchema = z
     runConfig: runConfigSchemaV2,
     budget: optimizationBudgetSchema,
     maxRounds: z.number().int().min(1).max(3).default(2),
+    acknowledgeUnknownCost: z.boolean().default(false),
     idempotencyKey: z.string().trim().min(1).max(200),
   })
   .strict()

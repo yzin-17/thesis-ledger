@@ -14,13 +14,20 @@ const baseEnvironment = {
 describe('configured AI providers', () => {
   it('registers multiple explicit provider/model identities', () => {
     const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-      { id: 'alpha', baseUrl: 'https://alpha.example/v1', apiKey: 'a', models: ['a1', 'a2'] },
+      { id: 'alpha', baseUrl: 'https://alpha.example/v1', apiKey: 'a', models: ['a1', 'a2'], costPer1kInput: 0.1, costPer1kOutput: 0.2, costCurrency: 'USD', pricingVersion: '2026-09' },
       { id: 'beta', baseUrl: 'https://beta.example/v1', apiKey: 'b', models: ['b1'], timeoutMs: 1234 },
     ]) });
-    expect(createConfiguredAiProviders(config).map(({ id, models }) => ({ id, models: [...models] }))).toEqual([
+    const providers = createConfiguredAiProviders(config);
+    expect(providers.map(({ id, models }) => ({ id, models: [...models] }))).toEqual([
       { id: 'alpha', models: ['a1', 'a2'] },
       { id: 'beta', models: ['b1'] },
     ]);
+    expect(providers[0]?.metadata).toMatchObject({
+      costPer1kInput: 0.1,
+      costPer1kOutput: 0.2,
+      costCurrency: 'USD',
+      pricingVersion: '2026-09',
+    });
   });
 
   it('rejects duplicate provider identities', () => {

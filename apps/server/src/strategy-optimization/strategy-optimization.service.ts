@@ -50,9 +50,18 @@ export class StrategyOptimizationService implements OnModuleInit {
     return {
       riskApplicationsEnabled: process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 'false',
       aiOptimizationEnabled: optimizationFeatureEnabled(),
-      providers: this.providers.list().flatMap((provider) =>
-        provider.models.map((model) => ({ provider: provider.id, model })),
-      ),
+      providers: this.providers.list().flatMap((provider) => {
+        const costKnown =
+          typeof provider.metadata?.costPer1kInput === 'number' &&
+          typeof provider.metadata?.costPer1kOutput === 'number';
+        return provider.models.map((model) => ({
+          provider: provider.id,
+          model,
+          costStatus: costKnown ? ('known' as const) : ('unknown' as const),
+          ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
+          ...(provider.metadata?.pricingVersion ? { pricingVersion: provider.metadata.pricingVersion } : {}),
+        }));
+      }),
     };
   }
 
@@ -109,8 +118,21 @@ export class StrategyOptimizationService implements OnModuleInit {
     const baseline = await this.formalStrategyVersion(parsed.strategyVersionId);
     const descriptors = describeStrategyParameters(baseline.strategy);
     this.candidateService.validateAuthorizedParameters(descriptors, parsed.allowedParameterIds);
-    parsed.models.forEach((route) => this.providers.strict(route.provider, route.model));
-    const created = await this.insertExperiment(parsed, baseline);
+    const modelConfig = parsed.models.map((route) => {
+      const provider = this.providers.strict(route.provider, route.model);
+      const costKnown =
+        typeof provider.metadata?.costPer1kInput === 'number' &&
+        typeof provider.metadata?.costPer1kOutput === 'number';
+      return {
+        ...route,
+        costStatus: costKnown ? ('known' as const) : ('unknown' as const),
+        ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
+        ...(provider.metadata?.pricingVersion ? { pricingVersion: provider.metadata.pricingVersion } : {}),
+      };
+    });
+    if (modelConfig.some((route) => route.costStatus === 'unknown') && !parsed.acknowledgeUnknownCost)
+      throw new BadRequestException('所选模型存在未知费用；请明确确认费用上限不可保证');
+    const created = await this.insertExperiment(parsed, baseline, modelConfig);
     void this.process(created.id).catch(() => undefined);
     return created;
   }
@@ -118,6 +140,13 @@ export class StrategyOptimizationService implements OnModuleInit {
   private async insertExperiment(
     parsed: ReturnType<typeof optimizationExperimentCreateSchema.parse>,
     baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+    modelConfig: Array<{
+      provider: string;
+      model: string;
+      costStatus: 'known' | 'unknown';
+      costCurrency?: string;
+      pricingVersion?: string;
+    }>,
   ) {
     const id = randomUUID();
     const dataFingerprint = optimizationSha256({
@@ -133,7 +162,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       ) VALUES (
         ${id}::uuid, ${parsed.strategyVersionId}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
         ${JSON.stringify(parsed.allowedParameterIds)}::jsonb, ${JSON.stringify(parsed.split)}::jsonb,
-        ${JSON.stringify(parsed.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(parsed.models)}::jsonb,
+        ${JSON.stringify(parsed.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(modelConfig)}::jsonb,
         ${JSON.stringify(parsed.budget)}::jsonb, ${parsed.maxRounds}, ${parsed.idempotencyKey}, CURRENT_TIMESTAMP
       ) RETURNING *
     `);

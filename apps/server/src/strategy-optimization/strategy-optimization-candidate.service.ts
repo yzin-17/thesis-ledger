@@ -87,10 +87,16 @@ export class StrategyOptimizationCandidateService {
     round: number,
   ) {
     const modelKey = `${route.provider}:${route.model}`;
-    const estimatedCost = 0;
+    const provider = this.providers.strict(route.provider, route.model);
     const messages = await this.prompt(experiment, baseline.strategy, descriptors, modelKey, round);
     const inputTokenReservation = this.runs.conservativeInputTokenReservation(messages);
     const outputTokenReservation = this.runs.outputTokenReservation(experiment);
+    const inputRate = provider.metadata?.costPer1kInput;
+    const outputRate = provider.metadata?.costPer1kOutput;
+    const estimatedCost =
+      typeof inputRate === 'number' && typeof outputRate === 'number'
+        ? (inputTokenReservation * inputRate + outputTokenReservation * outputRate) / 1_000
+        : 0;
     await this.runs.reserveBudget(experiment.id, {
       aiCalls: 1,
       inputTokens: inputTokenReservation,
@@ -158,7 +164,10 @@ export class StrategyOptimizationCandidateService {
             requestedProvider: route.provider,
             actualProvider: provider.id,
             requestedModel: route.model,
-            actualModel: route.model,
+            actualModel: completion.actualModel ?? route.model,
+            costStatus: completion.costKnown === false ? 'unknown' : 'known',
+            ...(completion.costCurrency ? { costCurrency: completion.costCurrency } : {}),
+            ...(completion.pricingVersion ? { pricingVersion: completion.pricingVersion } : {}),
             round,
             fallbackUsed: false,
           }),

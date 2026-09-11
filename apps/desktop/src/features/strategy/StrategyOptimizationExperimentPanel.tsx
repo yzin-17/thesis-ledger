@@ -83,6 +83,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   const [maxInputTokens, setMaxInputTokens] = useState('100000');
   const [maxOutputTokens, setMaxOutputTokens] = useState('20000');
   const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');
+  const [acknowledgeUnknownCost, setAcknowledgeUnknownCost] = useState(false);
   const [executionModelJson, setExecutionModelJson] = useState('');
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
   const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
@@ -132,6 +133,10 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
       );
   }, [capabilities.data?.providers, selectedModels.length]);
 
+  const selectedProviderRoutes = (capabilities.data?.providers ?? []).filter((route) =>
+    selectedModels.includes(`${route.provider}:${route.model}`),
+  );
+  const hasUnknownCost = selectedProviderRoutes.some((route) => route.costStatus === 'unknown');
   const selectedVersion = versions.find((entry) => entry.version.id === strategyVersionId) ?? versions[0];
   const parsedStrategy = selectedVersion?.version.schema
     ? strategySchemaV2.safeParse(selectedVersion.version.schema)
@@ -189,6 +194,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
           maxDurationSeconds: Number(maxDurationSeconds),
         },
         maxRounds: 2,
+        acknowledgeUnknownCost: !hasUnknownCost || acknowledgeUnknownCost,
         idempotencyKey: crypto.randomUUID(),
       };
       return createOptimizationExperiment(input);
@@ -317,6 +323,20 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
               })}
             </div>
           </div>
+          {hasUnknownCost ? (
+            <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="text-sm font-medium">所选模型存在未知费用</div>
+              <p className="text-xs text-muted-foreground">系统仍会限制调用、Token、回测和计算时长，但没有价格表时不能保证费用上限。</p>
+              <Button
+                type="button"
+                size="sm"
+                variant={acknowledgeUnknownCost ? 'default' : 'outline'}
+                onClick={() => setAcknowledgeUnknownCost((current) => !current)}
+              >
+                {acknowledgeUnknownCost ? '已确认未知费用' : '确认后允许创建'}
+              </Button>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <div className="text-sm text-muted-foreground">允许 AI 修改的参数</div>
             <div className="flex flex-wrap gap-2">
@@ -344,7 +364,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">执行模型 JSON（可选）</span><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button disabled={createMutation.isPending || !capabilities.data?.aiOptimizationEnabled} onClick={() => createMutation.mutate()}>{createMutation.isPending ? '创建中…' : '创建优化实验'}</Button>
+            <Button disabled={createMutation.isPending || !capabilities.data?.aiOptimizationEnabled || (hasUnknownCost && !acknowledgeUnknownCost)} onClick={() => createMutation.mutate()}>{createMutation.isPending ? '创建中…' : '创建优化实验'}</Button>
             {feedback ? <span className="text-sm text-muted-foreground">{feedback}</span> : null}
           </div>
         </CardContent>
@@ -355,7 +375,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         <CardContent className="space-y-2">
           {(experiments.data ?? []).map((experiment) => (
             <div key={experiment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-              <div><div className="font-medium">{experiment.stage}</div><div className="text-xs text-muted-foreground">AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token {experiment.inputTokensUsed}/{experiment.outputTokensUsed} · 成本 {String(experiment.costUsed)}</div></div>
+              <div><div className="font-medium">{experiment.stage}</div><div className="text-xs text-muted-foreground">AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token {experiment.inputTokensUsed}/{experiment.outputTokensUsed} · {experiment.modelConfig.some((route) => route.costStatus === 'unknown') ? '成本 未知' : `成本 ${String(experiment.costUsed)}`}</div></div>
               <div className="flex items-center gap-2">
                 <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>{experiment.status}</Badge>
                 <Button size="sm" variant="outline" onClick={() => setSelectedExperimentId(experiment.id)}>查看</Button>

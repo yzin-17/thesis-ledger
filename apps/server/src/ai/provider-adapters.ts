@@ -18,6 +18,10 @@ const providerConfigSchema = z
         apiKey: z.string().trim().min(1),
         models: z.array(z.string().trim().min(1).max(200)).min(1),
         timeoutMs: z.number().int().positive().optional(),
+        costPer1kInput: z.number().nonnegative().optional(),
+        costPer1kOutput: z.number().nonnegative().optional(),
+        costCurrency: z.string().trim().min(1).max(16).optional(),
+        pricingVersion: z.string().trim().min(1).max(120).optional(),
       })
       .strict(),
   )
@@ -67,8 +71,22 @@ export class OpenAiCompatibleProvider implements AiProvider {
     private readonly baseUrl: string,
     private readonly apiKey: string,
     private readonly timeoutMs = 30_000,
+    pricing?: {
+      costPer1kInput?: number;
+      costPer1kOutput?: number;
+      costCurrency?: string;
+      pricingVersion?: string;
+    },
   ) {
-    this.metadata = { baseURL: baseUrl, health: 'unknown' as const, priority: 100 };
+    this.metadata = {
+      baseURL: baseUrl,
+      health: 'unknown' as const,
+      priority: 100,
+      ...(pricing?.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
+      ...(pricing?.costPer1kOutput === undefined ? {} : { costPer1kOutput: pricing.costPer1kOutput }),
+      ...(pricing?.costCurrency ? { costCurrency: pricing.costCurrency } : {}),
+      ...(pricing?.pricingVersion ? { pricingVersion: pricing.pricingVersion } : {}),
+    };
   }
 
   async complete(input: CompletionInput, signal: AbortSignal) {
@@ -100,11 +118,20 @@ export class OpenAiCompatibleProvider implements AiProvider {
     const usage = asRecord(root?.usage);
     if (!message || !('content' in message))
       throw new Error('Provider 响应缺少 choices[0].message.content');
+    const inputTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
+    const outputTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : 0;
+    const inputRate = this.metadata.costPer1kInput;
+    const outputRate = this.metadata.costPer1kOutput;
+    const costKnown = typeof inputRate === 'number' && typeof outputRate === 'number';
     return {
       content: parseContent(message.content),
-      inputTokens: typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : 0,
-      outputTokens: typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : 0,
-      cost: 0,
+      inputTokens,
+      outputTokens,
+      cost: costKnown ? (inputTokens * inputRate + outputTokens * outputRate) / 1_000 : 0,
+      costKnown,
+      ...(this.metadata.costCurrency ? { costCurrency: this.metadata.costCurrency } : {}),
+      ...(this.metadata.pricingVersion ? { pricingVersion: this.metadata.pricingVersion } : {}),
+      ...(typeof root?.model === 'string' ? { actualModel: root.model } : {}),
     };
   }
 }
@@ -160,6 +187,10 @@ export class FixtureAiProvider implements AiProvider {
         inputTokens: 0,
         outputTokens: 0,
         cost: 0,
+        costKnown: true,
+        costCurrency: 'FIXTURE',
+        pricingVersion: 'fixture-v1',
+        actualModel: input.model,
       });
     }
     const marker = parseResearchMarker(input.messages);
@@ -188,7 +219,16 @@ export class FixtureAiProvider implements AiProvider {
       ...(marker?.context ? { context: marker.context } : {}),
       createdAt: new Date().toISOString(),
     };
-    return Promise.resolve({ content: result, inputTokens: 0, outputTokens: 0, cost: 0 });
+    return Promise.resolve({
+      content: result,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
+      costKnown: true,
+      costCurrency: 'FIXTURE',
+      pricingVersion: 'fixture-v1',
+      actualModel: input.model,
+    });
   }
 }
 
@@ -212,6 +252,12 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
     input.baseUrl,
     input.apiKey,
     input.timeoutMs ?? defaultTimeoutMs,
+    {
+      ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
+      ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
+      ...(input.costCurrency ? { costCurrency: input.costCurrency } : {}),
+      ...(input.pricingVersion ? { pricingVersion: input.pricingVersion } : {}),
+    },
   );
 
 export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => {

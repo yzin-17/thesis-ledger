@@ -8,7 +8,13 @@ import { requestDesktopJson, type DesktopRequestClient } from '../shared/request
 export type OptimizationCapabilities = {
   riskApplicationsEnabled: boolean;
   aiOptimizationEnabled: boolean;
-  providers: Array<{ provider: string; model: string }>;
+  providers: Array<{
+    provider: string;
+    model: string;
+    costStatus: 'known' | 'unknown';
+    costCurrency?: string;
+    pricingVersion?: string;
+  }>;
 };
 
 export type OptimizationExperimentSummary = {
@@ -18,7 +24,13 @@ export type OptimizationExperimentSummary = {
   stage: string;
   objective: Record<string, unknown>;
   split: Record<string, unknown>;
-  modelConfig: Array<{ provider: string; model: string }>;
+  modelConfig: Array<{
+    provider: string;
+    model: string;
+    costStatus?: 'known' | 'unknown';
+    costCurrency?: string;
+    pricingVersion?: string;
+  }>;
   aiCallsUsed: number;
   backtestRunsUsed: number;
   inputTokensUsed: number;
