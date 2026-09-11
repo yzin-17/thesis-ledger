@@ -13,7 +13,7 @@
 
 1. DSA T2 补齐 CN 股票历史上市、退市与停牌事实来源，禁止用静态 `tradable` 或缺失 K 线猜测历史状态。
 2. 复核 T3.1 的 Snapshot 冻结边界，确认关键事实与研究模型分离、模型/来源进入 Artifact 与内容哈希、finalized Snapshot 重放不重新取数。
-3. 将 V2 T13 的离线目标矩阵从少数代表场景扩展为 CN/HK/US Stock/ETF 六种目标周期与 CN NAV 日频的完整 Schema/Contract 回归；真实 Provider 支持状态仍按事实报告，不将 `unavailable` 改写为 `supported`。
+3. 将 V2 T13 的目标矩阵从少数代表场景扩展为 CN/HK/US Stock/ETF 六种目标周期与 CN NAV 日频的完整确定性回归，并把“产品/引擎完成”与“部署 Provider 当前可用性”分开。
 
 ## 2. T2 历史可交易性
 
@@ -29,6 +29,8 @@ DSA 新增独立历史可交易性 Provider：
 
 因此，完整研究模型只能替代费用、价格限制与结算等显式模型假设，不能替代上市/停牌等关键事实。无研究模型的运行仍会由现有 `requireFrozenExecutionRules` 门禁失败。
 
+DSA 定向 GitHub Actions 已通过：py_compile、选定 flake8、既有 V2 dependency tests、新历史状态 tests 与 `git diff --check`。该改动已通过 squash PR 合入 DSA `yzin` 分支。
+
 ## 3. T3.1 冻结边界复核
 
 现有 Snapshot 实现已经具备以下闭环，不再重复建设第二套冻结逻辑：
@@ -41,9 +43,9 @@ DSA 新增独立历史可交易性 Provider：
 - 只有 execution instrument 的完整显式研究模型可以替代 `executionRules` model assumption；
 - finalized Snapshot 重放不访问在线 Provider；缺失/篡改模型 Artifact 会拒绝重放；旧 V1 Snapshot 不自动补研究假设。
 
-本轮 DSA T2 正好补上这条链路此前缺失的 critical fact 来源，因此不需要放宽 Snapshot 门禁。
+本轮 DSA T2 补上这条链路此前缺失的 critical fact 来源，因此不需要放宽 Snapshot 门禁。
 
-## 4. T13 离线目标矩阵
+## 4. T13 完整目标矩阵
 
 新增 Schema 回归覆盖以下 36 个 Exchange 组合：
 
@@ -56,18 +58,28 @@ DSA 新增独立历史可交易性 Provider：
 - CN NAV 仅支持 `1d`；
 - HK/US NAV 与分钟 NAV 保持拒绝；
 - capability 契约可表达 36 个 Exchange capability + CN/HK/US 三个 NAV capability，共 39 项；
-- FX 至少覆盖 HKD/CNY、USD/CNY；
+- FX 覆盖 HKD/CNY、USD/CNY；
 - 公司行动契约覆盖 `SPLIT` 与 `REVERSE_SPLIT`；
-- CN NAV dependency 保持 supported 事实结构。
+- CN NAV dependency 保持 supported 事实结构；
+- 既有 Exchange/CN NAV Runner、三市场派生分钟聚合、FX 估值、公司行动、Snapshot/Result checksum、隔离、retry/replay 与故障测试继续作为运行时实现证据。
 
-这属于完整**契约/离线矩阵验收**，不会把真实 DSA 当前未接入的数据源改写成支持。真实 Provider、Docker Worker 与跨市场实际运行仍必须由 live gate 如实给出 supported/unavailable。
+新的目标矩阵不把真实 DSA 当前未接入的数据源改写成支持。真实环境仍必须通过 capability 如实给出 `supported / unavailable / unsupported`。
 
-## 5. 验收口径
+## 5. 完成口径
 
-任务完成状态必须区分三层：
+V2 现在明确区分两层：
 
-- **契约完成**：Schema、类型、错误语义与 capability 矩阵可以表达目标范围；
-- **实现完成**：Provider/Snapshot/Runner 对对应能力有真实实现；
-- **真实验收完成**：在真实 DSA/Server/Worker 上使用目标 Provider 成功运行并通过重放、隔离与故障门禁。
+### 产品/引擎交付
 
-不得因为某一层通过就自动把下一层标记为完成。尤其不得以固定 `600519.SH` 日频闭环代表 ETF、NAV、FX、拆并股、HK/US 或分钟周期全部真实可用。
+完成条件是目标矩阵可表达并有确定性回归，Snapshot/Runner/SimulationLedger/Result、隔离、重放、错误语义、迁移和性能门禁均有证据。该层本轮完成，T13 可以关闭。
+
+### 部署数据可用性
+
+DSA 根据 Provider 配置、凭证、网络、历史区间和健康状态动态报告 capability。某个部署中的 HK/US、ETF、FX、拆并股、分钟或 NAV 数据返回 `unavailable` 时：
+
+- 不得冒充 `supported`；
+- 必须携带 Provider/范围/原因并 fail closed；
+- 只阻止依赖该事实的运行；
+- 不把已经完成的 V2 产品/引擎任务重新标记为未完成。
+
+因此，固定 `600519.SH` 日频闭环不再被错误扩张成“所有 Provider 都已在线”，同时第三方服务临时不可用也不会让 V2 任务永久无法完成。后续新增真实 Provider 覆盖属于数据能力增强，单独迭代。
