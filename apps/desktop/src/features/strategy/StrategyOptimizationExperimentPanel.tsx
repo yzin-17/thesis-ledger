@@ -71,15 +71,20 @@ const numericValue = (value: string | number | null | undefined) => {
 };
 const durationText = (durationMs: number) =>
   durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(1)}s` : `${durationMs}ms`;
+const displayScalar = (value: unknown, fallback = '—') =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+    ? String(value)
+    : fallback;
 const riskRuleText = (value: unknown) => {
   if (!value || typeof value !== 'object') return '—';
   const rule = value as Record<string, unknown>;
-  const identity = String(rule.label ?? rule.sourceKey ?? '规则');
+  const identity = displayScalar(rule.label, displayScalar(rule.sourceKey, '规则'));
   const comparison =
     rule.operator !== undefined || rule.threshold !== undefined
-      ? `${String(rule.operator ?? '—')} ${String(rule.threshold ?? '—')}`
+      ? `${displayScalar(rule.operator)} ${displayScalar(rule.threshold)}`
       : null;
-  const timeframe = rule.timeframe ? `周期 ${String(rule.timeframe)}` : null;
+  const timeframeValue = displayScalar(rule.timeframe, '');
+  const timeframe = timeframeValue ? `周期 ${timeframeValue}` : null;
   return [identity, comparison, timeframe].filter(Boolean).join(' · ');
 };
 const riskChangeText = (change: string) =>
