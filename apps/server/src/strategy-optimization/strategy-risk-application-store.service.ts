@@ -154,18 +154,17 @@ export class StrategyRiskApplicationStoreService {
     return updated;
   }
 
-  syncFrozenRuleEnabled(
+  syncFrozenRuleState(
     transaction: Prisma.TransactionClient,
     applicationId: string,
-    enabled: boolean,
-    revision: number,
+    input: { enabled: boolean; revision: number; enabledChanged: boolean },
   ) {
     return transaction.riskRule.updateMany({
       where: { sourcePlanId: applicationId, archivedAt: null },
       data: {
-        enabled,
-        version: { increment: 1 },
-        parameters: asJson({ applicationRevision: revision }),
+        enabled: input.enabled,
+        ...(input.enabledChanged ? { version: { increment: 1 } } : {}),
+        parameters: asJson({ applicationRevision: input.revision }),
       },
     });
   }
