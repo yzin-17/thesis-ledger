@@ -18,6 +18,11 @@ import type {
   StoredRule,
 } from './risk-types.js';
 
+type RiskScanOptions = {
+  evaluatedAt?: Date;
+  includeStrategyRules?: boolean;
+};
+
 @Injectable()
 export class RiskService {
   private readonly rules: RiskRuleService;
@@ -71,7 +76,7 @@ export class RiskService {
     if (stored.sourcePlanId) {
       const evaluated = await this.strategyRuntime.evaluateStoredRule(
         stored,
-        this.scanEvaluationTime(input, parsed),
+        this.scanEvaluationTime(parsed),
       );
       return evaluated.event ? [evaluated.event] : [];
     }
@@ -80,13 +85,13 @@ export class RiskService {
     return events;
   }
 
-  async scan(input: unknown) {
+  async scan(input: unknown, options: RiskScanOptions = {}) {
     const parsed = await this.contexts.prepare(input, true);
     const scanId = parsed.scanId ?? crypto.randomUUID();
     const rules = await this.rules.listEnabledRules();
     const traceId = crypto.randomUUID();
-    const evaluatedAt = this.scanEvaluationTime(input, parsed);
-    const includeStrategyRules = this.includeStrategyRules(input);
+    const evaluatedAt = options.evaluatedAt ?? this.scanEvaluationTime(parsed);
+    const includeStrategyRules = options.includeStrategyRules ?? true;
     const results: Array<{ ruleId: string; eventId?: string; error?: string }> = [];
 
     for (const stored of rules) {
@@ -223,19 +228,7 @@ export class RiskService {
     }
   }
 
-  private includeStrategyRules(input: unknown) {
-    if (input === null || typeof input !== 'object' || Array.isArray(input)) return true;
-    return (input as Record<string, unknown>).includeStrategyRules !== false;
-  }
-
-  private scanEvaluationTime(input: unknown, scan: ParsedScan) {
-    if (input !== null && typeof input === 'object' && !Array.isArray(input)) {
-      const value = (input as Record<string, unknown>).evaluatedAt;
-      if (typeof value === 'string') {
-        const parsed = new Date(value);
-        if (!Number.isNaN(parsed.getTime())) return parsed;
-      }
-    }
+  private scanEvaluationTime(scan: ParsedScan) {
     const marketTimes = [
       ...scan.security.map((context) => context.marketTime),
       ...scan.accounts.map((context) => context.marketTime),
