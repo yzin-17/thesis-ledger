@@ -42,24 +42,29 @@ export function StrategyRiskApplicationsSection({
   const copy = useMutation({
     mutationFn: async (application: StrategyRiskApplication) => {
       const rules = copyableRules(application);
-      if (rules.length === 0) throw new Error('当前应用没有可复制为旧手工规则的成本止损/止盈条件');
+      if (rules.length === 0) throw new Error('当前应用没有可复制为手工规则的成本止损/止盈条件');
       const created = await Promise.all(
         rules.map((rule) =>
           createRiskRule({
             kind: rule.kind,
             scope: 'security',
-            severity: 'warning',
+            severity: application.notification.severity ?? 'warning',
             threshold: rule.kind === 'cost-stop' ? Math.abs(Number(rule.threshold)) : Number(rule.threshold),
             enabled: false,
             symbol: application.symbol,
             accountId: application.accountId,
+            parameters: {
+              comparisonOperator: rule.operator,
+              semanticVersion: 'strategy-monitoring-v1-detached',
+              sourceKey: rule.sourceKey,
+            },
           }),
         ),
       );
       return created.length;
     },
     onSuccess: async (count) => {
-      setFeedback(`已复制 ${count} 条独立手工规则，默认保持停用；后续修改不再跟随策略版本。`);
+      setFeedback(`已复制 ${count} 条独立手工规则，保留原策略等号边界语义并默认停用；后续修改不再跟随策略版本。`);
       await queryClient.invalidateQueries({ queryKey: riskKeys.rules() });
     },
     onError: (error) => setFeedback(error instanceof Error ? error.message : '复制独立规则失败'),
