@@ -5,6 +5,7 @@ import { StrategyRiskRuntimeService } from '../../src/risk/strategy-risk-runtime
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 const applicationId = '22222222-2222-4222-8222-222222222222';
+const evaluatedAt = new Date('2026-09-11T08:00:00.000Z');
 
 describe('统一策略风险运行时', () => {
   it('策略规则由 RiskService 分派到 Strategy evaluator，并复用 RiskEvent/Notification 管线', async () => {
@@ -86,12 +87,9 @@ describe('统一策略风险运行时', () => {
       strategyRuntime as never,
     );
 
-    const result = await service.scan({ contexts: [], evaluatedAt: '2026-09-11T08:00:00.000Z' });
+    const result = await service.scan({ contexts: [] }, { evaluatedAt });
 
-    expect(strategyRuntime.evaluateStoredRule).toHaveBeenCalledWith(
-      stored,
-      new Date('2026-09-11T08:00:00.000Z'),
-    );
+    expect(strategyRuntime.evaluateStoredRule).toHaveBeenCalledWith(stored, evaluatedAt);
     expect(eventService.persist).toHaveBeenCalledOnce();
     expect(notifications.enqueue).toHaveBeenCalledWith(
       expect.any(Object),
@@ -128,18 +126,16 @@ describe('统一策略风险运行时', () => {
       strategyRuntime as never,
     );
 
-    const result = await service.scan({
-      contexts: [],
-      evaluatedAt: '2026-09-11T08:00:00.000Z',
-      includeStrategyRules: false,
-    });
+    const result = await service.scan(
+      { contexts: [] },
+      { evaluatedAt, includeStrategyRules: false },
+    );
 
     expect(strategyRuntime.evaluateStoredRule).not.toHaveBeenCalled();
     expect(result.results).toEqual([]);
   });
 
   it('策略上下文只读取已在评价时点可用的 MarketBar，不依赖实时 quote', async () => {
-    const evaluatedAt = new Date('2026-09-11T08:00:00.000Z');
     const prisma = {
       account: { findUnique: vi.fn(async () => ({ active: true })) },
       position: {
