@@ -139,6 +139,7 @@ export interface CreateRiskRuleInput {
   enabled: boolean;
   symbol?: string;
   accountId?: string;
+  parameters?: Record<string, unknown>;
 }
 
 export type UpdateRiskRuleInput = Partial<Omit<CreateRiskRuleInput, 'enabled'>> & {
