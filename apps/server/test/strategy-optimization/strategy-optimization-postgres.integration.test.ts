@@ -639,7 +639,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
       outputTokens: 17,
       cost: 0,
       costKnown: true,
-      actualModel: provider.models[0],
+      actualModel: 'optimizer-model',
     }));
     const runs = new StrategyOptimizationRunService(prisma, backtests as never);
     const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
