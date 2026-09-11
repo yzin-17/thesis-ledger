@@ -247,6 +247,7 @@ export const optimizationExperimentCreateSchema = z
       ctx.addIssue({ code: 'custom', path: ['split'], message: '数据切分必须位于 RunConfig 区间内' });
   });
 export type OptimizationExperimentCreate = z.infer<typeof optimizationExperimentCreateSchema>;
+export type OptimizationExperimentClone = z.infer<typeof optimizationExperimentCloneSchema>;
 
 export const optimizationProposalChangeSchema = z
   .object({
@@ -288,6 +289,10 @@ export const optimizationExperimentStageSchema = z.enum([
   'failed',
   'cancelled',
 ]);
+
+export const optimizationExperimentCloneSchema = z
+  .object({ idempotencyKey: z.string().trim().min(1).max(200) })
+  .strict();
 
 export const optimizationFinalizeSchema = z
   .object({

@@ -165,6 +165,13 @@ export const createOptimizationExperiment = (
   client?: DesktopRequestClient,
 ) => jsonPost<OptimizationExperimentSummary>('/strategy-optimization/experiments', input, client);
 
+export const cloneOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>
+  jsonPost<OptimizationExperimentSummary>(
+    `/strategy-optimization/experiments/${encodeURIComponent(id)}/clone`,
+    { idempotencyKey: crypto.randomUUID() },
+    client,
+  );
+
 export const cancelOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>
   jsonPost<OptimizationExperimentSummary>(
     `/strategy-optimization/experiments/${encodeURIComponent(id)}/cancel`,

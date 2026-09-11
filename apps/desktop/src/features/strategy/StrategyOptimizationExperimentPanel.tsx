@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   adoptOptimizationCandidate,
   cancelOptimizationExperiment,
+  cloneOptimizationExperiment,
   createOptimizationExperiment,
   fetchOptimizationCapabilities,
   fetchOptimizationCompare,
@@ -210,6 +211,17 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
     mutationFn: (id: string) => cancelOptimizationExperiment(id),
     onSuccess: invalidate,
   });
+  const cloneMutation = useMutation({
+    mutationFn: (id: string) => cloneOptimizationExperiment(id),
+    onSuccess: async (experiment) => {
+      setSelectedExperimentId(experiment.id);
+      setFeedback(experiment.testExposedAt
+        ? '实验已克隆；源实验测试集已暴露，新实验继承暴露状态，不视为新的独立验证。'
+        : '实验已克隆，并继承相同模型、参数、数据切分与预算配置。');
+      await invalidate();
+    },
+    onError: (error) => setFeedback(error instanceof Error ? error.message : '克隆实验失败'),
+  });
   const finalizeMutation = useMutation({
     mutationFn: () => {
       if (!selectedExperimentId || !preselectedCandidateId || lockedCandidateIds.length === 0)
@@ -379,6 +391,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
               <div className="flex items-center gap-2">
                 <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>{experiment.status}</Badge>
                 <Button size="sm" variant="outline" onClick={() => setSelectedExperimentId(experiment.id)}>查看</Button>
+                <Button size="sm" variant="outline" disabled={cloneMutation.isPending} onClick={() => cloneMutation.mutate(experiment.id)}>克隆</Button>
                 {!settledStatuses.has(experiment.status) ? <Button size="sm" variant="outline" onClick={() => cancelMutation.mutate(experiment.id)}>取消</Button> : null}
               </div>
             </div>

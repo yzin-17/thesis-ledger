@@ -93,6 +93,11 @@ export class StrategyOptimizationController {
     return this.optimization.compare(id);
   }
 
+  @Post('experiments/:id/clone')
+  clone(@Param('id') id: string, @Body() body: unknown) {
+    return this.optimization.clone(id, body);
+  }
+
   @Post('experiments/:id/cancel')
   cancel(@Param('id') id: string) {
     return this.optimization.cancel(id);

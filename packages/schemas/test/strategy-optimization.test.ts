@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  optimizationExperimentCloneSchema,
   optimizationExperimentCreateSchema,
   optimizationProposalSchema,
   riskApplicationCreateSchema,
@@ -64,6 +65,11 @@ describe('strategy optimization contracts', () => {
         },
       }),
     ).toThrow();
+  });
+
+  it('keeps experiment clone input narrow and cannot reset exposure', () => {
+    expect(optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1' })).toEqual({ idempotencyKey: 'clone-1' });
+    expect(() => optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1', resetExposure: true })).toThrow();
   });
 
   it('reserves symmetric model work and final verification before starting', () => {

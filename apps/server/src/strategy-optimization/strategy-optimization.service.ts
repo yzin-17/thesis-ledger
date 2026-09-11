@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from
 import { Prisma } from '@prisma/client';
 import {
   optimizationAdoptSchema,
+  optimizationExperimentCloneSchema,
   optimizationExperimentCreateSchema,
   optimizationFinalizeSchema,
   strategySchemaV2,
@@ -167,6 +168,38 @@ export class StrategyOptimizationService implements OnModuleInit {
       ) RETURNING *
     `);
     return rows[0]!;
+  }
+
+  async clone(id: string, input: unknown) {
+    this.assertEnabled();
+    const parsed = optimizationExperimentCloneSchema.parse(input);
+    const previous = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
+      SELECT * FROM "OptimizationExperiment" WHERE "idempotencyKey"=${parsed.idempotencyKey} LIMIT 1
+    `);
+    if (previous[0]) return previous[0];
+    const source = await this.experiment(id);
+    const cloneId = randomUUID();
+    const inheritedExposure = source.testExposedAt
+      ? { ...toRecord(source.exposure), inheritedFromExperimentId: source.id, inheritedTestExposure: true, inheritedAt: new Date().toISOString() }
+      : { inheritedFromExperimentId: source.id, inheritedTestExposure: false };
+    const rows = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
+      INSERT INTO "OptimizationExperiment" (
+        "id", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
+        "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds",
+        "idempotencyKey", "testExposedAt", "exposure", "updatedAt"
+      ) VALUES (
+        ${cloneId}::uuid, ${source.baselineStrategyVersionId}::uuid, 'queued', 'preparing',
+        ${JSON.stringify(source.objective)}::jsonb, ${JSON.stringify(source.allowedParameterIds)}::jsonb,
+        ${JSON.stringify(source.split)}::jsonb, ${JSON.stringify(source.runConfig)}::jsonb,
+        ${source.dataFingerprint}, ${JSON.stringify(source.modelConfig)}::jsonb,
+        ${JSON.stringify(source.budget)}::jsonb, ${source.maxRounds}, ${parsed.idempotencyKey},
+        ${source.testExposedAt}, ${JSON.stringify(inheritedExposure)}::jsonb, CURRENT_TIMESTAMP
+      ) RETURNING *
+    `);
+    const created = rows[0];
+    if (!created) throw new Error('克隆实验创建失败');
+    void this.process(created.id).catch(() => undefined);
+    return created;
   }
 
   async cancel(id: string) {
