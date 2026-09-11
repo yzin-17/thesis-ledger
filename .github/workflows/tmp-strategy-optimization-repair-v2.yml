@@ -1,0 +1,101 @@
+name: Temporary Strategy Optimization Repair V2
+
+on:
+  push:
+    branches:
+      - feat/strategy-risk-ai-optimization-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/strategy-risk-ai-optimization-20260911
+          fetch-depth: 0
+      - name: Apply focused repairs
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = 1):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'missing expected snippet in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, count))
+
+          replace('apps/desktop/src/features/strategy/StrategyOptimizationExperimentPanel.tsx', "onValueChange={(value) => value && setObjective(value as typeof objective)}", "onValueChange={(value) => value && setObjective(value)}")
+          replace('apps/desktop/src/features/strategy/StrategyRiskApplicationPanel.tsx', "onValueChange={(value) => value && setCycleMode(value as typeof cycleMode)}", "onValueChange={(value) => value && setCycleMode(value)}")
+          replace('apps/server/src/strategy-optimization/strategy-optimization-common.ts', "import { Prisma } from '@prisma/client';", "import type { Prisma } from '@prisma/client';")
+          replace('apps/server/src/strategy-optimization/strategy-optimization-parameters.ts', '  const next = structuredClone(baseline) as StrategySchemaV2;', '  const next = structuredClone(baseline);')
+          replace('apps/server/src/strategy-optimization/strategy-optimization-parameters.ts', '  return strategySchemaV2.parse(next) as StrategySchemaV2;', '  return strategySchemaV2.parse(next);')
+          replace('apps/server/src/strategy-optimization/strategy-optimization.service.ts', '  asJson,\n  optimizationFeatureEnabled,', '  optimizationAttemptFailureStatus,\n  optimizationFeatureEnabled,')
+
+          common_path = Path('apps/server/src/strategy-optimization/strategy-optimization-common.ts')
+          common = common_path.read_text()
+          anchor = "export const redactOptimizationError = (error: unknown) =>\n"
+          helpers = """export const optimizationRemainingDurationMs = (\n  input: Pick<ExperimentRow, 'createdAt' | 'budget'>,\n  now = Date.now(),\n) => {\n  const raw = toRecord(input.budget).maxDurationSeconds;\n  const maxSeconds =\n    typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 1_800;\n  return Math.max(0, maxSeconds * 1_000 - (now - input.createdAt.getTime()));\n};\n\nexport const optimizationAttemptFailureStatus = (error: unknown) => {\n  const name = error instanceof Error ? error.name : '';\n  return name === 'AbortError' || name === 'TimeoutError' ? 'unknown_outcome' : 'failed';\n};\n\n"""
+          if helpers not in common:
+              if anchor not in common: raise SystemExit('missing common helper anchor')
+              common_path.write_text(common.replace(anchor, helpers + anchor, 1))
+
+          run_path = Path('apps/server/src/strategy-optimization/strategy-optimization-run.service.ts')
+          run = run_path.read_text()
+          run = run.replace('  optimizationSha256,\n  toRecord,', '  optimizationRemainingDurationMs,\n  optimizationSha256,\n  toRecord,', 1)
+          old = '''      WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL\n        AND "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int)\n        AND "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int)\n        AND (("budget"->>'maxCost') IS NULL OR "costUsed"+${estimatedCost} <= (("budget"->>'maxCost')::decimal))\n    `);\n    if (updated !== 1) throw new BadRequestException('优化实验预算已耗尽或实验已取消');'''
+          new = '''      WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL\n        AND EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "createdAt"))\n          <= COALESCE(NULLIF("budget"->>'maxDurationSeconds', '')::int, 1800)\n        AND "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int)\n        AND "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int)\n        AND (("budget"->>'maxCost') IS NULL OR "costUsed"+${estimatedCost} <= (("budget"->>'maxCost')::decimal))\n    `);\n    if (updated !== 1)\n      throw new BadRequestException('优化实验预算或最长运行时长已耗尽，或实验已取消');'''
+          if old not in run: raise SystemExit('missing reserve budget block')
+          run = run.replace(old, new, 1)
+          touch = '''  private async touchLease(id: string) {\n    await this.prisma.$executeRaw(Prisma.sql`\n      UPDATE "OptimizationExperiment" SET "leaseUntil"=${new Date(Date.now() + 600_000)}, "updatedAt"=CURRENT_TIMESTAMP\n      WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL\n    `);\n  }\n\n'''
+          method = '''  requestTimeoutMs(experiment: ExperimentRow, ceilingMs: number) {\n    const remaining = optimizationRemainingDurationMs(experiment);\n    if (remaining <= 0) throw new BadRequestException('优化实验最长运行时长已耗尽');\n    return Math.max(1, Math.min(ceilingMs, remaining));\n  }\n\n'''
+          if touch not in run: raise SystemExit('missing touchLease block')
+          run = run.replace(touch, touch + method, 1)
+          if ': await this.waitForRun(run.id);' not in run: raise SystemExit('missing waitForRun call')
+          run = run.replace(': await this.waitForRun(run.id);', ': await this.waitForRun(run.id, this.requestTimeoutMs(experiment, 180_000));', 1)
+          run_path.write_text(run)
+
+          replace('apps/server/src/strategy-optimization/strategy-optimization-candidate.service.ts', '        AbortSignal.timeout(60_000),', '        AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),')
+          replace('apps/server/src/strategy-optimization/strategy-optimization.service.ts', "        status: 'failed',\n        error: redactOptimizationError(error),", "        status: optimizationAttemptFailureStatus(error),\n        error: redactOptimizationError(error),")
+
+          service_path = Path('apps/server/src/strategy-optimization/strategy-optimization.service.ts')
+          service = service_path.read_text()
+          old_rounds = '''  private async processModelRounds(\n    experiment: ExperimentRow,\n    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },\n  ) {\n    const descriptors = describeStrategyParameters(baseline.strategy);\n    const routes = experiment.modelConfig as Array<{ provider: string; model: string }>;\n    for (const route of routes) {\n      for (let round = 1; round <= experiment.maxRounds; round += 1) {\n        await this.processRound(experiment, baseline, descriptors, route, round);\n        if (await this.cancelled(experiment.id)) return;\n      }\n    }\n  }'''
+          new_rounds = '''  private async bestValidationScore(experimentId: string, modelKey: string) {\n    const rows = await this.prisma.$queryRaw<Array<{ metrics: unknown }>>(Prisma.sql`\n      SELECT "metrics" FROM "OptimizationCandidate"\n      WHERE "experimentId"=${experimentId}::uuid AND "modelKey"=${modelKey} AND "validationStatus"='valid'\n    `);\n    return rows.reduce((best, row) => {\n      const score = toRecord(toRecord(row.metrics).validation).score;\n      return typeof score === 'number' ? Math.max(best, score) : best;\n    }, Number.NEGATIVE_INFINITY);\n  }\n\n  private async processModelRounds(\n    experiment: ExperimentRow,\n    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },\n  ) {\n    const descriptors = describeStrategyParameters(baseline.strategy);\n    const routes = experiment.modelConfig as Array<{ provider: string; model: string }>;\n    for (const route of routes) {\n      const modelKey = `${route.provider}:${route.model}`;\n      let bestScore = Number.NEGATIVE_INFINITY;\n      for (let round = 1; round <= experiment.maxRounds; round += 1) {\n        await this.processRound(experiment, baseline, descriptors, route, round);\n        if (await this.cancelled(experiment.id)) return;\n        const currentBest = await this.bestValidationScore(experiment.id, modelKey);\n        if (round > 1 && currentBest <= bestScore) break;\n        bestScore = Math.max(bestScore, currentBest);\n      }\n    }\n  }'''
+          if old_rounds not in service: raise SystemExit('missing processModelRounds block')
+          service_path.write_text(service.replace(old_rounds, new_rounds, 1))
+
+          panel_path = Path('apps/desktop/src/features/strategy/StrategyOptimizationExperimentPanel.tsx')
+          panel = panel_path.read_text()
+          anchor = "  const [initialCash, setInitialCash] = useState('100000');\n"
+          states = """  const [maxAiCalls, setMaxAiCalls] = useState('6');\n  const [maxBacktestRuns, setMaxBacktestRuns] = useState('20');\n  const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');\n"""
+          if anchor not in panel: raise SystemExit('missing budget state anchor')
+          panel = panel.replace(anchor, anchor + states, 1)
+          budget_old = '        budget: { maxAiCalls: 6, maxBacktestRuns: 20, maxDurationSeconds: 1_800 },'
+          budget_new = '''        budget: {\n          maxAiCalls: Number(maxAiCalls),\n          maxBacktestRuns: Number(maxBacktestRuns),\n          maxDurationSeconds: Number(maxDurationSeconds),\n        },'''
+          if budget_old not in panel: raise SystemExit('missing fixed budget')
+          panel = panel.replace(budget_old, budget_new, 1)
+          ui_anchor = '''          <div className="grid gap-3 lg:grid-cols-[180px_1fr]">\n            <label className="space-y-1 text-sm"><span className="text-muted-foreground">初始资金（{currency}）</span><Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} /></label>'''
+          budget_ui = '''          <div className="grid gap-3 sm:grid-cols-3">\n            <label className="space-y-1 text-sm"><span className="text-muted-foreground">AI 调用上限</span><Input type="number" min="1" max="30" value={maxAiCalls} onChange={(event) => setMaxAiCalls(event.target.value)} /></label>\n            <label className="space-y-1 text-sm"><span className="text-muted-foreground">回测运行上限</span><Input type="number" min="2" max="100" value={maxBacktestRuns} onChange={(event) => setMaxBacktestRuns(event.target.value)} /></label>\n            <label className="space-y-1 text-sm"><span className="text-muted-foreground">最长计算（秒）</span><Input type="number" min="30" max="86400" value={maxDurationSeconds} onChange={(event) => setMaxDurationSeconds(event.target.value)} /></label>\n          </div>\n          <p className="text-xs text-muted-foreground">预算为服务端硬上限；达到调用、回测、费用或时长上限后停止创建新工作。</p>\n'''
+          if ui_anchor not in panel: raise SystemExit('missing budget UI anchor')
+          panel_path.write_text(panel.replace(ui_anchor, budget_ui + ui_anchor, 1))
+
+          Path('apps/server/test/strategy-optimization/strategy-optimization-budget.test.ts').write_text("""import { describe, expect, it } from 'vitest';\nimport { optimizationAttemptFailureStatus, optimizationRemainingDurationMs } from '../../src/strategy-optimization/strategy-optimization-common.js';\n\ndescribe('strategy optimization duration budget', () => {\n  it('uses maxDurationSeconds as a hard elapsed-time budget', () => {\n    const createdAt = new Date('2026-09-11T00:00:00.000Z');\n    expect(optimizationRemainingDurationMs({ createdAt, budget: { maxDurationSeconds: 120 } }, createdAt.getTime() + 30_000)).toBe(90_000);\n    expect(optimizationRemainingDurationMs({ createdAt, budget: { maxDurationSeconds: 120 } }, createdAt.getTime() + 121_000)).toBe(0);\n  });\n\n  it('marks timeout and abort ambiguity as unknown_outcome', () => {\n    const timeout = new Error('timeout');\n    timeout.name = 'TimeoutError';\n    const abort = new Error('abort');\n    abort.name = 'AbortError';\n    expect(optimizationAttemptFailureStatus(timeout)).toBe('unknown_outcome');\n    expect(optimizationAttemptFailureStatus(abort)).toBe('unknown_outcome');\n    expect(optimizationAttemptFailureStatus(new Error('validation'))).toBe('failed');\n  });\n});\n""")
+
+          Path('apps/server/test/ai/configured-providers.test.ts').write_text("""import { describe, expect, it } from 'vitest';\nimport { createConfiguredAiProviders } from '../../src/ai/provider-adapters.js';\nimport { parseConfig } from '../../src/platform/config.js';\n\nconst baseEnvironment = {\n  NODE_ENV: 'development',\n  DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',\n  REDIS_URL: 'redis://localhost:6379',\n  DSA_BASE_URL: 'http://localhost:8000',\n  THESIS_LEDGER_DSA_TOKEN: 'test-token',\n  CREDENTIAL_ENCRYPTION_KEY: '0123456789abcdef',\n};\n\ndescribe('configured AI providers', () => {\n  it('registers multiple explicit provider/model identities', () => {\n    const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_CONFIGS_JSON: JSON.stringify([\n      { id: 'alpha', baseUrl: 'https://alpha.example/v1', apiKey: 'a', models: ['a1', 'a2'] },\n      { id: 'beta', baseUrl: 'https://beta.example/v1', apiKey: 'b', models: ['b1'], timeoutMs: 1234 },\n    ]) });\n    expect(createConfiguredAiProviders(config).map(({ id, models }) => ({ id, models: [...models] }))).toEqual([\n      { id: 'alpha', models: ['a1', 'a2'] },\n      { id: 'beta', models: ['b1'] },\n    ]);\n  });\n\n  it('rejects duplicate provider identities', () => {\n    const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_CONFIGS_JSON: JSON.stringify([\n      { id: 'alpha', baseUrl: 'https://one.example/v1', apiKey: 'a', models: ['a1'] },\n      { id: 'alpha', baseUrl: 'https://two.example/v1', apiKey: 'b', models: ['a2'] },\n    ]) });\n    expect(() => createConfiguredAiProviders(config)).toThrow(/Provider id 必须唯一/);\n  });\n\n  it('keeps the legacy single-provider configuration compatible', () => {\n    const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_ID: 'legacy', AI_BASE_URL: 'https://legacy.example/v1', AI_API_KEY: 'legacy-key', AI_MODEL: 'legacy-model' });\n    expect(createConfiguredAiProviders(config).map(({ id, models }) => ({ id, models: [...models] }))).toEqual([{ id: 'legacy', models: ['legacy-model'] }]);\n  });\n});\n""")
+          PY
+      - name: Remove temporary workflows and commit repairs
+        shell: bash
+        run: |
+          rm -f .github/workflows/tmp-strategy-optimization-repair.yml
+          rm -f .github/workflows/tmp-strategy-optimization-repair-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: close strategy optimization acceptance gaps"
+          git push origin HEAD:feat/strategy-risk-ai-optimization-20260911
