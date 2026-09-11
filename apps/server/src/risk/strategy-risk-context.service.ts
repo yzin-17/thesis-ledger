@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { MarketBar } from '@prisma/client';
 import {
   aggregateMinuteBars,
   tradingCalendars,
@@ -33,10 +34,6 @@ export type StrategyRiskActualContext = {
     availableAt?: string;
   };
 };
-
-type StoredBar = Awaited<ReturnType<PrismaService['marketBar']['findFirst']>> extends infer Row
-  ? NonNullable<Row>
-  : never;
 
 const timeframeMinutes = (timeframe: string) => {
   const matched = timeframe.match(/^(1|5|15|30|60)m$/u);
@@ -177,16 +174,18 @@ export class StrategyRiskContextService {
     if (minutes !== null) return new Date(timestamp.getTime() + minutes * 60_000);
     if (timeframe !== '1d' || !market) return null;
     const calendar = tradingCalendars[market];
-    const sessions = calendar.sessionsForDate(timestamp);
+    // Daily Bar 的 ISO 日期是交易日身份；不能把 UTC 零点直接转市场时区，否则 US 会落到前一天。
+    const tradingDate = timestamp.toISOString().slice(0, 10);
+    const localNoon = utcForLocalMinute(tradingDate, 12 * 60, calendar.timezone);
+    const sessions = calendar.sessionsForDate(localNoon);
     const end = sessions.at(-1)?.end;
     if (end === undefined) return null;
-    const tradingDate = timestamp.toISOString().slice(0, 10);
     return utcForLocalMinute(tradingDate, end, calendar.timezone);
   }
 
-  private effectiveBars(rows: StoredBar[]) {
+  private effectiveBars(rows: MarketBar[]) {
     const seen = new Set<number>();
-    const result: StoredBar[] = [];
+    const result: MarketBar[] = [];
     for (const row of rows) {
       const timestamp = row.timestamp.getTime();
       if (seen.has(timestamp)) continue;
@@ -224,7 +223,7 @@ export class StrategyRiskContextService {
     return this.effectiveBars(rows);
   }
 
-  private minuteInputs(rows: StoredBar[], market: TradingMarket): BacktestMinuteBar[] {
+  private minuteInputs(rows: MarketBar[], market: TradingMarket): BacktestMinuteBar[] {
     return rows.map((row) => ({
       symbol: row.symbol,
       market,
