@@ -111,7 +111,12 @@ export class StrategyOptimizationController {
   }
 
   @Post('experiments/:id/adopt')
-  adopt(@Param('id') id: string, @Body() body: unknown) {
-    return this.optimization.adopt(id, body);
+  async adopt(@Param('id') id: string, @Body() body: unknown) {
+    const result = await this.optimization.adopt(id, body);
+    const strategyVersionId = result.strategyVersion?.id;
+    const riskApplicationDiffs = strategyVersionId
+      ? await this.riskApplications.planDiffsForTargetVersion(strategyVersionId)
+      : [];
+    return { ...result, riskApplicationDiffs };
   }
 }

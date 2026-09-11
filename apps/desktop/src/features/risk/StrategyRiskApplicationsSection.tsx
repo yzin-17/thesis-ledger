@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -5,9 +6,15 @@ import type { Account } from '../portfolio/portfolio.types.js';
 import {
   fetchStrategyRiskApplications,
   updateStrategyRiskApplication,
+  type StrategyRiskApplication,
 } from '../strategy/strategy-optimization.api.js';
+import { createRiskRule } from './risk.api.js';
+import { riskKeys } from './risk.queries.js';
 
 const strategyRiskApplicationsKey = ['desktop', 'strategy', 'risk-applications'] as const;
+
+const copyableRules = (application: StrategyRiskApplication) =>
+  application.plan.rules.filter((rule) => rule.kind === 'cost-stop' || rule.kind === 'take-profit');
 
 export function StrategyRiskApplicationsSection({
   accounts,
@@ -17,6 +24,7 @@ export function StrategyRiskApplicationsSection({
   onOpenStrategy: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState<string | null>(null);
   const applications = useQuery({
     queryKey: strategyRiskApplicationsKey,
     queryFn: () => fetchStrategyRiskApplications(),
@@ -30,6 +38,36 @@ export function StrategyRiskApplicationsSection({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: strategyRiskApplicationsKey });
     },
+  });
+  const copy = useMutation({
+    mutationFn: async (application: StrategyRiskApplication) => {
+      const rules = copyableRules(application);
+      if (rules.length === 0) throw new Error('当前应用没有可复制为手工规则的成本止损/止盈条件');
+      const created = await Promise.all(
+        rules.map((rule) =>
+          createRiskRule({
+            kind: rule.kind,
+            scope: 'security',
+            severity: application.notification.severity ?? 'warning',
+            threshold: rule.kind === 'cost-stop' ? Math.abs(Number(rule.threshold)) : Number(rule.threshold),
+            enabled: false,
+            symbol: application.symbol,
+            accountId: application.accountId,
+            parameters: {
+              comparisonOperator: rule.operator,
+              semanticVersion: 'strategy-monitoring-v1-detached',
+              sourceKey: rule.sourceKey,
+            },
+          }),
+        ),
+      );
+      return created.length;
+    },
+    onSuccess: async (count) => {
+      setFeedback(`已复制 ${count} 条独立手工规则，保留原策略等号边界语义并默认停用；后续修改不再跟随策略版本。`);
+      await queryClient.invalidateQueries({ queryKey: riskKeys.rules() });
+    },
+    onError: (error) => setFeedback(error instanceof Error ? error.message : '复制独立规则失败'),
   });
 
   if (applications.isPending) {
@@ -63,6 +101,7 @@ export function StrategyRiskApplicationsSection({
     <div className="space-y-2">
       {applications.data?.map((application) => {
         const account = accounts.find((item) => item.id === application.accountId);
+        const copyableCount = copyableRules(application).length;
         return (
           <div
             key={application.id}
@@ -78,7 +117,10 @@ export function StrategyRiskApplicationsSection({
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 {account?.name ?? application.accountId} · 应用修订 r{application.revision} · 覆盖{' '}
-                {application.coverage.riskMapped}/{application.coverage.riskTotal}
+                {application.coverage.riskMapped}/{application.coverage.riskTotal} · 通知{' '}
+                {application.notification.enabled === false
+                  ? '关闭'
+                  : `开启 / ${application.notification.cooldownMinutes ?? 60} 分钟`}
               </div>
               <div className="mt-1 break-all text-xs text-muted-foreground">
                 来源策略版本 {application.strategyVersionId}
@@ -87,6 +129,14 @@ export function StrategyRiskApplicationsSection({
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={onOpenStrategy}>
                 查看来源/升级
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={copy.isPending || copyableCount === 0}
+                onClick={() => copy.mutate(application)}
+              >
+                复制为独立规则{copyableCount > 0 ? ` (${copyableCount})` : ''}
               </Button>
               <Button
                 size="sm"
@@ -106,6 +156,7 @@ export function StrategyRiskApplicationsSection({
           </div>
         );
       })}
+      {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
       {toggle.isError ? (
         <p className="text-sm text-destructive">
           {toggle.error instanceof Error ? toggle.error.message : '更新策略风险应用失败'}

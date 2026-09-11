@@ -10,6 +10,7 @@ import {
 } from '@thesis-ledger/domain';
 import {
   riskApplicationCreateSchema,
+  riskApplicationNotificationSchema,
   riskApplicationPreviewInputSchema,
   riskApplicationUpdateSchema,
   riskApplicationUpgradeSchema,
@@ -62,6 +63,10 @@ export class StrategyRiskApplicationService {
 
   private assertEnabled() {
     if (!featureEnabled()) throw new BadRequestException('策略来源风险监控当前已关闭');
+  }
+
+  private notification(value: unknown) {
+    return riskApplicationNotificationSchema.parse(value ?? {});
   }
 
   private async strategyVersion(
@@ -145,6 +150,38 @@ export class StrategyRiskApplicationService {
     return this.store.get(id);
   }
 
+  private planDiff(beforePlan: StrategyMonitoringPlan, afterPlan: StrategyMonitoringPlan) {
+    const before = new Map(beforePlan.rules.map((rule) => [rule.sourceKey, rule]));
+    const after = new Map(afterPlan.rules.map((rule) => [rule.sourceKey, rule]));
+    const keys = new Set([...before.keys(), ...after.keys()]);
+    return [...keys].map((sourceKey) => this.ruleDiff(sourceKey, before, after));
+  }
+
+  async planDiffsForTargetVersion(targetStrategyVersionId: string) {
+    const [targetVersion, targetPlan] = await Promise.all([
+      this.strategyVersion(targetStrategyVersionId),
+      this.monitoringPlan(targetStrategyVersionId),
+    ]);
+    const applications = await this.prisma.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT application.*
+      FROM "StrategyRiskApplication" AS application
+      JOIN "StrategyVersion" AS source_version ON source_version."id"=application."strategyVersionId"
+      WHERE source_version."strategyId"=${targetVersion.strategyId}::uuid
+        AND application."ownerKey"='local-user'
+        AND application."archivedAt" IS NULL
+      ORDER BY application."updatedAt" DESC, application."id" DESC
+    `);
+    return applications.map((application) => ({
+      applicationId: application.id,
+      accountId: application.accountId,
+      symbol: application.symbol,
+      currentStrategyVersionId: application.strategyVersionId,
+      currentRevision: application.revision,
+      enabled: application.enabled,
+      diff: this.planDiff(application.plan as StrategyMonitoringPlan, targetPlan),
+    }));
+  }
+
   private async createTransaction(
     id: string,
     parsed: ReturnType<typeof riskApplicationCreateSchema.parse>,
@@ -176,6 +213,7 @@ export class StrategyRiskApplicationService {
         symbol: parsed.symbol,
         revision: 1,
         enabled: parsed.enabled,
+        severity: parsed.notification.severity,
         plan: preview.plan,
       });
       await this.store.audit(transaction, {
@@ -218,7 +256,8 @@ export class StrategyRiskApplicationService {
     input: ReturnType<typeof riskApplicationUpdateSchema.parse>,
   ) {
     const enabled = input.enabled ?? current.enabled;
-    const notification = input.notification ?? current.notification;
+    const notification = input.notification ?? this.notification(current.notification);
+    const enabledChanged = enabled !== current.enabled;
     return this.prisma.$transaction(async (transaction) => {
       if (enabled && !current.enabled)
         await this.store.assertNoEnabledConflict(
@@ -233,7 +272,12 @@ export class StrategyRiskApplicationService {
         enabled,
         notification,
       });
-      await this.store.syncFrozenRuleEnabled(transaction, id, enabled, updated.revision);
+      await this.store.syncFrozenRuleState(transaction, id, {
+        enabled,
+        severity: notification.severity,
+        revision: updated.revision,
+        enabledChanged,
+      });
       await this.store.audit(transaction, {
         applicationId: id,
         revision: updated.revision,
@@ -259,15 +303,10 @@ export class StrategyRiskApplicationService {
       symbol: current.symbol,
       cycleMode: current.cycleMode,
     });
-    const before = new Map(
-      (current.plan as StrategyMonitoringPlan).rules.map((rule) => [rule.sourceKey, rule]),
-    );
-    const after = new Map(preview.plan.rules.map((rule) => [rule.sourceKey, rule]));
-    const keys = new Set([...before.keys(), ...after.keys()]);
     return {
       ...preview,
       currentRevision: current.revision,
-      diff: [...keys].map((sourceKey) => this.ruleDiff(sourceKey, before, after)),
+      diff: this.planDiff(current.plan as StrategyMonitoringPlan, preview.plan),
     };
   }
 
@@ -302,6 +341,7 @@ export class StrategyRiskApplicationService {
     input: ReturnType<typeof riskApplicationUpgradeSchema.parse>,
     preview: RiskPreview,
   ) {
+    const notification = this.notification(current.notification);
     return this.prisma.$transaction(async (transaction) => {
       await this.store.archiveFrozenRules(transaction, id);
       const updated = await this.store.replacePlan(transaction, {
@@ -316,6 +356,7 @@ export class StrategyRiskApplicationService {
         symbol: current.symbol,
         revision: updated.revision,
         enabled: current.enabled,
+        severity: notification.severity,
         plan: preview.plan,
       });
       await this.store.audit(transaction, {

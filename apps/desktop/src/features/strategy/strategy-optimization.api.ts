@@ -60,11 +60,28 @@ export type OptimizationCandidate = {
   validationScore?: number | null;
 };
 
+export type OptimizationAttempt = {
+  id: string;
+  experimentId: string;
+  modelKey: string;
+  aiRunId?: string | null;
+  attempt: number;
+  status: string;
+  proposal?: unknown;
+  error?: string | null;
+  createdAt: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  cost?: string | number | null;
+  durationMs?: number | null;
+  modelMetadata?: Record<string, unknown> | null;
+};
+
 export type OptimizationCompare = {
   experiment: OptimizationExperimentSummary;
   baseline: { runRefs: Record<string, string>; metrics: Record<string, unknown> };
   candidates: OptimizationCandidate[];
-  attempts: Array<Record<string, unknown>>;
+  attempts: OptimizationAttempt[];
   note: string;
 };
 
@@ -82,14 +99,23 @@ export type RiskApplicationPreview = {
   context: Record<string, unknown>;
 };
 
+export type RiskRuleDiff = {
+  sourceKey: string;
+  before: MonitoringPlan['rules'][number] | null;
+  after: MonitoringPlan['rules'][number] | null;
+  change: 'added' | 'removed' | 'changed' | 'unchanged';
+};
+
 export type RiskApplicationUpgradePreview = RiskApplicationPreview & {
   currentRevision: number;
-  diff: Array<{
-    sourceKey: string;
-    before: MonitoringPlan['rules'][number] | null;
-    after: MonitoringPlan['rules'][number] | null;
-    change: 'added' | 'removed' | 'changed' | 'unchanged';
-  }>;
+  diff: RiskRuleDiff[];
+};
+
+export type StrategyRiskNotification = {
+  enabled: boolean;
+  cooldownMinutes: number;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  channels: Array<'feishu'>;
 };
 
 export type StrategyRiskApplication = {
@@ -102,10 +128,20 @@ export type StrategyRiskApplication = {
   plan: MonitoringPlan;
   cycleMode: string;
   enabled: boolean;
-  notification: { enabled?: boolean; cooldownMinutes?: number };
+  notification: StrategyRiskNotification;
   coverage: MonitoringPlan['coverage'];
   createdAt: string;
   updatedAt: string;
+};
+
+export type AdoptionRiskApplicationDiff = {
+  applicationId: string;
+  accountId: string;
+  symbol: string;
+  currentStrategyVersionId: string;
+  currentRevision: number;
+  enabled: boolean;
+  diff: RiskRuleDiff[];
 };
 
 const jsonPost = <T>(path: string, body: unknown, client?: DesktopRequestClient) =>
@@ -150,7 +186,7 @@ export const fetchOptimizationExperiment = (id: string, client?: DesktopRequestC
   requestDesktopJson<{
     experiment: OptimizationExperimentSummary;
     candidates: OptimizationCandidate[];
-    attempts: Array<Record<string, unknown>>;
+    attempts: OptimizationAttempt[];
   }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}`, { cache: 'no-store' }, client);
 
 export const fetchOptimizationCompare = (id: string, client?: DesktopRequestClient) =>
@@ -205,6 +241,7 @@ export const adoptOptimizationCandidate = (
     strategyVersion: { id: string; version: number };
     monitoringPlan: MonitoringPlan;
     riskApplicationEnabled: boolean;
+    riskApplicationDiffs: AdoptionRiskApplicationDiff[];
   }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt`, input, client);
 
 export const previewStrategyRiskApplication = (
@@ -226,7 +263,7 @@ export const createStrategyRiskApplication = (
     previewHash: string;
     idempotencyKey: string;
     enabled: boolean;
-    notification: { enabled: boolean; cooldownMinutes: number };
+    notification: StrategyRiskNotification;
   },
   client?: DesktopRequestClient,
 ) => jsonPost<StrategyRiskApplication>('/strategy-optimization/risk-applications', input, client);
@@ -249,7 +286,11 @@ export const fetchStrategyRiskApplications = (
 
 export const updateStrategyRiskApplication = (
   id: string,
-  input: { expectedRevision: number; enabled?: boolean },
+  input: {
+    expectedRevision: number;
+    enabled?: boolean;
+    notification?: StrategyRiskNotification;
+  },
   client?: DesktopRequestClient,
 ) =>
   requestDesktopJson<StrategyRiskApplication>(

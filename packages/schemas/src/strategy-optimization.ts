@@ -121,18 +121,26 @@ export const riskApplicationPreviewInputSchema = z
   })
   .strict();
 
+export const riskApplicationNotificationSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    cooldownMinutes: z.number().int().min(0).max(10_080).default(60),
+    severity: z.enum(['info', 'warning', 'error', 'critical']).default('warning'),
+    channels: z.array(z.enum(['feishu'])).max(1).default(['feishu']),
+  })
+  .strict();
+
 export const riskApplicationCreateSchema = riskApplicationPreviewInputSchema
   .extend({
     previewHash: z.string().trim().min(1),
     idempotencyKey: z.string().trim().min(1).max(200),
     enabled: z.boolean().default(false),
-    notification: z
-      .object({
-        enabled: z.boolean().default(true),
-        cooldownMinutes: z.number().int().min(0).max(10_080).default(60),
-      })
-      .strict()
-      .default({ enabled: true, cooldownMinutes: 60 }),
+    notification: riskApplicationNotificationSchema.default({
+      enabled: true,
+      cooldownMinutes: 60,
+      severity: 'warning',
+      channels: ['feishu'],
+    }),
   })
   .strict();
 
@@ -140,13 +148,7 @@ export const riskApplicationUpdateSchema = z
   .object({
     expectedRevision: z.number().int().positive(),
     enabled: z.boolean().optional(),
-    notification: z
-      .object({
-        enabled: z.boolean(),
-        cooldownMinutes: z.number().int().min(0).max(10_080),
-      })
-      .strict()
-      .optional(),
+    notification: riskApplicationNotificationSchema.optional(),
   })
   .strict();
 

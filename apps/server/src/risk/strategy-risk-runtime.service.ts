@@ -29,13 +29,19 @@ export type StrategyRiskRuntimeEvaluation = {
   evaluation: StrategyMonitoringEvaluation;
   candidate?: EvaluationCandidate;
   event?: RiskEvent;
-  notification: { enabled: boolean; cooldownMinutes: number };
+  notification: {
+    enabled: boolean;
+    cooldownMinutes: number;
+    severity: RiskEvent['severity'];
+    channels: string[];
+  };
 };
 
 const toRecord = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+const severityValues = new Set<RiskEvent['severity']>(['info', 'warning', 'error', 'critical']);
 
 @Injectable()
 export class StrategyRiskRuntimeService {
@@ -58,12 +64,20 @@ export class StrategyRiskRuntimeService {
 
   private notification(application: StrategyRiskApplicationRuntimeRow) {
     const value = toRecord(application.notification);
+    const severity = severityValues.has(value.severity as RiskEvent['severity'])
+      ? (value.severity as RiskEvent['severity'])
+      : 'warning';
+    const channels = Array.isArray(value.channels)
+      ? value.channels.filter((item): item is string => typeof item === 'string')
+      : ['feishu'];
     return {
       enabled: value.enabled !== false,
       cooldownMinutes:
         typeof value.cooldownMinutes === 'number' && Number.isFinite(value.cooldownMinutes)
           ? Math.max(0, Math.floor(value.cooldownMinutes))
           : 60,
+      severity,
+      channels,
     };
   }
 
@@ -73,15 +87,20 @@ export class StrategyRiskRuntimeService {
       throw new BadRequestException('策略风险规则修订已经失效，请刷新后重试');
   }
 
-  private async target(symbol: string, timeframe: string) {
+  private async target(
+    symbol: string,
+    timeframe: string,
+    requiresHoldingPeriods: boolean,
+  ) {
     const asset = await this.prisma.asset.findUnique({
       where: { symbol },
-      select: { assetType: true },
+      select: { assetType: true, market: true },
     });
     if (!asset) throw new NotFoundException('策略风险应用标的不存在');
     return {
-      executionInstrument: { symbol, assetType: asset.assetType },
+      executionInstrument: { symbol, assetType: asset.assetType, market: asset.market },
       primaryTimeframe: timeframe,
+      requiresHoldingPeriods,
     };
   }
 
@@ -191,7 +210,11 @@ export class StrategyRiskRuntimeService {
     const actual = await this.contexts.load(
       application.accountId,
       application.symbol,
-      await this.target(application.symbol, rule.evaluationTimeframe),
+      await this.target(
+        application.symbol,
+        rule.evaluationTimeframe,
+        rule.metric === 'holdingPeriods',
+      ),
       evaluatedAt,
     );
     const evaluation =

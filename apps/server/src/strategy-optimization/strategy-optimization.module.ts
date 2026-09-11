@@ -5,6 +5,7 @@ import { RiskModule } from '../risk/risk.module.js';
 import { StrategyOptimizationCandidateService } from './strategy-optimization-candidate.service.js';
 import { StrategyOptimizationController } from './strategy-optimization.controller.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
+import { StrategyOptimizationReconciler } from './strategy-optimization-reconciler.service.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 import { StrategyOptimizationService } from './strategy-optimization.service.js';
 import { StrategyRiskApplicationStoreService } from './strategy-risk-application-store.service.js';
@@ -20,6 +21,7 @@ import { StrategyRiskApplicationService } from './strategy-risk-application.serv
     StrategyRiskApplicationStoreService,
     StrategyRiskApplicationService,
     StrategyOptimizationService,
+    StrategyOptimizationReconciler,
   ],
   exports: [StrategyOptimizationService, StrategyRiskApplicationService],
 })

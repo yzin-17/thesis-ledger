@@ -1,0 +1,34 @@
+{
+  "tables": [
+    {
+      "name": "StrategyRiskApplication",
+      "owner": "strategy-optimization",
+      "reason": "运行时需要 PostgreSQL JSONB、部分唯一索引与显式 SQL 锁语义，当前由服务层 raw SQL 管理。"
+    },
+    {
+      "name": "StrategyRiskApplicationAudit",
+      "owner": "strategy-optimization",
+      "reason": "策略风险应用审计与 raw-owned 主表保持同一事务边界。"
+    },
+    {
+      "name": "OptimizationExperiment",
+      "owner": "strategy-optimization",
+      "reason": "实验编排依赖租约、JSONB 原子更新、预算原子预留和恢复查询，当前由服务层 raw SQL 管理。"
+    },
+    {
+      "name": "OptimizationCandidate",
+      "owner": "strategy-optimization",
+      "reason": "候选状态、Run 引用和指标以 JSONB 原子更新并受实验内唯一约束保护。"
+    },
+    {
+      "name": "OptimizationAttempt",
+      "owner": "strategy-optimization",
+      "reason": "模型尝试记录使用实验与模型轮次唯一键进行幂等 upsert。"
+    },
+    {
+      "name": "OptimizationAdoption",
+      "owner": "strategy-optimization",
+      "reason": "正式版本采纳需要与 StrategyVersion 创建保持显式事务和幂等约束。"
+    }
+  ]
+}

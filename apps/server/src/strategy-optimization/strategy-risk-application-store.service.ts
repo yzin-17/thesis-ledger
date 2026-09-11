@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { StrategyMonitoringPlan } from '@thesis-ledger/domain';
+import type { Severity, StrategyMonitoringPlan } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
 import type { StrategyRiskApplicationRow } from './strategy-risk-application.types.js';
 
@@ -62,6 +62,7 @@ export class StrategyRiskApplicationStoreService {
       symbol: string;
       revision: number;
       enabled: boolean;
+      severity: Severity;
       plan: StrategyMonitoringPlan;
     },
   ) {
@@ -70,7 +71,7 @@ export class StrategyRiskApplicationStoreService {
         data: {
           kind: rule.kind,
           scope: 'security',
-          severity: 'warning',
+          severity: input.severity,
           threshold: rule.threshold,
           enabled: input.enabled,
           symbol: input.symbol,
@@ -154,18 +155,18 @@ export class StrategyRiskApplicationStoreService {
     return updated;
   }
 
-  syncFrozenRuleEnabled(
+  syncFrozenRuleState(
     transaction: Prisma.TransactionClient,
     applicationId: string,
-    enabled: boolean,
-    revision: number,
+    input: { enabled: boolean; severity: Severity; revision: number; enabledChanged: boolean },
   ) {
     return transaction.riskRule.updateMany({
       where: { sourcePlanId: applicationId, archivedAt: null },
       data: {
-        enabled,
-        version: { increment: 1 },
-        parameters: asJson({ applicationRevision: revision }),
+        enabled: input.enabled,
+        severity: input.severity,
+        ...(input.enabledChanged ? { version: { increment: 1 } } : {}),
+        parameters: asJson({ applicationRevision: input.revision }),
       },
     });
   }

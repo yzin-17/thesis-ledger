@@ -29,6 +29,7 @@ import {
   fetchOptimizationExperiments,
   fetchStrategyOptimizationParameters,
   finalizeOptimizationExperiment,
+  type AdoptionRiskApplicationDiff,
   type OptimizationCandidate,
 } from './strategy-optimization.api.js';
 import type { StrategyRecord } from './strategy.types.js';
@@ -48,18 +49,22 @@ const addDays = (dateOnly: string, days: number) => {
   date.setUTCDate(date.getUTCDate() + days);
   return isoDate(date);
 };
-const validationMetricText = (candidate: OptimizationCandidate) => {
-  const validation = candidate.metrics.validation;
-  if (!validation || typeof validation !== 'object') return '验证指标不可用';
-  const value = validation as Record<string, unknown>;
+const metricText = (value: unknown) => {
+  if (!value || typeof value !== 'object') return '指标不可用';
+  const metric = value as Record<string, unknown>;
   return [
-    typeof value.totalReturn === 'string' ? `收益 ${value.totalReturn}` : null,
-    typeof value.maxDrawdown === 'string' ? `回撤 ${value.maxDrawdown}` : null,
-    typeof value.tradeCount === 'number' ? `交易 ${value.tradeCount}` : null,
+    typeof metric.totalReturn === 'string' ? `收益 ${metric.totalReturn}` : null,
+    typeof metric.maxDrawdown === 'string' ? `回撤 ${metric.maxDrawdown}` : null,
+    typeof metric.turnover === 'string' ? `换手 ${metric.turnover}` : null,
+    typeof metric.tradeCount === 'number' ? `交易 ${metric.tradeCount}` : null,
+    typeof metric.fillCount === 'number' ? `成交 ${metric.fillCount}` : null,
+    typeof metric.rejectedOrderCount === 'number' ? `拒绝 ${metric.rejectedOrderCount}` : null,
   ]
     .filter(Boolean)
-    .join(' · ') || '验证指标不可用';
+    .join(' · ') || '指标不可用';
 };
+const validationMetricText = (candidate: OptimizationCandidate) =>
+  metricText(candidate.metrics.validation);
 
 export function StrategyOptimizationExperimentPanel({ strategies }: { strategies: StrategyRecord[] }) {
   const queryClient = useQueryClient();
@@ -86,11 +91,13 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   const [maxInputTokens, setMaxInputTokens] = useState('100000');
   const [maxOutputTokens, setMaxOutputTokens] = useState('20000');
   const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');
+  const [maxCost, setMaxCost] = useState('');
   const [acknowledgeUnknownCost, setAcknowledgeUnknownCost] = useState(false);
   const [executionModelJson, setExecutionModelJson] = useState('');
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
   const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
   const [preselectedCandidateId, setPreselectedCandidateId] = useState<string | null>(null);
+  const [adoptionDiffs, setAdoptionDiffs] = useState<AdoptionRiskApplicationDiff[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const capabilities = useQuery({
@@ -135,6 +142,9 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         providers.slice(0, Math.min(2, providers.length)).map((item) => `${item.provider}:${item.model}`),
       );
   }, [capabilities.data?.providers, selectedModels.length]);
+  useEffect(() => {
+    setAdoptionDiffs([]);
+  }, [selectedExperimentId]);
 
   const selectedProviderRoutes = (capabilities.data?.providers ?? []).filter((route) =>
     selectedModels.includes(`${route.provider}:${route.model}`),
@@ -195,6 +205,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
           maxInputTokens: Number(maxInputTokens),
           maxOutputTokens: Number(maxOutputTokens),
           maxDurationSeconds: Number(maxDurationSeconds),
+          ...(maxCost.trim() ? { maxCost: maxCost.trim() } : {}),
         },
         maxRounds: 2,
         acknowledgeUnknownCost: !hasUnknownCost || acknowledgeUnknownCost,
@@ -256,7 +267,10 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
       });
     },
     onSuccess: async (result) => {
-      setFeedback(`已采纳为正式策略 v${result.strategyVersion.version}；风险应用仍保持人工确认。`);
+      setAdoptionDiffs(result.riskApplicationDiffs ?? []);
+      setFeedback(
+        `已采纳为正式策略 v${result.strategyVersion.version}；${result.riskApplicationDiffs.length} 个现有风险应用可查看升级差异，仍需人工确认。`,
+      );
       await invalidate();
     },
     onError: (error) => setFeedback(error instanceof Error ? error.message : '采纳候选失败'),
@@ -321,7 +335,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
                   <SelectItem value="balanced">收益 / 回撤平衡</SelectItem>
                   <SelectItem value="return">优先收益</SelectItem>
                   <SelectItem value="drawdown">优先低回撤</SelectItem>
-                  <SelectItem value="lowTurnover">兼顾低换手</SelectItem>
+                  <SelectItem value="lowTurnover">优先低换手</SelectItem>
                 </SelectContent>
               </Select>
             </FieldLabel>
@@ -365,12 +379,13 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <DateInput type="date" value={validationEnd} onChange={(event) => setValidationEnd(event.target.value)} aria-label="验证集结束" />
             <DateInput type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} aria-label="测试集结束" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">AI 调用上限</span><Input type="number" min="1" max="30" value={maxAiCalls} onChange={(event) => setMaxAiCalls(event.target.value)} /></FieldLabel>
             <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">回测运行上限</span><Input type="number" min="2" max="100" value={maxBacktestRuns} onChange={(event) => setMaxBacktestRuns(event.target.value)} /></FieldLabel>
             <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">输入 Token</span><Input type="number" min="1" max="10000000" value={maxInputTokens} onChange={(event) => setMaxInputTokens(event.target.value)} /></FieldLabel>
             <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">输出 Token</span><Input type="number" min="1" max="2000000" value={maxOutputTokens} onChange={(event) => setMaxOutputTokens(event.target.value)} /></FieldLabel>
             <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">最长计算（秒）</span><Input type="number" min="30" max="86400" value={maxDurationSeconds} onChange={(event) => setMaxDurationSeconds(event.target.value)} /></FieldLabel>
+            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">模型费用上限（可选）</span><Input inputMode="decimal" value={maxCost} onChange={(event) => setMaxCost(event.target.value)} placeholder="如 5.00" /></FieldLabel>
           </div>
           <p className="text-xs text-muted-foreground">预算为服务端硬上限；模型调用前预留保守输入 Token 与单次输出额度，完成后按 Provider 实际 usage 结算。</p>
           <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
@@ -407,10 +422,34 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
           <CardHeader><CardTitle>多模型候选对比</CardTitle><CardDescription>{compare.data.note}</CardDescription></CardHeader>
           <CardContent className="space-y-3">
             {compare.data.experiment.testExposedAt ? <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">测试集已揭示。改选原预选候选之外的方案会显式记录测试暴露。</div> : null}
+            <div className="rounded-md border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-medium">基准策略</div>
+                <Badge variant="outline">固定对照</Badge>
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">验证集：{metricText(compare.data.baseline.metrics.validation)}</div>
+              {compare.data.baseline.metrics.test ? (
+                <div className="mt-1 text-xs text-muted-foreground">测试集：{metricText(compare.data.baseline.metrics.test)}</div>
+              ) : null}
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {compare.data.experiment.modelConfig.map((route) => {
+                const key = `${route.provider}:${route.model}`;
+                const attempts = compare.data.attempts.filter((attempt) => attempt.modelKey === key);
+                const latest = attempts.at(-1);
+                return (
+                  <div key={key} className="rounded-md border p-3">
+                    <div className="font-medium">{key}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">尝试 {attempts.length} 次 · 最新 {String(latest?.status ?? '尚未开始')}</div>
+                    {latest?.error ? <div className="mt-1 text-xs text-destructive">{String(latest.error)}</div> : null}
+                  </div>
+                );
+              })}
+            </div>
             {compare.data.candidates.map((candidate) => (
               <div key={candidate.id} className="rounded-md border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><div className="font-medium">候选 {candidate.candidateNumber} · {candidate.modelKey}</div><div className="text-xs text-muted-foreground">{validationMetricText(candidate)} · score {candidate.validationScore ?? '—'}</div></div>
+                  <div><div className="font-medium">候选 {candidate.candidateNumber} · {candidate.modelKey}</div><div className="text-xs text-muted-foreground">验证集：{validationMetricText(candidate)} · score {candidate.validationScore ?? '—'}</div>{candidate.metrics.test ? <div className="text-xs text-muted-foreground">测试集：{metricText(candidate.metrics.test)}</div> : null}</div>
                   <Badge variant={candidate.validationStatus.includes('valid') ? 'default' : 'outline'}>{candidate.validationStatus}</Badge>
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground">{candidate.diff.map((item) => `${String(item.label ?? item.parameterId)}: ${String(item.before)} → ${String(item.after)}`).join('；') || '无参数变化'}</div>
@@ -426,6 +465,20 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
               </div>
             ))}
             {compare.data.experiment.stage === 'awaiting_finalization' ? <Button disabled={finalizeMutation.isPending || !preselectedCandidateId || lockedCandidateIds.length === 0} onClick={() => finalizeMutation.mutate()}>{finalizeMutation.isPending ? '测试中…' : '锁定候选并运行测试集'}</Button> : null}
+            {adoptionDiffs.length > 0 ? (
+              <div className="space-y-2 rounded-md border p-3">
+                <div className="font-medium">现有风险应用升级差异</div>
+                {adoptionDiffs.map((application) => {
+                  const changed = application.diff.filter((item) => item.change !== 'unchanged');
+                  return (
+                    <div key={application.applicationId} className="rounded-md border p-2 text-xs text-muted-foreground">
+                      {application.symbol} · r{application.currentRevision} · {application.enabled ? '监控中' : '已停用'} · {changed.length === 0 ? '规则无变化' : `${changed.length} 项规则变化`}
+                    </div>
+                  );
+                })}
+                <p className="text-xs text-muted-foreground">这些差异不会自动覆盖或启用风险应用；请到“策略风险规则”中逐个确认升级。</p>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

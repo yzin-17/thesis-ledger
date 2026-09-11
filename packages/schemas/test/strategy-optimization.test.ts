@@ -108,7 +108,7 @@ describe('strategy optimization contracts', () => {
     ).toThrow();
   });
 
-  it('keeps risk application creation explicit and idempotent', () => {
+  it('keeps risk application creation explicit and fills notification policy defaults', () => {
     const parsed = riskApplicationCreateSchema.parse({
       strategyVersionId: '11111111-1111-4111-8111-111111111111',
       accountId: '22222222-2222-4222-8222-222222222222',
@@ -120,5 +120,11 @@ describe('strategy optimization contracts', () => {
       notification: { enabled: true, cooldownMinutes: 60 },
     });
     expect(parsed.enabled).toBe(false);
+    expect(parsed.notification).toEqual({
+      enabled: true,
+      cooldownMinutes: 60,
+      severity: 'warning',
+      channels: ['feishu'],
+    });
   });
 });
