@@ -26,6 +26,7 @@ jobs:
         run: python scripts/tmp_close_backtest_v2_tasks.py
       - name: Build workspace dependencies
         run: |
+          pnpm --filter @thesis-ledger/shared build
           pnpm --filter @thesis-ledger/schemas build
           pnpm --filter @thesis-ledger/domain build
           pnpm --filter @thesis-ledger/api-client build
