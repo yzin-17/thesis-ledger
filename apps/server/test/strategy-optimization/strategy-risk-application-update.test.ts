@@ -28,7 +28,12 @@ describe('StrategyRiskApplicationService update', () => {
     const updated = {
       ...current,
       revision: 2,
-      notification: { enabled: false, cooldownMinutes: 30 },
+      notification: {
+        enabled: false,
+        cooldownMinutes: 30,
+        severity: 'warning',
+        channels: ['feishu'],
+      },
     };
     const store = {
       get: vi.fn(async () => current),
@@ -57,7 +62,7 @@ describe('StrategyRiskApplicationService update', () => {
     expect(store.syncFrozenRuleState).toHaveBeenCalledWith(
       expect.anything(),
       applicationId,
-      { enabled: true, revision: 2, enabledChanged: false },
+      { enabled: true, severity: 'warning', revision: 2, enabledChanged: false },
     );
   });
 });
