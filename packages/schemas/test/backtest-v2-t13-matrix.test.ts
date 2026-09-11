@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   backtestCapabilitiesSchema,
   strategySchemaV2,
+  type BacktestCapabilities,
   type BacktestMarket,
   type StrategySchemaV2,
 } from '../src/index.js';
@@ -9,6 +10,11 @@ import {
 const markets = ['CN', 'HK', 'US'] as const satisfies readonly BacktestMarket[];
 const assetTypes = ['stock', 'etf'] as const;
 const timeframes = ['1d', '60m', '30m', '15m', '5m', '1m'] as const;
+const marketTimezones = {
+  CN: 'Asia/Shanghai',
+  HK: 'Asia/Hong_Kong',
+  US: 'America/New_York',
+} as const;
 
 const symbols = {
   CN: { stock: '600519.SH', etf: '510300.SH' },
@@ -51,14 +57,9 @@ const exchangeStrategy = (
   cost: { commissionRate: '0', slippageRate: '0' },
 });
 
-const dependencyMatrix = () => {
-  const timezones = {
-    CN: 'Asia/Shanghai',
-    HK: 'Asia/Hong_Kong',
-    US: 'America/New_York',
-  } as const;
+const dependencyMatrix = (): BacktestCapabilities['capabilities'] => {
   const instrumentTypes = ['STOCK', 'ETF'] as const;
-  const capabilities = markets.flatMap((market) =>
+  const capabilities: BacktestCapabilities['capabilities'] = markets.flatMap((market) =>
     instrumentTypes.flatMap((instrumentType) => [
       ...(['1m', '1d'] as const).map((timeframe) => ({
         market,
@@ -72,7 +73,7 @@ const dependencyMatrix = () => {
         freshness: 'delayed' as const,
         quality: 'complete' as const,
         completeness: 'complete' as const,
-        timezone: timezones[market],
+        timezone: marketTimezones[market],
       })),
       ...(['5m', '15m', '30m', '60m'] as const).map((timeframe) => ({
         market,
@@ -86,7 +87,7 @@ const dependencyMatrix = () => {
         freshness: 'delayed' as const,
         quality: 'complete' as const,
         completeness: 'complete' as const,
-        timezone: timezones[market],
+        timezone: marketTimezones[market],
       })),
     ]),
   );
@@ -103,7 +104,7 @@ const dependencyMatrix = () => {
       freshness: 'delayed',
       quality: 'complete',
       completeness: 'complete',
-      timezone: 'Asia/Shanghai',
+      timezone: marketTimezones.CN,
     },
     ...(['HK', 'US'] as const).map((market) => ({
       market,
@@ -117,7 +118,7 @@ const dependencyMatrix = () => {
       freshness: 'unknown' as const,
       quality: 'unknown' as const,
       completeness: 'unavailable' as const,
-      timezone: timezones[market],
+      timezone: marketTimezones[market],
       reason: 'V2 仅支持中国内地 NAV Fund',
     })),
   );
@@ -197,12 +198,7 @@ describe('V2 T13 完整目标矩阵', () => {
       capabilities,
       calendars: markets.map((market) => ({
         market,
-        timezone:
-          market === 'CN'
-            ? 'Asia/Shanghai'
-            : market === 'HK'
-              ? 'Asia/Hong_Kong'
-              : 'America/New_York',
+        timezone: marketTimezones[market],
         provider: 't13-fixture',
         providerRevision: '1',
         availableAt: '2026-01-01T00:00:00Z',
