@@ -219,6 +219,7 @@ export class StrategyRiskApplicationService {
   ) {
     const enabled = input.enabled ?? current.enabled;
     const notification = input.notification ?? current.notification;
+    const enabledChanged = enabled !== current.enabled;
     return this.prisma.$transaction(async (transaction) => {
       if (enabled && !current.enabled)
         await this.store.assertNoEnabledConflict(
@@ -233,7 +234,11 @@ export class StrategyRiskApplicationService {
         enabled,
         notification,
       });
-      await this.store.syncFrozenRuleEnabled(transaction, id, enabled, updated.revision);
+      await this.store.syncFrozenRuleState(transaction, id, {
+        enabled,
+        revision: updated.revision,
+        enabledChanged,
+      });
       await this.store.audit(transaction, {
         applicationId: id,
         revision: updated.revision,
