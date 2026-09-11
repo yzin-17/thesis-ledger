@@ -161,8 +161,12 @@ export class RiskService {
         created: outcome.created,
         rule: stored,
         policy: evaluated.notification,
-        accountId: evaluated.candidate.accountId,
-        symbol: evaluated.candidate.symbol,
+        ...(evaluated.candidate.accountId === undefined
+          ? {}
+          : { accountId: evaluated.candidate.accountId }),
+        ...(evaluated.candidate.symbol === undefined
+          ? {}
+          : { symbol: evaluated.candidate.symbol }),
       });
       persistedEvents.push({ ruleId: stored.id, eventId: outcome.eventId });
     }
@@ -200,8 +204,12 @@ export class RiskService {
         created: outcome.created,
         rule: stored,
         policy: evaluated.notification,
-        accountId: evaluated.candidate.accountId,
-        symbol: evaluated.candidate.symbol,
+        ...(evaluated.candidate.accountId === undefined
+          ? {}
+          : { accountId: evaluated.candidate.accountId }),
+        ...(evaluated.candidate.symbol === undefined
+          ? {}
+          : { symbol: evaluated.candidate.symbol }),
       });
       results.push({ ruleId: stored.id, eventId: outcome.eventId });
     } catch (notificationError) {
