@@ -145,6 +145,38 @@ export class StrategyRiskApplicationService {
     return this.store.get(id);
   }
 
+  private planDiff(beforePlan: StrategyMonitoringPlan, afterPlan: StrategyMonitoringPlan) {
+    const before = new Map(beforePlan.rules.map((rule) => [rule.sourceKey, rule]));
+    const after = new Map(afterPlan.rules.map((rule) => [rule.sourceKey, rule]));
+    const keys = new Set([...before.keys(), ...after.keys()]);
+    return [...keys].map((sourceKey) => this.ruleDiff(sourceKey, before, after));
+  }
+
+  async planDiffsForTargetVersion(targetStrategyVersionId: string) {
+    const [targetVersion, targetPlan] = await Promise.all([
+      this.strategyVersion(targetStrategyVersionId),
+      this.monitoringPlan(targetStrategyVersionId),
+    ]);
+    const applications = await this.prisma.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT application.*
+      FROM "StrategyRiskApplication" AS application
+      JOIN "StrategyVersion" AS source_version ON source_version."id"=application."strategyVersionId"
+      WHERE source_version."strategyId"=${targetVersion.strategyId}::uuid
+        AND application."ownerKey"='local-user'
+        AND application."archivedAt" IS NULL
+      ORDER BY application."updatedAt" DESC, application."id" DESC
+    `);
+    return applications.map((application) => ({
+      applicationId: application.id,
+      accountId: application.accountId,
+      symbol: application.symbol,
+      currentStrategyVersionId: application.strategyVersionId,
+      currentRevision: application.revision,
+      enabled: application.enabled,
+      diff: this.planDiff(application.plan as StrategyMonitoringPlan, targetPlan),
+    }));
+  }
+
   private async createTransaction(
     id: string,
     parsed: ReturnType<typeof riskApplicationCreateSchema.parse>,
@@ -264,15 +296,10 @@ export class StrategyRiskApplicationService {
       symbol: current.symbol,
       cycleMode: current.cycleMode,
     });
-    const before = new Map(
-      (current.plan as StrategyMonitoringPlan).rules.map((rule) => [rule.sourceKey, rule]),
-    );
-    const after = new Map(preview.plan.rules.map((rule) => [rule.sourceKey, rule]));
-    const keys = new Set([...before.keys(), ...after.keys()]);
     return {
       ...preview,
       currentRevision: current.revision,
-      diff: [...keys].map((sourceKey) => this.ruleDiff(sourceKey, before, after)),
+      diff: this.planDiff(current.plan as StrategyMonitoringPlan, preview.plan),
     };
   }
 
