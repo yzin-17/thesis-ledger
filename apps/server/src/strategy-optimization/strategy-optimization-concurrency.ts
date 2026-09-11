@@ -54,10 +54,3 @@ export class OptimizationModelConcurrencyGate {
 }
 
 export const optimizationModelConcurrency = new OptimizationModelConcurrencyGate(2, 1);
-
-export const isRetriableOptimizationNetworkError = (error: unknown) => {
-  if (!(error instanceof Error)) return false;
-  if (error.name === 'AbortError' || error.name === 'TimeoutError') return false;
-  if (error instanceof TypeError) return true;
-  return /(?:fetch failed|network|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN)/iu.test(error.message);
-};
