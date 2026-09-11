@@ -337,7 +337,8 @@ function RuleDetail({
   const restoring = busyAction === `restore:${rule.id}`;
   const triggered = testResults.filter((result) => result.triggered).length;
   const targetLabel = ruleTargetLabel(rule, accountName, rule.assetName);
-  const archived = rule.archivedAt != null;
+  const archivedAt = rule.archivedAt;
+  const archived = archivedAt != null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -361,7 +362,7 @@ function RuleDetail({
           )}
           {archived && (
             <p className="mt-2 mb-0 text-sm text-muted-foreground">
-              这条规则已于 {formatDateTime(rule.archivedAt!)} 归档，不再出现在默认列表中；
+              这条规则已于 {formatDateTime(archivedAt)} 归档，不再出现在默认列表中；
               恢复后会保持停用状态。
             </p>
           )}
@@ -393,7 +394,11 @@ function RuleDetail({
               aria-busy={restoring}
             >
               {restoring && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               {restoring ? '恢复中…' : '恢复规则'}
             </Button>
@@ -418,7 +423,11 @@ function RuleDetail({
               aria-busy={testing}
             >
               {testing && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               {testing ? '测试中…' : '人工测试'}
             </Button>
@@ -440,7 +449,11 @@ function RuleDetail({
               aria-busy={toggling}
             >
               {toggling && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
             </Button>
@@ -453,7 +466,11 @@ function RuleDetail({
               aria-busy={archiving}
             >
               {archiving && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               归档规则
             </Button>
