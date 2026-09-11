@@ -11,6 +11,12 @@ import {
 } from '@thesis-ledger/schemas';
 import { AiProviderRegistry } from '../ai/provider-registry.js';
 import { PrismaService } from '../platform/prisma.service.js';
+import {
+  candidateOptimizationAdoption,
+  formalizeOptimizationCandidate,
+  previousOptimizationAdoption,
+  replayOptimizationAdoption,
+} from './strategy-optimization-adoption.js';
 import { StrategyOptimizationCandidateService } from './strategy-optimization-candidate.service.js';
 import {
   optimizationAttemptFailureStatus,
@@ -494,33 +500,6 @@ export class StrategyOptimizationService implements OnModuleInit {
     }
   }
 
-  private async previousAdoption(idempotencyKey: string) {
-    const rows = await this.prisma.$queryRaw<Array<{ formalStrategyVersionId: string }>>(Prisma.sql`
-      SELECT "formalStrategyVersionId" FROM "OptimizationAdoption" WHERE "idempotencyKey"=${idempotencyKey} LIMIT 1
-    `);
-    return rows[0] ?? null;
-  }
-
-  private async candidateAdoption(candidateId: string) {
-    const rows = await this.prisma.$queryRaw<
-      Array<{ formalStrategyVersionId: string; idempotencyKey: string }>
-    >(Prisma.sql`
-      SELECT "formalStrategyVersionId", "idempotencyKey" FROM "OptimizationAdoption"
-      WHERE "candidateId"=${candidateId}::uuid LIMIT 1
-    `);
-    return rows[0] ?? null;
-  }
-
-  private async replayAdoption(formalStrategyVersionId: string) {
-    const formal = await this.prisma.strategyVersion.findUnique({
-      where: { id: formalStrategyVersionId },
-    });
-    return {
-      strategyVersion: formal,
-      monitoringPlan: formal ? await this.riskApplications.monitoringPlan(formal.id) : null,
-    };
-  }
-
   private async adoptableCandidate(id: string, candidateId: string) {
     const rows = await this.prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationCandidate" WHERE "experimentId"=${id}::uuid AND "id"=${candidateId}::uuid LIMIT 1
@@ -532,48 +511,17 @@ export class StrategyOptimizationService implements OnModuleInit {
     return candidate;
   }
 
-  private async formalizeCandidate(
-    experimentId: string,
-    candidate: CandidateRow,
-    expectedVersion: number,
-    idempotencyKey: string,
-  ) {
-    const candidateVersion = await this.prisma.strategyVersion.findUnique({
-      where: { id: candidate.candidateStrategyVersionId },
-    });
-    if (!candidateVersion) throw new NotFoundException('候选策略版本不存在');
-    const latest = await this.prisma.strategyVersion.aggregate({
-      where: { strategyId: candidateVersion.strategyId, version: { gt: 0 } },
-      _max: { version: true },
-    });
-    if ((latest._max.version ?? 0) !== expectedVersion)
-      throw new BadRequestException('正式策略已经发布新版本，请重新确认采纳');
-    return this.prisma.$transaction(async (transaction) => {
-      const formal = await transaction.strategyVersion.create({
-        data: {
-          strategyId: candidateVersion.strategyId,
-          version: expectedVersion + 1,
-          schemaVersion: 2,
-          schema: candidateVersion.schema as Prisma.InputJsonValue,
-        },
-      });
-      await transaction.$executeRaw(Prisma.sql`
-        INSERT INTO "OptimizationAdoption" ("experimentId", "candidateId", "idempotencyKey", "candidateHash", "formalStrategyVersionId")
-        VALUES (${experimentId}::uuid, ${candidate.id}::uuid, ${idempotencyKey}, ${candidate.executionHash}, ${formal.id}::uuid)
-      `);
-      await transaction.$executeRaw(Prisma.sql`
-        UPDATE "OptimizationCandidate" SET "adoptedStrategyVersionId"=${formal.id}::uuid WHERE "id"=${candidate.id}::uuid
-      `);
-      return formal;
-    });
-  }
-
   async adopt(id: string, input: unknown) {
     this.assertEnabled();
     const parsed = optimizationAdoptSchema.parse(input);
-    const previous = await this.previousAdoption(parsed.idempotencyKey);
-    if (previous) return this.replayAdoption(previous.formalStrategyVersionId);
-    const alreadyAdopted = await this.candidateAdoption(parsed.candidateId);
+    const previous = await previousOptimizationAdoption(this.prisma, parsed.idempotencyKey);
+    if (previous)
+      return replayOptimizationAdoption(
+        this.prisma,
+        this.riskApplications,
+        previous.formalStrategyVersionId,
+      );
+    const alreadyAdopted = await candidateOptimizationAdoption(this.prisma, parsed.candidateId);
     if (alreadyAdopted)
       throw new BadRequestException('该候选已经被正式采纳；请复用原采纳结果，不要创建新的采纳意图');
     const experiment = await this.experiment(id);
@@ -586,17 +534,28 @@ export class StrategyOptimizationService implements OnModuleInit {
       throw new BadRequestException('候选执行哈希已变化，必须重新验证');
     let formal;
     try {
-      formal = await this.formalizeCandidate(
+      formal = await formalizeOptimizationCandidate(
+        this.prisma,
         id,
         candidate,
         parsed.expectedStrategyVersion,
         parsed.idempotencyKey,
       );
     } catch (error) {
-      const concurrentSameIntent = await this.previousAdoption(parsed.idempotencyKey);
+      const concurrentSameIntent = await previousOptimizationAdoption(
+        this.prisma,
+        parsed.idempotencyKey,
+      );
       if (concurrentSameIntent)
-        return this.replayAdoption(concurrentSameIntent.formalStrategyVersionId);
-      const concurrentCandidate = await this.candidateAdoption(parsed.candidateId);
+        return replayOptimizationAdoption(
+          this.prisma,
+          this.riskApplications,
+          concurrentSameIntent.formalStrategyVersionId,
+        );
+      const concurrentCandidate = await candidateOptimizationAdoption(
+        this.prisma,
+        parsed.candidateId,
+      );
       if (concurrentCandidate)
         throw new BadRequestException('该候选已经被另一个采纳意图正式采纳');
       if ((error as { code?: string }).code === 'P2002')
