@@ -1,0 +1,47 @@
+name: Temporary Strategy Optimization Type Fix
+
+on:
+  push:
+    branches:
+      - feat/strategy-risk-ai-optimization-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/strategy-risk-ai-optimization-20260911
+      - name: Fix strict types
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/server/src/ai/provider-adapters.ts')
+          text = path.read_text()
+          old = "  const providers = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map((input) =>\n    providerFromInput(input, config.aiTimeoutMs),\n  );"
+          new = "  const providers: AiProvider[] = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map(\n    (input) => providerFromInput(input, config.aiTimeoutMs),\n  );"
+          if old not in text: raise SystemExit('provider array snippet not found')
+          path.write_text(text.replace(old, new, 1))
+
+          path = Path('apps/server/src/strategy-optimization/strategy-optimization-parameters.ts')
+          text = path.read_text()
+          old = '  return strategySchemaV2.parse(next);'
+          new = '  return strategySchemaV2.parse(next) as StrategySchemaV2;'
+          if old not in text: raise SystemExit('strategy parse snippet not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit
+        shell: bash
+        run: |
+          rm .github/workflows/tmp-strategy-optimization-typefix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: tighten optimization adapter types"
+          git push origin HEAD:feat/strategy-risk-ai-optimization-20260911
