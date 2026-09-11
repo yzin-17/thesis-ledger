@@ -91,13 +91,15 @@ export class StrategyOptimizationRunService {
       outputTokens?: number;
       estimatedCost?: number;
     },
+    transaction?: Prisma.TransactionClient,
   ) {
+    const database = transaction ?? this.prisma;
     const aiCalls = input.aiCalls ?? 0;
     const runs = input.backtestRuns ?? 0;
     const inputTokens = input.inputTokens ?? 0;
     const outputTokens = input.outputTokens ?? 0;
     const estimatedCost = input.estimatedCost ?? 0;
-    const updated = await this.prisma.$executeRaw(Prisma.sql`
+    const updated = await database.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "aiCallsUsed"="aiCallsUsed"+${aiCalls}, "backtestRunsUsed"="backtestRunsUsed"+${runs},
           "inputTokensUsed"="inputTokensUsed"+${inputTokens},
@@ -134,10 +136,12 @@ export class StrategyOptimizationRunService {
     reservedOutput: number,
     actualInput: number,
     actualOutput: number,
+    transaction?: Prisma.TransactionClient,
   ) {
+    const database = transaction ?? this.prisma;
     const inputDelta = actualInput - reservedInput;
     const outputDelta = actualOutput - reservedOutput;
-    const rows = await this.prisma.$queryRaw<
+    const rows = await database.$queryRaw<
       Array<{ inputTokensUsed: number; outputTokensUsed: number; budget: unknown }>
     >(Prisma.sql`
       UPDATE "OptimizationExperiment"
@@ -156,13 +160,19 @@ export class StrategyOptimizationRunService {
       throw new BadRequestException('Provider 实际 token 用量超过预留预算，已停止新任务');
   }
 
-  async reconcileCost(id: string, estimated: number, actual: number) {
+  async reconcileCost(
+    id: string,
+    estimated: number,
+    actual: number,
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const database = transaction ?? this.prisma;
     const delta = actual - estimated;
-    await this.prisma.$executeRaw(Prisma.sql`
+    await database.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment" SET "costUsed"="costUsed"+${delta}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid
     `);
-    const rows = await this.prisma.$queryRaw<Array<{ costUsed: Prisma.Decimal; budget: unknown }>>(Prisma.sql`
+    const rows = await database.$queryRaw<Array<{ costUsed: Prisma.Decimal; budget: unknown }>>(Prisma.sql`
       SELECT "costUsed", "budget" FROM "OptimizationExperiment" WHERE "id"=${id}::uuid LIMIT 1
     `);
     const row = rows[0];
