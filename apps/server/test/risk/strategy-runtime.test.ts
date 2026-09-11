@@ -101,6 +101,43 @@ describe('统一策略风险运行时', () => {
     expect(result.results).toEqual([{ ruleId: 'rule-strategy', eventId: 'event-1' }]);
   });
 
+  it('shadow 扫描不重复评价只属于实际账户的策略来源规则', async () => {
+    const stored = {
+      id: 'rule-strategy',
+      version: 1,
+      kind: 'cost-stop',
+      scope: 'security',
+      severity: 'warning',
+      threshold: '-0.08',
+      enabled: true,
+      needsRepair: false,
+      repairReason: null,
+      symbol: '600519.SH',
+      accountId,
+      sourcePlanId: applicationId,
+    };
+    const strategyRuntime = { evaluateStoredRule: vi.fn() };
+    const service = new RiskService(
+      {} as never,
+      { enqueue: vi.fn(), subjectDeliveryStatus: vi.fn() } as never,
+      { listEnabledRules: vi.fn(async () => [stored]) } as never,
+      {
+        prepare: vi.fn(async () => ({ security: [], accounts: [], allowStale: false })),
+      } as never,
+      { persist: vi.fn() } as never,
+      strategyRuntime as never,
+    );
+
+    const result = await service.scan({
+      contexts: [],
+      evaluatedAt: '2026-09-11T08:00:00.000Z',
+      includeStrategyRules: false,
+    });
+
+    expect(strategyRuntime.evaluateStoredRule).not.toHaveBeenCalled();
+    expect(result.results).toEqual([]);
+  });
+
   it('策略上下文只读取已在评价时点可用的 MarketBar，不依赖实时 quote', async () => {
     const evaluatedAt = new Date('2026-09-11T08:00:00.000Z');
     const prisma = {
