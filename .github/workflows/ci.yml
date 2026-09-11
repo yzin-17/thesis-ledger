@@ -30,6 +30,22 @@ jobs:
 
   contracts-and-guardrails:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/thesis_ledger?schema=public
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: thesis_ledger
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d thesis_ledger"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,6 +62,11 @@ jobs:
         run: pnpm security:secrets
       - name: Migration matrix
         run: pnpm migration:matrix
+      - name: Strategy optimization database smoke
+        run: |
+          pnpm db:generate
+          pnpm db:migrate
+          pnpm --filter @thesis-ledger/server exec node scripts/strategy-optimization-db-smoke.mjs
       - name: Contract tests
         run: pnpm contract:test
       - name: Complexity guardrails
