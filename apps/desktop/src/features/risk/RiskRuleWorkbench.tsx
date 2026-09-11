@@ -337,7 +337,8 @@ function RuleDetail({
   const restoring = busyAction === `restore:${rule.id}`;
   const triggered = testResults.filter((result) => result.triggered).length;
   const targetLabel = ruleTargetLabel(rule, accountName, rule.assetName);
-  const archived = rule.archivedAt != null;
+  const archivedAt = rule.archivedAt;
+  const archived = archivedAt != null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -361,7 +362,7 @@ function RuleDetail({
           )}
           {archived && (
             <p className="mt-2 mb-0 text-sm text-muted-foreground">
-              这条规则已于 {formatDateTime(rule.archivedAt!)} 归档，不再出现在默认列表中；
+              这条规则已于 {formatDateTime(archivedAt)} 归档，不再出现在默认列表中；
               恢复后会保持停用状态。
             </p>
           )}

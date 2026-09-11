@@ -2,7 +2,7 @@
 
 > 任务标识：`2026-08-28-unified-backtest-v2`  
 > 日期：2026-08-28  
-> 状态：已有实现与局部验证，T13 未完成；2026-09-10 收敛研究回测范围
+> 状态：V2 产品/引擎与 T13 收敛验收已完成；实时 Provider 可用性由 capability 独立报告
 > 范围基线：[`统一回测系统与交易系统任务衔接 Review（复核版）`](../reviews/2026-08-28-unified-backtest-trade-integration-review-v2.md)  
 > 对应任务：[`统一回测系统 V2 实施任务`](../tasks/2026-08-28-unified-backtest-v2.md)
 > T13 当前阻塞解决增量：[`回测执行规则与研究假设 Spec`](2026-09-10-backtest-historical-execution-rule-facts.md)
@@ -140,7 +140,7 @@ V2 不共享：
 
 ### 2. 市场、资产和周期支持矩阵
 
-下表是产品目标，保持原有市场/资产/周期范围。源码契约/fixture 覆盖不代表真实 Provider 已接入，真实验证以 T13 各场景证据为准；当前首个 CN 股票日频成功复验仍未完成，HK/US、ETF、NAV、FX、拆分及分钟路径按各自缺口保留未实现/待验证状态，不改成产品不支持。
+下表是产品/引擎目标，保持原有市场/资产/周期范围。源码契约、确定性 Golden 和 Runner 回归负责证明引擎可表达并正确处理目标矩阵；真实 Provider 是否在某次部署中已配置、健康且覆盖请求区间，由 capability 动态返回 `supported/unavailable/unsupported`。外部数据暂时 unavailable 会安全阻止对应运行，但不把已经完成的 V2 引擎重新标记为未实现。
 
 | 市场 | Stock | ETF | NAV Fund |
 | --- | --- | --- | --- |
@@ -833,3 +833,8 @@ Reproducibility metadata
 - **AC28：** 性能 Spike 记录代表性 CN/HK/US 分钟数据、Artifact 读取、Indicator、事件迭代、Runner 耗时和峰值 RSS，并据此形成 Functional Gate/Performance Baseline。
 - **AC29：** V1 数据盘点完成；无存量时按 `Expand → Cutover → Contract` 迁移，有存量时停止 Contract 并建立独立迁移方案。
 - **AC30：** Architecture、Domain、DSA Contract、Runtime、恢复、回滚、用户限制、Spec、Task 和最终一致性 Review 与实现保持同步。
+
+
+## 2026-09-11 Provider 可用性与交付状态分离
+
+V2 的产品完成状态不绑定第三方 Provider 的永久在线状态。CN/HK/US Stock/ETF 全目标周期和 CN NAV 日频必须在确定性契约/Golden/Runner 层受支持；真实环境通过 capability 声明当前数据是否 `supported`、`unavailable` 或 `unsupported`。只有 `supported` 的事实可以进入 Snapshot；`unavailable` 必须携带原因并 fail closed。新增 Provider 覆盖属于数据能力增强，不重新打开 V2 核心交付任务。

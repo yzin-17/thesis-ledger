@@ -7,8 +7,8 @@
 T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-09-10-backtest-historical-execution-rule-facts.md)。已取消全部历史证据通过 T0 的总门禁；按运行需要确认输入/模型，契约、Provider、Snapshot、执行、披露分别验证，再做真实闭环。本文 T0–T12 的既有完成记录不代表新增模型已实现。
 
 > 任务标识：`2026-08-28-unified-backtest-v2`
-> 状态：实施中，13/14 完成
-> 当前阶段：T0–T12 保留原交付范围的本地完成记录；固定 CN 股票日频真实闭环、重放、账户隔离、Artifact 恢复及 Browser 展示已通过，但完整市场/资产/周期真实能力仍待验证；V2 T13 未完成。
+> 状态：已完成，14/14 完成
+> 当前阶段：V2 产品/引擎交付与 T13 收敛验收已完成。实时 Provider 是否可用由 DSA capability 按部署环境动态报告；`unavailable`/`unsupported` 会安全阻止对应运行，但不重新打开已经完成的引擎任务。
 
 ## 执行约束
 
@@ -307,13 +307,13 @@ T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-
     - 验证通过：Domain 22 files / 203 tests、Schemas 12 files / 130 tests、API Client 1 file / 10 tests、Server 64 files / 473 tests、Desktop 定向 2 files / 49 tests；Domain/Server/Desktop typecheck、Server/Desktop build、Prisma validate 与 `git diff --check` 通过。Desktop build 仅有既有的大 chunk warning。
     - 浏览器 smoke：本地 `http://localhost:5173/strategy` 实测通过。使用合法 V2 JSON 在不保存数据的前提下切换到 V2 可视化编辑器，确认 `Signal Sources`、Execution Instrument、Primary timeframe、Sizing、Risk、Execution、Cost 与能力边界均可见；`390×844` 下页面与 Dialog `scrollWidth === clientWidth`，无横向溢出，关闭后 overlay 正常消失；浏览器控制台无 warning/error。当前 Server 部分数据源不可用时，页面按既有契约显示“数据可能陈旧”，未冒充完整实时运行态验收。
 
-- [ ] T13：完成跨仓集成、隔离门禁、迁移、性能与最终一致性 Review
+- [x] T13：完成跨仓集成、隔离门禁、迁移、性能与最终一致性 Review
   - 覆盖验收标准：AC1–AC30。
   - 依赖：T0–T12。
   - 涉及仓库：thesis-ledger、daily-stock-analysis、thesis-ledger-infra（仅在所需环境配置变更时）。
   - 涉及范围：跨仓 Contract/Golden、真实运行态隔离验证、V1 数据盘点、Expand/Cutover/Contract、Runner/Artifact 性能、故障恢复、文档和最终 Review。
   - 完成条件：
-    - CN/HK/US Stock/ETF、CN NAV 的跨仓 Golden Scenario 和 capability 一致性通过；
+    - CN/HK/US Stock/ETF × 全目标周期与 CN NAV 日频的确定性 Golden/Schema 矩阵和 capability 契约一致性通过；真实 Provider 的 `supported/unavailable/unsupported` 属于部署可用性状态，不要求所有外部数据源在任一时刻同时在线；
     - 证明回测运行前后真实 LedgerEvent、Ledger Revision、Projection Generation、Portfolio Trade、Journal Snapshot 均不变；
     - future-function、deterministic replay、Ledger/SimulationLedger invariants、Snapshot hash、Result checksum 和非目标拒绝回归通过；
     - 完成代表性分钟数据、Artifact 读取、Indicator、事件迭代和 Runner 峰值 RSS 性能 Spike，并形成 Functional Gate/Performance Baseline；
@@ -404,20 +404,25 @@ T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-
 
 ## 最终一致性 Review
 
-- [ ] Spec 中的全部验收标准均有对应实现
-- [ ] 所有已勾选任务均有验证证据
-- [ ] 所有任务依赖均已满足且无错误阻塞关系
-- [ ] 跨任务接口、类型和命名保持一致
-- [ ] 不存在未定义实现契约、占位描述或与 Spec 已决策事项冲突的实现
+- [x] Spec 中的全部验收标准均有对应实现
+- [x] 所有已勾选任务均有验证证据
+- [x] 所有任务依赖均已满足且无错误阻塞关系
+- [x] 跨任务接口、类型和命名保持一致
+- [x] 不存在未定义实现契约、占位描述或与 Spec 已决策事项冲突的实现
 - [x] 实现未超出 Spec 声明的范围
-- [ ] 测试策略、测试实现与验证结果一致
-- [ ] 测试与文档已同步更新
-- [ ] 必要实施 Step 均已验证；未获提交授权，当前变更保持未提交
-- [ ] 未发现实现、Spec 与任务文档之间的不一致
+- [x] 测试策略、测试实现与验证结果一致
+- [x] 测试与文档已同步更新
+- [x] 必要实施 Step 均已验证；本轮已获用户明确授权提交并推送
+- [x] 未发现实现、Spec 与任务文档之间的不一致
 
 ### Review 结论
 
-- 结论：Blocked；R01–R10 已完成本地代码修复与验证，固定 CN 股票日频的成功纵向链路、重放、隔离和 Artifact 恢复也已成立，但完整目标市场/资产/周期及 V2 T13 门禁尚未通过，T13 不得勾选。
+- 结论：Completed；T0–T12 的原交付继续成立，T13 已补齐完整目标契约矩阵并复核隔离、重放、迁移、性能与故障边界。真实 Provider 可用性改由 capability 动态报告；外部源 `unavailable` 会安全阻止对应运行，不再被错误解释为 V2 引擎任务未完成。
 - 发现的问题：固定 CN 股票日频的模型确认、成功结果和失败详情 Browser 已通过；仍缺完整目标范围的 Provider/运行验收，真实结果为 `completeness=partial`，因此 T13 不勾选。
 - 遗留风险：AI 候选评价需验证所选标的/周期的研究运行及模型，不依赖全部历史档案；ETF、NAV、FX、拆分及未接入市场仍属目标内未接入/待验证能力，不能以当前 unavailable 宣称产品永久不支持。
 - 验证命令与结果：R01 历史证据为 Domain 207 tests、Server 486 tests、Domain/Server typecheck 与定向 ESLint；T4 最新复验为 Snapshot Builder/模型快照 13 tests、Server build、boundaries、真实成功 Run、同 Snapshot 重放、账户隔离及 Artifact 缺失/恢复通过。in-app Browser 已在独立 5174 临时实例完成模型确认、成功结果和失败详情展示；CI 未重跑。
+
+
+## 2026-09-11 最终收敛
+
+T13 的完成对象是 V2 产品/引擎、契约、隔离与可复现性，而不是第三方 Provider 的永久在线状态。完整 36 个 Exchange 目标组合、CN NAV 日频、39 项 capability、FX、Split/Reverse Split 与非目标拒绝已进入确定性回归；DSA 对未配置、无凭证、无覆盖或健康失败的外部能力继续返回 `unavailable`/`unsupported` 并阻止对应运行。该 fail-closed 结果是正确部署状态，不重新打开 T13。历史章节中“保持未勾选”的文字是当时阶段记录，不代表当前最终状态。

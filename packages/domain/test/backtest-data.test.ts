@@ -10,7 +10,7 @@ const bar = (
     close: number;
     volume: number;
     availableAt: string;
-    quality: 'complete' | 'partial' | 'suspended' | 'unknown';
+    quality: 'complete' | 'partial' | 'suspended' | 'stale' | 'unknown';
   }> = {},
 ) => ({
   symbol: '600000.SH',
@@ -71,6 +71,20 @@ describe('aggregateMinuteBars', () => {
       isTail: true,
       missingMinutes: 4,
     });
+  });
+
+  it('propagates stale source quality into derived bars', () => {
+    const result = aggregateMinuteBars(
+      [
+        bar('2026-09-08T01:30:00.000Z', { quality: 'stale' }),
+        bar('2026-09-08T01:31:00.000Z'),
+        bar('2026-09-08T01:32:00.000Z'),
+        bar('2026-09-08T01:33:00.000Z'),
+        bar('2026-09-08T01:34:00.000Z'),
+      ],
+      '5m',
+    );
+    expect(result[0]).toMatchObject({ quality: 'stale', completeness: 'partial' });
   });
 
   it('does not merge CN morning and afternoon windows', () => {

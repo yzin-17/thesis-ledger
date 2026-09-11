@@ -23,13 +23,8 @@ export const composeEffectiveBacktestCapabilities = (
   for (const base of baseCapabilities) {
     if (base.instrumentType === 'NAV_FUND' || base.timeframe !== '1m') continue;
     for (const timeframe of derivedTimeframes) {
-      const hasCalendar = input.calendars.some(
-        (calendar) => calendar.market === base.market,
-      );
-      const status =
-        base.status === 'supported' && !hasCalendar
-          ? 'unavailable'
-          : base.status;
+      const hasCalendar = input.calendars.some((calendar) => calendar.market === base.market);
+      const status = base.status === 'supported' && !hasCalendar ? 'unavailable' : base.status;
       const reason =
         status === 'supported'
           ? '由 Server 从冻结 1m Bar 按市场 Session 确定性派生'
@@ -58,16 +53,12 @@ export class BacktestBarAggregationService {
     bars: readonly unknown[];
   }): BacktestDailyBar[] | BacktestMinuteBar[] | DerivedBacktestBar[] {
     if (input.timeframe === '1d') {
-      return directDailyBars(
-        input.bars.map((bar) => backtestDailyBarSchema.parse(bar)),
-      ) as BacktestDailyBar[];
+      return directDailyBars(input.bars.map((bar) => backtestDailyBarSchema.parse(bar)));
     }
     if (input.timeframe === '1m') {
-      return input.bars.map((bar) =>
-        backtestMinuteBarSchema.parse(bar),
-      ) as BacktestMinuteBar[];
+      return input.bars.map((bar) => backtestMinuteBarSchema.parse(bar));
     }
-    const bars = input.bars.map((bar) => backtestMinuteBarSchema.parse(bar)) as BacktestMinuteBar[];
+    const bars = input.bars.map((bar) => backtestMinuteBarSchema.parse(bar));
     return aggregateMinuteBars(bars, input.timeframe);
   }
 }

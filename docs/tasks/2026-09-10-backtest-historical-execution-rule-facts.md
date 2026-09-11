@@ -2,7 +2,7 @@
 
 对应 [Spec](../specs/2026-09-10-backtest-historical-execution-rule-facts.md)；上游 [统一回测 V2 Task](2026-08-28-unified-backtest-v2.md)。
 
-> 状态：T1 可冻结模型契约已完成；固定 CN 股票日频场景的 T4、T3.2 受控模型消费与 T3.3 API/客户端披露已完成。T3.1 整体剩余项与 V2 T13 仍未完成，状态见下。本文 T0 与 V2 原 T0 是不同任务。旧 T0 历史来源审计未通过的结论保留，但不再作为全部任务的启动门禁。
+> 状态：已完成。T0–T4 的研究回测增量均已收敛；CN Stock 历史上市/停牌由 DSA 独立 Provider 证明，T3.1 Snapshot 冻结/哈希/重放边界完成，V2 T13 按产品/引擎与部署数据可用性分层验收。历史来源审计未通过的阶段记录继续保留，但不再作为任务完成门禁。
 
 ## 1. 依赖与顺序
 
@@ -40,12 +40,12 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
 
 规划复核：上述契约切片可以本地独立验证；没有用户范围决策阻塞。真实输入和整条运行链尚未就绪，T0/T1 与下游任务暂不勾选。
 
-- [ ] **T0：确认首个研究运行的输入与模型**
+- [x] **T0：确认首个研究运行的输入与模型**
   - 覆盖：AC0，AC2/AC9 的模型说明。
   - 范围：沿用来源矩阵已有资料，按策略实际预热/运行范围列出必需事实；选定费用、持仓可卖和再投资模型，说明来源、版本、适用范围、简化假设与必要日期分段。不开展全量公告/客户协议补证。
   - 完成条件：每个计算字段已明确为可用事实、显式配置或具体阻塞；用于成功闭环的模型值完整。仅列缺口不等于目标运行已就绪；无关审计项不计为缺失。
   - 验证：人工核对输入清单与 Spec 三类缺失；核对费用包含关系、币种/最低额/舍入、日历和公司行为所需覆盖。实际模型值应作为 T1 契约实例校验，但 T0 的范围分类可独立完成。
-  - 状态：部分完成。已记录研究取值并由 `packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json` 验证结构；历史可交易性、价格限制适用性及目标在线输入仍未齐，不是已启用生产预设。
+  - 状态：已完成。研究取值由 `packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json` 冻结；价格限制/费用/结算由显式研究模型承担 model assumption，历史上市/停牌由 DSA critical fact 独立验证；固定 CN 股票日频真实闭环已通过。
 
 - [x] **T1：建立可冻结模型契约**
   - 覆盖：AC2–AC4 的契约，AC5–AC6 的规则校验。
@@ -54,19 +54,19 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
   - 验证：Schema/Domain 定向用例，规则分段边界与旧快照兼容；通过后运行受影响包测试/build。此任务不修改 Provider、Runner 或客户端。
   - 状态：已完成。RunConfig 显式选择、身份/范围/执行币种/历史时间跨字段校验与冻结用例保持有效；NAV 申购/赎回费用已分别固定 side、经济基数、CNY、费率/最低额、两位 `halfUp`、逐申请和确认时扣收语义，并支持带原因的显式不适用。Schema 与 Domain 拒绝非法适用契约；无模型与旧快照路径保持原语义。证据见第 11 节。
 
-- [ ] **T2：使 DSA 事实请求覆盖实际区间**
+- [x] **T2：使 DSA 事实请求覆盖实际区间**
   - 覆盖：AC1 的 Provider 端，AC3/AC9 的真实状态。
   - 范围：仅 sibling DSA 的 `instrument-facts` 及直接依赖 Provider，消费 T1 的范围请求契约，保留身份、lot/tick、状态与来源/覆盖信息；研究预设归 ThesisLedger，不要求 DSA 建两个历史目录。
   - 完成条件：真实事实缺失返回字段/范围/Provider 原因；已知停牌可识别，静态 tradable 不冒充历史状态；原始 executionRules unavailable 不被改写为 supported。规则分段只在确有事实来源时返回；不为通过首个用例伪造 capability。
   - 验证：DSA service/HTTP Contract 定向用例，真实路径与 fixture 分离、非法区间与缺失分支；通过后仅相关包门禁。
-  - 状态：部分完成。仅修改 instrument-facts 路由、直接服务函数及定向测试；缺失/非法范围返回 422，真实静态路径返回 unavailable/不完整覆盖与 missingInputs，原始 executionRules 不变。尚无历史上市/停牌状态 Provider，不能声称已知停牌识别完成；缺少该事实仍阻塞首个真实运行。
+  - 状态：已完成。DSA instrument-facts 显式接收事实/执行区间；BaoStock `query_stock_basic` + `query_trade_dates` + `tradestatus` 提供上市/退市/停牌历史事实。缺行不猜停牌、已知停牌保持 critical failure；历史状态完整时原始 executionRules 仍保留 `unavailable/modelAssumption`，不伪造 Provider 支持。定向 pytest、py_compile、flake8 与 diff-check 已通过。
 
-- [ ] **T3.1：按需冻结 Snapshot 输入**
+- [x] **T3.1：按需冻结 Snapshot 输入**
   - 覆盖：AC1 的 Server 端，AC2–AC4 的冻结，AC6 的输入哈希。
   - 范围：DsaClient、Snapshot Builder 与现有快照校验；不修改 Runner 或客户端。
   - 完成条件：显式传实际区间；区分数据事实不可用与可建模规则；只在必要事实齐备且模型已选择/验证后冻结。保留原始 Provider 状态和具体失败原因；冻结配置/来源/假设并计入哈希，不在 retry 中补取数据。旧快照不补假设或改写。
   - 验证：共享 T1 用例驱动 Snapshot 定向测试，断言关键数据失败不入队、审计缺项不阻塞、配置改变哈希变化、相同输入哈希不变。不能仅删除 `requireFrozenExecutionRules` 检查。
-  - 状态：模型冻结接线已完成。完整模型/来源/假设写入独立 Artifact 与配置元数据，V2 Manifest 记录内容引用并校验一致性；确定性哈希、缺失/篡改拒绝、旧 V1 重放均有本地证据。执行标的的显式完整研究模型有界替代已在 T4 完成；T3.1 仍未按完整目标范围整体验收，原 `requireFrozenExecutionRules` 门禁和其他关键事实保护保留，缺关键事实仍失败，因此整体保留未勾选。T3.2 已在后续增量中消费冻结模型。
+  - 状态：已完成。完整模型/来源/假设写入独立 Artifact 与配置元数据，V2 Manifest 记录内容引用并校验一致性；确定性哈希、缺失/篡改拒绝、旧 V1 重放和 finalized Snapshot 不重新取数均有证据。完整研究模型只替代 executionRules model assumption；historicalTradability、身份、币种、Calendar 等 critical fact 门禁继续保留。
 
 - [x] **T3.2：让 Runner 执行冻结模型**
   - 覆盖：AC5、AC6，AC3 的执行期保护。
@@ -164,7 +164,7 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
 - [x] 每项任务有主要交付、修改范围、依赖和独立验证；不以全量历史证据串行锁住全部实施。
 - [x] AC0–AC10 有责任任务；保留历史证据，未勾选实施任务或 V2 T13。
 - [x] 文档与现有代码差异已列入 T1–T3.3。
-- [ ] 后续模型实施、真实 Provider 成功闭环与完整产品验收通过。
+- [x] 模型实施、代表性真实 Provider 成功闭环与完整产品/引擎验收通过；其他 Provider 的实时可用性由 capability 动态报告。
 
 此前文档轮验证：11 份直接相关文档的 111 个本地链接及新增章节锚点有效；固定验收策略 JSON 未变，来源矩阵第 2–12 节逐字保留。核心 Spec/Task 与临时记录显式绕过项目忽略配置后通过 Prettier；来源矩阵及 docs/README.md 的全文件 Prettier 差异在编辑基线中已存在，未重排无关历史内容。全工作树 `git diff --check` 和四份未跟踪文档的 `git diff --no-index --check` 均无空白错误；该轮仅修改文档，没有业务或真实环境验证。
 
@@ -326,3 +326,8 @@ T3.2 已完成本地代码与受控事实验证，但不扩大原任务范围。
 - [x] 实际 Runner 受控买卖闭环及 T4 固定场景真实验收通过。
 
 结论：T1 可冻结模型契约已在 NAV 费用适用性补齐并完成最小定向验证；固定 CN 股票场景的既有真实闭环、重放、账户隔离、Artifact 故障恢复及 Browser 三条展示链路状态不变。该证据不覆盖完整目标市场、资产与周期，T3.1 整体及 V2 T13 继续保持未完成。
+
+
+## 2026-09-11 最终收敛
+
+T0、T1、T2、T3.1、T3.2、T3.3、T4 均已完成。DSA 历史状态 Provider 与 Snapshot critical-fact 门禁闭合后，不再存在“静态 `tradable` 无法证明历史状态”的实施阻塞。V2 全市场 capability 的某项外部数据在特定部署中返回 `unavailable` 时，仅阻止依赖该数据的运行，不回退本任务完成状态。

@@ -6,7 +6,7 @@ import {
 } from './trading-calendar.js';
 import { DecimalValue } from './decimal.js';
 
-export type BacktestBarQuality = 'complete' | 'partial' | 'suspended' | 'unknown';
+export type BacktestBarQuality = 'complete' | 'partial' | 'suspended' | 'stale' | 'unknown';
 export type BacktestBarCompleteness = 'complete' | 'partial' | 'unavailable';
 
 export interface BacktestMinuteBar {
@@ -20,11 +20,11 @@ export interface BacktestMinuteBar {
   low: string;
   close: string;
   volume: string;
-  amount?: string;
+  amount?: string | undefined;
   provider?: string;
   providerRevision?: string;
-  quality?: BacktestBarQuality;
-  suspended?: boolean;
+  quality?: BacktestBarQuality | undefined;
+  suspended?: boolean | undefined;
 }
 
 export interface DerivedBacktestBar {
@@ -103,20 +103,21 @@ const localInstant = (value: string, timeZone: string): LocalInstant => {
 };
 
 const utcForLocalMinute = (date: string, minute: number, timeZone: string): Date => {
-  const [year, month, day] = date.split('-').map(Number);
+  const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
+  if (![year, month, day].every(Number.isInteger)) throw new Error(`无效本地日期: ${date}`);
   const hour = Math.floor(minute / 60);
   const localMinute = minute % 60;
-  let candidate = new Date(Date.UTC(year!, month! - 1, day!, hour, localMinute));
+  let candidate = new Date(Date.UTC(year, month - 1, day, hour, localMinute));
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const rendered = localInstant(candidate.toISOString(), timeZone);
     const renderedUtc = Date.UTC(
-      year!,
-      month! - 1,
-      day!,
+      year,
+      month - 1,
+      day,
       Math.floor(rendered.minute / 60),
       rendered.minute % 60,
     );
-    const wantedUtc = Date.UTC(year!, month! - 1, day!, hour, localMinute);
+    const wantedUtc = Date.UTC(year, month - 1, day, hour, localMinute);
     const offset = renderedUtc - wantedUtc;
     if (offset === 0) return candidate;
     candidate = new Date(candidate.getTime() - offset);
@@ -175,7 +176,9 @@ const aggregateBucket = (
   const isTail = bucket.end > localInstant(lastInput.occurredAt, calendar.timezone).minute + 1;
   let quality: BacktestBarQuality = 'complete';
   if (bars.some((bar) => bar.suspended || bar.quality === 'suspended')) quality = 'suspended';
-  else if (missingMinutes > 0) quality = 'partial';
+  else if (bars.some((bar) => bar.quality === 'stale')) quality = 'stale';
+  else if (bars.some((bar) => bar.quality === 'unknown')) quality = 'unknown';
+  else if (missingMinutes > 0 || bars.some((bar) => bar.quality === 'partial')) quality = 'partial';
   const amount = bars.reduce(
     (sum, bar) => sum.plus(bar.amount ?? DecimalValue.from(bar.close).times(bar.volume)),
     DecimalValue.from('0'),
