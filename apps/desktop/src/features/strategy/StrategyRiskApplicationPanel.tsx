@@ -23,6 +23,8 @@ import {
   upgradeStrategyRiskApplication,
   type RiskApplicationPreview,
   type RiskApplicationUpgradePreview,
+  type StrategyRiskApplication,
+  type StrategyRiskNotification,
 } from './strategy-optimization.api.js';
 import type { StrategyRecord } from './strategy.types.js';
 
@@ -34,6 +36,20 @@ const stateLabel: Record<RiskApplicationPreview['evaluations'][number]['state'],
   unavailable: '不可用',
   not_applicable: '不适用',
 };
+
+const severityLabel: Record<StrategyRiskNotification['severity'], string> = {
+  info: '提示',
+  warning: '警告',
+  error: '严重',
+  critical: '关键',
+};
+
+const notificationFor = (application: StrategyRiskApplication): StrategyRiskNotification => ({
+  enabled: application.notification?.enabled !== false,
+  cooldownMinutes: application.notification?.cooldownMinutes ?? 60,
+  severity: application.notification?.severity ?? 'warning',
+  channels: application.notification?.channels ?? ['feishu'],
+});
 
 export function StrategyRiskApplicationPanel({ strategies }: { strategies: StrategyRecord[] }) {
   const queryClient = useQueryClient();
@@ -52,6 +68,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
     'existingAndFuture',
   );
   const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const [notificationSeverity, setNotificationSeverity] = useState<StrategyRiskNotification['severity']>('warning');
+  const [feishuEnabled, setFeishuEnabled] = useState(true);
   const [cooldownMinutes, setCooldownMinutes] = useState('60');
   const [cooldownDrafts, setCooldownDrafts] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<RiskApplicationPreview | null>(null);
@@ -97,6 +115,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
         notification: {
           enabled: notificationEnabled,
           cooldownMinutes: Math.max(0, Number(cooldownMinutes) || 0),
+          severity: notificationSeverity,
+          channels: feishuEnabled ? ['feishu'] : [],
         },
       });
     },
@@ -112,7 +132,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
       id: string;
       revision: number;
       enabled?: boolean;
-      notification?: { enabled: boolean; cooldownMinutes: number };
+      notification?: StrategyRiskNotification;
     }) =>
       updateStrategyRiskApplication(input.id, {
         expectedRevision: input.revision,
@@ -181,21 +201,15 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
           <div className="grid gap-3 lg:grid-cols-3">
             <FieldLabel className="space-y-1 text-sm">
               <span className="text-muted-foreground">策略版本</span>
-              <Select
-                value={strategyVersionId}
-                onValueChange={(value) => {
-                  if (value) {
-                    setStrategyVersionId(value);
-                    setPreview(null);
-                  }
-                }}
-              >
+              <Select value={strategyVersionId} onValueChange={(value) => {
+                if (!value) return;
+                setStrategyVersionId(value);
+                setPreview(null);
+              }}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {versions.map(({ strategy, version }) => (
-                    <SelectItem key={version.id} value={version.id}>
-                      {strategy.name} · v{version.version}
-                    </SelectItem>
+                    <SelectItem key={version.id} value={version.id}>{strategy.name} · v{version.version}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -222,31 +236,40 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
               </Select>
             </FieldLabel>
           </div>
-          <div className="grid gap-3 sm:grid-cols-[auto_180px] sm:items-end">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
             <div className="space-y-1">
               <div className="text-sm text-muted-foreground">通知</div>
-              <Button
-                type="button"
-                size="sm"
-                variant={notificationEnabled ? 'default' : 'outline'}
-                onClick={() => setNotificationEnabled((current) => !current)}
-              >
+              <Button type="button" size="sm" variant={notificationEnabled ? 'default' : 'outline'} onClick={() => setNotificationEnabled((current) => !current)}>
                 {notificationEnabled ? '风险通知已开启' : '风险通知已关闭'}
               </Button>
             </div>
             <FieldLabel className="space-y-1 text-sm">
+              <span className="text-muted-foreground">严重级别</span>
+              <Select value={notificationSeverity} onValueChange={(value) => value && setNotificationSeverity(value)}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="info">提示</SelectItem>
+                  <SelectItem value="warning">警告</SelectItem>
+                  <SelectItem value="error">严重</SelectItem>
+                  <SelectItem value="critical">关键</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldLabel>
+            <FieldLabel className="space-y-1 text-sm">
               <span className="text-muted-foreground">通知冷却（分钟）</span>
               <Input type="number" min="0" max="10080" value={cooldownMinutes} onChange={(event) => setCooldownMinutes(event.target.value)} />
             </FieldLabel>
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">通知渠道</div>
+              <Button type="button" size="sm" variant={feishuEnabled ? 'default' : 'outline'} onClick={() => setFeishuEnabled((current) => !current)}>
+                {feishuEnabled ? '飞书已选择' : '飞书未选择'}
+              </Button>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">通知通道由“通知 Provider”统一路由；策略应用只控制是否通知与冷却时间，不复制 Provider 配置。</p>
+          <p className="text-xs text-muted-foreground">渠道使用统一 Notification Provider 路由；当前首版可投递渠道为飞书。</p>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">执行标的 {symbol || '—'}</Badge>
-            <Button
-              variant="outline"
-              disabled={!accountId || !symbol || previewMutation.isPending}
-              onClick={() => previewMutation.mutate()}
-            >
+            <Button variant="outline" disabled={!accountId || !symbol || previewMutation.isPending} onClick={() => previewMutation.mutate()}>
               {previewMutation.isPending ? '生成中…' : '预览风险规则'}
             </Button>
           </div>
@@ -269,19 +292,23 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                 <div key={rule.sourceKey} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
                   <div>
                     <div className="font-medium">{rule.label}</div>
-                    <div className="text-xs text-muted-foreground">{rule.sourceKey} · 阈值 {rule.threshold}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {rule.sourceKey} · {rule.metric} {rule.operator} {rule.threshold} · {rule.evaluationTimeframe} · {rule.costBasisPolicy}
+                    </div>
                   </div>
                   <Badge variant="outline">{evaluation ? stateLabel[evaluation.state] : '待评价'}</Badge>
+                  {evaluation?.reason ? <div className="w-full text-xs text-muted-foreground">{evaluation.reason}</div> : null}
                 </div>
               );
             })}
+            {preview.plan.coverage.items.filter((item) => item.status !== 'mapped').map((item) => (
+              <div key={`${item.category}:${item.source}`} className="text-xs text-muted-foreground">
+                {item.category} · {item.source}：{item.reason}
+              </div>
+            ))}
             <div className="flex flex-wrap gap-2 pt-2">
-              <Button variant="outline" disabled={createMutation.isPending} onClick={() => createMutation.mutate(false)}>
-                创建但不启用
-              </Button>
-              <Button disabled={createMutation.isPending} onClick={() => createMutation.mutate(true)}>
-                创建并启用
-              </Button>
+              <Button variant="outline" disabled={createMutation.isPending} onClick={() => createMutation.mutate(false)}>创建但不启用</Button>
+              <Button disabled={createMutation.isPending} onClick={() => createMutation.mutate(true)}>创建并启用</Button>
             </div>
           </CardContent>
         </Card>
@@ -300,10 +327,15 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                 .filter((version) => version.version > 0 && version.schemaVersion === 2)
                 .sort((left, right) => right.version - left.version)[0];
               const canUpgrade = Boolean(latest && latest.version > (source?.version.version ?? 0));
-              const currentUpgrade =
-                upgradePreview?.applicationId === application.id ? upgradePreview : null;
-              const cooldownDraft = cooldownDrafts[application.id] ?? String(application.notification.cooldownMinutes ?? 60);
-              const appNotificationEnabled = application.notification.enabled !== false;
+              const currentUpgrade = upgradePreview?.applicationId === application.id ? upgradePreview : null;
+              const notification = notificationFor(application);
+              const cooldownDraft = cooldownDrafts[application.id] ?? String(notification.cooldownMinutes);
+              const saveNotification = (patch: Partial<StrategyRiskNotification>) =>
+                updateMutation.mutate({
+                  id: application.id,
+                  revision: application.revision,
+                  notification: { ...notification, ...patch },
+                });
               return (
                 <div key={application.id} className="space-y-3 rounded-md border p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -313,96 +345,53 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                         <Badge variant="outline">{source ? `${source.strategy.name} · v${source.version.version}` : '策略来源'}</Badge>
                         {canUpgrade && latest ? <Badge variant="outline">可升级至 v{latest.version}</Badge> : null}
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">plan {application.planHash.slice(0, 12)} · {application.plan.rules.length} 条规则 · 通知 {appNotificationEnabled ? `开启 / ${application.notification.cooldownMinutes ?? 60} 分钟` : '关闭'}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        plan {application.planHash.slice(0, 12)} · {application.plan.rules.length} 条规则 · {severityLabel[notification.severity]} · 通知 {notification.enabled ? `${notification.cooldownMinutes} 分钟` : '关闭'} · {notification.channels.includes('feishu') ? '飞书' : '无渠道'}
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={application.enabled ? 'default' : 'outline'}>{application.enabled ? '实际监控中' : '已停用'}</Badge>
                       {canUpgrade && latest ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={upgradePreviewMutation.isPending}
-                          onClick={() =>
-                            upgradePreviewMutation.mutate({
-                              applicationId: application.id,
-                              targetStrategyVersionId: latest.id,
-                              targetVersion: latest.version,
-                            })
-                          }
-                        >
-                          预览升级
-                        </Button>
+                        <Button size="sm" variant="outline" disabled={upgradePreviewMutation.isPending} onClick={() => upgradePreviewMutation.mutate({ applicationId: application.id, targetStrategyVersionId: latest.id, targetVersion: latest.version })}>预览升级</Button>
                       ) : null}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={updateMutation.isPending}
-                        onClick={() => updateMutation.mutate({ id: application.id, revision: application.revision, enabled: !application.enabled })}
-                      >
+                      <Button size="sm" variant="outline" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: application.id, revision: application.revision, enabled: !application.enabled })}>
                         {application.enabled ? '停用实际监控' : '启用实际监控'}
                       </Button>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={updateMutation.isPending}
-                      onClick={() => updateMutation.mutate({
-                        id: application.id,
-                        revision: application.revision,
-                        notification: {
-                          enabled: !appNotificationEnabled,
-                          cooldownMinutes: application.notification.cooldownMinutes ?? 60,
-                        },
-                      })}
-                    >
-                      {appNotificationEnabled ? '关闭通知' : '开启通知'}
+                    <Button size="sm" variant="outline" disabled={updateMutation.isPending} onClick={() => saveNotification({ enabled: !notification.enabled })}>
+                      {notification.enabled ? '关闭通知' : '开启通知'}
                     </Button>
+                    <Button size="sm" variant={notification.channels.includes('feishu') ? 'default' : 'outline'} disabled={updateMutation.isPending} onClick={() => saveNotification({ channels: notification.channels.includes('feishu') ? [] : ['feishu'] })}>
+                      飞书
+                    </Button>
+                    <Select value={notification.severity} onValueChange={(value) => value && saveNotification({ severity: value })}>
+                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="info">提示</SelectItem>
+                        <SelectItem value="warning">警告</SelectItem>
+                        <SelectItem value="error">严重</SelectItem>
+                        <SelectItem value="critical">关键</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FieldLabel className="space-y-1 text-xs">
                       <span className="text-muted-foreground">冷却分钟</span>
-                      <Input
-                        className="w-28"
-                        type="number"
-                        min="0"
-                        max="10080"
-                        value={cooldownDraft}
-                        onChange={(event) => setCooldownDrafts((current) => ({ ...current, [application.id]: event.target.value }))}
-                      />
+                      <Input className="w-28" type="number" min="0" max="10080" value={cooldownDraft} onChange={(event) => setCooldownDrafts((current) => ({ ...current, [application.id]: event.target.value }))} />
                     </FieldLabel>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={updateMutation.isPending}
-                      onClick={() => updateMutation.mutate({
-                        id: application.id,
-                        revision: application.revision,
-                        notification: {
-                          enabled: appNotificationEnabled,
-                          cooldownMinutes: Math.max(0, Number(cooldownDraft) || 0),
-                        },
-                      })}
-                    >
-                      保存通知设置
-                    </Button>
+                    <Button size="sm" variant="outline" disabled={updateMutation.isPending} onClick={() => saveNotification({ cooldownMinutes: Math.max(0, Number(cooldownDraft) || 0) })}>保存冷却</Button>
                   </div>
                   {currentUpgrade ? (
                     <div className="space-y-2 rounded-md border bg-muted/20 p-3">
                       <div className="text-sm font-medium">升级到 v{currentUpgrade.targetVersion} 的规则差异</div>
-                      {currentUpgrade.preview.diff
-                        .filter((item) => item.change !== 'unchanged')
-                        .map((item) => (
-                          <div key={item.sourceKey} className="text-xs text-muted-foreground">
-                            {item.change === 'added' ? '新增' : item.change === 'removed' ? '移除' : '修改'} · {item.sourceKey}
-                          </div>
-                        ))}
-                      {currentUpgrade.preview.diff.every((item) => item.change === 'unchanged') ? (
-                        <div className="text-xs text-muted-foreground">监控规则内容没有变化，但来源版本仍会形成新的应用修订。</div>
-                      ) : null}
+                      {currentUpgrade.preview.diff.filter((item) => item.change !== 'unchanged').map((item) => (
+                        <div key={item.sourceKey} className="text-xs text-muted-foreground">
+                          {item.change === 'added' ? '新增' : item.change === 'removed' ? '移除' : '修改'} · {item.sourceKey}
+                        </div>
+                      ))}
+                      {currentUpgrade.preview.diff.every((item) => item.change === 'unchanged') ? <div className="text-xs text-muted-foreground">监控规则内容没有变化，但来源版本仍会形成新的应用修订。</div> : null}
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" disabled={upgradeMutation.isPending} onClick={() => upgradeMutation.mutate()}>
-                          {upgradeMutation.isPending ? '升级中…' : '确认升级'}
-                        </Button>
+                        <Button size="sm" disabled={upgradeMutation.isPending} onClick={() => upgradeMutation.mutate()}>{upgradeMutation.isPending ? '升级中…' : '确认升级'}</Button>
                         <Button size="sm" variant="outline" onClick={() => setUpgradePreview(null)}>取消</Button>
                       </div>
                     </div>
