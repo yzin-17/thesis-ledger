@@ -112,8 +112,6 @@ export class StrategyOptimizationCandidateService {
     );
     return this.completeProposal(
       experiment,
-      baseline,
-      descriptors,
       route,
       round,
       modelKey,
@@ -127,8 +125,6 @@ export class StrategyOptimizationCandidateService {
 
   private async completeProposal(
     experiment: ExperimentRow,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
-    descriptors: StrategyParameterDescriptor[],
     route: { provider: string; model: string },
     round: number,
     modelKey: string,
