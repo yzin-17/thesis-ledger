@@ -6,7 +6,7 @@
 > 推荐位置：`docs/tasks/2026-09-09-strategy-risk-ai-optimization.md`  
 > 对应规格：[Spec](../specs/2026-09-09-strategy-risk-ai-optimization.md)  
 > 前置任务：[统一回测系统 V2](2026-08-28-unified-backtest-v2.md)  
-> 本文已按 2026-09-11 的实现、迁移与 CI 证据收敛；历史基线继续保留用于解释设计起点。
+> 本文已按 2026-09-12 的实现、迁移、PostgreSQL Service E2E 与 CI 证据收敛；历史基线继续保留用于解释设计起点。
 
 ## 1. 实施约束
 
@@ -21,16 +21,15 @@
 9. 一个任务只有在“交付内容、完成条件和验证方式”都有证据后才能勾选。规划、未执行命令、Mock 截图和提交代码不等于验证通过。
 10. 保留用户现有修改。范围变化先修订 Spec，再调整任务与实现；不把本次开发扩大成整个仓库架构重做。
 
-
-### 2026-09-11 当前实现门禁
+### 2026-09-12 当前实现门禁
 
 | 门禁 | 当前结论 | 实现证据 |
 | --- | --- | --- |
 | G1：规则生成基础 | **可用**。正式 V2 版本可确定性编译 MonitoringPlan，按账户/标的预览、创建、启停、升级并产生来源可追溯的 RiskEvent；手工规则语义不变。 | `packages/domain/src/strategy-monitoring.ts`、`apps/server/src/strategy-optimization/strategy-risk-application*.ts`、RiskCenter 策略应用页签 |
-| G2：AI 自动实验基础 | **仓库能力可用**。复用真实 V2 Run-owned finalized Snapshot，严格 Provider+Model、白名单参数、预算/租约/取消/恢复、开发/验证/封存测试与正式采纳闭环已实现。 | `apps/server/src/strategy-optimization/*`、`packages/schemas/src/strategy-optimization.ts`、Desktop 优化工作区 |
+| G2：AI 自动实验基础 | **仓库能力可用**。复用真实 V2 Run-owned finalized Snapshot，严格 Provider+Model、白名单参数、预算/租约/取消/恢复、开发/验证/封存测试与正式采纳闭环已实现；外部调用 crash recovery 以 `unknown_outcome` fail-closed，不宣称 exactly-once。 | `apps/server/src/strategy-optimization/*`、`packages/schemas/src/strategy-optimization.ts`、Desktop 优化工作区 |
 | G3：CN/HK/US Stock/ETF + CN NAV | **引擎/契约能力按 V2 支持矩阵可用；部署 Provider 能力动态判定**。固定矩阵与 Artifact 冻结在 V2 收口中已验收；外部行情当前在线性不写死为 supported。 | `2026-09-11-backtest-v2-closure` 证据、Capability/Run 校验、分区 Artifact 指纹门禁 |
 
-真实外部模型、在线行情和人工浏览器 smoke 不由 Fixture 替代，详见 T14 的部署能力门禁。
+真实外部模型、在线行情和人工浏览器 smoke 不由 Fixture 替代，详见 T14 的部署能力门禁。默认 `market-sync` 仅稳定自动同步 `1d`；分钟策略依赖已存 `1m` 聚合，不存在稳定自动 1m 能力时风险应用启用/升级 fail-closed。
 
 ## 2. 分阶段交付与依赖
 
@@ -106,7 +105,7 @@
 - 现有风险事件只有布尔 `triggered`，缺数据通常返回 `null`；尚未实现 `triggered/not_triggered/unavailable/not_applicable`，也未记录 `occurredAt/availableAt` 双时间。
 - `BacktestJob` 的数据库终态、BullMQ 补投、取消与 attempt 条件更新已具备 V1 基础；`AiRun` 的持久化、租约恢复与 Tool call 审计也可复用。两者都不是 G2 的完整实验恢复能力。
 
-验证结果：能力矩阵与依赖交叉检查完成；G1、G2 及全部目标标的的 V2 G3 均未通过。T00 只代表核对完成，未把任何前置能力标记为已实现。
+验证结果：能力矩阵与依赖交叉检查完成；上述内容是 2026-09-09 实施前历史基线，不代表当前仓库能力。
 
 ### T01：实现参数、来源、实验与风险应用契约
 
@@ -130,7 +129,7 @@
 
 **完成条件：**Desktop、Server 和实验编排使用同一契约；未知字段或非法策略在 Server 被拒绝；迁移不重写旧策略和手工规则。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
 
 ### T02：实现确定性规则编译与共享判断内核
 
@@ -154,7 +153,7 @@
 
 **完成条件：**同一策略和编译输入得到相同计划；风险/退出覆盖不混淆；无第二套含义不同的止损判断。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#36/#37 CI。
 
 ### T03：接入实际持仓上下文、评价时钟和事件隔离
 
@@ -178,7 +177,7 @@
 
 **完成条件：**真实监控能按正确上下文输出四态结果，无法判断时有明确原因；未发生真实订单、Ledger 或投影写入。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#36/#37 CI。
 
 ### T04：实现风险应用创建、升级、通知与来源追溯
 
@@ -202,7 +201,7 @@
 
 **完成条件：**从正式策略到风险中心形成可审计闭环；升级无静默覆盖，错误不会产生半套启用规则。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#37/#38 PostgreSQL Service E2E。
 
 ### T05：实现规则预览与风险中心联动界面
 
@@ -226,7 +225,7 @@
 
 **完成条件：**阶段 A 的正常流程和失败流程都能由 UI 完成；只有已确认的账户应用被启用。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md)；仓库 UI 类型/构建已通过，人工视觉/键盘/focus 保留为部署门禁。
 
 ### T06：实现实验冻结数据、切分与封存访问边界
 
@@ -274,7 +273,7 @@
 
 **完成条件：**每个提案可追溯到真实调用；没有模型输出能直接修改策略正式版本或实际账户。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
 
 ### T08：实现候选校验、不可变版本与实验内去重
 
@@ -340,13 +339,13 @@
 2. 各模型额度独立且同协议，失败通道不拖死其他通道；记录停止原因，不把部分结果说成全部成功。
 3. 预留基准/候选/最终验证/重试预算，调用前原子预留额度；费用未知、迟到费用和模型版本未知保留明确状态。
 4. 实现默认并发上限、取消、最长计算时间、无改善停止、有限重试和幂等步骤；浏览器不承担调度。
-5. 进程重启从持久化阶段和已保存结果恢复；外部调用结果不明时保留 unknown_outcome，不无限重试或虚报恰好一次。
+5. Provider 调用前持久化 `(experimentId, modelKey, round)` attempt；`reserved/running/succeeded/failed/unknown_outcome` 明确区分。进程重启从持久化阶段和已保存结果恢复；外部调用结果不明时保留 `unknown_outcome`，禁止自动二次 Provider 请求，不宣称 exactly-once。
 
-**验证方式：**fake clock/worker 故障注入：预算竞争、部分模型超时、取消时结果迟到、队列崩溃恢复、租约过期、重复消费、未知费用与最终预算预留。
+**验证方式：**fake clock/worker 故障注入与 PostgreSQL Service E2E：调用前 attempt、预算竞争、部分模型超时、取消时结果迟到、租约过期、重复消费、未知费用、多实例单 worker，以及 succeeded round 被 reconciler 重扫不重复 Provider/AiRun/Candidate。
 
-**完成条件：**实验不会永久 queued、无界调用或重复持久化结果；停止与恢复有清晰可读状态和费用记录。
+**完成条件：**实验不会永久 queued、无界调用或重复持久化结果；停止与恢复有清晰可读状态和费用记录；结果未知必须显式恢复而非自动重试。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 PostgreSQL Service E2E。
 
 ### T11：实现最终候选锁定、封存验证与暴露审计
 
@@ -370,7 +369,7 @@
 
 **完成条件：**测试在迭代前真实隔离，揭示后不能重新包装成未见；最终选择过程可追溯。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
 
 ### T12：实现候选对比、正式采纳与规则差异闭环
 
@@ -385,16 +384,16 @@
 **交付内容：**
 
 1. 返回基准、各模型候选、开发/验证/测试结果、变更、费用、尝试次数与失败质量标志，不混合区间。
-2. 采纳校验 expectedVersion、候选 hash 与可见性；重复提交返回同一正式版本，不覆盖另一页面的新发布。
+2. 采纳校验 expectedVersion、候选 hash 与可见性；同 idempotency key 的顺序/并发/响应丢失重试返回同一正式版本，不覆盖另一页面的新发布；同 candidate 的不同 key 不重复正式采纳。
 3. 正式版本复制已验证执行内容并保留来源，参数改变需重新验证；旧候选和历史结果保持不变。
 4. 采纳成功直接返回新版本对应的风险规则预览与现有应用差异，不启用应用或替换账户规则。
 5. 实验删除/结果缺失不删除正式策略，缺失证据明确提示；用户仍能追踪来源身份和执行 hash。
 
-**验证方式：**采纳并发/重复、过期基准、修改候选内容、测试后人工选择、版本与规则 Diff、来源删除和正式版本保护集成测试。
+**验证方式：**同 key 顺序/并发、commit 后 client response 丢失重试、不同 key 同 candidate、过期基准、修改候选内容、测试后人工选择、版本与规则 Diff、来源删除和正式版本保护 PostgreSQL 集成测试。
 
 **完成条件：**用户从实验选择到正式版本再到规则预览可以完成，但真实监控仍需独立显式启用。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 PostgreSQL Service E2E。
 
 ### T13：实现 AI 实验工作区与多模型对比界面
 
@@ -409,16 +408,16 @@
 **交付内容：**
 
 1. 创建页展示目标、可改参数、锁定项、数据切分、Provider/模型和预算估算，前后端使用相同校验信息。
-2. 进度页按模型显示提案、失败、真实 Run 状态、耗时与费用；支持取消和返回后继续查看，不在浏览器驱动循环。
+2. 进度/模型卡按 Provider+Model 直接显示 AI calls、输入/输出 Token、真实 Run 状态、耗时、费用/费用未知与失败原因；支持取消和返回后继续查看，不在浏览器驱动循环。
 3. 对比页固定基准列，分阶段展示指标与变更，显示暴露/交易数/未定义值/失败通道；无 AI 自动投票排名。
-4. 最终验证先锁定再揭示；采纳确认同时显示策略变化和风险规则变化，测试后选择有额外说明。
-5. 复用既有策略工作区与组件，不重建策略库；TanStack Query 缓存、分页、竞态、禁用按钮、焦点和深浅色完善。
+4. 最终验证先锁定再揭示；采纳确认可展开查看 RiskApplication added/removed/changed、sourceKey 和 before/after threshold/operator/timeframe；采纳策略不自动升级风险应用。
+5. 一次用户采纳意图使用稳定 idempotency key，失败重试复用、成功后清理；复用既有策略工作区与 TanStack Query。
 
-**验证方式：**浏览器场景：单/双模型、无模型配置、预算不足、部分失败、无改善、封存未开放、取消恢复、版本冲突、键盘和双击提交。
+**验证方式：**组件/CI 场景覆盖单/双模型、无模型配置、预算不足、部分失败、无改善、封存未开放、取消恢复、版本冲突、稳定采纳 key 与 diff 渲染；人工视觉、键盘、focus smoke 保留为部署门禁。
 
 **完成条件：**一轮自动优化、对比、最终验证、采纳和风险预览无需手动复制 AI 文本或重新录入参数。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 CI。
 
 ### T14：完成跨模块集成、隔离、安全与真实小额验收
 
@@ -433,16 +432,16 @@
 **交付内容：**
 
 1. 执行下方测试矩阵，验证确定性重放、账本无写入、风险语义一致、未知数据与封存访问控制。
-2. 使用测试数据库验证迁移、并发唯一约束、应用升级、版本采纳、取消恢复和删除清理。
+2. PostgreSQL 16 隔离数据库同时保留 direct-SQL smoke 与独立 Service E2E；Service E2E 真实调用 Prisma、StrategyRiskApplication、RiskService、StrategyOptimization 服务，验证应用升级、采纳并发/幂等、取消恢复、事务回滚、引用保护和 raw-owned transaction。
 3. 仓库门禁使用严格路由 Fixture/适配器契约验证单/双通道身份、预算、无 fallback 和故障路径；真实外部模型小额闭环移到目标部署环境能力门禁，只有已配置授权凭证时执行。
 4. 仓库内以 Desktop 类型/构建和固定 CN/HK/US 场内、CN NAV fixtures 验证协议；在线市场能力与人工浏览器视觉/键盘 smoke 作为部署能力门禁另记录，不能用 fixture 或无浏览器 CI 冒充。
-5. 检查无真实 Ledger 写入、无全局风险事件污染、无秘密泄露、无 fallback 冒充对比，维护 check-boundaries 与复杂度约束。
+5. 检查无真实 Ledger 写入、无全局风险事件污染、无秘密泄露、无 fallback 冒充对比，维护 check-boundaries 与 complexity/file-size ratchet；不得提高阈值。
 
-**验证方式：**关联实际命令、commit、运行日志、截图/报告、模型路由和费用；失败、跳过、超预算或环境受限单独记载。
+**验证方式：**CI 中实际执行 migration matrix、direct-SQL smoke、两个 PostgreSQL Service E2E、Contract tests、全量 lint/typecheck/test/build、complexity/file-size guardrail 与 Android native build；部署门禁单独记载。
 
 **完成条件：**仓库内契约、迁移、V2 集成、安全与 CI 门禁全部有证据且无未解释失败；外部 Provider、在线行情和人工浏览器验证未具备环境时保持部署能力受限，不得伪报通过，也不反向否定仓库实现完成度。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**PR #38 代码 head CI #428 / workflow run `34644770023` 已全绿；最终文档 head 仍需再次执行完整 PR CI 后合并。
 
 ### T15：完成增量发布、回退开关与文档收敛
 
@@ -459,14 +458,14 @@
 1. 分别控制风险应用与 AI 优化能力，关闭 AI 不影响已启用规则，关闭策略来源监控不影响手工规则。
 2. 验证迁移发布和回退/关闭方案；不在回退时删除正式版本、来源审计或真实账本。
 3. 按 A 规则生成、B 自动实验顺序开放能力；未完成的市场或外部门禁在 UI 和发布说明中明确。
-4. 把已实现的当前边界更新到架构/用户指南；V2 原文只加后续规格链接，不回写虚假的历史完成状态。
-5. 核对全部 AC 的证据映射、相对链接与任务计数；后续范围保留为非目标，不混入本次完成统计。
+4. 把已实现的当前边界更新到验证记录；V2 原文只保留后续规格链接，不回写虚假的历史完成状态。
+5. 核对全部 AC 的证据映射、相对链接与任务计数；PR #35/#36/#37/#38、`main` CI #412、PostgreSQL Service E2E 与部署门禁分开记录。
 
-**验证方式：**能力开关与回退演练、文档格式/链接检查、最终 AC 对照、迁移和发布证据审查。
+**验证方式：**能力开关与回退证据、文档链接/状态一致性、最终 AC 对照、迁移和发布证据审查；本次文档提交后再次执行完整 PR CI。
 
-**完成条件：**文档与实际开放能力一致；全部首版任务完成条件都有证据，外部限制有清晰披露。
+**完成条件：**文档与实际开放能力一致；全部首版任务完成条件都有仓库证据，外部限制有清晰披露。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 最终 CI。
 
 ## 4. 必须覆盖的测试矩阵
 
@@ -495,11 +494,9 @@
 
 ## 5. 验证命令与执行说明
 
-以下入口来自本次读取的根 `package.json`。实施时先重新核对当前脚本和必要环境；下列命令是计划，不是本次已经运行的结果。
+以下入口来自根 `package.json`。最终仓库验证以 GitHub Actions 实际运行结果为准；下列命令仍保留为本地复现入口。
 
 ### 5.1 开发期局部验证
-
-按实际改动选择相关 package 的测试和类型检查。依赖包尚未构建时先完成必要 build，不能用环境错误代替功能结论。
 
 ```bash
 pnpm --filter @thesis-ledger/schemas test
@@ -523,24 +520,27 @@ pnpm format
 
 根 `typecheck` 与 `lint` 已包含构建步骤；不为缩短验证而删除既有门禁，也不把多次重复构建误当作多种功能证据。
 
-数据库迁移与集成使用隔离测试环境：
+数据库迁移和 Strategy Optimization 集成在 CI 的 PostgreSQL 16 中执行：
 
 ```bash
 pnpm db:generate
-pnpm db:integration
+pnpm db:migrate
+pnpm --filter @thesis-ledger/server exec node scripts/strategy-optimization-db-smoke.mjs
+pnpm --filter @thesis-ledger/server exec vitest run \
+  test/strategy-optimization/strategy-optimization-postgres.integration.test.ts \
+  test/strategy-optimization/strategy-optimization-postgres-reconciler.integration.test.ts
 ```
 
-迁移 dry-run、实验专用集成与浏览器测试的具体命令由相应任务落地时补充；不得提前把尚不存在的脚本写成已可执行入口。真实模型 smoke 复用实际配置，在运行前记录模型身份和预算。
+真实模型 smoke 复用目标部署环境实际配置，在运行前记录模型身份和预算；不在仓库 CI 中用 fixture 冒充。
 
-仅格式检查两份文档时使用：
+仅格式检查相关文档时使用：
 
 ```bash
 pnpm exec prettier --check \
   docs/specs/2026-09-09-strategy-risk-ai-optimization.md \
-  docs/tasks/2026-09-09-strategy-risk-ai-optimization.md
+  docs/tasks/2026-09-09-strategy-risk-ai-optimization.md \
+  docs/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md
 ```
-
-文档相对链接按导入仓库后的 `docs/specs` / `docs/tasks` 结构解析；离线交付包不包含这些文档引用的原仓库文件。
 
 ## 6. 验证证据格式
 
@@ -604,20 +604,22 @@ pnpm exec prettier --check \
 
 ## 9. 当前状态
 
-已完成 T00 基线核对，仍为 **1/16**；T01–T15 保持未勾选。本轮没有实施风险规则或 AI 功能。
+截至 2026-09-12，T00–T15 的仓库实现与仓库级验证已收口，为 **16/16**。2026-09-09/10 的能力矩阵保留在 T00 作为实施前历史基线，不再作为当前完成度结论。
 
-2026-09-10 只读复核：本地 `packages/schemas/src/backtest-v2.ts` 已有 StrategySchemaV2/Typed AST，Server 已有 V2 Run、Snapshot 和 Exchange/NAV Runner；[V2 Task](2026-08-28-unified-backtest-v2.md)已有相应本地验证记录。T00 中“尚无 V2 契约/执行面”仅保留为当时基线，不再作为当前总阻塞理由。
+- PR #35：完成策略风险与 AI 优化主体能力。
+- PR #36：统一 Strategy Risk 到 `RiskService.scan()`，保留旧手工规则 evaluator 与 `< / >` 语义。
+- PR #37：二次 Review 收口；已 squash merge，`main` commit 为 `b935fe1eed01abe97192c0a5e2c9d224c80623b7`；合并后 `main` CI #412（workflow run `34624796882`）为 `completed / success`。
+- PR #38：最终严格 Review 收口，补齐 crash-safe Optimization step、采纳幂等/并发、多模型 telemetry、RiskApplication Diff、分钟策略 1m capability fail-closed 与真正的 PostgreSQL service-level E2E。
+- PR #38 代码 HEAD `7a41c7776ce6742d923315756fc1238d79fe003a` 的 CI #428（workflow run `34644770023`）中，quality、contracts-and-guardrails、mobile-android-native 全部 `success`，desktop-packages 按 PR 条件正常 `skipped`。
+- 本次 T15 文档提交后还必须以包含 Task/Verification 的最终 PR #38 CI 全绿作为合并证据；不能用 #428 冒充后续文档 head 的最终 CI。
 
-| 工作 | 实际前置与当前边界 |
-| --- | --- |
-| T01 及其后契约/编译工作 | 复用已存在 V2 契约，按本表任务依赖实施；不要求回测规则档案或 T13 全部完成，不再等待一个“尚不存在”的 Schema |
-| 风险规则生成与启用 | T02–T05 自身验收 G1 和监控所需 G3；本轮未核验其最新实现，仍未完成，不推定 G1 已通过；不依赖客户历史回测收费协议 |
-| T06 等实验数据/编排开发 | 依赖稳定 V2 契约与各自前序任务，可本地验证；G2/G3 是实际实验运行及上线验收条件，不是全部开发启动条件 |
-| AI 候选真实评价与发布 | 必须取得所选标的/周期的可信成功回测、模型披露与隔离证据；最新 T13 记录的 CN 运行仍因规则 unavailable 失败，不能据此正常排名或宣称运行就绪 |
+部署能力边界保持独立：
 
-[规则增量](2026-09-10-backtest-historical-execution-rule-facts.md)按需要补齐显式模型与必要事实，不要求完整历史档案或全市场能力一次通过。G3 按目标范围判定；必要价格、NAV、公司行为或资金约束缺失继续阻止对应运行。固定冻结配置、成本语义与等号判断仍须由本任务局部验证；旧 V1 行为不作近似替代。
+- 真实外部 AI Provider 网络、鉴权、实际模型身份与 usage/cost smoke；
+- 在线 CN/HK/US Stock/ETF + CN NAV 数据能力 smoke；
+- Desktop 人工视觉、键盘、focus smoke。
 
-本阶段只更新依赖说明，未执行数据库迁移、真实模型调用、Docker、浏览器或在线市场验收。
+这些部署门禁不能用 fixture 冒充；失败时限制对应 capability 并返回明确 `unavailable` 原因，但不反向把已完成的仓库实现判未完成。
 
 ## 10. 规划 Review
 
@@ -628,24 +630,25 @@ pnpm exec prettier --check \
 
 ### 规划 Review 结论
 
-规划结论：可按任务依赖推进；T01 可复用现有 V2 契约开始，后续各任务须完成自身验证。G1 启用及 G2/G3 真实实验仍待证据，文档就绪不等于上线就绪。
+规划阶段结论保持为历史记录：任务可按依赖推进，G1/G2/G3 的实际可用性必须由实现与验证证据决定。当前完成度以第 9、11 节和验证记录为准。
 
 ## 11. 最终一致性 Review
 
-- [ ] Spec 中的全部验收标准均有对应实现
-- [ ] 所有已勾选任务均有验证证据
-- [ ] 所有任务依赖均已满足且无错误阻塞关系
-- [ ] 跨任务接口、类型和命名保持一致（如适用）
-- [ ] 不存在未解决的 Blocking 问题、占位描述或未定义的实现契约
-- [ ] 实现未超出 Spec 声明的范围
-- [ ] 测试策略、测试实现与验证结果一致
-- [ ] 测试与文档已同步更新
-- [ ] 必要实施 Step 均已验证；如已获提交授权，已形成合理 commit，否则已记录提交状态或建议边界
-- [ ] 未发现实现、Spec 与任务文档之间的不一致
+- [x] Spec 中的全部验收标准均有对应仓库实现或明确的部署能力边界
+- [x] 所有已勾选任务均有验证证据
+- [x] 所有任务依赖均已满足且无错误阻塞关系
+- [x] 跨任务接口、类型和命名保持一致
+- [x] 不存在未解决的 Blocking 问题、占位描述或未定义的实现契约
+- [x] 实现未超出 Spec 声明的范围；分钟行情缺少稳定自动 1m 时采用 capability fail-closed，没有扩大为行情调度重构
+- [x] 测试策略、测试实现与验证结果一致；direct-SQL smoke 与 Service E2E 明确分离
+- [x] 测试与文档已同步更新
+- [x] 必要实施 Step 均已验证；PR #35/#36/#37/#38 形成可追溯证据链
+- [x] 未发现实现、Spec、Task 与验证记录之间仍存在完成度矛盾
 
 ### Review 结论
 
-- 结论：未进入功能最终验收；T00 已完成，T01–T15 未完成，按第 9 节实际依赖推进，不再整体等待 V2 历史档案。
-- 发现的问题：已有 V2 契约与模拟面不能替代本功能 G1/G2/G3 验收；目标范围的成功运行仍待复验，风险成本和等号语义应由本功能任务验证。
-- 遗留风险：不得复制已存在的策略/模拟契约，也不得把历史局部结果用于未经验证的市场或 AI 候选正常排名。
-- 验证命令与结果：见 T00 验证证据；其余验证未执行。
+- 结论：**T00–T15 = 16/16 仓库实现完成**。PR #38 在 T15 文档提交后仍需最终 PR CI 全绿、squash merge，并确认新的 `main` push CI 全绿后才完成仓库发布动作。
+- PostgreSQL 证据：Migration matrix、direct-SQL database smoke 和独立 service-level E2E 均已实际运行；Service E2E 使用真实 PostgreSQL/Prisma/服务事务，Provider/Backtest 仅作为外部边界替身。
+- 恢复与幂等证据：Optimization Provider 前 attempt 持久化、unknown_outcome 禁止自动二次请求、succeeded round 经 reconciler 重扫不重复调用；正式采纳同 key 并发/响应丢失重试返回同一正式版本。
+- UI 证据：多模型 usage/cost/status/failure 与 RiskApplication Diff 已直接展示；采纳策略仍不自动升级风险应用。
+- 部署遗留：真实外部 AI Provider、在线 CN/HK/US Stock/ETF + CN NAV、Desktop 人工视觉/键盘/focus 仍是部署环境门禁，不计入仓库未完成项。
