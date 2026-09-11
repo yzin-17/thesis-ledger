@@ -427,9 +427,9 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
                 <div className="font-medium">基准策略</div>
                 <Badge variant="outline">固定对照</Badge>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">验证集：{metricText((compare.data.baseline.metrics as Record<string, unknown>).validation)}</div>
-              {(compare.data.baseline.metrics as Record<string, unknown>).test ? (
-                <div className="mt-1 text-xs text-muted-foreground">测试集：{metricText((compare.data.baseline.metrics as Record<string, unknown>).test)}</div>
+              <div className="mt-1 text-xs text-muted-foreground">验证集：{metricText(compare.data.baseline.metrics.validation)}</div>
+              {compare.data.baseline.metrics.test ? (
+                <div className="mt-1 text-xs text-muted-foreground">测试集：{metricText(compare.data.baseline.metrics.test)}</div>
               ) : null}
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
