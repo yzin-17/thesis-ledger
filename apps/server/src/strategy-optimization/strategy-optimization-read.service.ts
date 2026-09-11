@@ -66,8 +66,16 @@ export class StrategyOptimizationReadService {
 
   attempts(id: string) {
     return this.prisma.$queryRaw<AttemptRow[]>(Prisma.sql`
-      SELECT * FROM "OptimizationAttempt"
-      WHERE "experimentId"=${id}::uuid ORDER BY "createdAt" ASC, "id" ASC
+      SELECT attempt.*,
+             ai."inputTokens" AS "inputTokens",
+             ai."outputTokens" AS "outputTokens",
+             ai."cost" AS "cost",
+             ai."durationMs" AS "durationMs",
+             ai."modelMetadata" AS "modelMetadata"
+      FROM "OptimizationAttempt" AS attempt
+      LEFT JOIN "AiRun" AS ai ON ai."id"=attempt."aiRunId"
+      WHERE attempt."experimentId"=${id}::uuid
+      ORDER BY attempt."createdAt" ASC, attempt."id" ASC
     `);
   }
 
