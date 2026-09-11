@@ -17,13 +17,13 @@ import {
   type StrategySchemaV2,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { RiskService } from '../risk/risk.service.js';
 import { StrategyRiskApplicationStoreService } from './strategy-risk-application-store.service.js';
 import type {
   ActualRiskContext,
   StrategyRiskApplicationRow,
 } from './strategy-risk-application.types.js';
 import { StrategyRiskContextService } from './strategy-risk-context.service.js';
-import { StrategyRiskEvaluationStoreService } from './strategy-risk-evaluation-store.service.js';
 
 type StrategyVersionRecord = {
   id: string;
@@ -57,7 +57,7 @@ export class StrategyRiskApplicationService {
     private readonly prisma: PrismaService,
     private readonly contexts: StrategyRiskContextService,
     private readonly store: StrategyRiskApplicationStoreService,
-    private readonly evaluations: StrategyRiskEvaluationStoreService,
+    private readonly risk: RiskService,
   ) {}
 
   private assertEnabled() {
@@ -341,45 +341,8 @@ export class StrategyRiskApplicationService {
     return this.upgradeTransaction(id, current, parsed, preview);
   }
 
-  private deferredEvaluations(
-    application: StrategyRiskApplicationRow,
-    plan: StrategyMonitoringPlan,
-    actual: ActualRiskContext,
-  ) {
-    const anchor = application.cycleAnchor as {
-      tradeId?: string | null;
-      positionId?: string | null;
-    } | null;
-    const sameCycle = Boolean(
-      actual.context.quantity &&
-        anchor &&
-        (anchor.tradeId ? anchor.tradeId === actual.tradeId : anchor.positionId === actual.positionId),
-    );
-    if (application.cycleMode !== 'nextPositionCycle' || !sameCycle) return null;
-    return plan.rules.map((rule) => ({
-      sourceKey: rule.sourceKey,
-      state: 'not_applicable' as const,
-      threshold: rule.threshold,
-      reason: '应用配置为下一持仓周期，当前持仓周期不参与监控',
-      ...(actual.context.occurredAt ? { occurredAt: actual.context.occurredAt } : {}),
-      ...(actual.context.availableAt ? { availableAt: actual.context.availableAt } : {}),
-    }));
-  }
-
   async evaluate(id: string) {
     this.assertEnabled();
-    const application = await this.get(id);
-    const version = await this.strategyVersion(application.strategyVersionId);
-    const actual = await this.contexts.load(
-      application.accountId,
-      application.symbol,
-      version.strategy,
-    );
-    const plan = application.plan as StrategyMonitoringPlan;
-    const evaluations =
-      this.deferredEvaluations(application, plan, actual) ??
-      evaluateStrategyMonitoringPlan(plan, actual.context);
-    const persistedEvents = await this.evaluations.persist(application, plan, evaluations);
-    return { application, evaluations, persistedEvents };
+    return this.risk.evaluateStrategyApplication(id);
   }
 }
