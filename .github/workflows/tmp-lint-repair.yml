@@ -1,0 +1,60 @@
+name: Temporary Lint Repair
+
+on:
+  push:
+    branches:
+      - fix/backtest-v2-closure-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/backtest-v2-closure-20260911
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply narrow archivedAt lint fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/desktop/src/features/risk/RiskRuleWorkbench.tsx')
+          text = path.read_text(encoding='utf-8')
+          old_decl = '  const archived = rule.archivedAt != null;\n'
+          new_decl = '  const archivedAt = rule.archivedAt;\n  const archived = archivedAt != null;\n'
+          if new_decl not in text:
+              if text.count(old_decl) != 1:
+                  raise SystemExit(f'archived declaration anchor count: {text.count(old_decl)}')
+              text = text.replace(old_decl, new_decl, 1)
+          old_use = 'formatDateTime(rule.archivedAt!)'
+          new_use = 'formatDateTime(archivedAt)'
+          if new_use not in text:
+              if text.count(old_use) != 1:
+                  raise SystemExit(f'archived use anchor count: {text.count(old_use)}')
+              text = text.replace(old_use, new_use, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          pnpm exec prettier --write apps/desktop/src/features/risk/RiskRuleWorkbench.tsx
+          git diff --check
+      - name: Commit narrow repair
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/desktop/src/features/risk/RiskRuleWorkbench.tsx
+          git commit -m "fix: narrow archived risk rule timestamp"
+          git push origin HEAD:fix/backtest-v2-closure-20260911
+      - name: Validate lint and complexity
+        run: |
+          pnpm lint
+          pnpm guardrails:complexity
