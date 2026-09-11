@@ -41,7 +41,7 @@ export class StrategyOptimizationService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    void this.resumePending().catch(() => undefined);
+    void this.reconcilePending().catch(() => undefined);
   }
 
   private assertEnabled() {
@@ -343,14 +343,16 @@ export class StrategyOptimizationService implements OnModuleInit {
     `).catch(() => undefined);
   }
 
-  private async resumePending() {
+  async reconcilePending(limit = 100) {
+    const bounded = Math.max(1, Math.min(limit, 500));
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT "id" FROM "OptimizationExperiment"
       WHERE "status" IN ('queued','running') AND "cancelRequestedAt" IS NULL
         AND ("status"='queued' OR "leaseUntil" IS NULL OR "leaseUntil" < CURRENT_TIMESTAMP)
-      ORDER BY "createdAt" ASC LIMIT 10
+      ORDER BY "createdAt" ASC LIMIT ${bounded}
     `);
     rows.forEach((row) => void this.process(row.id).catch(() => undefined));
+    return { scheduled: rows.length };
   }
 
   private async eligibleFinalCandidates(id: string, candidateIds: string[]) {
