@@ -88,7 +88,15 @@ export class StrategyOptimizationCandidateService {
   ) {
     const modelKey = `${route.provider}:${route.model}`;
     const estimatedCost = 0;
-    await this.runs.reserveBudget(experiment.id, { aiCalls: 1, estimatedCost });
+    const messages = await this.prompt(experiment, baseline.strategy, descriptors, modelKey, round);
+    const inputTokenReservation = this.runs.conservativeInputTokenReservation(messages);
+    const outputTokenReservation = this.runs.outputTokenReservation(experiment);
+    await this.runs.reserveBudget(experiment.id, {
+      aiCalls: 1,
+      inputTokens: inputTokenReservation,
+      outputTokens: outputTokenReservation,
+      estimatedCost,
+    });
     const aiRun = await this.aiRuns.start(
       route.provider,
       route.model,
@@ -111,6 +119,9 @@ export class StrategyOptimizationCandidateService {
       modelKey,
       aiRun.id,
       estimatedCost,
+      messages,
+      inputTokenReservation,
+      outputTokenReservation,
     );
   }
 
@@ -123,6 +134,9 @@ export class StrategyOptimizationCandidateService {
     modelKey: string,
     aiRunId: string,
     estimatedCost: number,
+    messages: unknown[],
+    inputTokenReservation: number,
+    outputTokenReservation: number,
   ) {
     const startedAt = Date.now();
     try {
@@ -130,28 +144,19 @@ export class StrategyOptimizationCandidateService {
       const completion = await provider.complete(
         {
           model: route.model,
-          messages: await this.prompt(
-            experiment,
-            baseline.strategy,
-            descriptors,
-            modelKey,
-            round,
-          ),
+          messages,
           tools: [],
+          maxOutputTokens: outputTokenReservation,
         },
         AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
       );
-      const proposal = optimizationProposalSchema.parse(completion.content);
       await this.prisma.aiRun.update({
         where: { id: aiRunId },
         data: {
-          status: 'succeeded',
-          result: asJson(proposal),
           inputTokens: completion.inputTokens,
           outputTokens: completion.outputTokens,
           cost: completion.cost,
           durationMs: Date.now() - startedAt,
-          completedAt: new Date(),
           modelMetadata: asJson({
             optimizationExperimentId: experiment.id,
             requestedProvider: route.provider,
@@ -163,7 +168,19 @@ export class StrategyOptimizationCandidateService {
           }),
         },
       });
+      await this.runs.reconcileTokenUsage(
+        experiment.id,
+        inputTokenReservation,
+        outputTokenReservation,
+        completion.inputTokens,
+        completion.outputTokens,
+      );
       await this.runs.reconcileCost(experiment.id, estimatedCost, completion.cost);
+      const proposal = optimizationProposalSchema.parse(completion.content);
+      await this.prisma.aiRun.update({
+        where: { id: aiRunId },
+        data: { status: 'succeeded', result: asJson(proposal), completedAt: new Date() },
+      });
       return { proposal, aiRunId, modelKey };
     } catch (error) {
       await this.aiRuns.fail(

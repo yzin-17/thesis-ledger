@@ -34,7 +34,7 @@ export interface AiProvider {
   readonly models: readonly string[];
   readonly metadata?: AiProviderMetadata;
   complete(
-    input: { model: string; messages: unknown[]; tools: string[] },
+    input: { model: string; messages: unknown[]; tools: string[]; maxOutputTokens?: number },
     signal: AbortSignal,
   ): Promise<{ content: unknown; inputTokens: number; outputTokens: number; cost: number }>;
 }

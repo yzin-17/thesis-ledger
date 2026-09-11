@@ -18,6 +18,8 @@ export type ExperimentRow = {
   maxRounds: number;
   aiCallsUsed: number;
   backtestRunsUsed: number;
+  inputTokensUsed: number;
+  outputTokensUsed: number;
   pausedDurationMs: number;
   costUsed: Prisma.Decimal;
   baselineRunRefs: unknown;

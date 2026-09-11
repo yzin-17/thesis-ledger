@@ -255,15 +255,22 @@ export class StrategyOptimizationService implements OnModuleInit {
   ) {
     const descriptors = describeStrategyParameters(baseline.strategy);
     const routes = experiment.modelConfig as Array<{ provider: string; model: string }>;
-    for (const route of routes) {
-      const modelKey = `${route.provider}:${route.model}`;
-      let bestScore = Number.NEGATIVE_INFINITY;
-      for (let round = 1; round <= experiment.maxRounds; round += 1) {
+    const states = new Map(
+      routes.map((route) => [
+        `${route.provider}:${route.model}`,
+        { bestScore: Number.NEGATIVE_INFINITY, stopped: false },
+      ]),
+    );
+    for (let round = 1; round <= experiment.maxRounds; round += 1) {
+      for (const route of routes) {
+        const modelKey = `${route.provider}:${route.model}`;
+        const state = states.get(modelKey);
+        if (!state || state.stopped) continue;
         await this.processRound(experiment, baseline, descriptors, route, round);
         if (await this.cancelled(experiment.id)) return;
         const currentBest = await this.bestValidationScore(experiment.id, modelKey);
-        if (round > 1 && currentBest <= bestScore) break;
-        bestScore = Math.max(bestScore, currentBest);
+        if (round > 1 && currentBest <= state.bestScore) state.stopped = true;
+        state.bestScore = Math.max(state.bestScore, currentBest);
       }
     }
   }

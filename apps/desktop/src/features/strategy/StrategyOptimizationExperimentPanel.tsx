@@ -80,6 +80,8 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   const [initialCash, setInitialCash] = useState('100000');
   const [maxAiCalls, setMaxAiCalls] = useState('6');
   const [maxBacktestRuns, setMaxBacktestRuns] = useState('20');
+  const [maxInputTokens, setMaxInputTokens] = useState('100000');
+  const [maxOutputTokens, setMaxOutputTokens] = useState('20000');
   const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');
   const [executionModelJson, setExecutionModelJson] = useState('');
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
@@ -182,6 +184,8 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         budget: {
           maxAiCalls: Number(maxAiCalls),
           maxBacktestRuns: Number(maxBacktestRuns),
+          maxInputTokens: Number(maxInputTokens),
+          maxOutputTokens: Number(maxOutputTokens),
           maxDurationSeconds: Number(maxDurationSeconds),
         },
         maxRounds: 2,
@@ -327,12 +331,14 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <Input type="date" value={validationEnd} onChange={(event) => setValidationEnd(event.target.value)} aria-label="验证集结束" />
             <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} aria-label="测试集结束" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">AI 调用上限</span><Input type="number" min="1" max="30" value={maxAiCalls} onChange={(event) => setMaxAiCalls(event.target.value)} /></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">回测运行上限</span><Input type="number" min="2" max="100" value={maxBacktestRuns} onChange={(event) => setMaxBacktestRuns(event.target.value)} /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">输入 Token</span><Input type="number" min="1" max="10000000" value={maxInputTokens} onChange={(event) => setMaxInputTokens(event.target.value)} /></label>
+            <label className="space-y-1 text-sm"><span className="text-muted-foreground">输出 Token</span><Input type="number" min="1" max="2000000" value={maxOutputTokens} onChange={(event) => setMaxOutputTokens(event.target.value)} /></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">最长计算（秒）</span><Input type="number" min="30" max="86400" value={maxDurationSeconds} onChange={(event) => setMaxDurationSeconds(event.target.value)} /></label>
           </div>
-          <p className="text-xs text-muted-foreground">预算为服务端硬上限；达到调用、回测、费用或时长上限后停止创建新工作。</p>
+          <p className="text-xs text-muted-foreground">预算为服务端硬上限；模型调用前预留保守输入 Token 与单次输出额度，完成后按 Provider 实际 usage 结算。</p>
           <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">初始资金（{currency}）</span><Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} /></label>
             <label className="space-y-1 text-sm"><span className="text-muted-foreground">执行模型 JSON（可选）</span><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></label>
@@ -349,7 +355,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         <CardContent className="space-y-2">
           {(experiments.data ?? []).map((experiment) => (
             <div key={experiment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-              <div><div className="font-medium">{experiment.stage}</div><div className="text-xs text-muted-foreground">AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · 成本 {String(experiment.costUsed)}</div></div>
+              <div><div className="font-medium">{experiment.stage}</div><div className="text-xs text-muted-foreground">AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token {experiment.inputTokensUsed}/{experiment.outputTokensUsed} · 成本 {String(experiment.costUsed)}</div></div>
               <div className="flex items-center gap-2">
                 <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>{experiment.status}</Badge>
                 <Button size="sm" variant="outline" onClick={() => setSelectedExperimentId(experiment.id)}>查看</Button>

@@ -33,7 +33,7 @@ const experiment = {
     test: { start: '2024-10-01', end: '2024-12-31' },
   },
   runConfig,
-  budget: { maxAiCalls: 6, maxBacktestRuns: 12, maxDurationSeconds: 1800 },
+  budget: { maxAiCalls: 6, maxBacktestRuns: 13, maxDurationSeconds: 1800 },
   maxRounds: 2,
   idempotencyKey: 'experiment-1',
 };
@@ -64,6 +64,21 @@ describe('strategy optimization contracts', () => {
         },
       }),
     ).toThrow();
+  });
+
+  it('reserves symmetric model work and final verification before starting', () => {
+    expect(() =>
+      optimizationExperimentCreateSchema.parse({
+        ...experiment,
+        budget: { ...experiment.budget, maxAiCalls: 3 },
+      }),
+    ).toThrow(/至少需要 4 次/);
+    expect(() =>
+      optimizationExperimentCreateSchema.parse({
+        ...experiment,
+        budget: { ...experiment.budget, maxBacktestRuns: 12 },
+      }),
+    ).toThrow(/至少需要 13 次/);
   });
 
   it('rejects duplicate proposal parameters and unknown fields', () => {

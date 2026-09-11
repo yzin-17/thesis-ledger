@@ -6,6 +6,7 @@ type CompletionInput = {
   model: string;
   messages: unknown[];
   tools: string[];
+  maxOutputTokens?: number;
 };
 
 const providerConfigSchema = z
@@ -83,6 +84,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         messages: input.messages,
         tools: input.tools.map((name) => ({ type: 'function', function: { name } })),
         response_format: { type: 'json_object' },
+        ...(input.maxOutputTokens === undefined ? {} : { max_tokens: input.maxOutputTokens }),
       }),
       signal: AbortSignal.any([signal, timeout]),
     });

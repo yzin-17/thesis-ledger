@@ -200,6 +200,8 @@ export const optimizationBudgetSchema = z
   .object({
     maxAiCalls: z.number().int().min(1).max(30),
     maxBacktestRuns: z.number().int().min(2).max(100),
+    maxInputTokens: z.number().int().min(1).max(10_000_000).default(100_000),
+    maxOutputTokens: z.number().int().min(1).max(2_000_000).default(20_000),
     maxCost: nonNegativeDecimalStringSchema.optional(),
     maxDurationSeconds: z.number().int().min(30).max(86_400).default(1_800),
   })
@@ -224,6 +226,20 @@ export const optimizationExperimentCreateSchema = z
       ctx.addIssue({ code: 'custom', path: ['models'], message: 'Provider + model 必须唯一' });
     if (new Set(value.allowedParameterIds).size !== value.allowedParameterIds.length)
       ctx.addIssue({ code: 'custom', path: ['allowedParameterIds'], message: '参数授权不得重复' });
+    const plannedAiCalls = value.models.length * value.maxRounds;
+    const plannedBacktestRuns = 3 + value.models.length * (value.maxRounds * 2 + 1);
+    if (value.budget.maxAiCalls < plannedAiCalls)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['budget', 'maxAiCalls'],
+        message: `AI 调用预算至少需要 ${plannedAiCalls} 次以保证各模型同额度`,
+      });
+    if (value.budget.maxBacktestRuns < plannedBacktestRuns)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['budget', 'maxBacktestRuns'],
+        message: `回测预算至少需要 ${plannedBacktestRuns} 次以预留最终验证`,
+      });
     const splitStart = value.split.development.start;
     const splitEnd = value.split.test.end;
     if (splitStart < value.runConfig.startDate || splitEnd > value.runConfig.endDate)

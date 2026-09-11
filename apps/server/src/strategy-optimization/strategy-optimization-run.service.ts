@@ -70,24 +70,76 @@ export class StrategyOptimizationRunService {
 
   async reserveBudget(
     id: string,
-    input: { aiCalls?: number; backtestRuns?: number; estimatedCost?: number },
+    input: {
+      aiCalls?: number;
+      backtestRuns?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      estimatedCost?: number;
+    },
   ) {
     const aiCalls = input.aiCalls ?? 0;
     const runs = input.backtestRuns ?? 0;
+    const inputTokens = input.inputTokens ?? 0;
+    const outputTokens = input.outputTokens ?? 0;
     const estimatedCost = input.estimatedCost ?? 0;
     const updated = await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "aiCallsUsed"="aiCallsUsed"+${aiCalls}, "backtestRunsUsed"="backtestRunsUsed"+${runs},
+          "inputTokensUsed"="inputTokensUsed"+${inputTokens},
+          "outputTokensUsed"="outputTokensUsed"+${outputTokens},
           "costUsed"="costUsed"+${estimatedCost}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL
         AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "createdAt")) * 1000 - "pausedDurationMs")
           <= COALESCE(NULLIF("budget"->>'maxDurationSeconds', '')::int, 1800) * 1000
         AND "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int)
         AND "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int)
+        AND "inputTokensUsed"+${inputTokens} <= (("budget"->>'maxInputTokens')::int)
+        AND "outputTokensUsed"+${outputTokens} <= (("budget"->>'maxOutputTokens')::int)
         AND (("budget"->>'maxCost') IS NULL OR "costUsed"+${estimatedCost} <= (("budget"->>'maxCost')::decimal))
     `);
     if (updated !== 1)
       throw new BadRequestException('优化实验预算或最长运行时长已耗尽，或实验已取消');
+  }
+
+  conservativeInputTokenReservation(messages: unknown[]) {
+    return Buffer.byteLength(JSON.stringify(messages), 'utf8');
+  }
+
+  outputTokenReservation(experiment: ExperimentRow) {
+    const budget = toRecord(experiment.budget);
+    const maxOutputTokens =
+      typeof budget.maxOutputTokens === 'number' ? budget.maxOutputTokens : 20_000;
+    const maxAiCalls = typeof budget.maxAiCalls === 'number' ? budget.maxAiCalls : 1;
+    return Math.max(1, Math.floor(maxOutputTokens / Math.max(1, maxAiCalls)));
+  }
+
+  async reconcileTokenUsage(
+    id: string,
+    reservedInput: number,
+    reservedOutput: number,
+    actualInput: number,
+    actualOutput: number,
+  ) {
+    const inputDelta = actualInput - reservedInput;
+    const outputDelta = actualOutput - reservedOutput;
+    const rows = await this.prisma.$queryRaw<
+      Array<{ inputTokensUsed: number; outputTokensUsed: number; budget: unknown }>
+    >(Prisma.sql`
+      UPDATE "OptimizationExperiment"
+      SET "inputTokensUsed"="inputTokensUsed"+${inputDelta},
+          "outputTokensUsed"="outputTokensUsed"+${outputDelta},
+          "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${id}::uuid
+      RETURNING "inputTokensUsed", "outputTokensUsed", "budget"
+    `);
+    const row = rows[0];
+    if (!row) return;
+    const budget = toRecord(row.budget);
+    const maxInput = typeof budget.maxInputTokens === 'number' ? budget.maxInputTokens : 0;
+    const maxOutput = typeof budget.maxOutputTokens === 'number' ? budget.maxOutputTokens : 0;
+    if (row.inputTokensUsed > maxInput || row.outputTokensUsed > maxOutput)
+      throw new BadRequestException('Provider 实际 token 用量超过预留预算，已停止新任务');
   }
 
   async reconcileCost(id: string, estimated: number, actual: number) {

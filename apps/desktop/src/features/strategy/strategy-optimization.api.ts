@@ -21,6 +21,8 @@ export type OptimizationExperimentSummary = {
   modelConfig: Array<{ provider: string; model: string }>;
   aiCallsUsed: number;
   backtestRunsUsed: number;
+  inputTokensUsed: number;
+  outputTokensUsed: number;
   costUsed: string | number;
   selectedCandidateId?: string | null;
   lockedCandidateIds?: string[] | null;

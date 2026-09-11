@@ -59,6 +59,8 @@ CREATE TABLE "OptimizationExperiment" (
   "maxRounds" INTEGER NOT NULL,
   "aiCallsUsed" INTEGER NOT NULL DEFAULT 0,
   "backtestRunsUsed" INTEGER NOT NULL DEFAULT 0,
+  "inputTokensUsed" INTEGER NOT NULL DEFAULT 0 CHECK ("inputTokensUsed" >= 0),
+  "outputTokensUsed" INTEGER NOT NULL DEFAULT 0 CHECK ("outputTokensUsed" >= 0),
   "pausedDurationMs" INTEGER NOT NULL DEFAULT 0 CHECK ("pausedDurationMs" >= 0),
   "costUsed" DECIMAL(18,8) NOT NULL DEFAULT 0,
   "baselineRunRefs" JSONB NOT NULL DEFAULT '{}'::jsonb,
