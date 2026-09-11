@@ -65,6 +65,25 @@ const metricText = (value: unknown) => {
 };
 const validationMetricText = (candidate: OptimizationCandidate) =>
   metricText(candidate.metrics.validation);
+const numericValue = (value: string | number | null | undefined) => {
+  const parsed = typeof value === 'number' ? value : Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const durationText = (durationMs: number) =>
+  durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(1)}s` : `${durationMs}ms`;
+const riskRuleText = (value: unknown) => {
+  if (!value || typeof value !== 'object') return '—';
+  const rule = value as Record<string, unknown>;
+  const identity = String(rule.label ?? rule.sourceKey ?? '规则');
+  const comparison =
+    rule.operator !== undefined || rule.threshold !== undefined
+      ? `${String(rule.operator ?? '—')} ${String(rule.threshold ?? '—')}`
+      : null;
+  const timeframe = rule.timeframe ? `周期 ${String(rule.timeframe)}` : null;
+  return [identity, comparison, timeframe].filter(Boolean).join(' · ');
+};
+const riskChangeText = (change: string) =>
+  change === 'added' ? '新增' : change === 'removed' ? '移除' : change === 'changed' ? '修改' : '无变化';
 
 export function StrategyOptimizationExperimentPanel({ strategies }: { strategies: StrategyRecord[] }) {
   const queryClient = useQueryClient();
@@ -98,6 +117,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
   const [preselectedCandidateId, setPreselectedCandidateId] = useState<string | null>(null);
   const [adoptionDiffs, setAdoptionDiffs] = useState<AdoptionRiskApplicationDiff[]>([]);
+  const [adoptionIntentKeys, setAdoptionIntentKeys] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const capabilities = useQuery({
@@ -144,6 +164,7 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
   }, [capabilities.data?.providers, selectedModels.length]);
   useEffect(() => {
     setAdoptionDiffs([]);
+    setAdoptionIntentKeys({});
   }, [selectedExperimentId]);
 
   const selectedProviderRoutes = (capabilities.data?.providers ?? []).filter((route) =>
@@ -258,15 +279,23 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
         (entry) => entry.version.id === compare.data?.experiment.baselineStrategyVersionId,
       );
       if (!baseline) throw new Error('找不到基线正式策略版本');
+      const idempotencyKey = adoptionIntentKeys[candidate.id] ?? crypto.randomUUID();
+      if (!adoptionIntentKeys[candidate.id])
+        setAdoptionIntentKeys((current) => ({ ...current, [candidate.id]: idempotencyKey }));
       return adoptOptimizationCandidate(selectedExperimentId, {
         candidateId: candidate.id,
         candidateHash: candidate.executionHash,
         expectedStrategyVersion: baseline.version.version,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         acknowledgeTestExposure: candidate.id !== compare.data?.experiment.selectedCandidateId,
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result, candidate) => {
+      setAdoptionIntentKeys((current) => {
+        const next = { ...current };
+        delete next[candidate.id];
+        return next;
+      });
       setAdoptionDiffs(result.riskApplicationDiffs ?? []);
       setFeedback(
         `已采纳为正式策略 v${result.strategyVersion.version}；${result.riskApplicationDiffs.length} 个现有风险应用可查看升级差异，仍需人工确认。`,
@@ -437,11 +466,25 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
                 const key = `${route.provider}:${route.model}`;
                 const attempts = compare.data.attempts.filter((attempt) => attempt.modelKey === key);
                 const latest = attempts.at(-1);
+                const aiCalls = attempts.filter((attempt) => Boolean(attempt.aiRunId)).length;
+                const inputTokens = attempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0);
+                const outputTokens = attempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0);
+                const durationMs = attempts.reduce((sum, attempt) => sum + (attempt.durationMs ?? 0), 0);
+                const costUnknown =
+                  route.costStatus === 'unknown' ||
+                  attempts.some((attempt) => attempt.modelMetadata?.costStatus === 'unknown');
+                const cost = attempts.reduce((sum, attempt) => sum + numericValue(attempt.cost), 0);
                 return (
                   <div key={key} className="rounded-md border p-3">
                     <div className="font-medium">{key}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">尝试 {attempts.length} 次 · 最新 {String(latest?.status ?? '尚未开始')}</div>
-                    {latest?.error ? <div className="mt-1 text-xs text-destructive">{String(latest.error)}</div> : null}
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>AI calls</span><span>{aiCalls}</span>
+                      <span>Input / Output</span><span>{inputTokens} / {outputTokens}</span>
+                      <span>Duration</span><span>{durationText(durationMs)}</span>
+                      <span>Cost</span><span>{costUnknown ? '费用未知' : cost.toFixed(4)}</span>
+                      <span>Latest status</span><span>{String(latest?.status ?? '尚未开始')}</span>
+                    </div>
+                    {latest?.error ? <div className="mt-2 text-xs text-destructive">Failure: {String(latest.error)}</div> : null}
                   </div>
                 );
               })}
@@ -471,9 +514,22 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
                 {adoptionDiffs.map((application) => {
                   const changed = application.diff.filter((item) => item.change !== 'unchanged');
                   return (
-                    <div key={application.applicationId} className="rounded-md border p-2 text-xs text-muted-foreground">
-                      {application.symbol} · r{application.currentRevision} · {application.enabled ? '监控中' : '已停用'} · {changed.length === 0 ? '规则无变化' : `${changed.length} 项规则变化`}
-                    </div>
+                    <details key={application.applicationId} className="rounded-md border p-2 text-xs text-muted-foreground">
+                      <summary className="cursor-pointer select-none font-medium text-foreground">
+                        {application.symbol} · r{application.currentRevision} · {application.enabled ? '监控中' : '已停用'} · {changed.length === 0 ? '规则无变化' : `${changed.length} 项规则变化`}
+                      </summary>
+                      {changed.length > 0 ? (
+                        <div className="mt-2 space-y-2">
+                          {changed.map((item) => (
+                            <div key={item.sourceKey} className="rounded border p-2">
+                              <div className="font-medium text-foreground">{riskChangeText(item.change)} · {item.sourceKey}</div>
+                              <div className="mt-1">Before: {riskRuleText(item.before)}</div>
+                              <div>After: {riskRuleText(item.after)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </details>
                   );
                 })}
                 <p className="text-xs text-muted-foreground">这些差异不会自动覆盖或启用风险应用；请到“策略风险规则”中逐个确认升级。</p>
