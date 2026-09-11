@@ -83,6 +83,9 @@ export type EvaluationSummary = {
   status: 'valid' | 'invalid';
   completeness: string;
   tradeCount: number;
+  fillCount?: number;
+  rejectedOrderCount?: number;
+  rejectionReasons?: Record<string, number>;
   totalReturn?: string;
   maxDrawdown?: string;
   turnover?: string;
