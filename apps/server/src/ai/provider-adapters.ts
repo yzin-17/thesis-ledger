@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { AppConfig } from '../platform/config.js';
 import type { AiProvider } from './contracts.js';
 
@@ -6,6 +7,35 @@ type CompletionInput = {
   messages: unknown[];
   tools: string[];
 };
+
+const providerConfigSchema = z
+  .array(
+    z
+      .object({
+        id: z.string().trim().min(1).max(120),
+        baseUrl: z.url(),
+        apiKey: z.string().trim().min(1),
+        models: z.array(z.string().trim().min(1).max(200)).min(1),
+        timeoutMs: z.number().int().positive().optional(),
+      })
+      .strict(),
+  )
+  .max(12)
+  .superRefine((providers, context) => {
+    const ids = providers.map((provider) => provider.id);
+    if (new Set(ids).size !== ids.length)
+      context.addIssue({ code: 'custom', message: 'AI Provider id 必须唯一' });
+    providers.forEach((provider, index) => {
+      if (new Set(provider.models).size !== provider.models.length)
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'models'],
+          message: '同一 Provider 的模型不得重复',
+        });
+    });
+  });
+
+export type ConfiguredAiProviderInput = z.infer<typeof providerConfigSchema>[number];
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -160,20 +190,51 @@ export class FixtureAiProvider implements AiProvider {
   }
 }
 
-export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => {
-  const providers: AiProvider[] = [];
-  if (config.aiBaseUrl && config.aiApiKey && config.aiModel) {
-    providers.push(
-      new OpenAiCompatibleProvider(
-        config.aiProviderId ?? 'openai-compatible',
-        [config.aiModel],
-        config.aiBaseUrl,
-        config.aiApiKey,
-        config.aiTimeoutMs,
-      ),
-    );
+export const parseConfiguredAiProviderInputs = (raw: string | undefined) => {
+  if (!raw) return [];
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error('AI_PROVIDER_CONFIGS_JSON 不是合法 JSON');
   }
-  if (config.aiFixtureEnabled || config.environment === 'test')
-    providers.push(new FixtureAiProvider());
+  const parsed = providerConfigSchema.safeParse(decoded);
+  if (!parsed.success) throw new Error('AI_PROVIDER_CONFIGS_JSON 配置无效');
+  return parsed.data;
+};
+
+const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: number) =>
+  new OpenAiCompatibleProvider(
+    input.id,
+    input.models,
+    input.baseUrl,
+    input.apiKey,
+    input.timeoutMs ?? defaultTimeoutMs,
+  );
+
+export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => {
+  const providers = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map((input) =>
+    providerFromInput(input, config.aiTimeoutMs),
+  );
+  const configuredIds = new Set(providers.map((provider) => provider.id));
+  if (config.aiBaseUrl && config.aiApiKey && config.aiModel) {
+    const id = config.aiProviderId ?? 'openai-compatible';
+    if (!configuredIds.has(id)) {
+      providers.push(
+        new OpenAiCompatibleProvider(
+          id,
+          [config.aiModel],
+          config.aiBaseUrl,
+          config.aiApiKey,
+          config.aiTimeoutMs,
+        ),
+      );
+    }
+  }
+  if (config.aiFixtureEnabled || config.environment === 'test') {
+    const fixture = new FixtureAiProvider();
+    if (!configuredIds.has(fixture.id) && !providers.some((provider) => provider.id === fixture.id))
+      providers.push(fixture);
+  }
   return providers;
 };
