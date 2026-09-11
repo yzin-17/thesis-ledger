@@ -196,12 +196,16 @@ export class StrategyOptimizationRunService {
   ): Promise<BacktestJob> {
     await this.touchLease(experiment.id);
     await this.reserveBudget(experiment.id, { backtestRuns: 1 });
-    const run = await this.backtests.createRun({
+    let run = await this.backtests.createRun({
       strategyVersionId,
       runConfig: this.runConfigForSplit(experiment, splitName),
       idempotencyKey: `optimization:${experiment.id}:${identity}:${splitName}`,
     });
     if (!run) throw new Error('V2 Run 创建后未找到持久化记录');
+    if (run.status === 'failed' && run.errorCode === 'INTERNAL_ERROR') {
+      run = await this.backtests.retryRun(run.id);
+      if (!run) throw new Error('V2 Run retry 后未找到持久化记录');
+    }
     if (run.status === 'queued') await this.backtests.runV2(run.id);
     const terminal = ['succeeded', 'failed', 'cancelled'].includes(run.status)
       ? run

@@ -352,9 +352,28 @@ export class StrategyOptimizationService implements OnModuleInit {
     const selected = all.filter((candidate) => candidateIds.includes(candidate.id));
     if (selected.length !== candidateIds.length)
       throw new BadRequestException('锁定候选不属于当前实验');
-    if (selected.some((candidate) => candidate.validationStatus !== 'valid'))
+    if (
+      selected.some(
+        (candidate) => !['valid', 'test_valid', 'test_invalid'].includes(candidate.validationStatus),
+      )
+    )
       throw new BadRequestException('只有开发/验证均通过的候选可以进入封存测试');
     return selected;
+  }
+
+  private assertSameFinalizationLock(
+    experiment: ExperimentRow,
+    candidateIds: string[],
+    selectedCandidateId: string,
+  ) {
+    const existing = Array.isArray(experiment.lockedCandidateIds)
+      ? experiment.lockedCandidateIds.filter((item): item is string => typeof item === 'string')
+      : [];
+    if (existing.length === 0) return;
+    const requested = [...candidateIds].sort();
+    const locked = [...existing].sort();
+    if (JSON.stringify(requested) !== JSON.stringify(locked) || experiment.selectedCandidateId !== selectedCandidateId)
+      throw new BadRequestException('测试集已开始访问，只允许对原锁定候选进行技术重试');
   }
 
   private async lockFinalization(
@@ -362,18 +381,25 @@ export class StrategyOptimizationService implements OnModuleInit {
     candidateIds: string[],
     selectedCandidateId: string,
   ) {
+    this.assertSameFinalizationLock(experiment, candidateIds, selectedCandidateId);
     const updated = await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "status"='testing', "stage"='testing', "lockedCandidateIds"=${JSON.stringify(candidateIds)}::jsonb,
           "selectedCandidateId"=${selectedCandidateId}::uuid, "leaseUntil"=${new Date(Date.now() + 3_600_000)},
           "pausedDurationMs"="pausedDurationMs" + GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "updatedAt")) * 1000))::int,
-          "updatedAt"=CURRENT_TIMESTAMP
+          "testExposedAt"=COALESCE("testExposedAt", CURRENT_TIMESTAMP),
+          "exposure"=COALESCE("exposure", '{}'::jsonb) || ${JSON.stringify({ testAccessStarted: true, lockedCandidateIds: candidateIds, preselectedCandidateId: selectedCandidateId })}::jsonb,
+          "stopReason"=NULL, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${experiment.id}::uuid AND "stage"='awaiting_finalization' AND "cancelRequestedAt" IS NULL
     `);
     if (updated !== 1) throw new BadRequestException('实验封存状态发生并发变化');
   }
 
   private async finalBaseline(experiment: ExperimentRow) {
+    const existingFingerprint = toRecord(experiment.frozenDataFingerprints).test;
+    const existingRunId = toRecord(experiment.baselineRunRefs).test;
+    if (typeof existingFingerprint === 'string' && typeof existingRunId === 'string')
+      return existingFingerprint;
     const run = await this.runs.executeRun(
       experiment,
       experiment.baselineStrategyVersionId,
@@ -393,6 +419,12 @@ export class StrategyOptimizationService implements OnModuleInit {
   }
 
   private async finalCandidate(experiment: ExperimentRow, candidate: CandidateRow, fingerprint: string) {
+    const existingRunId = toRecord(candidate.runRefs).test;
+    if (
+      typeof existingRunId === 'string' &&
+      ['test_valid', 'test_invalid'].includes(candidate.validationStatus)
+    )
+      return;
     const run = await this.runs.executeRun(
       experiment,
       candidate.candidateStrategyVersionId,
@@ -416,10 +448,20 @@ export class StrategyOptimizationService implements OnModuleInit {
   private async completeFinalization(id: string, candidateIds: string[], selectedCandidateId: string) {
     await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
-      SET "status"='succeeded', "stage"='completed', "testExposedAt"=CURRENT_TIMESTAMP,
-          "exposure"=${JSON.stringify({ testRevealed: true, lockedCandidateIds: candidateIds, preselectedCandidateId: selectedCandidateId })}::jsonb,
-          "leaseUntil"=NULL, "updatedAt"=CURRENT_TIMESTAMP
+      SET "status"='succeeded', "stage"='completed', "testExposedAt"=COALESCE("testExposedAt", CURRENT_TIMESTAMP),
+          "exposure"=COALESCE("exposure", '{}'::jsonb) || ${JSON.stringify({ testRevealed: true, lockedCandidateIds: candidateIds, preselectedCandidateId: selectedCandidateId })}::jsonb,
+          "leaseUntil"=NULL, "stopReason"=NULL, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid
+    `);
+  }
+
+  private async releaseFinalizationForRetry(id: string, error: unknown) {
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE "OptimizationExperiment"
+      SET "status"='awaiting_finalization', "stage"='awaiting_finalization', "leaseUntil"=NULL,
+          "stopReason"=${`final_test_retry_required:${redactOptimizationError(error)}`},
+          "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${id}::uuid AND "status"='testing'
     `);
   }
 
@@ -439,7 +481,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       await this.completeFinalization(id, parsed.candidateIds, parsed.selectedCandidateId);
       return this.compare(id);
     } catch (error) {
-      await this.fail(id, redactOptimizationError(error));
+      await this.releaseFinalizationForRetry(id, error);
       throw error;
     }
   }
