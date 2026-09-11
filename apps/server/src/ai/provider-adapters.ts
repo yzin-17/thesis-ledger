@@ -213,8 +213,8 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
   );
 
 export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => {
-  const providers = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map((input) =>
-    providerFromInput(input, config.aiTimeoutMs),
+  const providers: AiProvider[] = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map(
+    (input) => providerFromInput(input, config.aiTimeoutMs),
   );
   const configuredIds = new Set(providers.map((provider) => provider.id));
   if (config.aiBaseUrl && config.aiApiKey && config.aiModel) {

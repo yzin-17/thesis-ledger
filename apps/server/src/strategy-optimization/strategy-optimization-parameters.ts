@@ -168,7 +168,7 @@ export const applyOptimizationProposal = (
       (next.cost as unknown as Record<string, unknown>)[descriptor.target.field] = change.value;
     }
   }
-  return strategySchemaV2.parse(next);
+  return strategySchemaV2.parse(next) as StrategySchemaV2;
 };
 
 export const proposalDiff = (
