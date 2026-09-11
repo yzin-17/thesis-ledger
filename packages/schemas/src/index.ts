@@ -20,4 +20,5 @@ export * from './recurring-fund-investment.js';
 export * from './exact-optional.js';
 export * from './backtest-data.js';
 export * from './backtest-execution-model.js';
+export * from './strategy-optimization.js';
 export { isDateOnly } from './temporal.js';

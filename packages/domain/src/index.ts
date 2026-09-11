@@ -33,3 +33,4 @@ export * from './simulation-ledger.js';
 export * from './simulation-valuation.js';
 export * from './nav-simulation.js';
 export * from './nav-simulation-rules.js';
+export * from './strategy-monitoring.js';
