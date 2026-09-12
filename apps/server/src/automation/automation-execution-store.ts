@@ -118,6 +118,34 @@ export class AutomationExecutionStore {
     });
   }
 
+  async createClaimedManualRun(jobId: string, leaseMs: number, now = new Date()) {
+    if (this.memoryMode) {
+      const run = await this.createManualRunInMemory(jobId);
+      const ownerAttempt = await this.claimInMemory(run.runId, leaseMs, now);
+      if (ownerAttempt === null) throw new Error('手动 Automation run 创建后无法 claim');
+      return { ...run, ownerAttempt };
+    }
+    return this.prisma.$transaction(async (transaction) => {
+      const run = await transaction.automationRun.create({
+        data: { jobId, status: 'running', traceId: crypto.randomUUID() },
+        select: { id: true, traceId: true },
+      });
+      const ownerAttempt = 1;
+      await transaction.$executeRaw(
+        Prisma.sql`
+          INSERT INTO "AutomationRunLease" (
+            "runId", "jobId", "trigger", "executionAttempt", "claimedAt", "leaseUntil",
+            "recoveryPolicy"
+          ) VALUES (
+            ${run.id}::uuid, ${jobId}::uuid, 'manual', ${ownerAttempt}, ${now},
+            ${new Date(now.getTime() + leaseMs)}, 'unknown-outcome'
+          )
+        `,
+      );
+      return { runId: run.id, traceId: run.traceId, ownerAttempt };
+    });
+  }
+
   async claim(runId: string, leaseMs: number, now = new Date()) {
     if (this.memoryMode) return this.claimInMemory(runId, leaseMs, now);
     return this.prisma.$transaction(async (transaction) => {
