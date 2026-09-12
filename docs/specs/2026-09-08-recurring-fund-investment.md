@@ -1,9 +1,16 @@
 # 基金定投计划 Spec
 
 - 日期：2026-09-08
-- 状态：实现完成，待运行时验收
+- 状态：主体实现完成；T2 与并发补期验收仍未关闭
 - 适用项目：`thesis-ledger`
 - 类型：增量设计
+- 加固跟踪：[`2026-09-12-recurring-plan-materialization-hardening.md`](2026-09-12-recurring-plan-materialization-hardening.md)
+
+## 2026-09-12 全仓 Review 重新打开说明
+
+当前 `main` 重新审查确认：基金定投主体模型、确认写账和 Desktop 入口已存在，但任务文档的 T2 仍未完成；同时 `materializePlan` 与现金计划一样没有真实数据库串行化，两个并发扫描可以读取同一版本，最终让其中一个以版本冲突失败。现有并发证据来自 mock Prisma，无法证明 PostgreSQL 下“并发补期保持确定状态”。
+
+因此本 Spec 不再以“实现完成，仅待运行时验收”描述整体状态。T2 以及 AC2/AC4 中与并发补期确定性相关的部分由 [`2026-09-12-recurring-plan-materialization-hardening.md`](2026-09-12-recurring-plan-materialization-hardening.md) 继续关闭；其余已经实现的账户/标的约束、确认成交和 UI 行为继续有效。
 
 ## 背景与问题
 
@@ -42,7 +49,7 @@
 
 ### 自动化
 
-现有 Scheduler 增加一个固定的 `fund-investment-materialization` Handler。它扫描到期计划，补齐启用期间的全部月份；暂停月份不补齐，恢复后从恢复月份继续，结束后不再生成记录。
+现有 Scheduler 增加一个固定的 `fund-investment-materialization` Handler。它扫描到期计划，补齐启用期间的全部月份；暂停月份不补齐，恢复后从恢复月份继续，结束后不再生成记录。同计划并发扫描的数据库串行化与 success/no-op 收敛由 2026-09-12 加固 Spec 关闭。
 
 ### Desktop
 
@@ -65,12 +72,12 @@
 
 - 非真实基金账户和非 `.OF` 标的无法创建计划。
 - 到期只生成待确认记录，不改变 Ledger；确认后恰好生成一次买入成交。
-- 暂停、恢复、结束、跳过、恢复待确认与并发补期保持确定状态。
+- 暂停、恢复、结束、跳过、恢复待确认与并发补期保持确定状态；并发补期必须由真实 PostgreSQL 测试证明，不能只依赖 mock Prisma。
 - Desktop 只在真实基金账户成交页显示完整入口和操作。
 
 ### 优先测试层级
 
-Schema 与日期纯函数 → Server Service/API → Automation Handler → Desktop API/UI → 浏览器验收。
+Schema 与日期纯函数 → Server Service/API → PostgreSQL 并发物化 → Automation Handler → Desktop API/UI → 浏览器验收。
 
 ### 可复用的现有测试入口
 
@@ -79,7 +86,7 @@ Schema 与日期纯函数 → Server Service/API → Automation Handler → Desk
 
 ### 需要新增的测试入口
 
-- 定投 Schema、Service、Automation runtime 和成交页 UI 定向测试。
+- 定投真实 PostgreSQL 并发 materialization、与 pause/end 竞争，以及 T2 尚未关闭的运行时验收。
 
 ### 关键边界与回归场景
 
@@ -88,13 +95,13 @@ Schema 与日期纯函数 → Server Service/API → Automation Handler → Desk
 ## 风险与备选方案
 
 - 直接按计划金额推导基金份额会把未知费率和外部确认结果伪装成事实，因此确认时录入实际份额和单位净值。
-- 直接复用定期现金入账模型会混淆外部入金与基金申购，故采用独立模型但复用其已验证的调度模式。
+- 直接复用定期现金入账模型会混淆外部入金与基金申购，故采用独立模型但只共享已验证的基础物化不变量。
 
 ## 未决问题
 
 ### Blocking
 
-无。
+- T2 与真实 PostgreSQL 并发补期验收尚未关闭，见 2026-09-12 加固 Spec/Task。
 
 ### Non-blocking
 
@@ -103,8 +110,8 @@ Schema 与日期纯函数 → Server Service/API → Automation Handler → Desk
 ## 验收标准
 
 - AC1：启用中的真实基金账户可为已确认 `.OF` 基金创建月度固定金额计划，其他账户或标的被拒绝。
-- AC2：到期只生成唯一 `PENDING` 记录，不改变 Ledger；停机恢复后补齐启用期间漏期。
+- AC2（部分重新打开）：到期只生成唯一 `PENDING` 记录，不改变 Ledger；停机恢复后补齐启用期间漏期；真实 PostgreSQL 重复/并发 materializer 均以 success/no-op 收敛且不丢月份。
 - AC3：确认实际份额、单位净值、可选手续费和日期后恰好写入一次 `BUY_EXECUTION`，并可在成交记录中看到。
-- AC4：计划支持编辑、暂停、恢复和结束；到期记录支持跳过和恢复，乐观版本冲突可识别。
+- AC4（部分重新打开）：计划支持编辑、暂停、恢复和结束；到期记录支持跳过和恢复，用户命令乐观版本冲突可识别；materialization 竞争不能被误报为用户版本冲突。
 - AC5：基金账户成交页提供定投入口、待确认列表和计划管理，其他账户不显示。
 - AC6：既有逐笔成交、定期现金入账和 Automation 行为保持兼容。
