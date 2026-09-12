@@ -44,6 +44,24 @@ describe('Automation durable occurrence / owner', () => {
     expect(prisma.automationRun.create).toHaveBeenCalledTimes(1);
   });
 
+  it('未 claim 的 manual run 不会被 scheduler 自动恢复执行', async () => {
+    const { store } = fixture();
+    const manual = await store.createManualRun('00000000-0000-4000-8000-000000000001');
+    const scheduled = await store.reserveScheduledOccurrence({
+      jobId: '00000000-0000-4000-8000-000000000001',
+      scheduledAt: new Date('2026-09-12T01:00:00Z'),
+      nextRunAt: new Date('2026-09-12T02:00:00Z'),
+      recoveryPolicy: 'replay-safe',
+    });
+
+    const pending = await store.recoverAndListQueued(new Date('2026-09-12T01:00:01Z'));
+
+    expect(pending).toEqual([
+      expect.objectContaining({ runId: scheduled.runId, trigger: 'scheduled' }),
+    ]);
+    expect(pending.some((run) => run.runId === manual.runId)).toBe(false);
+  });
+
   it('lease 过期后 replay-safe run 生成新 owner，旧 owner 无法提交', async () => {
     const { store, runs } = fixture();
     const reserved = await store.reserveScheduledOccurrence({
