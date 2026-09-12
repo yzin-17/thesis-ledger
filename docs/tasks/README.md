@@ -20,6 +20,7 @@
 
 以下任务已有确定性实现和验证证据，但仍记录浏览器、真实 Provider、在线服务或目标设备等运行时验收边界，因此暂不归档：
 
+- [自动化执行耐久身份、租约与恢复加固](2026-09-05-automation-execution-lease-hardening.md)（PR #32 已实现 PostgreSQL occurrence/owner/lease/recovery；待最终 CI 与目标 Compose post-claim hard-kill smoke）
 - [巨型组件拆分与请求层统一](2026-08-23-large-component-split.md)
 - [风险中心 AB 组合交互](2026-08-23-risk-center-interaction.md)
 - [研究助手任务工作台](2026-08-25-ai-research-workbench.md)
