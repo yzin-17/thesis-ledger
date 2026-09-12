@@ -31,7 +31,8 @@ CREATE INDEX "AutomationRunLease_jobId_idx"
   ON "AutomationRunLease"("jobId", "runId");
 
 -- 历史 AutomationRun 无法可靠区分 manual/scheduled，不伪造 scheduled occurrence。
--- 非终态历史 run 采用 unknown-outcome：部署后由 reconciler 保守终结，不自动重放副作用。
+-- running 交给部署后的 reconciler 保守转 unknown_outcome；极端遗留 queued 直接在迁移中终结，
+-- 避免它们因没有可信 trigger/occurrence 身份而永久悬挂或被自动重放。
 INSERT INTO "AutomationRunLease" (
   "runId", "jobId", "trigger", "executionAttempt", "claimedAt", "leaseUntil",
   "recoveryPolicy", "recoveryReason", "createdAt", "updatedAt"
@@ -40,9 +41,20 @@ SELECT
   r."id", r."jobId", 'legacy', GREATEST(r."attempt", 1), r."startedAt",
   CASE WHEN r."status"='running' THEN CURRENT_TIMESTAMP ELSE NULL END,
   'unknown-outcome',
-  CASE WHEN r."status"='running' THEN 'legacy_running_requires_reconciliation' ELSE NULL END,
+  CASE
+    WHEN r."status"='running' THEN 'legacy_running_requires_reconciliation'
+    WHEN r."status"='queued' THEN 'legacy_queued_closed_during_migration'
+    ELSE NULL
+  END,
   r."startedAt", CURRENT_TIMESTAMP
 FROM "AutomationRun" r
 ON CONFLICT ("runId") DO NOTHING;
+
+UPDATE "AutomationRun"
+SET
+  "status"='unknown_outcome',
+  "finishedAt"=COALESCE("finishedAt", CURRENT_TIMESTAMP),
+  "error"=COALESCE("error", '历史 queued Automation 无法证明 trigger/occurrence 身份，迁移时保守终结。')
+WHERE "status"='queued';
 
 COMMIT;
