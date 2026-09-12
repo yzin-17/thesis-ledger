@@ -49,12 +49,14 @@
 - [ ] 在 Notification 边界增加可持久化、稳定去重、可重放的通知 intent；优先由 Notification 模块拥有 schema/API。
 - [ ] 现金 materialization 的业务事务必须在 occurrence/计划推进提交时同步持久化通知 intent 或等价 durable identity。
 - [ ] route 解析、Redis cooldown、Delivery upsert 与外部发送全部发生在业务事务之后。
+- [ ] 由 `NotificationDispatcher`（或 Notification 模块内等价 reconciler）先把待处理 intent 原子收敛为 route-specific delivery，再沿用现有 `dispatchDue` 投递；不得把 intent 恢复逻辑塞进 Automation 或现金计划扫描器。
+- [ ] 当前没有可用通知路由时，把该 intent 解析为稳定的 terminal `no-route/skipped` 结果（命名可按现有状态模型调整），默认不在未来新增 Provider 后突然补发陈旧月份；只有显式重放策略才能重新打开。
 - [ ] 增加 intent reconciliation：业务提交后进程退出、Redis/数据库 enqueue 异常后，可从数据库重建同一通知。
 - [ ] catch-up 多月份保持单计划一条汇总消息；消息快照和 period snapshot 在 intent 中稳定保存。
 - [ ] intent → delivery 使用稳定 dedup key，重复 reconcile 不形成第二条业务通知。
-- [ ] Risk 现有 Notification 路径与 `NotificationDelivery` 历史兼容；若引入 migration，补 fresh/upgrade 验证。
+- [ ] Risk 现有 Notification 路径与 `NotificationDelivery` 历史兼容；本轮不要求 Risk 强制迁移到 intent，只要求新层不破坏它；若引入 migration，补 fresh/upgrade 验证。
 
-完成条件：覆盖 AC4、AC5；故障恢复不依赖下一次重新物化同一月份。
+完成条件：覆盖 AC4、AC5；故障恢复不依赖下一次重新物化同一月份，且未配置路由的兼容语义明确。
 
 ## T5：收敛共享生命周期能力但不建设通用框架
 
