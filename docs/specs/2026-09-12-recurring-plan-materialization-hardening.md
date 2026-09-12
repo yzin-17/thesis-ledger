@@ -84,12 +84,13 @@
 - 不重构 Ledger、Portfolio、Risk、Performance、Backtest 或 Provider 体系。
 - 不借本轮拆分所有大文件；现有 file-size ratchet 继续约束长期热点。
 - 不新增基金定投通知。
+- 不要求 Risk 通知在本轮强制迁移到新的 durable intent；只要求兼容现有 Risk delivery 路径。
 
 ## 设计方案
 
 ### A. 同计划 materialization 使用数据库串行化，而不是把调度冲突暴露成业务版本冲突
 
-每个领域的 `materializePlan(planId, now)` 必须在单个 PostgreSQL 事务中先锁定对应计划行，再读取用于计算的最新状态。建议使用 `SELECT ... FOR UPDATE` 锁定该计划；锁只覆盖单一 `planId`，不同计划仍可并行。
+每个领域的 `materializePlan(planId, now)` 必须在单个 PostgreSQL 事务中先锁定对应计划行，再读取用于计算的最新状态。首选使用 `SELECT ... FOR UPDATE` 锁定该计划；锁只覆盖单一 `planId`，不同计划仍可并行。
 
 锁内顺序固定为：
 
@@ -109,12 +110,16 @@ materializer 不再把另一个合法 materializer 的推进解释为 `*_VERSION
 现金 occurrence 的数据库提交不能再依赖一次 best-effort post-commit enqueue 才知道“需要通知”。实施时采用以下最小契约：
 
 - 物化事务内必须同时持久化一个稳定、可重放的“通知意图身份”；
-- 事务提交后才执行路由解析、Redis cooldown 与外部 delivery；
-- 如果进程在业务提交后、delivery 建立前退出，下一次 reconciliation 必须能从数据库恢复该 intent；
+- 事务提交后才执行路由解析、Redis cooldown 与 route-specific `NotificationDelivery` 建立；
+- 如果进程在业务提交后、delivery 建立前退出，Notification 模块下一轮 reconciliation 必须能从数据库恢复该 intent；
 - intent 重放必须使用稳定 dedup identity，不能因重试生成新的业务通知；
 - 已成功生成 delivery 后，后续发送失败继续由 Notification 模块现有重试状态机处理。
 
 优先复用 Notification 模块作为 owner：可以新增轻量 `NotificationIntent`/transaction-aware outbox seam，或提供等价的 durable persistence API；现金计划不得直接写 `NotificationDelivery` 表，也不得把通知路由/Provider 细节吸收到 `cash-plans`。如果新增 schema，迁移必须兼容既有 Risk delivery，并提供 fresh + upgrade migration 验证。
+
+`NotificationDispatcher`（或 Notification 模块内等价 reconciler）负责把 durable intent 收敛为 route-specific delivery，然后继续使用现有 delivery dispatcher。Automation 与现金计划 materializer 都不承担 intent recovery。
+
+“未配置通知路由”与“瞬时 enqueue/reconcile 故障”必须区分：如果 reconciliation 时明确没有可用路由，intent 应记录稳定的 terminal `no-route/skipped` 结果（具体状态名按最终模型定义），默认不在用户未来新配置 Provider 后突然补发陈旧月份；只有显式重放策略可以重新打开。瞬时数据库/进程故障则保持可重试。
 
 补期聚合语义保持不变：一次 materialization 对同一计划补齐多个历史月份时，用户只收到一条汇总通知。durable intent 需要保存足够的消息快照/period snapshot，不能在重放时依赖已变化的计划名称或 `nextDueAt`。
 
@@ -139,6 +144,8 @@ materializer 不再把另一个合法 materializer 的推进解释为 `*_VERSION
 
 如果通知 durable intent 仍由 Notification 模块提供，则继续保持 `notifications` 不反向依赖具体现金/基金计划。Cash/Fund 领域可以调用 Notification 的稳定公共接口，但 Notification 不识别计划领域类型。
 
+同步 `docs/architecture/2026-09-02-server-module-boundaries.md`：明确 Automation → Cash/Fund 为编排方向；Ledger/Notification 不反向依赖计划领域；Notification 拥有 intent/delivery 生命周期。
+
 ### E. 真实 PostgreSQL 并发验收是完成条件
 
 新增数据库级测试，至少覆盖：
@@ -147,7 +154,8 @@ materializer 不再把另一个合法 materializer 的推进解释为 `*_VERSION
 - 两个并发 materializer 针对同一基金计划：同上。
 - 一个调用 horizon 更晚、一个更早时，不丢月份且 `nextDueAt` 不回退。
 - materialization 与 pause/end 竞争：最终状态和 occurrence 集合符合锁获取顺序，不出现“计划已暂停但后续继续补期”的越界提交。
-- 现金业务事务提交后模拟 enqueue/reconciliation 故障：重启/重试可恢复同一 durable intent，且只形成一次业务通知。
+- 现金业务事务提交后模拟 intent reconciliation 前进程退出：重启后恢复同一 durable intent，且只形成一次业务通知。
+- 无路由场景稳定落为 terminal skip；新增 Provider 不会自动补发旧月份。
 
 mock 单元测试仍可保留用于日期和普通状态机，但不得作为数据库并发验收证据。
 
@@ -157,6 +165,7 @@ mock 单元测试仍可保留用于日期和普通状态机，但不得作为数
 
 - 计划锁只在单计划物化事务内持有；事务内不进行网络 I/O、Redis 操作或真实通知发送。
 - Ledger 确认事务维持现状：现金继续走 `CashLedgerCommandService.createCashFlowWithEffect`，基金继续走 `LedgerCommandService.createExecutionWithEffect`。
+- durable notification intent 可以与现金 occurrence/计划推进同事务持久化，但 route expansion 与 delivery 发送必须在事务外。
 
 ### 死锁与吞吐
 
@@ -172,6 +181,7 @@ mock 单元测试仍可保留用于日期和普通状态机，但不得作为数
 
 - REST API、Desktop 数据形状、Plan/Occurrence 状态值和 Ledger 事实语义保持不变。
 - 唯一可观察变化是并发扫描不再把合法竞争返回成业务冲突，以及现金通知在进程故障后可以恢复。
+- 当前“没有通知 Provider 时不发送”的行为保持；新 intent 只让这一结果可审计，不把后来新增 Provider 解释为自动补发历史通知。
 
 ## 与现有 Spec 的关系
 
@@ -184,7 +194,7 @@ mock 单元测试仍可保留用于日期和普通状态机，但不得作为数
 
 ## 候选问题与本轮取舍
 
-本轮还观察到 Ledger/import/market/integrity 等长期大文件、`packages/api-client/src/index.ts` 聚合体积，以及部分历史任务长期停留在运行时验收状态。现有 file-size ratchet、模块拆分任务或独立 Spec 已对这些问题形成约束，当前未发现比“周期计划并发正确性 + 文档过度完成”更明确的新 correctness 证据，因此不在本 PR 扩大重构范围。
+本轮还观察到 Ledger/import/market/integrity 等长期大文件、`packages/api-client/src/index.ts` 聚合体积，以及部分历史任务长期停留在运行时验收状态。现有 file-size ratchet、模块拆分任务或独立 Spec 已对这些问题形成约束，当前未发现比“周期计划并发正确性 + 通知提交空窗 + 文档过度完成”更明确的新 correctness 证据，因此不在本 PR 扩大重构范围。
 
 Automation durable occurrence 已有开放 PR #32；Strategy/Risk/AI、Backtest、Ledger/Portfolio 等近期闭环也已有独立方案和验证证据，本轮不重复提交。
 
@@ -194,7 +204,7 @@ Automation durable occurrence 已有开放 PR #32；Strategy/Risk/AI、Backtest�
 - AC2：任意并发/重复扫描后，`planId + periodKey` 仍唯一，启用区间月份不丢失，`nextDueAt` 只前进不回退。
 - AC3：pause/end 与 materialization 竞争时，事务序列化结果确定且不会在最终停用状态之后继续越界生成月份。
 - AC4：现金 occurrence 一旦持久化，对应通知意图即可从数据库恢复；业务提交后进程退出不会永久丢失通知。
-- AC5：现金补多月仍只形成一条稳定汇总通知；重放不会重复业务通知。
+- AC5：现金补多月仍只形成一条稳定汇总通知；重放不会重复业务通知；没有配置路由时稳定记录为 terminal skip，不在未来 Provider 配置后自动补发。
 - AC6：Notification 不反向依赖现金/基金领域；Ledger 不反向依赖计划领域；Fund 与 Cash 均不能依赖 Automation 编排层。
 - AC7：新增真实 PostgreSQL 并发/故障恢复测试进入 CI 的确定性验证入口；mock 测试不再被文档表述为并发数据库证据。
 - AC8：现金/基金旧 Spec、Task 与任务索引的完成状态同步修正，只有在上述验收通过后才能重新标记实现关闭。
