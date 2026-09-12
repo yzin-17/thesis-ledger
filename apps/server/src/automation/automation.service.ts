@@ -71,7 +71,6 @@ export const INTRADAY_VALUATION_CRON = '* * * * *';
 
 const replaySafeScheduledTypes = new Set<AutomationJobType>([
   'market-sync',
-  'provider-health',
   'cash-deposit-materialization',
   'fund-investment-materialization',
 ]);
