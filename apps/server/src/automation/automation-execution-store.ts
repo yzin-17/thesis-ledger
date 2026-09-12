@@ -61,8 +61,8 @@ export class AutomationExecutionStore {
       );
       if (existing[0]) return existing[0];
 
-      // occurrence 尚未登记时，先用持久化 schedule 做 CAS。用户若已修改 cron/timezone、
-      // 停用任务或其他 scheduler 已推进 nextRunAt，本次旧调度不能再创建 run。
+      // 先通过 schedule CAS 锁定 AutomationJob 行。所有 claim 路径也先锁同一 Job，
+      // 因此 Job 行就是 durable job mutex，避免不同 occurrence 并发执行。
       const advanced = await transaction.automationJob.updateMany({
         where: {
           id: input.jobId,
@@ -72,6 +72,18 @@ export class AutomationExecutionStore {
         data: { nextRunAt: input.nextRunAt },
       });
       if (advanced.count !== 1) return null;
+
+      // 已有 queued/running occurrence 时，本 tick 只推进 schedule，不再创建新 run。
+      // 这既保留旧 per-job lock 的互斥语义，也避免长任务期间按 cron 周期堆积 backlog。
+      const active = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT r."id"
+        FROM "AutomationRun" r
+        JOIN "AutomationRunLease" l ON l."runId"=r."id"
+        WHERE l."jobId"=${input.jobId}::uuid
+          AND r."status" IN ('queued', 'running')
+        LIMIT 1
+      `);
+      if (active[0]) return null;
 
       const created = await transaction.automationRun.create({
         data: {
@@ -114,6 +126,20 @@ export class AutomationExecutionStore {
       return { ...run, ownerAttempt };
     }
     return this.prisma.$transaction(async (transaction) => {
+      const jobs = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "id" FROM "AutomationJob"
+        WHERE "id"=${jobId}::uuid
+        FOR UPDATE
+      `);
+      if (!jobs[0]) throw new Error('Automation Job 不存在');
+
+      const running = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "id" FROM "AutomationRun"
+        WHERE "jobId"=${jobId}::uuid AND "status"='running'
+        LIMIT 1
+      `);
+      if (running[0]) return null;
+
       const run = await transaction.automationRun.create({
         data: { jobId, status: 'running', traceId: crypto.randomUUID() },
         select: { id: true, traceId: true },
@@ -137,24 +163,49 @@ export class AutomationExecutionStore {
   async claim(runId: string, leaseMs: number, now = new Date()) {
     if (this.memoryMode) return this.claimInMemory(runId, leaseMs, now);
     return this.prisma.$transaction(async (transaction) => {
-      const rows = await transaction.$queryRaw<Array<LeaseRow & { jobEnabled: boolean }>>(
-        Prisma.sql`
-          SELECT l."runId", l."jobId", l."trigger", l."scheduledAt", l."executionAttempt",
-                 l."leaseUntil", l."recoveryPolicy", r."status", j."enabled" AS "jobEnabled"
-          FROM "AutomationRunLease" l
-          JOIN "AutomationRun" r ON r."id"=l."runId"
-          JOIN "AutomationJob" j ON j."id"=l."jobId"
-          WHERE l."runId"=${runId}::uuid
-          FOR UPDATE OF l, r, j
-        `,
-      );
+      const identities = await transaction.$queryRaw<
+        Array<{ jobId: string; trigger: AutomationExecutionTrigger }>
+      >(Prisma.sql`
+        SELECT "jobId", "trigger"
+        FROM "AutomationRunLease"
+        WHERE "runId"=${runId}::uuid
+        LIMIT 1
+      `);
+      const identity = identities[0];
+      if (!identity) return null;
+
+      // 所有 claim/create-running 路径先锁 Job，再读取/锁 run，统一锁顺序避免
+      // 不同 occurrence 或 manual/scheduled 之间出现双 running owner。
+      const jobs = await transaction.$queryRaw<Array<{ enabled: boolean }>>(Prisma.sql`
+        SELECT "enabled"
+        FROM "AutomationJob"
+        WHERE "id"=${identity.jobId}::uuid
+        FOR UPDATE
+      `);
+      const lockedJob = jobs[0];
+      if (!lockedJob || (identity.trigger === 'scheduled' && !lockedJob.enabled)) return null;
+
+      const rows = await transaction.$queryRaw<LeaseRow[]>(Prisma.sql`
+        SELECT l."runId", l."jobId", l."trigger", l."scheduledAt", l."executionAttempt",
+               l."leaseUntil", l."recoveryPolicy", r."status"
+        FROM "AutomationRunLease" l
+        JOIN "AutomationRun" r ON r."id"=l."runId"
+        WHERE l."runId"=${runId}::uuid
+        FOR UPDATE OF l, r
+      `);
       const row = rows[0];
-      if (
-        !row ||
-        row.status !== 'queued' ||
-        (row.trigger === 'scheduled' && !row.jobEnabled)
-      )
-        return null;
+      if (!row || row.status !== 'queued') return null;
+
+      const running = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "id"
+        FROM "AutomationRun"
+        WHERE "jobId"=${row.jobId}::uuid
+          AND "status"='running'
+          AND "id"<>${runId}::uuid
+        LIMIT 1
+      `);
+      if (running[0]) return null;
+
       const ownerAttempt = row.executionAttempt + 1;
       const claimed = await transaction.automationRun.updateMany({
         where: { id: runId, status: 'queued' },
