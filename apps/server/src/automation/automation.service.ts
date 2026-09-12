@@ -246,7 +246,8 @@ export class AutomationService {
       nextRunAt,
       recoveryPolicy: automationRecoveryPolicy(type, 'scheduled'),
     });
-    if (!reserved) return { skipped: true, reason: '调度计划已变化' } as const;
+    if (!reserved)
+      return { skipped: true, reason: '调度计划已变化或已有任务待执行' } as const;
 
     try {
       const result = await this.executeReserved(
@@ -310,6 +311,7 @@ export class AutomationService {
     if (trigger === 'scheduled') return this.executeScheduled(jobId, handler, scheduledAt);
 
     const run = await this.executionStore.createClaimedManualRun(jobId, job.lockTtlMs);
+    if (!run) return { skipped: true, reason: '任务已有实例运行' } as const;
     return this.executeReserved(
       job,
       handler,
