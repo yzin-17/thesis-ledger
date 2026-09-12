@@ -14,6 +14,7 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
   const scheduledAt = new Date('2026-09-12T06:00:00.000Z');
   const nextRunAt = new Date('2026-09-12T07:00:00.000Z');
   let runId = '';
+  let pendingRunId = '';
 
   beforeAll(async () => {
     await prisma.$connect();
@@ -115,28 +116,47 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
     expect(current.nextRunAt).toEqual(editedNextRunAt);
   });
 
-  it('occurrence 已登记后停用任务时拒绝 scheduled claim', async () => {
+  it('已有 queued occurrence 时合并后续 cron tick，不堆积 backlog', async () => {
     const occurrenceAt = new Date('2026-09-12T08:00:00.000Z');
-    const future = new Date('2026-09-12T09:00:00.000Z');
-    const reserved = await store.reserveScheduledOccurrence({
+    const followingAt = new Date('2026-09-12T09:00:00.000Z');
+    const afterFollowingAt = new Date('2026-09-12T10:00:00.000Z');
+    const first = await store.reserveScheduledOccurrence({
       jobId,
       scheduledAt: occurrenceAt,
-      nextRunAt: future,
+      nextRunAt: followingAt,
       recoveryPolicy: 'replay-safe',
     });
-    expect(reserved).not.toBeNull();
-    if (!reserved) throw new Error('scheduled occurrence 登记意外被拒绝');
+    expect(first).not.toBeNull();
+    if (!first) throw new Error('scheduled occurrence 登记意外被拒绝');
+    pendingRunId = first.runId;
+    const beforeSecondTick = await prisma.automationRun.count({ where: { jobId } });
 
+    const coalesced = await store.reserveScheduledOccurrence({
+      jobId,
+      scheduledAt: followingAt,
+      nextRunAt: afterFollowingAt,
+      recoveryPolicy: 'replay-safe',
+    });
+
+    expect(coalesced).toBeNull();
+    await expect(prisma.automationRun.count({ where: { jobId } })).resolves.toBe(beforeSecondTick);
+    const current = await prisma.automationJob.findUniqueOrThrow({ where: { id: jobId } });
+    expect(current.nextRunAt).toEqual(afterFollowingAt);
+  });
+
+  it('occurrence 已登记后停用任务时拒绝 scheduled claim', async () => {
     await prisma.automationJob.update({ where: { id: jobId }, data: { enabled: false } });
 
-    await expect(store.claim(reserved.runId, 1_000, occurrenceAt)).resolves.toBeNull();
-    const queued = await prisma.automationRun.findUniqueOrThrow({ where: { id: reserved.runId } });
+    await expect(store.claim(pendingRunId, 1_000, new Date('2026-09-12T08:00:00.000Z'))).resolves.toBeNull();
+    const queued = await prisma.automationRun.findUniqueOrThrow({ where: { id: pendingRunId } });
     expect(queued.status).toBe('queued');
   });
 
   it('manual run 创建即 claim，租约丢失后不进入 scheduler replay', async () => {
     const claimedAt = new Date(scheduledAt.getTime() + 3_000);
     const manual = await store.createClaimedManualRun(jobId, 1_000, claimedAt);
+    expect(manual).not.toBeNull();
+    if (!manual) throw new Error('manual run 原子 claim 意外被拒绝');
 
     expect(manual.ownerAttempt).toBe(1);
     const running = await prisma.automationRun.findUniqueOrThrow({ where: { id: manual.runId } });
