@@ -256,14 +256,14 @@ export class AutomationService {
       if (!result.skipped) {
         await this.prisma.automationJob.update({
           where: { id: jobId },
-          data: { lastRunAt: scheduledAt, nextRunAt },
+          data: { lastRunAt: scheduledAt },
         });
       }
       return result;
     } catch (error) {
       await this.prisma.automationJob.update({
         where: { id: jobId },
-        data: { lastRunAt: scheduledAt, nextRunAt },
+        data: { lastRunAt: scheduledAt },
       });
       await this.notifySchedulingFailure(job, error);
       throw error;
