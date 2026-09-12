@@ -56,9 +56,16 @@ describe('AutomationService durable lifecycle', () => {
     };
 
     const execution = service.execute(job().id, handler, new Date('2026-09-12T01:00:00Z'));
+    const settled = execution.then(
+      () => ({ ok: true as const, error: null }),
+      (error: unknown) => ({ ok: false as const, error }),
+    );
     await vi.advanceTimersByTimeAsync(300);
 
-    await expect(execution).rejects.toThrow('Automation 执行所有权已丢失');
+    const result = await settled;
+    expect(result.ok).toBe(false);
+    expect(result.error).toBeInstanceOf(Error);
+    expect((result.error as Error).message).toBe('Automation 执行所有权已丢失');
     expect(executionStore.renewLease).toHaveBeenCalled();
     expect(executionStore.complete).not.toHaveBeenCalled();
     expect(executionStore.fail).not.toHaveBeenCalled();
