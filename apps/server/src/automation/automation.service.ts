@@ -246,6 +246,8 @@ export class AutomationService {
       nextRunAt,
       recoveryPolicy: automationRecoveryPolicy(type, 'scheduled'),
     });
+    if (!reserved) return { skipped: true, reason: '调度计划已变化' } as const;
+
     try {
       const result = await this.executeReserved(
         job,
