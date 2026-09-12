@@ -27,8 +27,8 @@ const fixture = () => {
   return { store: new AutomationExecutionStore(prisma as never), prisma, runs };
 };
 
-const requireReservation = <T>(value: T | null): T => {
-  if (!value) throw new Error('scheduled occurrence 登记意外被拒绝');
+const requireValue = <T>(value: T | null, message: string): T => {
+  if (!value) throw new Error(message);
   return value;
 };
 
@@ -42,8 +42,14 @@ describe('Automation durable occurrence / owner', () => {
       recoveryPolicy: 'replay-safe' as const,
     };
 
-    const first = requireReservation(await store.reserveScheduledOccurrence(input));
-    const second = requireReservation(await store.reserveScheduledOccurrence(input));
+    const first = requireValue(
+      await store.reserveScheduledOccurrence(input),
+      'scheduled occurrence 登记意外被拒绝',
+    );
+    const second = requireValue(
+      await store.reserveScheduledOccurrence(input),
+      '重复 scheduled occurrence 查询意外失败',
+    );
 
     expect(second.runId).toBe(first.runId);
     expect(prisma.automationRun.create).toHaveBeenCalledTimes(1);
@@ -51,10 +57,13 @@ describe('Automation durable occurrence / owner', () => {
 
   it('manual run 创建即 claim，崩溃后保守进入 unknown_outcome', async () => {
     const { store, runs } = fixture();
-    const run = await store.createClaimedManualRun(
-      '00000000-0000-4000-8000-000000000001',
-      1_000,
-      new Date('2026-09-12T01:00:00Z'),
+    const run = requireValue(
+      await store.createClaimedManualRun(
+        '00000000-0000-4000-8000-000000000001',
+        1_000,
+        new Date('2026-09-12T01:00:00Z'),
+      ),
+      'manual run 原子 claim 意外被拒绝',
     );
 
     expect(run.ownerAttempt).toBe(1);
@@ -71,13 +80,14 @@ describe('Automation durable occurrence / owner', () => {
 
   it('lease 过期后 replay-safe run 生成新 owner，旧 owner 无法提交', async () => {
     const { store, runs } = fixture();
-    const reserved = requireReservation(
+    const reserved = requireValue(
       await store.reserveScheduledOccurrence({
         jobId: '00000000-0000-4000-8000-000000000001',
         scheduledAt: new Date('2026-09-12T01:00:00Z'),
         nextRunAt: new Date('2026-09-12T02:00:00Z'),
         recoveryPolicy: 'replay-safe',
       }),
+      'scheduled occurrence 登记意外被拒绝',
     );
     const owner1 = await store.claim(reserved.runId, 1_000, new Date('2026-09-12T01:00:00Z'));
     expect(owner1).toBe(1);
@@ -96,13 +106,14 @@ describe('Automation durable occurrence / owner', () => {
 
   it('replay-safe recovery 有独立于 handler retry 的 owner 上限', async () => {
     const { store, runs } = fixture();
-    const reserved = requireReservation(
+    const reserved = requireValue(
       await store.reserveScheduledOccurrence({
         jobId: '00000000-0000-4000-8000-000000000001',
         scheduledAt: new Date('2026-09-12T01:00:00Z'),
         nextRunAt: new Date('2026-09-12T02:00:00Z'),
         recoveryPolicy: 'replay-safe',
       }),
+      'scheduled occurrence 登记意外被拒绝',
     );
 
     for (let attempt = 1; attempt <= AUTOMATION_MAX_RECOVERY_ATTEMPTS; attempt += 1) {
