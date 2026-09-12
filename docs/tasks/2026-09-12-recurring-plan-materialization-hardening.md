@@ -2,7 +2,7 @@
 
 对应 Spec：[`../specs/2026-09-12-recurring-plan-materialization-hardening.md`](../specs/2026-09-12-recurring-plan-materialization-hardening.md)
 
-状态：待实施。
+状态：待实施；本轮文档状态修正已先行完成。
 
 ## 跨任务契约
 
@@ -65,24 +65,25 @@
 
 完成条件：不会为了 DRY 引入新的跨域抽象；并发不变量拥有唯一、可测试的实现或明确的对称实现规范。
 
-## T6：补齐工程边界和 CI 守卫
+## T6：补齐工程边界、架构文档和 CI 守卫
 
 - [ ] `scripts/check-boundaries.mjs` 增加 `fund-plans -> automation` 禁止规则。
 - [ ] 增加 `ledger -> fund-plans` 禁止规则，与现金计划方向保持对称。
 - [ ] 若 Notification 新增 intent 层，增加守卫保证 Notification 不反向依赖 `cash-plans`/`fund-plans`。
+- [ ] 同步 `docs/architecture/2026-09-02-server-module-boundaries.md`，写明 Automation → Cash/Fund 的编排方向、Ledger/Notification 不反向依赖业务计划，以及 durable notification intent 的 owner。
 - [ ] 将 T1–T4 的 PostgreSQL 并发/故障恢复测试接入现有 CI PostgreSQL job；控制执行时间，不增加独立重复数据库工作流。
 - [ ] `check-workspace-dependencies`、`check-boundaries`、migration matrix、Server typecheck/test 必须通过。
 
-完成条件：覆盖 AC6、AC7；新边界不是只写在文档中。
+完成条件：覆盖 AC6、AC7；新边界不是只写在 Spec，也不是只存在脚本中。
 
 ## T7：同步旧 Spec/Task 完成状态与验证证据
 
-- [ ] 更新 `2026-08-30-recurring-cash-deposit-plan`：AC5/AC7 在本任务关闭前标为重新打开，不再宣称 fake Prisma 覆盖真实并发。
-- [ ] 更新 `2026-09-08-recurring-fund-investment`：明确 T2/并发补期仍未关闭，修正“实现完成”与任务未完成的矛盾。
-- [ ] 更新 `docs/tasks/README.md`，将两项从“实现完成，仅剩运行时验收”迁回当前实施入口，并链接本任务。
+- [x] 更新 `2026-08-30-recurring-cash-deposit-plan`：AC5/AC7 在本任务关闭前标为重新打开，不再宣称 fake Prisma 覆盖真实并发。
+- [x] 更新 `2026-09-08-recurring-fund-investment`：明确 T2/并发补期仍未关闭，修正“实现完成”与任务未完成的矛盾。
+- [x] 更新 `docs/tasks/README.md`，将两项从“实现完成，仅剩运行时验收”迁回当前实施入口，并链接本任务。
 - [ ] 完成实现后，把真实 PostgreSQL 并发测试、notification crash/reconcile、migration matrix、boundary guard 作为最终证据写回；没有执行的浏览器/外部 Provider smoke 不得伪装成已验证。
 
-完成条件：覆盖 AC8，Spec、Task、任务索引和实际测试能力一致。
+完成条件：前三项由本轮文档 PR 先行完成；最后一项随代码实施关闭后，AC8 才整体完成。
 
 ## T8：最终全仓回归与边界 Review
 
@@ -118,7 +119,7 @@
 
 - [ ] 全部验收标准有实现与真实证据
 - [ ] 并发、事务、迁移、故障恢复风险均有测试
-- [ ] 旧 Spec/Task 的状态已经同步
-- [ ] 边界守卫覆盖 Cash/Fund 对称关系
+- [ ] 旧 Spec/Task 的状态和最终证据已经同步
+- [ ] 边界守卫与架构文档覆盖 Cash/Fund 对称关系
 - [ ] 全仓相关调用方已复核
 - [ ] 没有无关大规模重构
