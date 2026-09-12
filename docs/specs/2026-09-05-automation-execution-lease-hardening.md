@@ -2,7 +2,7 @@
 
 > 日期：2026-09-05  
 > 更新：2026-09-12  
-> 状态：Implemented，待最终 CI 与目标进程级 smoke  
+> 状态：Repository implementation complete，目标进程级 smoke 待验收  
 > 来源：PR #32 全仓架构 Review；按 PR #33 已落地的 durable owner 原则收敛
 
 ## 1. 背景
@@ -78,9 +78,11 @@ Scheduler 读取到 `job.nextRunAt <= now` 后：
 
 1. 以数据库中的 `job.nextRunAt` 作为本次 `scheduledAt`；
 2. 先幂等登记 scheduled occurrence；
-3. 同一事务/所有权边界内推进 `nextRunAt`；
+3. 在 occurrence 登记边界推进 `nextRunAt`；
 4. 再对 canonical run claim；
 5. claim 成功才调用 handler。
+
+`executeScheduled()` 不允许在 `nextRunAt` 尚未到期时用当前 `now` 临时制造 occurrence；提前调用直接返回 `尚未到调度时间`。
 
 `nextRunAt` 的下一值按当前调度时刻 `now` 计算，因此服务停机两小时后只处理当前已到期 occurrence，不逐分钟补 120 个历史 tick。`cash-deposit-materialization`、`fund-investment-materialization` 等业务本身按到期范围补齐，负责业务级 catch-up。
 
@@ -96,7 +98,7 @@ Scheduler 读取到 `job.nextRunAt <= now` 后：
 
 ## 7. Durable claim 与 owner fencing
 
-claim 必须在 PostgreSQL 中完成：
+scheduled run 的 claim 必须在 PostgreSQL 中完成：
 
 ```text
 queued
@@ -105,6 +107,8 @@ queued
   -> claimedAt / leaseUntil
 ```
 
+手动 `run-now` 不存在“先建 queued run，再单独 claim”的崩溃窗口：创建 `AutomationRun` 与写入 `ownerAttempt=1 / claimedAt / leaseUntil` 在同一个数据库事务完成，直接进入 `running`。因此进程若紧接着崩溃，后续可由 lease recovery 明确收敛为 `unknown_outcome`，不会留下永久无主的 manual `queued` run。
+
 Worker 持有本次 `ownerAttempt`。以下写操作都必须验证当前 owner：
 
 - heartbeat；
@@ -112,7 +116,7 @@ Worker 持有本次 `ownerAttempt`。以下写操作都必须验证当前 owner�
 - succeeded；
 - failed。
 
-若 run 已被 recovery 并由新 worker claim，旧 worker 即使稍后返回，也不能覆盖新 owner 的状态或结果。
+若 run 已被 recovery 并由新 worker claim，旧 worker即使稍后返回，也不能覆盖新 owner 的状态或结果。
 
 ### 7.1 两层 attempt 不混用
 
@@ -128,8 +132,9 @@ Worker 持有本次 `ownerAttempt`。以下写操作都必须验证当前 owner�
 运行期间按约 `lease / 3` heartbeat：
 
 - 仅当前 `ownerAttempt` 可以续租；
-- heartbeat 失败或 owner 丢失时触发本地 AbortController，并禁止旧 owner 提交终态；
-- handler 是否立即停止不是正确性前提，最终数据库状态仍由 owner fencing 保证。
+- heartbeat 失败或 owner 丢失时触发本地 AbortController；
+- handler 是否立即停止不是正确性前提；
+- 一旦本地确认 `leaseLost`，旧 worker **不再写 `succeeded`，也不主动写 `failed`**，而是保留状态给 reconciler 按 `replay-safe / unknown-outcome` 收敛，避免把“副作用是否已发生未知”错误压缩为普通失败。
 
 Redis 不再参与 Automation 执行所有权或 lease 正确性；保留 RedisService 构造注入仅用于兼容当前模块 wiring，后续可单独清理。
 
@@ -142,11 +147,13 @@ Redis 不再参与 Automation 执行所有权或 lease 正确性；保留 RedisS
 仅明确具备幂等/安全重放边界的 scheduled handler 自动恢复：
 
 - `market-sync`；
-- `provider-health`；
 - `cash-deposit-materialization`；
 - `fund-investment-materialization`。
 
-其中定期现金与基金定投本身有业务 occurrence 唯一键；行情同步以市场数据唯一键/upsert 收敛。Provider health 重复检查只增加审计样本，不产生投资事实副作用。
+依据：
+
+- 行情同步最终写入 `MarketBar` 使用市场数据唯一键/upsert 收敛；
+- 定期现金与基金定投按 `planId + periodKey` 等业务 occurrence 唯一边界物化，并使用 `createMany(skipDuplicates)` / version fencing 收敛。
 
 恢复规则：
 
@@ -160,7 +167,17 @@ running + lease expired + executionAttempt < 3
 
 ### 9.2 `unknown-outcome`
 
-无法证明自动重放绝对安全的任务，包括 snapshot、risk evaluation、digest、backup 等，在 lease 过期后进入：
+无法证明自动重放绝对安全的任务，包括：
+
+- `provider-health`：失败检查会递增 `consecutiveFailures` 并写健康历史，重复执行可能提前改变 Provider 状态；
+- snapshot；
+- risk evaluation；
+- digest；
+- backup；
+- 其他未明确证明幂等的 scheduled handler；
+- 所有 manual `run-now`。
+
+lease 过期后进入：
 
 ```text
 unknown_outcome
@@ -168,13 +185,13 @@ unknown_outcome
 
 不会自动重跑。该状态明确表达“进程失联后无法证明副作用是否已经发生”，避免为了恢复运行状态制造重复业务副作用。
 
-所有 manual `run-now` 默认采用 `unknown-outcome`，因为它不是 cron occurrence，也不应在进程崩溃后由 scheduler 自动重放。
-
 ## 10. 历史数据迁移
 
 旧 `AutomationRun` 无法可靠判断当时是 manual 还是 scheduled，因此迁移不得伪造 `scheduledAt`。
 
-历史 run 统一登记为 `trigger=legacy`；历史非终态 run 使用 `unknown-outcome` 策略。部署后 reconciler 会保守终结旧 running 状态，而不会自动再次执行未知副作用。
+- 历史 run 统一登记为 `trigger=legacy`；
+- 历史 `running` 写入立即过期 lease，由部署后的 reconciler 保守转为 `unknown_outcome`；
+- 极端遗留 `queued` run 因没有可信 trigger/occurrence 身份，在 migration 中直接终结为 `unknown_outcome`，避免永久悬挂或被错误自动重放。
 
 ## 11. Scheduler recovery
 
@@ -182,10 +199,10 @@ unknown_outcome
 
 1. 扫描 lease 已过期的 `running`；
 2. 按 recovery policy 转为 `queued / failed / unknown_outcome`；
-3. 对 queued canonical run 尝试 claim/resume；
+3. 只对 `trigger=scheduled`、job 仍启用的 queued canonical run 尝试 claim/resume；
 4. 再扫描新的 `nextRunAt <= now` 任务。
 
-多实例可以同时进入 reconcile；最终 claim 与 completion 仍由 PostgreSQL row lock + ownerAttempt 收敛。
+manual run 不会被 scheduler 自动接管。多实例可以同时进入 reconcile；最终 claim 与 completion 仍由 PostgreSQL row lock + ownerAttempt 收敛。
 
 ## 12. 测试与工程门禁
 
@@ -194,12 +211,17 @@ unknown_outcome
 - 同一 `jobId + scheduledAt` 只生成一个 canonical run；
 - replay-safe lease 过期后 ownerAttempt `1 -> 2`；
 - owner 1 无法覆盖 owner 2；
+- manual run 创建即原子 claim；
 - unknown-outcome lease 过期后不会自动 replay；
+- leaseLost 后旧 worker 即使 handler 忽略 AbortSignal 并继续返回，也不会写 succeeded/failed；
+- `nextRunAt` 尚未到期时不制造 scheduled occurrence；
 - recovery 达到上限后确定失败；
-- manual/scheduled policy 分离；
+- replay-safe 白名单按下游真实幂等边界审查，`provider-health` 明确 fail closed；
 - 真实 PostgreSQL 并发 reserve 与 owner fencing；
 - migration matrix；
 - lint / typecheck / full tests / build / contract / complexity。
+
+最终 CI 证据以 PR #32 的最新 HEAD 为准，不使用旧代码 HEAD 的成功结果冒充最终验证。
 
 ## 13. 验收标准
 
@@ -207,11 +229,12 @@ unknown_outcome
 - [x] Redis TTL 不再是 Automation 执行正确性来源。
 - [x] claim / heartbeat / completion 使用 durable ownerAttempt fencing。
 - [x] stale old owner 无法覆盖新 owner。
-- [x] manual 与 scheduled lifecycle 分离。
+- [x] manual 创建与 claim 原子化，且不由 scheduler 自动重放。
 - [x] missed cron 不逐 tick backfill。
+- [x] 未到 `nextRunAt` 不制造 occurrence。
 - [x] gate skip 不制造高频无意义 run。
 - [x] recovery 根据 handler 安全属性区分 replay-safe / unknown-outcome。
-- [x] 历史 running migration fail closed，不自动重放。
-- [x] 增加 unit 与 PostgreSQL integration 验证。
-- [ ] PR 最终 HEAD CI 全绿。
+- [x] `provider-health` 等状态型 handler 不误标 replay-safe。
+- [x] 历史 running/queued migration fail closed，不自动重放。
+- [x] 增加 unit、Service lifecycle 与 PostgreSQL integration 验证。
 - [ ] 目标 Compose 做一次真实“claim 后硬杀进程 → recovery” smoke；该项属于运行环境验收，不用单元测试冒充。
