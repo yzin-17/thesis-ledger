@@ -5,7 +5,8 @@
 ## 仍在实施或待完成
 
 - [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
-- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（T00 已完成，按 G1/G2/G3 推进，真实运行待验收）
+- [V1 回测任务 BullMQ 生命周期](2026-09-09-backtest-bullmq-lifecycle.md)（PR #33 已完成 durable owner/reconciler 代码修复；仍待目标 Compose post-claim hard-kill 与 Electron 运行态 smoke）
+- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（仓库实现已收口，真实外部 Provider/在线数据/Desktop 人工 smoke 仍按部署门禁记录）
 - [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
