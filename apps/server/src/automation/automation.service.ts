@@ -303,12 +303,13 @@ export class AutomationService {
     if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
     if (trigger === 'scheduled') return this.executeScheduled(jobId, handler, scheduledAt);
 
-    const run = await this.executionStore.createManualRun(jobId);
+    const run = await this.executionStore.createClaimedManualRun(jobId, job.lockTtlMs);
     return this.executeReserved(
       job,
       handler,
       { runId: run.runId, jobId, trigger: 'manual', scheduledAt: null },
       scheduledAt,
+      run.ownerAttempt,
     );
   }
 
@@ -387,8 +388,10 @@ export class AutomationService {
     handler: AutomationHandler,
     run: PendingAutomationExecution,
     effectiveAt: Date,
+    claimedOwnerAttempt?: number,
   ) {
-    const ownerAttempt = await this.executionStore.claim(run.runId, job.lockTtlMs);
+    const ownerAttempt =
+      claimedOwnerAttempt ?? (await this.executionStore.claim(run.runId, job.lockTtlMs));
     if (ownerAttempt === null) return { skipped: true, reason: '任务已有实例运行' } as const;
 
     const abortController = new AbortController();
