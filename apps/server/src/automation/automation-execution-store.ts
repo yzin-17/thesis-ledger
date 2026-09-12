@@ -155,16 +155,24 @@ export class AutomationExecutionStore {
   async claim(runId: string, leaseMs: number, now = new Date()) {
     if (this.memoryMode) return this.claimInMemory(runId, leaseMs, now);
     return this.prisma.$transaction(async (transaction) => {
-      const rows = await transaction.$queryRaw<LeaseRow[]>(Prisma.sql`
-        SELECT l."runId", l."jobId", l."trigger", l."scheduledAt", l."executionAttempt",
-               l."leaseUntil", l."recoveryPolicy", r."status"
-        FROM "AutomationRunLease" l
-        JOIN "AutomationRun" r ON r."id"=l."runId"
-        WHERE l."runId"=${runId}::uuid
-        FOR UPDATE OF l, r
-      `);
+      const rows = await transaction.$queryRaw<Array<LeaseRow & { jobEnabled: boolean }>>(
+        Prisma.sql`
+          SELECT l."runId", l."jobId", l."trigger", l."scheduledAt", l."executionAttempt",
+                 l."leaseUntil", l."recoveryPolicy", r."status", j."enabled" AS "jobEnabled"
+          FROM "AutomationRunLease" l
+          JOIN "AutomationRun" r ON r."id"=l."runId"
+          JOIN "AutomationJob" j ON j."id"=l."jobId"
+          WHERE l."runId"=${runId}::uuid
+          FOR UPDATE OF l, r, j
+        `,
+      );
       const row = rows[0];
-      if (!row || row.status !== 'queued') return null;
+      if (
+        !row ||
+        row.status !== 'queued' ||
+        (row.trigger === 'scheduled' && !row.jobEnabled)
+      )
+        return null;
       const ownerAttempt = row.executionAttempt + 1;
       const claimed = await transaction.automationRun.updateMany({
         where: { id: runId, status: 'queued' },
