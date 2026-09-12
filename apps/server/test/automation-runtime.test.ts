@@ -258,7 +258,7 @@ const redisFixture = () => {
 };
 
 describe('AutomationService scheduled execution', () => {
-  it('Redis claim 保证现金补期 job 并发只执行一次并维护运行时间', async () => {
+  it('durable occurrence claim 保证现金补期 job 并发只执行一次并维护运行时间', async () => {
     const stored = job('cash-deposit-materialization');
     const prisma = {
       automationJob: {
@@ -298,16 +298,23 @@ describe('AutomationService scheduled execution', () => {
     await expect(first).resolves.toMatchObject({ skipped: false });
 
     expect(handler.run).toHaveBeenCalledOnce();
-    expect(prisma.automationJob.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: stored.id },
-        data: expect.objectContaining({ lastRunAt: now, nextRunAt: expect.any(Date) }),
-      }),
-    );
+    expect(prisma.automationJob.update).toHaveBeenCalledTimes(2);
+    expect(prisma.automationJob.update).toHaveBeenCalledWith({
+      where: { id: stored.id },
+      data: { nextRunAt: new Date('2026-08-20T13:00:00Z') },
+    });
+    expect(prisma.automationJob.update).toHaveBeenCalledWith({
+      where: { id: stored.id },
+      data: { lastRunAt: stored.nextRunAt },
+    });
   });
 
   it('A 股休市日不执行 market handler 但推进 nextRunAt', async () => {
-    const stored = { ...job('market-sync'), cron: '0 9 * * *' };
+    const stored = {
+      ...job('market-sync'),
+      cron: '0 9 * * *',
+      nextRunAt: new Date('2026-02-20T01:00:00Z'),
+    };
     const prisma = {
       automationJob: {
         findUniqueOrThrow: vi.fn(async () => stored),
@@ -694,7 +701,7 @@ describe('AutomationService failure notification', () => {
     );
   });
 
-  it('任务无运行记录时失败通知回退以任务为主语', async () => {
+  it('查不到运行记录时失败通知仍绑定当前 reserved runId', async () => {
     const stored = job();
     const prisma = prismaFor(stored, null);
     const notifications = notificationsFixture();
@@ -708,8 +715,12 @@ describe('AutomationService failure notification', () => {
       '行情接口超时',
     );
     expect(notifications.enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ id: stored.id, dedupKey: `automation-failure:${stored.id}` }),
-      expect.objectContaining({ traceId: stored.id }),
+      expect.objectContaining({
+        type: 'automation-run',
+        id: 'run-9',
+        dedupKey: `automation-failure:${stored.id}`,
+      }),
+      expect.objectContaining({ traceId: 'run-9' }),
       expect.anything(),
     );
   });
