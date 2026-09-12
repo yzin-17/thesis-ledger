@@ -91,13 +91,18 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
     expect(leases[0]).toMatchObject({ executionAttempt: 2, leaseUntil: null });
   });
 
-  it('未 claim 的 manual run 不进入 scheduler pending 集合', async () => {
-    const manual = await store.createManualRun(jobId);
+  it('manual run 创建即 claim，租约丢失后不进入 scheduler replay', async () => {
+    const claimedAt = new Date(scheduledAt.getTime() + 3_000);
+    const manual = await store.createClaimedManualRun(jobId, 1_000, claimedAt);
 
-    const pending = await store.recoverAndListQueued(new Date(scheduledAt.getTime() + 3_000));
+    expect(manual.ownerAttempt).toBe(1);
+    const running = await prisma.automationRun.findUniqueOrThrow({ where: { id: manual.runId } });
+    expect(running.status).toBe('running');
+
+    const pending = await store.recoverAndListQueued(new Date(claimedAt.getTime() + 2_000));
 
     expect(pending.some((item) => item.runId === manual.runId)).toBe(false);
-    const manualRun = await prisma.automationRun.findUniqueOrThrow({ where: { id: manual.runId } });
-    expect(manualRun.status).toBe('queued');
+    const terminal = await prisma.automationRun.findUniqueOrThrow({ where: { id: manual.runId } });
+    expect(terminal.status).toBe('unknown_outcome');
   });
 });
