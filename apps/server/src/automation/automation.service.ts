@@ -267,23 +267,26 @@ export class AutomationService {
         where: { id: jobId },
         data: { lastRunAt: scheduledAt },
       });
-      await this.notifySchedulingFailure(job, error);
+      await this.notifySchedulingFailure(job, reserved.runId, error);
       throw error;
     }
   }
 
   /** 仅调度路径经过本方法；手动 run-now 直调 execute，不产生失败通知。 */
-  private async notifySchedulingFailure(job: { id: string; name: string }, error: unknown) {
+  private async notifySchedulingFailure(
+    job: { id: string; name: string },
+    runId: string,
+    error: unknown,
+  ) {
     try {
       const run = await this.prisma.automationRun.findFirst({
-        where: { jobId: job.id },
-        orderBy: { startedAt: 'desc' },
+        where: { id: runId, jobId: job.id },
       });
       await enqueueAutomationFailureNotification(this.notifications, {
         jobId: job.id,
         jobName: job.name,
-        runId: run?.id ?? job.id,
-        traceId: run?.traceId ?? job.id,
+        runId: run?.id ?? runId,
+        traceId: run?.traceId ?? runId,
         error,
       });
     } catch (notificationError) {
@@ -341,7 +344,7 @@ export class AutomationService {
           where: { id: job.id },
           data: { lastRunAt: effectiveAt },
         });
-        await this.notifySchedulingFailure(job, error);
+        await this.notifySchedulingFailure(job, run.runId, error);
       }
       throw error;
     }
@@ -399,7 +402,7 @@ export class AutomationService {
 
     const abortController = new AbortController();
     let leaseLost = false;
-    const heartbeatEveryMs = Math.max(250, Math.floor(job.lockTtlMs / 3));
+    const heartbeatEveryMs = Math.max(1, Math.floor(job.lockTtlMs / 3));
     const heartbeat = setInterval(() => {
       void this.executionStore
         .renewLease(run.runId, ownerAttempt, job.lockTtlMs)
