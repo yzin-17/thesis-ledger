@@ -90,4 +90,14 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
     );
     expect(leases[0]).toMatchObject({ executionAttempt: 2, leaseUntil: null });
   });
+
+  it('未 claim 的 manual run 不进入 scheduler pending 集合', async () => {
+    const manual = await store.createManualRun(jobId);
+
+    const pending = await store.recoverAndListQueued(new Date(scheduledAt.getTime() + 3_000));
+
+    expect(pending.some((item) => item.runId === manual.runId)).toBe(false);
+    const manualRun = await prisma.automationRun.findUniqueOrThrow({ where: { id: manual.runId } });
+    expect(manualRun.status).toBe('queued');
+  });
 });
