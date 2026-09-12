@@ -239,6 +239,7 @@ export class AutomationExecutionStore {
         AND EXISTS (
           SELECT 1 FROM "AutomationRunLease" l
           WHERE l."runId"=r."id" AND l."executionAttempt"=${ownerAttempt}
+            AND l."leaseUntil" IS NOT NULL AND l."leaseUntil" >= CURRENT_TIMESTAMP
         )
     `);
     return changed === 1;
@@ -247,7 +248,14 @@ export class AutomationExecutionStore {
   async renewLease(runId: string, ownerAttempt: number, leaseMs: number, now = new Date()) {
     if (this.memoryMode) {
       const lease = this.memoryLeases.get(runId);
-      if (!lease || lease.executionAttempt !== ownerAttempt || lease.status !== 'running') return false;
+      if (
+        !lease ||
+        lease.executionAttempt !== ownerAttempt ||
+        lease.status !== 'running' ||
+        !lease.leaseUntil ||
+        lease.leaseUntil < now
+      )
+        return false;
       lease.leaseUntil = new Date(now.getTime() + leaseMs);
       return true;
     }
@@ -255,6 +263,7 @@ export class AutomationExecutionStore {
       UPDATE "AutomationRunLease" l
       SET "leaseUntil"=${new Date(now.getTime() + leaseMs)}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE l."runId"=${runId}::uuid AND l."executionAttempt"=${ownerAttempt}
+        AND l."leaseUntil" IS NOT NULL AND l."leaseUntil" >= ${now}
         AND EXISTS (
           SELECT 1 FROM "AutomationRun" r WHERE r."id"=l."runId" AND r."status"='running'
         )
@@ -275,15 +284,20 @@ export class AutomationExecutionStore {
       attempt: handlerAttempts,
       ...(output === undefined ? {} : { output: output as Prisma.InputJsonValue }),
       error: null,
-    });
+    }, finishedAt);
   }
 
   async fail(runId: string, ownerAttempt: number, error: unknown, finishedAt = new Date()) {
-    return this.finish(runId, ownerAttempt, {
-      status: 'failed',
+    return this.finish(
+      runId,
+      ownerAttempt,
+      {
+        status: 'failed',
+        finishedAt,
+        error: error instanceof Error ? error.message : '未知错误',
+      },
       finishedAt,
-      error: error instanceof Error ? error.message : '未知错误',
-    });
+    );
   }
 
   async recoverAndListQueued(now = new Date()): Promise<PendingAutomationExecution[]> {
@@ -313,6 +327,7 @@ export class AutomationExecutionStore {
     runId: string,
     ownerAttempt: number,
     data: Prisma.AutomationRunUpdateManyMutationInput,
+    finishedAt: Date,
   ) {
     if (this.memoryMode) {
       const lease = this.memoryLeases.get(runId);
@@ -323,17 +338,24 @@ export class AutomationExecutionStore {
       return true;
     }
     return this.prisma.$transaction(async (transaction) => {
-      const rows = await transaction.$queryRaw<Array<{ executionAttempt: number; status: string }>>(
-        Prisma.sql`
-          SELECT l."executionAttempt", r."status"
-          FROM "AutomationRunLease" l
-          JOIN "AutomationRun" r ON r."id"=l."runId"
-          WHERE l."runId"=${runId}::uuid
-          FOR UPDATE OF l, r
-        `,
-      );
+      const rows = await transaction.$queryRaw<
+        Array<{ executionAttempt: number; leaseUntil: Date | null; status: string }>
+      >(Prisma.sql`
+        SELECT l."executionAttempt", l."leaseUntil", r."status"
+        FROM "AutomationRunLease" l
+        JOIN "AutomationRun" r ON r."id"=l."runId"
+        WHERE l."runId"=${runId}::uuid
+        FOR UPDATE OF l, r
+      `);
       const row = rows[0];
-      if (!row || row.status !== 'running' || row.executionAttempt !== ownerAttempt) return false;
+      if (
+        !row ||
+        row.status !== 'running' ||
+        row.executionAttempt !== ownerAttempt ||
+        !row.leaseUntil ||
+        row.leaseUntil < finishedAt
+      )
+        return false;
       const updated = await transaction.automationRun.updateMany({
         where: { id: runId, status: 'running' },
         data,
