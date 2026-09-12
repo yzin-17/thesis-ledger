@@ -229,8 +229,10 @@ export class AutomationService {
 
     const type = automationJobTypeSchema.parse(job.type);
     if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
+    if (!job.nextRunAt || job.nextRunAt > now)
+      return { skipped: true, reason: '尚未到调度时间' } as const;
 
-    const scheduledAt = job.nextRunAt && job.nextRunAt <= now ? job.nextRunAt : now;
+    const scheduledAt = job.nextRunAt;
     // 不逐条补跑停机期间错过的 cron tick；catch-up 由 materializeDue 等业务 handler 自己负责。
     const nextRunAt = nextCronOccurrence(job.cron, job.timezone, now);
     const gate = await this.scheduledGate(type, handler, scheduledAt);
@@ -429,7 +431,10 @@ export class AutomationService {
       if (!completed) throw new Error('Automation 执行所有权已丢失，拒绝旧 owner 提交结果');
       return { skipped: false, output: execution.result } as const;
     } catch (error) {
-      await this.executionStore.fail(run.runId, ownerAttempt, error).catch(() => false);
+      // leaseLost 时旧 owner 已无法证明自己仍拥有执行权；保留 running 让 reconciler
+      // 按 replay-safe / unknown-outcome 处理，不能把不确定副作用错误压成普通 failed。
+      if (!leaseLost)
+        await this.executionStore.fail(run.runId, ownerAttempt, error).catch(() => false);
       throw error;
     } finally {
       clearInterval(heartbeat);
