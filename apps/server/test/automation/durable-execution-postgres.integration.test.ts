@@ -68,19 +68,31 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
     expect(Number(leases[0]?.count ?? 0)).toBe(1);
   });
 
-  it('lease recovery 单调增加 ownerAttempt 且拒绝旧 owner 提交', async () => {
+  it('lease 过期立即失权，recovery 单调增加 ownerAttempt 且拒绝旧 owner 提交', async () => {
     const owner1 = await store.claim(runId, 1_000, scheduledAt);
     expect(owner1).toBe(1);
 
-    const pending = await store.recoverAndListQueued(new Date(scheduledAt.getTime() + 2_000));
+    const expiredAt = new Date(scheduledAt.getTime() + 1_500);
+    await expect(store.renewLease(runId, owner1!, 1_000, expiredAt)).resolves.toBe(false);
+    await expect(store.complete(runId, owner1!, { expired: true }, 1, expiredAt)).resolves.toBe(
+      false,
+    );
+
+    const recoveryAt = new Date(scheduledAt.getTime() + 2_000);
+    const pending = await store.recoverAndListQueued(recoveryAt);
     expect(pending).toEqual([
       expect.objectContaining({ runId, jobId, trigger: 'scheduled' }),
     ]);
 
-    const owner2 = await store.claim(runId, 1_000, new Date(scheduledAt.getTime() + 2_000));
+    const owner2 = await store.claim(runId, 1_000, recoveryAt);
     expect(owner2).toBe(2);
-    await expect(store.complete(runId, owner1!, { stale: true }, 1)).resolves.toBe(false);
-    await expect(store.complete(runId, owner2!, { ok: true }, 1)).resolves.toBe(true);
+    const owner2FinishedAt = new Date(scheduledAt.getTime() + 2_500);
+    await expect(
+      store.complete(runId, owner1!, { stale: true }, 1, owner2FinishedAt),
+    ).resolves.toBe(false);
+    await expect(
+      store.complete(runId, owner2!, { ok: true }, 1, owner2FinishedAt),
+    ).resolves.toBe(true);
 
     const run = await prisma.automationRun.findUniqueOrThrow({ where: { id: runId } });
     expect(run.status).toBe('succeeded');
@@ -147,7 +159,9 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
   it('occurrence 已登记后停用任务时拒绝 scheduled claim', async () => {
     await prisma.automationJob.update({ where: { id: jobId }, data: { enabled: false } });
 
-    await expect(store.claim(pendingRunId, 1_000, new Date('2026-09-12T08:00:00.000Z'))).resolves.toBeNull();
+    await expect(
+      store.claim(pendingRunId, 1_000, new Date('2026-09-12T08:00:00.000Z')),
+    ).resolves.toBeNull();
     const queued = await prisma.automationRun.findUniqueOrThrow({ where: { id: pendingRunId } });
     expect(queued.status).toBe('queued');
   });
