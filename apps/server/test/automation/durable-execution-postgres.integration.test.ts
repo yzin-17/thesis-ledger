@@ -115,6 +115,25 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
     expect(current.nextRunAt).toEqual(editedNextRunAt);
   });
 
+  it('occurrence 已登记后停用任务时拒绝 scheduled claim', async () => {
+    const occurrenceAt = new Date('2026-09-12T08:00:00.000Z');
+    const future = new Date('2026-09-12T09:00:00.000Z');
+    const reserved = await store.reserveScheduledOccurrence({
+      jobId,
+      scheduledAt: occurrenceAt,
+      nextRunAt: future,
+      recoveryPolicy: 'replay-safe',
+    });
+    expect(reserved).not.toBeNull();
+    if (!reserved) throw new Error('scheduled occurrence 登记意外被拒绝');
+
+    await prisma.automationJob.update({ where: { id: jobId }, data: { enabled: false } });
+
+    await expect(store.claim(reserved.runId, 1_000, occurrenceAt)).resolves.toBeNull();
+    const queued = await prisma.automationRun.findUniqueOrThrow({ where: { id: reserved.runId } });
+    expect(queued.status).toBe('queued');
+  });
+
   it('manual run 创建即 claim，租约丢失后不进入 scheduler replay', async () => {
     const claimedAt = new Date(scheduledAt.getTime() + 3_000);
     const manual = await store.createClaimedManualRun(jobId, 1_000, claimedAt);
