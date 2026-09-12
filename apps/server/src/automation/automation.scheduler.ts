@@ -37,6 +37,20 @@ export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
     if (this.running) return { skipped: true, reason: '调度器上一轮仍在运行', jobs: [] } as const;
     this.running = true;
     try {
+      // 先接住“occurrence 已登记但进程在 claim 前崩溃”以及 lease 过期后的安全恢复。
+      // claim 仍由 PostgreSQL ownerAttempt 决定，多实例同时进入这里不会产生双 owner。
+      const pending = (await this.automations.recoverPendingRuns?.(now)) ?? [];
+      for (const run of pending) {
+        const pendingJob = await this.prisma.automationJob.findUnique({ where: { id: run.jobId } });
+        if (!pendingJob?.enabled) continue;
+        try {
+          const type = automationJobTypeSchema.parse(pendingJob.type);
+          await this.automations.resumePendingRun?.(run, this.handlers.for(type), now);
+        } catch {
+          // 单个恢复任务失败不阻断本轮其他 due job；终态与失败通知由 AutomationService 负责。
+        }
+      }
+
       const jobs = await this.prisma.automationJob.findMany({
         where: { enabled: true, nextRunAt: { lte: now } },
         orderBy: [{ nextRunAt: 'asc' }, { id: 'asc' }],

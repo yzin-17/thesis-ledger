@@ -15,8 +15,13 @@ import {
   type AutomationJobType,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { RedisService, redisKey } from '../platform/redis.service.js';
+import { RedisService } from '../platform/redis.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import {
+  AutomationExecutionStore,
+  type AutomationRecoveryPolicy,
+  type PendingAutomationExecution,
+} from './automation-execution-store.js';
 import {
   automationNotificationLogger,
   enqueueAutomationFailureNotification,
@@ -64,6 +69,18 @@ export const MAX_AUTOMATION_HISTORY_PAGE_SIZE = 100;
 const LEGACY_INTRADAY_VALUATION_CRON = '* * * * 1-5';
 export const INTRADAY_VALUATION_CRON = '* * * * *';
 
+const replaySafeScheduledTypes = new Set<AutomationJobType>([
+  'market-sync',
+  'cash-deposit-materialization',
+  'fund-investment-materialization',
+]);
+
+export const automationRecoveryPolicy = (
+  type: AutomationJobType,
+  trigger: 'manual' | 'scheduled',
+): AutomationRecoveryPolicy =>
+  trigger === 'scheduled' && replaySafeScheduledTypes.has(type) ? 'replay-safe' : 'unknown-outcome';
+
 export const managedValuationJobs = [
   {
     id: '00000000-0000-4000-8000-000000000011',
@@ -96,11 +113,17 @@ export const managedValuationJobs = [
 
 @Injectable()
 export class AutomationService {
+  private readonly executionStore: AutomationExecutionStore;
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    redis: RedisService,
     private readonly notifications: NotificationService,
-  ) {}
+  ) {
+    // Redis 仍由 AutomationModule 保持兼容注入，但不再参与执行所有权或 lease 正确性。
+    void redis;
+    this.executionStore = new AutomationExecutionStore(prisma);
+  }
 
   async ensureManagedValuationJobs() {
     for (const definition of managedValuationJobs) {
@@ -205,68 +228,69 @@ export class AutomationService {
 
     const type = automationJobTypeSchema.parse(job.type);
     if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
+    if (!job.nextRunAt || job.nextRunAt > now)
+      return { skipped: true, reason: '尚未到调度时间' } as const;
 
+    const scheduledAt = job.nextRunAt;
+    // 不逐条补跑停机期间错过的 cron tick；catch-up 由 materializeDue 等业务 handler 自己负责。
     const nextRunAt = nextCronOccurrence(job.cron, job.timezone, now);
-    if (handler.scheduledGate) {
-      const gate = await handler.scheduledGate(now);
-      if (!gate.allowed) {
-        await this.prisma.automationJob.update({
-          where: { id: jobId },
-          data: { nextRunAt },
-        });
-        return { skipped: true, reason: gate.reason } as const;
-      }
-    } else if (isMarketAutomationJobType(type)) {
-      const tradingDay = cnTradingCalendar.status(now);
-      if (!tradingDay.open) {
-        await this.prisma.automationJob.update({
-          where: { id: jobId },
-          data: { nextRunAt },
-        });
-        return {
-          skipped: true,
-          reason:
-            tradingDay.reason === 'calendar-unavailable'
-              ? '交易日历未覆盖，保守跳过市场任务'
-              : '休市日跳过市场任务',
-        } as const;
-      }
+    const gate = await this.scheduledGate(type, handler, scheduledAt);
+    if (!gate.allowed) {
+      await this.executionStore.advanceSkippedOccurrence(jobId, scheduledAt, nextRunAt);
+      return { skipped: true, reason: gate.reason } as const;
     }
 
+    const reserved = await this.executionStore.reserveScheduledOccurrence({
+      jobId,
+      scheduledAt,
+      nextRunAt,
+      recoveryPolicy: automationRecoveryPolicy(type, 'scheduled'),
+    });
+    if (!reserved)
+      return { skipped: true, reason: '调度计划已变化或已有任务待执行' } as const;
+
     try {
-      const result = await this.execute(jobId, handler, now, 'scheduled');
-      if (result.skipped) return result;
-      await this.prisma.automationJob.update({
-        where: { id: jobId },
-        data: { lastRunAt: now, nextRunAt },
-      });
+      const result = await this.executeReserved(
+        job,
+        handler,
+        { runId: reserved.runId, jobId, trigger: 'scheduled', scheduledAt },
+        scheduledAt,
+      );
+      if (!result.skipped) {
+        await this.prisma.automationJob.update({
+          where: { id: jobId },
+          data: { lastRunAt: scheduledAt },
+        });
+      }
       return result;
     } catch (error) {
       await this.prisma.automationJob.update({
         where: { id: jobId },
-        data: { lastRunAt: now, nextRunAt },
+        data: { lastRunAt: scheduledAt },
       });
-      await this.notifySchedulingFailure(job, error);
+      await this.notifySchedulingFailure(job, reserved.runId, error);
       throw error;
     }
   }
 
   /** 仅调度路径经过本方法；手动 run-now 直调 execute，不产生失败通知。 */
-  private async notifySchedulingFailure(job: { id: string; name: string }, error: unknown) {
+  private async notifySchedulingFailure(
+    job: { id: string; name: string },
+    runId: string,
+    error: unknown,
+  ) {
     try {
       const run = await this.prisma.automationRun.findFirst({
-        where: { jobId: job.id },
-        orderBy: { startedAt: 'desc' },
+        where: { id: runId, jobId: job.id },
       });
       await enqueueAutomationFailureNotification(this.notifications, {
         jobId: job.id,
         jobName: job.name,
-        runId: run?.id ?? job.id,
-        traceId: run?.traceId ?? job.id,
+        runId: run?.id ?? runId,
+        traceId: run?.traceId ?? runId,
         error,
       });
     } catch (notificationError) {
-      // 通知准备或入队失败不影响失败状态记录与原始执行错误的抛出。
       automationNotificationLogger.warn({
         operation: 'automation.failure_notification_failed',
         jobId: job.id,
@@ -284,49 +308,47 @@ export class AutomationService {
     const job = await this.prisma.automationJob.findUniqueOrThrow({ where: { id: jobId } });
     const type = automationJobTypeSchema.parse(job.type);
     if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
+    if (trigger === 'scheduled') return this.executeScheduled(jobId, handler, scheduledAt);
 
-    const lockKey = redisKey('lock', `automation:${jobId}`);
-    const token = crypto.randomUUID();
-    const locked = await this.redis.client.set(lockKey, token, 'PX', job.lockTtlMs, 'NX');
-    if (!locked) return { skipped: true, reason: '任务已有实例运行' } as const;
+    const run = await this.executionStore.createClaimedManualRun(jobId, job.lockTtlMs);
+    if (!run) return { skipped: true, reason: '任务已有实例运行' } as const;
+    return this.executeReserved(
+      job,
+      handler,
+      { runId: run.runId, jobId, trigger: 'manual', scheduledAt: null },
+      scheduledAt,
+      run.ownerAttempt,
+    );
+  }
 
-    const run = await this.prisma.automationRun.create({
-      data: { jobId, status: 'running', traceId: crypto.randomUUID() },
-    });
+  recoverPendingRuns(now = new Date()) {
+    return this.executionStore.recoverAndListQueued(now);
+  }
+
+  async resumePendingRun(run: PendingAutomationExecution, handler: AutomationHandler, now = new Date()) {
+    const job = await this.prisma.automationJob.findUnique({ where: { id: run.jobId } });
+    if (!job || !job.enabled) return { skipped: true, reason: '任务不存在或已停用' } as const;
+    const type = automationJobTypeSchema.parse(job.type);
+    if (handler.type !== type) throw new Error(`Automation handler 类型不匹配: ${type}`);
+    const effectiveAt = run.scheduledAt ?? now;
     try {
-      const retry = automationJobSchema.shape.retry.parse(job.retryPolicy);
-      const execution = await runWithRetry(async (attempt) => {
-        if (attempt > 1)
-          await this.prisma.automationRun.update({
-            where: { id: run.id },
-            data: { attempt },
-          });
-        return handler.run(AbortSignal.timeout(job.lockTtlMs), scheduledAt, trigger);
-      }, retry);
-      const output = execution.result;
-      await this.prisma.automationRun.update({
-        where: { id: run.id },
-        data: {
-          status: 'succeeded',
-          attempt: execution.attempts,
-          output: output as object,
-          finishedAt: new Date(),
-        },
-      });
-      return { skipped: false, output } as const;
+      const result = await this.executeReserved(job, handler, run, effectiveAt);
+      if (run.trigger === 'scheduled' && !result.skipped) {
+        await this.prisma.automationJob.update({
+          where: { id: job.id },
+          data: { lastRunAt: effectiveAt },
+        });
+      }
+      return result;
     } catch (error) {
-      await this.prisma.automationRun.update({
-        where: { id: run.id },
-        data: {
-          status: 'failed',
-          error: error instanceof Error ? error.message : '未知错误',
-          finishedAt: new Date(),
-        },
-      });
+      if (run.trigger === 'scheduled') {
+        await this.prisma.automationJob.update({
+          where: { id: job.id },
+          data: { lastRunAt: effectiveAt },
+        });
+        await this.notifySchedulingFailure(job, run.runId, error);
+      }
       throw error;
-    } finally {
-      const current = await this.redis.client.get(lockKey);
-      if (current === token) await this.redis.client.del(lockKey);
     }
   }
 
@@ -353,5 +375,75 @@ export class AutomationService {
       total,
       totalPages,
     };
+  }
+
+  private async scheduledGate(type: AutomationJobType, handler: AutomationHandler, scheduledAt: Date) {
+    if (handler.scheduledGate) return handler.scheduledGate(scheduledAt);
+    if (!isMarketAutomationJobType(type)) return { allowed: true } as const;
+    const tradingDay = cnTradingCalendar.status(scheduledAt);
+    if (tradingDay.open) return { allowed: true } as const;
+    return {
+      allowed: false,
+      reason:
+        tradingDay.reason === 'calendar-unavailable'
+          ? '交易日历未覆盖，保守跳过市场任务'
+          : '休市日跳过市场任务',
+    } as const;
+  }
+
+  private async executeReserved(
+    job: { id: string; type: string; retryPolicy: Prisma.JsonValue; lockTtlMs: number },
+    handler: AutomationHandler,
+    run: PendingAutomationExecution,
+    effectiveAt: Date,
+    claimedOwnerAttempt?: number,
+  ) {
+    const ownerAttempt =
+      claimedOwnerAttempt ?? (await this.executionStore.claim(run.runId, job.lockTtlMs));
+    if (ownerAttempt === null) return { skipped: true, reason: '任务已有实例运行' } as const;
+
+    const abortController = new AbortController();
+    let leaseLost = false;
+    const heartbeatEveryMs = Math.max(1, Math.floor(job.lockTtlMs / 3));
+    const heartbeat = setInterval(() => {
+      void this.executionStore
+        .renewLease(run.runId, ownerAttempt, job.lockTtlMs)
+        .then((renewed) => {
+          if (renewed) return;
+          leaseLost = true;
+          abortController.abort(new Error('Automation durable lease 已丢失'));
+        })
+        .catch(() => {
+          leaseLost = true;
+          abortController.abort(new Error('Automation durable lease 续租失败'));
+        });
+    }, heartbeatEveryMs);
+    heartbeat.unref?.();
+
+    try {
+      const retry = automationJobSchema.shape.retry.parse(job.retryPolicy);
+      const execution = await runWithRetry(async (attempt) => {
+        const owned = await this.executionStore.setHandlerAttempt(run.runId, ownerAttempt, attempt);
+        if (!owned || leaseLost) throw new Error('Automation 执行所有权已丢失');
+        return handler.run(abortController.signal, effectiveAt, run.trigger === 'manual' ? 'manual' : 'scheduled');
+      }, retry);
+      if (leaseLost) throw new Error('Automation 执行所有权已丢失');
+      const completed = await this.executionStore.complete(
+        run.runId,
+        ownerAttempt,
+        execution.result,
+        execution.attempts,
+      );
+      if (!completed) throw new Error('Automation 执行所有权已丢失，拒绝旧 owner 提交结果');
+      return { skipped: false, output: execution.result } as const;
+    } catch (error) {
+      // leaseLost 时旧 owner 已无法证明自己仍拥有执行权；保留 running 让 reconciler
+      // 按 replay-safe / unknown-outcome 处理，不能把不确定副作用错误压成普通 failed。
+      if (!leaseLost)
+        await this.executionStore.fail(run.runId, ownerAttempt, error).catch(() => false);
+      throw error;
+    } finally {
+      clearInterval(heartbeat);
+    }
   }
 }

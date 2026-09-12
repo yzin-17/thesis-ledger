@@ -186,9 +186,11 @@ export const automationJobTypeLabel = (type: string) =>
   automationJobTypeLabels[type] ?? `其他（${type}）`;
 
 export const automationRunStatusLabels: Record<string, string> = {
+  queued: '等待运行',
   running: '运行中',
   succeeded: '成功',
   failed: '失败',
+  unknown_outcome: '结果待确认',
 };
 
 export const automationRunStatusLabel = (status: string) =>
