@@ -29,6 +29,11 @@
       "name": "OptimizationAdoption",
       "owner": "strategy-optimization",
       "reason": "正式版本采纳需要与 StrategyVersion 创建保持显式事务和幂等约束。"
+    },
+    {
+      "name": "AutomationRunLease",
+      "owner": "automation",
+      "reason": "Automation scheduled occurrence、durable owner attempt、数据库 lease 与 recovery 需要 PostgreSQL 部分唯一索引和显式行锁；AutomationRun 继续保留公开运行历史。"
     }
   ]
 }
