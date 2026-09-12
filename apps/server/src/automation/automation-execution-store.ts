@@ -227,7 +227,8 @@ export class AutomationExecutionStore {
       SELECT l."runId", l."jobId", l."trigger", l."scheduledAt"
       FROM "AutomationRunLease" l
       JOIN "AutomationRun" r ON r."id"=l."runId"
-      WHERE r."status"='queued'
+      JOIN "AutomationJob" j ON j."id"=l."jobId"
+      WHERE r."status"='queued' AND l."trigger"='scheduled' AND j."enabled"=TRUE
       ORDER BY r."startedAt" ASC, r."id" ASC
       LIMIT ${RECONCILE_LIMIT}
     `);
@@ -241,7 +242,7 @@ export class AutomationExecutionStore {
     if (this.memoryMode) {
       const lease = this.memoryLeases.get(runId);
       if (!lease || lease.executionAttempt !== ownerAttempt || lease.status !== 'running') return false;
-      lease.status = String(data.status ?? lease.status);
+      if (typeof data.status === 'string') lease.status = data.status;
       lease.leaseUntil = null;
       await this.prisma.automationRun.update({ where: { id: runId }, data });
       return true;
@@ -397,7 +398,11 @@ export class AutomationExecutionStore {
         lease.leaseUntil = null;
         await this.prisma.automationRun.update({
           where: { id: lease.runId },
-          data: { status: 'queued', finishedAt: null, error: '自动化 Worker 租约过期，等待安全重放。' },
+          data: {
+            status: 'queued',
+            finishedAt: null,
+            error: '自动化 Worker 租约过期，等待安全重放。',
+          },
         });
       } else {
         lease.status = lease.recoveryPolicy === 'replay-safe' ? 'failed' : 'unknown_outcome';
@@ -416,7 +421,7 @@ export class AutomationExecutionStore {
       }
     }
     return [...this.memoryLeases.values()]
-      .filter((lease) => lease.status === 'queued')
+      .filter((lease) => lease.status === 'queued' && lease.trigger === 'scheduled')
       .map(({ runId, jobId, trigger, scheduledAt }) => ({ runId, jobId, trigger, scheduledAt }));
   }
 }
