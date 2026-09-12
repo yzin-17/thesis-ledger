@@ -113,6 +113,8 @@ describe('Automation durable occurrence / owner', () => {
   it('仅明确幂等的 scheduled handler 允许自动 replay', () => {
     expect(automationRecoveryPolicy('market-sync', 'scheduled')).toBe('replay-safe');
     expect(automationRecoveryPolicy('cash-deposit-materialization', 'scheduled')).toBe('replay-safe');
+    expect(automationRecoveryPolicy('fund-investment-materialization', 'scheduled')).toBe('replay-safe');
+    expect(automationRecoveryPolicy('provider-health', 'scheduled')).toBe('unknown-outcome');
     expect(automationRecoveryPolicy('backup', 'scheduled')).toBe('unknown-outcome');
     expect(automationRecoveryPolicy('snapshot-close-estimate', 'scheduled')).toBe('unknown-outcome');
     expect(automationRecoveryPolicy('provider-health', 'manual')).toBe('unknown-outcome');
