@@ -52,6 +52,9 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
       store.reserveScheduledOccurrence(input),
       store.reserveScheduledOccurrence(input),
     ]);
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    if (!first || !second) throw new Error('并发 occurrence 登记意外被拒绝');
     runId = first.runId;
 
     expect(second.runId).toBe(first.runId);
@@ -89,6 +92,27 @@ postgresDescribe('Automation durable occurrence PostgreSQL E2E', () => {
       `,
     );
     expect(leases[0]).toMatchObject({ executionAttempt: 2, leaseUntil: null });
+  });
+
+  it('schedule 已被编辑后拒绝旧 occurrence 落库', async () => {
+    const editedNextRunAt = new Date('2026-09-12T08:00:00.000Z');
+    await prisma.automationJob.update({
+      where: { id: jobId },
+      data: { nextRunAt: editedNextRunAt },
+    });
+    const before = await prisma.automationRun.count({ where: { jobId } });
+
+    const stale = await store.reserveScheduledOccurrence({
+      jobId,
+      scheduledAt: nextRunAt,
+      nextRunAt: editedNextRunAt,
+      recoveryPolicy: 'replay-safe',
+    });
+
+    expect(stale).toBeNull();
+    await expect(prisma.automationRun.count({ where: { jobId } })).resolves.toBe(before);
+    const current = await prisma.automationJob.findUniqueOrThrow({ where: { id: jobId } });
+    expect(current.nextRunAt).toEqual(editedNextRunAt);
   });
 
   it('manual run 创建即 claim，租约丢失后不进入 scheduler replay', async () => {
