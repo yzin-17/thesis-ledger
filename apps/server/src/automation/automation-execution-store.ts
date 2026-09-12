@@ -59,33 +59,39 @@ export class AutomationExecutionStore {
           LIMIT 1
         `,
       );
-      let run = existing[0];
-      if (!run) {
-        const created = await transaction.automationRun.create({
-          data: {
-            jobId: input.jobId,
-            status: 'queued',
-            traceId: crypto.randomUUID(),
-          },
-          select: { id: true, traceId: true },
-        });
-        await transaction.$executeRaw(
-          Prisma.sql`
-            INSERT INTO "AutomationRunLease" (
-              "runId", "jobId", "trigger", "scheduledAt", "recoveryPolicy"
-            ) VALUES (
-              ${created.id}::uuid, ${input.jobId}::uuid, 'scheduled', ${input.scheduledAt},
-              ${input.recoveryPolicy}
-            )
-          `,
-        );
-        run = { runId: created.id, traceId: created.traceId };
-      }
-      await transaction.automationJob.updateMany({
-        where: { id: input.jobId, nextRunAt: input.scheduledAt },
+      if (existing[0]) return existing[0];
+
+      // occurrence 尚未登记时，先用持久化 schedule 做 CAS。用户若已修改 cron/timezone、
+      // 停用任务或其他 scheduler 已推进 nextRunAt，本次旧调度不能再创建 run。
+      const advanced = await transaction.automationJob.updateMany({
+        where: {
+          id: input.jobId,
+          enabled: true,
+          nextRunAt: input.scheduledAt,
+        },
         data: { nextRunAt: input.nextRunAt },
       });
-      return run;
+      if (advanced.count !== 1) return null;
+
+      const created = await transaction.automationRun.create({
+        data: {
+          jobId: input.jobId,
+          status: 'queued',
+          traceId: crypto.randomUUID(),
+        },
+        select: { id: true, traceId: true },
+      });
+      await transaction.$executeRaw(
+        Prisma.sql`
+          INSERT INTO "AutomationRunLease" (
+            "runId", "jobId", "trigger", "scheduledAt", "recoveryPolicy"
+          ) VALUES (
+            ${created.id}::uuid, ${input.jobId}::uuid, 'scheduled', ${input.scheduledAt},
+            ${input.recoveryPolicy}
+          )
+        `,
+      );
+      return { runId: created.id, traceId: created.traceId };
     });
   }
 
@@ -95,7 +101,7 @@ export class AutomationExecutionStore {
       return;
     }
     await this.prisma.automationJob.updateMany({
-      where: { id: jobId, nextRunAt: scheduledAt },
+      where: { id: jobId, enabled: true, nextRunAt: scheduledAt },
       data: { nextRunAt },
     });
   }
