@@ -106,24 +106,6 @@ export class AutomationExecutionStore {
     });
   }
 
-  async createManualRun(jobId: string) {
-    if (this.memoryMode) return this.createManualRunInMemory(jobId);
-    return this.prisma.$transaction(async (transaction) => {
-      const run = await transaction.automationRun.create({
-        data: { jobId, status: 'queued', traceId: crypto.randomUUID() },
-        select: { id: true, traceId: true },
-      });
-      await transaction.$executeRaw(
-        Prisma.sql`
-          INSERT INTO "AutomationRunLease" (
-            "runId", "jobId", "trigger", "recoveryPolicy"
-          ) VALUES (${run.id}::uuid, ${jobId}::uuid, 'manual', 'unknown-outcome')
-        `,
-      );
-      return { runId: run.id, traceId: run.traceId };
-    });
-  }
-
   async createClaimedManualRun(jobId: string, leaseMs: number, now = new Date()) {
     if (this.memoryMode) {
       const run = await this.createManualRunInMemory(jobId);
