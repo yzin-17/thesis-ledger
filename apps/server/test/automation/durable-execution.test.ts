@@ -44,22 +44,24 @@ describe('Automation durable occurrence / owner', () => {
     expect(prisma.automationRun.create).toHaveBeenCalledTimes(1);
   });
 
-  it('未 claim 的 manual run 不会被 scheduler 自动恢复执行', async () => {
-    const { store } = fixture();
-    const manual = await store.createManualRun('00000000-0000-4000-8000-000000000001');
-    const scheduled = await store.reserveScheduledOccurrence({
-      jobId: '00000000-0000-4000-8000-000000000001',
-      scheduledAt: new Date('2026-09-12T01:00:00Z'),
-      nextRunAt: new Date('2026-09-12T02:00:00Z'),
-      recoveryPolicy: 'replay-safe',
+  it('manual run 创建即 claim，崩溃后保守进入 unknown_outcome', async () => {
+    const { store, runs } = fixture();
+    const run = await store.createClaimedManualRun(
+      '00000000-0000-4000-8000-000000000001',
+      1_000,
+      new Date('2026-09-12T01:00:00Z'),
+    );
+
+    expect(run.ownerAttempt).toBe(1);
+    expect(runs.get(run.runId)).toMatchObject({ status: 'running' });
+
+    const pending = await store.recoverAndListQueued(new Date('2026-09-12T01:00:02Z'));
+
+    expect(pending).toEqual([]);
+    expect(runs.get(run.runId)).toMatchObject({
+      status: 'unknown_outcome',
+      error: expect.stringContaining('无法确认外部副作用'),
     });
-
-    const pending = await store.recoverAndListQueued(new Date('2026-09-12T01:00:01Z'));
-
-    expect(pending).toEqual([
-      expect.objectContaining({ runId: scheduled.runId, trigger: 'scheduled' }),
-    ]);
-    expect(pending.some((run) => run.runId === manual.runId)).toBe(false);
   });
 
   it('lease 过期后 replay-safe run 生成新 owner，旧 owner 无法提交', async () => {
@@ -83,20 +85,6 @@ describe('Automation durable occurrence / owner', () => {
     await expect(store.complete(reserved.runId, 1, { stale: true }, 1)).resolves.toBe(false);
     await expect(store.complete(reserved.runId, 2, { ok: true }, 1)).resolves.toBe(true);
     expect(runs.get(reserved.runId)).toMatchObject({ status: 'succeeded', output: { ok: true } });
-  });
-
-  it('unknown-outcome run 租约丢失后不自动重放', async () => {
-    const { store, runs } = fixture();
-    const run = await store.createManualRun('00000000-0000-4000-8000-000000000001');
-    await store.claim(run.runId, 1_000, new Date('2026-09-12T01:00:00Z'));
-
-    const pending = await store.recoverAndListQueued(new Date('2026-09-12T01:00:02Z'));
-
-    expect(pending).toEqual([]);
-    expect(runs.get(run.runId)).toMatchObject({
-      status: 'unknown_outcome',
-      error: expect.stringContaining('无法确认外部副作用'),
-    });
   });
 
   it('replay-safe recovery 有独立于 handler retry 的 owner 上限', async () => {
