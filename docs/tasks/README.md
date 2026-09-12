@@ -8,6 +8,9 @@
 - [V1 回测任务 BullMQ 生命周期](2026-09-09-backtest-bullmq-lifecycle.md)（PR #33 已完成 durable owner/reconciler 代码修复；仍待目标 Compose post-claim hard-kill 与 Electron 运行态 smoke）
 - [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（仓库实现已收口，真实外部 Provider/在线数据/Desktop 人工 smoke 仍按部署门禁记录）
 - [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）
+- [周期计划物化一致性加固](2026-09-12-recurring-plan-materialization-hardening.md)（2026-09-12 全仓 Review 新增：关闭现金/基金同计划并发物化、现金 durable notification intent、对称边界守卫与真实 PostgreSQL 验收）
+- [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)（主体功能已实现；AC5/AC7 因并发物化与通知恢复重新打开，跟随周期计划加固任务）
+- [基金定投计划](2026-09-08-recurring-fund-investment.md)（主体功能已实现；原 T2 与真实 PostgreSQL 并发补期仍未关闭，跟随周期计划加固任务）
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
 - [市场数据 v1.2 closure-11：最终追踪 Review](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md)
@@ -18,18 +21,16 @@
 
 ## 实现完成，仍保留验收边界
 
-以下任务已有确定性实现和验证证据，但仍记录浏览器、真实 Provider、在线服务或目标设备等运行时验收边界，因此暂不归档：
+以下任务已有确定性实现和验证证据，但仍记录浏览器、真实 Provider、在线服务或目标设备等运行时验收边界，因此暂不归档。存在数据库正确性或实现任务未关闭的事项不得放入本节：
 
 - [巨型组件拆分与请求层统一](2026-08-23-large-component-split.md)
 - [风险中心 AB 组合交互](2026-08-23-risk-center-interaction.md)
 - [研究助手任务工作台](2026-08-25-ai-research-workbench.md)
 - [策略实验工作台](../archive/tasks/2026-08-25-strategy-lab-workbench.md)（已归档，保留历史证据入口）
 - [现金账户资金范围与内部划转](2026-08-30-cash-account-funding-and-transfer.md)
-- [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)
 - [现金页面 UI 优化](2026-09-03-cash-page-ui-optimization.md)
 - [ETF 日线独立备用源](2026-09-08-etf-daily-independent-fallback.md)
 - [日线缓存与 Provider 主备路由](2026-09-08-market-data-cache-and-provider-routing.md)
-- [基金定投计划](2026-09-08-recurring-fund-investment.md)
 
 “实现完成”只表示代码一致性和已记录的确定性验证完成，不等于真实 Provider、生产数据、设备、浏览器或 Worker 运行时验收已经完成。运行时门禁关闭后，再按 `DOCUMENTATION-GUIDE.md` 归档。
 
