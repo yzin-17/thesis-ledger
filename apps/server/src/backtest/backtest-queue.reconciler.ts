@@ -9,6 +9,8 @@ import {
 } from './backtest-queue.service.js';
 import { BACKTEST_MAX_ATTEMPTS } from './backtest-bull-queue.js';
 
+const RECONCILE_PAGE_SIZE = 100;
+
 @Injectable()
 export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -36,25 +38,43 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
     if (this.reconciling) return;
     this.reconciling = true;
     try {
-      const jobs = await this.prisma.backtestJob.findMany({
-        where: { status: { in: ['queued', 'running'] } },
-        orderBy: { createdAt: 'asc' },
-        take: 100,
-        select: { id: true, status: true, executionAttempt: true },
-      });
-      for (const job of jobs) {
-        let queueState: string | null | undefined;
-        try {
-          queueState = await this.queue.getState?.(job.id);
-        } catch {
-          if (job.status === 'queued') await this.queueService.ensureEnqueued(job.id);
-          continue;
-        }
-        if (queueState && !['completed', 'failed'].includes(queueState)) continue;
-        if (job.status === 'running') {
+      let cursor: { createdAt: Date; id: string } | undefined;
+      for (;;) {
+        const jobs = await this.prisma.backtestJob.findMany({
+          where: {
+            status: { in: ['queued', 'running'] },
+            ...(cursor
+              ? {
+                  OR: [
+                    { createdAt: { gt: cursor.createdAt } },
+                    { createdAt: cursor.createdAt, id: { gt: cursor.id } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          take: RECONCILE_PAGE_SIZE,
+          select: { id: true, status: true, executionAttempt: true, createdAt: true },
+        });
+        if (jobs.length === 0) break;
+
+        for (const job of jobs) {
+          let queueState: string | null | undefined;
+          try {
+            queueState = await this.queue.getState?.(job.id);
+          } catch {
+            if (job.status === 'queued') await this.queueService.ensureEnqueued(job.id);
+            continue;
+          }
+          if (queueState && !['completed', 'failed'].includes(queueState)) continue;
+
           if (job.executionAttempt >= BACKTEST_MAX_ATTEMPTS) {
-            await this.prisma.backtestJob.update({
-              where: { id: job.id },
+            const failed = await this.prisma.backtestJob.updateMany({
+              where: {
+                id: job.id,
+                status: job.status,
+                executionAttempt: job.executionAttempt,
+              },
               data: {
                 status: 'failed',
                 progress: 100,
@@ -63,19 +83,31 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
                 errorSummary: '回测 Worker 多次中断，已停止自动重试。',
               },
             });
-            await this.events.publishJob(job.id).catch(() => undefined);
+            if (failed.count === 1) await this.events.publishJob(job.id).catch(() => undefined);
             continue;
           }
-          await this.prisma.backtestJob.update({
-            where: { id: job.id },
-            data: {
-              status: 'queued',
-              errorCode: 'worker_attempt_failed',
-              errorSummary: '回测 Worker 中断，任务已重新排队。',
-            },
-          });
+
+          if (job.status === 'running') {
+            const requeued = await this.prisma.backtestJob.updateMany({
+              where: {
+                id: job.id,
+                status: 'running',
+                executionAttempt: job.executionAttempt,
+              },
+              data: {
+                status: 'queued',
+                errorCode: 'worker_attempt_failed',
+                errorSummary: '回测 Worker 中断，任务已重新排队。',
+              },
+            });
+            if (requeued.count !== 1) continue;
+          }
+          await this.queueService.ensureEnqueued(job.id);
         }
-        await this.queueService.ensureEnqueued(job.id);
+
+        const last = jobs.at(-1);
+        if (!last || jobs.length < RECONCILE_PAGE_SIZE) break;
+        cursor = { createdAt: last.createdAt, id: last.id };
       }
     } finally {
       this.reconciling = false;
