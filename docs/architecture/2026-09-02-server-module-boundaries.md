@@ -1,6 +1,7 @@
 # Server 模块边界与依赖方向
 
 > 日期：2026-09-02  
+> 更新：2026-09-12  
 > 状态：Active  
 > 适用范围：`apps/server` 与 workspace 内部 runtime dependency  
 > 来源：[`2026-09-02-full-repo-architecture-hardening`](../specs/2026-09-02-full-repo-architecture-hardening.md)
@@ -61,7 +62,26 @@ Performance 是分析/read-model 模块：
 
 若未来 Performance 触发投资事实变化，应通过明确的 Ledger command 边界实现，而不是向 Performance 注入数据库写事实的捷径。
 
-## 5. Workspace runtime dependency
+## 5. 后台长任务执行生命周期
+
+Automation、AI Optimization、Backtest 等模块可以拥有各自的业务状态机和表，但长任务执行必须遵守同一组可靠性原则：
+
+1. **耐久身份在 PostgreSQL。** scheduled occurrence、run 或 job 必须有数据库可审计身份，不能只依赖 Redis key、进程内 Map 或队列 transport record。
+2. **耐久 owner 版本单调递增。** 每次重新 claim 必须生成新的 `executionAttempt`/等价 owner version；transport retry count 不能直接充当数据库 owner。
+3. **所有终态写必须 fencing。** success、failure、cancel、requeue、heartbeat 等状态变化必须验证当前 owner，旧 worker 不能覆盖新 owner。
+4. **lease 与业务 deadline 分离。** lease 表示 worker 所有权存活，不等于 handler 一定在该时刻被强制停止；AbortSignal 可用于协作取消，但不是正确性的唯一前提。
+5. **恢复必须考虑副作用可重放性。** 只有明确幂等或可安全 replay 的任务才能在 owner 丢失后自动重放；无法证明时必须保守进入 `unknown_outcome` 或等价人工确认状态。
+6. **Redis/队列是协调或运输层。** Redis TTL、BullMQ attempt、进程局部状态可以优化调度，但不得成为唯一正确性来源。
+
+当前模块实现：
+
+- Backtest：`BacktestJob.executionAttempt` 是 durable owner；BullMQ attempt 仅为 transport metadata。
+- Automation：`AutomationRun` 保留公开运行历史；raw-owned `AutomationRunLease` 持有 scheduled occurrence、ownerAttempt、lease 与 recovery policy。
+- Strategy Optimization：继续使用自身 raw-owned experiment/attempt 生命周期，不与 Automation/Backtest 合表。
+
+共享的是**生命周期原则**，不是业务表或通用 Job Framework；禁止为了复用而建立 Automation ↔ AI ↔ Backtest 的反向模块依赖。
+
+## 6. Workspace runtime dependency
 
 Workspace runtime graph 以各 package 的 `dependencies`、`optionalDependencies`、`peerDependencies` 为准，`devDependencies` 不参与 runtime cycle 判定。
 
@@ -92,7 +112,7 @@ services -> packages
 - workspace package graph：`scripts/check-workspace-dependencies.mjs`；
 - 两者均接入根 `pnpm lint`。
 
-## 6. Ledger V2 与旧写语义
+## 7. Ledger V2 与旧写语义
 
 Ledger V2 专用命令已经取代旧的通用 Position Adjustment / LedgerEvent 写入方式：
 
@@ -103,13 +123,14 @@ Ledger V2 专用命令已经取代旧的通用 Position Adjustment / LedgerEvent
 
 禁止为了兼容新功能重新引入无类型的通用 LedgerEvent 写 API。
 
-## 7. 变更规则
+## 8. 变更规则
 
 出现以下情况时必须同步更新本文：
 
 - 新增跨模块写事务或改变事实所有权；
 - Risk / Notification 或 Performance / Ledger 的依赖方向变化；
+- 后台长任务改变 durable identity、owner fencing、lease 或 recovery 原则；
 - workspace runtime dependency 允许关系变化；
 - Ledger V2 revision、projection generation 或锁序语义变化。
 
-具体业务协议变化只更新对应 Spec/Schema；除非同时改变模块所有权或依赖方向，否则不扩写本文。
+具体业务协议变化只更新对应 Spec/Schema；除非同时改变模块所有权、依赖方向或后台任务生命周期原则，否则不扩写本文。
