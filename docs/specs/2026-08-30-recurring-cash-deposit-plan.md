@@ -1,10 +1,17 @@
 # 定期现金入账计划 Spec
 
 - 日期：2026-08-30
-- 状态：T1–T4 已实现并验证
+- 状态：主体实现完成；AC5/AC7 因 2026-09-12 全仓 Review 重新打开
 - 适用项目：`thesis-ledger`
 - 类型：增量设计
 - 依赖：[`2026-08-30-cash-account-funding-and-transfer.md`](2026-08-30-cash-account-funding-and-transfer.md)
+- 加固跟踪：[`2026-09-12-recurring-plan-materialization-hardening.md`](2026-09-12-recurring-plan-materialization-hardening.md)
+
+## 2026-09-12 全仓 Review 重新打开说明
+
+当前 `main` 重新审查发现，本 Spec 关于“数据库唯一约束和锁共同保证并发扫描”的描述高于实际实现：当前 materializer 没有计划行锁，两个并发执行者可读取同一版本并导致其中一个以版本冲突失败；现有测试使用 fake Prisma，不能证明 PostgreSQL 并发收敛。同时，现金 occurrence/计划推进先提交，`NotificationService.enqueue` 后执行且异常被吞掉，业务提交与通知 delivery 持久化之间存在不可恢复空窗。
+
+因此在 [`2026-09-12-recurring-plan-materialization-hardening.md`](2026-09-12-recurring-plan-materialization-hardening.md) 完成前：AC5 的“并发扫描”与 AC7 的“通知失败可恢复”不视为关闭；其余已实现范围继续有效。本说明不撤销已有功能，只修正文档完成度和后续验收边界。
 
 ## 背景与问题
 
@@ -41,11 +48,11 @@
 
 ### 自动化与幂等
 
-业务计划存放在专用表，现有 Automation 只新增一个固定的 `cash-deposit-materialization` Handler。Handler 扫描 `nextDueAt <= now` 的计划，逐月 upsert 实例并推进下次到期；数据库唯一约束和锁共同保证并发扫描不重复。
+业务计划存放在专用表，现有 Automation 只新增一个固定的 `cash-deposit-materialization` Handler。Handler 扫描 `nextDueAt <= now` 的计划，逐月 upsert 实例并推进下次到期；数据库唯一约束保留为重复防线，同计划并发扫描的事务串行化要求由 2026-09-12 加固 Spec 关闭。
 
 ### 通知
 
-通知模块提供通用 Outbox 接口，持久化 subject、消息快照、去重键和投递状态。RiskEvent 迁移为该接口的一个调用方。正常到期按计划通知；一次补齐多个历史月份时，每个计划只排队一条汇总通知。通知未配置或发送失败不回滚实例，只记录失败和重试状态。
+通知模块提供通用 Outbox 接口，持久化 subject、消息快照、去重键和投递状态。RiskEvent 迁移为该接口的一个调用方。正常到期按计划通知；一次补齐多个历史月份时，每个计划只排队一条汇总通知。通知未配置或发送失败不回滚实例；业务提交后到 delivery 持久化之间的 durable intent/恢复要求由 2026-09-12 加固 Spec 关闭。
 
 ## 对外行为或接口变化
 
@@ -62,7 +69,7 @@
 ## 测试策略
 
 - 纯函数测试覆盖月末、时区、启停区间和补期计算。
-- 数据库/Server 测试覆盖唯一月份、并发扫描、重复确认、Ledger 原子提交和通知失败隔离。
+- 数据库/Server 测试覆盖唯一月份、并发扫描、重复确认、Ledger 原子提交和通知失败隔离；其中并发扫描与通知提交空窗必须使用 2026-09-12 加固任务规定的真实 PostgreSQL/故障恢复测试，fake Prisma 只作为普通单元测试。
 - Notification 测试覆盖风险通知迁移、正常到期和补期汇总。
 - Desktop 测试覆盖计划表单、待确认实例、确认时修改金额/日期、跳过恢复和错误态。
 
@@ -75,7 +82,7 @@
 
 ### 阻塞问题
 
-无。
+- AC5/AC7 的并发与 durable notification 关闭条件见 2026-09-12 加固 Spec。
 
 ### 非阻塞问题
 
@@ -87,7 +94,7 @@
 - AC2：到期只生成 `PENDING` 实例，不改变现金余额或 Ledger。
 - AC3：确认实例使用实际金额和日期写入一次外部 `DEPOSIT`，重复确认不重复入账。
 - AC4：跳过实例不写 Ledger，恢复后仍可确认；计划修改不改写已有实例。
-- AC5：应用停机后补齐启用期间的全部漏期，重复或并发扫描不会产生重复月份。
+- AC5（重新打开）：应用停机后补齐启用期间的全部漏期，重复或并发扫描不会产生重复月份，且真实 PostgreSQL 并发调用均以 success/no-op 收敛。
 - AC6：暂停期间不补期，结束计划后不再生成实例。
-- AC7：正常到期发送应用内和外部通知；多期补齐只发送一条汇总通知，通知失败不影响实例。
+- AC7（重新打开）：正常到期发送应用内和外部通知；多期补齐只发送一条汇总通知；业务提交后即使 enqueue/进程故障，通知意图仍可恢复且通知失败不影响实例。
 - AC8：Desktop 可创建/管理计划并完成待确认、跳过和恢复流程。
