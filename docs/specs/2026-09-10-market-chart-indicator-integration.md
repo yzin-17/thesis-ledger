@@ -1,0 +1,150 @@
+# 日线行情与技术指标联动 Spec
+
+> 任务标识：market-chart-indicator-integration
+> 日期：2026-09-10（2026-09-13 按当前代码适配）
+> 状态：已完成（2026-09-13，独立本地环境验收通过）
+> 对应任务：[日线行情与技术指标联动实施任务](../tasks/2026-09-10-market-chart-indicator-integration.md)
+
+## 背景与问题
+
+持仓行情详情已经通过 `GET /api/v1/market/:symbol/detail` 提供按资产类型分段的 quote、日线、指标和基金净值读模型。当前 Desktop `MarketDetailCharts.tsx` 使用纯 SVG 绘制收盘价折线和高低范围，指标仍以数值进度条或独立趋势块展示。图表没有日期轴、成交量、K 线、同日期联动或历史选择，指标值无法解释其对应的价格时点。
+
+本次适配只收敛行情详情的图表表达和交互，不重新设计已有 Market Detail 能力矩阵。股票与 ETF 继续使用证券行情能力，场外基金继续使用独立 NAV 能力。原始讨论附件无法作为代码事实来源，以下现状均以 2026-09-13 工作树盘点为准。
+
+## 目标
+
+- 在证券行情详情中合并价格主图、MA、成交量和一个可切换的 MACD/RSI 副图；全屏时允许同时展开两个指标副图。
+- 所有图层共享同一组日线日期；悬停显示该日 OHLC、成交量和可用指标值，点击锁定，按 `Esc` 恢复最新日。
+- 支持 K 线/收盘线、已实现的日线范围选择、缩放、平移、加载更早的已支持历史、回到最新和重置视图。回到最新把可视窗口移动到数据末端并保留缩放比例，重置视图同时恢复默认范围与默认缩放比例。
+- 保留最新行情概览的实时语义；历史日期选择不得改写实时价、持仓数量、成本和持仓盈亏。
+- 缺失 OHLC、成交量或指标值显示为空值，不以零值、最近值或虚构蜡烛补齐。指标预热不足保留不可用点。
+- 显示一次数据截至时间、来源、时间框架、复权/计算口径和局部异常；正常状态不重复渲染内部 section 状态标签。
+- 只开放当前 Contract 和真实数据源声明支持的周期及范围。当前详情接口单次最多返回 90 条，Desktop 初始加载 90 条以覆盖 3 月和可用的 6 月视图；历史视图可通过有界分页加载多于 90 条，6 月、1 年等范围只有在实际覆盖和请求能力声明支持时才显示。未实现的周线、月线和分钟线不显示为可用选项。
+- 复用 shadcn/ui 现有组件和原子类；图表技术选型必须通过小范围验证，不能因为当前没有依赖就自行重造复杂图表引擎，也不能引入第二套指标计算。
+
+## 非目标
+
+- 交易标记、持仓成本线、风险规则线、区间测量和分钟级行情。
+- 把 MA、MACD 或 RSI 计算迁移到 Server 或 Desktop，或重新实现一套与 DSA 不同的公式。
+- 为场外基金伪造证券 K 线、成交量或技术指标。
+- 修复 Provider、DSA 路由优先级或 ETF 上游故障；在线 Provider 可用性只进入运行验收证据。
+- 以单次响应 90 条作为产品历史总上限；历史视图可按服务端覆盖声明分多页加载，更长历史仍须遵守数据源和指标预热能力。
+
+## 现状与约束
+
+### 主仓已确认事实
+
+- `apps/desktop/src/features/market-detail/MarketDetailDialog.tsx` 使用 TanStack Query 和已有 `MarketDetailRequestCoordinator`，当前请求 `barsLimit: 90`、`navLimit: 30`；图表默认可视 3 月。
+- `apps/desktop/src/features/market-detail/MarketDetailSections.tsx` 仍把 `bars` 与三个指标作为独立 section，`MarketDetailCharts.tsx` 只有纯 SVG 趋势图和指标进度条，没有日期索引或交互状态。
+- `BarV1` 提供 `timestamp`、OHLC、`volume`、`amount`、`provider`、`upstreamSource`、`freshness`、`fallbackUsed`，Schema 校验 OHLC 关系和时间升序；当前没有明确的日线完成状态或输入指纹，需要由 T1 additive 契约补齐。详情响应的 `limits.barsHasMoreBefore` 作为历史分页是否可继续的可选覆盖声明。
+- `IndicatorV1` 当前提供最新 `marketTime`、`parameters`、`values`、`provider`、`engineVersion`；`values` 允许 scalar 或数组，但没有历史点的日期键。
+- `apps/server/src/market/market-detail.service.ts` 以 `DAILY_BAR` 作为指标共同依赖，指标仍分别调用 `MarketService.getIndicator`；`MarketService.getIndicator` 通过 DSA Contract V1，并保留缓存与 stale fallback。
+- `STOCK` 支持 quote、bars、MA/MACD/RSI、chip；`ETF` 支持 quote、bars、MA/MACD/RSI；`MUTUAL_FUND` 只支持 Fund NAV 与 NAV history。未知类型安全降级。
+- 主仓没有 Recharts、ECharts、D3 或 Lightweight Charts 依赖；现有实现为纯 SVG/React。
+
+### 图表技术选型
+
+| 方案 | 可复用能力 | 主要成本与风险 | 本次决策 |
+| --- | --- | --- | --- |
+| 现有 SVG/React | 零依赖、现有样式和静态测试可复用 | 需要自行维护时间轴、十字线、K 线、多个 pane、缩放、平移、缺失点和命中测试，容易形成未充分验证的图表引擎 | 仅在成熟库无法满足兼容或可访问要求时保留为降级方案 |
+| Lightweight Charts | 面向金融图表的 K 线、线、柱、时间轴、crosshair、缩放/平移和多 pane 能力 | 新增 Desktop 运行依赖；React 生命周期、ARIA/键盘语义、异常覆盖和自定义指标图例仍需外围封装；版本 API 必须以官方文档和包版本实测为准 | T2 先用当前包管理器和官方文档做最小 spike；满足多 pane/交互后优先采用，依赖纳入 Desktop package 与锁文件 |
+
+本次不接受只以“当前没有依赖”作为保留 SVG 的理由。T2 的 spike 需实际证明 K 线、成交量、MACD/RSI pane、日期 crosshair、缩放平移、数据缺口和全屏容器可行；若采用 Lightweight Charts，产品可见状态仍由主仓组件和 shadcn 控件负责，指标数值继续来自 DSA。
+
+### 指标历史契约适配
+
+DSA 现有 `api/thesis_ledger.py::_real_indicator` 复用 `StockTrendAnalyzer` 的 MA、MACD、RSI 计算，但只序列化最新行；历史联动需要该既有计算层返回日期索引序列。最小扩展复用现有 Market Detail response 的 `bars` 与指标 section，在同一响应中增加可选 points 和口径字段；不新建独立 chart service 或全局数据基础设施。
+
+扩展必须满足：
+
+1. 保留已有 scalar `values`、字段名、`engineVersion` 和旧调用行为；旧客户端可以继续读取最新值。
+2. 增加可选的日期键序列，例如 `points: [{ timestamp, values: { ma5: number|null, ... } }]`，按日线升序且日期唯一；空值表示预热或输入缺失，禁止填零。
+3. 由同一份日线 DataFrame 计算并返回 `inputProvenance`（至少包含 timeframe、provider、upstreamSource/adjustment 口径和计算窗口）；不在 Server/Desktop 重算。
+4. 指标内部输入窗口至少覆盖 MA60 与 MACD EMA(12/26/9) 的预热要求，响应展示窗口单次最多 90 条但可分页。当前 DSA 日线输入上限为 365 条，参数校验保证“可见窗口 + 预热窗口”不超过该上限，无法满足时返回可解释的参数错误。每页必须带 `calculationAnchor` 和覆盖范围；合并分页时按重叠日期的逐日 inputFingerprint、symbol、timeframe、日期和复权口径校验，不能要求不相交页面的全局 inputFingerprint 相等。扩展更早历史导致 anchor 或受影响日期重算时，客户端替换受影响指标序列并明确“已按更完整预热窗口重算”，不得静默漂移。
+5. DSA fixture、Contract Test 和主仓 Schema/API Client 必须同时支持 scalar-only 旧响应与带 `points` 的新响应。DSA 仓库只改 `api/`、既有计算适配和直接测试/文档；主仓不复制 DSA 实现。
+
+这项扩展是本功能的必要跨仓契约，不构成新增 Provider 或 DSA 批量详情接口。若 DSA 无法提供带日期序列，AC3、AC4、AC5 和浏览器联动验收保持未通过，不能用位置数组或主仓公式冒充。
+
+## 设计方案
+
+### 页面结构
+
+证券详情保留持仓上下文和最新行情概览，`bars` 与指标 section 合并为一个 `MarketChartPanel`。面板工具栏包括图形类型（K 线/收盘线）、范围（1 月/3 月/6 月/1 年/全部，仅按实际覆盖裁剪）、指标切换（MACD/RSI）、设置、重置、回到最新和全屏。默认范围为 3 月；MA5、MA20、MA60 默认显示，MA10 可在图例中显隐；RSI 默认显示 RSI12，并可选择 RSI6/12/24；全屏允许 MACD 与 RSI 同时展开。
+
+主图区从左到右按日期绘制，价格轴、成交量轴和指标副图共享 x 轴。K 线在该日有完整 open/high/low/close 且没有明确标为 `incomplete` 时绘制；字段缺失或当日未完成的日期保留在 x 轴但该蜡烛为空并显示可信状态，`unknown` 只作为未知状态标签。收盘线只连接有效收盘点，不把缺失点连接成虚假连续走势。成交量使用独立轴，缺失时隐藏柱并在口径区说明。最新已完成日线用明确的最新价格标记；无法确认完成状态时不冒充最新收盘。
+
+MACD 副图绘制 DIF、DEA 和围绕 0 轴的柱；RSI 副图使用 0–100 轴和 30/50/70 参考线。副图图例显示选中日期的值和参数，选中日缺值显示“暂无数据”。图例操作只改变可见性，不触发数据请求。
+
+### 日期与状态模型
+
+图表内部以 `ChartPoint`（日期、Bar 可用字段、指标点、有效性和来源口径）为唯一联动行。`hoveredDate` 只表示指针所在日期，`lockedDate` 表示点击锁定；`Esc` 清除锁定并选择最新可用日期。最新行情概览始终使用 quote，不读取 `selectedDate`。
+
+范围和视图状态属于组件状态；成功请求的用户偏好全局复用到不同标的，按能力裁剪。保存内容包括图形类型、可见 MA、选中的副图、RSI 选择、MACD/RSI 参数和范围，不保存服务端数据或诊断信息。切换标的时清空选中/锁定日期并恢复全局偏好；不支持的指标或参数回退默认值并提示。
+
+历史加载按 start/end/limit 分页并合并按 timestamp 去重；`Market Detail limits.bars=90` 只表示单次详情响应上限。分页请求携带固定视图 anchor，若服务端返回新的 anchor/fingerprint，客户端替换受影响序列并重新校验，不让 EMA/预热值无解释漂移。没有游标或覆盖声明时，界面不得声称还有更多历史。加载失败保留当前图表和可解释提示。普通页面滚轮继续滚动页面，图表只在明确的缩放手势或按钮操作中消费输入。
+
+### 数据口径
+
+图表 footer 显示 `数据截至`（当前选择数据的最后一根已完成或明确标注未完成的日线）、`来源`、`1d`、币种和复权/计算口径。另显示可视区间涨跌幅，口径为视口内最早与最晚有效收盘价的简单收益率 `(lastClose / firstClose - 1) * 100%`；端点缺失或未完成时显示暂无可计算结果。Bar 与指标必须通过 symbol、日期、timeframe、provider/providerRevision、复权口径、inputFingerprint 和 calculationAnchor 对齐；不一致时保留各自数据但禁止叠加，并显示异常说明。`stale`、`empty`、`unavailable`、`unsupported` 沿用 Market Detail 语义；局部日线失败不显示指标成功值。
+
+场外基金复用同一范围、日期联动、锁定、Esc、回到最新、重置和偏好交互，但绘制 NAV history 的净值线和日期，不显示证券 K 线、成交量或技术指标。净值 footer 明确单位净值、净值日期、币种、来源和新鲜度；净值日期不是交易日时仍按实际披露日期联动。
+
+## 对外行为或接口变化
+
+主仓已有的 Market Detail URL、能力矩阵、quote/bars/NAV 和旧 scalar 指标字段保持兼容。主仓 Schema/API Client 为 `IndicatorV1` 增加可选历史 points、输入口径、完成状态和计算锚点字段；现有客户端无需读取这些字段。Server 产品契约负责把 `start`/`end`/`limit`、参数和锚点转发到既有 DSA 指标计算层，并将这些值纳入缓存 key 与乱序响应校验。历史加载使用已有日线查询能力和 additive 指标窗口参数；单次 90 条是响应窗口约束，不是产品历史总上限。bars 与 points 继续复用现有 Market Detail 响应，不新建独立图表服务或全局基础设施。
+
+DSA Contract V1 做向后兼容的 additive 扩展，提供历史指标点和计算输入口径；不新增批量详情路由，不改变旧指标路由、认证或 Provider 入口。若该扩展需要跨仓发布，infra 只负责已有版本矩阵中的兼容版本确认，不新增部署拓扑。
+
+## 数据、状态或兼容性影响
+
+不修改数据库 Schema、迁移或持久化行情事实。Server 继续使用现有 Redis/数据库缓存；带 points 的指标缓存键必须包含指标参数、窗口和计算/Contract 版本，旧 scalar 缓存命中时只能用于最新值，不得伪装为历史序列。
+
+ETF 沿用证券能力但不请求 chip；基金详情只渲染 NAV/NAV history，不创建图表假数据。响应失败仍以 section 状态表达，客户端 loading、悬停、锁定和全屏属于 UI 状态。
+
+## 测试策略
+
+### 关键可观察行为
+
+- 指标 points 日期唯一升序、预热点为 null、旧 scalar 字段仍可解析。
+- 同一日期选择同时更新 K 线/收盘线、MA、成交量和当前副图图例；Esc/回到最新/重置视图语义区分。
+- OHLC 缺失不画蜡烛、不补值；MACD 0 轴和 RSI 30/50/70 参考线稳定。
+- 范围、历史加载、缩放和平移只使用 1d 实际能力；单次最多 90 条但允许按覆盖声明分页；实时 quote 和持仓概览不随历史选择变化。刷新或加载追加历史不得改变当前可视窗口和缩放比例。
+- 股票、ETF、基金和 unavailable/stale/empty 状态不越过能力矩阵；ETF 不产生 chip/ATR 请求。
+
+### 测试层级与证据边界
+
+Schema/Contract 测试证明字段与错误边界；DSA 测试证明既有 `StockTrendAnalyzer` 计算输出 points；Server 测试证明缓存、窗口、口径不一致和分段状态；Desktop 组件测试证明交互状态和可访问语义；typecheck/build/lint 证明工程一致性。确定性 fixture 不证明在线 Provider 可用。
+
+浏览器验收必须在真实本地运行态检查 Network、日期联动、局部异常、全屏和截图；在线 Provider smoke 作为观测证据单独记录。真实运行态若使用旧 Server/DSA 镜像或旧缓存，必须记录 revision/Contract 版本，不能把页面静态渲染当成联通验收。
+
+## 风险与备选方案
+
+主要风险是 DSA 历史指标序列与 Bar 使用不同 Provider、版本、复权或预热窗口，导致视觉上看似对齐但语义错误。处理方式是用共同日期的 OHLC/close 输入指纹、复权口径和来源信息判断可比；`providerRevision` 仅在来源真实提供时参与校验。`calculationAnchor` 只约束指标预热计算，不要求 Bar 拥有相同 anchor。分页时不要求不相交页面的完整指纹相等，按重叠日期校验输入；扩展预热窗口导致 anchor 或受影响日期重算时，替换受影响点并标明重算。纯前端按位置拼接数组、按最新值扩展整条线、或用当前 Bar 重算都不作为备选实现。
+
+若 T2 spike 证明 Lightweight Charts 与当前桌面构建、ARIA 外围和多 pane 交互兼容，则采用它以降低自研图表引擎风险；否则才保留现有 SVG，并把按钮式缩放/平移作为明确的有限交互。后续分钟级数据或大量标注另立图表与 Contract 评估。
+
+## 未决问题
+
+### Blocking
+
+无。具体字段命名和兼容测试由 T1 在主仓/DSA 代码盘点后冻结，必须保持本节的日期键、预热、口径和版本不变量。
+
+### Non-blocking
+
+- 当前详情响应单次最多 90 条，Desktop 当前请求 90 条且默认可视 3 月；若运行环境实际声明更小窗口，界面按 `limits.bars` 裁剪并隐藏不可用选项。历史加载是否能继续向前由 start/end/limit 响应的实际覆盖和 points 声明决定，不把 90 条当作产品总上限；6 月、1 年和全部范围同样按实际覆盖决定是否展示。
+- 图表依赖和输入能力以 T2 spike 为准；无论选用何种实现，都必须保留按钮式缩放、平移、回到最新和重置，不降低日期联动语义。
+- 颜色沿用现有 `--chart-*` 变量和正负值主题语义，具体色号不新增全局变量。
+
+## 验收标准
+
+- AC1：证券详情提供一个合并图表区，支持 K 线/收盘线、默认 MA5/20/60、成交量和 MACD/RSI 单副图；全屏可同时展示两个副图。
+- AC2：图表绘图区占满详情可用宽度，包含日期轴、选中日期 OHLC/成交量/指标图例；悬停、点击锁定和 `Esc` 恢复最新可观察且可访问。
+- AC3：指标历史由 DSA 既有计算层按日期 points 提供，包含参数、计算版本、输入日期范围、providerRevision、inputFingerprint、calculationAnchor、timeframe/复权口径；MA60、MACD、RSI 预热不足不显示伪值，旧 scalar 调用兼容。
+- AC4：只有 Bar 与指标的 symbol、日期、timeframe、provider/providerRevision、复权口径以及共同日期的逐日 inputFingerprint 一致时才叠加；指标预热使用 calculationAnchor，分页扩大预热窗口导致锚点或受影响点变化时明确替换并标注重算。不一致、缺失 OHLC 或指标点时明确显示空值/异常，不补零或最近值。
+- AC5：范围、缩放、平移、历史分页、回到最新和重置可用；单次请求受服务端真实 `limits.bars`（当前请求 90、单次最多 90）约束，累计历史可多页加载；6 月、1 年和全部范围只有在实际覆盖声明支持时显示，未实现周期不显示。回到最新把可视区间移到末端并保留缩放比例，重置恢复默认范围与默认比例；刷新/加载不打断当前视图。
+- AC6：实时行情概览、持仓数量、成本和盈亏不随历史日期选择改变；stale、empty、unavailable、unsupported、日期、币种、复权/计算口径、来源/截至时间和当日未完成状态保持可解释。可视区间涨跌幅按视口内最早与最晚有效收盘价计算，端点不可信时不显示伪值。
+- AC7：STOCK、ETF、MUTUAL_FUND 遵守现有能力矩阵；ETF 不请求 chip/ATR，基金不请求证券 quote/bars/indicator，旧 Market Detail 与 API Client 调用保持兼容。
+- AC8：桌面定向测试、Schema/DSA Contract/Server 测试、typecheck/build/lint 通过；浏览器真实运行态完成 Network、交互、双主题和全屏截图验收，证据与代码 revision/Contract 版本一致。
+- AC9：图形、MA 可见性、副图、RSI6/12/24（默认 RSI12）、MACD 参数和范围偏好跨标的复用；参数变更进入请求 key、缓存失效和乱序保护，非法值回退默认值。
+- AC10：基金 NAV history 复用范围、日期联动、锁定、Esc、回到最新、重置和全局偏好，保持净值日期、单位净值和来源语义，不发起证券图表请求。
+- AC11：在 500 个日线点、K 线+成交量+双指标 pane、连续缩放/平移 10 秒负载下，初次可交互 ≤300ms、日期联动 ≤100ms、无 >200ms 主线程长任务，并记录设备、浏览器、构建 revision 和采样方法。

@@ -6,7 +6,9 @@
 
 ## 当前文档
 
-全站体验统一规划：[规格](specs/2026-09-08-ui-interaction-consistency.md) · [实施任务](tasks/2026-09-08-ui-interaction-consistency.md)（实施中）。组合概览收益指标语义统一：[规格](specs/2026-09-09-portfolio-pnl-metrics.md) · [实施任务](tasks/2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）。策略风险规则与 AI 多模型优化：[规格](specs/2026-09-09-strategy-risk-ai-optimization.md) · [实施任务](tasks/2026-09-09-strategy-risk-ai-optimization.md)（按 G1/G2/G3 推进，真实运行待验收）。历史建仓时间补录：[规格](specs/2026-09-10-trade-opening-boundary-supplement.md) · [实施任务](tasks/2026-09-10-trade-opening-boundary-supplement.md)（代码实现完成，待运行时验收）。
+开发数据库重建：[归档规格](archive/specs/2026-09-14-dev-database-rebuild.md) · [归档任务](archive/tasks/2026-09-14-dev-database-rebuild.md) · [验证记录](reviews/2026-09-14-dev-database-rebuild.md)（当前开发库重建完成，Server/Worker 已恢复 healthy）。
+
+全站体验统一规划：[规格](specs/2026-09-08-ui-interaction-consistency.md) · [实施任务](tasks/2026-09-08-ui-interaction-consistency.md)（实施中）。组合概览收益指标语义统一：[规格](specs/2026-09-09-portfolio-pnl-metrics.md) · [实施任务](tasks/2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）。策略风险规则与 AI 多模型优化：[规格](specs/2026-09-09-strategy-risk-ai-optimization.md) · [实施任务](tasks/2026-09-09-strategy-risk-ai-optimization.md)（按 G1/G2/G3 推进，真实运行待验收）。历史建仓时间补录：[规格](specs/2026-09-10-trade-opening-boundary-supplement.md) · [实施任务](tasks/2026-09-10-trade-opening-boundary-supplement.md)（代码实现完成，待运行时验收）。日线行情与技术指标联动：[规格](specs/2026-09-10-market-chart-indicator-integration.md) · [实施任务](tasks/2026-09-10-market-chart-indicator-integration.md)（2026-09-13 实施完成，独立本地验收通过）。
 
 | 目录 | 用途与主要入口 |
 | --- | --- |

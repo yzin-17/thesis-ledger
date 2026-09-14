@@ -7,6 +7,9 @@ import {
   BACKTEST_QUEUE_NAME,
   type BacktestQueueData,
 } from './backtest-bull-queue.js';
+import { assertBacktestWorkerDatabaseReady } from './backtest-worker-startup.js';
+
+await assertBacktestWorkerDatabaseReady();
 
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) throw new Error('REDIS_URL is required');
@@ -71,7 +74,9 @@ worker.on('failed', (job, error) => {
     maxTransportAttempts,
     ...(startedAt === undefined ? {} : { durationMs: Date.now() - startedAt }),
     errorCode:
-      job.attemptsMade >= maxTransportAttempts ? 'worker_transport_exhausted' : 'worker_transport_failed',
+      job.attemptsMade >= maxTransportAttempts
+        ? 'worker_transport_exhausted'
+        : 'worker_transport_failed',
     error: error.message,
   });
 });

@@ -7,6 +7,32 @@ import {
   getVisibleMarketDetail,
 } from './market-detail.types.js';
 import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { IndicatorV1 } from '@thesis-ledger/schemas';
+
+const indicator = (
+  parameters: Record<string, number>,
+  end: string,
+  anchor: string,
+): IndicatorV1 => ({
+  version: 1,
+  symbol: '600519.SH',
+  name: 'MA',
+  parameters,
+  timeframe: '1d',
+  marketTime: end,
+  calculatedAt: end,
+  values: { ma5: 100 },
+  provider: 'efinance',
+  engineVersion: 'dsa-v1',
+  points: [{ timestamp: end, values: { ma5: 100 }, inputFingerprint: `fp-${end}` }],
+  inputProvenance: {
+    timeframe: '1d',
+    provider: 'efinance',
+    inputDateRange: { start: anchor, end },
+    inputFingerprint: `full-${anchor}`,
+  },
+  calculationAnchor: { timestamp: anchor, inputFingerprint: `anchor-${anchor}` },
+});
 
 const detail = (symbol: string): MarketDetailResponse => ({
   version: 1,
@@ -66,5 +92,77 @@ describe('MarketDetail 类型辅助函数', () => {
     expect(marketDetailStatusLabel('empty')).toBe('暂无数据');
     expect(marketDetailStatusLabel('unavailable')).toBe('暂时不可用');
     expect(marketDetailStatusClass('stale')).toBe('tag warning');
+  });
+
+  it('详情合并不把不同 anchor 的指标页伪装成一个序列', () => {
+    const currentIndicator = indicator(
+      { period: 5 },
+      '2026-08-20T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z',
+    );
+    const olderPage = indicator(
+      { period: 5 },
+      '2026-07-31T00:00:00.000Z',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const merged = mergeMarketDetail(
+      {
+        ...detail('600519.SH'),
+        sections: {
+          'indicator:MA': {
+            capability: 'indicator:MA',
+            status: 'ready',
+            data: currentIndicator,
+          },
+        },
+      },
+      {
+        ...detail('600519.SH'),
+        sections: {
+          'indicator:MA': {
+            capability: 'indicator:MA',
+            status: 'ready',
+            data: olderPage,
+          },
+        },
+      },
+    );
+    expect(merged.sections['indicator:MA']?.data).toBe(olderPage);
+  });
+
+  it('参数变化时只接受新定义，旧参数 points 不会混入新页', () => {
+    const oldIndicator = indicator(
+      { period: 5 },
+      '2026-08-20T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z',
+    );
+    const newIndicator = indicator(
+      { period: 20 },
+      '2026-08-20T00:00:00.000Z',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const merged = mergeMarketDetail(
+      {
+        ...detail('600519.SH'),
+        sections: {
+          'indicator:MA': {
+            capability: 'indicator:MA',
+            status: 'ready',
+            data: oldIndicator,
+          },
+        },
+      },
+      {
+        ...detail('600519.SH'),
+        sections: {
+          'indicator:MA': {
+            capability: 'indicator:MA',
+            status: 'ready',
+            data: newIndicator,
+          },
+        },
+      },
+    );
+    expect(merged.sections['indicator:MA']?.data).toBe(newIndicator);
   });
 });

@@ -28,7 +28,11 @@ vi.mock('@/components/ui/dialog', () => {
   };
 });
 
-import { MarketDetailDialog } from './MarketDetailDialog.js';
+import {
+  commitIfCurrentGeneration,
+  MarketDetailDialog,
+  responseMatchesIndicatorParams,
+} from './MarketDetailDialog.js';
 
 const time = '2026-08-21T00:00:00.000Z';
 const position = {
@@ -46,7 +50,7 @@ const detail = (input: Partial<MarketDetailResponse>): MarketDetailResponse => (
   identity: { source: 'asset', status: 'confirmed' },
   requested: [],
   capabilities: { supported: [], unsupported: [] },
-  limits: { bars: 30, nav: 30 },
+  limits: { bars: 30, nav: 30, barsHasMoreBefore: true },
   sections: {},
   dependencies: {},
   requestId: 'request-1',
@@ -93,6 +97,44 @@ describe('MarketDetailDialog UI contract', () => {
   beforeEach(() => {
     useQueryClientMock.mockReturnValue(queryClient);
     useQueryMock.mockReset();
+  });
+
+  it('参数变化时拒绝旧响应，避免旧指标页短暂回填', () => {
+    const response = detail({
+      sections: {
+        'indicator:MACD': {
+          capability: 'indicator:MACD',
+          status: 'ready',
+          data: { ...readyIndicator('MACD'), parameters: { fast: 12, slow: 26, signal: 9 } },
+        },
+      },
+    });
+    expect(
+      responseMatchesIndicatorParams(response, {
+        fast: 20,
+        slow: 50,
+        signal: 9,
+        short: 6,
+        mid: 12,
+        long: 24,
+      }),
+    ).toBe(false);
+  });
+
+  it('参数变化后拒绝延迟完成的旧重试提交', async () => {
+    let generation = 1;
+    let resolveRequest!: (value: MarketDetailResponse) => void;
+    const request = new Promise<MarketDetailResponse>((resolve) => {
+      resolveRequest = resolve;
+    });
+    const commit = vi.fn();
+    const pending = commitIfCurrentGeneration(1, () => generation, () => request, commit);
+
+    generation = 2;
+    resolveRequest(detail({ requestId: 'old-retry' }));
+
+    await expect(pending).resolves.toBe(false);
+    expect(commit).not.toHaveBeenCalled();
   });
 
   it('渲染股票的持仓上下文、行情、指标和局部失败重试', () => {
@@ -178,8 +220,11 @@ describe('MarketDetailDialog UI contract', () => {
     expect(html).toContain('实时价');
     expect(html).toContain('技术指标');
     expect(html).toContain('data-market-price-chart="true"');
-    expect(html).toContain('data-market-indicator-chart="trend"');
-    expect(html).toContain('data-market-indicator-chart="values"');
+    expect(html).not.toContain('共享日线依赖');
+    expect(html).not.toContain('已并入上方日线图');
+    expect(html).toContain('缺少历史序列或日线口径证据');
+    expect(html).toContain('加载更早日线');
+    expect(html).not.toContain('data-market-indicator-chart');
     expect(html).toContain('data-market-detail-section="chip"');
     expect(html).toContain('重试');
     expect(html).toContain('数据可用性');

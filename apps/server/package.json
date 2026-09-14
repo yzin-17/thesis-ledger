@@ -9,6 +9,7 @@
     "start:worker": "node dist/src/backtest/backtest-worker.main.js",
     "health:worker": "node dist/src/backtest/backtest-worker-health.js",
     "start:dev": "tsx watch src/main.ts",
+    "db:dev-structure": "tsx src/platform/dev-database-rebuild.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prisma": "prisma",

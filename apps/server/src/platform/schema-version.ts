@@ -1,4 +1,6 @@
-export const CURRENT_SCHEMA_VERSION = '20260905000000_fresh_database_baseline';
+import { discoverCurrentSchemaVersionSync } from './database-structure.js';
+
+export const CURRENT_SCHEMA_VERSION = discoverCurrentSchemaVersionSync();
 
 type SchemaVersionRow = { version?: unknown };
 

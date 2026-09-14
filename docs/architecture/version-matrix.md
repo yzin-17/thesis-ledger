@@ -9,10 +9,12 @@
 | DSA Control Contract     | `V1`                                | handshake、Provider Policy、Catalog control    | control contract smoke                 |
 | DSA Fork release         | `v3.28.0-thesisledger.1` convention | upstream version + ThesisLedger patch revision | immutable GHCR digest + contract smoke |
 | `@thesis-ledger/schemas` | `0.1.0`                             | versioned shared contracts                     | schema tests                           |
-| PostgreSQL schema        | migration controlled                | ordered Prisma migrations                      | `pnpm migration:matrix`                |
+| PostgreSQL schema        | 主仓结构 SQL 的排序 head             | Prisma model 与 raw-owned 结构共同校验           | `pnpm migration:matrix` 与运行时结构检查 |
 | Infrastructure           | immutable image digests             | Compose + persistent volume contract           | infra compatibility + contract tests   |
 
 ## 兼容规则
+
+- 开发数据库的显式重建与正式发布的数据升级分开验收；已完成的设计见 [归档规格](../archive/specs/2026-09-14-dev-database-rebuild.md)，部署证据见 [验证记录](../reviews/2026-09-14-dev-database-rebuild.md)。
 
 - 业务模块依赖 ThesisLedger Contract 和 Adapter，不依赖 DSA 实现细节。
 - DSA 上游同步只有在 Data/Control Contract V1 黑盒套件继续通过时才允许合入。

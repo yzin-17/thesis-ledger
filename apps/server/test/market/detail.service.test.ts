@@ -134,6 +134,96 @@ describe('MarketDetailService', () => {
     expect(market).not.toHaveProperty('getAtr');
   });
 
+  it('把详情日期窗口和指标参数转发到同一日线范围', async () => {
+    const market = {
+      getBars: vi.fn(async () => bars),
+      getIndicator: vi.fn(async (_symbol: string, name: 'MA' | 'MACD' | 'RSI') => indicator(name)),
+    };
+    const service = new MarketDetailService(
+      market as never,
+      makeControl() as never,
+      makePrisma({ assetType: 'stock' }) as never,
+    );
+
+    await service.getDetail('600519.SH', {
+      include: ['bars', 'indicator:MACD'],
+      barsLimit: 20,
+      start: '2026-01-01',
+      end: '2026-03-31',
+      indicatorParams: { fast: 12, slow: 26, signal: 9 },
+    });
+
+    expect(market.getBars).toHaveBeenCalledWith(
+      '600519.SH',
+      '1d',
+      { start: '2026-01-01', end: '2026-03-31', limit: 21 },
+      { allowStale: true },
+    );
+    expect(market.getIndicator).toHaveBeenCalledWith('600519.SH', 'MACD', {
+      start: '2026-01-01',
+      end: '2026-03-31',
+      limit: 20,
+      parameters: { fast: 12, slow: 26, signal: 9 },
+    });
+  });
+
+  it('用额外一根日线探测更早覆盖，并裁剪为请求数量', async () => {
+    const returnedBars = Array.from({ length: 4 }, (_, index) => ({
+      ...bars[0]!,
+      timestamp: `2026-08-${String(index + 18).padStart(2, '0')}T00:00:00.000Z`,
+    }));
+    const market = {
+      getBars: vi.fn(async () => returnedBars),
+      getIndicator: vi.fn(),
+    };
+    const service = new MarketDetailService(
+      market as never,
+      makeControl() as never,
+      makePrisma({ assetType: 'stock' }) as never,
+    );
+
+    const result = await service.getDetail('600519.SH', {
+      include: ['bars'],
+      barsLimit: 3,
+    });
+
+    expect(market.getBars).toHaveBeenCalledWith(
+      '600519.SH',
+      '1d',
+      { limit: 4 },
+      { allowStale: true },
+    );
+    expect(result.sections.bars?.data).toEqual(returnedBars.slice(-3));
+    expect(result.limits.barsHasMoreBefore).toBe(true);
+  });
+
+  it('刚好返回请求数量或空页时不虚报更早覆盖', async () => {
+    for (const returnedBars of [bars.slice(0, 1), []]) {
+      const market = {
+        getBars: vi.fn(async () => returnedBars),
+        getIndicator: vi.fn(),
+      };
+      const service = new MarketDetailService(
+        market as never,
+        makeControl() as never,
+        makePrisma({ assetType: 'stock' }) as never,
+      );
+
+      const result = await service.getDetail('600519.SH', {
+        include: ['bars'],
+        barsLimit: 1,
+      });
+
+      expect(market.getBars).toHaveBeenCalledWith(
+        '600519.SH',
+        '1d',
+        { limit: 2 },
+        { allowStale: true },
+      );
+      expect(result.limits.barsHasMoreBefore).toBe(false);
+    }
+  });
+
   it('非法能力和超限历史参数在调用 Provider 前返回 400', async () => {
     const market = {
       getQuote: vi.fn(),
@@ -150,6 +240,12 @@ describe('MarketDetailService', () => {
     );
     await expect(service.getDetail('600519', { barsLimit: 91 })).rejects.toThrow(
       'barsLimit 必须是 1 到 90 之间的整数',
+    );
+    await expect(service.getDetail('600519', { start: '2026-02-30' })).rejects.toThrow(
+      'start 必须是有效日历日期',
+    );
+    await expect(service.getDetail('600519', { indicatorParams: { fast: 30 } })).rejects.toThrow(
+      'MACD fast 必须小于 slow',
     );
     expect(market.getQuote).not.toHaveBeenCalled();
     expect(market.getBars).not.toHaveBeenCalled();

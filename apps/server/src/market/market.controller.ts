@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { MarketService } from './market.service.js';
 import { MarketStorageService } from './market-storage.service.js';
 import { MarketDetailService } from './market-detail.service.js';
+import { assertCalendarDateRange, assertIndicatorParameters } from './market-request-validation.js';
 
 @Controller('market')
 export class MarketController {
@@ -16,12 +17,20 @@ export class MarketController {
     @Query('include') include?: string | string[],
     @Query('barsLimit') barsLimit?: string,
     @Query('navLimit') navLimit?: string,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('indicatorParams') indicatorParams?: string,
+    @Query('calculationAnchor') calculationAnchor?: string,
     @Query('refresh') refresh?: string,
   ) {
     return this.detail.getDetail(symbol, {
       ...(include !== undefined ? { include } : {}),
       ...(barsLimit !== undefined ? { barsLimit } : {}),
       ...(navLimit !== undefined ? { navLimit } : {}),
+      ...(start !== undefined ? { start } : {}),
+      ...(end !== undefined ? { end } : {}),
+      ...(indicatorParams !== undefined ? { indicatorParams } : {}),
+      ...(calculationAnchor !== undefined ? { calculationAnchor } : {}),
       refresh: refresh === '1',
     });
   }
@@ -60,8 +69,49 @@ export class MarketController {
   @Get(':symbol/indicators/:name') indicator(
     @Param('symbol') symbol: string,
     @Param('name') name: 'MA' | 'MACD' | 'RSI' | 'ATR',
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('limit') limit?: string,
+    @Query('parameters') parameters?: string,
+    @Query('calculationAnchor') calculationAnchor?: string,
   ) {
-    return this.market.getIndicator(symbol, name);
+    try {
+      assertCalendarDateRange(start, end);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : '日期范围无效');
+    }
+    if (limit !== undefined && (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 365))
+      throw new BadRequestException('indicator limit 必须是 1 到 365 之间的整数');
+    let indicatorParameters: Record<string, number> | undefined;
+    if (parameters) {
+      try {
+        const parsed: unknown = JSON.parse(parameters);
+        if (
+          parsed === null ||
+          typeof parsed !== 'object' ||
+          Array.isArray(parsed) ||
+          !Object.values(parsed).every(
+            (value) => typeof value === 'number' && Number.isFinite(value),
+          )
+        )
+          throw new Error('invalid');
+        indicatorParameters = parsed as Record<string, number>;
+      } catch {
+        throw new BadRequestException('parameters 必须是 JSON 数字对象');
+      }
+      try {
+        assertIndicatorParameters(name, indicatorParameters);
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : '指标参数无效');
+      }
+    }
+    return this.market.getIndicator(symbol, name, {
+      ...(start ? { start } : {}),
+      ...(end ? { end } : {}),
+      ...(limit ? { limit: Number(limit) } : {}),
+      ...(indicatorParameters ? { parameters: indicatorParameters } : {}),
+      ...(calculationAnchor ? { calculationAnchor } : {}),
+    });
   }
   @Get(':symbol/chip') chip(@Param('symbol') symbol: string) {
     return this.market.getChip(symbol);

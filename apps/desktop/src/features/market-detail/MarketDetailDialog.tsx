@@ -5,6 +5,7 @@ import type {
   MarketDetailResponse,
   MarketDetailSection,
 } from '@thesis-ledger/api-client';
+import type { IndicatorV1 } from '@thesis-ledger/schemas';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
   QuoteSection,
   sectionIsVisible,
 } from './MarketDetailSections.js';
+import type { MarketIndicatorParams } from './MarketDetailCharts.js';
 import {
   marketDetailSectionTitle,
   mergeMarketDetail,
@@ -35,8 +37,65 @@ import {
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
-const detailQueryKey = (symbol: string, refreshSequence: number) =>
-  ['desktop', 'market-detail', symbol, refreshSequence] as const;
+const detailQueryKey = (
+  symbol: string,
+  refreshSequence: number,
+  indicatorParams: MarketIndicatorParams,
+  historyEnd?: string,
+  calculationAnchor?: string,
+) =>
+  [
+    'desktop',
+    'market-detail',
+    symbol,
+    refreshSequence,
+    indicatorParams,
+    historyEnd ?? null,
+    calculationAnchor ?? null,
+  ] as const;
+
+type HistoryPage = {
+  key: string;
+  paramsKey: string;
+  end?: string;
+  response: MarketDetailResponse;
+};
+
+const indicatorParamsKey = (params: MarketIndicatorParams) => JSON.stringify(params);
+
+const clearIndicatorSections = (response: MarketDetailResponse | null) => {
+  if (!response) return response;
+  const sections = { ...response.sections };
+  delete sections['indicator:MA'];
+  delete sections['indicator:MACD'];
+  delete sections['indicator:RSI'];
+  return { ...response, sections };
+};
+
+/** Resolve delayed work before committing it to the current request generation. */
+export const commitIfCurrentGeneration = async <T,>(
+  generation: number,
+  currentGeneration: () => number,
+  request: () => Promise<T>,
+  commit: (value: T) => void,
+) => {
+  const value = await request();
+  if (generation !== currentGeneration()) return false;
+  commit(value);
+  return true;
+};
+
+export const responseMatchesIndicatorParams = (
+  response: MarketDetailResponse,
+  params: MarketIndicatorParams,
+) => {
+  const data = response.sections['indicator:MACD']?.data as IndicatorV1 | undefined;
+  if (!data) return true;
+  return Object.entries(params).every(([name, value]) => {
+    const actual = data.parameters[name];
+    return actual === undefined || actual === value;
+  });
+};
 
 export function MarketDetailDialog({
   position,
@@ -48,25 +107,74 @@ export function MarketDetailDialog({
   const queryClient = useQueryClient();
   const [refreshSequence, setRefreshSequence] = useState(0);
   const [detail, setDetail] = useState<MarketDetailResponse | null>(null);
+  const [historyPages, setHistoryPages] = useState<HistoryPage[]>([]);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [indicatorParams, setIndicatorParams] = useState<MarketIndicatorParams>({
+    fast: 12,
+    slow: 26,
+    signal: 9,
+    short: 6,
+    mid: 12,
+    long: 24,
+  });
+  const [historyEnd, setHistoryEnd] = useState<string | undefined>();
+  const [historyCalculationAnchor, setHistoryCalculationAnchor] = useState<string | undefined>();
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyExhausted, setHistoryExhausted] = useState(false);
+  const [historyLoadingEnd, setHistoryLoadingEnd] = useState<string | undefined>();
+  const [parameterRefreshEnds, setParameterRefreshEnds] = useState<string[]>([]);
+  const [parameterRefreshRevision, setParameterRefreshRevision] = useState(0);
+  const [parameterRefreshLoading, setParameterRefreshLoading] = useState(false);
+  const [parameterRefreshError, setParameterRefreshError] = useState<string | null>(null);
   const pendingRefreshSequenceRef = useRef<number | null>(null);
   const activeSymbolRef = useRef(position.symbol);
   const retryQueryKeysRef = useRef<Array<readonly unknown[]>>([]);
+  const requestGenerationRef = useRef(0);
+  const requestSignatureRef = useRef('');
+  const queryResponseGenerationRef = useRef(new Map<string, number>());
+  const requestSignature = JSON.stringify({
+    symbol: position.symbol,
+    refreshSequence,
+    indicatorParams,
+    historyEnd: historyEnd ?? null,
+    calculationAnchor: historyCalculationAnchor ?? null,
+  });
+  if (requestSignatureRef.current !== requestSignature) {
+    requestSignatureRef.current = requestSignature;
+    requestGenerationRef.current += 1;
+  }
+  const requestGeneration = requestGenerationRef.current;
   const query = useQuery({
-    queryKey: detailQueryKey(position.symbol, refreshSequence),
-    queryFn: ({ signal }: { signal: AbortSignal }) => {
+    queryKey: detailQueryKey(
+      position.symbol,
+      refreshSequence,
+      indicatorParams,
+      historyEnd,
+      historyCalculationAnchor,
+    ),
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
       const refresh = pendingRefreshSequenceRef.current === refreshSequence;
       if (refresh) pendingRefreshSequenceRef.current = null;
-      return requestMarketDetail(
+      const historyInclude = ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] as const;
+      const response = await requestMarketDetail(
         {
           symbol: position.symbol,
-          barsLimit: 30,
-          navLimit: 30,
+          ...(historyEnd ? { include: historyInclude } : {}),
+          barsLimit: 90,
+          navLimit: 90,
+          indicatorParams,
+          ...(historyEnd ? { end: historyEnd } : {}),
+          ...(historyCalculationAnchor ? { calculationAnchor: historyCalculationAnchor } : {}),
           ...(refresh ? { refresh: true } : {}),
         },
         signal,
       );
+      if (requestGeneration !== requestGenerationRef.current) {
+        throw new DOMException('行情请求已过期', 'AbortError');
+      }
+      queryResponseGenerationRef.current.set(response.requestId, requestGeneration);
+      return response;
     },
     staleTime: 15_000,
   });
@@ -74,7 +182,17 @@ export function MarketDetailDialog({
   useEffect(() => {
     activeSymbolRef.current = position.symbol;
     setDetail(null);
+    setHistoryPages([]);
     setRetryError(null);
+    setIndicatorParams({ fast: 12, slow: 26, signal: 9, short: 6, mid: 12, long: 24 });
+    setHistoryEnd(undefined);
+    setHistoryCalculationAnchor(undefined);
+    setHistoryError(null);
+    setHistoryExhausted(false);
+    setHistoryLoadingEnd(undefined);
+    setParameterRefreshEnds([]);
+    setParameterRefreshLoading(false);
+    setParameterRefreshError(null);
     pendingRefreshSequenceRef.current = null;
     return () => {
       for (const queryKey of retryQueryKeysRef.current)
@@ -84,11 +202,128 @@ export function MarketDetailDialog({
   }, [position.symbol, queryClient]);
 
   useEffect(() => {
-    if (query.data && query.data.symbol === activeSymbolRef.current)
-      setDetail((current) => mergeMarketDetail(current, query.data));
-  }, [query.data]);
+    if (parameterRefreshEnds.length === 0) return;
+    const generation = requestGenerationRef.current;
+    const params = indicatorParams;
+    const symbol = position.symbol;
+    let cancelled = false;
+    const controller = new AbortController();
+    setParameterRefreshLoading(true);
+    setParameterRefreshError(null);
 
-  const visibleDetail = getVisibleMarketDetail(detail, query.data, position.symbol);
+    const refreshLoadedPages = async () => {
+      for (const end of parameterRefreshEnds) {
+        if (cancelled || generation !== requestGenerationRef.current) return;
+        const committed = await commitIfCurrentGeneration(
+          generation,
+          () => requestGenerationRef.current,
+          () =>
+            requestMarketDetail(
+              {
+                symbol,
+                include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'],
+                barsLimit: 90,
+                navLimit: 90,
+                indicatorParams: params,
+                end,
+              },
+              controller.signal,
+            ),
+          (next) => {
+            if (cancelled || next.symbol !== activeSymbolRef.current) return;
+            setDetail((current) => mergeMarketDetail(current, next));
+            const paramsKey = indicatorParamsKey(params);
+            const pageKey = JSON.stringify({ paramsKey, end });
+            setHistoryPages((current) => {
+              const page = {
+                key: pageKey,
+                paramsKey,
+                ...(end ? { end } : {}),
+                response: next,
+              };
+              const index = current.findIndex((item) => item.key === pageKey);
+              if (index < 0) return [...current, page];
+              return current.map((item, itemIndex) => (itemIndex === index ? page : item));
+            });
+          },
+        );
+        if (!committed) return;
+      }
+      if (!cancelled && generation === requestGenerationRef.current) {
+        setParameterRefreshLoading(false);
+        setParameterRefreshEnds([]);
+      }
+    };
+
+    void refreshLoadedPages().catch((error) => {
+      if (
+        !cancelled &&
+        generation === requestGenerationRef.current &&
+        !(error instanceof DOMException && error.name === 'AbortError')
+      ) {
+        setParameterRefreshLoading(false);
+        setParameterRefreshError('指标参数更新失败，已保留价格与当前行情。');
+      }
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [indicatorParams, parameterRefreshEnds, parameterRefreshRevision, position.symbol]);
+
+  useEffect(() => {
+    if (
+      query.data &&
+      query.data.symbol === activeSymbolRef.current &&
+      (queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
+        queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
+      responseMatchesIndicatorParams(query.data, indicatorParams)
+    ) {
+      setDetail((current) => mergeMarketDetail(current, query.data));
+      const paramsKey = indicatorParamsKey(indicatorParams);
+      const pageKey = JSON.stringify({ paramsKey, end: historyEnd ?? null });
+      setHistoryPages((current) => {
+        const page = {
+          key: pageKey,
+          paramsKey,
+          ...(historyEnd ? { end: historyEnd } : {}),
+          response: query.data,
+        };
+        const index = current.findIndex((item) => item.key === pageKey);
+        if (index < 0) return [...current, page];
+        return current.map((item, itemIndex) => (itemIndex === index ? page : item));
+      });
+    }
+  }, [historyEnd, indicatorParams, query.data, requestGeneration]);
+
+  useEffect(() => {
+    if (!historyEnd) return;
+    if (query.isError) {
+      setHistoryError('更早日线加载失败，当前图表已保留。');
+      setHistoryLoadingEnd(undefined);
+      return;
+    }
+    if (!query.data) return;
+    const incomingBars = query.data.sections.bars?.data as Array<{ timestamp: string }> | undefined;
+    const incomingEarliest = incomingBars?.[0]?.timestamp?.slice(0, 10);
+    if (!incomingEarliest || incomingEarliest > historyEnd) {
+      setHistoryError('没有更多可用的更早日线。');
+      setHistoryExhausted(true);
+    } else {
+      setHistoryError(null);
+      setHistoryExhausted(false);
+    }
+    setHistoryLoadingEnd(undefined);
+  }, [historyEnd, query.data, query.isError]);
+
+  const queryDataForCurrentParams =
+    query.data &&
+    (queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
+      queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
+    responseMatchesIndicatorParams(query.data, indicatorParams)
+      ? query.data
+      : undefined;
+  const visibleDetail = getVisibleMarketDetail(detail, queryDataForCurrentParams, position.symbol);
   const indicatorCapabilities = useMemo(
     () =>
       visibleDetail
@@ -110,7 +345,19 @@ export function MarketDetailDialog({
 
   const retrySection = async (capability: MarketDetailCapability) => {
     const symbol = position.symbol;
-    const queryKey = ['desktop', 'market-detail', symbol, 'section', capability] as const;
+    const params = indicatorParams;
+    const paramsKey = indicatorParamsKey(params);
+    const end = historyEnd;
+    const generation = requestGenerationRef.current;
+    const queryKey = [
+      'desktop',
+      'market-detail',
+      symbol,
+      'section',
+      capability,
+      paramsKey,
+      end ?? null,
+    ] as const;
     retryQueryKeysRef.current.push(queryKey);
     setRetrying(capability);
     setRetryError(null);
@@ -119,28 +366,133 @@ export function MarketDetailDialog({
         queryKey,
         queryFn: ({ signal }) =>
           requestMarketDetail(
-            { symbol, include: [capability], barsLimit: 30, navLimit: 30, refresh: true },
+            {
+              symbol,
+              include: [capability],
+              barsLimit: 90,
+              navLimit: 90,
+              indicatorParams: params,
+              ...(end ? { end } : {}),
+              refresh: true,
+            },
             signal,
           ),
         staleTime: 0,
       });
-      if (activeSymbolRef.current === symbol && next.symbol === symbol)
+      if (
+        generation === requestGenerationRef.current &&
+        activeSymbolRef.current === symbol &&
+        next.symbol === symbol &&
+        responseMatchesIndicatorParams(next, params)
+      )
         setDetail((current) => mergeMarketDetail(current, next));
+      if (
+        generation === requestGenerationRef.current &&
+        activeSymbolRef.current === symbol &&
+        next.symbol === symbol &&
+        responseMatchesIndicatorParams(next, params)
+      ) {
+        setHistoryPages((current) => [
+          ...current,
+          {
+            key: `retry:${capability}:${next.requestId}`,
+            paramsKey,
+            ...(end ? { end } : {}),
+            response: next,
+          },
+        ]);
+      }
     } catch (error) {
       const aborted = error instanceof DOMException && error.name === 'AbortError';
-      if (!aborted && activeSymbolRef.current === symbol)
+      if (!aborted && generation === requestGenerationRef.current && activeSymbolRef.current === symbol)
         setRetryError(`${marketDetailSectionTitle(capability)}重试失败，请稍后再试。`);
     } finally {
       retryQueryKeysRef.current = retryQueryKeysRef.current.filter(
         (activeKey) => activeKey !== queryKey,
       );
-      if (activeSymbolRef.current === symbol) setRetrying(null);
+      if (generation === requestGenerationRef.current && activeSymbolRef.current === symbol)
+        setRetrying(null);
     }
   };
 
   const unit = position.asset.assetType === 'stock' ? '股' : '份';
   const quoteSection = visibleDetail?.sections.quote;
   const barsSection = visibleDetail?.sections.bars;
+  const currentParamsKey = indicatorParamsKey(indicatorParams);
+  const pageIndicators = historyPages
+    .filter(({ paramsKey }) => paramsKey === currentParamsKey)
+    .flatMap(({ response }) =>
+      response.requested
+        .filter((capability) => capability.startsWith('indicator:'))
+        .map((capability) => response.sections[capability]?.data as IndicatorV1 | undefined)
+        .filter((indicator): indicator is IndicatorV1 => Boolean(indicator)),
+    );
+  const chartIndicators =
+    pageIndicators.length > 0
+      ? pageIndicators
+      : indicatorCapabilities
+          .map((capability) => visibleDetail?.sections[capability]?.data as IndicatorV1 | undefined)
+          .filter((indicator): indicator is IndicatorV1 => Boolean(indicator));
+  const loadEarlier = () => {
+    if (query.isFetching || historyLoadingEnd) return;
+    const firstDate = visibleDetail?.sections.bars?.data
+      ? (visibleDetail.sections.bars.data as Array<{ timestamp: string }>)[0]?.timestamp
+      : undefined;
+    if (!firstDate) return;
+    const date = new Date(firstDate);
+    date.setUTCDate(date.getUTCDate() - 1);
+    const nextEnd = date.toISOString().slice(0, 10);
+    if (nextEnd === historyEnd) {
+      setHistoryError('没有更多可用的更早日线。');
+      return;
+    }
+    const anchor = chartIndicators
+      .map((indicator) => indicator.calculationAnchor?.timestamp)
+      .find((value): value is string => Boolean(value));
+    setHistoryError(null);
+    setHistoryExhausted(false);
+    setHistoryLoadingEnd(nextEnd);
+    setHistoryCalculationAnchor(anchor?.slice(0, 10));
+    setHistoryEnd(nextEnd);
+  };
+  const canLoadEarlier = Boolean(
+    !historyExhausted &&
+    (historyError ||
+      visibleDetail?.limits.barsHasMoreBefore === true ||
+      chartIndicators.some((indicator) => indicator.coverage?.hasMoreBefore === true)),
+  );
+  const retryEarlier = () => {
+    if (parameterRefreshEnds.length > 0 && !parameterRefreshLoading) {
+      setParameterRefreshError(null);
+      setParameterRefreshRevision((value) => value + 1);
+      return;
+    }
+    if (!historyEnd || query.isFetching) return;
+    setHistoryError(null);
+    setHistoryLoadingEnd(historyEnd);
+    void query.refetch();
+  };
+  const updateIndicatorParams = (next: MarketIndicatorParams) => {
+    if (JSON.stringify(indicatorParams) === JSON.stringify(next)) return;
+    requestGenerationRef.current += 1;
+    const loadedEnds = [
+      ...new Set(
+        historyPages
+          .filter((page) => page.end)
+          .map((page) => page.end as string),
+      ),
+    ];
+    setDetail((current) => clearIndicatorSections(current));
+    setHistoryEnd(undefined);
+    setHistoryCalculationAnchor(undefined);
+    setHistoryError(null);
+    setHistoryLoadingEnd(undefined);
+    setHistoryExhausted(false);
+    setParameterRefreshError(null);
+    setParameterRefreshEnds(loadedEnds);
+    setParameterRefreshRevision((value) => value + 1);
+    setIndicatorParams(next);
+  };
   const chipSection = visibleDetail?.sections.chip;
   const fundNavSection = visibleDetail?.sections['fund-nav'];
   const fundNavHistorySection = visibleDetail?.sections['fund-nav-history'];
@@ -201,6 +553,15 @@ export function MarketDetailDialog({
       visibleDetail={visibleDetail}
       quoteSection={quoteSection}
       barsSection={barsSection}
+      chartIndicators={chartIndicators}
+      onIndicatorParamsChange={updateIndicatorParams}
+      onLoadEarlier={loadEarlier}
+      canLoadEarlier={canLoadEarlier}
+      historyLoading={
+        parameterRefreshLoading || Boolean(historyLoadingEnd) || (Boolean(historyEnd) && query.isFetching)
+      }
+      historyError={parameterRefreshError ?? historyError}
+      onRetryEarlier={retryEarlier}
       chipSection={chipSection}
       fundNavSection={fundNavSection}
       fundNavHistorySection={fundNavHistorySection}
@@ -225,6 +586,13 @@ function MarketDetailDialogContent({
   visibleDetail,
   quoteSection,
   barsSection,
+  chartIndicators,
+  onIndicatorParamsChange,
+  onLoadEarlier,
+  canLoadEarlier,
+  historyLoading,
+  historyError,
+  onRetryEarlier,
   chipSection,
   fundNavSection,
   fundNavHistorySection,
@@ -245,6 +613,13 @@ function MarketDetailDialogContent({
   visibleDetail: MarketDetailResponse | null;
   quoteSection: MarketDetailSection | undefined;
   barsSection: MarketDetailSection | undefined;
+  chartIndicators: IndicatorV1[];
+  onIndicatorParamsChange: (params: MarketIndicatorParams) => void;
+  onLoadEarlier: () => void;
+  canLoadEarlier: boolean;
+  historyLoading: boolean;
+  historyError: string | null;
+  onRetryEarlier: () => void;
   chipSection: MarketDetailSection | undefined;
   fundNavSection: MarketDetailSection | undefined;
   fundNavHistorySection: MarketDetailSection | undefined;
@@ -313,6 +688,13 @@ function MarketDetailDialogContent({
               {sectionIsVisible(barsSection) ? (
                 <BarsSection
                   section={barsSection}
+                  indicators={chartIndicators}
+                  onIndicatorParamsChange={onIndicatorParamsChange}
+                  onLoadEarlier={onLoadEarlier}
+                  canLoadEarlier={canLoadEarlier}
+                  historyLoading={historyLoading}
+                  historyError={historyError}
+                  onRetryEarlier={onRetryEarlier}
                   onRetry={() => void onRetrySection('bars')}
                   retrying={retrying === 'bars'}
                 />

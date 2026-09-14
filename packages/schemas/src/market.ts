@@ -4,6 +4,7 @@ const isoDate = z.iso.datetime({ offset: true });
 const isoCalendarDate = z.iso.date();
 const finite = z.number().finite();
 const freshnessSchema = z.enum(['live', 'delayed', 'stale', 'unknown']);
+const completionStatusSchema = z.enum(['complete', 'incomplete', 'unknown']);
 export const currencySchema = z.enum(['CNY', 'HKD', 'USD']);
 export type CurrencyV1 = z.infer<typeof currencySchema>;
 
@@ -83,6 +84,10 @@ export const barSchemaV1 = z
     freshness: freshnessSchema.default('unknown'),
     fallbackUsed: z.boolean().default(false),
     servedFromCache: z.boolean().default(false),
+    completionStatus: completionStatusSchema.optional(),
+    providerRevision: z.string().min(1).optional(),
+    adjustment: z.string().min(1).optional(),
+    inputFingerprint: z.string().min(1).optional(),
   })
   .refine((bar) => bar.high >= Math.max(bar.open, bar.close, bar.low), 'OHLC 最高价非法')
   .refine((bar) => bar.low <= Math.min(bar.open, bar.close, bar.high), 'OHLC 最低价非法');
@@ -99,6 +104,48 @@ export const barsSchemaV1 = z.array(barSchemaV1).superRefine((bars, context) => 
   }
 });
 
+export const indicatorPointSchemaV1 = z.object({
+  timestamp: isoDate,
+  values: z.record(z.string(), finite.nullable()),
+  inputFingerprint: z.string().min(1).optional(),
+});
+
+export const indicatorPointsSchemaV1 = z
+  .array(indicatorPointSchemaV1)
+  .superRefine((points, context) => {
+    for (let index = 1; index < points.length; index += 1) {
+      if (points[index - 1]!.timestamp >= points[index]!.timestamp) {
+        context.addIssue({
+          code: 'custom',
+          message: '指标 points 必须按时间升序且时间唯一',
+          path: [index, 'timestamp'],
+        });
+      }
+    }
+  });
+
+export const indicatorInputProvenanceSchemaV1 = z.object({
+  timeframe: z.enum(['1m', '1d']),
+  provider: z.string().min(1),
+  upstreamSource: z.string().min(1).optional(),
+  providerRevision: z.string().min(1).optional(),
+  adjustment: z.string().min(1).optional(),
+  inputDateRange: z.object({ start: isoDate, end: isoDate }),
+  inputFingerprint: z.string().min(1),
+});
+
+export const indicatorCalculationAnchorSchemaV1 = z.object({
+  timestamp: isoDate,
+  inputFingerprint: z.string().min(1),
+});
+
+export const indicatorCoverageSchemaV1 = z.object({
+  start: isoDate,
+  end: isoDate,
+  complete: z.boolean(),
+  hasMoreBefore: z.boolean().optional(),
+});
+
 export const indicatorSchemaV1 = z.object({
   version: z.literal(1),
   symbol: z.string().min(1),
@@ -107,8 +154,12 @@ export const indicatorSchemaV1 = z.object({
   timeframe: z.enum(['1m', '1d']),
   marketTime: isoDate,
   calculatedAt: isoDate,
-  values: z.record(z.string(), z.union([z.number(), z.array(z.number())])),
+  values: z.record(z.string(), z.union([finite.nullable(), z.array(finite)])),
   provider: z.string().min(1),
+  points: indicatorPointsSchemaV1.optional(),
+  inputProvenance: indicatorInputProvenanceSchemaV1.optional(),
+  calculationAnchor: indicatorCalculationAnchorSchemaV1.optional(),
+  coverage: indicatorCoverageSchemaV1.optional(),
   fallbackUsed: z.boolean().optional(),
   servedFromCache: z.boolean().optional(),
   engineVersion: z.string().min(1),
@@ -290,6 +341,10 @@ export const marketDetailRequestSchema = z.object({
   include: z.array(marketDetailCapabilitySchema).min(1).optional(),
   barsLimit: z.number().int().min(1).max(90).optional(),
   navLimit: z.number().int().min(1).max(90).optional(),
+  start: isoCalendarDate.optional(),
+  end: isoCalendarDate.optional(),
+  indicatorParams: z.record(z.string(), finite).optional(),
+  calculationAnchor: isoDate.optional(),
   refresh: z.boolean().optional(),
 });
 
@@ -409,6 +464,7 @@ const marketDetailResponseBaseSchema = z
     limits: z.object({
       bars: z.number().int().positive(),
       nav: z.number().int().positive(),
+      barsHasMoreBefore: z.boolean().optional(),
     }),
     sections: z.record(z.string(), marketDetailSectionSchema),
     dependencies: z.record(z.string(), marketDetailDependencySchema),
@@ -494,6 +550,10 @@ export type MarketDetailRequest = {
   include?: readonly MarketDetailCapability[];
   barsLimit?: number;
   navLimit?: number;
+  start?: string;
+  end?: string;
+  indicatorParams?: Readonly<Record<string, number>>;
+  calculationAnchor?: string;
   refresh?: boolean;
 };
 export type MarketDetailAssetType = z.infer<typeof marketDetailAssetTypeSchema>;
@@ -524,7 +584,7 @@ export type MarketDetailResponse = {
     supported: MarketDetailCapability[];
     unsupported: MarketDetailCapability[];
   };
-  limits: { bars: number; nav: number };
+  limits: { bars: number; nav: number; barsHasMoreBefore?: boolean };
   sections: Partial<Record<MarketDetailCapability, MarketDetailSection>>;
   dependencies: Record<string, MarketDetailDependency>;
   requestId: string;

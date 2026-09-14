@@ -28,6 +28,7 @@ import {
   MARKET_CACHE_POLICIES,
   MarketResultCache,
 } from './market-result-cache.js';
+import { buildIndicatorRequest, validateIndicatorLimit, type MarketIndicatorRequestOptions } from './market-indicator-request.js';
 
 export { resolveEffectiveBars } from './market-bar-cache.js';
 
@@ -513,11 +514,13 @@ export class MarketService {
   async getIndicator(
     input: string,
     name: 'MA' | 'MACD' | 'RSI' | 'ATR',
-    options: { refresh?: boolean } = {},
+    options: MarketIndicatorRequestOptions = {},
   ): Promise<IndicatorV1> {
     const { symbol } = normalizeSymbol(input);
     const refresh = options.refresh === true;
-    const key = `indicator:${symbol}:${name}`;
+    validateIndicatorLimit(options.limit);
+    const indicatorRequest = buildIndicatorRequest(symbol, name, options);
+    const { key } = indicatorRequest;
     const parse = (value: unknown) => indicatorSchemaV1.parse(value);
     const markCached = (value: IndicatorV1) =>
       indicatorSchemaV1.parse({ ...value, servedFromCache: true });
@@ -534,9 +537,7 @@ export class MarketService {
           markCached,
           policy: MARKET_CACHE_POLICIES.indicator,
           load: async () => {
-            const raw = await this.dsa.get<Record<string, unknown>>(
-              `/api/v1/thesis-ledger/market/indicators/${name.toLowerCase()}?symbol=${encodeURIComponent(symbol)}&timeframe=1d`,
-            );
+            const raw = await this.dsa.get<Record<string, unknown>>(indicatorRequest.path);
             return indicatorSchemaV1.parse({
               ...raw,
               version: 1,

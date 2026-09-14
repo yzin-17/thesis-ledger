@@ -540,11 +540,17 @@ describe('行情缓存', () => {
     await service.getIndicator('600519', 'RSI');
     expect(dsa.get).toHaveBeenCalledTimes(1);
 
+    await service.getIndicator('600519', 'RSI', {
+      start: '2025-01-01',
+      parameters: { period: 14 },
+    });
+    expect(dsa.get).toHaveBeenCalledTimes(2);
+
     dsa.get.mockRejectedValueOnce(new Error('offline'));
     await expect(service.getIndicator('600519', 'RSI', { refresh: true })).resolves.toMatchObject({
       fallbackUsed: true,
     });
-    expect(dsa.get).toHaveBeenCalledTimes(2);
+    expect(dsa.get).toHaveBeenCalledTimes(3);
   });
 });
 

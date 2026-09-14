@@ -23,6 +23,10 @@ export const marketDetailRequestKey = (request: MarketDetailRequest) =>
     include: request.include ? [...request.include].sort() : null,
     barsLimit: request.barsLimit ?? 30,
     navLimit: request.navLimit ?? 30,
+    start: request.start ?? null,
+    end: request.end ?? null,
+    indicatorParams: request.indicatorParams ?? null,
+    calculationAnchor: request.calculationAnchor ?? null,
     refresh: request.refresh === true,
   });
 

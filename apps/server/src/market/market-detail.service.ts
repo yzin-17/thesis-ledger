@@ -21,6 +21,10 @@ import { currentTraceId } from '../platform/structured-logger.js';
 import { DsaError } from '../integration/dsa/dsa.client.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketService } from './market.service.js';
+import {
+  parseMarketDetailDateRange,
+  parseMarketDetailIndicatorParams,
+} from './market-request-validation.js';
 
 export const MARKET_DETAIL_CAPABILITIES = [
   'quote',
@@ -73,7 +77,6 @@ export const MARKET_DETAIL_CAPABILITY_MATRIX: Record<
 
 type DetailInclude = string | readonly string[] | undefined;
 type DetailLimit = number | string | undefined;
-
 type ResolvedIdentity = {
   symbol: string;
   assetType: MarketDetailAssetType;
@@ -147,11 +150,17 @@ export class MarketDetailService {
       include?: DetailInclude;
       barsLimit?: DetailLimit;
       navLimit?: DetailLimit;
+      start?: string;
+      end?: string;
+      indicatorParams?: string | Readonly<Record<string, number>>;
+      calculationAnchor?: string;
       refresh?: boolean;
     } = {},
   ): Promise<MarketDetailResponse> {
     const barsLimit = this.parseLimit(options.barsLimit, 'barsLimit');
     const navLimit = this.parseLimit(options.navLimit, 'navLimit');
+    const indicatorParams = parseMarketDetailIndicatorParams(options.indicatorParams);
+    parseMarketDetailDateRange(options.start, options.end);
     const identity = await this.resolveIdentity(input);
     const baseSupported = MARKET_DETAIL_CAPABILITY_MATRIX[identity.assetType];
     const requested = this.parseInclude(options.include) ?? [...baseSupported];
@@ -170,6 +179,7 @@ export class MarketDetailService {
       string,
       { status: MarketDetailSectionStatus; error?: MarketDetailDiagnostic }
     > = {};
+    let barsHasMoreBefore = false;
 
     for (const capability of requested) {
       if (!baseSupported.includes(capability)) {
@@ -214,11 +224,21 @@ export class MarketDetailService {
     const barsNeeded = supportedRequested.includes('bars') || indicatorRequested.length > 0;
     const barsPromise = barsNeeded
       ? this.loadSection('bars', requestId, async () => {
-          const bars = await this.market.getBars(identity.symbol, '1d', undefined, {
-            allowStale: true,
-            ...refreshOptions,
-          });
-          return bars.slice(-barsLimit);
+          const bars = await this.market.getBars(
+            identity.symbol,
+            '1d',
+            {
+              ...(options.start ? { start: options.start } : {}),
+              ...(options.end ? { end: options.end } : {}),
+              limit: barsLimit + 1,
+            },
+            {
+              allowStale: true,
+              ...refreshOptions,
+            },
+          );
+          barsHasMoreBefore = bars.length > barsLimit;
+          return bars.length > barsLimit ? bars.slice(-barsLimit) : bars;
         })
       : null;
 
@@ -295,6 +315,13 @@ export class MarketDetailService {
               }
               const section = await this.loadSection(capability, requestId, () =>
                 this.market.getIndicator(identity.symbol, indicatorName(capability), {
+                  ...(options.start ? { start: options.start } : {}),
+                  ...(options.end ? { end: options.end } : {}),
+                  limit: barsLimit,
+                  ...(indicatorParams ? { parameters: indicatorParams } : {}),
+                  ...(options.calculationAnchor
+                    ? { calculationAnchor: options.calculationAnchor }
+                    : {}),
                   ...refreshOptions,
                 }),
               );
@@ -323,7 +350,7 @@ export class MarketDetailService {
           (capability) => !baseSupported.includes(capability),
         ),
       },
-      limits: { bars: barsLimit, nav: navLimit },
+      limits: { bars: barsLimit, nav: navLimit, barsHasMoreBefore },
       sections,
       dependencies,
       requestId,

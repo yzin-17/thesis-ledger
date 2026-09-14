@@ -161,7 +161,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                     className={cn('text-button', account.active !== false && 'danger')}
                     size="sm"
                     type="button"
-                    variant={account.active === false ? 'outline' : 'destructive'}
+                    variant={account.active === false ? 'link' : 'destructive'}
                     disabled={busyAction !== null}
                     aria-busy={busyAction === `account-toggle:${account.id}`}
                     onClick={() => void toggleAccount(account)}

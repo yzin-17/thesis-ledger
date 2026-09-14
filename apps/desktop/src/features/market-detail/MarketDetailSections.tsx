@@ -17,7 +17,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { dataSourceDisplay } from '../market-data/market-data.types.js';
-import { IndicatorValueChart, MarketPriceChart } from './MarketDetailCharts.js';
+import {
+  FundNavHistoryChart,
+  MarketPriceChart,
+  type MarketIndicatorParams,
+} from './MarketDetailCharts.js';
 import {
   isRetryableMarketDetailSection,
   marketDetailSectionTitle,
@@ -224,10 +228,24 @@ export const QuoteSection = ({
 
 export const BarsSection = ({
   section,
+  indicators = [],
+  onIndicatorParamsChange,
+  onLoadEarlier,
+  canLoadEarlier,
+  historyLoading,
+  historyError,
+  onRetryEarlier,
   onRetry,
   retrying,
 }: {
   section: MarketDetailSection;
+  indicators?: IndicatorV1[];
+  onIndicatorParamsChange?: (params: MarketIndicatorParams) => void;
+  onLoadEarlier?: () => void;
+  canLoadEarlier?: boolean;
+  historyLoading?: boolean;
+  historyError?: string | null;
+  onRetryEarlier?: () => void;
   onRetry: () => void;
   retrying: boolean;
 }) => {
@@ -242,7 +260,18 @@ export const BarsSection = ({
       />
       {renderReadyOrEmpty(
         section,
-        bars.length > 0 ? <MarketPriceChart bars={bars} /> : null,
+        bars.length > 0 ? (
+          <MarketPriceChart
+            bars={bars}
+            indicators={indicators}
+            {...(onIndicatorParamsChange ? { onIndicatorParamsChange } : {})}
+            {...(onLoadEarlier ? { onLoadEarlier } : {})}
+            {...(canLoadEarlier !== undefined ? { canLoadEarlier } : {})}
+            {...(historyLoading !== undefined ? { historyLoading } : {})}
+            {...(historyError !== undefined ? { historyError } : {})}
+            {...(onRetryEarlier ? { onRetryEarlier } : {})}
+          />
+        ) : null,
         <p className="empty-inline">当前没有可用日线。</p>,
       )}
     </section>
@@ -266,28 +295,13 @@ export const IndicatorSection = ({
     capability: MarketDetailCapability;
     section: MarketDetailSection;
   }>;
-  const firstFailure = sections.find(({ section }) => section.status === 'unavailable');
-  const allUnavailable =
-    sections.length > 0 && sections.every(({ section }) => section.status === 'unavailable');
-  const renderIndicator = ({ capability, section }: (typeof sections)[number]) => {
-    const indicator = section.data as IndicatorV1 | undefined;
-    return (
-      <div key={capability} className="grid min-w-0 gap-3 rounded-lg border border-border p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium">{capability.slice('indicator:'.length)}</span>
-          <SectionStatus
-            section={section}
-            {...retryProps(section, () => onRetry(capability))}
-            retrying={retrying === capability}
-            {...(allUnavailable ? { showErrorMessage: false } : {})}
-          />
-        </div>
-        {indicator && sectionIsDataReady(section) ? (
-          <IndicatorValueChart indicator={indicator} />
-        ) : null}
-      </div>
-    );
-  };
+  const firstProblem = sections.find(({ section }) => section.status !== 'ready');
+  const missingHistory = sections.filter(({ section }) => {
+    if (!sectionIsDataReady(section)) return false;
+    const data = section.data as IndicatorV1 | undefined;
+    return !data?.points || !data.inputProvenance || !data.calculationAnchor;
+  });
+  if (sections.length === 0 || (!firstProblem && missingHistory.length === 0)) return null;
   return (
     <section
       className="grid gap-3 border-t border-border pt-4"
@@ -296,23 +310,32 @@ export const IndicatorSection = ({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="m-0 text-sm font-medium">技术指标</h3>
-          <p className="mb-0 mt-1 text-xs text-muted-foreground">MA、MACD、RSI 共享日线依赖。</p>
         </div>
-        {!allUnavailable && firstFailure ? (
+        {firstProblem ? (
           <SectionStatus
-            section={firstFailure.section}
-            {...retryProps(firstFailure.section, () => onRetry(firstFailure.capability))}
-            retrying={retrying === firstFailure.capability}
+            section={firstProblem.section}
+            {...retryProps(firstProblem.section, () => onRetry(firstProblem.capability))}
+            retrying={retrying === firstProblem.capability}
           />
         ) : null}
       </div>
-      {allUnavailable ? (
-        <p className="empty-inline">
-          {firstFailure?.section.error?.message ?? '技术指标暂时不可用。'}
-        </p>
+      {firstProblem?.section.status === 'empty' ? (
+        <p className="empty-inline">技术指标暂无数据。</p>
       ) : null}
-      {!allUnavailable ? (
-        <div className="grid gap-3 lg:grid-cols-2">{sections.map(renderIndicator)}</div>
+      {missingHistory.length > 0 ? (
+        <p className="m-0 text-xs text-destructive" role="alert">
+          {missingHistory.map(({ capability }) => marketDetailSectionTitle(capability)).join('、')}
+          缺少历史序列或日线口径证据，暂不叠加到图表。{' '}
+          <Button
+            type="button"
+            size="sm"
+            variant="link"
+            className="h-auto p-0"
+            onClick={() => onRetry(missingHistory[0]!.capability)}
+          >
+            重试
+          </Button>
+        </p>
       ) : null}
     </section>
   );
@@ -416,17 +439,7 @@ export const FundNavHistorySection = ({
       />
       {renderReadyOrEmpty(
         section,
-        history.length > 0 ? (
-          <div className="bar-strip">
-            {history.slice(-10).map((point) => (
-              <div key={point.navDate}>
-                <span>{new Date(point.navDate).toLocaleDateString('zh-CN')}</span>
-                <strong>{number.format(point.unitNav)}</strong>
-                <small>{point.provider}</small>
-              </div>
-            ))}
-          </div>
-        ) : null,
+        history.length > 0 ? <FundNavHistoryChart history={history} /> : null,
         <p className="empty-inline">当前没有可用净值历史。</p>,
       )}
     </section>

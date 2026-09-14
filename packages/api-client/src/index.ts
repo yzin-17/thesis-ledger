@@ -437,10 +437,11 @@ export class ThesisLedgerApiClient {
         instrumentSearchResponseSchema,
       ),
     getDetail: (symbol: string, params: MarketDetailQuery = {}) => {
-      const { signal, refresh, include, ...query } = params;
+      const { signal, refresh, include, indicatorParams, ...query } = params;
       return this.requestParsed<MarketDetailResponse>(
         `/market/${encodeURIComponent(symbol)}/detail${queryString({
           ...query,
+          ...(indicatorParams ? { indicatorParams: JSON.stringify(indicatorParams) } : {}),
           ...(refresh ? { refresh: 1 } : {}),
           ...(include ? { include } : {}),
         })}`,

@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HealthService } from '../../src/platform/health.service.js';
 import { PrismaService } from '../../src/platform/prisma.service.js';
+import { discoverDatabaseStructure } from '../../src/platform/database-structure.js';
 import {
   assertDatabaseSchemaVersion,
   CURRENT_SCHEMA_VERSION,
@@ -40,28 +41,32 @@ describe('current database schema version', () => {
 });
 
 describe('PrismaService schema guard', () => {
-  const createService = (version: string) => {
+  const createService = async (version: string) => {
+    const structure = await discoverDatabaseStructure();
     const service = Object.create(PrismaService.prototype) as PrismaService;
     const connect = vi.fn(async () => undefined);
     const disconnect = vi.fn(async () => undefined);
-    const queryRaw = vi.fn(async () => queryResult(version));
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce(structure.expectedTables.map((tableName) => ({ tableName })))
+      .mockResolvedValueOnce(queryResult(version));
     Object.assign(service, { $connect: connect, $disconnect: disconnect, $queryRaw: queryRaw });
     return { service, connect, disconnect, queryRaw };
   };
 
   it('连接后验证 marker，销毁时断开 Prisma', async () => {
-    const { service, connect, disconnect, queryRaw } = createService(CURRENT_SCHEMA_VERSION);
+    const { service, connect, disconnect, queryRaw } = await createService(CURRENT_SCHEMA_VERSION);
 
     await service.onModuleInit();
     await service.onModuleDestroy();
 
     expect(connect).toHaveBeenCalledOnce();
-    expect(queryRaw).toHaveBeenCalledOnce();
+    expect(queryRaw).toHaveBeenCalledTimes(2);
     expect(disconnect).toHaveBeenCalledOnce();
   });
 
   it('旧版本连接失败并主动断开', async () => {
-    const { service, disconnect } = createService('stale-schema');
+    const { service, disconnect } = await createService('stale-schema');
 
     await expect(service.onModuleInit()).rejects.toThrow('Database schema version mismatch');
     expect(disconnect).toHaveBeenCalledOnce();

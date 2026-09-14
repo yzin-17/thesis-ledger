@@ -4,6 +4,7 @@ import type {
   MarketDetailSection,
   MarketDetailSectionStatus,
 } from '@thesis-ledger/api-client';
+import type { BarV1 } from '@thesis-ledger/schemas';
 
 export interface MarketDetailPosition {
   symbol: string;
@@ -19,10 +20,20 @@ export const mergeMarketDetail = (
 ): MarketDetailResponse => {
   if (!current) return next;
   if (current.symbol !== next.symbol) return current;
+  const sections = { ...current.sections, ...next.sections };
+  const currentBars = current.sections.bars?.data as BarV1[] | undefined;
+  const nextBars = next.sections.bars?.data as BarV1[] | undefined;
+  if (currentBars && nextBars) {
+    const byDate = new Map([...currentBars, ...nextBars].map((bar) => [bar.timestamp, bar]));
+    sections.bars = {
+      ...next.sections.bars!,
+      data: [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
+    } as MarketDetailSection;
+  }
   return {
     ...next,
     requested: [...new Set([...current.requested, ...next.requested])],
-    sections: { ...current.sections, ...next.sections },
+    sections,
     dependencies: { ...current.dependencies, ...next.dependencies },
   };
 };

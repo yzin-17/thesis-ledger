@@ -239,6 +239,63 @@ describe('行情契约', () => {
       }).name,
     ).toBe(name),
   );
+  it('允许带日期 points 和输入口径的指标响应，并保留预热点 null', () => {
+    const result = indicatorSchemaV1.parse({
+      version: 1,
+      symbol: '600519.SH',
+      name: 'MA',
+      parameters: { period: 5 },
+      timeframe: '1d',
+      marketTime: time,
+      calculatedAt: time,
+      values: { ma5: 1, ma60: null },
+      provider: 'mock',
+      engineVersion: 'dsa-thesis-ledger-v1',
+      points: [
+        {
+          timestamp: '2026-01-01T00:00:00Z',
+          values: { ma5: null, ma60: null },
+          inputFingerprint: 'a',
+        },
+        {
+          timestamp: '2026-01-02T00:00:00Z',
+          values: { ma5: 1, ma60: null },
+          inputFingerprint: 'b',
+        },
+      ],
+      inputProvenance: {
+        timeframe: '1d',
+        provider: 'mock',
+        inputDateRange: { start: time, end: time },
+        inputFingerprint: 'series',
+      },
+      calculationAnchor: { timestamp: time, inputFingerprint: 'series' },
+      coverage: { start: time, end: time, complete: true },
+    });
+    expect(result.points?.[0]?.values.ma5).toBeNull();
+    expect(result.values.ma60).toBeNull();
+  });
+
+  it('拒绝乱序或重复日期的指标 points', () => {
+    expect(() =>
+      indicatorSchemaV1.parse({
+        version: 1,
+        symbol: '600519.SH',
+        name: 'MA',
+        parameters: {},
+        timeframe: '1d',
+        marketTime: time,
+        calculatedAt: time,
+        values: { value: 1 },
+        provider: 'mock',
+        engineVersion: '1',
+        points: [
+          { timestamp: '2026-01-02T00:00:00Z', values: { ma5: 1 } },
+          { timestamp: '2026-01-01T00:00:00Z', values: { ma5: 1 } },
+        ],
+      }),
+    ).toThrow('升序');
+  });
   it('校验筹码权重', () =>
     expect(() =>
       chipDistributionSchemaV1.parse({

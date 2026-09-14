@@ -13,6 +13,12 @@ const fetchMarketDetail: MarketDetailFetcher = async (request, signal) => {
     ...(request.include ? { include: request.include } : {}),
     ...(request.barsLimit !== undefined ? { barsLimit: request.barsLimit } : {}),
     ...(request.navLimit !== undefined ? { navLimit: request.navLimit } : {}),
+    ...(request.start !== undefined ? { start: request.start } : {}),
+    ...(request.end !== undefined ? { end: request.end } : {}),
+    ...(request.indicatorParams ? { indicatorParams: request.indicatorParams } : {}),
+    ...(request.calculationAnchor !== undefined
+      ? { calculationAnchor: request.calculationAnchor }
+      : {}),
     ...(request.refresh !== undefined ? { refresh: request.refresh } : {}),
     signal,
   };
