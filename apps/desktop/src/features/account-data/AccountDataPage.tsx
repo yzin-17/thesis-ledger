@@ -1,21 +1,11 @@
 import { PageHeader } from '../shared/PageHeader.js';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
-import { Field, FieldLabel } from '@/components/ui/field';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -23,15 +13,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { accountDisplayLabel, type Account, type Position } from '../portfolio/portfolio.types.js';
-import {
-  useAccountValuationQuery,
-  usePortfolioValuationQuery,
-} from '../portfolio/portfolio.queries.js';
-import { PortfolioPositionTable, PortfolioSummary } from '../portfolio/PortfolioOverview.js';
+import type { Account, Position } from '../portfolio/portfolio.types.js';
+import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
 import { useRemovePortfolioPositionMutation } from '../portfolio/portfolio.mutations.js';
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
 import { ScreenshotImportReview } from '../import/ScreenshotImportReview.js';
@@ -41,7 +26,7 @@ import {
   useReconciliationCandidatesQuery,
   type AccountDataEventFilter,
 } from './account-data.queries.js';
-import { readLastAccount, errorMessage } from './account-data.helpers.js';
+import { errorMessage } from './account-data.helpers.js';
 import { PositionCalibrationSection, TransactionSection } from './AccountDataSections.js';
 import { CashSection } from './AccountDataCashSections.js';
 import {
@@ -60,35 +45,16 @@ import type {
 } from './account-data.types.js';
 import { invalidatePortfolioChange } from './portfolio-change.js';
 import type { PortfolioChangeImpact } from '../portfolio/portfolio.types.js';
+import { AccountDataAccountSelector } from './AccountDataAccountSelector.js';
+import { AccountDataAllAccountsView } from './AccountDataAllAccountsView.js';
+import { AccountDataFrame, AccountDataLoading } from './AccountDataLayout.js';
+import { useAccountDataNavigation } from './useAccountDataNavigation.js';
 
-export const resolveAccountSelection = ({
-  accounts,
-  accountId,
-  requestedAccountId,
-}: {
-  accounts: Account[];
-  accountId: string;
-  requestedAccountId: string;
-}) => {
-  if (requestedAccountId === 'all') return 'all';
-  if (requestedAccountId && accounts.some((account) => account.id === requestedAccountId))
-    return requestedAccountId;
-  if (accountId === 'all') return 'all';
-  if (accountId && accounts.some((account) => account.id === accountId)) return accountId;
-  return accounts[0]?.id ?? '';
-};
-
-export const accountSelectionTransition = (
-  nextAccountId: string,
-  extraLocationUpdates: Record<string, string | null> = {},
-) => ({
-  accountId: nextAccountId,
-  locationUpdates: {
-    ...extraLocationUpdates,
-    accountId: nextAccountId,
-    entry: null,
-  },
-});
+export {
+  accountSelectionTransition,
+  resolveAccountSelection,
+  shouldDeferAccountSelection,
+} from './account-data.selection.js';
 
 export function AccountDataPage({
   accounts,
@@ -105,22 +71,8 @@ export function AccountDataPage({
   mode?: Account['mode'];
   onRetryAccounts?: () => void;
 }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const params = new URLSearchParams(location.search);
-  const requestedAccountId = params.get('accountId') ?? '';
-  const entryRequested = params.get('entry');
-  const requestedTab = params.get('tab');
-  const initialTab: AccountDataTab =
-    requestedTab === 'positions' || requestedTab === 'cash' || requestedTab === 'transactions'
-      ? requestedTab
-      : 'transactions';
-  const [accountId, setAccountId] = useState(
-    () => requestedAccountId || readLastAccount() || accounts[0]?.id || '',
-  );
-  const [tab, setTab] = useState<AccountDataTab>(initialTab);
   const [transactionFilter, setTransactionFilter] = useState<AccountDataEventFilter>('executions');
-  const [executionOpen, setExecutionOpen] = useState(entryRequested === 'execution');
+  const [executionOpen, setExecutionOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ExecutionEvent | null>(null);
   const [auditEvent, setAuditEvent] = useState<LedgerEventV2 | null>(null);
   const [voidEvent, setVoidEvent] = useState<ExecutionEvent | null>(null);
@@ -128,14 +80,13 @@ export function AccountDataPage({
     event: VoidEvent;
     source: ExecutionEvent;
   } | null>(null);
-  const [importOpen, setImportOpen] = useState(entryRequested === 'screenshot');
+  const [importOpen, setImportOpen] = useState(false);
   const [reconciliationOpen, setReconciliationOpen] = useState(false);
   const [cashObservationOpen, setCashObservationOpen] = useState(false);
   const [cashTransferAction, setCashTransferAction] = useState<{
     event: CashTransferEvent;
     mode: 'replace' | 'void' | 'restore';
   } | null>(null);
-  const [accountManagerOpen, setAccountManagerOpen] = useState(params.get('setup') === '1');
   const [draftDirty, setDraftDirty] = useState(false);
   const [positionSheetOpen, setPositionSheetOpen] = useState(false);
   const [positionSheetEditing, setPositionSheetEditing] = useState<Position | null>(null);
@@ -143,10 +94,76 @@ export function AccountDataPage({
   const toastManager = useToastManager();
   const queryClient = useQueryClient();
   const removeSnapshotMutation = useRemovePortfolioPositionMutation();
-  const selectedAccount = accounts.find((account) => account.id === accountId);
-  const allAccountsSelected = accountId === 'all';
-  const isCashAccount = selectedAccount?.type === 'cash';
-  const allValuationQuery = usePortfolioValuationQuery(mode, allAccountsSelected);
+
+  const confirmDiscard = useCallback(async () => {
+    if (!draftDirty) return true;
+    return confirm({
+      title: '放弃未保存修改？',
+      description: '当前有未保存修改，切换后会丢弃，继续吗？',
+      confirmLabel: '放弃修改',
+      cancelLabel: '继续编辑',
+      variant: 'destructive',
+    });
+  }, [confirm, draftDirty]);
+
+  const clearDraft = useCallback(() => {
+    setDraftDirty(false);
+  }, []);
+
+  const resetAccountContext = useCallback(() => {
+    setExecutionOpen(false);
+    setEditingEvent(null);
+    setAuditEvent(null);
+    setVoidEvent(null);
+    setRestoreEvent(null);
+    setImportOpen(false);
+    setReconciliationOpen(false);
+    setCashObservationOpen(false);
+    setCashTransferAction(null);
+  }, []);
+
+  const resetTabContext = useCallback(() => {
+    setExecutionOpen(false);
+    setEditingEvent(null);
+    setImportOpen(false);
+    setReconciliationOpen(false);
+    setCashObservationOpen(false);
+    setCashTransferAction(null);
+  }, []);
+
+  const resetEmptyState = useCallback(() => {
+    resetAccountContext();
+    setPositionSheetOpen(false);
+    setPositionSheetEditing(null);
+  }, [resetAccountContext]);
+
+  const {
+    accountId,
+    accountManagerOpen,
+    allAccountsSelected,
+    entryRequested,
+    handleAccountManagerOpenChange,
+    isCashAccount,
+    navigateToTab,
+    openAccountManager,
+    selectAccount,
+    selectManagedAccount,
+    selectTab,
+    selectedAccount,
+    tab,
+    updateLocation,
+  } = useAccountDataNavigation({
+    accounts,
+    accountsReady,
+    accountsPending,
+    accountsError,
+    confirmDiscard,
+    clearDraft,
+    resetAccountContext,
+    resetEmptyState,
+    resetTabContext,
+  });
+
   const valuationQuery = useAccountValuationQuery(
     accountId,
     selectedAccount?.mode,
@@ -183,114 +200,16 @@ export function AccountDataPage({
     [accountId, queryClient, selectedAccount?.mode],
   );
 
-  const updateLocation = useCallback((updates: Record<string, string | null>) => {
-    const next = new URLSearchParams(location.search);
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === null) next.delete(key);
-      else next.set(key, value);
-    }
-    const search = next.toString();
-    void navigate({ pathname: '/accounts', ...(search ? { search: `?${search}` } : {}) });
-  }, [location.search, navigate]);
-
   useEffect(() => {
-    const nextAccountId = resolveAccountSelection({ accounts, accountId, requestedAccountId });
-    if (nextAccountId === accountId && accounts.length > 0) return;
-    if (accounts.length === 0) {
-      setAccountId('');
-      setDraftDirty(false);
-      setExecutionOpen(false);
-      setEditingEvent(null);
-      setAuditEvent(null);
-      setVoidEvent(null);
-      setRestoreEvent(null);
-      setImportOpen(false);
-      setReconciliationOpen(false);
-      setCashObservationOpen(false);
-      setCashTransferAction(null);
-      setPositionSheetOpen(false);
-      setPositionSheetEditing(null);
-      setAccountManagerOpen(false);
-      try {
-        window.sessionStorage.removeItem('thesis-ledger-last-account');
-      } catch {
-        /* sessionStorage is optional */
-      }
-      updateLocation({ accountId: null, entry: null, tab: null, setup: null });
-      return;
-    }
-    setAccountId(nextAccountId);
-    try {
-      window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
-    } catch {
-      /* sessionStorage is optional */
-    }
-    updateLocation({ accountId: nextAccountId, entry: null });
-  }, [accountId, accounts, requestedAccountId, updateLocation]);
-
-  useEffect(() => {
+    if (entryRequested === 'execution') setExecutionOpen(true);
     if (entryRequested === 'screenshot' && selectedAccount?.type !== 'cash') setImportOpen(true);
   }, [entryRequested, selectedAccount?.type]);
-
-  const confirmDiscard = async () => {
-    if (!draftDirty) return true;
-    return confirm({
-      title: '放弃未保存修改？',
-      description: '当前有未保存修改，切换后会丢弃，继续吗？',
-      confirmLabel: '放弃修改',
-      cancelLabel: '继续编辑',
-      variant: 'destructive',
-    });
-  };
-
-  const selectAccount = async (
-    nextAccountId: string,
-    extraLocationUpdates: Record<string, string | null> = {},
-  ) => {
-    if (!nextAccountId || nextAccountId === accountId) return true;
-    if (!(await confirmDiscard())) return false;
-    setDraftDirty(false);
-    setExecutionOpen(false);
-    setEditingEvent(null);
-    setAuditEvent(null);
-    setVoidEvent(null);
-    setRestoreEvent(null);
-    setImportOpen(false);
-    setReconciliationOpen(false);
-    setCashObservationOpen(false);
-    setCashTransferAction(null);
-    const transition = accountSelectionTransition(nextAccountId, extraLocationUpdates);
-    setAccountId(transition.accountId);
-    try {
-      window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
-    } catch {
-      /* sessionStorage is optional */
-    }
-    updateLocation(transition.locationUpdates);
-    return true;
-  };
-
-  const selectTab = async (nextTab: AccountDataTab) => {
-    if (isCashAccount && nextTab !== 'cash') return;
-    if (nextTab === tab) return;
-    if (!(await confirmDiscard())) return;
-    setDraftDirty(false);
-    setTab(nextTab);
-    setExecutionOpen(false);
-    setEditingEvent(null);
-    setImportOpen(false);
-    setReconciliationOpen(false);
-    setCashObservationOpen(false);
-    setCashTransferAction(null);
-    updateLocation({ tab: nextTab, entry: null });
-  };
 
   const openCreateExecution = () => {
     if (!selectedAccount || selectedAccount.type === 'cash') return;
     setEditingEvent(null);
     setExecutionOpen(true);
-    setTab('transactions');
-    updateLocation({ tab: 'transactions', entry: 'execution' });
+    navigateToTab('transactions', 'execution');
   };
 
   const openCorrectExecution = async (event: ExecutionEvent) => {
@@ -299,8 +218,7 @@ export function AccountDataPage({
     setAuditEvent(null);
     setEditingEvent(event);
     setExecutionOpen(true);
-    setTab('transactions');
-    updateLocation({ tab: 'transactions', entry: 'execution' });
+    navigateToTab('transactions', 'execution');
   };
 
   const closeExecution = async (open: boolean, options?: ExecutionSheetCloseOptions) => {
@@ -333,17 +251,6 @@ export function AccountDataPage({
     updateLocation({ entry: null });
   };
 
-  const closeAccountManager = async (open: boolean) => {
-    if (open) {
-      setAccountManagerOpen(true);
-      return;
-    }
-    if (!(await confirmDiscard())) return;
-    setDraftDirty(false);
-    setAccountManagerOpen(false);
-    updateLocation({ setup: null });
-  };
-
   const openAudit = (event: LedgerEventV2) => {
     setAuditEvent(event);
   };
@@ -365,49 +272,6 @@ export function AccountDataPage({
             position.accountId === event.accountId && position.symbol === event.payload.symbol,
         )
       : undefined;
-
-  let accountSelectionLabel = '选择账户';
-  if (allAccountsSelected) accountSelectionLabel = '全部账户';
-  else if (selectedAccount) accountSelectionLabel = accountDisplayLabel(selectedAccount);
-
-  const accountSelector = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <Field className="min-w-0 flex-1 sm:flex-row sm:items-center sm:gap-3">
-        <FieldLabel htmlFor="account-data-account" className="shrink-0 whitespace-nowrap">
-          当前账户
-        </FieldLabel>
-        <Select
-          value={accountId || null}
-          onValueChange={(value) => {
-            if (value) void selectAccount(value);
-          }}
-        >
-            <SelectTrigger id="account-data-account" className="w-full">
-              <SelectValue placeholder="选择账户">
-                {accountSelectionLabel}
-              </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">全部账户</SelectItem>
-              {accounts.map((account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {accountDisplayLabel(account)}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </Field>
-      {!allAccountsSelected && (
-        <div className="flex shrink-0">
-          <Button type="button" variant="outline" onClick={() => setAccountManagerOpen(true)}>
-            管理账户
-          </Button>
-        </div>
-      )}
-    </div>
-  );
 
   const openSnapshotEditor = (event: LedgerEventV2) => {
     const position = findSnapshotPosition(event);
@@ -492,40 +356,13 @@ export function AccountDataPage({
   }
 
   if (allAccountsSelected) {
-    if (allValuationQuery.isPending && !allValuationQuery.data) return <AccountDataLoading />;
-    if (allValuationQuery.isError && !allValuationQuery.data) {
-      return (
-        <AccountDataFrame>
-          <PageHeader
-            className="mb-0"
-            eyebrow="ACCOUNT DATA"
-            title="全部账户"
-            description="查看当前估值范围内的组合汇总与持仓明细。"
-          />
-          {accountSelector}
-          <Alert variant="destructive">
-            <AlertTitle>组合读取失败</AlertTitle>
-            <AlertDescription>无法读取全部账户估值，请稍后重试。</AlertDescription>
-            <Button type="button" variant="outline" onClick={() => void allValuationQuery.refetch()}>
-              重新加载组合
-            </Button>
-          </Alert>
-        </AccountDataFrame>
-      );
-    }
-    if (!allValuationQuery.data) return <AccountDataLoading />;
     return (
-      <AccountDataFrame>
-        <PageHeader
-          className="mb-0"
-          eyebrow="ACCOUNT DATA"
-          title="全部账户"
-          description="只读查看当前估值范围内的组合汇总与持仓明细。"
-        />
-        {accountSelector}
-        <PortfolioSummary portfolio={allValuationQuery.data} />
-        <PortfolioPositionTable portfolio={allValuationQuery.data} />
-      </AccountDataFrame>
+      <AccountDataAllAccountsView
+        accounts={accounts}
+        accountId={accountId}
+        mode={mode}
+        onSelectAccount={selectAccount}
+      />
     );
   }
 
@@ -546,7 +383,12 @@ export function AccountDataPage({
         }
       />
 
-      {accountSelector}
+      <AccountDataAccountSelector
+        accounts={accounts}
+        accountId={accountId}
+        onSelectAccount={selectAccount}
+        onManageAccounts={openAccountManager}
+      />
 
       <Tabs value={activeTab} onValueChange={(value) => void selectTab(value as AccountDataTab)}>
         <TabsList variant="line">
@@ -722,7 +564,7 @@ export function AccountDataPage({
       <Sheet
         open={accountManagerOpen}
         onOpenChange={(open) => {
-          void closeAccountManager(open);
+          void handleAccountManagerOpenChange(open);
         }}
       >
         <SheetContent
@@ -740,34 +582,12 @@ export function AccountDataPage({
             accountManagerOpen={accountManagerOpen}
             onDirtyChange={setDraftDirty}
             onAccountEntry={(nextAccountId) => {
-              void (async () => {
-                if (await selectAccount(nextAccountId, { setup: null })) {
-                  setAccountManagerOpen(false);
-                }
-              })();
+              void selectManagedAccount(nextAccountId);
             }}
             onSaved={handlePortfolioChanged}
           />
         </SheetContent>
       </Sheet>
-    </AccountDataFrame>
-  );
-}
-
-function AccountDataFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="module-page" data-account-data-page>
-      <div className="flex w-full max-w-7xl flex-col gap-6">{children}</div>
-    </section>
-  );
-}
-
-function AccountDataLoading() {
-  return (
-    <AccountDataFrame>
-      <PageHeader className="mb-0" eyebrow="ACCOUNT DATA" title="账户数据" />
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-96 w-full" />
     </AccountDataFrame>
   );
 }

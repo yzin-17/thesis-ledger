@@ -12,6 +12,7 @@ import {
   AccountDataPage,
   accountSelectionTransition,
   resolveAccountSelection,
+  shouldDeferAccountSelection,
 } from '../src/features/account-data/AccountDataPage.js';
 import { chargeCategoryLabel } from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
@@ -188,6 +189,18 @@ describe('账户数据页面契约', () => {
       new URL('../src/features/account-data/AccountDataPage.tsx', import.meta.url),
       'utf8',
     );
+    const selectorSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataAccountSelector.tsx', import.meta.url),
+      'utf8',
+    );
+    const navigationSource = readFileSync(
+      new URL('../src/features/account-data/useAccountDataNavigation.ts', import.meta.url),
+      'utf8',
+    );
+    const allAccountsSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataAllAccountsView.tsx', import.meta.url),
+      'utf8',
+    );
 
     expect(markup).toContain('账户数据');
     expect(markup).toContain('持仓');
@@ -198,10 +211,15 @@ describe('账户数据页面契约', () => {
     expect(markup).toContain('实际证券账户 · 证券 · CNY · 实际');
     expect(markup).not.toContain('账本模式');
     expect(markup).not.toContain('data-selected-account-id');
-    expect(pageSource).toContain('accountDisplayLabel(selectedAccount)');
+    expect(selectorSource).toContain('accountDisplayLabel(selectedAccount)');
     expect(markup).toContain('data-active');
-    expect(pageSource).toMatch(/const selectAccount[\s\S]*?setCashTransferAction\(null\)/);
-    expect(pageSource).toMatch(/const selectTab[\s\S]*?setCashTransferAction\(null\)/);
+    expect(navigationSource).toMatch(/const selectAccount[\s\S]*?transitionToAccount\(/);
+    expect(navigationSource).toMatch(/const selectTab[\s\S]*?resetTabContext\(\)/);
+    expect(navigationSource).toMatch(
+      /const selectManagedAccount[\s\S]*?transitionToAccount\(nextAccountId, \{ setup: null \}, true\)/,
+    );
+    expect(pageSource).toContain('void selectManagedAccount(nextAccountId);');
+    expect(allAccountsSource).not.toContain('onManageAccounts');
 
     const fundMarkup = renderPage('', [fundAccount], false);
     expect(fundMarkup).toContain('支付宝 · 基金 · CNY · 实际');
@@ -239,12 +257,71 @@ describe('账户数据页面契约', () => {
       if (value === null) search.delete(key);
       else search.set(key, value);
     }
-    expect(transition.accountId).toBe('all');
+    expect('accountId' in transition).toBe(false);
+    expect(transition.locationUpdates.accountId).toBe('all');
     expect(search.toString()).toBe('tab=positions&accountId=all');
 
     const concreteTransition = accountSelectionTransition(shadowAccount.id);
     search.set('accountId', concreteTransition.locationUpdates.accountId);
     expect(search.get('accountId')).toBe(shadowAccount.id);
+  });
+
+  it('账户选择状态机在 URL 更新前不回退旧账户，更新后再同步新目标', () => {
+    const toAll = accountSelectionTransition('all');
+    expect('accountId' in toAll).toBe(false);
+    expect(toAll.locationUpdates.accountId).toBe('all');
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: account.id,
+        requestedAccountId: 'all',
+      }),
+    ).toBe('all');
+
+    const toShadow = accountSelectionTransition(shadowAccount.id);
+    expect('accountId' in toShadow).toBe(false);
+    expect(toShadow.locationUpdates.accountId).toBe(shadowAccount.id);
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: 'all',
+        requestedAccountId: shadowAccount.id,
+      }),
+    ).toBe(shadowAccount.id);
+  });
+
+  it('账户目录从 pending/error 到 loaded 时保留 all 与具体账户深链目标', () => {
+    expect(
+      shouldDeferAccountSelection({
+        accountsReady: false,
+        accountsPending: true,
+        accountsError: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldDeferAccountSelection({
+        accountsReady: false,
+        accountsPending: false,
+        accountsError: true,
+      }),
+    ).toBe(true);
+
+    const loadedState = { accountsReady: true, accountsPending: false, accountsError: false };
+    expect(shouldDeferAccountSelection(loadedState)).toBe(false);
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: 'all',
+        requestedAccountId: 'all',
+      }),
+    ).toBe('all');
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: shadowAccount.id,
+        requestedAccountId: shadowAccount.id,
+      }),
+    ).toBe(shadowAccount.id);
   });
 
   it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {

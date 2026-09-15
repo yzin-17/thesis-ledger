@@ -36,6 +36,11 @@ const createHarness = () => {
       findUnique: positionFindUnique,
       findMany: positionFindMany,
     },
+    ledgerEvent: {
+      findFirst: vi.fn(
+        async (): Promise<{ occurredAt: Date | null; payload: unknown } | null> => null,
+      ),
+    },
   };
   const context = (accountId: string) => ({
     transaction,
@@ -213,5 +218,47 @@ describe('Ledger position baseline composite mutations', () => {
 
     expect(harness.appendRevision).not.toHaveBeenCalled();
     expect(rebuildLedgerProjection).not.toHaveBeenCalled();
+  });
+
+  it('移除后重新保存时，较早的表单时间不会让新快照落到移除之前', async () => {
+    const harness = createHarness();
+    await harness.service.setPosition(
+      accountA,
+      '600519.SH',
+      '0',
+      '10',
+      'manual',
+      '手工移除持仓',
+    );
+
+    harness.transaction.ledgerEvent.findFirst.mockResolvedValueOnce({
+      occurredAt: new Date('2026-09-15T07:54:18.000Z'),
+      payload: { symbol: '600519.SH', quantity: '0.00' },
+    });
+
+    await harness.service.setPosition(
+      accountA,
+      '600519.SH',
+      '80',
+      '4',
+      'manual',
+      '保存当前持仓',
+      {
+        assetType: 'stock',
+        temporal: {
+          observedAt: '2026-09-15T07:54:00.000Z',
+          capturedAt: '2026-09-15T07:54:00.000Z',
+          timePrecision: 'INSTANT',
+        },
+      },
+    );
+
+    const event = harness.appendRevision.mock.calls.at(-1)?.[1] as {
+      occurredAt: string;
+      payload: { capturedAt: string };
+    };
+    expect(event.occurredAt).toBe('2026-09-15T07:54:18.000Z');
+    expect(event.payload.capturedAt).toBe('2026-09-15T07:54:18.000Z');
+    expect(harness.appendRevision).toHaveBeenCalledTimes(2);
   });
 });

@@ -17,6 +17,8 @@ import { rebuildLedgerProjection } from './ledger-projection.js';
 const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
 const MANUAL_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.manual;
 const SCREENSHOT_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.screenshot;
+const isZeroQuantity = (value: unknown) =>
+  typeof value === 'string' && /^0(?:\.0+)?$/.test(value);
 
 type LedgerTransactionClient = Prisma.TransactionClient;
 
@@ -129,6 +131,45 @@ export class LedgerService {
     });
   }
 
+  private async normalizePositionTemporalAfterRemoval(
+    client: Pick<LedgerTransactionClient, 'ledgerEvent'>,
+    accountId: string,
+    symbol: string,
+    quantity: string,
+    options?: SetPositionOptions,
+  ): Promise<SetPositionOptions | undefined> {
+    const observedAt = options?.temporal?.observedAt;
+    if (isZeroQuantity(quantity) || !observedAt || !options?.temporal) return options;
+
+    const latest = await client.ledgerEvent.findFirst({
+      where: {
+        accountId,
+        type: 'POSITION_BASELINE_OBSERVATION',
+        payload: { path: ['symbol'], equals: symbol },
+      },
+      orderBy: { ledgerRevision: 'desc' },
+      select: { occurredAt: true, payload: true },
+    });
+    if (
+      !latest?.occurredAt ||
+      typeof latest.payload !== 'object' ||
+      latest.payload === null ||
+      !isZeroQuantity((latest.payload as { quantity?: unknown }).quantity) ||
+      new Date(observedAt) >= latest.occurredAt
+    )
+      return options;
+
+    const normalizedAt = latest.occurredAt.toISOString();
+    return {
+      ...options,
+      temporal: {
+        ...options.temporal,
+        observedAt: normalizedAt,
+        capturedAt: normalizedAt,
+      },
+    };
+  }
+
   private async appendPositionBaselineWithClient(
     context: Parameters<LedgerV2Repository['appendRevision']>[0],
     accountId: string,
@@ -230,6 +271,13 @@ export class LedgerService {
     const batchId = randomUUID();
     const recordedAt = new Date().toISOString();
     const result = await this.repository.withAccountWrite(accountId, async (context) => {
+      const normalizedOptions = await this.normalizePositionTemporalAfterRemoval(
+        context.transaction,
+        accountId,
+        symbol,
+        quantity,
+        options,
+      );
       const event = await this.appendPositionBaselineWithClient(
         context,
         accountId,
@@ -238,7 +286,7 @@ export class LedgerService {
         costPrice,
         source,
         reason,
-        options,
+        normalizedOptions,
         batchId,
         recordedAt,
       );
