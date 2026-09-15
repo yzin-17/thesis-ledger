@@ -1,15 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  clearMarketProviderCredential,
   confirmMarketInstrument,
   removeMarketProvider,
   saveMarketPolicy,
-  saveMarketProvider,
   startCatalogSync,
   testMarketProvider,
 } from './market-data.api.js';
 import { marketDataKeys } from './market-data.queries.js';
-import type { MarketPolicy, ProviderManifest } from './market-data.types.js';
+import type { MarketPolicy, ProviderManifest, ProviderCredentialDraft } from './market-data.types.js';
 
 export const useSaveMarketPolicyMutation = () => {
   const client = useQueryClient();
@@ -19,27 +17,10 @@ export const useSaveMarketPolicyMutation = () => {
   });
 };
 
-export const useSaveMarketProviderMutation = () => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ provider, credential }: { provider: ProviderManifest; credential?: string }) =>
-      saveMarketProvider(provider, credential),
-    onSuccess: () => client.invalidateQueries({ queryKey: marketDataKeys.providers() }),
-  });
-};
-
-export const useClearMarketProviderCredentialMutation = () => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: clearMarketProviderCredential,
-    onSuccess: () => client.invalidateQueries({ queryKey: marketDataKeys.providers() }),
-  });
-};
-
 export const useTestMarketProviderMutation = () =>
   useMutation({
-    mutationFn: ({ provider, credential }: { provider: ProviderManifest; credential?: string }) =>
-      testMarketProvider(provider, credential),
+    mutationFn: ({ provider, credentials }: { provider: ProviderManifest; credentials?: ProviderCredentialDraft }) =>
+      testMarketProvider(provider, credentials),
   });
 
 export const useRemoveMarketProviderMutation = () => {

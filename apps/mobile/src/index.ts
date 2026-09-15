@@ -46,6 +46,7 @@ export interface MobileDashboardState {
 export const mobileNavigation = [
   { key: 'portfolio', label: '投资组合', readOnly: true },
   { key: 'risk', label: '风险事件', readOnly: true },
+  { key: 'account', label: '账户', readOnly: false },
 ] as const;
 
 const initialState: MobileDashboardState = {
@@ -128,6 +129,7 @@ export const createMobileBootstrap = (options: MobileBootstrapOptions) => {
   return {
     platform: 'react-native' as const,
     apiBaseUrl: options.apiBaseUrl,
+    api,
     navigation: mobileNavigation,
     store: new MobileReadOnlyStore(api),
   };

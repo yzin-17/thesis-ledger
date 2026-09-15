@@ -6,9 +6,15 @@
 
 ## 当前文档
 
+数据源即时启停与页面凭证配置：[规格](specs/2026-09-14-market-provider-credentials.md) · [实施任务](tasks/2026-09-14-market-provider-credentials.md)（实施中，真实运行时与在线验收未执行）。
+
+前端可配置 AI Provider 与 OpenRouter 接入：[规格](specs/2026-09-14-openrouter-free-ai-provider.md) · [实施任务](archive/tasks/2026-09-14-openrouter-free-ai-provider.md)（页面、动态 Registry、真实 OpenRouter 连接与目标 Compose/浏览器验收完成）。模型目录发现：[规格](specs/2026-09-15-ai-provider-model-discovery.md) · [实施任务](archive/tasks/2026-09-15-ai-provider-model-discovery.md)（Server 代理与标签式多选器验收完成）。
+
 开发数据库重建：[归档规格](archive/specs/2026-09-14-dev-database-rebuild.md) · [归档任务](archive/tasks/2026-09-14-dev-database-rebuild.md) · [验证记录](reviews/2026-09-14-dev-database-rebuild.md)（当前开发库重建完成，Server/Worker 已恢复 healthy）。
 
-全站体验统一规划：[规格](specs/2026-09-08-ui-interaction-consistency.md) · [实施任务](tasks/2026-09-08-ui-interaction-consistency.md)（实施中）。组合概览收益指标语义统一：[规格](specs/2026-09-09-portfolio-pnl-metrics.md) · [实施任务](tasks/2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）。策略风险规则与 AI 多模型优化：[规格](specs/2026-09-09-strategy-risk-ai-optimization.md) · [实施任务](tasks/2026-09-09-strategy-risk-ai-optimization.md)（按 G1/G2/G3 推进，真实运行待验收）。历史建仓时间补录：[规格](specs/2026-09-10-trade-opening-boundary-supplement.md) · [实施任务](tasks/2026-09-10-trade-opening-boundary-supplement.md)（代码实现完成，待运行时验收）。日线行情与技术指标联动：[规格](specs/2026-09-10-market-chart-indicator-integration.md) · [实施任务](tasks/2026-09-10-market-chart-indicator-integration.md)（2026-09-13 实施完成，独立本地验收通过）。
+账户永久删除：[规格](specs/2026-09-14-permanent-account-deletion.md) · [实施任务](tasks/2026-09-14-permanent-account-deletion.md)（代码、隔离数据库与 Server HTTP 验收完成；Desktop 浏览器和 Mobile 原生验收未完成）。全站体验统一规划：[规格](specs/2026-09-08-ui-interaction-consistency.md) · [实施任务](tasks/2026-09-08-ui-interaction-consistency.md)（实施中）。组合概览收益指标语义统一：[规格](specs/2026-09-09-portfolio-pnl-metrics.md) · [实施任务](tasks/2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）。策略风险规则与 AI 多模型优化：[规格](specs/2026-09-09-strategy-risk-ai-optimization.md) · [实施任务](tasks/2026-09-09-strategy-risk-ai-optimization.md)（按 G1/G2/G3 推进，真实运行待验收）。历史建仓时间补录：[规格](specs/2026-09-10-trade-opening-boundary-supplement.md) · [实施任务](tasks/2026-09-10-trade-opening-boundary-supplement.md)（代码实现完成，待运行时验收）。日线行情与技术指标联动：[规格](specs/2026-09-10-market-chart-indicator-integration.md) · [实施任务](tasks/2026-09-10-market-chart-indicator-integration.md)（2026-09-13 实施完成，独立本地验收通过）。
+
+组合估值按需查询与 ETF 行情上游保护：[规格](specs/2026-09-14-portfolio-valuation-demand-guard.md) · [实施任务](tasks/2026-09-14-portfolio-valuation-demand-guard.md)（规划完成，待从 T1 开始实施）。
 
 | 目录 | 用途与主要入口 |
 | --- | --- |

@@ -86,8 +86,8 @@ export function ExecutionFormSheet({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const toastManager = useToastManager();
-  const createMutation = useCreateExecutionMutation();
-  const replaceMutation = useReplaceExecutionMutation();
+  const createMutation = useCreateExecutionMutation(account.mode);
+  const replaceMutation = useReplaceExecutionMutation(account.mode);
   const confirmInstrumentMutation = useConfirmPortfolioInstrumentMutation();
   const [draft, setDraft] = useState(() => executionDraft(editingEvent, account.currency));
   const [charges, setCharges] = useState<ChargeDraft[]>([]);

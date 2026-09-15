@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Optional, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Header,
+  Optional,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { InstrumentService } from './instrument.service.js';
@@ -62,6 +73,37 @@ export class MarketDataController {
 
   @Post('providers/:providerId/remove') removeProvider(@Param('providerId') providerId: string) {
     return this.control.removeProvider(providerId);
+  }
+
+  @Post('providers/longbridge/oauth/sessions')
+  @Header('Cache-Control', 'no-store')
+  createProviderOAuth(@Body() body: unknown) {
+    const input = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    if (
+      typeof input.clientId !== 'string' ||
+      !input.clientId.trim() ||
+      Object.keys(input).some((key) => key !== 'clientId')
+    )
+      throw new BadRequestException('请提供有效的 Client ID');
+    return this.dsa.longbridgeOAuth({ kind: 'create', clientId: input.clientId.trim() });
+  }
+
+  @Get('providers/longbridge/oauth/sessions/current')
+  @Header('Cache-Control', 'no-store')
+  currentProviderOAuth() {
+    return this.dsa.longbridgeOAuth({ kind: 'current' });
+  }
+
+  @Get('providers/longbridge/oauth/sessions/:sessionId')
+  @Header('Cache-Control', 'no-store')
+  getProviderOAuth(@Param('sessionId') sessionId: string) {
+    return this.dsa.longbridgeOAuth({ kind: 'get', sessionId });
+  }
+
+  @Post('providers/longbridge/oauth/sessions/:sessionId/cancel')
+  @Header('Cache-Control', 'no-store')
+  cancelProviderOAuth(@Param('sessionId') sessionId: string) {
+    return this.dsa.longbridgeOAuth({ kind: 'cancel', sessionId });
   }
 
   @Get('instruments/search') async search(@Query('q') query = '', @Query('limit') limit = '20') {

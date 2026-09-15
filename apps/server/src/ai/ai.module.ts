@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ProviderModule } from '../providers/provider.module.js';
 import { AiController } from './ai.controller.js';
+import { AiProviderController } from './ai-provider.controller.js';
+import { AiProviderService } from './ai-provider.service.js';
 import { AiRunService } from './ai-run.service.js';
 import { AiResearchExecutor } from './ai-research.executor.js';
 import { AiProviderRegistry } from './provider-registry.js';
@@ -8,9 +11,11 @@ import { createConfiguredAiProviders } from './provider-adapters.js';
 import { loadConfig } from '../platform/config.js';
 
 @Module({
-  controllers: [AiController],
+  imports: [ProviderModule],
+  controllers: [AiController, AiProviderController],
   providers: [
     AiRunService,
+    AiProviderService,
     {
       provide: AiProviderRegistry,
       useFactory: () => {
@@ -36,6 +41,12 @@ import { loadConfig } from '../platform/config.js';
     },
     AiResearchExecutor,
   ],
-  exports: [AiRunService, AiProviderRegistry, PromptVersionRegistry, AiResearchExecutor],
+  exports: [
+    AiRunService,
+    AiProviderRegistry,
+    PromptVersionRegistry,
+    AiResearchExecutor,
+    AiProviderService,
+  ],
 })
 export class AiModule {}

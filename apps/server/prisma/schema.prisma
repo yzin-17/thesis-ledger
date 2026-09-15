@@ -58,6 +58,7 @@ model Account {
   importDrafts           ImportDraft[]
   riskRules              RiskRule[]
   riskPositionStates     RiskPositionState[]
+  riskEvents              RiskEvent[]
   tradePlans             TradePlan[]
   ledgerState            AccountLedgerState?
   costStrategies         AccountCostStrategyVersion[]
@@ -69,6 +70,10 @@ model Account {
   cashDepositOccurrences RecurringCashDepositOccurrence[]
   fundInvestmentPlans    RecurringFundInvestmentPlan[]
   fundInvestmentOccurrences RecurringFundInvestmentOccurrence[]
+  targetAllocations      TargetAllocation[]
+  journalEntries         JournalEntry[]
+  journalReviewSnapshots JournalReviewSnapshot[]
+  aiDecisionLogs         AiDecisionLog[]
 
   @@index([active])
 }
@@ -582,6 +587,7 @@ model TargetAllocation {
   targets   Json
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([scope, accountId, active])
 }
@@ -803,6 +809,7 @@ model RiskEvent {
   dedupeKey      String                 @unique
   context        Json
   evaluatedAt    DateTime               @default(now())
+  account        Account?               @relation(fields: [accountId], references: [id], onDelete: Restrict)
   rule           RiskRule               @relation(fields: [ruleId], references: [id], onDelete: Restrict)
   journalEntries JournalEntry[]
   triggerStates  RiskRuleTriggerState[]
@@ -1044,6 +1051,7 @@ model JournalEntry {
   notes             String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+  account            Account?         @relation(fields: [accountId], references: [id], onDelete: Restrict)
   ledgerEvent       LedgerEvent?     @relation(fields: [ledgerEventId], references: [id], onDelete: Restrict)
   riskEvent         RiskEvent?       @relation(fields: [riskEventId], references: [id], onDelete: Restrict)
   strategyVersion   StrategyVersion? @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
@@ -1101,6 +1109,7 @@ model JournalReviewSnapshot {
   status                String   @default("CURRENT")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  account               Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([accountId, reviewObjectType, tradeId])
   @@index([tradeId, closeSliceId, createdAt])
@@ -1218,6 +1227,7 @@ model AiDecisionLog {
   context     Json?
   provenance  Json?
   createdAt   DateTime @default(now())
+  account     Account? @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@index([symbol, createdAt])
   @@index([accountId, createdAt])

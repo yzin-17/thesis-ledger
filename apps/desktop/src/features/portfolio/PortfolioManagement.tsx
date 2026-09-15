@@ -2,11 +2,18 @@ import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 
-import type { Account, HeldAssetType, InstrumentLookup, Position } from './portfolio.types.js';
+import type {
+  Account,
+  HeldAssetType,
+  InstrumentLookup,
+  PortfolioChangeImpact,
+  Position,
+} from './portfolio.types.js';
 import { useManagedAccountsQuery } from './portfolio.queries.js';
 import {
   useConfirmPortfolioInstrumentMutation,
   useClearPortfolioPositionsMutation,
+  usePermanentDeleteAccountMutation,
   useRemovePortfolioPositionMutation,
   useSaveAccountMutation,
   useSaveCashBalanceMutation,
@@ -84,7 +91,7 @@ export function PortfolioManagement({
   editingPosition?: Position | null;
   onEditingPositionChange?: (editing: Position | null) => void;
   onDirtyChange?: (dirty: boolean) => void;
-  onSaved: () => void;
+  onSaved: (impact: PortfolioChangeImpact) => void;
 }) {
   const initialEntryAccountId = defaultAccountId ?? accounts[0]?.id ?? '';
   const [uncontrolledEditing, setUncontrolledEditing] = useState<Position | null>(null);
@@ -118,6 +125,7 @@ export function PortfolioManagement({
   const mutations = {
     saveAccount: useSaveAccountMutation(),
     toggleAccount: useToggleAccountMutation(),
+    permanentlyDeleteAccount: usePermanentDeleteAccountMutation(),
     confirmInstrument: useConfirmPortfolioInstrumentMutation(),
     savePosition: useSavePositionMutation(),
     saveCash: useSaveCashBalanceMutation(),
@@ -195,9 +203,6 @@ export function PortfolioManagement({
     setManualInstrumentEntry(false);
   }, [editing, positionSheetOpen]);
 
-  const loadManagedAccounts = async () => {
-    if (step === 'account') await managedAccountsQuery.refetch();
-  };
   useEffect(() => {
     if (
       !shouldAutoOpenEmptyAccountForm({
@@ -260,7 +265,6 @@ export function PortfolioManagement({
     confirm,
     onSaved,
     toastManager,
-    loadManagedAccounts,
     mutations,
   });
 
@@ -299,6 +303,7 @@ export function PortfolioManagement({
       confirmDiscard={confirmDiscard}
       openEntrySheet={openEntrySheet}
       toggleAccount={actions.toggleAccount}
+      permanentlyDeleteAccount={actions.permanentlyDeleteAccount}
       submitAccount={actions.submitAccount}
       submitPosition={actions.submitPosition}
       submitCashBalance={actions.submitCashBalance}

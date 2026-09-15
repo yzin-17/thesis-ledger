@@ -1,13 +1,38 @@
 import { z } from 'zod';
 import { decimalStringSchema, nonNegativeDecimalStringSchema } from './ledger-v2.js';
 
+export const accountTypeSchema = z.enum(['securities', 'fund', 'cash']);
+export const accountModeSchema = z.enum(['actual', 'shadow']);
+export const accountCurrencySchema = z.enum(['CNY', 'HKD', 'USD']);
+
 export const accountInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   institution: z.string().trim().max(80).optional(),
-  type: z.enum(['securities', 'fund', 'cash']),
-  mode: z.enum(['actual', 'shadow']).default('actual'),
-  currency: z.enum(['CNY', 'HKD', 'USD']),
+  type: accountTypeSchema,
+  mode: accountModeSchema.default('actual'),
+  currency: accountCurrencySchema,
 });
+
+export const accountResponseSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    institution: z.string().nullable(),
+    type: accountTypeSchema,
+    mode: accountModeSchema,
+    currency: accountCurrencySchema,
+    active: z.boolean(),
+  })
+  .passthrough();
+
+export const accountsResponseSchema = z.array(accountResponseSchema);
+export type AccountResponse = z.infer<typeof accountResponseSchema>;
+export type AccountMode = z.infer<typeof accountModeSchema>;
+
+export const accountPermanentDeletionErrorCodeSchema = z.literal('ACCOUNT_IN_USE');
+export type AccountPermanentDeletionErrorCode = z.infer<
+  typeof accountPermanentDeletionErrorCodeSchema
+>;
 
 export const positionInputSchema = z.object({
   accountId: z.uuid(),

@@ -1,4 +1,5 @@
 export * from './market.js';
+export * from './provider-oauth.js';
 export * from './portfolio.js';
 export * from './strategy.js';
 export * from './backtest-v2.js';

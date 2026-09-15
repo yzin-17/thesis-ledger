@@ -1,5 +1,10 @@
 import { getDesktopApiClient } from '../../shared/api/client.js';
-import type { CatalogStatus, MarketPolicy, ProviderManifest } from './market-data.types.js';
+import type {
+  CatalogStatus,
+  MarketPolicy,
+  ProviderManifest,
+  ProviderCredentialDraft,
+} from './market-data.types.js';
 
 const api = () => getDesktopApiClient();
 
@@ -24,25 +29,42 @@ export const saveMarketPolicy = (policy: MarketPolicy) =>
     }),
   });
 
-export const saveMarketProvider = (provider: ProviderManifest, credential?: string) =>
-  api().request(`/market-data/providers/${encodeURIComponent(provider.providerId)}/config`, {
+export const saveMarketProviderCredentials = (
+  providerId: string,
+  credentials: ProviderCredentialDraft,
+) =>
+  api().request(`/market-data/providers/${encodeURIComponent(providerId)}/config`, {
     method: 'POST',
-    body: JSON.stringify({ enabled: provider.enabled, ...(credential ? { credential } : {}) }),
+    body: JSON.stringify({ credentials }),
   });
+
+export const setMarketProviderEnabled = (providerId: string, enabled: boolean) =>
+  api().request<{ providerId: string; enabled: boolean }>(
+    `/market-data/providers/${encodeURIComponent(providerId)}/config`,
+    { method: 'POST', body: JSON.stringify({ enabled }) },
+  );
 
 export const clearMarketProviderCredential = (provider: ProviderManifest) =>
   api().request(`/market-data/providers/${encodeURIComponent(provider.providerId)}/config`, {
     method: 'POST',
-    body: JSON.stringify({ enabled: provider.enabled, clearCredentials: true }),
+    body: JSON.stringify({ clearCredentials: true }),
   });
 
-export const testMarketProvider = (provider: ProviderManifest, credential?: string) =>
+export const testMarketProvider = (
+  provider: ProviderManifest,
+  credentials?: ProviderCredentialDraft,
+  signal?: AbortSignal,
+) =>
   api().request<{
     status?: string;
-    capabilityResults?: Record<string, { status?: string; errorCode?: string }>;
+    capabilityResults?: Record<
+      string,
+      { status?: string; errorCode?: string; attempted?: boolean; readOnly?: boolean }
+    >;
   }>(`/market-data/providers/${encodeURIComponent(provider.providerId)}/test`, {
     method: 'POST',
-    body: JSON.stringify(credential ? { credential } : {}),
+    body: JSON.stringify(credentials ? { credentials } : {}),
+    signal: signal ?? null,
   });
 
 export const removeMarketProvider = (providerId: string) =>

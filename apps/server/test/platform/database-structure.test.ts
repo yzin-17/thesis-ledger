@@ -22,8 +22,8 @@ describe('database structure input', () => {
   it('自动发现全部 migration、Prisma 表和 raw-owned 表', async () => {
     const input = await discoverDatabaseStructure();
 
-    expect(input.currentHead).toBe('20260912163000_automation_durable_occurrence');
-    expect(input.migrations).toHaveLength(7);
+    expect(input.currentHead).toBe('20260914090000_permanent_account_deletion');
+    expect(input.migrations).toHaveLength(8);
     expect(input.prismaTables).toHaveLength(58);
     expect(input.rawOwnedTables).toHaveLength(7);
     expect(input.expectedTables).toHaveLength(65);

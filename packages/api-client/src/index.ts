@@ -1,5 +1,6 @@
 import {
   apiErrorResponseSchema,
+  accountsResponseSchema,
   baselineReconciliationCandidatesResponseSchemaV2,
   instrumentSearchResponseSchema,
   importDraftCommandResponseSchemaV2,
@@ -28,6 +29,8 @@ import {
   tradeReferenceResolveResponseSchemaV2,
   backtestRunResponseSchemaV2,
   type ApiErrorResponse,
+  type AccountResponse,
+  type AccountMode,
   type CreateBaselineObservationBatchCommandV2,
   type CreateCashFlowCommandV2,
   type CreateCashTransferCommandV2,
@@ -160,9 +163,14 @@ export type {
   UpdateRecurringFundInvestmentPlan,
   BacktestRunCreateV2,
   BacktestRunResponseV2,
+  AccountResponse,
+  AccountMode,
 } from '@thesis-ledger/schemas';
 
-export type { JournalLegacyReviewCandidate } from '@thesis-ledger/schemas';
+export type {
+  AccountPermanentDeletionErrorCode,
+  JournalLegacyReviewCandidate,
+} from '@thesis-ledger/schemas';
 
 export type MarketDetailQuery = Omit<MarketDetailRequest, 'symbol'> & {
   signal?: AbortSignal;
@@ -198,6 +206,15 @@ export class ThesisLedgerContractError extends Error {
 export class ThesisLedgerApiClient {
   private readonly baseUrl: string;
   private readonly fetcher: typeof fetch;
+
+  readonly accounts = {
+    list: (
+      params: { includeInactive?: boolean; mode?: AccountMode } = {},
+    ): Promise<AccountResponse[]> =>
+      this.requestParsed(`/accounts${queryString(params)}`, accountsResponseSchema),
+    permanentDelete: (accountId: string): Promise<void> =>
+      this.deleteNoContent(`/accounts/${encodeURIComponent(accountId)}/permanent`),
+  };
 
   readonly portfolio = {
     getValuation: (
@@ -613,6 +630,11 @@ export class ThesisLedgerApiClient {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
+  }
+
+  private async deleteNoContent(path: string): Promise<void> {
+    const response = await this.fetchResponse(path, { method: 'DELETE' });
+    if (response.status !== 204) throw new ThesisLedgerContractError(path);
   }
 
   private async requestParsed<T>(

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  Alert,
   Platform,
   Pressable,
   SafeAreaView,
@@ -18,6 +20,17 @@ import {
 import { MobilePortfolioScreen } from './components/MobilePortfolioScreen';
 import { MobileRiskScreen } from './components/MobileRiskScreen';
 import { MobileStatusBanner } from './components/MobileStatusBanner';
+import { MobileAccountScreen } from './components/MobileAccountScreen';
+import {
+  createMobileAccountDeletionHandler,
+  confirmMobileAccountDeletion,
+  mobileAccountDeletionErrorMessage,
+} from './mobile-account.actions';
+import {
+  resolveMobileAccountSelection,
+  useMobileAccountsQuery,
+  useMobilePermanentDeleteAccountMutation,
+} from './mobile-account.queries';
 import { createStyles } from './styles/mobileStyles';
 
 const apiBaseUrl = resolveMobileApiBaseUrl({
@@ -35,16 +48,59 @@ const resolveMobileTheme = (
   return systemTheme === 'dark' ? 'dark' : 'light';
 };
 
+type MobileScreen = 'portfolio' | 'risk' | 'account';
+
 export function MobileApp() {
+  const queryClient = useMemo(() => new QueryClient(), []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MobileAppContent />
+    </QueryClientProvider>
+  );
+}
+
+function MobileAppContent() {
   const bootstrap = useMemo(() => createMobileBootstrap({ apiBaseUrl }), []);
   const systemTheme = useColorScheme();
   const [state, setState] = useState<MobileDashboardState>(bootstrap.store.getState());
-  const [screen, setScreen] = useState<'portfolio' | 'risk'>('portfolio');
+  const [screen, setScreen] = useState<MobileScreen>('portfolio');
   const [themePreference, setThemePreference] = useState<MobileThemePreference>('system');
   const [focusedControl, setFocusedControl] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [accountFeedback, setAccountFeedback] = useState<string | null>(null);
   const resolvedTheme = resolveMobileTheme(themePreference, systemTheme);
   const theme = useMemo(() => getMobileTheme(resolvedTheme), [resolvedTheme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const accountsQuery = useMobileAccountsQuery(state.mode, bootstrap.api.accounts);
+  const deleteAccountMutation = useMobilePermanentDeleteAccountMutation(
+    bootstrap.api.accounts,
+    bootstrap.store,
+  );
+  const accounts = accountsQuery.data ?? [];
+
+  const accountDeletionHandler = useMemo(
+    () =>
+      createMobileAccountDeletionHandler({
+        isPending: () => deleteAccountMutation.isPending,
+        confirm: (account) =>
+          confirmMobileAccountDeletion(account, (title, message, buttons, options) =>
+            Alert.alert(title, message, buttons, options),
+          ),
+        permanentlyDelete: deleteAccountMutation.mutateAsync,
+        onSuccess: (deletedAccountId) => {
+          setAccountFeedback(null);
+          setSelectedAccountId((currentAccountId) =>
+            resolveMobileAccountSelection(
+              accounts.filter((account) => account.id !== deletedAccountId),
+              currentAccountId === deletedAccountId ? null : currentAccountId,
+            ),
+          );
+        },
+        onError: (error) => setAccountFeedback(mobileAccountDeletionErrorMessage(error)),
+      }),
+    [accounts, deleteAccountMutation.isPending, deleteAccountMutation.mutateAsync],
+  );
 
   useEffect(() => {
     const unsubscribe = bootstrap.store.subscribe(() => setState(bootstrap.store.getState()));
@@ -54,6 +110,11 @@ export function MobileApp() {
     };
   }, [bootstrap]);
 
+  useEffect(() => {
+    const nextAccountId = resolveMobileAccountSelection(accounts, selectedAccountId);
+    if (nextAccountId !== selectedAccountId) setSelectedAccountId(nextAccountId);
+  }, [accounts, selectedAccountId]);
+
   const cycleTheme = () => {
     const currentIndex = themePreferences.indexOf(themePreference);
     const nextPreference =
@@ -61,16 +122,46 @@ export function MobileApp() {
     setThemePreference(nextPreference);
   };
 
+  let eyebrow = 'PORTFOLIO';
+  let title = '投资组合';
+  if (screen === 'risk') {
+    eyebrow = 'RISK CENTER';
+    title = '风险事件';
+  } else if (screen === 'account') {
+    eyebrow = 'ACCOUNTS';
+    title = '账户';
+  }
+
+  let screenContent = <MobilePortfolioScreen state={state} theme={theme} styles={styles} />;
+  if (screen === 'risk') {
+    screenContent = <MobileRiskScreen state={state} styles={styles} />;
+  } else if (screen === 'account') {
+    screenContent = (
+      <MobileAccountScreen
+        accounts={accounts}
+        mode={state.mode}
+        loading={accountsQuery.isPending}
+        error={accountsQuery.error}
+        feedback={accountFeedback}
+        pendingAccountId={deleteAccountMutation.isPending ? deleteAccountMutation.variables : undefined}
+        onDelete={(account) => void accountDeletionHandler(account)}
+        onRetry={() => void accountsQuery.refetch()}
+        theme={theme}
+        styles={styles}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>
-              {screen === 'portfolio' ? 'PORTFOLIO' : 'RISK CENTER'}
+              {eyebrow}
             </Text>
             <Text accessibilityRole="header" style={styles.title}>
-              {screen === 'portfolio' ? '投资组合' : '风险事件'}
+              {title}
             </Text>
           </View>
           <Pressable
@@ -153,12 +244,23 @@ export function MobileApp() {
           >
             <Text style={screen === 'risk' ? styles.activeTabText : styles.tabText}>风险事件</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: screen === 'account' }}
+            onPress={() => setScreen('account')}
+            onFocus={() => setFocusedControl('account')}
+            onBlur={() => setFocusedControl(null)}
+            style={({ pressed }) => [
+              styles.tab,
+              screen === 'account' && styles.activeTab,
+              focusedControl === 'account' && styles.focusRing,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={screen === 'account' ? styles.activeTabText : styles.tabText}>账户</Text>
+          </Pressable>
         </View>
-        {screen === 'portfolio' ? (
-          <MobilePortfolioScreen state={state} theme={theme} styles={styles} />
-        ) : (
-          <MobileRiskScreen state={state} styles={styles} />
-        )}
+        {screenContent}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="刷新 ThesisLedger 数据"

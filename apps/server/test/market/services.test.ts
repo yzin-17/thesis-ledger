@@ -26,6 +26,8 @@ describe('行情缓存', () => {
     const redis = {
       client: {
         get: vi.fn(async (key: string) => values.get(key) ?? null),
+        set: vi.fn(async () => 'OK'),
+        eval: vi.fn(async () => 0),
         multi: () => {
           const writes: Array<[string, string]> = [];
           const chain = {

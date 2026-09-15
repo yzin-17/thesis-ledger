@@ -23,11 +23,12 @@ export const useAccountLedgerEventsQuery = (
   accountId: string,
   mode: PortfolioMode | undefined,
   filter: AccountDataEventFilter,
+  enabled = true,
 ) =>
   useQuery({
     queryKey: accountDataKeys.events(accountId, mode ?? 'unknown', filter),
     queryFn: () => fetchAccountLedgerEvents(accountId),
-    enabled: Boolean(accountId),
+    enabled: enabled && Boolean(accountId),
     retry: false,
   });
 

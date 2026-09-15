@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PortfolioDashboard } from '../src/features/portfolio/PortfolioDashboard.js';
 import {
   nextPortfolioPositionSort,
+  PortfolioPositionTable,
   PortfolioSummary,
   sortPortfolioPositions,
 } from '../src/features/portfolio/PortfolioOverview.js';
@@ -282,5 +283,37 @@ describe('Portfolio table contract', () => {
       dailyReturn: 0.005405,
       pnlRatio: 0.0262069,
     });
+  });
+
+  it('只读组合表格隐藏无效的行情详情操作列', () => {
+    const html = renderToStaticMarkup(
+      <PortfolioPositionTable
+        portfolio={{
+          totalMarketValue: 100,
+          totalCost: 90,
+          totalPnl: 10,
+          cashValue: 0,
+          mode: 'actual',
+          partial: false,
+          valuedAt: '2026-09-15T00:00:00.000Z',
+          positions: [
+            {
+              id: 'position-1',
+              accountId: 'account-1',
+              symbol: '600000.SH',
+              quantity: 1,
+              costPrice: 90,
+              marketValue: 100,
+              pnl: 10,
+              stale: false,
+              asset: { name: '测试标的' },
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(html).not.toContain('行情详情');
+    expect(html).not.toContain('操作');
   });
 });

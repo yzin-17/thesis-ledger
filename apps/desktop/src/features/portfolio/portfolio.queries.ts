@@ -5,6 +5,7 @@ import {
   fetchPortfolioValuation,
   searchPortfolioInstruments,
 } from './portfolio.api.js';
+import type { DesktopRequestClient } from '../shared/request.js';
 import type { LoadState, PortfolioMode } from './portfolio.types.js';
 
 export const portfolioKeys = {
@@ -17,13 +18,38 @@ export const portfolioKeys = {
     [...portfolioKeys.root, 'instrument-search', accountType, query] as const,
 };
 
-export const usePortfolioShellQueries = (mode: PortfolioMode) => {
+export const isPortfolioSummaryConsumerRoute = (pathname: string) =>
+  pathname === '/portfolio' || pathname === '/risk-center';
+
+export const portfolioValuationQueryOptions = (
+  mode: PortfolioMode,
+  enabled: boolean,
+  client?: DesktopRequestClient,
+) => ({
+  queryKey: portfolioKeys.valuation(mode),
+  queryFn: () => fetchPortfolioValuation(mode, undefined, client),
+  enabled,
+  staleTime: 15_000,
+});
+
+export const accountValuationQueryOptions = (
+  accountId: string,
+  mode: PortfolioMode | undefined,
+  enabled: boolean,
+  client?: DesktopRequestClient,
+) => ({
+  queryKey: portfolioKeys.valuation(mode ?? 'actual', accountId || 'all'),
+  queryFn: () => fetchPortfolioValuation(mode ?? 'actual', accountId, client),
+  enabled,
+});
+
+export const usePortfolioShellQueries = (
+  mode: PortfolioMode,
+  options: { enableValuation?: boolean } = {},
+) => {
+  const enableValuation = options.enableValuation ?? false;
   const queryClient = useQueryClient();
-  const portfolioQuery = useQuery({
-    queryKey: portfolioKeys.valuation(mode),
-    queryFn: () => fetchPortfolioValuation(mode),
-    staleTime: 15_000,
-  });
+  const portfolioQuery = useQuery(portfolioValuationQueryOptions(mode, enableValuation));
   const accountsQuery = useQuery({
     queryKey: portfolioKeys.accounts(),
     queryFn: () => fetchAccounts(),
@@ -32,20 +58,25 @@ export const usePortfolioShellQueries = (mode: PortfolioMode) => {
 
   const portfolio = portfolioQuery.data ?? null;
   const accounts = accountsQuery.data ?? [];
-  let state: LoadState = 'loading';
-  if (portfolioQuery.isError || accountsQuery.isError) state = 'error';
-  else if (portfolioQuery.isSuccess && accountsQuery.isSuccess && portfolio) {
+  let state: LoadState = enableValuation ? 'loading' : 'ready';
+  if (accountsQuery.isError || (enableValuation && portfolioQuery.isError)) state = 'error';
+  else if (enableValuation && portfolioQuery.isSuccess && accountsQuery.isSuccess && portfolio) {
     if (portfolio.positions.length === 0) state = 'empty';
     else if (portfolio.partial) state = 'stale';
     else state = 'ready';
   }
 
   const refresh = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.root }),
-      portfolioQuery.refetch(),
-      accountsQuery.refetch(),
-    ]);
+    const refreshes: Array<Promise<unknown>> = [accountsQuery.refetch()];
+    if (enableValuation) {
+      await queryClient.invalidateQueries({
+        queryKey: portfolioKeys.valuation(mode),
+        exact: true,
+        refetchType: 'none',
+      });
+      refreshes.push(portfolioQuery.refetch());
+    }
+    await Promise.all(refreshes);
   };
 
   return {
@@ -55,21 +86,20 @@ export const usePortfolioShellQueries = (mode: PortfolioMode) => {
     accountsReady: !accountsQuery.isPending && !accountsQuery.isError,
     accountsPending: accountsQuery.isPending,
     accountsError: accountsQuery.isError,
-    refreshing: portfolioQuery.isFetching || accountsQuery.isFetching,
+    refreshing: (enableValuation && portfolioQuery.isFetching) || accountsQuery.isFetching,
     refresh,
   };
 };
+
+export const usePortfolioValuationQuery = (mode: PortfolioMode, enabled: boolean) =>
+  useQuery(portfolioValuationQueryOptions(mode, enabled));
 
 export const useAccountValuationQuery = (
   accountId: string,
   mode: PortfolioMode | undefined,
   enabled: boolean,
 ) =>
-  useQuery({
-    queryKey: portfolioKeys.valuation(mode ?? 'actual', accountId || 'all'),
-    queryFn: () => fetchPortfolioValuation(mode ?? 'actual', accountId),
-    enabled,
-  });
+  useQuery(accountValuationQueryOptions(accountId, mode, enabled));
 
 export const useManagedAccountsQuery = (enabled: boolean) =>
   useQuery({

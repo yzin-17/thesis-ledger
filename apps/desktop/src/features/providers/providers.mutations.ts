@@ -17,13 +17,22 @@ import type {
   UpdateAutomationJobInput,
 } from './providers.types.js';
 
+export const invalidateProviderConnectionState = (
+  client: Pick<QueryClient, 'invalidateQueries'>,
+) =>
+  Promise.all([
+    client.invalidateQueries({ queryKey: providerKeys.providers() }),
+    client.invalidateQueries({ queryKey: providerKeys.healthHistoryRoot() }),
+  ]);
+
 export const useTestProviderConnectionMutation = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (name: string) => testProviderConnection(name),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: providerKeys.root });
-    },
+    onSuccess: (result) =>
+      result.healthCheck
+        ? invalidateProviderConnectionState(client)
+        : undefined,
   });
 };
 
@@ -34,7 +43,13 @@ export const useSaveProviderMutation = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: SaveProviderInput) => saveProvider(input),
-    onSuccess: () => client.invalidateQueries({ queryKey: providerKeys.root }),
+    onSuccess: (result) =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: providerKeys.providers() }),
+        ...(result.healthCheck
+          ? [client.invalidateQueries({ queryKey: providerKeys.healthHistoryRoot() })]
+          : []),
+      ]),
   });
 };
 

@@ -61,6 +61,7 @@ export const createProviderConfigHandlers = (dependencies: ProviderActionDepende
       setEditingProviderName(provider.name);
       setCredentialInputOpen(!provider.credentialConfigured);
       setProviderDraft({
+        ...newProviderDraft(),
         name: provider.name,
         type: provider.type,
         capabilities: [...provider.capabilities],

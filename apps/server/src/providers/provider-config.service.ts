@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   assertAllowedFeishuWebhookUrl,
@@ -123,6 +123,44 @@ export class ProviderConfigService {
   }
 
   async save(input: ProviderConfigInput) {
+    if (input.type === 'ai')
+      throw new BadRequestException('AI Provider 必须使用 /ai/providers 专用接口');
+    return this.saveInternal(input);
+  }
+
+  /** Internal stable persistence boundary consumed by the AI feature module. */
+  async saveAi(input: Omit<ProviderConfigInput, 'type'>) {
+    return this.saveInternal({ ...input, type: 'ai' });
+  }
+
+  async listStored() {
+    return this.prisma.providerConfig.findMany({
+      where: { type: 'ai' },
+      orderBy: [{ priority: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async findStored(name: string) {
+    return this.prisma.providerConfig.findUnique({ where: { name } });
+  }
+
+  async setEnabled(name: string, enabled: boolean) {
+    return this.prisma.providerConfig.update({ where: { name }, data: { enabled } });
+  }
+
+  async deleteStored(name: string) {
+    return this.prisma.providerConfig.delete({ where: { name } });
+  }
+
+  async setHealth(name: string, health: string) {
+    return this.prisma.providerConfig.update({ where: { name }, data: { health } });
+  }
+
+  async readCredential(config: { name: string; encryptedCredentials?: Uint8Array | null }) {
+    return this.readStoredCredential(config);
+  }
+
+  private async saveInternal(input: ProviderConfigInput) {
     const value = validate(input);
     const existing = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
     const tested = this.consumeDraftTest(value);

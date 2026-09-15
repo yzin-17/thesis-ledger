@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
-import { FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -343,7 +343,8 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <p className="text-sm text-muted-foreground">AI 优化功能当前已关闭。</p>
           ) : null}
           <div className="grid gap-3 lg:grid-cols-2">
-            <FieldLabel className="space-y-1 text-sm">
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">基线策略版本</span>
               <Select
                 value={strategyVersionId}
@@ -360,8 +361,10 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
                   ))}
                 </SelectContent>
               </Select>
-            </FieldLabel>
-            <FieldLabel className="space-y-1 text-sm">
+              </FieldLabel>
+            </Field>
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">优化目标</span>
               <Select value={objective} onValueChange={(value) => value && setObjective(value)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -372,7 +375,8 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
                   <SelectItem value="lowTurnover">优先低换手</SelectItem>
                 </SelectContent>
               </Select>
-            </FieldLabel>
+              </FieldLabel>
+            </Field>
           </div>
           <div className="space-y-2">
             <div className="text-sm text-muted-foreground">模型（最多 3 个；严格 Provider + Model，不自动 fallback）</div>
@@ -414,17 +418,17 @@ export function StrategyOptimizationExperimentPanel({ strategies }: { strategies
             <DateInput type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} aria-label="测试集结束" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">AI 调用上限</span><Input type="number" min="1" max="30" value={maxAiCalls} onChange={(event) => setMaxAiCalls(event.target.value)} /></FieldLabel>
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">回测运行上限</span><Input type="number" min="2" max="100" value={maxBacktestRuns} onChange={(event) => setMaxBacktestRuns(event.target.value)} /></FieldLabel>
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">输入 Token</span><Input type="number" min="1" max="10000000" value={maxInputTokens} onChange={(event) => setMaxInputTokens(event.target.value)} /></FieldLabel>
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">输出 Token</span><Input type="number" min="1" max="2000000" value={maxOutputTokens} onChange={(event) => setMaxOutputTokens(event.target.value)} /></FieldLabel>
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">最长计算（秒）</span><Input type="number" min="30" max="86400" value={maxDurationSeconds} onChange={(event) => setMaxDurationSeconds(event.target.value)} /></FieldLabel>
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">模型费用上限（可选）</span><Input inputMode="decimal" value={maxCost} onChange={(event) => setMaxCost(event.target.value)} placeholder="如 5.00" /></FieldLabel>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">AI 调用上限</span></FieldLabel><Input type="number" min="1" max="30" value={maxAiCalls} onChange={(event) => setMaxAiCalls(event.target.value)} /></Field>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">回测运行上限</span></FieldLabel><Input type="number" min="2" max="100" value={maxBacktestRuns} onChange={(event) => setMaxBacktestRuns(event.target.value)} /></Field>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">输入 Token</span></FieldLabel><Input type="number" min="1" max="10000000" value={maxInputTokens} onChange={(event) => setMaxInputTokens(event.target.value)} /></Field>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">输出 Token</span></FieldLabel><Input type="number" min="1" max="2000000" value={maxOutputTokens} onChange={(event) => setMaxOutputTokens(event.target.value)} /></Field>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">最长计算（秒）</span></FieldLabel><Input type="number" min="30" max="86400" value={maxDurationSeconds} onChange={(event) => setMaxDurationSeconds(event.target.value)} /></Field>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">模型费用上限（可选）</span></FieldLabel><Input inputMode="decimal" value={maxCost} onChange={(event) => setMaxCost(event.target.value)} placeholder="如 5.00" /></Field>
           </div>
           <p className="text-xs text-muted-foreground">预算为服务端硬上限；模型调用前预留保守输入 Token 与单次输出额度，完成后按 Provider 实际 usage 结算。</p>
           <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">初始资金（{currency}）</span><Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} /></FieldLabel>
-            <FieldLabel className="space-y-1 text-sm"><span className="text-muted-foreground">执行模型 JSON（可选）</span><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></FieldLabel>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">初始资金（{currency}）</span></FieldLabel><Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} /></Field>
+            <Field className="space-y-1 text-sm"><FieldLabel><span className="text-muted-foreground">执行模型 JSON（可选）</span></FieldLabel><Textarea value={executionModelJson} onChange={(event) => setExecutionModelJson(event.target.value)} placeholder="留空则完全依赖 Provider executionRules" /></Field>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button disabled={createMutation.isPending || !capabilities.data?.aiOptimizationEnabled || (hasUnknownCost && !acknowledgeUnknownCost)} onClick={() => createMutation.mutate()}>{createMutation.isPending ? '创建中…' : '创建优化实验'}</Button>

@@ -76,3 +76,19 @@ REPAIR_BUILD_CACHE_ON_NO_SPACE=false \
 - PostgreSQL 仍使用 `thesis-ledger-postgres-data`，其他持久卷保留。
 
 更新日志保存在 `/private/tmp/2026-09-14-thesis-ledger-g2-update.log` 与 `/private/tmp/2026-09-14-thesis-ledger-g2-update-retry.log`。本次证明开发库结构及应用启动恢复，不代表正式环境的保留数据升级已验收。
+
+## 新增账户外键后的再次重建
+
+2026-09-14 后续新增 `20260914090000_permanent_account_deletion`，源码与新镜像已包含第 8 份结构 SQL，但数据库仍为上一节记录的旧 head。默认 check 因版本不匹配拒绝启用新镜像，旧 Server/Worker 保持 healthy。
+
+用户再次明确确认清空 `thesis-ledger-dev/thesis_ledger` 的 public 数据并重建。本次直接复用已构建镜像，通过 infra `scripts/dev-database.sh` 的目标确认、消费者停止、结构重建及启动函数执行；未重复构建镜像，未修改默认 check 行为，未删除 volume，实际重建仅一次。
+
+主代理于 `2026-09-14T09:52:17Z` 验收通过：
+
+- Server/Worker 镜像为 `sha256:48b5639085bc27bfc14ca848522d36aa6d74b8ed098936c5855e7727ac9e9cb9`。
+- 当前 head 为 `20260914090000_permanent_account_deletion`；65 张表全部存在，`_prisma_migrations` 不存在。
+- `TargetAllocation`、`RiskEvent`、`JournalEntry`、`JournalReviewSnapshot`、`AiDecisionLog` 的 5 个新增 Account 外键均存在。
+- PostgreSQL、Server、Worker 均 running / healthy；API 的 database、redis、dsa 依赖均 healthy，Worker 心跳探针退出码为 0。
+- 本次 Server/Worker 启动日志无缺表或 Prisma 已知请求异常。
+
+执行日志：`/private/tmp/thesis-ledger-confirmed-rebuild-current-image.log`。本次仅验证结构部署与服务恢复，不替代账户永久删除功能的业务验收。

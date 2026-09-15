@@ -305,8 +305,8 @@ export function CorrectionReasonSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const toastManager = useToastManager();
-  const voidMutation = useVoidExecutionMutation();
-  const restoreMutation = useRestoreExecutionMutation();
+  const voidMutation = useVoidExecutionMutation(account.mode);
+  const restoreMutation = useRestoreExecutionMutation(account.mode);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const open = Boolean(target);

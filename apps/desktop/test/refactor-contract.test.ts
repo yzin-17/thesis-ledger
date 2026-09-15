@@ -215,7 +215,7 @@ describe('拆分后的领域请求契约', () => {
     await fetchPortfolioValuation('shadow', 'account-2', portfolio.client);
 
     expect(portfolio.request).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/portfolio\/valuation\?mode=shadow&accountId=account-2&t=/),
+      '/portfolio/valuation?mode=shadow&accountId=account-2',
       expect.objectContaining({ cache: 'no-store' }),
     );
     expect(portfolioKeys.valuation('actual', 'account-2')).not.toEqual(

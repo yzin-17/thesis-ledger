@@ -2,7 +2,13 @@ import type { FormEvent } from 'react';
 
 import type { SavePositionInput } from './portfolio.api.js';
 import type { PortfolioActionDependencies, PortfolioToastManager } from './portfolio.actions.js';
-import type { HeldAssetType, InstrumentLookup, Position } from './portfolio.types.js';
+import type {
+  HeldAssetType,
+  InstrumentLookup,
+  PortfolioChangeImpact,
+  PortfolioMode,
+  Position,
+} from './portfolio.types.js';
 import { formText } from '../shared/display.js';
 
 const positionSuccessTitle = (isCash: boolean, isEditing: boolean, calibrationMode: boolean) => {
@@ -18,6 +24,35 @@ const positionFailureTitle = (isCash: boolean, isEditing: boolean, calibrationMo
   if (isEditing) return '持仓更新失败';
   return '持仓添加失败';
 };
+
+const accountDataImpact = (mode: PortfolioMode, accountIds: string[]): PortfolioChangeImpact => ({
+  mode,
+  accountIds,
+  events: true,
+  audit: true,
+  reconciliation: true,
+});
+
+export const positionSaveImpact = (
+  mode: 'actual' | 'shadow',
+  accountId: string,
+  previousAccountId?: string,
+) =>
+  accountDataImpact(
+    mode,
+    previousAccountId && previousAccountId !== accountId
+      ? [previousAccountId, accountId]
+      : [accountId],
+  );
+
+export const cashSaveImpact = (mode: 'actual' | 'shadow', accountId: string) =>
+  accountDataImpact(mode, [accountId]);
+
+export const clearPositionsImpact = (mode: 'actual' | 'shadow', accountId: string) =>
+  accountDataImpact(mode, [accountId]);
+
+export const removePositionImpact = (mode: 'actual' | 'shadow', accountId: string) =>
+  accountDataImpact(mode, [accountId]);
 
 const validatePositionEntry = ({
   form,
@@ -149,7 +184,11 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
       setEditing(null);
       markDirty(false);
       setPositionSheetOpen(false);
-      onSaved();
+      onSaved(
+        isCash
+          ? cashSaveImpact(account?.mode ?? 'actual', accountId)
+          : positionSaveImpact(account?.mode ?? 'actual', accountId, editing?.accountId),
+      );
       toastManager.add({
         title: positionSuccessTitle(isCash, isEditing, calibrationMode),
         description: isCash ? undefined : '组合将重新估值。',
@@ -172,6 +211,7 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
 
 const createCashSubmitHandler = (dependencies: PortfolioActionDependencies) => {
   const {
+    accounts,
     busyAction,
     entryAccountId,
     mutations,
@@ -194,7 +234,8 @@ const createCashSubmitHandler = (dependencies: PortfolioActionDependencies) => {
       event.currentTarget.reset();
       markDirty(false);
       setPositionSheetOpen(false);
-      onSaved();
+      const mode = accounts.find((account) => account.id === entryAccountId)?.mode ?? 'actual';
+      onSaved(cashSaveImpact(mode, entryAccountId));
       toastManager.add({ title: '现金余额已保存', type: 'success', timeout: 2800 });
     } catch {
       toastManager.add({
@@ -212,6 +253,7 @@ const createCashSubmitHandler = (dependencies: PortfolioActionDependencies) => {
 
 const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) => {
   const {
+    accounts,
     entryAccountId,
     positions,
     calibrationMode,
@@ -239,7 +281,8 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
     try {
       await mutations.clearPositions.mutateAsync(entryAccountId);
       markDirty(false);
-      onSaved();
+      const mode = accounts.find((account) => account.id === entryAccountId)?.mode ?? 'actual';
+      onSaved(clearPositionsImpact(mode, entryAccountId));
       toastManager.add({
         title: calibrationMode ? '持仓快照已清空' : '持仓已清空',
         type: 'success',
@@ -261,6 +304,7 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
 
 const createRemovePositionHandler = (dependencies: PortfolioActionDependencies) => {
   const {
+    accounts,
     busyAction,
     mutations,
     setBusyAction,
@@ -287,7 +331,8 @@ const createRemovePositionHandler = (dependencies: PortfolioActionDependencies) 
     try {
       await mutations.removePosition.mutateAsync(position.id);
       markDirty(false);
-      onSaved();
+      const mode = accounts.find((account) => account.id === position.accountId)?.mode ?? 'actual';
+      onSaved(removePositionImpact(mode, position.accountId));
       toastManager.add({
         title: calibrationMode ? '持仓快照已移除' : '持仓已删除',
         type: 'success',

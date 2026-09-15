@@ -26,9 +26,13 @@ export const assertAccountCanHoldAsset = (
 export class AccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(includeInactive = false) {
+  list(includeInactive = false, mode?: AccountMode) {
+    const where = {
+      ...(includeInactive ? {} : { active: true }),
+      ...(mode === undefined ? {} : { mode }),
+    };
     return this.prisma.account.findMany({
-      ...(includeInactive ? {} : { where: { active: true } }),
+      ...(Object.keys(where).length === 0 ? {} : { where }),
       orderBy: { createdAt: 'asc' },
     });
   }

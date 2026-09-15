@@ -4,7 +4,7 @@ import { strategySchemaV2 } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -199,7 +199,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-3">
-            <FieldLabel className="space-y-1 text-sm">
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">策略版本</span>
               <Select value={strategyVersionId} onValueChange={(value) => {
                 if (!value) return;
@@ -213,8 +214,10 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   ))}
                 </SelectContent>
               </Select>
-            </FieldLabel>
-            <FieldLabel className="space-y-1 text-sm">
+              </FieldLabel>
+            </Field>
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">实际账户</span>
               <Select value={accountId} onValueChange={(value) => value && setAccountId(value)}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="选择账户" /></SelectTrigger>
@@ -224,8 +227,10 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   ))}
                 </SelectContent>
               </Select>
-            </FieldLabel>
-            <FieldLabel className="space-y-1 text-sm">
+              </FieldLabel>
+            </Field>
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">生效周期</span>
               <Select value={cycleMode} onValueChange={(value) => value && setCycleMode(value)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -234,7 +239,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   <SelectItem value="nextPositionCycle">仅下一持仓周期</SelectItem>
                 </SelectContent>
               </Select>
-            </FieldLabel>
+              </FieldLabel>
+            </Field>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
             <div className="space-y-1">
@@ -243,7 +249,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                 {notificationEnabled ? '风险通知已开启' : '风险通知已关闭'}
               </Button>
             </div>
-            <FieldLabel className="space-y-1 text-sm">
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">严重级别</span>
               <Select value={notificationSeverity} onValueChange={(value) => value && setNotificationSeverity(value)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -254,11 +261,14 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                   <SelectItem value="critical">关键</SelectItem>
                 </SelectContent>
               </Select>
-            </FieldLabel>
-            <FieldLabel className="space-y-1 text-sm">
+              </FieldLabel>
+            </Field>
+            <Field className="space-y-1 text-sm">
+              <FieldLabel>
               <span className="text-muted-foreground">通知冷却（分钟）</span>
               <Input type="number" min="0" max="10080" value={cooldownMinutes} onChange={(event) => setCooldownMinutes(event.target.value)} />
-            </FieldLabel>
+              </FieldLabel>
+            </Field>
             <div className="space-y-1">
               <div className="text-sm text-muted-foreground">通知渠道</div>
               <Button type="button" size="sm" variant={feishuEnabled ? 'default' : 'outline'} onClick={() => setFeishuEnabled((current) => !current)}>
@@ -375,10 +385,12 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                         <SelectItem value="critical">关键</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FieldLabel className="space-y-1 text-xs">
+                    <Field className="space-y-1 text-xs">
+                      <FieldLabel>
                       <span className="text-muted-foreground">冷却分钟</span>
                       <Input className="w-28" type="number" min="0" max="10080" value={cooldownDraft} onChange={(event) => setCooldownDrafts((current) => ({ ...current, [application.id]: event.target.value }))} />
-                    </FieldLabel>
+                      </FieldLabel>
+                    </Field>
                     <Button size="sm" variant="outline" disabled={updateMutation.isPending} onClick={() => saveNotification({ cooldownMinutes: Math.max(0, Number(cooldownDraft) || 0) })}>保存冷却</Button>
                   </div>
                   {currentUpgrade ? (

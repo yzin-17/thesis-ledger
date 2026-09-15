@@ -672,7 +672,7 @@ td span {
 
 .state-panel {
   max-width: 540px;
-  margin: clamp(76px, 16vh, 160px) auto 0;
+  margin: 0 auto;
   text-align: center;
 }
 

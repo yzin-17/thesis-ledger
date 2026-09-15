@@ -556,11 +556,9 @@ describe('账户现金操作', () => {
     );
 
     expect(source).toMatch(
-      /const invalidateCashAccount[\s\S]*?queryClient\.invalidateQueries\(\{ queryKey: accountDataKeys\.audit\(accountId, mode\) \}\)/,
+      /const invalidateCashAccount[\s\S]*?invalidatePortfolioChange\(queryClient,\s*\{[\s\S]*?events: true,[\s\S]*?audit: true,[\s\S]*?reconciliation: true,/,
     );
-    expect(source).toMatch(
-      /const invalidateCashAccount[\s\S]*?queryClient\.invalidateQueries\(\{ queryKey: portfolioKeys\.valuation\(mode, accountId\) \}\)/,
-    );
+    expect(source).not.toContain("portfolioKeys.valuation(mode)");
   });
 
   it('划转反馈不暴露 API 文案，并将余额不足解释为可操作提示', () => {

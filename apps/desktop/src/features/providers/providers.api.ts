@@ -18,11 +18,21 @@ import type {
   SaveProviderInput,
   UpdateAutomationJobInput,
 } from './providers.types.js';
+import { fetchAiProviders } from './ai-provider.api.js';
 
 const noStore = { cache: 'no-store' as const };
 
-export const fetchProviders = (client?: DesktopRequestClient) =>
+const fetchConfiguredProviders = (client?: DesktopRequestClient) =>
   requestDesktopJson<ProviderRecord[]>('/providers/config', noStore, client);
+
+/** AI 摘要只能来自专用端点，避免把旧通用记录当作可运行的 Registry 配置。 */
+export const fetchProviders = async (client?: DesktopRequestClient) => {
+  const [configured, aiProviders] = await Promise.all([
+    fetchConfiguredProviders(client),
+    fetchAiProviders(client),
+  ]);
+  return [...configured.filter((provider) => provider.type !== 'ai'), ...aiProviders];
+};
 
 export const fetchProviderIssues = (client?: DesktopRequestClient) =>
   requestDesktopJson<ProviderIssueRecord[]>('/data-quality/issues?status=open', noStore, client);

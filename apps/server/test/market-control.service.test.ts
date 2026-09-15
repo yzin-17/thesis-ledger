@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MarketControlService } from '../src/market/market-control.service.js';
-import { DsaError } from '../src/integration/dsa/dsa.client.js';
+import { DsaClient, DsaError } from '../src/integration/dsa/dsa.client.js';
 
 type Routes = Record<string, Record<string, string[]>>;
 
@@ -206,5 +206,70 @@ describe('MarketControlService', () => {
     expect(dsa.effectiveControlPolicy).toHaveBeenCalledTimes(1);
     expect(result.syncState).toBe('rejected');
     expect(result.revision).toBe(3);
+  });
+
+  it('forwards provider config patches without inventing enabled or settings defaults', async () => {
+    const dsa = { saveControlProvider: vi.fn(async () => ({ providerId: 'tushare' })) };
+
+    await new MarketControlService({} as never, dsa as never).saveProvider('tushare', {
+      requestId: 'patch-request',
+      credential: 'secret',
+    });
+
+    expect(dsa.saveControlProvider).toHaveBeenCalledWith('tushare', {
+      requestId: 'patch-request',
+      credential: 'secret',
+    });
+  });
+
+  it('forwards structured provider credentials without storing or reshaping values', async () => {
+    const dsa = { saveControlProvider: vi.fn(async () => ({ providerId: 'tushare' })) };
+
+    await new MarketControlService({} as never, dsa as never).saveProvider('tushare', {
+      requestId: 'structured-request',
+      credentials: { method: 'token', values: { token: 'secret' } },
+    });
+
+    expect(dsa.saveControlProvider).toHaveBeenCalledWith('tushare', {
+      requestId: 'structured-request',
+      credentials: { method: 'token', values: { token: 'secret' } },
+    });
+  });
+
+  it('forwards structured draft credentials to the provider test endpoint', async () => {
+    const dsa = { testControlProvider: vi.fn(async () => ({ providerId: 'tushare' })) };
+
+    await new MarketControlService({} as never, dsa as never).testProvider('tushare', {
+      requestId: 'draft-request',
+      credentials: { method: 'token', values: { token: 'secret' } },
+    });
+
+    expect(dsa.testControlProvider).toHaveBeenCalledWith('tushare', {
+      requestId: 'draft-request',
+      credentials: { method: 'token', values: { token: 'secret' } },
+    });
+  });
+
+  it('serializes structured draft credentials into the DSA HTTP payload', async () => {
+    const client = Object.create(DsaClient.prototype) as DsaClient;
+    const control = vi.spyOn(client, 'control').mockResolvedValue({});
+
+    await client.testControlProvider('tushare', {
+      requestId: 'http-draft-request',
+      credentials: { method: 'token', values: { token: 'secret' } },
+    });
+
+    expect(control).toHaveBeenCalledWith(
+      '/api/v1/thesis-ledger/control/providers/tushare/test',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          contractVersion: 1,
+          consumer: 'thesis-ledger',
+          requestId: 'http-draft-request',
+          credentials: { method: 'token', values: { token: 'secret' } },
+        }),
+      }),
+    );
   });
 });

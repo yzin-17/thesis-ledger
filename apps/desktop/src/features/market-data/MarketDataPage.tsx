@@ -8,15 +8,15 @@ import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InstrumentCatalogPanel } from './InstrumentCatalogPanel.js';
 import { MarketPolicyPanel } from './MarketPolicyPanel.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { ProviderCredentialsSheet } from './ProviderCredentialsSheet.js';
 import { MarketProviderPanel } from './MarketProviderPanel.js';
 import { MarketDataSectionTabs } from './MarketDataSectionTabs.js';
+import { useMarketProviderEnabled } from './useMarketProviderEnabled.js';
 import {
   useCatalogSyncMutation,
-  useClearMarketProviderCredentialMutation,
   useConfirmInstrumentMutation,
   useRemoveMarketProviderMutation,
   useSaveMarketPolicyMutation,
-  useSaveMarketProviderMutation,
   useTestMarketProviderMutation,
 } from './market-data.mutations.js';
 import {
@@ -33,16 +33,18 @@ export function MarketDataPage() {
   const { policy, providers, catalog } = useMarketDataQueries();
   const marketDataRefreshing = policy.isFetching || providers.isFetching || catalog.isFetching;
   const savePolicy = useSaveMarketPolicyMutation();
-  const saveProvider = useSaveMarketProviderMutation();
-  const clearCredential = useClearMarketProviderCredentialMutation();
   const testProvider = useTestMarketProviderMutation();
   const removeProvider = useRemoveMarketProviderMutation();
   const syncCatalog = useCatalogSyncMutation();
   const confirmInstrument = useConfirmInstrumentMutation();
 
   const [policyDraft, setPolicyDraft] = useState<MarketPolicy | null>(null);
-  const [providerDrafts, setProviderDrafts] = useState<ProviderManifest[]>([]);
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const providerEnabled = useMarketProviderEnabled(providers.data ?? []);
+  const providerDrafts = providerEnabled.providers;
+  const [credentialProviderId, setCredentialProviderId] = useState<string | null>(null);
+  const credentialProvider = providers.data?.find(
+    (provider) => provider.providerId === credentialProviderId,
+  );
   const toastManager = useToastManager();
   const [message, setErrorMessage] = useState<string | null>(null);
   const setMessage = useCallback(
@@ -60,9 +62,6 @@ export function MarketDataPage() {
   useEffect(() => {
     if (policy.data) setPolicyDraft(policy.data);
   }, [policy.data]);
-  useEffect(() => {
-    if (providers.data) setProviderDrafts(providers.data);
-  }, [providers.data]);
 
   const catalogJob = useCatalogJobQuery(catalogJobId);
   useEffect(() => {
@@ -114,38 +113,21 @@ export function MarketDataPage() {
     }
   };
 
-  const replaceProvider = (provider: ProviderManifest) =>
-    setProviderDrafts((current) =>
-      current.map((item) => (item.providerId === provider.providerId ? provider : item)),
-    );
-
-  const handleSaveProvider = async (provider: ProviderManifest) => {
-    setBusyAction(`provider-save:${provider.providerId}`);
-    setMessage(null);
-    const credential = credentials[provider.providerId]?.trim();
-    try {
-      await saveProvider.mutateAsync({ provider, ...(credential ? { credential } : {}) });
-      setCredentials((current) => ({ ...current, [provider.providerId]: '' }));
-      await queryClient.invalidateQueries({ queryKey: marketDataKeys.providers() });
-      setMessage({ type: 'success', text: `${provider.displayName} 配置已保存。` });
-    } catch (error) {
+  const replaceProvider = (provider: ProviderManifest) => {
+    void providerEnabled.setEnabled(provider).catch((error: unknown) => {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Provider 配置保存失败。',
+        text: error instanceof Error ? error.message : '启停保存失败。',
       });
-    } finally {
-      setBusyAction(null);
-    }
+    });
   };
 
   const handleTestProvider = async (provider: ProviderManifest) => {
     setBusyAction(`provider-test:${provider.providerId}`);
     setMessage(null);
-    const credential = credentials[provider.providerId]?.trim();
     try {
       const result = await testProvider.mutateAsync({
         provider,
-        ...(credential ? { credential } : {}),
       });
       if (result.status !== 'healthy') {
         const details = Object.entries(result.capabilityResults ?? {})
@@ -159,33 +141,6 @@ export function MarketDataPage() {
       setMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'Provider 测试失败。',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleClearCredential = async (provider: ProviderManifest) => {
-    if (
-      !(await confirm({
-        title: `清除 ${provider.displayName} 的已保存凭证？`,
-        description: '清除后将无法使用当前已保存凭证，之后可重新配置。',
-        confirmLabel: '清除凭证',
-        cancelLabel: '取消',
-        variant: 'destructive',
-      }))
-    )
-      return;
-    setBusyAction(`provider-clear:${provider.providerId}`);
-    try {
-      await clearCredential.mutateAsync(provider);
-      setCredentials((current) => ({ ...current, [provider.providerId]: '' }));
-      await queryClient.invalidateQueries({ queryKey: marketDataKeys.providers() });
-      setMessage({ type: 'success', text: `${provider.displayName} 凭证已清除。` });
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Provider 凭证清除失败。',
       });
     } finally {
       setBusyAction(null);
@@ -318,20 +273,24 @@ export function MarketDataPage() {
         </Badge>
       </section>
 
+      {credentialProvider && (
+        <ProviderCredentialsSheet
+          key={credentialProvider.providerId}
+          provider={credentialProvider}
+          onClose={() => setCredentialProviderId(null)}
+        />
+      )}
+
       <MarketDataSectionTabs
         providerPanel={
           <MarketProviderPanel
             providers={providerDrafts}
-            credentials={credentials}
             disabled={controlsDisabled}
             busyAction={busyAction}
+            pendingProviderIds={providerEnabled.pendingProviderIds}
             onProviderChange={replaceProvider}
-            onCredentialChange={(providerId, value) =>
-              setCredentials((current) => ({ ...current, [providerId]: value }))
-            }
-            onSave={(provider) => void handleSaveProvider(provider)}
+            onConfigure={(provider) => setCredentialProviderId(provider.providerId)}
             onTest={(provider) => void handleTestProvider(provider)}
-            onClearCredential={(provider) => void handleClearCredential(provider)}
             onRemove={(provider) => void handleRemoveProvider(provider)}
           />
         }

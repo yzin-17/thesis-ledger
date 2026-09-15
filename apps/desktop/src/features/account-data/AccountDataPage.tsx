@@ -1,5 +1,6 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router';
 import type { LedgerEventV2 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -26,7 +27,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { accountDisplayLabel, type Account, type Position } from '../portfolio/portfolio.types.js';
-import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
+import {
+  useAccountValuationQuery,
+  usePortfolioValuationQuery,
+} from '../portfolio/portfolio.queries.js';
+import { PortfolioPositionTable, PortfolioSummary } from '../portfolio/PortfolioOverview.js';
 import { useRemovePortfolioPositionMutation } from '../portfolio/portfolio.mutations.js';
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
 import { ScreenshotImportReview } from '../import/ScreenshotImportReview.js';
@@ -53,21 +58,52 @@ import type {
   ExecutionEvent,
   VoidEvent,
 } from './account-data.types.js';
+import { invalidatePortfolioChange } from './portfolio-change.js';
+import type { PortfolioChangeImpact } from '../portfolio/portfolio.types.js';
+
+export const resolveAccountSelection = ({
+  accounts,
+  accountId,
+  requestedAccountId,
+}: {
+  accounts: Account[];
+  accountId: string;
+  requestedAccountId: string;
+}) => {
+  if (requestedAccountId === 'all') return 'all';
+  if (requestedAccountId && accounts.some((account) => account.id === requestedAccountId))
+    return requestedAccountId;
+  if (accountId === 'all') return 'all';
+  if (accountId && accounts.some((account) => account.id === accountId)) return accountId;
+  return accounts[0]?.id ?? '';
+};
+
+export const accountSelectionTransition = (
+  nextAccountId: string,
+  extraLocationUpdates: Record<string, string | null> = {},
+) => ({
+  accountId: nextAccountId,
+  locationUpdates: {
+    ...extraLocationUpdates,
+    accountId: nextAccountId,
+    entry: null,
+  },
+});
 
 export function AccountDataPage({
   accounts,
   accountsReady = true,
   accountsPending = false,
   accountsError = false,
+  mode = 'actual',
   onRetryAccounts,
-  onPortfolioChanged,
 }: {
   accounts: Account[];
   accountsReady?: boolean;
   accountsPending?: boolean;
   accountsError?: boolean;
+  mode?: Account['mode'];
   onRetryAccounts?: () => void;
-  onPortfolioChanged: () => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -105,18 +141,22 @@ export function AccountDataPage({
   const [positionSheetEditing, setPositionSheetEditing] = useState<Position | null>(null);
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
+  const queryClient = useQueryClient();
   const removeSnapshotMutation = useRemovePortfolioPositionMutation();
   const selectedAccount = accounts.find((account) => account.id === accountId);
+  const allAccountsSelected = accountId === 'all';
   const isCashAccount = selectedAccount?.type === 'cash';
+  const allValuationQuery = usePortfolioValuationQuery(mode, allAccountsSelected);
   const valuationQuery = useAccountValuationQuery(
     accountId,
     selectedAccount?.mode,
-    Boolean(selectedAccount),
+    Boolean(selectedAccount) && !allAccountsSelected,
   );
   const ledgerEventsQuery = useAccountLedgerEventsQuery(
     accountId,
     selectedAccount?.mode,
     transactionFilter,
+    Boolean(selectedAccount) && !allAccountsSelected,
   );
   const auditQuery = useAccountLedgerAuditQuery(
     accountId,
@@ -128,28 +168,22 @@ export function AccountDataPage({
     selectedAccount?.mode,
     reconciliationOpen,
   );
+  const handlePortfolioChanged = useCallback(
+    (impact?: PortfolioChangeImpact) => {
+      const effectiveImpact =
+        impact ??
+        ({
+          mode: selectedAccount?.mode ?? 'actual',
+          accountIds: accountId ? [accountId] : [],
+          events: true,
+          audit: true,
+        } satisfies PortfolioChangeImpact);
+      void invalidatePortfolioChange(queryClient, effectiveImpact);
+    },
+    [accountId, queryClient, selectedAccount?.mode],
+  );
 
-  useEffect(() => {
-    if (requestedAccountId && accounts.some((account) => account.id === requestedAccountId)) {
-      setAccountId(requestedAccountId);
-      return;
-    }
-    if (accountId && accounts.some((account) => account.id === accountId)) return;
-    if (accounts[0]) {
-      setAccountId(accounts[0].id);
-      try {
-        window.sessionStorage.setItem('thesis-ledger-last-account', accounts[0].id);
-      } catch {
-        /* sessionStorage is optional */
-      }
-    }
-  }, [accountId, accounts, requestedAccountId]);
-
-  useEffect(() => {
-    if (entryRequested === 'screenshot' && selectedAccount?.type !== 'cash') setImportOpen(true);
-  }, [entryRequested, selectedAccount?.type]);
-
-  const updateLocation = (updates: Record<string, string | null>) => {
+  const updateLocation = useCallback((updates: Record<string, string | null>) => {
     const next = new URLSearchParams(location.search);
     for (const [key, value] of Object.entries(updates)) {
       if (value === null) next.delete(key);
@@ -157,7 +191,46 @@ export function AccountDataPage({
     }
     const search = next.toString();
     void navigate({ pathname: '/accounts', ...(search ? { search: `?${search}` } : {}) });
-  };
+  }, [location.search, navigate]);
+
+  useEffect(() => {
+    const nextAccountId = resolveAccountSelection({ accounts, accountId, requestedAccountId });
+    if (nextAccountId === accountId && accounts.length > 0) return;
+    if (accounts.length === 0) {
+      setAccountId('');
+      setDraftDirty(false);
+      setExecutionOpen(false);
+      setEditingEvent(null);
+      setAuditEvent(null);
+      setVoidEvent(null);
+      setRestoreEvent(null);
+      setImportOpen(false);
+      setReconciliationOpen(false);
+      setCashObservationOpen(false);
+      setCashTransferAction(null);
+      setPositionSheetOpen(false);
+      setPositionSheetEditing(null);
+      setAccountManagerOpen(false);
+      try {
+        window.sessionStorage.removeItem('thesis-ledger-last-account');
+      } catch {
+        /* sessionStorage is optional */
+      }
+      updateLocation({ accountId: null, entry: null, tab: null, setup: null });
+      return;
+    }
+    setAccountId(nextAccountId);
+    try {
+      window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
+    } catch {
+      /* sessionStorage is optional */
+    }
+    updateLocation({ accountId: nextAccountId, entry: null });
+  }, [accountId, accounts, requestedAccountId, updateLocation]);
+
+  useEffect(() => {
+    if (entryRequested === 'screenshot' && selectedAccount?.type !== 'cash') setImportOpen(true);
+  }, [entryRequested, selectedAccount?.type]);
 
   const confirmDiscard = async () => {
     if (!draftDirty) return true;
@@ -186,13 +259,14 @@ export function AccountDataPage({
     setReconciliationOpen(false);
     setCashObservationOpen(false);
     setCashTransferAction(null);
-    setAccountId(nextAccountId);
+    const transition = accountSelectionTransition(nextAccountId, extraLocationUpdates);
+    setAccountId(transition.accountId);
     try {
       window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
     } catch {
       /* sessionStorage is optional */
     }
-    updateLocation({ accountId: nextAccountId, entry: null, ...extraLocationUpdates });
+    updateLocation(transition.locationUpdates);
     return true;
   };
 
@@ -292,6 +366,49 @@ export function AccountDataPage({
         )
       : undefined;
 
+  let accountSelectionLabel = '选择账户';
+  if (allAccountsSelected) accountSelectionLabel = '全部账户';
+  else if (selectedAccount) accountSelectionLabel = accountDisplayLabel(selectedAccount);
+
+  const accountSelector = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <Field className="min-w-0 flex-1 sm:flex-row sm:items-center sm:gap-3">
+        <FieldLabel htmlFor="account-data-account" className="shrink-0 whitespace-nowrap">
+          当前账户
+        </FieldLabel>
+        <Select
+          value={accountId || null}
+          onValueChange={(value) => {
+            if (value) void selectAccount(value);
+          }}
+        >
+            <SelectTrigger id="account-data-account" className="w-full">
+              <SelectValue placeholder="选择账户">
+                {accountSelectionLabel}
+              </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="all">全部账户</SelectItem>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {accountDisplayLabel(account)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+      {!allAccountsSelected && (
+        <div className="flex shrink-0">
+          <Button type="button" variant="outline" onClick={() => setAccountManagerOpen(true)}>
+            管理账户
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
   const openSnapshotEditor = (event: LedgerEventV2) => {
     const position = findSnapshotPosition(event);
     if (!position) return;
@@ -316,7 +433,13 @@ export function AccountDataPage({
     try {
       await removeSnapshotMutation.mutateAsync(position.id);
       toastManager.add({ title: '持仓快照已移除', type: 'success', timeout: 2800 });
-      onPortfolioChanged();
+      handlePortfolioChanged({
+        mode: selectedAccount?.mode ?? 'actual',
+        accountIds: [position.accountId],
+        events: true,
+        audit: true,
+        reconciliation: true,
+      });
     } catch (caught) {
       toastManager.add({
         title: '持仓快照移除失败',
@@ -362,8 +485,46 @@ export function AccountDataPage({
           positions={[]}
           step="account"
           accountsReady={accountsReady}
-          onSaved={onPortfolioChanged}
+          onSaved={handlePortfolioChanged}
         />
+      </AccountDataFrame>
+    );
+  }
+
+  if (allAccountsSelected) {
+    if (allValuationQuery.isPending && !allValuationQuery.data) return <AccountDataLoading />;
+    if (allValuationQuery.isError && !allValuationQuery.data) {
+      return (
+        <AccountDataFrame>
+          <PageHeader
+            className="mb-0"
+            eyebrow="ACCOUNT DATA"
+            title="全部账户"
+            description="查看当前估值范围内的组合汇总与持仓明细。"
+          />
+          {accountSelector}
+          <Alert variant="destructive">
+            <AlertTitle>组合读取失败</AlertTitle>
+            <AlertDescription>无法读取全部账户估值，请稍后重试。</AlertDescription>
+            <Button type="button" variant="outline" onClick={() => void allValuationQuery.refetch()}>
+              重新加载组合
+            </Button>
+          </Alert>
+        </AccountDataFrame>
+      );
+    }
+    if (!allValuationQuery.data) return <AccountDataLoading />;
+    return (
+      <AccountDataFrame>
+        <PageHeader
+          className="mb-0"
+          eyebrow="ACCOUNT DATA"
+          title="全部账户"
+          description="只读查看当前估值范围内的组合汇总与持仓明细。"
+        />
+        {accountSelector}
+        <PortfolioSummary portfolio={allValuationQuery.data} />
+        <PortfolioPositionTable portfolio={allValuationQuery.data} />
       </AccountDataFrame>
     );
   }
@@ -385,39 +546,7 @@ export function AccountDataPage({
         }
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Field className="min-w-0 flex-1 sm:flex-row sm:items-center sm:gap-3">
-          <FieldLabel htmlFor="account-data-account" className="shrink-0 whitespace-nowrap">
-            当前账户
-          </FieldLabel>
-          <Select
-            value={accountId || null}
-            onValueChange={(value) => {
-              if (value) void selectAccount(value);
-            }}
-          >
-            <SelectTrigger id="account-data-account" className="w-full">
-              <SelectValue placeholder="选择账户">
-                {selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {accountDisplayLabel(account)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-        <div className="flex shrink-0">
-          <Button type="button" variant="outline" onClick={() => setAccountManagerOpen(true)}>
-            管理账户
-          </Button>
-        </div>
-      </div>
+      {accountSelector}
 
       <Tabs value={activeTab} onValueChange={(value) => void selectTab(value as AccountDataTab)}>
         <TabsList variant="line">
@@ -460,7 +589,7 @@ export function AccountDataPage({
                 cashValue={cashValue}
                 valuationQuery={valuationQuery}
                 onDirtyChange={setDraftDirty}
-                onSaved={onPortfolioChanged}
+                onSaved={handlePortfolioChanged}
                 entrySheetOpen={positionSheetOpen}
                 onEntrySheetOpenChange={(open) => {
                   setPositionSheetOpen(open);
@@ -549,7 +678,7 @@ export function AccountDataPage({
         account={selectedAccount}
         open={cashObservationOpen}
         onOpenChange={setCashObservationOpen}
-        onSaved={onPortfolioChanged}
+        onSaved={handlePortfolioChanged}
       />
       {cashTransferAction && (
         <CashTransferCorrectionSheet
@@ -585,7 +714,7 @@ export function AccountDataPage({
               accountLocked
               embedded
               onDirtyChange={setDraftDirty}
-              onPortfolioChanged={onPortfolioChanged}
+              onPortfolioChanged={handlePortfolioChanged}
             />
           </div>
         </SheetContent>
@@ -617,7 +746,7 @@ export function AccountDataPage({
                 }
               })();
             }}
-            onSaved={onPortfolioChanged}
+            onSaved={handlePortfolioChanged}
           />
         </SheetContent>
       </Sheet>

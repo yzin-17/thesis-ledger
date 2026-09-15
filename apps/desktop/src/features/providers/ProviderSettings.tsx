@@ -9,6 +9,8 @@ import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import { AutomationEditorSheet } from './AutomationEditorSheet.js';
 import { ProviderEditorSheet } from './ProviderEditorSheet.js';
+import { useAiProviderEditor } from './useAiProviderEditor.js';
+import { isAiProvider } from './providers.types.js';
 import { createProviderActionHandlers } from './providers.actions.js';
 import { useProviderQueries } from './providers.queries.js';
 import {
@@ -66,6 +68,7 @@ export function ProviderSettings() {
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const toastManager = useToastManager();
   const { confirm } = useConfirmDialog();
+  const aiEditor = useAiProviderEditor();
   const providerQueries = useProviderQueries(healthHistoryPage, automationHistoryPage);
   const providerMutation = useSaveProviderMutation();
   const testProviderMutation = useTestProviderConnectionMutation();
@@ -183,15 +186,41 @@ export function ProviderSettings() {
         editingProviderName={editingProviderName}
         providerDraft={providerDraft}
         credentialInputOpen={credentialInputOpen}
+        takingOverEnvironmentName={null}
         providerTestState={providerTestState}
         savingProviderDraft={savingProviderDraft}
         onOpenChange={(open) => (open ? setProviderSheetOpen(true) : actions.closeProviderSheet())}
         onUpdateDraft={updateProviderDraft}
         onResetTest={resetProviderTest}
         onSetCredentialInputOpen={setCredentialInputOpen}
+        onAiTypeSelected={() => {
+          actions.closeProviderSheet();
+          aiEditor.openEditor();
+        }}
         onClose={actions.closeProviderSheet}
         onTest={() => void actions.testProviderDraft()}
         onSave={(event) => void actions.saveProviderDraft(event)}
+      />
+      <ProviderEditorSheet
+        open={aiEditor.editor.open}
+        editingProviderName={aiEditor.editor.editingProviderName}
+        providerDraft={aiEditor.editor.providerDraft}
+        credentialInputOpen={aiEditor.editor.credentialInputOpen}
+        takingOverEnvironmentName={aiEditor.editor.takingOverEnvironmentName}
+        providerTestState={aiEditor.editor.providerTestState}
+        savingProviderDraft={aiEditor.editor.savingProviderDraft}
+        availableAiModels={aiEditor.editor.availableModels}
+        aiModelDetails={aiEditor.editor.modelDetails}
+        aiModelCatalogState={aiEditor.editor.modelCatalogState}
+        onOpenChange={aiEditor.editor.onOpenChange}
+        onUpdateDraft={aiEditor.updateDraft}
+        onResetTest={aiEditor.editor.onResetTest}
+        onSetCredentialInputOpen={aiEditor.editor.onSetCredentialInputOpen}
+        onAiTypeSelected={() => undefined}
+        onFetchAiModels={() => void aiEditor.fetchModels()}
+        onClose={aiEditor.close}
+        onTest={() => void aiEditor.testDraft()}
+        onSave={(event) => void aiEditor.saveDraft(event)}
       />
       <AutomationEditorSheet
         open={automationSheetOpen}
@@ -218,21 +247,33 @@ export function ProviderSettings() {
               loadState={loadState}
               providers={providers}
               priorityDrafts={providerPriorityDrafts}
-              testingProviderName={testingProviderName}
-              savingProviderName={savingProviderName}
+              testingProviderName={aiEditor.testingProviderName ?? testingProviderName}
+              savingProviderName={aiEditor.testingProviderName ?? savingProviderName}
+              deletingProviderName={aiEditor.deletingProviderName}
               onPriorityChange={(name, value) =>
                 setProviderPriorityDrafts((current) => ({ ...current, [name]: value }))
               }
-              onPrioritySave={(provider) => void actions.saveProvider(provider)}
-              onEdit={actions.openProviderSheet}
-              onTest={(name) => void actions.test(name)}
-              onToggle={(provider) =>
-                void actions.saveProvider(
-                  provider,
-                  !provider.enabled,
-                  `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
-                )
-              }
+              onPrioritySave={(provider) => {
+                if (!isAiProvider(provider)) void actions.saveProvider(provider);
+              }}
+              onEdit={(provider) => {
+                if (isAiProvider(provider)) aiEditor.openEditor(provider);
+                else actions.openProviderSheet(provider);
+              }}
+              onTest={(provider) => {
+                if (isAiProvider(provider)) void aiEditor.testSaved(provider);
+                else void actions.test(provider.name);
+              }}
+              onToggle={(provider) => {
+                if (isAiProvider(provider)) void aiEditor.toggle(provider);
+                else
+                  void actions.saveProvider(
+                    provider,
+                    !provider.enabled,
+                    `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
+                  );
+              }}
+              onDelete={(provider) => void aiEditor.remove(provider)}
               onCreate={() => actions.openProviderSheet()}
             />
             <HealthHistoryTable

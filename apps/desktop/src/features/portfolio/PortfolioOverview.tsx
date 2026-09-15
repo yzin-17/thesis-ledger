@@ -229,7 +229,7 @@ export function PortfolioPositionTable({
   onSelectPosition,
 }: {
   portfolio: Portfolio;
-  onSelectPosition: (position: Position) => void;
+  onSelectPosition?: (position: Position) => void;
 }) {
   const [sort, setSort] = useState<PortfolioPositionSortState>(null);
   const effectiveSort = sort ?? defaultPositionSort;
@@ -277,12 +277,12 @@ export function PortfolioPositionTable({
                 onSort={handleSort}
               />
               <th>状态</th>
-              <StickyTableActionHeader>操作</StickyTableActionHeader>
+              {onSelectPosition && <StickyTableActionHeader>操作</StickyTableActionHeader>}
             </tr>
           </thead>
           <tbody>
             {sortedPositions.length === 0 ? (
-              <EmptyTableRow colSpan={8} />
+              <EmptyTableRow colSpan={onSelectPosition ? 8 : 7} />
             ) : (
               sortedPositions.map((position) => {
                 const currency = position.currency ?? portfolio.baseCurrency ?? 'CNY';
@@ -337,17 +337,19 @@ export function PortfolioPositionTable({
                         {position.stale ? '陈旧' : '最新'}
                       </Badge>
                     </td>
-                    <StickyTableActionCell>
-                      <Button
-                        className="text-button"
-                        size="sm"
-                        type="button"
-                        variant="link"
-                        onClick={() => onSelectPosition(position)}
-                      >
-                        行情详情
-                      </Button>
-                    </StickyTableActionCell>
+                    {onSelectPosition && (
+                      <StickyTableActionCell>
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          onClick={() => onSelectPosition(position)}
+                        >
+                          行情详情
+                        </Button>
+                      </StickyTableActionCell>
+                    )}
                   </tr>
                 );
               })

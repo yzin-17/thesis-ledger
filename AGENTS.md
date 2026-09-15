@@ -36,6 +36,10 @@
 - 验证按“定向测试 → 包级测试与 build → 仓库门禁 → Docker/真实运行时”逐级执行；低层级失败时不得提前运行更高成本的验证。
 - 修改后的局部验证通过前，不重复运行全量测试或构建生产镜像。
 - 生产镜像应在主要源码和启动入口稳定后构建一次；故障恢复场景必须尽量复用同一镜像和同一套测试环境，不得为每个场景重复构建。
+- 需要使目标 Docker 运行态与当前源码一致时，必须先按实际变更选择相邻 `thesis-ledger-infra` 仓库的更新入口，并选择最小的 `[all|dsa|thesis-ledger]` 目标：
+  - 仅修改应用代码或可在宿主机构建的前端静态资源，且未改变 ThesisLedger Server/workspace 运行时 package manifest、Prisma Schema/migration/raw-owned inventory、DSA `requirements.txt`、Dockerfile、系统依赖或原生 SDK，同时目标容器已存在并运行时，使用 `./scripts/sync-code.sh [all|dsa|thesis-ledger]`；其兼容性预检必须通过。
+  - 需要更新本地开发镜像，或上述依赖、数据库结构、Dockerfile/运行时条件发生变化，或目标容器不存在、未运行、`sync-code.sh` 预检拒绝时，使用 `./scripts/update.sh [all|dsa|thesis-ledger]`，不得放宽快更门禁代替完整更新。
+- 不得绕过所选入口直接执行应用服务的 `docker compose build`、`up`、`docker cp` 或手工替换/重建容器；只读的状态、日志和镜像检查不受此限制。`sync-code.sh` 只更新容器可写层，不能作为镜像已更新或生产发布的证据，容器重建后该更新会消失。`update.sh` 通常需要约 5–6 分钟，调用后应等待完整执行窗口或脚本主动返回，除非出现明确异常信号，不得按分钟频繁轮询状态。
 - 已通过的高成本检查只有在其输入文件或依赖发生变化时才需要重跑；Task 中应记录检查命令、输入范围和最后一次结果。
 - 测试、构建和日志输出较大时，只保留失败详情与最终统计，避免完整成功日志持续进入 Agent 上下文。
 

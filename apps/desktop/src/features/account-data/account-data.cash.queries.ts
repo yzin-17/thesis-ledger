@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UpdateRecurringCashDepositPlan } from '@thesis-ledger/api-client';
 
-import { accountDataKeys } from './account-data.queries.js';
-import { portfolioKeys } from '../portfolio/portfolio.queries.js';
 import type { PortfolioMode } from '../portfolio/portfolio.types.js';
+import { invalidatePortfolioChange } from './portfolio-change.js';
 import {
   changeCashDepositPlanState,
   confirmCashDepositOccurrence,
@@ -46,28 +45,21 @@ export const useCashOperationsMutations = (accountId: string, mode: PortfolioMod
   const invalidateCashDeposits = () =>
     queryClient.invalidateQueries({ queryKey: cashDepositKeys.root });
   const invalidateCashAccount = () =>
-    Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: [...accountDataKeys.root, 'events', accountId],
-      }),
-      queryClient.invalidateQueries({ queryKey: accountDataKeys.audit(accountId, mode) }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode, accountId) }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode) }),
-    ]);
+    invalidatePortfolioChange(queryClient, {
+      mode,
+      accountIds: [accountId],
+      events: true,
+      audit: true,
+      reconciliation: true,
+    });
   const invalidateTransfer = async (sourceAccountId: string, targetAccountId: string) => {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: [...accountDataKeys.root, 'events', sourceAccountId],
-      }),
-      queryClient.invalidateQueries({
-        queryKey: [...accountDataKeys.root, 'events', targetAccountId],
-      }),
-      queryClient.invalidateQueries({ queryKey: accountDataKeys.audit(sourceAccountId, mode) }),
-      queryClient.invalidateQueries({ queryKey: accountDataKeys.audit(targetAccountId, mode) }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode, sourceAccountId) }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode, targetAccountId) }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation(mode) }),
-    ]);
+    await invalidatePortfolioChange(queryClient, {
+      mode,
+      accountIds: [sourceAccountId, targetAccountId],
+      events: true,
+      audit: true,
+      reconciliation: true,
+    });
   };
 
   return {

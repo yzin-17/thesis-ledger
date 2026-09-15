@@ -1,4 +1,5 @@
-import type { PortfolioValuationResponse } from '@thesis-ledger/api-client';
+import type { PortfolioValuationResponse, ThesisLedgerApiClient } from '@thesis-ledger/api-client';
+import { getDesktopApiClient } from '../../shared/api/client.js';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
 import type {
   Account,
@@ -119,7 +120,6 @@ export const fetchPortfolioValuation = async (
   const params = new URLSearchParams({
     mode,
     ...(accountId ? { accountId } : {}),
-    t: String(Date.now()),
   });
   return normalizePortfolio(
     await requestDesktopJson<PortfolioValuationResponse>(
@@ -195,6 +195,13 @@ export const toggleAccount = (accountId: string, active: boolean, client?: Deskt
     { ...noStore, method: active ? 'DELETE' : 'POST' },
     client,
   );
+
+export type PortfolioAccountClient = Pick<ThesisLedgerApiClient['accounts'], 'permanentDelete'>;
+
+export const permanentlyDeleteAccount = (
+  accountId: string,
+  client: PortfolioAccountClient = getDesktopApiClient().accounts,
+) => client.permanentDelete(accountId);
 
 export interface SavePositionInput {
   accountId: string;

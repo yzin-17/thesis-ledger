@@ -280,6 +280,26 @@ export const providerManifestSchema = z.object({
   origin: z.enum(['dsa']).optional(),
   markets: z.array(z.string().min(1)).optional(),
   configurationMode: z.enum(['control', 'built_in', 'dsa_environment']).optional(),
+  credentialSchema: z
+    .object({
+      methods: z.array(
+        z.object({
+          method: z.string().min(1),
+          fields: z.array(
+            z.object({
+              name: z.string().min(1),
+              secret: z.boolean(),
+              required: z.boolean(),
+            }),
+          ),
+        }),
+      ),
+    })
+    .optional(),
+  credentialSource: z.enum(['control', 'environment', 'none', 'built_in']).optional(),
+  credentialFieldsConfigured: z.record(z.string(), z.boolean()).optional(),
+  credentialMethod: z.string().min(1).nullable().optional(),
+  configVersion: z.number().int().nonnegative().optional(),
   upstreamSources: z
     .array(
       z.object({

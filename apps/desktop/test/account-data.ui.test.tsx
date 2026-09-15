@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest';
 import { Sheet } from '../src/components/ui/sheet.js';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { Toaster } from '../src/components/ui/toast.js';
-import { AccountDataPage } from '../src/features/account-data/AccountDataPage.js';
+import {
+  AccountDataPage,
+  accountSelectionTransition,
+  resolveAccountSelection,
+} from '../src/features/account-data/AccountDataPage.js';
 import { chargeCategoryLabel } from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
 import { AccountManagementSection } from '../src/features/portfolio/PortfolioManagementSections.js';
@@ -79,6 +83,7 @@ const seedAccountData = (queryClient: QueryClient) => {
     cashByCurrency: [{ currency: 'CNY' as const, amount: 100, convertedAmount: 100 }],
   };
   queryClient.setQueryData(portfolioKeys.valuation('actual', account.id), valuation);
+  queryClient.setQueryData(portfolioKeys.valuation('actual'), valuation);
   const events = {
     accountId: account.id,
     ledgerRevision: '7',
@@ -99,7 +104,7 @@ const renderPage = (search = '', accounts = [account, shadowAccount], seed = tru
       <MemoryRouter initialEntries={[`/accounts${search}`]}>
         <Toaster>
           <ConfirmDialogProvider>
-            <AccountDataPage accounts={accounts} onPortfolioChanged={() => undefined} />
+            <AccountDataPage accounts={accounts} />
           </ConfirmDialogProvider>
         </Toaster>
       </MemoryRouter>
@@ -200,6 +205,46 @@ describe('账户数据页面契约', () => {
 
     const fundMarkup = renderPage('', [fundAccount], false);
     expect(fundMarkup).toContain('支付宝 · 基金 · CNY · 实际');
+  });
+
+  it('选择全部账户时渲染只读组合汇总并保留 accountId=all 状态', () => {
+    const markup = renderPage('?accountId=all');
+
+    expect(markup).toContain('全部账户');
+    expect(markup).toContain('组合关键指标');
+    expect(markup).toContain('当前持仓');
+    expect(markup).not.toContain('管理账户');
+    expect(markup).not.toContain('成交记录');
+  });
+
+  it('账户选择可在 all 与具体账户之间双向切换', () => {
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: account.id,
+        requestedAccountId: 'all',
+      }),
+    ).toBe('all');
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: 'all',
+        requestedAccountId: shadowAccount.id,
+      }),
+    ).toBe(shadowAccount.id);
+
+    const transition = accountSelectionTransition('all');
+    const search = new URLSearchParams('tab=positions');
+    for (const [key, value] of Object.entries(transition.locationUpdates)) {
+      if (value === null) search.delete(key);
+      else search.set(key, value);
+    }
+    expect(transition.accountId).toBe('all');
+    expect(search.toString()).toBe('tab=positions&accountId=all');
+
+    const concreteTransition = accountSelectionTransition(shadowAccount.id);
+    search.set('accountId', concreteTransition.locationUpdates.accountId);
+    expect(search.get('accountId')).toBe(shadowAccount.id);
   });
 
   it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {

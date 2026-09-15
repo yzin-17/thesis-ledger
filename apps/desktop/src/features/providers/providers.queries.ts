@@ -13,6 +13,7 @@ export const providerKeys = {
   providers: () => [...providerKeys.root, 'config'] as const,
   issues: () => [...providerKeys.root, 'issues'] as const,
   jobs: () => [...providerKeys.root, 'automations'] as const,
+  healthHistoryRoot: () => [...providerKeys.root, 'health-history'] as const,
   healthHistory: (page: number) => [...providerKeys.root, 'health-history', page] as const,
   jobHistory: (page?: number) =>
     [...providerKeys.root, 'automation-history', ...(page === undefined ? [] : [page])] as const,

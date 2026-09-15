@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { AppConfig } from '../platform/config.js';
-import type { AiProvider } from './contracts.js';
+import type { AiProvider, AiProviderHealth } from './contracts.js';
 
 type CompletionInput = {
   model: string;
   messages: unknown[];
   tools: string[];
   maxOutputTokens?: number;
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 };
 
 const providerConfigSchema = z
@@ -60,7 +61,54 @@ const parseContent = (value: unknown) => {
   return value;
 };
 
+const contentFromParts = (value: unknown[]) => {
+  const text: string[] = [];
+  for (const part of value) {
+    const record = asRecord(part);
+    if (typeof record?.text === 'string') text.push(record.text);
+  }
+  return text.length > 0 ? text.join('') : undefined;
+};
+
+const normalizeResponseContent = (value: unknown) =>
+  Array.isArray(value) ? (contentFromParts(value) ?? value) : value;
+
+const completionContent = (root: Record<string, unknown>) => {
+  const choices = Array.isArray(root.choices) ? root.choices : [];
+  const choice = asRecord(choices[0]);
+  const message = asRecord(choice?.message);
+  if (message && Object.hasOwn(message, 'content'))
+    return normalizeResponseContent(message.content);
+  if (typeof choice?.text === 'string') return choice.text;
+
+  // Some OpenAI-compatible gateways return the Responses API envelope even
+  // when the request was sent through their chat-compatible endpoint.
+  if (typeof root.output_text === 'string') return root.output_text;
+  if (Array.isArray(root.output)) {
+    const text: string[] = [];
+    for (const item of root.output) {
+      const record = asRecord(item);
+      const content = record?.content;
+      if (Array.isArray(content)) {
+        const partText = contentFromParts(content);
+        if (partText) text.push(partText);
+      } else if (typeof record?.text === 'string') text.push(record.text);
+    }
+    if (text.length > 0) return text.join('');
+  }
+  return undefined;
+};
+
 const completionUrl = (baseUrl: string) => `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+
+const isOpenRouterUrl = (baseUrl: string) => {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === 'openrouter.ai' || hostname.endsWith('.openrouter.ai');
+  } catch {
+    return false;
+  }
+};
 
 export class OpenAiCompatibleProvider implements AiProvider {
   readonly metadata;
@@ -77,11 +125,20 @@ export class OpenAiCompatibleProvider implements AiProvider {
       costCurrency?: string;
       pricingVersion?: string;
     },
+    options?: {
+      priority?: number;
+      capabilities?: readonly string[];
+      health?: AiProviderHealth;
+      source?: 'database' | 'environment';
+    },
   ) {
     this.metadata = {
       baseURL: baseUrl,
-      health: 'unknown' as const,
-      priority: 100,
+      timeoutMs: this.timeoutMs,
+      health: options?.health ?? ('unknown' as const),
+      priority: options?.priority ?? 100,
+      ...(options?.capabilities ? { capabilities: [...options.capabilities] } : {}),
+      ...(options?.source ? { source: options.source } : {}),
       ...(pricing?.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
       ...(pricing?.costPer1kOutput === undefined ? {} : { costPer1kOutput: pricing.costPer1kOutput }),
       ...(pricing?.costCurrency ? { costCurrency: pricing.costCurrency } : {}),
@@ -103,6 +160,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
         tools: input.tools.map((name) => ({ type: 'function', function: { name } })),
         response_format: { type: 'json_object' },
         ...(input.maxOutputTokens === undefined ? {} : { max_tokens: input.maxOutputTokens }),
+        ...(input.reasoningEffort && isOpenRouterUrl(this.baseUrl)
+          ? { reasoning: { effort: input.reasoningEffort } }
+          : {}),
       }),
       signal: AbortSignal.any([signal, timeout]),
     });
@@ -113,10 +173,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
       throw new Error(typeof message === 'string' ? message : `Provider HTTP ${response.status}`);
     }
     const root = asRecord(payload);
-    const choice = Array.isArray(root?.choices) ? asRecord(root.choices[0]) : null;
-    const message = asRecord(choice?.message);
     const usage = asRecord(root?.usage);
-    if (!message || !('content' in message))
+    const content = root ? completionContent(root) : undefined;
+    if (content === undefined)
       throw new Error('Provider 响应缺少 choices[0].message.content');
     const inputTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
     const outputTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : 0;
@@ -124,7 +183,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     const outputRate = this.metadata.costPer1kOutput;
     const costKnown = typeof inputRate === 'number' && typeof outputRate === 'number';
     return {
-      content: parseContent(message.content),
+      content: parseContent(content),
       inputTokens,
       outputTokens,
       cost: costKnown ? (inputTokens * inputRate + outputTokens * outputRate) / 1_000 : 0,

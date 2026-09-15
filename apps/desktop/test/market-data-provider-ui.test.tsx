@@ -28,6 +28,11 @@ const routeProvider = (
   origin: 'dsa',
   markets,
   configurationMode,
+  credentialSchema: {
+    methods: configurationMode === 'dsa_environment' ? [{
+      method: 'api_key', fields: [{ name: 'apiKey', required: true, secret: true }],
+    }] : [],
+  },
 });
 
 const providers: ProviderManifest[] = [
@@ -147,14 +152,11 @@ describe('市场数据 Provider 与主备路由', () => {
     const html = renderToStaticMarkup(
       <MarketProviderPanel
         providers={providers}
-        credentials={{}}
         disabled={false}
         busyAction={null}
         onProviderChange={vi.fn()}
-        onCredentialChange={vi.fn()}
-        onSave={vi.fn()}
+        onConfigure={vi.fn()}
         onTest={vi.fn()}
-        onClearCredential={vi.fn()}
         onRemove={vi.fn()}
       />,
     );
@@ -170,9 +172,10 @@ describe('市场数据 Provider 与主备路由', () => {
     expect(html).toContain('市场：中国内地、港股、美股、日股、韩股、台股');
     expect(html).toContain('上游：');
     expect(html).toContain('腾讯财经');
-    expect(html).toContain('请在 DSA 环境配置凭证');
-    expect(html.match(/保存设置/g)).toHaveLength(11);
-    expect(html.match(/只读测试/g)).toHaveLength(11);
+    expect(html).toContain('尚未配置凭证');
+    expect(html).not.toContain('保存设置');
+    expect(html.match(/>配置凭证</g)).toHaveLength(5);
+    expect(html.match(/测试连接/g)).toHaveLength(11);
   });
 
   it('路由面板明确渲染主数据源和备用数据源', () => {

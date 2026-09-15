@@ -2,10 +2,17 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
 import type { useToastManager } from '@/components/ui/toast';
 
-import type { Account, HeldAssetType, InstrumentLookup, Position } from './portfolio.types.js';
+import type {
+  Account,
+  HeldAssetType,
+  InstrumentLookup,
+  PortfolioChangeImpact,
+  Position,
+} from './portfolio.types.js';
 import type {
   useConfirmPortfolioInstrumentMutation,
   useClearPortfolioPositionsMutation,
+  usePermanentDeleteAccountMutation,
   useRemovePortfolioPositionMutation,
   useSaveAccountMutation,
   useSaveCashBalanceMutation,
@@ -22,6 +29,7 @@ export type PortfolioConfirmDialog = (options: ConfirmDialogOptions) => Promise<
 export type PortfolioMutationBundle = {
   saveAccount: ReturnType<typeof useSaveAccountMutation>;
   toggleAccount: ReturnType<typeof useToggleAccountMutation>;
+  permanentlyDeleteAccount: ReturnType<typeof usePermanentDeleteAccountMutation>;
   confirmInstrument: ReturnType<typeof useConfirmPortfolioInstrumentMutation>;
   savePosition: ReturnType<typeof useSavePositionMutation>;
   saveCash: ReturnType<typeof useSaveCashBalanceMutation>;
@@ -55,10 +63,9 @@ export type PortfolioActionDependencies = {
   setAccountSheetOpen: Dispatch<SetStateAction<boolean>>;
   setPositionSheetOpen: (open: boolean) => void;
   markDirty: (nextDirty?: boolean) => void;
-  onSaved: () => void;
+  onSaved: (impact: PortfolioChangeImpact) => void;
   toastManager: PortfolioToastManager;
   confirm: PortfolioConfirmDialog;
-  loadManagedAccounts: () => Promise<unknown>;
   mutations: PortfolioMutationBundle;
 };
 

@@ -6,7 +6,6 @@ import {
   fundNavHistorySchemaV1,
   fundHoldingsSchemaV1,
   indicatorSchemaV1,
-  quoteSchemaV1,
   fxRatesResponseSchemaV1,
   type BarInputV1,
   type BarV1,
@@ -17,12 +16,12 @@ import {
   type FundNavHistoryV1,
   type FundHoldingsV1,
   type IndicatorV1,
-  type QuoteV1,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketBarCache, resolveEffectiveBars } from './market-bar-cache.js';
+import { MarketQuoteReader } from './market-quote-reader.js';
 import {
   historicalSeriesFreshSeconds,
   MARKET_CACHE_POLICIES,
@@ -37,6 +36,7 @@ const fundSymbolPattern = /^\d{6}\.OF$/;
 export class MarketService {
   private readonly logger = new Logger(MarketService.name);
   private readonly barCache: MarketBarCache;
+  private readonly quoteReader: MarketQuoteReader;
   private readonly resultCache: MarketResultCache;
 
   constructor(
@@ -45,6 +45,7 @@ export class MarketService {
     @Optional() private readonly prisma?: PrismaService,
   ) {
     this.barCache = new MarketBarCache(redis, prisma);
+    this.quoteReader = new MarketQuoteReader(dsa, redis);
     this.resultCache = new MarketResultCache(redis);
   }
 
@@ -123,62 +124,8 @@ export class MarketService {
     });
   }
 
-  async getQuote(
-    input: string,
-    options: { allowStale?: boolean; refresh?: boolean } = {},
-  ): Promise<QuoteV1> {
-    const { symbol } = normalizeSymbol(input);
-    const flightKey = `quote:${symbol}`;
-    const freshKey = redisKey('cache', `quote:${symbol}:fresh`);
-    const lastValidKey = redisKey('cache', `quote:${symbol}:last-valid`);
-    if (!options.refresh) {
-      const cached = await this.redis.client.get(freshKey);
-      if (cached) return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
-    }
-    const quote = await this.singleFlight(flightKey, () =>
-      this.withDistributedLock(flightKey, async () => {
-        if (!options.refresh) {
-          const cached = await this.redis.client.get(freshKey);
-          if (cached) return quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
-        }
-        try {
-          const raw = await this.dsa.get<Record<string, unknown>>(
-            `/api/v1/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}`,
-          );
-          const quote = quoteSchemaV1.parse({
-            ...raw,
-            version: 1,
-            symbol,
-            servedFromCache: false,
-          });
-          const serialized = JSON.stringify(quote);
-          await this.redis.client
-            .multi()
-            .set(freshKey, serialized, 'EX', MARKET_CACHE_POLICIES.realtimeQuote.freshSeconds)
-            .set(
-              lastValidKey,
-              serialized,
-              'EX',
-              MARKET_CACHE_POLICIES.realtimeQuote.lastValidSeconds,
-            )
-            .exec();
-          return quote;
-        } catch (error) {
-          const lastValid = await this.redis.client.get(lastValidKey);
-          if (lastValid)
-            return quoteSchemaV1.parse({
-              ...JSON.parse(lastValid),
-              stale: true,
-              freshness: 'stale',
-              servedFromCache: true,
-            });
-          throw error;
-        }
-      }),
-    );
-    if (options.allowStale === false && quote.stale)
-      throw new Error('行情陈旧，当前操作要求新鲜行情');
-    return quote;
+  getQuote(input: string, options: { allowStale?: boolean; refresh?: boolean } = {}) {
+    return this.quoteReader.getQuote(input, options);
   }
 
   async getFundNav(

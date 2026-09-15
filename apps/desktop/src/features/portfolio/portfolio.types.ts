@@ -2,6 +2,16 @@ export type PortfolioMode = 'actual' | 'shadow';
 export type LoadState = 'loading' | 'ready' | 'empty' | 'error' | 'stale';
 export type HeldAssetType = 'stock' | 'etf' | 'fund';
 
+export type PortfolioChangeImpact = {
+  mode: PortfolioMode;
+  accountIds: string[];
+  accounts?: boolean;
+  events?: boolean;
+  audit?: boolean;
+  reconciliation?: boolean;
+  allSummary?: boolean;
+};
+
 export interface InstrumentLookup {
   id: string;
   symbol: string;

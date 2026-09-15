@@ -11,10 +11,21 @@ const safeErrorMessage = (error: unknown) => {
 
 @Injectable()
 export class AiProviderRegistry {
-  private readonly providers = new Map<string, AiProvider>();
+  private providers = new Map<string, AiProvider>();
 
   register(provider: AiProvider) {
     this.providers.set(provider.id, provider);
+  }
+
+  /** Replace the complete snapshot in one synchronous operation. */
+  replace(providers: readonly AiProvider[]) {
+    const next = new Map<string, AiProvider>();
+    for (const provider of providers) {
+      if (!provider.id || provider.models.length === 0) throw new Error('AI Provider 快照无效');
+      if (next.has(provider.id)) throw new Error(`AI Provider id 重复: ${provider.id}`);
+      next.set(provider.id, provider);
+    }
+    this.providers = next;
   }
 
   list() {

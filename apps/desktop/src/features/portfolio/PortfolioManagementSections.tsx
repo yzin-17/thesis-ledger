@@ -69,6 +69,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
     setEditingAccount,
     setAccountSheetOpen,
     toggleAccount,
+    permanentlyDeleteAccount,
   } = props;
 
   if (accountFormInline && accountSheetOpen) {
@@ -99,9 +100,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
             </SheetDescription>
           </SheetHeader>
         )}
-        <div
-          className={cn('flex items-center justify-between gap-4', !accountFormInline && 'mt-6')}
-        >
+        <div className="flex items-center justify-between gap-4">
           <h2 className="m-0 text-xl font-semibold">已有账户</h2>
           <Button
             type="button"
@@ -177,6 +176,23 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                       busyAction === `account-toggle:${account.id}`,
                       account.active !== false,
                     )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="destructive"
+                    disabled={busyAction !== null}
+                    aria-busy={busyAction === `account-delete:${account.id}`}
+                    onClick={() => void permanentlyDeleteAccount(account)}
+                  >
+                    {busyAction === `account-delete:${account.id}` && (
+                      <LoaderCircle
+                        data-icon="inline-start"
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {busyAction === `account-delete:${account.id}` ? '删除中…' : '删除'}
                   </Button>
                 </div>
               </div>

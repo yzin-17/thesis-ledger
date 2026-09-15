@@ -381,13 +381,20 @@ export class MarketControlService {
     const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
     return this.dsa.saveControlProvider(providerId, {
       requestId: typeof raw.requestId === 'string' ? raw.requestId : randomUUID(),
-      enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
+      ...(typeof raw.enabled === 'boolean' ? { enabled: raw.enabled } : {}),
       ...(typeof raw.credential === 'string' ? { credential: raw.credential } : {}),
+      ...(raw.credentials && typeof raw.credentials === 'object'
+        ? {
+            credentials: raw.credentials as {
+              method: string;
+              values: Record<string, unknown>;
+            },
+          }
+        : {}),
       ...(raw.clearCredentials === true ? { clearCredentials: true } : {}),
-      settings:
-        raw.settings && typeof raw.settings === 'object'
-          ? (raw.settings as Record<string, unknown>)
-          : {},
+      ...(raw.settings && typeof raw.settings === 'object'
+        ? { settings: raw.settings as Record<string, unknown> }
+        : {}),
     });
   }
 
@@ -396,6 +403,14 @@ export class MarketControlService {
     return this.dsa.testControlProvider(providerId, {
       requestId: typeof raw.requestId === 'string' ? raw.requestId : randomUUID(),
       ...(typeof raw.credential === 'string' ? { credential: raw.credential } : {}),
+      ...(raw.credentials && typeof raw.credentials === 'object'
+        ? {
+            credentials: raw.credentials as {
+              method: string;
+              values: Record<string, unknown>;
+            },
+          }
+        : {}),
     });
   }
 }

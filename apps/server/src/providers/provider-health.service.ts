@@ -82,6 +82,12 @@ export class ProviderHealthService {
     return this.prisma.providerHealth.findMany({ orderBy: { provider: 'asc' } });
   }
 
+  get(provider: string) {
+    return this.prisma.providerHealth.findUnique({
+      where: { provider: normalizeProviderName(provider) },
+    });
+  }
+
   async checkDsa(source: ProviderHealthSource = 'manual') {
     const started = Date.now();
     try {

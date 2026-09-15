@@ -23,6 +23,22 @@ export interface ProviderTestEvidence {
   credentialsRef?: string;
 }
 
+export type AiProviderReasoningEffort =
+  'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+export type AiProviderModelReasoning = {
+  supportedEfforts?: AiProviderReasoningEffort[] | null;
+  defaultEffort?: AiProviderReasoningEffort;
+  defaultEnabled?: boolean;
+  supportsMaxTokens?: boolean;
+  mandatory?: boolean;
+};
+
+export type AiProviderModelDetail = {
+  id: string;
+  reasoning?: AiProviderModelReasoning;
+};
+
 export interface ProviderRecord {
   name: string;
   type: string;
@@ -31,6 +47,20 @@ export interface ProviderRecord {
   capabilities: string[];
   health: string;
   credentialConfigured?: boolean;
+  source?: 'database' | 'environment';
+  baseUrl?: string | null;
+  models?: string[];
+  modelReasoning?: Record<string, AiProviderModelReasoning>;
+  timeoutMs?: number;
+  costPer1kInput?: number;
+  costPer1kOutput?: number;
+  costCurrency?: string;
+  pricingVersion?: string;
+  updatedAt?: string | null;
+  checkedAt?: string | null;
+  latencyMs?: number | null;
+  errorCode?: string | null;
+  configError?: string;
 }
 
 export interface ProviderIssueRecord {
@@ -367,9 +397,39 @@ export const newProviderDraft = () => ({
   credentialsRef: '',
   priority: 1,
   enabled: true,
+  baseUrl: 'https://openrouter.ai/api/v1',
+  modelsText: 'nvidia/nemotron-3-super-120b-a12b:free',
+  timeoutMs: '30000',
+  costPer1kInput: '',
+  costPer1kOutput: '',
+  costCurrency: 'USD',
+  pricingVersion: '',
+  modelReasoning: {} as Record<string, AiProviderModelReasoning>,
 });
 
 export type ProviderDraft = ReturnType<typeof newProviderDraft>;
+
+export const newAiProviderDraft = () => ({
+  ...newProviderDraft(),
+  type: 'ai',
+  capabilities: ['chat'],
+  priority: 100,
+});
+
+export const providerDraftForType = (type: string, current: ProviderDraft): ProviderDraft => {
+  if (type === 'ai') return { ...newAiProviderDraft(), name: current.name };
+  return {
+    ...current,
+    type,
+    capabilities: type === 'notification' ? ['notification'] : [],
+    credentialsRef: '',
+  };
+};
+
+export const isAiProvider = (
+  provider: ProviderRecord,
+): provider is ProviderRecord & { type: 'ai'; source: 'database' | 'environment' } =>
+  provider.type === 'ai' && (provider.source === 'database' || provider.source === 'environment');
 
 export const normalizeProviderHealthHistory = (
   value: unknown,

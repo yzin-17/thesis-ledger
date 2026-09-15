@@ -23,9 +23,25 @@ export interface ProviderManifest {
   origin?: 'dsa';
   markets?: string[];
   configurationMode?: 'control' | 'built_in' | 'dsa_environment';
+  credentialSource?: 'control' | 'environment' | 'none' | 'built_in';
+  credentialMethod?: string | null;
+  credentialFieldsConfigured?: Record<string, boolean>;
+  credentialSchema?: { methods: Array<{ method: string; fields: CredentialField[] }> };
+  configVersion?: number;
   upstreamSources?: Array<{ sourceId: string; displayName: string }>;
   updatedAt?: string | null;
   health?: { scopes?: Array<{ state?: string; circuit?: string; errorCode?: string | null }> };
+}
+
+export interface CredentialField {
+  name: string;
+  secret: boolean;
+  required: boolean;
+}
+
+export interface ProviderCredentialDraft {
+  method: string;
+  values: Record<string, string>;
 }
 
 export interface CatalogStatus {

@@ -15,6 +15,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.4",
     "@thesis-ledger/api-client": "workspace:*",
     "@thesis-ledger/domain": "workspace:*",
     "expo": "57.0.9",

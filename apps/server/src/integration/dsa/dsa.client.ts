@@ -4,6 +4,7 @@ import type {
   CatalogDelta,
   DesiredProviderPolicy,
   ProviderManifest,
+  ProviderOAuthAction,
   CurrencyV1,
   FxRatesResponseV1,
   BacktestCapabilities,
@@ -25,6 +26,8 @@ import {
   backtestInstrumentFactsRequestSchema,
   backtestMinuteBarSchema,
   fxRatesResponseSchemaV1,
+  providerOAuthSessionSchema,
+  currentProviderOAuthSessionSchema,
 } from '@thesis-ledger/schemas';
 import { loadConfig } from '../../platform/config.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
@@ -64,15 +67,22 @@ export class DsaError extends Error {
 export class DsaClient {
   private readonly config = loadConfig();
 
+  /** Read-only budget used by callers to derive bounded distributed leases. */
+  get timeoutMs() {
+    return this.config.dsaTimeoutMs;
+  }
+
   async get<T>(path: string, attempts = 2): Promise<T> {
     let lastError: unknown;
+    const traceId = currentTraceId() ?? crypto.randomUUID();
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const response = await fetch(new URL(path, this.config.dsaBaseUrl), {
           signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
           headers: {
             authorization: `Bearer ${this.config.dsaToken}`,
-            'x-trace-id': currentTraceId() ?? crypto.randomUUID(),
+            'x-trace-id': traceId,
+            'x-request-id': traceId,
           },
         });
         if (!response.ok) {
@@ -269,12 +279,43 @@ export class DsaClient {
     );
   }
 
+  async longbridgeOAuth(action: ProviderOAuthAction) {
+    let path = '/api/v1/thesis-ledger/control/providers/longbridge/oauth/sessions';
+    let init: RequestInit = {};
+    if (action.kind === 'create') {
+      init = {
+        method: 'POST',
+        body: JSON.stringify({
+          contractVersion: 1,
+          consumer: 'thesis-ledger',
+          requestId: crypto.randomUUID(),
+          clientId: action.clientId,
+        }),
+      };
+    } else if (action.kind === 'current') {
+      path += '/current';
+    } else {
+      path += `/${encodeURIComponent(action.sessionId)}`;
+      if (action.kind === 'cancel') {
+        path += '/cancel';
+        init = { method: 'POST' };
+      }
+    }
+    const raw = await this.control<unknown>(path, init);
+    const schema =
+      action.kind === 'current' ? currentProviderOAuthSessionSchema : providerOAuthSessionSchema;
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) throw new DsaError('DSA 授权状态响应不完整', 'invalid-response');
+    return parsed.data;
+  }
+
   saveControlProvider(
     providerId: string,
     input: {
       requestId?: string;
       enabled?: boolean;
       credential?: string;
+      credentials?: { method: string; values: Record<string, unknown> };
       clearCredentials?: boolean;
       settings?: Record<string, unknown>;
     },
@@ -293,7 +334,14 @@ export class DsaClient {
     );
   }
 
-  testControlProvider(providerId: string, input: { requestId?: string; credential?: string } = {}) {
+  testControlProvider(
+    providerId: string,
+    input: {
+      requestId?: string;
+      credential?: string;
+      credentials?: { method: string; values: Record<string, unknown> };
+    } = {},
+  ) {
     return this.control(
       `/api/v1/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/test`,
       {

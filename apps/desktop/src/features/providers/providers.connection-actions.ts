@@ -10,7 +10,6 @@ export const createProviderConnectionHandlers = (dependencies: ProviderActionDep
     toastManager,
     testProviderMutation,
     testProviderDraftMutation,
-    load,
   } = dependencies;
 
   const test = async (name: string) => {
@@ -28,7 +27,6 @@ export const createProviderConnectionHandlers = (dependencies: ProviderActionDep
         });
         return;
       }
-      if (result.healthCheck) void load();
       toastManager.add({ title: `${name} 连通性测试成功`, type: 'success', timeout: 2800 });
     } catch (error) {
       toastManager.add({

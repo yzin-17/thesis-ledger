@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ import {
   providerDisplayStatus,
   providerHealthSourceLabel,
   providerHealthStateLabel,
+  isAiProvider,
   providerTypeLabel,
 } from './providers.types.js';
 import type {
@@ -43,11 +45,13 @@ export function ProviderTable({
   priorityDrafts,
   testingProviderName,
   savingProviderName,
+  deletingProviderName,
   onPriorityChange,
   onPrioritySave,
   onEdit,
   onTest,
   onToggle,
+  onDelete,
   onCreate,
 }: {
   loadState: LoadState;
@@ -55,11 +59,13 @@ export function ProviderTable({
   priorityDrafts: Record<string, number>;
   testingProviderName: string | null;
   savingProviderName: string | null;
+  deletingProviderName: string | null;
   onPriorityChange: (name: string, value: number) => void;
   onPrioritySave: (provider: ProviderRecord) => void;
   onEdit: (provider: ProviderRecord) => void;
-  onTest: (name: string) => void;
+  onTest: (provider: ProviderRecord) => void;
   onToggle: (provider: ProviderRecord) => void;
+  onDelete: (provider: ProviderRecord) => void;
   onCreate: () => void;
 }) {
   return (
@@ -92,6 +98,8 @@ export function ProviderTable({
               providers.map((provider) => {
                 const status = providerDisplayStatus(provider);
                 const priority = priorityDrafts[provider.name] ?? provider.priority;
+                const isAi = isAiProvider(provider);
+                const environmentSource = isAi && provider.source === 'environment';
                 // 类型标签与能力列重复时不重复展示（如通知 Provider 的「通知」）
                 const typeLabel = providerTypeLabel(provider.type);
                 const capabilityLabels: string[] =
@@ -102,28 +110,44 @@ export function ProviderTable({
                     <td className="text-left first:text-left">
                       <strong>{provider.name}</strong>
                       {showTypeLabel ? <span>{typeLabel}</span> : null}
+                      {environmentSource ? <Badge variant="outline">部署配置（只读）</Badge> : null}
+                      {isAi && provider.models?.length ? (
+                        <span>{provider.models.join(' · ')}</span>
+                      ) : null}
                     </td>
                     <td className="text-left">
                       {provider.capabilities.map(providerCapabilityLabel).join(' · ')}
                     </td>
                     <td className="text-left">
-                      <Input
-                        className="w-20"
-                        aria-label={`${provider.name} 优先级`}
-                        type="number"
-                        min={0}
-                        value={priority}
-                        onChange={(event) =>
-                          onPriorityChange(provider.name, Number(event.target.value))
-                        }
-                        onBlur={() => onPrioritySave({ ...provider, priority })}
-                      />
+                      {isAi ? (
+                        priority
+                      ) : (
+                        <Input
+                          className="w-20"
+                          aria-label={`${provider.name} 优先级`}
+                          type="number"
+                          min={0}
+                          value={priority}
+                          onChange={(event) =>
+                            onPriorityChange(provider.name, Number(event.target.value))
+                          }
+                          onBlur={() => onPrioritySave({ ...provider, priority })}
+                        />
+                      )}
                     </td>
                     <td className="text-left">
                       <span className={cn('provider-status', status.tone)}>
                         <span className="status-dot" aria-hidden="true" />
                         {status.label}
                       </span>
+                      {isAi && provider.checkedAt ? (
+                        <span>
+                          最近测试 {new Date(provider.checkedAt).toLocaleString('zh-CN')}
+                          {provider.latencyMs === null ? '' : ` · ${provider.latencyMs}ms`}
+                        </span>
+                      ) : null}
+                      {isAi && provider.errorCode ? <span>{provider.errorCode}</span> : null}
+                      {isAi && provider.configError ? <span>{provider.configError}</span> : null}
                     </td>
                     <td className="text-left">
                       {provider.credentialConfigured ? '已配置' : '未配置'}
@@ -136,16 +160,20 @@ export function ProviderTable({
                         variant="link"
                         onClick={() => onEdit(provider)}
                       >
-                        编辑
+                        {environmentSource ? '接管配置' : '编辑'}
                       </Button>
                       <Button
                         className="text-button"
                         size="sm"
                         type="button"
                         variant="link"
-                        disabled={testingProviderName !== null || savingProviderName !== null}
+                        disabled={
+                          testingProviderName !== null ||
+                          savingProviderName !== null ||
+                          deletingProviderName !== null
+                        }
                         aria-busy={testingProviderName === provider.name}
-                        onClick={() => onTest(provider.name)}
+                        onClick={() => onTest(provider)}
                       >
                         {testingProviderName === provider.name && (
                           <LoaderCircle
@@ -156,24 +184,53 @@ export function ProviderTable({
                         )}
                         {testingProviderName === provider.name ? '测试中…' : '连通性测试'}
                       </Button>
-                      <Button
-                        className="text-button"
-                        size="sm"
-                        type="button"
-                        variant="link"
-                        disabled={testingProviderName !== null || savingProviderName !== null}
-                        aria-busy={savingProviderName === provider.name}
-                        onClick={() => onToggle(provider)}
-                      >
-                        {savingProviderName === provider.name && (
-                          <LoaderCircle
-                            data-icon="inline-start"
-                            className="animate-spin"
-                            aria-hidden="true"
-                          />
-                        )}
-                        {toggleLabel(savingProviderName === provider.name, provider.enabled)}
-                      </Button>
+                      {!environmentSource && (
+                        <Button
+                          className="text-button"
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          disabled={
+                            testingProviderName !== null ||
+                            savingProviderName !== null ||
+                            deletingProviderName !== null
+                          }
+                          aria-busy={savingProviderName === provider.name}
+                          onClick={() => onToggle(provider)}
+                        >
+                          {savingProviderName === provider.name && (
+                            <LoaderCircle
+                              data-icon="inline-start"
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {toggleLabel(savingProviderName === provider.name, provider.enabled)}
+                        </Button>
+                      )}
+                      {isAi && !environmentSource && (
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="link"
+                          disabled={
+                            testingProviderName !== null ||
+                            savingProviderName !== null ||
+                            deletingProviderName !== null
+                          }
+                          aria-busy={deletingProviderName === provider.name}
+                          onClick={() => onDelete(provider)}
+                        >
+                          {deletingProviderName === provider.name && (
+                            <LoaderCircle
+                              data-icon="inline-start"
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          )}
+                          删除
+                        </Button>
+                      )}
                     </StickyTableActionCell>
                   </tr>
                 );

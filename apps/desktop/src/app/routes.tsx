@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { desktopPathForView, type DesktopNavigationView } from '../views.js';
-import { usePortfolioShellQueries } from '../features/portfolio/portfolio.queries.js';
+import {
+  isPortfolioSummaryConsumerRoute,
+  usePortfolioShellQueries,
+} from '../features/portfolio/portfolio.queries.js';
 import type { PortfolioMode } from '../features/portfolio/portfolio.types.js';
 import { AccountDataPage } from '../features/account-data/AccountDataPage.js';
 import { AiChat } from '../features/ai/AiChat.js';
@@ -23,7 +26,9 @@ export function AppRoutes() {
   const navigate = useNavigate();
   const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
   const { state, portfolio, accounts, accountsReady, accountsPending, accountsError, refreshing, refresh } =
-    usePortfolioShellQueries(portfolioMode);
+    usePortfolioShellQueries(portfolioMode, {
+      enableValuation: isPortfolioSummaryConsumerRoute(location.pathname),
+    });
 
   const navigateTo = (nextView: DesktopNavigationView, options?: NavigationOptions) => {
     const path = desktopPathForView(nextView);
@@ -90,8 +95,8 @@ export function AppRoutes() {
             accountsReady={accountsReady}
             accountsPending={accountsPending}
             accountsError={accountsError}
+            mode={portfolioMode}
             onRetryAccounts={() => void refresh()}
-            onPortfolioChanged={() => void refresh()}
           />
         }
       />

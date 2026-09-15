@@ -18,6 +18,9 @@ export default defineConfig(({ command }) => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  server: { port: 5173, proxy: { '/api': 'http://localhost:3000' } },
+  server: {
+    port: 5173,
+    proxy: { '/api': process.env.THESIS_LEDGER_API_URL || 'http://localhost:3000' },
+  },
   build: { sourcemap: true },
 }));

@@ -45,7 +45,7 @@ export function ReconciliationSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const toastManager = useToastManager();
-  const mutation = useConfirmBaselineReconciliationMutation();
+  const mutation = useConfirmBaselineReconciliationMutation(account.mode);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [reason, setReason] = useState('确认确定性对账匹配');
   const [error, setError] = useState<string | null>(null);

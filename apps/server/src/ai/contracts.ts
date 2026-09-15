@@ -15,9 +15,11 @@ export type AiProviderHealth = 'unknown' | 'healthy' | 'degraded' | 'down';
 
 export interface AiProviderMetadata {
   baseURL?: string;
+  timeoutMs?: number;
   capabilities?: readonly string[];
   priority?: number;
   health?: AiProviderHealth;
+  source?: 'database' | 'environment';
   costPer1kInput?: number;
   costPer1kOutput?: number;
   costCurrency?: string;
@@ -36,7 +38,13 @@ export interface AiProvider {
   readonly models: readonly string[];
   readonly metadata?: AiProviderMetadata;
   complete(
-    input: { model: string; messages: unknown[]; tools: string[]; maxOutputTokens?: number },
+    input: {
+      model: string;
+      messages: unknown[];
+      tools: string[];
+      maxOutputTokens?: number;
+      reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+    },
     signal: AbortSignal,
   ): Promise<{
     content: unknown;

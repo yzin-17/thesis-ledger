@@ -98,7 +98,7 @@ describe('Mobile read-only dashboard', () => {
 
     expect(bootstrap.platform).toBe('react-native');
     expect(Object.keys(mobileStateCopy)).toEqual(['loading', 'ready', 'empty', 'error', 'stale']);
-    expect(bootstrap.navigation.map((item) => item.key)).toEqual(['portfolio', 'risk']);
+    expect(bootstrap.navigation.map((item) => item.key)).toEqual(['portfolio', 'risk', 'account']);
     expect(bootstrap.store.getState()).toMatchObject({
       status: 'ready',
       portfolio: {

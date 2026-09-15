@@ -20,6 +20,7 @@ import {
 } from './investment-account-scope.js';
 import { calculatePortfolioDailyChange } from './portfolio-daily-change.js';
 import { valuePortfolioPosition } from './portfolio-position-valuation.js';
+import { PortfolioValuationTrace } from './portfolio-valuation-trace.js';
 
 const isZeroDecimal = (value: string) => /^0(?:\.0+)?$/.test(value);
 
@@ -245,10 +246,12 @@ export class PortfolioService {
     mode: 'actual' | 'shadow' = 'actual',
     options: PortfolioFxOptions = {},
   ) {
+    const valuationTrace = new PortfolioValuationTrace(accountId, mode);
     const [positions, accountCurrencyMap] = await Promise.all([
       this.listPositions(accountId, mode),
       this.accountCurrencies(accountId, mode),
     ]);
+    valuationTrace.mark('positions+account-currencies');
     const realizedAccountIds = accountId
       ? [accountId]
       : [...accountCurrencyMap.keys()].filter((key) => !key.startsWith('__currency-'));
@@ -261,6 +264,7 @@ export class PortfolioService {
           pnl: [],
           cost: [],
         };
+    valuationTrace.mark('realized-pnl');
     const baseCurrency =
       options.baseCurrency ?? (accountId ? accountCurrencyMap.get(accountId) : undefined) ?? 'CNY';
     const valuationOptions = { ...options, fxMerge: options.fxMerge ?? true, baseCurrency };
@@ -274,6 +278,7 @@ export class PortfolioService {
         return valuePortfolioPosition(position, currency, this.market);
       }),
     );
+    valuationTrace.mark('position-valuation');
 
     const cashByAccountAmounts = new Map<string, Array<{ currency: CurrencyV1; amount: number }>>();
     const cashAmounts: Array<{ accountId: string; currency: CurrencyV1; amount: number }> = [];
@@ -299,6 +304,7 @@ export class PortfolioService {
         cashByAccountAmounts.set(id, accountAmounts);
       }
     }
+    valuationTrace.mark('cash-materialization');
 
     const currencies = [
       ...new Set([
@@ -312,6 +318,7 @@ export class PortfolioService {
       ]),
     ] as CurrencyV1[];
     const fx = await resolveFx(this.market, currencies, valuationOptions, valuedAt, 'current-rate');
+    valuationTrace.mark('fx');
     const aggregateWithScope = (
       amounts: readonly { currency: CurrencyV1; amount: number }[],
       expectedBaseCurrency: CurrencyV1,
@@ -440,6 +447,7 @@ export class PortfolioService {
       cumulativePnl !== null && cumulativeCost !== null && cumulativeCost > 0
         ? cumulativePnl / cumulativeCost
         : null;
+    valuationTrace.mark('aggregation-total');
     return {
       positions: valuedWithBase,
       cashValue: roundMoney(cashAggregate.knownValue),

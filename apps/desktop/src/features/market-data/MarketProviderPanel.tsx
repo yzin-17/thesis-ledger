@@ -1,7 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
 import {
@@ -10,15 +9,7 @@ import {
   type ProviderManifest,
 } from './market-data.types.js';
 
-const credentialLabel = (provider: ProviderManifest) => {
-  if (provider.configurationMode === 'dsa_environment') {
-    return provider.configured ? 'DSA 环境凭证已就绪' : '请在 DSA 环境配置凭证';
-  }
-  if (provider.configurationMode === 'built_in') return 'DSA 内置，无需凭证';
-  if (!provider.requiresCredential) return '无需凭证';
-  if (provider.credentialConfigured) return '凭证已配置';
-  return '未配置凭证';
-};
+import { credentialSourceLabel } from './provider-credentials.js';
 
 const marketNames: Record<string, string> = {
   CN: '中国内地',
@@ -34,25 +25,21 @@ const providerMarkets = (provider: ProviderManifest) =>
 
 export function MarketProviderPanel({
   providers,
-  credentials,
   disabled,
   busyAction,
+  pendingProviderIds = [],
   onProviderChange,
-  onCredentialChange,
-  onSave,
+  onConfigure,
   onTest,
-  onClearCredential,
   onRemove,
 }: {
   providers: ProviderManifest[];
-  credentials: Record<string, string>;
   disabled: boolean;
   busyAction: string | null;
+  pendingProviderIds?: string[];
   onProviderChange: (provider: ProviderManifest) => void;
-  onCredentialChange: (providerId: string, value: string) => void;
-  onSave: (provider: ProviderManifest) => void;
+  onConfigure: (provider: ProviderManifest) => void;
   onTest: (provider: ProviderManifest) => void;
-  onClearCredential: (provider: ProviderManifest) => void;
   onRemove: (provider: ProviderManifest) => void;
 }) {
   const availableProviders = providers.filter(
@@ -60,8 +47,9 @@ export function MarketProviderPanel({
   );
 
   const providerRow = (provider: ProviderManifest) => {
-    const managesCredential =
-      provider.requiresCredential && provider.configurationMode === 'control';
+    const savingEnabled = pendingProviderIds.includes(provider.providerId);
+    const rowDisabled = disabled || savingEnabled;
+    const managesCredential = (provider.credentialSchema?.methods.length ?? 0) > 0;
     return (
       <div
         key={provider.providerId}
@@ -76,7 +64,7 @@ export function MarketProviderPanel({
             <Badge variant="outline">{providerHealthLabel(provider)}</Badge>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>{credentialLabel(provider)}</span>
+            <span>{credentialSourceLabel(provider)}</span>
             <span>市场：{providerMarkets(provider)}</span>
             {(provider.upstreamSources?.length ?? 0) > 0 && (
               <span>
@@ -99,47 +87,45 @@ export function MarketProviderPanel({
               variant="risk"
               aria-label={`${provider.displayName} 启用`}
               checked={provider.enabled}
-              disabled={disabled}
+              disabled={rowDisabled}
               onCheckedChange={(checked) => onProviderChange({ ...provider, enabled: checked })}
             >
               <SwitchThumb variant="risk" />
             </Switch>
           </div>
-          <Button type="button" size="sm" onClick={() => onSave(provider)} disabled={disabled}>
-            {busyAction === `provider-save:${provider.providerId}` && (
-              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-            )}
-            保存设置
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onTest(provider)}
-            disabled={disabled}
-          >
-            {busyAction === `provider-test:${provider.providerId}` && (
-              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-            )}
-            只读测试
-          </Button>
-          {managesCredential && provider.credentialConfigured && (
+          {savingEnabled && (
+            <span role="status" className="text-xs text-muted-foreground">
+              保存中…
+            </span>
+          )}
+          {managesCredential && (
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              onClick={() => onClearCredential(provider)}
-              disabled={disabled}
+              onClick={() => onConfigure(provider)}
+              disabled={rowDisabled}
             >
-              清除凭证
+              配置凭证
             </Button>
           )}
           <Button
             type="button"
             size="sm"
+            variant="outline"
+            onClick={() => onTest(provider)}
+            disabled={rowDisabled}
+          >
+            {busyAction === `provider-test:${provider.providerId}` && (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+            )}
+            测试连接
+          </Button>
+          <Button
+            type="button"
+            size="sm"
             variant="ghost"
             onClick={() => onRemove(provider)}
-            disabled={disabled}
+            disabled={rowDisabled}
           >
             {busyAction === `provider-remove:${provider.providerId}` && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
@@ -147,18 +133,6 @@ export function MarketProviderPanel({
             移除
           </Button>
         </div>
-        {managesCredential && (
-          <Input
-            className="xl:col-span-2"
-            type="password"
-            value={credentials[provider.providerId] ?? ''}
-            disabled={disabled}
-            placeholder="留空以保留已保存凭证"
-            autoComplete="new-password"
-            onChange={(event) => onCredentialChange(provider.providerId, event.target.value)}
-            aria-label={`${provider.displayName} 凭证`}
-          />
-        )}
       </div>
     );
   };

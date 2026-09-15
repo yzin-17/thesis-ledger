@@ -5,8 +5,7 @@ import type {
   UpdateRecurringFundInvestmentPlan,
 } from '@thesis-ledger/api-client';
 import { getDesktopApiClient } from '../../shared/api/client.js';
-import { portfolioKeys } from '../portfolio/portfolio.queries.js';
-import { accountDataKeys } from './account-data.queries.js';
+import { invalidatePortfolioChange } from './portfolio-change.js';
 
 export const fundInvestmentKeys = {
   root: ['desktop', 'fund-investments'] as const,
@@ -35,11 +34,13 @@ export const useFundInvestmentMutations = (accountId: string) => {
   const invalidatePlans = () =>
     queryClient.invalidateQueries({ queryKey: fundInvestmentKeys.root });
   const invalidateAccount = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: [...accountDataKeys.root, 'events', accountId] }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation('actual', accountId) }),
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.valuation('actual') }),
-    ]);
+    invalidatePortfolioChange(queryClient, {
+      mode: 'actual',
+      accountIds: [accountId],
+      events: true,
+      audit: true,
+      reconciliation: true,
+    });
 
   return {
     createPlan: useMutation({
