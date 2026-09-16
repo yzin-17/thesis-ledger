@@ -10,18 +10,19 @@
 
 ## 对照结果
 
-| 字段     | Desktop release                                                       | Android release                                                       | 结果 |
-| -------- | --------------------------------------------------------------------- | --------------------------------------------------------------------- | ---- |
-| 总市值   | `CN¥178,000.00`                                                       | `CN¥178,000.00`                                                       | 一致 |
-| 总成本   | `CN¥160,000.00`                                                       | `CN¥160,000.00`                                                       | 一致 |
-| 累计盈亏 | `CN¥18,000.00`                                                        | `CN¥18,000.00`                                                        | 一致 |
-| 持仓     | `600519.SH`，数量 100，成本 `CN¥1,600.00`                             | `600519.SH`，数量 100，成本 `CN¥1,600.00`                             | 一致 |
-| Risk     | `warning`、规则 v2、测试风险事件、市场时间 `2026-08-01T00:00:00.000Z` | `warning`、规则 v2、测试风险事件、市场时间 `2026-08-01T00:00:00.000Z` | 一致 |
+| 字段 | Desktop release | Android release | 结果 |
+| --- | --- | --- | --- |
+| 总市值 | `CN¥178,000.00` | `CN¥178,000.00` | 一致 |
+| 总成本 | `CN¥160,000.00` | `CN¥160,000.00` | 一致 |
+| 累计盈亏 | `CN¥18,000.00` | `CN¥18,000.00` | 一致 |
+| 持仓 | `600519.SH`，数量 100，成本 `CN¥1,600.00` | `600519.SH`，数量 100，成本 `CN¥1,600.00` | 一致 |
+| Risk | `warning`、规则 v2、测试风险事件、市场时间 `2026-08-01T00:00:00.000Z` | `warning`、规则 v2、测试风险事件、市场时间 `2026-08-01T00:00:00.000Z` | 一致 |
 
 ## 状态对照
 
 - Desktop release：切换 fixture 为 `partial=true`/`stale=true` 后显示“数据可能陈旧”和持仓“陈旧”；503 后显示“暂时无法读取投资组合”及“重新加载”。
 - Android release：同一 fixture 注入后显示“数据可能陈旧”和“行情陈旧”；503 后显示“读取失败”和“重新读取”。
-- ready、stale、error 的 Desktop 截图见 `docs/reviews/evidence/desktop-macos/`；Mobile XML/PNG 见本目录中的 `investment-os-mobile-ready.*`、`investment-os-mobile-stale-final.*` 和 `investment-os-mobile-error-final.*`。
+- Desktop ready、stale、error 截图见 `docs/reviews/evidence/desktop-macos/`。
+- Android 的 ready/stale/error/loading/empty/risk 等状态语义保留各自 XML 层级证据；唯一的 1080×2400 主视觉截图保留为 `investment-os-mobile-ready.png`，600×1000 滚动视觉保留为 `investment-os-mobile-small-scroll.png`。此前多个不同状态文件名的 PNG 实际指向同一个 Git blob，因此重复 PNG 已移除，不能把同一画面当成多个状态的独立截图证据。
 
 该报告证明同一隔离测试账户在两个 release 客户端的字段、数值和状态契约一致；不替代真实 Compose API、生产凭证、签名和 Windows/iOS 目标环境验收。

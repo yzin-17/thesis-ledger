@@ -1,8 +1,6 @@
-# DSA Fork 与上游同步
+# DSA Fork 与上游边界
 
-## 仓库边界
-
-主仓与 DSA 现在位于同级目录：
+`daily-stock-analysis` 是与 `thesis-ledger`、`thesis-ledger-infra` 并列的独立 Git 仓库，不再位于主仓 `third_party/` 下，也不通过主仓 `.gitignore` 形成隐式依赖。
 
 ```text
 thesis-ledger-workspace/
@@ -11,47 +9,22 @@ thesis-ledger-workspace/
 └── thesis-ledger-infra/
 ```
 
-`daily-stock-analysis` 是独立 Git 仓库，不再位于主仓 `third_party/` 下，也不通过主仓 `.gitignore` 形成隐式依赖。主仓只保留 DSA client、Schema、Stub 和 Contract Test；DSA 原生 API 继续由 Fork 自己维护。
+## 稳定仓库边界
 
-## 远程与审计基线
+- 上游：`ZhuLinsen/daily_stock_analysis`
+- ThesisLedger Fork：`yzin-17/daily_stock_analysis`
+- 主仓只保留 DSA client、共享 Schema、消费侧 Contract Test 和跨仓兼容说明；
+- Provider Adapter、Provider 原始配置/凭证、Effective Policy runtime、DSA 专属 API 实现与上游同步冲突处理都在 DSA Fork 内完成；
+- Compose、镜像 digest、Secret 注入和运行时部署清单由 `thesis-ledger-infra` 维护。
 
-- 上游：`https://github.com/ZhuLinsen/daily_stock_analysis.git`
-- 自有 Fork：`https://github.com/yzin-17/daily_stock_analysis`
-- 当前共同基线：`831ada5370123551e5cb4fc099208dd70e892e22`
-- 上游版本基线：`v3.28.0`
+## 版本与兼容
 
-同步时在 DSA 仓库内执行：
+不要在本文维护“当前共同 commit”或固定上游版本。发布级版本、Contract major、Fork release convention 与镜像兼容条件统一以 [`version-matrix.md`](version-matrix.md) 为 SSOT。
 
-```bash
-git fetch upstream --tags --prune
-git status --short --branch
-git merge --no-commit --no-ff upstream/main
-```
+Data/Control Contract 的当前能力与验证规则见 [`2026-08-18-thesis-ledger-dsa-compatibility.md`](2026-08-18-thesis-ledger-dsa-compatibility.md)。市场数据当前产品侧架构见 [`2026-09-16-market-data-v2.md`](2026-09-16-market-data-v2.md)。
 
-正式合并前必须保留临时同步分支，并运行 DSA 原有测试、ThesisLedger Contract Test 和固定行情/筹码回归。禁止直接覆盖无法解释的行为变化。
+## 上游同步
 
-## ThesisLedger Contract V1
+具体 fetch/merge、临时分支、测试和冲突审计流程属于工程操作，不在 Architecture 文档复制维护；统一见 [`../engineering/2026-09-16-dsa-upstream-sync.md`](../engineering/2026-09-16-dsa-upstream-sync.md)。
 
-DSA Fork 新增以下兼容层：
-
-```text
-GET /api/v1/thesis-ledger/capabilities
-GET /api/v1/thesis-ledger/market/quote
-GET /api/v1/thesis-ledger/market/bars
-GET /api/v1/thesis-ledger/market/indicators/{name}
-GET /api/v1/thesis-ledger/market/chip
-```
-
-接口使用 `THESIS_LEDGER_DSA_TOKEN` Bearer Token，不复用 DSA 管理员 session。Contract V1 只声明日线 `1d` bars、MA/MACD/RSI 和筹码摘要；分钟线、ATR 和完整筹码分布通过 capability 与结构化错误表达。缺失的 `buckets` 或 `mainPeak` 不得由适配层猜测。
-
-确定性集成使用 `THESIS_LEDGER_FIXTURE_MODE=true`；在线 Provider smoke test 只作为定时或手工非阻断检查。
-
-## 镜像版本策略
-
-DSA Fork 的版本格式为上游版本加 Fork 修订号，例如：
-
-```text
-v3.28.0-thesisledger.1
-```
-
-每个发布镜像必须同时记录：DSA Fork commit、上游 commit、Contract major version 和 GHCR digest。生产环境只使用 digest；tag 仅用于发布说明和兼容矩阵。发布前需确认 DSA 的 Docker workflow 已接受该 prerelease 版本格式。
+架构层只保留一个不变量：任何上游同步只有在共享 Contract、主仓消费边界和必要跨仓回归继续通过时才允许进入可发布基线，不能为了追上 upstream 静默覆盖 ThesisLedger 依赖的行为差异。

@@ -2,7 +2,7 @@
 
 > 任务标识：market-chart-period-aggregation
 > 日期：2026-09-16
-> 状态：规划完成，待父级确认后从 T1 开始实施；分钟线不在本 Spec 实施范围（见末节）
+> 状态：规划完成，待父级确认后从 T1 开始实施；分钟线属于延期项，统一见 [`../TODO.md`](../TODO.md)
 > 对应任务：[行情图表周期聚合实施任务](../tasks/2026-09-16-market-chart-period-aggregation.md)
 > 评审修订：补充显式评估时刻及周期结束判定；仅修订规格，不表示周期功能已经实现。
 
@@ -20,16 +20,16 @@
 - 指标（MA/MACD/RSI）继续由 DSA 在「所选周期的序列」上计算，不在主仓重写公式；预热不足按周期声明，不补零、不用最近值。
 - 契约向后兼容：默认仍是 `1d`，不传 `timeframe` 的旧调用行为不变。
 - 周期偏好按标的全局复用，覆盖不足时按真实声明裁剪并解释，不显示不可用周期。
-- 分钟线在本 Spec 只做记录与前置条件整理，不实施（见「后续：分钟线」）。
+- 分钟线不在本 Spec 实施范围；已明确的后续能力与前置条件统一由 [`../TODO.md`](../TODO.md) 的 `market-chart-minute-period` 管理。
 
 ## 非目标
 
-- 不实现分钟线、tick 或盘中任意周期（依据与前置条件见末节）。
+- 不实现分钟线、tick 或盘中任意周期；后续范围统一见 [`../TODO.md`](../TODO.md)。
 - 不新增 Provider、不改变 RouteTarget V2 主备语义、不改变 `1d` 事实的采集与复核窗口。
 - 不为派生周期新增 PostgreSQL 事实表或 migration：派生序列是可重算的视图，不是来源事实。
 - 不在 Desktop、不在 API Client 做聚合或指标计算，不引入第二套公式。
 - 不改变交易标记、成本线、风险线、区间测量等既有非目标。
-- 不修复分页锚点既有缺陷（`/detail` 未接收 `calculationAnchor`、`loadEarlier` 传序列末尾日期），该缺陷需独立修复并单独记录证据。
+- 不修复分页锚点既有缺陷（`/detail` 未接收 `calculationAnchor`、`loadEarlier` 传序列末尾日期）；该独立后续项已迁入 [`../TODO.md`](../TODO.md) 的 `market-detail-pagination-anchor`。
 
 ## 现状与约束
 
@@ -183,20 +183,6 @@ Schema/Domain 测试证明聚合与枚举；Server 测试证明声明、窗口�
 - AC10：Schema/Domain/Server/DSA/Desktop 定向测试、typecheck/build/lint 与边界脚本通过；浏览器真实运行态完成周期切换、Network、读数与分页验收并记录 revision。
 - AC11：周期切换在 500 点负载下不产生 >200ms 主线程长任务，且切换只请求新周期窗口，不在客户端整段拉取并本地聚合。
 
-## 后续：分钟线（不在本 Spec 实施）
+## 延期事项
 
-分钟线不是「顺手加一项」，它缺的是数据供给，与周期聚合是两条独立路线。记录如下事实与前置条件，供后续单独 Spec（暂定标识 `market-chart-minute-period`）使用：
-
-**当前不可用的证据**
-
-- DSA 能力声明只有日线：`services/dsa-adapter/src/index.ts:8-13` 为 `bars.timeframes = ['1d']`、`indicators.timeframes = ['1d']`，`services/dsa-adapter/test/capability.test.ts` 把 `bars-1d` 作为快照锁定。
-- 路由能力表没有分钟项：`apps/server/src/market/market-control.service.ts:20-56` 只有 `REALTIME_QUOTE / DAILY_BAR / FUND_NAV / FUND_NAV_HISTORY / FUND_HOLDINGS / CHIP_SUMMARY`；`market-bar-reader.ts:345` 直接读 `routeStatus.DAILY_BAR`。
-- 分钟数据只存在于 Backtest V2 冻结通道：DSA 提供 `1m`，Server 派生 `5m/15m/30m/60m`（`backtest-bar-aggregation.service.ts`），消费者是回测执行与 `strategy-risk-context`，不是实时图表。`packages/schemas/src/market-bar-series-v2.ts:8` 虽然允许 `'1m'`，实时路线没有对应 capability 与窗口语义。
-
-**后续 Spec 需要先解决的前置条件**
-
-1. 新增分钟能力与路由（Provider 侧 capability、Effective Policy、DSA runtime 缓存与限流），并明确 CN/HK/US Session 与午休边界。
-2. 重新定义窗口与分页：当前单次 90 条对 `1m` 只覆盖约半小时，需要新的 `limits`、覆盖声明与分页锚点语义。
-3. 重新定义缓存与新鲜度：分钟级 TTL、尾 bar 完成判定与盘中复核规则，不能复用日线的「下一交易日开盘」口径。
-4. 指标预热：分钟级 MA60/MACD 的预热条数与输入上限换算。
-5. Desktop 周期组扩展与实时刷新（盘中轮询/增量），并确认与「实时概览不随历史选择变化」的隔离不破。
+分钟线/盘中周期与 Market Detail 分页锚点修复都已经从本 Spec 的未来方案正文拆出，统一由 [`../TODO.md`](../TODO.md) 管理。本 Spec 不再维护这些延期事项的实现细节；正式启动时另建成对 Spec/Task。

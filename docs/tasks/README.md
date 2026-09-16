@@ -1,54 +1,58 @@
 # 当前实施任务
 
-当前任务目录优先保留仍在实施的任务，以及实现已经完成但仍存在明确运行时/外部环境验收边界的任务。已完成、被替代或只承担历史证据作用的任务应进入 `../archive/tasks/`。
+`docs/tasks/` 只承担两类职责：
 
-## 仍在实施或待完成
+1. 仍有当前实现工作未完成的任务；
+2. 代码已经实现，但真实 Provider、Docker、Worker、浏览器、设备、用户确认等仍属于**当前完成条件**的任务。
 
-- [数据源即时启停与页面凭证配置](2026-09-14-market-provider-credentials.md)（实施中，真实运行时与在线验收未执行）
+详细状态只维护在各 Task 文件自身；本 README 只做轻量索引，不复制 T1/T2/G1 等逐步进度。明确延期到以后、且不属于当前完成条件的事项统一进入 [`../TODO.md`](../TODO.md)。已完成任务正文进入 [`../archive/tasks/`](../archive/tasks/)。
 
-- [账户永久删除](2026-09-14-permanent-account-deletion.md)（代码、隔离数据库与 Server HTTP 验收完成；Desktop 浏览器和 Mobile 原生验收未完成）
-- [组合估值按需查询与 ETF 行情上游保护](2026-09-14-portfolio-valuation-demand-guard.md)（规划完成，待从 T1 开始实施）
-- [行情图表周期聚合](2026-09-16-market-chart-period-aggregation.md)（规划完成，待从 T1 开始实施；只覆盖 5 日/周/月/年派生周期，分钟线另行立项）
-- [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
-- [回测真实历史市场规则数据源](2026-09-16-backtest-real-historical-market-rules.md)（规划完成；待确认首个真实来源及授权条件后实施）
-- [V1 回测任务 BullMQ 生命周期](2026-09-09-backtest-bullmq-lifecycle.md)（PR #33 已完成 durable owner/reconciler 代码修复；仍待目标 Compose post-claim hard-kill 与 Electron 运行态 smoke）
-- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（仓库实现已收口，真实外部 Provider/在线数据/Desktop 人工 smoke 仍按部署门禁记录）
-- [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）
+## 当前仍在实施
+
+- [数据源即时启停与页面凭证配置](2026-09-14-market-provider-credentials.md)
+- [账户永久删除](2026-09-14-permanent-account-deletion.md)
+- [行情图表周期聚合](2026-09-16-market-chart-period-aggregation.md)
+- [回测真实历史市场规则数据源](2026-09-16-backtest-real-historical-market-rules.md)
+- [日线行情与技术指标联动 / 交互精炼](2026-09-10-market-chart-indicator-integration.md)
+- [全站体验统一](2026-09-08-ui-interaction-consistency.md)
+
+## 当前主要是运行时或外部门禁
+
+- [市场数据 RouteTarget V2](2026-09-16-market-data-route-target-v2.md)
+- [市场数据消费者一致性 V2](2026-09-16-market-data-consumer-consistency-v2.md)
+- [涨跌配色配置](2026-09-15-market-color-scheme.md)
+- [V1 回测任务 BullMQ 生命周期](2026-09-09-backtest-bullmq-lifecycle.md)
+- [自动化执行耐久身份、租约与恢复加固](2026-09-05-automation-execution-lease-hardening.md)
+- [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)
+- [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)
 - [市场数据与标的中心 v1.2](2026-08-18-market-data-provider-v1-2.md)
 - [市场数据 v1.2 closure-09：Mobile 原生验收](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md)
 - [市场数据 v1.2 closure-11：最终追踪 Review](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md)
 - [录入持仓与账户模型重构](2026-08-18-position-entry-account-model.md)
 - [持仓行情详情共享读模型](2026-08-21-market-detail-read-model.md)
-- [投资组合快照系统](2026-08-28-portfolio-snapshot-system.md)
-- [投资复盘工作台（统一 Trade Projection）](2026-08-28-journal-review-trade-projection.md)
-
-## 实现完成，仍保留验收边界
-
-以下任务已有确定性实现和验证证据，但仍记录浏览器、真实 Provider、在线服务或目标设备等运行时验收边界，因此暂不归档：
-
-- [自动化执行耐久身份、租约与恢复加固](2026-09-05-automation-execution-lease-hardening.md)（PR #32 已完成 PostgreSQL occurrence/owner/lease、handler-aware recovery 与确定性验证；仍待目标 Compose post-claim hard-kill smoke）
 - [巨型组件拆分与请求层统一](2026-08-23-large-component-split.md)
 - [风险中心 AB 组合交互](2026-08-23-risk-center-interaction.md)
 - [研究助手任务工作台](2026-08-25-ai-research-workbench.md)
-- [策略实验工作台](../archive/tasks/2026-08-25-strategy-lab-workbench.md)（已归档，保留历史证据入口）
+- [投资组合快照系统](2026-08-28-portfolio-snapshot-system.md)
+- [投资复盘工作台（统一 Trade Projection）](2026-08-28-journal-review-trade-projection.md)
 - [现金账户资金范围与内部划转](2026-08-30-cash-account-funding-and-transfer.md)
 - [定期现金入账计划](2026-08-30-recurring-cash-deposit-plan.md)
 - [现金页面 UI 优化](2026-09-03-cash-page-ui-optimization.md)
 - [ETF 日线独立备用源](2026-09-08-etf-daily-independent-fallback.md)
 - [日线缓存与 Provider 主备路由](2026-09-08-market-data-cache-and-provider-routing.md)
 - [基金定投计划](2026-09-08-recurring-fund-investment.md)
+- [历史建仓时间补录](2026-09-10-trade-opening-boundary-supplement.md)
 
-“实现完成”只表示代码一致性和已记录的确定性验证完成，不等于真实 Provider、生产数据、设备、浏览器或 Worker 运行时验收已经完成。运行时门禁关闭后，再按 `DOCUMENTATION-GUIDE.md` 归档。
+## 已归档任务的兼容跳转
 
-## 已完成的当前实现参考
+为避免历史 Spec、Review 和提交中的旧相对链接立即失效，少数已完成任务在原路径只保留一个**兼容跳转文件**；历史正文已经移到 `../archive/tasks/`，这些跳转文件不属于 active task：
 
-交易与成交记录系统主任务的 T1–T17 / Review 已完成；返工任务的 T18“交易规则能力元数据验证与运行时验收”仍未完成，本轮不再把两份文档作为新的执行入口；当前实现与领域规则仍由对应 Trade Spec 及子 Spec 负责。两份任务暂留当前目录仅用于现有实现证据和历史链接，后续在 T18 完成并统一重写内部相对链接后移动到 archive：
+- `2026-08-28-unified-backtest-v2.md`
+- `2026-09-10-backtest-historical-execution-rule-facts.md`
+- `2026-09-11-backtest-v2-closure-follow-up.md`
+- `2026-09-14-portfolio-valuation-demand-guard.md`
+- `2026-09-16-market-bar-series-cache-v2.md`
 
-- [交易与成交记录系统实施任务](2026-08-26-trade-execution-ledger-system.md)
-- [交易与成交记录系统剩余问题与返工任务](2026-08-26-trade-execution-ledger-system-follow-up.md)
+交易与成交记录系统主任务及 follow-up 仍因现有 T18/历史链接留在当前目录；完成对应当前门禁并统一修正内部引用后再归档，不把它们转成 TODO。
 
-## 已归档
-
-已完成的 V0.1–V1.0 阶段任务、market-data v1.2 已完成专项、architecture improvement、Fresh Database Baseline、历史工作区迁移，以及被新方案取代或已完成运行时验收的专项任务位于 [`../archive/tasks/`](../archive/tasks/)。其中包括旧 Journal 交互基线、收益快照自动化和 Docker 构建缓存重试任务；2026-09-07 归档批次：策略实验工作台、目录自动就绪、全仓架构加固、现金快照投影优化、通知 Provider 路由、自动化配置台、组合聚合快照。
-
-新功能必须成对创建：`docs/specs/YYYY-MM-DD-<topic>.md` 与 `docs/tasks/YYYY-MM-DD-<topic>.md`。主题任务文件使用 `YYYY-MM-DD-<topic>.md` 命名；`README.md` 仅作为目录入口。
+新功能必须成对创建 `docs/specs/YYYY-MM-DD-<topic>.md` 与 `docs/tasks/YYYY-MM-DD-<topic>.md`。如果只是明确的后续想法而尚未立项，先进入 `docs/TODO.md`，不要提前创建长期悬空 Task。
