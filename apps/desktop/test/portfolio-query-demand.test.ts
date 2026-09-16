@@ -26,7 +26,7 @@ const makeClient = () =>
   });
 
 const makeRequestClient = () => {
-  const request = vi.fn(async <T>(_path: string, _init?: RequestInit) => {
+  const request = vi.fn(async <T>() => {
     return {
       totalMarketValue: 100,
       totalCost: 90,
