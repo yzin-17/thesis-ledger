@@ -8,8 +8,8 @@ const marketTimeZone = (symbol: string) => {
 };
 
 const localMidnight = (date: string, timeZone: string) => {
-  const [year, month, day] = date.split('-').map(Number);
-  const wanted = Date.UTC(year!, month! - 1, day!);
+  const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
+  const wanted = Date.UTC(year, month - 1, day);
   if (new Date(wanted).toISOString().slice(0, 10) !== date)
     throw new Error('行情窗口必须使用有效日历日期');
   const formatter = new Intl.DateTimeFormat('en-US', {

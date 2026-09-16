@@ -134,6 +134,7 @@ describe('MarketBarReader review regressions', () => {
     const reader = new MarketBarReader(policy() as never, remote as never, store);
     await reader.read({ ...input(), acceptance: 'complete' });
     expect(remote.read).toHaveBeenCalledTimes(1);
-    expect(stored).toMatchObject({ freshUntil: new Date('2025-03-10T01:00:00.000Z') });
+    // 最新窗口缺少当天尾部，使用短复核周期，而非历史区间的七天 TTL。
+    expect(stored).toMatchObject({ freshUntil: new Date('2025-03-03T01:05:00.000Z') });
   });
 });

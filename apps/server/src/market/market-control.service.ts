@@ -153,7 +153,7 @@ export class MarketControlService {
   async getPolicy() {
     const current = await this.ensureSeededPolicy();
     if (current.syncState === 'pending') return this.retryLatest();
-    return this.policyResponse(current as unknown as Record<string, unknown>);
+    return this.policyResponse(current);
   }
 
   private async pushToDsa(
@@ -333,12 +333,12 @@ export class MarketControlService {
       return { current: next, shouldPush: true };
     });
     const response = result.shouldPush ? await this.pushToDsa(policy) : result.current;
-    return this.policyResponse(response as unknown as Record<string, unknown>);
+    return this.policyResponse(response);
   }
 
   async retryLatest() {
     const current = await this.ensureSeededPolicy();
-    if (current.syncState !== 'pending') return this.policyResponse(current as unknown as Record<string, unknown>);
+    if (current.syncState !== 'pending') return this.policyResponse(current);
     const policy = this.policyPayload(
       {
         enabled: current.enabled,
@@ -346,7 +346,7 @@ export class MarketControlService {
       },
       current.revision,
     );
-    return this.policyResponse((await this.pushToDsa(policy)) as unknown as Record<string, unknown>);
+    return this.policyResponse(await this.pushToDsa(policy));
   }
 
   async rollback(targetRevision: number) {
@@ -384,11 +384,11 @@ export class MarketControlService {
     );
     let dsaPolicy: Record<string, unknown>;
     if (routeDiff.length > 0) {
-      dsaPolicy = await this.applyPolicy(policy) as Record<string, unknown>;
+      dsaPolicy = await this.applyPolicy(policy);
     } else if (current.syncState === 'pending') {
-      dsaPolicy = await this.retryLatest() as Record<string, unknown>;
+      dsaPolicy = await this.retryLatest();
     } else {
-      dsaPolicy = current as unknown as Record<string, unknown>;
+      dsaPolicy = current;
     }
     if (dsaPolicy.syncState !== 'applied') {
       return {
@@ -396,7 +396,7 @@ export class MarketControlService {
         removed: false,
         pending: dsaPolicy.syncState === 'pending',
         routeDiff,
-        policy: this.policyResponse(dsaPolicy as unknown as Record<string, unknown>),
+        policy: this.policyResponse(dsaPolicy),
         tombstone: null,
         dsaTombstone: null,
       };
@@ -413,7 +413,7 @@ export class MarketControlService {
         removed: false,
         pending: true,
         routeDiff,
-        policy: this.policyResponse(dsaPolicy as unknown as Record<string, unknown>),
+        policy: this.policyResponse(dsaPolicy),
         tombstone: null,
         dsaTombstone: safeError(error),
       };
@@ -436,7 +436,7 @@ export class MarketControlService {
       providerId,
       removed: true,
       routeDiff,
-      policy: this.policyResponse(dsaPolicy as unknown as Record<string, unknown>),
+      policy: this.policyResponse(dsaPolicy),
       tombstone,
       dsaTombstone,
     };

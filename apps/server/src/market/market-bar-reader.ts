@@ -237,10 +237,10 @@ export class PrismaMarketBarFactStore {
     // 不能让历史窗口的 7/30 天 TTL 使未重新获取的最新行情继续命中。
     const freshUntil = new Date(replacesCoverage
       ? Date.parse(series.provenance.freshUntil)
-      : Math.min(new Date(existing!.freshUntil).getTime(), Date.parse(series.provenance.freshUntil)));
+      : Math.min(new Date(existing.freshUntil).getTime(), Date.parse(series.provenance.freshUntil)));
     const fetchedAt = new Date(replacesCoverage
       ? Date.parse(series.provenance.fetchedAt)
-      : Math.min(new Date(existing!.fetchedAt).getTime(), Date.parse(series.provenance.fetchedAt)));
+      : Math.min(new Date(existing.fetchedAt).getTime(), Date.parse(series.provenance.fetchedAt)));
     await client.marketBarSeriesCoverage.upsert({
       where: coverageKey,
       update: {
