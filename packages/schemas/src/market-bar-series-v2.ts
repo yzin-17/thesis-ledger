@@ -127,7 +127,14 @@ export type IndicatorCalculateRequestV2 = z.infer<typeof indicatorCalculateReque
 export const indicatorResultV2Schema = z.object({
   name: z.enum(['MA', 'MACD', 'RSI']),
   parameters: z.record(z.string(), z.number().int().positive()),
+  // 原始 DSA 结果绑定完整输入；Server 显示投影绑定公开 BarSeries，并保留 calculationInput。
   inputFingerprint: z.string().min(1),
+  calculationInput: z.object({
+    inputFingerprint: z.string().min(1),
+    actualStart: isoDateTime.nullable(),
+    actualEnd: isoDateTime.nullable(),
+    pointCount: z.number().int().nonnegative(),
+  }).optional(),
   points: z.array(
     z.object({
       timestamp: isoDateTime,
