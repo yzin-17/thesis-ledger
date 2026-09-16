@@ -4,6 +4,7 @@
 > 日期：2026-09-16
 > 状态：规划完成，待父级确认后从 T1 开始实施；分钟线不在本 Spec 实施范围（见末节）
 > 对应任务：[行情图表周期聚合实施任务](../tasks/2026-09-16-market-chart-period-aggregation.md)
+> 评审修订：补充显式评估时刻及周期结束判定；仅修订规格，不表示周期功能已经实现。
 
 ## 背景与问题
 
@@ -34,6 +35,8 @@
 
 ### 主仓已确认事实
 
+以下行号对应立项基线 `b69077e`，后续定位以符号为准。
+
 - 周期枚举只有日线与分钟：`packages/schemas/src/market.ts:79/134/160`（bar、indicator、inputProvenance）与 `packages/schemas/src/market-bar-series-v2.ts:8`（`BarSeriesIdentityV2`）均为 `z.enum(['1m', '1d'])`。
 - 详情端点写死日线：`apps/server/src/market/market-v2.controller.ts:232-243` 的 `detail()` 没有 `timeframe` 查询参数，`:286` 直接传 `timeframe: '1d'`；独立 bars/indicator 路由才有 `query.timeframe ?? '1d'`（`:145`）。
 - Reader 只按日线能力取路由：`apps/server/src/market/market-bar-reader.ts:345` 读 `effective.routeStatus.DAILY_BAR`，读方与 capability 都不含周期维度。
@@ -42,7 +45,7 @@
 - 指标缓存键已含输入口径：`market-v2.controller.ts:177` 为 `${series.inputFingerprint}:${engineVersion}:${requests}`，而 fingerprint 由 `identity + points` 决定，周期不同即天然隔离。
 - 事实身份含 timeframe：`docs/specs/2026-09-16-market-bar-series-cache-v2.md:15` 规定事实唯一身份为 `symbol + timeframe + timestamp + adjustment + providerId + upstreamSource`，且该 Spec 明确 PostgreSQL 只保存来源事实、Redis 保存可丢弃视图。
 - 主仓已有派生周期先例与命名法：`apps/server/src/market/backtest-bar-aggregation.service.ts:20-46` 用 `kind: 'derived'`、`provider: 'thesis-ledger-server'`、`providerRevision: 'server-aggregation-v2'`、reason「由 Server 从冻结 1m Bar 按市场 Session 确定性派生」，且「calendar fact 不可用时派生能力降级为 unavailable」；schema 侧 `packages/schemas/src/backtest-data.ts:10` 有 `dataTimeframeKindSchema = z.enum(['base','derived'])`。
-- 窗口与预热约束：详情单次最多 90 条（`limits.bars`），DSA 日线输入上限 365 条，`2026-09-10` Spec 要求「可见窗口 + 预热窗口」不超过该上限，否则返回可解释的参数错误。
+- 窗口与预热约束：详情单次最多 90 条（`limits.bars`）。指标计算输入上限 365 条，与 Reader 的 3650 条规范化事实获取上限不同；分别校验聚合所需基础事实量及聚合后送入指标计算的点数。
 - 图表侧的指纹与分页语义已冻结：`2026-09-10` Spec AC4 要求按「共同日期的逐日 inputFingerprint」判断可比；Desktop 已按「页 = 一次详情响应」的粒度构建 ChartPoint 并按日期合并（`market-chart-model.ts` 的 `mergeChartPoints`、`market-chart-types.ts` 的 `chartPageFromResponse`）。周期切换必须沿用这套页内可比语义。
 - 场外基金不参与证券周期：`market-detail.service.ts:56-58` 的 `FUND_CAPABILITIES` 只有 NAV，且净值日期不是交易日。
 
@@ -50,7 +53,7 @@
 
 ### 周期定义与桶边界
 
-周期标识使用 `5d | 1w | 1mo | 1y`，全部基于 `1d` 事实派生，桶边界固定如下（不随请求窗口变化）：
+周期标识使用 `5d | 1w | 1mo | 1y`，全部基于 `1d` 事实派生。周/月/年桶边界不随请求窗口变化，`5d` 使用显式窗口锚点：
 
 | 周期 | 桶边界 | 桶内取值 |
 | --- | --- | --- |
@@ -61,32 +64,47 @@
 
 规则：
 
-1. 桶内缺少交易日的日期不参与，不把停牌日补成零；桶内完全无有效日线时该桶不产生 bar，日期轴保留缺口。
-2. 桶内存在 `incomplete` 或 `unknown` 的日线时，派生 bar 的 `completionStatus` 取桶内最弱状态，`availableAt` 取桶内最大 `availableAt`，与该日线事实的尾 bar 语义一致。
+1. 桶内缺少交易日的日期不参与数值计算，不把停牌日补成零；桶内完全无有效日线时该桶不产生 bar，日期轴保留缺口。没有日线不等于已有停牌证据，完成状态另按下节判定。
+2. 派生 bar 的 `completionStatus` 同时检查周期结束与覆盖完整性，不能仅取已收到日线的最弱状态。`availableAt` 保留实际来源及必要完成证据的可得时刻。
 3. 复权口径必须一致：派生只在桶内所有日线的 `adjustment` 相同且与请求一致时进行，混合口径 fail-closed。
 4. `5d` 的锚点跟随可视区间末端，因此同一标的在不同窗口下的最后一根 `5d` bar 可能不同；其余周期不依赖窗口。
 
+### 周期完成状态与评估时刻
+
+聚合纯函数显式接收 UTC `evaluationAsOf`；调用方只传入该时刻已经可得的日线和版本化日历/覆盖证据。`5d` 另传冻结的交易日锚点。函数不得读取 `Date.now()`、系统时钟或隐式请求上下文。
+
+使用该市场的 calendar fact、Session 时区和半日市安排，求出整个桶最后一个计划交易 Session 的 `bucketEndAt`。它不是已有日线的最大时间，也不能被请求 `end` 提前裁短。周/月/年检查整个周期，`5d` 检查锚点确定的五个交易日。
+
+- 日历或桶结束边界不可确定时，不声明派生能力可用；有数值但存在无法解释的过去交易日缺失、未知日线状态或覆盖证据缺口时，状态为 `unknown`，不得当作停牌后声称完整。
+- 边界及已到期输入可确认，但 `evaluationAsOf < bucketEndAt` 时为 `incomplete`，即使所有已到达日线均为 `complete`。已到期输入仍有 `incomplete` 时也为 `incomplete`。
+- 只有 `evaluationAsOf >= bucketEndAt`，且每个应有交易日均有完整日线，或有在评估时刻已可得的版本化停牌/无交易证据解释缺失，才能输出 `complete`。单纯数组缺项不能作为无交易证据。
+- `availableAt` 取实际使用日线及必要证据可得时刻的最大值；`complete` 的可得时刻还不得早于 `bucketEndAt`。不通过填写未来 `availableAt` 提前宣称完成；输入证据晚于评估时刻必须拒绝或降级。
+- 同一输入、calendar revision、规则版本、锚点和 `evaluationAsOf` 必须逐字段可回放。不同评估时刻可以使尾桶从未完成变为完成，不得复用同一完成结论。
+
+例如正常交易周周二收盘后，周一、周二日线虽均完成，本周周线仍为 `incomplete`；只有该周最后计划 Session 结束且覆盖证据齐全，才能变为 `complete`。月线、年线同理。
+
 ### 派生位置与 provenance 口径
 
-- 聚合实现为 Domain 纯函数（与 `aggregateMinuteBars` 同级），入参是日线 bar 数组 + 交易日历 fact + 周期标识，输出派生 bar 数组；不得依赖「当前时间」或请求上下文。
+- 聚合实现为 Domain 纯函数（与 `aggregateMinuteBars` 同级），入参是日线数组 + 交易日历/必要覆盖证据 + 周期 + `evaluationAsOf` + 可选 `5d` 锚点，输出派生 bar 数组；不得依赖隐式当前时间。
 - Server 在 Reader 之上声明派生能力：仅当 `DAILY_BAR` 对应该资产类型为 `supported` 且该市场 calendar fact 可用时，才声明派生周期可用；否则以 `unavailable`/`unsupported` 加 reason 返回，文案遵循既有派生惯例。
 - 派生序列的 provenance 使用 `provider: 'thesis-ledger-server'`、`providerRevision: <聚合规则版本>`、`kind: derived`（对外字段名以 T1 冻结为准），并携带基础日线的 `providerId / upstreamSource / providerRevision` 作为「派生自谁」的引用。UI 来源区必须同时可见「派生」与基础来源。
-- 派生序列不写入事实表；允许进 Redis 视图缓存，key 必须包含 `symbol + 周期 + adjustment + 基础段 identity + 规则版本 + calendar revision`。基础日线事实或 calendar revision 变化时，派生视图必须失效或重算，不能沿用旧桶。
-- 聚合函数与规则版本必须可测可回放：同一输入 + 同一 calendar revision + 同一规则版本，输出逐字段稳定。
+- 派生序列不写入事实表；Redis 视图 key 包含 `symbol + 周期 + adjustment + 基础段 identity/fingerprint + 规则版本 + calendar revision + 锚点`。基础日线或 calendar revision 变化必须失效或重算。
+- 完成状态缓存还必须绑定 `evaluationAsOf`；允许只缓存与时间无关的数值聚合、每次返回前按显式时刻重新判定状态。不得跨过 `bucketEndAt` 后直接复用旧结论；派生 fingerprint 必须反映完成状态与 `availableAt`，指标缓存随实际输入变化。
+- 聚合函数与规则版本必须可测可回放：同一输入 + 同一 calendar revision + 同一规则版本 + 同一评估时刻/锚点，输出逐字段稳定。
 
 ### 契约扩展
 
 - `timeframe` 枚举扩展为 `1m | 1d | 5d | 1w | 1mo | 1y`，同时新增「基础/派生」标识（沿用 `dataTimeframeKindSchema` 的 `base | derived` 命名）。
 - `/api/v2/market/:symbol/detail` 增加 `timeframe` 查询参数，默认 `1d`；detail 端点不得再写死日线。`barsLimit` 语义改为「所选周期的 bar 条数」，`navLimit` 不受影响。
-- 指标分段继续用 `IndicatorResultV2`：其 `points` 的日期是所选周期的桶末交易日，`parameters` 不变，`inputFingerprint` 绑定该周期序列。详情响应内「指标与 BarSeries 共享 `inputFingerprint`」的既有校验保持不变。
+- 指标分段继续用 `IndicatorResultV2`：其 `points` 的日期是所选周期的桶末交易日，`parameters` 不变。公开 `inputFingerprint` 与显示 BarSeries 对齐；预热参与计算时，以可选 `calculationInput` 保留完整计算序列指纹、实际起止和点数。DSA 原始响应先按完整输入校验，再进行显示投影，不把显示指纹冒充计算指纹。
 - 未声明或不支持的周期返回结构化错误（`unsupported`/`unavailable` + reason），不静默回退到 `1d`。
 - 基金：`MUTUAL_FUND` 的 `timeframe` 只接受 `1d` 语义（NAV 序列），请求派生周期返回 `unsupported`。
 
 ### 预热、窗口与指标可得性
 
 - 每周期声明自己的预热需求：`MA60` 需要 60 个该周期 bar；`MACD(12,26,9)` 需要 26 + 9 个。可见窗口 90 个周期 bar 对应的日线输入量按周期换算（`1w` 约 5 倍、`1mo` 约 21 倍、`1y` 约 245 倍）。
-- 「可见窗口 + 预热窗口」换算后的日线输入量必须落在数据源输入上限内；超限时返回可解释的参数错误，不得截断预热后给出伪值。`1y` 上 `MA60/MACD` 在多数标的不可满足，因此**按周期声明可计算的指标集合**，UI 只展示该周期真实可得的指标，缺预热显示空值。
-- 派生窗口的日线输入不足时，只返回可满足的桶，不向前补造 bar；`coverage.actualStart/actualEnd` 表达真实覆盖。
+- 「可见窗口 + 预热窗口」换算后的日线量必须落在基础事实获取上限内，聚合后送入 DSA 的周期点数另按计算上限校验；超限返回可解释的参数错误，不得截断预热后给出伪值。`1y` 上 `MA60/MACD` 在多数标的不可满足，因此**按周期声明可计算的指标集合**，UI 只展示真实可得指标，缺预热显示空值。
+- 派生窗口的日线输入不足时，只返回可满足的桶，不向前补造 bar；`coverage.actualStart/actualEnd` 表达真实覆盖。显示起点前的预热参与计算后才裁剪显示点，不能把服务端漏取预热当作历史确实不足。
 
 ### 分页与覆盖
 
@@ -121,8 +139,9 @@
 ### 关键可观察行为
 
 - 聚合 golden test 覆盖：跨月/跨年周、半日市、停牌缺失交易日、桶内 `incomplete`、桶内混合 `adjustment`（fail-closed）、`5d` 锚点随窗口移动。
+- 完成状态测试覆盖：周二已到达日线均完整但周线未结束；当前月/年尾桶未结束；最后计划 Session 结束前、恰好结束、结束后；可信停牌证据与无解释缺口；证据晚于评估时刻；固定 `evaluationAsOf` 回放不受机器时钟影响。
 - 契约测试覆盖：枚举校验、未声明周期报错、默认 `1d` 兼容、detail 不再写死日线。
-- Server 测试覆盖：派生能力只在 calendar fact 可用时声明、Redis 视图失效、周期进入缓存 key、跨周期页不得合并、`hasMoreBefore` 桶边界。
+- Server 测试覆盖：派生能力只在 calendar fact 可用时声明、Redis 视图失效、周期进入缓存 key、跨周期页不得合并、`hasMoreBefore` 桶边界、跨过 `bucketEndAt` 后重新判定完成状态。
 - DSA 契约测试覆盖：以周期序列为输入的指标计算、预热不足返回 null、超上限参数错误。
 - Desktop 测试覆盖：周期组只渲染可用周期、周期与区间偏好正交、切换清空页集合、读数与右轴语义不回归。
 
@@ -142,7 +161,7 @@ Schema/Domain 测试证明聚合与枚举；Server 测试证明声明、窗口�
 
 ### Blocking
 
-无。周期集合、桶边界、派生位置、指标可得性规则与兼容策略均已确定；字段命名与规则版本号由 T1 在代码盘点后冻结，但不得改变本节的边界与不变量。
+无。周期集合、桶边界、派生位置、完成状态判定、指标可得性规则与兼容策略均已确定；字段命名与规则版本号由 T1 在代码盘点后冻结，但不得改变本节的边界与不变量。
 
 ### Non-blocking
 
@@ -152,11 +171,11 @@ Schema/Domain 测试证明聚合与枚举；Server 测试证明声明、窗口�
 
 ## 验收标准
 
-- AC1：`5d / 1w / 1mo / 1y` 四种周期按固定规则从日线事实聚合；同一输入 + 同一 calendar revision + 同一规则版本输出逐字段稳定。
+- AC1：`5d / 1w / 1mo / 1y` 四种周期按固定规则从日线事实聚合；同一输入 + 同一 calendar revision + 同一规则版本 + 同一 `evaluationAsOf`/锚点输出逐字段稳定。周期未结束不得输出 `complete`，未解释覆盖缺失不得当作停牌事实。
 - AC2：派生周期只在基础 `1d` 能力可用且该市场 calendar fact 可用时声明；provenance 明确标 `derived`、Server provider 与规则版本，并携带基础来源；不伪装为 Provider 原生周期。
 - AC3：契约向后兼容：默认 `1d`；未声明周期返回结构化 `unsupported`/`unavailable`，不静默回退。
 - AC4：指标按所选周期序列由 DSA 计算，参数不变；预热不足返回空值；`1y` 等不可满足的指标按周期声明而非补值。
-- AC5：`barsLimit` 表示所选周期条数；「可见窗口 + 预热窗口」换算后的日线输入不超上限；`hasMoreBefore` 按桶边界判断。
+- AC5：`barsLimit` 表示所选周期条数；「可见窗口 + 预热窗口」分别满足基础事实获取及指标计算上限；`hasMoreBefore` 按桶边界判断。
 - AC6：Desktop 提供独立「周期」语义组，只显示真实可用的周期；周期与区间偏好正交且跨标的复用；未支持周期回退 `1d` 并提示。
 - AC7：周期切换不改变实时概览（quote、持仓数量、成本、盈亏）；可视区间涨跌幅、读数分组、右轴末值、稳定槽位与分页交互不回归。
 - AC8：图表口径区显示当前周期与「派生」来源；基金（`MUTUAL_FUND`）不提供派生周期，NAV 语义不变。

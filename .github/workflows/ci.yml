@@ -79,6 +79,11 @@ jobs:
         env:
           RUN_STRATEGY_OPTIMIZATION_POSTGRES_E2E: '1'
           RUN_AUTOMATION_POSTGRES_E2E: '1'
+      - name: Market reader review regressions
+        run: |
+          pnpm --filter @thesis-ledger/server exec vitest run \
+            test/market/market-reader-review-regressions.test.ts \
+            test/market/market-indicator-window.test.ts
       - name: Contract tests
         run: pnpm contract:test
       - name: Complexity guardrails

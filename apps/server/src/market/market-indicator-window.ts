@@ -12,17 +12,18 @@ export type MarketIndicatorRequest = {
 };
 export const MAX_INDICATOR_INPUT_POINTS = 365;
 
+const warmupForRequest = (request: MarketIndicatorRequest) => {
+  const parameters = request.parameters;
+  switch (request.name) {
+    case 'MA': return (parameters.period ?? 5) - 1;
+    case 'MACD': return (parameters.slow ?? 26) + (parameters.signal ?? 9);
+    case 'RSI': return Math.max(parameters.short ?? 6, parameters.mid ?? 12, parameters.long ?? 24) + 1;
+  }
+};
+
 /** 仅规划输入窗口，不实现任何技术指标公式。 */
 export const indicatorWarmupPoints = (requests: readonly MarketIndicatorRequest[]) =>
-  requests.reduce((maximum, request) => {
-    const parameters = request.parameters;
-    const warmup = request.name === 'MA'
-      ? (parameters.period ?? 5) - 1
-      : request.name === 'MACD'
-        ? (parameters.slow ?? 26) + (parameters.signal ?? 9)
-        : Math.max(parameters.short ?? 6, parameters.mid ?? 12, parameters.long ?? 24) + 1;
-    return Math.max(maximum, warmup);
-  }, 0);
+  requests.reduce((maximum, request) => Math.max(maximum, warmupForRequest(request)), 0);
 
 export const indicatorReadInput = (
   input: BarReadInput,

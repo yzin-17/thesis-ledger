@@ -36,6 +36,7 @@
   - 涉及范围：`packages/schemas/src/market.ts`、`market-bar-series-v2.ts`、`packages/api-client/`、DSA 侧 Contract/capability 声明与直接测试；Desktop 只同步类型消费。
   - 不包含：聚合算法实现、Server 窗口逻辑、Desktop UI、分钟线。
   - 完成条件：`timeframe` 枚举扩展为 `1m | 1d | 5d | 1w | 1mo | 1y`；新增基础/派生标识（沿用 `base | derived` 命名）；`/detail` 接受 `timeframe` 且默认 `1d`；派生序列的 provenance 字段（provider、规则版本、基础来源引用）命名冻结；未声明周期返回结构化错误而不是回退；旧客户端不传 `timeframe` 的响应与错误语义不变。
+  - 完成状态契约：冻结显式 `evaluationAsOf`、计划 Session 推导的 `bucketEndAt`、`5d` 锚点及覆盖证据；未结束周期不标 `complete`，未解释缺失不当作停牌；冻结 `availableAt` 与评估时刻的关系。
   - 验证方式：Schema 契约测试、API Client 契约测试、DSA Contract 测试、跨仓 payload fixture；记录主仓与 DSA HEAD。
   - 停止条件：若 `base | derived` 标识无法在不破坏既有 BarSeries V2 消费者的前提下加入，保留 T1 未勾选并记录兼容矩阵后请示，不得用「周期名映射到假 provider」绕过。
 
@@ -44,16 +45,18 @@
   - 依赖：T1
   - 涉及范围：`packages/domain/`（与 `aggregateMinuteBars` 同级的新聚合函数）及其测试；不涉及 Server 装配。
   - 不包含：交易日历 fact 的采集、指标计算、缓存、UI。
-  - 完成条件：`5d / 1w / 1mo / 1y` 按 Spec 的桶边界聚合 OHLCV 与 `completionStatus`/`availableAt`；桶内混合 `adjustment` 或口径不一致时 fail-closed；不补零、不补最近值；桶内无有效日线时不出 bar；同输入 + 同 calendar revision + 同规则版本输出逐字段稳定。
+  - 完成条件：`5d / 1w / 1mo / 1y` 按 Spec 的桶边界聚合 OHLCV 与 `completionStatus`/`availableAt`；桶内混合 `adjustment` 或口径不一致时 fail-closed；不补零、不补最近值；桶内无有效日线时不出 bar；同输入 + 同 calendar revision + 同规则版本 + 同评估时刻/锚点输出逐字段稳定，函数不读取系统时钟。
   - 验证方式：golden test 覆盖跨月/跨年周、半日市、停牌缺失交易日、`incomplete`/`unknown` 传播、混合复权、`5d` 锚点随窗口移动、Dedupe 与排序；Domain 包级测试与 typecheck。
+  - 完成状态回归：周二日线均完整但周线未结束、当前月/年尾桶未结束、最后计划 Session 结束前/恰好结束/结束后、有可信停牌证据与无解释缺口、证据晚于评估时刻、固定 `evaluationAsOf` 回放均须有确定性断言。
 
 - [ ] T3：接入 Server 派生能力声明、窗口/预热换算与派生视图缓存
   - 覆盖验收标准：AC2、AC3、AC5、AC9
   - 依赖：T1、T2
   - 涉及范围：`apps/server/src/market/` 的 Reader/Controller/detail 装配、calendar fact 读取、派生能力声明、Redis 派生视图与失效、窗口与预热换算；相关 Server 定向测试。
   - 不包含：新增 Provider 或路由、改变日线事实治理、新增数据库 migration、指标公式。
-  - 完成条件：派生能力仅在 `DAILY_BAR` 可用且 calendar fact 可用时声明，否则带 reason 降级；`barsLimit` 表示所选周期条数；「可见窗口 + 预热窗口」换算后的日线输入不超上限，超限返回可解释参数错误；派生视图 key 含周期、基础段 identity、规则版本与 calendar revision，基础事实或日历变化时失效；跨周期页不得合并；`hasMoreBefore` 按桶边界判断。
-  - 验证方式：Server 定向测试覆盖能力声明、降级 reason、缓存 key 与失效、超限报错、桶边界 `hasMoreBefore`、跨周期隔离；Server typecheck/build。
+  - 完成条件：派生能力仅在 `DAILY_BAR` 可用且 calendar fact 可用时声明，否则带 reason 降级；`barsLimit` 表示所选周期条数；基础事实量与指标计算点数分别校验上限，超限返回可解释参数错误；派生视图 key 含周期、基础段 identity/fingerprint、规则版本、锚点与 calendar revision，基础事实或日历变化时失效；跨周期页不得合并；`hasMoreBefore` 按桶边界判断。
+  - 完成状态缓存：绑定显式评估时刻，或每次返回前重新判定尾桶状态；禁止跨过 `bucketEndAt` 后直接复用旧结论。保留计算输入指纹、显示指纹与 `calculationInput` 的对应关系。
+  - 验证方式：Server 定向测试覆盖能力声明、降级 reason、缓存 key 与失效、超限报错、桶边界 `hasMoreBefore`、跨周期隔离及跨完成边界重算；Server typecheck/build。
 
 - [ ] T4：DSA 在周期序列上计算指标并声明预热
   - 覆盖验收标准：AC4
@@ -104,7 +107,7 @@
 
 | AC / 断言 | 实现责任任务 | 验证责任任务或门禁 |
 | --- | --- | --- |
-| AC1 / 四周期确定性聚合 | T2 | T2；T6 |
+| AC1 / 四周期确定性聚合与完成状态 | T1、T2、T3 | T2；T3；T6 |
 | AC2 / 派生能力声明与 provenance | T1、T3 | T3；G1 |
 | AC3 / 契约兼容与结构化错误 | T1、T3 | T1；T3；G1 |
 | AC4 / 周期序列上的指标与预热 | T1、T4 | T4；G1 |
@@ -128,6 +131,7 @@
 ## 当前执行记录
 
 - 2026-09-16：按用户反馈完成 Spec/Task 立项。范围限定为 `5d / 1w / 1mo / 1y` 派生周期；分钟线只记录事实与前置条件，不进入实施。规划结论：桶边界、派生位置（Domain + Server 声明，不新增事实表）、指标可得性与兼容策略均有单一实现责任与对应验证，无 Blocking 问题；未开始 T1。
+- 2026-09-16 评审修订：补齐 `evaluationAsOf`、`bucketEndAt`、覆盖证据及尾桶完成状态，分配至 T1/T2/T3；区分基础事实获取上限与指标计算上限。本次仅修订规划，所有周期实现任务仍未开始，不以行情 V2 修复测试代替周期功能验收。
 
 ## 最终一致性 Review
 
@@ -139,6 +143,7 @@
 - [ ] 不存在未解决的 Blocking 问题、占位要求或未定义契约
 - [ ] 实现未超出 Spec 范围，未把可选设施变成强制要求
 - [ ] 派生周期未被写成事实、未被伪装为 Provider 原生周期
+- [ ] 周/月/年及 5 日桶同时满足周期结束、日线及覆盖证据条件，固定评估时刻可回放
 - [ ] 证据类型、场景覆盖、代码版本与目标环境支持所声明的验收结果
 - [ ] 测试、配置、文档、Spec/Task 状态与实际实现一致
 - [ ] 必要实施 Step 已验证；提交处理符合授权且保留既有用户修改
