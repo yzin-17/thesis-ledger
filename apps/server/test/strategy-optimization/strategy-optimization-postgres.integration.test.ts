@@ -16,6 +16,7 @@ import { StrategyOptimizationRunService } from '../../src/strategy-optimization/
 import { StrategyOptimizationService } from '../../src/strategy-optimization/strategy-optimization.service.js';
 import { StrategyRiskApplicationStoreService } from '../../src/strategy-optimization/strategy-risk-application-store.service.js';
 import { StrategyRiskApplicationService } from '../../src/strategy-optimization/strategy-risk-application.service.js';
+import { createRiskMarketFixture } from './strategy-optimization-market-fixture.js';
 
 const postgresDescribe =
   process.env.RUN_STRATEGY_OPTIMIZATION_POSTGRES_E2E === '1' ? describe : describe.skip;
@@ -106,6 +107,7 @@ const waitUntil = async (predicate: () => Promise<boolean>, timeoutMs = 8_000) =
 
 postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   const prisma = new PrismaService();
+  const market = createRiskMarketFixture(prisma, symbol, suffix);
   const accountId = randomUUID();
   const conflictAccountId = randomUUID();
   const strategyId = randomUUID();
@@ -118,6 +120,9 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     enqueue: vi.fn(async () => []),
     subjectDeliveryStatus: vi.fn(async () => ({ shouldRetry: false })),
   };
+  const makeRisk = () => new RiskService(
+    prisma, notifications as never, undefined, undefined, undefined, undefined, market.reader,
+  );
 
   const provider = {
     id: 'postgres-e2e',
@@ -314,10 +319,10 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     ]);
     version1Id = version1.id;
     version2Id = version2.id;
-    const risk = new RiskService(prisma, notifications as never);
+    const risk = makeRisk();
     riskApplications = new StrategyRiskApplicationService(
       prisma,
-      new StrategyRiskContextService(prisma),
+      new StrategyRiskContextService(prisma, market.reader),
       new StrategyRiskApplicationStoreService(prisma),
       risk,
     );
@@ -366,6 +371,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     await prisma.strategy.deleteMany({ where: { id: strategyId } }).catch(() => undefined);
     await prisma.position.deleteMany({ where: { accountId: { in: [accountId, conflictAccountId] } } }).catch(() => undefined);
     await prisma.account.deleteMany({ where: { id: { in: [accountId, conflictAccountId] } } }).catch(() => undefined);
+    await market.cleanup();
     await prisma.$disconnect();
   });
 
@@ -391,7 +397,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     const enabled = await riskApplications.update(created.id, { expectedRevision: 1, enabled: true });
     expect(enabled).toMatchObject({ enabled: true, revision: 2 });
 
-    const risk = new RiskService(prisma, notifications as never);
+    const risk = makeRisk();
     const scan = await risk.scan({ contexts: [] }, { evaluatedAt });
     const sourceRules = await prisma.riskRule.findMany({ where: { sourcePlanId: created.id, archivedAt: null } });
     expect(scan.results.some((result) => sourceRules.some((rule) => rule.id === result.ruleId))).toBe(true);
