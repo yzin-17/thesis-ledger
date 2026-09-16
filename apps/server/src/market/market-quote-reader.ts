@@ -1,7 +1,7 @@
 import { normalizeSymbol } from '@thesis-ledger/domain';
 import { quoteSchemaV1, type QuoteV1 } from '@thesis-ledger/schemas';
-import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
-import { RedisService, redisKey } from '../platform/redis.service.js';
+import { type DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
+import { type RedisService, redisKey } from '../platform/redis.service.js';
 import { StructuredLogger, currentTraceId } from '../platform/structured-logger.js';
 import { MARKET_CACHE_POLICIES } from './market-result-cache.js';
 
@@ -54,7 +54,7 @@ export class MarketQuoteReader {
   }
 
   private client(): QuoteRedisClient | undefined {
-    return this.redis?.client as unknown as QuoteRedisClient | undefined;
+    return this.redis?.client;
   }
 
   private async readFreshOrLastValid(

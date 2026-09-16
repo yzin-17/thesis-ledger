@@ -13,7 +13,7 @@ import { MarketBarReader } from '../../src/market/market-bar-reader.js';
 import type { BarReadInput } from '../../src/market/market-bar-reader.js';
 import type { BarSeriesV2 } from '@thesis-ledger/schemas';
 import { LocalSnapshotStore } from '../../src/backtest/backtest-snapshot.js';
-import { DsaClient } from '../../src/integration/dsa/dsa.client.js';
+import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 
 const temporaryDirectories: string[] = [];
 

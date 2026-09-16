@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { mkdir, readdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, parse, relative, resolve, sep } from 'node:path';
+import { isAbsolute, parse, relative, resolve, sep } from 'node:path';
 import { PrismaService } from './prisma.service.js';
 import { RedisService, redisKey } from './redis.service.js';
 

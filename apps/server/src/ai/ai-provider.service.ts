@@ -386,7 +386,7 @@ export class AiProviderService implements OnModuleInit {
     const metadata = input.modelReasoning?.[model];
     const started = Date.now();
     try {
-      const { result, latencyMs } = await runProviderConnectionTest({
+      const { latencyMs } = await runProviderConnectionTest({
         provider,
         model,
         metadata,

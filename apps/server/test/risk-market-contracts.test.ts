@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RiskService } from '../src/risk/risk.service.js';
-import { MarketService } from '../src/market/market.service.js';
 import { InstrumentService } from '../src/market/instrument.service.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';

@@ -286,7 +286,7 @@ export class MarketDetailService {
 
   private async readPolicy(): Promise<PolicySnapshot | null> {
     try {
-      const raw = (await this.control.getPolicy()) as unknown as Record<string, unknown>;
+      const raw = await this.control.getPolicy();
       const projection = isRecord(raw.effectiveProjection) ? raw.effectiveProjection : null;
       const source = projection ?? raw;
       const routes = normalizedPolicyRoutes(source.routes);

@@ -51,7 +51,6 @@ import {
   type VoidCashTransferCommandV2,
   type MarketDetailRequest,
   type MarketDetailResponseV2,
-  type MarketDetailSectionV2,
   type JournalReviewCandidatesQuery,
   type JournalReviewCandidatesResponse,
   type JournalReviewSnapshotInput,
