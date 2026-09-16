@@ -180,6 +180,7 @@ export class BacktestService {
 
   listStrategies() {
     return this.prisma.strategy.findMany({
+      where: { status: { not: 'experiment-only' } },
       include: { versions: true },
       orderBy: { updatedAt: 'desc' },
     });

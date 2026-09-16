@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoaderCircle, SlidersHorizontal } from 'lucide-react';
 import { useToastManager } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
+import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 
 import type { Account } from '../portfolio/portfolio.types.js';
 import { AdvancedJsonSheet } from './AdvancedJsonSheet.js';
@@ -248,7 +249,9 @@ function EvidenceSummary({
           </div>
           <div>
             <span className="text-xs text-muted-foreground">已实现盈亏</span>
-            <p className="font-medium">{trade.pnl}</p>
+            <p className={cn('font-medium', marketToneClass(marketToneForValue(trade.pnl)))}>
+              {trade.pnl}
+            </p>
           </div>
         </div>
         <div className="rounded-lg border bg-muted/20 p-3">
@@ -601,11 +604,7 @@ export function JournalDashboard({
         description="回顾交易计划与执行，结合证据总结经验。"
       />
 
-      <JournalAccountSelector
-        accounts={accounts}
-        value={accountId}
-        onValueChange={selectAccount}
-      />
+      <JournalAccountSelector accounts={accounts} value={accountId} onValueChange={selectAccount} />
 
       <Tabs
         value={tab}

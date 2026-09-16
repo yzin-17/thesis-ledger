@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  barSeriesV2Schema,
+  indicatorResultV2Schema,
+  type BarSeriesV2,
+  type IndicatorResultV2,
+} from './market-bar-series-v2.js';
 
 const isoDate = z.iso.datetime({ offset: true });
 const isoCalendarDate = z.iso.date();
@@ -305,6 +311,7 @@ export const providerManifestSchema = z.object({
       z.object({
         sourceId: z.string().min(1),
         displayName: z.string().min(1),
+        capabilities: z.record(z.string(), z.array(z.string().min(1))),
       }),
     )
     .optional(),
@@ -540,6 +547,80 @@ const marketDetailResponseSchemaImplementation = marketDetailResponseBaseSchema.
 export const marketDetailResponseSchema =
   marketDetailResponseSchemaImplementation as z.ZodType<MarketDetailResponse>;
 
+const marketDetailSectionV2Schema = z.object({
+  capability: marketDetailCapabilitySchema,
+  status: marketDetailSectionStatusSchema,
+  data: z.unknown().optional(),
+  error: marketDetailDiagnosticSchema.optional(),
+});
+
+const marketDetailResponseV2SchemaImplementation = z
+  .object({
+    contractVersion: z.literal(2),
+    symbol: z.string().min(1),
+    assetType: marketDetailAssetTypeSchema,
+    identity: z.object({
+      source: z.enum(['asset', 'catalog', 'symbol', 'unknown']),
+      status: z.enum(['confirmed', 'provider', 'unknown']),
+    }),
+    requested: z.array(marketDetailCapabilitySchema),
+    capabilities: z.object({
+      supported: z.array(marketDetailCapabilitySchema),
+      unsupported: z.array(marketDetailCapabilitySchema),
+    }),
+    limits: z.object({
+      bars: z.number().int().positive(),
+      nav: z.number().int().positive(),
+      barsHasMoreBefore: z.boolean().optional(),
+    }),
+    barSeries: barSeriesV2Schema.optional(),
+    sections: z.record(z.string(), marketDetailSectionV2Schema),
+    dependencies: z.record(z.string(), marketDetailDependencySchema),
+    requestId: z.string().min(1),
+    generatedAt: isoDate,
+  })
+  .superRefine((response, context) => {
+    for (const capability of response.requested) {
+      const section = response.sections[capability];
+      if (!section) {
+        context.addIssue({ code: 'custom', path: ['sections', capability], message: '响应必须为每个 requested 能力提供分段状态。' });
+        continue;
+      }
+      if (section.capability !== capability) {
+        context.addIssue({ code: 'custom', path: ['sections', capability, 'capability'], message: '分段键必须与 capability 一致。' });
+      }
+      if (section.status === 'ready' || section.status === 'stale') {
+        let parsed: { success: boolean } = { success: true };
+        if (capability === 'bars') {
+          parsed = barSeriesV2Schema.safeParse(section.data);
+        } else if (capability.startsWith('indicator:')) {
+          const indicator = indicatorResultV2Schema.safeParse(section.data);
+          parsed = indicator;
+          if (
+            indicator.success &&
+            response.barSeries &&
+            indicator.data.inputFingerprint !== response.barSeries.inputFingerprint
+          ) {
+            context.addIssue({
+              code: 'custom',
+              path: ['sections', capability, 'data', 'inputFingerprint'],
+              message: '详情指标必须与 BarSeriesV2 共享 inputFingerprint。',
+            });
+          }
+        }
+        if (!parsed.success) {
+          context.addIssue({ code: 'custom', path: ['sections', capability, 'data'], message: 'v2 分段数据契约不匹配。' });
+        }
+        if (capability.startsWith('indicator:') && !response.barSeries) {
+          context.addIssue({ code: 'custom', path: ['barSeries'], message: '指标分段必须携带对应的 BarSeriesV2。' });
+        }
+      }
+    }
+  });
+
+export const marketDetailResponseV2Schema =
+  marketDetailResponseV2SchemaImplementation as z.ZodType<MarketDetailResponseV2>;
+
 export type QuoteV1 = z.infer<typeof quoteSchemaV1>;
 export type BarInputV1 = z.input<typeof barSchemaV1>;
 export type BarV1 = z.output<typeof barSchemaV1>;
@@ -606,6 +687,35 @@ export type MarketDetailResponse = {
   };
   limits: { bars: number; nav: number; barsHasMoreBefore?: boolean };
   sections: Partial<Record<MarketDetailCapability, MarketDetailSection>>;
+  dependencies: Record<string, MarketDetailDependency>;
+  requestId: string;
+  generatedAt: string;
+};
+
+export type MarketDetailDataByCapabilityV2 = Omit<MarketDetailDataByCapability, 'bars' | 'indicator:MA' | 'indicator:MACD' | 'indicator:RSI'> & {
+  bars: BarSeriesV2;
+  'indicator:MA': IndicatorResultV2;
+  'indicator:MACD': IndicatorResultV2;
+  'indicator:RSI': IndicatorResultV2;
+};
+export type MarketDetailSectionV2 = {
+  [Capability in MarketDetailCapability]: {
+    capability: Capability;
+    status: MarketDetailSectionStatus;
+    data?: MarketDetailDataByCapabilityV2[Capability] | null;
+    error?: MarketDetailDiagnostic;
+  };
+}[MarketDetailCapability];
+export type MarketDetailResponseV2 = {
+  contractVersion: 2;
+  symbol: string;
+  assetType: MarketDetailAssetType;
+  identity: MarketDetailResponse['identity'];
+  requested: MarketDetailCapability[];
+  capabilities: MarketDetailResponse['capabilities'];
+  limits: MarketDetailResponse['limits'];
+  barSeries?: BarSeriesV2;
+  sections: Partial<Record<MarketDetailCapability, MarketDetailSectionV2>>;
   dependencies: Record<string, MarketDetailDependency>;
   requestId: string;
   generatedAt: string;

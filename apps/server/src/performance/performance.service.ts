@@ -1,5 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { MarketService } from '../market/market.service.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { PerformanceAnalysisService } from './performance-analysis.service.js';
 import { PerformanceDataService } from './performance-data.service.js';
@@ -27,10 +28,11 @@ export class PerformanceService {
     @Optional() layers?: PerformanceLayerService,
     @Optional() targets?: PerformanceTargetService,
     @Optional() data?: PerformanceDataService,
+    @Optional() bars?: MarketBarReader,
   ) {
     const performanceData = data ?? new PerformanceDataService(prisma, market);
     this.snapshotService =
-      snapshots ?? new PerformanceSnapshotService(prisma, market, performanceData);
+      snapshots ?? new PerformanceSnapshotService(prisma, market, performanceData, bars);
     this.layerService = layers ?? new PerformanceLayerService(prisma, market, performanceData);
     this.analysisService =
       analysis ?? new PerformanceAnalysisService(prisma, performanceData, this.snapshotService);

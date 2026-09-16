@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import type { AppConfig } from '../platform/config.js';
-import type { AiProvider, AiProviderHealth } from './contracts.js';
+import type {
+  AiProvider,
+  AiProviderHealth,
+  AiProviderModelReasoningMetadata,
+} from './contracts.js';
+import { aiProviderModelReasoningSchema } from './ai-provider.contracts.js';
 
 type CompletionInput = {
   model: string;
@@ -23,6 +28,9 @@ const providerConfigSchema = z
         costPer1kOutput: z.number().nonnegative().optional(),
         costCurrency: z.string().trim().min(1).max(16).optional(),
         pricingVersion: z.string().trim().min(1).max(120).optional(),
+        modelReasoning: z
+          .record(z.string().trim().min(1).max(200), aiProviderModelReasoningSchema)
+          .optional(),
       })
       .strict(),
   )
@@ -130,6 +138,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
       capabilities?: readonly string[];
       health?: AiProviderHealth;
       source?: 'database' | 'environment';
+      modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
     },
   ) {
     this.metadata = {
@@ -139,8 +148,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
       priority: options?.priority ?? 100,
       ...(options?.capabilities ? { capabilities: [...options.capabilities] } : {}),
       ...(options?.source ? { source: options.source } : {}),
+      ...(options?.modelReasoning ? { modelReasoning: options.modelReasoning } : {}),
       ...(pricing?.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
-      ...(pricing?.costPer1kOutput === undefined ? {} : { costPer1kOutput: pricing.costPer1kOutput }),
+      ...(pricing?.costPer1kOutput === undefined
+        ? {}
+        : { costPer1kOutput: pricing.costPer1kOutput }),
       ...(pricing?.costCurrency ? { costCurrency: pricing.costCurrency } : {}),
       ...(pricing?.pricingVersion ? { pricingVersion: pricing.pricingVersion } : {}),
     };
@@ -148,6 +160,16 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
   async complete(input: CompletionInput, signal: AbortSignal) {
     const timeout = AbortSignal.timeout(this.timeoutMs);
+    const hasDeclaredReasoning = Object.prototype.hasOwnProperty.call(
+      this.metadata.modelReasoning ?? {},
+      input.model,
+    );
+    let reasoningPayload: Record<string, unknown> = {};
+    if (input.reasoningEffort !== undefined && isOpenRouterUrl(this.baseUrl)) {
+      reasoningPayload = { reasoning: { effort: input.reasoningEffort } };
+    } else if (input.reasoningEffort !== undefined && hasDeclaredReasoning) {
+      reasoningPayload = { reasoning_effort: input.reasoningEffort };
+    }
     const response = await fetch(completionUrl(this.baseUrl), {
       method: 'POST',
       headers: {
@@ -160,9 +182,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         tools: input.tools.map((name) => ({ type: 'function', function: { name } })),
         response_format: { type: 'json_object' },
         ...(input.maxOutputTokens === undefined ? {} : { max_tokens: input.maxOutputTokens }),
-        ...(input.reasoningEffort && isOpenRouterUrl(this.baseUrl)
-          ? { reasoning: { effort: input.reasoningEffort } }
-          : {}),
+        ...reasoningPayload,
       }),
       signal: AbortSignal.any([signal, timeout]),
     });
@@ -175,8 +195,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     const root = asRecord(payload);
     const usage = asRecord(root?.usage);
     const content = root ? completionContent(root) : undefined;
-    if (content === undefined)
-      throw new Error('Provider 响应缺少 choices[0].message.content');
+    if (content === undefined) throw new Error('Provider 响应缺少 choices[0].message.content');
     const inputTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
     const outputTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : 0;
     const inputRate = this.metadata.costPer1kInput;
@@ -198,7 +217,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
 const parseMarker = (messages: unknown[], marker: string) => {
   const user = messages.find((message) => {
     const record = asRecord(message);
-    return record?.role === 'user' && typeof record.content === 'string' && record.content.includes(marker);
+    return (
+      record?.role === 'user' &&
+      typeof record.content === 'string' &&
+      record.content.includes(marker)
+    );
   });
   const text = asRecord(user)?.content;
   if (typeof text !== 'string') return null;
@@ -211,14 +234,20 @@ const parseMarker = (messages: unknown[], marker: string) => {
   }
 };
 
-const parseResearchMarker = (messages: unknown[]) => parseMarker(messages, 'RESEARCH_REQUEST_JSON:');
+const parseResearchMarker = (messages: unknown[]) =>
+  parseMarker(messages, 'RESEARCH_REQUEST_JSON:');
 const parseOptimizationMarker = (messages: unknown[]) =>
   parseMarker(messages, 'OPTIMIZATION_REQUEST_JSON:');
+const parseDiscoveryMarker = (messages: unknown[]) =>
+  parseMarker(messages, 'DISCOVERY_REQUEST_JSON:');
 
 const fixtureOptimizationProposal = (marker: Record<string, unknown>) => {
   const authorized = Array.isArray(marker.authorizedParameters) ? marker.authorizedParameters : [];
-  const first = authorized.map(asRecord).find((item): item is Record<string, unknown> => item !== null);
-  if (!first || typeof first.parameterId !== 'string') throw new Error('Fixture 优化请求缺少授权参数');
+  const first = authorized
+    .map(asRecord)
+    .find((item): item is Record<string, unknown> => item !== null);
+  if (!first || typeof first.parameterId !== 'string')
+    throw new Error('Fixture 优化请求缺少授权参数');
   const range = asRecord(first.optimizationRange) ?? asRecord(first.schemaRange);
   const candidateValue = range?.min ?? first.currentValue;
   if (typeof candidateValue !== 'string' && typeof candidateValue !== 'number')
@@ -226,6 +255,21 @@ const fixtureOptimizationProposal = (marker: Record<string, unknown>) => {
   return {
     changes: [{ parameterId: first.parameterId, value: candidateValue }],
     reason: 'Fixture Provider 选择授权范围内的确定性候选值，用于验证优化编排闭环。',
+    evidenceRefs: [],
+  };
+};
+
+const fixtureDiscoveryProposal = (marker: Record<string, unknown>) => {
+  const seed = asRecord(marker.seedStrategy);
+  if (!seed || typeof seed.schemaVersion !== 'string')
+    throw new Error('Fixture 探索请求缺少有效 seedStrategy');
+  return {
+    strategy: {
+      ...seed,
+      name: 'Fixture 探索策略',
+      description: 'Fixture Provider 在固定 strategy-space-v1 内生成的确定性候选。',
+    },
+    reason: 'Fixture Provider 复用请求中的合法 v0 seed，验证完整策略候选编排闭环。',
     evidenceRefs: [],
   };
 };
@@ -239,6 +283,19 @@ export class FixtureAiProvider implements AiProvider {
   ) {}
 
   complete(input: CompletionInput) {
+    const discovery = parseDiscoveryMarker(input.messages);
+    if (discovery) {
+      return Promise.resolve({
+        content: fixtureDiscoveryProposal(discovery),
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
+        costKnown: true,
+        costCurrency: 'FIXTURE',
+        pricingVersion: 'fixture-v1',
+        actualModel: input.model,
+      });
+    }
     const optimization = parseOptimizationMarker(input.messages);
     if (optimization) {
       return Promise.resolve({
@@ -316,6 +373,9 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
       ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
       ...(input.costCurrency ? { costCurrency: input.costCurrency } : {}),
       ...(input.pricingVersion ? { pricingVersion: input.pricingVersion } : {}),
+    },
+    {
+      ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
     },
   );
 

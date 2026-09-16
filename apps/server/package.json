@@ -10,6 +10,7 @@
     "health:worker": "node dist/src/backtest/backtest-worker-health.js",
     "start:dev": "tsx watch src/main.ts",
     "db:dev-structure": "tsx src/platform/dev-database-rebuild.ts",
+    "db:cleanup-market": "tsx src/platform/market-data-cleanup.cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prisma": "prisma",

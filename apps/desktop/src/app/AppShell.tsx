@@ -9,7 +9,9 @@ import { SidebarSimpleIcon } from '@phosphor-icons/react/SidebarSimple';
 import { ShieldCheckIcon } from '@phosphor-icons/react/ShieldCheck';
 import { StrategyIcon } from '@phosphor-icons/react/Strategy';
 import { UploadSimpleIcon } from '@phosphor-icons/react/UploadSimple';
+import { MarketColorMenu } from '@/components/market-color-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { cn } from '@/lib/utils';
 import { desktopRoutes, type DesktopNavigationView } from '../views.js';
 
 const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
@@ -73,12 +75,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="status-dot" />
             系统已连接
           </span>
-          <ThemeToggle />
+          <div
+            className={cn('flex items-center gap-1.5', sidebarCollapsed ? 'flex-col' : 'ml-auto')}
+          >
+            <ThemeToggle />
+            <MarketColorMenu />
+          </div>
         </div>
       </aside>
       <main className="content">
         <div className="content-theme-toggle">
-          <ThemeToggle />
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <MarketColorMenu />
+          </div>
         </div>
         {children}
       </main>

@@ -21,7 +21,6 @@ import { StrategyOptimizationCandidateService } from './strategy-optimization-ca
 import {
   optimizationAttemptFailureStatus,
   optimizationFeatureEnabled,
-  optimizationSha256,
   redactOptimizationError,
   toRecord,
   type CandidateRow,
@@ -30,8 +29,17 @@ import {
 } from './strategy-optimization-common.js';
 import { describeStrategyParameters } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
+import {
+  buildOptimizationModelConfig,
+  type OptimizationModelRoute,
+} from './strategy-optimization-model-routing.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
+import {
+  cloneDiscoveryExperiment,
+  createDiscoveryExperiment,
+} from './strategy-optimization-discovery-store.js';
+import { insertOptimizationExperiment } from './strategy-optimization-experiment.store.js';
 
 @Injectable()
 export class StrategyOptimizationService implements OnModuleInit {
@@ -49,17 +57,8 @@ export class StrategyOptimizationService implements OnModuleInit {
   onModuleInit() {
     void this.reconcilePending().catch(() => undefined);
   }
-
   private assertEnabled() {
     if (!optimizationFeatureEnabled()) throw new BadRequestException('AI 策略优化当前已关闭');
-  }
-
-  private async formalStrategyVersion(id: string) {
-    const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
-    if (!version) throw new NotFoundException('策略版本不存在');
-    if (version.schemaVersion !== 2 || version.version <= 0)
-      throw new BadRequestException('AI 优化只能从正式 V2 策略版本开始');
-    return { ...version, strategy: strategySchemaV2.parse(version.schema) as StrategySchemaV2 };
   }
 
   private async experiment(id: string) {
@@ -84,58 +83,24 @@ export class StrategyOptimizationService implements OnModuleInit {
       SELECT * FROM "OptimizationExperiment" WHERE "idempotencyKey"=${parsed.idempotencyKey} LIMIT 1
     `);
     if (previous[0]) return previous[0];
-    const baseline = await this.formalStrategyVersion(parsed.strategyVersionId);
-    const descriptors = describeStrategyParameters(baseline.strategy);
-    this.candidateService.validateAuthorizedParameters(descriptors, parsed.allowedParameterIds);
-    const modelConfig = parsed.models.map((route) => {
-      const provider = this.providers.strict(route.provider, route.model);
-      const costKnown =
-        typeof provider.metadata?.costPer1kInput === 'number' &&
-        typeof provider.metadata?.costPer1kOutput === 'number';
-      return {
-        ...route,
-        costStatus: costKnown ? ('known' as const) : ('unknown' as const),
-        ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
-        ...(provider.metadata?.pricingVersion ? { pricingVersion: provider.metadata.pricingVersion } : {}),
-      };
-    });
-    if (modelConfig.some((route) => route.costStatus === 'unknown') && !parsed.acknowledgeUnknownCost)
+    const modelConfig = buildOptimizationModelConfig(parsed.models, this.providers);
+    if (
+      modelConfig.some((route) => route.costStatus === 'unknown') &&
+      !parsed.acknowledgeUnknownCost
+    )
       throw new BadRequestException('所选模型存在未知费用；请明确确认费用上限不可保证');
-    const created = await this.insertExperiment(parsed, baseline, modelConfig);
+    if (parsed.sourceMode === 'discovery') {
+      const created = await createDiscoveryExperiment(this.prisma, parsed, modelConfig);
+      void this.process(created.id).catch(() => undefined);
+      return created;
+    }
+    const baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 } =
+      await this.reads.formalStrategyVersion(parsed.strategyVersionId!);
+    const descriptors = describeStrategyParameters(baseline.strategy);
+    this.candidateService.validateAuthorizedParameters(descriptors, parsed.allowedParameterIds!);
+    const created = await insertOptimizationExperiment(this.prisma, parsed, baseline, modelConfig);
     void this.process(created.id).catch(() => undefined);
     return created;
-  }
-
-  private async insertExperiment(
-    parsed: ReturnType<typeof optimizationExperimentCreateSchema.parse>,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
-    modelConfig: Array<{
-      provider: string;
-      model: string;
-      costStatus: 'known' | 'unknown';
-      costCurrency?: string;
-      pricingVersion?: string;
-    }>,
-  ) {
-    const id = randomUUID();
-    const dataFingerprint = optimizationSha256({
-      schema: baseline.strategy,
-      runConfig: parsed.runConfig,
-      split: parsed.split,
-      semanticVersion: 'strategy-optimization-v1',
-    });
-    const rows = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
-      INSERT INTO "OptimizationExperiment" (
-        "id", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
-        "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "idempotencyKey", "updatedAt"
-      ) VALUES (
-        ${id}::uuid, ${parsed.strategyVersionId}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
-        ${JSON.stringify(parsed.allowedParameterIds)}::jsonb, ${JSON.stringify(parsed.split)}::jsonb,
-        ${JSON.stringify(parsed.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(modelConfig)}::jsonb,
-        ${JSON.stringify(parsed.budget)}::jsonb, ${parsed.maxRounds}, ${parsed.idempotencyKey}, CURRENT_TIMESTAMP
-      ) RETURNING *
-    `);
-    return rows[0]!;
   }
 
   async clone(id: string, input: unknown) {
@@ -148,15 +113,33 @@ export class StrategyOptimizationService implements OnModuleInit {
     const source = await this.experiment(id);
     const cloneId = randomUUID();
     const inheritedExposure = source.testExposedAt
-      ? { ...toRecord(source.exposure), inheritedFromExperimentId: source.id, inheritedTestExposure: true, inheritedAt: new Date().toISOString() }
+      ? {
+          ...toRecord(source.exposure),
+          inheritedFromExperimentId: source.id,
+          inheritedTestExposure: true,
+          inheritedAt: new Date().toISOString(),
+        }
       : { inheritedFromExperimentId: source.id, inheritedTestExposure: false };
+    if (source.sourceMode === 'discovery') {
+      const created = await cloneDiscoveryExperiment(
+        this.prisma,
+        source,
+        cloneId,
+        parsed.idempotencyKey,
+        inheritedExposure,
+      );
+      if (!created) throw new Error('克隆实验创建失败');
+      void this.process(created.id).catch(() => undefined);
+      return created;
+    }
     const rows = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
       INSERT INTO "OptimizationExperiment" (
-        "id", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
+        "id", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
         "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds",
         "idempotencyKey", "testExposedAt", "exposure", "updatedAt"
       ) VALUES (
-        ${cloneId}::uuid, ${source.baselineStrategyVersionId}::uuid, 'queued', 'preparing',
+        ${cloneId}::uuid, ${source.sourceMode}, ${source.discoveryScope ? JSON.stringify(source.discoveryScope) : null}::jsonb,
+        ${source.strategySpaceVersion}, ${source.baselineStrategyVersionId}::uuid, 'queued', 'preparing',
         ${JSON.stringify(source.objective)}::jsonb, ${JSON.stringify(source.allowedParameterIds)}::jsonb,
         ${JSON.stringify(source.split)}::jsonb, ${JSON.stringify(source.runConfig)}::jsonb,
         ${source.dataFingerprint}, ${JSON.stringify(source.modelConfig)}::jsonb,
@@ -220,7 +203,7 @@ export class StrategyOptimizationService implements OnModuleInit {
     experiment: ExperimentRow,
     baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
     descriptors: ReturnType<typeof describeStrategyParameters>,
-    route: { provider: string; model: string },
+    route: OptimizationModelRoute,
     round: number,
   ) {
     if (await this.cancelled(experiment.id)) return;
@@ -284,7 +267,7 @@ export class StrategyOptimizationService implements OnModuleInit {
     baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
   ) {
     const descriptors = describeStrategyParameters(baseline.strategy);
-    const routes = experiment.modelConfig as Array<{ provider: string; model: string }>;
+    const routes = experiment.modelConfig as OptimizationModelRoute[];
     const states = new Map(
       routes.map((route) => [
         `${route.provider}:${route.model}`,
@@ -322,7 +305,13 @@ export class StrategyOptimizationService implements OnModuleInit {
 
   private async processClaimed(id: string) {
     let experiment = await this.experiment(id);
-    const baseline = await this.formalStrategyVersion(experiment.baselineStrategyVersionId);
+    const baselineVersion = await this.prisma.strategyVersion.findUnique({
+      where: { id: experiment.baselineStrategyVersionId },
+      include: { strategy: true },
+    });
+    if (!baselineVersion) throw new NotFoundException('实验基线策略版本不存在');
+    const parsedBaseline = strategySchemaV2.parse(baselineVersion.schema) as StrategySchemaV2;
+    const baseline = { ...baselineVersion, strategy: parsedBaseline };
     experiment = await this.ensureBaselines(experiment);
     await this.setStage(id, 'proposing');
     await this.processModelRounds(experiment, baseline);
@@ -342,11 +331,15 @@ export class StrategyOptimizationService implements OnModuleInit {
   }
 
   private async fail(id: string, reason: string) {
-    await this.prisma.$executeRaw(Prisma.sql`
+    await this.prisma
+      .$executeRaw(
+        Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "status"='failed', "stage"='failed', "leaseUntil"=NULL, "stopReason"=${reason}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid AND "status" <> 'cancelled'
-    `).catch(() => undefined);
+    `,
+      )
+      .catch(() => undefined);
   }
 
   async reconcilePending(limit = 100) {
@@ -368,7 +361,8 @@ export class StrategyOptimizationService implements OnModuleInit {
       throw new BadRequestException('锁定候选不属于当前实验');
     if (
       selected.some(
-        (candidate) => !['valid', 'test_valid', 'test_invalid'].includes(candidate.validationStatus),
+        (candidate) =>
+          !['valid', 'test_valid', 'test_invalid'].includes(candidate.validationStatus),
       )
     )
       throw new BadRequestException('只有开发/验证均通过的候选可以进入封存测试');
@@ -386,7 +380,10 @@ export class StrategyOptimizationService implements OnModuleInit {
     if (existing.length === 0) return;
     const requested = [...candidateIds].sort();
     const locked = [...existing].sort();
-    if (JSON.stringify(requested) !== JSON.stringify(locked) || experiment.selectedCandidateId !== selectedCandidateId)
+    if (
+      JSON.stringify(requested) !== JSON.stringify(locked) ||
+      experiment.selectedCandidateId !== selectedCandidateId
+    )
       throw new BadRequestException('测试集已开始访问，只允许对原锁定候选进行技术重试');
   }
 
@@ -432,7 +429,11 @@ export class StrategyOptimizationService implements OnModuleInit {
     return fingerprint;
   }
 
-  private async finalCandidate(experiment: ExperimentRow, candidate: CandidateRow, fingerprint: string) {
+  private async finalCandidate(
+    experiment: ExperimentRow,
+    candidate: CandidateRow,
+    fingerprint: string,
+  ) {
     const existingRunId = toRecord(candidate.runRefs).test;
     if (
       typeof existingRunId === 'string' &&
@@ -448,7 +449,13 @@ export class StrategyOptimizationService implements OnModuleInit {
     const sameData = this.runs.dataArtifactFingerprint(run) === fingerprint;
     const summary = sameData
       ? this.runs.evaluateResult(run, experiment.objective)
-      : { runId: run.id, status: 'invalid' as const, completeness: 'unavailable', tradeCount: 0, reason: '封存测试候选与基准数据 Artifact 指纹不一致' };
+      : {
+          runId: run.id,
+          status: 'invalid' as const,
+          completeness: 'unavailable',
+          tradeCount: 0,
+          reason: '封存测试候选与基准数据 Artifact 指纹不一致',
+        };
     const runRefs = { ...toRecord(candidate.runRefs), test: run.id };
     const metrics = { ...toRecord(candidate.metrics), test: summary };
     await this.prisma.$executeRaw(Prisma.sql`
@@ -459,7 +466,11 @@ export class StrategyOptimizationService implements OnModuleInit {
     `);
   }
 
-  private async completeFinalization(id: string, candidateIds: string[], selectedCandidateId: string) {
+  private async completeFinalization(
+    id: string,
+    candidateIds: string[],
+    selectedCandidateId: string,
+  ) {
     await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "status"='succeeded', "stage"='completed', "testExposedAt"=COALESCE("testExposedAt", CURRENT_TIMESTAMP),
@@ -527,7 +538,11 @@ export class StrategyOptimizationService implements OnModuleInit {
     const experiment = await this.experiment(id);
     if (experiment.status !== 'succeeded' || experiment.stage !== 'completed')
       throw new BadRequestException('实验尚未完成封存测试');
-    if (experiment.testExposedAt && parsed.candidateId !== experiment.selectedCandidateId && !parsed.acknowledgeTestExposure)
+    if (
+      experiment.testExposedAt &&
+      parsed.candidateId !== experiment.selectedCandidateId &&
+      !parsed.acknowledgeTestExposure
+    )
       throw new BadRequestException('测试集已经揭示；改选其他候选需要明确确认测试暴露');
     const candidate = await this.adoptableCandidate(id, parsed.candidateId);
     if (candidate.executionHash !== parsed.candidateHash)
@@ -540,6 +555,7 @@ export class StrategyOptimizationService implements OnModuleInit {
         candidate,
         parsed.expectedStrategyVersion,
         parsed.idempotencyKey,
+        experiment.sourceMode,
       );
     } catch (error) {
       const concurrentSameIntent = await previousOptimizationAdoption(
@@ -556,19 +572,25 @@ export class StrategyOptimizationService implements OnModuleInit {
         this.prisma,
         parsed.candidateId,
       );
-      if (concurrentCandidate)
-        throw new BadRequestException('该候选已经被另一个采纳意图正式采纳');
+      if (concurrentCandidate) throw new BadRequestException('该候选已经被另一个采纳意图正式采纳');
       if ((error as { code?: string }).code === 'P2002')
-        throw new BadRequestException('正式策略已经发布新版本，请刷新 expectedStrategyVersion 后重试');
+        throw new BadRequestException(
+          '正式策略已经发布新版本，请刷新 expectedStrategyVersion 后重试',
+        );
       throw error;
     }
-    const [monitoringPlan, baselinePlan] = await Promise.all([
-      this.riskApplications.monitoringPlan(formal.id),
-      this.riskApplications.monitoringPlan(experiment.baselineStrategyVersionId),
-    ]);
+    const monitoringPlan = await this.riskApplications.monitoringPlan(formal.id);
+    const baselinePlan =
+      experiment.sourceMode === 'discovery'
+        ? null
+        : await this.riskApplications.monitoringPlan(experiment.baselineStrategyVersionId);
     return {
       strategyVersion: formal,
-      source: { experimentId: id, candidateId: candidate.id, candidateHash: candidate.executionHash },
+      source: {
+        experimentId: id,
+        candidateId: candidate.id,
+        candidateHash: candidate.executionHash,
+      },
       monitoringPlan,
       monitoringDiff: { before: baselinePlan, after: monitoringPlan },
       riskApplicationEnabled: false,

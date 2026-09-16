@@ -25,6 +25,31 @@ const storedBar = (timestamp: string, close: string, fetchedAt = timestamp) => (
   fallbackUsed: false,
 });
 
+const marketReader = (rows: ReturnType<typeof storedBar>[]) => ({
+  read: vi.fn(async (input: { identity: { symbol: string; assetType: string; timeframe: string; adjustment: string } }) => ({
+    contractVersion: 2,
+    identity: input.identity,
+    points: rows.map((row) => ({
+      timestamp: row.timestamp.toISOString(),
+      open: Number(row.open),
+      high: Number(row.high),
+      low: Number(row.low),
+      close: Number(row.close),
+      volume: Number(row.volume),
+      amount: Number(row.amount),
+      completionStatus: 'complete' as const,
+      availableAt: row.fetchedAt.toISOString(),
+    })),
+    coverage: { actualStart: rows[0]?.timestamp.toISOString() ?? null, actualEnd: rows.at(-1)?.timestamp.toISOString() ?? null, hasMoreBefore: false, latestCompleteTradingDate: null },
+    provenance: {
+      providerId: 'fixture', upstreamSource: 'fixture', routeIndex: 0, effectivePolicyRevision: 1,
+      providerRevision: 'fixture', fetchedAt: rows.at(-1)?.fetchedAt.toISOString() ?? new Date().toISOString(),
+      freshUntil: '2099-01-01T00:00:00.000Z', servedFromCache: false, cacheStatus: 'miss' as const,
+    },
+    inputFingerprint: 'fixture-fingerprint',
+  })),
+});
+
 describe('统一策略风险运行时', () => {
   it('策略规则由 RiskService 分派到 Strategy evaluator，并复用 RiskEvent/Notification 管线', async () => {
     const stored = {
@@ -158,11 +183,9 @@ describe('统一策略风险运行时', () => {
         })),
       },
       trade: { findFirst: vi.fn(async () => null) },
-      marketBar: {
-        findMany: vi.fn(async () => [storedBar('2026-09-10T00:00:00.000Z', '92', '2026-09-10T08:01:00.000Z')]),
-      },
     };
-    const service = new StrategyRiskContextService(prisma as never);
+    const reader = marketReader([storedBar('2026-09-10T00:00:00.000Z', '92', '2026-09-10T08:01:00.000Z')]);
+    const service = new StrategyRiskContextService(prisma as never, reader as never);
 
     const actual = await service.load(
       accountId,
@@ -171,12 +194,7 @@ describe('统一策略风险运行时', () => {
       evaluatedAt,
     );
 
-    expect(prisma.marketBar.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ symbol: '600519.SH', timeframe: '1d' }),
-        take: 64,
-      }),
-    );
+    expect(reader.read).toHaveBeenCalledWith(expect.objectContaining({ acceptance: 'complete' }));
     expect(actual.context).toMatchObject({ price: '92', averageCost: '100' });
     expect(actual.context.holdingPeriods).toBeUndefined();
   });
@@ -193,14 +211,12 @@ describe('统一策略风险运行时', () => {
         })),
       },
       trade: { findFirst: vi.fn(async () => null) },
-      marketBar: {
-        findMany: vi.fn(async () => [
-          storedBar('2026-09-11T00:00:00.000Z', '80', '2026-09-11T05:30:00.000Z'),
-          storedBar('2026-09-10T00:00:00.000Z', '95', '2026-09-10T08:01:00.000Z'),
-        ]),
-      },
     };
-    const service = new StrategyRiskContextService(prisma as never);
+    const reader = marketReader([
+      storedBar('2026-09-11T00:00:00.000Z', '80', '2026-09-11T05:30:00.000Z'),
+      storedBar('2026-09-10T00:00:00.000Z', '95', '2026-09-10T08:01:00.000Z'),
+    ]);
+    const service = new StrategyRiskContextService(prisma as never, reader as never);
 
     const actual = await service.load(
       accountId,
@@ -231,9 +247,9 @@ describe('统一策略风险运行时', () => {
         })),
       },
       trade: { findFirst: vi.fn(async () => null) },
-      marketBar: { findMany: vi.fn(async () => minuteBars) },
     };
-    const service = new StrategyRiskContextService(prisma as never);
+    const reader = marketReader(minuteBars);
+    const service = new StrategyRiskContextService(prisma as never, reader as never);
 
     const actual = await service.load(
       accountId,
@@ -242,9 +258,7 @@ describe('统一策略风险运行时', () => {
       new Date('2026-09-11T01:35:01.000Z'),
     );
 
-    expect(prisma.marketBar.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ timeframe: '1m' }) }),
-    );
+    expect(reader.read).toHaveBeenCalledWith(expect.objectContaining({ acceptance: 'complete' }));
     expect(actual.context.price).toBe('104');
     expect(actual.context.occurredAt).toBe('2026-09-11T01:35:00.000Z');
   });

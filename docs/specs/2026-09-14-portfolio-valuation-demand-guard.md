@@ -2,7 +2,7 @@
 
 > 任务标识：`PORTFOLIO-VALUATION-DEMAND-GUARD-V1`
 > 日期：2026-09-14
-> 状态：实施中（T1、T2、I1、T3 完成；I2 待实施）
+> 状态：功能、运行态与 T4 `AccountDataPage` 行为保持型拆分验收完成（最终一致性 Review 仍有非阻塞提交范围问题）
 > 对应任务：[`../tasks/2026-09-14-portfolio-valuation-demand-guard.md`](../tasks/2026-09-14-portfolio-valuation-demand-guard.md)
 
 ## 背景与问题
@@ -21,6 +21,7 @@
 4. 让 Desktop 只在实际消费组合汇总的路由查询全组合估值；账户页只查询选中账户，并对持仓/现金/Ledger 变更执行精确失效。
 5. 消除 mutation 自身失效与页面 `onSaved -> refresh()` 叠加造成的重复请求，并用可观察的请求次数验收交互。
 6. 为组合估值、Server 行情读取和 DSA Provider 调用增加可关联的阶段耗时与请求来源证据。
+7. 收敛 `AccountDataPage` 的职责：页面只保留具体账户业务编排，账户选择状态机、选择器视图和“全部账户”只读汇总由边界明确的模块负责。
 
 ## 非目标
 
@@ -75,7 +76,7 @@ DSA 为 `provider + capability + instrumentType + symbol` 维护上游请求资�
 
 - ETF 单标的默认最小上游刷新间隔为 600 秒，复用当前 efinance 单标的缓存边界；允许通过受控配置延长，不允许在缺少新的上游证据和 Spec 决策时缩短。
 - 显式刷新只绕过 ThesisLedger 产品 fresh cache，不绕过 DSA 的最小请求间隔、熔断或限流保护。
-- 每个逻辑请求对每个候选 Provider 最多执行一次真实上游调用；超时、限流或响应不可解析后不得在 Fetcher、Provider runtime 和 Server 三层叠加重放同一 Provider。
+- 每个 ETF 单标的逻辑请求对每个候选 Provider 最多执行一次真实上游调用；超时、限流或响应不可解析后不得在 Fetcher、Provider runtime 和 Server 三层叠加重放同一 Provider。
 - Provider fallback 只在不同的合格单标的 Provider 之间发生；每个候选各自受独立请求预算约束。
 - 最近尝试时间、下一次允许时间和限流/熔断状态必须在 DSA 自有持久状态中跨进程重启保留。重启后缓存缺失但尚未到允许时间时，应返回受保护的 unavailable，而不是立即重新打上游。
 - 当前目标拓扑仍是一个 DSA 实例；多 DSA 实例不在本 Spec 的支持声明内。目标拓扑变化前必须补充共享 Provider 配额协调设计。
@@ -118,6 +119,16 @@ mutation 成功后的 query orchestration 只能有一个责任点。持仓、�
 持仓保存完成后，`/accounts` 选择具体账户时，网络层允许最多一次 selected-account valuation 请求且 all-account valuation 为 0；选择“全部账户”时，允许最多一次 all-account valuation 请求且 selected-account valuation 为 0。任何选择状态都不得执行 `invalidate root + onSaved refresh + explicit refetch` 叠加。编辑允许变更账户或标的身份时，mutation 结果或调用上下文必须包含新旧影响范围，不能只按新账户失效。
 
 `t=Date.now()` 与 `no-store` 不参与 TanStack Query 身份和业务失效；在 query 生命周期由 TanStack Query 统一管理后移除时间戳参数。是否保留 HTTP `no-store` 由现有安全缓存策略决定，不将其作为修复重复请求的手段。
+
+#### `AccountDataPage` 模块边界
+
+后续拆分必须保持现有 URL、DOM 层级、文案、账户选择、未保存草稿确认和查询互斥行为，不借机重设计页面或改变 mutation 失效契约：
+
+- 账户选择状态机负责解析 `accountId`、`tab`、`entry`、`setup`，处理冷深链、账户目录 pending/error/empty、sessionStorage 记忆及导航更新；对页面只暴露当前选择和少量语义化动作。
+- 账户选择器作为无数据请求的展示组件，只接收账户列表、当前账户和选择/管理回调，不拥有路由或查询生命周期。
+- “全部账户”视图拥有且只拥有 active all-account valuation 的读取及 loading/error/summary/table 展示；具体账户页不得同时启用该查询。
+- `AccountDataPage` 保留具体账户的 Ledger、audit、reconciliation、持仓/现金编辑和 overlay 编排。本轮不强行抽取会形成大参数袋的薄包装组件。
+- `cashSaveImpact`、`clearPositionsImpact`、`removePositionImpact` 等单账户 impact helper 保留语义化入口；相同返回形状代表它们当前共享同一个失效契约，不视为需要合并调用点的功能缺陷。
 
 ### 5. 可观察性
 
@@ -201,7 +212,7 @@ mutation 成功后的 query orchestration 只能有一个责任点。持仓、�
 
 - AC1：DSA `REALTIME_QUOTE / ETF` 单标的路径在成功、失败、fallback、显式刷新和冷缓存场景均不调用全市场 ETF 接口；无合格单标的 Provider 时返回结构化 unavailable。
 - AC2：ETF 单标的真实上游调用默认按 `provider + capability + instrumentType + symbol` 至少间隔 600 秒；该资格在 DSA 重启后仍有效，显式刷新不能绕过。
-- AC3：每个逻辑请求对每个合格 Provider 最多执行一次上游调用；Server 超时不自动重放仍可能执行中的 Quote，请求失败不会在多层 retry 中放大。
+- AC3：每个 ETF 单标的逻辑请求对每个合格 Provider 最多执行一次上游调用；Server 超时不自动重放仍可能执行中的 Quote，请求失败不会在多层 retry 中放大。
 - AC4：同 symbol 并发请求在单进程和多 Server 实例场景只产生一次 DSA 调用；未获锁的等待者重新读取缓存，等待结束后不会无条件执行上游工作。
 - AC5：fresh、last-valid、stale、unavailable、provider、upstreamSource 和时间来源保持真实；旧值不伪装实时值，缺失事实不填零。
 - AC6：`/accounts` 不常驻请求全组合估值；选择具体账户时 all-account valuation 为 0、selected-account valuation 不超过 1；选择“全部账户”时 all-account valuation 不超过 1、selected-account valuation 为 0；两套查询始终互斥。
@@ -209,3 +220,4 @@ mutation 成功后的 query orchestration 只能有一个责任点。持仓、�
 - AC8：Portfolio、MarketService、DSA 和 Desktop 请求证据可通过同一 trace 关联，能够区分数据库、锁等待、DSA、Provider、缓存和客户端触发次数，不记录敏感值。
 - AC9：DSA、Server、Desktop 的定向测试和包级检查通过；目标 Docker 冷/热/并发/重启门禁及浏览器保存路径 Network 门禁通过，且证据明确区分 fixture、构建、真实 Provider 与目标运行态。
 - AC10：若确认没有可用的 ETF 单标的 Quote Adapter，实施在引入全市场 fallback、新 Provider、语义降级或高频预热前停止，并向用户提交证据与备选路线请示；未获决定时不继续受影响任务。
+- AC11：`AccountDataPage` 拆分后不再直接拥有账户选择状态机、选择器 JSX 和 all-account valuation 查询；具体账户与“全部账户”的 URL、草稿确认、loading/error、查询互斥、只读汇总和账户管理可见性保持不变，定向 UI/查询测试、Desktop typecheck 与 build 通过。

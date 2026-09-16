@@ -9,8 +9,11 @@ import type {
 } from '@thesis-ledger/schemas';
 import { LocalSnapshotRunner } from '../../src/backtest/backtest-v2-runner.js';
 import { DsaSnapshotBuilder } from '../../src/backtest/backtest-snapshot-builder.js';
+import { MarketBarReader } from '../../src/market/market-bar-reader.js';
+import type { BarReadInput } from '../../src/market/market-bar-reader.js';
+import type { BarSeriesV2 } from '@thesis-ledger/schemas';
 import { LocalSnapshotStore } from '../../src/backtest/backtest-snapshot.js';
-import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
+import { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -43,6 +46,60 @@ afterEach(async () => {
 });
 
 describe('DsaSnapshotBuilder dependency-scoped facts', () => {
+  it('declares the explicit MarketBarReader injection token', () => {
+    const dependencies = Reflect.getMetadata('self:paramtypes', DsaSnapshotBuilder) as Array<{
+      index: number;
+      param: unknown;
+    }>;
+
+    expect(dependencies).toContainEqual({ index: 2, param: MarketBarReader });
+  });
+
+  const readerFor = (dsa: Pick<DsaClient, 'backtestBars'>): Pick<MarketBarReader, 'read'> => ({
+    read: vi.fn(async (input: BarReadInput): Promise<BarSeriesV2> => {
+      const bars = await dsa.backtestBars({
+        symbol: input.identity.symbol,
+        timeframe: input.identity.timeframe,
+        ...(input.window.start ? { start: input.window.start } : {}),
+        ...(input.window.end ? { end: input.window.end } : {}),
+      });
+      const points = bars.map((bar) => ({
+        timestamp: String(bar.occurredAt),
+        open: Number(bar.open),
+        high: Number(bar.high),
+        low: Number(bar.low),
+        close: Number(bar.close),
+        volume: Number(bar.volume),
+        amount: Number(bar.amount ?? 0),
+        completionStatus: 'complete' as const,
+        availableAt: String(bar.availableAt),
+      }));
+      return {
+        contractVersion: 2 as const,
+        identity: input.identity,
+        points,
+        coverage: {
+          actualStart: points[0]?.timestamp ?? null,
+          actualEnd: points.at(-1)?.timestamp ?? null,
+          hasMoreBefore: false,
+          latestCompleteTradingDate: null,
+        },
+        provenance: {
+          providerId: 'akshare',
+          upstreamSource: 'eastmoney',
+          routeIndex: 0,
+          effectivePolicyRevision: 1,
+          providerRevision: 'bars-v2',
+          fetchedAt: '2024-01-03T00:00:00Z',
+          freshUntil: '2099-01-01T00:00:00Z',
+          servedFromCache: false,
+          cacheStatus: 'miss' as const,
+        },
+        inputFingerprint: 'bars-v2-fingerprint',
+      };
+    }),
+  });
+
   it.each([
     ['supported', false],
     ['unavailable', false],
@@ -50,6 +107,11 @@ describe('DsaSnapshotBuilder dependency-scoped facts', () => {
     ['unavailable', true],
     ['rulesUnavailable', false],
     ['rulesUnavailable', true],
+    ['notTradable', false],
+    ['notTradable', true],
+    ['identityMismatch', false],
+    ['emptyFacts', true],
+    ['incompleteCoverage', true],
     ['currencyMismatch', true],
     ['calendarMismatch', true],
   ] as const)(
@@ -157,7 +219,7 @@ describe('DsaSnapshotBuilder dependency-scoped facts', () => {
           reason: null,
         }),
       } as unknown as DsaClient;
-      const builder = new DsaSnapshotBuilder(dsa, new LocalSnapshotStore(root));
+      const builder = new DsaSnapshotBuilder(dsa, new LocalSnapshotStore(root), readerFor(dsa));
 
       const unavailableRulesReason = '缺少覆盖请求历史区间的价格限制、法定收费与结算规则事实';
       if (instrumentStatus === 'rulesUnavailable') {
@@ -184,6 +246,48 @@ describe('DsaSnapshotBuilder dependency-scoped facts', () => {
           '600519.SH 2023-12-09..2024-01-03: historicalTradability: Provider 未提供历史状态';
         if (instrumentStatus === 'rulesUnavailable') {
           reason = unavailableRulesReason;
+        } else if (instrumentStatus === 'notTradable') {
+          reason = 'Provider 未证明标的历史可交易性: 600519.SH';
+          vi.mocked(dsa.backtestInstrumentFacts).mockResolvedValue({
+            version: 2,
+            status: 'supported',
+            provider: 'cn-market-rules',
+            providerRevision: 'cn-stock-v1',
+            coverage: { start: '2023-12-09', end: '2024-01-03', complete: true },
+            facts: [{ ...instrumentFact, tradable: false }],
+          });
+        } else if (instrumentStatus === 'identityMismatch') {
+          reason = 'Provider 标的事实与请求标的不一致';
+          vi.mocked(dsa.backtestInstrumentFacts).mockResolvedValue({
+            version: 2,
+            status: 'supported',
+            provider: 'cn-market-rules',
+            providerRevision: 'cn-stock-v1',
+            coverage: { start: '2023-12-09', end: '2024-01-03', complete: true },
+            facts: [{ ...instrumentFact, symbol: '000001.SZ' }],
+          });
+        } else if (instrumentStatus === 'emptyFacts') {
+          reason = 'Provider 未返回标的历史事实: 600519.SH';
+          vi.mocked(dsa.backtestInstrumentFacts).mockResolvedValue({
+            version: 2,
+            status: 'supported',
+            provider: 'cn-market-rules',
+            providerRevision: 'cn-stock-v1',
+            coverage: { start: '2023-12-09', end: '2024-01-03', complete: true },
+            facts: [],
+            reason,
+          });
+        } else if (instrumentStatus === 'incompleteCoverage') {
+          reason = 'Provider 未确认标的历史事实覆盖完整性: 600519.SH';
+          vi.mocked(dsa.backtestInstrumentFacts).mockResolvedValue({
+            version: 2,
+            status: 'supported',
+            provider: 'cn-market-rules',
+            providerRevision: 'cn-stock-v1',
+            coverage: { start: '2023-12-09', end: '2024-01-03', complete: false },
+            facts: [instrumentFact],
+            reason,
+          });
         } else if (instrumentStatus === 'calendarMismatch' && 'executionModel' in selectedConfig) {
           selectedConfig.executionModel.scope.timezone = 'UTC';
           reason = '冻结 Calendar 时区与研究模型不一致';
@@ -275,7 +379,11 @@ describe('DsaSnapshotBuilder dependency-scoped facts', () => {
             config.executionModel.segments[0]!.fees!.commission.rate = '0.0004';
           if (variation === 'source')
             config.executionModel.segments[0]!.source.description += '修订来源说明';
-          const next = await new DsaSnapshotBuilder(dsa, new LocalSnapshotStore(nextRoot)).build({
+          const next = await new DsaSnapshotBuilder(
+            dsa,
+            new LocalSnapshotStore(nextRoot),
+            readerFor(dsa),
+          ).build({
             runId: result.manifest.runId,
             strategyVersionId: result.manifest.strategyVersionId,
             strategyVersionHash: 'strategy-hash',
@@ -327,7 +435,7 @@ describe('DsaSnapshotBuilder dependency-scoped facts', () => {
         reason: 'Provider 未确认公司行动覆盖完整性',
       }),
     } as unknown as DsaClient;
-    const builder = new DsaSnapshotBuilder(dsa, new LocalSnapshotStore(root));
+    const builder = new DsaSnapshotBuilder(dsa, new LocalSnapshotStore(root), readerFor(dsa));
 
     await expect(
       builder.build({

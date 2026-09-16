@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import {
   optimizationProposalSchema,
   type OptimizationProposal,
+  type OptimizationDiscoveryProposal,
   type StrategyParameterDescriptor,
   type StrategySchemaV2,
 } from '@thesis-ledger/schemas';
@@ -19,13 +20,18 @@ import {
   type StrategyVersionRecord,
 } from './strategy-optimization-common.js';
 import { optimizationModelConcurrency } from './strategy-optimization-concurrency.js';
-import {
-  applyOptimizationProposal,
-  proposalDiff,
-} from './strategy-optimization-parameters.js';
+import { applyOptimizationProposal, proposalDiff } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
+import type { OptimizationModelRoute } from './strategy-optimization-model-routing.js';
+import {
+  discoveryCandidateDiff,
+  discoveryCandidateStrategy,
+  discoveryPrompt,
+  parseDiscoveryOutput,
+} from './strategy-optimization-discovery.js';
+import { recordOptimizationAttempt } from './strategy-optimization-attempt.store.js';
 
-type ProviderRoute = { provider: string; model: string };
+type ProviderRoute = OptimizationModelRoute;
 type OptimizationStepRow = {
   id: string;
   experimentId: string;
@@ -70,6 +76,8 @@ export class StrategyOptimizationCandidateService {
     const allowed = new Set(experiment.allowedParameterIds as string[]);
     const authorized = descriptors.filter((item) => allowed.has(item.parameterId));
     const priorCandidates = await this.priorFeedback(experiment.id, modelKey);
+    if (experiment.sourceMode === 'discovery')
+      return discoveryPrompt(experiment, strategy, round, priorCandidates);
     return [
       {
         role: 'system',
@@ -263,7 +271,10 @@ export class StrategyOptimizationCandidateService {
       return {
         cached: true as const,
         step: current,
-        proposal: optimizationProposalSchema.parse(current.proposal),
+        proposal:
+          input.experiment.sourceMode === 'discovery'
+            ? parseDiscoveryOutput(input.experiment, current.proposal)
+            : optimizationProposalSchema.parse(current.proposal),
       };
     }
     if (current.status === 'unknown_outcome')
@@ -287,7 +298,10 @@ export class StrategyOptimizationCandidateService {
       return {
         cached: true as const,
         step: current,
-        proposal: optimizationProposalSchema.parse(current.proposal),
+        proposal:
+          input.experiment.sourceMode === 'discovery'
+            ? parseDiscoveryOutput(input.experiment, current.proposal)
+            : optimizationProposalSchema.parse(current.proposal),
       };
     throw stepError('优化步骤未取得执行权，不会重复请求 Provider');
   }
@@ -355,6 +369,9 @@ export class StrategyOptimizationCandidateService {
             messages,
             tools: [],
             maxOutputTokens: outputTokenReservation,
+            ...(route.reasoningEffort === undefined
+              ? {}
+              : { reasoningEffort: route.reasoningEffort }),
           },
           AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
         ),
@@ -373,6 +390,9 @@ export class StrategyOptimizationCandidateService {
             requestedProvider: route.provider,
             actualProvider: provider.id,
             requestedModel: route.model,
+            ...(route.reasoningEffort === undefined
+              ? {}
+              : { requestedReasoningEffort: route.reasoningEffort }),
             actualModel: completion.actualModel ?? route.model,
             costStatus: completion.costKnown === false ? 'unknown' : 'known',
             ...(completion.costCurrency ? { costCurrency: completion.costCurrency } : {}),
@@ -391,7 +411,10 @@ export class StrategyOptimizationCandidateService {
         completion.outputTokens,
       );
       await this.runs.reconcileCost(experiment.id, estimatedCost, completion.cost);
-      const proposal = optimizationProposalSchema.parse(completion.content);
+      const proposal =
+        experiment.sourceMode === 'discovery'
+          ? parseDiscoveryOutput(experiment, completion.content)
+          : optimizationProposalSchema.parse(completion.content);
       await this.prisma.$transaction(async (transaction) => {
         await transaction.aiRun.update({
           where: { id: step.aiRunId! },
@@ -416,25 +439,6 @@ export class StrategyOptimizationCandidateService {
       else await this.markUnknownOutcome(step, error, Date.now() - startedAt);
       throw error;
     }
-  }
-
-  async recordAttempt(input: {
-    experimentId: string;
-    modelKey: string;
-    aiRunId?: string;
-    attempt: number;
-    status: string;
-    proposal?: OptimizationProposal;
-    error?: string;
-  }) {
-    if (!['failed', 'unknown_outcome'].includes(input.status)) return;
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationAttempt"
-      SET "status"=${input.status}, "error"=${input.error ?? null}, "leaseUntil"=NULL,
-          "completedAt"=CURRENT_TIMESTAMP
-      WHERE "experimentId"=${input.experimentId}::uuid AND "modelKey"=${input.modelKey}
-        AND "attempt"=${input.attempt} AND "status"='reserved'
-    `);
   }
 
   private async nextNegativeVersion(strategyId: string) {
@@ -472,7 +476,7 @@ export class StrategyOptimizationCandidateService {
     baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
     descriptors: StrategyParameterDescriptor[],
     modelKey: string,
-    proposal: OptimizationProposal,
+    proposal: OptimizationProposal | OptimizationDiscoveryProposal,
     strategy: StrategySchemaV2,
     executionHash: string,
   ) {
@@ -488,7 +492,11 @@ export class StrategyOptimizationCandidateService {
       ) VALUES (
         ${id}::uuid, ${experiment.id}::uuid, ${Number(count[0]?.count ?? 0n) + 1}, ${modelKey}, ${version.id}::uuid,
         ${executionHash}, ${JSON.stringify(proposal)}::jsonb,
-        ${JSON.stringify(proposalDiff(baseline.strategy, strategy, descriptors))}::jsonb,
+        ${JSON.stringify(
+          experiment.sourceMode === 'discovery'
+            ? discoveryCandidateDiff()
+            : proposalDiff(baseline.strategy, strategy, descriptors),
+        )}::jsonb,
         'evaluating', '{}'::jsonb, '{}'::jsonb
       ) RETURNING *
     `);
@@ -540,14 +548,17 @@ export class StrategyOptimizationCandidateService {
     baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
     descriptors: StrategyParameterDescriptor[],
     modelKey: string,
-    proposal: OptimizationProposal,
+    proposal: OptimizationProposal | OptimizationDiscoveryProposal,
   ) {
-    const strategy = applyOptimizationProposal(
-      baseline.strategy,
-      descriptors,
-      experiment.allowedParameterIds as string[],
-      proposal,
-    );
+    const strategy =
+      experiment.sourceMode === 'discovery'
+        ? discoveryCandidateStrategy(experiment, proposal as OptimizationDiscoveryProposal)
+        : applyOptimizationProposal(
+            baseline.strategy,
+            descriptors,
+            experiment.allowedParameterIds as string[],
+            proposal as OptimizationProposal,
+          );
     const executionHash = optimizationSha256(strategy);
     const duplicate = await this.existingByHash(experiment.id, executionHash);
     if (duplicate) return { candidate: duplicate, duplicate: true };
@@ -564,6 +575,10 @@ export class StrategyOptimizationCandidateService {
       candidate: await this.evaluateCandidate(experiment, candidate),
       duplicate: false,
     };
+  }
+
+  recordAttempt(input: Parameters<typeof recordOptimizationAttempt>[1]) {
+    return recordOptimizationAttempt(this.prisma, input);
   }
 
   validateAuthorizedParameters(

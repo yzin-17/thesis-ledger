@@ -290,10 +290,70 @@ describe('AI Provider 持久化管理', () => {
       expect(requests).toHaveLength(4);
       expect(requests[0]).toMatchObject({ max_tokens: 512 });
       expect(requests[0]).not.toHaveProperty('reasoning');
-      expect(requests[1]).toMatchObject({ max_tokens: 512 });
-      expect(requests[1]).not.toHaveProperty('reasoning');
+      expect(requests[1]).toMatchObject({ max_tokens: 2_048, reasoning: { effort: 'high' } });
       expect(requests[2]).toMatchObject({ max_tokens: 128, reasoning: { effort: 'none' } });
       expect(requests[3]).toMatchObject({ max_tokens: 128, reasoning: { effort: 'none' } });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('OpenRouter reasoning-only 响应会有限重试并要求可消费 JSON', async () => {
+    const configs = createConfigStub();
+    const service = new AiProviderService(
+      configs.service as never,
+      createHealthStub() as never,
+      new AiProviderRegistry(),
+    );
+    const requests: Array<Record<string, unknown>> = [];
+    let callCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        callCount += 1;
+        return {
+          ok: true,
+          json: async () =>
+            callCount === 1
+              ? {
+                  choices: [
+                    {
+                      message: {
+                        reasoning: '需要先完成内部推理，但首轮预算耗尽',
+                        content: null,
+                      },
+                      finish_reason: 'length',
+                    },
+                  ],
+                }
+              : { choices: [{ message: { content: '{"ok":true}' } }] },
+        };
+      }),
+    );
+    try {
+      const result = await service.testDraft({
+        name: 'openrouter',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        models: ['nvidia/nemotron-3-super-120b-a12b:free'],
+        modelReasoning: {
+          'nvidia/nemotron-3-super-120b-a12b:free': {
+            supportedEfforts: ['high'],
+            mandatory: true,
+          },
+        },
+        apiKey: key,
+      });
+      expect(result.status).toBe('healthy');
+      expect(requests).toHaveLength(2);
+      expect(requests[0]).toMatchObject({
+        max_tokens: 2_048,
+        reasoning: { effort: 'high' },
+      });
+      expect(requests[1]).toMatchObject({
+        max_tokens: 4_096,
+        reasoning: { effort: 'high' },
+      });
     } finally {
       vi.unstubAllGlobals();
     }

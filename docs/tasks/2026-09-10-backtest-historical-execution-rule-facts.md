@@ -2,7 +2,30 @@
 
 对应 [Spec](../specs/2026-09-10-backtest-historical-execution-rule-facts.md)；上游 [统一回测 V2 Task](2026-08-28-unified-backtest-v2.md)。
 
-> 状态：已完成。T0–T4 的研究回测增量均已收敛；CN Stock 历史上市/停牌由 DSA 独立 Provider 证明，T3.1 Snapshot 冻结/哈希/重放边界完成，V2 T13 按产品/引擎与部署数据可用性分层验收。历史来源审计未通过的阶段记录继续保留，但不再作为任务完成门禁。
+> 状态：已完成。T0–T4 的研究回测增量均已收敛；当前完成边界是 DSA 关键事实与显式研究模型闭环。真实历史市场规则 Provider 由后续 [`回测真实历史市场规则数据源任务`](2026-09-16-backtest-real-historical-market-rules.md) 承担。
+
+## 2026-09-16 完成条件收敛
+
+当前任务完成只要求：
+
+- DSA 为代表性场景提供身份、币种、lot/tick、Calendar、历史可交易性、行情及所需公司行为等不可替代的关键事实；
+- 完整 `execution-model-v1` 可显式提供价格限制、收费与持仓/现金结算假设，并被校验、冻结、执行和披露；
+- 未选择模型且 DSA 未提供真实规则时稳定返回 `DATA_UNAVAILABLE / MARKET_RULES_UNAVAILABLE`，不得静默补默认值；
+- 固定 CN Stock 日频场景完成真实运行、重放、隔离与失败恢复验证。
+
+以下内容不再计入当前任务完成条件，统一由后续专项负责：
+
+- DSA 直接提供法定收费、价格限制和结算制度的完整历史事实；
+- `market-rules-v1` 的真实 Provider 版本化覆盖及区间内制度变更分段；
+- 公告或规则原文引用、首次公开时间与长期可复核来源链；
+- 不提供研究模型时的真实历史规则成功运行，以及向更多市场、资产和周期扩展。
+
+### 2026-09-16 简化边界实施加固
+
+- Snapshot Builder 在允许显式 `execution-model-v1` 替代 `executionRules` 前，继续校验 Provider 标的身份、市场、资产类型、币种与历史可交易性；`status` 非 `supported`、覆盖不完整、事实为空或 `tradable=false` 均以 `MARKET_RULES_UNAVAILABLE` 失败关闭。
+- 研究模型仍只承担价格限制、收费与结算假设，不会把 Provider 的 `executionRules=unavailable` 改写为事实支持，也不会替代 DSA 关键事实。
+- 定向验证通过：`rtk pnpm --filter @thesis-ledger/server exec vitest run test/backtest/dsa-instrument-facts.test.ts test/backtest/v2-snapshot-builder.test.ts test/backtest/v2-execution.test.ts test/backtest/v2-runner.test.ts`，共 20 项测试；`rtk pnpm --filter @thesis-ledger/server typecheck` 与 `rtk pnpm --filter @thesis-ledger/server build` 均通过。
+- 本轮未执行 Docker、数据库、外部 Provider 或真实运行态验收；既有固定 CN Stock 日频运行态证据未因本轮局部加固失效。
 
 ## 1. 依赖与顺序
 
@@ -139,7 +162,7 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
 
 ## 3. F1–F6 与验收责任
 
-范围拆解以 [Spec 第 4.3 节](../specs/2026-09-10-backtest-historical-execution-rule-facts.md#43-f1f6-逐项收敛) 为准。F1/F2/F3/F5/F6 的配置与校验由 T1 负责，执行由 T3.2 负责；F4 现金/持仓生命周期由 T3.2 负责。T3.1 冻结全部实际使用配置，T3.3 披露，T4 验收首个真实场景。移出范围的档案要求不计入这些任务完成条件。
+范围拆解以 [Spec 第 4.3 节](../specs/2026-09-10-backtest-historical-execution-rule-facts.md#43-f1f6-逐项收敛) 为准。F1/F2/F3/F5/F6 的研究模型配置与校验由 T1 负责，执行由 T3.2 负责；F4 现金/持仓生命周期由 T3.2 负责。T3.1 冻结全部实际使用配置，T3.3 披露，T4 验收首个真实场景。法定收费、制度版本与来源链的 Provider 历史事实证明转入后续专项，不计入这些任务完成条件。
 
 | AC             | 实现/局部验证            | 真实门禁         |
 | -------------- | ------------------------ | ---------------- |
@@ -154,9 +177,9 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
 
 ## 4. 历史证据与当前门禁
 
-[来源矩阵](../benchmarks/2026-09-10-backtest-historical-execution-rule-source-matrix.md)的 36 条来源、39 个链接、digest 和 null/unproven 均保留为旧审计记录；旧 T0 没有通过。本次范围调整使完整档案不再成为前置条件，不把旧失败改成成功。
+[来源矩阵](../benchmarks/2026-09-10-backtest-historical-execution-rule-source-matrix.md)的 36 条来源、39 个链接、digest 和 null/unproven 均保留为旧审计记录；旧 T0 没有通过。本次范围调整使完整档案不再成为当前前置条件，也不把旧失败改成真实 Provider 成功。
 
-当前源码仍在规则 unavailable 时失败，尚无新研究模型的成功闭环；[T13](../benchmarks/2026-09-09-unified-backtest-v2-t13.md)保持未完成。CN/HK/US 股票与 ETF、国内场外基金及原有周期仍是产品目标，缺失接入/验证由 V2 原 T2/T7–T9 的对应能力和 T13 继续承担，不能由本文件 T4 一个 CN 日频用例替代。
+2026-09-10 的历史基线中，无模型运行在规则 unavailable 时失败且研究模型真实闭环尚未完成；后续 T4 已完成显式研究模型的固定 CN 日频闭环。当前源码继续让无模型且 Provider 规则 unavailable 的运行失败，这是保留的安全边界。CN/HK/US 股票与 ETF、国内场外基金及原有周期仍是目标能力，不能由本文件一个 CN 日频用例替代；真实历史规则 Provider 的新增覆盖按后续专项独立验收。
 
 ## 5. 文档一致性检查
 
@@ -322,12 +345,28 @@ T3.2 已完成本地代码与受控事实验证，但不扩大原任务范围。
 - [x] T3.2 的 RunConfig 模型快照消费、费用/资金/NAV 生命周期和受控重跑验证已完成。
 - [x] T3.3 本地 API/客户端披露及最终定向测试、相关构建通过；固定场景的模型确认、成功结果和失败详情真实展示已验收。
 - [x] 固定 CN 股票场景真实 Runner 买卖闭环、同 Snapshot 重放、账户隔离及 Artifact 缺失/恢复复验通过。
-- [ ] RunConfig、模型冻结/哈希、Runner 与客户端的全部产品契约就绪且完成披露。
+- [x] 当前完成边界内的 RunConfig、模型冻结/哈希、Runner 与客户端披露契约就绪；真实历史市场规则 Provider 由后续专项验收。
 - [x] 实际 Runner 受控买卖闭环及 T4 固定场景真实验收通过。
 
-结论：T1 可冻结模型契约已在 NAV 费用适用性补齐并完成最小定向验证；固定 CN 股票场景的既有真实闭环、重放、账户隔离、Artifact 故障恢复及 Browser 三条展示链路状态不变。该证据不覆盖完整目标市场、资产与周期，T3.1 整体及 V2 T13 继续保持未完成。
+结论：当前简化完成边界通过。显式研究模型闭环、DSA 关键事实门禁、固定 CN 股票场景真实运行与披露已有证据；本轮进一步确认异常或不完整的 Instrument Fact 不能被研究模型绕过。真实历史市场规则 Provider 及其无模型成功路径由后续专项验收。
 
 
 ## 2026-09-11 最终收敛
 
 T0、T1、T2、T3.1、T3.2、T3.3、T4 均已完成。DSA 历史状态 Provider 与 Snapshot critical-fact 门禁闭合后，不再存在“静态 `tradable` 无法证明历史状态”的实施阻塞。V2 全市场 capability 的某项外部数据在特定部署中返回 `unavailable` 时，仅阻止依赖该数据的运行，不回退本任务完成状态。
+
+## 2026-09-16 当前测试策略运行恢复
+
+### 运行阻塞与修复
+
+- 当前环境的 BaoStock TCP 端口可连接，但 SDK `login()` 长时间无响应，导致 `instrument-facts` 超过 Server 请求时限。DSA 改为使用已配置的 V2 原始日线 Provider route 证明代表性区间的历史可交易性：只有冻结 XSHG Calendar 的每个预期会话都存在唯一、完整、成交量大于零且不晚于 `dataAsOf` 的真实 Bar 时才返回 `tradable=true`。缺行、重复、非法日期、零成交量、未来数据或缺少 Provider provenance 均返回 unavailable，不从缺 K 线推断停牌。
+- Instrument Fact 的 `availableAt` 继续表达身份、lot/tick 事实本身的可用时间；区间历史可交易性由响应 coverage 和组合 Provider revision 在 Snapshot 构建时校验。区间证明完成时间不再覆盖长期有效的 Instrument Fact 时间，避免执行器把早期订单误判为“Instrument Fact 尚不可用”。
+- V2 日线 `timestamp` 是交易日标签，且完整 Bar 的 `availableAt` 是收盘时刻。执行器在缺少显式 `openedAt/openAvailableAt` 时，使用冻结 Calendar 的时区和首个交易 Session 推导开盘时刻；显式时间保持不变，分钟线不走该推导。由此修复真实日线被当作本地 08:00、全部 DAY 订单无法找到下一根可执行 Bar 的问题。
+
+### 验证与真实结果
+
+- DSA 定向：`python -m pytest -q tests/test_thesis_ledger_v2_tradability.py tests/test_thesis_ledger_v2_dependencies.py tests/test_thesis_ledger_market_v2.py tests/test_thesis_ledger_contract.py`，51 项通过；相关文件 `compileall`、`flake8` 与 `git diff --check` 通过。
+- Server 定向：`pnpm --filter @thesis-ledger/server exec vitest run test/backtest/daily-bar-session.test.ts test/backtest/v2-execution.test.ts test/backtest/v2-runner.test.ts test/backtest/v2-snapshot-builder.test.ts`，4 文件、23 项通过；Server typecheck 和宿主机构建通过。
+- 保留测试策略 v1，新建 v2 `64ea49d8-72d1-43aa-b2be-7bf4f555851c`，仅将固定投入从 CNY 10,000 调整为 CNY 200,000，以满足贵州茅台 100 股 lot；运行初始资金为 CNY 1,000,000。
+- 真实 Run `7e92fca3-62cc-44e5-938e-11a3f416b955` 使用 `600519.SH`、`2024-01-02..2024-03-29` 和 `cn-600519-research-2024q1`，收敛为 `succeeded / complete`。`snapshotId=18aea132b21cd871fb42d358db497cff688f17b85d4ebbf0c73c0eb583e31794`，`resultChecksum=a3d6f08dc040fa26`，模型哈希保持 `0b6ac70a935bf63b1a79b1358ce5853624dce4892d6cc03d26a0565b953a5cdf`；结果包含 58 个权益点、6 次 fill、3 笔闭合交易、0 个拒单和 0 条警告，期末权益 CNY 988,680.97，总收益率 -1.131903%，最大回撤 -1.349657%。
+- 运行态通过正式 `sync-code.sh dsa` 与 `sync-code.sh thesis-ledger` 入口更新，DSA、Server 和 Worker 均恢复 healthy；未执行数据库结构、volume 或业务数据清理。当前是容器可写层代码同步，镜像未重建，容器重建后会恢复为镜像内版本；持久部署仍需后续执行完整镜像更新。

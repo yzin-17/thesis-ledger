@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MarketControlService } from '../src/market/market-control.service.js';
+import {
+  defaultMarketRoutesV2,
+  MarketControlService,
+  removeProviderTargets,
+} from '../src/market/market-control.service.js';
 import { DsaClient, DsaError } from '../src/integration/dsa/dsa.client.js';
 
-type Routes = Record<string, Record<string, string[]>>;
+type RouteTarget = { providerId: string; upstreamSource: string };
+type Routes = Record<string, Record<string, RouteTarget[]>>;
+
+const target = (providerId: string, upstreamSource = 'eastmoney'): RouteTarget => ({
+  providerId,
+  upstreamSource,
+});
 
 type PolicyState = {
   consumer: string;
@@ -46,8 +56,98 @@ const makeTransaction = (state: PolicyState) => {
 };
 
 describe('MarketControlService', () => {
+  it('默认策略使用结构化 RouteTarget 且 ETF 日线为 Tencent 主源', () => {
+    expect(defaultMarketRoutesV2.DAILY_BAR.ETF).toEqual([
+      { providerId: 'tencent', upstreamSource: 'tencent' },
+      { providerId: 'akshare', upstreamSource: 'eastmoney' },
+    ]);
+    expect(defaultMarketRoutesV2.REALTIME_QUOTE.STOCK).toEqual([
+      { providerId: 'akshare', upstreamSource: 'akshare' },
+      { providerId: 'efinance', upstreamSource: 'efinance' },
+    ]);
+    expect(defaultMarketRoutesV2.FUND_NAV.MUTUAL_FUND).toEqual([
+      { providerId: 'akshare', upstreamSource: 'akshare' },
+      { providerId: 'efinance', upstreamSource: 'efinance' },
+    ]);
+  });
+
+  it('按 providerId 从所有 RouteTarget 中移除 Provider，不混淆同 Provider 的 source', () => {
+    const { nextRoutes, routeDiff } = removeProviderTargets(
+      {
+        DAILY_BAR: {
+          ETF: [
+            { providerId: 'akshare', upstreamSource: 'eastmoney' },
+            { providerId: 'akshare', upstreamSource: 'tencent' },
+          ],
+        },
+      },
+      'AKSHARE',
+    );
+    expect(nextRoutes.DAILY_BAR?.ETF).toEqual([]);
+    expect(routeDiff[0]).toMatchObject({ capability: 'DAILY_BAR', instrumentType: 'ETF' });
+  });
+
+  const policyState = (routes: Routes, enabled = false): PolicyState => ({
+    consumer: 'thesis-ledger',
+    revision: 4,
+    enabled,
+    routes,
+    syncState: 'applied',
+    history: [],
+  });
+
+  const policyPrisma = (state: PolicyState) => {
+    const transaction = makeTransaction(state);
+    return {
+      desiredProviderPolicy: {
+        findUnique: vi.fn(async () => ({ ...state, history: [...state.history] })),
+        update: transaction.desiredProviderPolicy.update,
+      },
+      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) => callback(transaction)),
+    };
+  };
+
+  it('当前策略只接受 V2，不新增 revision 或调用 DSA', async () => {
+    const routes: Routes = {
+      DAILY_BAR: {
+        ETF: [
+          { providerId: 'tencent', upstreamSource: 'tencent' },
+          { providerId: 'akshare', upstreamSource: 'eastmoney' },
+        ],
+      },
+    };
+    const state = policyState(routes, true);
+    state.syncState = 'applied';
+    const prisma = policyPrisma(state);
+    const dsa = { applyControlPolicyV2: vi.fn() };
+
+    const result = await new MarketControlService(prisma as never, dsa as never).getPolicy();
+
+    expect(result).toMatchObject({ revision: 4, enabled: true, contractVersion: 2, routes });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(dsa.applyControlPolicyV2).not.toHaveBeenCalled();
+  });
+
+  it('持久化策略仍是 providerId 数组时 fail-closed，不在运行时隐式迁移', async () => {
+    const current = {
+      consumer: 'thesis-ledger',
+      revision: 17,
+      enabled: true,
+      routes: { DAILY_BAR: { ETF: ['akshare', 'efinance'] } },
+      syncState: 'applied',
+      history: [],
+    };
+    const prisma = {
+      desiredProviderPolicy: { findUnique: vi.fn(async () => current) },
+    };
+    const dsa = { applyControlPolicyV2: vi.fn() };
+
+    await expect(new MarketControlService(prisma as never, dsa as never).getPolicy()).rejects.toThrow();
+    expect(dsa.applyControlPolicyV2).not.toHaveBeenCalled();
+  });
+
   it('accepts a monotonic revision jump and pushes the latest policy', async () => {
-    const routes: Routes = { REALTIME_QUOTE: { STOCK: ['akshare'] } };
+    const routes: Routes = { REALTIME_QUOTE: { STOCK: [target('akshare')] } };
     const state: PolicyState = {
       consumer: 'thesis-ledger',
       revision: 1,
@@ -87,7 +187,7 @@ describe('MarketControlService', () => {
       ),
     };
     const dsa = {
-      applyControlPolicy: vi.fn(async () => ({ effective: { sourceDesiredRevision: 3 } })),
+      applyControlPolicyV2: vi.fn(async () => ({ effective: { sourceDesiredRevision: 3 } })),
     };
 
     const result = await new MarketControlService(prisma as never, dsa as never).applyPolicy({
@@ -97,7 +197,8 @@ describe('MarketControlService', () => {
     });
 
     expect(result.revision).toBe(3);
-    expect(dsa.applyControlPolicy).toHaveBeenCalledWith(
+    expect(result.contractVersion).toBe(2);
+    expect(dsa.applyControlPolicyV2).toHaveBeenCalledWith(
       expect.objectContaining({ revision: 3, routes }),
     );
   });
@@ -107,7 +208,7 @@ describe('MarketControlService', () => {
       consumer: 'thesis-ledger',
       revision: 3,
       enabled: true,
-      routes: { REALTIME_QUOTE: { STOCK: ['akshare'] } },
+      routes: { REALTIME_QUOTE: { STOCK: [target('akshare')] } },
       syncState: 'applied',
       history: [],
     };
@@ -129,7 +230,7 @@ describe('MarketControlService', () => {
   });
 
   it('revision 落后于 DSA 时自动对基：以远端 revision + 1 重推一次', async () => {
-    const routes: Routes = { REALTIME_QUOTE: { STOCK: ['akshare'] } };
+    const routes: Routes = { REALTIME_QUOTE: { STOCK: [target('akshare')] } };
     const state: PolicyState = {
       consumer: 'thesis-ledger',
       revision: 3,
@@ -150,7 +251,7 @@ describe('MarketControlService', () => {
     };
     const staleError = new DsaError('Policy revision 4 早于当前 revision 11', 'stale-revision');
     const dsa = {
-      applyControlPolicy: vi
+      applyControlPolicyV2: vi
         .fn()
         .mockRejectedValueOnce(staleError)
         .mockResolvedValueOnce({ effective: { sourceDesiredRevision: 12 } }),
@@ -166,7 +267,7 @@ describe('MarketControlService', () => {
     });
 
     expect(dsa.effectiveControlPolicy).toHaveBeenCalledTimes(1);
-    expect(dsa.applyControlPolicy).toHaveBeenLastCalledWith(
+    expect(dsa.applyControlPolicyV2).toHaveBeenLastCalledWith(
       expect.objectContaining({ revision: 12, routes }),
     );
     expect(result.revision).toBe(12);
@@ -174,7 +275,7 @@ describe('MarketControlService', () => {
   });
 
   it('远端 revision 不高于本地时不触发对基，保留失败状态', async () => {
-    const routes: Routes = { REALTIME_QUOTE: { STOCK: ['akshare'] } };
+    const routes: Routes = { REALTIME_QUOTE: { STOCK: [target('akshare')] } };
     const state: PolicyState = {
       consumer: 'thesis-ledger',
       revision: 3,
@@ -194,7 +295,7 @@ describe('MarketControlService', () => {
     };
     const staleError = new DsaError('Policy revision 3 早于当前 revision 2', 'stale-revision');
     const dsa = {
-      applyControlPolicy: vi.fn().mockRejectedValue(staleError),
+      applyControlPolicyV2: vi.fn().mockRejectedValue(staleError),
       effectiveControlPolicy: vi.fn(async () => ({
         projection: { desired: { revision: 2 } },
       })),
@@ -202,7 +303,7 @@ describe('MarketControlService', () => {
 
     const result = await new MarketControlService(prisma as never, dsa as never).retryLatest();
 
-    expect(dsa.applyControlPolicy).toHaveBeenCalledTimes(1);
+    expect(dsa.applyControlPolicyV2).toHaveBeenCalledTimes(1);
     expect(dsa.effectiveControlPolicy).toHaveBeenCalledTimes(1);
     expect(result.syncState).toBe('rejected');
     expect(result.revision).toBe(3);

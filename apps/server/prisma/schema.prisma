@@ -116,7 +116,6 @@ model Asset {
   updatedAt                   DateTime                     @updatedAt
   positions                   Position[]
   trades                      Trade[]
-  bars                        MarketBar[]
   fundNavPoints               FundNavPoint[]
   instrumentAssetAssociations InstrumentAssetAssociation[]
   recurringInvestmentPlans   RecurringFundInvestmentPlan[]
@@ -592,26 +591,50 @@ model TargetAllocation {
   @@index([scope, accountId, active])
 }
 
-model MarketBar {
-  id           BigInt   @id @default(autoincrement())
-  symbol       String
-  timeframe    String
-  timestamp    DateTime
-  open         Decimal  @db.Decimal(24, 8)
-  high         Decimal  @db.Decimal(24, 8)
-  low          Decimal  @db.Decimal(24, 8)
-  close        Decimal  @db.Decimal(24, 8)
-  volume       Decimal  @db.Decimal(30, 8)
-  amount       Decimal  @db.Decimal(30, 8)
-  provider     String
-  upstreamSource String?
-  fetchedAt    DateTime @default(now())
-  freshness    String   @default("unknown")
-  fallbackUsed Boolean  @default(false)
-  asset        Asset    @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+model MarketBarSeriesFact {
+  id                    BigInt   @id @default(autoincrement())
+  symbol                String
+  assetType             String
+  timeframe             String
+  timestamp             DateTime
+  adjustment            String
+  open                  Decimal  @db.Decimal(24, 8)
+  high                  Decimal  @db.Decimal(24, 8)
+  low                   Decimal  @db.Decimal(24, 8)
+  close                 Decimal  @db.Decimal(24, 8)
+  volume                Decimal  @db.Decimal(30, 8)
+  amount                Decimal  @db.Decimal(30, 8)
+  completionStatus      String
+  availableAt           DateTime
+  providerId            String
+  upstreamSource        String
+  providerRevision      String
+  fetchedAt             DateTime
 
-  @@unique([symbol, timeframe, timestamp, provider])
-  @@index([symbol, timeframe, timestamp])
+  @@unique([symbol, timeframe, timestamp, adjustment, providerId, upstreamSource])
+  @@index([symbol, assetType, timeframe, adjustment, timestamp])
+  @@index([providerId, upstreamSource, fetchedAt])
+}
+
+model MarketBarSeriesCoverage {
+  id                       String   @id @default(uuid()) @db.Uuid
+  symbol                   String
+  assetType                String
+  timeframe                String
+  adjustment               String
+  providerId               String
+  upstreamSource           String
+  providerRevision         String
+  fetchedAt                DateTime
+  freshUntil               DateTime
+  actualStart              DateTime?
+  actualEnd                DateTime?
+  hasMoreBefore            Boolean
+  latestCompleteTradingDate DateTime?
+  updatedAt                DateTime   @updatedAt
+
+  @@unique([symbol, timeframe, adjustment, providerId, upstreamSource])
+  @@index([symbol, assetType, timeframe, adjustment, updatedAt])
 }
 
 model DataQualityIssue {
@@ -627,23 +650,6 @@ model DataQualityIssue {
   resolvedAt DateTime?
 
   @@index([status, detectedAt])
-}
-
-model BackfillJob {
-  id        String    @id @default(uuid()) @db.Uuid
-  symbol    String
-  timeframe String
-  start     DateTime
-  end       DateTime
-  cursor    DateTime?
-  status    String    @default("queued")
-  progress  Int       @default(0)
-  attempts  Int       @default(0)
-  error     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([symbol, timeframe, status])
 }
 
 model ProviderHealth {

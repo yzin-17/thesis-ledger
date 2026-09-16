@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   MarketDetailCapability,
-  MarketDetailResponse,
-  MarketDetailSection,
+  MarketDetailResponseV2,
+  MarketDetailSectionV2,
 } from '@thesis-ledger/api-client';
-import type { IndicatorV1 } from '@thesis-ledger/schemas';
+import type { IndicatorResultV2 } from '@thesis-ledger/schemas';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { MarketColorMenu } from '@/components/market-color-menu';
+import { marketToneForValue } from '@/ui/market-color';
 import { requestMarketDetail } from './market-detail.api.js';
 import {
   BarsSection,
@@ -33,6 +35,9 @@ import {
   getVisibleMarketDetail,
   type MarketDetailPosition,
 } from './market-detail.types.js';
+import { chartPageFromResponse } from './market-chart-types.js';
+import type { MarketChartIndicator, MarketChartPage } from './market-chart-types.js';
+import { buildChartPoints, mergeChartPoints, type ChartPoint } from './market-chart-model.js';
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
@@ -58,12 +63,12 @@ type HistoryPage = {
   key: string;
   paramsKey: string;
   end?: string;
-  response: MarketDetailResponse;
+  response: MarketDetailResponseV2;
 };
 
 const indicatorParamsKey = (params: MarketIndicatorParams) => JSON.stringify(params);
 
-const clearIndicatorSections = (response: MarketDetailResponse | null) => {
+const clearIndicatorSections = (response: MarketDetailResponseV2 | null) => {
   if (!response) return response;
   const sections = { ...response.sections };
   delete sections['indicator:MA'];
@@ -86,10 +91,10 @@ export const commitIfCurrentGeneration = async <T,>(
 };
 
 export const responseMatchesIndicatorParams = (
-  response: MarketDetailResponse,
+  response: MarketDetailResponseV2,
   params: MarketIndicatorParams,
 ) => {
-  const data = response.sections['indicator:MACD']?.data as IndicatorV1 | undefined;
+  const data = response.sections['indicator:MACD']?.data as IndicatorResultV2 | undefined;
   if (!data) return true;
   return Object.entries(params).every(([name, value]) => {
     const actual = data.parameters[name];
@@ -106,7 +111,7 @@ export function MarketDetailDialog({
 }) {
   const queryClient = useQueryClient();
   const [refreshSequence, setRefreshSequence] = useState(0);
-  const [detail, setDetail] = useState<MarketDetailResponse | null>(null);
+  const [detail, setDetail] = useState<MarketDetailResponseV2 | null>(null);
   const [historyPages, setHistoryPages] = useState<HistoryPage[]>([]);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -304,7 +309,7 @@ export function MarketDetailDialog({
       return;
     }
     if (!query.data) return;
-    const incomingBars = query.data.sections.bars?.data as Array<{ timestamp: string }> | undefined;
+    const incomingBars = query.data.barSeries?.points;
     const incomingEarliest = incomingBars?.[0]?.timestamp?.slice(0, 10);
     if (!incomingEarliest || incomingEarliest > historyEnd) {
       setHistoryError('没有更多可用的更早日线。');
@@ -404,7 +409,11 @@ export function MarketDetailDialog({
       }
     } catch (error) {
       const aborted = error instanceof DOMException && error.name === 'AbortError';
-      if (!aborted && generation === requestGenerationRef.current && activeSymbolRef.current === symbol)
+      if (
+        !aborted &&
+        generation === requestGenerationRef.current &&
+        activeSymbolRef.current === symbol
+      )
         setRetryError(`${marketDetailSectionTitle(capability)}重试失败，请稍后再试。`);
     } finally {
       retryQueryKeysRef.current = retryQueryKeysRef.current.filter(
@@ -419,25 +428,32 @@ export function MarketDetailDialog({
   const quoteSection = visibleDetail?.sections.quote;
   const barsSection = visibleDetail?.sections.bars;
   const currentParamsKey = indicatorParamsKey(indicatorParams);
-  const pageIndicators = historyPages
-    .filter(({ paramsKey }) => paramsKey === currentParamsKey)
-    .flatMap(({ response }) =>
-      response.requested
-        .filter((capability) => capability.startsWith('indicator:'))
-        .map((capability) => response.sections[capability]?.data as IndicatorV1 | undefined)
-        .filter((indicator): indicator is IndicatorV1 => Boolean(indicator)),
-    );
-  const chartIndicators =
-    pageIndicators.length > 0
-      ? pageIndicators
-      : indicatorCapabilities
-          .map((capability) => visibleDetail?.sections[capability]?.data as IndicatorV1 | undefined)
-          .filter((indicator): indicator is IndicatorV1 => Boolean(indicator));
+  const chartPages = useMemo(() => {
+    const pages = historyPages
+      .filter(({ paramsKey }) => paramsKey === currentParamsKey)
+      .flatMap(({ response }) => {
+        const page = chartPageFromResponse(response);
+        return page ? [page] : [];
+      });
+    if (pages.length > 0) return pages;
+    const fallback = visibleDetail ? chartPageFromResponse(visibleDetail) : null;
+    return fallback ? [fallback] : [];
+  }, [currentParamsKey, historyPages, visibleDetail]);
+  const chartIndicators = useMemo(
+    () => chartPages.flatMap((page: MarketChartPage) => page.indicators),
+    [chartPages],
+  );
+  const chartPoints = useMemo(
+    () =>
+      mergeChartPoints(
+        chartPages.map((page: MarketChartPage) => buildChartPoints(page.bars, page.indicators)),
+      ),
+    [chartPages],
+  );
+  const chartBars = visibleDetail?.barSeries?.points ?? [];
   const loadEarlier = () => {
     if (query.isFetching || historyLoadingEnd) return;
-    const firstDate = visibleDetail?.sections.bars?.data
-      ? (visibleDetail.sections.bars.data as Array<{ timestamp: string }>)[0]?.timestamp
-      : undefined;
+    const firstDate = chartBars[0]?.timestamp;
     if (!firstDate) return;
     const date = new Date(firstDate);
     date.setUTCDate(date.getUTCDate() - 1);
@@ -446,9 +462,7 @@ export function MarketDetailDialog({
       setHistoryError('没有更多可用的更早日线。');
       return;
     }
-    const anchor = chartIndicators
-      .map((indicator) => indicator.calculationAnchor?.timestamp)
-      .find((value): value is string => Boolean(value));
+    const anchor = chartIndicators[0]?.calculationAnchor?.timestamp;
     setHistoryError(null);
     setHistoryExhausted(false);
     setHistoryLoadingEnd(nextEnd);
@@ -458,8 +472,7 @@ export function MarketDetailDialog({
   const canLoadEarlier = Boolean(
     !historyExhausted &&
     (historyError ||
-      visibleDetail?.limits.barsHasMoreBefore === true ||
-      chartIndicators.some((indicator) => indicator.coverage?.hasMoreBefore === true)),
+      visibleDetail?.barSeries?.coverage.hasMoreBefore === true),
   );
   const retryEarlier = () => {
     if (parameterRefreshEnds.length > 0 && !parameterRefreshLoading) {
@@ -476,11 +489,7 @@ export function MarketDetailDialog({
     if (JSON.stringify(indicatorParams) === JSON.stringify(next)) return;
     requestGenerationRef.current += 1;
     const loadedEnds = [
-      ...new Set(
-        historyPages
-          .filter((page) => page.end)
-          .map((page) => page.end as string),
-      ),
+      ...new Set(historyPages.filter((page) => page.end).map((page) => page.end as string)),
     ];
     setDetail((current) => clearIndicatorSections(current));
     setHistoryEnd(undefined);
@@ -554,11 +563,14 @@ export function MarketDetailDialog({
       quoteSection={quoteSection}
       barsSection={barsSection}
       chartIndicators={chartIndicators}
+      chartPoints={chartPoints.length > 0 ? chartPoints : undefined}
       onIndicatorParamsChange={updateIndicatorParams}
       onLoadEarlier={loadEarlier}
       canLoadEarlier={canLoadEarlier}
       historyLoading={
-        parameterRefreshLoading || Boolean(historyLoadingEnd) || (Boolean(historyEnd) && query.isFetching)
+        parameterRefreshLoading ||
+        Boolean(historyLoadingEnd) ||
+        (Boolean(historyEnd) && query.isFetching)
       }
       historyError={parameterRefreshError ?? historyError}
       onRetryEarlier={retryEarlier}
@@ -587,6 +599,7 @@ function MarketDetailDialogContent({
   quoteSection,
   barsSection,
   chartIndicators,
+  chartPoints,
   onIndicatorParamsChange,
   onLoadEarlier,
   canLoadEarlier,
@@ -610,25 +623,28 @@ function MarketDetailDialogContent({
   refreshing: boolean;
   staleDescription: string;
   retryError: string | null;
-  visibleDetail: MarketDetailResponse | null;
-  quoteSection: MarketDetailSection | undefined;
-  barsSection: MarketDetailSection | undefined;
-  chartIndicators: IndicatorV1[];
+  visibleDetail: MarketDetailResponseV2 | null;
+  quoteSection: MarketDetailSectionV2 | undefined;
+  barsSection: MarketDetailSectionV2 | undefined;
+  chartIndicators: MarketChartIndicator[];
+  chartPoints: ChartPoint[] | undefined;
   onIndicatorParamsChange: (params: MarketIndicatorParams) => void;
   onLoadEarlier: () => void;
   canLoadEarlier: boolean;
   historyLoading: boolean;
   historyError: string | null;
   onRetryEarlier: () => void;
-  chipSection: MarketDetailSection | undefined;
-  fundNavSection: MarketDetailSection | undefined;
-  fundNavHistorySection: MarketDetailSection | undefined;
+  chipSection: MarketDetailSectionV2 | undefined;
+  fundNavSection: MarketDetailSectionV2 | undefined;
+  fundNavHistorySection: MarketDetailSectionV2 | undefined;
   indicatorCapabilities: MarketDetailCapability[];
   retrying: string | null;
   onRetryAll: () => void;
   onRetrySection: (capability: MarketDetailCapability) => Promise<void>;
   onClose: () => void;
 }) {
+  const positionPnlTone = marketToneForValue(position.pnl);
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -636,12 +652,17 @@ function MarketDetailDialogContent({
         className="flex max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]"
       >
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-14 text-left">
-          <p className="m-0 text-xs font-medium tracking-[0.16em] text-muted-foreground">
-            持仓行情
-          </p>
-          <DialogTitle id="market-detail-title" className="text-lg font-semibold">
-            {position.asset.name} · {position.symbol}
-          </DialogTitle>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="m-0 text-xs font-medium tracking-[0.16em] text-muted-foreground">
+                持仓行情
+              </p>
+              <DialogTitle id="market-detail-title" className="text-lg font-semibold">
+                {position.asset.name} · {position.symbol}
+              </DialogTitle>
+            </div>
+            <MarketColorMenu />
+          </div>
           <DialogDescription id="market-detail-description" className="sr-only">
             查看该持仓的数量、成本和按资产能力加载的市场数据。
           </DialogDescription>
@@ -656,6 +677,7 @@ function MarketDetailDialogContent({
             <DetailMetric
               label="持仓盈亏"
               value={position.pnl === null ? '—' : money.format(position.pnl)}
+              {...(positionPnlTone ? { tone: positionPnlTone } : {})}
             />
           </div>
           {queryNotice}
@@ -689,6 +711,7 @@ function MarketDetailDialogContent({
                 <BarsSection
                   section={barsSection}
                   indicators={chartIndicators}
+                  {...(chartPoints ? { chartPoints } : {})}
                   onIndicatorParamsChange={onIndicatorParamsChange}
                   onLoadEarlier={onLoadEarlier}
                   canLoadEarlier={canLoadEarlier}

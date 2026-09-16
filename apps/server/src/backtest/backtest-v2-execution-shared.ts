@@ -44,6 +44,7 @@ import {
   type StrategySchemaV2,
 } from '@thesis-ledger/schemas';
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
+import { dailyBarSessionTimes } from './backtest-daily-bar-session.js';
 
 export type RowsByArtifact = ReadonlyMap<string, readonly ArtifactRow[]>;
 
@@ -181,13 +182,14 @@ const instrumentType = (assetType: StrategySchemaV2['executionInstrument']['asse
   return 'NAV_FUND' as const;
 };
 
-const executionBars = (rows: readonly Record<string, unknown>[]) => {
+const executionBars = (rows: readonly Record<string, unknown>[], calendar: TradingCalendar) => {
   const ordered = rows
     .filter((row) => typeof row.occurredAt === 'string')
     .sort((left, right) =>
       stringField(left, 'occurredAt').localeCompare(stringField(right, 'occurredAt')),
     );
   return ordered.map((row, index) => {
+    const sessionTimes = dailyBarSessionTimes(row, calendar);
     let previousClose: string;
     if (typeof row.previousClose === 'string') {
       previousClose = row.previousClose;
@@ -207,11 +209,8 @@ const executionBars = (rows: readonly Record<string, unknown>[]) => {
     return {
       occurredAt: stringField(row, 'occurredAt'),
       availableAt: stringField(row, 'availableAt'),
-      openedAt: typeof row.openedAt === 'string' ? row.openedAt : stringField(row, 'occurredAt'),
-      openAvailableAt:
-        typeof row.openAvailableAt === 'string'
-          ? row.openAvailableAt
-          : stringField(row, 'availableAt'),
+      openedAt: sessionTimes.openedAt ?? stringField(row, 'occurredAt'),
+      openAvailableAt: sessionTimes.openAvailableAt ?? stringField(row, 'availableAt'),
       previousCloseAvailableAt,
       open: stringField(row, 'open'),
       close: stringField(row, 'close'),

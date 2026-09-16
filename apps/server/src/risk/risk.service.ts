@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { evaluateCompleteRule, type RiskRule } from '@thesis-ledger/domain';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
 import { RiskContextService } from './risk-context.service.js';
 import { RiskEventService } from './risk-event.service.js';
 import {
@@ -37,13 +38,14 @@ export class RiskService {
     @Optional() contextService?: RiskContextService,
     @Optional() eventService?: RiskEventService,
     @Optional() strategyRuntime?: StrategyRiskRuntimeService,
+    @Optional() marketBarReader?: MarketBarReader,
   ) {
     this.rules = ruleService ?? new RiskRuleService(prisma);
     this.contexts = contextService ?? new RiskContextService(prisma);
     this.events = eventService ?? new RiskEventService(prisma, notifications);
     this.strategyRuntime =
       strategyRuntime ??
-      new StrategyRiskRuntimeService(prisma, new StrategyRiskContextService(prisma));
+      new StrategyRiskRuntimeService(prisma, new StrategyRiskContextService(prisma, marketBarReader));
   }
 
   createRule(input: unknown) {

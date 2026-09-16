@@ -5,6 +5,7 @@
 - [`统一回测系统 V2`](2026-08-28-unified-backtest-v2.md)
 - [`回测执行规则与研究假设`](2026-09-10-backtest-historical-execution-rule-facts.md)
 - [`本轮验收记录`](../benchmarks/2026-09-11-backtest-v2-closure.md)
+- 后续 [`回测真实历史市场规则数据源`](2026-09-16-backtest-real-historical-market-rules.md)
 
 > 状态：已完成。本文件只收敛 2026-09-11 的责任边界；原任务历史证据保持不变。实时 Provider 可用性是运行环境状态，由 capability 动态报告，不再作为 V2 引擎交付永久完成条件。
 
@@ -54,4 +55,4 @@ V2 的完成状态分成两层，不再互相污染：
 1. **产品/引擎交付**：完整目标矩阵可表达并有确定性回归；Snapshot、Runner、SimulationLedger、结果、隔离、重放和错误语义已实现。该层本轮完成。
 2. **部署数据可用性**：DSA 根据 Provider 配置、凭证、网络、数据区间和健康状态动态返回 capability。`unavailable` 是合法且安全的运行状态，不等于产品代码任务重新变成未完成。
 
-任何后续新增真实 Provider 覆盖都作为数据能力增强独立迭代；不得通过 fixture、静态常量或放宽门禁把 unavailable 改写成 supported。
+任何后续新增真实 Provider 覆盖都作为数据能力增强独立迭代；法定收费、完整制度版本、规则分段、来源链和无模型成功运行已由后续专项承接。不得通过 fixture、静态常量或放宽门禁把 unavailable 改写成 supported。

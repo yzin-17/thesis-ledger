@@ -149,7 +149,7 @@ export function StrategyDashboard() {
           <TabsTrigger value="jobs">
             回测任务{jobs.length > 0 ? ` (${jobs.length})` : ''}
           </TabsTrigger>
-          <TabsTrigger value="optimization">优化与风险</TabsTrigger>
+          <TabsTrigger value="optimization">AI 策略实验</TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="mt-0">
           <StrategyLibrary

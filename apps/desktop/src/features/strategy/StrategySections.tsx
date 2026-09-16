@@ -692,7 +692,7 @@ export function StrategyResultDialog({
                     value={finalValue !== null ? money.format(finalValue) : '暂无'}
                   />
                   <Metric label="累计收益" value={metricValue('cumulativeReturn', 'totalReturn')} />
-                  <Metric label="最大回撤" value={metricValue('maxDrawdown')} tone="negative" />
+                  <Metric label="最大回撤" value={metricValue('maxDrawdown')} tone="down" />
                   <Metric label="交易胜率" value={metricValue('tradeWinRate', 'winRate')} />
                   {isV2Result && <Metric label="年化收益" value={metricValue('cagr')} />}
                   {isV2Result && <Metric label="波动率" value={metricValue('volatility')} />}

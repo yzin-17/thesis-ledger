@@ -25,7 +25,9 @@ const formatMoney = (value: number | null) =>
 
 const pnlClass = (value: number | null) => {
   if (value === null) return 'text-muted-foreground';
-  return value >= 0 ? 'text-positive' : 'text-negative';
+  if (value === 0) return 'text-muted-foreground';
+  if (value > 0) return 'text-[var(--color-market-up)]';
+  return 'text-[var(--color-market-down)]';
 };
 
 const objectLabel = (candidate: JournalReviewCandidate) =>

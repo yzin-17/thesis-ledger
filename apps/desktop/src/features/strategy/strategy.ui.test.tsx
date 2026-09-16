@@ -75,6 +75,11 @@ describe('策略实验工作台 UI 契约', () => {
     const source = readFileSync(new URL('./BacktestSetupDialog.tsx', import.meta.url), 'utf8');
 
     expect(source).toContain('提交后将在后台准备行情并启动任务，进度可在回测任务中查看。');
+    expect(source).toContain('grid-rows-[auto_minmax(0,1fr)_auto]');
+    expect(source).toContain('variant="compact"');
+    expect(source).toContain('<details');
+    expect(source).toContain('未填写模型时，数据源必须提供完整历史执行规则');
+    expect(source).not.toContain('可选，仅在需要覆盖执行假设时填写');
     expect(source).not.toContain('排队成功后将在后台启动任务');
   });
 

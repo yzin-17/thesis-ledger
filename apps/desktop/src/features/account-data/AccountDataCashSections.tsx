@@ -36,6 +36,7 @@ export type PendingCashRow = {
   amount: number;
   direction: CashSettlementDirection;
   label: string;
+  symbol?: string;
   note?: string;
   settledAt: string;
 };
@@ -117,6 +118,7 @@ export const pendingCash = (events: LedgerEventV2[], now = new Date()): PendingC
           event.type === 'BUY_EXECUTION'
             ? `买入 ${event.payload.symbol}`
             : `卖出 ${event.payload.symbol}`,
+        symbol: event.payload.symbol,
         ...optionalNote(event.payload.note),
         settledAt: pendingAt,
       });
@@ -147,6 +149,7 @@ export const pendingCash = (events: LedgerEventV2[], now = new Date()): PendingC
         amount,
         direction: '应收',
         label: `分红 ${event.payload.symbol}`,
+        symbol: event.payload.symbol,
         settledAt: pendingAt,
       });
     }
@@ -361,7 +364,13 @@ function CashOverview({
   );
 }
 
-function PendingCashSection({ rows }: { rows: PendingCashRow[] }) {
+function PendingCashSection({
+  rows,
+  resolveInstrumentName,
+}: {
+  rows: PendingCashRow[];
+  resolveInstrumentName: (symbol: string) => string | undefined;
+}) {
   return (
     <section className="flex flex-col gap-3" aria-labelledby="cash-pending-title">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -377,38 +386,48 @@ function PendingCashSection({ rows }: { rows: PendingCashRow[] }) {
         <div className="border-y py-4 text-sm text-muted-foreground">暂无待结算资金</div>
       ) : (
         <div className="divide-y border-y">
-          {rows.map((row) => (
-            <div
-              key={row.id}
-              className="grid gap-3 px-1 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_auto] sm:items-center"
-            >
-              <div className="flex flex-col gap-1">
-                <strong className="text-sm font-medium">
-                  {formatCashShortDate(row.settledAt)}
-                </strong>
-                <span className="text-xs text-muted-foreground">
-                  {cashRelativeDateLabel(row.settledAt)}
-                </span>
-              </div>
-              <div className="min-w-0">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                  <strong className="min-w-0 truncate text-sm font-medium">{row.label}</strong>
-                  <span className="text-xs text-muted-foreground">{row.currency}</span>
-                </div>
-                {row.note && (
-                  <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
-                    备注：{row.note}
+          {rows.map((row) => {
+            const instrumentName = row.symbol ? resolveInstrumentName(row.symbol) : undefined;
+            return (
+              <div
+                key={row.id}
+                className="grid gap-3 px-1 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_auto] sm:items-center"
+              >
+                <div className="flex flex-col gap-1">
+                  <strong className="text-sm font-medium">
+                    {formatCashShortDate(row.settledAt)}
+                  </strong>
+                  <span className="text-xs text-muted-foreground">
+                    {cashRelativeDateLabel(row.settledAt)}
                   </span>
-                )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <strong className="min-w-0 truncate text-sm font-medium">
+                      {instrumentName && row.symbol
+                        ? row.label.replace(row.symbol, instrumentName)
+                        : row.label}
+                    </strong>
+                    <span className="text-xs text-muted-foreground">{row.currency}</span>
+                    {instrumentName && row.symbol && (
+                      <span className="text-xs text-muted-foreground">{row.symbol}</span>
+                    )}
+                  </div>
+                  {row.note && (
+                    <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
+                      备注：{row.note}
+                    </span>
+                  )}
+                </div>
+                <div className="text-left sm:text-right">
+                  <strong className="block whitespace-nowrap font-mono text-base font-semibold">
+                    {formatSignedCashAmount(row.amount, row.currency, row.direction)}
+                  </strong>
+                  <span className="text-xs text-muted-foreground">待结算 · {row.direction}</span>
+                </div>
               </div>
-              <div className="text-left sm:text-right">
-                <strong className="block whitespace-nowrap font-mono text-base font-semibold">
-                  {formatSignedCashAmount(row.amount, row.currency, row.direction)}
-                </strong>
-                <span className="text-xs text-muted-foreground">待结算 · {row.direction}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
@@ -483,6 +502,7 @@ export function CashSection({
   events,
   eventsQuery,
   onCalibrate,
+  resolveInstrumentName,
 }: {
   account: Account;
   accounts: Account[];
@@ -491,6 +511,7 @@ export function CashSection({
   events: LedgerEventV2[];
   eventsQuery: QueryLike;
   onCalibrate: () => void;
+  resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
   const [transferOpen, setTransferOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
@@ -558,6 +579,7 @@ export function CashSection({
         pendingRows={pendingRows}
         settledCashFlowRows={settledCashFlowRows}
         evidencePartial={evidencePartial}
+        resolveInstrumentName={resolveInstrumentName}
       />
       {eventsQuery.isError && eventsQuery.data && (
         <Alert>
@@ -587,6 +609,7 @@ export function CashResults({
   pendingRows,
   settledCashFlowRows,
   evidencePartial,
+  resolveInstrumentName,
 }: {
   account: Account;
   valuation: CashValuation | undefined;
@@ -595,6 +618,7 @@ export function CashResults({
   pendingRows: PendingCashRow[];
   settledCashFlowRows: SettledCashFlowRow[];
   evidencePartial: boolean;
+  resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
   if (valuationQuery.isPending && !valuation) {
     return (
@@ -629,7 +653,7 @@ export function CashResults({
         pendingRows={pendingRows}
         evidencePartial={evidencePartial}
       />
-      <PendingCashSection rows={pendingRows} />
+      <PendingCashSection rows={pendingRows} resolveInstrumentName={resolveInstrumentName} />
       <RecentCashFlowSection rows={settledCashFlowRows} />
     </div>
   );

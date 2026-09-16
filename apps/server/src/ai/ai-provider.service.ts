@@ -15,6 +15,7 @@ import { ProviderConfigService } from '../providers/provider-config.service.js';
 import { ProviderHealthService, type ProviderState } from '../providers/provider-health.service.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { OpenAiCompatibleProvider, createConfiguredAiProviders } from './provider-adapters.js';
+import { runProviderConnectionTest } from './provider-connection-test.js';
 import type { AiProvider } from './contracts.js';
 import {
   aiProviderInputSchema,
@@ -330,6 +331,7 @@ export class AiProviderService implements OnModuleInit {
         capabilities: aiProviderCapabilities(row.capabilities),
         health: healthValue(row.health),
         source: 'database',
+        ...(settings.modelReasoning ? { modelReasoning: settings.modelReasoning } : {}),
       },
     );
   }
@@ -373,34 +375,23 @@ export class AiProviderService implements OnModuleInit {
         ...(input.costCurrency ? { costCurrency: input.costCurrency } : {}),
         ...(input.pricingVersion ? { pricingVersion: input.pricingVersion } : {}),
       },
-      { priority: input.priority, capabilities: input.capabilities },
+      {
+        priority: input.priority,
+        capabilities: input.capabilities,
+        ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
+      },
     );
     const model = input.models[0];
     if (!model) throw new BadRequestException('至少需要一个模型');
     const metadata = input.modelReasoning?.[model];
-    const requiresReasoning =
-      metadata?.mandatory === true ||
-      (metadata?.supportedEfforts !== null &&
-        metadata?.supportedEfforts !== undefined &&
-        metadata.supportedEfforts.length > 0 &&
-        !metadata.supportedEfforts.includes('none'));
     const started = Date.now();
     try {
-      const result = await provider.complete(
-        {
-          model,
-          messages: [
-            { role: 'user', content: 'Return exactly a minimal JSON object: {"ok":true}.' },
-          ],
-          tools: [],
-          maxOutputTokens: requiresReasoning ? 512 : 128,
-          ...(requiresReasoning ? {} : { reasoningEffort: 'none' as const }),
-        },
-        AbortSignal.timeout(input.timeoutMs ?? 30_000),
-      );
-      if (!result.content || typeof result.content !== 'object' || Array.isArray(result.content))
-        throw new Error('Provider 未返回 JSON 对象');
-      const latencyMs = Date.now() - started;
+      const { result, latencyMs } = await runProviderConnectionTest({
+        provider,
+        model,
+        metadata,
+        timeoutMs: input.timeoutMs ?? 30_000,
+      });
       if (!persist) {
         const testToken = randomUUID();
         this.drafts.set(testToken, {

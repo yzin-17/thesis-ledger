@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type {
   BacktestCapabilities,
   BacktestCalendarResponse,
@@ -9,6 +9,7 @@ import type {
 } from '@thesis-ledger/schemas';
 import { runConfigSchemaV2, validateStrategyRunConfig } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
 import {
   buildSnapshotManifest,
   canonicalizeManifest,
@@ -31,6 +32,12 @@ const instrumentType = (value: string): 'STOCK' | 'ETF' | 'NAV_FUND' => {
   return 'STOCK';
 };
 
+const barAssetType = (value: string): 'STOCK' | 'ETF' => {
+  if (value === 'etf') return 'ETF';
+  if (value === 'stock') return 'STOCK';
+  throw new Error(`Snapshot bars assetType 不支持: ${value}`);
+};
+
 const parseInstrument = (value: string) => {
   const [market, symbol, assetType] = value.split(':');
   if (!market || !symbol || !assetType) throw new Error(`Snapshot dataset identity 无效: ${value}`);
@@ -49,6 +56,12 @@ const dependencyInstrument = (
     market: parsed.market,
     instrumentType: instrumentType(parsed.assetType),
   };
+};
+
+const instrumentCurrency = (market: BacktestMarket): 'CNY' | 'HKD' | 'USD' => {
+  if (market === 'CN') return 'CNY';
+  if (market === 'HK') return 'HKD';
+  return 'USD';
 };
 
 const findCapability = (
@@ -190,6 +203,7 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
   constructor(
     private readonly dsa: DsaClient,
     private readonly snapshots: LocalSnapshotStore,
+    @Inject(MarketBarReader) private readonly bars: Pick<MarketBarReader, 'read'>,
   ) {}
 
   async build(input: Parameters<BacktestV2SnapshotBuilder['build']>[0]) {
@@ -284,12 +298,42 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
             artifactName = `${dataset.purpose}/${parsed.market}-${parsed.symbol}-1d.parquet`;
           } else {
             const instrument = findCapability(capabilities, dataset, input.runConfig.dataAsOf);
-            const bars = await this.dsa.backtestBars({
-              symbol: instrument.symbol,
-              timeframe: dataset.baseTimeframe as '1m' | '1d',
-              start: manifest.dateRange.warmupStartDate,
-              end: manifest.dateRange.endDate,
+            const series = await this.bars.read({
+              identity: {
+                symbol: instrument.symbol,
+                assetType: barAssetType(instrument.assetType),
+                timeframe: dataset.baseTimeframe as '1m' | '1d',
+                adjustment: 'none',
+              },
+              window: {
+                start: `${manifest.dateRange.warmupStartDate}T00:00:00.000Z`,
+                end: `${manifest.dateRange.endDate}T23:59:59.999Z`,
+              },
+              acceptance: 'point-in-time',
+              asOf: input.runConfig.dataAsOf,
             });
+            manifest.providerRevisions[`bars:${dataset.instrument}:${dataset.baseTimeframe}`] =
+              `${series.provenance.providerId}/${series.provenance.upstreamSource}#${series.provenance.routeIndex};policy=${series.provenance.effectivePolicyRevision};provider=${series.provenance.providerRevision};fingerprint=${series.inputFingerprint}`;
+            const bars = series.points.map((point) => ({
+              symbol: instrument.symbol,
+              market: instrument.market,
+              timeframe: dataset.baseTimeframe,
+              occurredAt: point.timestamp,
+              availableAt: point.availableAt,
+              open: point.open.toString(),
+              high: point.high.toString(),
+              low: point.low.toString(),
+              close: point.close.toString(),
+              volume: point.volume.toString(),
+              amount: point.amount.toString(),
+              provider: series.provenance.providerId,
+              upstreamSource: series.provenance.upstreamSource,
+              routeIndex: series.provenance.routeIndex,
+              effectivePolicyRevision: series.provenance.effectivePolicyRevision,
+              providerRevision: series.provenance.providerRevision,
+              inputFingerprint: series.inputFingerprint,
+              quality: 'complete',
+            }));
             if (bars.length === 0)
               throw new Error(`Snapshot bars unavailable: ${dataset.instrument}`);
             for (const bar of bars) {
@@ -340,7 +384,11 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
             executionEnd: manifest.dateRange.endDate,
             dataAsOf: input.runConfig.dataAsOf,
           });
-          if (response.status === 'unavailable') {
+          if (
+            response.status !== 'supported' ||
+            !response.coverage.complete ||
+            response.facts.length === 0
+          ) {
             throw new BacktestMarketRulesUnavailableError(
               response.reason ?? `缺少标的历史事实: ${instrument.symbol}`,
             );
@@ -359,6 +407,26 @@ export class DsaSnapshotBuilder implements BacktestV2SnapshotBuilder {
           ) {
             throw new BacktestMarketRulesUnavailableError(
               'Provider 标的事实与研究模型适用范围不一致',
+            );
+          }
+          if (
+            response.facts.some(
+              (fact) =>
+                fact.symbol !== instrument.symbol ||
+                fact.market !== instrument.market ||
+                fact.instrumentType !== instrument.instrumentType ||
+                fact.currency !== instrumentCurrency(instrument.market),
+            )
+          ) {
+            throw new BacktestMarketRulesUnavailableError(
+              model
+                ? 'Provider 标的事实与研究模型适用范围不一致'
+                : 'Provider 标的事实与请求标的不一致',
+            );
+          }
+          if (response.facts.some((fact) => !fact.tradable)) {
+            throw new BacktestMarketRulesUnavailableError(
+              `Provider 未证明标的历史可交易性: ${instrument.symbol}`,
             );
           }
           const result = rowsFromDependencyResponse(

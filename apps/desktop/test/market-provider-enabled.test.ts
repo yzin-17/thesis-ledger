@@ -52,7 +52,7 @@ describe('数据源即时启停', () => {
       providerId: 'finnhub',
       enabled: false,
     });
-    expect(request).toHaveBeenCalledWith('/market-data/providers/finnhub/config', {
+    expect(request).toHaveBeenCalledWith('/api/v2/market-data/providers/finnhub/config', {
       method: 'POST',
       body: JSON.stringify({ enabled: false }),
     });

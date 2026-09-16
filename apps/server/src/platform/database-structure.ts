@@ -63,6 +63,11 @@ const parseCreatedTables = (sql: string) =>
     .map((match) => match[1])
     .filter((value): value is string => Boolean(value));
 
+const parseDroppedTables = (sql: string) =>
+  [...sql.matchAll(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"([^"]+)"/giu)]
+    .map((match) => match[1])
+    .filter((value): value is string => Boolean(value));
+
 const uniqueSorted = (values: string[]) =>
   [...new Set(values)].sort((left, right) => left.localeCompare(right));
 
@@ -78,7 +83,7 @@ export const discoverDatabaseStructure = async (
   if (entries.length === 0) throw new Error(`迁移目录为空: ${migrationsRoot}`);
 
   const migrations: DatabaseMigrationInput[] = [];
-  const createdTables: string[] = [];
+  const createdTables = new Set<string>();
   for (const name of entries) {
     if (!MIGRATION_NAME.test(name)) throw new Error(`迁移目录命名无效: ${name}`);
     const sqlPath = join(migrationsRoot, name, 'migration.sql');
@@ -90,7 +95,8 @@ export const discoverDatabaseStructure = async (
     }
     if (!sql.trim()) throw new Error(`迁移 SQL 为空: ${name}`);
     migrations.push({ name, sqlPath, sql });
-    createdTables.push(...parseCreatedTables(sql));
+    for (const table of parseCreatedTables(sql)) createdTables.add(table);
+    for (const table of parseDroppedTables(sql)) createdTables.delete(table);
   }
 
   const schema = await readFile(join(root, 'schema.prisma'), 'utf8');
@@ -114,7 +120,7 @@ export const discoverDatabaseStructure = async (
   if (new Set(rawOwnedTables).size !== rawOwnedTables.length)
     throw new Error('raw-owned table manifest 存在重复声明');
 
-  const expectedTables = uniqueSorted(createdTables);
+  const expectedTables = uniqueSorted([...createdTables]);
   const coveredTables = new Set([...prismaTables, ...rawOwnedTables]);
   for (const table of expectedTables) {
     if (!coveredTables.has(table)) throw new Error(`迁移表 ${table} 未被 Prisma 或 raw-owned 覆盖`);

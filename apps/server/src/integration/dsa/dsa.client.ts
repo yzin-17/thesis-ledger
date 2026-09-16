@@ -4,6 +4,10 @@ import type {
   CatalogDelta,
   DesiredProviderPolicy,
   ProviderManifest,
+  DesiredProviderPolicyV2,
+  EffectiveProviderPolicyV2,
+  BarSeriesV2,
+  IndicatorCalculateResponseV2,
   ProviderOAuthAction,
   CurrencyV1,
   FxRatesResponseV1,
@@ -28,8 +32,14 @@ import {
   fxRatesResponseSchemaV1,
   providerOAuthSessionSchema,
   currentProviderOAuthSessionSchema,
+  desiredProviderPolicyV2Schema,
+  effectiveProviderPolicyV2Schema,
+  barSeriesV2Schema,
+  indicatorCalculateResponseV2Schema,
 } from '@thesis-ledger/schemas';
 import { loadConfig } from '../../platform/config.js';
+
+export const DSA_MARKET_INDICATOR_ENGINE_VERSION = 'dsa-indicator-v2';
 import { currentTraceId } from '../../platform/structured-logger.js';
 
 export type CatalogJob = {
@@ -99,6 +109,45 @@ export class DsaClient {
           throw new DsaError(
             detail?.message ?? `DSA 返回 ${response.status}`,
             code,
+            response.status,
+          );
+        }
+        return (await response.json()) as T;
+      } catch (error) {
+        lastError = error;
+        if (attempt + 1 < attempts)
+          await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
+      }
+    }
+    if (lastError instanceof DsaError) throw lastError;
+    if (lastError instanceof DOMException && lastError.name === 'TimeoutError')
+      throw new DsaError('DSA 请求超时', 'timeout');
+    throw new DsaError('DSA 不可用', 'unavailable');
+  }
+
+  async post<T>(path: string, body: unknown, attempts = 2): Promise<T> {
+    let lastError: unknown;
+    const traceId = currentTraceId() ?? crypto.randomUUID();
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        const response = await fetch(new URL(path, this.config.dsaBaseUrl), {
+          method: 'POST',
+          signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${this.config.dsaToken}`,
+            'x-trace-id': traceId,
+            'x-request-id': traceId,
+          },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            detail?: { code?: string; message?: string };
+          } | null;
+          throw new DsaError(
+            payload?.detail?.message ?? `DSA 返回 ${response.status}`,
+            'unavailable',
             response.status,
           );
         }
@@ -242,6 +291,41 @@ export class DsaClient {
     );
   }
 
+  marketBarsV2(input: {
+    symbol: string;
+    assetType: string;
+    timeframe: '1m' | '1d';
+    adjustment: 'none' | 'qfq' | 'hfq';
+    start?: string;
+    end?: string;
+    limit?: number;
+  }): Promise<BarSeriesV2> {
+    const params = new URLSearchParams({
+      symbol: input.symbol,
+      assetType: input.assetType,
+      timeframe: input.timeframe,
+      adjustment: input.adjustment,
+      limit: String(input.limit ?? 90),
+    });
+    if (input.start) params.set('start', input.start);
+    if (input.end) params.set('end', input.end);
+    return this.get<unknown>(`/api/v2/thesis-ledger/market/bars?${params.toString()}`, 1).then(
+      (raw) => barSeriesV2Schema.parse(raw),
+    );
+  }
+
+  calculateIndicatorsV2(input: {
+    identity: BarSeriesV2['identity'];
+    inputFingerprint: string;
+    points: BarSeriesV2['points'];
+    requests: Array<{ name: 'MA' | 'MACD' | 'RSI'; parameters: Record<string, number> }>;
+  }): Promise<IndicatorCalculateResponseV2> {
+    return this.post<unknown>('/api/v2/thesis-ledger/market/indicators/calculate', {
+      contractVersion: 2,
+      ...input,
+    }, 1).then((raw) => indicatorCalculateResponseV2Schema.parse(raw));
+  }
+
   fxRates(input: {
     baseCurrency: CurrencyV1;
     currencies: readonly CurrencyV1[];
@@ -269,6 +353,23 @@ export class DsaClient {
         consumer: 'thesis-ledger',
         requestId,
         supportedVersions: [1],
+      }),
+    });
+  }
+
+  /** Control Contract V2 的显式握手；V1 调用方不会被隐式升级。 */
+  controlHandshakeV2(requestId = crypto.randomUUID()) {
+    return this.control<{
+      contractVersion: number;
+      consumer: string;
+      accepted: boolean;
+    }>('/api/v1/thesis-ledger/control/handshake', {
+      method: 'POST',
+      body: JSON.stringify({
+        contractVersion: 2,
+        consumer: 'thesis-ledger',
+        requestId,
+        supportedVersions: [2],
       }),
     });
   }
@@ -375,6 +476,33 @@ export class DsaClient {
     return this.control('/api/v1/thesis-ledger/control/policies/apply', {
       method: 'POST',
       body: JSON.stringify(policy),
+    });
+  }
+
+  applyControlPolicyV2(policy: DesiredProviderPolicyV2) {
+    const validated = desiredProviderPolicyV2Schema.parse(policy);
+    return this.control<{
+      status: string;
+      idempotent: boolean;
+      desired: DesiredProviderPolicyV2;
+      effective: EffectiveProviderPolicyV2;
+      requestId: string;
+    }>('/api/v1/thesis-ledger/control/policies/apply', {
+      method: 'POST',
+      body: JSON.stringify(validated),
+    });
+  }
+
+  effectiveControlPolicyV2() {
+    return this.control<{
+      contractVersion: 2;
+      consumer: 'thesis-ledger';
+      projection: {
+        effective: EffectiveProviderPolicyV2;
+      } | null;
+    }>('/api/v1/thesis-ledger/control/policies/effective').then((raw) => {
+      if (raw.projection?.effective) effectiveProviderPolicyV2Schema.parse(raw.projection.effective);
+      return raw;
     });
   }
 

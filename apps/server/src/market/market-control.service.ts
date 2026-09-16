@@ -6,24 +6,74 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { desiredProviderPolicySchema, type DesiredProviderPolicy } from '@thesis-ledger/schemas';
+import {
+  desiredProviderPolicyV2Schema,
+  type DesiredProviderPolicyV2,
+  type RouteTargetV2,
+} from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 
-const defaultRoutes = {
+export const defaultMarketRoutesV2 = {
   REALTIME_QUOTE: {
-    STOCK: ['akshare', 'efinance'],
-    ETF: ['akshare', 'efinance'],
+    STOCK: [
+      { providerId: 'akshare', upstreamSource: 'akshare' },
+      { providerId: 'efinance', upstreamSource: 'efinance' },
+    ],
+    ETF: [
+      { providerId: 'akshare', upstreamSource: 'akshare' },
+      { providerId: 'efinance', upstreamSource: 'efinance' },
+    ],
   },
   DAILY_BAR: {
-    STOCK: ['akshare', 'efinance'],
-    ETF: ['akshare', 'efinance'],
+    STOCK: [
+      { providerId: 'akshare', upstreamSource: 'eastmoney' },
+      { providerId: 'efinance', upstreamSource: 'eastmoney' },
+    ],
+    ETF: [
+      { providerId: 'tencent', upstreamSource: 'tencent' },
+      { providerId: 'akshare', upstreamSource: 'eastmoney' },
+    ],
   },
-  FUND_NAV: { MUTUAL_FUND: ['akshare', 'efinance'] },
-  FUND_NAV_HISTORY: { MUTUAL_FUND: ['akshare', 'efinance'] },
-  FUND_HOLDINGS: { MUTUAL_FUND: ['akshare'] },
-  CHIP_SUMMARY: { STOCK: ['akshare'] },
+  FUND_NAV: {
+    MUTUAL_FUND: [
+      { providerId: 'akshare', upstreamSource: 'akshare' },
+      { providerId: 'efinance', upstreamSource: 'efinance' },
+    ],
+  },
+  FUND_NAV_HISTORY: {
+    MUTUAL_FUND: [
+      { providerId: 'akshare', upstreamSource: 'akshare' },
+      { providerId: 'efinance', upstreamSource: 'efinance' },
+    ],
+  },
+  FUND_HOLDINGS: { MUTUAL_FUND: [{ providerId: 'akshare', upstreamSource: 'akshare' }] },
+  CHIP_SUMMARY: { STOCK: [{ providerId: 'akshare', upstreamSource: 'akshare' }] },
 } as const;
+
+type RouteMatrixV2 = Record<string, Record<string, RouteTargetV2[]>>;
+
+export function removeProviderTargets(routes: RouteMatrixV2, providerId: string) {
+  const normalizedProviderId = providerId.trim().toLowerCase();
+  const nextRoutes: RouteMatrixV2 = {};
+  const routeDiff: Array<{
+    capability: string;
+    instrumentType: string;
+    previous: RouteTargetV2[];
+    next: RouteTargetV2[];
+  }> = [];
+  for (const [capability, typeRoutes] of Object.entries(routes)) {
+    nextRoutes[capability] = {};
+    for (const [instrumentType, targets] of Object.entries(typeRoutes)) {
+      const previous = Array.isArray(targets) ? targets : [];
+      const next = previous.filter((target) => target.providerId !== normalizedProviderId);
+      nextRoutes[capability][instrumentType] = next;
+      if (next.length !== previous.length)
+        routeDiff.push({ capability, instrumentType, previous, next });
+    }
+  }
+  return { nextRoutes, routeDiff };
+}
 
 const safeError = (error: unknown) => ({
   code: error instanceof DsaError ? error.code : 'control_unavailable',
@@ -37,16 +87,28 @@ export class MarketControlService {
     private readonly dsa: DsaClient,
   ) {}
 
-  private policyPayload(input: unknown, revision: number): DesiredProviderPolicy {
+  private policyPayload(input: unknown, revision: number): DesiredProviderPolicyV2 {
     const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
-    return desiredProviderPolicySchema.parse({
-      contractVersion: 1,
+    return desiredProviderPolicyV2Schema.parse({
+      contractVersion: 2,
       consumer: 'thesis-ledger',
       requestId: typeof raw.requestId === 'string' ? raw.requestId : randomUUID(),
       revision,
       enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-      routes: raw.routes ?? defaultRoutes,
+      routes: raw.routes ?? defaultMarketRoutesV2,
     });
+  }
+
+  private policyResponse(row: Record<string, unknown>): Record<string, unknown> {
+    const parsed = desiredProviderPolicyV2Schema.parse({
+      contractVersion: 2,
+      consumer: 'thesis-ledger',
+      requestId: randomUUID(),
+      revision: row.revision,
+      enabled: row.enabled,
+      routes: row.routes,
+    });
+    return { ...row, ...parsed, contractVersion: 2 };
   }
 
   private async ensureSeededPolicy() {
@@ -54,8 +116,18 @@ export class MarketControlService {
       where: { consumer: 'thesis-ledger' },
       include: { history: { orderBy: { revision: 'desc' }, take: 20 } },
     });
-    if (current) return current;
-    const payload = this.policyPayload({ routes: defaultRoutes }, 1);
+    if (current) {
+      desiredProviderPolicyV2Schema.parse({
+        contractVersion: 2,
+        consumer: 'thesis-ledger',
+        requestId: randomUUID(),
+        revision: current.revision,
+        enabled: current.enabled,
+        routes: current.routes,
+      });
+      return current;
+    }
+    const payload = this.policyPayload({ routes: defaultMarketRoutesV2 }, 1);
     return this.prisma.desiredProviderPolicy.upsert({
       where: { consumer: 'thesis-ledger' },
       update: {},
@@ -81,15 +153,15 @@ export class MarketControlService {
   async getPolicy() {
     const current = await this.ensureSeededPolicy();
     if (current.syncState === 'pending') return this.retryLatest();
-    return current;
+    return this.policyResponse(current as unknown as Record<string, unknown>);
   }
 
   private async pushToDsa(
-    policy: DesiredProviderPolicy,
+    policy: DesiredProviderPolicyV2,
     allowRebase = true,
   ): Promise<ReturnType<MarketControlService['recordSyncFailure']>> {
     try {
-      const projection = (await this.dsa.applyControlPolicy(policy)) as {
+      const projection = (await this.dsa.applyControlPolicyV2(policy)) as {
         status?: string;
         effective?: Record<string, unknown>;
       };
@@ -151,7 +223,7 @@ export class MarketControlService {
   }
 
   // 以 DSA 当前 revision 为基线：本地新建一个“远端版本 + 1”的修订（内容保持本地期望），推送由调用方完成
-  private async rebaseToDsaRevision(policy: DesiredProviderPolicy) {
+  private async rebaseToDsaRevision(policy: DesiredProviderPolicyV2) {
     try {
       const effective = (await this.dsa.effectiveControlPolicy()) as {
         projection?: { desired?: { revision?: number } } | null;
@@ -190,7 +262,7 @@ export class MarketControlService {
   }
 
   private recordSyncFailure(
-    policy: DesiredProviderPolicy,
+    policy: DesiredProviderPolicyV2,
     syncState: 'rejected' | 'pending',
     lastError: { code: string; message: string },
   ) {
@@ -260,12 +332,13 @@ export class MarketControlService {
       });
       return { current: next, shouldPush: true };
     });
-    return result.shouldPush ? this.pushToDsa(policy) : result.current;
+    const response = result.shouldPush ? await this.pushToDsa(policy) : result.current;
+    return this.policyResponse(response as unknown as Record<string, unknown>);
   }
 
   async retryLatest() {
     const current = await this.ensureSeededPolicy();
-    if (current.syncState !== 'pending') return current;
+    if (current.syncState !== 'pending') return this.policyResponse(current as unknown as Record<string, unknown>);
     const policy = this.policyPayload(
       {
         enabled: current.enabled,
@@ -273,7 +346,7 @@ export class MarketControlService {
       },
       current.revision,
     );
-    return this.pushToDsa(policy);
+    return this.policyResponse((await this.pushToDsa(policy)) as unknown as Record<string, unknown>);
   }
 
   async rollback(targetRevision: number) {
@@ -286,55 +359,44 @@ export class MarketControlService {
       where: { consumer_revision: { consumer: 'thesis-ledger', revision: targetRevision } },
     });
     if (!target) throw new NotFoundException(`找不到 revision ${targetRevision}`);
+    const policy = await this.applyPolicy({
+      revision: current.revision + 1,
+      enabled: target.enabled,
+      routes: target.routes,
+    });
     return {
       rolledBackFrom: current.revision,
       rolledBackTo: targetRevision,
-      ...(await this.applyPolicy({
-        revision: current.revision + 1,
-        enabled: target.enabled,
-        routes: target.routes,
-      })),
+      ...policy,
     };
   }
 
   async removeProvider(providerId: string) {
     const current = await this.ensureSeededPolicy();
-    const currentRoutes = (current.routes ?? {}) as Record<string, Record<string, string[]>>;
-    const nextRoutes: Record<string, Record<string, string[]>> = {};
-    const routeDiff: Array<{
-      capability: string;
-      instrumentType: string;
-      previous: string[];
-      next: string[];
-    }> = [];
-    for (const [capability, typeRoutes] of Object.entries(currentRoutes)) {
-      nextRoutes[capability] = {};
-      for (const [instrumentType, providers] of Object.entries(typeRoutes)) {
-        const previous = Array.isArray(providers) ? providers.map(String) : [];
-        const next = previous.filter((item) => item !== providerId);
-        nextRoutes[capability][instrumentType] = next;
-        if (next.length !== previous.length)
-          routeDiff.push({ capability, instrumentType, previous, next });
-      }
-    }
+    const { nextRoutes, routeDiff } = removeProviderTargets(
+      (current.routes ?? {}) as RouteMatrixV2,
+      providerId,
+    );
     const revision = current.revision + (routeDiff.length > 0 ? 1 : 0);
     const policy = this.policyPayload(
       { requestId: randomUUID(), enabled: current.enabled, routes: nextRoutes },
       revision,
     );
-    const dsaPolicy =
-      routeDiff.length > 0
-        ? await this.applyPolicy(policy)
-        : current.syncState === 'pending'
-          ? await this.retryLatest()
-          : current;
+    let dsaPolicy: Record<string, unknown>;
+    if (routeDiff.length > 0) {
+      dsaPolicy = await this.applyPolicy(policy) as Record<string, unknown>;
+    } else if (current.syncState === 'pending') {
+      dsaPolicy = await this.retryLatest() as Record<string, unknown>;
+    } else {
+      dsaPolicy = current as unknown as Record<string, unknown>;
+    }
     if (dsaPolicy.syncState !== 'applied') {
       return {
         providerId,
         removed: false,
         pending: dsaPolicy.syncState === 'pending',
         routeDiff,
-        policy: dsaPolicy,
+        policy: this.policyResponse(dsaPolicy as unknown as Record<string, unknown>),
         tombstone: null,
         dsaTombstone: null,
       };
@@ -351,7 +413,7 @@ export class MarketControlService {
         removed: false,
         pending: true,
         routeDiff,
-        policy: dsaPolicy,
+        policy: this.policyResponse(dsaPolicy as unknown as Record<string, unknown>),
         tombstone: null,
         dsaTombstone: safeError(error),
       };
@@ -370,7 +432,14 @@ export class MarketControlService {
         metadata: { routeDiff },
       },
     });
-    return { providerId, removed: true, routeDiff, policy: dsaPolicy, tombstone, dsaTombstone };
+    return {
+      providerId,
+      removed: true,
+      routeDiff,
+      policy: this.policyResponse(dsaPolicy as unknown as Record<string, unknown>),
+      tombstone,
+      dsaTombstone,
+    };
   }
 
   providers() {

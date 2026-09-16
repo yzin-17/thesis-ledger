@@ -5,6 +5,7 @@ import { MarketProviderPanel } from '../src/features/market-data/MarketProviderP
 import { MarketDataSectionTabs } from '../src/features/market-data/MarketDataSectionTabs.js';
 import { InstrumentCatalogPanel } from '../src/features/market-data/InstrumentCatalogPanel.js';
 import {
+  compatibleRouteTargets,
   compatibleProviders,
   updateRouteRole,
   type MarketPolicy,
@@ -28,6 +29,7 @@ const routeProvider = (
   origin: 'dsa',
   markets,
   configurationMode,
+  upstreamSources: [{ sourceId: providerId, displayName, capabilities: { DAILY_BAR: ['STOCK'] } }],
   credentialSchema: {
     methods: configurationMode === 'dsa_environment' ? [{
       method: 'api_key', fields: [{ name: 'apiKey', required: true, secret: true }],
@@ -48,8 +50,8 @@ const providers: ProviderManifest[] = [
     markets: ['CN'],
     configurationMode: 'control',
     upstreamSources: [
-      { sourceId: 'eastmoney', displayName: '东方财富' },
-      { sourceId: 'tencent', displayName: '腾讯财经' },
+      { sourceId: 'eastmoney', displayName: '东方财富', capabilities: { DAILY_BAR: ['STOCK', 'ETF'] } },
+      { sourceId: 'tencent', displayName: '腾讯财经', capabilities: { DAILY_BAR: ['STOCK', 'ETF'] } },
     ],
   },
   {
@@ -63,7 +65,7 @@ const providers: ProviderManifest[] = [
     origin: 'dsa',
     markets: ['CN'],
     configurationMode: 'control',
-    upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经' }],
+    upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经', capabilities: { DAILY_BAR: ['STOCK', 'ETF'] } }],
     updatedAt: '2026-09-08T00:00:00Z',
   },
   {
@@ -88,10 +90,20 @@ const providers: ProviderManifest[] = [
 ];
 
 const policy: MarketPolicy = {
+  contractVersion: 2,
   revision: 14,
   enabled: true,
   routes: {
-    DAILY_BAR: { STOCK: ['akshare', 'tencent'], ETF: ['akshare', 'tencent'] },
+    DAILY_BAR: {
+      STOCK: [
+        { providerId: 'akshare', upstreamSource: 'eastmoney' },
+        { providerId: 'tencent', upstreamSource: 'tencent' },
+      ],
+      ETF: [
+        { providerId: 'tencent', upstreamSource: 'tencent' },
+        { providerId: 'akshare', upstreamSource: 'eastmoney' },
+      ],
+    },
   },
   syncState: 'applied',
 };
@@ -141,11 +153,36 @@ describe('市场数据 Provider 与主备路由', () => {
   });
 
   it('用两个角色维护有序路由并阻止主备重复', () => {
-    const changedPrimary = updateRouteRole(policy, 'DAILY_BAR', 'ETF', 'primary', 'tencent');
-    expect(changedPrimary.routes.DAILY_BAR?.ETF).toEqual(['tencent']);
+    const eastmoney = { providerId: 'akshare', upstreamSource: 'eastmoney' };
+    const tencent = { providerId: 'tencent', upstreamSource: 'tencent' };
+    const akshareTencent = { providerId: 'akshare', upstreamSource: 'tencent' };
+    const changedPrimary = updateRouteRole(policy, 'DAILY_BAR', 'ETF', 'primary', eastmoney);
+    expect(changedPrimary.routes.DAILY_BAR?.ETF).toEqual([eastmoney]);
 
-    const changedFallback = updateRouteRole(policy, 'DAILY_BAR', 'ETF', 'fallback', 'akshare');
-    expect(changedFallback.routes.DAILY_BAR?.ETF).toEqual(['akshare']);
+    const changedFallback = updateRouteRole(policy, 'DAILY_BAR', 'ETF', 'fallback', tencent);
+    expect(changedFallback.routes.DAILY_BAR?.ETF).toEqual([tencent]);
+
+    const sameProviderDifferentSource = updateRouteRole(
+      changedPrimary,
+      'DAILY_BAR',
+      'ETF',
+      'fallback',
+      akshareTencent,
+    );
+    expect(sameProviderDifferentSource.routes.DAILY_BAR?.ETF).toEqual([
+      eastmoney,
+      akshareTencent,
+    ]);
+  });
+
+  it('路由候选是 manifest 声明的 adapter/source 组合', () => {
+    expect(
+      compatibleRouteTargets(providers, 'DAILY_BAR', 'ETF').map((option) => option.target),
+    ).toEqual([
+      { providerId: 'akshare', upstreamSource: 'eastmoney' },
+      { providerId: 'akshare', upstreamSource: 'tencent' },
+      { providerId: 'tencent', upstreamSource: 'tencent' },
+    ]);
   });
 
   it('Provider 清单为全部 DSA 数据源提供路由配置操作', () => {
@@ -193,6 +230,8 @@ describe('市场数据 Provider 与主备路由', () => {
     expect(html).toContain('主数据源');
     expect(html).toContain('备用数据源');
     expect(html).toContain('日线 Bar 主数据源');
+    expect(html).toContain('AKShare · 东方财富');
+    expect(html).toContain('腾讯财经');
     expect(html).toContain('保存路由策略');
     expect(html).not.toContain('第 14 版');
     expect(html).not.toContain('上移');

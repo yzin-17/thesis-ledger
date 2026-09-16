@@ -2,7 +2,7 @@
 
 > 任务标识：`2026-09-09-strategy-risk-ai-optimization`  
 > 日期：2026-09-09  
-> 状态：**16/16 完成（仓库实现）**；外部 Provider、在线行情和人工浏览器 smoke 作为部署能力门禁单独记录
+> 状态：**17/20 完成**；T17、T18 的仓库实现、本地门禁、目标开发数据库增量 SQL 与当前 Docker 更新已通过，T17 的隔离 PostgreSQL及 T19 的真实 Provider/在线行情闭环仍待执行，因此暂不勾选新增任务
 > 推荐位置：`docs/tasks/2026-09-09-strategy-risk-ai-optimization.md`  
 > 对应规格：[Spec](../specs/2026-09-09-strategy-risk-ai-optimization.md)  
 > 前置任务：[统一回测系统 V2](2026-08-28-unified-backtest-v2.md)  
@@ -57,8 +57,68 @@
 | T13 | B | T05、T10、T12 | 实现 AI 实验工作区与多模型对比界面 |
 | T14 | A/B 发布门禁 | T00、T01、T02、T03、T04、T05、T06、T07、T08、T09、T10、T11、T12、T13 | 完成跨模块集成、隔离、安全与真实小额验收 |
 | T15 | 发布 | T14 | 完成增量发布、回退开关与文档收敛 |
+| T16 | B 纠偏 | T07、T13 | 修正优化目标/时间边界展示、结构化模型多选与 reasoningEffort 全链路 |
+| T17 | B 探索契约与执行 | T06–T12、T16 | 实现从零探索来源、隐藏种子、完整候选校验与采纳隔离 |
+| T18 | B Desktop | T05、T13、T17 | 重构 AI 策略实验信息架构并提供正式策略通用风险入口 |
+| T19 | 增量验收门禁 | T17、T18 | 验证旧优化兼容、探索闭环、策略库隔离与浏览器关键路径 |
 
 可并行边界：T06、T07 可在各自前置通过后并行；T08 可与数据准备并行；T03 的真实适配与 T06 的模拟数据不得共享可变状态。T10 必须消费已经验证的运行/评价能力，不能先搭一个不执行真实回测的“成功流程”。
+
+### T16：实验表单语义与推理强度纠偏
+
+- [x] T16 完成（仓库实现；外部 Provider/浏览器仍属部署门禁）。
+
+**阶段：**B。
+**依赖：**T07、T13 的既有 Provider capability 与实验工作区契约。
+**覆盖验收：**AC33、AC34、AC35，并回归 AC12、AC19、AC23、AC26。
+
+**交付内容：**
+
+1. 优化目标选择器/摘要使用中文标签，保留 `return/drawdown/balanced/lowTurnover` wire value。
+2. 四个日期展示“开发集开始/结束、验证集结束、封存测试结束”标签和连续区间说明；验证集与测试集起始日由前一段结束日后一天派生并提交。
+3. capability 返回结构化 Provider/Model 及 reasoning metadata；Desktop 使用可搜索多选（最多 3 个），路由状态不依赖第一个冒号切分。
+4. 扩展 `optimizationModelSchema` 的可选 `reasoningEffort`；服务端仅接受模型声明的支持强度，`mandatory` 或不支持 `none` 时拒绝 `none`，缺少能力声明时对显式强度 fail-closed；旧请求/旧记录保持可读。
+5. 将合法强度从创建 payload、实验 `modelConfig` 传递到真实 Provider `complete` 调用，并记录请求强度以便审计；补齐 Schema、Server、Desktop 定向测试。
+
+**完成条件：**三个用户问题均可由表单直接理解和操作；服务端与 Provider 对强度选择有同一可验证语义；非法选择不会创建实验或隐式猜测能力。
+
+**验证方式：**Schema 契约测试、Server capability/创建/真实调用测试、Desktop 组件/类型测试；覆盖中文回显、日期标签与派生、最多 3 模型、含冒号路由、强度合法性/mandatory/缺能力、旧输入兼容。
+
+**验证证据：**`pnpm --filter @thesis-ledger/schemas test` 通过（18 个文件、172 个测试）；Server 定向 `pnpm exec vitest run test/strategy-optimization/ai-provider-strict-routing.test.ts test/ai/provider-adapters.test.ts` 通过（2 个文件、11 个测试）；`pnpm exec vitest run test/strategy-optimization-form.test.ts` 通过（6 个测试，包含完整渲染时的 Field 上下文回归）；`pnpm --filter @thesis-ledger/server typecheck` 与 `pnpm --filter @thesis-ledger/desktop typecheck` 通过；本任务目标文件的 scoped ESLint 与 Prettier 检查通过。拆分后 `StrategyOptimizationExperimentPanel.tsx` 为 544 行、`StrategyOptimizationExperimentResults.tsx` 为 410 行，`strategy-optimization.service.ts` 为 594 行。`GUARDRAIL_BASE_REF=HEAD node scripts/check-file-size-guardrails.mjs` 中本任务上述三个文件均通过尺寸检查；命令仍报告并行 dirty change 的 `PerformanceSections.tsx` 增长这一项既有失败，本任务未修改该文件。Desktop package test 全量命令受到并行 dirty change 的既有 `ui-contract.test.tsx` 失败影响（`AccountDataPage.tsx` 缺少 `accountDisplayLabel`），该失败不涉及本任务文件。真实外部 Provider、Docker 与人工浏览器交互仍属于 T14 部署门禁。
+
+### T17：从零探索契约、执行与采纳隔离
+
+- [ ] T17 仓库实现完成；隔离 PostgreSQL 结构与事务门禁待执行。
+
+**依赖：**T06–T12、T16。
+**覆盖验收：**AC37、AC38、AC39，并回归 AC12–AC24、AC27、AC29。
+**涉及范围：**`packages/schemas` 的实验来源与探索空间契约；Server 的隐藏种子、探索提示/输出、候选校验、持久化和采纳事务；必要的增量 migration 与结构门禁。不扩展任意代码执行、多标的组合、外部 Signal Source 或现有 V2 引擎支持矩阵。
+**完成条件：**旧的现有策略优化请求保持可解析；探索请求创建 experiment-only v0 种子且不出现在策略库；Provider 返回的完整候选经过探索空间与 V2 双重校验后才可回测；采纳后原子发布用户可见正式 v1。
+**验证方式：**Schema 与 Server 定向测试覆盖 existing/discovery 条件字段、旧输入、跨标的/周期、未知 AST、受支持候选、策略列表隔离、幂等采纳和失败回滚；数据库结构变更按 migration matrix 与隔离 PostgreSQL 门禁执行。
+
+**2026-09-16 增量证据：**新增 `existing/discovery` 条件契约、`experiment-only` v0 种子、受限 `strategy-space-v1` 完整候选、策略库隔离、独立探索克隆和采纳为正式 v1；创建与克隆均从实际持久化 seed schema 重算 `dataFingerprint`。`pnpm --filter @thesis-ledger/schemas test` 通过（18 个文件、174 个测试）；Server 定向通过（4 个文件、17 个测试）；Server typecheck/build、migration matrix（9 migrations、65 SQL tables、58 Prisma models、7 raw-owned tables）与 import boundaries 通过。目标开发库 `thesis_ledger` 已保留数据执行增量 migration，`SchemaVersion`、3 个新增字段和 2 个约束核验通过；`./scripts/update.sh thesis-ledger` 的结构 gate、镜像构建、Server/Worker 重建与健康检查通过。尚未对新增 migration 执行隔离 PostgreSQL，因此 T17 保持未勾选。
+
+### T18：AI 策略实验信息架构与正式策略通用风险入口
+
+- [ ] T18 仓库实现与本地浏览器 smoke 完成；随 T17 数据库门禁一起收口。
+
+**依赖：**T05、T13、T17。
+**覆盖验收：**AC36、AC37、AC40，并回归 AC03、AC04、AC25、AC26。
+**涉及范围：**Desktop 策略导航、实验工作区、探索表单、实验摘要和风险应用入口。复用现有 shadcn 组件、TanStack Query 与原子类，不新增页面级 CSS，不改变风险规则的确定性编译语义。
+**完成条件：**用户从顶层“AI 策略实验”选择优化/探索模式；探索模式只要求标的、市场、资产类型、周期及共用实验设置；风险区域明确适用于全部正式 V2 策略，手动与 AI 来源无资格差异。
+**验证方式：**Desktop 组件测试、类型检查与浏览器 smoke 覆盖两种模式切换、必填校验、创建 payload、正式策略枚举、V1/候选排除、实验结果中文语义、键盘/focus 和无控制台错误。
+
+**2026-09-16 增量证据：**顶层入口已改为“AI 策略实验”，内部明确分为“优化现有策略”和“从零探索策略”；风险页文案明确手动创建与 AI 采纳的正式 V2 版本共用确定性编译入口。Desktop 定向测试 6 个通过，typecheck/build 与 scoped ESLint/Prettier 通过。真实本地页面已验证模式切换、探索字段、创建按钮语义、风险空态与控制台；期间发现并修复 Base UI `ToggleGroup` 数组值协议错误，修复后 `pressed` 状态与探索表单同步，控制台无 error/warning。
+
+### T19：探索闭环与目标运行态验收
+
+- [ ] T19 待实施。
+
+**依赖：**T17、T18。
+**覆盖验收：**AC36–AC40，并回归 AC13–AC24、AC31、AC32。
+**关联门禁：**真实外部 Provider 与在线行情仍受 T14 部署能力条件约束；不可用时必须保留未通过状态，不用 Fixture 替代。
+**完成条件：**仓库级契约、Server、Desktop 与边界门禁通过；在具备目标 Provider/行情时完成一次“选择标的 → 探索 → 回测对比 → 封存测试 → 采纳 v1 → 风险规则预览”的真实闭环；环境不具备时准确记录为部署门禁未执行。
+**验证方式：**按“定向测试 → 包级 typecheck/build → 仓库边界/复杂度 → 当前 Docker → 浏览器”的成本阶梯执行并记录证据；低层失败时不提前运行高成本门禁。
 
 ## 3. 任务清单
 
@@ -597,14 +657,22 @@ pnpm exec prettier --check \
 | AC30 | T00、T03、T06、T09、T14 |
 | AC31 | T14、T15 |
 | AC32 | T00、T15 |
+| AC33 | T16 |
+| AC34 | T16、T07、T13 |
+| AC35 | T16、T07 |
+| AC36 | T18、T19 |
+| AC37 | T17、T18、T19 |
+| AC38 | T17、T19 |
+| AC39 | T17、T19 |
+| AC40 | T05、T18、T19 |
 
-## 8. 后续能力，不计入本次 16 项
+## 8. 后续能力，不计入本次 20 项
 
-技术离场表达式监控与入场订阅、移动/ATR 止损、账户/组合风控、结构优化、普通参数搜索对照、滚动验证、参数/成本稳健性实验和未来行情观察另立增量任务。本阶段仅保留明确的 unsupported 展示，不提前建立空接口或伪实现。
+技术离场表达式监控与入场订阅、移动/ATR 止损、账户/组合风控、任意代码/任意 AST 探索、普通参数搜索对照、滚动验证、参数/成本稳健性实验和未来行情观察另立增量任务。本阶段只实现版本化受支持组件空间内的单标的、单周期探索。
 
 ## 9. 当前状态
 
-截至 2026-09-12，T00–T15 的仓库实现与仓库级验证已收口，为 **16/16**。2026-09-09/10 的能力矩阵保留在 T00 作为实施前历史基线，不再作为当前完成度结论。
+截至 2026-09-16，T00–T16 的既有仓库实现与各自定向验证已收口；T17、T18 的新增仓库实现、本地门禁、目标开发数据库增量 SQL 和当前 Docker 更新已通过，但 T17 隔离 PostgreSQL 与 T19 真实 Provider/在线行情闭环尚未执行，当前仍为 **17/20**。文件尺寸门禁只报告并行 dirty change 的既有 `PerformanceSections.tsx` ratchet 失败，本任务未修改该文件。2026-09-09/10 的能力矩阵保留在 T00 作为实施前历史基线，不再作为当前完成度结论。
 
 - PR #35：完成策略风险与 AI 优化主体能力。
 - PR #36：统一 Strategy Risk 到 `RiskService.scan()`，保留旧手工规则 evaluator 与 `< / >` 语义。
@@ -617,38 +685,39 @@ pnpm exec prettier --check \
 
 - 真实外部 AI Provider 网络、鉴权、实际模型身份与 usage/cost smoke；
 - 在线 CN/HK/US Stock/ETF + CN NAV 数据能力 smoke；
-- Desktop 人工视觉、键盘、focus smoke。
+- Desktop 完整数据闭环的人工视觉、键盘、focus smoke；AI 两种模式切换与风险空态已在本地真实页面通过。
 
 这些部署门禁不能用 fixture 冒充；失败时限制对应 capability 并返回明确 `unavailable` 原因，但不反向把已完成的仓库实现判未完成。
 
 ## 10. 规划 Review
 
-- Spec 共 32 项验收标准，T00–T15 共 16 项任务；全部 AC 均有任务覆盖，任务引用不存在未知或孤立 AC。
+- Spec 共 40 项验收标准，T00–T19 共 20 项任务；全部 AC 均有任务覆盖，任务引用不存在未知或孤立 AC。
 - 未发现 `TBD`、`TODO`、未定义实现措辞或未解决的 Blocking Question。
 - G1/G2/G3 与 V2 任务的依赖按实际消费能力记录；历史审计档案退出前置，关键输入与可信运行验收仍不可跳过。
 - 跨任务的 `StrategyVersion`、`MonitoringPlan`、`StrategyRiskApplication`、`OptimizationExperiment`、`OptimizationCandidate`、`AiRun` 与 `BacktestRun` 命名和职责一致。
 
 ### 规划 Review 结论
 
-规划阶段结论保持为历史记录：任务可按依赖推进，G1/G2/G3 的实际可用性必须由实现与验证证据决定。当前完成度以第 9、11 节和验证记录为准。
+结论：**Ready with non-blocking assumptions**。T17–T19 的来源模式、探索空间、隐藏种子、采纳隔离、UI 所有权与验证责任已经明确；首版采用单标的、单周期和固定 `strategySpaceVersion`，该默认不改变用户确认的产品边界。真实 Provider/在线行情可用性只阻塞 T19 的目标运行态子门禁，不阻塞本地契约与实现。
 
 ## 11. 最终一致性 Review
 
 - [x] Spec 中的全部验收标准均有对应仓库实现或明确的部署能力边界
 - [x] 所有已勾选任务均有验证证据
-- [x] 所有任务依赖均已满足且无错误阻塞关系
+- [ ] T17–T19 的验证依赖待隔离 PostgreSQL 与目标运行态收口
 - [x] 跨任务接口、类型和命名保持一致
 - [x] 不存在未解决的 Blocking 问题、占位描述或未定义的实现契约
 - [x] 实现未超出 Spec 声明的范围；分钟行情缺少稳定自动 1m 时采用 capability fail-closed，没有扩大为行情调度重构
 - [x] 测试策略、测试实现与验证结果一致；direct-SQL smoke 与 Service E2E 明确分离
-- [x] 测试与文档已同步更新
-- [x] 必要实施 Step 均已验证；PR #35/#36/#37/#38 形成可追溯证据链
+- [x] 测试与文档已同步更新；T16 定向测试通过，Desktop 全量测试的既有并行失败已明确记录
+- [ ] 新增范围的必要实施 Step 尚缺隔离 PostgreSQL 与目标运行态证据；既有 PR #35/#36/#37/#38 证据链保持有效
 - [x] 未发现实现、Spec、Task 与验证记录之间仍存在完成度矛盾
 
 ### Review 结论
 
-- 结论：**T00–T15 = 16/16 仓库实现完成**。PR #38 最终文档 HEAD 已通过 CI #430，已 squash merge 为 `eceeb9b1aeccbcb390e7afd3cea4aa519edffe88`，合并后的 `main` CI #431 也已成功，仓库发布动作完成。
+- 结论：**新增范围尚未通过最终一致性 Review**；T00–T16 的既有证据仍有效，T17、T18 已实现并通过本地定向门禁，待隔离 PostgreSQL 和 T19 目标运行态验证后再勾选。文件尺寸门禁的并行 dirty change 失败继续单独记录。
 - PostgreSQL 证据：Migration matrix、direct-SQL database smoke 和独立 service-level E2E 均已实际运行；Service E2E 使用真实 PostgreSQL/Prisma/服务事务，Provider/Backtest 仅作为外部边界替身。
 - 恢复与幂等证据：Optimization Provider 前 attempt 持久化、unknown_outcome 禁止自动二次请求、succeeded round 经 reconciler 重扫不重复调用；正式采纳同 key 并发/响应丢失重试返回同一正式版本。
-- UI 证据：多模型 usage/cost/status/failure 与 RiskApplication Diff 已直接展示；采纳策略仍不自动升级风险应用。
-- 部署遗留：真实外部 AI Provider、在线 CN/HK/US Stock/ETF + CN NAV、Desktop 人工视觉/键盘/focus 仍是部署环境门禁，不计入仓库未完成项。
+- UI 证据：多模型 usage/cost/status/failure 与 RiskApplication Diff 已直接展示；采纳策略仍不自动升级风险应用；新增模式切换、探索字段和正式策略通用风险空态已通过本地浏览器 smoke，且无控制台错误。
+- 目标开发运行态：增量 SQL、`SchemaVersion=20260915090000_strategy_optimization_discovery`、结构 gate、新镜像、Server/Worker 健康及镜像内 `strategy-space-v1` 均已验证。
+- 部署遗留：新增 migration 的隔离 PostgreSQL、真实外部 AI Provider、在线 CN/HK/US Stock/ETF + CN NAV 与完整数据闭环人工验收仍是目标运行态门禁。

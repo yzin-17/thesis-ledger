@@ -18,6 +18,14 @@ export class StrategyOptimizationReadService {
     private readonly providers: AiProviderRegistry,
   ) {}
 
+  async formalStrategyVersion(id: string) {
+    const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
+    if (!version) throw new NotFoundException('策略版本不存在');
+    if (version.schemaVersion !== 2 || version.version <= 0)
+      throw new BadRequestException('AI 优化只能从正式 V2 策略版本开始');
+    return { ...version, strategy: strategySchemaV2.parse(version.schema) as StrategySchemaV2 };
+  }
+
   capabilities() {
     return {
       riskApplicationsEnabled: process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 'false',
@@ -30,9 +38,28 @@ export class StrategyOptimizationReadService {
           provider: provider.id,
           model,
           costStatus: costKnown ? ('known' as const) : ('unknown' as const),
-          ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
+          ...(provider.metadata?.costCurrency
+            ? { costCurrency: provider.metadata.costCurrency }
+            : {}),
           ...(provider.metadata?.pricingVersion
             ? { pricingVersion: provider.metadata.pricingVersion }
+            : {}),
+          ...(provider.metadata?.modelReasoning?.[model]
+            ? {
+                reasoning: {
+                  ...(provider.metadata.modelReasoning[model].supportedEfforts === undefined
+                    ? {}
+                    : {
+                        supportedEfforts: provider.metadata.modelReasoning[model].supportedEfforts,
+                      }),
+                  ...(provider.metadata.modelReasoning[model].defaultEffort === undefined
+                    ? {}
+                    : { defaultEffort: provider.metadata.modelReasoning[model].defaultEffort }),
+                  ...(provider.metadata.modelReasoning[model].mandatory === undefined
+                    ? {}
+                    : { mandatory: provider.metadata.modelReasoning[model].mandatory }),
+                },
+              }
             : {}),
         }));
       }),
@@ -40,7 +67,9 @@ export class StrategyOptimizationReadService {
   }
 
   async parameters(strategyVersionId: string) {
-    const version = await this.prisma.strategyVersion.findUnique({ where: { id: strategyVersionId } });
+    const version = await this.prisma.strategyVersion.findUnique({
+      where: { id: strategyVersionId },
+    });
     if (!version) throw new NotFoundException('策略版本不存在');
     if (version.schemaVersion !== 2 || version.version <= 0)
       throw new BadRequestException('只有正式 V2 策略版本可以配置优化参数');
@@ -100,8 +129,14 @@ export class StrategyOptimizationReadService {
       if (typeof route.provider !== 'string' || typeof route.model !== 'string') return [];
       const modelKey = `${route.provider}:${route.model}`;
       const modelAttempts = attempts.filter((attempt) => attempt.modelKey === modelKey);
-      const inputTokens = modelAttempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0);
-      const outputTokens = modelAttempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0);
+      const inputTokens = modelAttempts.reduce(
+        (sum, attempt) => sum + (attempt.inputTokens ?? 0),
+        0,
+      );
+      const outputTokens = modelAttempts.reduce(
+        (sum, attempt) => sum + (attempt.outputTokens ?? 0),
+        0,
+      );
       const durationMs = modelAttempts.reduce((sum, attempt) => sum + (attempt.durationMs ?? 0), 0);
       const costUnknown =
         route.costStatus === 'unknown' ||

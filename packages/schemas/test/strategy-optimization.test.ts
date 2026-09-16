@@ -3,6 +3,7 @@ import {
   optimizationExperimentCloneSchema,
   optimizationExperimentCreateSchema,
   optimizationProposalSchema,
+  optimizationDiscoveryProposalSchema,
   riskApplicationCreateSchema,
 } from '../src/strategy-optimization.js';
 
@@ -41,9 +42,59 @@ const experiment = {
 
 describe('strategy optimization contracts', () => {
   it('accepts a strict multi-model experiment contract', () => {
-    const parsed = optimizationExperimentCreateSchema.parse(experiment);
+    const parsed = optimizationExperimentCreateSchema.parse({
+      ...experiment,
+      models: [{ ...experiment.models[0], reasoningEffort: 'high' }, experiment.models[1]],
+    });
     expect(parsed.models).toHaveLength(2);
     expect(parsed.split.test.start).toBe('2024-10-01');
+    expect(parsed.models[0]?.reasoningEffort).toBe('high');
+    expect(parsed.models[1]).not.toHaveProperty('reasoningEffort');
+  });
+
+  it('keeps existing optimization compatible and requires a bounded discovery scope', () => {
+    const parsed = optimizationExperimentCreateSchema.parse(experiment);
+    expect(parsed.sourceMode).toBe('existing');
+    expect(() =>
+      optimizationExperimentCreateSchema.parse({ ...experiment, sourceMode: 'discovery' }),
+    ).toThrow();
+    const discovery = optimizationExperimentCreateSchema.parse({
+      ...experiment,
+      sourceMode: 'discovery',
+      strategyVersionId: undefined,
+      allowedParameterIds: undefined,
+      discoveryScope: {
+        executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
+        primaryTimeframe: '1d',
+      },
+    });
+    expect(discovery.discoveryScope?.primaryTimeframe).toBe('1d');
+    expect(() =>
+      optimizationExperimentCreateSchema.parse({
+        ...experiment,
+        discoveryScope: {
+          executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
+          primaryTimeframe: '1d',
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('requires discovery proposals to contain a complete StrategySchemaV2', () => {
+    expect(() =>
+      optimizationDiscoveryProposalSchema.parse({ strategy: { type: 'code' } }),
+    ).toThrow();
+  });
+
+  it('keeps provider/model identities distinct when either identity contains a colon', () => {
+    const parsed = optimizationExperimentCreateSchema.parse({
+      ...experiment,
+      models: [
+        { provider: 'provider:a', model: 'model' },
+        { provider: 'provider', model: 'a:model' },
+      ],
+    });
+    expect(parsed.models).toHaveLength(2);
   });
 
   it('rejects duplicate model identities and split leakage', () => {
@@ -68,8 +119,12 @@ describe('strategy optimization contracts', () => {
   });
 
   it('keeps experiment clone input narrow and cannot reset exposure', () => {
-    expect(optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1' })).toEqual({ idempotencyKey: 'clone-1' });
-    expect(() => optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1', resetExposure: true })).toThrow();
+    expect(optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1' })).toEqual({
+      idempotencyKey: 'clone-1',
+    });
+    expect(() =>
+      optimizationExperimentCloneSchema.parse({ idempotencyKey: 'clone-1', resetExposure: true }),
+    ).toThrow();
   });
 
   it('reserves symmetric model work and final verification before starting', () => {

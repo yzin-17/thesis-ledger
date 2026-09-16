@@ -1,4 +1,4 @@
-import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import {
   MarketDetailRequestCoordinator,
@@ -28,5 +28,5 @@ const fetchMarketDetail: MarketDetailFetcher = async (request, signal) => {
 export const requestMarketDetail = (
   request: MarketDetailRequest,
   signal?: AbortSignal,
-): Promise<MarketDetailResponse> =>
+): Promise<MarketDetailResponseV2> =>
   marketDetailRequestCoordinator.request(request, fetchMarketDetail, signal);

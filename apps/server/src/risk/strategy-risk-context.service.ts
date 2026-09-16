@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { MarketBar } from '@prisma/client';
 import {
   aggregateMinuteBars,
   tradingCalendars,
@@ -8,7 +7,9 @@ import {
   type DerivedBacktestBar,
   type TradingMarket,
 } from '@thesis-ledger/domain';
+import type { BarPointV2 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
 
 export type StrategyRiskTarget = {
   executionInstrument: { symbol: string; assetType: string; market?: string };
@@ -40,6 +41,13 @@ type ExchangeValues = {
   holdingPeriods?: number;
   occurredAt?: string;
   availableAt?: string;
+};
+
+type RiskBar = Omit<BarPointV2, 'timestamp' | 'availableAt'> & {
+  symbol: string;
+  provider: string;
+  timestamp: Date;
+  availableAt: Date;
 };
 
 const timeframeMinutes = (timeframe: string) => {
@@ -87,7 +95,10 @@ const utcForLocalMinute = (date: string, minute: number, timeZone: string) => {
 
 @Injectable()
 export class StrategyRiskContextService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bars?: MarketBarReader,
+  ) {}
 
   private async assertTarget(accountId: string, symbol: string, target: StrategyRiskTarget) {
     const account = await this.prisma.account.findUnique({
@@ -189,9 +200,9 @@ export class StrategyRiskContextService {
     return utcForLocalMinute(tradingDate, end, calendar.timezone);
   }
 
-  private effectiveBars(rows: MarketBar[]) {
+  private effectiveBars(rows: RiskBar[]) {
     const seen = new Set<number>();
-    const result: MarketBar[] = [];
+    const result: RiskBar[] = [];
     for (const row of rows) {
       const timestamp = row.timestamp.getTime();
       if (seen.has(timestamp)) continue;
@@ -205,37 +216,45 @@ export class StrategyRiskContextService {
     symbol: string,
     timeframe: '1m' | '1d',
     evaluatedAt: Date,
+    assetType: string,
     start?: Date,
     take?: number,
-  ) {
-    const rows = await this.prisma.marketBar.findMany({
-      where: {
+  ): Promise<RiskBar[]> {
+    if (!this.bars) throw new BadRequestException('行情 Reader 不可用，策略风险拒绝读取行情');
+    const normalizedAssetType = assetType.toLowerCase() === 'fund' ? 'MUTUAL_FUND' : assetType.toUpperCase();
+    const series = await this.bars.read({
+      identity: {
         symbol,
+        assetType: normalizedAssetType as 'STOCK' | 'ETF' | 'MUTUAL_FUND',
         timeframe,
-        timestamp: {
-          ...(start ? { gte: start } : {}),
-          lte: evaluatedAt,
-        },
-        fetchedAt: { lte: evaluatedAt },
+        adjustment: 'none',
       },
-      orderBy: [
-        { timestamp: start ? 'asc' : 'desc' },
-        { fallbackUsed: 'asc' },
-        { fetchedAt: 'desc' },
-        { provider: 'asc' },
-      ],
-      ...(take ? { take } : {}),
+      window: {
+        ...(start ? { start: start.toISOString() } : {}),
+        end: evaluatedAt.toISOString(),
+        ...(take ? { limit: take } : {}),
+      },
+      acceptance: 'complete',
     });
+    const rows = series.points
+      .filter((point) => new Date(point.timestamp) <= evaluatedAt && new Date(point.availableAt) <= evaluatedAt)
+      .map((point) => ({
+        ...point,
+        timestamp: new Date(point.timestamp),
+        availableAt: new Date(point.availableAt),
+        symbol,
+        provider: series.provenance.providerId,
+      }));
     return this.effectiveBars(rows);
   }
 
-  private minuteInputs(rows: MarketBar[], market: TradingMarket): BacktestMinuteBar[] {
+  private minuteInputs(rows: RiskBar[], market: TradingMarket): BacktestMinuteBar[] {
     return rows.map((row) => ({
       symbol: row.symbol,
       market,
       timeframe: '1m',
       occurredAt: row.timestamp.toISOString(),
-      availableAt: row.fetchedAt.toISOString(),
+      availableAt: row.availableAt.toISOString(),
       open: row.open.toString(),
       high: row.high.toString(),
       low: row.low.toString(),
@@ -243,7 +262,7 @@ export class StrategyRiskContextService {
       volume: row.volume.toString(),
       amount: row.amount.toString(),
       provider: row.provider,
-      quality: row.freshness === 'stale' ? 'stale' : 'complete',
+      quality: 'complete',
     }));
   }
 
@@ -251,10 +270,11 @@ export class StrategyRiskContextService {
     symbol: string,
     timeframe: DerivedBacktestBar['timeframe'],
     market: TradingMarket,
+    assetType: string,
     evaluatedAt: Date,
     start?: Date,
   ) {
-    const rows = await this.storedBars(symbol, '1m', evaluatedAt, start, start ? undefined : 1000);
+    const rows = await this.storedBars(symbol, '1m', evaluatedAt, assetType, start, start ? undefined : 1000);
     return aggregateMinuteBars(this.minuteInputs(rows, market), timeframe, {
       calendar: tradingCalendars[market],
       includePartialTail: false,
@@ -270,10 +290,11 @@ export class StrategyRiskContextService {
     symbol: string,
     timeframe: '1m' | '1d',
     market: TradingMarket,
+    assetType: string,
     evaluatedAt: Date,
     start?: Date,
   ) {
-    const rows = await this.storedBars(symbol, timeframe, evaluatedAt, start, start ? undefined : 64);
+    const rows = await this.storedBars(symbol, timeframe, evaluatedAt, assetType, start, start ? undefined : 64);
     return rows.filter((row) => {
       const completedAt = this.completedAt(row.timestamp, timeframe, market);
       return completedAt !== null && completedAt <= evaluatedAt;
@@ -284,11 +305,12 @@ export class StrategyRiskContextService {
     symbol: string,
     timeframe: DerivedBacktestBar['timeframe'],
     market: TradingMarket,
+    assetType: string,
     source: StrategyRiskPositionTradeContext,
     evaluatedAt: Date,
     requiresHoldingPeriods: boolean,
   ): Promise<ExchangeValues> {
-    const bars = await this.derivedBars(symbol, timeframe, market, evaluatedAt);
+    const bars = await this.derivedBars(symbol, timeframe, market, assetType, evaluatedAt);
     const bar = bars.at(-1);
     const holdingPeriods =
       requiresHoldingPeriods && source.trade?.openedAt && bar
@@ -299,6 +321,7 @@ export class StrategyRiskContextService {
                 symbol,
                 timeframe,
                 market,
+                assetType,
                 evaluatedAt,
                 source.trade.openedAt,
               )
@@ -315,11 +338,12 @@ export class StrategyRiskContextService {
     symbol: string,
     timeframe: '1m' | '1d',
     market: TradingMarket,
+    assetType: string,
     source: StrategyRiskPositionTradeContext,
     evaluatedAt: Date,
     requiresHoldingPeriods: boolean,
   ): Promise<ExchangeValues> {
-    const bars = await this.directBars(symbol, timeframe, market, evaluatedAt);
+    const bars = await this.directBars(symbol, timeframe, market, assetType, evaluatedAt);
     const bar = bars.at(-1);
     const holdingPeriods =
       requiresHoldingPeriods && source.trade?.openedAt && bar
@@ -330,6 +354,7 @@ export class StrategyRiskContextService {
                 symbol,
                 timeframe,
                 market,
+                assetType,
                 evaluatedAt,
                 source.trade.openedAt,
               )
@@ -341,7 +366,7 @@ export class StrategyRiskContextService {
         ? {
             price: bar.close.toString(),
             occurredAt: bar.timestamp.toISOString(),
-            availableAt: bar.fetchedAt.toISOString(),
+            availableAt: bar.availableAt.toISOString(),
           }
         : {}),
       ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
@@ -363,6 +388,7 @@ export class StrategyRiskContextService {
         symbol,
         target.primaryTimeframe,
         market,
+        target.executionInstrument.assetType,
         source,
         evaluatedAt,
         target.requiresHoldingPeriods === true,
@@ -372,6 +398,7 @@ export class StrategyRiskContextService {
         symbol,
         target.primaryTimeframe,
         market,
+        target.executionInstrument.assetType,
         source,
         evaluatedAt,
         target.requiresHoldingPeriods === true,

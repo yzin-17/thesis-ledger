@@ -9,6 +9,7 @@ import { EmptyTableRow } from '../shared/EmptyStates.js';
 import { isDataLoaded } from '../shared/display.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import type { LoadState } from '../shared/types.js';
+import { ProviderModelSummary } from './ProviderModelSummary.js';
 import {
   automationJobTypeLabel,
   automationOutputSummary,
@@ -112,7 +113,7 @@ export function ProviderTable({
                       {showTypeLabel ? <span>{typeLabel}</span> : null}
                       {environmentSource ? <Badge variant="outline">部署配置（只读）</Badge> : null}
                       {isAi && provider.models?.length ? (
-                        <span>{provider.models.join(' · ')}</span>
+                        <ProviderModelSummary models={provider.models} />
                       ) : null}
                     </td>
                     <td className="text-left">

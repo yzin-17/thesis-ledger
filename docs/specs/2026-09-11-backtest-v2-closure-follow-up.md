@@ -2,7 +2,7 @@
 
 日期：2026-09-11
 
-关联：[`统一回测系统 V2`](2026-08-28-unified-backtest-v2.md)、[`回测执行规则与研究假设`](2026-09-10-backtest-historical-execution-rule-facts.md)
+关联：[`统一回测系统 V2`](2026-08-28-unified-backtest-v2.md)、[`回测执行规则与研究假设`](2026-09-10-backtest-historical-execution-rule-facts.md)、[`回测真实历史市场规则数据源`](2026-09-16-backtest-real-historical-market-rules.md)
 
 ## 目标
 
@@ -44,6 +44,8 @@ Snapshot Builder 继续遵守既有边界：
 ### Provider/Runtime 层
 
 只有实际 Provider 能在所需区间提供完整事实，且 Server/Worker 真实运行、重放、隔离和故障门禁通过时，才可标记真实能力完成。`unavailable` 是合法且安全的结果，但不能计作能力已实现。
+
+本补充所称真实 Provider 必要事实不包含 DSA 在当前阶段直接提供法定收费、完整制度版本和历史规则分段。当前产品/引擎完成以显式研究模型闭环为准；无模型历史规则成功路径作为独立数据能力增强，由后续专项负责。
 
 ## 非目标
 

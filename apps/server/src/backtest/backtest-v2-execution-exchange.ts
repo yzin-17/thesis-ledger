@@ -53,11 +53,10 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
   const executionModel = input.runConfig.executionModel;
   const ruleSnapshot = executionModel
     ? undefined
-    : requireFrozenExecutionRules(
-        executionRuleSnapshot(instrumentRow),
-        input.marketRuleVersion,
-        { start: input.runConfig.startDate, end: input.runConfig.endDate },
-      );
+    : requireFrozenExecutionRules(executionRuleSnapshot(instrumentRow), input.marketRuleVersion, {
+        start: input.runConfig.startDate,
+        end: input.runConfig.endDate,
+      });
   const calendarRows = rowsForPurpose(input.rows, 'calendar');
   const calendar = tradingCalendarFromFact(
     calendarFact(rowFor(calendarRows, (row) => row.market === instrument.market)),
@@ -108,7 +107,10 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
   const ledgerConfig = initialLedgerConfig(input.strategy, input.runConfig);
   const ledger = new SimulationLedger(ledgerConfig);
   const barRows = rowsForPurpose(input.rows, 'execution');
-  const bars = executionBars(rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar));
+  const bars = executionBars(
+    rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar),
+    calendar,
+  );
   const fxRates = fxRatesFrom(input.rows);
   const sourceSeries = new Map<string, BacktestSeries>();
   for (const source of input.strategy.signalSources) {
@@ -399,7 +401,11 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
           }
           if (result?.applied && fill.side === 'buy' && positionOpenedAt === undefined)
             positionOpenedAt = fill.occurredAt;
-          if (result?.applied && fill.side === 'sell' && ledger.snapshot().position.quantity === '0')
+          if (
+            result?.applied &&
+            fill.side === 'sell' &&
+            ledger.snapshot().position.quantity === '0'
+          )
             positionOpenedAt = undefined;
         } else if (mutation.type === 'cashSettlement') {
           const settlement = mutation.payload as unknown as SimulationSettlement;

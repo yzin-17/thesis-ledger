@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { projectCashBalances } from '../ledger/cash-projection.js';
 import {
   aggregateCurrencyAmounts,
@@ -6,6 +6,7 @@ import {
   type ResolvedFx,
 } from '../market/fx-conversion.js';
 import { MarketService } from '../market/market.service.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { performanceRelationWhere, performanceSnapshotWhere } from './performance-account-scope.js';
 import { PerformanceDataService } from './performance-data.service.js';
@@ -45,6 +46,7 @@ export class PerformanceSnapshotService {
     private readonly prisma: PrismaService,
     private readonly market: MarketService,
     private readonly data: PerformanceDataService,
+    @Optional() private readonly bars?: MarketBarReader,
   ) {
     this.revisions = new PerformanceSnapshotRevisionRepository(prisma);
   }
@@ -80,7 +82,7 @@ export class PerformanceSnapshotService {
           supportedCurrency(position.asset.currency) ??
           accountCurrencyMap.get(position.accountId) ??
           baseCurrency;
-        return valueSnapshotPosition(this.market, position, currency, valuationDateKey, context);
+        return valueSnapshotPosition(this.market, position, currency, valuationDateKey, context, this.bars);
       }),
     );
     const cashBalances = projectCashBalances(ledger, capturedAt);

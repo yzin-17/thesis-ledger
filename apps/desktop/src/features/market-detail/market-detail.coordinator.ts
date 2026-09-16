@@ -1,6 +1,6 @@
 import type {
   MarketDetailRequest as SharedMarketDetailRequest,
-  MarketDetailResponse,
+  MarketDetailResponseV2,
 } from '@thesis-ledger/api-client';
 
 export type MarketDetailRequest = SharedMarketDetailRequest;
@@ -8,11 +8,11 @@ export type MarketDetailRequest = SharedMarketDetailRequest;
 export type MarketDetailFetcher = (
   request: MarketDetailRequest,
   signal: AbortSignal,
-) => Promise<MarketDetailResponse>;
+) => Promise<MarketDetailResponseV2>;
 
 type Flight = {
   controller: AbortController;
-  promise: Promise<MarketDetailResponse>;
+  promise: Promise<MarketDetailResponseV2>;
   consumers: number;
   state: { settled: boolean };
 };
@@ -42,7 +42,7 @@ export class MarketDetailRequestCoordinator {
     request: MarketDetailRequest,
     fetcher: MarketDetailFetcher,
     signal?: AbortSignal,
-  ): Promise<MarketDetailResponse> {
+  ): Promise<MarketDetailResponseV2> {
     const key = marketDetailRequestKey(request);
     let flight = this.flights.get(key);
     if (flight?.controller.signal.aborted) {
@@ -83,7 +83,7 @@ export class MarketDetailRequestCoordinator {
       return Promise.reject(abortReason(consumerSignal));
     }
 
-    return new Promise<MarketDetailResponse>((resolve, reject) => {
+    return new Promise<MarketDetailResponseV2>((resolve, reject) => {
       const onAbort = () => {
         release();
         reject(abortReason(consumerSignal));

@@ -301,23 +301,6 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
         { accountId: conflictAccountId, symbol, quantity: new Prisma.Decimal('100'), costPrice: new Prisma.Decimal('100'), source: 'postgres-e2e' },
       ],
     });
-    await prisma.marketBar.create({
-      data: {
-        symbol,
-        timeframe: '1d',
-        timestamp: new Date('2026-09-10T00:00:00.000Z'),
-        open: new Prisma.Decimal('95'),
-        high: new Prisma.Decimal('96'),
-        low: new Prisma.Decimal('89'),
-        close: new Prisma.Decimal('90'),
-        volume: new Prisma.Decimal('1000'),
-        amount: new Prisma.Decimal('90000'),
-        provider: `postgres-e2e-${suffix}`,
-        fetchedAt: new Date('2026-09-10T08:01:00.000Z'),
-        freshness: 'live',
-        fallbackUsed: false,
-      },
-    });
     const createdStrategy = await prisma.strategy.create({
       data: { id: strategyId, name: `Service E2E Strategy ${suffix}`, status: 'active', schemaVersion: 2 },
     });
@@ -383,7 +366,6 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     await prisma.strategy.deleteMany({ where: { id: strategyId } }).catch(() => undefined);
     await prisma.position.deleteMany({ where: { accountId: { in: [accountId, conflictAccountId] } } }).catch(() => undefined);
     await prisma.account.deleteMany({ where: { id: { in: [accountId, conflictAccountId] } } }).catch(() => undefined);
-    await prisma.marketBar.deleteMany({ where: { provider: `postgres-e2e-${suffix}` } }).catch(() => undefined);
     await prisma.$disconnect();
   });
 

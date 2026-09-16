@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FundNavHistoryV1 } from '@thesis-ledger/schemas';
 import { CrosshairMode, LineSeries, createChart } from 'lightweight-charts';
 import { Button } from '@/components/ui/button';
+import { MarketChartAttribution } from './MarketChartAttribution.js';
 
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
@@ -13,6 +14,12 @@ const rangeLabel = (months: number) => {
 };
 
 const NAV_RANGES = [1, 3, 6, 12] as const;
+
+export const navChartLayoutOptions = {
+  background: { color: 'transparent' },
+  textColor: '#64748b',
+  attributionLogo: false,
+} as const;
 
 export const navRangeAvailability = (history: FundNavHistoryV1, months: number) => {
   const earliest = history[0];
@@ -96,7 +103,7 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistoryV1 }) 
     const chart = createChart(container, {
       autoSize: true,
       height: 220,
-      layout: { background: { color: 'transparent' }, textColor: '#64748b' },
+      layout: navChartLayoutOptions,
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true },
       handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
       timeScale: { borderColor: 'rgba(148, 163, 184, 0.35)', timeVisible: false },
@@ -279,6 +286,7 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistoryV1 }) 
             ? ''
             : ` · 可视区间 ${viewportChange >= 0 ? '+' : ''}${(viewportChange * 100).toFixed(2)}%`}
         </span>
+        <MarketChartAttribution />
       </div>
     </div>
   );

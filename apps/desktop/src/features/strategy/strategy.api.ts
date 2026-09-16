@@ -1,4 +1,5 @@
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+import { barSeriesV2Schema } from '@thesis-ledger/schemas';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
 import type {
   BacktestJob,
@@ -97,12 +98,15 @@ export const fetchStrategyBars = async (
     t: String(Date.now()),
   });
   try {
-    const bars = await requestDesktopJson<unknown[]>(
-      `/market/${encodeURIComponent(input.symbol)}/bars?${query.toString()}`,
+    const response = await requestDesktopJson<unknown>(
+      `/api/v2/market/${encodeURIComponent(input.symbol)}/bars?${query.toString()}&acceptance=interactive&adjustment=none`,
       { cache: 'no-store' },
       client,
     );
-    return bars.map(compactBacktestBar).filter((bar) => bar !== null);
+    const series = barSeriesV2Schema.parse(response);
+    return series.points
+      .map((point) => compactBacktestBar({ ...point, symbol: series.identity.symbol }))
+      .filter((bar) => bar !== null);
   } catch (error) {
     if (error instanceof ThesisLedgerApiError) return [];
     throw error;

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { RequestMethod } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 import { loadConfig } from './platform/config.js';
 import { ApiExceptionFilter } from './platform/api-exception.filter.js';
@@ -40,7 +41,9 @@ const bootstrap = async () => {
     });
   });
   app.useGlobalFilters(new ApiExceptionFilter(app.get(ErrorTrackingService)));
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: [{ path: 'api/v2/(.*)', method: RequestMethod.ALL }],
+  });
   await app.listen(config.port, network.host);
 };
 

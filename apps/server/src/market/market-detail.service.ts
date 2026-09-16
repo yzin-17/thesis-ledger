@@ -21,10 +21,7 @@ import { currentTraceId } from '../platform/structured-logger.js';
 import { DsaError } from '../integration/dsa/dsa.client.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketService } from './market.service.js';
-import {
-  parseMarketDetailDateRange,
-  parseMarketDetailIndicatorParams,
-} from './market-request-validation.js';
+import { parseMarketDetailDateRange } from './market-request-validation.js';
 
 export const MARKET_DETAIL_CAPABILITIES = [
   'quote',
@@ -53,6 +50,14 @@ const ETF_CAPABILITIES: readonly MarketDetailCapability[] = [
   'indicator:RSI',
 ];
 const FUND_CAPABILITIES: readonly MarketDetailCapability[] = ['fund-nav', 'fund-nav-history'];
+// Bars and indicators are owned by the V2 controller/Reader. This helper only
+// orchestrates the historical non-bar detail capabilities.
+const NON_BAR_CAPABILITIES = new Set<MarketDetailCapability>([
+  'quote',
+  'chip',
+  'fund-nav',
+  'fund-nav-history',
+]);
 
 const POLICY_CAPABILITY_BY_DETAIL: Record<MarketDetailCapability, string> = {
   quote: 'REALTIME_QUOTE',
@@ -77,7 +82,7 @@ export const MARKET_DETAIL_CAPABILITY_MATRIX: Record<
 
 type DetailInclude = string | readonly string[] | undefined;
 type DetailLimit = number | string | undefined;
-type ResolvedIdentity = {
+export type ResolvedMarketDetailIdentity = {
   symbol: string;
   assetType: MarketDetailAssetType;
   source: 'asset' | 'catalog' | 'symbol' | 'unknown';
@@ -86,7 +91,7 @@ type ResolvedIdentity = {
 
 type PolicySnapshot = {
   enabled: boolean;
-  routes: Record<string, Record<string, string[]>>;
+  routes: Record<string, Record<string, Array<{ providerId: string; upstreamSource: string }>>>;
 };
 
 const assetTypeFromValue = (value: unknown): MarketDetailAssetType | null => {
@@ -96,11 +101,6 @@ const assetTypeFromValue = (value: unknown): MarketDetailAssetType | null => {
   if (normalized === 'FUND' || normalized === 'MUTUAL_FUND') return 'MUTUAL_FUND';
   return null;
 };
-
-const isIndicatorCapability = (value: MarketDetailCapability) => value.startsWith('indicator:');
-
-const indicatorName = (value: MarketDetailCapability): 'MA' | 'MACD' | 'RSI' =>
-  value.slice('indicator:'.length) as 'MA' | 'MACD' | 'RSI';
 
 const hasStaleValue = (value: unknown, seen = new Set<unknown>()): boolean => {
   if (value === null || typeof value !== 'object' || seen.has(value)) return false;
@@ -120,16 +120,34 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const normalizedPolicyRoutes = (
   value: unknown,
-): Record<string, Record<string, string[]>> | null => {
+): Record<string, Record<string, Array<{ providerId: string; upstreamSource: string }>>> | null => {
   if (!isRecord(value)) return null;
-  const result: Record<string, Record<string, string[]>> = {};
+  const result: Record<
+    string,
+    Record<string, Array<{ providerId: string; upstreamSource: string }>>
+  > = {};
   for (const [capability, rawTypes] of Object.entries(value)) {
     if (!isRecord(rawTypes)) return null;
-    const typeRoutes: Record<string, string[]> = {};
-    for (const [assetType, providers] of Object.entries(rawTypes)) {
-      if (!Array.isArray(providers) || !providers.every((provider) => typeof provider === 'string'))
-        return null;
-      typeRoutes[assetType] = providers;
+    const typeRoutes: Record<
+      string,
+      Array<{ providerId: string; upstreamSource: string }>
+    > = {};
+    for (const [assetType, targets] of Object.entries(rawTypes)) {
+      if (!Array.isArray(targets)) return null;
+      const parsedTargets: Array<{ providerId: string; upstreamSource: string }> = [];
+      for (const target of targets) {
+        if (
+          !isRecord(target) ||
+          typeof target.providerId !== 'string' ||
+          typeof target.upstreamSource !== 'string'
+        )
+          return null;
+        parsedTargets.push({
+          providerId: target.providerId,
+          upstreamSource: target.upstreamSource,
+        });
+      }
+      typeRoutes[assetType] = parsedTargets;
     }
     result[capability] = typeRoutes;
   }
@@ -157,12 +175,13 @@ export class MarketDetailService {
       refresh?: boolean;
     } = {},
   ): Promise<MarketDetailResponse> {
-    const barsLimit = this.parseLimit(options.barsLimit, 'barsLimit');
+    this.parseLimit(options.barsLimit, 'barsLimit');
     const navLimit = this.parseLimit(options.navLimit, 'navLimit');
-    const indicatorParams = parseMarketDetailIndicatorParams(options.indicatorParams);
     parseMarketDetailDateRange(options.start, options.end);
     const identity = await this.resolveIdentity(input);
-    const baseSupported = MARKET_DETAIL_CAPABILITY_MATRIX[identity.assetType];
+    const baseSupported = MARKET_DETAIL_CAPABILITY_MATRIX[identity.assetType].filter((capability) =>
+      NON_BAR_CAPABILITIES.has(capability),
+    );
     const requested = this.parseInclude(options.include) ?? [...baseSupported];
     const policy =
       baseSupported.length > 0 ? await this.readPolicy() : ({ enabled: true, routes: {} } as const);
@@ -179,7 +198,6 @@ export class MarketDetailService {
       string,
       { status: MarketDetailSectionStatus; error?: MarketDetailDiagnostic }
     > = {};
-    let barsHasMoreBefore = false;
 
     for (const capability of requested) {
       if (!baseSupported.includes(capability)) {
@@ -200,47 +218,9 @@ export class MarketDetailService {
     }
 
     const tasks: Array<Promise<void>> = [];
-    const requestedIndicators = requested.filter(isIndicatorCapability);
-    if (policyUnavailable && requestedIndicators.length > 0) {
-      const firstIndicator = sections[requestedIndicators[0]!];
-      dependencies.DAILY_BAR = {
-        status: 'unavailable',
-        ...(firstIndicator?.error ? { error: firstIndicator.error } : {}),
-      };
-    } else if (requestedIndicators.length > 0 && !policyEnabledCapabilities.includes('bars')) {
-      const firstIndicator = sections[requestedIndicators[0]!];
-      const error =
-        firstIndicator?.error ?? this.diagnostic(requestId, 'bars', 'capability_not_enabled');
-      dependencies.DAILY_BAR = { status: 'unavailable', error };
-      for (const capability of requestedIndicators) {
-        sections[capability] = this.unavailableSection(capability, requestId, error.code, error);
-      }
-    }
-
     const supportedRequested = requested.filter(
       (capability) => !policyUnavailable && policyEnabledCapabilities.includes(capability),
     );
-    const indicatorRequested = supportedRequested.filter(isIndicatorCapability);
-    const barsNeeded = supportedRequested.includes('bars') || indicatorRequested.length > 0;
-    const barsPromise = barsNeeded
-      ? this.loadSection('bars', requestId, async () => {
-          const bars = await this.market.getBars(
-            identity.symbol,
-            '1d',
-            {
-              ...(options.start ? { start: options.start } : {}),
-              ...(options.end ? { end: options.end } : {}),
-              limit: barsLimit + 1,
-            },
-            {
-              allowStale: true,
-              ...refreshOptions,
-            },
-          );
-          barsHasMoreBefore = bars.length > barsLimit;
-          return bars.length > barsLimit ? bars.slice(-barsLimit) : bars;
-        })
-      : null;
 
     if (supportedRequested.includes('quote')) {
       tasks.push(
@@ -282,60 +262,6 @@ export class MarketDetailService {
         }),
       );
     }
-    if (barsPromise && supportedRequested.includes('bars')) {
-      tasks.push(
-        barsPromise.then((section) => {
-          sections.bars = section;
-        }),
-      );
-    }
-
-    if (barsPromise && indicatorRequested.length > 0) {
-      const dependencyPromise = barsPromise.then((section) => {
-        dependencies.DAILY_BAR = {
-          status: section.status,
-          ...(section.error ? { error: section.error } : {}),
-        };
-        return section;
-      });
-      for (const capability of indicatorRequested) {
-        tasks.push(
-          dependencyPromise
-            .then(async (dependency) => {
-              if (dependency.status === 'unavailable') {
-                return this.unavailableSection(
-                  capability,
-                  requestId,
-                  dependency.error?.code ?? 'daily_bar_unavailable',
-                  dependency.error,
-                );
-              }
-              if (dependency.status === 'empty') {
-                return { capability, status: 'empty', data: null } satisfies MarketDetailSection;
-              }
-              const section = await this.loadSection(capability, requestId, () =>
-                this.market.getIndicator(identity.symbol, indicatorName(capability), {
-                  ...(options.start ? { start: options.start } : {}),
-                  ...(options.end ? { end: options.end } : {}),
-                  limit: barsLimit,
-                  ...(indicatorParams ? { parameters: indicatorParams } : {}),
-                  ...(options.calculationAnchor
-                    ? { calculationAnchor: options.calculationAnchor }
-                    : {}),
-                  ...refreshOptions,
-                }),
-              );
-              if (dependency.status === 'stale' && section.status === 'ready')
-                return { ...section, status: 'stale' } satisfies MarketDetailSection;
-              return section;
-            })
-            .then((section) => {
-              sections[capability] = section;
-            }),
-        );
-      }
-    }
-
     await Promise.all(tasks);
 
     return marketDetailResponseSchema.parse({
@@ -350,7 +276,7 @@ export class MarketDetailService {
           (capability) => !baseSupported.includes(capability),
         ),
       },
-      limits: { bars: barsLimit, nav: navLimit, barsHasMoreBefore },
+      limits: { bars: 30, nav: navLimit, barsHasMoreBefore: false },
       sections,
       dependencies,
       requestId,
@@ -382,7 +308,7 @@ export class MarketDetailService {
     return Array.isArray(route) && route.length > 0;
   }
 
-  private async resolveIdentity(input: string): Promise<ResolvedIdentity> {
+  async resolveIdentity(input: string): Promise<ResolvedMarketDetailIdentity> {
     let normalized: ReturnType<typeof normalizeSymbol>;
     try {
       normalized = normalizeSymbol(input);
@@ -489,8 +415,8 @@ export class MarketDetailService {
       .filter(Boolean);
     if (values.length === 0) throw new BadRequestException('include 至少需要一个合法能力');
     const unique = [...new Set(values)];
-    const invalid = unique.filter(
-      (value) => !(MARKET_DETAIL_CAPABILITIES as readonly string[]).includes(value),
+    const invalid = unique.filter((value) =>
+      !NON_BAR_CAPABILITIES.has(value as MarketDetailCapability),
     );
     if (invalid.length > 0)
       throw new BadRequestException(`不支持的行情详情能力: ${invalid.join(', ')}`);
@@ -545,10 +471,13 @@ export class MarketDetailService {
   }
 
   private errorCode(error: unknown) {
-    if (error instanceof DsaError) {
-      if (error.code === 'timeout') return 'market_data_timeout';
-      if (error.code === 'unauthorized') return 'market_data_unauthorized';
-      if (error.code === 'invalid-response') return 'market_data_contract_invalid';
+    let dsaCode: string | null = null;
+    if (error instanceof DsaError) dsaCode = error.code;
+    else if (isRecord(error) && typeof error.code === 'string') dsaCode = error.code;
+    if (dsaCode) {
+      if (dsaCode === 'timeout') return 'market_data_timeout';
+      if (dsaCode === 'unauthorized') return 'market_data_unauthorized';
+      if (dsaCode === 'invalid-response') return 'market_data_contract_invalid';
       return 'market_data_unavailable';
     }
     if (error instanceof ZodError) return 'market_data_contract_invalid';

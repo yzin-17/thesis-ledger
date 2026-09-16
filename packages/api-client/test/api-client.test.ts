@@ -349,8 +349,31 @@ describe('ThesisLedgerApiClient', () => {
   });
 
   it('通过共享 API Client 请求行情详情并保留 AbortSignal', async () => {
+    const barSeries = {
+      contractVersion: 2,
+      identity: { symbol: '600519.SH', assetType: 'STOCK', timeframe: '1d', adjustment: 'qfq' },
+      points: [],
+      coverage: {
+        actualStart: null,
+        actualEnd: null,
+        hasMoreBefore: false,
+        latestCompleteTradingDate: null,
+      },
+      provenance: {
+        providerId: 'tencent',
+        upstreamSource: 'tencent',
+        routeIndex: 0,
+        effectivePolicyRevision: 1,
+        providerRevision: 'tencent:1',
+        fetchedAt: '2026-08-21T00:00:00.000Z',
+        freshUntil: '2026-08-21T00:05:00.000Z',
+        servedFromCache: false,
+        cacheStatus: 'miss',
+      },
+      inputFingerprint: 'empty-series',
+    };
     const detail = {
-      version: 1,
+      contractVersion: 2,
       symbol: '600519.SH',
       assetType: 'STOCK',
       identity: { source: 'asset', status: 'confirmed' },
@@ -362,8 +385,9 @@ describe('ThesisLedgerApiClient', () => {
       limits: { bars: 30, nav: 30 },
       sections: {
         quote: { capability: 'quote', status: 'empty', data: null },
-        bars: { capability: 'bars', status: 'empty', data: [] },
+        bars: { capability: 'bars', status: 'empty', data: barSeries },
       },
+      barSeries,
       dependencies: {},
       requestId: 'trace-1',
       generatedAt: '2026-08-21T00:00:00.000Z',
@@ -381,9 +405,14 @@ describe('ThesisLedgerApiClient', () => {
         refresh: true,
         signal,
       }),
-    ).resolves.toMatchObject({ symbol: '600519.SH', assetType: 'STOCK' });
+    ).resolves.toMatchObject({
+      contractVersion: 2,
+      symbol: '600519.SH',
+      assetType: 'STOCK',
+      barSeries,
+    });
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(
-      '/market/600519.SH/detail?barsLimit=30&refresh=1&include=quote%2Cbars',
+      '/api/v2/market/600519.SH/detail?barsLimit=30&refresh=1&include=quote%2Cbars',
     );
     expect(fetcher.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ signal }));
   });

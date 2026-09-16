@@ -7,8 +7,6 @@ import {
   fundHoldingsSchemaV1,
   indicatorSchemaV1,
   fxRatesResponseSchemaV1,
-  type BarInputV1,
-  type BarV1,
   type ChipDistributionV1,
   type CurrencyV1,
   type FxRatesResponseV1,
@@ -20,7 +18,6 @@ import {
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
-import { MarketBarCache, resolveEffectiveBars } from './market-bar-cache.js';
 import { MarketQuoteReader } from './market-quote-reader.js';
 import {
   historicalSeriesFreshSeconds,
@@ -29,13 +26,10 @@ import {
 } from './market-result-cache.js';
 import { buildIndicatorRequest, validateIndicatorLimit, type MarketIndicatorRequestOptions } from './market-indicator-request.js';
 
-export { resolveEffectiveBars } from './market-bar-cache.js';
-
 const fundSymbolPattern = /^\d{6}\.OF$/;
 @Injectable()
 export class MarketService {
   private readonly logger = new Logger(MarketService.name);
-  private readonly barCache: MarketBarCache;
   private readonly quoteReader: MarketQuoteReader;
   private readonly resultCache: MarketResultCache;
 
@@ -44,7 +38,6 @@ export class MarketService {
     private readonly redis: RedisService,
     @Optional() private readonly prisma?: PrismaService,
   ) {
-    this.barCache = new MarketBarCache(redis, prisma);
     this.quoteReader = new MarketQuoteReader(dsa, redis);
     this.resultCache = new MarketResultCache(redis);
   }
@@ -345,116 +338,6 @@ export class MarketService {
         await this.redis.client.set(key, JSON.stringify(holdings), 'EX', 86_400);
         return holdings;
       }),
-    );
-  }
-
-  async getBars(
-    input: string,
-    timeframe: '1m' | '1d',
-    range?: { start?: string; end?: string; limit?: number },
-    options: { allowStale?: boolean; refresh?: boolean } = {},
-  ): Promise<BarV1[]> {
-    const { symbol } = normalizeSymbol(input);
-    const cacheKey = this.barCache.key(symbol, timeframe, range);
-    if (!options.refresh) {
-      const cached = await this.barCache.read(cacheKey);
-      if (cached) {
-        if (options.allowStale === false && cached.some((bar) => bar.freshness === 'stale'))
-          throw new Error('Bar 行情陈旧，当前操作要求新鲜行情');
-        return cached;
-      }
-    }
-    const bars = await this.singleFlight(cacheKey, () =>
-      this.withDistributedLock(cacheKey, async () => {
-        if (!options.refresh) {
-          const cached = await this.barCache.read(cacheKey);
-          if (cached) return cached;
-        }
-        const query = new URLSearchParams({ symbol, timeframe });
-        if (range?.start) query.set('start', range.start);
-        if (range?.end) query.set('end', range.end);
-        if (range?.limit) query.set('limit', String(range.limit));
-        try {
-          const raw = await this.dsa.get<unknown[]>(
-            `/api/v1/thesis-ledger/market/bars?${query.toString()}`,
-          );
-          const fetchedAt = new Date().toISOString();
-          const resolved = resolveEffectiveBars(
-            raw.map((bar) => ({
-              ...(bar as Record<string, unknown>),
-              version: 1,
-              symbol,
-              timeframe,
-              fetchedAt:
-                typeof (bar as Record<string, unknown>).fetchedAt === 'string'
-                  ? (bar as Record<string, unknown>).fetchedAt
-                  : fetchedAt,
-              freshness:
-                typeof (bar as Record<string, unknown>).freshness === 'string'
-                  ? (bar as Record<string, unknown>).freshness
-                  : 'unknown',
-              servedFromCache: false,
-            })) as BarInputV1[],
-          );
-          await this.barCache.record(cacheKey, resolved, range);
-          return resolved;
-        } catch (error) {
-          const stored = await this.readStoredBars(symbol, timeframe, range);
-          if (stored.length > 0) return stored;
-          throw error;
-        }
-      }),
-    );
-    if (options.allowStale === false && bars.some((bar) => bar.freshness === 'stale'))
-      throw new Error('Bar 行情陈旧，当前操作要求新鲜行情');
-    return bars;
-  }
-
-  private async readStoredBars(
-    symbol: string,
-    timeframe: '1m' | '1d',
-    range?: { start?: string; end?: string },
-  ): Promise<BarV1[]> {
-    if (!this.prisma) return [];
-    const stored = await this.prisma.marketBar.findMany({
-      where: {
-        symbol,
-        timeframe,
-        ...(range?.start || range?.end
-          ? {
-              timestamp: {
-                ...(range.start ? { gte: new Date(range.start) } : {}),
-                ...(range.end ? { lte: new Date(range.end) } : {}),
-              },
-            }
-          : {}),
-      },
-      orderBy: [
-        { timestamp: 'asc' },
-        { fallbackUsed: 'asc' },
-        { fetchedAt: 'desc' },
-        { provider: 'asc' },
-      ],
-    });
-    return resolveEffectiveBars(
-      stored.map((bar) => ({
-        version: 1,
-        symbol: bar.symbol,
-        timeframe: bar.timeframe as '1m' | '1d',
-        timestamp: bar.timestamp.toISOString(),
-        open: Number(bar.open),
-        high: Number(bar.high),
-        low: Number(bar.low),
-        close: Number(bar.close),
-        volume: Number(bar.volume),
-        amount: Number(bar.amount),
-        provider: bar.provider,
-        upstreamSource: bar.upstreamSource ?? undefined,
-        fetchedAt: bar.fetchedAt.toISOString(),
-        freshness: 'stale',
-        fallbackUsed: bar.fallbackUsed,
-        servedFromCache: true,
-      })),
     );
   }
 

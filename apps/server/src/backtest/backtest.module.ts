@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { resolve } from 'node:path';
 import { DsaModule } from '../integration/dsa/dsa.module.js';
+import { MarketModule } from '../market/market.module.js';
 import { BacktestController } from './backtest.controller.js';
 import { BacktestService } from './backtest.service.js';
 import {
@@ -19,7 +20,7 @@ import { BACKTEST_V2_RUNNER } from './backtest-v2-run.js';
 import { LocalSnapshotRunner } from './backtest-v2-runner.js';
 
 @Module({
-  imports: [DsaModule],
+  imports: [DsaModule, MarketModule],
   controllers: [BacktestController],
   providers: [
     BacktestService,

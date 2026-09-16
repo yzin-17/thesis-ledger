@@ -1,14 +1,40 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BarV1, IndicatorV1 } from '@thesis-ledger/schemas';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
 import {
   CandlestickSeries,
   CrosshairMode,
   HistogramSeries,
   LineSeries,
   createChart,
+  createTextWatermark,
 } from 'lightweight-charts';
-import { buildChartPoints, indicatorComparable, indicatorValue } from './market-chart-model.js';
+import {
+  buildChartPoints,
+  indicatorComparable,
+  indicatorValue,
+  type ChartPoint,
+} from './market-chart-model.js';
 import type { ChartPreference } from './market-chart-preferences.js';
+import {
+  beginHistoryDrag,
+  endHistoryDrag,
+  idleHistoryDragState,
+  markHistoryDragMovement,
+  transitionHistoryBoundary,
+} from './market-chart-history-gesture.js';
+import { hasLeftHistoryBlank } from './market-chart-viewport.js';
+import { marketChartPaneLabels } from './market-chart-pane-labels.js';
+
+export const auxiliaryLatestValueOptions = {
+  lastValueVisible: false,
+  priceLineVisible: false,
+} as const;
+
+export const marketChartLayoutOptions = {
+  background: { color: 'transparent' },
+  textColor: '#64748b',
+  attributionLogo: false,
+} as const;
 
 export const rangeMonths = (range: number): number | null => {
   if (range === 30) return 1;
@@ -18,7 +44,7 @@ export const rangeMonths = (range: number): number | null => {
   return null;
 };
 
-export const visibleBarsForRange = (bars: BarV1[], range: number) => {
+export const visibleBarsForRange = (bars: MarketChartBar[], range: number) => {
   const latest = bars.at(-1);
   if (!latest) return [];
   const months = rangeMonths(range);
@@ -29,7 +55,7 @@ export const visibleBarsForRange = (bars: BarV1[], range: number) => {
   return bars.filter((bar) => Date.parse(bar.timestamp) >= cutoff);
 };
 
-export const rangeCoverage = (bars: BarV1[], range: number) => {
+export const rangeCoverage = (bars: MarketChartBar[], range: number) => {
   const months = rangeMonths(range);
   const earliest = bars[0];
   const latest = bars.at(-1);
@@ -47,6 +73,7 @@ export const rangeCoverage = (bars: BarV1[], range: number) => {
 export function LightweightMarketChart({
   bars,
   indicators,
+  chartPoints: providedChartPoints,
   visibleRange,
   chartMode,
   activePane,
@@ -58,12 +85,18 @@ export function LightweightMarketChart({
   resetRevision,
   viewAction,
   onVisibleRangeChange,
+  onLoadEarlier,
+  onRetryEarlier,
+  canLoadEarlier,
+  historyLoading,
+  historyError,
   onHover,
   onClick,
   lockedTimestamp,
 }: {
-  bars: BarV1[];
-  indicators: IndicatorV1[];
+  bars: MarketChartBar[];
+  indicators: MarketChartIndicator[];
+  chartPoints?: ChartPoint[];
   visibleRange: number;
   chartMode: 'candles' | 'close';
   activePane: 'MACD' | 'RSI';
@@ -75,6 +108,11 @@ export function LightweightMarketChart({
   resetRevision: number;
   viewAction?: { type: 'zoomIn' | 'zoomOut' | 'panEarlier' | 'panLater'; revision: number };
   onVisibleRangeChange?: (range: { from: string; to: string } | null) => void;
+  onLoadEarlier?: (() => void) | undefined;
+  onRetryEarlier?: (() => void) | undefined;
+  canLoadEarlier?: boolean | undefined;
+  historyLoading?: boolean | undefined;
+  historyError?: string | null | undefined;
   onHover: (timestamp: string | null) => void;
   onClick: (timestamp: string | null) => void;
   lockedTimestamp?: string | null;
@@ -85,10 +123,12 @@ export function LightweightMarketChart({
   type DataSeries = SeriesHandle & {
     setData: (data: never[]) => void;
     applyOptions: (options: never) => void;
+    barsInLogicalRange: (range: { from: number; to: number }) => { barsBefore: number } | null;
   };
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ChartApi | null>(null);
   const seriesRef = useRef<Map<string, DataSeries>>(new Map());
+  const paneWatermarksRef = useRef<Array<{ detach: () => void }>>([]);
   const previousVisibleRangeRef = useRef<ReturnType<TimeScaleApi['getVisibleRange']>>(null);
   const requestedInitialRangeRef = useRef<ReturnType<TimeScaleApi['getVisibleRange']>>(null);
   const firstLayoutPendingRef = useRef(true);
@@ -99,27 +139,73 @@ export function LightweightMarketChart({
   const onHoverRef = useRef(onHover);
   const onClickRef = useRef(onClick);
   const onVisibleRangeChangeRef = useRef(onVisibleRangeChange);
+  const onLoadEarlierRef = useRef(onLoadEarlier);
+  const onRetryEarlierRef = useRef(onRetryEarlier);
+  const canLoadEarlierRef = useRef(canLoadEarlier);
+  const historyLoadingRef = useRef(historyLoading);
+  const historyErrorRef = useRef(historyError);
   const lockedTimestampRef = useRef(lockedTimestamp);
+  const chartModeRef = useRef(chartMode);
+  const historyDragStateRef = useRef(idleHistoryDragState);
   onHoverRef.current = onHover;
   onClickRef.current = onClick;
   onVisibleRangeChangeRef.current = onVisibleRangeChange;
+  onLoadEarlierRef.current = onLoadEarlier;
+  onRetryEarlierRef.current = onRetryEarlier;
+  canLoadEarlierRef.current = canLoadEarlier;
+  historyLoadingRef.current = historyLoading;
+  historyErrorRef.current = historyError;
   lockedTimestampRef.current = lockedTimestamp;
+  chartModeRef.current = chartMode;
   const [chartReady, setChartReady] = useState(false);
   const [themeRevision, setThemeRevision] = useState(0);
+  const [isLeftHistoryBlank, setIsLeftHistoryBlank] = useState(false);
   const chartIndicators = useMemo(
     () =>
-      indicators.filter((item) => visibleIndicators.includes(item.name as 'MA' | 'MACD' | 'RSI')),
+      indicators.filter((item) => visibleIndicators.includes(item.name)),
     [indicators, visibleIndicators],
   );
   const chartPoints = useMemo(
-    () => buildChartPoints(bars, chartIndicators),
-    [bars, chartIndicators],
+    () => providedChartPoints ?? buildChartPoints(bars, chartIndicators),
+    [bars, chartIndicators, providedChartPoints],
   );
+
+  const updateHistoryBoundary = useCallback((
+    chart: ChartApi,
+    range: { from: number; to: number } | null,
+  ) => {
+    if (!range) {
+      setIsLeftHistoryBlank(false);
+      return;
+    }
+    const primarySeries = seriesRef.current.get(
+      chartModeRef.current === 'candles' ? 'candles' : 'close',
+    );
+    const barsInfo = primarySeries?.barsInLogicalRange(range);
+    const hasBlank = hasLeftHistoryBlank(barsInfo?.barsBefore);
+    setIsLeftHistoryBlank(hasBlank);
+    const transition = transitionHistoryBoundary(historyDragStateRef.current, {
+      hasLeftHistoryBlank: hasBlank,
+      canLoadEarlier: canLoadEarlierRef.current === true,
+      historyLoading: historyLoadingRef.current === true,
+    });
+    historyDragStateRef.current = transition.state;
+    if (transition.shouldLoadEarlier) {
+      if (historyErrorRef.current && onRetryEarlierRef.current) {
+        onRetryEarlierRef.current();
+      } else {
+        onLoadEarlierRef.current?.();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
     const observer = new MutationObserver(() => setThemeRevision((value) => value + 1));
-    observer.observe(root, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'data-market-color-scheme'],
+    });
     return () => observer.disconnect();
   }, []);
 
@@ -129,7 +215,7 @@ export function LightweightMarketChart({
     const chart = createChart(container, {
       autoSize: true,
       height: 390,
-      layout: { background: { color: 'transparent' }, textColor: '#64748b' },
+      layout: marketChartLayoutOptions,
       grid: {
         vertLines: { color: 'rgba(148, 163, 184, 0.16)' },
         horzLines: { color: 'rgba(148, 163, 184, 0.16)' },
@@ -155,7 +241,24 @@ export function LightweightMarketChart({
         onVisibleRangeChangeRef.current?.({ from: range.from, to: range.to });
       }
     };
+    const visibleLogicalRangeHandler = (range: { from: number; to: number } | null) =>
+      updateHistoryBoundary(chart, range);
+    const pointerDownHandler = () => {
+      historyDragStateRef.current = beginHistoryDrag();
+    };
+    const pointerMoveHandler = () => {
+      historyDragStateRef.current = markHistoryDragMovement(historyDragStateRef.current);
+      updateHistoryBoundary(chart, chart.timeScale().getVisibleLogicalRange());
+    };
+    const pointerEndHandler = () => {
+      historyDragStateRef.current = endHistoryDrag();
+    };
     chart.timeScale().subscribeVisibleTimeRangeChange(visibleRangeHandler);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(visibleLogicalRangeHandler);
+    container.addEventListener('pointerdown', pointerDownHandler);
+    container.addEventListener('pointermove', pointerMoveHandler);
+    window.addEventListener('pointerup', pointerEndHandler);
+    window.addEventListener('pointercancel', pointerEndHandler);
     const resizeObserver = new ResizeObserver(() => {
       const requested = firstLayoutPendingRef.current
         ? requestedInitialRangeRef.current
@@ -164,7 +267,10 @@ export function LightweightMarketChart({
       chart.timeScale().setVisibleRange(requested);
       previousVisibleRangeRef.current = requested;
       firstLayoutPendingRef.current = false;
-      onVisibleRangeChangeRef.current?.({ from: requested.from as string, to: requested.to as string });
+      onVisibleRangeChangeRef.current?.({
+        from: requested.from as string,
+        to: requested.to as string,
+      });
     });
     resizeObserver.observe(container);
     chartRef.current = chart;
@@ -173,21 +279,32 @@ export function LightweightMarketChart({
       chart.unsubscribeCrosshairMove(crosshairHandler);
       chart.unsubscribeClick(clickHandler);
       chart.timeScale().unsubscribeVisibleTimeRangeChange(visibleRangeHandler);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(visibleLogicalRangeHandler);
+      container.removeEventListener('pointerdown', pointerDownHandler);
+      container.removeEventListener('pointermove', pointerMoveHandler);
+      window.removeEventListener('pointerup', pointerEndHandler);
+      window.removeEventListener('pointercancel', pointerEndHandler);
       resizeObserver.disconnect();
+      paneWatermarksRef.current.forEach((watermark) => watermark.detach());
+      paneWatermarksRef.current = [];
       chart.remove();
       chartRef.current = null;
       seriesRef.current.clear();
+      historyDragStateRef.current = endHistoryDrag();
+      setIsLeftHistoryBlank(false);
       setChartReady(false);
     };
-  }, []);
+  }, [updateHistoryBoundary]);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !chartReady || chartPoints.length === 0) return;
+    paneWatermarksRef.current.forEach((watermark) => watermark.detach());
+    paneWatermarksRef.current = [];
     const cssColor = (name: string, fallback: string) =>
       getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-    const positiveColor = cssColor('--color-positive', '#2f7a66');
-    const negativeColor = cssColor('--color-negative', '#b64c5b');
+    const positiveColor = cssColor('--color-market-up', '#c7393c');
+    const negativeColor = cssColor('--color-market-down', '#2f7a66');
     const chartPrimary = cssColor('--chart-1', '#2563eb');
     const chartWarning = cssColor('--chart-4', '#f59e0b');
     const chartMuted = cssColor('--chart-5', '#94a3b8');
@@ -195,9 +312,10 @@ export function LightweightMarketChart({
     const addSeries = (key: string, definition: unknown, options: unknown, pane?: number) => {
       let series = seriesRef.current.get(key);
       if (!series) {
-        series = pane === undefined
-          ? chart.addSeries(definition as never, options as never)
-          : chart.addSeries(definition as never, options as never, pane);
+        series =
+          pane === undefined
+            ? chart.addSeries(definition as never, options as never)
+            : chart.addSeries(definition as never, options as never, pane);
         seriesRef.current.set(key, series);
       } else {
         series.applyOptions(options as never);
@@ -215,6 +333,8 @@ export function LightweightMarketChart({
       wickUpColor: positiveColor,
       wickDownColor: negativeColor,
       visible: chartMode === 'candles',
+      lastValueVisible: chartMode === 'candles',
+      priceLineVisible: chartMode === 'candles',
     });
     setData(
       candles,
@@ -234,6 +354,8 @@ export function LightweightMarketChart({
       color: chartPrimary,
       lineWidth: 2,
       visible: chartMode === 'close',
+      lastValueVisible: chartMode === 'close',
+      priceLineVisible: chartMode === 'close',
     });
     setData(
       close,
@@ -244,7 +366,12 @@ export function LightweightMarketChart({
     const volume = addSeries(
       'volume',
       HistogramSeries,
-      { color: 'rgba(100, 116, 139, 0.45)', priceFormat: { type: 'volume' }, priceScaleId: '' },
+      {
+        color: 'rgba(100, 116, 139, 0.45)',
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        ...auxiliaryLatestValueOptions,
+      },
       1,
     );
     setData(
@@ -265,8 +392,19 @@ export function LightweightMarketChart({
       ['ma5', 'ma10', 'ma20', 'ma60']
         .filter((name) => visibleMA.includes(name as ChartPreference['visibleMA'][number]))
         .forEach((name, index) => {
-          const color = [chartPrimary, chartWarning, cssColor('--chart-2', '#9333ea'), cssColor('--chart-3', '#0891b2')][index] ?? chartPrimary;
-          const line = addSeries(`ma-${name}`, LineSeries, { color, lineWidth: 2 }, 0);
+          const color =
+            [
+              chartPrimary,
+              chartWarning,
+              cssColor('--chart-2', '#9333ea'),
+              cssColor('--chart-3', '#0891b2'),
+            ][index] ?? chartPrimary;
+          const line = addSeries(
+            `ma-${name}`,
+            LineSeries,
+            { color, lineWidth: 2, ...auxiliaryLatestValueOptions },
+            0,
+          );
           setData(
             line,
             chartPoints.map((point) => {
@@ -281,7 +419,7 @@ export function LightweightMarketChart({
 
     const paneIndicators = (showBothPanes ? (['MACD', 'RSI'] as const) : [activePane])
       .map((name) => chartIndicators.find((item) => item.name === name))
-      .filter((item): item is IndicatorV1 => Boolean(item?.points));
+      .filter((item): item is MarketChartIndicator => (item?.points?.length ?? 0) > 0);
     const hasMacdPane = paneIndicators.some((item) => item.name === 'MACD');
     paneIndicators.forEach((selected) => {
       const paneName = selected.name as 'MACD' | 'RSI';
@@ -292,7 +430,9 @@ export function LightweightMarketChart({
           : [[`rsi${rsiPeriod}`, 'rsi']];
       names.forEach((name, index) => {
         const color =
-          paneName === 'MACD' ? ([chartPrimary, chartWarning, chartMuted][index] ?? chartPrimary) : chartPrimary;
+          paneName === 'MACD'
+            ? ([chartPrimary, chartWarning, chartMuted][index] ?? chartPrimary)
+            : chartPrimary;
         const line = addSeries(
           `${paneName}-${pane}-${index}`,
           paneName === 'MACD' && index === 2 ? HistogramSeries : LineSeries,
@@ -310,9 +450,7 @@ export function LightweightMarketChart({
             ...(paneName === 'MACD' && index === 2
               ? { base: 0, priceFormat: { type: 'price' } }
               : {}),
-            ...(paneName === 'RSI'
-              ? { lastValueVisible: false, priceLineVisible: false }
-              : {}),
+            ...auxiliaryLatestValueOptions,
           },
           pane,
         );
@@ -352,8 +490,7 @@ export function LightweightMarketChart({
               lineWidth: 1,
               lineStyle: 2,
               priceScaleId: 'right',
-              lastValueVisible: false,
-              priceLineVisible: false,
+              ...auxiliaryLatestValueOptions,
             },
             pane,
           );
@@ -364,14 +501,21 @@ export function LightweightMarketChart({
         });
       }
       if (paneName === 'MACD') {
-        const zeroLine = addSeries(`MACD-${pane}-zero`, LineSeries, {
-          color: chartMuted,
-          lineWidth: 1,
-          lineStyle: 2,
-          lastValueVisible: false,
-          priceLineVisible: false,
-        }, pane);
-        setData(zeroLine, chartPoints.map((point) => ({ time: point.date, value: 0 })));
+        const zeroLine = addSeries(
+          `MACD-${pane}-zero`,
+          LineSeries,
+          {
+            color: chartMuted,
+            lineWidth: 1,
+            lineStyle: 2,
+            ...auxiliaryLatestValueOptions,
+          },
+          pane,
+        );
+        setData(
+          zeroLine,
+          chartPoints.map((point) => ({ time: point.date, value: 0 })),
+        );
       }
     });
 
@@ -384,6 +528,33 @@ export function LightweightMarketChart({
 
     chart.panes().forEach((pane, index) => {
       pane.setStretchFactor([5, 1, 2, 2][index] ?? 2);
+    });
+
+    paneWatermarksRef.current = marketChartPaneLabels({
+      chartMode,
+      activePane,
+      showBothPanes,
+      hasMacdPane: paneIndicators.some((item) => item.name === 'MACD'),
+      hasRsiPane: paneIndicators.some((item) => item.name === 'RSI'),
+    }).flatMap(({ pane, text }) => {
+      const targetPane = chart.panes()[pane];
+      if (!targetPane) return [];
+      return [
+        createTextWatermark(targetPane, {
+          visible: true,
+          horzAlign: 'left',
+          vertAlign: 'top',
+          lines: [
+            {
+              text,
+              color: cssColor('--muted-foreground', '#64748b'),
+              fontSize: 12,
+              fontFamily: 'Inter, sans-serif',
+              fontStyle: 'normal',
+            },
+          ],
+        }),
+      ];
     });
 
     const previous = previousVisibleRangeRef.current;
@@ -455,6 +626,7 @@ export function LightweightMarketChart({
     if (range && typeof range.from === 'string' && typeof range.to === 'string') {
       onVisibleRangeChangeRef.current?.({ from: range.from, to: range.to });
     }
+    updateHistoryBoundary(chart, chart.timeScale().getVisibleLogicalRange());
   }, [
     activePane,
     bars,
@@ -486,10 +658,17 @@ export function LightweightMarketChart({
   }, [chartMode, chartPoints, lockedTimestamp]);
 
   return (
-    <div
-      ref={containerRef}
-      className="h-[390px] max-h-[390px] min-h-0 min-w-0 w-full max-w-full overflow-hidden [&_table]:h-auto [&_table]:min-w-0 [&_table]:w-auto [&_td]:min-w-0 [&_td]:p-0"
-      data-market-lightweight-chart
-    />
+    <div className="relative">
+      <div
+        ref={containerRef}
+        className="h-[390px] max-h-[390px] min-h-0 min-w-0 w-full max-w-full overflow-hidden [&_table]:h-auto [&_table]:min-w-0 [&_table]:w-auto [&_td]:min-w-0 [&_td]:p-0"
+        data-market-lightweight-chart
+      />
+      {isLeftHistoryBlank && historyLoading ? (
+        <span className="pointer-events-none absolute top-3 left-3 text-xs text-muted-foreground">
+          正在加载更早日线…
+        </span>
+      ) : null}
+    </div>
   );
 }

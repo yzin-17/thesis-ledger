@@ -65,6 +65,7 @@ export function TransactionSection({
   findSnapshotPosition,
   onEditSnapshot,
   onRemoveSnapshot,
+  resolveInstrumentName,
 }: {
   account: Account;
   events: LedgerEventV2[];
@@ -82,6 +83,7 @@ export function TransactionSection({
   findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
   onEditSnapshot: (event: LedgerEventV2) => void;
   onRemoveSnapshot: (event: LedgerEventV2) => void;
+  resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
   const filteredEvents = events.filter((event) => {
     if (filter === 'all') return true;
@@ -137,6 +139,7 @@ export function TransactionSection({
         findSnapshotPosition={findSnapshotPosition}
         onEditSnapshot={onEditSnapshot}
         onRemoveSnapshot={onRemoveSnapshot}
+        resolveInstrumentName={resolveInstrumentName}
         onCorrect={onCorrect}
         onVoid={onVoid}
         onCorrectTransfer={onCorrectTransfer}
@@ -164,6 +167,7 @@ function TransactionResults({
   findSnapshotPosition,
   onEditSnapshot,
   onRemoveSnapshot,
+  resolveInstrumentName,
   onCorrect,
   onVoid,
   onCorrectTransfer,
@@ -177,6 +181,7 @@ function TransactionResults({
   findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
   onEditSnapshot: (event: LedgerEventV2) => void;
   onRemoveSnapshot: (event: LedgerEventV2) => void;
+  resolveInstrumentName: (symbol: string) => string | undefined;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onCorrectTransfer: (event: CashTransferEvent) => void;
@@ -240,6 +245,7 @@ function TransactionResults({
               findSnapshotPosition={findSnapshotPosition}
               onEditSnapshot={onEditSnapshot}
               onRemoveSnapshot={onRemoveSnapshot}
+              resolveInstrumentName={resolveInstrumentName}
               onCorrect={onCorrect}
               onVoid={onVoid}
               onCorrectTransfer={onCorrectTransfer}
@@ -263,6 +269,7 @@ function TransactionRow({
   findSnapshotPosition,
   onEditSnapshot,
   onRemoveSnapshot,
+  resolveInstrumentName,
 }: {
   event: LedgerEventV2;
   onCorrect: (event: ExecutionEvent) => void;
@@ -273,20 +280,24 @@ function TransactionRow({
   findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
   onEditSnapshot: (event: LedgerEventV2) => void;
   onRemoveSnapshot: (event: LedgerEventV2) => void;
+  resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
   const execution = isExecutionEvent(event);
   const cashTransfer = isCashTransferEvent(event);
   const snapshotPosition = findSnapshotPosition(event);
-  const title = eventSymbol(event) ?? eventTypeLabel(event);
-  const detail = execution
+  const symbol = eventSymbol(event);
+  const instrumentName = symbol ? resolveInstrumentName(symbol) : undefined;
+  const title = instrumentName ?? symbol ?? eventTypeLabel(event);
+  const baseDetail = execution
     ? `${executionSideLabel(event)} · ${formatDecimal(event.payload.quantity)} · ${formatDecimal(event.payload.price)} ${event.payload.currency}`
     : (eventSubjectDetail(event) ?? sourceChannelLabel(event.source.channel));
+  const detail = instrumentName && symbol ? `${symbol} · ${baseDetail}` : baseDetail;
   const amount = transactionAmount(event, execution ? event : null);
   return (
     <tr data-ledger-event-id={event.eventId}>
-      <td className="max-w-[240px] px-4 py-3 align-top">
+      <td className="max-w-[360px] whitespace-normal px-4 py-3 align-top">
         <strong className="block truncate font-medium">{title}</strong>
-        <span className="mt-1 block text-xs text-muted-foreground">{detail}</span>
+        <span className="mt-1 block break-words text-xs text-muted-foreground">{detail}</span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 align-top text-muted-foreground">
         {formatDate(event.occurredAt)}

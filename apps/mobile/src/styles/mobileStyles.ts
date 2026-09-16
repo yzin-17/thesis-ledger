@@ -14,6 +14,7 @@ export const createStyles = (theme: MobileThemeColors) =>
       width: '100%',
     },
     headerCopy: { flex: 1, gap: 8, minWidth: 0 },
+    headerControls: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     eyebrow: { color: theme.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 1.92 },
     title: {
       color: theme.textPrimary,
@@ -51,6 +52,12 @@ export const createStyles = (theme: MobileThemeColors) =>
       paddingVertical: 8,
     },
     themeButtonText: { color: theme.textSecondary, fontSize: 12, fontWeight: '600' },
+    marketColorButtonSelected: { borderColor: theme.brand },
+    storageFeedback: { color: theme.error, fontSize: 12, lineHeight: 18 },
+    marketUpText: { color: theme.marketUp },
+    marketDownText: { color: theme.marketDown },
+    financialRedText: { color: theme.negative },
+    financialGreenText: { color: theme.positive },
     pressed: { opacity: 0.72 },
     focusRing: {
       borderColor: theme.brand,

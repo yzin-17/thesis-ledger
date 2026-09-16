@@ -13,10 +13,16 @@ import {
 import { createMobileBootstrap, resolveMobileApiBaseUrl, type MobileDashboardState } from './index';
 import {
   getMobileTheme,
+  mobileMarketColorLabels,
   mobileThemeLabels,
   type MobileResolvedTheme,
   type MobileThemePreference,
 } from './theme';
+import {
+  createMobileMarketColorPersistence,
+  defaultMobileMarketColorScheme,
+  type MobileMarketColorScheme,
+} from './market-color';
 import { MobilePortfolioScreen } from './components/MobilePortfolioScreen';
 import { MobileRiskScreen } from './components/MobileRiskScreen';
 import { MobileStatusBanner } from './components/MobileStatusBanner';
@@ -66,11 +72,19 @@ function MobileAppContent() {
   const [state, setState] = useState<MobileDashboardState>(bootstrap.store.getState());
   const [screen, setScreen] = useState<MobileScreen>('portfolio');
   const [themePreference, setThemePreference] = useState<MobileThemePreference>('system');
+  const [marketColorScheme, setMarketColorScheme] = useState<MobileMarketColorScheme>(
+    defaultMobileMarketColorScheme,
+  );
+  const [marketColorStorageFeedback, setMarketColorStorageFeedback] = useState<string | null>(null);
+  const marketColorPersistence = useMemo(() => createMobileMarketColorPersistence(), []);
   const [focusedControl, setFocusedControl] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [accountFeedback, setAccountFeedback] = useState<string | null>(null);
   const resolvedTheme = resolveMobileTheme(themePreference, systemTheme);
-  const theme = useMemo(() => getMobileTheme(resolvedTheme), [resolvedTheme]);
+  const theme = useMemo(
+    () => getMobileTheme(resolvedTheme, marketColorScheme),
+    [marketColorScheme, resolvedTheme],
+  );
   const styles = useMemo(() => createStyles(theme), [theme]);
   const accountsQuery = useMobileAccountsQuery(state.mode, bootstrap.api.accounts);
   const deleteAccountMutation = useMobilePermanentDeleteAccountMutation(
@@ -111,6 +125,22 @@ function MobileAppContent() {
   }, [bootstrap]);
 
   useEffect(() => {
+    let active = true;
+    void marketColorPersistence
+      .restore()
+      .then((storedScheme) => {
+        if (!active || storedScheme === null) return;
+        setMarketColorScheme(storedScheme);
+      })
+      .catch(() => {
+        if (active) setMarketColorStorageFeedback('涨跌配色读取失败，当前会话使用默认配色。');
+      });
+    return () => {
+      active = false;
+    };
+  }, [marketColorPersistence]);
+
+  useEffect(() => {
     const nextAccountId = resolveMobileAccountSelection(accounts, selectedAccountId);
     if (nextAccountId !== selectedAccountId) setSelectedAccountId(nextAccountId);
   }, [accounts, selectedAccountId]);
@@ -120,6 +150,17 @@ function MobileAppContent() {
     const nextPreference =
       themePreferences[(currentIndex + 1) % themePreferences.length] ?? 'system';
     setThemePreference(nextPreference);
+  };
+
+  const selectMarketColorScheme = (nextScheme: MobileMarketColorScheme) => {
+    setMarketColorScheme(nextScheme);
+    setMarketColorStorageFeedback(null);
+    void marketColorPersistence
+      .save(nextScheme)
+      .then(() => setMarketColorStorageFeedback(null))
+      .catch(() => {
+        setMarketColorStorageFeedback('涨跌配色已应用，但未能保存到本机。');
+      });
   };
 
   let eyebrow = 'PORTFOLIO';
@@ -143,7 +184,9 @@ function MobileAppContent() {
         loading={accountsQuery.isPending}
         error={accountsQuery.error}
         feedback={accountFeedback}
-        pendingAccountId={deleteAccountMutation.isPending ? deleteAccountMutation.variables : undefined}
+        pendingAccountId={
+          deleteAccountMutation.isPending ? deleteAccountMutation.variables : undefined
+        }
         onDelete={(account) => void accountDeletionHandler(account)}
         onRetry={() => void accountsQuery.refetch()}
         theme={theme}
@@ -157,28 +200,68 @@ function MobileAppContent() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>
-              {eyebrow}
-            </Text>
+            <Text style={styles.eyebrow}>{eyebrow}</Text>
             <Text accessibilityRole="header" style={styles.title}>
               {title}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`切换主题，当前为${mobileThemeLabels[themePreference]}`}
-            onPress={cycleTheme}
-            onFocus={() => setFocusedControl('theme')}
-            onBlur={() => setFocusedControl(null)}
-            style={({ pressed }) => [
-              styles.themeButton,
-              focusedControl === 'theme' && styles.focusRing,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.themeButtonText}>主题：{mobileThemeLabels[themePreference]}</Text>
-          </Pressable>
+          <View style={styles.headerControls}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`切换主题，当前为${mobileThemeLabels[themePreference]}`}
+              onPress={cycleTheme}
+              onFocus={() => setFocusedControl('theme')}
+              onBlur={() => setFocusedControl(null)}
+              style={({ pressed }) => [
+                styles.themeButton,
+                focusedControl === 'theme' && styles.focusRing,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.themeButtonText}>主题：{mobileThemeLabels[themePreference]}</Text>
+            </Pressable>
+            {(['red-up', 'green-up'] as const).map((scheme) => (
+              <Pressable
+                key={scheme}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: marketColorScheme === scheme }}
+                accessibilityLabel={`涨跌配色：${mobileMarketColorLabels[scheme]}`}
+                onPress={() => selectMarketColorScheme(scheme)}
+                onFocus={() => setFocusedControl(`market-color-${scheme}`)}
+                onBlur={() => setFocusedControl(null)}
+                style={({ pressed }) => [
+                  styles.themeButton,
+                  marketColorScheme === scheme && styles.marketColorButtonSelected,
+                  focusedControl === `market-color-${scheme}` && styles.focusRing,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.themeButtonText}>
+                  {mobileMarketColorLabels[scheme]} ·{' '}
+                  <Text
+                    style={
+                      scheme === 'red-up' ? styles.financialRedText : styles.financialGreenText
+                    }
+                  >
+                    ↑
+                  </Text>
+                  <Text
+                    style={
+                      scheme === 'red-up' ? styles.financialGreenText : styles.financialRedText
+                    }
+                  >
+                    ↓
+                  </Text>
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
+        {marketColorStorageFeedback ? (
+          <Text style={styles.storageFeedback} accessibilityRole="alert">
+            {marketColorStorageFeedback}
+          </Text>
+        ) : null}
         <Text style={styles.apiHint}>
           数据源：ThesisLedger API ·{`\n`}
           {apiBaseUrl}

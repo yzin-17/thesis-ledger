@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { marketToneClass } from '@/ui/market-color';
 import { ChevronDownIcon, ChevronUpIcon, ChevronsUpDownIcon } from 'lucide-react';
 import { useState } from 'react';
 
@@ -35,7 +36,7 @@ const formatSignedPercent = (value: number) => {
 
 const tone = (value: number | null | undefined) => {
   if (value === null || value === undefined || value === 0) return undefined;
-  return value > 0 ? ('positive' as const) : ('negative' as const);
+  return value > 0 ? ('up' as const) : ('down' as const);
 };
 
 const positionBaseMarketValue = (position: Position) =>
@@ -151,7 +152,7 @@ const positionWeight = (position: Position, totalValue: number) => {
 type MetricPresentation = {
   value: string;
   detail: string;
-  tone?: 'positive' | 'negative';
+  tone?: 'up' | 'down';
 };
 
 const dailyMetric = (portfolio: Portfolio): MetricPresentation => {
@@ -303,7 +304,7 @@ export function PortfolioPositionTable({
                           ? '—'
                           : formatMoney(position.marketPrice, currency)}
                       </strong>
-                      <span className={cn(tone(position.dailyReturn))}>
+                      <span className={marketToneClass(tone(position.dailyReturn))}>
                         {position.dailyReturn === null || position.dailyReturn === undefined
                           ? '今日 —'
                           : `今日 ${formatSignedPercent(position.dailyReturn)}`}
@@ -317,16 +318,16 @@ export function PortfolioPositionTable({
                       </strong>
                       <span>{weight === null ? '仓位 —' : `仓位 ${formatPercent(weight)}`}</span>
                     </td>
-                    <td className={cn(tone(position.dailyPnl))}>
+                    <td className={marketToneClass(tone(position.dailyPnl))}>
                       {position.dailyPnl === null || position.dailyPnl === undefined
                         ? '—'
                         : formatSignedMoney(position.dailyPnl, currency)}
                     </td>
                     <td>
-                      <strong className={cn(tone(position.pnl))}>
+                      <strong className={marketToneClass(tone(position.pnl))}>
                         {position.pnl === null ? '—' : formatSignedMoney(position.pnl, currency)}
                       </strong>
-                      <span className={cn(tone(position.pnlRatio))}>
+                      <span className={marketToneClass(tone(position.pnlRatio))}>
                         {position.pnlRatio === null || position.pnlRatio === undefined
                           ? '收益率 —'
                           : formatSignedPercent(position.pnlRatio)}

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { MarketModule } from '../market/market.module.js';
 import { RiskContextService } from './risk-context.service.js';
 import { RiskController } from './risk.controller.js';
 import { RiskEventService } from './risk-event.service.js';
@@ -9,7 +10,7 @@ import { StrategyRiskContextService } from './strategy-risk-context.service.js';
 import { StrategyRiskRuntimeService } from './strategy-risk-runtime.service.js';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, MarketModule],
   controllers: [RiskController],
   providers: [
     RiskRuleService,

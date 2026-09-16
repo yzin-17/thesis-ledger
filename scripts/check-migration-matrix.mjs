@@ -9,6 +9,7 @@ const schemaPath = resolve(prismaRoot, 'schema.prisma');
 const rawOwnedPath = resolve(prismaRoot, 'raw-owned-tables.json');
 const migrationName = /^\d{14}_[a-z0-9_-]+$/u;
 const createTable = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"([^"]+)"/giu;
+const dropTable = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"([^"]+)"/giu;
 
 const entries = (await readdir(migrationsRoot, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
@@ -28,6 +29,7 @@ for (let index = 0; index < entries.length; index += 1) {
     if (!match[1]) throw new Error(`迁移建表语句缺少表名: ${name}`);
     createdTables.add(match[1]);
   }
+  for (const match of sql.matchAll(dropTable)) createdTables.delete(match[1]);
 }
 
 const schema = await readFile(schemaPath, 'utf8');

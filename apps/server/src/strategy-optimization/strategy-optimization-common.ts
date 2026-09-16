@@ -5,6 +5,9 @@ import { canonicalStrategyMonitoringJson } from '@thesis-ledger/domain';
 export type ExperimentRow = {
   id: string;
   ownerKey: string;
+  sourceMode: 'existing' | 'discovery';
+  discoveryScope: unknown;
+  strategySpaceVersion: string | null;
   baselineStrategyVersionId: string;
   status: string;
   stage: string;
@@ -116,8 +119,7 @@ export const optimizationRemainingDurationMs = (
   now = Date.now(),
 ) => {
   const raw = toRecord(input.budget).maxDurationSeconds;
-  const maxSeconds =
-    typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 1_800;
+  const maxSeconds = typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 1_800;
   const activeElapsedMs = Math.max(0, now - input.createdAt.getTime() - input.pausedDurationMs);
   return Math.max(0, maxSeconds * 1_000 - activeElapsedMs);
 };

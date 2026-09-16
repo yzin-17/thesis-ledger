@@ -1,6 +1,7 @@
 import type {
   MonitoringPlan,
   OptimizationExperimentCreate,
+  OptimizationReasoningEffort,
   StrategyParameterDescriptor,
 } from '@thesis-ledger/schemas';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
@@ -14,11 +15,26 @@ export type OptimizationCapabilities = {
     costStatus: 'known' | 'unknown';
     costCurrency?: string;
     pricingVersion?: string;
+    reasoning?: {
+      supportedEfforts?: OptimizationReasoningEffort[] | null;
+      defaultEffort?: OptimizationReasoningEffort;
+      mandatory?: boolean;
+    };
   }>;
 };
 
 export type OptimizationExperimentSummary = {
   id: string;
+  sourceMode?: 'existing' | 'discovery';
+  discoveryScope?: {
+    executionInstrument: {
+      symbol: string;
+      market: 'CN' | 'HK' | 'US';
+      assetType: 'stock' | 'etf' | 'fund';
+    };
+    primaryTimeframe: string;
+  } | null;
+  strategySpaceVersion?: string | null;
   baselineStrategyVersionId: string;
   status: string;
   stage: string;
@@ -30,6 +46,7 @@ export type OptimizationExperimentSummary = {
     costStatus?: 'known' | 'unknown';
     costCurrency?: string;
     pricingVersion?: string;
+    reasoningEffort?: OptimizationReasoningEffort;
   }>;
   aiCallsUsed: number;
   backtestRunsUsed: number;
@@ -156,7 +173,11 @@ const jsonPost = <T>(path: string, body: unknown, client?: DesktopRequestClient)
   );
 
 export const fetchOptimizationCapabilities = (client?: DesktopRequestClient) =>
-  requestDesktopJson<OptimizationCapabilities>('/strategy-optimization/capabilities', undefined, client);
+  requestDesktopJson<OptimizationCapabilities>(
+    '/strategy-optimization/capabilities',
+    undefined,
+    client,
+  );
 
 export const fetchStrategyOptimizationParameters = (
   strategyVersionId: string,
@@ -217,7 +238,11 @@ export const cancelOptimizationExperiment = (id: string, client?: DesktopRequest
 
 export const finalizeOptimizationExperiment = (
   id: string,
-  input: { candidateIds: string[]; selectedCandidateId: string; expectedStage: 'awaiting_finalization' },
+  input: {
+    candidateIds: string[];
+    selectedCandidateId: string;
+    expectedStage: 'awaiting_finalization';
+  },
   client?: DesktopRequestClient,
 ) =>
   jsonPost<OptimizationCompare>(
@@ -240,6 +265,10 @@ export const adoptOptimizationCandidate = (
   jsonPost<{
     strategyVersion: { id: string; version: number };
     monitoringPlan: MonitoringPlan;
+    monitoringDiff?: {
+      before: MonitoringPlan | null;
+      after: MonitoringPlan;
+    };
     riskApplicationEnabled: boolean;
     riskApplicationDiffs: AdoptionRiskApplicationDiff[];
   }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt`, input, client);
@@ -252,7 +281,12 @@ export const previewStrategyRiskApplication = (
     cycleMode: 'existingAndFuture' | 'nextPositionCycle';
   },
   client?: DesktopRequestClient,
-) => jsonPost<RiskApplicationPreview>('/strategy-optimization/risk-applications/preview', input, client);
+) =>
+  jsonPost<RiskApplicationPreview>(
+    '/strategy-optimization/risk-applications/preview',
+    input,
+    client,
+  );
 
 export const createStrategyRiskApplication = (
   input: {

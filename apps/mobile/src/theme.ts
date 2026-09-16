@@ -1,3 +1,5 @@
+import type { MobileMarketColorScheme } from './market-color';
+
 export type MobileThemePreference = 'system' | 'light' | 'dark';
 export type MobileResolvedTheme = 'light' | 'dark';
 
@@ -21,6 +23,10 @@ export interface MobileThemeColors {
   positiveSoft: string;
   negative: string;
   negativeSoft: string;
+  marketUp: string;
+  marketUpSoft: string;
+  marketDown: string;
+  marketDownSoft: string;
   warning: string;
   warningSoft: string;
   error: string;
@@ -47,6 +53,10 @@ const lightTheme: MobileThemeColors = {
   positiveSoft: '#e8f6f1',
   negative: '#cf4054',
   negativeSoft: '#fdecee',
+  marketUp: '#cf4054',
+  marketUpSoft: '#fdecee',
+  marketDown: '#0b8c68',
+  marketDownSoft: '#e8f6f1',
   warning: '#a96b00',
   warningSoft: '#fff5df',
   error: '#c7393c',
@@ -73,18 +83,38 @@ const darkTheme: MobileThemeColors = {
   positiveSoft: '#102d25',
   negative: '#ff6d7d',
   negativeSoft: '#3a2025',
+  marketUp: '#ff6d7d',
+  marketUpSoft: '#3a2025',
+  marketDown: '#26c59a',
+  marketDownSoft: '#102d25',
   warning: '#e0ad56',
   warningSoft: '#3a2e1a',
   error: '#ff7676',
   errorSoft: '#3a2020',
 };
 
-export function getMobileTheme(theme: MobileResolvedTheme): MobileThemeColors {
-  return theme === 'dark' ? darkTheme : lightTheme;
+export function getMobileTheme(
+  theme: MobileResolvedTheme,
+  scheme: MobileMarketColorScheme = 'red-up',
+): MobileThemeColors {
+  const colors = theme === 'dark' ? darkTheme : lightTheme;
+  if (scheme === 'red-up') return colors;
+  return {
+    ...colors,
+    marketUp: colors.marketDown,
+    marketUpSoft: colors.marketDownSoft,
+    marketDown: colors.marketUp,
+    marketDownSoft: colors.marketUpSoft,
+  };
 }
 
 export const mobileThemeLabels: Record<MobileThemePreference, string> = {
   system: '系统',
   light: '浅色',
   dark: '深色',
+};
+
+export const mobileMarketColorLabels: Record<MobileMarketColorScheme, string> = {
+  'red-up': '红涨绿跌',
+  'green-up': '绿涨红跌',
 };

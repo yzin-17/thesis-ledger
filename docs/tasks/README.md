@@ -9,6 +9,7 @@
 - [账户永久删除](2026-09-14-permanent-account-deletion.md)（代码、隔离数据库与 Server HTTP 验收完成；Desktop 浏览器和 Mobile 原生验收未完成）
 - [组合估值按需查询与 ETF 行情上游保护](2026-09-14-portfolio-valuation-demand-guard.md)（规划完成，待从 T1 开始实施）
 - [统一回测系统 V2](2026-08-28-unified-backtest-v2.md)
+- [回测真实历史市场规则数据源](2026-09-16-backtest-real-historical-market-rules.md)（规划完成；待确认首个真实来源及授权条件后实施）
 - [V1 回测任务 BullMQ 生命周期](2026-09-09-backtest-bullmq-lifecycle.md)（PR #33 已完成 durable owner/reconciler 代码修复；仍待目标 Compose post-claim hard-kill 与 Electron 运行态 smoke）
 - [策略驱动风险规则与 AI 多模型优化](2026-09-09-strategy-risk-ai-optimization.md)（仓库实现已收口，真实外部 Provider/在线数据/Desktop 人工 smoke 仍按部署门禁记录）
 - [组合概览收益指标语义统一](2026-09-09-portfolio-pnl-metrics.md)（代码实现完成，待运行时验收）

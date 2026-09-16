@@ -79,10 +79,16 @@ export function StrategyV2Summary({
   schema,
   editable = false,
   onChange,
+  variant = 'default',
+  strategyName,
+  version,
 }: {
   schema: StrategySchema;
   editable?: boolean;
   onChange?: (schema: StrategySchema) => void;
+  variant?: 'default' | 'compact';
+  strategyName?: string;
+  version?: number;
 }) {
   const instrument = asRecord(schema.executionInstrument);
   const sizing = asRecord(schema.sizing);
@@ -100,6 +106,50 @@ export function StrategyV2Summary({
     return 'weight';
   };
   const sizingKey = sizingValueKey();
+  if (variant === 'compact') {
+    return (
+      <Card size="sm" className="bg-muted/20">
+        <CardHeader className="gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:grid-rows-none">
+          <div className="min-w-0">
+            <CardTitle className="truncate">
+              {strategyName ?? text(schema.name, '未知策略')}
+            </CardTitle>
+            <CardDescription className="mt-1">
+              {text(instrument.symbol)} / {marketLabel(instrument.market)} /{' '}
+              {assetTypeLabel(instrument.assetType)}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Badge variant="secondary">V2 · v{version ?? '?'}</Badge>
+            <Badge variant="outline">{timeframeLabel(schema.primaryTimeframe)}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">信号来源</p>
+              <p className="mt-0.5 text-sm">{sources.length} 个</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">仓位</p>
+              <p className="mt-0.5 text-sm">
+                {sizingLabel(sizing.type)}{' '}
+                {text(sizing.amount ?? sizing.percent ?? sizing.quantity ?? sizing.weight)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">风险规则</p>
+              <p className="mt-0.5 text-sm">
+                {risks.length
+                  ? risks.map((risk) => riskLabel(asRecord(risk).type)).join('、')
+                  : '无风险退出规则'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Card>
       <CardHeader>

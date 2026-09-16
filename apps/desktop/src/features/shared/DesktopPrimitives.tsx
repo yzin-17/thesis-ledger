@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { cn } from '@/lib/utils';
+import { marketToneClass, type MarketTone } from '@/ui/market-color';
 import type { LoadState } from './types.js';
 
 export const Metric = ({
@@ -16,12 +17,12 @@ export const Metric = ({
   label: string;
   value: string;
   detail?: string;
-  tone?: 'positive' | 'negative';
+  tone?: MarketTone;
 }) => (
   <Card className="metric metric-card shadow-none ring-0">
     <CardContent className="metric-content">
       <p>{label}</p>
-      <strong className={tone}>{value}</strong>
+      <strong className={marketToneClass(tone)}>{value}</strong>
       {detail && <span>{detail}</span>}
     </CardContent>
   </Card>

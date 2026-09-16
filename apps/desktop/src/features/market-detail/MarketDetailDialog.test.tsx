@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
+import type { BarSeriesV2 } from '@thesis-ledger/schemas';
 
 const { useQueryMock, useQueryClientMock } = vi.hoisted(() => ({
   useQueryMock: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock('@/components/ui/dialog', () => {
   };
 });
 
+vi.mock('@/components/market-color-menu', () => ({
+  MarketColorMenu: () => null,
+}));
+
 import {
   commitIfCurrentGeneration,
   MarketDetailDialog,
@@ -43,14 +48,14 @@ const position = {
   asset: { name: '示例股票', assetType: 'stock' as const },
 };
 
-const detail = (input: Partial<MarketDetailResponse>): MarketDetailResponse => ({
-  version: 1,
+const detail = (input: Partial<MarketDetailResponseV2>): MarketDetailResponseV2 => ({
+  contractVersion: 2,
   symbol: '600519.SH',
   assetType: 'STOCK',
   identity: { source: 'asset', status: 'confirmed' },
   requested: [],
   capabilities: { supported: [], unsupported: [] },
-  limits: { bars: 30, nav: 30, barsHasMoreBefore: true },
+  limits: { bars: 30, nav: 30 },
   sections: {},
   dependencies: {},
   requestId: 'request-1',
@@ -76,17 +81,23 @@ const readyQuote = {
 };
 
 const readyIndicator = (name: 'MA' | 'MACD' | 'RSI') => ({
-  version: 1 as const,
-  symbol: '600519.SH',
   name,
   parameters: {},
-  timeframe: '1d' as const,
-  marketTime: time,
-  calculatedAt: time,
-  values: name === 'MA' ? { ma5: [100, 101, 102], ma10: [99, 100, 101] } : { value: 1 },
-  provider: 'fixture',
-  engineVersion: 'fixture',
+  inputFingerprint: 'fixture',
+  points: [],
 });
+
+const readySeries: BarSeriesV2 = {
+  contractVersion: 2,
+  identity: { symbol: '600519.SH', assetType: 'STOCK', timeframe: '1d', adjustment: 'qfq' },
+  points: [
+    { timestamp: '2026-08-20T00:00:00.000Z', open: 99, high: 102, low: 98, close: 100, volume: 100, amount: 10_000, completionStatus: 'complete', availableAt: time },
+    { timestamp: time, open: 100, high: 106, low: 99, close: 105, volume: 120, amount: 12_600, completionStatus: 'complete', availableAt: time },
+  ],
+  coverage: { actualStart: '2026-08-20T00:00:00.000Z', actualEnd: time, hasMoreBefore: true, latestCompleteTradingDate: '2026-08-21' },
+  provenance: { providerId: 'fixture', upstreamSource: 'fixture', routeIndex: 0, effectivePolicyRevision: 1, providerRevision: 'fixture', fetchedAt: time, freshUntil: '2099-01-01T00:00:00.000Z', servedFromCache: false, cacheStatus: 'miss' },
+  inputFingerprint: 'fixture',
+};
 
 const queryClient = {
   cancelQueries: vi.fn(),
@@ -123,12 +134,17 @@ describe('MarketDetailDialog UI contract', () => {
 
   it('参数变化后拒绝延迟完成的旧重试提交', async () => {
     let generation = 1;
-    let resolveRequest!: (value: MarketDetailResponse) => void;
-    const request = new Promise<MarketDetailResponse>((resolve) => {
+    let resolveRequest!: (value: MarketDetailResponseV2) => void;
+    const request = new Promise<MarketDetailResponseV2>((resolve) => {
       resolveRequest = resolve;
     });
     const commit = vi.fn();
-    const pending = commitIfCurrentGeneration(1, () => generation, () => request, commit);
+    const pending = commitIfCurrentGeneration(
+      1,
+      () => generation,
+      () => request,
+      commit,
+    );
 
     generation = 2;
     resolveRequest(detail({ requestId: 'old-retry' }));
@@ -150,42 +166,7 @@ describe('MarketDetailDialog UI contract', () => {
           bars: {
             capability: 'bars',
             status: 'ready',
-            data: [
-              {
-                version: 1,
-                symbol: '600519.SH',
-                timeframe: '1d',
-                timestamp: '2026-08-20T00:00:00.000Z',
-                open: 99,
-                high: 102,
-                low: 98,
-                close: 100,
-                volume: 100,
-                amount: 10_000,
-                provider: 'fixture',
-                fetchedAt: time,
-                freshness: 'delayed',
-                fallbackUsed: false,
-                servedFromCache: false,
-              },
-              {
-                version: 1,
-                symbol: '600519.SH',
-                timeframe: '1d',
-                timestamp: time,
-                open: 100,
-                high: 106,
-                low: 99,
-                close: 105,
-                volume: 120,
-                amount: 12_600,
-                provider: 'fixture',
-                fetchedAt: time,
-                freshness: 'delayed',
-                fallbackUsed: false,
-                servedFromCache: false,
-              },
-            ],
+            data: readySeries,
           },
           'indicator:MA': {
             capability: 'indicator:MA',
@@ -208,6 +189,7 @@ describe('MarketDetailDialog UI contract', () => {
             error: { code: 'market_data_unavailable', message: '暂不可用', diagnosticId: 'd-1' },
           },
         },
+        barSeries: readySeries,
       }),
       isPending: false,
       isError: false,
@@ -220,10 +202,15 @@ describe('MarketDetailDialog UI contract', () => {
     expect(html).toContain('实时价');
     expect(html).toContain('技术指标');
     expect(html).toContain('data-market-price-chart="true"');
+    expect(html).toContain('data-market-chart-navigation="true"');
+    expect(html.indexOf('全屏')).toBeLessThan(html.indexOf('data-market-chart-navigation="true"'));
+    expect(html.indexOf('data-market-chart-navigation="true"')).toBeLessThan(
+      html.indexOf('data-market-lightweight-chart="true"'),
+    );
     expect(html).not.toContain('共享日线依赖');
     expect(html).not.toContain('已并入上方日线图');
     expect(html).toContain('缺少历史序列或日线口径证据');
-    expect(html).toContain('加载更早日线');
+    expect(html).not.toContain('加载更早日线');
     expect(html).not.toContain('data-market-indicator-chart');
     expect(html).toContain('data-market-detail-section="chip"');
     expect(html).toContain('重试');

@@ -19,11 +19,11 @@ export const fetchOnboardingStatus = async (
     requestDesktopJson<OnboardingProviderRecord[]>('/providers/config', undefined, client),
     requestDesktopJson<OnboardingRiskRuleRecord[]>('/risk/rules', undefined, client),
     requestDesktopJson<{ providers?: ProviderManifest[] }>(
-      '/market-data/providers',
+      '/api/v2/market-data/providers',
       undefined,
       client,
     ),
-    requestDesktopJson<MarketPolicy>('/market-data/policy', undefined, client),
+    requestDesktopJson<MarketPolicy>('/api/v2/market-data/policy', undefined, client),
   ]);
   const marketData: OnboardingMarketData = {
     providers: marketProviders.providers ?? [],

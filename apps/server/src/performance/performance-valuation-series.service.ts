@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { assetMarketsByTradingMarket, openTradingMarketsAt } from '@thesis-ledger/domain';
 import type {
   FundHoldingsV1,
@@ -6,6 +6,8 @@ import type {
   PerformanceSeriesRange,
 } from '@thesis-ledger/schemas';
 import { MarketService } from '../market/market.service.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
+import { inferAssetType } from '../ledger/asset-type.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { investmentAccountWhere } from '../portfolio/investment-account-scope.js';
 import { PerformanceLayerService } from './performance-layer.service.js';
@@ -128,6 +130,7 @@ export class PerformanceValuationSeriesService {
     private readonly layers: PerformanceLayerService,
     private readonly snapshots: PerformanceSnapshotService,
     private readonly market: MarketService,
+    @Optional() private readonly bars?: MarketBarReader,
   ) {}
 
   private openAssetMarkets(at: Date) {
@@ -401,6 +404,8 @@ export class PerformanceValuationSeriesService {
         evidence: [],
       };
     }
+    if (!this.bars) throw new Error('绩效预估缺少 MarketBarReader');
+    const barsReader = this.bars;
     const estimates = await Promise.all(
       positions.map(async (position) => {
         try {
@@ -417,14 +422,18 @@ export class PerformanceValuationSeriesService {
               try {
                 const [quote, bars] = await Promise.all([
                   this.market.getQuote(holding.symbol, { allowStale: true }),
-                  this.market.getBars(
-                    holding.symbol,
-                    '1d',
-                    { start: anchorStart.toISOString(), end: nav.navDate },
-                    { allowStale: true },
-                  ),
+                  barsReader.read({
+                    identity: {
+                      symbol: holding.symbol,
+                      assetType: inferAssetType(holding.symbol) === 'etf' ? 'ETF' : 'STOCK',
+                      timeframe: '1d',
+                      adjustment: 'none',
+                    },
+                    window: { start: anchorStart.toISOString(), end: nav.navDate },
+                    acceptance: 'interactive',
+                  }),
                 ]);
-                const anchor = bars.at(-1);
+                const anchor = bars.points.at(-1);
                 if (!anchor || anchor.close <= 0) return;
                 returns.set(holding.symbol, quote.price / anchor.close - 1);
               } catch {

@@ -38,7 +38,9 @@ export const hasConfiguredDsaQuoteProvider = (marketData?: OnboardingMarketData)
       isUsableMarketProvider(provider) &&
       Array.isArray(provider.capabilities.REALTIME_QUOTE) &&
       provider.capabilities.REALTIME_QUOTE.length > 0 &&
-      quoteRoutes.some((providerIds) => providerIds.includes(provider.providerId)),
+      quoteRoutes.some((targets) =>
+        targets.some((target) => target.providerId === provider.providerId),
+      ),
   );
 };
 

@@ -67,6 +67,15 @@ async function inspect(path) {
     (match) => match[1],
   );
   const file = relative(root, path).replaceAll('\\', '/');
+  const isServerSource = file.startsWith('apps/server/src/');
+  const isMarketFeature = file.startsWith('apps/server/src/market/');
+  const isDsaBoundary = file.startsWith('apps/server/src/integration/dsa/');
+  if (isServerSource && !isMarketFeature && /prisma\.marketBar\.(?:find|count|groupBy|aggregate)\b|import\s+(?:type\s+)?\{[^}]*\bMarketBar\b/u.test(source)) {
+    violations.push(`${file} -> MarketBar (行情事实只能由 MarketBarReader 读取)`);
+  }
+  if (isServerSource && !isMarketFeature && !isDsaBoundary && /\b(?:this\.)?dsa\.(?:marketBarsV2|backtestBars)\s*\(/u.test(source)) {
+    violations.push(`${file} -> DsaClient market bars (必须通过 MarketBarReader)`);
+  }
   for (const specifier of imports) {
     if (specifier === 'bullmq' && !file.startsWith('apps/server/src/backtest/')) {
       violations.push(`${file} -> ${specifier} (BullMQ adapter must remain in backtest boundary)`);

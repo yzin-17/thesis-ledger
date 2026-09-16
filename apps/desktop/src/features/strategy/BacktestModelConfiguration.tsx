@@ -44,7 +44,7 @@ export function BacktestModelConfiguration({
       />
       <FieldDescription>
         粘贴完整的 execution-model-v1
-        配置，检查范围与假设后确认。留空沿用旧执行规则；当前没有默认预设，关键事实缺失会阻止运行。
+        配置，检查范围与假设后确认。留空时，数据源必须提供覆盖本次区间的历史执行规则；系统不会自动补充预设。
       </FieldDescription>
       {error && <FieldError>{error}</FieldError>}
       {model && (

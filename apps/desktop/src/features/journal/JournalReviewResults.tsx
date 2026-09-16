@@ -12,6 +12,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { LoaderCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 import type {
   BehaviorReviewResult,
   DeterministicJournalReviewResult,
@@ -63,11 +65,24 @@ const completenessLabel = (value: JournalReviewCandidate['evidenceCompleteness']
   return '仅有实际交易';
 };
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Metric({
+  label,
+  value,
+  hint,
+  toneValue,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  toneValue?: number | null;
+}) {
+  const tone = marketToneForValue(toneValue);
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-muted/20 p-3">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <strong className="truncate text-base font-medium">{value}</strong>
+      <strong className={cn('truncate text-base font-medium', marketToneClass(tone))}>
+        {value}
+      </strong>
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </div>
   );
@@ -238,7 +253,7 @@ export function SingleReviewResult({
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-4">
-          <Metric label="已实现盈亏" value={formatMoney(trade.pnl)} />
+          <Metric label="已实现盈亏" value={formatMoney(trade.pnl)} toneValue={trade.pnl} />
           <Metric label="实际持有" value={formatNumber(holdingDays(trade), ' 天')} />
           <Metric label="成交数量" value={formatNumber(trade.quantity ?? null)} />
           <Metric
@@ -327,12 +342,21 @@ export function SingleReviewResult({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Metric label="实际盈亏" value={formatMoney(readNumber(counterfactual, 'actualPnl'))} />
+            <Metric
+              label="实际盈亏"
+              value={formatMoney(readNumber(counterfactual, 'actualPnl'))}
+              toneValue={readNumber(counterfactual, 'actualPnl')}
+            />
             <Metric
               label="假设盈亏"
               value={formatMoney(readNumber(counterfactual, 'counterfactualPnl'))}
+              toneValue={readNumber(counterfactual, 'counterfactualPnl')}
             />
-            <Metric label="差额" value={formatMoney(readNumber(counterfactual, 'difference'))} />
+            <Metric
+              label="差额"
+              value={formatMoney(readNumber(counterfactual, 'difference'))}
+              toneValue={readNumber(counterfactual, 'difference')}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             {readString(counterfactual, 'assumption') ??

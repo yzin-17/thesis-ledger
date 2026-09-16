@@ -7,6 +7,7 @@
 | daily_stock_analysis | 同级 DSA Fork 的行情与研究能力 | 记录上游许可证、Fork commit、镜像 digest 与 attribution |
 | NestJS               | Server 框架                    | 保留其 MIT 许可证声明                                   |
 | React / Vite         | Desktop UI 与构建              | 保留其 MIT 许可证声明                                   |
+| Lightweight Charts 5.2.1 | Desktop 日线与净值图表 | Apache-2.0；保留 `TradingView Lightweight Charts™`、`Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/` NOTICE，并在产品图表口径区提供来源链接 |
 | Prisma               | ORM 与迁移                     | 保留其 Apache-2.0 许可证声明                            |
 | Zod                  | Schema 校验                    | 保留其 MIT 许可证声明                                   |
 | ioredis              | Redis 客户端                   | 保留其 MIT 许可证声明                                   |

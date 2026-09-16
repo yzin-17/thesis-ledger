@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { BarV1 } from '@thesis-ledger/schemas';
-import { rangeCoverage, rangeMonths, visibleBarsForRange } from './MarketPriceLightweightChart.js';
+import type { MarketChartBar } from './market-chart-types.js';
+import {
+  auxiliaryLatestValueOptions,
+  rangeCoverage,
+  rangeMonths,
+  visibleBarsForRange,
+} from './MarketPriceLightweightChart.js';
 
-const bar = (timestamp: string): BarV1 => ({
-  version: 1,
+const bar = (timestamp: string): MarketChartBar => ({
   symbol: '600519.SH',
   timeframe: '1d',
   timestamp,
@@ -16,8 +20,9 @@ const bar = (timestamp: string): BarV1 => ({
   provider: 'fixture',
   fetchedAt: timestamp,
   freshness: 'delayed',
-  fallbackUsed: false,
   servedFromCache: false,
+  completionStatus: 'complete',
+  availableAt: timestamp,
 });
 
 describe('MarketPriceLightweightChart range helpers', () => {
@@ -45,5 +50,12 @@ describe('MarketPriceLightweightChart range helpers', () => {
     expect(
       rangeCoverage([bar('2026-05-21T00:00:00.000Z'), bar('2026-08-21T00:00:00.000Z')], 90),
     ).toMatchObject({ available: true, months: 3 });
+  });
+
+  it('辅助序列不在价格轴输出无名称的末值或价格线', () => {
+    expect(auxiliaryLatestValueOptions).toEqual({
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
   });
 });

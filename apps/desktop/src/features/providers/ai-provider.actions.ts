@@ -85,7 +85,7 @@ export const mergeSelectedModelReasoning = (
 };
 
 const reasoningEffortLabel: Record<AiProviderReasoningEffort, string> = {
-  none: '关闭',
+  none: 'none',
   minimal: 'minimal',
   low: 'low',
   medium: 'medium',

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
 import {
   MarketDetailRequestCoordinator,
   type MarketDetailFetcher,
@@ -7,13 +7,13 @@ import {
 } from './market-detail.coordinator.js';
 
 const request: MarketDetailRequest = { symbol: '600519.SH', include: ['quote'] };
-const response = { symbol: '600519.SH' } as MarketDetailResponse;
+const response = { symbol: '600519.SH' } as unknown as MarketDetailResponseV2;
 
 describe('MarketDetailRequestCoordinator', () => {
   it('相同请求共享一个 in-flight fetch', async () => {
-    let resolveFetch!: (value: MarketDetailResponse) => void;
+    let resolveFetch!: (value: MarketDetailResponseV2) => void;
     const fetcher: MarketDetailFetcher = vi.fn(
-      () => new Promise<MarketDetailResponse>((resolve) => (resolveFetch = resolve)),
+      () => new Promise<MarketDetailResponseV2>((resolve) => (resolveFetch = resolve)),
     );
     const coordinator = new MarketDetailRequestCoordinator();
 
@@ -28,10 +28,10 @@ describe('MarketDetailRequestCoordinator', () => {
   });
 
   it('单个消费者取消不会中断仍在使用的共享请求', async () => {
-    let resolveFetch!: (value: MarketDetailResponse) => void;
+    let resolveFetch!: (value: MarketDetailResponseV2) => void;
     let fetchSignal!: AbortSignal;
     const fetcherImpl: MarketDetailFetcher = (_request, signal) =>
-      new Promise<MarketDetailResponse>((resolve) => {
+      new Promise<MarketDetailResponseV2>((resolve) => {
         fetchSignal = signal;
         resolveFetch = resolve;
       });
@@ -50,10 +50,10 @@ describe('MarketDetailRequestCoordinator', () => {
   });
 
   it('最后一个消费者取消时中断底层请求', async () => {
-    let resolveFetch!: (value: MarketDetailResponse) => void;
+    let resolveFetch!: (value: MarketDetailResponseV2) => void;
     let fetchSignal!: AbortSignal;
     const fetcherImpl: MarketDetailFetcher = (_request, signal) =>
-      new Promise<MarketDetailResponse>((resolve) => {
+      new Promise<MarketDetailResponseV2>((resolve) => {
         fetchSignal = signal;
         resolveFetch = resolve;
       });
@@ -74,11 +74,11 @@ describe('MarketDetailRequestCoordinator', () => {
   });
 
   it('取消后的请求不会复用已经 aborted 的 in-flight', async () => {
-    const resolvers: Array<(value: MarketDetailResponse) => void> = [];
+    const resolvers: Array<(value: MarketDetailResponseV2) => void> = [];
     const signals: AbortSignal[] = [];
     const fetcher: MarketDetailFetcher = vi.fn(
       (_request: MarketDetailRequest, signal: AbortSignal) =>
-        new Promise<MarketDetailResponse>((resolve) => {
+        new Promise<MarketDetailResponseV2>((resolve) => {
           signals.push(signal);
           resolvers.push(resolve);
         }),

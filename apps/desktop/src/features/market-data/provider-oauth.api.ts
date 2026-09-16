@@ -2,7 +2,7 @@ import { getDesktopApiClient } from '../../shared/api/client.js';
 import type { ProviderOAuthSession } from '@thesis-ledger/schemas';
 export type { ProviderOAuthSession } from '@thesis-ledger/schemas';
 
-const base = '/market-data/providers/longbridge/oauth/sessions';
+const base = '/api/v2/market-data/providers/longbridge/oauth/sessions';
 export const createProviderOAuth = (clientId: string) =>
   getDesktopApiClient().request<ProviderOAuthSession>(base, {
     method: 'POST',

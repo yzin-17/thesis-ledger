@@ -151,14 +151,14 @@ export const searchPortfolioInstruments = (
   signal?: AbortSignal,
 ) =>
   requestDesktopJson<InstrumentLookup[]>(
-    `/market-data/instruments/search?q=${encodeURIComponent(query)}`,
+    `/api/v2/market-data/instruments/search?q=${encodeURIComponent(query)}`,
     { ...noStore, ...(signal ? { signal } : {}) },
     client,
   );
 
 export const confirmPortfolioInstrument = (instrumentId: string, client?: DesktopRequestClient) =>
   requestDesktopJson<unknown>(
-    `/market-data/instruments/${encodeURIComponent(instrumentId)}/confirm`,
+    `/api/v2/market-data/instruments/${encodeURIComponent(instrumentId)}/confirm`,
     { ...noStore, method: 'POST' },
     client,
   );

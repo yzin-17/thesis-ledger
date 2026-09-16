@@ -1,27 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BarV1, IndicatorV1 } from '@thesis-ledger/schemas';
+import type { BarPointV2 } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { MarketChartAttribution } from './MarketChartAttribution.js';
+import { MarketChartNavigationControls } from './MarketChartNavigationControls.js';
+import { MarketChartReadout } from './MarketChartReadout.js';
+import { MarketChartToolbar } from './MarketChartToolbar.js';
+import { MarketIndicatorSettingsMenu } from './MarketIndicatorSettingsMenu.js';
 import {
   LightweightMarketChart,
   rangeCoverage,
   rangeMonths,
   visibleBarsForRange,
 } from './MarketPriceLightweightChart.js';
-import { buildChartPoints, indicatorComparable } from './market-chart-model.js';
+import { buildChartPoints, type ChartPoint } from './market-chart-model.js';
+import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
 import {
   defaultPreference,
   normalizeMacdParams,
@@ -43,7 +37,7 @@ const rangeLabel = (range: number) => {
   return '1年';
 };
 
-const completionLabel = (status: BarV1['completionStatus']) => {
+const completionLabel = (status: BarPointV2['completionStatus'] | undefined) => {
   if (status === 'incomplete') return '当日未完成';
   if (status === 'unknown') return '收盘状态未知';
   if (status === 'complete') return '已收盘';
@@ -55,6 +49,7 @@ const timestampOf = (timestamp: string) => timestamp.slice(0, 10);
 export function MarketPriceChart({
   bars,
   indicators = [],
+  chartPoints: providedChartPoints,
   onIndicatorParamsChange,
   onLoadEarlier,
   canLoadEarlier,
@@ -62,8 +57,9 @@ export function MarketPriceChart({
   historyError,
   onRetryEarlier,
 }: {
-  bars: BarV1[];
-  indicators?: IndicatorV1[];
+  bars: MarketChartBar[];
+  indicators?: MarketChartIndicator[];
+  chartPoints?: ChartPoint[];
   onIndicatorParamsChange?: (params: MarketIndicatorParams) => void;
   onLoadEarlier?: () => void;
   canLoadEarlier?: boolean;
@@ -93,7 +89,10 @@ export function MarketPriceChart({
     () => visibleBarsForRange(bars, preference.visibleRange),
     [bars, preference.visibleRange],
   );
-  const chartPoints = useMemo(() => buildChartPoints(bars, indicators), [bars, indicators]);
+  const chartPoints = useMemo(
+    () => providedChartPoints ?? buildChartPoints(bars, indicators),
+    [bars, indicators, providedChartPoints],
+  );
   const viewportBars = useMemo(() => {
     if (!viewport) return visible;
     return bars.filter((bar) => {
@@ -104,28 +103,13 @@ export function MarketPriceChart({
   const first = viewportBars[0];
   const last = viewportBars.at(-1);
   const latestBar = bars.at(-1);
-  const currency = latestBar?.symbol.match(/\.(SH|SZ|BJ)$/) ? 'CNY' : undefined;
+  const currency = latestBar?.symbol?.match(/\.(SH|SZ|BJ)$/) ? 'CNY' : undefined;
   const change = first && last && first.close !== 0 ? last.close / first.close - 1 : null;
   const selectedTimestamp = lockedTimestamp ?? hoveredTimestamp;
   const selectedBar = bars.find((bar) => timestampOf(bar.timestamp) === selectedTimestamp) ?? last;
-  const selectedIndicatorText = indicators
-    .map((indicator) => {
-      const point = indicator.points?.find(
-        (candidate) =>
-          timestampOf(candidate.timestamp) === timestampOf(selectedBar?.timestamp ?? ''),
-      );
-      const chartPoint = chartPoints.find(
-        (item) => item.date === timestampOf(selectedBar?.timestamp ?? ''),
-      );
-      if (!point || !chartPoint || !indicatorComparable(chartPoint, indicator.name)) return null;
-      const values = Object.entries(point.values)
-        .filter(([, value]) => typeof value === 'number')
-        .map(([name, value]) => `${name} ${number.format(value as number)}`)
-        .join(' · ');
-      return values ? `${indicator.name}: ${values}` : null;
-    })
-    .filter((value): value is string => Boolean(value))
-    .join(' ｜ ');
+  const selectedChartPoint = chartPoints.find(
+    (point) => point.date === timestampOf(selectedBar?.timestamp ?? ''),
+  );
 
   useEffect(() => {
     onIndicatorParamsChange?.({
@@ -217,250 +201,159 @@ export function MarketPriceChart({
 
   const panel = (
     <div className="grid gap-3 rounded-lg bg-muted/30 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-col gap-3">
         <div>
           <h4 className="m-0 text-sm font-medium">日线走势</h4>
           <p className="m-0 text-xs text-muted-foreground">K线、均线、成交量与指标共用日期轴</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ToggleGroup
-            value={[preference.chartMode]}
-            onValueChange={(value) =>
-              value[0] && updatePreference({ chartMode: value[0] as 'candles' | 'close' })
-            }
-            aria-label="图形类型"
-          >
-            <ToggleGroupItem value="candles">K线</ToggleGroupItem>
-            <ToggleGroupItem value="close">收盘线</ToggleGroupItem>
-          </ToggleGroup>
-          <ToggleGroup
-            value={[String(preference.visibleRange)]}
-            onValueChange={(value) => value[0] && chooseRange(Number(value[0]))}
-            aria-label="日线范围"
-          >
-            {[0, 30, 90, 180, 365].map((range) => (
-              <ToggleGroupItem key={range} value={String(range)}>
-                {rangeLabel(range)}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button type="button" size="sm" variant="outline">
-                  指标
-                </Button>
+        <MarketChartToolbar
+          chartControls={
+            <ToggleGroup
+              value={[preference.chartMode]}
+              onValueChange={(value) =>
+                value[0] && updatePreference({ chartMode: value[0] as 'candles' | 'close' })
               }
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>叠加与副图</DropdownMenuLabel>
-                {(['MA', 'MACD', 'RSI'] as const).map((name) => (
-                  <DropdownMenuCheckboxItem
-                    key={name}
-                    checked={preference.visibleIndicators.includes(name)}
-                    onCheckedChange={(checked) =>
-                      updatePreference({
-                        visibleIndicators: checked
-                          ? [...new Set([...preference.visibleIndicators, name])]
-                          : preference.visibleIndicators.filter((item) => item !== name),
-                      })
-                    }
-                  >
-                    {name}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuGroup>
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>参数</DropdownMenuLabel>
-                <div
-                  className="grid gap-2 px-2 py-2"
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Escape') event.stopPropagation();
-                  }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                >
-                <span className="text-xs text-muted-foreground">MACD 快 / 慢 / 信号</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {(['fast', 'slow', 'signal'] as const).map((name) => (
-                    <Input
-                      key={name}
-                      aria-label={`MACD ${name}`}
-                      min={2}
-                      max={200}
-                      step={1}
-                      type="number"
-                      value={macdDraft[name]}
-                      onChange={(event) =>
-                        setMacdDraft((current) => ({ ...current, [name]: event.target.value }))
-                      }
-                      className="h-8 px-1 text-center text-xs"
-                    />
-                  ))}
-                </div>
-                <span className="text-[11px] text-muted-foreground">快线必须小于慢线</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    const next = normalizeMacdParams({
-                      fast: Number(macdDraft.fast),
-                      slow: Number(macdDraft.slow),
-                      signal: Number(macdDraft.signal),
-                    });
-                    const valid =
-                      next.fast === Number(macdDraft.fast) &&
-                      next.slow === Number(macdDraft.slow) &&
-                      next.signal === Number(macdDraft.signal);
-                    if (valid) {
-                      setMacdDraftError(null);
-                      updatePreference({ macdParams: next });
-                    } else {
-                      setMacdDraftError('MACD 参数必须为 2–200 的整数，且快线小于慢线。');
-                    }
-                  }}
-                >
-                  应用 MACD 参数
-                </Button>
-                {macdDraftError ? (
-                  <span className="text-xs text-destructive" role="alert">
-                    {macdDraftError}
-                  </span>
-                ) : null}
-                </div>
-                <DropdownMenuItem
-                  onClick={() => updatePreference({ macdParams: { fast: 12, slow: 26, signal: 9 } })}
-                >
-                  恢复 MACD 12/26/9
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>RSI 周期</DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={String(preference.rsiPeriod)}
-                  onValueChange={(value) =>
-                    updatePreference({ rsiPeriod: Number(value) as 6 | 12 | 24 })
-                  }
-                >
-                  {([6, 12, 24] as const).map((period) => (
-                    <DropdownMenuRadioItem key={period} value={String(period)}>
-                      RSI {period}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuGroup>
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>均线</DropdownMenuLabel>
-                {(['ma5', 'ma10', 'ma20', 'ma60'] as const).map((name) => (
-                  <DropdownMenuCheckboxItem
-                    key={name}
-                    checked={preference.visibleMA.includes(name)}
-                    disabled={!preference.visibleIndicators.includes('MA')}
-                    onCheckedChange={(checked) =>
-                      updatePreference({
-                        visibleMA: checked
-                          ? [...new Set([...preference.visibleMA, name])]
-                          : preference.visibleMA.filter((item) => item !== name),
-                      })
-                    }
-                  >
-                    {name.toUpperCase()}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setLockedTimestamp(null);
-              setHoveredTimestamp(null);
-              setFocusLatestRevision((value) => value + 1);
-            }}
-          >
-            回到最新
-          </Button>
-          <div className="flex items-center gap-1" role="group" aria-label="图表视图控制">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => triggerViewAction('zoomIn')}
+              aria-label="图形类型"
             >
-              放大
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => triggerViewAction('zoomOut')}
-            >
-              缩小
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => triggerViewAction('panEarlier')}
-            >
-              更早
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => triggerViewAction('panLater')}
-            >
-              更晚
-            </Button>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setLockedTimestamp(null);
-              setHoveredTimestamp(null);
-              updatePreference(defaultPreference);
-              setResetRevision((value) => value + 1);
-            }}
-          >
-            重置
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? '退出全屏' : '全屏'}
-          </Button>
-        </div>
-      </div>
-      {preference.visibleIndicators.includes('MACD') ||
-      preference.visibleIndicators.includes('RSI') ? (
-        <ToggleGroup
-          value={[preference.activePane]}
-          onValueChange={(value) =>
-            value[0] && updatePreference({ activePane: value[0] as 'MACD' | 'RSI' })
+              <ToggleGroupItem value="candles">K线</ToggleGroupItem>
+              <ToggleGroupItem value="close">收盘线</ToggleGroupItem>
+            </ToggleGroup>
           }
-          aria-label="技术副图"
-        >
-          <ToggleGroupItem value="MACD" disabled={!indicators.some((item) => item.name === 'MACD')}>
-            MACD
-          </ToggleGroupItem>
-          <ToggleGroupItem value="RSI" disabled={!indicators.some((item) => item.name === 'RSI')}>
-            RSI
-          </ToggleGroupItem>
-        </ToggleGroup>
-      ) : null}
+          rangeControls={
+            <ToggleGroup
+              value={[String(preference.visibleRange)]}
+              onValueChange={(value) => value[0] && chooseRange(Number(value[0]))}
+              aria-label="日线范围"
+            >
+              {[0, 30, 90, 180, 365].map((range) => (
+                <ToggleGroupItem key={range} value={String(range)}>
+                  {rangeLabel(range)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          }
+          indicatorControls={
+            <>
+              <MarketIndicatorSettingsMenu
+                visibleIndicators={preference.visibleIndicators}
+                visibleMA={preference.visibleMA}
+                rsiPeriod={preference.rsiPeriod}
+                macdDraft={macdDraft}
+                macdDraftError={macdDraftError}
+                onIndicatorChange={(name, checked) =>
+                  updatePreference({
+                    visibleIndicators: checked
+                      ? [...new Set([...preference.visibleIndicators, name])]
+                      : preference.visibleIndicators.filter((item) => item !== name),
+                  })
+                }
+                onVisibleMAChange={(name, checked) =>
+                  updatePreference({
+                    visibleMA: checked
+                      ? [...new Set([...preference.visibleMA, name])]
+                      : preference.visibleMA.filter((item) => item !== name),
+                  })
+                }
+                onRsiPeriodChange={(rsiPeriod) => updatePreference({ rsiPeriod })}
+                onMacdDraftChange={(name, value) =>
+                  setMacdDraft((current) => ({ ...current, [name]: value }))
+                }
+                onApplyMacdParams={() => {
+                  const next = normalizeMacdParams({
+                    fast: Number(macdDraft.fast),
+                    slow: Number(macdDraft.slow),
+                    signal: Number(macdDraft.signal),
+                  });
+                  const valid =
+                    next.fast === Number(macdDraft.fast) &&
+                    next.slow === Number(macdDraft.slow) &&
+                    next.signal === Number(macdDraft.signal);
+                  if (valid) {
+                    setMacdDraftError(null);
+                    updatePreference({ macdParams: next });
+                  } else {
+                    setMacdDraftError('MACD 参数必须为 2–200 的整数，且快线小于慢线。');
+                  }
+                }}
+                onResetMacdParams={() =>
+                  updatePreference({ macdParams: { fast: 12, slow: 26, signal: 9 } })
+                }
+              />
+              {preference.visibleIndicators.includes('MACD') ||
+              preference.visibleIndicators.includes('RSI') ? (
+                <ToggleGroup
+                  value={[preference.activePane]}
+                  onValueChange={(value) =>
+                    value[0] && updatePreference({ activePane: value[0] as 'MACD' | 'RSI' })
+                  }
+                  aria-label="技术副图"
+                >
+                  <ToggleGroupItem
+                    value="MACD"
+                    disabled={!indicators.some((item) => item.name === 'MACD')}
+                  >
+                    MACD
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="RSI"
+                    disabled={!indicators.some((item) => item.name === 'RSI')}
+                  >
+                    RSI
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              ) : null}
+            </>
+          }
+          viewControls={
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setLockedTimestamp(null);
+                  setHoveredTimestamp(null);
+                  setFocusLatestRevision((value) => value + 1);
+                }}
+              >
+                回到最新
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setLockedTimestamp(null);
+                  setHoveredTimestamp(null);
+                  updatePreference(defaultPreference);
+                  setResetRevision((value) => value + 1);
+                }}
+              >
+                重置
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded ? '退出全屏' : '全屏'}
+              </Button>
+              <MarketChartNavigationControls
+                onZoomIn={() => triggerViewAction('zoomIn')}
+                onZoomOut={() => triggerViewAction('zoomOut')}
+                onPanEarlier={() => triggerViewAction('panEarlier')}
+                onPanLater={() => triggerViewAction('panLater')}
+              />
+            </>
+          }
+        />
+      </div>
       {visible.length > 0 ? (
         <LightweightMarketChart
           bars={bars}
           indicators={indicators}
+          {...(providedChartPoints ? { chartPoints: providedChartPoints } : {})}
           visibleRange={preference.visibleRange}
           chartMode={preference.chartMode}
           activePane={preference.activePane}
@@ -472,6 +365,11 @@ export function MarketPriceChart({
           showBothPanes={expanded}
           {...(viewAction ? { viewAction } : {})}
           onVisibleRangeChange={setViewport}
+          onLoadEarlier={onLoadEarlier}
+          onRetryEarlier={onRetryEarlier}
+          canLoadEarlier={canLoadEarlier}
+          historyLoading={historyLoading}
+          historyError={historyError}
           onHover={setHoveredTimestamp}
           onClick={setLockedTimestamp}
           lockedTimestamp={lockedTimestamp}
@@ -484,51 +382,22 @@ export function MarketPriceChart({
           {rangeNotice}
         </p>
       ) : null}
-      <div
-        className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"
-        role="status"
-        aria-live="polite"
-      >
-        <span>
-          {selectedTimestamp
-            ? `${lockedTimestamp ? '已锁定' : '悬停'} ${new Date(selectedTimestamp).toLocaleDateString('zh-CN')}`
-            : '悬停查看，点击锁定，Esc 恢复最新'}
-        </span>
-        <span>
-          {selectedBar
-            ? `开 ${number.format(selectedBar.open)} · 高 ${number.format(selectedBar.high)} · 低 ${number.format(selectedBar.low)} · 收 ${number.format(selectedBar.close)} · 量 ${number.format(selectedBar.volume)}`
-            : '—'}
-        </span>
-        {selectedIndicatorText ? <span>{selectedIndicatorText}</span> : null}
-        {historyError ? (
-          <span className="text-destructive" role="alert">
-            {historyError}{' '}
-            {onRetryEarlier ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="link"
-                className="h-auto p-0"
-                onClick={onRetryEarlier}
-              >
-                重试
-              </Button>
-            ) : null}
-          </span>
-        ) : null}
-        {onLoadEarlier && canLoadEarlier ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="link"
-            className="h-auto p-0"
-            disabled={historyLoading}
-            onClick={onLoadEarlier}
-          >
-            {historyLoading ? '正在加载更早日线…' : '加载更早日线'}
-          </Button>
-        ) : null}
-      </div>
+      <MarketChartReadout
+        selectedBar={selectedBar}
+        selectedPoint={selectedChartPoint}
+        selectedTimestamp={selectedTimestamp}
+        lockedTimestamp={lockedTimestamp}
+        visibleIndicators={preference.visibleIndicators}
+        visibleMA={preference.visibleMA}
+        rsiPeriod={preference.rsiPeriod}
+        activePane={preference.activePane}
+        showBothPanes={expanded}
+      />
+      {historyError ? (
+        <p className="m-0 text-xs text-destructive" role="alert">
+          {historyError}
+        </p>
+      ) : null}
     </div>
   );
   const caption = (
@@ -550,6 +419,7 @@ export function MarketPriceChart({
         数据来源 {last?.provider ?? '未知'} · 复权 {last?.adjustment ?? '未声明'} ·{' '}
         {completionLabel(last?.completionStatus)}
       </span>
+      <MarketChartAttribution />
     </figcaption>
   );
 

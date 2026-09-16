@@ -334,10 +334,6 @@ textarea:focus-visible {
   height: 12px;
 }
 
-.sidebar-foot .theme-switch {
-  margin-left: auto;
-}
-
 .status-dot {
   width: 7px;
   height: 7px;
@@ -522,27 +518,29 @@ h3 {
   padding: 17px 18px;
 }
 
-.metric p {
-  margin: 0 0 17px;
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
+@layer base {
+  .metric p {
+    margin: 0 0 17px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+  }
 
-.metric strong {
-  display: block;
-  color: var(--color-text-primary);
-  font-size: clamp(20px, 2vw, 28px);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-weight: 680;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-}
+  .metric strong {
+    display: block;
+    color: var(--color-text-primary);
+    font-size: clamp(20px, 2vw, 28px);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-weight: 680;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
 
-.metric span {
-  display: block;
-  margin-top: 6px;
-  color: var(--color-text-muted);
-  font-size: 11px;
+  .metric span {
+    display: block;
+    margin-top: 6px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+  }
 }
 
 .positive {
@@ -636,20 +634,22 @@ h3 {
   }
 }
 
-td strong,
-td span {
-  display: block;
-}
+@layer base {
+  td strong,
+  td span {
+    display: block;
+  }
 
-td strong {
-  color: var(--color-text-primary);
-  font-weight: 600;
-}
+  td strong {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
 
-td span {
-  margin-top: 3px;
-  color: var(--color-text-muted);
-  font-size: 11px;
+  td span {
+    margin-top: 3px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+  }
 }
 
 .tag {
@@ -1235,12 +1235,12 @@ textarea[data-slot='input-group-control']:focus-visible {
 }
 
 .text-button.danger {
-  color: var(--color-negative);
+  color: var(--color-error);
 }
 
 .text-button.danger:hover {
-  border-color: var(--color-negative);
-  background: var(--color-negative-soft);
+  border-color: var(--color-error);
+  background: var(--color-error-soft);
 }
 
 .detail-backdrop {

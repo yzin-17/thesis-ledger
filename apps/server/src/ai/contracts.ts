@@ -13,6 +13,14 @@ export type ToolPermission =
 
 export type AiProviderHealth = 'unknown' | 'healthy' | 'degraded' | 'down';
 
+export type AiReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+export type AiProviderModelReasoningMetadata = {
+  supportedEfforts?: readonly AiReasoningEffort[] | null | undefined;
+  defaultEffort?: AiReasoningEffort | undefined;
+  mandatory?: boolean | undefined;
+};
+
 export interface AiProviderMetadata {
   baseURL?: string;
   timeoutMs?: number;
@@ -24,6 +32,7 @@ export interface AiProviderMetadata {
   costPer1kOutput?: number;
   costCurrency?: string;
   pricingVersion?: string;
+  modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
 }
 
 export interface AiTool {
@@ -43,7 +52,7 @@ export interface AiProvider {
       messages: unknown[];
       tools: string[];
       maxOutputTokens?: number;
-      reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+      reasoningEffort?: AiReasoningEffort;
     },
     signal: AbortSignal,
   ): Promise<{

@@ -1,10 +1,10 @@
 import type {
   MarketDetailCapability,
-  MarketDetailResponse,
-  MarketDetailSection,
+  MarketDetailResponseV2,
+  MarketDetailSectionV2,
   MarketDetailSectionStatus,
 } from '@thesis-ledger/api-client';
-import type { BarV1 } from '@thesis-ledger/schemas';
+import type { BarSeriesV2 } from '@thesis-ledger/schemas';
 
 export interface MarketDetailPosition {
   symbol: string;
@@ -15,23 +15,37 @@ export interface MarketDetailPosition {
 }
 
 export const mergeMarketDetail = (
-  current: MarketDetailResponse | null,
-  next: MarketDetailResponse,
-): MarketDetailResponse => {
+  current: MarketDetailResponseV2 | null,
+  next: MarketDetailResponseV2,
+): MarketDetailResponseV2 => {
   if (!current) return next;
   if (current.symbol !== next.symbol) return current;
   const sections = { ...current.sections, ...next.sections };
-  const currentBars = current.sections.bars?.data as BarV1[] | undefined;
-  const nextBars = next.sections.bars?.data as BarV1[] | undefined;
-  if (currentBars && nextBars) {
-    const byDate = new Map([...currentBars, ...nextBars].map((bar) => [bar.timestamp, bar]));
+  const currentSeries = current.barSeries;
+  const nextSeries = next.barSeries;
+  let mergedBarSeries = nextSeries ?? currentSeries;
+  if (currentSeries && nextSeries) {
+    const byDate = new Map([...currentSeries.points, ...nextSeries.points].map((bar) => [bar.timestamp, bar]));
+    const points = [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const mergedSeries: BarSeriesV2 = {
+      ...nextSeries,
+      points,
+      coverage: {
+        ...nextSeries.coverage,
+        actualStart: points[0]?.timestamp ?? null,
+        actualEnd: points.at(-1)?.timestamp ?? null,
+        hasMoreBefore: nextSeries.coverage.hasMoreBefore || currentSeries.coverage.hasMoreBefore,
+      },
+    };
+    mergedBarSeries = mergedSeries;
     sections.bars = {
       ...next.sections.bars!,
-      data: [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
-    } as MarketDetailSection;
+      data: mergedSeries,
+    } as MarketDetailSectionV2;
   }
   return {
     ...next,
+    ...(mergedBarSeries ? { barSeries: mergedBarSeries } : {}),
     requested: [...new Set([...current.requested, ...next.requested])],
     sections,
     dependencies: { ...current.dependencies, ...next.dependencies },
@@ -39,8 +53,8 @@ export const mergeMarketDetail = (
 };
 
 export const getVisibleMarketDetail = (
-  detail: MarketDetailResponse | null,
-  queryData: MarketDetailResponse | undefined,
+  detail: MarketDetailResponseV2 | null,
+  queryData: MarketDetailResponseV2 | undefined,
   symbol: string,
 ) => {
   if (detail?.symbol === symbol) return detail;
@@ -49,7 +63,7 @@ export const getVisibleMarketDetail = (
 };
 
 export const getMarketDetailSection = <T>(
-  detail: MarketDetailResponse | null,
+  detail: MarketDetailResponseV2 | null,
   capability: MarketDetailCapability,
 ) => {
   const section = detail?.sections[capability];
@@ -80,5 +94,5 @@ export const marketDetailSectionTitle = (capability: MarketDetailCapability) => 
   return `技术指标 ${capability.slice('indicator:'.length)}`;
 };
 
-export const isRetryableMarketDetailSection = (section: MarketDetailSection | undefined) =>
+export const isRetryableMarketDetailSection = (section: MarketDetailSectionV2 | undefined) =>
   section?.status === 'unavailable';

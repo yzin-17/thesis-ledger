@@ -63,7 +63,7 @@ const readDesktopSource = (directory: string): string[] =>
 describe('Desktop UI contract - onboarding and portfolio', () => {
   it('所有账户选择入口复用统一账户显示格式', () => {
     const accountSelectorFiles = [
-      '../src/features/account-data/AccountDataPage.tsx',
+      '../src/features/account-data/AccountDataAccountSelector.tsx',
       '../src/features/account-data/AccountDataCashTransferSheet.tsx',
       '../src/features/ai/NewResearchSheet.tsx',
       '../src/features/import/ImportReview.tsx',
@@ -227,10 +227,15 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
         },
       ],
       policy: {
+        contractVersion: 2 as const,
         revision: 11,
         enabled: true,
         syncState: 'applied' as const,
-        routes: { REALTIME_QUOTE: { STOCK: ['akshare'] } },
+        routes: {
+          REALTIME_QUOTE: {
+            STOCK: [{ providerId: 'akshare', upstreamSource: 'eastmoney' }],
+          },
+        },
       },
     };
 

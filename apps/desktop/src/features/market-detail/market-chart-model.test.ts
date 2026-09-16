@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildChartPoints, indicatorValue } from './market-chart-model.js';
 import { normalizeMacdParams } from './market-chart-preferences.js';
+import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
 
-const bar = (timestamp: string, inputFingerprint: string) => ({
-  version: 1 as const,
+const bar = (timestamp: string, inputFingerprint: string): MarketChartBar => ({
   symbol: '600519.SH',
   timeframe: '1d' as const,
   timestamp,
@@ -16,13 +16,13 @@ const bar = (timestamp: string, inputFingerprint: string) => ({
   provider: 'efinance',
   fetchedAt: timestamp,
   freshness: 'live' as const,
-  fallbackUsed: false,
   servedFromCache: false,
+  completionStatus: 'complete',
+  availableAt: timestamp,
   inputFingerprint,
 });
 
-const indicator = (inputFingerprint: string) => ({
-  version: 1 as const,
+const indicator = (inputFingerprint: string): MarketChartIndicator => ({
   symbol: '600519.SH',
   name: 'MACD' as const,
   parameters: { fast: 12, slow: 26, signal: 9 },
@@ -44,6 +44,18 @@ const indicator = (inputFingerprint: string) => ({
       inputFingerprint,
     },
   ],
+  inputProvenance: {
+    timeframe: '1d',
+    provider: 'efinance',
+    upstreamSource: 'efinance',
+    providerRevision: 'fixture',
+    adjustment: 'qfq',
+    inputDateRange: { start: '2026-01-01T00:00:00.000Z', end: '2026-01-03T00:00:00.000Z' },
+    inputFingerprint,
+  },
+  calculationAnchor: { timestamp: '2026-01-01T00:00:00.000Z', inputFingerprint },
+  coverage: { start: '2026-01-01T00:00:00.000Z', end: '2026-01-03T00:00:00.000Z', complete: true, hasMoreBefore: false },
+  servedFromCache: false,
 });
 
 describe('market chart model', () => {

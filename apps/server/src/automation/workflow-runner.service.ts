@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PerformanceService } from '../performance/performance.service.js';
-import { MarketStorageService } from '../market/market-storage.service.js';
+import { MarketBarReader } from '../market/market-bar-reader.js';
+import { inferAssetType } from '../ledger/asset-type.js';
 import { RiskService } from '../risk/risk.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
 @Injectable()
 export class AutomationWorkflowRunner {
   constructor(
-    private readonly storage: MarketStorageService,
+    private readonly bars: MarketBarReader,
     private readonly performance: PerformanceService,
     private readonly risk: RiskService,
     private readonly prisma: PrismaService,
@@ -16,14 +17,26 @@ export class AutomationWorkflowRunner {
   async closeSync(input: { symbols: readonly string[]; timeframe?: '1d' | '1m'; end?: string }) {
     const results = [];
     for (const symbol of input.symbols) {
-      results.push(
-        await this.storage.syncBars({
-          symbol,
+      const normalized = symbol.trim().toUpperCase();
+      const inferred = inferAssetType(normalized);
+      const assetType = inferred === 'fund' ? 'MUTUAL_FUND' : inferred?.toUpperCase();
+      if (assetType !== 'STOCK' && assetType !== 'ETF' && assetType !== 'MUTUAL_FUND')
+        throw new Error(`无法可靠识别行情标的类型: ${symbol}`);
+      const series = await this.bars.read({
+        identity: {
+          symbol: normalized,
+          assetType,
           timeframe: input.timeframe ?? '1d',
-          mode: 'incremental',
-          ...(input.end ? { end: input.end } : {}),
-        }),
-      );
+          adjustment: 'none',
+        },
+        window: input.end ? { end: input.end } : {},
+        acceptance: 'complete',
+      });
+      results.push({
+        symbol: normalized,
+        count: series.points.length,
+        lastTimestamp: series.points.at(-1)?.timestamp ?? null,
+      });
     }
     return {
       symbols: input.symbols,

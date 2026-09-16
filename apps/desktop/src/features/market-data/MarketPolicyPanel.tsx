@@ -11,21 +11,28 @@ import {
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
 import {
-  compatibleProviders,
+  compatibleRouteTargets,
+  dataSourceDisplay,
   routeCandidates,
   routeDefinitions,
   routeLabel,
+  routeTargetKey,
+  sameRouteTarget,
   updateRouteRole,
   type MarketPolicy,
   type ProviderManifest,
+  type RouteTarget,
 } from './market-data.types.js';
 
 const NONE = '__none__';
 
-const providerName = (providers: readonly ProviderManifest[], providerId: string | undefined) =>
-  providers.find((provider) => provider.providerId === providerId)?.displayName ??
-  providerId ??
-  '未配置';
+const targetName = (
+  providers: readonly ProviderManifest[],
+  target: RouteTarget | undefined,
+) =>
+  target
+    ? dataSourceDisplay(target.providerId, target.upstreamSource, providers)
+    : '未配置';
 
 const providerOptionLabel = (provider: ProviderManifest) => {
   const states: string[] = [];
@@ -34,6 +41,16 @@ const providerOptionLabel = (provider: ProviderManifest) => {
   return states.length > 0
     ? `${provider.displayName} · ${states.join('、')}`
     : provider.displayName;
+};
+
+const targetOptionLabel = (
+  provider: ProviderManifest,
+  sourceDisplayName: string,
+) => {
+  const providerLabel = providerOptionLabel(provider);
+  return provider.displayName === sourceDisplayName
+    ? providerLabel
+    : `${providerLabel} · ${sourceDisplayName}`;
 };
 
 const saveLabel = (saving: boolean) => (saving ? '保存中…' : '保存路由策略');
@@ -82,10 +99,22 @@ export function MarketPolicyPanel({
           <div className="divide-y rounded-lg border border-border">
             {routeDefinitions.map(([capability, instrumentType]) => {
               const [primary, fallback] = routeCandidates(policy, capability, instrumentType);
-              const compatible = compatibleProviders(providers, capability, instrumentType);
-              const fallbackOptions = compatible.filter(
-                (provider) => provider.providerId !== primary,
+              const compatible = compatibleRouteTargets(
+                providers,
+                capability,
+                instrumentType,
               );
+              const fallbackOptions = compatible.filter(
+                (option) => !sameRouteTarget(option.target, primary),
+              );
+              const primaryItems = [
+                { label: '未配置', value: NONE },
+                ...compatible.map((option) => ({ label: option.label, value: option.key })),
+              ];
+              const fallbackItems = [
+                { label: '不设备用', value: NONE },
+                ...fallbackOptions.map((option) => ({ label: option.label, value: option.key })),
+              ];
               return (
                 <div
                   key={`${capability}:${instrumentType}`}
@@ -104,7 +133,8 @@ export function MarketPolicyPanel({
                       主数据源
                     </span>
                     <Select
-                      value={primary ?? NONE}
+                      items={primaryItems}
+                      value={primary ? routeTargetKey(primary) : NONE}
                       disabled={disabled}
                       onValueChange={(value) =>
                         onChange(
@@ -113,7 +143,9 @@ export function MarketPolicyPanel({
                             capability,
                             instrumentType,
                             'primary',
-                            value === NONE ? null : value,
+                            value === NONE
+                              ? null
+                              : (compatible.find((option) => option.key === value)?.target ?? null),
                           ),
                         )
                       }
@@ -122,14 +154,14 @@ export function MarketPolicyPanel({
                         className="w-full"
                         aria-label={`${routeLabel(capability, instrumentType)} 主数据源`}
                       >
-                        <SelectValue>{providerName(providers, primary)}</SelectValue>
+                        <SelectValue>{targetName(providers, primary)}</SelectValue>
                       </SelectTrigger>
                       <SelectContent alignItemWithTrigger={false}>
                         <SelectGroup>
                           <SelectItem value={NONE}>未配置</SelectItem>
-                          {compatible.map((provider) => (
-                            <SelectItem key={provider.providerId} value={provider.providerId}>
-                              {providerOptionLabel(provider)}
+                          {compatible.map((option) => (
+                            <SelectItem key={option.key} value={option.key}>
+                              {targetOptionLabel(option.provider, option.sourceDisplayName)}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -141,7 +173,8 @@ export function MarketPolicyPanel({
                       备用数据源
                     </span>
                     <Select
-                      value={fallback ?? NONE}
+                      items={fallbackItems}
+                      value={fallback ? routeTargetKey(fallback) : NONE}
                       disabled={disabled || !primary}
                       onValueChange={(value) =>
                         onChange(
@@ -150,7 +183,10 @@ export function MarketPolicyPanel({
                             capability,
                             instrumentType,
                             'fallback',
-                            value === NONE ? null : value,
+                            value === NONE
+                              ? null
+                              : (fallbackOptions.find((option) => option.key === value)?.target ??
+                                null),
                           ),
                         )
                       }
@@ -159,14 +195,14 @@ export function MarketPolicyPanel({
                         className="w-full"
                         aria-label={`${routeLabel(capability, instrumentType)} 备用数据源`}
                       >
-                        <SelectValue>{providerName(providers, fallback)}</SelectValue>
+                        <SelectValue>{targetName(providers, fallback)}</SelectValue>
                       </SelectTrigger>
                       <SelectContent alignItemWithTrigger={false}>
                         <SelectGroup>
                           <SelectItem value={NONE}>不设备用</SelectItem>
-                          {fallbackOptions.map((provider) => (
-                            <SelectItem key={provider.providerId} value={provider.providerId}>
-                              {providerOptionLabel(provider)}
+                          {fallbackOptions.map((option) => (
+                            <SelectItem key={option.key} value={option.key}>
+                              {targetOptionLabel(option.provider, option.sourceDisplayName)}
                             </SelectItem>
                           ))}
                         </SelectGroup>

@@ -26,7 +26,7 @@ import {
   useReconciliationCandidatesQuery,
   type AccountDataEventFilter,
 } from './account-data.queries.js';
-import { errorMessage } from './account-data.helpers.js';
+import { errorMessage, instrumentNameLookup } from './account-data.helpers.js';
 import { PositionCalibrationSection, TransactionSection } from './AccountDataSections.js';
 import { CashSection } from './AccountDataCashSections.js';
 import {
@@ -264,6 +264,7 @@ export function AccountDataPage({
   const currentLedgerRevision = ledgerEventsQuery.data?.ledgerRevision ?? '0';
   const accountPositions = valuationQuery.data?.positions ?? [];
   const cashValue = valuationQuery.data?.cashValue ?? 0;
+  const resolveInstrumentName = instrumentNameLookup(accountPositions);
 
   const findSnapshotPosition = (event: LedgerEventV2) =>
     event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID'
@@ -416,6 +417,7 @@ export function AccountDataPage({
                 findSnapshotPosition={findSnapshotPosition}
                 onEditSnapshot={openSnapshotEditor}
                 onRemoveSnapshot={(event) => void removeSnapshot(event)}
+                resolveInstrumentName={resolveInstrumentName}
                 onOpenImport={() => {
                   void openImport();
                 }}
@@ -456,6 +458,7 @@ export function AccountDataPage({
             events={events}
             eventsQuery={ledgerEventsQuery}
             onCalibrate={() => setCashObservationOpen(true)}
+            resolveInstrumentName={resolveInstrumentName}
           />
         </TabsContent>
       </Tabs>

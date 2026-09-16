@@ -100,6 +100,20 @@ describe('Strategy Lab V2 desktop contract', () => {
     expect(html).toContain('strategy-v2-timeframe');
   });
 
+  it('回测弹窗使用紧凑策略摘要并隐藏次要执行细节', () => {
+    const html = renderToStaticMarkup(
+      <StrategyV2Summary schema={schema} variant="compact" strategyName="测试策略" version={1} />,
+    );
+
+    expect(html).toContain('测试策略');
+    expect(html).toContain('V2 · v1');
+    expect(html).toContain('固定投入金额');
+    expect(html).toContain('固定止损');
+    expect(html).not.toContain('统一回测 V2 策略');
+    expect(html).not.toContain('能力边界');
+    expect(html).not.toContain('下一可执行 K 线开盘');
+  });
+
   it('V2 cancel/retry remain separate idempotent lifecycle endpoints', async () => {
     const cancel = makeClient({});
     await cancelBacktestV2('run/1', cancel.client);

@@ -8,6 +8,7 @@ import { MetricsController } from './metrics.controller.js';
 import { MetricsService } from './metrics.service.js';
 import { PrismaService } from './prisma.service.js';
 import { RedisService } from './redis.service.js';
+import { MarketDataCleanupService } from './market-data-cleanup.js';
 import { DsaModule } from '../integration/dsa/dsa.module.js';
 
 @Global()
@@ -21,6 +22,7 @@ import { DsaModule } from '../integration/dsa/dsa.module.js';
     DataExportService,
     MetricsService,
     ErrorTrackingService,
+    MarketDataCleanupService,
   ],
   exports: [PrismaService, RedisService, DataExportService, MetricsService, ErrorTrackingService],
 })

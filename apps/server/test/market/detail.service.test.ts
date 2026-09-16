@@ -1,12 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DsaError } from '../../src/integration/dsa/dsa.client.js';
-import {
-  MARKET_DETAIL_CAPABILITY_MATRIX,
-  MarketDetailService,
-} from '../../src/market/market-detail.service.js';
+import { MarketDetailService } from '../../src/market/market-detail.service.js';
 
 const time = '2026-08-21T00:00:00.000Z';
-
+const route = [{ providerId: 'fixture', upstreamSource: 'fixture' }];
 const quote = {
   version: 1,
   symbol: '600519.SH',
@@ -23,40 +19,6 @@ const quote = {
   fetchedAt: time,
   freshness: 'live' as const,
 };
-
-const bars = [
-  {
-    version: 1 as const,
-    symbol: '600519.SH',
-    timeframe: '1d' as const,
-    timestamp: time,
-    open: 10,
-    high: 12,
-    low: 9,
-    close: 11,
-    volume: 100,
-    amount: 1100,
-    provider: 'fixture',
-    fetchedAt: time,
-    freshness: 'live' as const,
-    fallbackUsed: false,
-    servedFromCache: false,
-  },
-];
-
-const indicator = (name: 'MA' | 'MACD' | 'RSI') => ({
-  version: 1 as const,
-  symbol: '600519.SH',
-  name,
-  parameters: {},
-  timeframe: '1d' as const,
-  marketTime: time,
-  calculatedAt: time,
-  values: { value: 1 },
-  provider: 'fixture',
-  engineVersion: 'fixture',
-});
-
 const chip = {
   version: 1,
   symbol: '600519.SH',
@@ -70,20 +32,10 @@ const chip = {
   calculatedAt: time,
 };
 
-const fundNav = {
-  version: 1,
-  symbol: '000001.OF',
-  unitNav: 1.2,
-  navDate: time,
-  provider: 'fixture',
-  fetchedAt: time,
-  freshness: 'delayed' as const,
-};
-
-const makePrisma = (asset: unknown, association: unknown = null, instrument: unknown = null) => ({
+const makePrisma = (asset: unknown) => ({
   asset: { findUnique: vi.fn(async () => asset) },
-  instrumentAssetAssociation: { findUnique: vi.fn(async () => association) },
-  instrument: { findFirst: vi.fn(async () => instrument) },
+  instrumentAssetAssociation: { findUnique: vi.fn(async () => null) },
+  instrument: { findFirst: vi.fn(async () => null) },
 });
 
 const makeControl = () => ({
@@ -91,22 +43,21 @@ const makeControl = () => ({
     enabled: true,
     syncState: 'applied',
     routes: {
-      REALTIME_QUOTE: { STOCK: ['fixture'], ETF: ['fixture'] },
-      DAILY_BAR: { STOCK: ['fixture'], ETF: ['fixture'] },
-      FUND_NAV: { MUTUAL_FUND: ['fixture'] },
-      FUND_NAV_HISTORY: { MUTUAL_FUND: ['fixture'] },
-      CHIP_SUMMARY: { STOCK: ['fixture'] },
+      REALTIME_QUOTE: { STOCK: route, ETF: route },
+      CHIP_SUMMARY: { STOCK: route },
+      FUND_NAV: { MUTUAL_FUND: route },
+      FUND_NAV_HISTORY: { MUTUAL_FUND: route },
     },
   })),
 });
 
-describe('MarketDetailService', () => {
-  it('为股票返回六个已支持分段，并且不会创建 ATR 请求', async () => {
+describe('MarketDetailService（非 bars/indicator helper）', () => {
+  it('默认只编排非 bars/indicator 能力', async () => {
     const market = {
       getQuote: vi.fn(async () => quote),
-      getBars: vi.fn(async () => bars),
-      getIndicator: vi.fn(async (_symbol: string, name: 'MA' | 'MACD' | 'RSI') => indicator(name)),
       getChip: vi.fn(async () => chip),
+      getBars: vi.fn(),
+      getIndicator: vi.fn(),
     };
     const service = new MarketDetailService(
       market as never,
@@ -116,174 +67,31 @@ describe('MarketDetailService', () => {
 
     const result = await service.getDetail('600519');
 
-    expect(result).toMatchObject({
-      symbol: '600519.SH',
-      assetType: 'STOCK',
-      identity: { source: 'asset', status: 'confirmed' },
-      requested: MARKET_DETAIL_CAPABILITY_MATRIX.STOCK,
-      sections: {
-        quote: { status: 'ready', data: { price: 11 } },
-        bars: { status: 'ready', data: bars },
-        'indicator:MA': { status: 'ready' },
-        'indicator:MACD': { status: 'ready' },
-        'indicator:RSI': { status: 'ready' },
-        chip: { status: 'ready' },
-      },
-    });
-    expect(market.getIndicator).toHaveBeenCalledTimes(3);
-    expect(market).not.toHaveProperty('getAtr');
+    expect(result.requested).toEqual(['quote', 'chip']);
+    expect(result.sections.quote).toMatchObject({ status: 'ready', data: { price: 11 } });
+    expect(result.sections.chip).toMatchObject({ status: 'ready' });
+    expect(result.sections.bars).toBeUndefined();
+    expect(market.getBars).not.toHaveBeenCalled();
+    expect(market.getIndicator).not.toHaveBeenCalled();
   });
 
-  it('把详情日期窗口和指标参数转发到同一日线范围', async () => {
-    const market = {
-      getBars: vi.fn(async () => bars),
-      getIndicator: vi.fn(async (_symbol: string, name: 'MA' | 'MACD' | 'RSI') => indicator(name)),
-    };
+  it('拒绝由旧 helper 直接请求 bars 或 indicator', async () => {
     const service = new MarketDetailService(
-      market as never,
+      { getQuote: vi.fn() } as never,
       makeControl() as never,
       makePrisma({ assetType: 'stock' }) as never,
     );
 
-    await service.getDetail('600519.SH', {
-      include: ['bars', 'indicator:MACD'],
-      barsLimit: 20,
-      start: '2026-01-01',
-      end: '2026-03-31',
-      indicatorParams: { fast: 12, slow: 26, signal: 9 },
-    });
-
-    expect(market.getBars).toHaveBeenCalledWith(
-      '600519.SH',
-      '1d',
-      { start: '2026-01-01', end: '2026-03-31', limit: 21 },
-      { allowStale: true },
-    );
-    expect(market.getIndicator).toHaveBeenCalledWith('600519.SH', 'MACD', {
-      start: '2026-01-01',
-      end: '2026-03-31',
-      limit: 20,
-      parameters: { fast: 12, slow: 26, signal: 9 },
-    });
-  });
-
-  it('用额外一根日线探测更早覆盖，并裁剪为请求数量', async () => {
-    const returnedBars = Array.from({ length: 4 }, (_, index) => ({
-      ...bars[0]!,
-      timestamp: `2026-08-${String(index + 18).padStart(2, '0')}T00:00:00.000Z`,
-    }));
-    const market = {
-      getBars: vi.fn(async () => returnedBars),
-      getIndicator: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'stock' }) as never,
-    );
-
-    const result = await service.getDetail('600519.SH', {
-      include: ['bars'],
-      barsLimit: 3,
-    });
-
-    expect(market.getBars).toHaveBeenCalledWith(
-      '600519.SH',
-      '1d',
-      { limit: 4 },
-      { allowStale: true },
-    );
-    expect(result.sections.bars?.data).toEqual(returnedBars.slice(-3));
-    expect(result.limits.barsHasMoreBefore).toBe(true);
-  });
-
-  it('刚好返回请求数量或空页时不虚报更早覆盖', async () => {
-    for (const returnedBars of [bars.slice(0, 1), []]) {
-      const market = {
-        getBars: vi.fn(async () => returnedBars),
-        getIndicator: vi.fn(),
-      };
-      const service = new MarketDetailService(
-        market as never,
-        makeControl() as never,
-        makePrisma({ assetType: 'stock' }) as never,
-      );
-
-      const result = await service.getDetail('600519.SH', {
-        include: ['bars'],
-        barsLimit: 1,
-      });
-
-      expect(market.getBars).toHaveBeenCalledWith(
-        '600519.SH',
-        '1d',
-        { limit: 2 },
-        { allowStale: true },
-      );
-      expect(result.limits.barsHasMoreBefore).toBe(false);
-    }
-  });
-
-  it('非法能力和超限历史参数在调用 Provider 前返回 400', async () => {
-    const market = {
-      getQuote: vi.fn(),
-      getBars: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'stock' }) as never,
-    );
-
-    await expect(service.getDetail('600519', { include: 'indicator:ATR' })).rejects.toThrow(
+    await expect(service.getDetail('600519', { include: 'bars' })).rejects.toThrow(
       '不支持的行情详情能力',
     );
-    await expect(service.getDetail('600519', { barsLimit: 91 })).rejects.toThrow(
-      'barsLimit 必须是 1 到 90 之间的整数',
+    await expect(service.getDetail('600519', { include: 'indicator:MA' })).rejects.toThrow(
+      '不支持的行情详情能力',
     );
-    await expect(service.getDetail('600519', { start: '2026-02-30' })).rejects.toThrow(
-      'start 必须是有效日历日期',
-    );
-    await expect(service.getDetail('600519', { indicatorParams: { fast: 30 } })).rejects.toThrow(
-      'MACD fast 必须小于 slow',
-    );
-    expect(market.getQuote).not.toHaveBeenCalled();
-    expect(market.getBars).not.toHaveBeenCalled();
   });
 
-  it('单个股票分段失败时保留其他结果并隐藏 Provider 原始错误', async () => {
-    const market = {
-      getQuote: vi.fn(async () => quote),
-      getBars: vi.fn(async () => bars),
-      getIndicator: vi.fn(async (_symbol: string, name: 'MA' | 'MACD' | 'RSI') => indicator(name)),
-      getChip: vi.fn(async () => {
-        throw new DsaError('provider-secret', 'unavailable');
-      }),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'stock' }) as never,
-    );
-
-    const result = await service.getDetail('600519', { include: ['quote', 'bars', 'chip'] });
-
-    expect(result.sections.quote).toMatchObject({ status: 'ready' });
-    expect(result.sections.bars).toMatchObject({ status: 'ready' });
-    expect(result.sections.chip).toMatchObject({
-      status: 'unavailable',
-      error: { code: 'market_data_unavailable', message: '当前行情暂时不可用，请稍后重试。' },
-    });
-    expect(JSON.stringify(result)).not.toContain('provider-secret');
-  });
-
-  it('ETF 的 chip 显式返回 unsupported 且不触发 chip Provider 请求', async () => {
-    const market = {
-      getQuote: vi.fn(async () => ({ ...quote, symbol: '510300.SH' })),
-      getBars: vi.fn(async () => []),
-      getIndicator: vi.fn(async (_symbol: string, name: 'MA' | 'MACD' | 'RSI') => indicator(name)),
-      getChip: vi.fn(),
-    };
+  it('资产不支持的非 bars 能力仍显式返回 unsupported', async () => {
+    const market = { getQuote: vi.fn(async () => quote), getChip: vi.fn() };
     const service = new MarketDetailService(
       market as never,
       makeControl() as never,
@@ -299,299 +107,19 @@ describe('MarketDetailService', () => {
     expect(market.getChip).not.toHaveBeenCalled();
   });
 
-  it('空日线返回 empty 而不是伪装成 ready', async () => {
-    const market = { getBars: vi.fn(async () => []) };
+  it('策略不可用时不调用非 bars Provider', async () => {
+    const market = { getQuote: vi.fn(), getChip: vi.fn() };
     const service = new MarketDetailService(
       market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'etf' }) as never,
-    );
-
-    const result = await service.getDetail('510300.SH', { include: ['bars'] });
-
-    expect(result.sections.bars).toMatchObject({ status: 'empty', data: [] });
-  });
-
-  it('基金默认只读取 NAV 两个分段', async () => {
-    const market = {
-      getFundNav: vi.fn(async () => fundNav),
-      getFundNavHistory: vi.fn(async () => [fundNav]),
-      getQuote: vi.fn(),
-      getBars: vi.fn(),
-      getIndicator: vi.fn(),
-      getChip: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'fund' }) as never,
-    );
-
-    const result = await service.getDetail('000001.OF');
-
-    expect(result.requested).toEqual(['fund-nav', 'fund-nav-history']);
-    expect(result.sections).toMatchObject({
-      'fund-nav': { status: 'ready' },
-      'fund-nav-history': { status: 'ready' },
-    });
-    expect(market.getFundNavHistory).toHaveBeenCalledWith(
-      '000001.OF',
-      { limit: 30 },
-      { persistIdentity: false },
-    );
-    expect(market.getQuote).not.toHaveBeenCalled();
-    expect(market.getBars).not.toHaveBeenCalled();
-    expect(market.getIndicator).not.toHaveBeenCalled();
-    expect(market.getChip).not.toHaveBeenCalled();
-  });
-
-  it('无法确认资产类型时只返回能力矩阵，不写回身份或请求 Provider', async () => {
-    const market = {
-      getQuote: vi.fn(),
-      getBars: vi.fn(),
-      getIndicator: vi.fn(),
-      getChip: vi.fn(),
-      getFundNav: vi.fn(),
-      getFundNavHistory: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma(null) as never,
-    );
-
-    const result = await service.getDetail('600519.SH');
-
-    expect(result).toMatchObject({
-      assetType: 'UNKNOWN',
-      identity: { source: 'unknown', status: 'unknown' },
-      requested: [],
-      sections: {},
-    });
-    expect(market.getQuote).not.toHaveBeenCalled();
-    expect(market.getFundNav).not.toHaveBeenCalled();
-  });
-
-  it('无法确认 .OF 资产时不推断基金，也不读取或写入基金净值', async () => {
-    const market = {
-      getFundNav: vi.fn(),
-      getFundNavHistory: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma(null) as never,
-    );
-
-    const result = await service.getDetail('000001.OF', { include: ['fund-nav-history'] });
-
-    expect(result.assetType).toBe('UNKNOWN');
-    expect(result.sections['fund-nav-history']).toMatchObject({ status: 'unsupported' });
-    expect(market.getFundNav).not.toHaveBeenCalled();
-    expect(market.getFundNavHistory).not.toHaveBeenCalled();
-  });
-
-  it('忽略未确认或失效的 Instrument 关联，不据此确定资产类型', async () => {
-    const market = { getQuote: vi.fn(), getBars: vi.fn() };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma(null, {
-        status: 'active',
-        confirmedAt: null,
-        instrument: { instrumentType: 'ETF', active: true },
-      }) as never,
-    );
-
-    const result = await service.getDetail('510300.SH');
-
-    expect(result.assetType).toBe('UNKNOWN');
-    expect(result.identity).toMatchObject({ source: 'unknown', status: 'unknown' });
-    expect(market.getQuote).not.toHaveBeenCalled();
-    expect(market.getBars).not.toHaveBeenCalled();
-  });
-
-  it('有效策略未启用的能力返回 unavailable 且不触发 Provider 请求', async () => {
-    const market = { getQuote: vi.fn(async () => quote), getChip: vi.fn() };
-    const control = {
-      getPolicy: vi.fn(async () => ({
-        enabled: true,
-        syncState: 'applied',
-        routes: { REALTIME_QUOTE: { STOCK: ['fixture'] } },
-      })),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      control as never,
+      { getPolicy: vi.fn(async () => { throw new Error('offline'); }) } as never,
       makePrisma({ assetType: 'stock' }) as never,
     );
 
     const result = await service.getDetail('600519.SH', { include: ['quote', 'chip'] });
 
-    expect(result.sections.quote).toMatchObject({ status: 'ready' });
-    expect(result.sections.chip).toMatchObject({
-      status: 'unavailable',
-      error: { code: 'capability_not_enabled' },
-    });
-    expect(result.capabilities.supported).toContain('chip');
-    expect(result.capabilities.unsupported).not.toContain('chip');
+    expect(result.sections.quote).toMatchObject({ status: 'unavailable' });
+    expect(result.sections.chip).toMatchObject({ status: 'unavailable' });
+    expect(market.getQuote).not.toHaveBeenCalled();
     expect(market.getChip).not.toHaveBeenCalled();
-  });
-
-  it('日线策略不可用时为指标返回共同 DAILY_BAR 依赖状态', async () => {
-    const market = { getBars: vi.fn(), getIndicator: vi.fn() };
-    const control = {
-      getPolicy: vi.fn(async () => ({
-        enabled: true,
-        syncState: 'applied',
-        routes: { REALTIME_QUOTE: { STOCK: ['fixture'] } },
-      })),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      control as never,
-      makePrisma({ assetType: 'stock' }) as never,
-    );
-
-    const result = await service.getDetail('600519.SH', {
-      include: ['indicator:MA', 'indicator:MACD', 'indicator:RSI'],
-    });
-
-    expect(result.dependencies.DAILY_BAR).toMatchObject({
-      status: 'unavailable',
-      error: { code: 'capability_not_enabled' },
-    });
-    expect(result.sections['indicator:MA']?.error?.diagnosticId).toBe(
-      result.dependencies.DAILY_BAR?.error?.diagnosticId,
-    );
-    expect(result.sections['indicator:RSI']?.error?.diagnosticId).toBe(
-      result.dependencies.DAILY_BAR?.error?.diagnosticId,
-    );
-    expect(market.getBars).not.toHaveBeenCalled();
-    expect(market.getIndicator).not.toHaveBeenCalled();
-  });
-
-  it('无法读取有效策略时将请求分段标记 unavailable 且不调用 Provider', async () => {
-    const market = { getQuote: vi.fn(), getBars: vi.fn(), getIndicator: vi.fn() };
-    const control = {
-      getPolicy: vi.fn(async () => {
-        throw new Error('policy offline');
-      }),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      control as never,
-      makePrisma({ assetType: 'stock' }) as never,
-    );
-
-    const result = await service.getDetail('600519.SH', {
-      include: ['quote', 'bars', 'indicator:MA'],
-    });
-
-    expect(result.sections.quote).toMatchObject({
-      status: 'unavailable',
-      error: { code: 'provider_policy_unavailable' },
-    });
-    expect(result.sections.bars).toMatchObject({ status: 'unavailable' });
-    expect(result.sections['indicator:MA']).toMatchObject({ status: 'unavailable' });
-    expect(result.dependencies.DAILY_BAR).toMatchObject({ status: 'unavailable' });
-    expect(result.dependencies.DAILY_BAR?.error?.diagnosticId).toBe(
-      result.sections['indicator:MA']?.error?.diagnosticId,
-    );
-    expect(market.getQuote).not.toHaveBeenCalled();
-    expect(market.getBars).not.toHaveBeenCalled();
-    expect(market.getIndicator).not.toHaveBeenCalled();
-  });
-
-  it('资产身份存储读取失败时不伪装成 UNKNOWN 空详情', async () => {
-    const market = { getQuote: vi.fn() };
-    const prisma = {
-      asset: {
-        findUnique: vi.fn(async () => {
-          throw new Error('database offline');
-        }),
-      },
-      instrumentAssetAssociation: { findUnique: vi.fn() },
-      instrument: { findFirst: vi.fn() },
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      prisma as never,
-    );
-
-    await expect(service.getDetail('600519.SH')).rejects.toThrow('资产身份暂时不可用');
-    expect(market.getQuote).not.toHaveBeenCalled();
-  });
-
-  it('日线共同依赖失败时只产生一条依赖诊断且不继续请求三个指标', async () => {
-    const market = {
-      getBars: vi.fn(async () => {
-        throw new DsaError('upstream detail', 'timeout');
-      }),
-      getIndicator: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'etf' }) as never,
-    );
-
-    const result = await service.getDetail('510300.SH', {
-      include: ['indicator:MA', 'indicator:MACD', 'indicator:RSI'],
-    });
-
-    expect(result.dependencies.DAILY_BAR).toMatchObject({
-      status: 'unavailable',
-      error: { code: 'market_data_timeout' },
-    });
-    expect(result.sections['indicator:MA']).toMatchObject({ status: 'unavailable' });
-    expect(result.sections['indicator:MACD']).toMatchObject({ status: 'unavailable' });
-    expect(result.sections['indicator:RSI']).toMatchObject({ status: 'unavailable' });
-    expect(result.sections['indicator:MA']?.error?.diagnosticId).toBe(
-      result.sections['indicator:RSI']?.error?.diagnosticId,
-    );
-    expect(market.getIndicator).not.toHaveBeenCalled();
-  });
-
-  it('stale fallback 保留陈旧状态，refresh 和限制参数传给底层能力', async () => {
-    const staleQuote = { ...quote, stale: true, freshness: 'stale' as const };
-    const staleBars = bars.map((bar) => ({ ...bar, freshness: 'stale' as const }));
-    const market = {
-      getQuote: vi.fn(async (_symbol: string, options: { refresh?: boolean }) => {
-        expect(options.refresh).toBe(true);
-        return staleQuote;
-      }),
-      getBars: vi.fn(
-        async (
-          _symbol: string,
-          _timeframe: '1d',
-          _range: unknown,
-          options: { refresh?: boolean },
-        ) => {
-          expect(options.refresh).toBe(true);
-          return [...staleBars, ...staleBars, ...staleBars];
-        },
-      ),
-      getFundNav: vi.fn(),
-      getFundNavHistory: vi.fn(),
-      getIndicator: vi.fn(),
-      getChip: vi.fn(),
-    };
-    const service = new MarketDetailService(
-      market as never,
-      makeControl() as never,
-      makePrisma({ assetType: 'stock' }) as never,
-    );
-
-    const result = await service.getDetail('600519.SH', {
-      include: ['quote', 'bars'],
-      barsLimit: 1,
-      refresh: true,
-    });
-
-    expect(result.sections.quote).toMatchObject({ status: 'stale' });
-    expect(result.sections.bars).toMatchObject({ status: 'stale', data: [staleBars.at(-1)] });
-    expect(result.limits.bars).toBe(1);
   });
 });

@@ -255,6 +255,12 @@ export function PerformanceAccountSelector({
   );
 }
 
+const performanceToneClass = (tone: 'up' | 'down' | undefined) => {
+  if (tone === 'up') return 'm-0 text-xs text-[var(--color-market-up)]';
+  if (tone === 'down') return 'm-0 text-xs text-[var(--color-market-down)]';
+  return 'm-0 text-xs text-muted-foreground';
+};
+
 const PerformanceKpiCard = ({
   label,
   value,
@@ -264,7 +270,7 @@ const PerformanceKpiCard = ({
   label: string;
   value: string;
   detail: string;
-  tone: 'positive' | 'negative' | undefined;
+  tone: 'up' | 'down' | undefined;
 }) => (
   <Card className="h-[120px] rounded-xl border border-border/70 bg-muted/25 py-0 shadow-none ring-0">
     <CardContent className="flex h-full flex-col justify-between p-4">
@@ -272,7 +278,7 @@ const PerformanceKpiCard = ({
       <strong className="block text-2xl font-semibold tracking-tight text-foreground">
         {value}
       </strong>
-      <p className={tone ? `m-0 text-xs ${tone}` : 'm-0 text-xs text-muted-foreground'}>{detail}</p>
+      <p className={performanceToneClass(tone)}>{detail}</p>
     </CardContent>
   </Card>
 );
@@ -333,10 +339,10 @@ export function PerformanceMetrics({
     }
   } else if (currencyTotals.length > 1) assetDetail = '分币种估值 · 开启汇率合并查看合计';
   else if (snapshotPartial) assetDetail = '行情不完整，尚无完整估值';
-  let assetTone: 'positive' | 'negative' | undefined;
+  let assetTone: 'up' | 'down' | undefined;
   if (currentPnlRate !== null && currentPnlRate !== undefined) {
-    if (currentPnlRate > 0) assetTone = 'positive';
-    else if (currentPnlRate < 0) assetTone = 'negative';
+    if (currentPnlRate > 0) assetTone = 'up';
+    else if (currentPnlRate < 0) assetTone = 'down';
   }
   const canCalculateTtwror = summary !== null && summary.ttwror !== null && snapshotCount >= 2;
   let ttwrorValue = '—';
@@ -425,13 +431,13 @@ const adjustmentLabel = (
   if (row.direction === 'increase' && row.amountGap !== null) {
     return {
       text: `↑ 买入 ${formatMoney(Math.abs(row.amountGap), currency)}`,
-      className: 'positive',
+      className: 'text-[var(--color-market-up)]',
     };
   }
   if (row.direction === 'decrease' && row.amountGap !== null) {
     return {
       text: `↓ 减少 ${formatMoney(Math.abs(row.amountGap), currency)}`,
-      className: 'negative',
+      className: 'text-[var(--color-market-down)]',
     };
   }
   if (row.direction === 'balanced') return { text: '无需调整', className: 'text-muted-foreground' };
@@ -879,7 +885,7 @@ export function PerformanceAllocationSection({
           <div className="text-sm">
             <span>合计 {validation.total.toFixed(2)}%</span>
             {validation.totalValid ? (
-              <span className="ml-2 positive">已完成</span>
+              <span className="ml-2 text-[var(--color-positive)]">已完成</span>
             ) : (
               <span className="ml-2 text-destructive">
                 目标权重合计 {validation.total.toFixed(2)}%，请调整至 100%。

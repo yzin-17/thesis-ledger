@@ -1,5 +1,7 @@
 # ETF 日线独立备用源实施任务
 
+> 状态：历史任务，已由 [`2026-09-16-market-data-route-target-v2.md`](./2026-09-16-market-data-route-target-v2.md) 的显式数据源路由改造取代。下列勾选项只表示旧方案当时完成，不表示其内部回退语义仍然有效。
+
 对应 Spec：[`../specs/2026-09-08-etf-daily-independent-fallback.md`](../specs/2026-09-08-etf-daily-independent-fallback.md)
 
 ## 任务

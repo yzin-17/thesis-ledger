@@ -1,5 +1,7 @@
 # ETF 日线独立备用源 Spec
 
+> 状态：已被 [`2026-09-16-market-data-route-target-v2.md`](./2026-09-16-market-data-route-target-v2.md) 取代。本文保留 2026-09-08 的历史实现与验收证据；其中“AkShare 内部 EastMoney → Tencent 回退”“内部切换不计入 fallback”的设计不再是现行契约。现行行为由显式 `RouteTarget` 顺序决定，ETF `DAILY_BAR` 默认是 `tencent/tencent → akshare/eastmoney`，DSA Adapter 不得隐藏回退。
+
 ## 背景与问题
 
 ThesisLedger 的 `DAILY_BAR + ETF` 按 `akshare -> efinance` 路由，但 2026-09-08 的运行证据显示，两者的 ETF 日线实现最终都请求东方财富历史 K 线端点。该端点对 `510300.SH` 持续主动断开连接后，两级 Provider 都失败，Data Contract 返回 `503`。实时行情及普通 A 股日线仍可用，故障集中在 ETF 日线的单一上游依赖。

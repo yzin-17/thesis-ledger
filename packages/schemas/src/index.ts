@@ -1,4 +1,6 @@
 export * from './market.js';
+export * from './market-route-v2.js';
+export * from './market-bar-series-v2.js';
 export * from './provider-oauth.js';
 export * from './portfolio.js';
 export * from './strategy.js';

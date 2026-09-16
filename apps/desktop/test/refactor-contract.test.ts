@@ -196,7 +196,7 @@ describe('拆分后的领域请求契约', () => {
     await searchPortfolioInstruments('600519', client, controller.signal);
 
     expect(request).toHaveBeenCalledWith(
-      '/market-data/instruments/search?q=600519',
+      '/api/v2/market-data/instruments/search?q=600519',
       expect.objectContaining({ signal: controller.signal }),
     );
   });
@@ -832,24 +832,39 @@ describe('Strategy 任务行为契约', () => {
   });
 
   it('Strategy 行情请求携带用户选择的回测区间', async () => {
-    const request = vi.fn().mockResolvedValue([
-      {
-        version: 1,
-        symbol: '510300.SH',
-        timeframe: '1d',
+    const request = vi.fn().mockResolvedValue({
+      contractVersion: 2,
+      identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'none' },
+      points: [{
         timestamp: '2025-09-08T00:00:00+00:00',
         open: 4.43,
         high: 4.45,
         low: 4.4,
         close: 4.44,
         volume: 1_000,
-        provider: 'akshare',
-        fetchedAt: '2026-09-08T00:00:00Z',
-        freshness: 'unknown',
-        fallbackUsed: false,
-        servedFromCache: false,
+        amount: 4_440,
+        completionStatus: 'complete',
+        availableAt: '2025-09-08T08:00:00+00:00',
+      }],
+      coverage: {
+        actualStart: '2025-09-08T00:00:00+00:00',
+        actualEnd: '2025-09-08T00:00:00+00:00',
+        hasMoreBefore: false,
+        latestCompleteTradingDate: '2025-09-08',
       },
-    ]);
+      provenance: {
+        providerId: 'akshare',
+        upstreamSource: 'eastmoney',
+        routeIndex: 1,
+        effectivePolicyRevision: 2,
+        providerRevision: 'akshare:2',
+        fetchedAt: '2026-09-08T00:00:00Z',
+        servedFromCache: false,
+        freshUntil: '2026-09-15T00:00:00Z',
+        cacheStatus: 'miss',
+      },
+      inputFingerprint: 'strategy-bars-v2',
+    });
     const client = { request } as unknown as DesktopRequestClient;
 
     const bars = await fetchStrategyBars(
@@ -862,7 +877,7 @@ describe('Strategy 任务行为契约', () => {
 
     expect(request).toHaveBeenCalledWith(
       expect.stringContaining(
-        '/market/510300.SH/bars?timeframe=1d&start=2025-09-08&end=2026-09-08&limit=365',
+        '/api/v2/market/510300.SH/bars?timeframe=1d&start=2025-09-08&end=2026-09-08&limit=365',
       ),
       expect.objectContaining({ cache: 'no-store' }),
     );
@@ -870,6 +885,7 @@ describe('Strategy 任务行为契约', () => {
       {
         symbol: '510300.SH',
         date: '2025-09-08',
+        availableAt: '2025-09-08T08:00:00+00:00',
         open: 4.43,
         high: 4.45,
         low: 4.4,

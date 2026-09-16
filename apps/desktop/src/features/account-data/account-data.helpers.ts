@@ -134,6 +134,17 @@ export const revisionBadgeVariant = (event: LedgerEventV2): 'default' | 'seconda
 export const executionSideLabel = (event: ExecutionEvent) =>
   event.type === 'BUY_EXECUTION' ? '买入' : '卖出';
 
+export const instrumentNameLookup = (
+  positions: Array<{ symbol: string; asset: { name: string } }>,
+) => {
+  const nameBySymbol = new Map(
+    positions.filter((position) => position.asset.name).map((position) =>
+      [position.symbol, position.asset.name] as const,
+    ),
+  );
+  return (symbol: string) => nameBySymbol.get(symbol);
+};
+
 export const eventSymbol = (event: LedgerEventV2): string | null => {
   if (event.revisionAction === 'VOID') return null;
   switch (event.type) {

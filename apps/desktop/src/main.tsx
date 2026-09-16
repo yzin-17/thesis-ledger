@@ -20,6 +20,14 @@ const initialResolvedTheme =
 document.documentElement.dataset.theme = initialTheme;
 document.documentElement.classList.toggle('dark', initialResolvedTheme === 'dark');
 document.documentElement.style.colorScheme = initialResolvedTheme;
+let storedMarketColorScheme: string | null = null;
+try {
+  storedMarketColorScheme = window.localStorage.getItem('thesis-ledger-market-color-scheme');
+} catch {
+  // MarketColorProvider surfaces storage failures after the application mounts.
+}
+document.documentElement.dataset.marketColorScheme =
+  storedMarketColorScheme === 'green-up' ? 'green-up' : 'red-up';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

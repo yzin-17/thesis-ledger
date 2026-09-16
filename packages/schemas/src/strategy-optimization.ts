@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { runConfigSchemaV2 } from './backtest-v2.js';
+import {
+  assetSymbolRefSchema,
+  backtestTimeframeSchema,
+  runConfigSchemaV2,
+  strategySchemaV2,
+} from './backtest-v2.js';
 import { decimalStringSchema, nonNegativeDecimalStringSchema } from './ledger-v2.js';
 
 export const strategyParameterIdSchema = z
@@ -42,11 +47,7 @@ export const strategyParameterDescriptorSchema = z
   .strict();
 export type StrategyParameterDescriptor = z.infer<typeof strategyParameterDescriptorSchema>;
 
-export const monitoringRuleKindSchema = z.enum([
-  'cost-stop',
-  'take-profit',
-  'max-holding-period',
-]);
+export const monitoringRuleKindSchema = z.enum(['cost-stop', 'take-profit', 'max-holding-period']);
 export const monitoringEvaluationStateSchema = z.enum([
   'triggered',
   'not_triggered',
@@ -126,7 +127,10 @@ export const riskApplicationNotificationSchema = z
     enabled: z.boolean().default(true),
     cooldownMinutes: z.number().int().min(0).max(10_080).default(60),
     severity: z.enum(['info', 'warning', 'error', 'critical']).default('warning'),
-    channels: z.array(z.enum(['feishu'])).max(1).default(['feishu']),
+    channels: z
+      .array(z.enum(['feishu']))
+      .max(1)
+      .default(['feishu']),
   })
   .strict();
 
@@ -161,10 +165,22 @@ export const riskApplicationUpgradeSchema = z
   })
   .strict();
 
+export const optimizationReasoningEffortSchema = z.enum([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+]);
+export type OptimizationReasoningEffort = z.infer<typeof optimizationReasoningEffortSchema>;
+
 export const optimizationModelSchema = z
   .object({
     provider: z.string().trim().min(1).max(120),
     model: z.string().trim().min(1).max(200),
+    reasoningEffort: optimizationReasoningEffortSchema.optional(),
   })
   .strict();
 
@@ -193,7 +209,11 @@ export const optimizationSplitSchema = z
   .strict()
   .superRefine((value, ctx) => {
     if (value.development.end >= value.validation.start)
-      ctx.addIssue({ code: 'custom', path: ['validation', 'start'], message: '验证集必须晚于开发集' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['validation', 'start'],
+        message: '验证集必须晚于开发集',
+      });
     if (value.validation.end >= value.test.start)
       ctx.addIssue({ code: 'custom', path: ['test', 'start'], message: '测试集必须晚于验证集' });
   });
@@ -209,11 +229,34 @@ export const optimizationBudgetSchema = z
   })
   .strict();
 
+export const optimizationSourceModeSchema = z.enum(['existing', 'discovery']);
+export type OptimizationSourceMode = z.infer<typeof optimizationSourceModeSchema>;
+
+/** 用户输入的探索边界；strategySpaceVersion 由 Server 固定，不接受客户端覆盖。 */
+export const optimizationDiscoveryScopeSchema = z
+  .object({
+    executionInstrument: assetSymbolRefSchema,
+    primaryTimeframe: backtestTimeframeSchema,
+  })
+  .strict();
+export type OptimizationDiscoveryScope = z.infer<typeof optimizationDiscoveryScopeSchema>;
+
+export const optimizationDiscoveryProposalSchema = z
+  .object({
+    strategy: strategySchemaV2,
+    reason: z.string().trim().min(1).max(2_000).optional(),
+    evidenceRefs: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  })
+  .strict();
+export type OptimizationDiscoveryProposal = z.infer<typeof optimizationDiscoveryProposalSchema>;
+
 export const optimizationExperimentCreateSchema = z
   .object({
-    strategyVersionId: z.uuid(),
+    sourceMode: optimizationSourceModeSchema.default('existing'),
+    strategyVersionId: z.uuid().optional(),
+    discoveryScope: optimizationDiscoveryScopeSchema.optional(),
     models: z.array(optimizationModelSchema).min(1).max(3),
-    allowedParameterIds: z.array(strategyParameterIdSchema).min(1).max(64),
+    allowedParameterIds: z.array(strategyParameterIdSchema).min(1).max(64).optional(),
     objective: optimizationObjectiveSchema,
     split: optimizationSplitSchema,
     runConfig: runConfigSchemaV2,
@@ -224,10 +267,45 @@ export const optimizationExperimentCreateSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    const modelKeys = value.models.map((item) => `${item.provider}:${item.model}`);
+    if (
+      value.sourceMode === 'existing' &&
+      (!value.strategyVersionId || !value.allowedParameterIds || value.discoveryScope)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['strategyVersionId'],
+        message: '现有策略优化必须选择正式策略版本和参数',
+      });
+    }
+    if (
+      value.sourceMode === 'discovery' &&
+      (!value.discoveryScope || value.strategyVersionId || value.allowedParameterIds)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['discoveryScope'],
+        message: '从零探索只能提供探索边界，不能携带策略版本或参数授权',
+      });
+    }
+    if (
+      value.sourceMode === 'discovery' &&
+      value.discoveryScope?.executionInstrument.assetType === 'fund' &&
+      (value.discoveryScope.executionInstrument.market !== 'CN' ||
+        value.discoveryScope.primaryTimeframe !== '1d')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['discoveryScope'],
+        message: 'NAV 基金探索只支持 CN 日频',
+      });
+    }
+    const modelKeys = value.models.map((item) => JSON.stringify([item.provider, item.model]));
     if (new Set(modelKeys).size !== modelKeys.length)
       ctx.addIssue({ code: 'custom', path: ['models'], message: 'Provider + model 必须唯一' });
-    if (new Set(value.allowedParameterIds).size !== value.allowedParameterIds.length)
+    if (
+      value.allowedParameterIds &&
+      new Set(value.allowedParameterIds).size !== value.allowedParameterIds.length
+    )
       ctx.addIssue({ code: 'custom', path: ['allowedParameterIds'], message: '参数授权不得重复' });
     const plannedAiCalls = value.models.length * value.maxRounds;
     const plannedBacktestRuns = 3 + value.models.length * (value.maxRounds * 2 + 1);
@@ -246,7 +324,11 @@ export const optimizationExperimentCreateSchema = z
     const splitStart = value.split.development.start;
     const splitEnd = value.split.test.end;
     if (splitStart < value.runConfig.startDate || splitEnd > value.runConfig.endDate)
-      ctx.addIssue({ code: 'custom', path: ['split'], message: '数据切分必须位于 RunConfig 区间内' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['split'],
+        message: '数据切分必须位于 RunConfig 区间内',
+      });
   });
 export type OptimizationExperimentCreate = z.infer<typeof optimizationExperimentCreateSchema>;
 export type OptimizationExperimentClone = z.infer<typeof optimizationExperimentCloneSchema>;
@@ -305,14 +387,18 @@ export const optimizationFinalizeSchema = z
   .strict()
   .superRefine((value, ctx) => {
     if (!value.candidateIds.includes(value.selectedCandidateId))
-      ctx.addIssue({ code: 'custom', path: ['selectedCandidateId'], message: '预选候选必须位于锁定集合中' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['selectedCandidateId'],
+        message: '预选候选必须位于锁定集合中',
+      });
   });
 
 export const optimizationAdoptSchema = z
   .object({
     candidateId: z.uuid(),
     candidateHash: z.string().trim().min(1),
-    expectedStrategyVersion: z.number().int().positive(),
+    expectedStrategyVersion: z.number().int().nonnegative(),
     idempotencyKey: z.string().trim().min(1).max(200),
     acknowledgeTestExposure: z.boolean().default(false),
   })

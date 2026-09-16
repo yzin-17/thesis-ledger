@@ -1,11 +1,16 @@
-export type RouteMatrix = Record<string, Record<string, string[]>>;
+export interface RouteTarget {
+  providerId: string;
+  upstreamSource: string;
+}
+export type RouteMatrixV2 = Record<string, Record<string, RouteTarget[]>>;
 export type SyncState = 'pending' | 'applied' | 'rejected' | 'unknown';
 
 export interface MarketPolicy {
+  contractVersion: 2;
   revision: number;
   enabled: boolean;
-  routes: RouteMatrix;
-  syncState: SyncState;
+  routes: RouteMatrixV2;
+  syncState?: SyncState;
   dsaRevision?: number | null;
   lastError?: { code?: string; message?: string } | null;
   effectiveProjection?: Record<string, unknown> | null;
@@ -28,7 +33,7 @@ export interface ProviderManifest {
   credentialFieldsConfigured?: Record<string, boolean>;
   credentialSchema?: { methods: Array<{ method: string; fields: CredentialField[] }> };
   configVersion?: number;
-  upstreamSources?: Array<{ sourceId: string; displayName: string }>;
+  upstreamSources?: Array<{ sourceId: string; displayName: string; capabilities: Record<string, string[]> }>;
   updatedAt?: string | null;
   health?: { scopes?: Array<{ state?: string; circuit?: string; errorCode?: string | null }> };
 }
@@ -77,6 +82,8 @@ export const routeDefinitions = [
 export const routeCandidates = (policy: MarketPolicy, capability: string, instrumentType: string) =>
   policy.routes[capability]?.[instrumentType] ?? [];
 
+export const routeTargets = routeCandidates;
+
 export const routeLabel = (capability: string, instrumentType: string) =>
   routeDefinitions.find(
     ([itemCapability, itemType]) => itemCapability === capability && itemType === instrumentType,
@@ -91,21 +98,58 @@ export const compatibleProviders = (
   instrumentType: string,
 ) => providers.filter((provider) => provider.capabilities[capability]?.includes(instrumentType));
 
+export const sameRouteTarget = (
+  left: RouteTarget | null | undefined,
+  right: RouteTarget | null | undefined,
+) =>
+  left?.providerId === right?.providerId && left?.upstreamSource === right?.upstreamSource;
+
+export const routeTargetKey = (target: RouteTarget) =>
+  `${encodeURIComponent(target.providerId)}:${encodeURIComponent(target.upstreamSource)}`;
+
+export type RouteTargetOption = {
+  key: string;
+  label: string;
+  sourceDisplayName: string;
+  target: RouteTarget;
+  provider: ProviderManifest;
+};
+
+export const compatibleRouteTargets = (
+  providers: readonly ProviderManifest[],
+  capability: string,
+  instrumentType: string,
+): RouteTargetOption[] =>
+  compatibleProviders(providers, capability, instrumentType).flatMap((provider) =>
+    (provider.upstreamSources ?? [])
+      .filter((source) => source.capabilities[capability]?.includes(instrumentType) ?? false)
+      .map((source) => {
+      const target = { providerId: provider.providerId, upstreamSource: source.sourceId };
+      return {
+        key: routeTargetKey(target),
+        label: `${provider.displayName} · ${source.displayName}`,
+        sourceDisplayName: source.displayName,
+        target,
+        provider,
+      };
+    }),
+  );
+
 export const updateRouteRole = (
   policy: MarketPolicy,
   capability: string,
   instrumentType: string,
   role: 'primary' | 'fallback',
-  providerId: string | null,
+  target: RouteTarget | null,
 ): MarketPolicy => {
   const [currentPrimary, currentFallback] = routeCandidates(policy, capability, instrumentType);
-  let next: string[] = [];
-  if (role === 'primary' && providerId) {
-    next = [providerId];
-    if (currentFallback && currentFallback !== providerId) next.push(currentFallback);
+  let next: RouteTarget[] = [];
+  if (role === 'primary' && target) {
+    next = [target];
+    if (currentFallback && !sameRouteTarget(currentFallback, target)) next.push(currentFallback);
   } else if (role === 'fallback' && currentPrimary) {
     next = [currentPrimary];
-    if (providerId && providerId !== currentPrimary) next.push(providerId);
+    if (target && !sameRouteTarget(target, currentPrimary)) next.push(target);
   }
   return {
     ...policy,

@@ -1,21 +1,21 @@
 import type { ReactNode } from 'react';
 import type {
-  BarV1,
+  BarSeriesV2,
   ChipDistributionV1,
   FundNavHistoryV1,
   FundNavV1,
-  IndicatorV1,
   QuoteV1,
 } from '@thesis-ledger/schemas';
 import type {
   MarketDetailCapability,
-  MarketDetailResponse,
-  MarketDetailSection,
+  MarketDetailResponseV2,
+  MarketDetailSectionV2,
 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { marketToneClass, type MarketTone } from '@/ui/market-color';
 import { dataSourceDisplay } from '../market-data/market-data.types.js';
 import {
   FundNavHistoryChart,
@@ -28,35 +28,50 @@ import {
   marketDetailStatusClass,
   marketDetailStatusLabel,
 } from './market-detail.types.js';
+import type { ChartPoint } from './market-chart-model.js';
+import {
+  chartBarsFromSeries,
+  type MarketChartIndicator,
+} from './market-chart-types.js';
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
-export const sectionIsDataReady = (section: MarketDetailSection | undefined) =>
+export const sectionIsDataReady = (section: MarketDetailSectionV2 | undefined) =>
   section?.status === 'ready' || section?.status === 'stale';
 
 export const sectionIsVisible = (
-  section: MarketDetailSection | undefined,
-): section is MarketDetailSection => section !== undefined && section.status !== 'unsupported';
+  section: MarketDetailSectionV2 | undefined,
+): section is MarketDetailSectionV2 => section !== undefined && section.status !== 'unsupported';
 
-const renderReadyOrEmpty = (section: MarketDetailSection, ready: ReactNode, empty: ReactNode) => {
+const renderReadyOrEmpty = (section: MarketDetailSectionV2, ready: ReactNode, empty: ReactNode) => {
   if (sectionIsDataReady(section)) return ready;
   if (section.status === 'empty') return empty;
   return null;
 };
 
-const retryProps = (section: MarketDetailSection, onRetry: () => void) =>
+const retryProps = (section: MarketDetailSectionV2, onRetry: () => void) =>
   isRetryableMarketDetailSection(section) ? { onRetry } : {};
 
 const providerOf = (data: unknown) => {
   if (!data || typeof data !== 'object') return '来源未知';
   const record: unknown = Array.isArray(data) ? data.at(-1) : data;
   if (!record || typeof record !== 'object') return '来源未知';
-  const source = record as { provider?: unknown; upstreamSource?: unknown };
-  if (typeof source.provider !== 'string') return '来源未知';
+  const source = record as {
+    provider?: unknown;
+    upstreamSource?: unknown;
+    provenance?: { providerId?: unknown; upstreamSource?: unknown };
+  };
+  let provider: string | null = null;
+  if (typeof source.provider === 'string') provider = source.provider;
+  else if (typeof source.provenance?.providerId === 'string') provider = source.provenance.providerId;
+  if (!provider) return '来源未知';
+  let upstreamSource: string | null = null;
+  if (typeof source.upstreamSource === 'string') upstreamSource = source.upstreamSource;
+  else if (typeof source.provenance?.upstreamSource === 'string') upstreamSource = source.provenance.upstreamSource;
   return dataSourceDisplay(
-    source.provider,
-    typeof source.upstreamSource === 'string' ? source.upstreamSource : null,
+    provider,
+    upstreamSource,
   );
 };
 
@@ -112,14 +127,21 @@ export const DetailMetric = ({
   label,
   value,
   detail,
+  tone,
 }: {
   label: string;
   value: string;
   detail?: string;
+  tone?: MarketTone;
 }) => (
   <div className="bg-card p-4">
     <span className="block text-xs text-muted-foreground">{label}</span>
-    <strong className="mt-1 block text-xl font-semibold tracking-tight tabular-nums">
+    <strong
+      className={cn(
+        'mt-1 block text-xl font-semibold tracking-tight tabular-nums',
+        marketToneClass(tone),
+      )}
+    >
       {value}
     </strong>
     {detail ? <small className="mt-1 block text-xs text-muted-foreground">{detail}</small> : null}
@@ -132,7 +154,7 @@ const SectionStatus = ({
   retrying,
   showErrorMessage = true,
 }: {
-  section: MarketDetailSection;
+  section: MarketDetailSectionV2;
   onRetry?: () => void;
   retrying: boolean;
   showErrorMessage?: boolean;
@@ -172,7 +194,7 @@ const SectionHeading = ({
   retrying,
 }: {
   capability: MarketDetailCapability;
-  section: MarketDetailSection;
+  section: MarketDetailSectionV2;
   onRetry?: () => void;
   retrying: boolean;
 }) => (
@@ -194,7 +216,7 @@ export const QuoteSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSection;
+  section: MarketDetailSectionV2;
   onRetry: () => void;
   retrying: boolean;
 }) => {
@@ -229,6 +251,7 @@ export const QuoteSection = ({
 export const BarsSection = ({
   section,
   indicators = [],
+  chartPoints,
   onIndicatorParamsChange,
   onLoadEarlier,
   canLoadEarlier,
@@ -238,8 +261,9 @@ export const BarsSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSection;
-  indicators?: IndicatorV1[];
+  section: MarketDetailSectionV2;
+  indicators?: MarketChartIndicator[];
+  chartPoints?: ChartPoint[];
   onIndicatorParamsChange?: (params: MarketIndicatorParams) => void;
   onLoadEarlier?: () => void;
   canLoadEarlier?: boolean;
@@ -249,7 +273,8 @@ export const BarsSection = ({
   onRetry: () => void;
   retrying: boolean;
 }) => {
-  const bars = (section.data as BarV1[] | undefined) ?? [];
+  const series = section.data as BarSeriesV2 | undefined;
+  const bars = series ? chartBarsFromSeries(series) : [];
   return (
     <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="bars">
       <SectionHeading
@@ -264,6 +289,7 @@ export const BarsSection = ({
           <MarketPriceChart
             bars={bars}
             indicators={indicators}
+            {...(chartPoints ? { chartPoints } : {})}
             {...(onIndicatorParamsChange ? { onIndicatorParamsChange } : {})}
             {...(onLoadEarlier ? { onLoadEarlier } : {})}
             {...(canLoadEarlier !== undefined ? { canLoadEarlier } : {})}
@@ -284,7 +310,7 @@ export const IndicatorSection = ({
   onRetry,
   retrying,
 }: {
-  detail: MarketDetailResponse;
+  detail: MarketDetailResponseV2;
   capabilities: readonly MarketDetailCapability[];
   onRetry: (capability: MarketDetailCapability) => void;
   retrying: string | null;
@@ -293,13 +319,13 @@ export const IndicatorSection = ({
     .map((capability) => ({ capability, section: detail.sections[capability] }))
     .filter(({ section }) => section !== undefined) as Array<{
     capability: MarketDetailCapability;
-    section: MarketDetailSection;
+    section: MarketDetailSectionV2;
   }>;
   const firstProblem = sections.find(({ section }) => section.status !== 'ready');
   const missingHistory = sections.filter(({ section }) => {
     if (!sectionIsDataReady(section)) return false;
-    const data = section.data as IndicatorV1 | undefined;
-    return !data?.points || !data.inputProvenance || !data.calculationAnchor;
+    const data = section.data as { points?: readonly unknown[] } | null | undefined;
+    return !data?.points || data.points.length === 0;
   });
   if (sections.length === 0 || (!firstProblem && missingHistory.length === 0)) return null;
   return (
@@ -346,7 +372,7 @@ export const ChipSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSection;
+    section: MarketDetailSectionV2;
   onRetry: () => void;
   retrying: boolean;
 }) => {
@@ -379,7 +405,7 @@ export const FundNavSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSection;
+  section: MarketDetailSectionV2;
   onRetry: () => void;
   retrying: boolean;
 }) => {
@@ -421,7 +447,7 @@ export const FundNavHistorySection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSection;
+  section: MarketDetailSectionV2;
   onRetry: () => void;
   retrying: boolean;
 }) => {

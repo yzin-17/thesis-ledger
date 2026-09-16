@@ -8,19 +8,23 @@ import { InstrumentSearchService } from './instruments/instrument-search.service
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketDataController } from './market-data.controller.js';
-import { MarketStorageService } from './market-storage.service.js';
-import { MarketController } from './market.controller.js';
 import { MarketDetailService } from './market-detail.service.js';
 import { MarketService } from './market.service.js';
 import { BacktestBarAggregationService } from './backtest-bar-aggregation.service.js';
+import {
+  DsaMarketBarPolicyPort,
+  DsaMarketBarRemotePort,
+  MarketBarReader,
+  PrismaMarketBarFactStore,
+} from './market-bar-reader.js';
+import { MarketV2Controller } from './market-v2.controller.js';
 
 @Module({
   imports: [QualityModule, DsaModule],
-  controllers: [MarketController, MarketDataController],
+  controllers: [MarketDataController, MarketV2Controller],
   providers: [
     MarketService,
     MarketDetailService,
-    MarketStorageService,
     CatalogSyncService,
     CatalogReadinessService,
     InstrumentSearchService,
@@ -28,17 +32,21 @@ import { BacktestBarAggregationService } from './backtest-bar-aggregation.servic
     InstrumentService,
     MarketControlService,
     BacktestBarAggregationService,
+    DsaMarketBarPolicyPort,
+    DsaMarketBarRemotePort,
+    PrismaMarketBarFactStore,
+    MarketBarReader,
   ],
   exports: [
     MarketService,
     MarketDetailService,
-    MarketStorageService,
     InstrumentService,
     CatalogSyncService,
     InstrumentSearchService,
     InstrumentAssociationService,
     MarketControlService,
     BacktestBarAggregationService,
+    MarketBarReader,
   ],
 })
 export class MarketModule {}

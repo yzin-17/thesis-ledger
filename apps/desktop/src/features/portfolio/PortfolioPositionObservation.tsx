@@ -16,13 +16,15 @@ import {
 } from '@/components/ui/empty';
 import { LoaderCircle, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 
 import { money } from '../shared/display.js';
-import {
-  StickyTableActionCell,
-  StickyTableActionHeader,
-} from '../shared/StickyTableActions.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { assetQuantityUnit, type Position } from './portfolio.types.js';
+
+const positionPnlClass = (value: number | null) => {
+  return marketToneClass(marketToneForValue(value)) ?? 'text-foreground';
+};
 
 export function PositionOverviewMenu({
   positions,
@@ -133,12 +135,7 @@ export function PositionObservationContent({
                 {position.marketValue === null ? '—' : money.format(position.marketValue)}
               </td>
               <td
-                className={cn(
-                  'px-4 py-3 text-right tabular-nums',
-                  position.pnl !== null && position.pnl < 0
-                    ? 'text-destructive'
-                    : 'text-foreground',
-                )}
+                className={cn('px-4 py-3 text-right tabular-nums', positionPnlClass(position.pnl))}
               >
                 {position.pnl === null ? '—' : money.format(position.pnl)}
               </td>

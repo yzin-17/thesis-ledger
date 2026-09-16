@@ -13,7 +13,7 @@ ThesisLedger Server 已有 OpenAI-compatible AI Provider 适配器，策略优�
 
 ## 2026-09-15 回归修复
 
-- 已确认 OpenRouter reasoning 模型在小 token 预算下可能只返回 reasoning，或通过合法的 content parts/Responses envelope 返回文本；连接测试显式关闭 reasoning，适配器兼容这些响应形态，并继续拒绝空内容、非 JSON 和非对象结果。
+- 已确认 OpenRouter reasoning 模型在小 token 预算下可能只返回 reasoning，或通过合法的 content parts/Responses envelope 返回文本；连接测试对已声明能力选择最低可用强度并使用受控预算，遇到仅 reasoning/不可消费内容时最多扩大一次预算，仍继续拒绝最终空内容、非 JSON 和非对象结果。
 - 已确认 Provider 页面连接测试原先失效 `providerKeys.root`，同时 handler 对全部查询执行 `load()`，导致自动化、诊断和通知失败查询被无关刷新；现改为按 Provider 摘要、健康历史和 AI 能力的实际副作用定向失效，草稿测试不刷新页面查询。
 
 ## 目标
@@ -90,7 +90,7 @@ Server 启动时从环境来源和数据库来源构建完整快照。每次成�
 
 ### 连接测试、状态与审计
 
-- 连接测试调用草稿或已保存 Provider 的第一个模型，要求返回一个最小 JSON 对象，并限制输出 token 和超时。
+- 连接测试调用草稿或已保存 Provider 的第一个模型，要求返回一个最小 JSON 对象，并限制输出 token 和超时。若模型元数据声明了推理能力，测试选择最低可用强度；首轮仅返回 reasoning 或其他不可消费内容时最多重试一次更大的受控预算，重试后仍无 JSON 则失败。
 - Provider 返回的错误先脱敏和截断，再作为 UI 消息或 `errorCode` 记录；不得记录请求 Authorization、API Key 或完整第三方响应。
 - 已保存配置测试写入 `ProviderHealth`/`ProviderHealthCheck`，并同步 `ProviderConfig.health`；草稿测试不写持久化健康历史。
 - 查询返回 `updatedAt`、`source`、最近 `health`、`checkedAt`、`latencyMs`、`errorCode`；无认证主体时不伪造操作者审计。

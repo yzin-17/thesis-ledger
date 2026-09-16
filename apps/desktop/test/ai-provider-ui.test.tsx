@@ -35,6 +35,7 @@ import {
 } from '../src/features/providers/providers.api.js';
 import { invalidateProviderConnectionState } from '../src/features/providers/providers.mutations.js';
 import { ProviderTable } from '../src/features/providers/ProviderSettingsSections.js';
+import { ProviderModelList } from '../src/features/providers/ProviderModelSummary.js';
 import {
   newAiProviderDraft,
   type ProviderRecord,
@@ -296,7 +297,7 @@ describe('AI Provider 页面操作', () => {
         defaultEffort: 'high',
         mandatory: true,
       }),
-    ).toEqual(['关闭', 'high', '默认 high', '强制推理']);
+    ).toEqual(['none', 'high', '默认 high', '强制推理']);
 
     const markup = renderToStaticMarkup(
       <ModelReasoningBadges reasoning={{ supportedEfforts: null, mandatory: true }} />,
@@ -329,6 +330,57 @@ describe('AI Provider 页面操作', () => {
     expect(markup).toContain('接管配置');
     expect(markup).not.toContain('>删除<');
     expect(markup).not.toContain('>停用<');
+  });
+
+  it('Provider 列表将长模型列表收敛为首项和剩余数量', () => {
+    const markup = renderToStaticMarkup(
+      <ProviderTable
+        loadState="ready"
+        providers={[
+          aiProvider({
+            models: [
+              'nvidia/nemotron-3-super-120b-a12b:free',
+              'cohere/north-mini-code:free',
+              'google/gemma-4-26b-a4b-it:free',
+            ],
+          }),
+        ]}
+        priorityDrafts={{}}
+        testingProviderName={null}
+        savingProviderName={null}
+        deletingProviderName={null}
+        onPriorityChange={() => undefined}
+        onPrioritySave={() => undefined}
+        onEdit={() => undefined}
+        onTest={() => undefined}
+        onToggle={() => undefined}
+        onDelete={() => undefined}
+        onCreate={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain('data-provider-model-summary="true"');
+    expect(markup).toContain('nvidia/nemotron-3-super-120b-a12b:free');
+    expect(markup).toContain('truncate');
+    expect(markup).toContain('>+2<');
+    expect(markup).not.toContain('cohere/north-mini-code:free');
+    expect(markup).not.toContain('google/gemma-4-26b-a4b-it:free');
+  });
+
+  it('Provider 模型悬停浮层每行展示一个完整模型', () => {
+    const models = [
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'cohere/north-mini-code:free',
+      'google/gemma-4-26b-a4b-it:free',
+    ];
+    const markup = renderToStaticMarkup(<ProviderModelList models={models} />);
+
+    expect(markup).toContain('已配置 3 个模型');
+    expect(markup.match(/<li/g)).toHaveLength(3);
+    expect(markup).toContain('overflow-auto');
+    expect(markup).toContain('whitespace-nowrap');
+    expect(markup.indexOf(models[0])).toBeLessThan(markup.indexOf(models[1]));
+    expect(markup.indexOf(models[1])).toBeLessThan(markup.indexOf(models[2]));
   });
 
   it('删除数据库 AI Provider 必须经过确认，部署来源不会发出删除请求', async () => {

@@ -11,7 +11,7 @@ import {
   ledgerAuditResponseSchemaV2,
   ledgerEventsResponseSchemaV2,
   ledgerReplayResponseSchemaV2,
-  marketDetailResponseSchema,
+  marketDetailResponseV2Schema,
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
@@ -50,7 +50,8 @@ import {
   type VoidCashFlowCommandV2,
   type VoidCashTransferCommandV2,
   type MarketDetailRequest,
-  type MarketDetailResponse,
+  type MarketDetailResponseV2,
+  type MarketDetailSectionV2,
   type JournalReviewCandidatesQuery,
   type JournalReviewCandidatesResponse,
   type JournalReviewSnapshotInput,
@@ -94,8 +95,8 @@ export type {
   RiskEventResponse,
   MarketDetailCapability,
   MarketDetailRequest,
-  MarketDetailResponse,
-  MarketDetailSection,
+  MarketDetailResponseV2,
+  MarketDetailSectionV2,
   MarketDetailSectionStatus,
   JournalReviewCandidate,
   JournalReviewCandidatesQuery,
@@ -450,19 +451,19 @@ export class ThesisLedgerApiClient {
   readonly market = {
     searchInstruments: (params: { q: string; limit?: number }) =>
       this.requestParsed(
-        `/market-data/instruments/search${queryString(params)}`,
+        `/api/v2/market-data/instruments/search${queryString(params)}`,
         instrumentSearchResponseSchema,
       ),
     getDetail: (symbol: string, params: MarketDetailQuery = {}) => {
       const { signal, refresh, include, indicatorParams, ...query } = params;
-      return this.requestParsed<MarketDetailResponse>(
-        `/market/${encodeURIComponent(symbol)}/detail${queryString({
+      return this.requestParsed<MarketDetailResponseV2>(
+        `/api/v2/market/${encodeURIComponent(symbol)}/detail${queryString({
           ...query,
           ...(indicatorParams ? { indicatorParams: JSON.stringify(indicatorParams) } : {}),
           ...(refresh ? { refresh: 1 } : {}),
           ...(include ? { include } : {}),
         })}`,
-        marketDetailResponseSchema,
+        marketDetailResponseV2Schema,
         signal ? { signal } : undefined,
       );
     },
@@ -655,10 +656,10 @@ export class ThesisLedgerApiClient {
     if (!isMultipart) {
       requestInit.headers = { 'content-type': 'application/json', ...init?.headers };
     }
-    const response = await this.fetcher(
-      new URL(path.replace(/^\/+/, ''), this.baseUrl),
-      requestInit,
-    );
+    const url = path.startsWith('/api/')
+      ? new URL(path, new URL(this.baseUrl).origin)
+      : new URL(path.replace(/^\/+/, ''), this.baseUrl);
+    const response = await this.fetcher(url, requestInit);
     if (response.ok) return response;
     let payload: ApiErrorResponse | null = null;
     try {

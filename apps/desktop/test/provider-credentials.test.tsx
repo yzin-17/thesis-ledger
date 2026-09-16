@@ -89,7 +89,7 @@ describe('页面凭证配置', () => {
     const controller = new AbortController();
     const draft = { method: 'legacy', values: { appKey: 'draft-only' } };
     await testMarketProvider(provider, draft, controller.signal);
-    expect(request).toHaveBeenLastCalledWith('/market-data/providers/longbridge/test', {
+    expect(request).toHaveBeenLastCalledWith('/api/v2/market-data/providers/longbridge/test', {
       method: 'POST',
       body: JSON.stringify({ credentials: draft }),
       signal: controller.signal,
@@ -145,12 +145,12 @@ describe('页面凭证配置', () => {
       values: { appKey: 'a', appSecret: 'b', accessToken: 'c' },
     };
     await saveMarketProviderCredentials('longbridge', credentials);
-    expect(request).toHaveBeenLastCalledWith('/market-data/providers/longbridge/config', {
+    expect(request).toHaveBeenLastCalledWith('/api/v2/market-data/providers/longbridge/config', {
       method: 'POST',
       body: JSON.stringify({ credentials }),
     });
     await clearMarketProviderCredential(provider);
-    expect(request).toHaveBeenLastCalledWith('/market-data/providers/longbridge/config', {
+    expect(request).toHaveBeenLastCalledWith('/api/v2/market-data/providers/longbridge/config', {
       method: 'POST',
       body: JSON.stringify({ clearCredentials: true }),
     });

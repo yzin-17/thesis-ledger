@@ -167,7 +167,7 @@ describe('行情契约', () => {
       origin: 'dsa',
       markets: ['CN'],
       configurationMode: 'control',
-      upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经' }],
+      upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经', capabilities: { DAILY_BAR: ['STOCK'] } }],
     });
     expect(quote).toMatchObject({ provider: 'akshare', upstreamSource: 'tencent' });
     expect(provider.upstreamSources?.[0]?.displayName).toBe('腾讯财经');

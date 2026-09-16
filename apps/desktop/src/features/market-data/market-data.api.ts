@@ -8,19 +8,19 @@ import type {
 
 const api = () => getDesktopApiClient();
 
-export const fetchMarketPolicy = () => api().request<MarketPolicy>('/market-data/policy');
+export const fetchMarketPolicy = () => api().request<MarketPolicy>('/api/v2/market-data/policy');
 export const fetchMarketProviders = async () =>
-  (await api().request<{ providers?: ProviderManifest[] }>('/market-data/providers')).providers ??
+  (await api().request<{ providers?: ProviderManifest[] }>('/api/v2/market-data/providers')).providers ??
   [];
-export const fetchCatalogStatus = () => api().request<CatalogStatus>('/market-data/catalog/status');
+export const fetchCatalogStatus = () => api().request<CatalogStatus>('/api/v2/market-data/catalog/status');
 export const fetchCatalogJob = (jobId: string) =>
-  api().request<CatalogStatus>(`/market-data/catalog/jobs/${encodeURIComponent(jobId)}`);
+  api().request<CatalogStatus>(`/api/v2/market-data/catalog/jobs/${encodeURIComponent(jobId)}`);
 
 export const saveMarketPolicy = (policy: MarketPolicy) =>
-  api().request<MarketPolicy>('/market-data/policy', {
+  api().request<MarketPolicy>('/api/v2/market-data/policy', {
     method: 'PUT',
     body: JSON.stringify({
-      contractVersion: 1,
+      contractVersion: 2,
       consumer: 'thesis-ledger',
       requestId: crypto.randomUUID(),
       revision: policy.revision + 1,
@@ -33,19 +33,19 @@ export const saveMarketProviderCredentials = (
   providerId: string,
   credentials: ProviderCredentialDraft,
 ) =>
-  api().request(`/market-data/providers/${encodeURIComponent(providerId)}/config`, {
+  api().request(`/api/v2/market-data/providers/${encodeURIComponent(providerId)}/config`, {
     method: 'POST',
     body: JSON.stringify({ credentials }),
   });
 
 export const setMarketProviderEnabled = (providerId: string, enabled: boolean) =>
   api().request<{ providerId: string; enabled: boolean }>(
-    `/market-data/providers/${encodeURIComponent(providerId)}/config`,
+    `/api/v2/market-data/providers/${encodeURIComponent(providerId)}/config`,
     { method: 'POST', body: JSON.stringify({ enabled }) },
   );
 
 export const clearMarketProviderCredential = (provider: ProviderManifest) =>
-  api().request(`/market-data/providers/${encodeURIComponent(provider.providerId)}/config`, {
+  api().request(`/api/v2/market-data/providers/${encodeURIComponent(provider.providerId)}/config`, {
     method: 'POST',
     body: JSON.stringify({ clearCredentials: true }),
   });
@@ -61,7 +61,7 @@ export const testMarketProvider = (
       string,
       { status?: string; errorCode?: string; attempted?: boolean; readOnly?: boolean }
     >;
-  }>(`/market-data/providers/${encodeURIComponent(provider.providerId)}/test`, {
+  }>(`/api/v2/market-data/providers/${encodeURIComponent(provider.providerId)}/test`, {
     method: 'POST',
     body: JSON.stringify(credentials ? { credentials } : {}),
     signal: signal ?? null,
@@ -74,15 +74,15 @@ export const removeMarketProvider = (providerId: string) =>
     message?: string;
     policy?: MarketPolicy;
     routeDiff?: unknown[];
-  }>(`/market-data/providers/${encodeURIComponent(providerId)}/remove`, { method: 'POST' });
+  }>(`/api/v2/market-data/providers/${encodeURIComponent(providerId)}/remove`, { method: 'POST' });
 
 export const startCatalogSync = () =>
-  api().request<CatalogStatus>('/market-data/catalog/sync', { method: 'POST' });
+  api().request<CatalogStatus>('/api/v2/market-data/catalog/sync', { method: 'POST' });
 
 export const searchMarketInstruments = (query: string) =>
   api().market.searchInstruments({ q: query, limit: 50 });
 
 export const confirmMarketInstrument = (instrumentId: string) =>
-  api().request(`/market-data/instruments/${encodeURIComponent(instrumentId)}/confirm`, {
+  api().request(`/api/v2/market-data/instruments/${encodeURIComponent(instrumentId)}/confirm`, {
     method: 'POST',
   });

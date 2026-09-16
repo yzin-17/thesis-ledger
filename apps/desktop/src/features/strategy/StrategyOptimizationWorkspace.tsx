@@ -7,7 +7,7 @@ export function StrategyOptimizationWorkspace({ strategies }: { strategies: Stra
   return (
     <Tabs defaultValue="ai" className="space-y-4">
       <TabsList>
-        <TabsTrigger value="ai">AI 优化</TabsTrigger>
+        <TabsTrigger value="ai">AI 策略实验</TabsTrigger>
         <TabsTrigger value="risk">策略风险规则</TabsTrigger>
       </TabsList>
       <TabsContent value="ai">

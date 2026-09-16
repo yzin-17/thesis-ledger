@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FixtureAiProvider, OpenAiCompatibleProvider } from '../../src/ai/provider-adapters.js';
+import { createDiscoverySeed } from '../../src/strategy-optimization/strategy-optimization-discovery.js';
 
 describe('AI Provider adapters', () => {
   it('调用 OpenAI-compatible endpoint 并提取结构化 usage', async () => {
@@ -41,7 +42,10 @@ describe('AI Provider adapters', () => {
             message: {
               role: 'assistant',
               reasoning: 'internal reasoning',
-              content: [{ type: 'text', text: '{"ok":' }, { type: 'text', text: 'true}' }],
+              content: [
+                { type: 'text', text: '{"ok":' },
+                { type: 'text', text: 'true}' },
+              ],
             },
           },
         ],
@@ -117,6 +121,73 @@ describe('AI Provider adapters', () => {
     vi.unstubAllGlobals();
   });
 
+  it('将选择的 reasoning effort 传递给 OpenRouter 请求', async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const fetch = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
+      };
+    });
+    vi.stubGlobal('fetch', fetch);
+    const provider = new OpenAiCompatibleProvider(
+      'openrouter',
+      ['m1'],
+      'https://openrouter.ai/api/v1',
+      'secret',
+      30_000,
+      undefined,
+      { modelReasoning: { m1: { supportedEfforts: ['high'] } } },
+    );
+    await provider.complete(
+      {
+        model: 'm1',
+        messages: [{ role: 'user', content: 'Return JSON' }],
+        tools: [],
+        reasoningEffort: 'high',
+      },
+      AbortSignal.timeout(1_000),
+    );
+    expect(requestBody).toMatchObject({ reasoning: { effort: 'high' } });
+    vi.unstubAllGlobals();
+  });
+
+  it('非 OpenRouter 仅在模型显式声明能力时透传 reasoning effort', async () => {
+    const requestBodies: Array<Record<string, unknown>> = [];
+    const fetch = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
+      };
+    });
+    vi.stubGlobal('fetch', fetch);
+    const declared = new OpenAiCompatibleProvider(
+      'openai-compatible',
+      ['declared', 'unknown'],
+      'https://provider.example.test/v1',
+      'secret',
+      30_000,
+      undefined,
+      { modelReasoning: { declared: { supportedEfforts: ['high'] } } },
+    );
+    await declared.complete(
+      { model: 'declared', messages: [], tools: [], reasoningEffort: 'high' },
+      AbortSignal.timeout(1_000),
+    );
+    await declared.complete(
+      { model: 'unknown', messages: [], tools: [], reasoningEffort: 'high' },
+      AbortSignal.timeout(1_000),
+    );
+    expect(requestBodies[0]).toMatchObject({ reasoning_effort: 'high' });
+    expect(requestBodies[1]).not.toHaveProperty('reasoning_effort');
+    expect(requestBodies[1]).not.toHaveProperty('reasoning');
+    vi.unstubAllGlobals();
+  });
+
   it('fixture Provider 只输出演示结构，不伪造外部来源', async () => {
     const provider = new FixtureAiProvider();
     const result = await provider.complete({
@@ -149,5 +220,38 @@ describe('AI Provider adapters', () => {
     });
     expect(result.content).toMatchObject({ version: 1, provider: 'fixture' });
     expect(result.content).toMatchObject({ disclaimer: expect.stringContaining('演示') });
+  });
+
+  it('Fixture Provider 根据 discovery marker 返回确定性完整策略候选', async () => {
+    const provider = new FixtureAiProvider();
+    const seed = createDiscoverySeed({
+      executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
+      primaryTimeframe: '1d',
+    });
+    const result = await provider.complete({
+      model: 'research-fixture',
+      tools: [],
+      messages: [
+        {
+          role: 'user',
+          content: `DISCOVERY_REQUEST_JSON:${JSON.stringify({
+            strategySpaceVersion: 'strategy-space-v1',
+            scope: {
+              executionInstrument: seed.executionInstrument,
+              primaryTimeframe: seed.primaryTimeframe,
+            },
+            seedStrategy: seed,
+          })}`,
+        },
+      ],
+    });
+    expect(result.content).toMatchObject({
+      strategy: {
+        schemaVersion: '2',
+        executionInstrument: seed.executionInstrument,
+        primaryTimeframe: '1d',
+      },
+    });
+    expect(result.costCurrency).toBe('FIXTURE');
   });
 });

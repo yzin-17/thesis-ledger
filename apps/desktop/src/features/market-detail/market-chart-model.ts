@@ -1,10 +1,10 @@
-import type { BarV1, IndicatorV1 } from '@thesis-ledger/schemas';
+import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
 
-type IndicatorPoint = NonNullable<IndicatorV1['points']>[number];
+type IndicatorPoint = MarketChartIndicator['points'][number];
 
 export type ChartPoint = {
   date: string;
-  bar?: BarV1;
+  bar?: MarketChartBar;
   indicators: Partial<Record<'MA' | 'MACD' | 'RSI', IndicatorPoint>>;
   comparableIndicators: Partial<Record<'MA' | 'MACD' | 'RSI', boolean>>;
   comparable: boolean;
@@ -12,18 +12,18 @@ export type ChartPoint = {
 
 const day = (timestamp: string) => timestamp.slice(0, 10);
 
-const sameInput = (bar: BarV1 | undefined, point: IndicatorPoint | undefined) => {
+const sameInput = (bar: MarketChartBar | undefined, point: IndicatorPoint | undefined) => {
   if (!bar?.inputFingerprint || !point?.inputFingerprint) return false;
   return bar.inputFingerprint === point.inputFingerprint;
 };
 
-const provenanceCoversDate = (indicator: IndicatorV1, date: string) => {
+const provenanceCoversDate = (indicator: MarketChartIndicator, date: string) => {
   const range = indicator.inputProvenance?.inputDateRange;
   if (!range) return true;
   return range.start.slice(0, 10) <= date && date <= range.end.slice(0, 10);
 };
 
-export const buildChartPoints = (bars: BarV1[], indicators: IndicatorV1[]): ChartPoint[] => {
+export const buildChartPoints = (bars: MarketChartBar[], indicators: MarketChartIndicator[]): ChartPoint[] => {
   const barByDate = new Map(bars.map((bar) => [day(bar.timestamp), bar]));
   const pointsByIndicator = indicators.map((indicator) => ({
     indicator,
@@ -46,7 +46,7 @@ export const buildChartPoints = (bars: BarV1[], indicators: IndicatorV1[]): Char
       const name = rawName as 'MA' | 'MACD' | 'RSI';
       const candidates = entries
         .map(({ indicator, points }) => ({ indicator, point: points.get(date) }))
-        .filter((candidate): candidate is { indicator: IndicatorV1; point: IndicatorPoint } =>
+        .filter((candidate): candidate is { indicator: MarketChartIndicator; point: IndicatorPoint } =>
           Boolean(candidate.point),
         );
       const comparable = candidates.find(({ indicator, point }) => {
@@ -83,6 +83,44 @@ export const buildChartPoints = (bars: BarV1[], indicators: IndicatorV1[]): Char
       comparable,
     };
   });
+};
+
+/**
+ * 历史分页的每一页都是独立的窗口与 inputFingerprint，因此 ChartPoint 必须先按页
+ * 构建再按日期合并。直接对合并后的 BarSeries 逐日比对 fingerprint 会让先前已加载
+ * 的日期失去可比性（均线/MACD 被置空）。
+ */
+const mergeChartPointEvidence = (left: ChartPoint, right: ChartPoint): ChartPoint => {
+  const indicators = { ...left.indicators };
+  const comparableIndicators = { ...left.comparableIndicators };
+  (Object.keys(right.indicators) as Array<keyof ChartPoint['indicators']>).forEach((name) => {
+    const next = right.indicators[name];
+    if (!next) return;
+    const rightComparable = right.comparableIndicators[name] === true;
+    if (!indicators[name] || (rightComparable && comparableIndicators[name] !== true)) {
+      indicators[name] = next;
+      comparableIndicators[name] = rightComparable;
+    }
+  });
+  const bar = left.bar ?? right.bar;
+  return {
+    date: left.date,
+    ...(bar ? { bar } : {}),
+    indicators,
+    comparableIndicators,
+    comparable: Object.values(comparableIndicators).every(Boolean),
+  };
+};
+
+export const mergeChartPoints = (groups: readonly ChartPoint[][]): ChartPoint[] => {
+  const byDate = new Map<string, ChartPoint>();
+  groups.forEach((points) => {
+    points.forEach((point) => {
+      const existing = byDate.get(point.date);
+      byDate.set(point.date, existing ? mergeChartPointEvidence(existing, point) : point);
+    });
+  });
+  return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
 };
 
 export const indicatorComparable = (point: ChartPoint, name: string) =>
