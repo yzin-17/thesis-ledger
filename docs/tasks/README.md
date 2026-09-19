@@ -11,6 +11,7 @@
 
 - [数据源即时启停与页面凭证配置](2026-09-14-market-provider-credentials.md)
 - [账户永久删除](2026-09-14-permanent-account-deletion.md)
+- [目标配置版本与并发一致性加固](2026-09-16-performance-target-allocation-consistency.md)
 - [行情图表周期聚合](2026-09-16-market-chart-period-aggregation.md)
 - [回测真实历史市场规则数据源](2026-09-16-backtest-real-historical-market-rules.md)
 - [日线行情与技术指标联动 / 交互精炼](2026-09-10-market-chart-indicator-integration.md)
