@@ -388,10 +388,20 @@ export const evaluateSignalAt = (
   const exit = evaluateBooleanExpression(input.strategy.exit as BooleanExpression, context);
   const risk = input.risk?.(context);
   const nextState: EdgeState = { ...state };
-  let signal = risk ? edgeSignal('risk', risk, undefined, input.strategy, sequence) : undefined;
-  if (risk?.status === 'available' && !risk.value) signal = undefined;
-  if (!signal) signal = edgeSignal('exit', exit, state.exit, input.strategy, sequence);
-  if (!signal) signal = edgeSignal('entry', entry, state.entry, input.strategy, sequence);
+  const isOpen = positionState?.isOpen;
+  let signal: SimulationSignal | undefined;
+  if (isOpen === true) {
+    signal = risk ? edgeSignal('risk', risk, undefined, input.strategy, sequence) : undefined;
+    if (risk?.status === 'available' && !risk.value) signal = undefined;
+    if (!signal) signal = edgeSignal('exit', exit, state.exit, input.strategy, sequence);
+  } else if (isOpen === false) {
+    signal = edgeSignal('entry', entry, state.entry, input.strategy, sequence);
+  } else {
+    signal = risk ? edgeSignal('risk', risk, undefined, input.strategy, sequence) : undefined;
+    if (risk?.status === 'available' && !risk.value) signal = undefined;
+    if (!signal) signal = edgeSignal('exit', exit, state.exit, input.strategy, sequence);
+    if (!signal) signal = edgeSignal('entry', entry, state.entry, input.strategy, sequence);
+  }
   if (entry.status === 'available') nextState.entry = entry.value;
   if (exit.status === 'available') nextState.exit = exit.value;
   return {

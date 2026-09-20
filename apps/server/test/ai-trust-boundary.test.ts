@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiController } from '../src/ai/ai.controller.js';
 import type { ToolPermission } from '../src/ai/contracts.js';
-import { AiRunService } from '../src/ai/ai-run.service.js';
-import { AiProviderRegistry } from '../src/ai/provider-registry.js';
 import { executeAuditedTool, type AiToolCallAuditInput } from '../src/ai/tool-runtime.js';
 
 describe('AI trust boundary', () => {
@@ -87,103 +85,6 @@ describe('AI trust boundary', () => {
       }),
     ).toThrow();
     expect(runs.start).not.toHaveBeenCalled();
-  });
-
-  it('persists token usage and cost from the actual provider completion', async () => {
-    const prisma = {
-      aiRun: {
-        update: vi.fn(async ({ data }: { data: object }) => data),
-      },
-      aiToolCall: {
-        findMany: vi.fn(async () => [{ id: '21111111-1111-4111-8111-111111111111' }]),
-      },
-    };
-    const runs = new AiRunService(prisma as never);
-    const registry = new AiProviderRegistry();
-    const complete = vi.fn(async () => ({
-      content: {
-        version: 1,
-        provider: 'trusted-provider',
-        conclusion: 'trusted',
-        evidence: [
-          {
-            claim: 'trusted evidence',
-            citations: [
-              {
-                toolCallId: '21111111-1111-4111-8111-111111111111',
-                tool: 'fixture',
-                sourceId: 'fixture:1',
-                provider: 'trusted-provider',
-                observedAt: '2026-08-26T00:00:00.000Z',
-              },
-            ],
-          },
-        ],
-        risks: [],
-        unknowns: [],
-        disclaimer: '仅供研究参考。',
-        createdAt: '2026-08-26T00:00:00.000Z',
-      },
-      inputTokens: 17,
-      outputTokens: 23,
-      cost: 0.0042,
-    }));
-    registry.register({ id: 'trusted-provider', models: ['m1'], complete });
-
-    await runs.completeWithProvider('11111111-1111-4111-8111-111111111111', registry, {
-      model: 'm1',
-      messages: [{ role: 'user', content: 'question' }],
-      tools: [],
-      toolCallIds: ['21111111-1111-4111-8111-111111111111'],
-    });
-
-    expect(complete).toHaveBeenCalledOnce();
-    expect(prisma.aiRun.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          provider: 'trusted-provider',
-          status: 'succeeded',
-          inputTokens: 17,
-          outputTokens: 23,
-          cost: 0.0042,
-          durationMs: expect.any(Number),
-        }),
-      }),
-    );
-  });
-
-  it('rejects an invalid provider result instead of persisting succeeded', async () => {
-    const updates: object[] = [];
-    const prisma = {
-      aiRun: {
-        update: vi.fn(async ({ data }: { data: object }) => {
-          updates.push(data);
-          return data;
-        }),
-      },
-    };
-    const runs = new AiRunService(prisma as never);
-    const registry = new AiProviderRegistry();
-    registry.register({
-      id: 'invalid-provider',
-      models: ['m1'],
-      complete: vi.fn(async () => ({
-        content: { conclusion: 'free form' },
-        inputTokens: 1,
-        outputTokens: 1,
-        cost: 0,
-      })),
-    });
-
-    await expect(
-      runs.completeWithProvider('11111111-1111-4111-8111-111111111111', registry, {
-        model: 'm1',
-        messages: [],
-        tools: [],
-      }),
-    ).rejects.toThrow();
-    expect(updates).toHaveLength(1);
-    expect(updates[0]).toMatchObject({ status: 'failed', errorCode: 'provider_completion_failed' });
   });
 
   it('derives tool audit duration and provenance from the server execution', async () => {

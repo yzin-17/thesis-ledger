@@ -10,12 +10,16 @@ import { BacktestService } from '../backtest/backtest.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
   optimizationRemainingDurationMs,
-  optimizationSha256,
   toRecord,
   type EvaluationSummary,
   type ExperimentRow,
   type SplitName,
 } from './strategy-optimization-common.js';
+import {
+  isKnownCostAmount,
+  normalizeCostCurrency,
+  optimizationCostError,
+} from './strategy-optimization-cost.js';
 
 type BacktestJob = NonNullable<Awaited<ReturnType<BacktestService['status']>>>;
 
@@ -165,27 +169,70 @@ export class StrategyOptimizationRunService {
     estimated: number,
     actual: number,
     transaction?: Prisma.TransactionClient,
+    actualCostKnown = true,
+    actualCurrency: string | null = null,
   ) {
     const database = transaction ?? this.prisma;
     const delta = actual - estimated;
-    await database.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment" SET "costUsed"="costUsed"+${delta}, "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}::uuid
-    `);
-    const rows = await database.$queryRaw<Array<{ costUsed: Prisma.Decimal; budget: unknown }>>(Prisma.sql`
-      SELECT "costUsed", "budget" FROM "OptimizationExperiment" WHERE "id"=${id}::uuid LIMIT 1
+    const rows = await database.$queryRaw<
+      Array<{ costUsed: Prisma.Decimal; budget: unknown; modelConfig: unknown }>
+    >(Prisma.sql`
+      SELECT "costUsed", "budget", "modelConfig"
+      FROM "OptimizationExperiment" WHERE "id"=${id}::uuid LIMIT 1
     `);
     const row = rows[0];
     if (!row) return;
     const maxCost = toRecord(row.budget).maxCost;
-    if (typeof maxCost === 'string' && DecimalValue.from(row.costUsed.toString()).compareTo(maxCost) > 0)
+    if (!actualCostKnown || !normalizeCostCurrency(actualCurrency) || !isKnownCostAmount(actual)) {
+      if (typeof maxCost === 'string')
+        throw optimizationCostError(
+          'OPTIMIZATION_COST_TOTAL_LIMIT_UNAVAILABLE',
+          'Provider 未返回可确认的费用币种，不能继续使用实验总金额上限',
+        );
+      return;
+    }
+    const knownCurrencies = [
+      ...new Set(
+        (Array.isArray(row.modelConfig) ? row.modelConfig : [])
+          .map((item) => toRecord(item))
+          .map((item) => normalizeCostCurrency(item.costCurrency))
+          .filter((currency): currency is string => currency !== null),
+      ),
+    ];
+    if (knownCurrencies.length > 1)
+      throw optimizationCostError(
+        'OPTIMIZATION_COST_MIXED_CURRENCY',
+        '同一实验不能混用已知的不同计费币种',
+        { currencies: knownCurrencies },
+      );
+    if (
+      knownCurrencies.length === 1 &&
+      knownCurrencies[0] !== normalizeCostCurrency(actualCurrency)
+    )
+      throw optimizationCostError(
+        'OPTIMIZATION_COST_CURRENCY_MISMATCH',
+        'Provider 返回的费用币种与实验冻结币种不一致',
+        { expected: knownCurrencies[0], actual: normalizeCostCurrency(actualCurrency) },
+      );
+    const updated = await database.$executeRaw(Prisma.sql`
+      UPDATE "OptimizationExperiment" SET "costUsed"="costUsed"+${delta}, "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${id}::uuid
+        AND ("budget"->>'maxCost' IS NULL OR "costUsed"+${delta} <= ("budget"->>'maxCost')::decimal)
+    `);
+    if (updated !== 1 && typeof maxCost === 'string')
       throw new BadRequestException('优化实验实际模型费用超过预算，已停止新任务');
+  }
+
+  private splitRangeFor(experiment: ExperimentRow, splitName: SplitName) {
+    const split = toRecord(experiment.split)[splitName] as
+      { start?: string; end?: string } | undefined;
+    if (!split?.start || !split.end) throw new Error(`实验缺少 ${splitName} 数据切分`);
+    return { start: split.start, end: split.end };
   }
 
   private runConfigForSplit(experiment: ExperimentRow, splitName: SplitName) {
     const base = experiment.runConfig as RunConfig;
-    const split = toRecord(experiment.split)[splitName] as { start?: string; end?: string } | undefined;
-    if (!split?.start || !split.end) throw new Error(`实验缺少 ${splitName} 数据切分`);
+    const split = this.splitRangeFor(experiment, splitName);
     return { ...base, startDate: split.start, endDate: split.end } satisfies RunConfig;
   }
 
@@ -241,15 +288,15 @@ export class StrategyOptimizationRunService {
     return terminal;
   }
 
-  dataArtifactFingerprint(job: BacktestJob) {
-    const manifest = toRecord(job.snapshotManifest);
-    const artifacts = Array.isArray(manifest.artifacts) ? manifest.artifacts : [];
-    const facts = artifacts
-      .map((item) => toRecord(item))
-      .filter((item) => typeof item.key === 'string' && !item.key.startsWith('metadata/'))
-      .map((item) => ({ key: item.key, contentHash: item.contentHash }))
-      .sort((left, right) => String(left.key).localeCompare(String(right.key)));
-    return optimizationSha256(facts);
+  dataArtifactFingerprint(job: BacktestJob, range: { start: string; end: string }) {
+    return this.backtests.comparableDataFingerprint(job.id, range);
+  }
+
+  async requireCompletedRun(id: string, label: string) {
+    const run = await this.backtests.status(id);
+    if (!run || run.status !== 'succeeded' || run.result === null || run.result === undefined)
+      throw new Error(`${label}冻结 Run 不可访问`);
+    return run;
   }
 
   evaluateResult(run: BacktestJob, objectiveValue: unknown): EvaluationSummary {
@@ -257,7 +304,8 @@ export class StrategyOptimizationRunService {
     if (result.completeness !== 'complete')
       return invalidSummary(run.id, result, '回测数据完整性不是 complete');
     const objective = toRecord(objectiveValue);
-    const minimumTrades = typeof objective.minClosedTrades === 'number' ? objective.minClosedTrades : 1;
+    const minimumTrades =
+      typeof objective.minClosedTrades === 'number' ? objective.minClosedTrades : 1;
     if (result.trades.length < minimumTrades)
       return invalidSummary(run.id, result, `闭合交易少于 ${minimumTrades}`);
     const totalReturn = metricValue(result, ['totalReturn', 'cumulativeReturn', 'return']);
@@ -265,7 +313,8 @@ export class StrategyOptimizationRunService {
     if (!totalReturn || !maxDrawdown)
       return invalidSummary(run.id, result, '关键收益/回撤指标不可用');
     const turnover = metricValue(result, ['turnover', 'turnoverRate']);
-    const maxAllowed = typeof objective.maxDrawdown === 'string' ? objective.maxDrawdown : undefined;
+    const maxAllowed =
+      typeof objective.maxDrawdown === 'string' ? objective.maxDrawdown : undefined;
     if (maxAllowed && drawdownMagnitude(maxDrawdown).compareTo(maxAllowed) > 0)
       return {
         ...invalidSummary(run.id, result, '最大回撤超过硬约束'),
@@ -294,7 +343,10 @@ export class StrategyOptimizationRunService {
       'baseline',
     );
     const summary = this.evaluateResult(run, experiment.objective);
-    const fingerprint = this.dataArtifactFingerprint(run);
+    const fingerprint = await this.dataArtifactFingerprint(
+      run,
+      this.splitRangeFor(experiment, splitName),
+    );
     await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "baselineRunRefs"=COALESCE("baselineRunRefs", '{}'::jsonb) || ${JSON.stringify({ [splitName]: run.id })}::jsonb,
@@ -319,7 +371,10 @@ export class StrategyOptimizationRunService {
       splitName,
       `candidate:${candidateId}`,
     );
-    const fingerprint = this.dataArtifactFingerprint(run);
+    const fingerprint = await this.dataArtifactFingerprint(
+      run,
+      this.splitRangeFor(experiment, splitName),
+    );
     if (fingerprint !== baselineFingerprint) {
       const summary: EvaluationSummary = {
         runId: run.id,

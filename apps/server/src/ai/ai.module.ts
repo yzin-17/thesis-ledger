@@ -5,6 +5,9 @@ import { AiProviderController } from './ai-provider.controller.js';
 import { AiProviderService } from './ai-provider.service.js';
 import { AiRunService } from './ai-run.service.js';
 import { AiResearchExecutor } from './ai-research.executor.js';
+import { AiExecutionStateStore } from './ai-execution-state.store.js';
+import { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
+import { AiResearchSdkExecution } from './ai-research-sdk-execution.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { PromptVersionRegistry } from './prompt-registry.js';
 import { createConfiguredAiProviders } from './provider-adapters.js';
@@ -15,6 +18,9 @@ import { loadConfig } from '../platform/config.js';
   controllers: [AiController, AiProviderController],
   providers: [
     AiRunService,
+    AiExecutionStateStore,
+    AiSdkGenerationAdapter,
+    AiResearchSdkExecution,
     AiProviderService,
     {
       provide: AiProviderRegistry,
@@ -43,6 +49,9 @@ import { loadConfig } from '../platform/config.js';
   ],
   exports: [
     AiRunService,
+    AiExecutionStateStore,
+    AiSdkGenerationAdapter,
+    AiResearchSdkExecution,
     AiProviderRegistry,
     PromptVersionRegistry,
     AiResearchExecutor,

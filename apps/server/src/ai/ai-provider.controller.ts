@@ -37,6 +37,11 @@ export class AiProviderController {
     return this.providers.testSaved(name);
   }
 
+  @Get(':name/readiness')
+  readiness(@Param('name') name: string) {
+    return this.providers.readiness(name);
+  }
+
   @Patch(':name/enabled')
   setEnabled(@Param('name') name: string, @Body() input: unknown) {
     const parsed = enabledSchema.parse(input);

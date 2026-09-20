@@ -1,13 +1,29 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import { RiskService } from '../risk/risk.service.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
 import { StrategyOptimizationService } from './strategy-optimization.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
 
-const listApplicationsQuery = z.object({ accountId: z.uuid().optional(), symbol: z.string().optional() });
-const listExperimentsQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(30) });
+const listApplicationsQuery = z.object({
+  accountId: z.uuid().optional(),
+  symbol: z.string().optional(),
+  includeArchived: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .default(true),
+});
+const listExperimentsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+  cursor: z.string().trim().min(1).optional(),
+  search: z.string().trim().max(120).optional(),
+  sourceMode: z.enum(['existing', 'discovery']).optional(),
+  status: z.string().trim().max(40).optional(),
+  strategyVersionId: z.uuid().optional(),
+});
+const listBacktestGroupsQuery = listExperimentsQuery.extend({ jobId: z.uuid().optional() });
 const upgradePreviewSchema = z.object({ targetStrategyVersionId: z.uuid() }).strict();
+const adoptionContextQuery = z.object({ candidateId: z.uuid() }).strict();
 
 @Controller('strategy-optimization')
 export class StrategyOptimizationController {
@@ -46,7 +62,7 @@ export class StrategyOptimizationController {
   @Get('risk-applications')
   listRiskApplications(@Query() query: unknown) {
     const parsed = listApplicationsQuery.parse(query);
-    return this.riskApplications.list(parsed.accountId, parsed.symbol);
+    return this.riskApplications.list(parsed.accountId, parsed.symbol, parsed.includeArchived);
   }
 
   @Get('risk-applications/:id')
@@ -57,6 +73,11 @@ export class StrategyOptimizationController {
   @Patch('risk-applications/:id')
   updateRiskApplication(@Param('id') id: string, @Body() body: unknown) {
     return this.riskApplications.update(id, body);
+  }
+
+  @Delete('risk-applications/:id')
+  archiveRiskApplication(@Param('id') id: string, @Body() body: unknown) {
+    return this.riskApplications.archive(id, body);
   }
 
   @Post('risk-applications/:id/upgrade-preview')
@@ -82,7 +103,12 @@ export class StrategyOptimizationController {
 
   @Get('experiments')
   listExperiments(@Query() query: unknown) {
-    return this.reads.list(listExperimentsQuery.parse(query).limit);
+    return this.reads.list(listExperimentsQuery.parse(query));
+  }
+
+  @Get('backtests/groups')
+  listBacktestGroups(@Query() query: unknown) {
+    return this.reads.listBacktestGroups(listBacktestGroupsQuery.parse(query));
   }
 
   @Get('experiments/:id')
@@ -90,9 +116,20 @@ export class StrategyOptimizationController {
     return this.reads.get(id);
   }
 
+  @Patch('experiments/:id')
+  renameExperiment(@Param('id') id: string, @Body() body: unknown) {
+    return this.optimization.rename(id, body);
+  }
+
   @Get('experiments/:id/compare')
   compare(@Param('id') id: string) {
     return this.reads.compare(id);
+  }
+
+  @Get('experiments/:id/adopt-context')
+  adoptContext(@Param('id') id: string, @Query() query: unknown) {
+    const parsed = adoptionContextQuery.parse(query);
+    return this.optimization.adoptionContext(id, parsed.candidateId);
   }
 
   @Post('experiments/:id/clone')

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { strategySchemaV2 } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { fetchAccounts } from '../portfolio/portfolio.api.js';
+import { NotificationRouteSelect } from '../risk/NotificationRouteSelect.js';
+import { notificationRouteLabel } from '../risk/risk.format.js';
+import { useNotificationRoutingQuery } from '../risk/risk.queries.js';
 import {
   createStrategyRiskApplication,
   fetchStrategyRiskApplications,
@@ -48,7 +51,7 @@ const notificationFor = (application: StrategyRiskApplication): StrategyRiskNoti
   enabled: application.notification?.enabled !== false,
   cooldownMinutes: application.notification?.cooldownMinutes ?? 60,
   severity: application.notification?.severity ?? 'warning',
-  channels: application.notification?.channels ?? ['feishu'],
+  channels: application.notification?.channels ?? [],
 });
 
 export function StrategyRiskApplicationPanel({ strategies }: { strategies: StrategyRecord[] }) {
@@ -70,7 +73,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
   const [notificationEnabled, setNotificationEnabled] = useState(true);
   const [notificationSeverity, setNotificationSeverity] =
     useState<StrategyRiskNotification['severity']>('warning');
-  const [feishuEnabled, setFeishuEnabled] = useState(true);
+  const [notificationChannel, setNotificationChannel] = useState('');
   const [cooldownMinutes, setCooldownMinutes] = useState('60');
   const [cooldownDrafts, setCooldownDrafts] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<RiskApplicationPreview | null>(null);
@@ -88,6 +91,20 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
   const symbol = parsed?.success ? parsed.data.executionInstrument.symbol : '';
 
   const accounts = useQuery({ queryKey: ['desktop', 'accounts'], queryFn: () => fetchAccounts() });
+  const notificationRouting = useNotificationRoutingQuery();
+  const notificationRoutes = notificationRouting.data?.routes ?? [];
+  let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
+  if (notificationRouting.isPending) notificationRoutingState = 'loading';
+  else if (notificationRouting.isError) notificationRoutingState = 'error';
+  const selectedNotificationRoute = notificationRoutes.find(
+    (route) => route.channel === notificationChannel,
+  );
+  useEffect(() => {
+    if (notificationRoutingState !== 'ready' || selectedNotificationRoute) return;
+    const nextChannel = notificationRoutes[0]?.channel ?? '';
+    setNotificationChannel(nextChannel);
+    if (!nextChannel) setNotificationEnabled(false);
+  }, [notificationRoutes, notificationRoutingState, selectedNotificationRoute]);
   const applications = useQuery({
     queryKey: [...riskApplicationKey, accountId, symbol],
     queryFn: () => fetchStrategyRiskApplications(accountId || undefined, symbol || undefined),
@@ -107,6 +124,8 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
   const createMutation = useMutation({
     mutationFn: (enabled: boolean) => {
       if (!preview) throw new Error('请先生成预览');
+      if (notificationEnabled && !selectedNotificationRoute)
+        throw new Error('请先选择已配置的通知 Provider');
       return createStrategyRiskApplication({
         strategyVersionId,
         accountId,
@@ -119,7 +138,10 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
           enabled: notificationEnabled,
           cooldownMinutes: Math.max(0, Number(cooldownMinutes) || 0),
           severity: notificationSeverity,
-          channels: feishuEnabled ? ['feishu'] : [],
+          channels:
+            notificationEnabled && selectedNotificationRoute
+              ? [selectedNotificationRoute.channel as StrategyRiskNotification['channels'][number]]
+              : [],
         },
       });
     },
@@ -308,20 +330,19 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                 />
               </FieldLabel>
             </Field>
-            <div className="space-y-1">
-              <div className="text-sm text-muted-foreground">通知渠道</div>
-              <Button
-                type="button"
-                size="sm"
-                variant={feishuEnabled ? 'default' : 'outline'}
-                onClick={() => setFeishuEnabled((current) => !current)}
-              >
-                {feishuEnabled ? '飞书已选择' : '飞书未选择'}
-              </Button>
-            </div>
+            <Field>
+              <FieldLabel>通知渠道</FieldLabel>
+              <NotificationRouteSelect
+                routes={notificationRoutes}
+                routingState={notificationRoutingState}
+                value={notificationChannel}
+                onValueChange={setNotificationChannel}
+                ariaLabel="策略风险通知渠道"
+              />
+            </Field>
           </div>
           <p className="text-xs text-muted-foreground">
-            渠道使用统一 Notification Provider 路由；当前首版可投递渠道为飞书。
+            渠道选项来自当前已配置且可投递的 Notification Provider 路由。
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">执行标的 {symbol || '—'}</Badge>
@@ -385,13 +406,17 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
             <div className="flex flex-wrap gap-2 pt-2">
               <Button
                 variant="outline"
-                disabled={createMutation.isPending}
+                disabled={
+                  createMutation.isPending || (notificationEnabled && !selectedNotificationRoute)
+                }
                 onClick={() => createMutation.mutate(false)}
               >
                 创建但不启用
               </Button>
               <Button
-                disabled={createMutation.isPending}
+                disabled={
+                  createMutation.isPending || (notificationEnabled && !selectedNotificationRoute)
+                }
                 onClick={() => createMutation.mutate(true)}
               >
                 创建并启用
@@ -448,7 +473,10 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                         plan {application.planHash.slice(0, 12)} · {application.plan.rules.length}{' '}
                         条规则 · {severityLabel[notification.severity]} · 通知{' '}
                         {notification.enabled ? `${notification.cooldownMinutes} 分钟` : '关闭'} ·{' '}
-                        {notification.channels.includes('feishu') ? '飞书' : '无渠道'}
+                        {notificationRoutes
+                          .filter((route) => route.channel === notification.channels[0])
+                          .map(notificationRouteLabel)
+                          .join('、') || '无渠道'}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -496,18 +524,21 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
                     >
                       {notification.enabled ? '关闭通知' : '开启通知'}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant={notification.channels.includes('feishu') ? 'default' : 'outline'}
-                      disabled={updateMutation.isPending}
-                      onClick={() =>
-                        saveNotification({
-                          channels: notification.channels.includes('feishu') ? [] : ['feishu'],
-                        })
-                      }
-                    >
-                      飞书
-                    </Button>
+                    <Field className="min-w-64">
+                      <FieldLabel>通知渠道</FieldLabel>
+                      <NotificationRouteSelect
+                        routes={notificationRoutes}
+                        routingState={notificationRoutingState}
+                        value={notification.channels[0] ?? ''}
+                        onValueChange={(value) =>
+                          saveNotification({
+                            channels: [value as StrategyRiskNotification['channels'][number]],
+                          })
+                        }
+                        ariaLabel="策略风险应用通知渠道"
+                        disabled={updateMutation.isPending}
+                      />
+                    </Field>
                     <Select
                       value={notification.severity}
                       onValueChange={(value) => value && saveNotification({ severity: value })}

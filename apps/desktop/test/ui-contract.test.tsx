@@ -61,6 +61,17 @@ const readDesktopSource = (directory: string): string[] =>
   });
 
 describe('Desktop UI contract - onboarding and portfolio', () => {
+  it('Alert 普通链接样式不覆盖 Button 渲染的链接按钮', () => {
+    const alertSource = readFileSync(
+      new URL('../src/components/ui/alert.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(alertSource).toContain('[&_a:not([data-slot=button])]:underline');
+    expect(alertSource).toContain('[&_a:not([data-slot=button])]:hover:text-foreground');
+    expect(alertSource).not.toContain('[&_a]:hover:text-foreground');
+  });
+
   it('所有账户选择入口复用统一账户显示格式', () => {
     const accountSelectorFiles = [
       '../src/features/account-data/AccountDataAccountSelector.tsx',
@@ -520,5 +531,7 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(notifications).toContain('完成');
     expect(notifications).toContain('data-slot="toast"');
     expect(notifications).toContain('rounded-2xl');
+    expect(notifications).toContain('shadow-sm');
+    expect(notifications).not.toContain('shadow-lg');
   });
 });

@@ -56,6 +56,7 @@ const candidateResponse = {
   total: 1,
   nextCursor: null,
   legacyItems: [],
+  instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
 };
 
 const clientFor = (response: unknown) => {
@@ -84,6 +85,7 @@ describe('投资复盘 Desktop 数据访问契约', () => {
       '/journal/review-candidates?accountId=11111111-1111-4111-8111-111111111111&symbol=600519.SH&start=2026-01-01T00%3A00%3A00.000Z&end=2026-01-31T23%3A59%3A59.000Z&cursor=cursor-1&limit=20',
       expect.objectContaining({ cache: 'no-store' }),
     );
+    expect(request).toHaveBeenCalledTimes(1);
     expect(journalKeys.candidates({ accountId, start: 'a' })).not.toEqual(
       journalKeys.candidates({ accountId, start: 'b' }),
     );

@@ -1,8 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Severity, StrategyMonitoringPlan } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
-import type { StrategyRiskApplicationRow } from './strategy-risk-application.types.js';
+import {
+  strategyRiskApplicationManagementEntry,
+  type StrategyRiskApplicationRow,
+} from './strategy-risk-application.types.js';
 
 const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
@@ -10,12 +18,13 @@ const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJ
 export class StrategyRiskApplicationStoreService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(accountId?: string, symbol?: string) {
+  list(accountId?: string, symbol?: string, includeArchived = true) {
     return this.prisma.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
       SELECT * FROM "StrategyRiskApplication"
-      WHERE "ownerKey"='local-user' AND "archivedAt" IS NULL
+      WHERE "ownerKey"='local-user'
         ${accountId ? Prisma.sql`AND "accountId"=${accountId}::uuid` : Prisma.empty}
         ${symbol ? Prisma.sql`AND "symbol"=${symbol}` : Prisma.empty}
+        ${includeArchived ? Prisma.empty : Prisma.sql`AND "archivedAt" IS NULL`}
       ORDER BY "updatedAt" DESC, "id" DESC
     `);
   }
@@ -32,7 +41,106 @@ export class StrategyRiskApplicationStoreService {
 
   async findByIdempotencyKey(idempotencyKey: string) {
     const rows = await this.prisma.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
-      SELECT * FROM "StrategyRiskApplication" WHERE "idempotencyKey"=${idempotencyKey} LIMIT 1
+      SELECT * FROM "StrategyRiskApplication"
+      WHERE "idempotencyKey"=${idempotencyKey} AND "ownerKey"='local-user' LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
+  private identityKey(input: {
+    strategyVersionId: string;
+    accountId: string;
+    symbol: string;
+    cycleMode: string;
+  }) {
+    return [
+      'strategy-risk-application',
+      input.strategyVersionId,
+      input.accountId,
+      input.symbol,
+      input.cycleMode,
+    ].join(':');
+  }
+
+  /**
+   * PostgreSQL advisory locks give the create/upgrade command a serializable
+   * identity boundary without adding a full unique index that would reject
+   * already-known historical duplicates.
+   */
+  async lockIdentity(
+    transaction: Prisma.TransactionClient,
+    input: { strategyVersionId: string; accountId: string; symbol: string; cycleMode: string },
+  ) {
+    await transaction.$queryRaw(Prisma.sql`
+      SELECT pg_advisory_xact_lock(hashtextextended(${this.identityKey(input)}, 0))::text AS "lockResult"
+    `);
+  }
+
+  async lockEnabledTarget(
+    transaction: Prisma.TransactionClient,
+    accountId: string,
+    symbol: string,
+  ) {
+    await transaction.$queryRaw(Prisma.sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${`strategy-risk-enabled:${accountId}:${symbol}`}, 0)
+      )::text AS "lockResult"
+    `);
+  }
+
+  findByIdentity(strategyVersionId: string, accountId: string, symbol: string, cycleMode: string) {
+    return this.prisma.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT * FROM "StrategyRiskApplication"
+      WHERE "ownerKey"='local-user'
+        AND "strategyVersionId"=${strategyVersionId}::uuid
+        AND "accountId"=${accountId}::uuid
+        AND "symbol"=${symbol}
+        AND "cycleMode"=${cycleMode}
+        AND "archivedAt" IS NULL
+      ORDER BY "updatedAt" DESC, "id" DESC
+    `);
+  }
+
+  findByIdentityForUpdate(
+    transaction: Prisma.TransactionClient,
+    strategyVersionId: string,
+    accountId: string,
+    symbol: string,
+    cycleMode: string,
+  ) {
+    return transaction.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT * FROM "StrategyRiskApplication"
+      WHERE "ownerKey"='local-user'
+        AND "strategyVersionId"=${strategyVersionId}::uuid
+        AND "accountId"=${accountId}::uuid
+        AND "symbol"=${symbol}
+        AND "cycleMode"=${cycleMode}
+        AND "archivedAt" IS NULL
+      ORDER BY "updatedAt" DESC, "id" DESC
+      FOR UPDATE
+    `);
+  }
+
+  async getForUpdate(transaction: Prisma.TransactionClient, id: string) {
+    const rows = await transaction.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT * FROM "StrategyRiskApplication"
+      WHERE "id"=${id}::uuid AND "ownerKey"='local-user'
+      LIMIT 1 FOR UPDATE
+    `);
+    const row = rows[0];
+    if (!row) throw new NotFoundException('策略风险应用不存在');
+    return row;
+  }
+
+  async findEnabledConflict(accountId: string, symbol: string, excludeId?: string) {
+    const rows = await this.prisma.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT * FROM "StrategyRiskApplication"
+      WHERE "ownerKey"='local-user'
+        AND "accountId"=${accountId}::uuid AND "symbol"=${symbol}
+        AND "enabled"=true AND "archivedAt" IS NULL
+        ${excludeId ? Prisma.sql`AND "id" <> ${excludeId}::uuid` : Prisma.empty}
+      ORDER BY "updatedAt" DESC, "id" DESC
+      LIMIT 1
     `);
     return rows[0] ?? null;
   }
@@ -43,15 +151,22 @@ export class StrategyRiskApplicationStoreService {
     symbol: string,
     excludeId?: string,
   ) {
-    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-      SELECT "id" FROM "StrategyRiskApplication"
-      WHERE "accountId"=${accountId}::uuid AND "symbol"=${symbol}
+    await this.lockEnabledTarget(transaction, accountId, symbol);
+    const rows = await transaction.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      SELECT * FROM "StrategyRiskApplication"
+      WHERE "ownerKey"='local-user' AND "accountId"=${accountId}::uuid AND "symbol"=${symbol}
         AND "enabled"=true AND "archivedAt" IS NULL
         ${excludeId ? Prisma.sql`AND "id" <> ${excludeId}::uuid` : Prisma.empty}
+      ORDER BY "updatedAt" DESC, "id" DESC
       LIMIT 1 FOR UPDATE
     `);
-    if (rows.length > 0)
-      throw new BadRequestException('该账户与标的已经有启用中的策略风险应用');
+    const conflict = rows[0];
+    if (conflict)
+      throw new ConflictException({
+        errorCode: 'STRATEGY_RISK_APPLICATION_ENABLED_CONFLICT',
+        message: '该账户与标的已经有启用中的策略风险应用，请先管理已有应用；当前配置可保存为停用',
+        application: strategyRiskApplicationManagementEntry(conflict),
+      });
   }
 
   async createFrozenRules(
@@ -153,6 +268,23 @@ export class StrategyRiskApplicationStoreService {
     const updated = rows[0];
     if (!updated) throw new BadRequestException('风险应用已被其他操作更新，请刷新后重试');
     return updated;
+  }
+
+  async archiveApplication(
+    transaction: Prisma.TransactionClient,
+    input: { id: string; expectedRevision: number },
+  ) {
+    const rows = await transaction.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
+      UPDATE "StrategyRiskApplication"
+      SET "enabled"=false, "archivedAt"=CURRENT_TIMESTAMP,
+          "revision"="revision"+1, "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${input.id}::uuid AND "ownerKey"='local-user'
+        AND "revision"=${input.expectedRevision} AND "archivedAt" IS NULL
+      RETURNING *
+    `);
+    const archived = rows[0];
+    if (!archived) throw new BadRequestException('风险应用已被其他操作更新，请刷新后重试');
+    return archived;
   }
 
   syncFrozenRuleState(

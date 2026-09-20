@@ -1,4 +1,5 @@
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import { Field } from '../src/components/ui/field.js';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -8,6 +9,7 @@ import {
   RiskEventTable,
   RiskNotificationTable,
 } from '../src/features/risk/RiskSections.js';
+import { NotificationRouteSelect } from '../src/features/risk/NotificationRouteSelect.js';
 import { RiskRuleWorkbench } from '../src/features/risk/RiskRuleWorkbench.js';
 import { toInput, validateDraft } from '../src/features/risk/RiskRuleEditorSheet.js';
 import { isPortfolioScanReady, portfolioDataStatus } from '../src/features/risk/RiskOverview.js';
@@ -50,6 +52,37 @@ describe('风险事件数值标签', () => {
     expect(riskEventValueLabel({ value: 0.2, metadata: { valueMetric: 'future_metric' } })).toBe(
       '触发值 0.2',
     );
+  });
+});
+
+describe('通知 Provider 选择', () => {
+  it('只回显服务端返回的可投递路由', () => {
+    const configured = renderToStaticMarkup(
+      <Field>
+        <NotificationRouteSelect
+          routes={[{ channel: 'feishu', provider: 'lark-webhook' }]}
+          routingState="ready"
+          value="feishu"
+          onValueChange={vi.fn()}
+          ariaLabel="通知渠道"
+        />
+      </Field>,
+    );
+    expect(configured).toContain('lark-webhook（飞书）');
+
+    const unconfigured = renderToStaticMarkup(
+      <Field>
+        <NotificationRouteSelect
+          routes={[]}
+          routingState="ready"
+          value=""
+          onValueChange={vi.fn()}
+          ariaLabel="通知渠道"
+        />
+      </Field>,
+    );
+    expect(unconfigured).toContain('没有可用的通知 Provider');
+    expect(unconfigured).not.toContain('>飞书<');
   });
 });
 

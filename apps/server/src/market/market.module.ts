@@ -4,6 +4,7 @@ import { QualityModule } from '../quality/quality.module.js';
 import { InstrumentService } from './instrument.service.js';
 import { CatalogSyncService } from './instruments/catalog-sync.service.js';
 import { InstrumentAssociationService } from './instruments/instrument-association.service.js';
+import { InstrumentDirectoryService } from './instruments/instrument-directory.service.js';
 import { InstrumentSearchService } from './instruments/instrument-search.service.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { MarketControlService } from './market-control.service.js';
@@ -29,6 +30,7 @@ import { MarketV2Controller } from './market-v2.controller.js';
     CatalogReadinessService,
     InstrumentSearchService,
     InstrumentAssociationService,
+    InstrumentDirectoryService,
     InstrumentService,
     MarketControlService,
     BacktestBarAggregationService,
@@ -44,6 +46,7 @@ import { MarketV2Controller } from './market-v2.controller.js';
     CatalogSyncService,
     InstrumentSearchService,
     InstrumentAssociationService,
+    InstrumentDirectoryService,
     MarketControlService,
     BacktestBarAggregationService,
     MarketBarReader,

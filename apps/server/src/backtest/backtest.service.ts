@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   quantStatsAnalytics,
@@ -9,11 +15,12 @@ import {
 } from '@thesis-ledger/domain';
 import { backtestJobSchema, strategySchemaV1, strategySchemaV2 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { ResultReadPolicyService } from '../platform/result-read-policy.service.js';
 import { explicitlyAllowsStale, hasStaleMarketData } from '../market/freshness.js';
 import { BacktestQueueService } from './backtest-queue.service.js';
 import { backtestJobSummarySelect, toBacktestJobSummary } from './backtest-summary.js';
 import { BacktestV2RunService } from './backtest-v2-run.js';
-import type { BacktestV2Runner } from './backtest-v2-run.js';
+import type { BacktestV2Runner, ComparableDataFingerprintRange } from './backtest-v2-run.js';
 
 export interface BacktestWorker {
   readonly id: string;
@@ -44,6 +51,8 @@ export interface BacktestExecutionAttempt {
   attempt: number;
   maxAttempts: number;
 }
+
+type ReadableBacktestJob = { input?: unknown } & Record<string, unknown>;
 
 const localAnalyticsWorker: BacktestAnalyticsWorker = {
   id: 'quantstats-local-v1',
@@ -90,9 +99,16 @@ export class BacktestService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly queueService?: BacktestQueueService,
-    @Optional() private readonly v2Runs?: BacktestV2RunService,
-  ) {}
+    @Optional()
+    @Inject(BacktestQueueService)
+    private readonly queueService: BacktestQueueService | undefined,
+    @Optional()
+    @Inject(BacktestV2RunService)
+    private readonly v2Runs: BacktestV2RunService | undefined,
+    private readonly resultReadPolicy: ResultReadPolicyService,
+  ) {
+    if (!resultReadPolicy) throw new Error('ResultReadPolicyService is required');
+  }
 
   private static isV2Strategy(value: unknown): boolean {
     return Boolean(
@@ -228,8 +244,12 @@ export class BacktestService {
     return this.queueService?.ensureEnqueued(created.id) ?? created;
   }
 
-  listJobs() {
-    return this.prisma.backtestJob.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
+  async listJobs() {
+    const jobs = await this.prisma.backtestJob.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return this.resultReadPolicy.protectBacktestJobs(jobs);
   }
 
   async listJobSummaries() {
@@ -238,11 +258,22 @@ export class BacktestService {
       take: 100,
       select: backtestJobSummarySelect,
     });
-    return jobs.map(toBacktestJobSummary);
+    const summaries = jobs.map(toBacktestJobSummary);
+    return this.resultReadPolicy.protectBacktestJobs(summaries);
   }
 
   status(id: string) {
     return this.prisma.backtestJob.findUnique({ where: { id } });
+  }
+
+  async statusForRead(id: string): Promise<ReadableBacktestJob | null> {
+    const job = await this.status(id);
+    if (!job) return job;
+    const protectedJob = this.resultReadPolicy.protectBacktestJob(
+      job,
+      await this.resultReadPolicy.run(id),
+    );
+    return protectedJob;
   }
 
   async run(id: string, worker?: BacktestWorker, execution?: BacktestExecutionAttempt) {
@@ -500,9 +531,29 @@ export class BacktestService {
     return this.v2Runs.runV2(id, runner, execution);
   }
 
+  async runForRead(id: string) {
+    const job = await this.run(id);
+    return this.protectMutationResult(job);
+  }
+
+  async runV2ForRead(id: string) {
+    const job = await this.runV2(id);
+    return this.protectMutationResult(job);
+  }
+
   async retryRun(id: string) {
     if (!this.v2Runs) throw new BadRequestException('V2 Run 服务未配置');
     return this.v2Runs.retryRun(id);
+  }
+
+  async retryRunForRead(id: string) {
+    const job = await this.retryRun(id);
+    return this.protectMutationResult(job);
+  }
+
+  async comparableDataFingerprint(runId: string, range: ComparableDataFingerprintRange) {
+    if (!this.v2Runs) throw new BadRequestException('V2 Run 服务未配置');
+    return this.v2Runs.comparableDataFingerprint(runId, range);
   }
 
   async cancel(id: string) {
@@ -525,5 +576,15 @@ export class BacktestService {
     });
     if (modeProbe?.mode === 'V2') this.v2Runs?.abortActiveRun(id);
     return cancelled;
+  }
+
+  async cancelForRead(id: string) {
+    const job = await this.cancel(id);
+    return this.protectMutationResult(job);
+  }
+
+  private async protectMutationResult<T extends { id: string } | null>(job: T) {
+    if (!job) return job;
+    return this.resultReadPolicy.protectBacktestJob(job, await this.resultReadPolicy.run(job.id));
   }
 }

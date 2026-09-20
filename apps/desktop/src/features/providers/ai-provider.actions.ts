@@ -1,17 +1,25 @@
 import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
 
 import type {
+  AiProviderExecutionRouteConfig,
   AiProviderModelDetail,
   AiProviderModelReasoning,
   AiProviderReasoningEffort,
   ProviderDraft,
   ProviderRecord,
 } from './providers.types.js';
+import {
+  aiProviderExecutionRouteDraftFromConfig,
+  aiProviderExecutionRouteInputFromDraft,
+} from './ai-provider-execution.js';
+import type { AiAdapter } from '@thesis-ledger/schemas';
 
 export type AiProviderInput = {
   name: string;
   baseUrl: string;
   models: string[];
+  adapter?: AiAdapter;
+  executionRoutes?: AiProviderExecutionRouteConfig[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   apiKey?: string;
   enabled: boolean;
@@ -125,6 +133,7 @@ export const aiProviderInputFromDraft = (
   const pricingVersion = draft.pricingVersion.trim();
   const models = modelsFromText(draft.modelsText);
   const modelReasoning = selectedModelReasoning(models, draft.modelReasoning);
+  const executionRoutes = draft.executionRoutes.map(aiProviderExecutionRouteInputFromDraft);
   return {
     name: draft.name.trim(),
     baseUrl: draft.baseUrl.trim(),
@@ -132,6 +141,8 @@ export const aiProviderInputFromDraft = (
     enabled: draft.enabled,
     priority: Number(draft.priority),
     capabilities: draft.capabilities,
+    adapter: draft.adapter,
+    executionRoutes,
     ...(apiKey ? { apiKey } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     ...(costPer1kInput === undefined ? {} : { costPer1kInput }),
@@ -153,6 +164,10 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
   baseUrl: provider.baseUrl ?? '',
   modelsText: (provider.models ?? []).join('\n'),
   modelReasoning: selectedModelReasoning(provider.models ?? [], provider.modelReasoning ?? {}),
+  adapter: provider.adapter ?? 'openrouter',
+  executionRoutes: (provider.executionRouteConfigs ?? []).map(
+    aiProviderExecutionRouteDraftFromConfig,
+  ),
   timeoutMs: provider.timeoutMs?.toString() ?? '',
   costPer1kInput: provider.costPer1kInput?.toString() ?? '',
   costPer1kOutput: provider.costPer1kOutput?.toString() ?? '',
@@ -166,6 +181,35 @@ export const aiProviderDraftError = (input: AiProviderInput) => {
   if (input.models.length === 0) return '请至少填写一个模型。';
   if (new Set(input.models).size !== input.models.length) return '模型不得重复。';
   if (input.capabilities.length === 0) return '请至少选择一项能力。';
+  const selectedModels = new Set(input.models);
+  const routeKeys = new Set<string>();
+  for (const route of input.executionRoutes ?? []) {
+    if (!selectedModels.has(route.model)) return '执行路由必须选择已配置的模型。';
+    const routeKey = `${route.model}:${route.mode}:${route.contract.id}:${route.contract.version}`;
+    if (routeKeys.has(routeKey)) return '模型、生成模式和契约相同的执行路由不得重复。';
+    routeKeys.add(routeKey);
+    if (
+      route.firstOutputTimeoutMs !== undefined &&
+      (!Number.isInteger(route.firstOutputTimeoutMs) || route.firstOutputTimeoutMs <= 0)
+    )
+      return '首输出超时必须是正整数毫秒。';
+    if (
+      route.outputIdleTimeoutMs !== undefined &&
+      (!Number.isInteger(route.outputIdleTimeoutMs) || route.outputIdleTimeoutMs <= 0)
+    )
+      return '输出空闲超时必须是正整数毫秒。';
+    if (route.capabilityDeclaration) {
+      if (!route.capabilityDeclaration.sourceRef || !route.capabilityDeclaration.sourceVersion)
+        return '能力声明必须填写来源引用和来源版本。';
+      if (
+        route.capabilityDeclaration.source === 'manual' &&
+        !route.capabilityDeclaration.declaredBy
+      )
+        return '人工能力声明必须填写声明者。';
+    }
+    if (route.freeEvidence && (!route.freeEvidence.sourceRef || !route.freeEvidence.sourceVersion))
+      return '免费依据必须填写来源引用和来源版本。';
+  }
   if (!Number.isInteger(input.priority) || input.priority < 0) return '优先级必须是非负整数。';
   if (input.timeoutMs !== undefined && (!Number.isInteger(input.timeoutMs) || input.timeoutMs <= 0))
     return '超时必须是正整数毫秒。';

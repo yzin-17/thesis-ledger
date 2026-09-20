@@ -7,6 +7,7 @@ export const useCreateAiRunMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateAiRunInput) => createAiRun(input),
+    retry: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: aiKeys.root }),
   });
 };

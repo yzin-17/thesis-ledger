@@ -4,6 +4,7 @@ import { BacktestService } from '../../src/backtest/backtest.service.js';
 import { BacktestV2RunService } from '../../src/backtest/backtest-v2-run.js';
 import { buildSnapshotManifest, finalizeSnapshotManifest } from '../../src/backtest/backtest-snapshot.js';
 import { BacktestMarketRulesUnavailableError } from '../../src/backtest/backtest-market-rules.js';
+import { testResultReadPolicy } from './test-result-read-policy.js';
 
 const strategy = strategySchemaV2.parse({
   schemaVersion: '2',
@@ -54,7 +55,12 @@ describe('V2 Server Run boundary', () => {
   });
   it('rejects Desktop bars and records unavailable when no Snapshot Builder is configured', async () => {
     const prisma = prismaFor();
-    const service = new BacktestService(prisma as never, undefined, new BacktestV2RunService(prisma as never));
+    const service = new BacktestService(
+      prisma as never,
+      undefined,
+      new BacktestV2RunService(prisma as never),
+      testResultReadPolicy(),
+    );
     await expect(service.createRun({ ...request, bars: [] })).rejects.toThrow();
     const result = await service.createRun(request);
     expect(result).toMatchObject({ mode: 'V2', status: 'failed', errorCode: 'DATA_UNAVAILABLE' });
@@ -72,7 +78,7 @@ describe('V2 Server Run boundary', () => {
       }),
     };
     const runs = new BacktestV2RunService(prisma as never, undefined, undefined, builder);
-    const service = new BacktestService(prisma as never, undefined, runs);
+    const service = new BacktestService(prisma as never, undefined, runs, testResultReadPolicy());
     const result = await service.createRun(request);
     expect(result).toMatchObject({ mode: 'V2', status: 'queued', snapshotId: expect.any(String) });
     expect(builder.build).toHaveBeenCalledOnce();

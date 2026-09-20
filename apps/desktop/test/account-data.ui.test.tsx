@@ -14,7 +14,10 @@ import {
   resolveAccountSelection,
   shouldDeferAccountSelection,
 } from '../src/features/account-data/AccountDataPage.js';
-import { chargeCategoryLabel } from '../src/features/account-data/account-data.helpers.js';
+import {
+  chargeCategoryLabel,
+  instrumentNameLookup,
+} from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
 import { AccountManagementSection } from '../src/features/portfolio/PortfolioManagementSections.js';
 import { shouldAutoOpenEmptyAccountForm } from '../src/features/portfolio/PortfolioManagement.js';
@@ -90,6 +93,7 @@ const seedAccountData = (queryClient: QueryClient) => {
     ledgerRevision: '7',
     projectionGeneration: '1',
     events: [],
+    instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
     effective: true,
   };
   for (const filter of ['executions', 'other', 'all'] as const) {
@@ -183,6 +187,26 @@ describe('账户显示', () => {
 });
 
 describe('账户数据页面契约', () => {
+  it('清仓后仍从账本响应携带的标的目录解析名称，不依赖当前持仓', () => {
+    const resolveInstrumentName = instrumentNameLookup({
+      generation: 1,
+      items: [
+        {
+          symbol: '159516.SZ',
+          canonicalCode: '159516',
+          instrumentType: 'ETF',
+          market: 'SZ',
+          displayName: '创业板ETF',
+          active: true,
+        },
+      ],
+      unresolvedSymbols: [],
+    });
+
+    expect(resolveInstrumentName('159516.SZ')).toBe('创业板ETF');
+    expect(instrumentNameLookup(undefined)('159516.SZ')).toBeUndefined();
+  });
+
   it('默认进入成交记录，并由账户下拉承载实际/模拟隔离信息', () => {
     const markup = renderPage();
     const pageSource = readFileSync(
@@ -201,13 +225,22 @@ describe('账户数据页面契约', () => {
       new URL('../src/features/account-data/AccountDataAllAccountsView.tsx', import.meta.url),
       'utf8',
     );
+    const accountDataSource = readFileSync(
+      new URL('../src/features/account-data/AccountDataSections.tsx', import.meta.url),
+      'utf8',
+    );
 
     expect(markup).toContain('账户数据');
     expect(markup).toContain('持仓');
     expect(markup).toContain('成交记录');
     expect(markup).toContain('现金');
     expect(markup).toContain('录入成交');
-    expect(markup).toMatch(/<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/);
+    expect(markup).not.toMatch(/<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/);
+    expect(accountDataSource).toContain('aria-label="更多成交操作"');
+    expect(accountDataSource).toContain('导入草稿（暂未开放）');
+    expect(accountDataSource).toContain('打开对账（暂未开放）');
+    expect(accountDataSource).toContain('min-w-[900px] table-fixed');
+    expect(accountDataSource).toContain('className="w-auto min-w-0 px-3 py-3 align-top"');
     expect(markup).toContain('实际证券账户 · 证券 · CNY · 实际');
     expect(markup).not.toContain('账本模式');
     expect(markup).not.toContain('data-selected-account-id');
@@ -499,21 +532,38 @@ describe('账户数据页面契约', () => {
       new URL('../src/features/portfolio/PortfolioPositionObservation.tsx', import.meta.url),
       'utf8',
     );
+    const positionManagementSource = readFileSync(
+      new URL('../src/features/portfolio/PortfolioManagementSections.tsx', import.meta.url),
+      'utf8',
+    );
     expect(positionMarkup).toContain('持仓快照');
     expect(positionMarkup).toContain('不产生 BUY / SELL 成交记录');
-    expect(positionMarkup).toContain('导入持仓快照');
-    expect(positionMarkup).toMatch(/<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/);
+    expect(positionManagementSource).toContain('...(onOpenImport ? { onOpenImport } : {})');
+    expect(positionManagementSource).toContain(
+      '...(onOpenReconciliation ? { onOpenReconciliation } : {})',
+    );
+    expect(positionSource).toContain('导入持仓快照（暂未开放）');
+    expect(positionSource).toContain('对账候选（暂未开放）');
+    expect(positionSource).toContain('directoryName');
+    expect(positionMarkup).not.toMatch(
+      /<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/,
+    );
     expect(positionMarkup).toContain('持仓市值');
     expect(positionMarkup).toContain('记录类型');
     expect(positionMarkup).toContain('快照状态');
+    expect(positionSource).toContain('min-w-[900px] table-fixed');
+    expect(positionSource).toContain('<col className="w-[25%]" />');
+    expect(positionSource).toContain('<col className="w-[15%]" />');
+    expect(positionSource).toContain('<col className="w-[11%]" />');
     expect(positionMarkup).toContain('已记录快照');
     expect(positionMarkup).toContain('sticky right-0');
     expect(positionMarkup).toContain('bg-background');
-    expect(positionMarkup).toContain('w-40');
-    expect(positionMarkup).toContain('min-w-40');
+    expect(positionMarkup).toContain('w-auto');
+    expect(positionMarkup).toContain('min-w-0');
     expect(positionMarkup).toContain('data-sticky-table-action="cell"');
-    // 操作列改为单行排布：按钮带 shrink-0 + whitespace-nowrap，列宽按内容自适应，不再折行。
-    expect(positionMarkup).toContain('flex gap-1');
+    // 操作列使用纵向两行，避免窄表格横向挤压。
+    expect(positionSource).toContain('mx-auto flex w-fit flex-col items-center gap-1');
+    expect(positionSource).not.toContain('className="w-full"');
     expect(positionMarkup).toContain('h-8');
     expect(positionMarkup).toContain('修改快照');
     expect(positionMarkup).toContain('移除快照');

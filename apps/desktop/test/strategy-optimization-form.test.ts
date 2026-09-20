@@ -5,6 +5,7 @@ import {
   addDays,
   objectiveLabels,
 } from '../src/features/strategy/StrategyOptimizationExperimentPanel.js';
+import { experimentCostPolicy } from '../src/features/strategy/StrategyExperimentCreatePage.js';
 import {
   isReasoningEffortValid,
   limitSelectedModels,
@@ -50,5 +51,20 @@ describe('策略优化实验表单契约', () => {
         }),
       ),
     ).not.toThrow();
+  });
+
+  it('未知费用禁用金额口径，已知混币种直接判为不可创建', () => {
+    expect(
+      experimentCostPolicy([
+        { provider: 'a', model: 'known', costStatus: 'known', costCurrency: 'USD' },
+        { provider: 'b', model: 'unknown', costStatus: 'unknown' },
+      ]),
+    ).toEqual({ hasUnknownCost: true, knownCurrencies: ['USD'], mixedCurrencies: false });
+    expect(
+      experimentCostPolicy([
+        { provider: 'a', model: 'usd', costStatus: 'known', costCurrency: 'USD' },
+        { provider: 'b', model: 'cny', costStatus: 'known', costCurrency: 'CNY' },
+      ]),
+    ).toEqual({ hasUnknownCost: false, knownCurrencies: ['USD', 'CNY'], mixedCurrencies: true });
   });
 });

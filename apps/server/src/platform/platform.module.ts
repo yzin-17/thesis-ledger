@@ -10,6 +10,7 @@ import { PrismaService } from './prisma.service.js';
 import { RedisService } from './redis.service.js';
 import { MarketDataCleanupService } from './market-data-cleanup.js';
 import { DsaModule } from '../integration/dsa/dsa.module.js';
+import { ResultReadPolicyService } from './result-read-policy.service.js';
 
 @Global()
 @Module({
@@ -23,7 +24,15 @@ import { DsaModule } from '../integration/dsa/dsa.module.js';
     MetricsService,
     ErrorTrackingService,
     MarketDataCleanupService,
+    ResultReadPolicyService,
   ],
-  exports: [PrismaService, RedisService, DataExportService, MetricsService, ErrorTrackingService],
+  exports: [
+    PrismaService,
+    RedisService,
+    DataExportService,
+    MetricsService,
+    ErrorTrackingService,
+    ResultReadPolicyService,
+  ],
 })
 export class PlatformModule {}

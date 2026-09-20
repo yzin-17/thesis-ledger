@@ -10,6 +10,7 @@ import { isDataLoaded } from '../shared/display.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import type { LoadState } from '../shared/types.js';
 import { ProviderModelSummary } from './ProviderModelSummary.js';
+import { AiProviderReadinessStatus } from './AiProviderReadinessStatus.js';
 import {
   automationJobTypeLabel,
   automationOutputSummary,
@@ -137,18 +138,14 @@ export function ProviderTable({
                       )}
                     </td>
                     <td className="text-left">
-                      <span className={cn('provider-status', status.tone)}>
-                        <span className="status-dot" aria-hidden="true" />
-                        {status.label}
-                      </span>
-                      {isAi && provider.checkedAt ? (
-                        <span>
-                          最近测试 {new Date(provider.checkedAt).toLocaleString('zh-CN')}
-                          {provider.latencyMs === null ? '' : ` · ${provider.latencyMs}ms`}
+                      {isAi ? (
+                        <AiProviderReadinessStatus provider={provider} />
+                      ) : (
+                        <span className={cn('provider-status', status.tone)}>
+                          <span className="status-dot" aria-hidden="true" />
+                          {status.label}
                         </span>
-                      ) : null}
-                      {isAi && provider.errorCode ? <span>{provider.errorCode}</span> : null}
-                      {isAi && provider.configError ? <span>{provider.configError}</span> : null}
+                      )}
                     </td>
                     <td className="text-left">
                       {provider.credentialConfigured ? '已配置' : '未配置'}
@@ -211,6 +208,7 @@ export function ProviderTable({
                       )}
                       {isAi && !environmentSource && (
                         <Button
+                          className="text-button danger"
                           size="sm"
                           type="button"
                           variant="link"
@@ -353,7 +351,7 @@ export function AutomationTable({
                     </Button>
                     {!job.managed ? (
                       <Button
-                        className="text-button"
+                        className="text-button danger"
                         size="sm"
                         variant="link"
                         onClick={() => onDelete(job)}

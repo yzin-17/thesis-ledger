@@ -220,6 +220,7 @@ describe('自动化任务表渲染', () => {
     expect(markup).toContain('编辑');
     expect(markup).toContain('立即运行');
     expect(markup).toContain('删除');
+    expect(markup).toContain('text-button danger');
     expect(markup).not.toContain('market-sync');
     expect(markup).not.toContain('>snapshot-close-estimate<');
   });

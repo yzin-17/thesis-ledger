@@ -196,6 +196,8 @@ function EntryLegs({ detail }: { detail: TradeDetailResponseV2 }) {
 }
 
 function BaselineComponents({ detail }: { detail: TradeDetailResponseV2 }) {
+  if (detail.baselineComponents.length === 0) return null;
+
   return (
     <section className="grid gap-2" aria-labelledby="trade-baseline-title">
       <SectionHeading
@@ -203,34 +205,30 @@ function BaselineComponents({ detail }: { detail: TradeDetailResponseV2 }) {
         title="持仓快照"
         description="快照是来源证据，不代表真实买入。"
       />
-      {detail.baselineComponents.length === 0 ? (
-        <EmptyDetail>暂无快照组成。</EmptyDetail>
-      ) : (
-        <DetailTable label="持仓快照组成">
-          <thead className="border-b bg-muted/30 text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">批次</th>
-              <th className="px-3 py-2">范围</th>
-              <th className="px-3 py-2">快照数量</th>
-              <th className="px-3 py-2">已纳入数量</th>
-              <th className="px-3 py-2">剩余数量</th>
-              <th className="px-3 py-2">平均成本</th>
+      <DetailTable label="持仓快照组成">
+        <thead className="border-b bg-muted/30 text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2">批次</th>
+            <th className="px-3 py-2">范围</th>
+            <th className="px-3 py-2">快照数量</th>
+            <th className="px-3 py-2">已纳入数量</th>
+            <th className="px-3 py-2">剩余数量</th>
+            <th className="px-3 py-2">平均成本</th>
+          </tr>
+        </thead>
+        <tbody>
+          {detail.baselineComponents.map((component) => (
+            <tr key={component.id} className="border-b last:border-0">
+              <td className="px-3 py-2 font-mono">{component.batchId}</td>
+              <td className="px-3 py-2">{tradeBatchScopeLabel(component.batchScope)}</td>
+              <td className="px-3 py-2 font-mono">{component.observedQuantity}</td>
+              <td className="px-3 py-2 font-mono">{component.quantity}</td>
+              <td className="px-3 py-2 font-mono">{component.remainingQuantity}</td>
+              <td className="px-3 py-2 font-mono">{formatTradeDecimal(component.averageCost)}</td>
             </tr>
-          </thead>
-          <tbody>
-            {detail.baselineComponents.map((component) => (
-              <tr key={component.id} className="border-b last:border-0">
-                <td className="px-3 py-2 font-mono">{component.batchId}</td>
-                <td className="px-3 py-2">{tradeBatchScopeLabel(component.batchScope)}</td>
-                <td className="px-3 py-2 font-mono">{component.observedQuantity}</td>
-                <td className="px-3 py-2 font-mono">{component.quantity}</td>
-                <td className="px-3 py-2 font-mono">{component.remainingQuantity}</td>
-                <td className="px-3 py-2 font-mono">{formatTradeDecimal(component.averageCost)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </DetailTable>
-      )}
+          ))}
+        </tbody>
+      </DetailTable>
     </section>
   );
 }
@@ -359,7 +357,7 @@ function TradeEvidence({ detail }: { detail: TradeDetailResponseV2 }) {
           ))}
         </EvidenceList>
       </section>
-      <details className="rounded-md border border-border bg-muted/20 p-3 text-xs">
+      <details open className="rounded-md border border-border bg-muted/20 p-3 text-xs">
         <summary className="cursor-pointer font-medium">技术信息</summary>
         <dl className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
           <div>
@@ -417,8 +415,8 @@ export function PortfolioTradeDetailTabs({
         />
       </TabsContent>
       <TabsContent value="positions" className="grid gap-5 pt-4">
-        <EntryLegs detail={detail} />
         <BaselineComponents detail={detail} />
+        <EntryLegs detail={detail} />
         <CloseSlices detail={detail} onReview={onReview} />
       </TabsContent>
       <TabsContent value="evidence" className="pt-4">

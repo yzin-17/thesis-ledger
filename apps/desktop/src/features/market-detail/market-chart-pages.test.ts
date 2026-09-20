@@ -120,6 +120,22 @@ describe('按页构建并合并 ChartPoint', () => {
     expect(indicatorValue(latest?.indicators.MACD, ['dif'])).toBe(1.1);
   });
 
+  it('历史页与最新页按任意响应到达顺序合并时保留两侧日期和可比指标', () => {
+    const newer = chartPageFromResponse(pageNewer)!;
+    const older = chartPageFromResponse(pageOlder)!;
+    const expectedDates = ['2026-09-10', '2026-09-11', '2026-09-14', '2026-09-15'];
+
+    for (const pagesByArrival of [
+      [older, newer],
+      [newer, older],
+    ]) {
+      const points = pointsFromPages(pagesByArrival);
+      expect(points.map((point) => point.date)).toEqual(expectedDates);
+      expect(points.every((point) => point.comparableIndicators.MA)).toBe(true);
+      expect(points.every((point) => point.comparableIndicators.MACD)).toBe(true);
+    }
+  });
+
   it('先拍平序列再逐日比对会让先前已加载的日期失去可比性（回归锁）', () => {
     const merged = mergeMarketDetail(pageNewer, pageOlder);
     // chartBarsFromSeries 会把合并序列唯一的 fingerprint 盖到每一根 bar 上

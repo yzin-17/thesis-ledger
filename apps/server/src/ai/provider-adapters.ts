@@ -1,11 +1,17 @@
 import { z } from 'zod';
-import type { AppConfig } from '../platform/config.js';
+import { createHash } from 'node:crypto';
+import { DEFAULT_AI_TIMEOUT_MS, type AppConfig } from '../platform/config.js';
 import type {
   AiProvider,
   AiProviderHealth,
   AiProviderModelReasoningMetadata,
 } from './contracts.js';
-import { aiProviderModelReasoningSchema } from './ai-provider.contracts.js';
+import {
+  aiProviderExecutionRouteInputSchema,
+  aiProviderModelReasoningSchema,
+  type AiProviderExecutionRouteInput,
+} from './ai-provider.contracts.js';
+import { aiAdapterSchema, type AiAdapter } from '@thesis-ledger/schemas';
 
 type CompletionInput = {
   model: string;
@@ -23,6 +29,8 @@ const providerConfigSchema = z
         baseUrl: z.url(),
         apiKey: z.string().trim().min(1),
         models: z.array(z.string().trim().min(1).max(200)).min(1),
+        adapter: aiAdapterSchema.optional(),
+        executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
         timeoutMs: z.number().int().positive().optional(),
         costPer1kInput: z.number().nonnegative().optional(),
         costPer1kOutput: z.number().nonnegative().optional(),
@@ -46,6 +54,13 @@ const providerConfigSchema = z
           path: [index, 'models'],
           message: '同一 Provider 的模型不得重复',
         });
+      const selectedModels = new Set(provider.models);
+      if (provider.executionRoutes?.some((route) => !selectedModels.has(route.model)))
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'executionRoutes'],
+          message: '执行路由只能配置同一 Provider 已选择的模型',
+        });
     });
   });
 
@@ -56,68 +71,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-const parseContent = (value: unknown) => {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) throw new Error('Provider 返回空内容');
-    try {
-      return JSON.parse(trimmed) as unknown;
-    } catch {
-      return value;
-    }
-  }
-  return value;
-};
-
-const contentFromParts = (value: unknown[]) => {
-  const text: string[] = [];
-  for (const part of value) {
-    const record = asRecord(part);
-    if (typeof record?.text === 'string') text.push(record.text);
-  }
-  return text.length > 0 ? text.join('') : undefined;
-};
-
-const normalizeResponseContent = (value: unknown) =>
-  Array.isArray(value) ? (contentFromParts(value) ?? value) : value;
-
-const completionContent = (root: Record<string, unknown>) => {
-  const choices = Array.isArray(root.choices) ? root.choices : [];
-  const choice = asRecord(choices[0]);
-  const message = asRecord(choice?.message);
-  if (message && Object.hasOwn(message, 'content'))
-    return normalizeResponseContent(message.content);
-  if (typeof choice?.text === 'string') return choice.text;
-
-  // Some OpenAI-compatible gateways return the Responses API envelope even
-  // when the request was sent through their chat-compatible endpoint.
-  if (typeof root.output_text === 'string') return root.output_text;
-  if (Array.isArray(root.output)) {
-    const text: string[] = [];
-    for (const item of root.output) {
-      const record = asRecord(item);
-      const content = record?.content;
-      if (Array.isArray(content)) {
-        const partText = contentFromParts(content);
-        if (partText) text.push(partText);
-      } else if (typeof record?.text === 'string') text.push(record.text);
-    }
-    if (text.length > 0) return text.join('');
-  }
-  return undefined;
-};
-
-const completionUrl = (baseUrl: string) => `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
-
-const isOpenRouterUrl = (baseUrl: string) => {
-  try {
-    const hostname = new URL(baseUrl).hostname.toLowerCase();
-    return hostname === 'openrouter.ai' || hostname.endsWith('.openrouter.ai');
-  } catch {
-    return false;
-  }
-};
-
 export class OpenAiCompatibleProvider implements AiProvider {
   readonly metadata;
 
@@ -126,7 +79,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     readonly models: readonly string[],
     private readonly baseUrl: string,
     private readonly apiKey: string,
-    private readonly timeoutMs = 30_000,
+    private readonly timeoutMs = DEFAULT_AI_TIMEOUT_MS,
     pricing?: {
       costPer1kInput?: number;
       costPer1kOutput?: number;
@@ -139,6 +92,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
       health?: AiProviderHealth;
       source?: 'database' | 'environment';
       modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
+      adapter?: AiAdapter;
+      executionRoutes?: readonly AiProviderExecutionRouteInput[];
+      credentialFingerprint?: string;
     },
   ) {
     this.metadata = {
@@ -149,6 +105,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
       ...(options?.capabilities ? { capabilities: [...options.capabilities] } : {}),
       ...(options?.source ? { source: options.source } : {}),
       ...(options?.modelReasoning ? { modelReasoning: options.modelReasoning } : {}),
+      ...(options?.adapter ? { adapter: options.adapter } : {}),
+      ...(options?.executionRoutes ? { executionRoutes: options.executionRoutes } : {}),
+      ...(options?.credentialFingerprint
+        ? { credentialFingerprint: options.credentialFingerprint }
+        : {}),
       ...(pricing?.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
       ...(pricing?.costPer1kOutput === undefined
         ? {}
@@ -158,59 +119,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
     };
   }
 
-  async complete(input: CompletionInput, signal: AbortSignal) {
-    const timeout = AbortSignal.timeout(this.timeoutMs);
-    const hasDeclaredReasoning = Object.prototype.hasOwnProperty.call(
-      this.metadata.modelReasoning ?? {},
-      input.model,
-    );
-    let reasoningPayload: Record<string, unknown> = {};
-    if (input.reasoningEffort !== undefined && isOpenRouterUrl(this.baseUrl)) {
-      reasoningPayload = { reasoning: { effort: input.reasoningEffort } };
-    } else if (input.reasoningEffort !== undefined && hasDeclaredReasoning) {
-      reasoningPayload = { reasoning_effort: input.reasoningEffort };
-    }
-    const response = await fetch(completionUrl(this.baseUrl), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: input.model,
-        messages: input.messages,
-        tools: input.tools.map((name) => ({ type: 'function', function: { name } })),
-        response_format: { type: 'json_object' },
-        ...(input.maxOutputTokens === undefined ? {} : { max_tokens: input.maxOutputTokens }),
-        ...reasoningPayload,
-      }),
-      signal: AbortSignal.any([signal, timeout]),
-    });
-    const payload = (await response.json().catch(() => null)) as unknown;
-    if (!response.ok) {
-      const error = asRecord(payload)?.error;
-      const message = asRecord(error)?.message;
-      throw new Error(typeof message === 'string' ? message : `Provider HTTP ${response.status}`);
-    }
-    const root = asRecord(payload);
-    const usage = asRecord(root?.usage);
-    const content = root ? completionContent(root) : undefined;
-    if (content === undefined) throw new Error('Provider 响应缺少 choices[0].message.content');
-    const inputTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
-    const outputTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : 0;
-    const inputRate = this.metadata.costPer1kInput;
-    const outputRate = this.metadata.costPer1kOutput;
-    const costKnown = typeof inputRate === 'number' && typeof outputRate === 'number';
-    return {
-      content: parseContent(content),
-      inputTokens,
-      outputTokens,
-      cost: costKnown ? (inputTokens * inputRate + outputTokens * outputRate) / 1_000 : 0,
-      costKnown,
-      ...(this.metadata.costCurrency ? { costCurrency: this.metadata.costCurrency } : {}),
-      ...(this.metadata.pricingVersion ? { pricingVersion: this.metadata.pricingVersion } : {}),
-      ...(typeof root?.model === 'string' ? { actualModel: root.model } : {}),
-    };
+  sdkRuntime() {
+    return { baseURL: this.baseUrl, apiKey: this.apiKey, timeoutMs: this.timeoutMs };
   }
 }
 
@@ -376,6 +286,9 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
     },
     {
       ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
+      ...(input.adapter ? { adapter: input.adapter } : {}),
+      ...(input.executionRoutes ? { executionRoutes: input.executionRoutes } : {}),
+      credentialFingerprint: createHash('sha256').update(input.apiKey, 'utf8').digest('hex'),
     },
   );
 

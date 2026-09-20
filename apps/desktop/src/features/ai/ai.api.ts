@@ -2,16 +2,23 @@ import { requestDesktopJson, type DesktopRequestClient } from '../shared/request
 import type {
   AiRunDetail,
   AiRunFilterStatus,
+  AiRunSourceFilter,
   AiRunPage,
   AiRunRecord,
   AiRunResult,
+  AiResearchRetryPrefill,
   AiToolCallsPage,
   AiCapabilitiesResponse,
   CreateAiRunInput,
 } from './ai.types.js';
 
 export interface AiRunListFilter {
+  view?: 'research';
   status?: Exclude<AiRunFilterStatus, 'all'>;
+  search?: string;
+  source?: AiRunSourceFilter;
+  includeInternal?: boolean;
+  sort?: 'updated_desc';
   limit?: number;
   cursor?: string;
 }
@@ -21,8 +28,13 @@ const isClient = (value: unknown): value is DesktopRequestClient =>
 
 const listPath = (filter: AiRunListFilter) => {
   const params = new URLSearchParams();
+  if (filter.view) params.set('view', filter.view);
   params.set('limit', String(filter.limit ?? 50));
   if (filter.status) params.set('status', filter.status);
+  if (filter.search) params.set('search', filter.search);
+  if (filter.source && filter.source !== 'all') params.set('source', filter.source);
+  if (filter.includeInternal) params.set('includeInternal', 'true');
+  if (filter.sort) params.set('sort', filter.sort);
   if (filter.cursor) params.set('cursor', filter.cursor);
   return `/ai/runs?${params.toString()}`;
 };
@@ -39,8 +51,20 @@ export const fetchAiRuns = (
   );
 };
 
-export const fetchAiRun = (id: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<AiRunDetail>(`/ai/runs/${encodeURIComponent(id)}`, undefined, client);
+export const fetchAiRun = (
+  id: string,
+  optionsOrClient?: { view?: 'research' } | DesktopRequestClient,
+  maybeClient?: DesktopRequestClient,
+) => {
+  const options = isClient(optionsOrClient) ? {} : (optionsOrClient ?? {});
+  const client = isClient(optionsOrClient) ? optionsOrClient : maybeClient;
+  const suffix = options.view === 'research' ? '?view=research' : '';
+  return requestDesktopJson<AiRunDetail>(
+    `/ai/runs/${encodeURIComponent(id)}${suffix}`,
+    undefined,
+    client,
+  );
+};
 
 export const fetchAiToolCalls = (
   id: string,
@@ -59,6 +83,13 @@ export const fetchAiToolCalls = (
 
 export const fetchAiCapabilities = (client?: DesktopRequestClient) =>
   requestDesktopJson<AiCapabilitiesResponse>('/ai/runs/capabilities', undefined, client);
+
+export const fetchAiResearchRetryPrefill = (id: string, client?: DesktopRequestClient) =>
+  requestDesktopJson<AiResearchRetryPrefill>(
+    `/ai/runs/${encodeURIComponent(id)}/retry-prefill`,
+    undefined,
+    client,
+  );
 
 export const createAiRun = (input: CreateAiRunInput, client?: DesktopRequestClient) =>
   requestDesktopJson<AiRunResult>(

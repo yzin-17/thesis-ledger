@@ -12,6 +12,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { LoaderCircle } from 'lucide-react';
+import type { InstrumentDirectory } from '@thesis-ledger/api-client';
 import { cn } from '@/lib/utils';
 import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 import type {
@@ -201,6 +202,7 @@ export function SingleReviewResult({
   trade,
   candidate,
   result,
+  instrumentDirectory,
   aiRun,
   aiPending,
   aiError,
@@ -209,6 +211,7 @@ export function SingleReviewResult({
   trade: ReviewTrade;
   candidate: JournalReviewCandidate | null;
   result: DeterministicJournalReviewResult;
+  instrumentDirectory?: InstrumentDirectory | undefined;
   aiRun: JournalReviewResult['aiRun'] | null;
   aiPending: boolean;
   aiError: Error | null;
@@ -231,6 +234,11 @@ export function SingleReviewResult({
       ? null
       : trade.peakWeight > trade.targetWeight;
   const missing = candidate?.missingEvidence ?? [];
+  const instrumentName = candidate
+    ? instrumentDirectory?.items.find(
+        (item) => item.symbol.toUpperCase() === candidate.symbol.toUpperCase(),
+      )?.displayName
+    : undefined;
   const rawEvidence = useMemo(
     () => ({ trade, planned, behavior, counterfactual }),
     [behavior, counterfactual, planned, trade],
@@ -242,7 +250,15 @@ export function SingleReviewResult({
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle>{trade.symbol} · 复盘结论</CardTitle>
+              <CardTitle>
+                {instrumentName ?? trade.symbol}
+                {instrumentName && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    {trade.symbol}
+                  </span>
+                )}{' '}
+                · 复盘结论
+              </CardTitle>
               <CardDescription>
                 {formatDateTime(trade.entryAt)} → {formatDateTime(trade.exitAt)}
               </CardDescription>

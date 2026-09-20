@@ -93,16 +93,19 @@ export const buildChartPoints = (bars: MarketChartBar[], indicators: MarketChart
 const mergeChartPointEvidence = (left: ChartPoint, right: ChartPoint): ChartPoint => {
   const indicators = { ...left.indicators };
   const comparableIndicators = { ...left.comparableIndicators };
+  const bar = left.bar ?? right.bar;
   (Object.keys(right.indicators) as Array<keyof ChartPoint['indicators']>).forEach((name) => {
     const next = right.indicators[name];
     if (!next) return;
-    const rightComparable = right.comparableIndicators[name] === true;
+    // 如果左侧页面提供了同日更新后的 bar，右侧旧页的指标即使自身可比，也不能
+    // 越过 fingerprint 校验重新挂到新 bar 上。
+    const rightComparable =
+      right.comparableIndicators[name] === true && (!bar || sameInput(bar, next));
     if (!indicators[name] || (rightComparable && comparableIndicators[name] !== true)) {
       indicators[name] = next;
       comparableIndicators[name] = rightComparable;
     }
   });
-  const bar = left.bar ?? right.bar;
   return {
     date: left.date,
     ...(bar ? { bar } : {}),

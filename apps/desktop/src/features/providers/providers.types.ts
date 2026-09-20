@@ -1,3 +1,43 @@
+import type {
+  AiAdapter,
+  AiGenerationContractRef,
+  AiGenerationMode,
+  AiProviderModelExecution,
+} from '@thesis-ledger/schemas';
+
+export type AiProviderExecutionRouteConfig = {
+  model: string;
+  mode: AiGenerationMode;
+  contract: AiGenerationContractRef;
+  capabilityDeclaration: AiProviderModelExecution['capabilityDeclaration'];
+  allowedUpstreams: string[];
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
+  freeEvidence: {
+    source: 'trusted_catalog' | 'controlled_local';
+    sourceRef: string;
+    sourceVersion: string;
+  } | null;
+};
+
+export type AiProviderExecutionRouteDraft = {
+  key: string;
+  model: string;
+  mode: AiGenerationMode;
+  contractId: AiGenerationContractRef['id'];
+  declarationSource: 'none' | 'trusted_catalog' | 'manual';
+  declarationSourceRef: string;
+  declarationSourceVersion: string;
+  declaredAt: string;
+  declaredBy: string;
+  allowedUpstreamsText: string;
+  firstOutputTimeoutMs: string;
+  outputIdleTimeoutMs: string;
+  freeEvidenceSource: 'none' | 'trusted_catalog' | 'controlled_local';
+  freeEvidenceSourceRef: string;
+  freeEvidenceSourceVersion: string;
+};
+
 export type ProviderHealthHistoryRecord = {
   provider: string;
   state: string;
@@ -50,6 +90,9 @@ export interface ProviderRecord {
   source?: 'database' | 'environment';
   baseUrl?: string | null;
   models?: string[];
+  adapter?: AiAdapter;
+  executionRouteConfigs?: AiProviderExecutionRouteConfig[];
+  executionRoutes?: AiProviderModelExecution[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   timeoutMs?: number;
   costPer1kInput?: number;
@@ -405,6 +448,8 @@ export const newProviderDraft = () => ({
   costCurrency: 'USD',
   pricingVersion: '',
   modelReasoning: {} as Record<string, AiProviderModelReasoning>,
+  adapter: 'openrouter' as AiAdapter,
+  executionRoutes: [] as AiProviderExecutionRouteDraft[],
 });
 
 export type ProviderDraft = ReturnType<typeof newProviderDraft>;

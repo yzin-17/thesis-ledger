@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import type { ExecutionModelDisclosure } from '@thesis-ledger/schemas';
+import type { ExecutionModelDisclosure, ResultReadEligibility } from '@thesis-ledger/schemas';
 import { withBacktestModelDisclosure } from './backtest-model-disclosure.js';
 
 export const backtestJobSummarySelect = {
@@ -27,19 +27,29 @@ export const backtestJobSummarySelect = {
   snapshotId: true,
   diagnostics: true,
   input: true,
+  result: true,
 } satisfies Prisma.BacktestJobSelect;
 
 type BacktestJobSummaryRecord = Prisma.BacktestJobGetPayload<{
   select: typeof backtestJobSummarySelect;
 }>;
 
-export type BacktestJobSummary = Omit<BacktestJobSummaryRecord, 'input'> & {
+export type BacktestJobSummary = Omit<BacktestJobSummaryRecord, 'input' | 'result'> & {
   initialCash: number | null;
+  resultMetrics: Record<string, unknown> | null;
+  readEligibility?: ResultReadEligibility;
   executionModelDisclosure?: ExecutionModelDisclosure;
 };
 
+const resultMetrics = (result: Prisma.JsonValue | null): Record<string, unknown> | null => {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
+  const metrics = result.metrics;
+  if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) return null;
+  return metrics;
+};
+
 export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): BacktestJobSummary => {
-  const { input, ...summary } = withBacktestModelDisclosure(record);
+  const { input, result, ...summary } = withBacktestModelDisclosure(record);
   let initialCashValue: unknown;
   if (input && typeof input === 'object' && !Array.isArray(input) && 'initialCash' in input) {
     initialCashValue = input.initialCash;
@@ -56,9 +66,9 @@ export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): Backtest
     }
   }
   const initialCash = Number(initialCashValue);
-  Reflect.deleteProperty(summary, 'result');
   return {
     ...summary,
     initialCash: Number.isFinite(initialCash) ? initialCash : null,
+    resultMetrics: resultMetrics(result),
   };
 };

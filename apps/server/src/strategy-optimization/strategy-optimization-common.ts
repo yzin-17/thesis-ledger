@@ -1,10 +1,19 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { canonicalStrategyMonitoringJson } from '@thesis-ledger/domain';
+import type {
+  OptimizationAdoptionDiffEntry,
+  OptimizationCandidateSource,
+  OptimizationCostSummary,
+  OptimizationExperimentSource,
+  OptimizationTradingCostReadModel,
+  ResultReadEligibility,
+} from '@thesis-ledger/schemas';
 
 export type ExperimentRow = {
   id: string;
   ownerKey: string;
+  name: string | null;
   sourceMode: 'existing' | 'discovery';
   discoveryScope: unknown;
   strategySpaceVersion: string | null;
@@ -39,6 +48,32 @@ export type ExperimentRow = {
   idempotencyKey: string;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ExperimentReadRow = ExperimentRow & {
+  strategyId: string | null;
+  strategyName: string | null;
+  strategyVersion: number | null;
+  strategySchemaVersion: number | null;
+  baselineStrategySchema?: unknown;
+};
+
+export type CandidateReadRow = CandidateRow & {
+  experimentStage: string | null;
+};
+
+export type EnrichedExperiment = Omit<ExperimentRow, 'costUsed'> & {
+  costUsed: Prisma.Decimal | null;
+  costSummary: OptimizationCostSummary;
+  nameSource: 'stored' | 'legacy_fallback';
+  source: OptimizationExperimentSource;
+  readEligibility: ResultReadEligibility;
+  tradingCost: OptimizationTradingCostReadModel;
+};
+
+export type EnrichedCandidate = CandidateRow & {
+  source: OptimizationCandidateSource;
+  readEligibility: ResultReadEligibility;
 };
 
 export type CandidateRow = {
@@ -107,12 +142,62 @@ export type EvaluationSummary = {
 export const optimizationSha256 = (value: unknown) =>
   createHash('sha256').update(canonicalStrategyMonitoringJson(value)).digest('hex');
 
+const sameJsonValue = (left: unknown, right: unknown) => {
+  try {
+    return canonicalStrategyMonitoringJson(left) === canonicalStrategyMonitoringJson(right);
+  } catch {
+    return Object.is(left, right);
+  }
+};
+
+/** 返回完整定义之间的可审阅差异；数组按整体值比较，避免伪造数组内稳定身份。 */
+export const strategyDefinitionDiff = (
+  before: unknown,
+  after: unknown,
+  path = '$',
+): OptimizationAdoptionDiffEntry[] => {
+  if (sameJsonValue(before, after)) return [];
+  if (
+    before === null ||
+    after === null ||
+    typeof before !== 'object' ||
+    typeof after !== 'object' ||
+    Array.isArray(before) ||
+    Array.isArray(after)
+  )
+    return [{ path, before, after }];
+  const left = before as Record<string, unknown>;
+  const right = after as Record<string, unknown>;
+  const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].sort();
+  return keys.flatMap((key) => strategyDefinitionDiff(left[key], right[key], `${path}.${key}`));
+};
+
 export const toRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 
 export const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
+
+export const defaultExperimentName = (input: {
+  sourceMode: 'existing' | 'discovery';
+  strategyName?: string | null;
+  discoveryScope?: unknown;
+}) => {
+  if (input.sourceMode === 'existing' && input.strategyName?.trim())
+    return `${input.strategyName.trim()} · AI 优化`;
+  const scope = toRecord(input.discoveryScope);
+  const instrument = toRecord(scope.executionInstrument);
+  if (input.sourceMode === 'discovery' && typeof instrument.symbol === 'string')
+    return `从零探索 · ${instrument.symbol}`;
+  return input.sourceMode === 'discovery' ? '从零探索实验' : 'AI 策略优化';
+};
+
+export const experimentDisplayName = (
+  row: Pick<ExperimentRow, 'name' | 'sourceMode' | 'discoveryScope'> & {
+    strategyName?: string | null;
+  },
+) => row.name?.trim() || defaultExperimentName(row);
 
 export const optimizationRemainingDurationMs = (
   input: Pick<ExperimentRow, 'createdAt' | 'pausedDurationMs' | 'budget'>,

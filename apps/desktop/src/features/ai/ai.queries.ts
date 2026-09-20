@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   fetchAiCapabilities,
   fetchAiRun,
+  fetchAiResearchRetryPrefill,
   fetchAiRuns,
   fetchAiToolCalls,
   type AiRunListFilter,
@@ -15,13 +16,18 @@ export const aiKeys = {
     [
       ...aiKeys.root,
       'runs',
+      filter.view ?? 'legacy',
       filter.status ?? 'all',
+      filter.search ?? '',
+      filter.source ?? 'all',
+      filter.includeInternal ?? false,
+      filter.sort ?? '',
       filter.limit ?? 50,
-      filter.cursor ?? '',
     ] as const,
   run: (id: string) => [...aiKeys.root, 'run', id] as const,
   toolCalls: (id: string, cursor = '') => [...aiKeys.root, 'tool-calls', id, cursor] as const,
   capabilities: () => [...aiKeys.root, 'capabilities'] as const,
+  retryPrefill: (id: string) => [...aiKeys.root, 'retry-prefill', id] as const,
 };
 
 const pollingStatuses = new Set(['queued', 'running']);
@@ -51,18 +57,24 @@ export const resolveAiRunsLoadState = (snapshot: {
   return 'loading';
 };
 
-export const useAiRunsQuery = (filter: AiRunListFilter = {}) =>
-  useQuery({
+export const useAiRunsQuery = (filter: Omit<AiRunListFilter, 'cursor'> = {}) =>
+  useInfiniteQuery({
     queryKey: aiKeys.runs(filter),
-    queryFn: () => fetchAiRuns(filter),
+    queryFn: ({ pageParam }) =>
+      fetchAiRuns({ ...filter, ...(pageParam ? { cursor: pageParam } : {}) }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 5_000,
-    refetchInterval: (query) => (shouldPollAiRuns(query.state.data) ? 1_500 : false),
+    refetchInterval: (query) => {
+      const pages = query.state.data?.pages ?? [];
+      return pages.some((page) => shouldPollAiRuns(page)) ? 1_500 : false;
+    },
   });
 
 export const useAiRunQuery = (id: string | null) =>
   useQuery({
     queryKey: aiKeys.run(id ?? ''),
-    queryFn: () => fetchAiRun(id ?? ''),
+    queryFn: () => fetchAiRun(id ?? '', { view: 'research' }),
     enabled: Boolean(id),
     staleTime: 1_000,
     refetchInterval: (query) =>
@@ -87,6 +99,15 @@ export const useAiCapabilitiesQuery = (enabled = true) =>
     queryFn: () => fetchAiCapabilities(),
     enabled,
     staleTime: 30_000,
+  });
+
+export const useAiResearchRetryPrefillQuery = (id: string | undefined, enabled = true) =>
+  useQuery({
+    queryKey: aiKeys.retryPrefill(id ?? ''),
+    queryFn: () => fetchAiResearchRetryPrefill(id ?? ''),
+    enabled: enabled && Boolean(id),
+    staleTime: 5_000,
+    retry: false,
   });
 
 export const findAiRun = (runs: AiRunRecord[], id: string | null) =>

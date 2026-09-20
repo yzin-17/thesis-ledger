@@ -5,7 +5,7 @@ import type {
   MarketDetailResponseV2,
   MarketDetailSectionV2,
 } from '@thesis-ledger/api-client';
-import type { IndicatorResultV2 } from '@thesis-ledger/schemas';
+import type { QuoteV1 } from '@thesis-ledger/schemas';
 import {
   Dialog,
   DialogContent,
@@ -27,37 +27,30 @@ import {
   MarketDetailNotice,
   QuoteSection,
   sectionIsVisible,
+  type MarketDetailNoticeState,
 } from './MarketDetailSections.js';
 import type { MarketIndicatorParams } from './MarketDetailCharts.js';
 import {
+  MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS,
+  isQuoteWithinUpstreamRefreshWindow,
   marketDetailSectionTitle,
   mergeMarketDetail,
+  quoteServedAgeMs,
   getVisibleMarketDetail,
   type MarketDetailPosition,
 } from './market-detail.types.js';
 import { chartPageFromResponse } from './market-chart-types.js';
 import type { MarketChartIndicator, MarketChartPage } from './market-chart-types.js';
 import { buildChartPoints, mergeChartPoints, type ChartPoint } from './market-chart-model.js';
+import {
+  latestDetailQueryKey,
+  responseMatchesIndicatorParams,
+  useMarketChartLatestRefresh,
+} from './useMarketChartLatestRefresh.js';
+export { responseMatchesIndicatorParams } from './useMarketChartLatestRefresh.js';
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
-
-const detailQueryKey = (
-  symbol: string,
-  refreshSequence: number,
-  indicatorParams: MarketIndicatorParams,
-  historyEnd?: string,
-  calculationAnchor?: string,
-) =>
-  [
-    'desktop',
-    'market-detail',
-    symbol,
-    refreshSequence,
-    indicatorParams,
-    historyEnd ?? null,
-    calculationAnchor ?? null,
-  ] as const;
 
 type HistoryPage = {
   key: string;
@@ -90,18 +83,6 @@ export const commitIfCurrentGeneration = async <T,>(
   return true;
 };
 
-export const responseMatchesIndicatorParams = (
-  response: MarketDetailResponseV2,
-  params: MarketIndicatorParams,
-) => {
-  const data = response.sections['indicator:MACD']?.data as IndicatorResultV2 | undefined;
-  if (!data) return true;
-  return Object.entries(params).every(([name, value]) => {
-    const actual = data.parameters[name];
-    return actual === undefined || actual === value;
-  });
-};
-
 export function MarketDetailDialog({
   position,
   onClose,
@@ -113,8 +94,6 @@ export function MarketDetailDialog({
   const [refreshSequence, setRefreshSequence] = useState(0);
   const [detail, setDetail] = useState<MarketDetailResponseV2 | null>(null);
   const [historyPages, setHistoryPages] = useState<HistoryPage[]>([]);
-  const [retrying, setRetrying] = useState<string | null>(null);
-  const [retryError, setRetryError] = useState<string | null>(null);
   const [indicatorParams, setIndicatorParams] = useState<MarketIndicatorParams>({
     fast: 12,
     slow: 26,
@@ -128,16 +107,15 @@ export function MarketDetailDialog({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyExhausted, setHistoryExhausted] = useState(false);
   const [historyLoadingEnd, setHistoryLoadingEnd] = useState<string | undefined>();
+  const historyBaselineRef = useRef<string | undefined>(undefined);
   const [parameterRefreshEnds, setParameterRefreshEnds] = useState<string[]>([]);
   const [parameterRefreshRevision, setParameterRefreshRevision] = useState(0);
   const [parameterRefreshLoading, setParameterRefreshLoading] = useState(false);
   const [parameterRefreshError, setParameterRefreshError] = useState<string | null>(null);
-  const pendingRefreshSequenceRef = useRef<number | null>(null);
   const activeSymbolRef = useRef(position.symbol);
-  const retryQueryKeysRef = useRef<Array<readonly unknown[]>>([]);
   const requestGenerationRef = useRef(0);
   const requestSignatureRef = useRef('');
-  const queryResponseGenerationRef = useRef(new Map<string, number>());
+  const chartPointsRef = useRef<ChartPoint[]>([]);
   const requestSignature = JSON.stringify({
     symbol: position.symbol,
     refreshSequence,
@@ -150,61 +128,61 @@ export function MarketDetailDialog({
     requestGenerationRef.current += 1;
   }
   const requestGeneration = requestGenerationRef.current;
+  const latestRefresh = useMarketChartLatestRefresh({
+    queryClient,
+    symbol: position.symbol,
+    refreshSequence,
+    historyEnd,
+    historyCalculationAnchor,
+    indicatorParams,
+    paramsKey: indicatorParamsKey(indicatorParams),
+    detail,
+    chartPointsRef,
+    requestGeneration,
+    onLatestDetail: (next) => setDetail((current) => mergeMarketDetail(current, next)),
+    onSectionRetry: (next, capability, end, paramsKey) => {
+      setDetail((current) => mergeMarketDetail(current, next));
+      setHistoryPages((current) => [
+        ...current,
+        {
+          key: `retry:${capability}:${next.requestId}`,
+          paramsKey,
+          ...(end ? { end } : {}),
+          response: next,
+        },
+      ]);
+    },
+  });
   const query = useQuery({
-    queryKey: detailQueryKey(
+    queryKey: latestDetailQueryKey(
       position.symbol,
       refreshSequence,
       indicatorParams,
       historyEnd,
       historyCalculationAnchor,
     ),
-    queryFn: async ({ signal }: { signal: AbortSignal }) => {
-      const refresh = pendingRefreshSequenceRef.current === refreshSequence;
-      if (refresh) pendingRefreshSequenceRef.current = null;
-      const historyInclude = ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] as const;
-      const response = await requestMarketDetail(
-        {
-          symbol: position.symbol,
-          ...(historyEnd ? { include: historyInclude } : {}),
-          barsLimit: 90,
-          navLimit: 90,
-          indicatorParams,
-          ...(historyEnd ? { end: historyEnd } : {}),
-          ...(historyCalculationAnchor ? { calculationAnchor: historyCalculationAnchor } : {}),
-          ...(refresh ? { refresh: true } : {}),
-        },
-        signal,
-      );
-      if (requestGeneration !== requestGenerationRef.current) {
-        throw new DOMException('行情请求已过期', 'AbortError');
-      }
-      queryResponseGenerationRef.current.set(response.requestId, requestGeneration);
-      return response;
-    },
+    queryFn: latestRefresh.queryFn,
     staleTime: 15_000,
+    retry: false,
+    // 详情重新挂载即使命中客户端 fresh cache 也要执行一次最新检查；缓存只负责先展示。
+    refetchOnMount: 'always',
   });
 
   useEffect(() => {
     activeSymbolRef.current = position.symbol;
     setDetail(null);
     setHistoryPages([]);
-    setRetryError(null);
     setIndicatorParams({ fast: 12, slow: 26, signal: 9, short: 6, mid: 12, long: 24 });
     setHistoryEnd(undefined);
     setHistoryCalculationAnchor(undefined);
     setHistoryError(null);
     setHistoryExhausted(false);
     setHistoryLoadingEnd(undefined);
+    historyBaselineRef.current = undefined;
     setParameterRefreshEnds([]);
     setParameterRefreshLoading(false);
     setParameterRefreshError(null);
-    pendingRefreshSequenceRef.current = null;
-    return () => {
-      for (const queryKey of retryQueryKeysRef.current)
-        void queryClient.cancelQueries({ queryKey });
-      retryQueryKeysRef.current = [];
-    };
-  }, [position.symbol, queryClient]);
+  }, [position.symbol]);
 
   useEffect(() => {
     if (parameterRefreshEnds.length === 0) return;
@@ -280,8 +258,8 @@ export function MarketDetailDialog({
     if (
       query.data &&
       query.data.symbol === activeSymbolRef.current &&
-      (queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
-        queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
+      (latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
+        latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
       responseMatchesIndicatorParams(query.data, indicatorParams)
     ) {
       setDetail((current) => mergeMarketDetail(current, query.data));
@@ -305,26 +283,36 @@ export function MarketDetailDialog({
     if (!historyEnd) return;
     if (query.isError) {
       setHistoryError('更早日线加载失败，当前图表已保留。');
+      setHistoryExhausted(false);
       setHistoryLoadingEnd(undefined);
       return;
     }
     if (!query.data) return;
     const incomingBars = query.data.barSeries?.points;
     const incomingEarliest = incomingBars?.[0]?.timestamp?.slice(0, 10);
-    if (!incomingEarliest || incomingEarliest > historyEnd) {
-      setHistoryError('没有更多可用的更早日线。');
-      setHistoryExhausted(true);
+    const baseline = historyBaselineRef.current;
+    if (!incomingEarliest) {
+      setHistoryError('本次未返回更早日线，可手动重试。');
+      setHistoryExhausted(false);
+    } else if (baseline && incomingEarliest >= baseline) {
+      setHistoryError('本次未推进更早日线，可手动重试。');
+      setHistoryExhausted(false);
+    } else if (incomingEarliest > historyEnd) {
+      setHistoryError('本次未返回请求范围内的更早日线，可手动重试。');
+      setHistoryExhausted(false);
     } else {
       setHistoryError(null);
       setHistoryExhausted(false);
     }
     setHistoryLoadingEnd(undefined);
+    if (incomingEarliest && (!baseline || incomingEarliest < baseline) && incomingEarliest <= historyEnd)
+      historyBaselineRef.current = undefined;
   }, [historyEnd, query.data, query.isError]);
 
   const queryDataForCurrentParams =
     query.data &&
-    (queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
-      queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
+    (latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
+      latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
     responseMatchesIndicatorParams(query.data, indicatorParams)
       ? query.data
       : undefined;
@@ -341,87 +329,13 @@ export function MarketDetailDialog({
     [visibleDetail],
   );
 
-  const retryAll = () =>
+  const retryAll = () => {
+    latestRefresh.cancelLatest();
     setRefreshSequence((value) => {
       const next = value + 1;
-      pendingRefreshSequenceRef.current = next;
+      latestRefresh.markRefreshSequence(next);
       return next;
     });
-
-  const retrySection = async (capability: MarketDetailCapability) => {
-    const symbol = position.symbol;
-    const params = indicatorParams;
-    const paramsKey = indicatorParamsKey(params);
-    const end = historyEnd;
-    const generation = requestGenerationRef.current;
-    const queryKey = [
-      'desktop',
-      'market-detail',
-      symbol,
-      'section',
-      capability,
-      paramsKey,
-      end ?? null,
-    ] as const;
-    retryQueryKeysRef.current.push(queryKey);
-    setRetrying(capability);
-    setRetryError(null);
-    try {
-      const next = await queryClient.fetchQuery({
-        queryKey,
-        queryFn: ({ signal }) =>
-          requestMarketDetail(
-            {
-              symbol,
-              include: [capability],
-              barsLimit: 90,
-              navLimit: 90,
-              indicatorParams: params,
-              ...(end ? { end } : {}),
-              refresh: true,
-            },
-            signal,
-          ),
-        staleTime: 0,
-      });
-      if (
-        generation === requestGenerationRef.current &&
-        activeSymbolRef.current === symbol &&
-        next.symbol === symbol &&
-        responseMatchesIndicatorParams(next, params)
-      )
-        setDetail((current) => mergeMarketDetail(current, next));
-      if (
-        generation === requestGenerationRef.current &&
-        activeSymbolRef.current === symbol &&
-        next.symbol === symbol &&
-        responseMatchesIndicatorParams(next, params)
-      ) {
-        setHistoryPages((current) => [
-          ...current,
-          {
-            key: `retry:${capability}:${next.requestId}`,
-            paramsKey,
-            ...(end ? { end } : {}),
-            response: next,
-          },
-        ]);
-      }
-    } catch (error) {
-      const aborted = error instanceof DOMException && error.name === 'AbortError';
-      if (
-        !aborted &&
-        generation === requestGenerationRef.current &&
-        activeSymbolRef.current === symbol
-      )
-        setRetryError(`${marketDetailSectionTitle(capability)}重试失败，请稍后再试。`);
-    } finally {
-      retryQueryKeysRef.current = retryQueryKeysRef.current.filter(
-        (activeKey) => activeKey !== queryKey,
-      );
-      if (generation === requestGenerationRef.current && activeSymbolRef.current === symbol)
-        setRetrying(null);
-    }
   };
 
   const unit = position.asset.assetType === 'stock' ? '股' : '份';
@@ -429,16 +343,19 @@ export function MarketDetailDialog({
   const barsSection = visibleDetail?.sections.bars;
   const currentParamsKey = indicatorParamsKey(indicatorParams);
   const chartPages = useMemo(() => {
-    const pages = historyPages
-      .filter(({ paramsKey }) => paramsKey === currentParamsKey)
-      .flatMap(({ response }) => {
-        const page = chartPageFromResponse(response);
-        return page ? [page] : [];
-      });
+    const pagesOf = (source: HistoryPage[]) =>
+      source
+        .filter(({ paramsKey }) => paramsKey === currentParamsKey)
+        .flatMap(({ response }) => {
+          const page = chartPageFromResponse(response);
+          return page ? [page] : [];
+        });
+    // 右边界增量窗口向左侧重叠了一个断点交易日；把它排在最前，重叠那天以新数据为准。
+    const pages = [...pagesOf(latestRefresh.laterPages), ...pagesOf(historyPages)];
     if (pages.length > 0) return pages;
     const fallback = visibleDetail ? chartPageFromResponse(visibleDetail) : null;
     return fallback ? [fallback] : [];
-  }, [currentParamsKey, historyPages, visibleDetail]);
+  }, [currentParamsKey, historyPages, latestRefresh.laterPages, visibleDetail]);
   const chartIndicators = useMemo(
     () => chartPages.flatMap((page: MarketChartPage) => page.indicators),
     [chartPages],
@@ -450,6 +367,7 @@ export function MarketDetailDialog({
       ),
     [chartPages],
   );
+  chartPointsRef.current = chartPoints;
   const chartBars = visibleDetail?.barSeries?.points ?? [];
   const loadEarlier = () => {
     if (query.isFetching || historyLoadingEnd) return;
@@ -466,6 +384,7 @@ export function MarketDetailDialog({
     setHistoryError(null);
     setHistoryExhausted(false);
     setHistoryLoadingEnd(nextEnd);
+    historyBaselineRef.current = firstDate.slice(0, 10);
     setHistoryCalculationAnchor(anchor?.slice(0, 10));
     setHistoryEnd(nextEnd);
   };
@@ -491,6 +410,7 @@ export function MarketDetailDialog({
     const loadedEnds = [
       ...new Set(historyPages.filter((page) => page.end).map((page) => page.end as string)),
     ];
+    latestRefresh.resetForIndicatorParams();
     setDetail((current) => clearIndicatorSections(current));
     setHistoryEnd(undefined);
     setHistoryCalculationAnchor(undefined);
@@ -514,6 +434,22 @@ export function MarketDetailDialog({
       Object.values(visibleDetail.sections).some((section) => section.status === 'stale'),
     ) ||
     (query.isFetching && Boolean(visibleDetail));
+
+  // 只有「行情分段」因上游刷新间隔回退，且回退数据仍在该间隔内时，
+  // 才把提示降级为中性说明：此时它已是上游允许的最新结果，不是故障。
+  const staleCapabilities = visibleDetail
+    ? Object.values(visibleDetail.sections)
+        .filter((section) => section.status === 'stale')
+        .map((section) => section.capability)
+    : [];
+  const quoteWithinUpstreamWindow =
+    quoteSection?.status === 'stale' &&
+    isQuoteWithinUpstreamRefreshWindow(quoteSection.data as QuoteV1 | undefined);
+  const staleWithinUpstreamWindowOnly =
+    !query.isFetching &&
+    staleCapabilities.length > 0 &&
+    staleCapabilities.every((capability) => capability === 'quote') &&
+    quoteWithinUpstreamWindow;
 
   const queryNotice = () => {
     if (loading)
@@ -545,9 +481,38 @@ export function MarketDetailDialog({
     return null;
   };
 
-  const staleDescription = query.isFetching
-    ? '已保留当前可见内容，正在尝试获取更新数据。'
-    : '部分数据来自陈旧回退结果，仍可查看并可主动刷新。';
+  const quoteAge = quoteServedAgeMs(quoteSection?.data as QuoteV1 | undefined);
+  const remainingMinutes = Math.max(
+    1,
+    Math.ceil(
+      (MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS * 1_000 - (quoteAge ?? 0)) / 60_000,
+    ),
+  );
+  // 上游刷新间隔内的回退不是故障：提示放进「实时行情」分段（分界线下、标题上），
+  // 不再占用弹窗级横幅位置。弹窗级横幅只保留刷新中与真正的陈旧告警。
+  const quoteUpstreamNotice = staleWithinUpstreamWindowOnly ? (
+    <MarketDetailNotice
+      flush
+      state="info"
+      title="行情按上游刷新间隔更新"
+      description={`上游对单标的行情有约 ${
+        MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS / 60
+      } 分钟最小刷新间隔，当前已是该间隔内的最新结果；约 ${remainingMinutes} 分钟后可再次刷新。`}
+      onRetry={retryAll}
+    />
+  ) : null;
+
+  const staleNotice: MarketDetailNoticeState = query.isFetching
+    ? {
+        state: 'stale',
+        title: '正在刷新行情详情',
+        description: '已保留当前可见内容，正在尝试获取更新数据。',
+      }
+    : {
+        state: 'stale',
+        title: '行情详情可能陈旧',
+        description: '部分数据来自陈旧回退结果，仍可查看并可主动刷新。',
+      };
 
   return (
     <MarketDetailDialogContent
@@ -556,10 +521,10 @@ export function MarketDetailDialog({
       queryNotice={queryNotice()}
       loading={loading}
       stale={stale}
-      refreshing={query.isFetching}
-      staleDescription={staleDescription}
-      retryError={retryError}
+      staleNotice={staleNotice}
+      retryError={latestRefresh.retryError}
       visibleDetail={visibleDetail}
+      quoteUpstreamNotice={quoteUpstreamNotice}
       quoteSection={quoteSection}
       barsSection={barsSection}
       chartIndicators={chartIndicators}
@@ -574,13 +539,19 @@ export function MarketDetailDialog({
       }
       historyError={parameterRefreshError ?? historyError}
       onRetryEarlier={retryEarlier}
+      onLoadLater={latestRefresh.loadLater}
+      onRetryLater={latestRefresh.retryLater}
+      canLoadLater={chartPoints.length > 0}
+      latestLoading={latestRefresh.latestLoading}
+      latestNotice={latestRefresh.latestNotice}
+      latestError={latestRefresh.latestError}
       chipSection={chipSection}
       fundNavSection={fundNavSection}
       fundNavHistorySection={fundNavHistorySection}
       indicatorCapabilities={indicatorCapabilities}
-      retrying={retrying}
+      retrying={latestRefresh.retrying}
       onRetryAll={retryAll}
-      onRetrySection={retrySection}
+      onRetrySection={latestRefresh.retrySection}
       onClose={onClose}
     />
   );
@@ -592,10 +563,10 @@ function MarketDetailDialogContent({
   queryNotice,
   loading,
   stale,
-  refreshing,
-  staleDescription,
+  staleNotice,
   retryError,
   visibleDetail,
+  quoteUpstreamNotice,
   quoteSection,
   barsSection,
   chartIndicators,
@@ -606,6 +577,12 @@ function MarketDetailDialogContent({
   historyLoading,
   historyError,
   onRetryEarlier,
+  onLoadLater,
+  onRetryLater,
+  canLoadLater,
+  latestLoading,
+  latestNotice,
+  latestError,
   chipSection,
   fundNavSection,
   fundNavHistorySection,
@@ -620,10 +597,10 @@ function MarketDetailDialogContent({
   queryNotice: ReactNode;
   loading: boolean;
   stale: boolean;
-  refreshing: boolean;
-  staleDescription: string;
+  staleNotice: MarketDetailNoticeState;
   retryError: string | null;
   visibleDetail: MarketDetailResponseV2 | null;
+  quoteUpstreamNotice: ReactNode;
   quoteSection: MarketDetailSectionV2 | undefined;
   barsSection: MarketDetailSectionV2 | undefined;
   chartIndicators: MarketChartIndicator[];
@@ -634,6 +611,12 @@ function MarketDetailDialogContent({
   historyLoading: boolean;
   historyError: string | null;
   onRetryEarlier: () => void;
+  onLoadLater: () => void;
+  onRetryLater: () => void;
+  canLoadLater: boolean;
+  latestLoading: boolean;
+  latestNotice: string | null;
+  latestError: string | null;
   chipSection: MarketDetailSectionV2 | undefined;
   fundNavSection: MarketDetailSectionV2 | undefined;
   fundNavHistorySection: MarketDetailSectionV2 | undefined;
@@ -682,11 +665,11 @@ function MarketDetailDialogContent({
           </div>
           {queryNotice}
           {loading ? <MarketDetailLoadingSections /> : null}
-          {stale ? (
+          {stale && !quoteUpstreamNotice ? (
             <MarketDetailNotice
-              state="stale"
-              title={refreshing ? '正在刷新行情详情' : '行情详情可能陈旧'}
-              description={staleDescription}
+              state={staleNotice.state}
+              title={staleNotice.title}
+              description={staleNotice.description}
               onRetry={onRetryAll}
             />
           ) : null}
@@ -703,6 +686,7 @@ function MarketDetailDialogContent({
               {sectionIsVisible(quoteSection) ? (
                 <QuoteSection
                   section={quoteSection}
+                  notice={quoteUpstreamNotice ?? undefined}
                   onRetry={() => void onRetrySection('quote')}
                   retrying={retrying === 'quote'}
                 />
@@ -718,6 +702,12 @@ function MarketDetailDialogContent({
                   historyLoading={historyLoading}
                   historyError={historyError}
                   onRetryEarlier={onRetryEarlier}
+                  onLoadLater={onLoadLater}
+                  onRetryLater={onRetryLater}
+                  canLoadLater={canLoadLater}
+                  latestLoading={latestLoading}
+                  latestNotice={latestNotice}
+                  latestError={latestError}
                   onRetry={() => void onRetrySection('bars')}
                   retrying={retrying === 'bars'}
                 />

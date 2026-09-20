@@ -264,7 +264,7 @@ export function AccountDataPage({
   const currentLedgerRevision = ledgerEventsQuery.data?.ledgerRevision ?? '0';
   const accountPositions = valuationQuery.data?.positions ?? [];
   const cashValue = valuationQuery.data?.cashValue ?? 0;
-  const resolveInstrumentName = instrumentNameLookup(accountPositions);
+  const resolveInstrumentName = instrumentNameLookup(ledgerEventsQuery.data?.instrumentDirectory);
 
   const findSnapshotPosition = (event: LedgerEventV2) =>
     event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID'
@@ -288,7 +288,7 @@ export function AccountDataPage({
     if (
       !(await confirm({
         title: '移除快照？',
-        description: `确认移除 ${position.asset.name || position.symbol}（${position.symbol}）？`,
+        description: `确认移除 ${resolveInstrumentName(position.symbol) ?? (position.asset.name || position.symbol)}（${position.symbol}）？`,
         confirmLabel: '移除快照',
         cancelLabel: '取消',
         variant: 'destructive',
@@ -441,6 +441,7 @@ export function AccountDataPage({
                 }}
                 editingPosition={positionSheetEditing}
                 onEditingPositionChange={setPositionSheetEditing}
+                resolveInstrumentName={resolveInstrumentName}
                 onOpenImport={() => {
                   void openImport();
                 }}

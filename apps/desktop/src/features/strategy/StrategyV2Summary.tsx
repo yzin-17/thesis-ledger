@@ -12,6 +12,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { StrategySchema } from './strategy.types.js';
+import {
+  strategyAssetTypeLabel,
+  strategyExecutionModeLabel,
+  strategyExecutionTimingLabel,
+  strategyMarketLabel,
+  strategyOrderTypeLabel,
+  strategyRiskTypeLabel,
+  strategySizingTypeLabel,
+  strategySizingTypeOptions,
+  strategyTimeframeLabel,
+  strategyTimeframeValues,
+  strategyTimeInForceLabel,
+} from './strategy-display-labels.js';
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -20,57 +33,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 
 const text = (value: unknown, fallback = '未配置') =>
   typeof value === 'string' && value.trim() ? value : fallback;
-
-const enumLabel = (value: unknown, labels: Record<string, string>) => {
-  if (typeof value !== 'string' || !value.trim()) return '未配置';
-  return labels[value] ?? `未识别（${value}）`;
-};
-
-const marketLabel = (value: unknown) => {
-  if (value === 'CN') return '中国内地';
-  if (value === 'HK') return '香港';
-  if (value === 'US') return '美国';
-  return enumLabel(value, {});
-};
-
-const assetTypeLabel = (value: unknown) =>
-  enumLabel(value, { stock: '股票', etf: 'ETF', fund: '基金' });
-
-const timeframeLabel = (value: unknown) =>
-  enumLabel(value, {
-    '1d': '日线',
-    '60m': '60 分钟',
-    '30m': '30 分钟',
-    '15m': '15 分钟',
-    '5m': '5 分钟',
-    '1m': '1 分钟',
-  });
-
-const sizingLabel = (value: unknown) => {
-  return enumLabel(value, {
-    fixedAmount: '固定投入金额',
-    percentOfEquity: '权益比例',
-    fixedQuantity: '固定数量',
-    targetWeight: '目标权重',
-  });
-};
-
-const riskLabel = (value: unknown) => {
-  return enumLabel(value, {
-    fixedStop: '固定止损',
-    fixedTakeProfit: '固定止盈',
-    maxHoldingPeriod: '最大持有期',
-  });
-};
-
-const executionModeLabel = (value: unknown) => enumLabel(value, { exchange: '交易所' });
-
-const orderTypeLabel = (value: unknown) => enumLabel(value, { market: '市价单' });
-
-const timeInForceLabel = (value: unknown) => enumLabel(value, { DAY: '当日有效' });
-
-const executionTimingLabel = (value: unknown) =>
-  enumLabel(value, { nextEligibleBarOpen: '下一可执行 K 线开盘' });
 
 export const isV2StrategySchema = (schema: StrategySchema | null | undefined) =>
   schema?.schemaVersion === '2';
@@ -115,13 +77,15 @@ export function StrategyV2Summary({
               {strategyName ?? text(schema.name, '未知策略')}
             </CardTitle>
             <CardDescription className="mt-1">
-              {text(instrument.symbol)} / {marketLabel(instrument.market)} /{' '}
-              {assetTypeLabel(instrument.assetType)}
+              {text(instrument.symbol)} / {strategyMarketLabel(instrument.market, '未配置')} /{' '}
+              {strategyAssetTypeLabel(instrument.assetType, '未配置')}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <Badge variant="secondary">V2 · v{version ?? '?'}</Badge>
-            <Badge variant="outline">{timeframeLabel(schema.primaryTimeframe)}</Badge>
+            <Badge variant="outline">
+              {strategyTimeframeLabel(schema.primaryTimeframe, '未配置')}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -133,7 +97,7 @@ export function StrategyV2Summary({
             <div>
               <p className="text-xs text-muted-foreground">仓位</p>
               <p className="mt-0.5 text-sm">
-                {sizingLabel(sizing.type)}{' '}
+                {strategySizingTypeLabel(sizing.type)}{' '}
                 {text(sizing.amount ?? sizing.percent ?? sizing.quantity ?? sizing.weight)}
               </p>
             </div>
@@ -141,7 +105,7 @@ export function StrategyV2Summary({
               <p className="text-xs text-muted-foreground">风险规则</p>
               <p className="mt-0.5 text-sm">
                 {risks.length
-                  ? risks.map((risk) => riskLabel(asRecord(risk).type)).join('、')
+                  ? risks.map((risk) => strategyRiskTypeLabel(asRecord(risk).type)).join('、')
                   : '无风险退出规则'}
               </p>
             </div>
@@ -159,10 +123,12 @@ export function StrategyV2Summary({
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">策略版本 2</Badge>
-          <Badge variant="outline">{timeframeLabel(schema.primaryTimeframe)}</Badge>
+          <Badge variant="outline">
+            {strategyTimeframeLabel(schema.primaryTimeframe, '未配置')}
+          </Badge>
           <span className="text-sm text-muted-foreground">
-            {text(instrument.symbol)} · {marketLabel(instrument.market)} ·{' '}
-            {assetTypeLabel(instrument.assetType)}
+            {text(instrument.symbol)} · {strategyMarketLabel(instrument.market, '未配置')} ·{' '}
+            {strategyAssetTypeLabel(instrument.assetType, '未配置')}
           </span>
         </div>
         {editable && (
@@ -174,13 +140,15 @@ export function StrategyV2Summary({
                 onValueChange={(value) => value && update('primaryTimeframe', value)}
               >
                 <SelectTrigger id="strategy-v2-timeframe">
-                  <SelectValue>{timeframeLabel(schema.primaryTimeframe)}</SelectValue>
+                  <SelectValue>
+                    {strategyTimeframeLabel(schema.primaryTimeframe, '未配置')}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {['1d', '60m', '30m', '15m', '5m', '1m'].map((value) => (
+                    {strategyTimeframeValues.map((value) => (
                       <SelectItem key={value} value={value}>
-                        {timeframeLabel(value)}
+                        {strategyTimeframeLabel(value)}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -221,14 +189,15 @@ export function StrategyV2Summary({
                 }}
               >
                 <SelectTrigger id="strategy-v2-sizing-type">
-                  <SelectValue>{sizingLabel(sizing.type)}</SelectValue>
+                  <SelectValue>{strategySizingTypeLabel(sizing.type)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="fixedAmount">固定投入金额</SelectItem>
-                    <SelectItem value="percentOfEquity">权益比例</SelectItem>
-                    <SelectItem value="fixedQuantity">固定数量</SelectItem>
-                    <SelectItem value="targetWeight">目标权重</SelectItem>
+                    {strategySizingTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -261,7 +230,7 @@ export function StrategyV2Summary({
                 .map((source) => {
                   const record = asRecord(source);
                   const asset = asRecord(record.asset);
-                  return `${text(asset.symbol)} / ${timeframeLabel(record.timeframe)}`;
+                  return `${text(asset.symbol)} / ${strategyTimeframeLabel(record.timeframe, '未配置')}`;
                 })
                 .join('、') || '未配置'}
             </p>
@@ -269,7 +238,7 @@ export function StrategyV2Summary({
           <div>
             <p className="text-xs text-muted-foreground">仓位</p>
             <p className="text-sm">
-              {sizingLabel(sizing.type)} ·{' '}
+              {strategySizingTypeLabel(sizing.type)} ·{' '}
               {text(sizing.amount ?? sizing.percent ?? sizing.quantity ?? sizing.weight)}
             </p>
           </div>
@@ -277,15 +246,17 @@ export function StrategyV2Summary({
             <p className="text-xs text-muted-foreground">风险规则</p>
             <p className="text-sm">
               {risks.length
-                ? risks.map((risk) => riskLabel(asRecord(risk).type)).join('、')
+                ? risks.map((risk) => strategyRiskTypeLabel(asRecord(risk).type)).join('、')
                 : '无风险退出规则'}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">执行设置</p>
             <p className="text-sm">
-              {executionModeLabel(execution.mode)} · {orderTypeLabel(execution.orderType)} ·{' '}
-              {executionTimingLabel(execution.timing)} · {timeInForceLabel(execution.timeInForce)}
+              {strategyExecutionModeLabel(execution.mode)} ·{' '}
+              {strategyOrderTypeLabel(execution.orderType)} ·{' '}
+              {strategyExecutionTimingLabel(execution.timing)} ·{' '}
+              {strategyTimeInForceLabel(execution.timeInForce)}
             </p>
           </div>
           <div>

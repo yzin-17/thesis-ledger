@@ -2,6 +2,7 @@ import { firstValueFrom, filter } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { BacktestEventPublisher } from '../../src/backtest/backtest-event.publisher.js';
 import { BacktestEventService } from '../../src/backtest/backtest-event.service.js';
+import { testResultReadPolicy } from './test-result-read-policy.js';
 
 describe('Backtest SSE 事件', () => {
   it('发布的摘要不携带 input/result，并保留列表所需初始资金', async () => {
@@ -25,6 +26,7 @@ describe('Backtest SSE 事件', () => {
       {
         client: { publish },
       } as never,
+      testResultReadPolicy(),
     );
 
     await publisher.publishJob('job-1');

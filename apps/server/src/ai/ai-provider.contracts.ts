@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  aiAdapterSchema,
+  aiCapabilityDeclarationSchema,
+  aiGenerationContractRefSchema,
+  aiGenerationModeSchema,
+  type AiProviderModelExecution,
+} from '@thesis-ledger/schemas';
 import type { ProviderState } from '../providers/provider-health.service.js';
 
 export const httpUrl = z.url().refine((value) => {
@@ -38,11 +45,49 @@ const modelReasoningSchema = z
   .refine((value) => Object.keys(value).length <= 32, '最多保存 32 个模型推理能力')
   .optional();
 
+export const aiProviderFreeEvidenceSchema = z
+  .object({
+    source: z.enum(['trusted_catalog', 'controlled_local']),
+    sourceRef: z.string().trim().min(1).max(500),
+    sourceVersion: z.string().trim().min(1).max(120),
+  })
+  .strict();
+
+export const aiProviderExecutionRouteInputSchema = z
+  .object({
+    model: z.string().trim().min(1).max(200),
+    mode: aiGenerationModeSchema,
+    contract: aiGenerationContractRefSchema,
+    capabilityDeclaration: aiCapabilityDeclarationSchema.nullable(),
+    allowedUpstreams: z.array(z.string().trim().min(1).max(200)).max(32).default([]),
+    firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
+    outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+    freeEvidence: aiProviderFreeEvidenceSchema.nullable().default(null),
+  })
+  .strict();
+
+export type AiProviderExecutionRouteInput = z.infer<typeof aiProviderExecutionRouteInputSchema>;
+
+export const aiProviderCapabilityRevocationSchema = z
+  .object({
+    model: z.string().trim().min(1).max(200),
+    mode: aiGenerationModeSchema,
+    contract: aiGenerationContractRefSchema,
+    configurationFingerprint: z.string().trim().min(1).max(200),
+    reason: z.string().trim().min(1).max(240),
+    revokedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export type AiProviderCapabilityRevocation = z.infer<typeof aiProviderCapabilityRevocationSchema>;
+
 export const aiProviderInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     baseUrl: httpUrl,
     models: z.array(z.string().trim().min(1).max(200)).min(1).max(32),
+    adapter: aiAdapterSchema.optional(),
+    executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
     modelReasoning: modelReasoningSchema,
     apiKey: z.string().trim().min(1).max(10_000).optional(),
     credentialsRef: z.string().trim().min(1).max(10_000).optional(),
@@ -70,6 +115,23 @@ export const aiProviderInputSchema = z
         code: 'custom',
         path: ['modelReasoning'],
         message: '模型推理能力只能保存已选择的模型',
+      });
+    const executionRoutes = value.executionRoutes ?? [];
+    if (executionRoutes.some((route) => !selectedModels.has(route.model)))
+      context.addIssue({
+        code: 'custom',
+        path: ['executionRoutes'],
+        message: '执行路由只能配置已选择的模型',
+      });
+    const routeKeys = executionRoutes.map(
+      (route) =>
+        `${route.model}\u0000${route.mode}\u0000${route.contract.id}\u0000${route.contract.version}`,
+    );
+    if (new Set(routeKeys).size !== routeKeys.length)
+      context.addIssue({
+        code: 'custom',
+        path: ['executionRoutes'],
+        message: '模型、模式和契约相同的执行路由不得重复',
       });
   });
 
@@ -112,6 +174,9 @@ export interface AiProviderSummary {
   capabilities: string[];
   baseUrl: string | null;
   models: string[];
+  adapter?: z.infer<typeof aiAdapterSchema>;
+  executionRouteConfigs?: AiProviderExecutionRouteInput[];
+  executionRoutes?: AiProviderModelExecution[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   timeoutMs?: number;
   costPer1kInput?: number;

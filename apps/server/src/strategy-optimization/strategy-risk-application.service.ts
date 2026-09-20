@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   canonicalStrategyMonitoringJson,
@@ -9,6 +14,7 @@ import {
   type StrategyMonitoringPlan,
 } from '@thesis-ledger/domain';
 import {
+  riskApplicationArchiveSchema,
   riskApplicationCreateSchema,
   riskApplicationNotificationSchema,
   riskApplicationPreviewInputSchema,
@@ -20,9 +26,13 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 import { RiskService } from '../risk/risk.service.js';
 import { StrategyRiskApplicationStoreService } from './strategy-risk-application-store.service.js';
+import { strategyRiskApplicationManagementEntry } from './strategy-risk-application.types.js';
 import type {
   ActualRiskContext,
   StrategyRiskApplicationRow,
+  StrategyRiskApplicationCommandResult,
+  StrategyRiskApplicationManagementEntry,
+  StrategyRiskApplicationResolution,
 } from './strategy-risk-application.types.js';
 import { StrategyRiskContextService } from './strategy-risk-context.service.js';
 
@@ -52,6 +62,16 @@ const featureEnabled = () => process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 
 const minuteStrategyTimeframes = new Set(['1m', '5m', '15m', '30m', '60m']);
 const sha256 = (value: unknown) =>
   createHash('sha256').update(canonicalStrategyMonitoringJson(value)).digest('hex');
+
+const isUniqueViolation = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as { code?: string; message?: string; meta?: { code?: string } };
+  return (
+    value.code === 'P2002' ||
+    (value.code === 'P2010' && value.meta?.code === '23505') ||
+    value.message?.includes('StrategyRiskApplication_active_account_symbol_key') === true
+  );
+};
 
 @Injectable()
 export class StrategyRiskApplicationService {
@@ -94,11 +114,7 @@ export class StrategyRiskApplicationService {
   async monitoringPlan(strategyVersionId: string) {
     const version = await this.strategyVersion(strategyVersionId);
     const strategyHash = sha256(version.strategy);
-    const plan = compileStrategyMonitoringPlan(
-      version.strategy,
-      strategyHash,
-      strategyVersionId,
-    );
+    const plan = compileStrategyMonitoringPlan(version.strategy, strategyHash, strategyVersionId);
     return { ...plan, planHash: sha256({ ...plan, planHash: undefined }) };
   }
 
@@ -151,12 +167,59 @@ export class StrategyRiskApplicationService {
     };
   }
 
-  list(accountId?: string, symbol?: string) {
-    return this.store.list(accountId, symbol);
+  list(accountId?: string, symbol?: string, includeArchived = true) {
+    return this.store.list(accountId, symbol, includeArchived);
   }
 
   get(id: string) {
     return this.store.get(id);
+  }
+
+  private management(row: StrategyRiskApplicationRow): StrategyRiskApplicationManagementEntry {
+    return strategyRiskApplicationManagementEntry(row);
+  }
+
+  private resolution(
+    kind: StrategyRiskApplicationResolution['kind'],
+    row: StrategyRiskApplicationRow,
+    sourceApplicationId?: string,
+  ): StrategyRiskApplicationResolution {
+    if (kind === 'reused')
+      return {
+        kind,
+        reason: 'same_identity',
+        management: { applicationId: row.id, actions: ['view', 'edit'] },
+      };
+    if (kind === 'already_bound')
+      return {
+        kind,
+        sourceApplicationId: sourceApplicationId ?? row.id,
+        management: { applicationId: row.id, actions: ['view', 'edit'] },
+      };
+    return {
+      kind: 'upgrade_target_exists',
+      sourceApplicationId: sourceApplicationId ?? row.id,
+      management: { applicationId: row.id, actions: ['view', 'edit'] },
+    };
+  }
+
+  private throwAmbiguousIdentity(
+    applications: StrategyRiskApplicationRow[],
+    message = '同源策略风险应用存在多条历史记录，请选择一条查看或编辑后再继续',
+  ): never {
+    throw new ConflictException({
+      errorCode: 'STRATEGY_RISK_APPLICATION_IDENTITY_AMBIGUOUS',
+      message,
+      applications: applications.map((application) => this.management(application)),
+    });
+  }
+
+  private throwEnabledConflict(application: StrategyRiskApplicationRow | null): never {
+    throw new ConflictException({
+      errorCode: 'STRATEGY_RISK_APPLICATION_ENABLED_CONFLICT',
+      message: '该账户与标的已经有启用中的策略风险应用，请先管理已有应用；当前配置可保存为停用',
+      ...(application ? { application: this.management(application) } : {}),
+    });
   }
 
   private planDiff(beforePlan: StrategyMonitoringPlan, afterPlan: StrategyMonitoringPlan) {
@@ -202,6 +265,28 @@ export class StrategyRiskApplicationService {
       openedAt: preview.context.openedAt,
     };
     return this.prisma.$transaction(async (transaction) => {
+      await this.store.lockIdentity(transaction, {
+        strategyVersionId: parsed.strategyVersionId,
+        accountId: parsed.accountId,
+        symbol: parsed.symbol,
+        cycleMode: parsed.cycleMode,
+      });
+      const existing = await this.store.findByIdentityForUpdate(
+        transaction,
+        parsed.strategyVersionId,
+        parsed.accountId,
+        parsed.symbol,
+        parsed.cycleMode,
+      );
+      if (existing.length > 1) this.throwAmbiguousIdentity(existing);
+      const current = existing[0];
+      if (current)
+        return {
+          ...current,
+          applicationResolution: this.resolution('reused', current),
+        } satisfies StrategyRiskApplicationCommandResult;
+
+      if (parsed.enabled) await this.assertAutomaticRuntimeCapability(parsed.strategyVersionId);
       if (parsed.enabled)
         await this.store.assertNoEnabledConflict(transaction, parsed.accountId, parsed.symbol);
       const application = await this.store.insertApplication(transaction, {
@@ -247,7 +332,6 @@ export class StrategyRiskApplicationService {
     const parsed = riskApplicationCreateSchema.parse(input);
     const existing = await this.store.findByIdempotencyKey(parsed.idempotencyKey);
     if (existing) return existing;
-    if (parsed.enabled) await this.assertAutomaticRuntimeCapability(parsed.strategyVersionId);
     const preview = await this.preview({
       strategyVersionId: parsed.strategyVersionId,
       accountId: parsed.accountId,
@@ -258,9 +342,13 @@ export class StrategyRiskApplicationService {
     try {
       return await this.createTransaction(randomUUID(), parsed, preview);
     } catch (error) {
-      if ((error as { code?: string }).code !== 'P2002') throw error;
+      if (!isUniqueViolation(error)) throw error;
       const concurrent = await this.store.findByIdempotencyKey(parsed.idempotencyKey);
       if (concurrent) return concurrent;
+      const conflict = parsed.enabled
+        ? await this.store.findEnabledConflict(parsed.accountId, parsed.symbol)
+        : null;
+      if (conflict) this.throwEnabledConflict(conflict);
       throw error;
     }
   }
@@ -308,23 +396,77 @@ export class StrategyRiskApplicationService {
     this.assertEnabled();
     const parsed = riskApplicationUpdateSchema.parse(input);
     const current = await this.get(id);
+    if (current.archivedAt)
+      throw new ConflictException({
+        errorCode: 'STRATEGY_RISK_APPLICATION_ARCHIVED',
+        message: '归档策略风险应用仅可查看，不能通过更新自动恢复；请创建新的应用',
+        application: this.management(current),
+      });
     if (parsed.enabled === true && !current.enabled)
       await this.assertAutomaticRuntimeCapability(current.strategyVersionId);
-    return this.updateTransaction(id, current, parsed);
+    try {
+      return await this.updateTransaction(id, current, parsed);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const conflict = await this.store.findEnabledConflict(current.accountId, current.symbol, id);
+      if (conflict) this.throwEnabledConflict(conflict);
+      throw error;
+    }
+  }
+
+  async archive(id: string, input: unknown) {
+    this.assertEnabled();
+    const parsed = riskApplicationArchiveSchema.parse(input);
+    const current = await this.get(id);
+    if (current.archivedAt)
+      throw new ConflictException({
+        errorCode: 'STRATEGY_RISK_APPLICATION_ARCHIVED',
+        message: '该风险应用已删除',
+        application: this.management(current),
+      });
+    return this.prisma.$transaction(async (transaction) => {
+      const archived = await this.store.archiveApplication(transaction, {
+        id,
+        expectedRevision: parsed.expectedRevision,
+      });
+      await this.store.archiveFrozenRules(transaction, id);
+      await this.store.audit(transaction, {
+        applicationId: id,
+        revision: archived.revision,
+        action: 'archive',
+        before: current,
+        after: archived,
+      });
+      return archived;
+    });
   }
 
   async upgradePreview(id: string, targetStrategyVersionId: string) {
     const current = await this.get(id);
+    if (current.archivedAt)
+      throw new ConflictException({
+        errorCode: 'STRATEGY_RISK_APPLICATION_ARCHIVED',
+        message: '归档策略风险应用不能自动升级；请查看历史记录或创建新的应用',
+        application: this.management(current),
+      });
     const preview = await this.preview({
       strategyVersionId: targetStrategyVersionId,
       accountId: current.accountId,
       symbol: current.symbol,
       cycleMode: current.cycleMode,
     });
+    const targetApplications = await this.store.findByIdentity(
+      targetStrategyVersionId,
+      current.accountId,
+      current.symbol,
+      current.cycleMode,
+    );
+    if (targetApplications.length > 1) this.throwAmbiguousIdentity(targetApplications);
     return {
       ...preview,
       currentRevision: current.revision,
       diff: this.planDiff(current.plan as StrategyMonitoringPlan, preview.plan),
+      targetApplication: targetApplications[0] ? this.management(targetApplications[0]) : null,
     };
   }
 
@@ -355,12 +497,55 @@ export class StrategyRiskApplicationService {
 
   private async upgradeTransaction(
     id: string,
-    current: StrategyRiskApplicationRow,
     input: ReturnType<typeof riskApplicationUpgradeSchema.parse>,
     preview: RiskPreview,
   ) {
-    const notification = this.notification(current.notification);
     return this.prisma.$transaction(async (transaction) => {
+      const lockedCurrent = await this.store.getForUpdate(transaction, id);
+      if (lockedCurrent.archivedAt)
+        throw new ConflictException({
+          errorCode: 'STRATEGY_RISK_APPLICATION_ARCHIVED',
+          message: '归档策略风险应用不能自动升级；请查看历史记录或创建新的应用',
+          application: this.management(lockedCurrent),
+        });
+      if (lockedCurrent.revision !== input.expectedRevision)
+        throw new BadRequestException('风险应用已被其他操作更新，请刷新后重试');
+
+      await this.store.lockIdentity(transaction, {
+        strategyVersionId: input.targetStrategyVersionId,
+        accountId: lockedCurrent.accountId,
+        symbol: lockedCurrent.symbol,
+        cycleMode: lockedCurrent.cycleMode,
+      });
+      const targetApplications = await this.store.findByIdentityForUpdate(
+        transaction,
+        input.targetStrategyVersionId,
+        lockedCurrent.accountId,
+        lockedCurrent.symbol,
+        lockedCurrent.cycleMode,
+      );
+      const otherTargets = targetApplications.filter((application) => application.id !== id);
+      if (otherTargets.length > 1) this.throwAmbiguousIdentity(otherTargets);
+      const target = otherTargets[0];
+      if (target)
+        return {
+          ...target,
+          applicationResolution: this.resolution('upgrade_target_exists', target, id),
+        } satisfies StrategyRiskApplicationCommandResult;
+      if (targetApplications.some((application) => application.id === id))
+        return {
+          ...lockedCurrent,
+          applicationResolution: this.resolution('already_bound', lockedCurrent, id),
+        } satisfies StrategyRiskApplicationCommandResult;
+
+      if (lockedCurrent.enabled)
+        await this.store.assertNoEnabledConflict(
+          transaction,
+          lockedCurrent.accountId,
+          lockedCurrent.symbol,
+          id,
+        );
+      const notification = this.notification(lockedCurrent.notification);
       await this.store.archiveFrozenRules(transaction, id);
       const updated = await this.store.replacePlan(transaction, {
         id,
@@ -370,10 +555,10 @@ export class StrategyRiskApplicationService {
       });
       await this.store.createFrozenRules(transaction, {
         applicationId: id,
-        accountId: current.accountId,
-        symbol: current.symbol,
+        accountId: lockedCurrent.accountId,
+        symbol: lockedCurrent.symbol,
         revision: updated.revision,
-        enabled: current.enabled,
+        enabled: lockedCurrent.enabled,
         severity: notification.severity,
         plan: preview.plan,
       });
@@ -381,7 +566,7 @@ export class StrategyRiskApplicationService {
         applicationId: id,
         revision: updated.revision,
         action: `upgrade:${input.idempotencyKey}`,
-        before: current,
+        before: lockedCurrent,
         after: updated,
       });
       return updated;
@@ -393,12 +578,19 @@ export class StrategyRiskApplicationService {
     const parsed = riskApplicationUpgradeSchema.parse(input);
     if (await this.upgradeAlreadyApplied(id, parsed.idempotencyKey)) return this.get(id);
     const current = await this.get(id);
+    if (current.archivedAt)
+      throw new ConflictException({
+        errorCode: 'STRATEGY_RISK_APPLICATION_ARCHIVED',
+        message: '归档策略风险应用不能自动升级；请查看历史记录或创建新的应用',
+        application: this.management(current),
+      });
     if (current.revision !== parsed.expectedRevision)
       throw new BadRequestException('风险应用已被其他操作更新，请刷新后重试');
-    if (current.enabled) await this.assertAutomaticRuntimeCapability(parsed.targetStrategyVersionId);
+    if (current.enabled)
+      await this.assertAutomaticRuntimeCapability(parsed.targetStrategyVersionId);
     const preview = await this.upgradePreview(id, parsed.targetStrategyVersionId);
     this.validatePreview(preview, parsed.previewHash);
-    return this.upgradeTransaction(id, current, parsed, preview);
+    return this.upgradeTransaction(id, parsed, preview);
   }
 
   async evaluate(id: string) {

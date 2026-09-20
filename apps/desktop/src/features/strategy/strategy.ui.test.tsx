@@ -61,13 +61,13 @@ const job: BacktestJob = {
 };
 
 describe('策略实验工作台 UI 契约', () => {
-  it('页面头部使用共享刷新图标按钮并绑定两个策略查询的刷新状态', () => {
+  it('策略中心页面头部使用共享刷新按钮并绑定两个策略查询的刷新状态', () => {
     const source = readFileSync(new URL('./StrategyDashboard.tsx', import.meta.url), 'utf8');
 
     expect(source).toContain("import { RefreshIconButton } from '../shared/RefreshIconButton.js';");
     expect(source).toContain('<RefreshIconButton');
-    expect(source).toContain('label="刷新策略与回测任务"');
-    expect(source).toContain('refreshing={strategyRefreshing}');
+    expect(source).toContain('label="刷新策略中心"');
+    expect(source).toContain('refreshing={refreshing}');
     expect(source).not.toContain("from 'lucide-react'");
   });
 
@@ -287,12 +287,12 @@ describe('策略实验工作台 UI 契约', () => {
 
   it('信号指标使用回测引擎支持的下拉枚举', () => {
     expect(signalIndicatorOptions).toEqual([
-      { value: 'close', label: '收盘价（close）' },
-      { value: 'price', label: '收盘价（price）' },
-      { value: 'open', label: '开盘价（open）' },
-      { value: 'high', label: '最高价（high）' },
-      { value: 'low', label: '最低价（low）' },
-      { value: 'volume', label: '成交量（volume）' },
+      { value: 'close', label: '收盘价' },
+      { value: 'price', label: '收盘价' },
+      { value: 'open', label: '开盘价' },
+      { value: 'high', label: '最高价' },
+      { value: 'low', label: '最低价' },
+      { value: 'volume', label: '成交量' },
     ]);
   });
 

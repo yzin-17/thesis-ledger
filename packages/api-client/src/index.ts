@@ -163,6 +163,20 @@ export type {
   UpdateRecurringFundInvestmentPlan,
   BacktestRunCreateV2,
   BacktestRunResponseV2,
+  AiCostFacts,
+  AiExecutionSummary,
+  AiGenerationContractRef,
+  AiGenerationError,
+  AiProviderModelExecution,
+  AiRequestAttempt,
+  AiResearchGeneration,
+  AiResearchPolicyV1,
+  AiResearchRetryPrefill,
+  AiResearchStartInput,
+  AiUsageFacts,
+  AiUsageSummaryReadModel,
+  OptimizationTradingCostDisclosure,
+  InstrumentDirectory,
   AccountResponse,
   AccountMode,
 } from '@thesis-ledger/schemas';
@@ -593,11 +607,22 @@ export class ThesisLedgerApiClient {
     createRun: (input: BacktestRunCreateV2): Promise<BacktestRunResponseV2> =>
       this.postParsed('/backtests/runs', input, backtestRunResponseSchemaV2),
     getRun: (runId: string): Promise<BacktestRunResponseV2> =>
-      this.requestParsed(`/backtests/runs/${encodeURIComponent(runId)}`, backtestRunResponseSchemaV2),
+      this.requestParsed(
+        `/backtests/runs/${encodeURIComponent(runId)}`,
+        backtestRunResponseSchemaV2,
+      ),
     cancelRun: (runId: string): Promise<BacktestRunResponseV2> =>
-      this.postParsed(`/backtests/runs/${encodeURIComponent(runId)}/cancel`, {}, backtestRunResponseSchemaV2),
+      this.postParsed(
+        `/backtests/runs/${encodeURIComponent(runId)}/cancel`,
+        {},
+        backtestRunResponseSchemaV2,
+      ),
     retryRun: (runId: string): Promise<BacktestRunResponseV2> =>
-      this.postParsed(`/backtests/runs/${encodeURIComponent(runId)}/retry`, {}, backtestRunResponseSchemaV2),
+      this.postParsed(
+        `/backtests/runs/${encodeURIComponent(runId)}/retry`,
+        {},
+        backtestRunResponseSchemaV2,
+      ),
   };
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {

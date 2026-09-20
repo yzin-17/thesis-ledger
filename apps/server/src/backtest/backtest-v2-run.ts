@@ -14,11 +14,12 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 import { BacktestQueueService } from './backtest-queue.service.js';
 import {
+  canonicalizeManifest,
   hashCanonicalManifest,
   LocalSnapshotStore,
   type SnapshotManifest,
 } from './backtest-snapshot.js';
-import type { ArtifactRef } from './backtest-artifact-store.js';
+import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 
 export interface BacktestV2Runner {
   readonly id: string;
@@ -53,6 +54,105 @@ export interface BacktestExecutionAttempt {
   attempt: number;
   maxAttempts: number;
 }
+
+export interface ComparableDataFingerprintRange {
+  start: string;
+  end: string;
+}
+
+const comparableDateFields = ['date', 'tradingDate', 'occurredAt', 'effectiveDate'] as const;
+const comparableTimestampFields = new Set(['occurredAt', 'availableAt']);
+const comparableNumberFields = new Set(['amount']);
+const COMPARABLE_AMOUNT_DECIMAL_PLACES = 6;
+
+const datePart = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
+  return match?.[1];
+};
+
+const rowDates = (row: ArtifactRow): string[] =>
+  comparableDateFields.flatMap((field) => {
+    const value = datePart(row[field]);
+    return value ? [value] : [];
+  });
+
+const inRange = (date: string, range: ComparableDataFingerprintRange) =>
+  date >= range.start && date <= range.end;
+
+const parseJsonValue = (value: ArtifactRow['sessions']): unknown => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+};
+
+const stringifyJsonValue = (value: unknown): ArtifactRow['sessions'] =>
+  typeof value === 'string' ? value : JSON.stringify(value);
+
+const normalizeComparableField = (
+  key: string,
+  value: ArtifactRow['sessions'],
+  range: ComparableDataFingerprintRange,
+): ArtifactRow['sessions'] => {
+  if (comparableTimestampFields.has(key) && typeof value === 'string') {
+    const timestamp = Date.parse(value);
+    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
+  }
+  if (comparableNumberFields.has(key) && (typeof value === 'string' || typeof value === 'number')) {
+    const number = Number(value);
+    if (Number.isFinite(number))
+      return Number(number.toFixed(COMPARABLE_AMOUNT_DECIMAL_PLACES)).toString();
+  }
+  const parsed = parseJsonValue(value);
+  if (key === 'range' && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return JSON.stringify({ start: range.start, end: range.end });
+  }
+  if (key === 'holidays' && Array.isArray(parsed)) {
+    return stringifyJsonValue(parsed.filter((item) => {
+      const date = datePart(item);
+      return !date || inRange(date, range);
+    }));
+  }
+  if (key === 'sessionOverrides' && Array.isArray(parsed)) {
+    return stringifyJsonValue(parsed.filter((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return true;
+      const date = datePart((item as Record<string, unknown>).date);
+      return !date || inRange(date, range);
+    }));
+  }
+  return value;
+};
+
+const comparableRow = (
+  row: ArtifactRow,
+  range: ComparableDataFingerprintRange,
+  artifactKey: string,
+): ArtifactRow =>
+  Object.fromEntries(
+    Object.entries(row)
+      .filter(
+        ([key]) =>
+          key !== 'inputFingerprint' &&
+          !(artifactKey.startsWith('calendar/') && key === 'availableAt'),
+      )
+      .map(([key, value]) => [key, normalizeComparableField(key, value, range)]),
+  );
+
+const comparableRows = (
+  rows: readonly ArtifactRow[],
+  range: ComparableDataFingerprintRange,
+  artifactKey: string,
+): ArtifactRow[] =>
+  rows
+    .filter((row) => {
+      const dates = rowDates(row);
+      return dates.length === 0 || dates.some((date) => inRange(date, range));
+    })
+    .map((row) => comparableRow(row, range, artifactKey))
+    .sort((left, right) => canonicalizeManifest(left).localeCompare(canonicalizeManifest(right)));
 
 export class BacktestV2RunService {
   private readonly activeControllers = new Map<string, AbortController>();
@@ -408,5 +508,26 @@ export class BacktestV2RunService {
       },
     });
     return this.queueService?.ensureEnqueued(id) ?? retried;
+  }
+
+  async comparableDataFingerprint(
+    runId: string,
+    range: ComparableDataFingerprintRange,
+  ): Promise<string> {
+    const snapshot = await this.v2SnapshotStore().load(runId);
+    if (!snapshot) throw new BadRequestException('Run Snapshot 不存在');
+    if (snapshot.status !== 'finalized') throw new BadRequestException('Run Snapshot 尚未 finalized');
+    const artifacts = [] as Array<{ key: string; rows: ArtifactRow[] }>;
+    for (const artifact of snapshot.artifacts) {
+      const key = artifact.key.startsWith(`${runId}/`)
+        ? artifact.key.slice(runId.length + 1)
+        : artifact.key;
+      if (key.startsWith('metadata/')) continue;
+      const rows: ArtifactRow[] = [];
+      for await (const row of await this.v2SnapshotStore().artifacts.openRead(artifact)) rows.push(row);
+      artifacts.push({ key, rows: comparableRows(rows, range, key) });
+    }
+    artifacts.sort((left, right) => left.key.localeCompare(right.key));
+    return hashCanonicalManifest(artifacts);
   }
 }

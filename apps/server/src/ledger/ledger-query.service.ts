@@ -9,6 +9,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
+import { InstrumentDirectoryService } from '../market/instruments/instrument-directory.service.js';
 import { LedgerV2Repository, toLedgerEventV2 } from './ledger-v2.repository.js';
 
 type StoredLedgerEvent = {
@@ -57,11 +58,28 @@ const sortEffectiveEvents = <T extends { ledgerRevision: string; eventId: string
       : revisionDifference;
   });
 
+const symbolsFromEvents = (events: readonly unknown[]) => {
+  const symbols = new Set<string>();
+  for (const event of events) {
+    if (!event || typeof event !== 'object') continue;
+    const record = event as Record<string, unknown>;
+    const payload = record.payload;
+    if (payload && typeof payload === 'object') {
+      const payloadSymbol = (payload as Record<string, unknown>).symbol;
+      if (typeof payloadSymbol === 'string') symbols.add(payloadSymbol);
+    }
+    const symbol = record.symbol;
+    if (typeof symbol === 'string') symbols.add(symbol);
+  }
+  return [...symbols];
+};
+
 @Injectable()
 export class LedgerQueryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repository: LedgerV2Repository,
+    private readonly instrumentDirectory: InstrumentDirectoryService,
   ) {}
 
   async effectiveEvents(accountId: string, asOfRevision?: string): Promise<LedgerEventsResponseV2> {
@@ -69,12 +87,14 @@ export class LedgerQueryService {
     await this.requireAccount(accountId);
     const events = sortEffectiveEvents(await this.repository.readEffectiveEvents(accountId, asOf));
     const state = await this.readState(accountId);
+    const directory = await this.resolveInstrumentDirectory(events);
     return ledgerEventsResponseSchemaV2.parse({
       accountId,
       ledgerRevision: state.ledgerRevision,
       projectionGeneration: state.projectionGeneration,
       ...(asOf === undefined ? {} : { asOfLedgerRevision: asOf }),
       events,
+      instrumentDirectory: directory,
       effective: true,
     });
   }
@@ -94,12 +114,14 @@ export class LedgerQueryService {
       orderBy: [{ ledgerRevision: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     })) as StoredLedgerEvent[];
     const events = stored.map(toLedgerEventV2);
+    const directory = await this.resolveInstrumentDirectory(events);
     return ledgerAuditResponseSchemaV2.parse({
       accountId,
       asOfLedgerRevision: asOf,
       ledgerRevision: state.ledgerRevision,
       projectionGeneration: state.projectionGeneration,
       events,
+      instrumentDirectory: directory,
       effective: false,
     });
   }
@@ -113,6 +135,7 @@ export class LedgerQueryService {
       ledgerRevision: effective.ledgerRevision,
       projectionGeneration: effective.projectionGeneration,
       events: effective.events,
+      instrumentDirectory: effective.instrumentDirectory,
       asOfLedgerRevision: asOf,
       replayed: true,
     });
@@ -135,5 +158,9 @@ export class LedgerQueryService {
       ledgerRevision: state?.ledgerRevision.toString() ?? '0',
       projectionGeneration: state?.projectionGeneration.toString() ?? '0',
     };
+  }
+
+  private resolveInstrumentDirectory(events: readonly unknown[]) {
+    return this.instrumentDirectory.resolveSymbols(symbolsFromEvents(events));
   }
 }

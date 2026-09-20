@@ -4,10 +4,15 @@ import {
   createAiRun,
   fetchAiCapabilities,
   fetchAiRun,
+  fetchAiResearchRetryPrefill,
   fetchAiRuns,
   fetchAiToolCalls,
 } from '../src/features/ai/ai.api.js';
 import { aiKeys, shouldPollAiRuns } from '../src/features/ai/ai.queries.js';
+import {
+  parseAiResearchPageState,
+  serializeAiResearchPageState,
+} from '../src/features/ai/ai.navigation.js';
 
 const clientFor = (response: unknown) => {
   const request = vi.fn(async <T>(path: string, init?: RequestInit) => {
@@ -27,6 +32,10 @@ describe('AI 研究工作台数据契约', () => {
         context: { scope: 'portfolio', portfolioId: 'portfolio-1' },
         templateId: 'primary-risks',
         retryOfRunId: '11111111-1111-4111-8111-111111111111',
+        retryConfirmation: {
+          contextConfirmed: true,
+          acknowledgeUnknownOutcomeRisk: false,
+        },
       },
       client,
     );
@@ -39,10 +48,24 @@ describe('AI 研究工作台数据契约', () => {
           context: { scope: 'portfolio', portfolioId: 'portfolio-1' },
           templateId: 'primary-risks',
           retryOfRunId: '11111111-1111-4111-8111-111111111111',
+          retryConfirmation: {
+            contextConfirmed: true,
+            acknowledgeUnknownOutcomeRisk: false,
+          },
         }),
       }),
     );
     expect(request.mock.calls[0]?.[1]?.body).not.toEqual(expect.stringContaining('provider'));
+  });
+
+  it('再次生成先读取服务端预填与风险状态', async () => {
+    const prefill = clientFor({
+      sourceRunId: '11111111-1111-4111-8111-111111111111',
+      sourceOutcome: 'unknown',
+    });
+    await fetchAiResearchRetryPrefill('run/1', prefill.client);
+    expect(prefill.request).toHaveBeenCalledWith('/ai/runs/run%2F1/retry-prefill', undefined);
+    expect(aiKeys.retryPrefill('run-1')).not.toEqual(aiKeys.run('run-1'));
   });
 
   it('列表筛选与详情 key 隔离，详情按任务 ID 请求', async () => {
@@ -54,6 +77,47 @@ describe('AI 研究工作台数据契约', () => {
     expect(detail.request).toHaveBeenCalledWith('/ai/runs/run%2F1', undefined);
     expect(aiKeys.runs({ status: 'failed' })).not.toEqual(aiKeys.runs({ status: 'succeeded' }));
     expect(aiKeys.run('run-1')).not.toEqual(aiKeys.run('run-2'));
+  });
+
+  it('研究列表编码完整查询条件，详情显式请求研究展示投影', async () => {
+    const list = clientFor({ items: [], nextCursor: null, hasMore: false });
+    await fetchAiRuns(
+      {
+        view: 'research',
+        status: 'succeeded',
+        search: '现金流',
+        source: 'strategy',
+        includeInternal: true,
+        sort: 'updated_desc',
+      },
+      list.client,
+    );
+    expect(list.request).toHaveBeenCalledWith(
+      '/ai/runs?view=research&limit=50&status=succeeded&search=%E7%8E%B0%E9%87%91%E6%B5%81&source=strategy&includeInternal=true&sort=updated_desc',
+      undefined,
+    );
+    const detail = clientFor({ id: 'run-1' });
+    await fetchAiRun('run/1', { view: 'research' }, detail.client);
+    expect(detail.request).toHaveBeenCalledWith('/ai/runs/run%2F1?view=research', undefined);
+  });
+
+  it('URL 状态可往返恢复查询、选中任务和完整阅读模式', () => {
+    const state = parseAiResearchPageState(
+      '?q=%E9%A3%8E%E9%99%A9&status=failed&source=strategy&internal=1&run=11111111-1111-4111-8111-111111111111&mode=reading',
+    );
+    expect(state).toMatchObject({
+      search: '风险',
+      status: 'failed',
+      source: 'strategy',
+      includeInternal: true,
+      selectedRunId: '11111111-1111-4111-8111-111111111111',
+      mode: 'reading',
+    });
+    expect(parseAiResearchPageState(`?${serializeAiResearchPageState(state)}`)).toEqual(state);
+    expect(parseAiResearchPageState('?run=invalid&mode=reading')).toMatchObject({
+      selectedRunId: null,
+      mode: 'list',
+    });
   });
 
   it('只有非终态任务开启轮询', () => {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencySchema, fxRateSchemaV1 } from './market.js';
+import { currencySchema, fxRateSchemaV1, instrumentDirectorySchema } from './market.js';
 
 export const apiErrorResponseSchema = z
   .object({
@@ -533,6 +533,7 @@ export const journalReviewCandidatesResponseSchema = z.object({
   total: z.number().int().nonnegative(),
   nextCursor: z.string().min(1).nullable(),
   legacyItems: z.array(journalLegacyReviewCandidateSchema).default([]),
+  instrumentDirectory: instrumentDirectorySchema,
 });
 
 export type PortfolioValuationResponse = z.infer<typeof portfolioValuationResponseSchema>;

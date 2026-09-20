@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../src/platform/prisma.service.js';
+import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
 import { RiskService } from '../../src/risk/risk.service.js';
 import { StrategyRiskContextService } from '../../src/risk/strategy-risk-context.service.js';
 import { StrategyOptimizationCandidateService } from '../../src/strategy-optimization/strategy-optimization-candidate.service.js';
@@ -202,7 +203,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     await prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "selectedCandidateId"=${candidateId}::uuid, "lockedCandidateIds"=${JSON.stringify([candidateId])}::jsonb,
-          "testExposedAt"=CURRENT_TIMESTAMP
+          "testExposedAt"=CURRENT_TIMESTAMP, "exposure"='{"testRevealed":true}'::jsonb
       WHERE "id"=${experimentId}::uuid
     `);
     return { experimentId, candidateId, candidateVersionId: candidateVersion.id, hash };
@@ -554,7 +555,11 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     }));
     const runs = new StrategyOptimizationRunService(prisma, backtests as never);
     const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
-    const reads = new StrategyOptimizationReadService(prisma, providers as never);
+    const reads = new StrategyOptimizationReadService(
+      prisma,
+      providers as never,
+      new ResultReadPolicyService(prisma),
+    );
     const optimizer = new StrategyOptimizationService(
       prisma,
       providers as never,
@@ -596,6 +601,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     expect(adopted.strategyVersion?.version).toBe(3);
     const repeated = await optimizer.adopt(experimentId, adoptionInput);
     expect(repeated.strategyVersion?.id).toBe(adopted.strategyVersion?.id);
+    expect(repeated).toEqual(adopted);
     const diffs = await riskApplications.planDiffsForTargetVersion(adopted.strategyVersion!.id);
     const primaryDiff = diffs.find((item) => item.applicationId === primaryApplicationId);
     expect(primaryDiff).toBeDefined();
@@ -606,7 +612,11 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   it('正式采纳同 key 并发幂等、不同 key 禁止重复候选、expectedVersion fail-closed，并验证失败事务不留半套 Adoption', async () => {
     const runs = new StrategyOptimizationRunService(prisma, backtests as never);
     const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
-    const reads = new StrategyOptimizationReadService(prisma, providers as never);
+    const reads = new StrategyOptimizationReadService(
+      prisma,
+      providers as never,
+      new ResultReadPolicyService(prisma),
+    );
     const optimizer = new StrategyOptimizationService(
       prisma,
       providers as never,
@@ -617,10 +627,15 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     );
 
     const concurrentCandidate = await insertAdoptableCandidate(version2Id, -20, strategy('0.09', '0.20'));
+    const currentBeforeConcurrent = await prisma.strategyVersion.aggregate({
+      where: { strategyId, version: { gt: 0 } },
+      _max: { version: true },
+    });
+    const expectedBeforeConcurrent = currentBeforeConcurrent._max.version ?? 0;
     const concurrentInput = {
       candidateId: concurrentCandidate.candidateId,
       candidateHash: concurrentCandidate.hash,
-      expectedStrategyVersion: 3,
+      expectedStrategyVersion: expectedBeforeConcurrent,
       idempotencyKey: `postgres-e2e-adoption-${suffix}-concurrent`,
       acknowledgeTestExposure: false,
     };
@@ -629,7 +644,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
       optimizer.adopt(concurrentCandidate.experimentId, concurrentInput),
     ]);
     expect(concurrent[0].strategyVersion?.id).toBe(concurrent[1].strategyVersion?.id);
-    expect(concurrent[0].strategyVersion?.version).toBe(4);
+    expect(concurrent[0].strategyVersion?.version).toBe(expectedBeforeConcurrent + 1);
     const retryAfterCommittedResponseLoss = await optimizer.adopt(
       concurrentCandidate.experimentId,
       concurrentInput,
@@ -647,7 +662,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
       optimizer.adopt(staleCandidate.experimentId, {
         candidateId: staleCandidate.candidateId,
         candidateHash: staleCandidate.hash,
-        expectedStrategyVersion: 3,
+        expectedStrategyVersion: expectedBeforeConcurrent,
         idempotencyKey: `postgres-e2e-adoption-${suffix}-stale-version`,
         acknowledgeTestExposure: false,
       }),
@@ -659,18 +674,23 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
 
     const raceA = await insertAdoptableCandidate(version2Id, -22, strategy('0.11', '0.20'));
     const raceB = await insertAdoptableCandidate(version2Id, -23, strategy('0.12', '0.20'));
+    const currentBeforeRace = await prisma.strategyVersion.aggregate({
+      where: { strategyId, version: { gt: 0 } },
+      _max: { version: true },
+    });
+    const expectedBeforeRace = currentBeforeRace._max.version ?? 0;
     const race = await Promise.allSettled([
       optimizer.adopt(raceA.experimentId, {
         candidateId: raceA.candidateId,
         candidateHash: raceA.hash,
-        expectedStrategyVersion: 4,
+        expectedStrategyVersion: expectedBeforeRace,
         idempotencyKey: `postgres-e2e-adoption-${suffix}-race-a`,
         acknowledgeTestExposure: false,
       }),
       optimizer.adopt(raceB.experimentId, {
         candidateId: raceB.candidateId,
         candidateHash: raceB.hash,
-        expectedStrategyVersion: 4,
+        expectedStrategyVersion: expectedBeforeRace,
         idempotencyKey: `postgres-e2e-adoption-${suffix}-race-b`,
         acknowledgeTestExposure: false,
       }),

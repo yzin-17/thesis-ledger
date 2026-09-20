@@ -69,7 +69,7 @@ export class StrategyRiskRuntimeService {
       : 'warning';
     const channels = Array.isArray(value.channels)
       ? value.channels.filter((item): item is string => typeof item === 'string')
-      : ['feishu'];
+      : [];
     return {
       enabled: value.enabled !== false,
       cooldownMinutes:
@@ -81,17 +81,16 @@ export class StrategyRiskRuntimeService {
     };
   }
 
-  private assertCurrentRevision(stored: StoredRule, application: StrategyRiskApplicationRuntimeRow) {
+  private assertCurrentRevision(
+    stored: StoredRule,
+    application: StrategyRiskApplicationRuntimeRow,
+  ) {
     const revision = toRecord(stored.parameters).applicationRevision;
     if (typeof revision === 'number' && revision !== application.revision)
       throw new BadRequestException('策略风险规则修订已经失效，请刷新后重试');
   }
 
-  private async target(
-    symbol: string,
-    timeframe: string,
-    requiresHoldingPeriods: boolean,
-  ) {
+  private async target(symbol: string, timeframe: string, requiresHoldingPeriods: boolean) {
     const asset = await this.prisma.asset.findUnique({
       where: { symbol },
       select: { assetType: true, market: true },
@@ -114,10 +113,10 @@ export class StrategyRiskRuntimeService {
     const hasPosition = Number(actual.context.quantity ?? '0') > 0;
     const sameCycle = Boolean(
       hasPosition &&
-        ((typeof anchor.tradeId === 'string' && anchor.tradeId === actual.tradeId) ||
-          (typeof anchor.tradeId !== 'string' &&
-            typeof anchor.positionId === 'string' &&
-            anchor.positionId === actual.positionId)),
+      ((typeof anchor.tradeId === 'string' && anchor.tradeId === actual.tradeId) ||
+        (typeof anchor.tradeId !== 'string' &&
+          typeof anchor.positionId === 'string' &&
+          anchor.positionId === actual.positionId)),
     );
     if (!sameCycle) return null;
     return {
@@ -138,7 +137,10 @@ export class StrategyRiskRuntimeService {
     actual: StrategyRiskActualContext,
     evaluatedAt: Date,
   ): { candidate: EvaluationCandidate; event: RiskEvent } | null {
-    if (!['triggered', 'not_triggered'].includes(evaluation.state) || evaluation.value === undefined)
+    if (
+      !['triggered', 'not_triggered'].includes(evaluation.state) ||
+      evaluation.value === undefined
+    )
       return null;
     const marketTime = evaluation.occurredAt ?? evaluatedAt.toISOString();
     const value = Number(evaluation.value);
@@ -200,7 +202,10 @@ export class StrategyRiskRuntimeService {
     return { candidate, event };
   }
 
-  async evaluateStoredRule(stored: StoredRule, evaluatedAt = new Date()): Promise<StrategyRiskRuntimeEvaluation> {
+  async evaluateStoredRule(
+    stored: StoredRule,
+    evaluatedAt = new Date(),
+  ): Promise<StrategyRiskRuntimeEvaluation> {
     if (!stored.sourcePlanId) throw new BadRequestException('规则缺少策略风险应用来源');
     const application = await this.application(stored.sourcePlanId);
     this.assertCurrentRevision(stored, application);

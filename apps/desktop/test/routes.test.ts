@@ -6,8 +6,8 @@ describe('Desktop routes', () => {
     expect(desktopRoutes.map(({ view, path }) => [view, path])).toEqual([
       ['portfolio', '/portfolio'],
       ['position-entry', '/accounts'],
-      ['risk-center', '/risk-center'],
       ['performance', '/performance'],
+      ['risk-center', '/risk-center'],
       ['strategy', '/strategy'],
       ['journal', '/journal'],
       ['ai-chat', '/ai-chat'],
@@ -17,8 +17,8 @@ describe('Desktop routes', () => {
     expect(desktopNavigation).toEqual([
       'portfolio',
       'position-entry',
-      'risk-center',
       'performance',
+      'risk-center',
       'strategy',
       'journal',
       'ai-chat',

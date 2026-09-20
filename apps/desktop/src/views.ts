@@ -16,9 +16,9 @@ export type DesktopNavigationView = Exclude<DesktopView, 'position-detail' | 'au
 export const desktopRoutes = [
   { view: 'portfolio', path: '/portfolio', label: '投资组合' },
   { view: 'position-entry', path: '/accounts', label: '账户数据' },
-  { view: 'risk-center', path: '/risk-center', label: '风险中心' },
   { view: 'performance', path: '/performance', label: '收益分析' },
-  { view: 'strategy', path: '/strategy', label: '策略实验' },
+  { view: 'risk-center', path: '/risk-center', label: '风险中心' },
+  { view: 'strategy', path: '/strategy', label: '策略中心' },
   { view: 'journal', path: '/journal', label: '投资复盘' },
   { view: 'ai-chat', path: '/ai-chat', label: '研究助手' },
   { view: 'providers', path: '/providers', label: '数据与自动化' },

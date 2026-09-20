@@ -32,6 +32,18 @@ describe('回测模型响应与摘要', () => {
     expect(summary).not.toHaveProperty('input');
     expect(summary.executionModelDisclosure).not.toHaveProperty('contentHash');
   });
+  it('摘要只提取结果指标，不返回完整结果', () => {
+    const summary = toBacktestJobSummary({
+      ...record,
+      result: {
+        metrics: { cumulativeReturn: 0.12, maxDrawdown: -0.05 },
+        equityCurve: [{ date: '2026-01-01', value: 100 }],
+        trades: [{ id: 'trade-1' }],
+      },
+    } as never);
+    expect(summary.resultMetrics).toEqual({ cumulativeReturn: 0.12, maxDrawdown: -0.05 });
+    expect(summary).not.toHaveProperty('result');
+  });
   it('旧任务和没有模型的输入保持原样', () => {
     expect(withBacktestModelDisclosure(null)).toBeNull();
     for (const input of [null, {}, { runConfig: {} }]) {
@@ -41,7 +53,10 @@ describe('回测模型响应与摘要', () => {
   });
   it('创建和两条详情路由返回同一披露契约', async () => {
     const controller = new BacktestController(
-      { createRun: vi.fn(async () => record), status: vi.fn(async () => record) } as never,
+      {
+        createRun: vi.fn(async () => record),
+        statusForRead: vi.fn(async () => record),
+      } as never,
       {} as never,
     );
     for (const response of [

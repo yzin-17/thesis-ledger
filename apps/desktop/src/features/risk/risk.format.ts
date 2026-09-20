@@ -117,7 +117,9 @@ export const ruleTargetLabel = (
   if (rule.scope === 'security') {
     const symbol = rule.symbol ?? '未指定证券';
     const parts = [symbol, ...(assetName ? [assetName] : [])];
-    return rule.accountId ? `${parts.join(' · ')} · ${accountName ?? '指定账户'}` : parts.join(' · ');
+    return rule.accountId
+      ? `${parts.join(' · ')} · ${accountName ?? '指定账户'}`
+      : parts.join(' · ');
   }
   if (rule.scope === 'account') return rule.accountId ?? '未指定账户';
   return '全组合';
@@ -222,14 +224,16 @@ export const riskEventValueLabel = (context: Record<string, unknown> | null | un
   if (riskEventContextInput(context, 'observations') !== undefined) {
     return `回撤 ${formatRatioPercent(value)}`;
   }
-  if (riskEventContextInput(context, 'rsi') !== undefined) return `RSI ${formatMetricNumber(value)}`;
+  if (riskEventContextInput(context, 'rsi') !== undefined)
+    return `RSI ${formatMetricNumber(value)}`;
   if (riskEventContextInput(context, 'ma') !== undefined) {
     return `较均线偏离 ${formatMetricNumber(value)}`;
   }
   if (riskEventContextInput(context, 'dea') !== undefined) {
     return `MACD 差值 ${formatMetricNumber(value)}`;
   }
-  if (riskEventContextInput(context, 'atr') !== undefined) return `ATR ${formatMetricNumber(value)}`;
+  if (riskEventContextInput(context, 'atr') !== undefined)
+    return `ATR ${formatMetricNumber(value)}`;
   if (riskEventContextInput(context, 'mainPeak') !== undefined) {
     return `距筹码峰 ${formatRatioPercent(value)}`;
   }
@@ -247,6 +251,11 @@ export const riskChannelLabel = (channel: string) => {
   if (channel === 'email') return '邮件';
   if (channel === 'webhook') return 'Webhook';
   return channel;
+};
+
+export const notificationRouteLabel = (route: { channel: string; provider: string }) => {
+  const channelLabel = riskChannelLabel(route.channel);
+  return channelLabel === route.provider ? channelLabel : `${route.provider}（${channelLabel}）`;
 };
 
 export const riskSubjectLabel = (subjectType: string) => {

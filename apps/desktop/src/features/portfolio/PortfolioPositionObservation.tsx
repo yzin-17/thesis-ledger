@@ -26,17 +26,29 @@ const positionPnlClass = (value: number | null) => {
   return marketToneClass(marketToneForValue(value)) ?? 'text-foreground';
 };
 
+const positionDisplayName = (
+  position: Position,
+  resolveInstrumentName?: (symbol: string) => string | undefined,
+) => {
+  const directoryName = resolveInstrumentName?.(position.symbol);
+  return directoryName ?? (position.asset.name || position.symbol);
+};
+
 export function PositionOverviewMenu({
   positions,
   busyAction,
   clearPositions,
+  onOpenImport,
+  onOpenReconciliation,
 }: {
   positions: Position[];
   busyAction: string | null;
   clearPositions: () => Promise<void>;
+  onOpenImport?: () => void;
+  onOpenReconciliation?: () => void;
 }) {
   const busy = busyAction !== null;
-  if (positions.length === 0) return null;
+  if (positions.length === 0 && !onOpenImport && !onOpenReconciliation) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -55,6 +67,16 @@ export function PositionOverviewMenu({
       />
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
+          {onOpenImport && (
+            <DropdownMenuItem disabled onClick={onOpenImport}>
+              导入持仓快照（暂未开放）
+            </DropdownMenuItem>
+          )}
+          {onOpenReconciliation && (
+            <DropdownMenuItem disabled onClick={onOpenReconciliation}>
+              对账候选（暂未开放）
+            </DropdownMenuItem>
+          )}
           {positions.length > 0 && (
             <DropdownMenuItem
               variant="destructive"
@@ -76,12 +98,14 @@ export function PositionObservationContent({
   onCreate,
   onEdit,
   remove,
+  resolveInstrumentName,
 }: {
   positions: Position[];
   busyAction: string | null;
   onCreate: () => void;
   onEdit: (position: Position) => void;
   remove: (position: Position) => Promise<void>;
+  resolveInstrumentName?: (symbol: string) => string | undefined;
 }) {
   if (positions.length === 0) {
     return (
@@ -101,17 +125,26 @@ export function PositionObservationContent({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-sm">
+      <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-0 text-left text-sm">
         <caption className="sr-only">持仓快照列表</caption>
+        <colgroup>
+          <col className="w-[25%]" />
+          <col className="w-[14%]" />
+          <col className="w-[12%]" />
+          <col className="w-[13%]" />
+          <col className="w-[11%]" />
+          <col className="w-[10%]" />
+          <col className="w-[15%]" />
+        </colgroup>
         <thead className="border-b bg-muted text-xs text-muted-foreground">
           <tr>
-            <th className="px-4 py-3 font-medium">标的</th>
-            <th className="px-4 py-3 text-right font-medium">持仓市值</th>
-            <th className="px-4 py-3 text-right font-medium">盈亏</th>
-            <th className="px-4 py-3 font-medium">记录类型</th>
-            <th className="px-4 py-3 font-medium">来源</th>
-            <th className="px-4 py-3 font-medium">快照状态</th>
-            <StickyTableActionHeader className="w-40 px-3 py-3 font-medium">
+            <th className="px-3 py-3 font-medium">标的</th>
+            <th className="px-3 py-3 text-right font-medium">持仓市值</th>
+            <th className="px-3 py-3 text-right font-medium">盈亏</th>
+            <th className="px-3 py-3 font-medium">记录类型</th>
+            <th className="px-3 py-3 font-medium">来源</th>
+            <th className="px-3 py-3 font-medium">快照状态</th>
+            <StickyTableActionHeader className="w-auto min-w-0 px-3 py-3 font-medium">
               操作
             </StickyTableActionHeader>
           </tr>
@@ -119,37 +152,40 @@ export function PositionObservationContent({
         <tbody className="divide-y">
           {positions.map((position) => (
             <tr key={position.id} className="align-middle">
-              <td className="px-4 py-3">
+              <td className="min-w-0 max-w-0 whitespace-normal px-3 py-3 align-top">
                 <div className="min-w-0">
-                  <strong className="block max-w-[320px] truncate font-medium text-foreground">
-                    {position.asset.name || position.symbol}
+                  <strong className="block max-w-full truncate font-medium text-foreground">
+                    {positionDisplayName(position, resolveInstrumentName)}
                   </strong>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="mt-1 block break-words text-xs text-muted-foreground">
                     {position.symbol} · {position.quantity}
                     {assetQuantityUnit(position.asset.assetType, position.symbol)} ·{' '}
                     {money.format(position.costPrice)}
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-foreground">
+              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-foreground">
                 {position.marketValue === null ? '—' : money.format(position.marketValue)}
               </td>
               <td
-                className={cn('px-4 py-3 text-right tabular-nums', positionPnlClass(position.pnl))}
+                className={cn(
+                  'whitespace-nowrap px-3 py-3 text-right tabular-nums',
+                  positionPnlClass(position.pnl),
+                )}
               >
                 {position.pnl === null ? '—' : money.format(position.pnl)}
               </td>
-              <td className="px-4 py-3">
+              <td className="whitespace-nowrap px-3 py-3">
                 <Badge variant="outline">持仓快照</Badge>
               </td>
-              <td className="px-4 py-3 text-sm text-muted-foreground">
+              <td className="truncate px-3 py-3 text-sm text-muted-foreground">
                 {position.source ?? '未知'}
               </td>
-              <td className="px-4 py-3">
+              <td className="whitespace-nowrap px-3 py-3">
                 <Badge variant="secondary">已记录快照</Badge>
               </td>
-              <StickyTableActionCell className="w-40 px-3 py-2">
-                <div className="flex gap-1">
+              <StickyTableActionCell className="w-auto min-w-0 px-3 py-2">
+                <div className="mx-auto flex w-fit flex-col items-center gap-1">
                   <Button
                     size="sm"
                     type="button"
@@ -191,11 +227,13 @@ export function StandardPositionContent({
   busyAction,
   onEdit,
   remove,
+  resolveInstrumentName,
 }: {
   positions: Position[];
   busyAction: string | null;
   onEdit: (position: Position) => void;
   remove: (position: Position) => Promise<void>;
+  resolveInstrumentName?: (symbol: string) => string | undefined;
 }) {
   if (positions.length === 0) {
     return (
@@ -214,7 +252,7 @@ export function StandardPositionContent({
         >
           <div className="min-w-0">
             <strong className="block truncate text-sm font-medium text-foreground">
-              {position.asset.name || position.symbol}
+              {positionDisplayName(position, resolveInstrumentName)}
             </strong>
             <span className="text-xs text-muted-foreground">
               {position.symbol} · {position.quantity} · {money.format(position.costPrice)}

@@ -226,7 +226,7 @@ JSON 必须合法，且应包含可识别的 `universe.symbols`。Schema 校验�
 
 研究任务采用“持久化队列 + 专用研究执行器”：创建后进入 `queued`，服务端 Worker 会领取任务、执行只读 Tool、记录 `AiToolCall` 审计并调用 Provider；只有通过 `ResearchResult V1` 和 citation/Tool 关联校验的结果才会进入“已完成”。Worker 租约过期或服务重启后会重新排队，超过重试上限则进入失败终态，不会永久停留在排队或运行中。
 
-要启用 OpenAI-compatible Provider，在服务端配置 `AI_BASE_URL`、`AI_API_KEY` 和 `AI_MODEL`，可选 `AI_PROVIDER_ID`、`AI_TIMEOUT_MS`。`AI_FIXTURE_ENABLED=true` 只用于本地演示，页面会显示“演示模式”，不能当作实时外部事实。未配置 Provider 时仍可浏览历史任务，但新建 Sheet 会在能力预检阶段说明缺失配置并禁用提交。
+AI 业务生成固定使用 Vercel AI SDK，`AI_GENERATION_RUNTIME` 只接受 `sdk`，不存在 legacy 回退开关。推荐在 Provider 设置页保存 adapter、模型和按业务契约声明的执行路由；部署级配置可使用 `AI_PROVIDER_CONFIGS_JSON` 提供同一结构。旧的 `AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL` 与可选 `AI_PROVIDER_ID` 只保留 Provider 注册兼容性，没有执行路由声明时不会被视为接入就绪。`AI_FIXTURE_ENABLED=true` 只注册显式进程内演示 Provider，不会在真实 Provider 失败后接管业务请求，也不能当作外部接入证据。未配置就绪路由时仍可浏览历史任务，但新任务会在首次发送前失败关闭。
 
 ### 8. 数据与自动化
 

@@ -11,6 +11,7 @@ import {
   modelsToText,
   requestAiProviderDeletion,
 } from '../src/features/providers/ai-provider.actions.js';
+import { newAiProviderExecutionRouteDraft } from '../src/features/providers/ai-provider-execution.js';
 import {
   deleteAiProvider,
   fetchAiProviderModels,
@@ -188,6 +189,65 @@ describe('AI Provider 专用请求与密钥边界', () => {
     );
   });
 
+  it('执行路由可保存未就绪声明，并保留 adapter、模式、参数和免费依据', () => {
+    const route = {
+      ...newAiProviderExecutionRouteDraft('model-a'),
+      mode: 'native_schema' as const,
+      contractId: 'strategy_discovery' as const,
+      declarationSource: 'manual' as const,
+      declarationSourceRef: 'provider-docs',
+      declarationSourceVersion: '2026-09',
+      declaredBy: 'local-operator',
+      firstOutputTimeoutMs: '10000',
+      outputIdleTimeoutMs: '30000',
+      freeEvidenceSource: 'controlled_local' as const,
+      freeEvidenceSourceRef: 'controlled-run-1',
+      freeEvidenceSourceVersion: 'v1',
+    };
+    const input = aiProviderInputFromDraft({
+      ...newAiProviderDraft(),
+      name: 'local-provider',
+      modelsText: 'model-a',
+      adapter: 'openai-compatible',
+      executionRoutes: [route],
+    });
+
+    expect(input).toMatchObject({
+      adapter: 'openai-compatible',
+      executionRoutes: [
+        {
+          model: 'model-a',
+          mode: 'native_schema',
+          contract: { id: 'strategy_discovery' },
+          capabilityDeclaration: {
+            source: 'manual',
+            sourceRef: 'provider-docs',
+            declaredBy: 'local-operator',
+          },
+          firstOutputTimeoutMs: 10000,
+          outputIdleTimeoutMs: 30000,
+          freeEvidence: {
+            source: 'controlled_local',
+            sourceRef: 'controlled-run-1',
+          },
+        },
+      ],
+    });
+    expect(aiProviderDraftError(input)).toBeNull();
+    expect(
+      aiProviderDraftError({
+        ...input,
+        executionRoutes: [
+          {
+            ...input.executionRoutes![0]!,
+            capabilityDeclaration: null,
+            freeEvidence: null,
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
   it('通知 Provider 仍使用通用保存与草稿测试端点', async () => {
     const requestClient = client({});
     const notification = {
@@ -235,6 +295,9 @@ describe('AI Provider 页面操作', () => {
     expect(markup).not.toContain('<textarea');
     expect(markup).toContain('API Key');
     expect(markup).toContain('超时（毫秒）');
+    expect(markup).toContain('id="ai-cost-currency"');
+    expect(markup).toContain('data-slot="select-trigger"');
+    expect(markup).toContain('>USD<');
     expect(draft.credentialsRef).toBe('');
     expect(markup).not.toContain('server-secret');
   });
@@ -363,8 +426,58 @@ describe('AI Provider 页面操作', () => {
     expect(markup).toContain('nvidia/nemotron-3-super-120b-a12b:free');
     expect(markup).toContain('truncate');
     expect(markup).toContain('>+2<');
+    expect(markup).toContain('text-button danger');
     expect(markup).not.toContain('cohere/north-mini-code:free');
     expect(markup).not.toContain('google/gemma-4-26b-a4b-it:free');
+  });
+
+  it('连接健康、接入就绪和真实验收使用独立中文状态', () => {
+    const markup = renderToStaticMarkup(
+      <ProviderTable
+        loadState="ready"
+        providers={[
+          aiProvider({
+            health: 'healthy',
+            executionRoutes: [
+              {
+                model: 'model-a',
+                adapter: 'openai-compatible',
+                mode: 'json_validated',
+                contract: { id: 'research', version: 'research-generation-v1' },
+                capabilityDeclaration: null,
+                adapterEvidence: null,
+                readiness: {
+                  state: 'blocked',
+                  reasons: ['capability_declaration_missing'],
+                  configurationFingerprint: 'fingerprint',
+                  evaluatedAt: '2026-09-19T00:00:00.000Z',
+                },
+                liveValidation: { status: 'not_run', checkedAt: null, requestId: null },
+                allowedUpstreams: [],
+                freeEvidenceRef: null,
+              },
+            ],
+          }),
+        ]}
+        priorityDrafts={{}}
+        testingProviderName={null}
+        savingProviderName={null}
+        deletingProviderName={null}
+        onPriorityChange={() => undefined}
+        onPrioritySave={() => undefined}
+        onEdit={() => undefined}
+        onTest={() => undefined}
+        onToggle={() => undefined}
+        onDelete={() => undefined}
+        onCreate={() => undefined}
+      />,
+    );
+    expect(markup).toContain('连接健康：健康');
+    expect(markup).toContain('接入阻断 1/1');
+    expect(markup).toContain('真实验收未执行');
+    expect(markup).toContain('缺少能力声明。编辑配置后会重新评估。');
+    expect(markup).not.toContain('>ready<');
+    expect(markup).not.toContain('>not_run<');
   });
 
   it('Provider 模型悬停浮层每行展示一个完整模型', () => {

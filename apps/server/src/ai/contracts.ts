@@ -1,3 +1,9 @@
+import type { AiAdapter } from '@thesis-ledger/schemas';
+import type {
+  AiProviderCapabilityRevocation,
+  AiProviderExecutionRouteInput,
+} from './ai-provider.contracts.js';
+
 export type PortfolioMode = 'actual' | 'shadow';
 
 export type ToolPermission =
@@ -33,6 +39,10 @@ export interface AiProviderMetadata {
   costCurrency?: string;
   pricingVersion?: string;
   modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
+  adapter?: AiAdapter;
+  executionRoutes?: readonly AiProviderExecutionRouteInput[];
+  capabilityRevocations?: readonly AiProviderCapabilityRevocation[];
+  credentialFingerprint?: string;
 }
 
 export interface AiTool {
@@ -46,7 +56,9 @@ export interface AiProvider {
   readonly id: string;
   readonly models: readonly string[];
   readonly metadata?: AiProviderMetadata;
-  complete(
+  sdkRuntime?(): { baseURL: string; apiKey: string; timeoutMs: number };
+  /** 仅供显式进程内 fixture 使用；远程业务生成统一走 AiSdkGenerationAdapter。 */
+  complete?: (
     input: {
       model: string;
       messages: unknown[];
@@ -55,7 +67,7 @@ export interface AiProvider {
       reasoningEffort?: AiReasoningEffort;
     },
     signal: AbortSignal,
-  ): Promise<{
+  ) => Promise<{
     content: unknown;
     inputTokens: number;
     outputTokens: number;

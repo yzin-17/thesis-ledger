@@ -55,6 +55,7 @@ export function PortfolioManagement({
   step,
   showCash = true,
   calibrationMode = false,
+  resolveInstrumentName,
   embedded = false,
   onOpenImport,
   onOpenReconciliation,
@@ -77,6 +78,7 @@ export function PortfolioManagement({
   step: 'account' | 'position';
   showCash?: boolean;
   calibrationMode?: boolean;
+  resolveInstrumentName?: (symbol: string) => string | undefined;
   embedded?: boolean;
   onOpenImport?: () => void;
   onOpenReconciliation?: () => void;
@@ -277,6 +279,7 @@ export function PortfolioManagement({
       showCash={showCash}
       calibrationMode={calibrationMode}
       embedded={embedded}
+      {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
       {...(onOpenImport ? { onOpenImport } : {})}
       {...(onOpenReconciliation ? { onOpenReconciliation } : {})}
       accountFormInline={accountFormInline}

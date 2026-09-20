@@ -110,13 +110,17 @@ describe('AI 研究分页与上下文授权', () => {
     );
     expect(updateMany.mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({
-        where: expect.objectContaining({ promptVersion: { not: 'strategy-optimization-v1' } }),
+        where: expect.objectContaining({
+          promptVersion: { notIn: ['strategy-optimization-v1', 'research-v1'] },
+        }),
         data: expect.objectContaining({ errorCode: 'worker_lease_expired' }),
       }),
     );
     expect(updateMany.mock.calls[2]?.[0]).toEqual(
       expect.objectContaining({
-        where: expect.objectContaining({ promptVersion: { not: 'strategy-optimization-v1' } }),
+        where: expect.objectContaining({
+          promptVersion: { notIn: ['strategy-optimization-v1', 'research-v1'] },
+        }),
         data: expect.objectContaining({ errorCode: 'worker_lease_exhausted' }),
       }),
     );

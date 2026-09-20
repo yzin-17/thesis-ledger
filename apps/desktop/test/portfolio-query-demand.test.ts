@@ -16,6 +16,7 @@ import {
 import {
   accountValuationQueryOptions,
   isPortfolioSummaryConsumerRoute,
+  portfolioInstrumentSearchQueryOptions,
   portfolioValuationQueryOptions,
   portfolioKeys,
 } from '../src/features/portfolio/portfolio.queries.js';
@@ -42,6 +43,20 @@ const makeRequestClient = () => {
 };
 
 describe('组合估值按消费路由与影响范围失效', () => {
+  it('标的搜索失败后不因观察者重新挂载而自动重试', () => {
+    const client = makeClient();
+    const query = new QueryObserver(
+      client,
+      portfolioInstrumentSearchQueryOptions('securities', '159516', true),
+    );
+
+    expect(query.options.retry).toBe(false);
+    expect(query.options.retryOnMount).toBe(false);
+    expect(query.options.refetchOnMount).toBe(false);
+    expect(query.options.refetchOnReconnect).toBe(false);
+    expect(query.options.refetchOnWindowFocus).toBe(false);
+  });
+
   it('只在实际消费组合摘要的路由启用 all valuation', () => {
     expect(isPortfolioSummaryConsumerRoute('/portfolio')).toBe(true);
     expect(isPortfolioSummaryConsumerRoute('/risk-center')).toBe(true);

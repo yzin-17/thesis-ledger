@@ -14,6 +14,7 @@ export type PortfolioManagementViewProps = {
   step: 'account' | 'position';
   showCash?: boolean;
   calibrationMode?: boolean;
+  resolveInstrumentName?: (symbol: string) => string | undefined;
   embedded?: boolean;
   onOpenImport?: () => void;
   onOpenReconciliation?: () => void;

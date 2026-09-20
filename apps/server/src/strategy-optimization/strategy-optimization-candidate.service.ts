@@ -13,39 +13,40 @@ import { PrismaService } from '../platform/prisma.service.js';
 import {
   asJson,
   optimizationSha256,
-  redactOptimizationError,
   toRecord,
   type CandidateRow,
   type ExperimentRow,
   type StrategyVersionRecord,
 } from './strategy-optimization-common.js';
-import { optimizationModelConcurrency } from './strategy-optimization-concurrency.js';
 import { applyOptimizationProposal, proposalDiff } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 import type { OptimizationModelRoute } from './strategy-optimization-model-routing.js';
 import {
   discoveryCandidateDiff,
   discoveryCandidateStrategy,
-  discoveryPrompt,
   parseDiscoveryOutput,
 } from './strategy-optimization-discovery.js';
 import { recordOptimizationAttempt } from './strategy-optimization-attempt.store.js';
+import { optimizationCostFacts } from './strategy-optimization-cost.js';
+import {
+  markOptimizationUnknownOutcome,
+  type OptimizationStepRow,
+} from './strategy-optimization-attempt-lifecycle.js';
+import { StrategyOptimizationSdkExecutor } from './strategy-optimization-sdk-executor.js';
+import { strategyOptimizationPrompt } from './strategy-optimization-prompt.js';
+import {
+  reusableOptimizationSdkCache,
+  type OptimizationSdkCacheIdentity,
+} from './strategy-optimization-sdk-cache.js';
 
 type ProviderRoute = OptimizationModelRoute;
-type OptimizationStepRow = {
-  id: string;
-  experimentId: string;
-  modelKey: string;
-  aiRunId: string | null;
-  attempt: number;
-  status: string;
-  proposal: unknown;
-  error: string | null;
-  startedAt: Date | null;
-  leaseUntil: Date | null;
-  completedAt: Date | null;
-  createdAt: Date;
-};
+const OPTIMIZATION_PROVIDER_REQUEST_CEILING_MS = 120_000;
+
+const missingSdkExecutor = {
+  resolveRoute: () => {
+    throw new Error('策略优化 SDK 执行器未装配；禁止回退 legacy Provider 调用');
+  },
+} as unknown as StrategyOptimizationSdkExecutor;
 
 const stepError = (message: string) => new Error(message);
 
@@ -53,56 +54,10 @@ const stepError = (message: string) => new Error(message);
 export class StrategyOptimizationCandidateService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly providers: AiProviderRegistry,
+    _providers: AiProviderRegistry,
     private readonly runs: StrategyOptimizationRunService,
+    private readonly sdkExecutor: StrategyOptimizationSdkExecutor = missingSdkExecutor,
   ) {}
-
-  private async priorFeedback(experimentId: string, modelKey: string) {
-    const rows = await this.prisma.$queryRaw<Array<{ diff: unknown; metrics: unknown }>>(Prisma.sql`
-      SELECT "diff", "metrics" FROM "OptimizationCandidate"
-      WHERE "experimentId"=${experimentId}::uuid AND "modelKey"=${modelKey}
-      ORDER BY "candidateNumber" DESC LIMIT 3
-    `);
-    return rows.map((row) => ({ diff: row.diff, metrics: row.metrics }));
-  }
-
-  private async prompt(
-    experiment: ExperimentRow,
-    strategy: StrategySchemaV2,
-    descriptors: StrategyParameterDescriptor[],
-    modelKey: string,
-    round: number,
-  ) {
-    const allowed = new Set(experiment.allowedParameterIds as string[]);
-    const authorized = descriptors.filter((item) => allowed.has(item.parameterId));
-    const priorCandidates = await this.priorFeedback(experiment.id, modelKey);
-    if (experiment.sourceMode === 'discovery')
-      return discoveryPrompt(experiment, strategy, round, priorCandidates);
-    return [
-      {
-        role: 'system',
-        content:
-          '你是策略参数优化器。只能修改允许的 parameterId；不得修改数据、执行语义或生成代码。只输出 OptimizationProposal JSON。不得声明收益率或回测结果，真实结果以服务端回测为准。',
-      },
-      {
-        role: 'user',
-        content: `OPTIMIZATION_REQUEST_JSON:${JSON.stringify({
-          semanticVersion: 'strategy-optimization-v1',
-          modelKey,
-          round,
-          objective: experiment.objective,
-          authorizedParameters: authorized,
-          baselineMetrics: experiment.baselineMetrics,
-          priorCandidates,
-          strategy: {
-            name: strategy.name,
-            primaryTimeframe: strategy.primaryTimeframe,
-            executionInstrument: strategy.executionInstrument,
-          },
-        })}`,
-      },
-    ];
-  }
 
   private async step(experimentId: string, modelKey: string, round: number) {
     const rows = await this.prisma.$queryRaw<OptimizationStepRow[]>(Prisma.sql`
@@ -139,51 +94,7 @@ export class StrategyOptimizationCandidateService {
   }
 
   private async markUnknownOutcome(step: OptimizationStepRow, error: unknown, durationMs?: number) {
-    const summary = redactOptimizationError(error);
-    const rows = await this.prisma.$queryRaw<Array<{ aiRunId: string | null }>>(Prisma.sql`
-      UPDATE "OptimizationAttempt"
-      SET "status"='unknown_outcome', "error"=${summary}, "leaseUntil"=NULL, "completedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${step.id}::uuid AND "status"='running'
-      RETURNING "aiRunId"
-    `);
-    const aiRunId = rows[0]?.aiRunId ?? step.aiRunId;
-    if (aiRunId) {
-      await this.prisma.aiRun.updateMany({
-        where: { id: aiRunId, status: 'running' },
-        data: {
-          status: 'failed',
-          errorCode: 'optimization_unknown_outcome',
-          errorSummary: summary,
-          completedAt: new Date(),
-          claimedAt: null,
-          leaseUntil: null,
-          ...(durationMs === undefined ? {} : { durationMs }),
-        },
-      });
-    }
-  }
-
-  private async markKnownFailure(step: OptimizationStepRow, error: unknown, durationMs?: number) {
-    const summary = redactOptimizationError(error);
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationAttempt"
-      SET "status"='failed', "error"=${summary}, "leaseUntil"=NULL, "completedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${step.id}::uuid AND "status"='running'
-    `);
-    if (step.aiRunId) {
-      await this.prisma.aiRun.updateMany({
-        where: { id: step.aiRunId, status: 'running' },
-        data: {
-          status: 'failed',
-          errorCode: 'optimization_proposal_failed',
-          errorSummary: summary,
-          completedAt: new Date(),
-          claimedAt: null,
-          leaseUntil: null,
-          ...(durationMs === undefined ? {} : { durationMs }),
-        },
-      });
-    }
+    await markOptimizationUnknownOutcome(this.prisma, step, error, durationMs);
   }
 
   private async recoverExpiredRunningStep(step: OptimizationStepRow) {
@@ -204,9 +115,13 @@ export class StrategyOptimizationCandidateService {
     inputTokenReservation: number;
     outputTokenReservation: number;
     estimatedCost: number;
+    sdkCacheIdentity: OptimizationSdkCacheIdentity | null;
   }) {
     const now = new Date();
-    const requestTimeout = this.runs.requestTimeoutMs(input.experiment, 60_000);
+    const requestTimeout = this.runs.requestTimeoutMs(
+      input.experiment,
+      OPTIMIZATION_PROVIDER_REQUEST_CEILING_MS,
+    );
     const leaseUntil = new Date(now.getTime() + requestTimeout + 30_000);
     return this.prisma.$transaction(async (transaction) => {
       const claimed = await transaction.$queryRaw<OptimizationStepRow[]>(Prisma.sql`
@@ -244,6 +159,9 @@ export class StrategyOptimizationCandidateService {
             requestedModel: input.route.model,
             round: input.step.attempt,
             fallbackUsed: false,
+            ...(input.sdkCacheIdentity === null
+              ? {}
+              : { sdkCacheIdentity: input.sdkCacheIdentity }),
           }),
           question: `优化策略 ${input.baseline.strategy.name}`,
         },
@@ -264,13 +182,20 @@ export class StrategyOptimizationCandidateService {
     inputTokenReservation: number;
     outputTokenReservation: number;
     estimatedCost: number;
+    sdkCacheIdentity: OptimizationSdkCacheIdentity | null;
   }) {
     let current = await this.reserveStep(input.experiment.id, input.modelKey, input.round);
     if (current.status === 'succeeded') {
       if (!current.aiRunId) throw stepError('已完成优化步骤缺少 AiRun');
+      const continuationBlockedReason = await reusableOptimizationSdkCache(
+        this.prisma,
+        current.aiRunId,
+        input.sdkCacheIdentity,
+      );
       return {
         cached: true as const,
         step: current,
+        continuationBlockedReason,
         proposal:
           input.experiment.sourceMode === 'discovery'
             ? parseDiscoveryOutput(input.experiment, current.proposal)
@@ -291,6 +216,7 @@ export class StrategyOptimizationCandidateService {
       inputTokenReservation: input.inputTokenReservation,
       outputTokenReservation: input.outputTokenReservation,
       estimatedCost: input.estimatedCost,
+      sdkCacheIdentity: input.sdkCacheIdentity,
     });
     if (claimed) return { cached: false as const, step: claimed };
     current = (await this.step(input.experiment.id, input.modelKey, input.round)) ?? current;
@@ -298,6 +224,11 @@ export class StrategyOptimizationCandidateService {
       return {
         cached: true as const,
         step: current,
+        continuationBlockedReason: await reusableOptimizationSdkCache(
+          this.prisma,
+          current.aiRunId,
+          input.sdkCacheIdentity,
+        ),
         proposal:
           input.experiment.sourceMode === 'discovery'
             ? parseDiscoveryOutput(input.experiment, current.proposal)
@@ -314,14 +245,33 @@ export class StrategyOptimizationCandidateService {
     round: number,
   ) {
     const modelKey = `${route.provider}:${route.model}`;
-    const provider = this.providers.strict(route.provider, route.model);
-    const messages = await this.prompt(experiment, baseline.strategy, descriptors, modelKey, round);
+    const messages = await strategyOptimizationPrompt({
+      prisma: this.prisma,
+      experiment,
+      strategy: baseline.strategy,
+      descriptors,
+      modelKey,
+      round,
+      useSdkContract: true,
+    });
+    // 领取前最后一步冻结 ready route；领取后的热更新不改写本次在途快照。
+    const resolved = this.sdkExecutor.resolveRoute(experiment, route);
+    const sdkCacheIdentity = {
+      adapter: resolved.execution.adapter,
+      mode: resolved.execution.mode,
+      contract: resolved.execution.contract,
+      configurationFingerprint: resolved.execution.readiness.configurationFingerprint,
+    };
+    const provider = resolved.provider;
     const inputTokenReservation = this.runs.conservativeInputTokenReservation(messages);
     const outputTokenReservation = this.runs.outputTokenReservation(experiment);
+    const costFacts = optimizationCostFacts(provider.metadata);
     const inputRate = provider.metadata?.costPer1kInput;
     const outputRate = provider.metadata?.costPer1kOutput;
     const estimatedCost =
-      typeof inputRate === 'number' && typeof outputRate === 'number'
+      costFacts.costStatus === 'known' &&
+      typeof inputRate === 'number' &&
+      typeof outputRate === 'number'
         ? (inputTokenReservation * inputRate + outputTokenReservation * outputRate) / 1_000
         : 0;
     const prepared = await this.claimedOrCachedStep({
@@ -333,112 +283,31 @@ export class StrategyOptimizationCandidateService {
       inputTokenReservation,
       outputTokenReservation,
       estimatedCost,
+      sdkCacheIdentity,
     });
     if (prepared.cached)
-      return { proposal: prepared.proposal, aiRunId: prepared.step.aiRunId!, modelKey };
-    return this.completeProposal(
+      return {
+        proposal: prepared.proposal,
+        aiRunId: prepared.step.aiRunId!,
+        modelKey,
+        continuationBlockedReason: prepared.continuationBlockedReason,
+      };
+    return this.sdkExecutor.completeProposal({
       experiment,
+      baseline: baseline.strategy,
       route,
       modelKey,
-      prepared.step,
-      estimatedCost,
+      step: prepared.step,
       messages,
       inputTokenReservation,
       outputTokenReservation,
-    );
-  }
-
-  private async completeProposal(
-    experiment: ExperimentRow,
-    route: ProviderRoute,
-    modelKey: string,
-    step: OptimizationStepRow,
-    estimatedCost: number,
-    messages: unknown[],
-    inputTokenReservation: number,
-    outputTokenReservation: number,
-  ) {
-    const provider = this.providers.strict(route.provider, route.model);
-    const startedAt = Date.now();
-    let providerResponded = false;
-    try {
-      const completion = await optimizationModelConcurrency.withSlot(modelKey, () =>
-        provider.complete(
-          {
-            model: route.model,
-            messages,
-            tools: [],
-            maxOutputTokens: outputTokenReservation,
-            ...(route.reasoningEffort === undefined
-              ? {}
-              : { reasoningEffort: route.reasoningEffort }),
-          },
-          AbortSignal.timeout(this.runs.requestTimeoutMs(experiment, 60_000)),
-        ),
-      );
-      providerResponded = true;
-      const durationMs = Date.now() - startedAt;
-      await this.prisma.aiRun.update({
-        where: { id: step.aiRunId! },
-        data: {
-          inputTokens: completion.inputTokens,
-          outputTokens: completion.outputTokens,
-          cost: completion.cost,
-          durationMs,
-          modelMetadata: asJson({
-            optimizationExperimentId: experiment.id,
-            requestedProvider: route.provider,
-            actualProvider: provider.id,
-            requestedModel: route.model,
-            ...(route.reasoningEffort === undefined
-              ? {}
-              : { requestedReasoningEffort: route.reasoningEffort }),
-            actualModel: completion.actualModel ?? route.model,
-            costStatus: completion.costKnown === false ? 'unknown' : 'known',
-            ...(completion.costCurrency ? { costCurrency: completion.costCurrency } : {}),
-            ...(completion.pricingVersion ? { pricingVersion: completion.pricingVersion } : {}),
-            round: step.attempt,
-            retryCount: 0,
-            fallbackUsed: false,
-          }),
-        },
-      });
-      await this.runs.reconcileTokenUsage(
-        experiment.id,
-        inputTokenReservation,
-        outputTokenReservation,
-        completion.inputTokens,
-        completion.outputTokens,
-      );
-      await this.runs.reconcileCost(experiment.id, estimatedCost, completion.cost);
-      const proposal =
-        experiment.sourceMode === 'discovery'
-          ? parseDiscoveryOutput(experiment, completion.content)
-          : optimizationProposalSchema.parse(completion.content);
-      await this.prisma.$transaction(async (transaction) => {
-        await transaction.aiRun.update({
-          where: { id: step.aiRunId! },
-          data: {
-            status: 'succeeded',
-            result: asJson(proposal),
-            completedAt: new Date(),
-            claimedAt: null,
-            leaseUntil: null,
-          },
-        });
-        await transaction.$executeRaw(Prisma.sql`
-          UPDATE "OptimizationAttempt"
-          SET "status"='succeeded', "proposal"=${JSON.stringify(proposal)}::jsonb,
-              "error"=NULL, "leaseUntil"=NULL, "completedAt"=CURRENT_TIMESTAMP
-          WHERE "id"=${step.id}::uuid AND "status"='running'
-        `);
-      });
-      return { proposal, aiRunId: step.aiRunId!, modelKey };
-    } catch (error) {
-      if (providerResponded) await this.markKnownFailure(step, error, Date.now() - startedAt);
-      else await this.markUnknownOutcome(step, error, Date.now() - startedAt);
-      throw error;
-    }
+      estimatedCost,
+      resolved,
+      requestTimeoutMs: this.runs.requestTimeoutMs(
+        experiment,
+        OPTIMIZATION_PROVIDER_REQUEST_CEILING_MS,
+      ),
+    });
   }
 
   private async nextNegativeVersion(strategyId: string) {

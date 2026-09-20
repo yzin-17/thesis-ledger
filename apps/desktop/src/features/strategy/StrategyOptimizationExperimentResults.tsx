@@ -13,6 +13,12 @@ import {
   adoptOptimizationCandidate,
   finalizeOptimizationExperiment,
 } from './strategy-optimization.api.js';
+import {
+  experimentCostText,
+  experimentUsageText,
+  optimizationAttemptExecutionText,
+  tradingCostText,
+} from './strategy-experiment-detail.model.js';
 
 const metricText = (value: unknown) => {
   if (!value || typeof value !== 'object') return '指标不可用';
@@ -32,10 +38,6 @@ const metricText = (value: unknown) => {
 };
 const validationMetricText = (candidate: OptimizationCandidate) =>
   metricText(candidate.metrics.validation);
-const numericValue = (value: string | number | null | undefined) => {
-  const parsed = typeof value === 'number' ? value : Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
 const durationText = (durationMs: number) =>
   durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(1)}s` : `${durationMs}ms`;
 const displayScalar = (value: unknown, fallback = '—') =>
@@ -171,10 +173,11 @@ export function StrategyOptimizationExperimentResults({
                 <div className="font-medium">{experiment.stage}</div>
                 <div className="text-xs text-muted-foreground">
                   AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token{' '}
-                  {experiment.inputTokensUsed}/{experiment.outputTokensUsed} ·{' '}
-                  {experiment.modelConfig.some((route) => route.costStatus === 'unknown')
-                    ? '成本 未知'
-                    : `成本 ${String(experiment.costUsed)}`}
+                  {experimentUsageText(
+                    experiment,
+                    compare?.experiment.id === experiment.id ? compare.attempts : [],
+                  )}{' '}
+                  · AI 费用 {experimentCostText(experiment.costSummary)}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -226,6 +229,14 @@ export function StrategyOptimizationExperimentResults({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            <div className="rounded-md border p-3 text-xs text-muted-foreground">
+              <div className="font-medium text-foreground">回测交易成本假设（与 AI 费用分开）</div>
+              {tradingCostText(compare.experiment.tradingCost).map((line) => (
+                <div key={line} className="mt-1">
+                  {line}
+                </div>
+              ))}
+            </div>
             {compare.experiment.testExposedAt ? (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
                 测试集已揭示。改选原预选候选之外的方案会显式记录测试暴露。
@@ -251,22 +262,25 @@ export function StrategyOptimizationExperimentResults({
                 const attempts = compare.attempts.filter((attempt) => attempt.modelKey === key);
                 const latest = attempts.at(-1);
                 const aiCalls = attempts.filter((attempt) => Boolean(attempt.aiRunId)).length;
-                const inputTokens = attempts.reduce(
-                  (sum, attempt) => sum + (attempt.inputTokens ?? 0),
-                  0,
+                const executionDisplays = attempts.map(optimizationAttemptExecutionText);
+                const tokenText =
+                  executionDisplays.length > 0
+                    ? executionDisplays.map((display) => display.tokenText).join('；')
+                    : '尚未开始';
+                const costText =
+                  executionDisplays.length > 0
+                    ? [...new Set(executionDisplays.flatMap((display) => display.costLines))].join(
+                        '；',
+                      )
+                    : '尚未开始';
+                const knownDurations = attempts.flatMap((attempt) =>
+                  attempt.durationMs == null ? [] : [attempt.durationMs],
                 );
-                const outputTokens = attempts.reduce(
-                  (sum, attempt) => sum + (attempt.outputTokens ?? 0),
-                  0,
-                );
-                const durationMs = attempts.reduce(
-                  (sum, attempt) => sum + (attempt.durationMs ?? 0),
-                  0,
-                );
-                const costUnknown =
-                  route.costStatus === 'unknown' ||
-                  attempts.some((attempt) => attempt.modelMetadata?.costStatus === 'unknown');
-                const cost = attempts.reduce((sum, attempt) => sum + numericValue(attempt.cost), 0);
+                const durationMs = knownDurations.reduce((sum, value) => sum + value, 0);
+                const durationSummary =
+                  knownDurations.length === attempts.length
+                    ? durationText(durationMs)
+                    : `${durationText(durationMs)}（部分耗时未知）`;
                 return (
                   <div key={key} className="rounded-md border p-3">
                     <div className="font-medium">{key}</div>
@@ -274,13 +288,11 @@ export function StrategyOptimizationExperimentResults({
                       <span>AI calls</span>
                       <span>{aiCalls}</span>
                       <span>Input / Output</span>
-                      <span>
-                        {inputTokens} / {outputTokens}
-                      </span>
+                      <span>{tokenText}</span>
                       <span>Duration</span>
-                      <span>{durationText(durationMs)}</span>
-                      <span>Cost</span>
-                      <span>{costUnknown ? '费用未知' : cost.toFixed(4)}</span>
+                      <span>{durationSummary}</span>
+                      <span>AI 费用</span>
+                      <span>{costText}</span>
                       <span>Latest status</span>
                       <span>{String(latest?.status ?? '尚未开始')}</span>
                     </div>

@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, ArrowRight, BookOpen, CircleDot, RotateCcw, Search } from 'lucide-react';
 import { researchQuestionTemplates } from './ai.templates.js';
 import type { AiRunDetail as AiRunDetailRecord, AiRunRecord } from './ai.types.js';
+import { AiExecutionFacts } from './AiExecutionFacts.js';
 import {
   checkpointLabel,
   contextSummary,
@@ -34,11 +35,6 @@ import {
 
 const listOrEmpty = (items: string[] | undefined, empty: string) =>
   items && items.length > 0 ? items : [empty];
-
-const formatNumber = (value: number | string | null | undefined) => {
-  if (value === null || value === undefined || value === '') return '未记录';
-  return typeof value === 'number' ? value.toLocaleString('zh-CN') : value;
-};
 
 function RunMetadata({ run }: { run: AiRunRecord }) {
   return (
@@ -69,18 +65,6 @@ function RunMetadata({ run }: { run: AiRunRecord }) {
           <dd className="break-all font-mono text-xs">{run.retryOfRunId ?? '无'}</dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">输入 Token</dt>
-          <dd>{formatNumber(run.inputTokens)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">输出 Token</dt>
-          <dd>{formatNumber(run.outputTokens)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">成本</dt>
-          <dd>{formatNumber(run.cost)}</dd>
-        </div>
-        <div>
           <dt className="text-xs text-muted-foreground">耗时</dt>
           <dd>
             {run.durationMs === null || run.durationMs === undefined
@@ -103,6 +87,15 @@ function RunMetadata({ run }: { run: AiRunRecord }) {
           </div>
         )}
       </dl>
+      <div className="mt-4 border-t pt-4">
+        <AiExecutionFacts
+          {...(run.execution === undefined ? {} : { execution: run.execution })}
+          legacy={{
+            ...(run.inputTokens == null ? {} : { inputTokens: run.inputTokens }),
+            ...(run.outputTokens == null ? {} : { outputTokens: run.outputTokens }),
+          }}
+        />
+      </div>
     </section>
   );
 }

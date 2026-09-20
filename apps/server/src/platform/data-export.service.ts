@@ -46,7 +46,13 @@ export class DataExportService {
         notifications,
       },
       global: { strategies },
-      omitted: ['Provider credentials', 'AI API keys', 'Feishu Webhook'],
+      omitted: [
+        'Provider credentials',
+        'AI API keys',
+        'Feishu Webhook',
+        'BACKTEST_RESULTS_REQUIRES_REVEAL',
+        'OPTIMIZATION_TEST_RESULTS_REQUIRES_REVEAL',
+      ],
     };
   }
 }

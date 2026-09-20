@@ -43,7 +43,9 @@ describe('StrategyRiskApplicationService update', () => {
       assertNoEnabledConflict: vi.fn(),
     };
     const prisma = {
-      $transaction: vi.fn(async (callback: (transaction: unknown) => Promise<unknown>) => callback({})),
+      $transaction: vi.fn(async (callback: (transaction: unknown) => Promise<unknown>) =>
+        callback({}),
+      ),
     };
     const service = new StrategyRiskApplicationService(
       prisma as never,
@@ -59,10 +61,77 @@ describe('StrategyRiskApplicationService update', () => {
       }),
     ).resolves.toEqual(updated);
 
-    expect(store.syncFrozenRuleState).toHaveBeenCalledWith(
-      expect.anything(),
-      applicationId,
-      { enabled: true, severity: 'warning', revision: 2, enabledChanged: false },
+    expect(store.syncFrozenRuleState).toHaveBeenCalledWith(expect.anything(), applicationId, {
+      enabled: true,
+      severity: 'warning',
+      revision: 2,
+      enabledChanged: false,
+    });
+  });
+
+  it('删除时原子归档应用、冻结规则并保留审计', async () => {
+    const current = {
+      id: applicationId,
+      strategyVersionId: '33333333-3333-4333-8333-333333333333',
+      accountId: '11111111-1111-4111-8111-111111111111',
+      symbol: '600519.SH',
+      revision: 1,
+      semanticVersion: 'strategy-monitoring-v1',
+      planHash: 'plan',
+      plan: { rules: [] },
+      cycleMode: 'existingAndFuture',
+      cycleAnchor: null,
+      enabled: true,
+      notification: { enabled: true, cooldownMinutes: 60 },
+      coverage: {},
+      ownerKey: 'local-user',
+      idempotencyKey: 'idem',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    const archived = {
+      ...current,
+      revision: 2,
+      enabled: false,
+      archivedAt: new Date(),
+    };
+    const transaction = {};
+    const store = {
+      get: vi.fn(async () => current),
+      archiveApplication: vi.fn(async () => archived),
+      archiveFrozenRules: vi.fn(async () => ({ count: 2 })),
+      audit: vi.fn(async () => 1),
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (input: unknown) => Promise<unknown>) =>
+        callback(transaction),
+      ),
+    };
+    const service = new StrategyRiskApplicationService(
+      prisma as never,
+      {} as never,
+      store as never,
+      {} as never,
+    );
+
+    await expect(service.archive(applicationId, { expectedRevision: 1 })).resolves.toEqual(
+      archived,
+    );
+    expect(store.archiveApplication).toHaveBeenCalledWith(transaction, {
+      id: applicationId,
+      expectedRevision: 1,
+    });
+    expect(store.archiveFrozenRules).toHaveBeenCalledWith(transaction, applicationId);
+    expect(store.audit).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({
+        applicationId,
+        revision: 2,
+        action: 'archive',
+        before: current,
+        after: archived,
+      }),
     );
   });
 });

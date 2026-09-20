@@ -25,10 +25,18 @@ export function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
-  const { state, portfolio, accounts, accountsReady, accountsPending, accountsError, refreshing, refresh } =
-    usePortfolioShellQueries(portfolioMode, {
-      enableValuation: isPortfolioSummaryConsumerRoute(location.pathname),
-    });
+  const {
+    state,
+    portfolio,
+    accounts,
+    accountsReady,
+    accountsPending,
+    accountsError,
+    refreshing,
+    refresh,
+  } = usePortfolioShellQueries(portfolioMode, {
+    enableValuation: isPortfolioSummaryConsumerRoute(location.pathname),
+  });
 
   const navigateTo = (nextView: DesktopNavigationView, options?: NavigationOptions) => {
     const path = desktopPathForView(nextView);
@@ -123,7 +131,7 @@ export function AppRoutes() {
           />
         }
       />
-      <Route path="/strategy" element={<StrategyDashboard />} />
+      <Route path="/strategy/*" element={<StrategyDashboard />} />
       <Route
         path="/journal"
         element={

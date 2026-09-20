@@ -49,6 +49,8 @@ export function BacktestSetupDialog({
   strategy,
   version,
   busy,
+  initialSetup,
+  intent = 'new',
   onOpenChange,
   onSubmit,
 }: {
@@ -56,23 +58,29 @@ export function BacktestSetupDialog({
   strategy: StrategyRecord | null;
   version: StrategyVersion | null;
   busy: boolean;
+  initialSetup?: BacktestSetupInput | null;
+  intent?: 'new' | 'rerun';
   onOpenChange: (open: boolean) => void;
   onSubmit: (setup: BacktestSetupInput) => Promise<boolean>;
 }) {
   const [period, setPeriod] = useState(defaultBacktestPeriod);
   const [initialCash, setInitialCash] = useState('100000');
+  const [baseCurrency, setBaseCurrency] = useState<'CNY' | 'HKD' | 'USD'>('CNY');
   const [error, setError] = useState<string | null>(null);
   const [modelText, setModelText] = useState('');
   const [executionModel, setExecutionModel] = useState<BacktestExecutionModel>();
   useEffect(() => {
     if (open) {
-      setPeriod(defaultBacktestPeriod());
-      setInitialCash('100000');
+      setPeriod(initialSetup?.period ?? defaultBacktestPeriod());
+      setInitialCash(String(initialSetup?.initialCash ?? 100000));
+      setBaseCurrency(initialSetup?.baseCurrency ?? 'CNY');
       setError(null);
-      setModelText('');
-      setExecutionModel(undefined);
+      setModelText(
+        initialSetup?.executionModel ? JSON.stringify(initialSetup.executionModel, null, 2) : '',
+      );
+      setExecutionModel(initialSetup?.executionModel);
     }
-  }, [open, version?.id]);
+  }, [initialSetup, open, version?.id]);
   const symbols = version?.schema ? schemaSymbols(version.schema) : [];
   const presets = backtestPeriodPresets();
   const activePreset = presets.find(
@@ -97,6 +105,7 @@ export function BacktestSetupDialog({
     const succeeded = await onSubmit({
       period,
       initialCash: cash,
+      baseCurrency,
       ...(executionModel ? { executionModel } : {}),
     });
     if (!succeeded) return;
@@ -106,9 +115,11 @@ export function BacktestSetupDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-32px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6 pr-14 pb-4">
-          <DialogTitle>开始回测</DialogTitle>
+          <DialogTitle>{intent === 'rerun' ? '基于本次配置再次运行' : '开始回测'}</DialogTitle>
           <DialogDescription>
-            提交后将在后台准备行情并启动任务，进度可在回测任务中查看。
+            {intent === 'rerun'
+              ? '保留原版本、区间与已记录执行假设，重新获取当前可用数据并创建新任务；数据修订可能使结果不同。'
+              : '提交后将在后台准备行情并启动任务，进度可在回测任务中查看。'}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
@@ -141,7 +152,7 @@ export function BacktestSetupDialog({
           <div>
             <p className="text-sm font-medium">回测参数</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              设置回测区间与初始资金，金额单位为人民币。
+              设置回测区间与初始资金，金额单位为 {baseCurrency}。
             </p>
           </div>
           <FieldGroup className="grid gap-4 sm:grid-cols-3">
@@ -168,7 +179,7 @@ export function BacktestSetupDialog({
               />
             </Field>
             <Field invalid={Boolean(error && error.includes('资金'))}>
-              <FieldLabel htmlFor="backtest-cash">初始资金（CNY）</FieldLabel>
+              <FieldLabel htmlFor="backtest-cash">初始资金（{baseCurrency}）</FieldLabel>
               <Input
                 id="backtest-cash"
                 type="number"
@@ -237,7 +248,7 @@ export function BacktestSetupDialog({
                   aria-hidden="true"
                 />
               )}
-              {busy ? '准备中…' : '开始回测'}
+              {busy ? '准备中…' : intent === 'rerun' ? '创建新任务' : '开始回测'}
             </Button>
           </DialogFooter>
         </div>

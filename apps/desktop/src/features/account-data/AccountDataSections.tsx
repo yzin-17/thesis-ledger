@@ -102,16 +102,29 @@ export function TransactionSection({
             这里显示当前有效版本；修正链保留在审计面板中，不会重复计数。
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button type="button" onClick={onCreate} disabled={account.type === 'cash'}>
             录入成交
           </Button>
-          <Button type="button" variant="outline" onClick={onOpenImport} disabled>
-            导入草稿（暂未开放）
-          </Button>
-          <Button type="button" variant="outline" onClick={onOpenReconciliation} disabled>
-            打开对账（暂未开放）
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="更多成交操作">
+                  <MoreHorizontalIcon />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuItem disabled onClick={onOpenImport}>
+                  导入草稿（暂未开放）
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled onClick={onOpenReconciliation}>
+                  打开对账（暂未开放）
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -223,16 +236,24 @@ function TransactionResults({
   }
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
-      <table className="w-full min-w-[900px] text-left text-sm">
+      <table className="w-full min-w-[900px] table-fixed text-left text-sm">
         <caption className="sr-only">{emptyTitle}</caption>
+        <colgroup>
+          <col className="w-[30%]" />
+          <col className="w-[20%]" />
+          <col className="w-[12%]" />
+          <col className="w-[13%]" />
+          <col className="w-[10%]" />
+          <col className="w-[15%]" />
+        </colgroup>
         <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
           <tr>
-            <th className="px-4 py-3 font-medium">事实</th>
-            <th className="px-4 py-3 font-medium">发生时间</th>
-            <th className="px-4 py-3 font-medium">金额/数量</th>
-            <th className="px-4 py-3 font-medium">来源</th>
-            <th className="px-4 py-3 font-medium">状态</th>
-            <StickyTableActionHeader className="px-4 py-3 font-medium">
+            <th className="px-3 py-3 font-medium">事实</th>
+            <th className="px-3 py-3 font-medium">发生时间</th>
+            <th className="px-3 py-3 font-medium">金额/数量</th>
+            <th className="px-3 py-3 font-medium">来源</th>
+            <th className="px-3 py-3 font-medium">状态</th>
+            <StickyTableActionHeader className="w-auto min-w-0 px-3 py-3 font-medium">
               操作
             </StickyTableActionHeader>
           </tr>
@@ -295,83 +316,85 @@ function TransactionRow({
   const amount = transactionAmount(event, execution ? event : null);
   return (
     <tr data-ledger-event-id={event.eventId}>
-      <td className="max-w-[360px] whitespace-normal px-4 py-3 align-top">
+      <td className="min-w-0 max-w-0 whitespace-normal px-3 py-3 align-top">
         <strong className="block truncate font-medium">{title}</strong>
         <span className="mt-1 block break-words text-xs text-muted-foreground">{detail}</span>
       </td>
-      <td className="whitespace-nowrap px-4 py-3 align-top text-muted-foreground">
+      <td className="whitespace-nowrap px-3 py-3 align-top text-muted-foreground">
         {formatDate(event.occurredAt)}
         <span className="mt-1 block text-xs">记录于 {formatDate(event.recordedAt)}</span>
       </td>
-      <td className="whitespace-nowrap px-4 py-3 align-top font-mono text-xs text-muted-foreground">
+      <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-xs text-muted-foreground">
         {amount}
       </td>
-      <td className="px-4 py-3 align-top">
+      <td className="truncate px-3 py-3 align-top">
         <span className="block text-xs text-muted-foreground">
           {sourceChannelLabel(event.source.channel)}
         </span>
         {event.source.sourceRowId && (
-          <span className="mt-1 block text-xs text-muted-foreground">
+          <span className="mt-1 block truncate text-xs text-muted-foreground">
             来源行 {event.source.sourceRowId}
           </span>
         )}
       </td>
-      <td className="px-4 py-3 align-top">
+      <td className="whitespace-nowrap px-3 py-3 align-top">
         <Badge variant={revisionBadgeVariant(event)}>{revisionLabel(event)}</Badge>
       </td>
-      <StickyTableActionCell className="px-4 py-3 align-top">
-        <div className="flex flex-wrap justify-end gap-1">
-          {execution && (
-            <>
-              <Button type="button" size="sm" variant="outline" onClick={() => onCorrect(event)}>
-                更正
-              </Button>
-              <Button type="button" size="sm" variant="destructive" onClick={() => onVoid(event)}>
-                作废
-              </Button>
-            </>
-          )}
-          {snapshotPosition && (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => onEditSnapshot(event)}
-              >
-                修改
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                onClick={() => onRemoveSnapshot(event)}
-              >
-                移除
-              </Button>
-            </>
-          )}
-          {cashTransfer && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button type="button" size="icon-sm" variant="ghost" aria-label="管理现金划转">
-                    <MoreHorizontalIcon />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => onCorrectTransfer(event)}>
-                    更正划转
-                  </DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive" onClick={() => onVoidTransfer(event)}>
-                    作废划转
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      <StickyTableActionCell className="w-auto min-w-0 px-3 py-3 align-top">
+        <div className="mx-auto flex w-fit flex-col items-center gap-1">
+          <div className="flex gap-1">
+            {execution && (
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={() => onCorrect(event)}>
+                  更正
+                </Button>
+                <Button type="button" size="sm" variant="destructive" onClick={() => onVoid(event)}>
+                  作废
+                </Button>
+              </>
+            )}
+            {snapshotPosition && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onEditSnapshot(event)}
+                >
+                  修改
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => onRemoveSnapshot(event)}
+                >
+                  移除
+                </Button>
+              </>
+            )}
+            {cashTransfer && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button type="button" size="icon-sm" variant="ghost" aria-label="管理现金划转">
+                      <MoreHorizontalIcon />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem onClick={() => onCorrectTransfer(event)}>
+                      更正划转
+                    </DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" onClick={() => onVoidTransfer(event)}>
+                      作废划转
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
           <Button type="button" size="sm" variant="ghost" onClick={() => onAudit(event)}>
             查看修正链
           </Button>
@@ -391,6 +414,7 @@ export function PositionCalibrationSection({
   onSaved,
   onOpenImport,
   onOpenReconciliation,
+  resolveInstrumentName,
   entrySheetOpen,
   onEntrySheetOpenChange,
   editingPosition,
@@ -405,6 +429,7 @@ export function PositionCalibrationSection({
   onSaved: () => void;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
+  resolveInstrumentName: (symbol: string) => string | undefined;
   entrySheetOpen: boolean;
   onEntrySheetOpenChange: (open: boolean) => void;
   editingPosition: Position | null;
@@ -450,6 +475,7 @@ export function PositionCalibrationSection({
       onEntrySheetOpenChange={onEntrySheetOpenChange}
       editingPosition={editingPosition}
       onEditingPositionChange={onEditingPositionChange}
+      resolveInstrumentName={resolveInstrumentName}
       onOpenImport={onOpenImport}
       onOpenReconciliation={onOpenReconciliation}
       onDirtyChange={onDirtyChange}

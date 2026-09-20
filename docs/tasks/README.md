@@ -9,11 +9,17 @@
 
 ## 当前仍在实施
 
+- [AI 接入层迁移至 Vercel AI SDK](2026-09-19-vercel-ai-sdk-integration.md)
+
+- [自然语言创建与修改回测策略](2026-09-18-natural-language-strategy-authoring.md)
 - [数据源即时启停与页面凭证配置](2026-09-14-market-provider-credentials.md)
 - [账户永久删除](2026-09-14-permanent-account-deletion.md)
 - [行情图表周期聚合](2026-09-16-market-chart-period-aggregation.md)
 - [回测真实历史市场规则数据源](2026-09-16-backtest-real-historical-market-rules.md)
 - [日线行情与技术指标联动 / 交互精炼](2026-09-10-market-chart-indicator-integration.md)
+- [行情图表跨日更新、双向加载与盘中快照](2026-09-17-market-chart-refresh.md)
+- [实时行情涨跌展示](2026-09-18-market-quote-change-display.md)
+- [服务端标的目录聚合](2026-09-18-instrument-directory-server-read-aggregation.md)
 - [全站体验统一](2026-09-08-ui-interaction-consistency.md)
 
 ## 当前主要是运行时或外部门禁

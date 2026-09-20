@@ -73,6 +73,37 @@ describe('指标预热和部分成功回归', () => {
     expect(result.results[0]?.calculationInput?.pointCount).toBe(229);
   });
 
+  it('MA 只请求 period=5 时仍按最长默认均线 60 预热，左边缘不留空档', async () => {
+    const { controller, calculate } = fixture();
+    const result = await controller.detail('510300.SH', 'bars,indicator:MA', '30', undefined, 'qfq',
+      undefined, undefined, undefined, JSON.stringify({ period: 5 }));
+    expect(calculate.mock.calls[0]![0].points).toHaveLength(89);
+    const section = result.sections['indicator:MA'];
+    if (section?.capability !== 'indicator:MA' || !section.data) throw new Error('缺少 MA 结果');
+    expect(section.data.points).toHaveLength(30);
+    expect(section.data.calculationInput?.pointCount).toBe(89);
+  });
+
+  it('DSA 回传带偏移的 ISO 时间戳时仍投影出可见窗口，并归一为 BarSeries 写法', async () => {
+    const { controller, calculate } = fixture();
+    calculate.mockImplementation(async (request) => ({
+      contractVersion: 2 as const,
+      engineVersion: 'dsa-indicator-v2',
+      inputFingerprint: request.inputFingerprint,
+      // 真实 DSA 返回 `2026-03-18T00:00:00+00:00`，与 BarSeries 的 `…000Z` 不同串同时刻。
+      results: request.requests.map((item) => ({ ...item, inputFingerprint: request.inputFingerprint,
+        points: request.points.map((point) => ({
+          timestamp: point.timestamp.replace(/\.\d{3}Z$/, '+00:00'), values: { value: 123 } })) })),
+    }));
+    const result = await controller.detail('510300.SH', 'bars,indicator:MACD', '30');
+    const section = result.sections['indicator:MACD'];
+    if (section?.capability !== 'indicator:MACD' || !section.data) throw new Error('缺少 MACD 结果');
+    expect(section.data.points).toHaveLength(30);
+    expect(section.data.points.map((point) => point.timestamp))
+      .toEqual(result.barSeries?.points.map((point) => point.timestamp));
+    expect(section.data.calculationInput?.pointCount).toBe(65);
+  });
+
   it('显示加预热超上限时返回参数错误，不静默截断或请求上游', async () => {
     const { controller, read, calculate } = fixture();
     await expect(controller.detail('510300.SH', 'bars,indicator:MACD', '90', undefined, 'qfq',

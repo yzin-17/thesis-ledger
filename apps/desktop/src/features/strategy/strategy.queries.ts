@@ -21,6 +21,11 @@ export const shouldPollJobs = (jobs: unknown) => {
 
 export const jobFallbackInterval = (jobs: unknown) => (shouldPollJobs(jobs) ? 30_000 : false);
 
+export const jobDetailFallbackInterval = (job: unknown) => {
+  if (!job || typeof job !== 'object' || !('status' in job)) return false;
+  return terminalJobStatuses.has(String((job as { status?: unknown }).status)) ? false : 5_000;
+};
+
 export const useStrategyQueries = () => {
   const strategies = useQuery({
     queryKey: strategyKeys.strategies(),
@@ -41,4 +46,5 @@ export const useBacktestJobQuery = (jobId: string | null) =>
     queryKey: strategyKeys.job(jobId ?? 'closed'),
     queryFn: () => fetchBacktestJob(jobId ?? ''),
     enabled: Boolean(jobId),
+    refetchInterval: (query) => jobDetailFallbackInterval(query.state.data),
   });

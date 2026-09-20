@@ -6,13 +6,21 @@ import {
   httpUrl,
   stringArray,
   aiProviderModelReasoningSchema,
+  aiProviderCapabilityRevocationSchema,
+  aiProviderExecutionRouteInputSchema,
+  type AiProviderCapabilityRevocation,
+  type AiProviderExecutionRouteInput,
   type AiProviderModelReasoning,
   type AiProviderSummary,
 } from './ai-provider.contracts.js';
+import { aiAdapterSchema, type AiAdapter } from '@thesis-ledger/schemas';
 
 export interface ParsedAiProviderSettings {
   baseUrl: string;
   models: string[];
+  adapter?: AiAdapter;
+  executionRoutes?: AiProviderExecutionRouteInput[];
+  capabilityRevocations?: AiProviderCapabilityRevocation[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   timeoutMs?: number;
   costPer1kInput?: number;
@@ -28,9 +36,15 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   const models = stringArray(record.models);
   if (typeof baseUrl !== 'string' || !httpUrl.safeParse(baseUrl).success || !models) return null;
   const modelReasoning = parseModelReasoning(record.modelReasoning, models);
+  const adapter = aiAdapterSchema.safeParse(record.adapter);
+  const executionRoutes = parseExecutionRoutes(record.executionRoutes, models);
+  const capabilityRevocations = parseCapabilityRevocations(record.capabilityRevocations);
   return {
     baseUrl,
     models,
+    ...(adapter.success ? { adapter: adapter.data } : {}),
+    ...(executionRoutes ? { executionRoutes } : {}),
+    ...(capabilityRevocations ? { capabilityRevocations } : {}),
     ...(modelReasoning ? { modelReasoning } : {}),
     ...(typeof record.timeoutMs === 'number' ? { timeoutMs: record.timeoutMs } : {}),
     ...(typeof record.costPer1kInput === 'number' ? { costPer1kInput: record.costPer1kInput } : {}),
@@ -40,6 +54,29 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
     ...(typeof record.costCurrency === 'string' ? { costCurrency: record.costCurrency } : {}),
     ...(typeof record.pricingVersion === 'string' ? { pricingVersion: record.pricingVersion } : {}),
   };
+};
+
+const parseExecutionRoutes = (
+  value: unknown,
+  models: readonly string[],
+): AiProviderExecutionRouteInput[] | null => {
+  if (!Array.isArray(value)) return null;
+  const selected = new Set(models);
+  const parsed = value
+    .map((route) => aiProviderExecutionRouteInputSchema.safeParse(route))
+    .filter((result) => result.success)
+    .map((result) => result.data)
+    .filter((route) => selected.has(route.model));
+  return parsed.length > 0 ? parsed : null;
+};
+
+const parseCapabilityRevocations = (value: unknown): AiProviderCapabilityRevocation[] | null => {
+  if (!Array.isArray(value)) return null;
+  const parsed = value
+    .map((entry) => aiProviderCapabilityRevocationSchema.safeParse(entry))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+  return parsed.length > 0 ? parsed : null;
 };
 
 const parseModelReasoning = (
@@ -69,6 +106,10 @@ type HealthSnapshot = {
 } | null;
 
 const settingsSummary = (settings: ParsedAiProviderSettings | null) => ({
+  ...(settings?.adapter === undefined ? {} : { adapter: settings.adapter }),
+  ...(settings?.executionRoutes === undefined
+    ? {}
+    : { executionRouteConfigs: settings.executionRoutes }),
   ...(settings?.modelReasoning === undefined ? {} : { modelReasoning: settings.modelReasoning }),
   ...(settings?.timeoutMs === undefined ? {} : { timeoutMs: settings.timeoutMs }),
   ...(settings?.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
@@ -109,6 +150,10 @@ export const aiProviderSummaryFromProvider = (provider: AiProvider): AiProviderS
   capabilities: [...(provider.metadata?.capabilities ?? ['chat'])],
   baseUrl: provider.metadata?.baseURL ?? null,
   models: [...provider.models],
+  ...(provider.metadata?.adapter === undefined ? {} : { adapter: provider.metadata.adapter }),
+  ...(provider.metadata?.executionRoutes === undefined
+    ? {}
+    : { executionRouteConfigs: [...provider.metadata.executionRoutes] }),
   ...(provider.metadata?.timeoutMs === undefined ? {} : { timeoutMs: provider.metadata.timeoutMs }),
   ...(provider.metadata?.costPer1kInput === undefined
     ? {}

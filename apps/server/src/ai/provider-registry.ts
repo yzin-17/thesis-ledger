@@ -1,39 +1,59 @@
 import { Injectable } from '@nestjs/common';
+import type { AiGenerationContractRef, AiGenerationMode } from '@thesis-ledger/schemas';
 import type { AiProvider } from './contracts.js';
-
-const safeErrorMessage = (error: unknown) => {
-  const message = error instanceof Error ? error.message : '调用失败';
-  return message
-    .replace(/Bearer\s+\S+/giu, 'Bearer [REDACTED]')
-    .replace(/(?:sk-|api[_-]?key[=:])\S+/giu, '[REDACTED]')
-    .slice(0, 240);
-};
+import {
+  evaluateAiProviderReadiness,
+  inferLegacyAiAdapter,
+  type AiProviderRouteSnapshot,
+} from './ai-provider-readiness.js';
 
 @Injectable()
 export class AiProviderRegistry {
   private providers = new Map<string, AiProvider>();
+  private routes = new Map<string, AiProviderRouteSnapshot>();
 
   register(provider: AiProvider) {
     this.providers.set(provider.id, provider);
+    for (const route of routeSnapshotsFromProvider(provider))
+      this.routes.set(
+        routeKey(provider.id, route.route.model, route.route.mode, route.route.contract),
+        route,
+      );
   }
 
   /** Replace the complete snapshot in one synchronous operation. */
-  replace(providers: readonly AiProvider[]) {
+  replace(providers: readonly AiProvider[], routeSnapshots?: readonly AiProviderRouteSnapshot[]) {
     const next = new Map<string, AiProvider>();
     for (const provider of providers) {
       if (!provider.id || provider.models.length === 0) throw new Error('AI Provider 快照无效');
       if (next.has(provider.id)) throw new Error(`AI Provider id 重复: ${provider.id}`);
       next.set(provider.id, provider);
     }
+    const nextRoutes = new Map<string, AiProviderRouteSnapshot>();
+    const snapshots =
+      routeSnapshots ?? providers.flatMap((provider) => routeSnapshotsFromProvider(provider));
+    for (const snapshot of snapshots) {
+      const key = routeKey(
+        snapshot.providerId,
+        snapshot.route.model,
+        snapshot.route.mode,
+        snapshot.route.contract,
+      );
+      if (nextRoutes.has(key)) throw new Error(`AI Provider 执行路由重复: ${key}`);
+      nextRoutes.set(key, snapshot);
+    }
     this.providers = next;
+    this.routes = nextRoutes;
   }
 
   list() {
-    return [...this.providers.values()].map((provider) => ({
-      id: provider.id,
-      models: [...provider.models],
-      metadata: provider.metadata ?? {},
-    }));
+    return [...this.providers.values()].map((provider) => {
+      const metadata = { ...(provider.metadata ?? {}) };
+      delete metadata.credentialFingerprint;
+      delete metadata.capabilityRevocations;
+      delete metadata.executionRoutes;
+      return { id: provider.id, models: [...provider.models], metadata };
+    });
   }
 
   health() {
@@ -72,6 +92,88 @@ export class AiProviderRegistry {
     return provider;
   }
 
+  readiness(providerId: string, budgetAuthorized = false) {
+    return [...this.routes.values()]
+      .filter((snapshot) => snapshot.providerId === providerId)
+      .map((snapshot) => evaluateAiProviderReadiness(snapshot, { budgetAuthorized }));
+  }
+
+  strictReady(input: {
+    providerId: string;
+    model: string;
+    mode: AiGenerationMode;
+    contract: AiGenerationContractRef;
+    budgetAuthorized: boolean;
+  }) {
+    const snapshot = this.routes.get(
+      routeKey(input.providerId, input.model, input.mode, input.contract),
+    );
+    if (!snapshot)
+      throw new Error(`AI Provider 执行路由未配置: ${input.providerId}/${input.model}`);
+    const execution = evaluateAiProviderReadiness(snapshot, {
+      budgetAuthorized: input.budgetAuthorized,
+    });
+    if (execution.readiness.state !== 'ready')
+      throw new Error(`AI Provider 执行路由未就绪: ${execution.readiness.reasons.join(',')}`);
+    return { provider: this.strict(input.providerId, input.model), execution };
+  }
+
+  strictReadyContract(input: {
+    providerId: string;
+    model: string;
+    contract: AiGenerationContractRef;
+    budgetAuthorized: boolean;
+  }) {
+    const candidates = [...this.routes.values()].filter(
+      (snapshot) =>
+        snapshot.providerId === input.providerId &&
+        snapshot.route.model === input.model &&
+        snapshot.route.contract.id === input.contract.id &&
+        snapshot.route.contract.version === input.contract.version,
+    );
+    if (candidates.length === 0)
+      throw new Error(`AI Provider 生成契约路由未配置: ${input.providerId}/${input.model}`);
+    const evaluated = candidates.map((snapshot) => ({
+      snapshot,
+      execution: evaluateAiProviderReadiness(snapshot, {
+        budgetAuthorized: input.budgetAuthorized,
+      }),
+    }));
+    const ready = evaluated.filter((candidate) => candidate.execution.readiness.state === 'ready');
+    if (ready.length !== 1) {
+      const reasons = evaluated.flatMap((candidate) => candidate.execution.readiness.reasons);
+      if (ready.length > 1) reasons.push('configuration_invalid');
+      throw new Error(`AI Provider 生成契约路由未就绪: ${[...new Set(reasons)].join(',')}`);
+    }
+    const selected = ready[0]!;
+    return {
+      provider: this.strict(input.providerId, input.model),
+      execution: selected.execution,
+    };
+  }
+
+  readyContractCandidates(input: {
+    model: string;
+    contract: AiGenerationContractRef;
+    preferred?: string;
+    budgetAuthorized: (providerId: string, model: string) => boolean;
+  }) {
+    return this.candidates(input.model, input.preferred).flatMap((provider) => {
+      try {
+        return [
+          this.strictReadyContract({
+            providerId: provider.id,
+            model: input.model,
+            contract: input.contract,
+            budgetAuthorized: input.budgetAuthorized(provider.id, input.model),
+          }),
+        ];
+      } catch {
+        return [];
+      }
+    });
+  }
+
   candidates(model: string, preferred?: string) {
     return [...this.providers.values()]
       .filter((provider) => provider.models.includes(model))
@@ -85,18 +187,26 @@ export class AiProviderRegistry {
   }
 }
 
-export const completeWithFallback = async (
-  registry: AiProviderRegistry,
-  input: { model: string; messages: unknown[]; tools: string[]; preferred?: string },
-) => {
-  const errors: string[] = [];
-  for (const provider of registry.candidates(input.model, input.preferred)) {
-    try {
-      const result = await provider.complete(input, AbortSignal.timeout(30_000));
-      return { ...result, provider: provider.id, fallbackErrors: errors };
-    } catch (error) {
-      errors.push(`${provider.id}: ${safeErrorMessage(error)}`);
-    }
-  }
-  throw new AggregateError(errors, `没有可用的 AI Provider: ${input.model}`);
+const routeKey = (
+  providerId: string,
+  model: string,
+  mode: AiGenerationMode,
+  contract: AiGenerationContractRef,
+) => `${providerId}\u0000${model}\u0000${mode}\u0000${contract.id}\u0000${contract.version}`;
+
+export const routeSnapshotsFromProvider = (provider: AiProvider): AiProviderRouteSnapshot[] => {
+  const metadata = provider.metadata;
+  const baseUrl = metadata?.baseURL ?? '';
+  const adapter = metadata?.adapter ?? inferLegacyAiAdapter(baseUrl);
+  return (metadata?.executionRoutes ?? []).map((route) => ({
+    providerId: provider.id,
+    baseUrl,
+    adapter,
+    models: provider.models,
+    route,
+    enabled: true,
+    health: metadata?.health ?? 'unknown',
+    credentialFingerprint: metadata?.credentialFingerprint ?? null,
+    revocations: metadata?.capabilityRevocations ?? [],
+  }));
 };

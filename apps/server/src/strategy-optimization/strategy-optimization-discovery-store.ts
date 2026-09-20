@@ -4,6 +4,7 @@ import type { OptimizationExperimentCreate, StrategySchemaV2 } from '@thesis-led
 import type { PrismaService } from '../platform/prisma.service.js';
 import {
   asJson,
+  defaultExperimentName,
   optimizationSha256,
   type ExperimentRow,
   type StrategyVersionRecord,
@@ -21,12 +22,18 @@ const insert = async (
 ) => {
   const id = randomUUID();
   const dataFingerprint = computeDiscoveryDataFingerprint(baselineSchema, parsed);
+  const name =
+    parsed.name ??
+    defaultExperimentName({
+      sourceMode: 'discovery',
+      discoveryScope: parsed.discoveryScope,
+    });
   const rows = await prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
     INSERT INTO "OptimizationExperiment" (
-      "id", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
+      "id", "name", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
       "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "idempotencyKey", "updatedAt"
     ) VALUES (
-      ${id}::uuid, 'discovery', ${JSON.stringify(parsed.discoveryScope)}::jsonb, ${STRATEGY_SPACE_VERSION}, ${baseline.id}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
+      ${id}::uuid, ${name}, 'discovery', ${JSON.stringify(parsed.discoveryScope)}::jsonb, ${STRATEGY_SPACE_VERSION}, ${baseline.id}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
       '[]'::jsonb, ${JSON.stringify(parsed.split)}::jsonb, ${JSON.stringify(parsed.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(modelConfig)}::jsonb,
       ${JSON.stringify(parsed.budget)}::jsonb, ${parsed.maxRounds}, ${idempotencyKey}, CURRENT_TIMESTAMP
     ) RETURNING *
@@ -86,6 +93,7 @@ export async function cloneDiscoveryExperiment(
   cloneId: string,
   idempotencyKey: string,
   exposure: unknown,
+  name?: string,
 ) {
   const scope = source.discoveryScope as OptimizationExperimentCreate['discoveryScope'];
   return prisma.$transaction(async (transaction) => {
@@ -106,13 +114,17 @@ export async function cloneDiscoveryExperiment(
         schema: asJson(seed),
       },
     });
+    const experimentName =
+      name ??
+      source.name ??
+      defaultExperimentName({ sourceMode: 'discovery', discoveryScope: scope });
     const dataFingerprint = computeDiscoveryDataFingerprint(seed, source);
     const rows = await transaction.$queryRaw<ExperimentRow[]>(Prisma.sql`
       INSERT INTO "OptimizationExperiment" (
-        "id", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
+        "id", "name", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
         "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "idempotencyKey", "testExposedAt", "exposure", "updatedAt"
       ) VALUES (
-        ${cloneId}::uuid, 'discovery', ${JSON.stringify(source.discoveryScope)}::jsonb, ${source.strategySpaceVersion}, ${version.id}::uuid, 'queued', 'preparing',
+        ${cloneId}::uuid, ${experimentName}, 'discovery', ${JSON.stringify(source.discoveryScope)}::jsonb, ${source.strategySpaceVersion}, ${version.id}::uuid, 'queued', 'preparing',
         ${JSON.stringify(source.objective)}::jsonb, ${JSON.stringify(source.allowedParameterIds)}::jsonb, ${JSON.stringify(source.split)}::jsonb,
         ${JSON.stringify(source.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(source.modelConfig)}::jsonb,
         ${JSON.stringify(source.budget)}::jsonb, ${source.maxRounds}, ${idempotencyKey}, ${source.testExposedAt}, ${JSON.stringify(exposure)}::jsonb, CURRENT_TIMESTAMP

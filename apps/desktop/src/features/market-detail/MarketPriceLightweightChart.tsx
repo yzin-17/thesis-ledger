@@ -22,7 +22,7 @@ import {
   markHistoryDragMovement,
   transitionHistoryBoundary,
 } from './market-chart-history-gesture.js';
-import { hasLeftHistoryBlank } from './market-chart-viewport.js';
+import { hasLeftHistoryBlank, hasReachedLatestBoundary } from './market-chart-viewport.js';
 import { marketChartPaneLabels } from './market-chart-pane-labels.js';
 
 export const auxiliaryLatestValueOptions = {
@@ -90,6 +90,10 @@ export function LightweightMarketChart({
   canLoadEarlier,
   historyLoading,
   historyError,
+  onLoadLater,
+  onRetryLater,
+  canLoadLater,
+  latestLoading,
   onHover,
   onClick,
   lockedTimestamp,
@@ -113,6 +117,10 @@ export function LightweightMarketChart({
   canLoadEarlier?: boolean | undefined;
   historyLoading?: boolean | undefined;
   historyError?: string | null | undefined;
+  onLoadLater?: (() => void) | undefined;
+  onRetryLater?: (() => void) | undefined;
+  canLoadLater?: boolean | undefined;
+  latestLoading?: boolean | undefined;
   onHover: (timestamp: string | null) => void;
   onClick: (timestamp: string | null) => void;
   lockedTimestamp?: string | null;
@@ -144,6 +152,10 @@ export function LightweightMarketChart({
   const canLoadEarlierRef = useRef(canLoadEarlier);
   const historyLoadingRef = useRef(historyLoading);
   const historyErrorRef = useRef(historyError);
+  const onLoadLaterRef = useRef(onLoadLater);
+  const onRetryLaterRef = useRef(onRetryLater);
+  const canLoadLaterRef = useRef(canLoadLater);
+  const latestLoadingRef = useRef(latestLoading);
   const lockedTimestampRef = useRef(lockedTimestamp);
   const chartModeRef = useRef(chartMode);
   const historyDragStateRef = useRef(idleHistoryDragState);
@@ -155,11 +167,16 @@ export function LightweightMarketChart({
   canLoadEarlierRef.current = canLoadEarlier;
   historyLoadingRef.current = historyLoading;
   historyErrorRef.current = historyError;
+  onLoadLaterRef.current = onLoadLater;
+  onRetryLaterRef.current = onRetryLater;
+  canLoadLaterRef.current = canLoadLater;
+  latestLoadingRef.current = latestLoading;
   lockedTimestampRef.current = lockedTimestamp;
   chartModeRef.current = chartMode;
   const [chartReady, setChartReady] = useState(false);
   const [themeRevision, setThemeRevision] = useState(0);
   const [isLeftHistoryBlank, setIsLeftHistoryBlank] = useState(false);
+  const [isLatestBoundaryReached, setIsLatestBoundaryReached] = useState(false);
   const chartIndicators = useMemo(
     () =>
       indicators.filter((item) => visibleIndicators.includes(item.name)),
@@ -176,6 +193,7 @@ export function LightweightMarketChart({
   ) => {
     if (!range) {
       setIsLeftHistoryBlank(false);
+      setIsLatestBoundaryReached(false);
       return;
     }
     const primarySeries = seriesRef.current.get(
@@ -183,11 +201,16 @@ export function LightweightMarketChart({
     );
     const barsInfo = primarySeries?.barsInLogicalRange(range);
     const hasBlank = hasLeftHistoryBlank(barsInfo?.barsBefore);
+    const reachedLatest = hasReachedLatestBoundary(barsInfo?.barsAfter);
     setIsLeftHistoryBlank(hasBlank);
+    setIsLatestBoundaryReached(reachedLatest);
     const transition = transitionHistoryBoundary(historyDragStateRef.current, {
       hasLeftHistoryBlank: hasBlank,
       canLoadEarlier: canLoadEarlierRef.current === true,
       historyLoading: historyLoadingRef.current === true,
+      hasReachedLatestBoundary: reachedLatest,
+      canLoadLater: canLoadLaterRef.current === true,
+      latestLoading: latestLoadingRef.current === true,
     });
     historyDragStateRef.current = transition.state;
     if (transition.shouldLoadEarlier) {
@@ -197,6 +220,7 @@ export function LightweightMarketChart({
         onLoadEarlierRef.current?.();
       }
     }
+    if (transition.shouldLoadLater) onLoadLaterRef.current?.();
   }, []);
 
   useEffect(() => {
@@ -586,7 +610,8 @@ export function LightweightMarketChart({
         };
       }
       if (previous) firstLayoutPendingRef.current = false;
-    } else if (shouldFocusLatest) {
+    } else if (shouldFocusLatest || isLatestBoundaryReached) {
+      // 最新探针返回时仅在用户仍贴着右边界才跟随新日期；离开边界后保留用户当前视口。
       const logical = chart.timeScale().getVisibleLogicalRange();
       if (logical) {
         const width = Math.max(logical.to - logical.from, 1);
@@ -635,6 +660,7 @@ export function LightweightMarketChart({
     chartPoints,
     chartReady,
     focusLatestRevision,
+    isLatestBoundaryReached,
     resetRevision,
     rsiPeriod,
     showBothPanes,
@@ -667,6 +693,11 @@ export function LightweightMarketChart({
       {isLeftHistoryBlank && historyLoading ? (
         <span className="pointer-events-none absolute top-3 left-3 text-xs text-muted-foreground">
           正在加载更早日线…
+        </span>
+      ) : null}
+      {isLatestBoundaryReached && latestLoading ? (
+        <span className="pointer-events-none absolute top-3 right-3 text-xs text-muted-foreground">
+          正在检查更新日线…
         </span>
       ) : null}
     </div>

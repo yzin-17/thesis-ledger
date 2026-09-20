@@ -11,11 +11,16 @@ export type MarketIndicatorRequest = {
   parameters: Record<string, number>;
 };
 export const MAX_INDICATOR_INPUT_POINTS = 365;
+/**
+ * DSA 的 MA 结果固定回传 ma5/ma10/ma20/ma60，与请求的 period 无关。
+ * 预热多读不会出错，少读会在显示窗口左边缘留下均线空档，因此按最长默认均线取上限。
+ */
+const MA_LONGEST_DEFAULT_PERIOD = 60;
 
 const warmupForRequest = (request: MarketIndicatorRequest) => {
   const parameters = request.parameters;
   switch (request.name) {
-    case 'MA': return (parameters.period ?? 5) - 1;
+    case 'MA': return Math.max(parameters.period ?? 5, MA_LONGEST_DEFAULT_PERIOD) - 1;
     case 'MACD': return (parameters.slow ?? 26) + (parameters.signal ?? 9);
     case 'RSI': return Math.max(parameters.short ?? 6, parameters.mid ?? 12, parameters.long ?? 24) + 1;
   }
@@ -53,6 +58,12 @@ export const indicatorWindows = (
   return { visible, calculation };
 };
 
+/**
+ * DSA 回传的是带偏移的 ISO 写法（`2026-03-18T00:00:00+00:00`），BarSeries 用 `…000Z`。
+ * 契约两者都合法，因此按时刻比对，不按字符串比对。
+ */
+const instantOf = (value: string) => Date.parse(value);
+
 /** DSA 完整输入已经过指纹校验；投影保留该证据，不把显示指纹冒充计算指纹。 */
 export const projectIndicatorResponse = (
   response: IndicatorCalculateResponseV2,
@@ -61,7 +72,10 @@ export const projectIndicatorResponse = (
 ): IndicatorCalculateResponseV2 => {
   if (response.inputFingerprint !== calculation.inputFingerprint)
     throw new Error('指标计算输入 fingerprint 不一致');
-  const timestamps = new Set(visible.points.map((point) => point.timestamp));
+  // 时刻 -> BarSeries 规范写法，投影同时把指标点位归一到与可见 BarSeries 相同的时间戳格式。
+  const visibleTimestamps = new Map(
+    visible.points.map((point) => [instantOf(point.timestamp), point.timestamp] as const),
+  );
   return indicatorCalculateResponseV2Schema.parse({
     ...response,
     inputFingerprint: visible.inputFingerprint,
@@ -74,7 +88,10 @@ export const projectIndicatorResponse = (
         actualEnd: calculation.coverage.actualEnd,
         pointCount: calculation.points.length,
       },
-      points: result.points.filter((point) => timestamps.has(point.timestamp)),
+      points: result.points.flatMap((point) => {
+        const timestamp = visibleTimestamps.get(instantOf(point.timestamp));
+        return timestamp ? [{ ...point, timestamp }] : [];
+      }),
     })),
   });
 };

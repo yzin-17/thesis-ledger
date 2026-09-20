@@ -646,6 +646,7 @@ export function JournalDashboard({
             <ReviewCandidateList
               candidates={candidates}
               legacyItems={candidateQuery.data?.legacyItems}
+              instrumentDirectory={candidateQuery.data?.instrumentDirectory}
               selectedId={selectedCandidate?.id ?? null}
               filter={symbolFilter}
               onFilterChange={setSymbolFilter}
@@ -757,6 +758,7 @@ export function JournalDashboard({
                         trade={currentSingleTrade}
                         candidate={selectedCandidate}
                         result={singleResult}
+                        instrumentDirectory={candidateQuery.data?.instrumentDirectory}
                         aiRun={singleAiRun}
                         aiPending={singleExplanation.isPending}
                         aiError={
@@ -978,6 +980,7 @@ export function JournalDashboard({
           <ReviewCandidateList
             candidates={candidates}
             legacyItems={candidateQuery.data?.legacyItems}
+            instrumentDirectory={candidateQuery.data?.instrumentDirectory}
             filter={symbolFilter}
             onFilterChange={setSymbolFilter}
             loading={candidateQuery.isPending}

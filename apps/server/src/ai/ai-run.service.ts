@@ -1,49 +1,28 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
+  aiExecutionSummarySchema,
+  aiGenerationContracts,
   aiContextSchema,
   aiResearchStartInputSchema,
   researchResultSchema,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
 import { PrismaService } from '../platform/prisma.service.js';
+import { AiResearchQuery } from './ai-research-query.js';
+import {
+  aiRunReadProjection,
+  aiUsageSummaryReadModel,
+  safeFallbackSummary,
+} from './ai-execution-read-model.js';
 import { recoverStaleAiRuns } from './ai-run-recovery.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
-import { AiProviderRegistry, completeWithFallback } from './provider-registry.js';
-
-export interface ProviderCompletionRequest {
-  model: string;
-  messages: unknown[];
-  tools: string[];
-  preferred?: string;
-  toolCallIds?: readonly string[];
-}
+import { AiProviderRegistry } from './provider-registry.js';
+import { freezeAiResearchRoutes, loadAiResearchPolicy } from './ai-research-policy.js';
+import { AiResearchRetry } from './ai-research-retry.js';
+import type { AiRunPage, ResearchFinishRoute } from './ai-run.types.js';
 
 type AiResearchStartInput = z.infer<typeof aiResearchStartInputSchema>;
-
-export interface AiRunPage<T = unknown> {
-  items: T[];
-  nextCursor: string | null;
-  hasMore: boolean;
-}
-
-interface ResearchFinishRoute {
-  provider?: string;
-  model?: string;
-  fallbackErrors?: readonly string[];
-  toolCallIds?: readonly string[];
-}
-
-const fallbackSummary = (metadata: unknown) => {
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
-  const errors = (metadata as { fallbackErrors?: unknown }).fallbackErrors;
-  if (!Array.isArray(errors)) return null;
-  const safeErrors = errors
-    .filter((error): error is string => typeof error === 'string')
-    .slice(0, 3)
-    .map((error) => error.slice(0, 160));
-  return safeErrors.length > 0 ? safeErrors.join('；') : null;
-};
 
 const encodeCursor = (createdAt: Date | string, id: string) => {
   const date = createdAt instanceof Date ? createdAt : new Date(createdAt);
@@ -65,24 +44,22 @@ const decodeCursor = (cursor?: string) => {
   }
 };
 
-const sanitizeError = (error: unknown) => {
-  let message = '未知错误';
-  if (error instanceof Error) message = error.message;
-  else if (typeof error === 'string') message = error;
-  if (message === '未知错误') return message;
-  return message
-    .replace(/Bearer\s+\S+/giu, 'Bearer [REDACTED]')
-    .replace(/(?:sk-|api[_-]?key[=:])\S+/giu, '[REDACTED]')
-    .slice(0, 500);
-};
-
 type ModelWithFindUnique = {
   findUnique?: (args: unknown) => Promise<unknown>;
 };
 
 @Injectable()
 export class AiRunService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly researchQuery: AiResearchQuery;
+  private readonly researchRetry: AiResearchRetry;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly providers?: AiProviderRegistry,
+  ) {
+    this.researchQuery = new AiResearchQuery(prisma);
+    this.researchRetry = new AiResearchRetry(prisma);
+  }
 
   start(
     provider: string,
@@ -116,7 +93,6 @@ export class AiRunService {
       account?: ModelWithFindUnique;
       position?: ModelWithFindUnique;
       strategyVersion?: ModelWithFindUnique;
-      aiRun?: ModelWithFindUnique;
     };
     const context = parsed.context;
 
@@ -150,14 +126,10 @@ export class AiRunService {
       });
       if (!version) throw new NotFoundException(`策略版本不存在: ${context.strategyVersionId}`);
     }
+  }
 
-    if (parsed.retryOfRunId && models.aiRun?.findUnique) {
-      const source = await models.aiRun.findUnique({
-        where: { id: parsed.retryOfRunId },
-        select: { id: true },
-      });
-      if (!source) throw new NotFoundException(`原研究任务不存在: ${parsed.retryOfRunId}`);
-    }
+  async researchRetryPrefill(id: string) {
+    return this.researchRetry.prefill(id);
   }
 
   private async assertStoredRunAccess(contextValue: unknown) {
@@ -200,17 +172,38 @@ export class AiRunService {
   async startResearch(input: AiResearchStartInput) {
     const parsed = aiResearchStartInputSchema.parse(input);
     await this.assertResearchContext(parsed);
+    await this.researchRetry.assertRetry(parsed);
+    const policy = loadAiResearchPolicy();
+    const createdAt = new Date();
+    const deadlineAt = new Date(
+      createdAt.getTime() + policy.maxDurationSeconds * 1_000,
+    ).toISOString();
+    const sdkExecution = aiExecutionSummarySchema.parse({
+      version: 'sdk-execution-v1',
+      contract: aiGenerationContracts.research.ref,
+      frozenPolicy: policy,
+      deadlineAt,
+      generationStatus: 'pending',
+      usageCompleteness: 'unknown',
+      requests: [],
+      continuationBlockedReason: null,
+    });
+    const routeSnapshot = freezeAiResearchRoutes(this.providers, policy);
     return this.prisma.aiRun.create({
       data: {
-        provider: 'pending',
-        model: 'pending',
+        provider: routeSnapshot.provider,
+        model: routeSnapshot.model,
         promptVersion: 'research-v1',
         status: 'queued',
         question: parsed.question,
         context: parsed.context,
-        ...(parsed.templateId === undefined
-          ? {}
-          : { modelMetadata: { templateId: parsed.templateId } }),
+        createdAt,
+        modelMetadata: {
+          ...(parsed.templateId === undefined ? {} : { templateId: parsed.templateId }),
+          researchPolicy: policy,
+          researchRoutes: routeSnapshot.routes,
+          sdkExecution,
+        },
         ...(parsed.retryOfRunId === undefined ? {} : { retryOfRunId: parsed.retryOfRunId }),
       },
     });
@@ -289,44 +282,6 @@ export class AiRunService {
     return this.persistValidatedResult(id, parsed, usage, durationMs, route);
   }
 
-  async completeWithProvider(
-    id: string,
-    registry: AiProviderRegistry,
-    input: ProviderCompletionRequest,
-  ) {
-    const startedAt = Date.now();
-    try {
-      const completion = await completeWithFallback(registry, input);
-      const parsed = researchResultSchema.parse(completion.content);
-      const durationMs = Date.now() - startedAt;
-      const run = await this.finishResearch(
-        id,
-        parsed,
-        {
-          inputTokens: completion.inputTokens,
-          outputTokens: completion.outputTokens,
-          cost: completion.cost,
-        },
-        durationMs,
-        {
-          provider: completion.provider,
-          model: input.model,
-          fallbackErrors: completion.fallbackErrors,
-          toolCallIds: input.toolCallIds ?? [],
-        },
-      );
-      return { run, completion: { ...completion, content: parsed }, durationMs };
-    } catch (error) {
-      await this.fail(
-        id,
-        'provider_completion_failed',
-        sanitizeError(error),
-        Date.now() - startedAt,
-      );
-      throw error;
-    }
-  }
-
   /** Atomically claims one queued run and assigns a short lease to the worker. */
   async claim(id: string, leaseMs = 60_000) {
     const now = new Date();
@@ -351,13 +306,6 @@ export class AiRunService {
     });
     if (result.count !== 1) return null;
     return this.prisma.aiRun.findUnique({ where: { id } });
-  }
-
-  async renewLease(id: string, leaseMs = 60_000) {
-    return this.prisma.aiRun.updateMany({
-      where: { id, status: 'running' },
-      data: { leaseUntil: new Date(Date.now() + leaseMs) },
-    });
   }
 
   async fail(id: string, errorCode: string, errorSummary: string, durationMs?: number) {
@@ -427,10 +375,19 @@ export class AiRunService {
     });
     if (!run) return null;
     await this.assertStoredRunAccess(run.context);
-    const { modelMetadata, ...safeRun } = run;
-    return { ...safeRun, fallbackSummary: fallbackSummary(modelMetadata) };
+    return {
+      ...aiRunReadProjection(run),
+      fallbackSummary: safeFallbackSummary(run.modelMetadata),
+    };
   }
 
+  listResearchPage(input: unknown) {
+    return this.researchQuery.listPage(input);
+  }
+
+  researchDetail(id: string) {
+    return this.researchQuery.detail(id);
+  }
   private async listPageInternal(
     limit = 50,
     status?: string,
@@ -475,9 +432,9 @@ export class AiRunService {
     });
     const hasMore = includeLookahead && runs.length > bounded;
     const visible = hasMore ? runs.slice(0, bounded) : runs;
-    const items = visible.map(({ modelMetadata, ...run }) => ({
-      ...run,
-      fallbackSummary: fallbackSummary(modelMetadata),
+    const items = visible.map((run) => ({
+      ...aiRunReadProjection(run),
+      fallbackSummary: safeFallbackSummary(run.modelMetadata),
     }));
     const tail = visible.at(-1);
     return {
@@ -539,17 +496,14 @@ export class AiRunService {
           ? { createdAt: { ...(start ? { gte: start } : {}), ...(end ? { lt: end } : {}) } }
           : {}),
       },
-    });
-    return runs.reduce(
-      (summary: { runs: number; inputTokens: number; outputTokens: number; cost: number }, run) => {
-        summary.runs += 1;
-        summary.inputTokens += run.inputTokens;
-        summary.outputTokens += run.outputTokens;
-        summary.cost += Number(run.cost);
-        return summary;
+      select: {
+        inputTokens: true,
+        outputTokens: true,
+        cost: true,
+        modelMetadata: true,
       },
-      { runs: 0, inputTokens: 0, outputTokens: 0, cost: 0 },
-    );
+    });
+    return aiUsageSummaryReadModel(runs);
   }
 
   createDecisionLog(input: {

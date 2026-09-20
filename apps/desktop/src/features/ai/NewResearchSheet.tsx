@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
 import { fetchAccounts, fetchPortfolioValuation } from '../portfolio/portfolio.api.js';
 import { portfolioKeys } from '../portfolio/portfolio.queries.js';
@@ -31,7 +32,7 @@ import { strategyKeys } from '../strategy/strategy.queries.js';
 import type { StrategyRecord } from '../strategy/strategy.types.js';
 import { useToastManager } from '@/components/ui/toast';
 import { useCreateAiRunMutation } from './ai.mutations.js';
-import { useAiCapabilitiesQuery } from './ai.queries.js';
+import { useAiCapabilitiesQuery, useAiResearchRetryPrefillQuery } from './ai.queries.js';
 import { researchQuestionTemplates } from './ai.templates.js';
 import type { AiResearchScope, AiRunResult, StartResearchInput } from './ai.types.js';
 
@@ -91,8 +92,12 @@ export function NewResearchSheet({
   const [templateId, setTemplateId] = useState<StartResearchInput['templateId']>();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [retryContextReselected, setRetryContextReselected] = useState(false);
+  const [retryConfirmed, setRetryConfirmed] = useState(false);
+  const [unknownRiskConfirmed, setUnknownRiskConfirmed] = useState(false);
   const mutation = useCreateAiRunMutation();
   const capabilitiesQuery = useAiCapabilitiesQuery(open);
+  const retryPrefillQuery = useAiResearchRetryPrefillQuery(retryOfRunId, open);
   const toastManager = useToastManager();
 
   useEffect(() => {
@@ -105,7 +110,21 @@ export function NewResearchSheet({
     setTemplateId(undefined);
     setSubmitError(null);
     setHasAttemptedSubmit(false);
+    setRetryContextReselected(false);
+    setRetryConfirmed(false);
+    setUnknownRiskConfirmed(false);
   }, [open, initialQuestion]);
+
+  useEffect(() => {
+    const prefill = retryPrefillQuery.data;
+    if (!open || !prefill || prefill.sourceRunId !== retryOfRunId) return;
+    setQuestion(prefill.question);
+    setScope(prefill.context.scope);
+    setAccountId(prefill.context.accountId ?? null);
+    setSymbol(prefill.context.symbol ?? null);
+    setStrategyVersionId(prefill.context.strategyVersionId ?? null);
+    setTemplateId(prefill.templateId ?? undefined);
+  }, [open, retryOfRunId, retryPrefillQuery.data]);
 
   const accountsQuery = useQuery({
     queryKey: portfolioKeys.accounts(),
@@ -141,12 +160,20 @@ export function NewResearchSheet({
   if (scope === 'position' && !accountId) entityError = '请先选择账户。';
   if (scope === 'position' && accountId && !symbol) entityError = '请选择账户中的实际持仓。';
   if (scope === 'strategy' && !strategyVersionId) entityError = '请选择一个具体策略版本。';
+  if (retryPrefillQuery.data?.contextState === 'missing' && !retryContextReselected && !entityError)
+    entityError = '原研究对象已失效，请显式重新选择研究范围或对象。';
+  if (retryPrefillQuery.data?.contextState === 'forbidden' && !entityError)
+    entityError = '原研究对象已不可访问，不能再次生成。';
   const visibleQuestionError = hasAttemptedSubmit ? questionError : null;
   const visibleEntityError = hasAttemptedSubmit ? entityError : null;
   const canSubmit =
     !questionError &&
     !entityError &&
     !mutation.isPending &&
+    (!retryOfRunId || !retryPrefillQuery.isPending) &&
+    (!retryOfRunId || !retryPrefillQuery.isError) &&
+    (!retryOfRunId || retryConfirmed) &&
+    (!retryPrefillQuery.data?.requiresUnknownOutcomeAcknowledgement || unknownRiskConfirmed) &&
     capabilitiesQuery.data?.canStart === true;
 
   const expectedTools = {
@@ -191,19 +218,31 @@ export function NewResearchSheet({
     setStrategyVersionId(null);
     setSubmitError(null);
     setHasAttemptedSubmit(false);
+    if (retryOfRunId) setRetryContextReselected(true);
   };
 
   const submit = async () => {
     setHasAttemptedSubmit(true);
     if (!canSubmit) return;
-    const context = buildContext({ scope, accountId, symbol, strategyVersionId });
+    let context = buildContext({ scope, accountId, symbol, strategyVersionId });
+    if (retryPrefillQuery.data && !retryContextReselected) {
+      context = retryPrefillQuery.data.context;
+    }
     setSubmitError(null);
     try {
       const run = await mutation.mutateAsync({
         question: question.trim(),
         context,
         ...(templateId ? { templateId } : {}),
-        ...(retryOfRunId ? { retryOfRunId } : {}),
+        ...(retryOfRunId
+          ? {
+              retryOfRunId,
+              retryConfirmation: {
+                contextConfirmed: true as const,
+                acknowledgeUnknownOutcomeRisk: unknownRiskConfirmed,
+              },
+            }
+          : {}),
       });
       onCreated(run);
       onOpenChange(false);
@@ -224,16 +263,26 @@ export function NewResearchSheet({
     dirty:
       question !== initialQuestion ||
       scope !== 'portfolio' ||
-      Boolean(accountId || symbol || strategyVersionId || templateId),
+      Boolean(
+        accountId ||
+        symbol ||
+        strategyVersionId ||
+        templateId ||
+        retryConfirmed ||
+        unknownRiskConfirmed,
+      ),
     busy: mutation.isPending,
     onOpenChange,
   });
+
+  let submitLabel = retryOfRunId ? '确认并再次生成' : '开始研究';
+  if (mutation.isPending) submitLabel = '开始中…';
 
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="form" className="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>新建研究</SheetTitle>
+          <SheetTitle>{retryOfRunId ? '再次生成研究' : '新建研究'}</SheetTitle>
           <SheetDescription>
             选择真实研究对象并描述需要回答的问题。研究只读取授权数据，不会修改账本或生成订单。
           </SheetDescription>
@@ -261,7 +310,10 @@ export function NewResearchSheet({
                 <FieldLabel htmlFor="ai-account">研究账户</FieldLabel>
                 <Select
                   value={accountId ?? ''}
-                  onValueChange={(value) => setAccountId(value || null)}
+                  onValueChange={(value) => {
+                    setAccountId(value || null);
+                    if (retryOfRunId) setRetryContextReselected(true);
+                  }}
                 >
                   <SelectTrigger
                     id="ai-account"
@@ -299,6 +351,7 @@ export function NewResearchSheet({
                     onValueChange={(value) => {
                       setAccountId(value || null);
                       setSymbol(null);
+                      if (retryOfRunId) setRetryContextReselected(true);
                     }}
                   >
                     <SelectTrigger
@@ -325,7 +378,10 @@ export function NewResearchSheet({
                   <FieldLabel htmlFor="ai-position-symbol">实际持仓</FieldLabel>
                   <Select
                     value={symbol ?? ''}
-                    onValueChange={(value) => setSymbol(value || null)}
+                    onValueChange={(value) => {
+                      setSymbol(value || null);
+                      if (retryOfRunId) setRetryContextReselected(true);
+                    }}
                     disabled={!accountId || positionsQuery.isPending}
                   >
                     <SelectTrigger
@@ -368,7 +424,10 @@ export function NewResearchSheet({
                 <FieldLabel htmlFor="ai-strategy-version">策略版本</FieldLabel>
                 <Select
                   value={strategyVersionId ?? ''}
-                  onValueChange={(value) => setStrategyVersionId(value || null)}
+                  onValueChange={(value) => {
+                    setStrategyVersionId(value || null);
+                    if (retryOfRunId) setRetryContextReselected(true);
+                  }}
                 >
                   <SelectTrigger
                     id="ai-strategy-version"
@@ -456,6 +515,60 @@ export function NewResearchSheet({
               {` ${capabilityMessage}`}
             </AlertDescription>
           </Alert>
+          {retryOfRunId && retryPrefillQuery.isPending && (
+            <Alert>
+              <AlertTitle>正在核对来源任务</AlertTitle>
+              <AlertDescription>服务端正在确认来源类型、终态和研究对象访问状态。</AlertDescription>
+            </Alert>
+          )}
+          {retryOfRunId && retryPrefillQuery.isError && (
+            <Alert variant="destructive">
+              <AlertTitle>无法再次生成</AlertTitle>
+              <AlertDescription>
+                来源任务无效、状态不允许或不可访问。请返回列表重新选择失败任务。
+              </AlertDescription>
+            </Alert>
+          )}
+          {retryPrefillQuery.data && (
+            <Alert
+              variant={
+                retryPrefillQuery.data.sourceOutcome === 'unknown' ? 'destructive' : 'default'
+              }
+            >
+              <AlertTitle>
+                {retryPrefillQuery.data.sourceOutcome === 'unknown'
+                  ? '来源结果状态未知'
+                  : '确认再次生成'}
+              </AlertTitle>
+              <AlertDescription className="flex flex-col gap-3">
+                <p>新任务会获得独立 ID、执行期限和预算；原任务的结果、计量事实与预留保持不变。</p>
+                <div className="flex items-center justify-between gap-3">
+                  <span>我已核对预填的问题、研究对象和问题模板</span>
+                  <Switch
+                    variant="risk"
+                    checked={retryConfirmed}
+                    onCheckedChange={setRetryConfirmed}
+                    aria-label="确认再次生成的预填内容"
+                  >
+                    <SwitchThumb variant="risk" aria-hidden="true" />
+                  </Switch>
+                </div>
+                {retryPrefillQuery.data.requiresUnknownOutcomeAcknowledgement && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span>我理解原请求可能仍在外部执行，并确认创建独立的新请求</span>
+                    <Switch
+                      variant="risk"
+                      checked={unknownRiskConfirmed}
+                      onCheckedChange={setUnknownRiskConfirmed}
+                      aria-label="确认未知外部结果风险"
+                    >
+                      <SwitchThumb variant="risk" aria-hidden="true" />
+                    </Switch>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           {submitError && (
             <Alert variant="destructive">
               <AlertTitle>研究启动失败</AlertTitle>
@@ -476,7 +589,7 @@ export function NewResearchSheet({
             {mutation.isPending && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
             )}
-            {mutation.isPending ? '开始中…' : '开始研究'}
+            {submitLabel}
           </Button>
         </SheetFooter>
       </SheetContent>

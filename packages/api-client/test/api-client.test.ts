@@ -169,7 +169,13 @@ describe('ThesisLedgerApiClient', () => {
     };
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
-        JSON.stringify({ items: [candidate], total: 1, nextCursor: null, legacyItems: [] }),
+        JSON.stringify({
+          items: [candidate],
+          total: 1,
+          nextCursor: null,
+          legacyItems: [],
+          instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
+        }),
         {
           status: 200,
         },

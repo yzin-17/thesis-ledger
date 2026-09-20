@@ -18,6 +18,7 @@ import { EmptyListState, EmptyTableRow } from '../shared/EmptyStates.js';
 import type { LoadState } from '../shared/types.js';
 import {
   formatDateTime,
+  notificationRouteLabel,
   riskChannelLabel,
   riskEventMode,
   riskEventValueLabel,
@@ -190,15 +191,7 @@ export function RiskNotificationTable({
   let routingDescription = '正在确认通知 Provider…';
   if (routingState === 'error') routingDescription = '暂时无法确认当前通知 Provider。';
   else if (routes.length > 0) {
-    // Provider 名称与渠道中文名相同时不再追加括号，避免“飞书（飞书）”式重复
-    routingDescription = `当前按 Provider 配置投递到：${routes
-      .map((route) => {
-        const channelLabel = riskChannelLabel(route.channel);
-        return channelLabel === route.provider
-          ? channelLabel
-          : `${route.provider}（${channelLabel}）`;
-      })
-      .join('、')}。`;
+    routingDescription = `当前按 Provider 配置投递到：${routes.map(notificationRouteLabel).join('、')}。`;
   } else if (routingState === 'ready') {
     routingDescription = '当前没有可投递的通知 Provider。';
   }
@@ -374,8 +367,18 @@ function AuditSnapshots({ before, after }: { before: string | null; after: strin
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-3 grid gap-2 sm:grid-cols-2">
-      <AuditSnapshot label="修改前快照" value={before} open={open} onToggle={() => setOpen((current) => !current)} />
-      <AuditSnapshot label="修改后快照" value={after} open={open} onToggle={() => setOpen((current) => !current)} />
+      <AuditSnapshot
+        label="修改前快照"
+        value={before}
+        open={open}
+        onToggle={() => setOpen((current) => !current)}
+      />
+      <AuditSnapshot
+        label="修改后快照"
+        value={after}
+        open={open}
+        onToggle={() => setOpen((current) => !current)}
+      />
     </div>
   );
 }

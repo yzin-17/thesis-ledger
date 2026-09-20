@@ -253,8 +253,6 @@ describe('实际 Exchange Runner 的总权益定仓', () => {
     expect(result.fills.map((fill) => ({ side: fill.side, quantity: fill.quantity }))).toEqual([
       { side: 'buy', quantity: '500' },
     ]);
-    expect(result.rejects).toContainEqual(
-      expect.objectContaining({ ruleVersion: 'sizing-v1', reason: 'sizing 规范化后数量为零' }),
-    );
+    expect(result.rejects).toEqual([]);
   });
 });

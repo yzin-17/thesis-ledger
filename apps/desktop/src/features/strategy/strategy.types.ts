@@ -3,6 +3,7 @@ import type {
   ExecutionModelDisclosure,
   BacktestResultV2,
   RunConfig,
+  ResultReadEligibility,
   StrategySchemaV2,
 } from '@thesis-ledger/schemas';
 
@@ -48,6 +49,7 @@ export interface BacktestJobResult {
 }
 
 export interface BacktestJobSummary {
+  readEligibility?: ResultReadEligibility;
   executionModelDisclosure?: ExecutionModelDisclosure;
   id: string;
   strategyVersionId: string;
@@ -75,6 +77,7 @@ export interface BacktestJobSummary {
   resultChecksum?: string | null;
   snapshotId?: string | null;
   initialCash?: number | null;
+  resultMetrics?: Record<string, unknown> | null;
   warnings?: unknown;
 }
 

@@ -19,15 +19,26 @@ const sourceFiles = (directory: string): string[] =>
   });
 
 describe('表格操作列统一契约', () => {
-  it('操作列使用共享 sticky 语义组件，不保留普通 th 操作列', () => {
+  it('操作列默认使用共享 sticky 语义组件，明确采用静态窄列的列表必须声明例外', () => {
     const violations: string[] = [];
     for (const path of sourceFiles(featureRoot)) {
       const text = readFileSync(path, 'utf8');
-      const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const source = ts.createSourceFile(
+        path,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
       const visit = (node: ts.Node) => {
         if (ts.isJsxElement(node)) {
           const tag = node.openingElement.tagName.getText(source);
-          if (tag === 'th' && /操作|调整/.test(node.getText(source))) {
+          const attributes = node.openingElement.attributes.getText(source);
+          if (
+            tag === 'th' &&
+            /操作|调整/.test(node.getText(source)) &&
+            !attributes.includes('data-table-action-static')
+          ) {
             violations.push(path);
           }
         }
@@ -46,11 +57,13 @@ describe('表格操作列统一契约', () => {
     expect(header).toContain('sticky');
     expect(header).toContain('right-0');
     expect(header).toContain('bg-muted');
-    expect(header).toContain('border-l');
+    expect(header).toContain('before:w-px');
+    expect(header).toContain('before:bg-border');
     expect(cell).toContain('data-sticky-table-action="cell"');
     expect(cell).toContain('sticky');
     expect(cell).toContain('right-0');
     expect(cell).toContain('bg-background');
-    expect(cell).toContain('border-l');
+    expect(cell).toContain('before:w-px');
+    expect(cell).toContain('before:bg-border');
   });
 });

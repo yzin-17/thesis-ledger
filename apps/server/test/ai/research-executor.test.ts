@@ -5,6 +5,27 @@ import { FixtureAiProvider } from '../../src/ai/provider-adapters.js';
 import { PromptVersionRegistry } from '../../src/ai/prompt-registry.js';
 
 const runId = '11111111-1111-4111-8111-111111111111';
+const executionMetadata = {
+  sdkExecution: {
+    version: 'sdk-execution-v1',
+    contract: { id: 'research', version: 'research-generation-v1' },
+    frozenPolicy: {
+      version: 'research-policy-v1',
+      maxAiCalls: 2,
+      maxInputTokens: 100_000,
+      maxOutputTokens: 20_000,
+      maxDurationSeconds: 300,
+      maxCost: '0',
+      costCurrency: null,
+      paidRoutes: [],
+    },
+    deadlineAt: '2099-08-26T00:05:00.000Z',
+    generationStatus: 'pending',
+    usageCompleteness: 'unknown',
+    requests: [],
+    continuationBlockedReason: null,
+  },
+};
 
 const promptRegistry = () => {
   const prompts = new PromptVersionRegistry();
@@ -60,13 +81,9 @@ const toolCallIds = new Map([
 ]);
 
 const runRecorder = (context: object = { scope: 'portfolio' }) => {
-  const finishResearch = vi.fn(async (id: string, result: unknown) => {
-    void id;
-    void result;
-    return undefined;
-  });
+  const failOwned = vi.fn(async () => true);
   return {
-    finishResearch,
+    executions: { renewLease: vi.fn(async () => true), failOwned },
     runs: {
       claim: vi.fn(async () => ({
         id: runId,
@@ -76,20 +93,73 @@ const runRecorder = (context: object = { scope: 'portfolio' }) => {
         status: 'running',
         question: '当前组合的主要风险是什么？',
         context,
+        executionAttempt: 1,
+        modelMetadata: executionMetadata,
       })),
-      renewLease: vi.fn(async () => ({ count: 1 })),
       recordToolCall: vi.fn(async (input: { tool: string }) => ({
         id: toolCallIds.get(input.tool),
       })),
-      finishResearch,
-      fail: vi.fn(async () => undefined),
     },
   };
 };
 
+const sdkFixture = () => {
+  let result: unknown;
+  const execute = vi.fn(
+    async (input: {
+      messages: Array<{ role: string; content: string }>;
+      buildResult: (output: unknown, provider: string) => unknown;
+    }) => {
+      const marker = 'RESEARCH_REQUEST_JSON:';
+      const user = input.messages.find((message) => message.role === 'user');
+      const request = JSON.parse(user?.content.split(marker)[1] ?? '{}') as {
+        evidence?: Array<{
+          claim: string;
+          citations: Array<{ toolCallId?: string; tool: string; sourceId: string }>;
+        }>;
+      };
+      result = input.buildResult(
+        {
+          conclusion: '基于服务端事实完成研究。',
+          evidence: request.evidence ?? [],
+          risks: [],
+          unknowns: [],
+          signals: [],
+          disclaimer: 'test',
+        },
+        'fixture',
+      );
+    },
+  );
+  return { execute, result: () => result };
+};
+
 describe('AI 研究执行器', () => {
+  it('发布停用开关关闭时不领取或恢复研究任务', async () => {
+    vi.stubEnv('AI_RESEARCH_EXECUTION_ENABLED', 'false');
+    const { runs, executions } = runRecorder();
+    const sdk = sdkFixture();
+    const executor = new AiResearchExecutor(
+      runs as never,
+      prismaFixture() as never,
+      new AiProviderRegistry(),
+      promptRegistry(),
+      executions as never,
+      sdk as never,
+    );
+    try {
+      executor.dispatch(runId);
+      await executor.tick();
+      expect(runs.claim).not.toHaveBeenCalled();
+      expect(sdk.execute).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('领取队列任务，执行只读 Tool，并把证据关联到实际 Tool call', async () => {
-    const { runs, finishResearch } = runRecorder();
+    const { runs, executions } = runRecorder();
+    const sdk = sdkFixture();
     const providers = new AiProviderRegistry();
     providers.register(new FixtureAiProvider());
     const executor = new AiResearchExecutor(
@@ -97,34 +167,33 @@ describe('AI 研究执行器', () => {
       prismaFixture() as never,
       providers,
       promptRegistry(),
+      executions as never,
+      sdk as never,
     );
 
     executor.dispatch(runId);
-    await vi.waitFor(() => expect(finishResearch).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledOnce());
 
-    const result = finishResearch.mock.calls[0]?.[1] as {
+    const result = sdk.result() as {
       evidence: Array<{ citations: Array<{ toolCallId?: string }> }>;
     };
     expect(result.evidence.length).toBeGreaterThan(0);
     expect(
       result.evidence.flatMap((item) => item.citations).every((citation) => citation.toolCallId),
     ).toBe(true);
-    expect(runs.fail).not.toHaveBeenCalled();
+    expect(executions.failOwned).not.toHaveBeenCalled();
   });
 
   it('把实际 Tool 返回的数据放进 Provider 研究上下文', async () => {
-    const { runs, finishResearch } = runRecorder();
+    const { runs, executions } = runRecorder();
     let providerRequest: {
       evidence?: unknown[];
       context?: unknown;
       toolResults?: Array<{ tool?: string; data?: unknown }>;
     } = {};
     const providers = new AiProviderRegistry();
-    providers.register({
-      id: 'capture',
-      models: ['capture-model'],
-      metadata: { health: 'healthy' },
-      complete: vi.fn(async (input: { messages: unknown[] }) => {
+    const sdk = {
+      execute: vi.fn(async (input: { messages: unknown[] }) => {
         const user = input.messages.find(
           (message) =>
             message &&
@@ -133,35 +202,23 @@ describe('AI 研究执行器', () => {
             (message as { role?: unknown }).role === 'user',
         ) as { content?: string } | undefined;
         const marker = 'RESEARCH_REQUEST_JSON:';
-        providerRequest = JSON.parse(user?.content?.split(marker)[1] ?? '{}') as typeof providerRequest;
-        return {
-          content: {
-            version: 1,
-            provider: 'capture',
-            conclusion: '基于持仓事实完成研究。',
-            evidence: providerRequest.evidence ?? [],
-            risks: [],
-            unknowns: [],
-            signals: [],
-            disclaimer: 'test',
-            context: providerRequest.context,
-            createdAt: '2026-08-26T00:00:00.000Z',
-          },
-          inputTokens: 1,
-          outputTokens: 1,
-          cost: 0,
-        };
+        providerRequest = JSON.parse(
+          user?.content?.split(marker)[1] ?? '{}',
+        ) as typeof providerRequest;
+        return undefined;
       }),
-    });
+    };
     const executor = new AiResearchExecutor(
       runs as never,
       prismaFixture() as never,
       providers,
       promptRegistry(),
+      executions as never,
+      sdk as never,
     );
 
     executor.dispatch(runId);
-    await vi.waitFor(() => expect(finishResearch).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledOnce());
 
     const positionsResult = providerRequest.toolResults?.find(
       (result) => result.tool === 'getPositions',
@@ -173,7 +230,8 @@ describe('AI 研究执行器', () => {
 
   it('策略研究只读取指定 StrategyVersion，不退化读取全局 Risk/Journal', async () => {
     const strategyVersionId = '61111111-1111-4111-8111-111111111111';
-    const { runs, finishResearch } = runRecorder({ scope: 'strategy', strategyVersionId });
+    const { runs, executions } = runRecorder({ scope: 'strategy', strategyVersionId });
+    const sdk = sdkFixture();
     const prisma = prismaFixture();
     const providers = new AiProviderRegistry();
     providers.register(new FixtureAiProvider());
@@ -182,10 +240,12 @@ describe('AI 研究执行器', () => {
       prisma as never,
       providers,
       promptRegistry(),
+      executions as never,
+      sdk as never,
     );
 
     executor.dispatch(runId);
-    await vi.waitFor(() => expect(finishResearch).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledOnce());
 
     expect(prisma.strategyVersion.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: strategyVersionId } }),
@@ -195,10 +255,10 @@ describe('AI 研究执行器', () => {
   });
 
   it('没有 Provider 时把任务标记为明确的 provider_unavailable', async () => {
-    const fail = vi.fn(async (id: string, code: string) => {
-      void id;
-      void code;
-      return undefined;
+    const failOwned = vi.fn(async (ownership: unknown, input: { errorCode: string }) => {
+      void ownership;
+      void input;
+      return true;
     });
     const runs = {
       claim: vi.fn(async () => ({
@@ -209,20 +269,71 @@ describe('AI 研究执行器', () => {
         status: 'running',
         question: '风险？',
         context: { scope: 'portfolio' },
+        executionAttempt: 1,
+        modelMetadata: executionMetadata,
       })),
-      renewLease: vi.fn(async () => ({ count: 1 })),
-      fail,
     };
     const executor = new AiResearchExecutor(
       runs as never,
       prismaFixture() as never,
       new AiProviderRegistry(),
       promptRegistry(),
+      { renewLease: vi.fn(async () => true), failOwned } as never,
+      {
+        execute: vi.fn(async () => {
+          throw new Error('没有可用路由');
+        }),
+      } as never,
     );
 
     executor.dispatch(runId);
-    await vi.waitFor(() => expect(fail).toHaveBeenCalledOnce());
-    expect(fail.mock.calls[0]?.[1]).toBe('provider_unavailable');
+    await vi.waitFor(() => expect(failOwned).toHaveBeenCalledOnce());
+    expect(failOwned.mock.calls[0]?.[1]).toMatchObject({ errorCode: 'provider_unavailable' });
+  });
+
+  it('拒绝伪造或跨任务的 Tool call 引用', async () => {
+    const { runs, executions } = runRecorder();
+    const providers = new AiProviderRegistry();
+    providers.register(new FixtureAiProvider());
+    const sdk = {
+      execute: vi.fn(
+        async (input: { buildResult: (output: unknown, provider: string) => unknown }) =>
+          input.buildResult(
+            {
+              conclusion: '伪造引用',
+              evidence: [
+                {
+                  claim: '不属于本任务',
+                  citations: [{ toolCallId: '91111111-1111-4111-8111-111111111111' }],
+                },
+              ],
+              risks: [],
+              unknowns: [],
+              signals: [],
+              disclaimer: 'test',
+            },
+            'fixture',
+          ),
+      ),
+    };
+    const executor = new AiResearchExecutor(
+      runs as never,
+      prismaFixture() as never,
+      providers,
+      promptRegistry(),
+      executions as never,
+      sdk as never,
+    );
+
+    executor.dispatch(runId);
+    await vi.waitFor(() => expect(executions.failOwned).toHaveBeenCalledOnce());
+    expect(executions.failOwned).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        errorCode: 'research_execution_failed',
+        errorSummary: expect.stringContaining('不属于本任务'),
+      }),
+    );
   });
 
   it('能力预检区分演示和异常 Provider，并给出可执行影响', () => {
@@ -238,6 +349,8 @@ describe('AI 研究执行器', () => {
       prismaFixture() as never,
       providers,
       promptRegistry(),
+      {} as never,
+      {} as never,
     );
     const capabilities = executor.capabilities();
     expect(capabilities.canStart).toBe(false);

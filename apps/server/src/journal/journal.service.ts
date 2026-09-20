@@ -23,6 +23,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { TradeQueryService } from '../ledger/trade-query.service.js';
+import { InstrumentDirectoryService } from '../market/instruments/instrument-directory.service.js';
 
 type PlanRow = {
   id: string;
@@ -382,6 +383,7 @@ export class JournalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tradeQuery: TradeQueryService,
+    private readonly instrumentDirectory: InstrumentDirectoryService,
   ) {}
 
   createEntry(input: Omit<JournalEntry, 'id' | 'createdAt'>) {
@@ -522,12 +524,17 @@ export class JournalService {
       )
       .filter((item) => item.accountId !== '')
       .filter((item) => !query.symbol || item.symbol === null || item.symbol === query.symbol);
+    const instrumentDirectory = await this.instrumentDirectory.resolveSymbols([
+      ...items.map((item) => item.symbol),
+      ...legacyItems.flatMap((item) => (item.symbol === null ? [] : [item.symbol])),
+    ]);
 
     return {
       items,
       total: candidates.length,
       nextCursor: hasMore ? (items.at(-1)?.reviewObjectId ?? null) : null,
       legacyItems,
+      instrumentDirectory,
     };
   }
 

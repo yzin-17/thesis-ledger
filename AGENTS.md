@@ -88,6 +88,10 @@
 - 不要使用 Tailwind 的 `!` 修饰符或 CSS `!important` 作为常规样式覆盖手段。只有在确认原子类、组件变体和 CSS 层级都无法解决后，才可使用，并需说明原因。
 - 保留现有 DOM、交互、数据接口和业务行为；视觉调整应尽量局部化。
 
+## 用户可见文案
+
+- 面向中文用户的下拉框，触发器中的当前回显必须与选项列表复用同一份中文显示标签映射；不得直接展示内部枚举、接口字段或技术术语的英文值（例如 `all`、`Provider`）。内部值可继续用于状态管理和请求参数，但必须通过显示标签映射后再渲染。
+
 ## 表单标签交互
 
 - 不得依赖 HTML `<label>` 的默认激活行为（包括 `htmlFor`/`for` 关联或用 `<label>` 包裹控件）让点击标签聚焦、打开或切换表单控件。表单标签只用于说明；需要可访问命名时保留语义关联并在共享组件层阻止默认激活，或使用 `aria-label`/`aria-labelledby`，不得通过全局 `pointer-events` 规则阻断控件自身操作。
@@ -97,3 +101,5 @@
 - 涉及 `shadcn/ui` 项目初始化、组件搜索、添加、更新、修复、组合、样式、表单、overlay 或 preset 时，必须使用 `shadcn` skill。
 - 先检查目标前端目录的 `components.json`、已安装组件、`package.json` 中的 `packageManager` 和现有组件实现，优先复用和组合已有组件；使用项目包管理器运行 shadcn CLI，并在新增或修改组件前查看对应 docs 与示例。
 - 遵守项目实际 alias、`base`、icon library 和 Tailwind version；未经明确确认不得使用 `--overwrite` 覆盖本地组件。
+- 在已安装 `shadcn` 的工作区查询项目或组件信息时，优先从目标前端目录执行项目锁定版本，例如 `pnpm exec shadcn info --json` 和 `pnpm exec shadcn docs <components...>`；不得无必要改用 `pnpm dlx shadcn@latest`，以免绕过仓库锁定版本和依赖图。
+- 若 `pnpm dlx shadcn@latest` 因 `@modelcontextprotocol/sdk` 与 `zod` 解析冲突出现 `ERR_PACKAGE_PATH_NOT_EXPORTED`（如 `zod/v3` 或 `zod/./v3`），不得据此判定组件缺失，也不得仅为查询修改项目依赖或锁文件。先改用项目锁定的 `pnpm exec shadcn`；确需验证最新版 CLI 时，可使用当前已验证的隔离命令 `pnpm dlx --package shadcn@latest --package zod@3.25.76 shadcn <command>`，并在使用前确认该兼容版本仍满足最新版 SDK 的 peer dependency。

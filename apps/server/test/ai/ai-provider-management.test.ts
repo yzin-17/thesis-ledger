@@ -6,8 +6,15 @@ import {
 import { AiProviderService } from '../../src/ai/ai-provider.service.js';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { ProviderConfigService } from '../../src/providers/provider-config.service.js';
+import { aiGenerationContracts } from '@thesis-ledger/schemas';
 
 const key = 'test-api-key-not-returned';
+const successfulSdk = () => ({
+  generate: vi.fn(async (input: unknown) => {
+    void input;
+    return { output: { ok: true } };
+  }),
+});
 type TestRow = {
   name: string;
   type: string;
@@ -57,6 +64,24 @@ const createConfigStub = (initial: TestRow[] = []) => {
     }),
     deleteStored: vi.fn(async (name: string) => {
       rows = rows.filter((row) => row.name !== name);
+    }),
+    saveAi: vi.fn(async (input: SaveInput) => {
+      const existing = rows.find((row) => row.name === input.name);
+      const saved: TestRow = {
+        name: input.name,
+        type: 'ai',
+        enabled: input.enabled ?? existing?.enabled ?? true,
+        priority: input.priority,
+        capabilities: input.capabilities,
+        settings: input.settings,
+        ...(existing?.encryptedCredentials
+          ? { encryptedCredentials: existing.encryptedCredentials }
+          : {}),
+        health: existing?.health ?? 'unknown',
+        updatedAt: new Date(),
+      };
+      rows = [...rows.filter((row) => row.name !== input.name), saved];
+      return saved;
     }),
   };
   return {
@@ -156,7 +181,12 @@ describe('AI Provider 持久化管理', () => {
       get: vi.fn(async () => null),
     };
     const registry = new AiProviderRegistry();
-    const service = new AiProviderService(configs as never, health as never, registry);
+    const service = new AiProviderService(
+      configs as never,
+      health as never,
+      registry,
+      successfulSdk() as never,
+    );
 
     vi.stubGlobal(
       'fetch',
@@ -235,23 +265,14 @@ describe('AI Provider 持久化管理', () => {
     expect(registry.list().map((item) => item.id)).toEqual(['old']);
   });
 
-  it('连接测试对强制或不支持 none 的首模型使用安全预算并省略 reasoning', async () => {
+  it('连接测试统一通过 SDK adapter 发出单次中性探针', async () => {
     const configs = createConfigStub();
+    const sdk = successfulSdk();
     const service = new AiProviderService(
       configs.service as never,
       createHealthStub() as never,
       new AiProviderRegistry(),
-    );
-    const requests: Array<Record<string, unknown>> = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-        requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
-        return {
-          ok: true,
-          json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
-        };
-      }),
+      sdk as never,
     );
     try {
       await service.testDraft({
@@ -287,49 +308,29 @@ describe('AI Provider 持久化管理', () => {
         models: ['unknown-model'],
         apiKey: key,
       });
-      expect(requests).toHaveLength(4);
-      expect(requests[0]).toMatchObject({ max_tokens: 512 });
-      expect(requests[0]).not.toHaveProperty('reasoning');
-      expect(requests[1]).toMatchObject({ max_tokens: 2_048, reasoning: { effort: 'high' } });
-      expect(requests[2]).toMatchObject({ max_tokens: 128, reasoning: { effort: 'none' } });
-      expect(requests[3]).toMatchObject({ max_tokens: 128, reasoning: { effort: 'none' } });
+      expect(sdk.generate).toHaveBeenCalledTimes(4);
+      for (const [input] of sdk.generate.mock.calls) {
+        expect(input).toMatchObject({
+          adapter: 'openrouter',
+          mode: 'json_validated',
+          transport: 'single',
+          maxOutputTokens: 128,
+        });
+        expect(input).not.toHaveProperty('reasoningEffort');
+      }
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('OpenRouter reasoning-only 响应会有限重试并要求可消费 JSON', async () => {
+  it('连接测试失败时不隐式发出第二次请求', async () => {
     const configs = createConfigStub();
+    const sdk = { generate: vi.fn(async () => Promise.reject(new Error('reasoning-only'))) };
     const service = new AiProviderService(
       configs.service as never,
       createHealthStub() as never,
       new AiProviderRegistry(),
-    );
-    const requests: Array<Record<string, unknown>> = [];
-    let callCount = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-        requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
-        callCount += 1;
-        return {
-          ok: true,
-          json: async () =>
-            callCount === 1
-              ? {
-                  choices: [
-                    {
-                      message: {
-                        reasoning: '需要先完成内部推理，但首轮预算耗尽',
-                        content: null,
-                      },
-                      finish_reason: 'length',
-                    },
-                  ],
-                }
-              : { choices: [{ message: { content: '{"ok":true}' } }] },
-        };
-      }),
+      sdk as never,
     );
     try {
       const result = await service.testDraft({
@@ -344,16 +345,8 @@ describe('AI Provider 持久化管理', () => {
         },
         apiKey: key,
       });
-      expect(result.status).toBe('healthy');
-      expect(requests).toHaveLength(2);
-      expect(requests[0]).toMatchObject({
-        max_tokens: 2_048,
-        reasoning: { effort: 'high' },
-      });
-      expect(requests[1]).toMatchObject({
-        max_tokens: 4_096,
-        reasoning: { effort: 'high' },
-      });
+      expect(result.status).toBe('down');
+      expect(sdk.generate).toHaveBeenCalledOnce();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -366,6 +359,7 @@ describe('AI Provider 持久化管理', () => {
       configs.service as never,
       createHealthStub() as never,
       new AiProviderRegistry(),
+      successfulSdk() as never,
     );
 
     await expect(
@@ -458,6 +452,7 @@ describe('AI Provider 持久化管理', () => {
       configs.service as never,
       createHealthStub() as never,
       new AiProviderRegistry(),
+      successfulSdk() as never,
     );
     vi.stubGlobal(
       'fetch',
@@ -532,6 +527,27 @@ describe('AI Provider 持久化管理', () => {
           costPer1kOutput: 0.09,
           costCurrency: 'USD',
           pricingVersion: 'env-v1',
+          adapter: 'openai-compatible',
+          executionRoutes: [
+            {
+              model: 'env-only-model',
+              mode: 'native_schema',
+              contract: aiGenerationContracts.research.ref,
+              capabilityDeclaration: {
+                source: 'manual',
+                sourceRef: 'deployment-config',
+                declaredAt: '2026-09-19T00:00:00.000Z',
+                declaredBy: 'deployment-operator',
+                sourceVersion: 'env-v1',
+              },
+              allowedUpstreams: [],
+              freeEvidence: {
+                source: 'controlled_local',
+                sourceRef: 'environment-provider',
+                sourceVersion: 'env-v1',
+              },
+            },
+          ],
         },
       ]),
     };
@@ -571,11 +587,78 @@ describe('AI Provider 持久化管理', () => {
           costPer1kOutput: 0.09,
           costCurrency: 'USD',
           pricingVersion: 'env-v1',
+          adapter: 'openai-compatible',
+          executionRouteConfigs: [
+            expect.objectContaining({
+              model: 'env-only-model',
+              mode: 'native_schema',
+              contract: aiGenerationContracts.research.ref,
+            }),
+          ],
+          executionRoutes: [{ readiness: { state: 'ready' } }],
         },
       );
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  it('能力撤销由服务端绑定当前配置指纹并只阻断后续发送', async () => {
+    const configuredRoute = {
+      model: 'db-model',
+      mode: 'native_schema' as const,
+      contract: aiGenerationContracts.research.ref,
+      capabilityDeclaration: {
+        source: 'manual' as const,
+        sourceRef: 'provider-settings',
+        declaredAt: '2026-09-19T00:00:00.000Z',
+        declaredBy: 'operator',
+        sourceVersion: 'v1',
+      },
+      allowedUpstreams: [],
+      freeEvidence: null,
+    };
+    const configs = createConfigStub([
+      createDbRow('ready-provider', {
+        health: 'healthy',
+        settings: {
+          ...validSettings(),
+          adapter: 'openai-compatible',
+          executionRoutes: [configuredRoute],
+        },
+      }),
+    ]);
+    const registry = new AiProviderRegistry();
+    const service = new AiProviderService(
+      configs.service as never,
+      createHealthStub() as never,
+      registry,
+    );
+    await service.refreshRegistry();
+    const inFlight = registry.strictReady({
+      providerId: 'ready-provider',
+      model: 'db-model',
+      mode: 'native_schema',
+      contract: aiGenerationContracts.research.ref,
+      budgetAuthorized: true,
+    }).execution;
+    await service.revokeCapability({
+      providerId: 'ready-provider',
+      model: 'db-model',
+      mode: 'native_schema',
+      contract: aiGenerationContracts.research.ref,
+      reason: 'Provider 明确拒绝必需参数',
+    });
+    expect(inFlight.readiness.state).toBe('ready');
+    expect(() =>
+      registry.strictReady({
+        providerId: 'ready-provider',
+        model: 'db-model',
+        mode: 'native_schema',
+        contract: aiGenerationContracts.research.ref,
+        budgetAuthorized: true,
+      }),
+    ).toThrow('capability_revoked');
   });
 
   it('坏的数据库记录被跳过但在管理查询中标记配置错误', async () => {
@@ -594,26 +677,24 @@ describe('AI Provider 持久化管理', () => {
     ]);
   });
 
-  it('草稿成功/失败不写健康历史，已保存失败写入审计且错误脱敏', async () => {
+  it('连接测试只更新健康事实，不授予结构化能力或接入就绪', async () => {
     const configs = createConfigStub([createDbRow('saved')]);
     const health = createHealthStub();
-    const service = new AiProviderService(
-      configs.service as never,
-      health as never,
-      new AiProviderRegistry(),
-    );
+    const registry = new AiProviderRegistry();
     let call = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    const sdk = {
+      generate: vi.fn(async () => {
         call += 1;
         if (call > 1)
           throw new Error(`upstream failed api_key=${call === 2 ? 'draft-key' : 'db-key-saved'}`);
-        return {
-          ok: true,
-          json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
-        };
+        return { output: { ok: true } };
       }),
+    };
+    const service = new AiProviderService(
+      configs.service as never,
+      health as never,
+      registry,
+      sdk as never,
     );
     try {
       await service.testDraft({
@@ -636,6 +717,7 @@ describe('AI Provider 持久化管理', () => {
       expect(savedFailure.message).not.toContain('db-key-saved');
       expect(health.record).toHaveBeenCalledTimes(1);
       expect(configs.service.setHealth).toHaveBeenCalledWith('saved', 'degraded');
+      expect(registry.readiness('saved', true)).toEqual([]);
     } finally {
       vi.unstubAllGlobals();
     }

@@ -352,6 +352,25 @@ export const catalogDeltaSchema = catalogSnapshotSchema.extend({
   requiresFullSnapshot: z.boolean().optional(),
 });
 
+export const instrumentDirectoryItemSchema = z
+  .object({
+    symbol: z.string().trim().min(1),
+    canonicalCode: z.string().trim().min(1),
+    instrumentType: z.string().trim().min(1),
+    market: z.string().trim().min(1),
+    displayName: z.string().trim().min(1),
+    active: z.boolean(),
+  })
+  .strict();
+
+export const instrumentDirectorySchema = z
+  .object({
+    generation: z.number().int().nonnegative(),
+    items: z.array(instrumentDirectoryItemSchema),
+    unresolvedSymbols: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const marketDetailCapabilitySchema = z.enum([
   'quote',
   'bars',
@@ -583,11 +602,19 @@ const marketDetailResponseV2SchemaImplementation = z
     for (const capability of response.requested) {
       const section = response.sections[capability];
       if (!section) {
-        context.addIssue({ code: 'custom', path: ['sections', capability], message: '响应必须为每个 requested 能力提供分段状态。' });
+        context.addIssue({
+          code: 'custom',
+          path: ['sections', capability],
+          message: '响应必须为每个 requested 能力提供分段状态。',
+        });
         continue;
       }
       if (section.capability !== capability) {
-        context.addIssue({ code: 'custom', path: ['sections', capability, 'capability'], message: '分段键必须与 capability 一致。' });
+        context.addIssue({
+          code: 'custom',
+          path: ['sections', capability, 'capability'],
+          message: '分段键必须与 capability 一致。',
+        });
       }
       if (section.status === 'ready' || section.status === 'stale') {
         let parsed: { success: boolean } = { success: true };
@@ -609,10 +636,18 @@ const marketDetailResponseV2SchemaImplementation = z
           }
         }
         if (!parsed.success) {
-          context.addIssue({ code: 'custom', path: ['sections', capability, 'data'], message: 'v2 分段数据契约不匹配。' });
+          context.addIssue({
+            code: 'custom',
+            path: ['sections', capability, 'data'],
+            message: 'v2 分段数据契约不匹配。',
+          });
         }
         if (capability.startsWith('indicator:') && !response.barSeries) {
-          context.addIssue({ code: 'custom', path: ['barSeries'], message: '指标分段必须携带对应的 BarSeriesV2。' });
+          context.addIssue({
+            code: 'custom',
+            path: ['barSeries'],
+            message: '指标分段必须携带对应的 BarSeriesV2。',
+          });
         }
       }
     }
@@ -635,6 +670,8 @@ export type EffectiveProviderPolicy = z.infer<typeof effectiveProviderPolicySche
 export type CatalogItem = z.infer<typeof catalogItemSchema>;
 export type CatalogSnapshot = z.infer<typeof catalogSnapshotSchema>;
 export type CatalogDelta = z.infer<typeof catalogDeltaSchema>;
+export type InstrumentDirectoryItem = z.infer<typeof instrumentDirectoryItemSchema>;
+export type InstrumentDirectory = z.infer<typeof instrumentDirectorySchema>;
 export type MarketDetailCapability = z.infer<typeof marketDetailCapabilitySchema>;
 export type MarketDetailDataByCapability = {
   quote: QuoteV1;
@@ -692,7 +729,10 @@ export type MarketDetailResponse = {
   generatedAt: string;
 };
 
-export type MarketDetailDataByCapabilityV2 = Omit<MarketDetailDataByCapability, 'bars' | 'indicator:MA' | 'indicator:MACD' | 'indicator:RSI'> & {
+export type MarketDetailDataByCapabilityV2 = Omit<
+  MarketDetailDataByCapability,
+  'bars' | 'indicator:MA' | 'indicator:MACD' | 'indicator:RSI'
+> & {
   bars: BarSeriesV2;
   'indicator:MA': IndicatorResultV2;
   'indicator:MACD': IndicatorResultV2;

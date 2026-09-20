@@ -1,4 +1,8 @@
-import type { LedgerCommandResponseV2, LedgerEventV2 } from '@thesis-ledger/api-client';
+import type {
+  InstrumentDirectory,
+  LedgerCommandResponseV2,
+  LedgerEventV2,
+} from '@thesis-ledger/api-client';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 
 import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
@@ -134,15 +138,11 @@ export const revisionBadgeVariant = (event: LedgerEventV2): 'default' | 'seconda
 export const executionSideLabel = (event: ExecutionEvent) =>
   event.type === 'BUY_EXECUTION' ? '买入' : '卖出';
 
-export const instrumentNameLookup = (
-  positions: Array<{ symbol: string; asset: { name: string } }>,
-) => {
+export const instrumentNameLookup = (directory: InstrumentDirectory | undefined) => {
   const nameBySymbol = new Map(
-    positions.filter((position) => position.asset.name).map((position) =>
-      [position.symbol, position.asset.name] as const,
-    ),
+    (directory?.items ?? []).map((item) => [item.symbol.toUpperCase(), item.displayName] as const),
   );
-  return (symbol: string) => nameBySymbol.get(symbol);
+  return (symbol: string) => nameBySymbol.get(symbol.trim().toUpperCase());
 };
 
 export const eventSymbol = (event: LedgerEventV2): string | null => {
@@ -361,10 +361,7 @@ export const executionDraft = (
     localDateTimeValue(event?.occurredAt, event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT') ||
     currentLocalDateTime(),
   timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
-  settledAt: localDateTimeValue(
-    event?.payload.settledAt ?? event?.payload.expectedAt,
-    'INSTANT',
-  ),
+  settledAt: localDateTimeValue(event?.payload.settledAt ?? event?.payload.expectedAt, 'INSTANT'),
   capabilityVerification: event?.payload.capabilityVerification ?? 'UNVERIFIED',
   note: event?.payload.note ?? '',
   reason: '',

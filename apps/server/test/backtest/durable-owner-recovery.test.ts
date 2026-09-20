@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { prepareBacktestExecution } from '../../src/backtest/backtest-execution-owner.js';
 import { BacktestV2RunService, type BacktestV2Runner } from '../../src/backtest/backtest-v2-run.js';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
+import { testResultReadPolicy } from './test-result-read-policy.js';
 
 const matchesWhere = (state: Record<string, unknown>, where: Record<string, unknown>) => {
   if (where.id !== undefined && where.id !== state.id) return false;
@@ -115,7 +116,7 @@ describe('Backtest durable owner recovery', () => {
     if (prepared.action !== 'run') throw new Error('test owner attempt missing');
     const worker = { id: 'recovered-v1', run: vi.fn(async () => ({ marker: 'v1-recovered' })) };
 
-    await new BacktestService(state.prisma).run(id, worker as never, {
+    await new BacktestService(state.prisma, undefined, undefined, testResultReadPolicy()).run(id, worker as never, {
       attempt: prepared.ownerAttempt,
       maxAttempts: 3,
     });

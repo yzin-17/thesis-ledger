@@ -10,30 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  strategyComparisonOperatorLabel,
+  strategySignalIndicatorLabel,
+  strategySignalIndicatorOptions,
+  strategySignalOperatorOptions,
+} from './strategy-display-labels.js';
 
 export type Signal = { indicator: string; operator: string; value: number | string };
 
-const signalOperatorLabels: Record<string, string> = {
-  gt: '大于',
-  gte: '大于等于',
-  lt: '小于',
-  lte: '小于等于',
-  crossesAbove: '上穿',
-  crossesBelow: '下穿',
-};
-
-const signalIndicatorLabels: Record<string, string> = {
-  close: '收盘价（close）',
-  price: '收盘价（price）',
-  open: '开盘价（open）',
-  high: '最高价（high）',
-  low: '最低价（low）',
-  volume: '成交量（volume）',
-};
-
-export const signalIndicatorOptions = Object.entries(signalIndicatorLabels).map(
-  ([value, label]) => ({ value, label }),
-);
+export const signalIndicatorOptions = strategySignalIndicatorOptions;
 
 export function SignalEditor({
   label,
@@ -70,8 +56,7 @@ export function SignalEditor({
             >
               <SelectTrigger className="w-full">
                 <SelectValue>
-                  {signalIndicatorLabels[signal.indicator] ??
-                    (signal.indicator ? `历史值（${signal.indicator}）` : '请选择指标')}
+                  {signal.indicator ? strategySignalIndicatorLabel(signal.indicator) : '请选择指标'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -81,9 +66,10 @@ export function SignalEditor({
                       {option.label}
                     </SelectItem>
                   ))}
-                  {signal.indicator && !signalIndicatorLabels[signal.indicator] && (
-                    <SelectItem value={signal.indicator}>历史值（{signal.indicator}）</SelectItem>
-                  )}
+                  {signal.indicator &&
+                    !strategySignalIndicatorOptions.some(
+                      (option) => option.value === signal.indicator,
+                    ) && <SelectItem value={signal.indicator}>历史指标</SelectItem>}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -96,17 +82,16 @@ export function SignalEditor({
             >
               <SelectTrigger className="w-full">
                 <SelectValue>
-                  {signalOperatorLabels[signal.operator] ?? signal.operator}
+                  {strategyComparisonOperatorLabel(signal.operator, '未识别运算符')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="gt">大于</SelectItem>
-                  <SelectItem value="gte">大于等于</SelectItem>
-                  <SelectItem value="lt">小于</SelectItem>
-                  <SelectItem value="lte">小于等于</SelectItem>
-                  <SelectItem value="crossesAbove">上穿</SelectItem>
-                  <SelectItem value="crossesBelow">下穿</SelectItem>
+                  {strategySignalOperatorOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectGroup>
               </SelectContent>
             </Select>

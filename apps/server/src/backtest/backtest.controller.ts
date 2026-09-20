@@ -41,32 +41,32 @@ export class BacktestController {
 
   @Post('runs/:id/cancel')
   cancelRun(@Param('id') id: string) {
-    return this.backtests.cancel(id);
+    return this.backtests.cancelForRead(id);
   }
 
   @Post('runs/:id/retry')
   retryRun(@Param('id') id: string) {
-    return this.backtests.retryRun(id);
+    return this.backtests.retryRunForRead(id);
   }
 
   @Post('runs/:id/run')
   runV2(@Param('id') id: string) {
-    return this.backtests.runV2(id);
+    return this.backtests.runV2ForRead(id);
   }
 
   @Get('runs/:id')
   runStatus(@Param('id') id: string) {
-    return this.backtests.status(id).then(withBacktestModelDisclosure);
+    return this.backtests.statusForRead(id).then(withBacktestModelDisclosure);
   }
 
   @Post('jobs/:id/cancel')
   cancel(@Param('id') id: string) {
-    return this.backtests.cancel(id);
+    return this.backtests.cancelForRead(id);
   }
 
   @Post('jobs/:id/run')
   run(@Param('id') id: string) {
-    return this.backtests.run(id);
+    return this.backtests.runForRead(id);
   }
 
   @Get('jobs')
@@ -86,7 +86,7 @@ export class BacktestController {
 
   @Get('jobs/:id')
   status(@Param('id') id: string) {
-    return this.backtests.status(id).then(withBacktestModelDisclosure);
+    return this.backtests.statusForRead(id).then(withBacktestModelDisclosure);
   }
 
   @Get('strategies')

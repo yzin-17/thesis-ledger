@@ -53,7 +53,31 @@ export class AiController {
     @Query('limit') limit?: string,
     @Query('status') status?: string,
     @Query('cursor') cursor?: string,
+    @Query('view') view?: string,
+    @Query('search') search?: string,
+    @Query('source') source?: string,
+    @Query('includeInternal') includeInternal?: string,
+    @Query('sort') sort?: string,
   ) {
+    if (view === 'research') {
+      const parsedIncludeInternal =
+        includeInternal === undefined
+          ? undefined
+          : z
+              .enum(['true', 'false'])
+              .transform((value) => value === 'true')
+              .parse(includeInternal);
+      return this.runs.listResearchPage({
+        view,
+        ...(limit === undefined ? {} : { limit }),
+        ...(status === undefined ? {} : { status }),
+        ...(cursor === undefined ? {} : { cursor }),
+        ...(search === undefined ? {} : { search }),
+        ...(source === undefined ? {} : { source }),
+        ...(parsedIncludeInternal === undefined ? {} : { includeInternal: parsedIncludeInternal }),
+        ...(sort === undefined ? {} : { sort }),
+      });
+    }
     const parsedStatus = status === undefined ? undefined : aiRunStatusSchema.parse(status);
     const parsedCursor = cursor === undefined ? undefined : aiRunCursorSchema.parse(cursor);
     const listPage = (
@@ -139,6 +163,11 @@ export class AiController {
     );
   }
 
+  @Get(':id/retry-prefill')
+  retryPrefill(@Param('id') id: string) {
+    return this.runs.researchRetryPrefill(z.uuid().parse(id));
+  }
+
   @Get(':id/tool-calls')
   toolCalls(
     @Param('id') id: string,
@@ -150,7 +179,8 @@ export class AiController {
   }
 
   @Get(':id')
-  resume(@Param('id') id: string) {
+  resume(@Param('id') id: string, @Query('view') view?: string) {
+    if (view === 'research') return this.runs.researchDetail(z.uuid().parse(id));
     return this.runs.resume(id);
   }
 }

@@ -1,9 +1,18 @@
+import type {
+  AiExecutionReadModel,
+  AiResearchDisplayProjection,
+  AiResearchSourceType,
+  AiUsageCompleteness,
+} from '@thesis-ledger/schemas';
+
 export type AiResearchScope = 'portfolio' | 'account' | 'position' | 'strategy';
 
 export type AiRunStatus =
   'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | (string & {});
 
 export type AiRunFilterStatus = 'all' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+export type AiRunSourceFilter = 'all' | AiResearchSourceType;
 
 export interface AiResearchContext {
   scope: AiResearchScope;
@@ -81,6 +90,9 @@ export interface AiRunRecord {
   completedAt?: string | null;
   retryOfRunId?: string | null;
   fallbackSummary?: string | null;
+  execution?: AiExecutionReadModel | null;
+  usageCompleteness?: AiUsageCompleteness;
+  display?: AiResearchDisplayProjection;
 }
 
 export interface AiRunDetail extends AiRunRecord {
@@ -121,6 +133,20 @@ export interface StartResearchInput {
   context: AiResearchContext;
   templateId?: 'primary-risks' | 'recent-changes' | 'counter-evidence' | 'stress-scenario';
   retryOfRunId?: string;
+  retryConfirmation?: {
+    contextConfirmed: true;
+    acknowledgeUnknownOutcomeRisk: boolean;
+  };
+}
+
+export interface AiResearchRetryPrefill {
+  sourceRunId: string;
+  question: string;
+  context: AiResearchContext;
+  templateId: StartResearchInput['templateId'] | null;
+  sourceOutcome: 'failed' | 'unknown';
+  contextState: 'valid' | 'missing' | 'forbidden';
+  requiresUnknownOutcomeAcknowledgement: boolean;
 }
 
 /** Compatibility input for existing deterministic AI flows such as Journal review. */

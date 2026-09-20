@@ -38,7 +38,7 @@ const rangeLabel = (range: number) => {
 };
 
 const completionLabel = (status: BarPointV2['completionStatus'] | undefined) => {
-  if (status === 'incomplete') return '当日未完成';
+  if (status === 'incomplete') return '未收盘（当日未完成）';
   if (status === 'unknown') return '收盘状态未知';
   if (status === 'complete') return '已收盘';
   return '收盘状态未声明';
@@ -56,6 +56,12 @@ export function MarketPriceChart({
   historyLoading,
   historyError,
   onRetryEarlier,
+  onLoadLater,
+  onRetryLater,
+  canLoadLater,
+  latestLoading,
+  latestNotice,
+  latestError,
 }: {
   bars: MarketChartBar[];
   indicators?: MarketChartIndicator[];
@@ -66,6 +72,12 @@ export function MarketPriceChart({
   historyLoading?: boolean;
   historyError?: string | null;
   onRetryEarlier?: () => void;
+  onLoadLater?: () => void;
+  onRetryLater?: () => void;
+  canLoadLater?: boolean;
+  latestLoading?: boolean;
+  latestNotice?: string | null;
+  latestError?: string | null;
 }) {
   const [preference, setPreference] = useState<ChartPreference>(readPreference);
   const [expanded, setExpanded] = useState(false);
@@ -370,6 +382,10 @@ export function MarketPriceChart({
           canLoadEarlier={canLoadEarlier}
           historyLoading={historyLoading}
           historyError={historyError}
+          {...(onLoadLater ? { onLoadLater } : {})}
+          {...(onRetryLater ? { onRetryLater } : {})}
+          {...(canLoadLater !== undefined ? { canLoadLater } : {})}
+          {...(latestLoading !== undefined ? { latestLoading } : {})}
           onHover={setHoveredTimestamp}
           onClick={setLockedTimestamp}
           lockedTimestamp={lockedTimestamp}
@@ -380,6 +396,11 @@ export function MarketPriceChart({
       {rangeNotice ? (
         <p className="m-0 text-xs text-muted-foreground" role="status">
           {rangeNotice}
+        </p>
+      ) : null}
+      {latestNotice ? (
+        <p className="m-0 text-xs text-muted-foreground" role="status" data-market-latest-notice>
+          {latestNotice}
         </p>
       ) : null}
       <MarketChartReadout
@@ -396,6 +417,20 @@ export function MarketPriceChart({
       {historyError ? (
         <p className="m-0 text-xs text-destructive" role="alert">
           {historyError}
+        </p>
+      ) : null}
+      {latestError ? (
+        <p className="m-0 text-xs text-destructive" role="alert" data-market-latest-error>
+          {latestError}{' '}
+          <Button
+            type="button"
+            size="sm"
+            variant="link"
+            className="h-auto p-0"
+            onClick={() => onRetryLater?.()}
+          >
+            重试
+          </Button>
         </p>
       ) : null}
     </div>

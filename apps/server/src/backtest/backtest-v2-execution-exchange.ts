@@ -171,7 +171,10 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
           })
         : undefined;
       return {
-        rule: input.strategy.sizing,
+        rule:
+          intent.side === 'sell'
+            ? { type: 'fixedQuantity', quantity: state.position.quantity }
+            : input.strategy.sizing,
         executionCurrency: fact.currency,
         lotSize: fact.lotSize,
         currentQuantity: state.position.quantity,
@@ -260,11 +263,12 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
     ...executionSeries,
     points: executionSeries.points.filter((point) => point.status === 'available'),
   };
-  const ticks = bars
-    .filter((bar) => {
-      const tradingDate = calendar.status(bar.occurredAt).date;
-      return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
-    })
+  const executionRangeBars = bars.filter((bar) => {
+    const tradingDate = calendar.status(bar.occurredAt).date;
+    return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
+  });
+  const ticks = executionRangeBars
+    .slice(0, -1)
     .map((bar) => ({
       occurredAt: bar.availableAt,
       availableAt: bar.availableAt,

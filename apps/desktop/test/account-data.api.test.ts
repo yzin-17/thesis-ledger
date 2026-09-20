@@ -23,6 +23,7 @@ const response = {
   ledgerRevision: '4',
   projectionGeneration: '7',
   events: [],
+  instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
   effective: true as const,
 };
 
@@ -54,6 +55,7 @@ describe('账户数据查询与命令边界', () => {
         ledgerRevision: '4',
         projectionGeneration: '7',
         events: [],
+        instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
         effective: false as const,
       }),
       getReconciliationCandidates: vi.fn().mockResolvedValue({

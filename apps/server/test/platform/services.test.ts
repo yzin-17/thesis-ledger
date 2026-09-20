@@ -6,7 +6,6 @@ import {
   composeFinalAnalysis,
   createCoreTools,
   createResearchTools,
-  completeWithFallback,
   executeToolSafely,
   portfolioGate,
   PromptVersionRegistry,
@@ -37,29 +36,6 @@ describe('AI 安全边界', () => {
     };
     registry.register(provider);
     expect(registry.route(undefined, 'm1')).toBe(provider);
-  });
-  it('主模型失败后路由备用 Provider 并记录失败链', async () => {
-    const registry = new AiProviderRegistry();
-    registry.register({
-      id: 'primary',
-      models: ['m1'],
-      complete: async () => {
-        throw new Error('down');
-      },
-    });
-    registry.register({
-      id: 'fallback',
-      models: ['m1'],
-      complete: async () => ({ content: {}, inputTokens: 1, outputTokens: 2, cost: 0.1 }),
-    });
-    await expect(
-      completeWithFallback(registry, {
-        model: 'm1',
-        messages: [],
-        tools: [],
-        preferred: 'primary',
-      }),
-    ).resolves.toMatchObject({ provider: 'fallback', fallbackErrors: ['primary: down'] });
   });
   it('拒绝越权 Tool', () =>
     expect(() =>
@@ -257,6 +233,9 @@ describe('环境配置', () => {
   it('解析完整必需配置', () =>
     expect(parseConfig(base)).toMatchObject({
       port: 3000,
+      aiGenerationRuntime: 'sdk',
+      aiResearchExecutionEnabled: true,
+      aiTimeoutMs: 120_000,
       providerHealthCheckIntervalMs: 3_600_000,
       projectionReadMode: 'unified',
       projectionSwitchStage: 'journal',
@@ -271,6 +250,14 @@ describe('环境配置', () => {
     ).toMatchObject({ projectionReadMode: 'shadow', projectionSwitchStage: 'portfolio' });
     expect(() => parseConfig({ ...base, PROJECTION_READ_MODE: 'invalid' })).toThrow(
       'PROJECTION_READ_MODE',
+    );
+  });
+  it('AI 生成运行时固定为 SDK，不接受 legacy 回退开关', () => {
+    expect(parseConfig({ ...base, AI_GENERATION_RUNTIME: 'sdk' })).toMatchObject({
+      aiGenerationRuntime: 'sdk',
+    });
+    expect(() => parseConfig({ ...base, AI_GENERATION_RUNTIME: 'legacy' })).toThrow(
+      'AI_GENERATION_RUNTIME',
     );
   });
   it('缺失数据库配置时明确失败字段', () =>

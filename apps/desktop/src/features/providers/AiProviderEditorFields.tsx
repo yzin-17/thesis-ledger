@@ -15,6 +15,14 @@ import {
 } from '@/components/ui/combobox';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { LoaderCircle, RefreshCw, Search } from 'lucide-react';
 import {
   mergeModelOptions,
@@ -23,6 +31,7 @@ import {
   modelsFromText,
   modelsToText,
 } from './ai-provider.actions.js';
+import { AiProviderExecutionFields } from './AiProviderExecutionFields.js';
 import type {
   AiProviderModelDetail,
   AiProviderModelReasoning,
@@ -30,6 +39,12 @@ import type {
 } from './providers.types.js';
 
 const MAX_SELECTED_MODELS = 32;
+const costCurrencyOptions = [
+  { value: 'USD', label: 'USD · 美元' },
+  { value: 'CNY', label: 'CNY · 人民币' },
+  { value: 'HKD', label: 'HKD · 港元' },
+] as const;
+const unsetCostCurrency = '__unset__';
 
 export const ModelReasoningBadges = ({
   reasoning,
@@ -79,6 +94,10 @@ export function AiProviderEditorFields({
     () => new Map(modelDetails.map((detail) => [detail.id, detail])),
     [modelDetails],
   );
+  const costCurrencies =
+    draft.costCurrency && !costCurrencyOptions.some(({ value }) => value === draft.costCurrency)
+      ? [...costCurrencyOptions, { value: draft.costCurrency, label: draft.costCurrency }]
+      : costCurrencyOptions;
 
   const updateModels = (models: string[]) => {
     const modelsText = modelsToText(models, MAX_SELECTED_MODELS);
@@ -205,6 +224,7 @@ export function AiProviderEditorFields({
           个可用模型。
         </FieldDescription>
       </Field>
+      <AiProviderExecutionFields draft={draft} onUpdateDraft={onUpdateDraft} />
       {credentialInputOpen ? (
         <Field>
           <FieldLabel htmlFor="ai-api-key">API Key</FieldLabel>
@@ -284,14 +304,29 @@ export function AiProviderEditorFields({
         </Field>
         <Field>
           <FieldLabel htmlFor="ai-cost-currency">费用币种（可选）</FieldLabel>
-          <Input
-            id="ai-cost-currency"
-            aria-label="费用币种（可选）"
-            value={draft.costCurrency}
-            onChange={(event) =>
-              onUpdateDraft((current) => ({ ...current, costCurrency: event.target.value }))
+          <Select
+            value={draft.costCurrency || null}
+            onValueChange={(value) =>
+              onUpdateDraft((current) => ({
+                ...current,
+                costCurrency: value === unsetCostCurrency ? '' : (value ?? ''),
+              }))
             }
-          />
+          >
+            <SelectTrigger id="ai-cost-currency" aria-label="费用币种（可选）" className="w-full">
+              <SelectValue placeholder="未设置" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={unsetCostCurrency}>未设置</SelectItem>
+                {costCurrencies.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="ai-pricing-version">定价版本（可选）</FieldLabel>

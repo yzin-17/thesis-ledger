@@ -167,6 +167,7 @@ describe('shared API contracts', () => {
         ledgerRevision: '0',
         projectionGeneration: '0',
         events: [],
+        instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
         effective: true,
       }),
     ).toMatchObject({ ledgerRevision: '0', projectionGeneration: '0' });

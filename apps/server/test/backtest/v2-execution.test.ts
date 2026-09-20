@@ -462,6 +462,48 @@ describe('V2 场内运行时集成', () => {
     const modelRerun = runExchangeVertical(modelInput);
     expect(modelRerun.analytics.resultChecksum).toBe(modelResult.analytics.resultChecksum);
 
+    const fullCloseRows = new Map(rows);
+    fullCloseRows.set(
+      executionRef.key,
+      (rows.get(executionRef.key) ?? []).map((row) =>
+        row.occurredAt === '2026-09-10T00:00:00Z' ? { ...row, open: '10.5' } : row,
+      ),
+    );
+    const fullCloseStrategy = strategySchemaV2.parse({
+      ...exchangeStrategy,
+      exit: { type: 'positionState', field: 'isOpen' },
+      sizing: { type: 'percentOfEquity', percent: '0.5' },
+    }) as StrategySchemaV2;
+    const fullCloseResult = runExchangeVertical({
+      ...modelInput,
+      runId: 'run-exchange-full-close',
+      snapshotId: 'snapshot-exchange-full-close',
+      strategy: fullCloseStrategy,
+      rows: fullCloseRows,
+    });
+    expect(fullCloseResult.rejects).toEqual([]);
+    expect(fullCloseResult.fills.map((fill) => [fill.side, fill.quantity])).toEqual([
+      ['buy', '100'],
+      ['sell', '100'],
+    ]);
+
+    const terminalRunConfig = runConfigSchemaV2.parse({
+      ...modelRunConfig,
+      startDate: '2026-09-10',
+      endDate: '2026-09-10',
+    });
+    const terminalResult = runExchangeVertical({
+      ...modelInput,
+      runId: 'run-exchange-terminal-bar',
+      snapshotId: 'snapshot-exchange-terminal-bar',
+      runConfig: terminalRunConfig,
+      strategy: exchangeStrategy,
+      rows,
+    });
+    expect(terminalResult.rejects).toEqual([]);
+    expect(terminalResult.fills).toEqual([]);
+    expect(terminalResult.analytics.equityCurve.length).toBeGreaterThan(0);
+
     const instrumentRow = rows.get(instrumentRef.key)?.[0];
     expect(instrumentRow).toBeDefined();
     rows.set(instrumentRef.key, [

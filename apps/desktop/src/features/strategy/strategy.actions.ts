@@ -36,6 +36,7 @@ type Dependencies = {
   runV2Mutation?: AsyncMutation<string, BacktestJob>;
   cancelV2Mutation?: AsyncMutation<string, BacktestJob>;
   retryV2Mutation?: AsyncMutation<string, BacktestJob>;
+  onJobQueued?: (job: BacktestJob) => void;
   load: () => Promise<unknown>;
 };
 
@@ -246,6 +247,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
             type: 'success',
             timeout: 2800,
           });
+          dependencies.onJobQueued?.(job);
           refreshStrategyData();
           return;
         }
@@ -287,13 +289,14 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
           ...(benchmarkBars.length > 0 ? { benchmarkBars } : {}),
           initialCash: setup.initialCash,
         };
-        await queueMutation.mutateAsync(queueInput);
+        const job = await queueMutation.mutateAsync(queueInput);
         toastManager.add({
           title: '回测已排队',
           description: '任务已进入回测任务，正在后台启动。',
           type: 'success',
           timeout: 2800,
         });
+        dependencies.onJobQueued?.(job);
         refreshStrategyData();
       } catch (error) {
         errorToast(

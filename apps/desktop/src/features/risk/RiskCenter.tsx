@@ -2,7 +2,7 @@ import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import type { Account, Portfolio, PortfolioMode } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
@@ -51,7 +51,16 @@ export function RiskCenter({
   mode: PortfolioMode;
   onModeChange: (mode: PortfolioMode) => void;
 }) {
-  const [tab, setTab] = useState<RiskTab>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const initialTab: RiskTab =
+    requestedTab === 'rules' ||
+    requestedTab === 'strategy-applications' ||
+    requestedTab === 'events' ||
+    requestedTab === 'notifications'
+      ? requestedTab
+      : 'overview';
+  const [tab, setTab] = useState<RiskTab>(initialTab);
   const [eventSeverityFilter, setEventSeverityFilter] = useState<string | null>(null);
   const [notificationStatusFilter, setNotificationStatusFilter] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -145,6 +154,11 @@ export function RiskCenter({
 
   const selectTab = (nextTab: RiskTab, filter?: string) => {
     setTab(nextTab);
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === 'overview') next.delete('tab');
+    else next.set('tab', nextTab);
+    if (nextTab !== 'strategy-applications') next.delete('applicationId');
+    setSearchParams(next, { replace: true });
     if (nextTab === 'events') {
       setEventSeverityFilter(filter ?? null);
       setNotificationStatusFilter(null);
@@ -295,10 +309,7 @@ export function RiskCenter({
           />
         </TabsContent>
         <TabsContent value="strategy-applications">
-          <StrategyRiskApplicationsSection
-            accounts={accounts}
-            onOpenStrategy={() => void navigate('/strategy?tab=optimization')}
-          />
+          <StrategyRiskApplicationsSection accounts={accounts} />
         </TabsContent>
         <TabsContent value="events">
           <RiskEventTable

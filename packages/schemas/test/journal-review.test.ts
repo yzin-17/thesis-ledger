@@ -74,7 +74,12 @@ describe('投资复盘候选契约', () => {
 
   it('响应保留稳定 cursor，不把数组下标作为分页依据', () => {
     expect(
-      journalReviewCandidatesResponseSchema.parse({ items: [base], total: 1, nextCursor: base.id }),
+      journalReviewCandidatesResponseSchema.parse({
+        items: [base],
+        total: 1,
+        nextCursor: base.id,
+        instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
+      }),
     ).toMatchObject({ total: 1, nextCursor: base.id });
   });
 });

@@ -7,15 +7,14 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-import { createHash } from 'node:crypto';
-import type { ProviderConfig } from '@prisma/client';
+import { createHash, randomUUID } from 'node:crypto';
 import { loadConfig } from '../platform/config.js';
 import { ProviderConfigService } from '../providers/provider-config.service.js';
 import { ProviderHealthService, type ProviderState } from '../providers/provider-health.service.js';
-import { AiProviderRegistry } from './provider-registry.js';
-import { OpenAiCompatibleProvider, createConfiguredAiProviders } from './provider-adapters.js';
+import { AiProviderRegistry, routeSnapshotsFromProvider } from './provider-registry.js';
+import { createConfiguredAiProviders } from './provider-adapters.js';
 import { runProviderConnectionTest } from './provider-connection-test.js';
+import { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
 import type { AiProvider } from './contracts.js';
 import {
   aiProviderInputSchema,
@@ -28,15 +27,24 @@ import {
   type AiProviderSummary,
   type AiProviderTestResult,
   type AiProviderTestStatus,
+  type AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
 import { fetchAiProviderModelCatalog } from './ai-provider-model-catalog.js';
 import {
   aiProviderCapabilities,
   aiProviderSummaryFromProvider,
   aiProviderSummaryFromRow,
-  healthValue,
   parseAiProviderSettings,
 } from './ai-provider-summary.js';
+import { evaluateAiProviderReadiness, inferLegacyAiAdapter } from './ai-provider-readiness.js';
+import type { AiAdapter } from '@thesis-ledger/schemas';
+import {
+  persistAiCapabilityRevocation,
+  routeSnapshotsFromProviderRow,
+  settingsFromAiProviderInput,
+  type AiCapabilityRevocationInput,
+} from './ai-provider-readiness.persistence.js';
+import { createStoredAiProvider } from './ai-provider-runtime.js';
 
 export { aiProviderInputSchema, sanitizeAiProviderError } from './ai-provider.contracts.js';
 
@@ -64,6 +72,8 @@ interface AiTestRuntimeInput {
   costPer1kOutput?: number;
   costCurrency?: string;
   pricingVersion?: string;
+  adapter?: AiAdapter;
+  executionRoutes?: AiProviderExecutionRouteInput[];
 }
 
 const DRAFT_TTL_MS = 5 * 60 * 1000;
@@ -76,23 +86,6 @@ const configuredTimeout = () => {
   }
 };
 
-const settingsFromInput = (input: AiProviderInput) => ({
-  baseUrl: input.baseUrl,
-  models: [...new Set(input.models.map((model) => model.trim()))],
-  ...(input.modelReasoning
-    ? {
-        modelReasoning: Object.fromEntries(
-          Object.entries(input.modelReasoning).filter(([model]) => input.models.includes(model)),
-        ),
-      }
-    : {}),
-  ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
-  ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-  ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
-  ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
-  ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
-});
-
 @Injectable()
 export class AiProviderService implements OnModuleInit {
   private readonly drafts = new Map<string, DraftTest>();
@@ -102,6 +95,7 @@ export class AiProviderService implements OnModuleInit {
     private readonly configs: ProviderConfigService,
     private readonly health: ProviderHealthService,
     private readonly registry: AiProviderRegistry,
+    private readonly sdk: AiSdkGenerationAdapter = new AiSdkGenerationAdapter(),
   ) {}
 
   async onModuleInit() {
@@ -115,17 +109,28 @@ export class AiProviderService implements OnModuleInit {
     const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
     const environmentSummaries = environment
       .filter((provider) => !databaseIds.has(provider.id) && !disabled.has(provider.id))
-      .map((provider) => aiProviderSummaryFromProvider(provider));
+      .map((provider) => {
+        const summary = aiProviderSummaryFromProvider(provider);
+        const executionRoutes = routeSnapshotsFromProvider(provider).map((snapshot) =>
+          evaluateAiProviderReadiness(snapshot, { budgetAuthorized: false }),
+        );
+        return executionRoutes.length > 0 ? { ...summary, executionRoutes } : summary;
+      });
     const databaseSummaries = await Promise.all(
-      rows.map(async (row) =>
-        aiProviderSummaryFromRow(
-          row,
-          parseAiProviderSettings(row.settings),
+      rows.map(async (row) => {
+        const settings = parseAiProviderSettings(row.settings);
+        const health =
           typeof this.health.get === 'function'
             ? await this.health.get(row.name).catch(() => null)
-            : null,
-        ),
-      ),
+            : null;
+        const summary = aiProviderSummaryFromRow(row, settings, health);
+        const executionRoutes = routeSnapshotsFromProviderRow(
+          row,
+          settings,
+          health?.state ?? row.health,
+        ).map((snapshot) => evaluateAiProviderReadiness(snapshot, { budgetAuthorized: false }));
+        return executionRoutes.length > 0 ? { ...summary, executionRoutes } : summary;
+      }),
     );
     return [...databaseSummaries, ...environmentSummaries].sort(
       (left, right) => left.priority - right.priority || left.name.localeCompare(right.name),
@@ -159,7 +164,7 @@ export class AiProviderService implements OnModuleInit {
       priority: input.priority,
       capabilities: input.capabilities ?? ['chat'],
       ...(credential ? { credentialsRef: credential } : {}),
-      settings: settingsFromInput(input),
+      settings: settingsFromAiProviderInput(input, existing?.settings),
       ...(draft ? {} : {}),
     });
     if (draft) await this.recordSavedHealth(input.name, true, draft.latencyMs, draft.checkedAt);
@@ -189,6 +194,8 @@ export class AiProviderService implements OnModuleInit {
         ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
         ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
         ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+        ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
+        ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
       },
       false,
       this.runtimeFingerprint(this.runtimeInput(input, existing, credential)),
@@ -274,14 +281,22 @@ export class AiProviderService implements OnModuleInit {
     const environment = this.environmentProviders();
     const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
     const databaseIds = new Set(rows.map((row) => row.name));
-    const databaseProviders = await Promise.all(rows.map(async (row) => this.providerFromRow(row)));
+    const databaseProviders = await Promise.all(
+      rows.map(async (row) => createStoredAiProvider(row, this.configs, configuredTimeout())),
+    );
     const next = [
       ...databaseProviders.filter((provider): provider is AiProvider => provider !== null),
       ...environment.filter(
         (provider) => !databaseIds.has(provider.id) && !disabled.has(provider.id),
       ),
     ];
-    this.registry.replace(next);
+    const databaseRoutes = rows.flatMap((row) =>
+      routeSnapshotsFromProviderRow(row, parseAiProviderSettings(row.settings), row.health),
+    );
+    const environmentRoutes = next
+      .filter((provider) => provider.metadata?.source !== 'database')
+      .flatMap((provider) => routeSnapshotsFromProvider(provider));
+    this.registry.replace(next, [...databaseRoutes, ...environmentRoutes]);
     return next;
   }
 
@@ -306,34 +321,14 @@ export class AiProviderService implements OnModuleInit {
     }
   }
 
-  private async providerFromRow(row: ProviderConfig): Promise<AiProvider | null> {
-    const settings = parseAiProviderSettings(row.settings);
-    const credential = await this.configs.readCredential(row).catch(() => '');
-    if (!settings || !credential || !row.enabled) return null;
-    return new OpenAiCompatibleProvider(
-      row.name,
-      settings.models,
-      settings.baseUrl,
-      credential,
-      settings.timeoutMs ?? configuredTimeout(),
-      {
-        ...(settings.costPer1kInput === undefined
-          ? {}
-          : { costPer1kInput: settings.costPer1kInput }),
-        ...(settings.costPer1kOutput === undefined
-          ? {}
-          : { costPer1kOutput: settings.costPer1kOutput }),
-        ...(settings.costCurrency ? { costCurrency: settings.costCurrency } : {}),
-        ...(settings.pricingVersion ? { pricingVersion: settings.pricingVersion } : {}),
-      },
-      {
-        priority: row.priority,
-        capabilities: aiProviderCapabilities(row.capabilities),
-        health: healthValue(row.health),
-        source: 'database',
-        ...(settings.modelReasoning ? { modelReasoning: settings.modelReasoning } : {}),
-      },
-    );
+  readiness(name: string) {
+    return this.registry.readiness(name, false);
+  }
+
+  async revokeCapability(input: AiCapabilityRevocationInput) {
+    await persistAiCapabilityRevocation(this.configs, input);
+    await this.refreshOrThrow();
+    return this.registry.readiness(input.providerId, false);
   }
 
   private async findSummary(name: string, fallbackUpdatedAt: string | null = null) {
@@ -363,33 +358,17 @@ export class AiProviderService implements OnModuleInit {
         message: '请先配置 API Key，再测试连接',
         credentialConfigured: false,
       };
-    const provider = new OpenAiCompatibleProvider(
-      input.name,
-      input.models,
-      input.baseUrl,
-      input.credential,
-      input.timeoutMs ?? configuredTimeout(),
-      {
-        ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-        ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
-        ...(input.costCurrency ? { costCurrency: input.costCurrency } : {}),
-        ...(input.pricingVersion ? { pricingVersion: input.pricingVersion } : {}),
-      },
-      {
-        priority: input.priority,
-        capabilities: input.capabilities,
-        ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
-      },
-    );
     const model = input.models[0];
     if (!model) throw new BadRequestException('至少需要一个模型');
-    const metadata = input.modelReasoning?.[model];
     const started = Date.now();
     try {
       const { latencyMs } = await runProviderConnectionTest({
-        provider,
+        sdk: this.sdk,
+        adapter: input.adapter ?? inferLegacyAiAdapter(input.baseUrl) ?? 'openai-compatible',
+        providerId: input.name,
+        baseURL: input.baseUrl,
+        apiKey: input.credential,
         model,
-        metadata,
         timeoutMs: input.timeoutMs ?? 30_000,
       });
       if (!persist) {
@@ -531,6 +510,8 @@ export class AiProviderService implements OnModuleInit {
       ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
       ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
       ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+      ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
+      ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
     };
   }
 
@@ -548,6 +529,8 @@ export class AiProviderService implements OnModuleInit {
       costPer1kOutput: input.costPer1kOutput ?? null,
       costCurrency: input.costCurrency ?? null,
       pricingVersion: input.pricingVersion ?? null,
+      adapter: input.adapter ?? null,
+      executionRoutes: input.executionRoutes ?? null,
     });
   }
 

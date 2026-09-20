@@ -14,6 +14,19 @@ const boundary = (state: ReturnType<typeof beginHistoryDrag>, historyLoading = f
     historyLoading,
   });
 
+const latestBoundary = (
+  state: ReturnType<typeof beginHistoryDrag>,
+  { latestLoading = false, canLoadLater = true } = {},
+) =>
+  transitionHistoryBoundary(state, {
+    hasLeftHistoryBlank: false,
+    canLoadEarlier: false,
+    historyLoading: false,
+    hasReachedLatestBoundary: true,
+    canLoadLater,
+    latestLoading,
+  });
+
 describe('market chart history drag gesture', () => {
   it('不因初始或程序化逻辑范围变化触发历史加载', () => {
     expect(boundary(idleHistoryDragState).shouldLoadEarlier).toBe(false);
@@ -37,5 +50,43 @@ describe('market chart history drag gesture', () => {
     expect(duringLoading.state.handledBoundary).toBe(true);
     expect(endHistoryDrag()).toEqual(idleHistoryDragState);
     expect(retry.shouldLoadEarlier).toBe(true);
+  });
+
+  it('不因初始或程序化逻辑范围变化触发更新日线探测', () => {
+    expect(latestBoundary(idleHistoryDragState).shouldLoadLater).toBe(false);
+    expect(latestBoundary(beginHistoryDrag()).shouldLoadLater).toBe(false);
+  });
+
+  it('拖动贴到最新边界最多探测一次，加载中不重入', () => {
+    const first = latestBoundary(markHistoryDragMovement(beginHistoryDrag()));
+    const repeated = latestBoundary(first.state);
+    const duringLoading = latestBoundary(markHistoryDragMovement(beginHistoryDrag()), {
+      latestLoading: true,
+    });
+
+    expect(first.shouldLoadLater).toBe(true);
+    expect(repeated.shouldLoadLater).toBe(false);
+    expect(duringLoading.shouldLoadLater).toBe(false);
+    expect(duringLoading.state.handledLatestBoundary).toBe(true);
+    expect(latestBoundary(markHistoryDragMovement(beginHistoryDrag()), { canLoadLater: false })
+      .shouldLoadLater).toBe(false);
+  });
+
+  it('一次拖动里两侧边界各自记账，互不吞掉', () => {
+    const dragging = markHistoryDragMovement(beginHistoryDrag());
+    const both = transitionHistoryBoundary(dragging, {
+      hasLeftHistoryBlank: true,
+      canLoadEarlier: true,
+      historyLoading: false,
+      hasReachedLatestBoundary: true,
+      canLoadLater: true,
+      latestLoading: false,
+    });
+    const afterLatest = latestBoundary(both.state);
+
+    expect(both.shouldLoadEarlier).toBe(true);
+    expect(both.shouldLoadLater).toBe(true);
+    expect(afterLatest.shouldLoadEarlier).toBe(false);
+    expect(afterLatest.shouldLoadLater).toBe(false);
   });
 });

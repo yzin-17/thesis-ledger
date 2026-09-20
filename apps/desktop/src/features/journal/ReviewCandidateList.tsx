@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { InstrumentDirectory } from '@thesis-ledger/api-client';
 import { SearchIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const completenessVariant = (value: JournalReviewCandidate['evidenceCompleteness
 export function ReviewCandidateList({
   candidates,
   legacyItems = [],
+  instrumentDirectory,
   selectedId,
   filter,
   onFilterChange,
@@ -62,6 +64,7 @@ export function ReviewCandidateList({
 }: {
   candidates: JournalReviewCandidate[];
   legacyItems?: JournalLegacyReviewCandidate[] | undefined;
+  instrumentDirectory?: InstrumentDirectory | undefined;
   selectedId?: string | null;
   filter: string;
   onFilterChange: (value: string) => void;
@@ -74,6 +77,9 @@ export function ReviewCandidateList({
   onEndDateChange?: (value: string) => void;
   emptyActions?: ReactNode;
 }) {
+  const instrumentNameBySymbol = new Map(
+    (instrumentDirectory?.items ?? []).map((item) => [item.symbol.toUpperCase(), item.displayName]),
+  );
   const normalizedFilter = filter.trim().toUpperCase();
   const visibleCandidates = normalizedFilter
     ? candidates.filter((candidate) => candidate.symbol.toUpperCase().includes(normalizedFilter))
@@ -114,7 +120,9 @@ export function ReviewCandidateList({
           >
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="flex items-center justify-between gap-3">
-                <strong className="truncate font-medium">{candidate.symbol}</strong>
+                <strong className="truncate font-medium">
+                  {instrumentNameBySymbol.get(candidate.symbol.toUpperCase()) ?? candidate.symbol}
+                </strong>
                 <span className={pnlClass(candidate.pnl)}>
                   {candidate.pnl !== null && candidate.pnl >= 0 ? '+' : ''}
                   {formatMoney(candidate.pnl)}
@@ -206,7 +214,10 @@ export function ReviewCandidateList({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
               >
                 <span>
-                  {item.symbol ?? '未知标的'} · {item.journalEntryId.slice(0, 8)}
+                  {(item.symbol && instrumentNameBySymbol.get(item.symbol.toUpperCase())) ??
+                    item.symbol ??
+                    '未知标的'}{' '}
+                  · {item.journalEntryId.slice(0, 8)}
                 </span>
                 <Badge variant="outline">人工确认</Badge>
               </div>

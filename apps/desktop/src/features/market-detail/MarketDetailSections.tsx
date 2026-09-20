@@ -23,6 +23,7 @@ import {
   type MarketIndicatorParams,
 } from './MarketDetailCharts.js';
 import {
+  isQuoteWithinUpstreamRefreshWindow,
   isRetryableMarketDetailSection,
   marketDetailSectionTitle,
   marketDetailStatusClass,
@@ -33,6 +34,10 @@ import {
   chartBarsFromSeries,
   type MarketChartIndicator,
 } from './market-chart-types.js';
+import {
+  formatQuoteChangePercent,
+  quoteChangeTone,
+} from './market-quote-display.js';
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
@@ -75,19 +80,28 @@ const providerOf = (data: unknown) => {
   );
 };
 
+export type MarketDetailNoticeState = {
+  state: 'loading' | 'error' | 'stale' | 'info';
+  title: string;
+  description: string;
+};
+
 export const MarketDetailNotice = ({
   title,
   description,
   state,
   onRetry,
+  flush = false,
 }: {
   title: string;
   description: string;
-  state: 'loading' | 'error' | 'stale';
+  state: MarketDetailNoticeState['state'];
   onRetry?: () => void;
+  /** 嵌入分段内部时去掉 banner 自带的下边距，交给分段的 grid gap 控制节奏。 */
+  flush?: boolean;
 }) => (
   <Alert
-    className={cn('data-state-banner', state)}
+    className={cn('data-state-banner', state, flush && 'banner-flush')}
     role="status"
     aria-live="polite"
     aria-busy={state === 'loading'}
@@ -148,6 +162,14 @@ export const DetailMetric = ({
   </div>
 );
 
+/** 行情分段在上游刷新间隔内的回退不是故障，徽标与横幅保持一致，不显示告警色。 */
+const quoteUpstreamWindowLabel = (section: MarketDetailSectionV2) => {
+  if (section.capability !== 'quote' || section.status !== 'stale') return null;
+  return isQuoteWithinUpstreamRefreshWindow(section.data as QuoteV1 | undefined)
+    ? '按上游间隔'
+    : null;
+};
+
 const SectionStatus = ({
   section,
   onRetry,
@@ -158,34 +180,39 @@ const SectionStatus = ({
   onRetry?: () => void;
   retrying: boolean;
   showErrorMessage?: boolean;
-}) => (
-  <div className="flex flex-wrap items-center gap-2" data-section-status={section.status}>
-    <Badge
-      className={cn(retrying ? 'tag' : marketDetailStatusClass(section.status))}
-      variant="secondary"
-    >
-      {retrying ? '加载中' : marketDetailStatusLabel(section.status)}
-    </Badge>
-    {showErrorMessage && section.error ? (
-      <span className="text-sm text-muted-foreground">{section.error.message}</span>
-    ) : null}
-    {section.error?.diagnosticId ? (
-      <code className="text-xs text-muted-foreground">诊断 {section.error.diagnosticId}</code>
-    ) : null}
-    {onRetry ? (
-      <Button
-        className="text-button"
-        disabled={retrying}
-        size="sm"
-        type="button"
-        variant="link"
-        onClick={onRetry}
+}) => {
+  const upstreamWindowLabel = quoteUpstreamWindowLabel(section);
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-section-status={section.status}>
+      <Badge
+        className={cn(
+          retrying || upstreamWindowLabel ? 'tag' : marketDetailStatusClass(section.status),
+        )}
+        variant="secondary"
       >
-        {retrying ? '重试中…' : '重试'}
-      </Button>
-    ) : null}
-  </div>
-);
+        {retrying ? '加载中' : (upstreamWindowLabel ?? marketDetailStatusLabel(section.status))}
+      </Badge>
+      {showErrorMessage && section.error ? (
+        <span className="text-sm text-muted-foreground">{section.error.message}</span>
+      ) : null}
+      {section.error?.diagnosticId ? (
+        <code className="text-xs text-muted-foreground">诊断 {section.error.diagnosticId}</code>
+      ) : null}
+      {onRetry ? (
+        <Button
+          className="text-button"
+          disabled={retrying}
+          size="sm"
+          type="button"
+          variant="link"
+          onClick={onRetry}
+        >
+          {retrying ? '重试中…' : '重试'}
+        </Button>
+      ) : null}
+    </div>
+  );
+};
 
 const SectionHeading = ({
   capability,
@@ -213,16 +240,25 @@ const SectionHeading = ({
 
 export const QuoteSection = ({
   section,
+  notice,
   onRetry,
   retrying,
 }: {
   section: MarketDetailSectionV2;
+  notice?: ReactNode;
   onRetry: () => void;
   retrying: boolean;
 }) => {
   const quote = section.data as QuoteV1 | undefined;
+  const quoteDetail = quote?.stale
+    ? isQuoteWithinUpstreamRefreshWindow(quote)
+      ? '按上游间隔刷新'
+      : '陈旧回退'
+      : undefined;
+  const quoteTone = quote ? quoteChangeTone(quote) : undefined;
   return (
     <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="quote">
+      {notice ?? null}
       <SectionHeading
         capability="quote"
         section={section}
@@ -232,13 +268,22 @@ export const QuoteSection = ({
       {renderReadyOrEmpty(
         section,
         quote ? (
-          <div className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px">
-            <DetailMetric label="实时价" value={money.format(quote.price)} />
+          <div className="grid rounded-lg border border-border bg-border sm:grid-cols-4 sm:gap-px">
+            <DetailMetric
+              label="实时价"
+              value={money.format(quote.price)}
+              {...(quoteTone ? { tone: quoteTone } : {})}
+            />
+            <DetailMetric
+              label="涨跌幅"
+              value={formatQuoteChangePercent(quote)}
+              {...(quoteTone ? { tone: quoteTone } : {})}
+            />
             <DetailMetric label="涨跌前收" value={money.format(quote.previousClose)} />
             <DetailMetric
               label="行情时点"
               value={new Date(quote.marketTime).toLocaleString('zh-CN')}
-              {...(quote.stale ? { detail: '陈旧回退' } : {})}
+              {...(quoteDetail ? { detail: quoteDetail } : {})}
             />
           </div>
         ) : null,
@@ -258,6 +303,12 @@ export const BarsSection = ({
   historyLoading,
   historyError,
   onRetryEarlier,
+  onLoadLater,
+  onRetryLater,
+  canLoadLater,
+  latestLoading,
+  latestNotice,
+  latestError,
   onRetry,
   retrying,
 }: {
@@ -270,6 +321,12 @@ export const BarsSection = ({
   historyLoading?: boolean;
   historyError?: string | null;
   onRetryEarlier?: () => void;
+  onLoadLater?: () => void;
+  onRetryLater?: () => void;
+  canLoadLater?: boolean;
+  latestLoading?: boolean;
+  latestNotice?: string | null;
+  latestError?: string | null;
   onRetry: () => void;
   retrying: boolean;
 }) => {
@@ -296,6 +353,12 @@ export const BarsSection = ({
             {...(historyLoading !== undefined ? { historyLoading } : {})}
             {...(historyError !== undefined ? { historyError } : {})}
             {...(onRetryEarlier ? { onRetryEarlier } : {})}
+            {...(onLoadLater ? { onLoadLater } : {})}
+            {...(onRetryLater ? { onRetryLater } : {})}
+            {...(canLoadLater !== undefined ? { canLoadLater } : {})}
+            {...(latestLoading !== undefined ? { latestLoading } : {})}
+            {...(latestNotice !== undefined ? { latestNotice } : {})}
+            {...(latestError !== undefined ? { latestError } : {})}
           />
         ) : null,
         <p className="empty-inline">当前没有可用日线。</p>,

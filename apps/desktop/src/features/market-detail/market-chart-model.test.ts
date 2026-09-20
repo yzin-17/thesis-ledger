@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChartPoints, indicatorValue } from './market-chart-model.js';
+import { buildChartPoints, indicatorValue, mergeChartPoints } from './market-chart-model.js';
 import { normalizeMacdParams } from './market-chart-preferences.js';
 import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
 
@@ -235,5 +235,20 @@ describe('market chart model', () => {
     );
     expect(points[0]?.comparableIndicators.MACD).toBe(false);
     expect(points[1]?.comparableIndicators.MACD).toBe(true);
+  });
+
+  it('同日新 bar 没有新指标时不沿用旧页的可比指标', () => {
+    const oldPage = buildChartPoints(
+      [bar('2026-01-03T00:00:00.000Z', 'old-input')],
+      [indicator('old-input')],
+    );
+    const latestPage = buildChartPoints(
+      [{ ...bar('2026-01-03T07:00:00.000Z', 'new-input'), close: 103 }],
+      [],
+    );
+    const [point] = mergeChartPoints([latestPage, oldPage]);
+    expect(point?.bar?.close).toBe(103);
+    expect(point?.comparableIndicators.MACD).toBe(false);
+    expect(indicatorValue(point?.indicators.MACD, ['histogram'])).toBe(0.5);
   });
 });

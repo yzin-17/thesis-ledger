@@ -133,13 +133,32 @@ describe('投资复盘工作台 UI 契约', () => {
     const list = renderToStaticMarkup(
       <ReviewCandidateList
         candidates={[candidate]}
+        instrumentDirectory={{
+          generation: 1,
+          items: [
+            {
+              symbol: '600519.SH',
+              canonicalCode: '600519',
+              instrumentType: 'STOCK',
+              market: 'SH',
+              displayName: '贵州茅台',
+              active: true,
+            },
+          ],
+          unresolvedSymbols: [],
+        }}
         selectedId={candidate.id}
         filter=""
         onFilterChange={vi.fn()}
       />,
     );
     expect(list).toContain('证据完整');
-    expect(list).toContain('600519.SH');
+    expect(list).toContain('贵州茅台');
+
+    const fallback = renderToStaticMarkup(
+      <ReviewCandidateList candidates={[candidate]} filter="" onFilterChange={vi.fn()} />,
+    );
+    expect(fallback).toContain('600519.SH');
 
     const result = renderToStaticMarkup(
       <SingleReviewResult
@@ -154,6 +173,20 @@ describe('投资复盘工作台 UI 契约', () => {
             difference: 70,
             assumption: '按计划止损价成交，数量按每笔 1 单位归一化，未计滑点。',
           },
+        }}
+        instrumentDirectory={{
+          generation: 1,
+          items: [
+            {
+              symbol: '600519.SH',
+              canonicalCode: '600519',
+              instrumentType: 'STOCK',
+              market: 'SH',
+              displayName: '贵州茅台',
+              active: true,
+            },
+          ],
+          unresolvedSymbols: [],
         }}
         aiRun={null}
         aiPending={false}
@@ -183,6 +216,7 @@ describe('投资复盘工作台 UI 契约', () => {
     expect(result).toContain('发现偏差');
     expect(noDeviation).toContain('未发现偏差');
     expect(result).toContain('反事实比较');
+    expect(result).toContain('贵州茅台');
     expect(result).toContain('按计划止损价成交');
     expect(result).not.toContain('missed-stop');
   });

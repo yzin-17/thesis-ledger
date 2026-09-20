@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { MarketModule } from '../market/market.module.js';
 import { LedgerController } from './ledger.controller.js';
 import { CashLedgerCommandService } from './cash-ledger-command.service.js';
 import { BaselineImportService } from './baseline-import.service.js';
@@ -11,6 +12,7 @@ import { TradeQueryService } from './trade-query.service.js';
 import { TradeOpeningBoundaryCommandService } from './trade-opening-boundary-command.service.js';
 
 @Module({
+  imports: [MarketModule],
   controllers: [LedgerController],
   providers: [
     LedgerService,

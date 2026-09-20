@@ -348,6 +348,7 @@ function PositionOverview({
   selectedAccount,
   busyAction,
   cashValue,
+  resolveInstrumentName,
   setEditing,
   openEntrySheet,
   clearPositions,
@@ -376,20 +377,12 @@ function PositionOverview({
       <Button type="button" onClick={createPosition}>
         记录持仓快照
       </Button>
-      {onOpenImport && (
-        <Button type="button" variant="outline" onClick={onOpenImport} disabled>
-          导入持仓快照（暂未开放）
-        </Button>
-      )}
-      {onOpenReconciliation && (
-        <Button type="button" variant="outline" onClick={onOpenReconciliation} disabled>
-          对账候选（暂未开放）
-        </Button>
-      )}
       <PositionOverviewMenu
         positions={positions}
         busyAction={busyAction}
         clearPositions={clearPositions}
+        {...(onOpenImport ? { onOpenImport } : {})}
+        {...(onOpenReconciliation ? { onOpenReconciliation } : {})}
       />
     </div>
   ) : (
@@ -440,6 +433,7 @@ function PositionOverview({
               onCreate={createPosition}
               onEdit={editPosition}
               remove={remove}
+              {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
             />
           ) : (
             <StandardPositionContent
@@ -447,6 +441,7 @@ function PositionOverview({
               busyAction={busyAction}
               onEdit={editPosition}
               remove={remove}
+              {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
             />
           )}
         </section>

@@ -9,7 +9,7 @@ import {
 } from '@thesis-ledger/domain';
 import type { BarPointV2 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { MarketBarReader } from '../market/market-bar-reader.js';
+import { isMarketBarTemporarilyUnavailable, MarketBarReader } from '../market/market-bar-reader.js';
 
 export type StrategyRiskTarget = {
   executionInstrument: { symbol: string; assetType: string; market?: string };
@@ -18,7 +18,11 @@ export type StrategyRiskTarget = {
 };
 
 export type StrategyRiskPositionTradeContext = {
-  position: { id: string; quantity: { toString(): string }; costPrice: { toString(): string } } | null;
+  position: {
+    id: string;
+    quantity: { toString(): string };
+    costPrice: { toString(): string };
+  } | null;
   trade: { id: string; openedAt: Date | null } | null;
 };
 
@@ -55,9 +59,7 @@ const timeframeMinutes = (timeframe: string) => {
   return matched ? Number(matched[1]) : null;
 };
 
-const isDerivedTimeframe = (
-  timeframe: string,
-): timeframe is DerivedBacktestBar['timeframe'] =>
+const isDerivedTimeframe = (timeframe: string): timeframe is DerivedBacktestBar['timeframe'] =>
   timeframe === '5m' || timeframe === '15m' || timeframe === '30m' || timeframe === '60m';
 
 const utcForLocalMinute = (date: string, minute: number, timeZone: string) => {
@@ -122,7 +124,9 @@ export class StrategyRiskContextService {
         orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }],
         select: { id: true, openedAt: true },
       }),
-    ]).then(([position, trade]) => ({ position, trade }) satisfies StrategyRiskPositionTradeContext);
+    ]).then(
+      ([position, trade]) => ({ position, trade }) satisfies StrategyRiskPositionTradeContext,
+    );
   }
 
   private baseContext(source: StrategyRiskPositionTradeContext) {
@@ -221,7 +225,8 @@ export class StrategyRiskContextService {
     take?: number,
   ): Promise<RiskBar[]> {
     if (!this.bars) throw new BadRequestException('行情 Reader 不可用，策略风险拒绝读取行情');
-    const normalizedAssetType = assetType.toLowerCase() === 'fund' ? 'MUTUAL_FUND' : assetType.toUpperCase();
+    const normalizedAssetType =
+      assetType.toLowerCase() === 'fund' ? 'MUTUAL_FUND' : assetType.toUpperCase();
     const series = await this.bars.read({
       identity: {
         symbol,
@@ -237,7 +242,10 @@ export class StrategyRiskContextService {
       acceptance: 'complete',
     });
     const rows = series.points
-      .filter((point) => new Date(point.timestamp) <= evaluatedAt && new Date(point.availableAt) <= evaluatedAt)
+      .filter(
+        (point) =>
+          new Date(point.timestamp) <= evaluatedAt && new Date(point.availableAt) <= evaluatedAt,
+      )
       .map((point) => ({
         ...point,
         timestamp: new Date(point.timestamp),
@@ -274,7 +282,14 @@ export class StrategyRiskContextService {
     evaluatedAt: Date,
     start?: Date,
   ) {
-    const rows = await this.storedBars(symbol, '1m', evaluatedAt, assetType, start, start ? undefined : 1000);
+    const rows = await this.storedBars(
+      symbol,
+      '1m',
+      evaluatedAt,
+      assetType,
+      start,
+      start ? undefined : 1000,
+    );
     return aggregateMinuteBars(this.minuteInputs(rows, market), timeframe, {
       calendar: tradingCalendars[market],
       includePartialTail: false,
@@ -294,7 +309,14 @@ export class StrategyRiskContextService {
     evaluatedAt: Date,
     start?: Date,
   ) {
-    const rows = await this.storedBars(symbol, timeframe, evaluatedAt, assetType, start, start ? undefined : 64);
+    const rows = await this.storedBars(
+      symbol,
+      timeframe,
+      evaluatedAt,
+      assetType,
+      start,
+      start ? undefined : 64,
+    );
     return rows.filter((row) => {
       const completedAt = this.completedAt(row.timestamp, timeframe, market);
       return completedAt !== null && completedAt <= evaluatedAt;
@@ -329,7 +351,9 @@ export class StrategyRiskContextService {
           )
         : undefined;
     return {
-      ...(bar ? { price: bar.close, occurredAt: bar.occurredAt, availableAt: bar.availableAt } : {}),
+      ...(bar
+        ? { price: bar.close, occurredAt: bar.occurredAt, availableAt: bar.availableAt }
+        : {}),
       ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
     };
   }
@@ -383,26 +407,30 @@ export class StrategyRiskContextService {
     if (!market) throw new BadRequestException('策略风险应用缺少可识别的交易市场');
 
     let values: ExchangeValues = {};
-    if (isDerivedTimeframe(target.primaryTimeframe)) {
-      values = await this.derivedExchangeValues(
-        symbol,
-        target.primaryTimeframe,
-        market,
-        target.executionInstrument.assetType,
-        source,
-        evaluatedAt,
-        target.requiresHoldingPeriods === true,
-      );
-    } else if (target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d') {
-      values = await this.directExchangeValues(
-        symbol,
-        target.primaryTimeframe,
-        market,
-        target.executionInstrument.assetType,
-        source,
-        evaluatedAt,
-        target.requiresHoldingPeriods === true,
-      );
+    try {
+      if (isDerivedTimeframe(target.primaryTimeframe)) {
+        values = await this.derivedExchangeValues(
+          symbol,
+          target.primaryTimeframe,
+          market,
+          target.executionInstrument.assetType,
+          source,
+          evaluatedAt,
+          target.requiresHoldingPeriods === true,
+        );
+      } else if (target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d') {
+        values = await this.directExchangeValues(
+          symbol,
+          target.primaryTimeframe,
+          market,
+          target.executionInstrument.assetType,
+          source,
+          evaluatedAt,
+          target.requiresHoldingPeriods === true,
+        );
+      }
+    } catch (error) {
+      if (!isMarketBarTemporarilyUnavailable(error)) throw error;
     }
 
     const base = this.baseContext(source);
@@ -430,12 +458,7 @@ export class StrategyRiskContextService {
     await this.assertTarget(accountId, symbol, target);
     const source = await this.loadPositionTrade(accountId, symbol);
     if (target.executionInstrument.assetType === 'fund')
-      return this.fundContext(
-        symbol,
-        source,
-        evaluatedAt,
-        target.requiresHoldingPeriods === true,
-      );
+      return this.fundContext(symbol, source, evaluatedAt, target.requiresHoldingPeriods === true);
     return this.exchangeContext(symbol, target, source, evaluatedAt);
   }
 }

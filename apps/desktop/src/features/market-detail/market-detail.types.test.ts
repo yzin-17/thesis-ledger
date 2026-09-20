@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS,
+  isQuoteWithinUpstreamRefreshWindow,
   isRetryableMarketDetailSection,
   marketDetailStatusClass,
   marketDetailStatusLabel,
   mergeMarketDetail,
+  quoteServedAgeMs,
   getVisibleMarketDetail,
 } from './market-detail.types.js';
+import type { BarSeriesV2, QuoteV1 } from '@thesis-ledger/schemas';
 import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
 
 const detail = (symbol: string): MarketDetailResponseV2 => ({
@@ -22,7 +26,7 @@ const detail = (symbol: string): MarketDetailResponseV2 => ({
   generatedAt: '2026-08-21T00:00:00.000Z',
 });
 
-const series = (timestamps: string[]) => ({
+const series = (timestamps: string[]): BarSeriesV2 => ({
   contractVersion: 2 as const,
   identity: { symbol: '600519.SH', assetType: 'STOCK' as const, timeframe: '1d' as const, adjustment: 'qfq' as const },
   points: timestamps.map((timestamp) => ({ timestamp, open: 10, high: 12, low: 9, close: 11, volume: 100, amount: 1100, completionStatus: 'complete' as const, availableAt: timestamp })),
@@ -54,10 +58,62 @@ describe('MarketDetail V2 类型辅助函数', () => {
     expect(mergeMarketDetail(current, detail('600519.SH')).barSeries).toBe(current.barSeries);
   });
 
+  it('按交易日替换同日修订，不因 ISO 时刻不同产生重复 bar', () => {
+    const current: MarketDetailResponseV2 = {
+      ...detail('600519.SH'),
+      requested: ['bars'],
+      barSeries: series(['2026-08-21T00:00:00.000Z']),
+    };
+    const revisedSeries = series(['2026-08-21T07:00:00.000Z']);
+    revisedSeries.points[0] = {
+      ...revisedSeries.points[0]!,
+      close: 13,
+      completionStatus: 'incomplete',
+    };
+    const next: MarketDetailResponseV2 = {
+      ...detail('600519.SH'),
+      requested: ['bars'],
+      barSeries: revisedSeries,
+    };
+    const merged = mergeMarketDetail(current, next);
+    expect(merged.barSeries?.points).toHaveLength(1);
+    expect(merged.barSeries?.points[0]).toMatchObject({
+      timestamp: '2026-08-21T07:00:00.000Z',
+      close: 13,
+      completionStatus: 'incomplete',
+    });
+  });
+
   it('只允许 unavailable 分段进入局部重试并保持状态文案', () => {
     expect(isRetryableMarketDetailSection({ status: 'unavailable' } as never)).toBe(true);
     expect(isRetryableMarketDetailSection({ status: 'unsupported' } as never)).toBe(false);
     expect(marketDetailStatusLabel('empty')).toBe('暂无数据');
     expect(marketDetailStatusClass('stale')).toBe('tag warning');
+  });
+
+  it('按取回时间判断行情是否仍在上游刷新间隔内', () => {
+    const now = Date.parse('2026-08-21T00:10:00.000Z');
+    const quote = (fetchedAt: string): QuoteV1 => ({
+      version: 1,
+      symbol: '600519.SH',
+      open: 100,
+      high: 110,
+      low: 90,
+      price: 105,
+      previousClose: 100,
+      volume: 100,
+      amount: 10_500,
+      stale: true,
+      provider: 'fixture',
+      marketTime: '2026-08-20T07:00:00.000Z',
+      fetchedAt,
+      freshness: 'stale',
+    });
+    expect(MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS).toBe(600);
+    expect(quoteServedAgeMs(quote('2026-08-21T00:05:00.000Z'), now)).toBe(5 * 60_000);
+    expect(isQuoteWithinUpstreamRefreshWindow(quote('2026-08-21T00:05:00.000Z'), now)).toBe(true);
+    // 间隔边界外视为真正过期，仍要给用户陈旧告警。
+    expect(isQuoteWithinUpstreamRefreshWindow(quote('2026-08-20T23:55:00.000Z'), now)).toBe(false);
+    expect(isQuoteWithinUpstreamRefreshWindow(undefined, now)).toBe(false);
   });
 });

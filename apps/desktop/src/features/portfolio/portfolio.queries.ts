@@ -108,16 +108,26 @@ export const useManagedAccountsQuery = (enabled: boolean) =>
     enabled,
   });
 
+export const portfolioInstrumentSearchQueryOptions = (
+  accountType: string | undefined,
+  query: string,
+  enabled: boolean,
+  client?: DesktopRequestClient,
+) => ({
+    queryKey: portfolioKeys.instrumentSearch(accountType ?? 'all', query),
+    queryFn: ({ signal }: { signal: AbortSignal }) => searchPortfolioInstruments(query, client, signal),
+    enabled,
+    placeholderData: [],
+    retry: false,
+    retryOnMount: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+  });
+
 export const usePortfolioInstrumentSearchQuery = (
   accountType: string | undefined,
   query: string,
   enabled: boolean,
-) =>
-  useQuery({
-    queryKey: portfolioKeys.instrumentSearch(accountType ?? 'all', query),
-    queryFn: ({ signal }) => searchPortfolioInstruments(query, undefined, signal),
-    enabled,
-    placeholderData: [],
-    retry: false,
-    staleTime: 30_000,
-  });
+) => useQuery(portfolioInstrumentSearchQueryOptions(accountType, query, enabled));

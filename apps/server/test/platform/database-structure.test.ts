@@ -22,8 +22,8 @@ describe('database structure input', () => {
   it('自动发现全部 migration、Prisma 表和 raw-owned 表', async () => {
     const input = await discoverDatabaseStructure();
 
-    expect(input.currentHead).toBe('20260916100000_remove_legacy_market_bar');
-    expect(input.migrations).toHaveLength(11);
+    expect(input.currentHead).toBe('20260918153000_strategy_optimization_adoption_context');
+    expect(input.migrations).toHaveLength(13);
     expect(input.prismaTables).toHaveLength(58);
     expect(input.rawOwnedTables).toHaveLength(7);
     expect(input.expectedTables).toHaveLength(65);

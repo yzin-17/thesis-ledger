@@ -121,7 +121,7 @@ export function StrategyOptimizationExperimentPanel({
     queryKey: [...optimizationKey, 'experiments'],
     queryFn: () => fetchOptimizationExperiments(),
     refetchInterval: (query) =>
-      query.state.data?.some((item) => !settledStatuses.has(item.status)) ? 3_000 : false,
+      query.state.data?.items.some((item) => !settledStatuses.has(item.status)) ? 3_000 : false,
   });
   const compare = useQuery({
     queryKey: [...optimizationKey, 'compare', selectedExperimentId],
@@ -134,8 +134,8 @@ export function StrategyOptimizationExperimentPanel({
   });
 
   useEffect(() => {
-    if (!selectedExperimentId && experiments.data?.[0])
-      setSelectedExperimentId(experiments.data[0].id);
+    if (!selectedExperimentId && experiments.data?.items[0])
+      setSelectedExperimentId(experiments.data.items[0].id);
   }, [experiments.data, selectedExperimentId]);
   useEffect(() => {
     if (parameters.data?.length && selectedParameters.length === 0)
@@ -669,7 +669,7 @@ export function StrategyOptimizationExperimentPanel({
       </Card>
 
       <StrategyOptimizationExperimentResults
-        experiments={experiments.data ?? []}
+        experiments={experiments.data?.items ?? []}
         compare={compare.data}
         settledStatuses={settledStatuses}
         selectedExperimentId={selectedExperimentId}

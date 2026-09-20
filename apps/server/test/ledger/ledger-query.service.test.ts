@@ -4,6 +4,25 @@ import { LedgerQueryService } from '../../src/ledger/ledger-query.service.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 
+const instrumentDirectory = {
+  resolveSymbols: vi.fn(async (symbols: readonly string[]) => ({
+    generation: 1,
+    items: symbols.includes('AAPL.US')
+      ? [
+          {
+            symbol: 'AAPL.US',
+            canonicalCode: 'AAPL',
+            instrumentType: 'STOCK',
+            market: 'US',
+            displayName: 'Apple',
+            active: true,
+          },
+        ]
+      : [],
+    unresolvedSymbols: [],
+  })),
+};
+
 const event = ledgerEventEnvelopeSchemaV2.parse({
   version: 2,
   eventId: '22222222-2222-4222-8222-222222222222',
@@ -67,13 +86,18 @@ describe('Ledger 查询 API 服务', () => {
     const repository = {
       readEffectiveEvents: vi.fn(async () => [event]),
     };
-    const service = new LedgerQueryService(prisma as never, repository as never);
+    const service = new LedgerQueryService(
+      prisma as never,
+      repository as never,
+      instrumentDirectory as never,
+    );
 
     await expect(service.effectiveEvents(accountId)).resolves.toMatchObject({
       ledgerRevision: '3',
       projectionGeneration: '4',
       effective: true,
       events: [{ payload: { quantity: '1.25' } }],
+      instrumentDirectory: { items: [{ displayName: 'Apple' }] },
     });
     await expect(service.auditEvents(accountId, '3')).resolves.toMatchObject({
       asOfLedgerRevision: '3',
@@ -84,6 +108,7 @@ describe('Ledger 查询 API 服务', () => {
           payload: expect.objectContaining({ quantity: '1.25' }),
         }),
       ],
+      instrumentDirectory: { items: [{ displayName: 'Apple' }] },
     });
   });
 
@@ -95,7 +120,11 @@ describe('Ledger 查询 API 服务', () => {
       },
     };
     const repository = { readEffectiveEvents: vi.fn(async () => [event]) };
-    const service = new LedgerQueryService(prisma as never, repository as never);
+    const service = new LedgerQueryService(
+      prisma as never,
+      repository as never,
+      instrumentDirectory as never,
+    );
 
     await expect(service.replay(accountId, '2')).resolves.toMatchObject({
       asOfLedgerRevision: '2',

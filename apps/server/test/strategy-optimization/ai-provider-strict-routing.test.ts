@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AiProvider } from '../../src/ai/contracts.js';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { StrategyOptimizationReadService } from '../../src/strategy-optimization/strategy-optimization-read.service.js';
+import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
 import { optimizationReasoningEffortSupported } from '../../src/strategy-optimization/strategy-optimization-model-routing.js';
 
 const provider = (
@@ -56,7 +57,11 @@ describe('AI optimization strict routing', () => {
         modelReasoning: { 'model-a': { supportedEfforts: ['low', 'high'], defaultEffort: 'low' } },
       },
     });
-    const service = new StrategyOptimizationReadService({} as never, registry);
+    const service = new StrategyOptimizationReadService(
+      {} as never,
+      registry,
+      new ResultReadPolicyService({} as never),
+    );
     expect(service.capabilities().providers[0]).toMatchObject({
       provider: 'alpha',
       model: 'model-a',

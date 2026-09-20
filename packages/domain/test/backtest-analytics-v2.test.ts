@@ -60,6 +60,36 @@ describe('V2 backtest analytics', () => {
     expect(result.benchmark).toEqual({ totalReturn: { status: 'available', value: '0.3' } });
   });
 
+  it('全胜交易仅使 profit factor 为无穷，不降低数据完整性', () => {
+    const result = buildBacktestAnalytics(
+      baseInput({
+        trades: [
+          {
+            source: 'BACKTEST',
+            executionSymbol: '159516.SZ',
+            openedAt: '2025-01-01T00:00:00Z',
+            closedAt: '2025-01-02T00:00:00Z',
+            entryQuantity: '100',
+            exitQuantity: '100',
+            entryValue: { amount: '100', currency: 'CNY' },
+            exitValue: { amount: '120', currency: 'CNY' },
+            realizedPnl: { amount: '20', currency: 'CNY' },
+            charges: [],
+            returnRate: '0.2',
+            closeReason: 'signal',
+            fillIds: ['buy-1', 'sell-1'],
+          },
+        ],
+      }),
+    );
+
+    expect(result.metrics.profitFactor).toEqual({
+      status: 'unavailable',
+      reason: 'NO_LOSING_TRADES',
+    });
+    expect(result.completeness).toBe('complete');
+  });
+
   it('returns unavailable benchmark with warning when foreign FX is missing', () => {
     const result = buildBacktestAnalytics(
       baseInput({

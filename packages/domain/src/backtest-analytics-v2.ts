@@ -446,7 +446,9 @@ export const buildBacktestAnalytics = (input: BacktestAnalyticsInput): BacktestA
     completeness = 'unavailable';
   } else if (
     warnings.length > 0 ||
-    Object.values(metrics).some((metric) => metric.status === 'unavailable')
+    Object.values(metrics).some(
+      (metric) => metric.status === 'unavailable' && metric.reason !== 'NO_LOSING_TRADES',
+    )
   ) {
     completeness = 'partial';
   }

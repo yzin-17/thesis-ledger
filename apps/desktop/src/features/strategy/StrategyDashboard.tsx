@@ -1,11 +1,8 @@
-import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToastManager } from '@/components/ui/toast';
-import type { LoadState } from '../shared/types.js';
-import { DataStateBanner } from '../shared/DesktopPrimitives.js';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { DataStateBanner } from '../shared/DesktopPrimitives.js';
+import type { LoadState } from '../shared/types.js';
 import {
   useCancelBacktestMutation,
   useCancelBacktestV2Mutation,
@@ -13,51 +10,135 @@ import {
   useCreateStrategyVersionMutation,
   useFetchStrategyBarsMutation,
   useQueueBacktestMutation,
+  useRetryBacktestV2Mutation,
   useRunBacktestMutation,
   useRunBacktestV2Mutation,
-  useRetryBacktestV2Mutation,
 } from './strategy.mutations.js';
 import { createStrategyActionHandlers } from './strategy.actions.js';
-import { useBacktestJobQuery, useStrategyQueries } from './strategy.queries.js';
+import { useStrategyQueries } from './strategy.queries.js';
 import { useBacktestJobEvents } from './strategy.events.js';
-import { StrategyEditorSheet } from './StrategyEditorSheet.js';
-import { StrategyOptimizationWorkspace } from './StrategyOptimizationWorkspace.js';
+import { useToastManager } from '@/components/ui/toast';
+import { StrategyCenterLayout } from './StrategyCenterLayout.js';
+import { StrategyEditorPage } from './StrategyEditorPage.js';
+import { StrategyExperimentCreatePage } from './StrategyExperimentCreatePage.js';
+import { StrategyExperimentDetailPage } from './StrategyExperimentDetailPage.js';
+import { StrategyExperimentListPage } from './StrategyExperimentListPage.js';
 import {
-  BacktestSetupDialog,
-  StrategyJobs,
-  StrategyLibrary,
-  StrategyResultDialog,
-} from './StrategySections.js';
+  StrategyLibraryPage,
+  StrategyVersionPage,
+  type StrategyVersionTabState,
+} from './StrategyLibraryPages.js';
+import { StrategyRiskApplicationPage } from './StrategyRiskApplicationPage.js';
+import { BacktestSetupDialog } from './StrategySections.js';
+import { StrategyBacktestJobsPage } from './StrategyBacktestJobsPage.js';
+import { StrategyBacktestDetailPage } from './StrategyBacktestDetailPage.js';
+import { StrategyCenterErrorBoundary } from './StrategyCenterErrorBoundary.js';
+import {
+  legacyStrategyDestination,
+  strategyCenterPath,
+  strategyCenterTabForPath,
+  type StrategyCenterTab,
+} from './strategy-center.navigation.js';
 import type {
   BacktestJobSummary,
   BacktestSetupInput,
   StrategyRecord,
-  StrategySchema,
   StrategyVersion,
 } from './strategy.types.js';
 
-type EditorSelection = {
-  mode: 'create' | 'edit';
-  strategy: StrategyRecord | null;
-  version: StrategyVersion | null;
+type BacktestSelection = {
+  strategy: StrategyRecord;
+  version: StrategyVersion;
+  initialSetup?: BacktestSetupInput;
+  intent?: 'new' | 'rerun';
 };
-type BacktestSelection = { strategy: StrategyRecord; version: StrategyVersion };
+
+function LegacyStrategyRedirect() {
+  const location = useLocation();
+  return <Navigate to={legacyStrategyDestination(location.search)} replace />;
+}
+
+function StrategyRiskApplicationRoute({
+  strategies,
+  loading,
+  onBacktest,
+  tabState,
+  onTabChange,
+}: {
+  strategies: StrategyRecord[];
+  loading: boolean;
+  onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
+  tabState: StrategyVersionTabState;
+  onTabChange: (state: StrategyVersionTabState) => void;
+}) {
+  const { strategyId, versionId } = useParams();
+  const sourceKey = `${strategyId ?? ''}:${versionId ?? ''}`;
+  return (
+    <>
+      <StrategyVersionPage
+        strategies={strategies}
+        loading={loading}
+        onBacktest={onBacktest}
+        tabState={tabState}
+        onTabChange={onTabChange}
+      />
+      <StrategyRiskApplicationPage key={sourceKey} strategies={strategies} presentation="drawer" />
+    </>
+  );
+}
+
+function StrategyEditorRoute({
+  strategies,
+  loading,
+  onBacktest,
+  tabState,
+  onTabChange,
+}: {
+  strategies: StrategyRecord[];
+  loading: boolean;
+  onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
+  tabState: StrategyVersionTabState;
+  onTabChange: (state: StrategyVersionTabState) => void;
+}) {
+  const { strategyId, versionId } = useParams();
+  const sourceKey = `${strategyId ?? ''}:${versionId ?? ''}`;
+  return (
+    <>
+      <StrategyVersionPage
+        strategies={strategies}
+        loading={loading}
+        onBacktest={onBacktest}
+        tabState={tabState}
+        onTabChange={onTabChange}
+      />
+      <StrategyEditorPage
+        key={sourceKey}
+        strategies={strategies}
+        loading={loading}
+        mode="edit"
+        presentation="drawer"
+      />
+    </>
+  );
+}
 
 export function StrategyDashboard() {
+  const navigate = useNavigate();
   const location = useLocation();
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('library');
-  const [editorSelection, setEditorSelection] = useState<EditorSelection | null>(null);
-  const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
-  const [resultJobId, setResultJobId] = useState<string | null>(null);
-  useEffect(() => {
-    const requested = new URLSearchParams(location.search).get('tab');
-    if (requested === 'library' || requested === 'jobs' || requested === 'optimization')
-      setActiveTab(requested);
-  }, [location.search]);
   const toastManager = useToastManager();
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
+  const [versionTabState, setVersionTabState] = useState<StrategyVersionTabState>({
+    sourceKey: '',
+    value: 'definition',
+  });
+  const [centerTab, setCenterTab] = useState<StrategyCenterTab>(() =>
+    strategyCenterTabForPath(location.pathname),
+  );
+  useEffect(() => {
+    setCenterTab(strategyCenterTabForPath(location.pathname));
+  }, [location.pathname]);
   const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
-  const resultJobQuery = useBacktestJobQuery(resultJobId);
   useBacktestJobEvents();
   const createMutation = useCreateStrategyMutation();
   const createVersionMutation = useCreateStrategyVersionMutation();
@@ -70,13 +151,10 @@ export function StrategyDashboard() {
   const retryV2Mutation = useRetryBacktestV2Mutation();
   const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
   const jobs: BacktestJobSummary[] = jobsQuery.data ?? [];
-  const strategyRefreshing = strategiesQuery.isFetching || jobsQuery.isFetching;
   let loadState: LoadState = 'loading';
-  if (strategiesQuery.isError || jobsQuery.isError) {
+  if (strategiesQuery.isError || jobsQuery.isError)
     loadState = strategies.length || jobs.length ? 'stale' : 'error';
-  } else if (strategiesQuery.isSuccess && jobsQuery.isSuccess) {
-    loadState = 'ready';
-  }
+  else if (strategiesQuery.isSuccess && jobsQuery.isSuccess) loadState = 'ready';
   const load = async () => {
     await Promise.all([strategiesQuery.refetch(), jobsQuery.refetch()]);
   };
@@ -95,125 +173,131 @@ export function StrategyDashboard() {
     runV2Mutation,
     cancelV2Mutation,
     retryV2Mutation,
+    onJobQueued: (job) => void navigate(strategyCenterPath.job(job.id)),
     load,
   });
-
-  const saveSchema = async (schema: StrategySchema) => {
-    if (!editorSelection) return;
-    let succeeded = false;
-    if (editorSelection.mode === 'edit' && editorSelection.strategy) {
-      succeeded = await actions.createVersion(editorSelection.strategy.id, schema);
-    } else {
-      const name = typeof schema.name === 'string' ? schema.name : '未命名策略';
-      succeeded = await actions.createStrategy({ name, schema });
-    }
-    if (succeeded) setEditorSelection(null);
-  };
-
   const startBacktest = async (setup: BacktestSetupInput) => {
     if (!backtestSelection) return false;
     const succeeded = await actions.startBacktest(backtestSelection.version, setup);
-    if (succeeded) setActiveTab('jobs');
     return succeeded;
   };
+  const refreshing = strategiesQuery.isFetching || jobsQuery.isFetching;
 
-  const selectedJob = resultJobQuery.data ?? null;
-  const selectedStrategy = selectedJob
-    ? strategies.find((candidate) =>
-        candidate.versions.some(
-          (candidateVersion) => candidateVersion.id === selectedJob.strategyVersionId,
-        ),
-      )
-    : null;
-  const selectedVersion = selectedStrategy?.versions.find(
-    (candidate) => candidate.id === selectedJob?.strategyVersionId,
-  );
   return (
-    <section className="module-page">
-      <PageHeader
-        eyebrow="策略实验室"
-        title="策略实验"
-        description="创建投资策略，通过历史回测评估表现，并将验证后的策略衔接到风险监控与 AI 参数优化。"
-        actions={
-          <RefreshIconButton
-            label="刷新策略与回测任务"
-            refreshing={strategyRefreshing}
-            onClick={() => void load()}
+    <StrategyCenterLayout
+      value={centerTab}
+      onValueChange={setCenterTab}
+      actions={
+        <RefreshIconButton
+          label="刷新策略中心"
+          refreshing={refreshing}
+          onClick={() => void load()}
+        />
+      }
+    >
+      <StrategyCenterErrorBoundary>
+        <DataStateBanner state={loadState} onRetry={() => void load()} />
+        <Routes>
+          <Route index element={<LegacyStrategyRedirect />} />
+          <Route
+            path="library"
+            element={
+              <StrategyLibraryPage
+                strategies={strategies}
+                jobs={jobs}
+                loading={strategiesQuery.isPending}
+                onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
+              />
+            }
           />
-        }
-      />
-      <DataStateBanner state={loadState} onRetry={() => void load()} />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList variant="line" className="w-full">
-          <TabsTrigger value="library">策略库</TabsTrigger>
-          <TabsTrigger value="jobs">
-            回测任务{jobs.length > 0 ? ` (${jobs.length})` : ''}
-          </TabsTrigger>
-          <TabsTrigger value="optimization">AI 策略实验</TabsTrigger>
-        </TabsList>
-        <TabsContent value="library" className="mt-0">
-          <StrategyLibrary
-            strategies={strategies}
-            jobs={jobs}
-            loadState={loadState}
-            busyAction={busyAction}
-            onCreate={() => setEditorSelection({ mode: 'create', strategy: null, version: null })}
-            onEdit={(strategy, version) => setEditorSelection({ mode: 'edit', strategy, version })}
-            onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
+          <Route
+            path="library/new"
+            element={
+              <StrategyEditorPage
+                strategies={strategies}
+                loading={strategiesQuery.isPending}
+                mode="create"
+              />
+            }
           />
-        </TabsContent>
-        <TabsContent value="jobs" className="mt-0">
-          <StrategyJobs
-            jobs={jobs}
-            strategies={strategies}
-            loadState={loadState}
-            busyAction={busyAction}
-            onRun={(job) => void actions.run(job.id, job.mode)}
-            onCancel={(job) => void actions.cancel(job.id, job.mode)}
-            onRetry={(jobId) => void actions.retry(jobId)}
-            onViewResult={(job) => setResultJobId(job.id)}
-            onOpenLibrary={() => setActiveTab('library')}
+          <Route
+            path="library/:strategyId/versions/:versionId"
+            element={
+              <StrategyVersionPage
+                strategies={strategies}
+                loading={strategiesQuery.isPending}
+                onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
+                tabState={versionTabState}
+                onTabChange={setVersionTabState}
+              />
+            }
           />
-        </TabsContent>
-        <TabsContent value="optimization" className="mt-0">
-          <StrategyOptimizationWorkspace strategies={strategies} />
-        </TabsContent>
-      </Tabs>
-      <StrategyEditorSheet
-        open={editorSelection !== null}
-        mode={editorSelection?.mode ?? 'create'}
-        strategy={editorSelection?.strategy ?? null}
-        version={editorSelection?.version ?? null}
-        busy={
-          busyAction === 'create-strategy' ||
-          (editorSelection?.strategy
-            ? busyAction === `create-version:${editorSelection.strategy.id}`
-            : false)
-        }
-        onOpenChange={(open) => {
-          if (!open) setEditorSelection(null);
-        }}
-        onSave={(schema) => void saveSchema(schema)}
-      />
+          <Route
+            path="library/:strategyId/versions/:versionId/edit"
+            element={
+              <StrategyEditorRoute
+                strategies={strategies}
+                loading={strategiesQuery.isPending}
+                onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
+                tabState={versionTabState}
+                onTabChange={setVersionTabState}
+              />
+            }
+          />
+          <Route
+            path="library/:strategyId/versions/:versionId/risk-application"
+            element={
+              <StrategyRiskApplicationRoute
+                strategies={strategies}
+                loading={strategiesQuery.isPending}
+                onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
+                tabState={versionTabState}
+                onTabChange={setVersionTabState}
+              />
+            }
+          />
+          <Route path="jobs" element={<StrategyBacktestJobsPage strategies={strategies} />} />
+          <Route
+            path="jobs/:jobId"
+            element={
+              <StrategyBacktestDetailPage
+                strategies={strategies}
+                strategiesLoading={strategiesQuery.isPending}
+                busyAction={busyAction}
+                onRun={(job) => void actions.run(job.id, job.mode)}
+                onCancel={(job) => void actions.cancel(job.id, job.mode)}
+                onRetry={(job) => void actions.retry(job.id)}
+                onRerun={({ strategy, version, setup }) =>
+                  setBacktestSelection({ strategy, version, initialSetup: setup, intent: 'rerun' })
+                }
+                onSourceTabChange={setCenterTab}
+              />
+            }
+          />
+          <Route path="experiments" element={<StrategyExperimentListPage />} />
+          <Route
+            path="experiments/new"
+            element={<StrategyExperimentCreatePage strategies={strategies} />}
+          />
+          <Route
+            path="experiments/:experimentId"
+            element={<StrategyExperimentDetailPage strategies={strategies} />}
+          />
+          <Route path="*" element={<Navigate to={strategyCenterPath.library} replace />} />
+        </Routes>
+      </StrategyCenterErrorBoundary>
       <BacktestSetupDialog
         open={backtestSelection !== null}
         strategy={backtestSelection?.strategy ?? null}
         version={backtestSelection?.version ?? null}
         busy={Boolean(busyAction?.startsWith('queue:'))}
+        initialSetup={backtestSelection?.initialSetup ?? null}
+        intent={backtestSelection?.intent ?? 'new'}
         onOpenChange={(open) => {
           if (!open) setBacktestSelection(null);
         }}
         onSubmit={startBacktest}
       />
-      <StrategyResultDialog
-        job={selectedJob}
-        strategy={selectedStrategy ?? null}
-        version={selectedVersion ?? null}
-        open={resultJobId !== null}
-        onOpenChange={(open) => {
-          if (!open) setResultJobId(null);
-        }}
-      />
-    </section>
+    </StrategyCenterLayout>
   );
 }

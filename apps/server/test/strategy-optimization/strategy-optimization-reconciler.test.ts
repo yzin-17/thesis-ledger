@@ -2,6 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { StrategyOptimizationReconciler } from '../../src/strategy-optimization/strategy-optimization-reconciler.service.js';
 
 describe('StrategyOptimizationReconciler', () => {
+  it('发布停用开关关闭时不调度恢复任务', async () => {
+    vi.stubEnv('STRATEGY_AI_OPTIMIZATION_ENABLED', 'false');
+    const optimization = { reconcilePending: vi.fn() };
+    const reconciler = new StrategyOptimizationReconciler(optimization as never);
+    try {
+      await expect(reconciler.runNow()).resolves.toEqual({
+        skipped: true,
+        reason: 'AI 策略优化当前已关闭',
+      });
+      expect(optimization.reconcilePending).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('周期恢复会批量调度可恢复实验', async () => {
     const optimization = { reconcilePending: vi.fn(async () => ({ scheduled: 12 })) };
     const reconciler = new StrategyOptimizationReconciler(optimization as never);

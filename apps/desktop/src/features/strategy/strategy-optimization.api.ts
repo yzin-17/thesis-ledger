@@ -1,10 +1,19 @@
 import type {
   MonitoringPlan,
+  AiExecutionReadModel,
+  AiUsageCompleteness,
+  OptimizationAdoptionContext,
   OptimizationExperimentCreate,
+  OptimizationExperimentSource,
+  OptimizationCandidateSource,
+  OptimizationCostSummary,
   OptimizationReasoningEffort,
+  OptimizationTradingCostReadModel,
+  ResultReadEligibility,
   StrategyParameterDescriptor,
 } from '@thesis-ledger/schemas';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import type { BacktestJobSummary } from './strategy.types.js';
 
 export type OptimizationCapabilities = {
   riskApplicationsEnabled: boolean;
@@ -24,7 +33,11 @@ export type OptimizationCapabilities = {
 };
 
 export type OptimizationExperimentSummary = {
+  readEligibility?: ResultReadEligibility;
   id: string;
+  name: string;
+  nameSource: 'stored' | 'legacy_fallback';
+  source?: OptimizationExperimentSource;
   sourceMode?: 'existing' | 'discovery';
   discoveryScope?: {
     executionInstrument: {
@@ -52,7 +65,9 @@ export type OptimizationExperimentSummary = {
   backtestRunsUsed: number;
   inputTokensUsed: number;
   outputTokensUsed: number;
-  costUsed: string | number;
+  costUsed: string | number | null;
+  costSummary: OptimizationCostSummary;
+  tradingCost: OptimizationTradingCostReadModel;
   selectedCandidateId?: string | null;
   lockedCandidateIds?: string[] | null;
   testExposedAt?: string | null;
@@ -62,6 +77,7 @@ export type OptimizationExperimentSummary = {
 };
 
 export type OptimizationCandidate = {
+  readEligibility?: ResultReadEligibility;
   id: string;
   experimentId: string;
   candidateNumber: number;
@@ -75,6 +91,33 @@ export type OptimizationCandidate = {
   metrics: Record<string, unknown>;
   adoptedStrategyVersionId?: string | null;
   validationScore?: number | null;
+  source?: OptimizationCandidateSource;
+};
+
+export type OptimizationExperimentPage = {
+  items: OptimizationExperimentSummary[];
+  totalCount: number;
+  pageInfo: { nextCursor: string | null; hasNextPage: boolean };
+};
+
+export type StrategyBacktestGroupPage = {
+  items: Array<{
+    id: string;
+    kind: 'user' | 'experiment';
+    name: string;
+    experimentId: string | null;
+    experimentStage: string | null;
+    source: OptimizationExperimentSource | null;
+    jobs: BacktestJobSummary[];
+    members: Array<{
+      jobId: string;
+      relation: 'user' | 'baseline' | 'candidate';
+      split: string | null;
+      candidateSource: OptimizationCandidateSource | null;
+    }>;
+  }>;
+  totalCount: number;
+  pageInfo: { nextCursor: string | null; hasNextPage: boolean };
 };
 
 export type OptimizationAttempt = {
@@ -92,6 +135,8 @@ export type OptimizationAttempt = {
   cost?: string | number | null;
   durationMs?: number | null;
   modelMetadata?: Record<string, unknown> | null;
+  execution?: AiExecutionReadModel | null;
+  usageCompleteness?: AiUsageCompleteness;
 };
 
 export type OptimizationCompare = {
@@ -126,6 +171,16 @@ export type RiskRuleDiff = {
 export type RiskApplicationUpgradePreview = RiskApplicationPreview & {
   currentRevision: number;
   diff: RiskRuleDiff[];
+  targetApplication?: {
+    id: string;
+    strategyVersionId: string;
+    accountId: string;
+    symbol: string;
+    cycleMode: string;
+    revision: number;
+    enabled: boolean;
+    archivedAt?: string | null;
+  } | null;
 };
 
 export type StrategyRiskNotification = {
@@ -149,6 +204,16 @@ export type StrategyRiskApplication = {
   coverage: MonitoringPlan['coverage'];
   createdAt: string;
   updatedAt: string;
+  archivedAt?: string | null;
+  applicationResolution?: {
+    kind: 'reused' | 'upgrade_target_exists' | 'already_bound';
+    reason?: 'same_identity';
+    sourceApplicationId?: string;
+    management: {
+      applicationId: string;
+      actions: Array<'view' | 'edit'>;
+    };
+  };
 };
 
 export type AdoptionRiskApplicationDiff = {
@@ -196,12 +261,50 @@ export const fetchMonitoringPlan = (strategyVersionId: string, client?: DesktopR
     client,
   );
 
-export const fetchOptimizationExperiments = (client?: DesktopRequestClient) =>
-  requestDesktopJson<OptimizationExperimentSummary[]>(
-    '/strategy-optimization/experiments?limit=50',
+export const fetchOptimizationExperiments = (
+  options: {
+    limit?: number;
+    cursor?: string;
+    search?: string;
+    sourceMode?: 'existing' | 'discovery';
+    status?: string;
+    strategyVersionId?: string;
+  } = {},
+  client?: DesktopRequestClient,
+) => {
+  const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
+  for (const [key, value] of Object.entries(options)) {
+    if (key !== 'limit' && typeof value === 'string' && value.length > 0) query.set(key, value);
+  }
+  return requestDesktopJson<OptimizationExperimentPage>(
+    `/strategy-optimization/experiments?${query.toString()}`,
     { cache: 'no-store' },
     client,
   );
+};
+
+export const fetchStrategyBacktestGroups = (
+  options: {
+    limit?: number;
+    cursor?: string;
+    jobId?: string;
+    search?: string;
+    sourceMode?: 'existing' | 'discovery';
+    status?: string;
+    strategyVersionId?: string;
+  } = {},
+  client?: DesktopRequestClient,
+) => {
+  const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
+  for (const [key, value] of Object.entries(options)) {
+    if (key !== 'limit' && typeof value === 'string' && value.length > 0) query.set(key, value);
+  }
+  return requestDesktopJson<StrategyBacktestGroupPage>(
+    `/strategy-optimization/backtests/groups?${query.toString()}`,
+    { cache: 'no-store' },
+    client,
+  );
+};
 
 export const fetchOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>
   requestDesktopJson<{
@@ -222,10 +325,29 @@ export const createOptimizationExperiment = (
   client?: DesktopRequestClient,
 ) => jsonPost<OptimizationExperimentSummary>('/strategy-optimization/experiments', input, client);
 
-export const cloneOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>
+export const cloneOptimizationExperiment = (
+  id: string,
+  options: { acknowledgeUnknownCost?: boolean; name?: string } = {},
+  client?: DesktopRequestClient,
+) =>
   jsonPost<OptimizationExperimentSummary>(
     `/strategy-optimization/experiments/${encodeURIComponent(id)}/clone`,
-    { idempotencyKey: crypto.randomUUID() },
+    { ...options, idempotencyKey: crypto.randomUUID() },
+    client,
+  );
+
+export const renameOptimizationExperiment = (
+  id: string,
+  name: string,
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<OptimizationExperimentSummary>(
+    `/strategy-optimization/experiments/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    },
     client,
   );
 
@@ -263,7 +385,8 @@ export const adoptOptimizationCandidate = (
   client?: DesktopRequestClient,
 ) =>
   jsonPost<{
-    strategyVersion: { id: string; version: number };
+    strategyVersion: { id: string; strategyId: string; version: number };
+    adoptionContext: OptimizationAdoptionContext;
     monitoringPlan: MonitoringPlan;
     monitoringDiff?: {
       before: MonitoringPlan | null;
@@ -272,6 +395,17 @@ export const adoptOptimizationCandidate = (
     riskApplicationEnabled: boolean;
     riskApplicationDiffs: AdoptionRiskApplicationDiff[];
   }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt`, input, client);
+
+export const fetchOptimizationAdoptionContext = (
+  id: string,
+  candidateId: string,
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<OptimizationAdoptionContext>(
+    `/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt-context?candidateId=${encodeURIComponent(candidateId)}`,
+    undefined,
+    client,
+  );
 
 export const previewStrategyRiskApplication = (
   input: {
@@ -308,6 +442,7 @@ export const fetchStrategyRiskApplications = (
   client?: DesktopRequestClient,
 ) => {
   const query = new URLSearchParams();
+  query.set('includeArchived', 'false');
   if (accountId) query.set('accountId', accountId);
   if (symbol) query.set('symbol', symbol);
   const suffix = query.size > 0 ? `?${query.toString()}` : '';
@@ -333,6 +468,21 @@ export const updateStrategyRiskApplication = (
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
+    },
+    client,
+  );
+
+export const deleteStrategyRiskApplication = (
+  id: string,
+  expectedRevision: number,
+  client?: DesktopRequestClient,
+) =>
+  requestDesktopJson<StrategyRiskApplication>(
+    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedRevision }),
     },
     client,
   );

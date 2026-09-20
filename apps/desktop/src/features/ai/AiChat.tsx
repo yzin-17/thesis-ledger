@@ -1,22 +1,13 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import { debounce } from 'es-toolkit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/ui/empty';
-import { AlertTriangle } from 'lucide-react';
 import { PageHeader } from '../shared/PageHeader.js';
-import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { ResearchDetailSheet, ResearchReadingView } from './AiResearchDetailView.js';
 import { NewResearchSheet } from './NewResearchSheet.js';
-import { AiRunDetail } from './AiRunDetail.js';
 import { AiRunList } from './AiRunList.js';
-import { EvidenceChainSheet } from './EvidenceChainSheet.js';
+import { parseAiResearchPageState, serializeAiResearchPageState } from './ai.navigation.js';
 import {
   findAiRun,
   resolveAiRunsLoadState,
@@ -25,55 +16,111 @@ import {
   useAiRunsQuery,
   useAiToolCallsQuery,
 } from './ai.queries.js';
-import type { AiRunFilterStatus, AiRunRecord, AiRunResult, AiToolCall } from './ai.types.js';
+import type { AiCapabilitiesResponse, AiRunRecord, AiRunResult } from './ai.types.js';
 
-function AiRunsUnavailable({ onRetry }: { onRetry: () => void }) {
-  return (
-    <Empty className="min-h-[28rem] rounded-md border bg-card p-6">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <AlertTriangle aria-hidden="true" />
-        </EmptyMedia>
-        <EmptyTitle>暂时无法读取研究任务</EmptyTitle>
-        <EmptyDescription>已有研究不会受到影响，请稍后重新加载。</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button type="button" variant="outline" onClick={onRetry}>
-          重新加载
-        </Button>
-      </EmptyContent>
-    </Empty>
-  );
-}
+const uniqueRuns = (pages: Array<{ items: AiRunRecord[] }> | undefined) => {
+  const runs = new Map<string, AiRunRecord>();
+  for (const page of pages ?? []) {
+    for (const run of page.items) runs.set(run.id, run);
+  }
+  return [...runs.values()];
+};
+
+const fresherRun = (listRun: AiRunRecord | null, detail: AiRunRecord | undefined) => {
+  if (!detail) return listRun;
+  if (!listRun) return detail;
+  const listTime = new Date(listRun.updatedAt ?? listRun.createdAt).getTime();
+  const detailTime = new Date(detail.updatedAt ?? detail.createdAt).getTime();
+  return detailTime >= listTime ? detail : listRun;
+};
+
+const providerDisplay = (data: AiCapabilitiesResponse | undefined, isError: boolean) => {
+  if (data?.canStart) {
+    return { label: '服务已就绪', variant: 'outline' as const, action: null };
+  }
+  if (data?.providers.some((provider) => provider.state === 'error')) {
+    return { label: '服务异常', variant: 'destructive' as const, action: '检查服务配置' };
+  }
+  if (data) {
+    return { label: '服务未配置', variant: 'secondary' as const, action: '配置服务' };
+  }
+  if (isError) {
+    return { label: '服务检查失败', variant: 'destructive' as const, action: '检查服务配置' };
+  }
+  return { label: '服务检查中', variant: 'secondary' as const, action: null };
+};
+
+const researchTitle = (selected: AiRunRecord | null, listed: AiRunRecord | null) =>
+  selected?.question?.trim() || listed?.question?.trim() || '研究详情';
 
 export function AiChat() {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<AiRunFilterStatus>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const pageState = useMemo(() => parseAiResearchPageState(location.search), [location.search]);
+  const [searchInput, setSearchInput] = useState(pageState.search);
   const [newResearchOpen, setNewResearchOpen] = useState(false);
   const [initialQuestion, setInitialQuestion] = useState('');
   const [retryOfRunId, setRetryOfRunId] = useState<string | undefined>();
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>();
-  const [loadedRuns, setLoadedRuns] = useState<AiRunRecord[]>([]);
-  const [toolCursor, setToolCursor] = useState<string | undefined>();
-  const [loadedToolCalls, setLoadedToolCalls] = useState<AiToolCall[]>([]);
-  const listFilter = {
-    ...(filter === 'all' ? {} : { status: filter }),
-    ...(cursor ? { cursor } : {}),
+  const [navigationIds, setNavigationIds] = useState<string[]>([]);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listFallbackRef = useRef<HTMLElement | null>(null);
+  const listScrollRef = useRef(0);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  const updatePageState = (
+    updates: Partial<typeof pageState>,
+    options: { replace?: boolean; state?: unknown } = {},
+  ) => {
+    const next = { ...pageState, ...updates };
+    const search = serializeAiResearchPageState(next);
+    void navigate(
+      { pathname: '/ai-chat', ...(search ? { search: `?${search}` } : {}) },
+      { replace: options.replace ?? true, state: options.state ?? (location.state as unknown) },
+    );
   };
-  const runsQuery = useAiRunsQuery(listFilter);
-  const detailQuery = useAiRunQuery(selectedId);
-  const capabilitiesQuery = useAiCapabilitiesQuery();
-  const toolCallsQuery = useAiToolCallsQuery(
-    selectedId,
-    evidenceOpen,
-    toolCursor ? { cursor: toolCursor } : {},
+
+  useEffect(() => setSearchInput(pageState.search), [pageState.search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const updateSearch = debounce(
+      (value: string) =>
+        updatePageState({ search: value.trim(), selectedRunId: null, mode: 'list' }),
+      250,
+      { signal: controller.signal },
+    );
+    if (searchInput !== pageState.search) updateSearch(searchInput);
+    return () => controller.abort();
+  }, [searchInput, pageState.search]);
+
+  const listFilter = useMemo(
+    () => ({
+      view: 'research' as const,
+      ...(pageState.status === 'all' ? {} : { status: pageState.status }),
+      ...(pageState.source === 'all' ? {} : { source: pageState.source }),
+      ...(pageState.search ? { search: pageState.search } : {}),
+      includeInternal: pageState.includeInternal,
+      sort: pageState.sort,
+    }),
+    [
+      pageState.includeInternal,
+      pageState.search,
+      pageState.sort,
+      pageState.source,
+      pageState.status,
+    ],
   );
-  const runsPage = runsQuery.data;
-  const runs = loadedRuns;
-  const selectedFromList = findAiRun(runs, selectedId);
-  const selectedRun = detailQuery.data ?? selectedFromList;
+  const runsQuery = useAiRunsQuery(listFilter);
+  const detailQuery = useAiRunQuery(pageState.selectedRunId);
+  const toolCallsQuery = useAiToolCallsQuery(
+    pageState.selectedRunId,
+    Boolean(pageState.selectedRunId),
+  );
+  const capabilitiesQuery = useAiCapabilitiesQuery();
+  const runs = useMemo(() => uniqueRuns(runsQuery.data?.pages), [runsQuery.data?.pages]);
+  const selectedFromList = findAiRun(runs, pageState.selectedRunId);
+  const selectedRun = fresherRun(selectedFromList, detailQuery.data);
+  const toolCalls = toolCallsQuery.data?.items ?? [];
   const loadState = resolveAiRunsLoadState({
     isPending: runsQuery.isPending,
     isError: runsQuery.isError,
@@ -81,183 +128,156 @@ export function AiChat() {
     hasRuns: runs.length > 0,
   });
 
-  useEffect(() => {
-    setLoadedRuns([]);
-    setCursor(undefined);
-  }, [filter]);
+  const selectedIndex = pageState.selectedRunId
+    ? navigationIds.indexOf(pageState.selectedRunId)
+    : -1;
+  const previousId = selectedIndex > 0 ? navigationIds[selectedIndex - 1] : undefined;
+  const nextId = selectedIndex >= 0 ? navigationIds[selectedIndex + 1] : undefined;
 
   useEffect(() => {
-    if (!runsPage) return;
-    setLoadedRuns((previous) => {
-      if (!cursor) return runsPage.items;
-      const merged = new Map(previous.map((run) => [run.id, run]));
-      for (const run of runsPage.items) merged.set(run.id, run);
-      return [...merged.values()];
-    });
-  }, [cursor, runsPage]);
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [pageState.selectedRunId]);
 
   useEffect(() => {
-    setLoadedToolCalls([]);
-    setToolCursor(undefined);
-  }, [selectedId, evidenceOpen]);
+    if (pageState.selectedRunId) return;
+    window.scrollTo({ top: listScrollRef.current });
+    const trigger = triggerRef.current;
+    const focusTimer = window.setTimeout(() => (trigger ?? listFallbackRef.current)?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [pageState.selectedRunId]);
 
-  useEffect(() => {
-    if (!toolCallsQuery.data) return;
-    setLoadedToolCalls((previous) => {
-      if (!toolCursor) return toolCallsQuery.data.items;
-      const merged = new Map(
-        previous.map((call) => [call.id ?? `${call.tool}-${call.createdAt}`, call]),
-      );
-      for (const call of toolCallsQuery.data.items)
-        merged.set(call.id ?? `${call.tool}-${call.createdAt}`, call);
-      return [...merged.values()];
-    });
-  }, [toolCallsQuery.data, toolCursor]);
+  const openRun = (id: string, trigger?: HTMLButtonElement, ids = runs.map((run) => run.id)) => {
+    setNavigationIds(ids);
+    triggerRef.current = trigger ?? null;
+    listScrollRef.current = window.scrollY;
+    updatePageState(
+      { selectedRunId: id, mode: 'drawer' },
+      { replace: false, state: { ...(location.state ?? {}), aiListOrigin: true } },
+    );
+  };
 
-  useEffect(() => {
-    if (runs.length === 0) {
-      setSelectedId(null);
+  const switchRun = (id: string) => updatePageState({ selectedRunId: id, mode: pageState.mode });
+
+  const closeDetail = () => {
+    const state = location.state as { aiListOrigin?: boolean } | null;
+    if (state?.aiListOrigin) {
+      void navigate(-1);
       return;
     }
-    const firstRun = runs[0];
-    if (!firstRun) return;
-    if (!selectedId || !runs.some((run) => run.id === selectedId)) setSelectedId(firstRun.id);
-  }, [runs, selectedId]);
-
-  const refresh = async () => {
-    await runsQuery.refetch();
-    if (selectedId) await detailQuery.refetch();
+    updatePageState({ selectedRunId: null, mode: 'list' });
   };
 
   const openNewResearch = (question = '', retryId?: string) => {
-    setInitialQuestion(question);
-    setRetryOfRunId(retryId);
-    setNewResearchOpen(true);
+    const openForm = () => {
+      setInitialQuestion(question);
+      setRetryOfRunId(retryId);
+      setNewResearchOpen(true);
+    };
+    if (pageState.selectedRunId) {
+      closeDetail();
+      requestAnimationFrame(openForm);
+      return;
+    }
+    openForm();
   };
 
   const handleCreated = (run: AiRunResult) => {
-    setFilter('all');
-    setCursor(undefined);
-    setLoadedRuns([]);
-    setSelectedId(run.id);
+    setNewResearchOpen(false);
     setRetryOfRunId(undefined);
+    void runsQuery.refetch();
+    requestAnimationFrame(() => openRun(run.id, undefined, []));
   };
 
-  const detail = selectedRun && detailQuery.data?.id === selectedRun.id ? detailQuery.data : null;
-  let providerLabel = 'Provider 检查中';
-  let providerVariant: 'outline' | 'secondary' | 'destructive' = 'secondary';
-  let providerActionLabel: string | null = null;
-  if (capabilitiesQuery.data) {
-    const hasError = capabilitiesQuery.data.providers.some(
-      (provider) => provider.state === 'error',
-    );
-    if (capabilitiesQuery.data.canStart) {
-      providerLabel = 'Provider 已就绪';
-      providerVariant = 'outline';
-    } else if (hasError) {
-      providerLabel = 'Provider 异常';
-      providerVariant = 'destructive';
-      providerActionLabel = '检查 Provider';
-    } else {
-      providerLabel = 'Provider 未配置';
-      providerActionLabel = '配置 Provider';
-    }
-  } else if (capabilitiesQuery.isError) {
-    providerLabel = 'Provider 检查失败';
-    providerVariant = 'destructive';
-    providerActionLabel = '检查 Provider';
+  const provider = providerDisplay(capabilitiesQuery.data, capabilitiesQuery.isError);
+  const detailTitle = researchTitle(selectedRun, selectedFromList);
+  const detailViewProps = {
+    selectedRun,
+    detailTitle,
+    detailPending: detailQuery.isPending,
+    detailError: detailQuery.isError,
+    toolCalls,
+    navigationIds,
+    selectedIndex,
+    ...(previousId ? { previousId } : {}),
+    ...(nextId ? { nextId } : {}),
+    contentRef,
+    onClose: closeDetail,
+    onSwitch: switchRun,
+    onRetry: (run: AiRunRecord) => openNewResearch(run.question ?? '', run.id),
+    onOpenSource: (href: string) => void navigate(href),
+  };
+
+  if (pageState.mode === 'reading' && pageState.selectedRunId) {
+    return <ResearchReadingView {...detailViewProps} />;
   }
-  const showInitialEmpty = filter === 'all' && loadState === 'empty';
-  const showWorkspaceError = filter === 'all' && loadState === 'error';
-  const showHeaderCreate = runs.length > 0 || filter !== 'all' || loadState === 'error';
 
   return (
-    <section className="module-page flex flex-col gap-6">
+    <section
+      ref={listFallbackRef}
+      tabIndex={-1}
+      className="module-page flex flex-col gap-4 focus:outline-none"
+    >
       <PageHeader
         className="mb-0"
         eyebrow="RESEARCH ASSISTANT"
         title="研究助手"
-        description="围绕投资问题展开研究，结论保留来源与数据缺口。"
         actions={
-          <>
-            <RefreshIconButton
-              label="刷新研究任务与当前详情"
-              refreshing={runsQuery.isFetching || detailQuery.isFetching}
-              onClick={() => void refresh()}
-            />
-            {showHeaderCreate && (
-              <Button type="button" size="sm" onClick={() => openNewResearch()}>
-                新建研究
-              </Button>
-            )}
-          </>
+          <Button type="button" size="sm" onClick={() => openNewResearch()}>
+            新建研究
+          </Button>
         }
       />
-      <div data-ai-provider-status className="-mt-2 flex flex-wrap items-center gap-2">
-        <Badge variant={providerVariant}>{providerLabel}</Badge>
-        {providerActionLabel && (
-          <Button type="button" size="sm" onClick={() => void navigate('/providers')}>
-            {providerActionLabel}
+      <div data-ai-provider-status className="flex flex-wrap items-center gap-2">
+        <Badge variant={provider.variant}>{provider.label}</Badge>
+        {provider.action && (
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            onClick={() => void navigate('/providers')}
+          >
+            {provider.action}
           </Button>
         )}
       </div>
-      {showWorkspaceError ? (
-        <AiRunsUnavailable onRetry={() => void runsQuery.refetch()} />
-      ) : showInitialEmpty ? (
-        <AiRunDetail
-          run={null}
-          detail={null}
-          isLoading={false}
-          detailError={false}
-          onEvidence={() => setEvidenceOpen(true)}
-          onRetry={(run) => openNewResearch(run.question ?? '', run.id)}
-          onDetailRetry={() => void detailQuery.refetch()}
-          onCreate={openNewResearch}
-        />
-      ) : (
-        <div className="grid gap-5 lg:min-h-[32rem] lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)]">
-          <AiRunList
-            runs={runs}
-            selectedId={selectedId}
-            filter={filter}
-            loadState={loadState}
-            onFilterChange={setFilter}
-            onSelect={setSelectedId}
-            onRefresh={() => void refresh()}
-            hasMore={Boolean(runsPage?.hasMore)}
-            onLoadMore={() => {
-              if (runsPage?.nextCursor) setCursor(runsPage.nextCursor);
-            }}
-            isLoadingMore={runsQuery.isFetching && Boolean(cursor)}
-          />
-          <AiRunDetail
-            run={selectedRun}
-            detail={detail}
-            isLoading={loadState === 'loading' || (Boolean(selectedId) && detailQuery.isPending)}
-            detailError={detailQuery.isError}
-            onEvidence={() => setEvidenceOpen(true)}
-            onRetry={(run) => openNewResearch(run.question ?? '', run.id)}
-            onDetailRetry={() => void detailQuery.refetch()}
-            onCreate={openNewResearch}
-            emptyState={filter === 'all' ? 'first-run' : 'filtered'}
-          />
-        </div>
-      )}
-      {selectedRun && (
-        <EvidenceChainSheet
-          open={evidenceOpen}
-          onOpenChange={setEvidenceOpen}
-          evidence={selectedRun.result?.evidence ?? []}
-          toolCalls={loadedToolCalls}
-          toolCallsLoading={toolCallsQuery.isPending}
-          toolCallsError={toolCallsQuery.isError}
-          toolCallsHasMore={Boolean(toolCallsQuery.data?.hasMore)}
-          onLoadMoreToolCalls={() => {
-            if (toolCallsQuery.data?.nextCursor) setToolCursor(toolCallsQuery.data.nextCursor);
-          }}
-          toolCallsLoadingMore={toolCallsQuery.isFetching && Boolean(toolCursor)}
-        />
-      )}
+      <AiRunList
+        runs={runs}
+        selectedId={pageState.selectedRunId}
+        status={pageState.status}
+        source={pageState.source}
+        includeInternal={pageState.includeInternal}
+        search={searchInput}
+        loadState={loadState}
+        refreshing={runsQuery.isFetching && !runsQuery.isFetchingNextPage}
+        onStatusChange={(status) => updatePageState({ status, selectedRunId: null, mode: 'list' })}
+        onSourceChange={(source) => updatePageState({ source, selectedRunId: null, mode: 'list' })}
+        onIncludeInternalChange={(includeInternal) =>
+          updatePageState({ includeInternal, selectedRunId: null, mode: 'list' })
+        }
+        onSearchChange={setSearchInput}
+        onSelect={(id, trigger) => openRun(id, trigger)}
+        onOpenSource={(href) => void navigate(href)}
+        onRefresh={() => void runsQuery.refetch()}
+        onClearFilters={() => {
+          setSearchInput('');
+          updatePageState({
+            search: '',
+            status: 'all',
+            source: 'all',
+            includeInternal: false,
+            selectedRunId: null,
+            mode: 'list',
+          });
+        }}
+        hasMore={runsQuery.hasNextPage}
+        onLoadMore={() => void runsQuery.fetchNextPage()}
+        isLoadingMore={runsQuery.isFetchingNextPage}
+      />
+      <ResearchDetailSheet
+        {...detailViewProps}
+        open={pageState.mode === 'drawer' && Boolean(pageState.selectedRunId)}
+        onRead={() => updatePageState({ mode: 'reading' })}
+      />
       <NewResearchSheet
         open={newResearchOpen}
         onOpenChange={(open) => {

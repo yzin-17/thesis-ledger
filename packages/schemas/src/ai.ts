@@ -84,8 +84,25 @@ export const aiResearchStartInputSchema = z
     context: aiResearchContextSchema,
     templateId: aiResearchTemplateIdSchema.optional(),
     retryOfRunId: z.uuid().optional(),
+    retryConfirmation: z
+      .object({
+        contextConfirmed: z.literal(true),
+        acknowledgeUnknownOutcomeRisk: z.boolean().default(false),
+      })
+      .strict()
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (Boolean(value.retryOfRunId) !== Boolean(value.retryConfirmation)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['retryConfirmation'],
+        message: '再次生成必须同时提交来源任务和用户确认',
+      });
+    }
+  });
+export type AiResearchStartInput = z.infer<typeof aiResearchStartInputSchema>;
 
 export const aiToolCallSchema = z.object({
   id: z.uuid().optional(),

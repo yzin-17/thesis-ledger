@@ -76,6 +76,9 @@ export const useBacktestJobEvents = () => {
           if (!current || typeof current !== 'object') return current;
           return { ...current, ...incoming };
         });
+        if (['succeeded', 'failed', 'cancelled'].includes(incoming.status)) {
+          void queryClient.invalidateQueries({ queryKey: strategyKeys.job(incoming.id) });
+        }
       },
       onInvalid: () => {
         void queryClient.invalidateQueries({ queryKey: strategyKeys.jobs() });

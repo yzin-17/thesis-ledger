@@ -104,6 +104,27 @@ const queryClient = {
   fetchQuery: vi.fn(),
 };
 
+const staleQuoteWithinUpstreamWindow = (fetchedAt: string) => ({
+  ...readyQuote,
+  stale: true,
+  servedFromCache: true,
+  freshness: 'stale' as const,
+  fetchedAt,
+});
+
+const detailWithStaleQuote = (fetchedAt: string): MarketDetailResponseV2 =>
+  detail({
+    requested: ['quote'],
+    capabilities: { supported: ['quote'], unsupported: [] },
+    sections: {
+      quote: {
+        capability: 'quote',
+        status: 'stale',
+        data: staleQuoteWithinUpstreamWindow(fetchedAt),
+      },
+    },
+  });
+
 describe('MarketDetailDialog UI contract', () => {
   beforeEach(() => {
     useQueryClientMock.mockReturnValue(queryClient);
@@ -200,6 +221,9 @@ describe('MarketDetailDialog UI contract', () => {
 
     expect(html).toContain('持仓数量');
     expect(html).toContain('实时价');
+    expect(html).toContain('涨跌幅');
+    expect(html).toContain('+5.00%');
+    expect(html).toContain('sm:grid-cols-4');
     expect(html).toContain('技术指标');
     expect(html).toContain('data-market-price-chart="true"');
     expect(html).toContain('data-market-chart-navigation="true"');
@@ -281,6 +305,45 @@ describe('MarketDetailDialog UI contract', () => {
     expect(fundHtml).not.toContain('data-market-detail-section="quote"');
   });
 
+  it('上游刷新间隔内的行情回退只提示、不告警', () => {
+    const now = Date.now();
+    useQueryMock.mockReturnValue({
+      data: detailWithStaleQuote(new Date(now - 60_000).toISOString()),
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    const html = renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
+    expect(html).toContain('行情按上游刷新间隔更新');
+    expect(html).toContain('按上游间隔刷新');
+    expect(html).not.toContain('行情详情可能陈旧');
+    expect(html).not.toContain('陈旧回退');
+    // 徽标与横幅保持一致：间隔内不显示告警色「陈旧」，契约状态仍为 stale。
+    expect(html).toContain('按上游间隔');
+    expect(html).not.toMatch(/>陈旧</);
+    expect(html).toContain('data-section-status="stale"');
+    // 提示位于「实时行情」分段的分界线之下、标题之上。
+    expect(html.indexOf('data-market-detail-section="quote"')).toBeLessThan(
+      html.indexOf('行情按上游刷新间隔更新'),
+    );
+    expect(html.indexOf('行情按上游刷新间隔更新')).toBeLessThan(html.indexOf('实时行情</h3>'));
+  });
+
+  it('超过上游刷新间隔的行情回退仍保持陈旧告警', () => {
+    const now = Date.now();
+    useQueryMock.mockReturnValue({
+      data: detailWithStaleQuote(new Date(now - 30 * 60_000).toISOString()),
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    const html = renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
+    expect(html).toContain('行情详情可能陈旧');
+    expect(html).toContain('陈旧回退');
+    expect(html).toMatch(/>陈旧</);
+    expect(html).not.toContain('行情按上游刷新间隔更新');
+  });
+
   it('保留 loading 和整页读取失败状态', () => {
     useQueryMock.mockReturnValue({
       data: undefined,
@@ -304,5 +367,16 @@ describe('MarketDetailDialog UI contract', () => {
     );
     expect(errorHtml).toContain('行情详情读取失败');
     expect(errorHtml).toContain('重新加载');
+  });
+
+  it('重新打开即使命中客户端缓存也始终重新执行最新检查', () => {
+    useQueryMock.mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
+    expect(useQueryMock.mock.calls[0]?.[0]).toMatchObject({ refetchOnMount: 'always' });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BacktestService } from '../src/backtest/backtest.service.js';
+import { testResultReadPolicy } from './backtest/test-result-read-policy.js';
 
 type WorkerRun = (input: unknown, signal: AbortSignal) => Promise<unknown>;
 
@@ -59,7 +60,7 @@ describe('Backtest service correctness regressions', () => {
       id: 'mock-worker',
       run: vi.fn<WorkerRun>(async () => ({ returns: [] })),
     };
-    await new BacktestService(prisma as never).run(state.id, worker as never);
+    await new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy()).run(state.id, worker as never);
     expect(worker.run).toHaveBeenCalledWith(
       expect.objectContaining({ strategy: savedStrategy }),
       expect.any(AbortSignal),
@@ -90,7 +91,7 @@ describe('Backtest service correctness regressions', () => {
       },
     };
     const worker = { id: 'mock-worker', run: vi.fn(async () => ({ returns: [] })) };
-    const service = new BacktestService(prisma as never);
+    const service = new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
     await Promise.all([
       service.run(state.id, worker as never),
       service.run(state.id, worker as never),
@@ -100,7 +101,7 @@ describe('Backtest service correctness regressions', () => {
 
   it('drops a legacy client strategy payload when queueing a job', async () => {
     const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
-    const service = new BacktestService({ backtestJob: { create } } as never);
+    const service = new BacktestService({ backtestJob: { create } } as never, undefined, undefined, testResultReadPolicy());
     await service.queue({
       id: '11111111-1111-4111-8111-111111111119',
       strategyVersionId: '11111111-1111-4111-8111-111111111116',
@@ -117,7 +118,7 @@ describe('Backtest service correctness regressions', () => {
 
   it('normalizes Market Bar timestamps before persisting backtest input', async () => {
     const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
-    const service = new BacktestService({ backtestJob: { create } } as never);
+    const service = new BacktestService({ backtestJob: { create } } as never, undefined, undefined, testResultReadPolicy());
 
     await service.queue({
       id: '11111111-1111-4111-8111-111111111121',
@@ -160,7 +161,7 @@ describe('Backtest service correctness regressions', () => {
     const service = new BacktestService({
       strategyVersion: { findUnique: vi.fn(async () => selectedVersion) },
       backtestJob: { create },
-    } as never);
+    } as never, undefined, undefined, testResultReadPolicy());
     await service.queue({
       id: '11111111-1111-4111-8111-111111111120',
       strategyVersionId: '11111111-1111-4111-8111-111111111116',
@@ -196,7 +197,7 @@ describe('Backtest service correctness regressions', () => {
       },
     };
     const worker = { id: 'benchmark-worker', run: vi.fn(async () => ({ returns: [] })) };
-    await new BacktestService(prisma as never).run(job.id, worker as never);
+    await new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy()).run(job.id, worker as never);
     expect(worker.run).toHaveBeenCalledWith(
       expect.objectContaining({
         benchmarkBars: [{ symbol: '000300.SH', date: '2025-01-01', close: 10 }],

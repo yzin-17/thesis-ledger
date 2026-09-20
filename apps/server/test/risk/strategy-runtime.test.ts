@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 import { RiskService } from '../../src/risk/risk.service.js';
 import { StrategyRiskContextService } from '../../src/risk/strategy-risk-context.service.js';
 import { StrategyRiskRuntimeService } from '../../src/risk/strategy-risk-runtime.service.js';
@@ -26,28 +27,43 @@ const storedBar = (timestamp: string, close: string, fetchedAt = timestamp) => (
 });
 
 const marketReader = (rows: ReturnType<typeof storedBar>[]) => ({
-  read: vi.fn(async (input: { identity: { symbol: string; assetType: string; timeframe: string; adjustment: string } }) => ({
-    contractVersion: 2,
-    identity: input.identity,
-    points: rows.map((row) => ({
-      timestamp: row.timestamp.toISOString(),
-      open: Number(row.open),
-      high: Number(row.high),
-      low: Number(row.low),
-      close: Number(row.close),
-      volume: Number(row.volume),
-      amount: Number(row.amount),
-      completionStatus: 'complete' as const,
-      availableAt: row.fetchedAt.toISOString(),
-    })),
-    coverage: { actualStart: rows[0]?.timestamp.toISOString() ?? null, actualEnd: rows.at(-1)?.timestamp.toISOString() ?? null, hasMoreBefore: false, latestCompleteTradingDate: null },
-    provenance: {
-      providerId: 'fixture', upstreamSource: 'fixture', routeIndex: 0, effectivePolicyRevision: 1,
-      providerRevision: 'fixture', fetchedAt: rows.at(-1)?.fetchedAt.toISOString() ?? new Date().toISOString(),
-      freshUntil: '2099-01-01T00:00:00.000Z', servedFromCache: false, cacheStatus: 'miss' as const,
-    },
-    inputFingerprint: 'fixture-fingerprint',
-  })),
+  read: vi.fn(
+    async (input: {
+      identity: { symbol: string; assetType: string; timeframe: string; adjustment: string };
+    }) => ({
+      contractVersion: 2,
+      identity: input.identity,
+      points: rows.map((row) => ({
+        timestamp: row.timestamp.toISOString(),
+        open: Number(row.open),
+        high: Number(row.high),
+        low: Number(row.low),
+        close: Number(row.close),
+        volume: Number(row.volume),
+        amount: Number(row.amount),
+        completionStatus: 'complete' as const,
+        availableAt: row.fetchedAt.toISOString(),
+      })),
+      coverage: {
+        actualStart: rows[0]?.timestamp.toISOString() ?? null,
+        actualEnd: rows.at(-1)?.timestamp.toISOString() ?? null,
+        hasMoreBefore: false,
+        latestCompleteTradingDate: null,
+      },
+      provenance: {
+        providerId: 'fixture',
+        upstreamSource: 'fixture',
+        routeIndex: 0,
+        effectivePolicyRevision: 1,
+        providerRevision: 'fixture',
+        fetchedAt: rows.at(-1)?.fetchedAt.toISOString() ?? new Date().toISOString(),
+        freshUntil: '2099-01-01T00:00:00.000Z',
+        servedFromCache: false,
+        cacheStatus: 'miss' as const,
+      },
+      inputFingerprint: 'fixture-fingerprint',
+    }),
+  ),
 });
 
 describe('统一策略风险运行时', () => {
@@ -84,7 +100,12 @@ describe('统一策略风险运行时', () => {
           enabled: true,
           notification: { enabled: true, cooldownMinutes: 45 },
         },
-        evaluation: { sourceKey: 'risk:0:fixedStop', state: 'triggered', value: '-0.08', threshold: '-0.08' },
+        evaluation: {
+          sourceKey: 'risk:0:fixedStop',
+          state: 'triggered',
+          value: '-0.08',
+          threshold: '-0.08',
+        },
         candidate: {
           scope: 'security',
           mode: 'actual',
@@ -184,19 +205,85 @@ describe('统一策略风险运行时', () => {
       },
       trade: { findFirst: vi.fn(async () => null) },
     };
-    const reader = marketReader([storedBar('2026-09-10T00:00:00.000Z', '92', '2026-09-10T08:01:00.000Z')]);
+    const reader = marketReader([
+      storedBar('2026-09-10T00:00:00.000Z', '92', '2026-09-10T08:01:00.000Z'),
+    ]);
     const service = new StrategyRiskContextService(prisma as never, reader as never);
 
     const actual = await service.load(
       accountId,
       '600519.SH',
-      { executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '1d' },
+      {
+        executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' },
+        primaryTimeframe: '1d',
+      },
       evaluatedAt,
     );
 
     expect(reader.read).toHaveBeenCalledWith(expect.objectContaining({ acceptance: 'complete' }));
     expect(actual.context).toMatchObject({ price: '92', averageCost: '100' });
     expect(actual.context.holdingPeriods).toBeUndefined();
+  });
+
+  it.each(['unavailable', 'timeout'] as const)(
+    'MarketBar %s 时保留持仓事实并将行情相关字段交给四态判断标记为 unavailable',
+    async (code) => {
+      const prisma = {
+        account: { findUnique: vi.fn(async () => ({ active: true })) },
+        position: {
+          findUnique: vi.fn(async () => ({
+            id: 'position-1',
+            quantity: { toString: () => '100' },
+            costPrice: { toString: () => '100' },
+          })),
+        },
+        trade: { findFirst: vi.fn(async () => null) },
+      };
+      const reader = {
+        read: vi.fn(async () => {
+          throw new DsaError('V2 BarSeries 暂时不可用', code, 503);
+        }),
+      };
+      const service = new StrategyRiskContextService(prisma as never, reader as never);
+
+      const actual = await service.load(
+        accountId,
+        '600519.SH',
+        {
+          executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' },
+          primaryTimeframe: '1d',
+        },
+        evaluatedAt,
+      );
+
+      expect(actual.context).toEqual({ quantity: '100', averageCost: '100' });
+    },
+  );
+
+  it('MarketBar 契约错误不降级为行情不可用', async () => {
+    const prisma = {
+      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      position: { findUnique: vi.fn(async () => null) },
+      trade: { findFirst: vi.fn(async () => null) },
+    };
+    const reader = {
+      read: vi.fn(async () => {
+        throw new DsaError('BarSeries 响应不完整', 'invalid-response', 502);
+      }),
+    };
+    const service = new StrategyRiskContextService(prisma as never, reader as never);
+
+    await expect(
+      service.load(
+        accountId,
+        '600519.SH',
+        {
+          executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' },
+          primaryTimeframe: '1d',
+        },
+        evaluatedAt,
+      ),
+    ).rejects.toMatchObject({ code: 'invalid-response' });
   });
 
   it('日线盘中已有当日数据时仍回退到上一根已闭合日线', async () => {
@@ -221,7 +308,10 @@ describe('统一策略风险运行时', () => {
     const actual = await service.load(
       accountId,
       '600519.SH',
-      { executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '1d' },
+      {
+        executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' },
+        primaryTimeframe: '1d',
+      },
       intraday,
     );
 
@@ -254,7 +344,10 @@ describe('统一策略风险运行时', () => {
     const actual = await service.load(
       accountId,
       '600519.SH',
-      { executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '5m' },
+      {
+        executionInstrument: { symbol: '600519.SH', assetType: 'stock', market: 'CN' },
+        primaryTimeframe: '5m',
+      },
       new Date('2026-09-11T01:35:01.000Z'),
     );
 

@@ -1,6 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
-import type { OptimizationReasoningEffort } from '@thesis-ledger/schemas';
+import type {
+  OptimizationModelConfigSnapshot,
+  OptimizationReasoningEffort,
+} from '@thesis-ledger/schemas';
 import type { AiProviderRegistry } from '../ai/provider-registry.js';
+import { optimizationCostFacts } from './strategy-optimization-cost.js';
 
 export type OptimizationModelRoute = {
   provider: string;
@@ -8,14 +12,7 @@ export type OptimizationModelRoute = {
   reasoningEffort?: OptimizationReasoningEffort | undefined;
 };
 
-export type OptimizationModelConfig = {
-  provider: string;
-  model: string;
-  reasoningEffort?: OptimizationReasoningEffort;
-  costStatus: 'known' | 'unknown';
-  costCurrency?: string;
-  pricingVersion?: string;
-};
+export type OptimizationModelConfig = OptimizationModelConfigSnapshot;
 
 export const optimizationReasoningEffortSupported = (
   reasoning:
@@ -44,17 +41,11 @@ export const buildOptimizationModelConfig = (
       throw new BadRequestException(
         `模型 ${route.provider}:${route.model} 未声明支持推理强度 ${route.reasoningEffort}`,
       );
-    const costKnown =
-      typeof provider.metadata?.costPer1kInput === 'number' &&
-      typeof provider.metadata?.costPer1kOutput === 'number';
+    const costFacts = optimizationCostFacts(provider.metadata);
     return {
       provider: route.provider,
       model: route.model,
       ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
-      costStatus: costKnown ? ('known' as const) : ('unknown' as const),
-      ...(provider.metadata?.costCurrency ? { costCurrency: provider.metadata.costCurrency } : {}),
-      ...(provider.metadata?.pricingVersion
-        ? { pricingVersion: provider.metadata.pricingVersion }
-        : {}),
+      ...costFacts,
     };
   });

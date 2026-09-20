@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { OptimizationExperimentCreate, StrategySchemaV2 } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import {
+  defaultExperimentName,
   optimizationSha256,
   type ExperimentRow,
   type StrategyVersionRecord,
@@ -23,12 +24,19 @@ export async function insertOptimizationExperiment(
     split: parsed.split,
     semanticVersion: 'strategy-optimization-v1',
   });
+  const name =
+    parsed.name ??
+    defaultExperimentName({
+      sourceMode: parsed.sourceMode,
+      strategyName: baseline.strategy.name,
+      discoveryScope: parsed.discoveryScope,
+    });
   const rows = await prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
     INSERT INTO "OptimizationExperiment" (
-      "id", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
+      "id", "name", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
       "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "idempotencyKey", "updatedAt"
     ) VALUES (
-      ${id}::uuid, ${parsed.sourceMode}, ${parsed.discoveryScope ? JSON.stringify(parsed.discoveryScope) : null}::jsonb,
+      ${id}::uuid, ${name}, ${parsed.sourceMode}, ${parsed.discoveryScope ? JSON.stringify(parsed.discoveryScope) : null}::jsonb,
       ${parsed.sourceMode === 'discovery' ? STRATEGY_SPACE_VERSION : null}, ${baseline.id}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
       ${JSON.stringify(parsed.allowedParameterIds ?? [])}::jsonb, ${JSON.stringify(parsed.split)}::jsonb,
       ${JSON.stringify(parsed.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(modelConfig)}::jsonb,

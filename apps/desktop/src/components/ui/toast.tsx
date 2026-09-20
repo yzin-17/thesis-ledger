@@ -42,7 +42,7 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
     <ToastPrimitive.Root
       data-slot="toast"
       className={cn(
-        'group/toast pointer-events-auto relative layer-toast-item w-full rounded-2xl border bg-popover text-popover-foreground shadow-lg outline-none select-none transition-[opacity,transform] duration-200 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'group/toast pointer-events-auto relative layer-toast-item w-full rounded-2xl border bg-popover text-popover-foreground shadow-sm outline-none select-none transition-[opacity,transform] duration-200 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
         'data-starting-style:translate-y-2 data-starting-style:opacity-0 data-ending-style:-translate-y-2 data-ending-style:opacity-0',
         className,
       )}

@@ -1,12 +1,19 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { aiResearchContextSchema, researchResultSchema } from '@thesis-ledger/schemas';
+import {
+  aiExecutionSummarySchema,
+  aiResearchContextSchema,
+  researchResultSchema,
+  type AiResearchGeneration,
+} from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AiRunService } from './ai-run.service.js';
 import { createCoreTools, createResearchTools } from './tool-factory.js';
 import { evidenceCitation } from './grounding.js';
 import { executeAuditedTool } from './tool-runtime.js';
-import { AiProviderRegistry, completeWithFallback } from './provider-registry.js';
+import { AiProviderRegistry } from './provider-registry.js';
 import { PromptVersionRegistry } from './prompt-registry.js';
+import { AiExecutionStateStore, type AiExecutionOwnership } from './ai-execution-state.store.js';
+import { AiResearchSdkExecution } from './ai-research-sdk-execution.js';
 
 const allowedPermissions = new Set([
   'market:read',
@@ -15,6 +22,8 @@ const allowedPermissions = new Set([
   'risk:read',
   'journal:read',
 ] as const);
+
+const researchExecutionEnabled = () => process.env.AI_RESEARCH_EXECUTION_ENABLED !== 'false';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -35,19 +44,6 @@ const decimalValue = (value: unknown) => {
   return value;
 };
 
-const jsonResult = (value: unknown) => {
-  if (typeof value !== 'string') return value;
-  const trimmed = value
-    .trim()
-    .replace(/^```(?:json)?\s*/u, '')
-    .replace(/\s*```$/u, '');
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    return value;
-  }
-};
-
 @Injectable()
 export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
   private readonly active = new Set<string>();
@@ -58,10 +54,12 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly providers: AiProviderRegistry,
     private readonly prompts: PromptVersionRegistry,
+    private readonly executions: AiExecutionStateStore,
+    private readonly sdkExecution: AiResearchSdkExecution,
   ) {}
 
   onModuleInit() {
-    if (process.env.NODE_ENV === 'test') return;
+    if (process.env.NODE_ENV === 'test' || !researchExecutionEnabled()) return;
     void this.tick();
     this.timer = setInterval(() => void this.tick(), 5_000);
     this.timer.unref?.();
@@ -72,6 +70,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
   }
 
   dispatch(id: string) {
+    if (!researchExecutionEnabled()) return;
     if (this.active.has(id)) return;
     this.active.add(id);
     void this.execute(id)
@@ -80,6 +79,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
   }
 
   async tick() {
+    if (!researchExecutionEnabled()) return;
     await this.runs.recoverStaleRuns().catch(() => undefined);
     const queued = await this.prisma.aiRun
       .findMany({
@@ -300,24 +300,50 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     return tools;
   }
 
-  private startLeaseHeartbeat(id: string) {
+  private startLeaseHeartbeat(ownership: AiExecutionOwnership, deadlineAt: number) {
+    const controller = new AbortController();
     const heartbeat = setInterval(() => {
-      void this.runs.renewLease(id).catch(() => undefined);
+      void this.executions
+        .renewLease(ownership, 60_000)
+        .then((renewed) => {
+          if (!renewed) controller.abort('lease_lost');
+        })
+        .catch(() => controller.abort('lease_renewal_failed'));
     }, 20_000);
     heartbeat.unref?.();
-    return heartbeat;
+    const deadline = setTimeout(
+      () => controller.abort('deadline_expired'),
+      Math.min(2_147_483_647, Math.max(0, deadlineAt - Date.now())),
+    );
+    deadline.unref?.();
+    return {
+      signal: controller.signal,
+      close: () => {
+        clearInterval(heartbeat);
+        clearTimeout(deadline);
+      },
+    };
   }
 
   private async execute(id: string) {
     const startedAt = Date.now();
     const run = await this.runs.claim(id);
     if (!run) return;
-    const leaseHeartbeat = this.startLeaseHeartbeat(id);
+    const ownership = { runId: id, executionAttempt: run.executionAttempt };
+    const execution = aiExecutionSummarySchema.safeParse(asRecord(run.modelMetadata)?.sdkExecution);
+    if (!execution.success || !execution.data.deadlineAt) {
+      await this.executions.failOwned(ownership, {
+        errorCode: 'research_policy_missing',
+        errorSummary: '研究任务缺少创建时冻结的 SDK 执行策略',
+      });
+      return;
+    }
+    const deadlineAt = new Date(execution.data.deadlineAt).getTime();
+    const lifecycle = this.startLeaseHeartbeat(ownership, deadlineAt);
     try {
-      const model = run.model === 'pending' ? this.providers.defaultModel() : run.model;
-      if (!model) throw new Error('没有配置可用的 AI Provider/Model');
       const prompt = this.prompts.latest('research');
       if (!prompt) throw new Error('缺少 research prompt 注册');
+      if (Date.now() >= deadlineAt) throw new Error('研究任务已超过创建时冻结的绝对期限');
       const context = asContext(run.context);
       const input = { context, question: run.question ?? '请基于当前上下文完成研究。' };
       const evidence: Array<{ claim: string; citations: ReturnType<typeof evidenceCitation>[] }> =
@@ -326,6 +352,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       const toolInput = { ...context };
       const tools = this.tools(context.scope);
       for (const tool of tools) {
+        if (lifecycle.signal.aborted || Date.now() >= deadlineAt) break;
         const result = await executeAuditedTool(this.runs, id, tool, toolInput, allowedPermissions);
         if (result.status === 'ok') {
           successfulCalls.push({
@@ -357,69 +384,65 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
           })}`,
         },
       ];
-      const completion = await completeWithFallback(this.providers, {
-        model,
+      const buildResult = (output: AiResearchGeneration, provider: string) => {
+        const normalizedEvidence = output.evidence.map((item) => ({
+          claim: item.claim,
+          citations: item.citations.map((citation) => {
+            const matched = successfulCalls.find((call) => {
+              if (citation.toolCallId) return call.toolCallId === citation.toolCallId;
+              const sourceId = asRecord(call.data)?.sourceId;
+              return typeof sourceId === 'string' && sourceId === citation.sourceId;
+            });
+            if (!matched?.toolCallId)
+              throw new Error('研究结论引用了不属于本任务的 Tool call 或来源');
+            if (citation.tool && citation.tool !== matched.tool)
+              throw new Error('研究结论中的 Tool 引用与审计记录不一致');
+            const grounded = evidenceCitation(matched.tool, matched.data, matched.toolCallId);
+            if (citation.sourceId && citation.sourceId !== grounded.sourceId)
+              throw new Error('研究结论中的来源标识与 Tool 结果不一致');
+            return grounded;
+          }),
+        }));
+        return researchResultSchema.parse({
+          ...output,
+          version: 1,
+          provider,
+          context,
+          evidence: normalizedEvidence,
+          createdAt: new Date().toISOString(),
+        });
+      };
+      await this.sdkExecution.execute({
+        ownership,
+        run,
         messages,
-        tools: tools.map((tool) => tool.name),
-        ...(run.provider === 'pending' ? {} : { preferred: run.provider }),
+        startedAt,
+        signal: lifecycle.signal,
+        buildResult,
       });
-      const raw = asRecord(jsonResult(completion.content));
-      if (!raw) throw new Error('Provider 返回内容不是 JSON 对象');
-      const callIds = new Set(successfulCalls.map((call) => call.toolCallId).filter(Boolean));
-      const normalizedEvidence = Array.isArray(raw.evidence)
-        ? raw.evidence.map((item) => {
-            const record = asRecord(item);
-            const citations = Array.isArray(record?.citations)
-              ? record.citations.map((citation) => {
-                  const value = asRecord(citation);
-                  if (!value) return citation as unknown;
-                  if (typeof value.toolCallId === 'string') return value;
-                  const matched = successfulCalls.find((call) => call.tool === value.tool);
-                  return matched?.toolCallId ? { ...value, toolCallId: matched.toolCallId } : value;
-                })
-              : [];
-            return { ...record, citations };
-          })
-        : evidence;
-      const result = researchResultSchema.parse({
-        ...raw,
-        version: 1,
-        provider: completion.provider,
-        context,
-        signals: Array.isArray(raw.signals) ? raw.signals : [],
-        evidence: normalizedEvidence,
-        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
-      });
-      for (const item of result.evidence) {
-        for (const citation of item.citations) {
-          if (!citation.toolCallId || !callIds.has(citation.toolCallId))
-            throw new Error('研究结论的每条证据必须关联本次执行的 Tool call');
-        }
-      }
-      await this.runs.finishResearch(
-        id,
-        result,
-        {
-          inputTokens: completion.inputTokens,
-          outputTokens: completion.outputTokens,
-          cost: completion.cost,
-        },
-        Date.now() - startedAt,
-        {
-          provider: completion.provider,
-          model,
-          fallbackErrors: completion.fallbackErrors,
-          toolCallIds: [...callIds].filter((id): id is string => typeof id === 'string'),
-        },
-      );
     } catch (error) {
       const summary = error instanceof Error ? error.message : '研究执行失败';
-      const errorCode = this.providers.hasProviders()
+      const expired = Date.now() >= deadlineAt;
+      const cancelled = error instanceof DOMException && error.name === 'AbortError';
+      let errorCode = this.providers.hasProviders()
         ? 'research_execution_failed'
         : 'provider_unavailable';
-      await this.runs.fail(id, errorCode, summary, Date.now() - startedAt);
+      let continuationBlockedReason: 'expired' | 'cancelled' | undefined;
+      if (expired) {
+        errorCode = 'research_deadline_expired';
+        continuationBlockedReason = 'expired';
+      } else if (cancelled) {
+        errorCode = 'research_cancelled';
+        continuationBlockedReason = 'cancelled';
+      }
+      await this.executions.failOwned(ownership, {
+        errorCode,
+        errorSummary: summary,
+        durationMs: Date.now() - startedAt,
+        ...(continuationBlockedReason ? { continuationBlockedReason } : {}),
+      });
     } finally {
-      clearInterval(leaseHeartbeat);
+      lifecycle.close();
     }
   }
 }

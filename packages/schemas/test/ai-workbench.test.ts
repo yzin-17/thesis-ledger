@@ -72,6 +72,10 @@ describe('AI 研究工作台契约', () => {
         question: '  当前风险？  ',
         context: { scope: 'portfolio' },
         retryOfRunId: '11111111-1111-4111-8111-111111111111',
+        retryConfirmation: {
+          contextConfirmed: true,
+          acknowledgeUnknownOutcomeRisk: false,
+        },
       }),
     ).toMatchObject({ question: '当前风险？' });
     expect(() =>
@@ -79,8 +83,25 @@ describe('AI 研究工作台契约', () => {
         question: '风险？',
         context: { scope: 'portfolio' },
         retryOfRunId: 'run-1',
+        retryConfirmation: {
+          contextConfirmed: true,
+          acknowledgeUnknownOutcomeRisk: false,
+        },
       }),
     ).toThrow();
+    expect(
+      aiResearchStartInputSchema.parse({
+        question: '风险？',
+        context: { scope: 'portfolio' },
+        retryOfRunId: '11111111-1111-4111-8111-111111111111',
+        retryConfirmation: {
+          contextConfirmed: true,
+          acknowledgeUnknownOutcomeRisk: true,
+        },
+      }),
+    ).toMatchObject({
+      retryConfirmation: { contextConfirmed: true, acknowledgeUnknownOutcomeRisk: true },
+    });
   });
 
   it('表达 Provider 能力状态、缺失影响和启动条件', () => {
@@ -100,5 +121,22 @@ describe('AI 研究工作台契约', () => {
         checkedAt: '2026-08-26T00:00:00Z',
       }),
     ).toMatchObject({ canStart: true });
+  });
+
+  it('拒绝客户端覆盖研究预算或伪造接入就绪', () => {
+    expect(() =>
+      aiResearchStartInputSchema.parse({
+        question: '风险？',
+        context: { scope: 'portfolio' },
+        budget: { maxAiCalls: 99 },
+      }),
+    ).toThrow();
+    expect(() =>
+      aiResearchStartInputSchema.parse({
+        question: '风险？',
+        context: { scope: 'portfolio' },
+        ready: true,
+      }),
+    ).toThrow();
   });
 });

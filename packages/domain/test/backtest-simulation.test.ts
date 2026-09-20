@@ -165,6 +165,40 @@ describe('deterministic simulation events', () => {
     expect(next.signal).toBeUndefined();
   });
 
+  it('gates entry and exit signals by the actual position state', () => {
+    const closed = {
+      isOpen: false,
+      quantity: '0',
+      averageCost: '0',
+      holdingPeriods: 0,
+      availableAt: '2025-01-01T00:00:00Z',
+    };
+    const open = { ...closed, isOpen: true, quantity: '100', averageCost: '10' };
+    const input = baseInput({
+      strategy: {
+        ...strategy(compare('gt', '10')),
+        exit: compare('lt', '20'),
+      },
+      positionStateAt: () => closed,
+    });
+    expect(evaluateSignalAt(input, input.ticks[0]!, {}, 1).signal?.kind).toBe('entry');
+    expect(
+      evaluateSignalAt({ ...input, positionStateAt: () => open }, input.ticks[0]!, {}, 1).signal,
+    ).toMatchObject({ kind: 'exit' });
+    expect(
+      evaluateSignalAt(
+        {
+          ...input,
+          strategy: { ...input.strategy, entry: compare('gt', '20') },
+          positionStateAt: () => closed,
+        },
+        input.ticks[0]!,
+        {},
+        1,
+      ).signal,
+    ).toBeUndefined();
+  });
+
   it('replays the complete signal-to-fill chain deterministically and mutates only on fill', () => {
     const onMutation = vi.fn();
     const execution = {

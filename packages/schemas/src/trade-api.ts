@@ -6,6 +6,7 @@ import {
   ledgerEventSourceSchemaV2,
   ledgerEventEnvelopeSchemaV2,
 } from './ledger-v2.js';
+import { instrumentDirectorySchema } from './market.js';
 
 const nonNegativeIntegerStringSchema = z.string().regex(/^\d+$/);
 const isoDateTimeSchema = z.iso.datetime({ offset: true });
@@ -263,6 +264,7 @@ const ledgerReadBaseShape = {
   ledgerRevision: nonNegativeIntegerStringSchema,
   projectionGeneration: nonNegativeIntegerStringSchema,
   events: z.array(ledgerEventEnvelopeSchemaV2),
+  instrumentDirectory: instrumentDirectorySchema,
 };
 
 export const ledgerEventsResponseSchemaV2 = z
@@ -280,6 +282,7 @@ export const ledgerAuditResponseSchemaV2 = z
     ledgerRevision: nonNegativeIntegerStringSchema,
     projectionGeneration: nonNegativeIntegerStringSchema,
     events: z.array(z.union([ledgerEventEnvelopeSchemaV2, legacyLedgerEventResponseSchemaV2])),
+    instrumentDirectory: instrumentDirectorySchema,
     effective: z.literal(false),
   })
   .strict();

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
+import { testResultReadPolicy } from './test-result-read-policy.js';
 
 describe('Strategy 与 Backtest Worker', () => {
   const schema = {
@@ -25,7 +26,7 @@ describe('Strategy 与 Backtest Worker', () => {
         create: createVersion,
       },
     };
-    const service = new BacktestService(prisma as never);
+    const service = new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
     await service.createStrategy('test', schema);
     await service.createVersion('11111111-1111-4111-8111-111111111116', schema);
     expect(create).toHaveBeenCalledWith(
@@ -36,7 +37,12 @@ describe('Strategy 与 Backtest Worker', () => {
     );
   });
   it('回测默认拒绝带 partial 市场数据的输入', async () => {
-    const service = new BacktestService({ backtestJob: { create: vi.fn() } } as never);
+    const service = new BacktestService(
+      { backtestJob: { create: vi.fn() } } as never,
+      undefined,
+      undefined,
+      testResultReadPolicy(),
+    );
     await expect(
       service.queue({
         id: '11111111-1111-4111-8111-111111111119',
@@ -62,7 +68,7 @@ describe('Strategy 与 Backtest Worker', () => {
     const queue = {
       ensureEnqueued: vi.fn(async () => ({ ...created, dispatchedAt: new Date('2025-01-03') })),
     };
-    const service = new BacktestService(prisma as never, queue as never);
+    const service = new BacktestService(prisma as never, queue as never, undefined, testResultReadPolicy());
 
     const job = await service.queue({
       id: created.id,
@@ -79,7 +85,7 @@ describe('Strategy 与 Backtest Worker', () => {
   it('兼容运行入口只确保派发，不在 API 进程执行 Worker', async () => {
     const queued = { id: '11111111-1111-4111-8111-111111111119', status: 'queued' };
     const queue = { ensureEnqueued: vi.fn(async () => queued) };
-    const service = new BacktestService({} as never, queue as never);
+    const service = new BacktestService({} as never, queue as never, undefined, testResultReadPolicy());
 
     await expect(service.run(queued.id)).resolves.toEqual(queued);
     expect(queue.ensureEnqueued).toHaveBeenCalledWith(queued.id);
@@ -110,7 +116,12 @@ describe('Strategy 与 Backtest Worker', () => {
         result: { returns: [0.1] },
       },
     ]);
-    const service = new BacktestService({ backtestJob: { findMany } } as never);
+    const service = new BacktestService(
+      { backtestJob: { findMany } } as never,
+      undefined,
+      undefined,
+      testResultReadPolicy(),
+    );
 
     const summaries = await service.listJobSummaries();
 
@@ -153,7 +164,12 @@ describe('Strategy 与 Backtest Worker', () => {
         returns: [0.01, -0.01],
       })),
     };
-    const result = await new BacktestService(prisma as never).run(job.id, worker as never);
+    const result = await new BacktestService(
+      prisma as never,
+      undefined,
+      undefined,
+      testResultReadPolicy(),
+    ).run(job.id, worker as never);
     expect(result).toMatchObject({
       status: 'succeeded',
       progress: 100,
@@ -198,7 +214,7 @@ describe('Strategy 与 Backtest Worker', () => {
       id: 'unstable-worker',
       run: vi.fn(async () => Promise.reject(new Error('暂时失败'))),
     };
-    const service = new BacktestService(prisma as never);
+    const service = new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
 
     await expect(
       service.run(job.id, worker as never, { attempt: 1, maxAttempts: 3 }),
@@ -239,7 +255,7 @@ describe('Strategy 与 Backtest Worker', () => {
     };
 
     await expect(
-      new BacktestService(prisma as never).run(job.id, worker as never, {
+      new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy()).run(job.id, worker as never, {
         attempt: 3,
         maxAttempts: 3,
       }),
@@ -279,7 +295,7 @@ describe('Strategy 与 Backtest Worker', () => {
         }),
       },
     };
-    const service = new BacktestService(prisma as never);
+    const service = new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
 
     await expect(
       service.run(job.id, { id: 'worker', run: vi.fn() } as never, { attempt: 1, maxAttempts: 3 }),
@@ -346,7 +362,7 @@ describe('Strategy 与 Backtest Worker', () => {
       id: 'worker',
       run: vi.fn(() => new Promise((resolve) => (resolveOld = resolve))),
     };
-    const service = new BacktestService(prisma as never);
+    const service = new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
     const oldAttempt = service.run(job.id, oldWorker as never, { attempt: 1, maxAttempts: 3 });
     await vi.waitFor(() => expect(state.executionAttempt).toBe(1));
     state = { ...state, status: 'queued' };
@@ -392,7 +408,7 @@ describe('Strategy 与 Backtest Worker', () => {
           }),
       ),
     };
-    const service = new BacktestService(prisma as never);
+    const service = new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
     const running = service.run(job.id, worker as never);
     await Promise.resolve();
     await service.cancel(job.id);
