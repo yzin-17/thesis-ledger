@@ -3,7 +3,6 @@ import type { AiGenerationContractRef, AiGenerationMode } from '@thesis-ledger/s
 import type { AiProvider } from './contracts.js';
 import {
   evaluateAiProviderReadiness,
-  inferLegacyAiAdapter,
   type AiProviderRouteSnapshot,
 } from './ai-provider-readiness.js';
 
@@ -197,11 +196,20 @@ const routeKey = (
 export const routeSnapshotsFromProvider = (provider: AiProvider): AiProviderRouteSnapshot[] => {
   const metadata = provider.metadata;
   const baseUrl = metadata?.baseURL ?? '';
-  const adapter = metadata?.adapter ?? inferLegacyAiAdapter(baseUrl);
+  const upstreamFormat = metadata?.upstreamFormat ?? 'chat-completions';
+  const chatImplementation =
+    upstreamFormat === 'chat-completions'
+      ? (metadata?.chatImplementation ?? 'compatible')
+      : undefined;
   return (metadata?.executionRoutes ?? []).map((route) => ({
     providerId: provider.id,
     baseUrl,
-    adapter,
+    upstreamFormat,
+    ...(chatImplementation === undefined ? {} : { chatImplementation }),
+    ...(metadata?.compatibilityExtensionProfile === undefined
+      ? {}
+      : { compatibilityExtensionProfile: metadata.compatibilityExtensionProfile }),
+    adapter: metadata?.adapter ?? null,
     models: provider.models,
     route,
     enabled: true,

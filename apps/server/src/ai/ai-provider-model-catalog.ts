@@ -1,3 +1,4 @@
+import type { AiUpstreamFormat } from '@thesis-ledger/schemas';
 import {
   asRecord,
   type AiProviderModelCatalogItem,
@@ -9,6 +10,16 @@ const MAX_MODEL_COUNT = 2_000;
 const MAX_MODEL_ID_LENGTH = 200;
 
 const modelsUrl = (baseUrl: string) => `${baseUrl.replace(/\/+$/u, '')}/models`;
+
+const requestHeaders = (credential: string, upstreamFormat: AiUpstreamFormat) => {
+  if (upstreamFormat === 'anthropic-messages')
+    return {
+      ...(credential ? { 'x-api-key': credential } : {}),
+      'anthropic-version': '2023-06-01',
+    };
+  if (credential) return { authorization: `Bearer ${credential}` };
+  return {};
+};
 
 const providerError = (payload: unknown) => {
   const error = asRecord(asRecord(payload)?.error);
@@ -51,10 +62,11 @@ export const fetchAiProviderModelCatalog = async (
   baseUrl: string,
   credential: string,
   timeoutMs: number,
+  upstreamFormat: AiUpstreamFormat = 'chat-completions',
 ) => {
   const response = await fetch(modelsUrl(baseUrl), {
     method: 'GET',
-    headers: credential ? { authorization: `Bearer ${credential}` } : {},
+    headers: requestHeaders(credential, upstreamFormat),
     redirect: 'error',
     signal: AbortSignal.timeout(timeoutMs),
   });

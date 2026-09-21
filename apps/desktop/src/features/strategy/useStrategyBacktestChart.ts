@@ -6,6 +6,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
+import { formatDateTimeInTimeZone } from '@/lib/date-display';
 import type { BacktestChartModel } from './strategy-backtest-chart.model.js';
 import { nextBacktestLogicalRange } from './strategy-backtest-chart.model.js';
 
@@ -29,17 +30,6 @@ const currencyFormatter = (currency: BacktestChartModel['currency']) => {
   });
   return (value: number) => formatter.format(value);
 };
-
-const formatChartTime = (time: number, timezone: string) =>
-  new Intl.DateTimeFormat('zh-CN', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(time));
 
 export const useStrategyBacktestChart = ({
   model,
@@ -147,7 +137,7 @@ export const useStrategyBacktestChart = ({
       localization: {
         timeFormatter: (time: Time) => {
           const value = milliseconds(time);
-          return value === null ? '' : formatChartTime(value, model.timezone);
+          return value === null ? '' : formatDateTimeInTimeZone(value, model.timezone, '');
         },
       },
     });

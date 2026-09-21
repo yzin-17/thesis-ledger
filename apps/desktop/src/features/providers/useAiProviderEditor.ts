@@ -19,61 +19,95 @@ import {
   useTestSavedAiProviderMutation,
 } from './ai-provider.mutations.js';
 import {
-  newAiProviderDraft,
+  useSaveProviderMutation,
+  useTestProviderDraftMutation,
+} from './providers.mutations.js';
+import {
+  newProviderDraft,
+  providerCredentialForSave,
+  providerDraftForType,
   type AiProviderModelDetail,
   type ProviderDraft,
   type ProviderRecord,
+  type ProviderTestEvidence,
   type ProviderTestState,
 } from './providers.types.js';
+import { createLatestRequestGate } from './ai-provider-editor-async.js';
 
 const testSucceeded = (status: string | undefined) => status === 'healthy';
 
 export const useAiProviderEditor = () => {
-  const [draft, setDraft] = useState<ProviderDraft>(newAiProviderDraft);
+  const [draft, setDraft] = useState<ProviderDraft>(newProviderDraft);
   const [open, setOpen] = useState(false);
   const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
   const [takingOverEnvironmentName, setTakingOverEnvironmentName] = useState<string | null>(null);
   const [credentialInputOpen, setCredentialInputOpen] = useState(true);
   const [testState, setTestState] = useState<ProviderTestState>('idle');
-  const [testToken, setTestToken] = useState<string | null>(null);
+  const [testEvidence, setTestEvidence] = useState<ProviderTestEvidence | null>(null);
   const [testingProviderName, setTestingProviderName] = useState<string | null>(null);
   const [deletingProviderName, setDeletingProviderName] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [modelDetails, setModelDetails] = useState<AiProviderModelDetail[]>([]);
+  const [modelRequestGate] = useState(createLatestRequestGate);
+  const [testRequestGate] = useState(createLatestRequestGate);
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const saveMutation = useSaveAiProviderMutation();
   const testDraftMutation = useTestAiProviderDraftMutation();
   const testSavedMutation = useTestSavedAiProviderMutation();
+  const saveProviderMutation = useSaveProviderMutation();
+  const testProviderDraftMutation = useTestProviderDraftMutation();
   const setEnabledMutation = useSetAiProviderEnabledMutation();
   const deleteMutation = useDeleteAiProviderMutation();
   const modelCatalogMutation = useFetchAiProviderModelsMutation();
 
   const resetTest = () => {
+    testRequestGate.invalidate();
     setTestState('idle');
-    setTestToken(null);
+    setTestEvidence(null);
   };
 
-  const close = () => {
-    if (saveMutation.isPending || testState === 'testing') return;
+  const invalidateDraftResults = () => {
+    modelRequestGate.invalidate();
+    resetTest();
+  };
+
+  const resetEditor = () => {
     setOpen(false);
     setEditingProviderName(null);
     setTakingOverEnvironmentName(null);
     setCredentialInputOpen(true);
-    setDraft((current) => ({ ...current, credentialsRef: '' }));
+    setDraft(newProviderDraft());
     setAvailableModels([]);
     setModelDetails([]);
-    resetTest();
+    invalidateDraftResults();
   };
 
-  const openEditor = (provider?: ProviderRecord) => {
+  const close = () => {
+    if (saveMutation.isPending || saveProviderMutation.isPending || testState === 'testing') return;
+    resetEditor();
+  };
+
+  const providerDraftFromRecord = (provider: ProviderRecord): ProviderDraft => {
+    if (provider.type === 'ai') return aiProviderDraftFromRecord(provider);
+    return {
+      ...newProviderDraft(),
+      name: provider.name,
+      type: provider.type,
+      capabilities: [...provider.capabilities],
+      priority: provider.priority,
+      enabled: provider.enabled,
+    };
+  };
+
+  const openEditor = (provider?: ProviderRecord, initialDraft?: ProviderDraft) => {
     if (!provider) {
-      setDraft(newAiProviderDraft());
+      setDraft(initialDraft ?? newProviderDraft());
       setEditingProviderName(null);
       setTakingOverEnvironmentName(null);
       setCredentialInputOpen(true);
     } else {
-      setDraft(aiProviderDraftFromRecord(provider));
+      setDraft(providerDraftFromRecord(provider));
       if (provider.source === 'environment') {
         setEditingProviderName(null);
         setTakingOverEnvironmentName(provider.name);
@@ -84,15 +118,24 @@ export const useAiProviderEditor = () => {
         setCredentialInputOpen(!provider.credentialConfigured);
       }
     }
-    resetTest();
+    invalidateDraftResults();
     setAvailableModels([]);
     setModelDetails([]);
     setOpen(true);
   };
 
+  const changeType = (type: string) => {
+    if (type === draft.type) return;
+    setDraft((current) => providerDraftForType(type, current));
+    setCredentialInputOpen(true);
+    invalidateDraftResults();
+    setAvailableModels([]);
+    setModelDetails([]);
+  };
+
   const updateDraft = (updater: (current: ProviderDraft) => ProviderDraft) => {
     setDraft(updater);
-    resetTest();
+    invalidateDraftResults();
   };
 
   const invalidDraft = (input: ReturnType<typeof aiProviderInputFromDraft>) => {
@@ -100,6 +143,42 @@ export const useAiProviderEditor = () => {
     if (!error) return false;
     toastManager.add({
       title: 'AI Provider 配置不完整',
+      description: error,
+      type: 'error',
+      timeout: 7000,
+      priority: 'high',
+    });
+    return true;
+  };
+
+  const providerInputFromDraft = () => {
+    const credentialsRef = credentialInputOpen
+      ? providerCredentialForSave(draft.credentialsRef, testEvidence)
+      : testEvidence?.credentialsRef;
+    return {
+      name: draft.name.trim(),
+      type: draft.type,
+      enabled: draft.enabled,
+      priority: Number(draft.priority),
+      capabilities: draft.capabilities,
+      ...(credentialsRef ? { credentialsRef } : {}),
+      ...(testEvidence ? { connectionTestToken: testEvidence.token } : {}),
+    };
+  };
+
+  const ordinaryProviderDraftError = (input: ReturnType<typeof providerInputFromDraft>) => {
+    if (!input.name) return '请填写 Provider 名称。';
+    if (input.capabilities.length === 0) return '请至少选择一项 Provider 能力。';
+    if (!Number.isInteger(input.priority) || input.priority < 0)
+      return 'Provider 优先级必须是非负整数。';
+    return null;
+  };
+
+  const invalidOrdinaryDraft = (input: ReturnType<typeof providerInputFromDraft>) => {
+    const error = ordinaryProviderDraftError(input);
+    if (!error) return false;
+    toastManager.add({
+      title: 'Provider 配置不完整',
       description: error,
       type: 'error',
       timeout: 7000,
@@ -123,13 +202,16 @@ export const useAiProviderEditor = () => {
     const name = draft.name.trim();
     const apiKey = draft.credentialsRef.trim();
     const timeoutMs = Number(draft.timeoutMs);
+    const requestSequence = modelRequestGate.begin();
     try {
       const result = await modelCatalogMutation.mutateAsync({
         ...(name ? { name } : {}),
         baseUrl,
+        upstreamFormat: draft.upstreamFormat,
         ...(apiKey ? { apiKey } : {}),
         ...(Number.isInteger(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : {}),
       });
+      if (!modelRequestGate.isCurrent(requestSequence)) return;
       const nextModelDetails = modelDetailsFromCatalog(result.modelDetails);
       setAvailableModels(result.models);
       setModelDetails(nextModelDetails);
@@ -151,6 +233,7 @@ export const useAiProviderEditor = () => {
         timeout: 2800,
       });
     } catch (error) {
+      if (!modelRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
         title: '模型目录获取失败',
         description: error instanceof Error ? error.message : '可继续手动填写模型 ID。',
@@ -159,17 +242,24 @@ export const useAiProviderEditor = () => {
         priority: 'high',
       });
     } finally {
-      modelCatalogMutation.reset();
+      if (modelRequestGate.isCurrent(requestSequence)) modelCatalogMutation.reset();
     }
   };
 
-  const testDraft = async () => {
-    const input = aiProviderInputFromDraft(draft);
-    if (invalidDraft(input)) return;
+  const testOrdinaryDraft = async () => {
+    const input = providerInputFromDraft();
+    if (invalidOrdinaryDraft(input)) return;
+    const requestSequence = testRequestGate.begin();
     setTestState('testing');
     try {
-      const result = await testDraftMutation.mutateAsync(input);
-      setTestToken(result.testToken ?? null);
+      const result = await testProviderDraftMutation.mutateAsync(input);
+      if (!testRequestGate.isCurrent(requestSequence)) return;
+      const credentialsRef = input.credentialsRef;
+      setTestEvidence(
+        result.testToken
+          ? { token: result.testToken, ...(credentialsRef ? { credentialsRef } : {}) }
+          : null,
+      );
       if (testSucceeded(result.status)) {
         setTestState('success');
         toastManager.add({
@@ -189,6 +279,60 @@ export const useAiProviderEditor = () => {
         });
       }
     } catch (error) {
+      if (!testRequestGate.isCurrent(requestSequence)) return;
+      setTestState('error');
+      toastManager.add({
+        title: `${input.name} 连通性测试失败`,
+        description: error instanceof Error ? error.message : '连接测试失败。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+    }
+  };
+
+  const testDraft = async () => {
+    if (draft.type !== 'ai') {
+      await testOrdinaryDraft();
+      return;
+    }
+    const input = aiProviderInputFromDraft(draft);
+    if (invalidDraft(input)) return;
+    const requestSequence = testRequestGate.begin();
+    setTestState('testing');
+    try {
+      const result = await testDraftMutation.mutateAsync(input);
+      if (!testRequestGate.isCurrent(requestSequence)) return;
+      setTestEvidence(
+        result.testToken
+          ? {
+              token: result.testToken,
+              ...(draft.credentialsRef.trim()
+                ? { credentialsRef: draft.credentialsRef.trim() }
+                : {}),
+            }
+          : null,
+      );
+      if (testSucceeded(result.status)) {
+        setTestState('success');
+        toastManager.add({
+          title: `${input.name} 最小生成测试成功`,
+          description: `仅证明连接与最小生成可用，不代表业务结构化生成已通过。${result.message ? ` ${result.message}` : ''}`,
+          type: 'success',
+          timeout: 2800,
+        });
+      } else {
+        setTestState('error');
+        toastManager.add({
+          title: `${input.name} 连通性测试失败`,
+          description: result.message ?? '连接异常。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+      }
+    } catch (error) {
+      if (!testRequestGate.isCurrent(requestSequence)) return;
       setTestState('error');
       toastManager.add({
         title: `${input.name} 连通性测试失败`,
@@ -202,8 +346,41 @@ export const useAiProviderEditor = () => {
 
   const saveDraft = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (saveMutation.isPending) return;
-    const input = aiProviderInputFromDraft(draft, testToken ?? undefined);
+    if (saveMutation.isPending || saveProviderMutation.isPending) return;
+    if (draft.type !== 'ai') {
+      const input = providerInputFromDraft();
+      if (invalidOrdinaryDraft(input)) return;
+      if (takingOverEnvironmentName && !input.credentialsRef) {
+        toastManager.add({
+          title: '接管部署配置需要凭证',
+          description: '请填写目标类型的 API Key、Token 或 Webhook 后保存。',
+          type: 'error',
+          timeout: 7000,
+          priority: 'high',
+        });
+        return;
+      }
+      try {
+        await saveProviderMutation.mutateAsync(input);
+        toastManager.add({
+          title: `${input.name} 配置已保存`,
+          description: '页面不会回显凭证。',
+          type: 'success',
+          timeout: 2800,
+        });
+        resetEditor();
+      } catch (error) {
+        toastManager.add({
+          title: 'Provider 配置保存失败',
+          description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+          type: 'error',
+          timeout: 0,
+          priority: 'high',
+        });
+      }
+      return;
+    }
+    const input = aiProviderInputFromDraft(draft, testEvidence?.token);
     if (invalidDraft(input)) return;
     if (takingOverEnvironmentName && !input.apiKey) {
       toastManager.add({
@@ -217,14 +394,13 @@ export const useAiProviderEditor = () => {
     }
     try {
       await saveMutation.mutateAsync(input);
-      setDraft((current) => ({ ...current, credentialsRef: '' }));
       toastManager.add({
         title: `${input.name} 配置已保存`,
         description: '页面不会回显 API Key。',
         type: 'success',
         timeout: 2800,
       });
-      close();
+      resetEditor();
     } catch (error) {
       toastManager.add({
         title: 'AI Provider 配置保存失败',
@@ -315,6 +491,7 @@ export const useAiProviderEditor = () => {
   return {
     close,
     openEditor,
+    changeType,
     updateDraft,
     fetchModels,
     testDraft,
@@ -329,7 +506,7 @@ export const useAiProviderEditor = () => {
       credentialInputOpen,
       takingOverEnvironmentName,
       providerTestState: testState,
-      savingProviderDraft: saveMutation.isPending,
+      savingProviderDraft: saveMutation.isPending || saveProviderMutation.isPending,
       availableModels,
       modelDetails,
       modelCatalogState: modelCatalogMutation.isPending ? ('loading' as const) : ('idle' as const),

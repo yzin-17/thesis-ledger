@@ -1,8 +1,9 @@
-import type { AiAdapter } from '@thesis-ledger/schemas';
+import type { AiAdapter, AiChatImplementation, AiUpstreamFormat } from '@thesis-ledger/schemas';
 import type {
   AiProviderCapabilityRevocation,
   AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
+import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 
 export type PortfolioMode = 'actual' | 'shadow';
 
@@ -39,6 +40,9 @@ export interface AiProviderMetadata {
   costCurrency?: string;
   pricingVersion?: string;
   modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
+  upstreamFormat?: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
   adapter?: AiAdapter;
   executionRoutes?: readonly AiProviderExecutionRouteInput[];
   capabilityRevocations?: readonly AiProviderCapabilityRevocation[];

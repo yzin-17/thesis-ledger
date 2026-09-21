@@ -1,26 +1,13 @@
 import type { OptimizationExperimentSource } from '@thesis-ledger/schemas';
+import { formatDateOnly } from '@/lib/date-display';
 import type { OptimizationExperimentSummary } from './strategy-optimization.api.js';
 import { backtestMetricNumber } from './strategy-backtest-detail.model.js';
 import type { BacktestJobSummary } from './strategy.types.js';
 
-const twoDigits = (value: number) => String(value).padStart(2, '0');
-
-const compactDate = (date: Date) =>
-  `${twoDigits(date.getMonth() + 1)}/${twoDigits(date.getDate())} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
-
-export const formatCompactDateTime = (
-  value: string | null | undefined,
-  fallback = '时间未记录',
-) => {
-  if (!value) return fallback;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? fallback : compactDate(date);
-};
-
 const businessDate = (value: string | undefined) => {
   if (!value) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return match ? `${match[1]}/${match[2]}/${match[3]}` : null;
+  const formatted = formatDateOnly(value, '');
+  return formatted || null;
 };
 
 export const backtestPeriodLabel = (job: BacktestJobSummary) => {

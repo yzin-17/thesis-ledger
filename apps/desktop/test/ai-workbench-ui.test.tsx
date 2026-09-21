@@ -176,12 +176,17 @@ describe('研究工作台 UI 契约', () => {
       new URL('../src/features/ai/AiRunList.tsx', import.meta.url),
       'utf8',
     );
+    const newResearchSource = readFileSync(
+      new URL('../src/features/ai/NewResearchSheet.tsx', import.meta.url),
+      'utf8',
+    );
     expect(listSource).toContain('<RefreshIconButton');
     expect(source).not.toContain('<RefreshCw');
     expect(source).toContain("navigate('/providers')");
     expect(source).toContain('provider.action');
     expect(source).toContain('data-ai-provider-status');
     expect(source).toContain("label: '服务已就绪'");
+    expect(newResearchSource).toContain('Provider、Tool 和执行 Worker 已就绪。');
     expect(source).not.toContain("label: 'Provider 已就绪'");
     expect(source).toContain('<Button type="button" size="sm"');
     expect(source).toContain('trigger ?? listFallbackRef.current');

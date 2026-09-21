@@ -1,5 +1,6 @@
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAICompatible, type MetadataExtractor } from '@ai-sdk/openai-compatible';
 import {
   Output,
   generateText,
@@ -21,6 +22,10 @@ import {
   type AiUsageFacts,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
+import {
+  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
+  type AiCompatibilityExtensionProfile,
+} from './ai-provider-upstream.js';
 
 type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -32,6 +37,7 @@ export type AiSdkProgress = {
 export type AiSdkGenerationRequest<OUTPUT> = {
   requestId: string;
   adapter: AiAdapter;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
   providerId: string;
   baseURL: string;
   apiKey: string;
@@ -93,7 +99,8 @@ const retryAfterMs = (error: unknown) => {
   const raw = headers?.['retry-after'] ?? headers?.['Retry-After'];
   if (typeof raw !== 'string') return undefined;
   const seconds = Number(raw);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(Math.ceil(seconds * 1_000), 86_400_000);
+  if (Number.isFinite(seconds) && seconds >= 0)
+    return Math.min(Math.ceil(seconds * 1_000), 86_400_000);
   const at = Date.parse(raw);
   if (Number.isNaN(at)) return undefined;
   return Math.min(Math.max(0, at - Date.now()), 86_400_000);
@@ -170,16 +177,32 @@ const providerCost = (metadata: unknown) => {
   return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? String(cost) : null;
 };
 
+const openRouterCostMetadata = (value: unknown) => {
+  const usage = asRecord(asRecord(value)?.usage);
+  const cost = usage?.cost;
+  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost < 0) return undefined;
+  return { openrouter: { usage: { cost } } };
+};
+
+const openRouterMetadataExtractor: MetadataExtractor = {
+  extractMetadata: ({ parsedBody }) => Promise.resolve(openRouterCostMetadata(parsedBody)),
+  createStreamExtractor: () => {
+    let metadata: ReturnType<typeof openRouterCostMetadata>;
+    return {
+      processChunk: (parsedChunk) => {
+        metadata = openRouterCostMetadata(parsedChunk) ?? metadata;
+      },
+      buildMetadata: () => metadata,
+    };
+  },
+};
+
 const actualModel = (response: unknown) => {
   const record = asRecord(response);
   return typeof record?.modelId === 'string' ? record.modelId : null;
 };
 
-const assertFinishReason = (
-  finishReason: FinishReason,
-  requestId: string,
-  usage: AiUsageFacts,
-) => {
+const assertFinishReason = (finishReason: FinishReason, requestId: string, usage: AiUsageFacts) => {
   if (finishReason === 'stop') return;
   let code: AiGenerationError['code'] = 'provider_stream_error';
   if (finishReason === 'length') code = 'output_truncated';
@@ -196,12 +219,18 @@ const assertFinishReason = (
   );
 };
 
-const convertCompatibleUsage = (usage: {
-  prompt_tokens?: number | null | undefined;
-  completion_tokens?: number | null | undefined;
-  prompt_tokens_details?: { cached_tokens?: number | null | undefined } | null | undefined;
-  completion_tokens_details?: { reasoning_tokens?: number | null | undefined } | null | undefined;
-} | null | undefined) => ({
+const convertCompatibleUsage = (
+  usage:
+    | {
+        prompt_tokens?: number | null | undefined;
+        completion_tokens?: number | null | undefined;
+        prompt_tokens_details?: { cached_tokens?: number | null | undefined } | null | undefined;
+        completion_tokens_details?:
+          { reasoning_tokens?: number | null | undefined } | null | undefined;
+      }
+    | null
+    | undefined,
+) => ({
   inputTokens: {
     total: usage?.prompt_tokens ?? undefined,
     noCache: undefined,
@@ -215,43 +244,83 @@ const convertCompatibleUsage = (usage: {
   },
 });
 
+const compatibilityProfile = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) =>
+  input.compatibilityExtensionProfile ??
+  (input.adapter === 'openrouter' ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 : undefined);
+
+const openRouterTransform = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) =>
+  compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+    ? (body: Record<string, unknown>) => ({
+        ...body,
+        provider: {
+          ...(input.mode === 'native_schema' ? { require_parameters: true } : {}),
+          ...(input.allowedUpstreams?.length ? { only: input.allowedUpstreams } : {}),
+        },
+      })
+    : undefined;
+
 const modelFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>): LanguageModel => {
-  if (input.adapter === 'openrouter') {
-    if (input.reasoningEffort === 'max')
-      throw new AiSdkGenerationError(
-        aiGenerationErrorSchema.parse({
-          code: 'capability_unsupported',
-          phase: 'preflight',
-          summary: 'OpenRouter adapter 不支持 max reasoning effort',
-          externalResult: 'not_sent',
-          requestId: input.requestId,
-        }),
-        { status: 'unknown', inputTokens: null, outputTokens: null },
-      );
-    const provider = createOpenRouter({
-      baseURL: input.baseURL,
-      apiKey: input.apiKey,
-      compatibility: 'strict',
-    });
-    return provider.chat(input.model, {
-      usage: { include: true },
-      provider: {
-        ...(input.mode === 'native_schema' ? { require_parameters: true } : {}),
-        ...(input.allowedUpstreams?.length ? { only: input.allowedUpstreams } : {}),
-      },
-      ...(input.reasoningEffort === undefined
-        ? {}
-        : { reasoning: { effort: input.reasoningEffort } }),
-    });
+  if (
+    compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 &&
+    input.reasoningEffort === 'max'
+  )
+    throw new AiSdkGenerationError(
+      aiGenerationErrorSchema.parse({
+        code: 'capability_unsupported',
+        phase: 'preflight',
+        summary: 'OpenRouter 兼容扩展不支持 max reasoning effort',
+        externalResult: 'not_sent',
+        requestId: input.requestId,
+      }),
+      { status: 'unknown', inputTokens: null, outputTokens: null },
+    );
+  if (input.adapter === 'openai-chat') {
+    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey }).chat(input.model);
   }
+  if (input.adapter === 'openai-responses') {
+    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey }).responses(input.model);
+  }
+  if (input.adapter === 'anthropic-messages') {
+    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey }).messages(input.model);
+  }
+  const transformRequestBody = openRouterTransform(input);
   return createOpenAICompatible({
-    name: input.providerId,
+    name: 'compatible',
     baseURL: input.baseURL,
     apiKey: input.apiKey,
     includeUsage: true,
     supportsStructuredOutputs: input.mode === 'native_schema',
     convertUsage: convertCompatibleUsage,
+    ...(transformRequestBody === undefined ? {} : { transformRequestBody }),
+    ...(compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      ? { metadataExtractor: openRouterMetadataExtractor }
+      : {}),
   }).chatModel(input.model);
+};
+
+const providerOptionsFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
+  if (input.reasoningEffort === undefined) return {};
+  if (input.adapter === 'anthropic-messages') {
+    if (input.reasoningEffort === 'minimal')
+      throw new AiSdkGenerationError(
+        aiGenerationErrorSchema.parse({
+          code: 'capability_unsupported',
+          phase: 'preflight',
+          summary: 'Anthropic Messages 不支持 minimal reasoning effort',
+          externalResult: 'not_sent',
+          requestId: input.requestId,
+        }),
+      );
+    if (input.reasoningEffort === 'none') return {};
+    return { providerOptions: { anthropic: { effort: input.reasoningEffort } } };
+  }
+  if (input.adapter === 'openai-chat' || input.adapter === 'openai-responses')
+    return { providerOptions: { openai: { reasoningEffort: input.reasoningEffort } } };
+  return {
+    providerOptions: {
+      compatible: { reasoningEffort: input.reasoningEffort },
+    },
+  };
 };
 
 const timeoutFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => ({
@@ -286,6 +355,7 @@ const commonOptions = <OUTPUT>(
   abortSignal: input.signal,
   timeout: timeoutFor(input),
   telemetry,
+  ...providerOptionsFor(input),
   onLanguageModelCallEnd: ({ usage }: { usage: LanguageModelUsage }) => onUsage(usage),
   ...(input.maxOutputTokens === undefined ? {} : { maxOutputTokens: input.maxOutputTokens }),
 });
@@ -309,7 +379,9 @@ const resultMetadata = (
 });
 
 export class AiSdkGenerationAdapter {
-  async generate<OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>): Promise<AiSdkGenerationResult<OUTPUT>> {
+  async generate<OUTPUT>(
+    input: AiSdkGenerationRequest<OUTPUT>,
+  ): Promise<AiSdkGenerationResult<OUTPUT>> {
     try {
       aiGenerationContractRefSchema.parse(input.contract);
       modelMessageSchema.array().parse(input.messages);
@@ -409,9 +481,7 @@ export class AiSdkGenerationAdapter {
     startedAt: number,
   ): Promise<AiSdkGenerationResult<OUTPUT>> {
     const output =
-      input.mode === 'native_schema'
-        ? Output.object({ schema: input.schema })
-        : Output.text();
+      input.mode === 'native_schema' ? Output.object({ schema: input.schema }) : Output.text();
     let streamError: unknown;
     let firstEvent: number | null = null;
     let firstText: number | null = null;
@@ -422,7 +492,9 @@ export class AiSdkGenerationAdapter {
         streamError = error;
       },
     });
-    for await (const part of result.stream as AsyncIterable<TextStreamPart<Record<string, never>>>) {
+    for await (const part of result.stream as AsyncIterable<
+      TextStreamPart<Record<string, never>>
+    >) {
       if (part.type === 'error') streamError = part.error;
       if (part.type === 'abort')
         throw new DOMException(part.reason ?? 'Provider stream aborted', 'AbortError');

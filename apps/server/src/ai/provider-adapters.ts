@@ -11,7 +11,21 @@ import {
   aiProviderModelReasoningSchema,
   type AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
-import { aiAdapterSchema, type AiAdapter } from '@thesis-ledger/schemas';
+import {
+  aiLegacyAdapterSchema,
+  aiChatImplementationSchema,
+  aiUpstreamFormatSchema,
+  aiUpstreamSelectionSchema,
+  type AiAdapter,
+  type AiChatImplementation,
+  type AiUpstreamFormat,
+} from '@thesis-ledger/schemas';
+import {
+  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
+  runtimeAdapterForSelection,
+  selectionFromLegacyAdapter,
+  type AiCompatibilityExtensionProfile,
+} from './ai-provider-upstream.js';
 
 type CompletionInput = {
   model: string;
@@ -29,7 +43,9 @@ const providerConfigSchema = z
         baseUrl: z.url(),
         apiKey: z.string().trim().min(1),
         models: z.array(z.string().trim().min(1).max(200)).min(1),
-        adapter: aiAdapterSchema.optional(),
+        upstreamFormat: aiUpstreamFormatSchema.optional(),
+        chatImplementation: aiChatImplementationSchema.optional(),
+        adapter: aiLegacyAdapterSchema.optional(),
         executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
         timeoutMs: z.number().int().positive().optional(),
         costPer1kInput: z.number().nonnegative().optional(),
@@ -48,6 +64,18 @@ const providerConfigSchema = z
     if (new Set(ids).size !== ids.length)
       context.addIssue({ code: 'custom', message: 'AI Provider id 必须唯一' });
     providers.forEach((provider, index) => {
+      const selection = aiUpstreamSelectionSchema.safeParse({
+        upstreamFormat: provider.upstreamFormat ?? 'chat-completions',
+        ...(provider.chatImplementation === undefined
+          ? {}
+          : { chatImplementation: provider.chatImplementation }),
+      });
+      if (!selection.success)
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'chatImplementation'],
+          message: '只有 Chat Completions 可以选择 Chat 实现',
+        });
       if (new Set(provider.models).size !== provider.models.length)
         context.addIssue({
           code: 'custom',
@@ -92,6 +120,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
       health?: AiProviderHealth;
       source?: 'database' | 'environment';
       modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
+      upstreamFormat?: AiUpstreamFormat;
+      chatImplementation?: AiChatImplementation;
+      compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
       adapter?: AiAdapter;
       executionRoutes?: readonly AiProviderExecutionRouteInput[];
       credentialFingerprint?: string;
@@ -105,6 +136,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
       ...(options?.capabilities ? { capabilities: [...options.capabilities] } : {}),
       ...(options?.source ? { source: options.source } : {}),
       ...(options?.modelReasoning ? { modelReasoning: options.modelReasoning } : {}),
+      ...(options?.upstreamFormat ? { upstreamFormat: options.upstreamFormat } : {}),
+      ...(options?.chatImplementation ? { chatImplementation: options.chatImplementation } : {}),
+      ...(options?.compatibilityExtensionProfile
+        ? { compatibilityExtensionProfile: options.compatibilityExtensionProfile }
+        : {}),
       ...(options?.adapter ? { adapter: options.adapter } : {}),
       ...(options?.executionRoutes ? { executionRoutes: options.executionRoutes } : {}),
       ...(options?.credentialFingerprint
@@ -271,8 +307,22 @@ export const parseConfiguredAiProviderInputs = (raw: string | undefined) => {
   return parsed.data;
 };
 
-const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: number) =>
-  new OpenAiCompatibleProvider(
+const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: number) => {
+  const selection =
+    input.adapter && input.upstreamFormat === undefined && input.chatImplementation === undefined
+      ? selectionFromLegacyAdapter(input.adapter)
+      : aiUpstreamSelectionSchema.parse({
+          upstreamFormat: input.upstreamFormat ?? 'chat-completions',
+          ...(input.chatImplementation === undefined
+            ? {}
+            : { chatImplementation: input.chatImplementation }),
+        });
+  const compatibilityExtensionProfile =
+    input.adapter === 'openrouter' && Boolean(input.executionRoutes?.length)
+      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      : undefined;
+  const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
+  return new OpenAiCompatibleProvider(
     input.id,
     input.models,
     input.baseUrl,
@@ -286,11 +336,17 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
     },
     {
       ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
-      ...(input.adapter ? { adapter: input.adapter } : {}),
+      upstreamFormat: selection.upstreamFormat,
+      ...(selection.upstreamFormat === 'chat-completions'
+        ? { chatImplementation: selection.chatImplementation }
+        : {}),
+      ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
+      ...(adapter ? { adapter } : {}),
       ...(input.executionRoutes ? { executionRoutes: input.executionRoutes } : {}),
       credentialFingerprint: createHash('sha256').update(input.apiKey, 'utf8').digest('hex'),
     },
   );
+};
 
 export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => {
   const providers: AiProvider[] = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map(
@@ -307,6 +363,12 @@ export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => 
           config.aiBaseUrl,
           config.aiApiKey,
           config.aiTimeoutMs,
+          undefined,
+          {
+            upstreamFormat: 'chat-completions',
+            chatImplementation: 'compatible',
+            adapter: 'openai-compatible-chat',
+          },
         ),
       );
     }

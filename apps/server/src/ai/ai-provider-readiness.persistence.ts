@@ -1,37 +1,36 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ProviderConfig } from '@prisma/client';
 import { createHash } from 'node:crypto';
-import type {
-  AiGenerationContractRef,
-  AiGenerationMode,
+import {
+  aiUpstreamSelectionSchema,
+  type AiGenerationContractRef,
+  type AiGenerationMode,
 } from '@thesis-ledger/schemas';
 import type { ProviderConfigService } from '../providers/provider-config.service.js';
-import {
-  aiProviderCapabilities,
-  parseAiProviderSettings,
-} from './ai-provider-summary.js';
-import {
-  asRecord,
-  type AiProviderInput,
-} from './ai-provider.contracts.js';
-import {
-  configurationFingerprint,
-  inferLegacyAiAdapter,
-  type AiProviderRouteSnapshot,
-} from './ai-provider-readiness.js';
+import { aiProviderCapabilities, parseAiProviderSettings } from './ai-provider-summary.js';
+import { asRecord, type AiProviderInput } from './ai-provider.contracts.js';
+import { configurationFingerprint, type AiProviderRouteSnapshot } from './ai-provider-readiness.js';
 
-export const settingsFromAiProviderInput = (
-  input: AiProviderInput,
-  existingSettings?: unknown,
-) => {
+export const settingsFromAiProviderInput = (input: AiProviderInput, existingSettings?: unknown) => {
   const existing = parseAiProviderSettings(existingSettings);
-  const adapter = input.adapter ?? existing?.adapter;
+  const selection = aiUpstreamSelectionSchema.parse({
+    upstreamFormat: input.upstreamFormat,
+    ...(input.chatImplementation === undefined
+      ? {}
+      : { chatImplementation: input.chatImplementation }),
+  });
   const executionRoutes =
     input.executionRoutes !== undefined ? input.executionRoutes : existing?.executionRoutes;
   return {
     baseUrl: input.baseUrl,
     models: [...new Set(input.models.map((model) => model.trim()))],
-    ...(adapter ? { adapter } : {}),
+    upstreamFormat: selection.upstreamFormat,
+    ...(selection.upstreamFormat === 'chat-completions'
+      ? { chatImplementation: selection.chatImplementation }
+      : {}),
+    ...(existing?.compatibilityExtensionProfile
+      ? { compatibilityExtensionProfile: existing.compatibilityExtensionProfile }
+      : {}),
     ...(executionRoutes === undefined ? {} : { executionRoutes }),
     ...(existing?.capabilityRevocations
       ? { capabilityRevocations: existing.capabilityRevocations }
@@ -60,11 +59,17 @@ export const routeSnapshotsFromProviderRow = (
   const credentialFingerprint = row.encryptedCredentials
     ? createHash('sha256').update(row.encryptedCredentials).digest('hex')
     : null;
-  const adapter = settings.adapter ?? inferLegacyAiAdapter(settings.baseUrl);
   return settings.executionRoutes.map((route) => ({
     providerId: row.name,
     baseUrl: settings.baseUrl,
-    adapter,
+    upstreamFormat: settings.upstreamFormat,
+    ...(settings.chatImplementation === undefined
+      ? {}
+      : { chatImplementation: settings.chatImplementation }),
+    ...(settings.compatibilityExtensionProfile === undefined
+      ? {}
+      : { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }),
+    adapter: settings.adapter ?? null,
     models: settings.models,
     route,
     enabled: row.enabled,

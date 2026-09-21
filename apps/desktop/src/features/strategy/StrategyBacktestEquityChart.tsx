@@ -1,20 +1,10 @@
 import { useMemo } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatDateTimeInTimeZone } from '@/lib/date-display';
 import type { BacktestChartModel } from './strategy-backtest-chart.model.js';
 import { backtestRangePresets } from './strategy-backtest-chart.model.js';
 import { useStrategyBacktestChart } from './useStrategyBacktestChart.js';
-
-const formatTime = (time: number, timezone: string) =>
-  new Intl.DateTimeFormat('zh-CN', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(time));
 
 const currencyFormatter = (currency: BacktestChartModel['currency']) => {
   if (!currency)
@@ -100,7 +90,7 @@ export function StrategyBacktestEquityChart({
         {chart.activeTime !== null && (
           <div className="pointer-events-none absolute left-3 top-3 rounded-md border bg-popover/95 px-3 py-2 text-xs shadow-sm">
             <p className="font-medium">
-              {formatTime(chart.activeTime, model.timezone)}
+              {formatDateTimeInTimeZone(chart.activeTime, model.timezone)}
               {chart.lockedTime !== null ? ' · 已锁定' : ''}
             </p>
             <p className="mt-1">

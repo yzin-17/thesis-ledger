@@ -8,7 +8,6 @@ import {
   experimentSourceLabel,
   experimentStageLabel,
   experimentStatusLabel,
-  formatCompactDateTime,
 } from '../src/features/strategy/strategy-list-presentation.js';
 import type { OptimizationExperimentSummary } from '../src/features/strategy/strategy-optimization.api.js';
 import type { BacktestJobSummary } from '../src/features/strategy/strategy.types.js';
@@ -45,12 +44,10 @@ const experiment = (
   }) as OptimizationExperimentSummary;
 
 describe('策略中心列表展示规则', () => {
-  it('分别格式化业务区间和紧凑本地时间', () => {
+  it('使用统一的业务日期格式', () => {
     expect(backtestPeriodLabel(job({ period: { start: '2025-01-02', end: '2025-08-31' } }))).toBe(
-      '2025/01/02 – 2025/08/31',
+      '2025-01-02 – 2025-08-31',
     );
-    expect(formatCompactDateTime('2026-09-18T12:34:00.000Z')).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
-    expect(formatCompactDateTime('invalid')).toBe('时间未记录');
   });
 
   it('只使用真实任务状态、进度和结果事实', () => {

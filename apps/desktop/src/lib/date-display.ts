@@ -10,6 +10,17 @@ const dateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
   hour12: false,
 });
 
+const timeZoneDateTimeFormatter = (timeZone: string) =>
+  new Intl.DateTimeFormat('zh-CN', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
 /**
  * Formats an API timestamp for people without changing date-only and month values
  * that are intentionally used as business periods or form values.
@@ -19,6 +30,17 @@ export const formatDateTime = (value: string | null | undefined, fallback = '—
   if (plainDateOrMonth.test(value)) return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? fallback : dateTimeFormatter.format(date);
+};
+
+/** Formats a timestamp in the supplied business timezone without exposing ISO syntax. */
+export const formatDateTimeInTimeZone = (
+  value: number | string | Date | null | undefined,
+  timeZone: string,
+  fallback = '—',
+) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : timeZoneDateTimeFormatter(timeZone).format(date);
 };
 
 /** Formats an API date-time as a business date for visible date ranges and tables. */

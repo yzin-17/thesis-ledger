@@ -3,23 +3,37 @@ import {
   aiGenerationContracts,
   aiProviderModelExecutionSchema,
   type AiAdapter,
+  type AiChatImplementation,
   type AiProviderModelExecution,
   type AiReadinessReason,
+  type AiUpstreamFormat,
 } from '@thesis-ledger/schemas';
 import type {
   AiProviderCapabilityRevocation,
   AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
+import {
+  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
+  resolveAiSdkProviderImplementation,
+  type AiCompatibilityExtensionProfile,
+} from './ai-provider-upstream.js';
 
-const SDK_VERSION = '7.0.95';
+const SDK_VERSION = '7.0.107';
 const ADAPTER_VERSIONS: Record<AiAdapter, string> = {
   openrouter: '3.0.0',
   'openai-compatible': '3.0.45',
+  'openai-compatible-chat': '3.0.53',
+  'openai-chat': '4.0.71',
+  'openai-responses': '4.0.71',
+  'anthropic-messages': '4.0.58',
 };
 
 export type AiProviderRouteSnapshot = {
   providerId: string;
   baseUrl: string;
+  upstreamFormat: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
   adapter: AiAdapter | null;
   models: readonly string[];
   route: AiProviderExecutionRouteInput;
@@ -47,26 +61,12 @@ const normalizedBaseUrl = (baseUrl: string) => {
   }
 };
 
-export const inferLegacyAiAdapter = (baseUrl: string): AiAdapter | null => {
-  try {
-    const hostname = new URL(baseUrl).hostname.toLowerCase();
-    if (hostname === 'openrouter.ai' || hostname.endsWith('.openrouter.ai')) return 'openrouter';
-    if (hostname === 'api.openai.com') return 'openai-compatible';
-    return null;
-  } catch {
-    return null;
-  }
-};
-
 const knownContract = (route: AiProviderExecutionRouteInput) =>
   Object.values(aiGenerationContracts).some(
     ({ ref }) => ref.id === route.contract.id && ref.version === route.contract.version,
   );
 
-const adapterEvidence = (
-  adapter: AiAdapter | null,
-  route: AiProviderExecutionRouteInput,
-) => {
+const adapterEvidence = (adapter: AiAdapter | null, route: AiProviderExecutionRouteInput) => {
   if (!adapter || !knownContract(route)) return null;
   const adapterVersion = ADAPTER_VERSIONS[adapter];
   return {
@@ -87,7 +87,8 @@ const adapterEvidence = (
 
 const routeAllowed = (snapshot: AiProviderRouteSnapshot, baseUrl: string | null) => {
   if (snapshot.route.allowedUpstreams.length === 0) return true;
-  if (snapshot.adapter === 'openrouter') return true;
+  if (snapshot.compatibilityExtensionProfile === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1)
+    return true;
   if (!baseUrl) return false;
   const endpoint = new URL(baseUrl);
   return snapshot.route.allowedUpstreams.some((allowed) => {
@@ -110,6 +111,15 @@ export const configurationFingerprint = (snapshot: AiProviderRouteSnapshot) =>
   fingerprint({
     providerId: snapshot.providerId,
     baseUrl: normalizedBaseUrl(snapshot.baseUrl),
+    upstreamFormat: snapshot.upstreamFormat,
+    chatImplementation: snapshot.chatImplementation ?? null,
+    sdkProviderImplementation: resolveAiSdkProviderImplementation({
+      upstreamFormat: snapshot.upstreamFormat,
+      ...(snapshot.chatImplementation === undefined
+        ? {}
+        : { chatImplementation: snapshot.chatImplementation }),
+    }),
+    compatibilityExtensionProfile: snapshot.compatibilityExtensionProfile ?? null,
     adapter: snapshot.adapter,
     model: snapshot.route.model,
     mode: snapshot.route.mode,
@@ -161,6 +171,9 @@ export const evaluateAiProviderReadiness = (
   return aiProviderModelExecutionSchema.parse({
     model: snapshot.route.model,
     adapter: snapshot.adapter ?? 'openai-compatible',
+    ...(snapshot.compatibilityExtensionProfile === undefined
+      ? {}
+      : { compatibilityExtensionProfile: snapshot.compatibilityExtensionProfile }),
     mode: snapshot.route.mode,
     contract: snapshot.route.contract,
     capabilityDeclaration: snapshot.route.capabilityDeclaration,

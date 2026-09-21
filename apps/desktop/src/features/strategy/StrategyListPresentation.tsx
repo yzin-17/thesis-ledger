@@ -4,12 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { formatDateTime } from '@/lib/date-display';
 import { strategyCenterPath } from './strategy-center.navigation.js';
-import {
-  backtestProgressLabel,
-  backtestResultSummary,
-  formatCompactDateTime,
-} from './strategy-list-presentation.js';
+import { backtestProgressLabel, backtestResultSummary } from './strategy-list-presentation.js';
 import { jobStatusLabel, jobStatusVariant } from './StrategySections.js';
 import type { BacktestJobSummary } from './strategy.types.js';
 
@@ -92,7 +89,7 @@ export function StrategyRecentBacktest({ job }: { job: BacktestJobSummary | null
     >
       <Badge variant={jobStatusVariant(job.status)}>{jobStatusLabel(job.status)}</Badge>
       <span className="text-xs text-muted-foreground">
-        {formatCompactDateTime(job.updatedAt ?? job.createdAt)}
+        {formatDateTime(job.updatedAt ?? job.createdAt, '时间未记录')}
       </span>
     </Link>
   );

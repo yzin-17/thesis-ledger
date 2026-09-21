@@ -1,6 +1,19 @@
 import type { ProviderConfig } from '@prisma/client';
 import type { AiProvider } from './contracts.js';
 import {
+  aiLegacyAdapterSchema,
+  aiUpstreamSelectionSchema,
+  type AiAdapter,
+  type AiChatImplementation,
+  type AiUpstreamFormat,
+} from '@thesis-ledger/schemas';
+import {
+  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
+  runtimeAdapterForSelection,
+  selectionFromLegacyAdapter,
+  type AiCompatibilityExtensionProfile,
+} from './ai-provider-upstream.js';
+import {
   asRecord,
   healthValue,
   httpUrl,
@@ -13,12 +26,14 @@ import {
   type AiProviderModelReasoning,
   type AiProviderSummary,
 } from './ai-provider.contracts.js';
-import { aiAdapterSchema, type AiAdapter } from '@thesis-ledger/schemas';
 
 export interface ParsedAiProviderSettings {
   baseUrl: string;
   models: string[];
-  adapter?: AiAdapter;
+  upstreamFormat: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
+  adapter: AiAdapter;
   executionRoutes?: AiProviderExecutionRouteInput[];
   capabilityRevocations?: AiProviderCapabilityRevocation[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
@@ -36,13 +51,46 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   const models = stringArray(record.models);
   if (typeof baseUrl !== 'string' || !httpUrl.safeParse(baseUrl).success || !models) return null;
   const modelReasoning = parseModelReasoning(record.modelReasoning, models);
-  const adapter = aiAdapterSchema.safeParse(record.adapter);
+  const legacyAdapter = aiLegacyAdapterSchema.safeParse(record.adapter);
   const executionRoutes = parseExecutionRoutes(record.executionRoutes, models);
   const capabilityRevocations = parseCapabilityRevocations(record.capabilityRevocations);
+  const explicitSelection = aiUpstreamSelectionSchema.safeParse({
+    upstreamFormat: record.upstreamFormat,
+    ...(record.chatImplementation === undefined
+      ? {}
+      : { chatImplementation: record.chatImplementation }),
+  });
+  if (
+    !explicitSelection.success &&
+    (record.upstreamFormat !== undefined || record.chatImplementation !== undefined)
+  )
+    return null;
+  if (!explicitSelection.success && !legacyAdapter.success) return null;
+  const selection = explicitSelection.success
+    ? explicitSelection.data
+    : selectionFromLegacyAdapter(legacyAdapter.data!);
+  const storedProfile =
+    record.compatibilityExtensionProfile === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      : undefined;
+  const migratedProfile =
+    !explicitSelection.success &&
+    legacyAdapter.success &&
+    legacyAdapter.data === 'openrouter' &&
+    Boolean(executionRoutes?.length)
+      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      : undefined;
+  const compatibilityExtensionProfile = storedProfile ?? migratedProfile;
+  const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
   return {
     baseUrl,
     models,
-    ...(adapter.success ? { adapter: adapter.data } : {}),
+    upstreamFormat: selection.upstreamFormat,
+    ...(selection.upstreamFormat === 'chat-completions'
+      ? { chatImplementation: selection.chatImplementation }
+      : {}),
+    ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
+    adapter,
     ...(executionRoutes ? { executionRoutes } : {}),
     ...(capabilityRevocations ? { capabilityRevocations } : {}),
     ...(modelReasoning ? { modelReasoning } : {}),
@@ -106,7 +154,10 @@ type HealthSnapshot = {
 } | null;
 
 const settingsSummary = (settings: ParsedAiProviderSettings | null) => ({
-  ...(settings?.adapter === undefined ? {} : { adapter: settings.adapter }),
+  ...(settings?.upstreamFormat === undefined ? {} : { upstreamFormat: settings.upstreamFormat }),
+  ...(settings?.chatImplementation === undefined
+    ? {}
+    : { chatImplementation: settings.chatImplementation }),
   ...(settings?.executionRoutes === undefined
     ? {}
     : { executionRouteConfigs: settings.executionRoutes }),
@@ -150,7 +201,12 @@ export const aiProviderSummaryFromProvider = (provider: AiProvider): AiProviderS
   capabilities: [...(provider.metadata?.capabilities ?? ['chat'])],
   baseUrl: provider.metadata?.baseURL ?? null,
   models: [...provider.models],
-  ...(provider.metadata?.adapter === undefined ? {} : { adapter: provider.metadata.adapter }),
+  ...(provider.metadata?.upstreamFormat === undefined
+    ? {}
+    : { upstreamFormat: provider.metadata.upstreamFormat }),
+  ...(provider.metadata?.chatImplementation === undefined
+    ? {}
+    : { chatImplementation: provider.metadata.chatImplementation }),
   ...(provider.metadata?.executionRoutes === undefined
     ? {}
     : { executionRouteConfigs: [...provider.metadata.executionRoutes] }),

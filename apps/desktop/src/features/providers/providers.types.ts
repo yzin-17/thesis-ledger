@@ -1,8 +1,9 @@
 import type {
-  AiAdapter,
+  AiChatImplementation,
   AiGenerationContractRef,
   AiGenerationMode,
   AiProviderModelExecution,
+  AiUpstreamFormat,
 } from '@thesis-ledger/schemas';
 
 export type AiProviderExecutionRouteConfig = {
@@ -90,7 +91,8 @@ export interface ProviderRecord {
   source?: 'database' | 'environment';
   baseUrl?: string | null;
   models?: string[];
-  adapter?: AiAdapter;
+  upstreamFormat?: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
   executionRouteConfigs?: AiProviderExecutionRouteConfig[];
   executionRoutes?: AiProviderModelExecution[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
@@ -440,15 +442,16 @@ export const newProviderDraft = () => ({
   credentialsRef: '',
   priority: 1,
   enabled: true,
-  baseUrl: 'https://openrouter.ai/api/v1',
-  modelsText: 'nvidia/nemotron-3-super-120b-a12b:free',
+  baseUrl: '',
+  modelsText: '',
   timeoutMs: '30000',
   costPer1kInput: '',
   costPer1kOutput: '',
   costCurrency: 'USD',
   pricingVersion: '',
   modelReasoning: {} as Record<string, AiProviderModelReasoning>,
-  adapter: 'openrouter' as AiAdapter,
+  upstreamFormat: 'chat-completions' as AiUpstreamFormat,
+  chatImplementation: 'compatible' as AiChatImplementation | undefined,
   executionRoutes: [] as AiProviderExecutionRouteDraft[],
 });
 
@@ -462,12 +465,17 @@ export const newAiProviderDraft = () => ({
 });
 
 export const providerDraftForType = (type: string, current: ProviderDraft): ProviderDraft => {
-  if (type === 'ai') return { ...newAiProviderDraft(), name: current.name };
+  const shared = {
+    name: current.name,
+    priority: current.priority,
+    enabled: current.enabled,
+  };
+  if (type === 'ai') return { ...newAiProviderDraft(), ...shared };
   return {
-    ...current,
+    ...newProviderDraft(),
+    ...shared,
     type,
     capabilities: type === 'notification' ? ['notification'] : [],
-    credentialsRef: '',
   };
 };
 

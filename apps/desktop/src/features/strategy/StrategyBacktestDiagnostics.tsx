@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Copy, Download } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import {
   buildBacktestDiagnosticExport,
   buildBacktestDiagnosticSummary,
@@ -10,6 +11,20 @@ import {
 import type { BacktestJob, BacktestJobResult } from './strategy.types.js';
 
 type DiagnosticField = { label: string; value: unknown };
+
+const displayDiagnosticDateTime = (value: unknown) =>
+  typeof value === 'string' ? formatDateTime(value, '未记录') : '未记录';
+
+const displayDiagnosticDate = (value: unknown) =>
+  typeof value === 'string' ? formatDateOnly(value, '未记录') : '未记录';
+
+const displayExecutionModel = (
+  model: BacktestDiagnosticExport['frozenConfiguration']['executionModel'],
+) => ({
+  ...model,
+  rangeStart: displayDiagnosticDate(model.rangeStart),
+  rangeEnd: displayDiagnosticDate(model.rangeEnd),
+});
 
 const valueText = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '未记录';
@@ -35,20 +50,32 @@ const diagnosticGroups = (payload: BacktestDiagnosticExport) => [
       { label: '任务模式', value: payload.identity.mode },
       { label: '任务状态', value: payload.identity.status },
       { label: '执行阶段', value: payload.identity.stage },
-      { label: '请求区间', value: payload.identity.period },
-      { label: '创建时间', value: payload.identity.createdAt },
-      { label: '开始时间', value: payload.identity.startedAt },
-      { label: '完成时间', value: payload.identity.finishedAt },
+      {
+        label: '请求区间',
+        value: {
+          start: displayDiagnosticDate(payload.identity.period.start),
+          end: displayDiagnosticDate(payload.identity.period.end),
+        },
+      },
+      { label: '创建时间', value: displayDiagnosticDateTime(payload.identity.createdAt) },
+      { label: '开始时间', value: displayDiagnosticDateTime(payload.identity.startedAt) },
+      { label: '完成时间', value: displayDiagnosticDateTime(payload.identity.finishedAt) },
     ],
   },
   {
     title: '数据与执行',
     fields: [
-      { label: '数据冻结时点', value: payload.frozenConfiguration.dataAsOf },
+      {
+        label: '数据冻结时点',
+        value: displayDiagnosticDateTime(payload.frozenConfiguration.dataAsOf),
+      },
       { label: '基准币种', value: payload.frozenConfiguration.baseCurrency },
       { label: '初始资金', value: payload.frozenConfiguration.initialCash },
       { label: '估值策略', value: payload.frozenConfiguration.valuationPolicy },
-      { label: '执行模型摘要', value: payload.frozenConfiguration.executionModel },
+      {
+        label: '执行模型摘要',
+        value: displayExecutionModel(payload.frozenConfiguration.executionModel),
+      },
       { label: '数据快照 ID', value: payload.traceability.snapshotId },
       { label: '执行模型哈希', value: payload.traceability.executionModelHash },
       { label: '市场规则版本', value: payload.traceability.marketRuleVersion },

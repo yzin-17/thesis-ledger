@@ -38,6 +38,8 @@ type SaveInput = {
 const validSettings = (baseUrl = 'https://db.example/v1', models = ['db-model']) => ({
   baseUrl,
   models,
+  upstreamFormat: 'chat-completions',
+  chatImplementation: 'compatible',
 });
 
 const createConfigStub = (initial: TestRow[] = []) => {
@@ -311,7 +313,6 @@ describe('AI Provider 持久化管理', () => {
       expect(sdk.generate).toHaveBeenCalledTimes(4);
       for (const [input] of sdk.generate.mock.calls) {
         expect(input).toMatchObject({
-          adapter: 'openrouter',
           mode: 'json_validated',
           transport: 'single',
           maxOutputTokens: 128,
@@ -352,7 +353,7 @@ describe('AI Provider 持久化管理', () => {
     }
   });
 
-  it('同名非 AI Provider 永远拒绝覆盖', async () => {
+  it('统一流程允许同名非 AI Provider 转换为 AI', async () => {
     const existing = createDbRow('shared', { type: 'notification' });
     const configs = createConfigStub([existing]);
     const service = new AiProviderService(
@@ -362,16 +363,22 @@ describe('AI Provider 持久化管理', () => {
       successfulSdk() as never,
     );
 
-    await expect(
-      service.save({
-        name: 'shared',
-        baseUrl: 'https://ai.example/v1',
-        models: ['model'],
-        apiKey: 'new-key',
-      }),
-    ).rejects.toThrow('不能转换或覆盖');
-    expect(existing.type).toBe('notification');
-    expect(configs.service.findStored).toHaveBeenCalledTimes(1);
+    await service.save({
+      name: 'shared',
+      baseUrl: 'https://ai.example/v1',
+      models: ['model'],
+      apiKey: 'new-key',
+    });
+
+    const saved = await configs.service.findStored('shared');
+    expect(saved?.type).toBe('ai');
+    expect(saved?.settings).toMatchObject({
+      baseUrl: 'https://ai.example/v1',
+      models: ['model'],
+    });
+    expect(configs.service.saveAi).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'shared', credentialsRef: 'new-key' }),
+    );
   });
 
   it('模型目录支持草稿 Key 与已保存凭据，返回去重排序后的脱敏 ID', async () => {
@@ -587,7 +594,8 @@ describe('AI Provider 持久化管理', () => {
           costPer1kOutput: 0.09,
           costCurrency: 'USD',
           pricingVersion: 'env-v1',
-          adapter: 'openai-compatible',
+          upstreamFormat: 'chat-completions',
+          chatImplementation: 'compatible',
           executionRouteConfigs: [
             expect.objectContaining({
               model: 'env-only-model',

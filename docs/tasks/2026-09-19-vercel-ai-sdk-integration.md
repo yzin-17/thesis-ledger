@@ -3,14 +3,15 @@
 > 任务标识：`2026-09-19-vercel-ai-sdk-integration`
 > 创建日期：2026-09-19
 > 对应 Spec：[AI 接入层迁移至 Vercel AI SDK](../specs/2026-09-19-vercel-ai-sdk-integration.md)
-> 状态：实施中；T0–T11、G0 已完成，G1 因真实上游连续限流阻塞，G2 待执行。
+> 状态：实施中；T0–T13、G0、G0.1 与 G2 已完成，T13 的统一流程待浏览器/目标运行态重新验收，G1 因真实上游连续限流阻塞。
 
 ## 1. 执行边界
 
-- 规划阶段只生成文档；2026-09-19 已开始实施，当前已完成 T0–T11 与 G0。策略生成和 Research Assistant 已切换到 SDK 请求事实链路，目标 Docker 已更新并完成受控故障与兼容回滚验收；G1 已发起真实上游请求，但触发连续 3 次同类限流停止条件，未取得合法结果；浏览器验收尚未执行。
+- 2026-09-19 已完成 T0–T11 与原 G0。2026-09-20 用户要求先完成方案，先只修订 Spec/Task，不修改源码、依赖、容器或外部配置；随后在确认统一流程后进入 T13 实施。T12 完成前，原 adapter/UI 实现不满足新增 AC41–AC46；原 G0 仅保留为旧输入的历史证据，不能证明纠偏后的运行态。
+- 2026-09-20 用户进一步确认普通 Provider 与 AI Provider 必须进入同一编辑流程；T13 在现有 T12 结果上增加统一草稿协调、双向类型切换和目标类型保存转换，不重做 T0–T12 的已完成证据。
 - 保留当前工作树已有修改；实施前记录提交、相关未提交 diff 与配置指纹，不拿远端旧实现覆盖本地。
 - Spec 是行为与验收事实源，本 Task 维护交付、依赖和证据。按状态持久化、执行面、消费面、部署验收拆分；先 T5 策略本地闭环，再 T6 研究链路。
-- 每项任务自带定向验证；G0–G2 不接收缺失核心实现。真实免费模型受限不阻断其他已就绪的本地任务。
+- 每项任务自带定向验证；G0–G2 及新增 G0.1 不接收缺失核心实现。真实免费模型受限不阻断其他已就绪的本地任务。
 - 当前方案使用既有 JSON、checkpoint、executionAttempt 及步骤绑定，不新增数据库表列。若 T2 证明必须改结构，先修订 Spec/Task 并增加独立结构任务，维护新增 migration、matrix、raw-owned inventory、打包输入和结构门禁；不改历史 migration，不隐式重建开发库。
 
 ## 2. 实施任务
@@ -155,6 +156,57 @@
   - 验证证据：回滚样例覆盖 legacy/new facts、unknown 防重放、在途和损坏事实；停领开关、SDK 单次连接探针、无远程 `complete` 协议及策略 SDK 执行器均有回归。Server 全量 124 文件/767 项通过，15 个需显式环境的集成文件共 49 项保持跳过；Server 生产构建、定向 ESLint/Prettier、import boundaries、workspace dependency graph、主仓/infra `git diff --check` 和 infra Compose AI Provider 契约通过。仓库级文件尺寸门禁仍为 T10 已记录的 5 个既有工作树增量阻断；T11 未新增尺寸违规，`strategy-optimization.service.ts` 恢复到本轮开始前的行数，未声称总门禁通过。
   - T11 完成时的未验证边界：回滚预检尚未连接当前 Docker 数据库，目标镜像更新、在途阻断、故障注入和回滚演练当时仍属于 G0；这些边界已在后续 G0 证据中补齐。真实 Provider 和浏览器消费仍分别属于 G1、G2，未以本地样例、构建或 Compose 渲染替代。
 
+### T12：上游格式与 Provider 编辑器纠偏
+
+T12 是 2026-09-20 新增的纠偏任务组。它保留 T0–T11 的请求事实、预算、防重放与业务契约，不重新打开无关实现；完成前不得把旧 UI 或旧 `adapter` 枚举称为符合当前方案。
+
+- [x] T12.1：建立上游格式、Chat 实现与 Vercel Provider 的显式契约。
+  - 覆盖验收：AC24、AC28、AC34、AC35、AC43、AC44。
+  - 依赖：T1、T3、T4 的历史契约与接入模块已完成。
+  - 范围：共享 Schema、AI Provider 管理输入/摘要、数据库与环境 JSON 读取、Provider metadata、就绪快照及配置指纹；不修改生成、预算或任务状态机。
+  - 交付与完成条件：新增 `upstreamFormat`，值只允许 `chat-completions`、`responses`、`anthropic-messages`；仅 Chat Completions 接受 `chatImplementation=compatible/openai-native`，缺省为 `compatible`。客户端不能提交 SDK 包名或内部 adapter。服务端通过纯解析器按这两个显式字段得到四条执行分支；base URL 只参与地址、安全校验和配置指纹，不参与 Provider 选择。旧 `adapter=openrouter/openai-compatible` 只在存量数据库与环境配置读取边界映射为 `chat-completions + compatible`；旧 OpenRouter 配置存在厂商扩展时同时保留服务端只读的 `compatibilityExtensionProfile=openrouter-v1`，客户端不能创建或覆盖该标记。新保存结果不继续写旧 adapter，旧执行事实仍可读，不回写或重新解释历史请求。
+  - 验证方式：共享 Schema 与 Server 契约测试覆盖三个合法格式、Chat 条件字段组合、未知值、客户端伪造 adapter/扩展标记、四条显式分支、相同 URL 配不同 Chat 实现、不同 URL 配相同实现、旧数据库/环境样例、旧扩展标记跨无关编辑保留、新保存往返、旧执行事实读取和指纹变化。测试不得访问真实 Provider。
+  - 2026-09-20 实施证据：新增共享 `aiUpstreamSelectionSchema` 与 Server 纯路由解析器，管理输入/摘要、数据库与环境配置读取、metadata、就绪快照和配置指纹已改用显式格式；旧 adapter 仅在读取边界迁移，新保存不再持久化 adapter，旧 OpenRouter 扩展标记只读保留。Schema 定向 2 项、Server 定向 5 文件/39 项、Schema 全量 23 文件/209 项、Server 全量 125 文件/775 项通过；15 个需显式数据库环境的文件共 49 项保持跳过。Schema/Server typecheck、Server build、修改范围 ESLint、import boundaries、workspace dependency graph、文件尺寸 ratchet 与 `git diff --check` 通过，文件尺寸仅报告 11 个存量 warning。全仓复杂度聚合入口因 Mobile `node_modules` 解析噪声及未涉及的 MarketDetail 测试 23 个既有 ESLint error 未通过，未计为通过且未在本任务中扩张范围。四条官方 Provider 执行链、Desktop payload、Docker、浏览器与真实 Provider 仍分别属于 T12.2、T12.3、G0.1、G2/G1，本项不越界声称就绪。
+
+- [x] T12.2：接通官方 Vercel Provider 并迁移必要的 OpenRouter 兼容能力。
+  - 覆盖验收：AC01–AC10、AC13、AC15、AC20、AC28、AC35、AC43–AC45。
+  - 依赖：T12.1 的显式配置契约通过。
+  - 范围：`AiSdkGenerationAdapter`、依赖 manifest/lockfile、连接测试、模型目录请求和本地 HTTP/SSE fixture；不修改业务 Prompt、领域 Schema、fallback 数量或预算上限。
+  - 交付与完成条件：通用 Chat 使用 `@ai-sdk/openai-compatible.chatModel()`；OpenAI 原生 Chat 使用 `@ai-sdk/openai.chat()`；Responses 使用 `@ai-sdk/openai.responses()`；Anthropic Messages 使用 `@ai-sdk/anthropic.messages()`。服务端依赖只保留 `ai` 与官方 `@ai-sdk/*`，完成迁移后移除 `@openrouter/ai-sdk-provider`。四条路径保留 `maxRetries: 0`、超时/取消、完整流消费、usage/finish reason 和结构化输出边界。现有 OpenRouter 配置已使用的 reasoning、路由约束及 usage/cost 分别通过已验证的 compatible provider options、受只读 `openrouter-v1` 标记约束的 `transformRequestBody` 白名单和 `metadataExtractor` 迁移；新连接不得因 URL 获得该扩展，无法等价映射时标记待迁移并阻断执行。模型目录、最小生成、业务结构化生成分别保存验证结果；连接测试不得走另一个协议或冒充业务能力通过。
+  - 验证方式：锁定并实际导入兼容版本；四条本地 HTTP/SSE 路径分别断言 URL、鉴权头、请求体、结构化输出、流尾帧、用量/错误、请求次数与无隐式降级。另以 OpenRouter 兼容 fixture 对照迁移前后出站字段和元数据，覆盖等价迁移、不可迁移阻断、未知费用不填零，以及三类验证状态互不代替。包级测试、typecheck/build 和依赖/边界门禁通过后才可完成；不以 SDK mock 代替实际 Provider 包出站形态。
+  - 2026-09-20 实施证据：精确锁定 `ai@7.0.107`、`@ai-sdk/openai-compatible@3.0.53`、`@ai-sdk/openai@4.0.71`、`@ai-sdk/anthropic@4.0.58`，`pnpm install --frozen-lockfile` 与实际顶层依赖核对通过，`@openrouter/ai-sdk-provider` 已从 manifest/lockfile 移除。生成适配器按显式分支调用 `chatModel()`、`chat()`、`responses()`、`messages()`；本地真实 Provider 包 fixture 覆盖四类 URL/鉴权/请求体/native Schema、OpenAI-compatible SSE 尾帧、usage、finish reason、取消/超时、单请求和无降级。旧 OpenRouter 路由约束只在 `openrouter-v1` 下经白名单转换，reasoning 走 compatible provider options，usage/cost 经 metadata extractor 提取；同名或同 URL 的新连接不能获得扩展，无法映射的 `max` 在发送前以 `capability_unsupported` 阻断，未知费用保持未知。Anthropic 模型目录使用 API Key/版本头，其余格式保持 Bearer `/models`。T12.2 定向 9 文件/69 项、Server 全量 125 文件/779 项通过，15 个需显式数据库环境的文件共 49 项保持跳过；Schema 全量 23 文件/209 项、Server typecheck/build、修改范围 ESLint、import boundaries、workspace dependency graph、文件尺寸 ratchet 与 `git diff --check` 通过。官方资料核对使用 OpenAI Responses 迁移文档与 Vercel AI SDK Provider 文档；未发真实 Provider 请求，三类真实路由与浏览器仍留给 G1/G2。
+
+- [x] T12.3：在同一个 Drawer 内完成 AI 类型切换与中性默认值。
+  - 覆盖验收：AC41–AC43、AC45、AC46。
+  - 依赖：T12.1 的 `upstreamFormat` 客户端契约就绪；T12.2 可并行实施，但 T12.3 完成验收需要保存/测试 API 契约一致。
+  - 范围：Desktop Provider 新建/编辑状态所有权、`ProviderEditorSheet`、AI 字段、草稿转换与定向交互测试；复用既有 shadcn Sheet/Select/Field，不改 Provider 列表与无关样式。
+  - 交付与完成条件：从非 AI 类型切到 AI 时不关闭或替换 Sheet 组件，名称保持；AI 默认草稿的 base URL、模型列表、凭证和厂商信息为空，默认选择 `Chat Completions + 通用兼容`。字段标签改为“上游格式”，选项中文显示为 `Chat Completions（需支持对应接口）`、`Responses（原生）`、`Anthropic Messages（需支持对应接口）`；仅选择 Chat 时在高级选项显示“Chat 实现：通用兼容 / OpenAI 原生”，不出现 OpenRouter 选项或内部包名。切换格式保留名称、地址、凭证和模型输入；不兼容的条件字段清除前给出明确处理，相关验证标记过期，旧异步结果不得覆盖新状态。编辑旧配置显示迁移后的格式和 Chat 实现。
+  - 验证方式：组件交互测试必须先输入名称再切换 AI，并断言同一 Sheet 保持打开、名称不丢失、无 OpenRouter 默认 URL/模型/选项、三种中文回显、Chat 条件字段、切换时字段保留/不兼容处理、验证过期和异步竞态。分别断言模型目录失败仍能手填模型、最小生成成功不显示业务结构化能力通过及最终保存 payload。G2 再验证真实浏览器焦点、滚动和保存流程，组件测试不替代浏览器门禁。
+  - 2026-09-20 实施证据：Provider 页面由两个编辑 Sheet 收敛为单一 `ProviderEditorSheet` 实例；新建普通 Provider 输入名称后切换 AI 时，以同一打开状态接管中性 AI 草稿并保留名称，不再关闭后重开。AI 草稿不预填 base URL、模型、凭证或厂商信息，默认仅为 `chat-completions + compatible`；界面使用三种中文“上游格式”选项，Chat 时才显示“高级选项 · Chat 实现”，旧 `adapter`/OpenRouter 选项和 OpenRouter 占位地址已移除。格式切换保留公共字段、明确提示并清除不兼容的 Chat 条件字段；模型目录请求携带格式，目录失败时仍可手动添加模型 ID。草稿变更、格式/地址/模型修改及后发请求会使连接测试 token、模型目录和最小生成旧结果失效；成功提示明确只证明连接与最小生成，不冒充业务结构化能力。旧摘要缺少新字段时按迁移后的 `Chat Completions + 通用兼容` 显示，保存 payload 只提交显式新字段。
+  - 定向与包级验证：`ai-provider-ui.test.tsx` 与 `providers-automation-ui.test.tsx` 共 41 项通过，覆盖名称后切换、单 Sheet 接线、中性默认、三种中文回显、Chat 条件字段、公共字段保留、条件字段清理、旧异步结果失效、手动模型入口、分层成功文案、旧配置显示和最终 payload；Desktop 全量 66 个文件/448 项通过，typecheck 与生产 build 通过。修改范围 ESLint 与 `git diff --check` 无 error；定向复杂度诊断仅报告 9 个既有大函数/复杂度 warning。import boundaries、workspace dependency graph 与文件尺寸 ratchet 通过，文件尺寸仍仅报告 11 个存量 warning。未执行真实浏览器，焦点、滚动和目标运行态保存仍由 G2/G0.1 承担。
+
+### T13：统一 Provider 编辑流程与类型转换
+
+T13 是 2026-09-20 根据用户对 Provider 选择流程的进一步确认新增的任务组。它只扩展 Provider 编辑/保存边界，不重新打开 AI SDK 生成、预算、任务状态机或 T12 的上游格式契约。
+
+- [x] T13.1：建立统一 Provider 草稿协调器。
+  - 覆盖验收：AC47、AC46。
+  - 依赖：T12.3 的字段契约与异步失效规则已就绪。
+  - 范围：Desktop Provider 编辑状态、`ProviderEditorSheet` 类型选择、普通/AI 字段显隐、模型目录/测试状态、保存与测试分派；列表级启停/删除操作保持现有专用入口。
+  - 交付与完成条件：普通与 AI 共用一个 Sheet、一个草稿状态和一个类型选择器；类型可双向切换；名称、启用状态和优先级保留；切换时清理不适用的类型专属字段并使测试/模型目录结果失效；最终保存/测试由协调器按草稿类型选择专用接口，普通接口不会收到 AI 字段。
+  - 验证方式：Desktop 定向交互/纯函数测试断言四类类型的双向切换、公共字段保留、专属字段清理、单 Sheet 接线、类型选择器未被 AI 状态禁用及旧异步结果失效；随后运行 Desktop typecheck/build 与修改范围 ESLint。
+  - 2026-09-20 实施证据：`ProviderSettings` 现在只挂载一个 `ProviderEditorSheet`，新建、普通 Provider 编辑和 AI Provider 编辑均通过 `useAiProviderEditor` 的统一草稿协调器进入；类型选择器可在普通与 AI 之间双向切换。类型切换保留名称、启用状态和优先级，清空目标类型不适用的凭证、AI 设置、模型目录与执行路由，并使连接测试/模型目录/最小生成旧结果失效；最终保存与测试按草稿最终类型分派到普通或 AI 接口，普通接口不会收到 AI 专属字段。
+  - 定向验证：`apps/desktop` 的 `rtk pnpm exec vitest run test/ai-provider-ui.test.tsx` 通过，24 项通过；Desktop 全量测试 66 个文件、449 项通过；Desktop typecheck 与生产 build 通过。测试覆盖普通→AI、AI→普通、公共字段保留、专属字段清理、单 Sheet 接线、类型选择器不再锁死和旧异步结果失效。未执行统一流程的真实浏览器焦点、滚动和保存验收。
+
+- [x] T13.2：支持数据库来源 Provider 的目标类型保存转换。
+  - 覆盖验收：AC48。
+  - 依赖：T13.1 的最终类型分派契约；T12.1 的普通/AI 配置持久化边界。
+  - 范围：普通配置服务、AI Provider 保存校验及管理测试；不新增数据库列或 migration，不改变环境来源配置的只读/接管约束。
+  - 交付与完成条件：同名数据库来源记录可以从普通类型切换为 AI 或从 AI 切换为普通类型；目标接口重新校验目标类型字段，替换不再适用的 `settings`，空凭证保留现有凭证；环境来源切换必须重新提交目标类型凭证，不能静默覆盖部署配置。
+  - 验证方式：Server 定向管理测试覆盖普通→AI、AI→普通、凭证保留、旧类型专属设置不泄漏及环境接管缺凭证阻断；通过后运行 Server typecheck/build 与相关依赖/边界检查。
+  - 2026-09-20 实施证据：AI 保存服务不再拒绝同名普通数据库记录，目标 AI 接口会按 AI Schema 更新类型并替换 AI `settings`；普通配置服务按目标普通类型 upsert 并将不再适用的 settings 置空，空凭证继续保留已有加密凭证。统一编辑器对环境来源的接管要求重新提交目标类型凭证，避免 UI 静默覆盖部署配置；数据库字段与 migration 未改变。
+  - 定向验证：`apps/server` 的 `rtk pnpm exec vitest run test/ai/ai-provider-management.test.ts` 通过，13 项通过；`rtk pnpm exec vitest run test/providers/services.test.ts` 通过，10 项通过；覆盖普通→AI、AI→普通、目标 settings 隔离、凭证保留和原有环境来源只读/接管规则。Server typecheck 与 build 通过。未执行统一流程的真实浏览器保存和目标 Docker 重新部署验收。
+
 T1 的契约与共享样例通过后才是下游契约就绪点；消费者不得独立发明不一致的 mock。契约修改需同步消费者并标记失效证据。T2 的 AI 请求事实与策略预算保持明确所有权，调整依赖方向时维护 `scripts/check-boundaries.mjs`；不创建无所有权的通用工具目录。
 
 ## 3. 独立运行态门禁
@@ -170,9 +222,20 @@ T1 的契约与共享样例通过后才是下游契约就绪点；消费者不�
   - 回滚演练：目标数据库初始预检为 `ready`。插入一条带合法 `sdk-execution-v1`、`dispatching` 请求的可识别临时在途事实后，目标镜像内 CLI 以退出码 2 返回 `keep_tasks_disabled`，阻断项为 `active_ai_runs` 和 `unsettled_sdk_requests`；删除且仅删除该临时事实后恢复 `ready`。重启同一镜像模拟兼容恢复启动，容器再次 healthy，两个停领开关仍为 `false`，预检仍为 `ready`；历史 6 个 unknown run 与 6 个 unknown attempt 的防重放清单前后不变。临时事实和临时转发容器均已清理。
   - 放行边界：G0 通过；它证明当前目标 Docker、受控本地 Provider/目标数据库竞态与兼容回滚输入，不证明真实上游 Provider、免费路由、浏览器交互或长期稳定性。G1/G2 开始前需显式恢复对应执行开关并继续使用标准部署入口，不能把本次停领状态当作业务可用。
 
+- [x] G0.1：T12 后的目标运行态与兼容读取重新验收。
+  - 覆盖验收：AC24、AC28、AC34、AC35、AC39、AC43–AC46 的纠偏后运行态断言。
+  - 依赖：T12.1–T12.3 完成；低成本验证通过。
+  - 责任与入口：部署集成；T12 新增 Server 运行时依赖，必须使用相邻 infra 的 `./scripts/update.sh thesis-ledger` 完整更新，不能使用 `sync-code.sh`、直接 Compose build/up 或 `docker cp`。
+  - 场景：同一稳定镜像读取旧 OpenRouter/通用兼容配置并显示为 `Chat Completions + 通用兼容`；同一 base URL 分别配置通用兼容/OpenAI 原生时命中不同显式 Provider，相同显式配置更换 base URL 时不改变 Provider；使用受控本地端点验证通用 Chat、OpenAI Chat、Responses、Anthropic Messages 的单请求执行与未就绪阻断；验证 OpenRouter 必要扩展的等价迁移和不可迁移阻断，以及三类验证结果互不冒充；回滚预检继续读取旧、新执行事实并维持 unknown 防重放。
+  - 证据与放行：记录源码、依赖、配置、镜像与容器指纹、显式上游格式/Chat 实现、实际 Provider、请求 URL/次数、迁移结果、三类验证状态及任务/预算事实。原 G0 证据只证明 T12 之前的输入，不能替代本门禁。
+  - 2026-09-20 更新证据：在研究与策略优化停领开关均为 `false` 的条件下，使用相邻 infra 的 `AI_RESEARCH_EXECUTION_ENABLED=false STRATEGY_AI_OPTIMIZATION_ENABLED=false ./scripts/update.sh thesis-ledger` 完整构建并更新一次，没有使用 `sync-code.sh`、直接 Compose 或 `docker cp`。受限环境中的首次构建在 Buildx 活动文件写入前因权限拒绝退出，未改变容器；同一标准入口获准后成功完成。目标镜像摘要为 `sha256:fad589088df3ffd87fb4a6aaffead57b74b58037d75339226d235d95d2a3c8b1`，Server 容器为 `6af81bee34de43f67f17184c0110ed62728ccc37b4a18b28e257e80eebcea84e`；Server、backtest-worker、PostgreSQL、Redis 与 DSA 均 healthy，健康 API 报告版本 `0.1.0`、Schema `20260918153000_strategy_optimization_adoption_context`。容器内实际版本为 `ai@7.0.107`、`@ai-sdk/openai-compatible@3.0.53`、`@ai-sdk/openai@4.0.71`、`@ai-sdk/anthropic@4.0.58`，OpenRouter 专用包不存在。
+  - 兼容读取与显式选择：目标 API 将存量数据库 OpenRouter 配置读取为 `upstreamFormat=chat-completions`、`chatImplementation=compatible`，三条路由均解析为 `openai-compatible-chat` 并保留只读 `openrouter-v1`。目标镜像内纯解析器证明同一 base URL 的通用兼容与 OpenAI 原生分别选择 `openai-compatible-chat`、`openai-chat`，同一通用兼容配置更换两个不同 base URL 后实现仍保持 `openai-compatible-chat`，地址不参与 Provider 选择。
+  - 受控出站与阻断：目标容器连接同一受控本地端点，通用 Chat、OpenAI Chat、Responses、Anthropic Messages 分别命中 `/v1/chat/completions`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages`，四条路径各 1 次并取得合法结构化结果及 reported usage；前三者使用 Bearer，Anthropic 使用 `x-api-key` 与 `anthropic-version`。旧 `openrouter-v1` 路径把 `reasoning_effort=high`、`provider.require_parameters=true` 和单一允许上游等价写入；无扩展标记的新兼容连接即使名称类似 OpenRouter 也不携带 `provider` 字段；旧 `max` 推理强度以 `capability_unsupported/preflight/not_sent` 阻断，总请求数仍为 6。缺少能力声明的路由经 `strictReady` 以 `capability_declaration_missing` 阻断。
+  - 分层与回滚：目标公开摘要同时保留连接健康 `healthy`、本地接入就绪 `ready` 与真实业务验收 `not_run`，没有相互冒充。回滚 CLI 实际读取 19 个 AiRun，其中新 SDK 事实 7 个、legacy 事实 12 个；当前目标库存在 1 条未结算 SDK 请求和 1 个活动优化 attempt，因此正确返回 `keep_tasks_disabled`，并继续保护 8 个 unknown run 与 7 个 unknown attempt。该结果证明新旧事实可读和防重放门禁生效，不将真实在途/未知事实删除为“通过”；两个执行开关继续保持关闭。受控 fixture 已停止，未保存临时 Provider 配置，也未改变真实请求账本或预算。
+
 - [ ] G1：三类真实免费模型验收。
   - 覆盖验收：AC01、AC19、AC25、AC28、AC36、AC40 的真实接入断言。
-  - 依赖：G0；正式路由满足接入就绪、免费依据、允许列表与凭证前提。
+  - 依赖：G0.1；正式路由满足接入就绪、免费依据、允许列表与凭证前提。历史 6/10 请求账本保持原记录，不因 T12 重新开始或扩充预算。
   - 责任与入口：Provider 业务集成；参数优化、discovery、研究助手各使用业务等价完整提示词，分别取得一个可追溯合法结果。
   - 预算与停止：总费用零，三类共用不超过 10 次生成的账本，探针/手动连接测试/fallback 均计入。额度耗尽或同类外部错误连续 3 次立即停止，不切付费、不另起账本。就绪检查本身不需要额外真实探针。
   - 证据与放行：逐次记录业务/request ID、源码/SDK/配置/Schema 版本、请求/实际模型、首输出/总耗时、完整率、Schema 合法率、错误分布、用量/费用未知占比及每个合法结果的请求数。三类分别记录；外部阻塞保持未通过，少量样本不证明长期 SLA 或整个回测闭环。
@@ -191,16 +254,19 @@ T1 的契约与共享样例通过后才是下游契约就绪点；消费者不�
 
   - 指标与停止结论：参数优化完整结果率 1/6（仅表示 Provider 返回了可解析 JSON），Schema 合法率 0/6，合法结果 0；用量未知 6/6，请求费用金额未知 6/6，但 5 条已结算请求均携带可追溯的官方目录免费依据，AiRun 累计费用为 `0`。第 4–6 次为连续 3 次同类上游限流，已按硬规则立即停止；未再请求 discovery/research，不将剩余 4 次额度视为可绕过停止条件的新账本。所有请求均未产生 checkpoint，实际模型与首输出耗时不可得；未达到三类各一个可追溯合法结果的放行条件。
 
-- [ ] G2：真实浏览器消费与再次生成验收。
-  - 覆盖验收：AC14、AC20、AC24、AC30、AC31、AC33–AC37 的用户流程。
-  - 依赖：G0；T7–T10 契约/组件验证通过。G1 的外部阻塞不妨碍以受控路由验证 UI 自身行为。
+- [x] G2：真实浏览器消费与再次生成验收。
+  - 覆盖验收：AC14、AC20、AC24、AC30、AC31、AC33–AC37、AC41–AC46 的用户流程。
+  - 依赖：G0.1；T7–T10 与 T12.3 契约/组件验证通过。G1 的外部阻塞不妨碍以受控路由验证 UI 自身行为。
   - 责任与入口：客户端集成；目标运行态中的 Provider 配置→就绪/阻断、计量详情、研究限额、成本来源、上下文预填/失效引用、未知风险确认。
   - 请求边界：错误/计量场景用隔离受控路由并明确 fixture 证据；真实结果复用 G1。若浏览器触发真实生成，纳入 G1 同一账本，不为截图发未记账请求。
   - 证据与放行：操作路径、截图和 API 状态、请求次数及 Console/Network 错误；仅布局正常不能证明权限、计量或真实 Provider 行为。
+  - 目标浏览器证据：2026-09-20 使用 in-app Browser 打开 `http://127.0.0.1:5174`，由 Desktop Vite 代理当前目标 Server。Provider 编辑器从 Market 切换到 AI 时始终保持同一 Sheet，名称不丢失；中性默认值、三种中文上游格式、Chat 下两种实现、手工模型 ID、格式切换后的字段显隐与草稿保留均可操作，保存后的 API 记录为 `anthropic-messages` 且 `chatImplementation=null`，焦点回到“新增或更新 Provider”。临时 Provider `G2 临时验收` 已按精确记录删除，未发真实模型请求。
+  - 研究消费证据：Research Assistant 能正确显示“Provider、Tool 和执行 Worker 已就绪。”；实际内部失败任务的详情展示未知 Token、未知费用、请求预留、冻结策略、绝对期限及生成未完成状态。受控未知结果 fixture `f2a01234-5678-4abc-8def-1234567890ab` 从详情进入“再次生成研究”后，问题、全组合范围和模板由服务端预填；只确认预填内容时“确认并再次生成”仍禁用，两项风险确认都开启后才解锁。浏览器截图已记录初始与双确认状态；未点击提交，真实 Provider 请求数为 `0`。
+  - 清理与控制台：临时未知结果 fixture 已精确删除，目标库 `AiRun` 总数恢复为原有 `19`，该 ID 数量为 `0`；浏览器 Console 的 `warn/error` 汇总为空。验收中发现就绪提示在成功状态仍停留“正在检查”，已在 `NewResearchSheet.tsx` 修复并经目标浏览器复验。Desktop 定向 51 项分批通过；全量 66 个文件/448 项、typecheck、生产 build 与修改范围 ESLint 通过。首次并行定向入口因宿主磁盘仅余约 867 MiB 在第三个 suite 写 Vitest 临时缓存时触发 `ENOSPC`，改为单 Worker 后同一 suite 与全量均通过；未将环境失败记作产品失败或伪造通过。
 
 ## 4. 验收责任映射
 
-AC01–AC29 保留初稿稳定编号，AC30–AC40 对应本轮新增决策。下表所有验证均待实施；最终 Review 只审查覆盖，不继承缺失实现。
+AC01–AC29 保留初稿稳定编号，AC30–AC40 对应第一轮新增决策，AC41–AC46 对应 2026-09-20 Provider 编辑器、显式 Provider 选择与兼容迁移纠偏，AC47–AC48 对应统一 Provider 编辑流程。最终 Review 只审查覆盖，不继承缺失实现。
 
 | 验收断言 | 实现责任 | 本地验证 / 必要运行态门禁 |
 | --- | --- | --- |
@@ -220,23 +286,31 @@ AC01–AC29 保留初稿稳定编号，AC30–AC40 对应本轮新增决策。�
 | AC21 取消/失租/旧执行器 | T2、T3、T5、T6 | 竞争/信号；G0 |
 | AC22 保存失败 | T2、T5、T6 | 故障/有限重试；G0 |
 | AC23 对账幂等 | T2、T5、T6 | 修订/重复回调/崩溃；G0 |
-| AC24 配置冻结/兼容 | T0、T1、T4、T7、T9、T11 | 配置/API/装配；G0、G2 |
+| AC24 配置冻结/兼容 | T0、T1、T4、T7、T9、T11、T12.1 | 配置/API/装配；G0.1、G2 |
 | AC25 权限/引用 | T6、T8 | 实际工具审计、API；G1 |
 | AC26 脱敏 | T3、T7 | 日志/遥测/存储/API 白名单 |
 | AC27 候选复用 | T5 | 回测失败编排，原门禁保持 |
-| AC28 fixture/兼容 adapter | T0、T3、T4、T11 | 包/HTTP/装配；G1 已测路由 |
+| AC28 fixture/兼容 adapter | T0、T3、T4、T11、T12.1、T12.2 | 包/HTTP/装配；G0.1、G1 已测路由 |
 | AC29 deadline/释放 | T3、T6 | 流/假时钟/排队/工具；G0 |
 | AC30 研究策略 | T1、T6、T7、T10 | 默认/配置/冻结/API；G2 |
 | AC31 超额事实 | T2、T5、T6、T7、T10 | 事务/结果可读/调度停止；G0、G2 |
 | AC32 未知后的门禁 | T2、T5、T6、T7、T10 | 有余额/不足/不可核算费用 |
 | AC33 估算/历史/币种 | T1、T2、T7、T10 | 差额对账/汇总；G2 |
-| AC34 声明与就绪 | T1、T4、T9 | 发布证据、人工声明、伪造拒绝；G2 |
-| AC35 显式兼容模式 | T1、T3、T4、T9 | 两模式请求/校验；G2 配置 |
+| AC34 声明与就绪 | T1、T4、T9、T12.1 | 发布证据、人工声明、伪造拒绝；G0.1、G2 |
+| AC35 两种生成模式 | T1、T3、T4、T9、T12.1、T12.2 | 两模式请求/校验；G0.1、G2 配置 |
 | AC36 精简探索 | T1、T5、T7、T10 | seed/series/固定字段/旧结果；G1、G2 |
 | AC37 再次生成 | T1、T8 | API/表单/提交竞态；G2 |
 | AC38 发送与领取竞争 | T1、T2、T5、T6 | PostgreSQL 竞争/发送窗口；G0 |
-| AC39 发布/回滚 | T0、T11 | 版本/边界；G0 |
+| AC39 发布/回滚 | T0、T11、T12.2 | 版本/边界；G0、G0.1 |
 | AC40 真实样本与预算 | G1 | 共用账本，不以 mock 替代 |
+| AC41 同 Drawer 切换 AI | T12.3 | 组件交互；G2 |
+| AC42 中性 AI 默认值 | T12.3 | 草稿/组件交互；G2 |
+| AC43 上游格式与 Vercel Provider | T12.1、T12.2、T12.3 | 显式 Schema/四条本地 HTTP/组件；G0.1、G2 |
+| AC44 OpenRouter 兼容迁移 | T12.1、T12.2 | 出站字段/元数据/不可迁移阻断；G0.1 |
+| AC45 分层验证 | T12.2、T12.3 | Server 状态/组件消费；G0.1、G2 |
+| AC46 编辑状态与验证竞态 | T12.3 | 组件交互与异步竞态；G2 |
+| AC47 Provider 类型统一编辑流程 | T13.1 | 同一编辑器的双向类型切换、公共字段保留与专属字段隔离；G2 |
+| AC48 Provider 类型转换保存 | T13.2 | 普通/AI 目标接口转换保存、凭证保留与环境来源接管；Server 定向测试、G2 |
 
 ## 5. 验证入口与成本控制
 
@@ -267,21 +341,21 @@ rtk git diff --check
 
 | 当前证据层 | 结果 |
 | --- | --- |
-| 文档规划 | Spec/Task 已生成，静态核验记录见第 6 节 |
-| 定向/包级/仓库代码门禁 | T0–T11 的定向、包级、Server 全量、build、边界、workspace dependency 与 diff 证据已记录；仓库级文件尺寸门禁仍被 5 个既有工作树增量阻断，未伪装为全门禁通过 |
-| PostgreSQL/Docker/恢复 | G0 通过：目标镜像一次完整更新；目标 PostgreSQL 46 项受控竞态/故障断言；在途阻断、清理后放行及同镜像重启回滚演练通过，执行开关保持关闭 |
-| 真实 Provider/浏览器 | G1 已执行并因连续 3 次上游限流按规则停止，6/10 次账本无合法结果，保持未通过；G2 未执行 |
+| 文档规划 | Spec/Task 已按“三种上游格式＋Chat 显式实现 → 官方 Vercel Provider”及统一 Provider 编辑流程方案修订；T12.1–T12.3 与 T13.1–T13.2 已实施 |
+| 定向/包级/仓库代码门禁 | T12.1–T12.3 的共享契约、兼容读取、四条官方 Provider 本地出站、单 Sheet 客户端交互、T13 双向类型/转换定向测试、typecheck/build、修改范围 ESLint、依赖边界与文件尺寸 ratchet 已通过；全仓复杂度聚合入口仍有与本任务无关的既有 ESLint error，未计为通过 |
+| PostgreSQL/Docker/恢复 | 原 G0 与 T12 后 G0.1 均通过；当前新镜像、四条受控出站、兼容读取、未就绪阻断及新旧回滚事实已验证，真实在途/unknown 事实要求继续停领 |
+| 真实 Provider/浏览器 | G1 已执行并因连续 3 次上游限流按规则停止，6/10 次账本无合法结果，保持未通过；既有 G2 已完成，但 T13 的双向类型切换、转换保存与目标运行态重新浏览器验收尚未执行 |
 
 ## 6. 规划前置 Review
 
-- 结论：可实施；从 T0 核验实际版本、环境及完整调用清单开始，不代表生产发布已就绪。
-- 产品/语义 Blocking：无。研究期限/预算、防重放与就绪被列为新增交付；没有误称既有能力。
-- 依赖：T1 提供共享契约；T2/T3 各有独立验证；T5 是早期纵向闭环；T6 随后接通；G0–G2 不反向成为前置实施任务的完成条件。
-- 覆盖：保留 AC01–AC29，新增 AC30–AC40；每项有实现和对应证据层，真实门禁不承接核心实现。
-- 环境前提：稳定依赖组合、免费路由/凭证、Docker、浏览器待实施核验；外部失败保留门禁未完成，不改为 fixture 通过。
-- 文档核验：配对/导航链接、40 项 AC、任务编号/依赖、中文说明及空白检查；结果只属于文档证据。
-- 本轮证据（2026-09-19）：只读 Python 文档检查通过，40 项 AC 连续且映射完整，12 个实施任务与 3 个门禁无未知依赖或循环，链接均可解析，无未决占位或错误完成勾选。限定四份本轮文档的 `rtk git diff --check` 通过；两个新增未跟踪文件另行逐行检查空白。Prettier 的 `--file-info` 返回 ignored，未将其空跑计为格式验收。
-- TODO/归档：没有新延期承诺，不改 TODO，不归档本任务，不修改其他任务完成状态。
+- 结论：`Ready with non-blocking assumptions`；T13.1/T13.2 的统一编辑器、目标类型转换保存与本地验证已完成，剩余是 G2 的重新浏览器/目标运行态验收；G1 的真实上游阻塞不阻止 T13 的本地实现。
+- 产品/语义 Blocking：无。普通与 AI 共用一个编辑器和草稿协调器，底层普通/AI 保存接口作为内部 Adapter；数据库来源允许目标类型转换，环境来源切换必须重新提交凭证。
+- 粒度：T12.1 负责显式共享契约与兼容读取，T12.2 负责四条官方 Provider 执行路径、OpenRouter 必要能力迁移及分层验证，T12.3 负责单 Drawer 交互与验证竞态；T13.1 已完成统一编辑器协调器，T13.2 已完成目标类型保存与转换契约。各任务有独立完成条件；G2 只承担组合浏览器验收，不隐藏核心实现。
+- 依赖：T13.1 依赖 T12.3 的字段与异步失效契约，T13.2 依赖 T12.1 的普通/AI持久化边界；T13.1 与 T13.2 可并行，G2 的 T13 场景依赖两者完成，无循环。
+- 覆盖：保留 AC01–AC40，新增 AC41–AC48；新增断言均有具体实现责任和本地/运行态验证责任。原 G0/G2 证据不自动覆盖 T13。
+- 环境前提：新增 Provider 包版本需在实施时重新核对已发布版本、peer dependency 与实际导出；Docker、浏览器和真实凭证仍是独立门禁。外部失败保持未通过，不改为 fixture 通过。
+- 文档核验：配对链接、中文说明、T12/T13 子任务、AC41–AC48 映射与 G2 依赖均已检查；T12 源码与依赖、目标 Docker 和历史浏览器证据，以及 T13 源码、转换接口和定向验证已同步记录；T13 的重新浏览器/目标运行态验收尚未完成，真实 Provider 仍只保留 G1 的失败账本。
+- TODO/归档：T12 属于当前 Spec/Task 范围，不转入 TODO，不归档本任务，不改写 T0–T11 的历史完成证据。
 
 ## 7. 最终一致性 Review
 
@@ -289,13 +363,13 @@ rtk git diff --check
 - [x] 所有已勾选任务满足自身完成条件，证据与当前输入一致。
 - [ ] PostgreSQL、Docker、真实 Provider、浏览器与回滚必要门禁通过。
 - [x] 生成、计量、预算、取消/领取、配置与再次生成在已完成的本地及目标数据库消费者中一致。
-- [x] 40 项 AC 没有被宽泛最终门禁掩盖，当前义务没有转为后续。
+- [ ] 48 项 AC 没有被宽泛最终门禁掩盖，当前义务没有转为后续。
 - [x] 工作树既有修改保留，范围、复杂度和模块边界满足要求；既有文件尺寸门禁阻断继续单独记录。
-- [ ] 文档、配置、测试与实际状态一致，fixture/build 未冒充真实验收。
-- [ ] 当前实现说明及导航按实际结果更新；全部完成后才允许归档。
+- [x] 文档、配置、测试与实际状态一致，fixture/build 未冒充真实验收。
+- [x] 当前实现说明及导航按实际结果更新；G1 未通过，因此本任务保持实施中且未归档。
 
 ### Review 结论
 
-- 实现结论：T0–T11 已完成；G0 目标 Docker、状态竞争与兼容回滚验收通过。G1 已执行但因真实上游连续限流按规则停止，保持未通过；G2 真实浏览器验收待执行。
-- 必要门禁：G0 已通过；G1 在 6/10 次账本时触发连续 3 次同类外部限流停止条件，三类均未取得合法结果；G2 未执行。当前研究与优化执行开关为 `true`、fixture 为 `false`，这仅是 G1 运行条件，不能声称真实 Provider 可用。
-- 证据：manifest/lockfile、实际导入、共享契约、状态事务、SDK 适配、本地 HTTP、目标 PostgreSQL、目标镜像与兼容回滚证据已记录；G1 新增了 6 次真实免费路由请求及外部失败证据，尚无三类合法结果或浏览器验收证据。
+- 实现结论：尚未最终通过；T0–T13、G0、G0.1 与既有 G2 已完成本地/历史证据，T13/AC47–AC48 的重新浏览器与目标运行态验收尚未完成；G1 仍缺少三类真实上游的可追溯合法结果，不能宣称整项迁移完成。
+- 必要门禁：G2 已通过且没有产生真实生成请求；G1 保留 6/10 次账本与连续 3 次同类外部限流停止结论，不能重置账本或绕过停止条件。目标库现有未结算/活动事实要求两个执行开关继续关闭。
+- 证据：已新增 T12.1–T12.3 的共享 Schema、Server 契约、兼容读取、四条官方 Provider 包本地出站、Desktop 单 Sheet 交互、本地测试/构建、G0.1 新镜像运行态及 G2 浏览器消费/再次生成证据；受控配置与未知结果 fixture 已清理，未把它们计作 G1 真实 Provider 成功样本。

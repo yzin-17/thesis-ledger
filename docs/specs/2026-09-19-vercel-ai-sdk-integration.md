@@ -4,17 +4,17 @@
 | --- | --- |
 | 文档类型 | Spec |
 | 创建日期 | 2026-09-19 |
-| 状态 | 设计已确认；代码与运行态均待实施、待验收 |
+| 状态 | 实施中；T0–T13、G0、G0.1 与 G2 已完成，T13 的浏览器/目标运行态重新验收待执行 |
 | 适用仓库 | `yzin-17/thesis-ledger` |
 | 任务标识 | `2026-09-19-vercel-ai-sdk-integration` |
 | 对应任务 | [实施任务](../tasks/2026-09-19-vercel-ai-sdk-integration.md) |
 | 主要执行面 | NestJS Server / 现有后台执行器与 Worker |
 | 关联需求 | 策略中心体验优化、AI 策略生成、研究助手 |
-| 交付边界 | 本文定义设计与验收要求，不代表代码已修改、测试已通过或环境已更新 |
+| 交付边界 | 本文保留已完成实施证据并定义当前纠偏要求；T13 的本地实现与定向验证已记录，历史 G2 证据不自动证明统一流程的浏览器/运行态 |
 
 ## 1. 决策摘要
 
-采用 **Vercel AI SDK Core** 作为服务端模型调用基础设施，OpenRouter 使用 `@openrouter/ai-sdk-provider`。保留项目自己的 `AiProvider` 接口、Provider 注册与配置、`AiRun`、`OptimizationAttempt`、预算、工具审计和业务校验。
+采用 **Vercel AI SDK Core** 作为服务端模型调用基础设施，服务端依赖收敛为 `ai` 与官方 `@ai-sdk/openai`、`@ai-sdk/anthropic`、`@ai-sdk/openai-compatible`。页面配置三种上游格式；Chat Completions 额外显式选择“通用兼容”或“OpenAI 原生”，服务端据此确定 Provider 实现。base URL 只决定请求地址，不按域名自动切换 SDK。OpenRouter 可继续作为通用 Chat Completions 服务使用，但不作为默认服务商、接口格式或专用依赖。保留项目自己的 `AiProvider` 接口、Provider 注册与配置、`AiRun`、`OptimizationAttempt`、预算、工具审计和业务校验。
 
 本次不是将 `fetch` 改成一个 SDK 函数后继续沿用原有错误处理，而是完成以下闭环：
 
@@ -37,6 +37,8 @@
 
 本 Spec 由用户提供的同名初稿、2026-09-19 当前工作树只读核查及本轮逐项确认的设计决策合并形成。仓库已有大量未提交修改；以当前工作树为实施基线，保留既有超时、提示词、策略中心和研究助手修复。下载目录初稿只作为来源，不是并行维护的需求源。
 
+2026-09-20 用户根据实际 Provider 编辑器补充并纠正：切换到 AI 时不得重建 Drawer 或丢失名称；新建 AI Provider 不预填 OpenRouter URL、模型或厂商选项；页面配置的是截图所示三种上游格式，而不是直接把三种格式当作 Vercel SDK adapter。进一步核对 Vercel Provider 能力后确认：Provider 实现必须由显式配置确定，不按 base URL 隐式切换；本轮只覆盖策略生成与研究助手需要的语言模型能力，不扩展为 Embedding、Image、Audio 或 Video 平台。随后确认普通 Provider 与 AI Provider 应进入同一个编辑流程，类型可以在同一草稿中双向切换，底层专用接口只作为编辑器内部 Adapter。
+
 | 当前代码区域 | 已核实事实与本轮增量 |
 | --- | --- |
 | `ai/contracts.ts`、`provider-adapters.ts` | 仍为项目 Promise 接口与手写请求；本地已保留响应读取超时，但未知 usage 仍会投影为零；新增完整性与诊断契约 |
@@ -53,7 +55,10 @@
 
 ### 2.2 本轮术语与证据边界
 
-- **接入就绪**：指定模型、adapter、配置、生成模式及契约具备能力声明和对应本地 adapter 契约测试证据，可以进入调用。能力声明可来自可信目录或显式人工声明；这不代表真实业务验收通过。
+- **上游格式**：用户配置的远端 HTTP 协议，固定为 `chat-completions`、`responses`、`anthropic-messages`。
+- **Chat 实现**：仅当上游格式为 `chat-completions` 时有效的显式配置，固定为 `compatible` 或 `openai-native`；它不根据域名变化。
+- **SDK Provider 实现**：服务端由上游格式和 Chat 实现确定的 Vercel Provider 包及模型工厂。它是执行事实，不作为可任意组合的厂商格式；OpenRouter 通过通用兼容实现接入。
+- **接入就绪**：指定模型、上游格式、Chat 实现、SDK Provider 实现、配置、生成模式及契约具备能力声明和对应本地 adapter 契约测试证据，可以进入调用。能力声明可来自可信目录或显式人工声明；这不代表真实业务验收通过。
 - **真实业务验收通过**：在指定版本与路由上，受控真实请求得到可追溯合法结果，只证明当次覆盖的契约。
 - **生成成功**：完整生成结果通过校验并保存；实验是否可继续还取决于预算、取消与其他门禁。候选含义沿用 [领域术语](../../CONTEXT.md)，生成完成不等于评估通过或采纳。
 - **AI 调用费用**：上游模型调用的已报告、估算或未知消耗；**策略交易成本**：策略/回测中的佣金、滑点假设，两者不混用。
@@ -81,9 +86,9 @@
 
 ### 4.1 选型与版本验证
 
-服务端接入模块使用 `ai`、`@openrouter/ai-sdk-provider`；实际通用兼容端点使用 `@ai-sdk/openai-compatible`，保留现有 Zod。通过显式 Provider 对象调用，不隐式经过 Vercel Gateway。
+服务端接入模块使用 `ai`、`@ai-sdk/openai-compatible`、`@ai-sdk/openai` 与 `@ai-sdk/anthropic`，保留现有 Zod；完成兼容迁移后移除 `@openrouter/ai-sdk-provider`。通过显式 Provider 对象调用，不隐式经过 Vercel Gateway。
 
-选取已发布、相互兼容的稳定组合，精确锁定 manifest 与 lockfile；主线 manifest 和文档仅作参考，不作为已发布或已安装证据。[S1] [S2] 实施任务 T0 核验 Node、实际安装 Zod、SDK、Provider 包与开发/CI/Server/Worker 运行时，记录导出、请求形态、构建与 peer dependency 结果。不忽略冲突，不通过类型断言掩盖不兼容，不从主线直接安装。
+选取已发布、相互兼容的稳定组合，精确锁定 manifest 与 lockfile；主线 manifest 和文档仅作参考，不作为已发布或已安装证据。[S1] [S2] T0 保留原依赖核验历史，T12.2 必须针对新增官方 Provider 包与移除 OpenRouter 专用包重新核验 Node、实际安装 Zod、SDK、开发/CI/Server/Worker 运行时，记录导出、请求形态、构建与 peer dependency 结果。不忽略冲突，不通过类型断言掩盖不兼容，不从主线直接安装。
 
 ### 4.2 SDK 能力映射
 
@@ -106,7 +111,7 @@ SDK 导入限于 AI 接入模块及对应测试；领域、策略 Schema、公�
                      ↓
           Vercel AI SDK Core + Provider 包
                      ↓
-           OpenRouter / 已配置兼容服务
+       OpenAI / Anthropic / OpenRouter 等已配置兼容服务
 ```
 
 | 责任 | 归属 |
@@ -125,15 +130,34 @@ SDK 类型不得扩散到 `packages/domain`、策略 Schema 或公共 API DTO。
 
 ### 6.1 配置保存与冻结
 
-保留 Provider ID、models、base URL、密钥、enabled、priority、health、timeout、价格、推理配置及数据库/环境变量优先级。新增 `adapter`（`openrouter / openai-compatible`）及按模型保存的执行配置：生成模式、能力声明及来源/时间/版本、允许的上游端点范围、首输出/间隔覆盖值、价格来源及免费依据。复用现有 Provider JSON 配置；API、环境读取和 Desktop 编辑器使用同一契约。
+保留 Provider ID、models、base URL、密钥、enabled、priority、health、timeout、价格、推理配置及数据库/环境变量优先级。新增用户可配置的 `upstreamFormat`（`chat-completions / responses / anthropic-messages`）与条件字段 `chatImplementation`（`compatible / openai-native`）；后者仅在 Chat Completions 下允许存在，默认 `compatible`。`adapter` 不再由 Desktop 选择或写入新配置。按模型保存的执行配置继续包含生成模式、能力声明及来源/时间/版本、允许的上游端点范围、首输出/间隔覆盖值、价格来源及免费依据。复用现有 Provider JSON 配置；API、环境读取和 Desktop 编辑器使用同一显式契约。
 
-旧配置仅可按严格 URL 主机规则推导 adapter；自建反向代理支持显式选择。不得按显示名称或模糊包含关系推断，不自动改写已保存密钥或模型列表。保留受信代理、本地服务及自定义 baseUrl 访问策略；不接受请求方任意传入目标 URL。
+上游格式、Chat 实现与 SDK Provider 的确定规则固定如下：
+
+| 上游格式 | Chat 实现 | Vercel SDK Provider 与显式入口 |
+| --- | --- | --- |
+| `chat-completions` | `compatible` | `@ai-sdk/openai-compatible` 的 `chatModel()`；用于兼容服务、中转服务、本地服务及 OpenRouter |
+| `chat-completions` | `openai-native` | `@ai-sdk/openai` 的 `chat()`；用于需要 OpenAI 原生 Chat 参数的连接 |
+| `responses` | 不适用 | `@ai-sdk/openai` 的 `responses()` |
+| `anthropic-messages` | 不适用 | `@ai-sdk/anthropic` 的 `messages()` |
+
+新建 AI Provider 默认选择 `chat-completions + compatible`，但 base URL、模型列表与厂商信息为空，不预填 OpenRouter。界面中 Chat Completions 与 Anthropic Messages 的说明使用“需支持对应接口”，表示上游必须提供相应 HTTP endpoint，不表示 ThesisLedger 的执行路由或 Vercel AI SDK 会自动创建网关路由。普通 Provider 与 AI Provider 共用一个编辑器、一个草稿协调器和一个类型选择器；类型可在未提交草稿中双向切换。切换保留名称、启用状态和优先级，清理目标类型不适用的专属字段，并使连接测试、模型目录和最小生成结果失效。保存/测试由协调器按最终类型选择专用接口，不能因 UI 统一而把 AI 字段提交到普通接口。base URL 可用于校验、提示或推荐配置，但不得改变已保存的上游格式、Chat 实现或实际 Provider 包。
+
+数据库来源的 Provider 允许通过该统一编辑器改变最终类型：普通目标类型由普通配置接口保存，AI 目标类型由 AI 配置接口保存；同名记录按目标类型更新并替换不再适用的 `settings`，空凭证继续遵循既有“保留已配置凭证”语义。环境来源配置不得被静默覆盖；切换后接管必须重新提交目标类型凭证，仍保持部署配置只读边界。
+
+旧配置中的 `adapter=openrouter` 与 `adapter=openai-compatible` 只在数据库/环境配置读取边界兼容映射为 `chat-completions + compatible`；新建与更新 API 不再接受客户端直接指定 adapter。旧 OpenRouter 配置若实际保存了厂商扩展字段，服务端同时保留只读迁移标记 `compatibilityExtensionProfile=openrouter-v1`，用于约束后述白名单转换；该标记不选择 Provider、不对新客户端开放，也不能因编辑名称、地址或模型而丢失。缺少显式新字段的旧配置只按旧 adapter 字段迁移；URL 和显示名称不得参与运行语义推断，不自动改写已保存密钥或模型列表。保留受信代理、本地服务及自定义 baseUrl 访问策略；不接受请求方任意传入目标 URL。
+
+移除 OpenRouter 专用包前，必须逐项处理当前已使用的差异：`reasoningEffort` 通过锁定版本确认的 compatible provider options 映射；仅带受控 `openrouter-v1` 迁移标记的旧配置可将 `provider.only`、`provider.require_parameters` 等路由约束通过 `transformRequestBody` 白名单转换；usage/cost 仅可通过 `metadataExtractor` 归一化为“已报告、估算、未知”。新建通用兼容连接不因 URL 自动获得厂商扩展。无法证明等价的旧配置标记为“待迁移、不可执行”，不得静默丢弃字段、放宽路由或把未知费用写为零。迁移只覆盖项目已经使用的必要能力，不复制 OpenRouter adapter 的完整插件、图片、视频或其他厂商能力。
+
+Vercel Provider 包负责生成协议，不自动提供统一模型目录。现有“从接口获取”继续作为独立管理能力：Chat Completions/Responses 默认使用 Bearer 鉴权访问受控 base URL 的 `/models`；Anthropic Messages 使用对应的 API Key/版本头。端点没有模型目录能力时明确返回不可用并允许手动填写模型，不得静默改用另一种上游格式或据此判定生成 adapter 不可用。
+
+Provider 验证结果拆分保存为“模型目录获取”“最小生成”“业务结构化生成”三类；任一结果不得冒充另外两类。模型目录失败不阻止手动填写模型，最小生成成功不授予结构化输出或业务 Schema 能力。修改 base URL、上游格式、Chat 实现或模型后使相关验证证据过期；较早发起的异步结果不得覆盖新配置状态。
 
 任务创建时冻结有效预算策略和候选路由配置；执行时再次检查就绪、启用、权限和撤销状态。热更新不替换在途请求的模型/模式/参数；显式停用或能力撤销阻断尚未发送的请求，包括已冻结的 fallback。凭证仅保留受控引用及版本/指纹，不复制明文到任务 JSON。
 
 ### 6.2 接入就绪门禁
 
-就绪证据按 adapter、模型、端点/路由配置指纹、生成模式和生成契约版本绑定，由服务端计算，不接受客户端直接提交 `ready: true`。要求同时具备：
+就绪证据按上游格式、Chat 实现、确定的 SDK Provider、模型、端点/路由配置指纹、生成模式和生成契约版本绑定，由服务端计算，不接受客户端直接提交 `ready: true` 或 adapter 覆盖。要求同时具备：
 
 1. 覆盖所用参数的能力声明。可信目录记录来源版本；人工声明记录声明者/来源、时间、配置版本，并显示“人工声明，未完成真实业务验证”。
 2. 锁定 SDK/adapter/契约对应的本地 HTTP/SSE 契约测试证据。证据随版本发布，由受控发布输入登记，不允许页面伪造测试通过。
@@ -141,7 +165,7 @@ SDK 类型不得扩散到 `packages/domain`、策略 Schema 或公共 API DTO。
 
 已有连接测试只证明连接能力，不自动授予结构化能力或免费资格。接入就绪、真实验证、运行健康分别保存，不把一次 Schema 验证失败直接计为整个 Provider 离线。
 
-切换 SDK 的业务链路立即停用未就绪路由；允许先保存待配置记录，正常业务不得发出请求。展示具体原因与设置入口。配置/模型/Schema/adapter 的相关指纹变化后重新计算就绪；说明文案、价格等变化不伪造新能力证据，价格变更仍重新检查预算授权。
+切换上游格式或 Chat 实现后，业务链路立即停用未就绪路由；允许先保存待配置记录，正常业务不得发出请求。展示具体原因与设置入口。配置/模型/Schema/上游格式/Chat 实现/Provider 包的相关指纹变化后重新计算就绪；说明文案、价格等变化不伪造新能力证据，价格变更仍重新检查预算授权。
 
 真实请求若明确证明某参数或模式不受支持，撤销受影响组合的就绪状态，阻断后续请求；其他组合保留。更正声明或相关配置、重新满足契约检查后才能恢复。偶发非法 JSON 属于输出失败，不据此永久判定不支持模式。
 
@@ -149,10 +173,10 @@ SDK 类型不得扩散到 `packages/domain`、策略 Schema 或公共 API DTO。
 
 | 模式 | 行为 |
 | --- | --- |
-| `native_schema` | 策略首选；传输 Schema、严格选项和本地校验共同约束；OpenRouter 请求携带 `response_format: json_schema` 及 `provider.require_parameters: true`，以实际出站测试验证 |
+| `native_schema` | 策略首选；传输 Schema、严格选项和本地校验共同约束；各 Provider 只发送已声明且经实际出站测试验证的参数，兼容服务的额外约束必须来自受控白名单映射 |
 | `json_validated` | 必须提前显式选择；使用端点声明支持的 JSON 或文本路径，完整接收后做相同的本地验收；不发送不支持的原生 Schema 参数 |
 
-不在失败后自动切模式、删除参数再调用或换模型。原生模式的能力不按模型名称猜测；OpenRouter 上游端点约束也属于冻结路由的一部分。[S5] 不将随机 `openrouter/free` 设为默认可靠路由。
+不在失败后自动切模式、删除参数再调用或换模型。原生模式的能力不按模型名称猜测；兼容服务的路由约束也属于冻结配置的一部分。[S5] 不将随机 `openrouter/free` 设为默认可靠路由。
 
 ### 6.4 推理、价格与免费依据
 
@@ -198,7 +222,7 @@ SDK 类型不得扩散到 `packages/domain`、策略 Schema 或公共 API DTO。
 
 必须同时处理：请求前异常、非成功 HTTP 响应、HTTP 200 中的错误体或流内错误、生成中断、结束原因、最终结构化结果和诊断元数据。SDK 的 `onError` 不能只是写日志后继续走成功路径。[S3] [S4]
 
-OpenRouter 会发送 SSE 心跳；最终 usage 也可能位于独立尾帧，并重复 `finish_reason`。不能在第一次看到结束原因后提前断开或把计量尾帧当作第二次完成。[S6]
+部分兼容服务会发送 SSE 心跳；最终 usage 也可能位于独立尾帧，并重复 `finish_reason`。不能在第一次看到结束原因后提前断开或把计量尾帧当作第二次完成。OpenRouter 作为代表性兼容服务保留该契约样例。[S6]
 
 成功交付候选必须满足：
 
@@ -373,7 +397,7 @@ prepared（已有预留，尚未授权发送）
 
 ### 11.3 API 与既有界面消费
 
-AiProvider 配置/列表 API 增量提供 adapter、模型执行配置、声明来源、就绪状态/阻断原因与独立真实验收状态。设置页沿用现有编辑与保存流程，增加上述配置及恢复入口；连接测试结果保持独立标记，不自动切换就绪。
+AiProvider 配置/列表 API 增量提供上游格式、条件性 Chat 实现、模型执行配置、声明来源、就绪状态/阻断原因与三类独立验证状态；内部 Provider 包名只作为服务端诊断事实，不成为客户端可写字段。设置页沿用现有编辑与保存流程，增加上述配置及恢复入口；连接测试结果保持独立标记，不自动切换就绪。
 
 AiRun 列表/详情提供版本化执行摘要：冻结预算及 deadline、生成/计量状态、请求摘要、结果可读性和后续停止原因。usage 汇总提供已报告部分、未知/历史未核对数量、估算状态及按币种分组费用。旧数字只作为兼容投影；中文界面不将部分合计显示为确定总额。
 
@@ -383,7 +407,7 @@ AiRun 列表/详情提供版本化执行摘要：冻结预算及 deadline、生�
 
 保留 `FixtureAiProvider` 作为确定性测试实现，并符合新的结果完整性契约；继续明确标记 fixture。禁止真实调用失败后自动切 fixture，也不得以 fixture 通过替代真实 Provider 验收。
 
-对现有 OpenAI-compatible 端点通过专用 SDK adapter 验证，不继续在主路径保留“任意接口返回任意 envelope 都尝试猜测”的兼容逻辑。不符合所声明协议的返回应明确报协议错误或通过独立、经过测试的兼容配置处理。
+对现有 OpenAI-compatible 端点通过 `@ai-sdk/openai-compatible` 验证，不继续在主路径保留“任意接口返回任意 envelope 都尝试猜测”的兼容逻辑。不符合所声明协议的返回应明确报协议错误或通过独立、经过测试的兼容配置处理。
 
 ## 12. 诊断与安全
 
@@ -453,6 +477,14 @@ SDK mock 用于确定性结果测试；本地 HTTP/SSE 服务用于真实 Provid
 | AC38 | 发送窗口与领取竞争 | prepared 与 dispatching 转换原子；发送授权后崩溃按未知；旧领取不能发送/续租/终态写入；请求数组和其他元数据不被覆盖 |
 | AC39 | 分阶段切换、部署与回滚 | 两链路独立本地验收；同一稳定输入完整更新 Docker；未就绪无 legacy 绕行；回滚保留新事实与门禁 |
 | AC40 | 受控真实验证 | 三类各有完整合法结果，总出站不超过 10 次，仅有依据免费路由；同类外部错误连续 3 次停止；未完成保持阻塞 |
+| AC41 | 新建时切换为 AI | 保持同一个 Drawer 和已输入名称，不通过关闭后重开另一个编辑器切换 |
+| AC42 | 新建 AI Provider 默认值 | base URL、模型列表和厂商信息为空；不预填 OpenRouter URL、模型或厂商选项 |
+| AC43 | 上游格式与 Vercel Provider | 页面只显示三种上游格式；Chat 下显式选择通用兼容或 OpenAI 原生；服务端不按 base URL 改变 Provider 实现；四条显式调用路径均有本地 HTTP 契约测试 |
+| AC44 | OpenRouter 兼容迁移 | 旧配置的只读扩展标记可追溯且不由 URL 产生；移除专用包后，已使用的 reasoning、路由约束及 usage/cost 均有白名单映射和出站证据；不能等价迁移时阻断执行，不静默放宽或填零 |
+| AC45 | 分层验证 | 模型目录、最小生成、业务结构化生成分别保存结果；模型目录失败允许手动填写，任一成功不冒充另一类能力通过 |
+| AC46 | 编辑状态与验证竞态 | 切换格式或修改地址、模型时保留名称和不冲突字段、使相关验证过期；旧异步结果不能覆盖新草稿状态 |
+| AC47 | Provider 类型统一编辑流程 | 普通与 AI 共用同一个编辑器、草稿协调器和类型选择器；类型可双向切换；名称、启用状态和优先级保留；类型专属字段不泄漏到目标接口 |
+| AC48 | Provider 类型转换保存 | 数据库来源的同名 Provider 可按最终类型保存并更新；目标类型接口校验自己的字段和凭证；环境来源配置切换后必须重新提交凭证，不静默覆盖部署配置 |
 
 ### 14.2 真实调用验证
 
@@ -516,14 +548,21 @@ SDK mock 用于确定性结果测试；本地 HTTP/SSE 服务用于真实 Provid
 [S7]: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
 [S8]: https://github.com/vercel/ai/blob/main/content/docs/03-ai-sdk-core/55-testing.mdx
 [S9]: https://openrouter.ai/docs/guides/community/vercel-ai-sdk
+[S10]: https://ai-sdk.dev/providers/ai-sdk-providers/openai
+[S11]: https://ai-sdk.dev/providers/ai-sdk-providers/anthropic
+[S12]: https://ai-sdk.dev/providers/openai-compatible-providers
 
 | 引用 | 主题 |
 | --- | --- |
-| [S1] / [S2] | SDK 与 OpenRouter adapter 的依赖、Node、Zod 约束 |
+| [S1] | Vercel AI SDK Core 的依赖、Node、Zod 约束 |
+| [S2] | 当前 OpenRouter 专用 adapter 的历史依赖与迁移输入，不是目标依赖 |
 | [S3] | 流、超时、重试、取消及 telemetry；以锁定版本为准 |
 | [S4] | `Output.object`、生成契约与结构化流 |
 | [S5] | OpenRouter 端点级结构化能力和严格模式限制 |
 | [S6] | 心跳、usage 尾帧、流内错误及取消边界 |
 | [S7] | 推理 token 与预算关系 |
 | [S8] | mock provider 与流测试工具 |
-| [S9] | OpenRouter 的 Vercel AI SDK 集成入口 |
+| [S9] | OpenRouter 专用 adapter 的历史行为对照，用于验证兼容迁移，不作为目标选型 |
+| [S10] | OpenAI Provider 的 `chat()` / `responses()` 能力与自定义 base URL |
+| [S11] | Anthropic Provider 的 Messages API、`messages()` 与鉴权能力 |
+| [S12] | OpenAI Compatible Provider 的 Chat Completions、Provider options 与元数据扩展 |

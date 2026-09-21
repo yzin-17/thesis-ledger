@@ -36,8 +36,17 @@ import {
   aiProviderSummaryFromRow,
   parseAiProviderSettings,
 } from './ai-provider-summary.js';
-import { evaluateAiProviderReadiness, inferLegacyAiAdapter } from './ai-provider-readiness.js';
-import type { AiAdapter } from '@thesis-ledger/schemas';
+import { evaluateAiProviderReadiness } from './ai-provider-readiness.js';
+import {
+  aiUpstreamSelectionSchema,
+  type AiAdapter,
+  type AiChatImplementation,
+  type AiUpstreamFormat,
+} from '@thesis-ledger/schemas';
+import {
+  runtimeAdapterForSelection,
+  type AiCompatibilityExtensionProfile,
+} from './ai-provider-upstream.js';
 import {
   persistAiCapabilityRevocation,
   routeSnapshotsFromProviderRow,
@@ -72,7 +81,10 @@ interface AiTestRuntimeInput {
   costPer1kOutput?: number;
   costCurrency?: string;
   pricingVersion?: string;
-  adapter?: AiAdapter;
+  upstreamFormat: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
+  adapter: AiAdapter;
   executionRoutes?: AiProviderExecutionRouteInput[];
 }
 
@@ -142,8 +154,6 @@ export class AiProviderService implements OnModuleInit {
     const existing = await this.configs.findStored(input.name);
     const environment = this.environmentProviders();
     const hasInputCredential = Boolean(input.apiKey?.trim() || input.credentialsRef?.trim());
-    if (existing && existing.type !== 'ai')
-      throw new ConflictException('同名 Provider 已存在且不是 AI，不能转换或覆盖');
     if (
       !existing &&
       environment.some((provider) => provider.id === input.name) &&
@@ -179,27 +189,8 @@ export class AiProviderService implements OnModuleInit {
       input.apiKey?.trim() ||
       input.credentialsRef?.trim() ||
       (existing ? await this.configs.readCredential(existing) : '');
-    return this.executeTest(
-      {
-        name: input.name,
-        baseUrl: input.baseUrl,
-        models: input.models,
-        ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
-        credential,
-        enabled: input.enabled ?? existing?.enabled ?? true,
-        priority: input.priority,
-        capabilities: input.capabilities ?? ['chat'],
-        ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
-        ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-        ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
-        ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
-        ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
-        ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
-        ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
-      },
-      false,
-      this.runtimeFingerprint(this.runtimeInput(input, existing, credential)),
-    );
+    const runtimeInput = this.runtimeInput(input, existing, credential);
+    return this.executeTest(runtimeInput, false, this.runtimeFingerprint(runtimeInput));
   }
 
   async testSaved(name: string): Promise<AiProviderTestResult> {
@@ -228,11 +219,11 @@ export class AiProviderService implements OnModuleInit {
     if (existing && existing.type !== 'ai')
       throw new ConflictException('同名 Provider 已存在且不是 AI，不能读取其模型目录');
     const suppliedCredential = input.apiKey?.trim() || input.credentialsRef?.trim();
+    const existingSettings = existing ? parseAiProviderSettings(existing.settings) : null;
     if (existing && !suppliedCredential) {
-      const settings = parseAiProviderSettings(existing.settings);
-      if (!settings) throw new BadRequestException('保存的 AI Provider 配置无效');
+      if (!existingSettings) throw new BadRequestException('保存的 AI Provider 配置无效');
       const requestedBaseUrl = input.baseUrl.replace(/\/+$/u, '');
-      const savedBaseUrl = settings.baseUrl.replace(/\/+$/u, '');
+      const savedBaseUrl = existingSettings.baseUrl.replace(/\/+$/u, '');
       if (requestedBaseUrl !== savedBaseUrl)
         throw new BadRequestException('Base URL 已变化，请输入 API Key 后重新获取模型目录');
     }
@@ -243,6 +234,7 @@ export class AiProviderService implements OnModuleInit {
         input.baseUrl,
         credential,
         input.timeoutMs ?? configuredTimeout(),
+        input.upstreamFormat ?? existingSettings?.upstreamFormat ?? 'chat-completions',
       );
       return { ...catalog, fetchedAt: new Date().toISOString() };
     } catch (error) {
@@ -364,7 +356,10 @@ export class AiProviderService implements OnModuleInit {
     try {
       const { latencyMs } = await runProviderConnectionTest({
         sdk: this.sdk,
-        adapter: input.adapter ?? inferLegacyAiAdapter(input.baseUrl) ?? 'openai-compatible',
+        adapter: input.adapter,
+        ...(input.compatibilityExtensionProfile === undefined
+          ? {}
+          : { compatibilityExtensionProfile: input.compatibilityExtensionProfile }),
         providerId: input.name,
         baseURL: input.baseUrl,
         apiKey: input.credential,
@@ -493,9 +488,18 @@ export class AiProviderService implements OnModuleInit {
 
   private runtimeInput(
     input: AiProviderInput,
-    existing: { enabled: boolean } | null,
+    existing: { enabled: boolean; settings?: unknown } | null,
     credential: string,
   ): AiTestRuntimeInput {
+    const selection = aiUpstreamSelectionSchema.parse({
+      upstreamFormat: input.upstreamFormat,
+      ...(input.chatImplementation === undefined
+        ? {}
+        : { chatImplementation: input.chatImplementation }),
+    });
+    const existingSettings = existing ? parseAiProviderSettings(existing.settings) : null;
+    const compatibilityExtensionProfile = existingSettings?.compatibilityExtensionProfile;
+    const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
     return {
       name: input.name,
       baseUrl: input.baseUrl,
@@ -510,7 +514,12 @@ export class AiProviderService implements OnModuleInit {
       ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
       ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
       ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
-      ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
+      upstreamFormat: selection.upstreamFormat,
+      ...(selection.upstreamFormat === 'chat-completions'
+        ? { chatImplementation: selection.chatImplementation }
+        : {}),
+      ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
+      adapter,
       ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
     };
   }
@@ -529,7 +538,9 @@ export class AiProviderService implements OnModuleInit {
       costPer1kOutput: input.costPer1kOutput ?? null,
       costCurrency: input.costCurrency ?? null,
       pricingVersion: input.pricingVersion ?? null,
-      adapter: input.adapter ?? null,
+      upstreamFormat: input.upstreamFormat,
+      chatImplementation: input.chatImplementation ?? null,
+      compatibilityExtensionProfile: input.compatibilityExtensionProfile ?? null,
       executionRoutes: input.executionRoutes ?? null,
     });
   }

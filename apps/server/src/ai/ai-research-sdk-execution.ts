@@ -89,15 +89,9 @@ const requestTotals = (execution: AiExecutionSummary) =>
       const revision = request.usageRevisions.at(-1);
       return {
         calls: total.calls + request.reservation.aiCalls,
-        input:
-          total.input +
-          (revision?.usage.inputTokens ?? request.reservation.inputTokens),
-        output:
-          total.output +
-          (revision?.usage.outputTokens ?? request.reservation.outputTokens),
-        cost:
-          total.cost +
-          Number(revision?.cost.amount ?? request.reservation.cost.amount ?? 0),
+        input: total.input + (revision?.usage.inputTokens ?? request.reservation.inputTokens),
+        output: total.output + (revision?.usage.outputTokens ?? request.reservation.outputTokens),
+        cost: total.cost + Number(revision?.cost.amount ?? request.reservation.cost.amount ?? 0),
       };
     },
     { calls: 0, input: 0, output: 0, cost: 0 },
@@ -105,13 +99,19 @@ const requestTotals = (execution: AiExecutionSummary) =>
 
 const routeCost = (
   policy: AiResearchPolicyV1,
-  provider: { metadata?: { costPer1kInput?: number; costPer1kOutput?: number; costCurrency?: string; pricingVersion?: string } },
+  provider: {
+    metadata?: {
+      costPer1kInput?: number;
+      costPer1kOutput?: number;
+      costCurrency?: string;
+      pricingVersion?: string;
+    };
+  },
   freeEvidenceRef: string | null,
   inputTokens: number,
   outputTokens: number,
 ): AiCostFacts | null => {
-  if (freeEvidenceRef)
-    return unknownCost(`free_evidence:${freeEvidenceRef}`.slice(0, 120));
+  if (freeEvidenceRef) return unknownCost(`free_evidence:${freeEvidenceRef}`.slice(0, 120));
   const metadata = provider.metadata;
   if (
     metadata?.costPer1kInput === undefined ||
@@ -133,12 +133,18 @@ const routeCost = (
 
 const completedCost = (
   policy: AiResearchPolicyV1,
-  provider: { metadata?: { costPer1kInput?: number; costPer1kOutput?: number; costCurrency?: string; pricingVersion?: string } },
+  provider: {
+    metadata?: {
+      costPer1kInput?: number;
+      costPer1kOutput?: number;
+      costCurrency?: string;
+      pricingVersion?: string;
+    };
+  },
   freeEvidenceRef: string | null,
   result: Pick<AiSdkGenerationResult<unknown>, 'providerCost' | 'providerCostCurrency' | 'usage'>,
 ): AiCostFacts => {
-  if (freeEvidenceRef)
-    return unknownCost(`free_evidence:${freeEvidenceRef}`.slice(0, 120));
+  if (freeEvidenceRef) return unknownCost(`free_evidence:${freeEvidenceRef}`.slice(0, 120));
   if (result.providerCost !== null && result.providerCostCurrency === policy.costCurrency)
     return {
       status: 'known',
@@ -319,6 +325,11 @@ export class AiResearchSdkExecution {
         const generated = await this.adapter.generate({
           requestId,
           adapter: route.execution.adapter,
+          ...(route.execution.compatibilityExtensionProfile === undefined
+            ? {}
+            : {
+                compatibilityExtensionProfile: route.execution.compatibilityExtensionProfile,
+              }),
           providerId: route.provider.id,
           baseURL: runtime.baseURL,
           apiKey: runtime.apiKey,
@@ -349,7 +360,8 @@ export class AiResearchSdkExecution {
             {
               code: 'business_invalid',
               phase: 'validation',
-              summary: error instanceof Error ? error.message.slice(0, 500) : '研究结果业务校验失败',
+              summary:
+                error instanceof Error ? error.message.slice(0, 500) : '研究结果业务校验失败',
               externalResult: 'complete',
               requestId,
             },
@@ -357,7 +369,12 @@ export class AiResearchSdkExecution {
             { cause: error },
           );
         }
-        const cost = completedCost(policy, route.provider, route.execution.freeEvidenceRef, generated);
+        const cost = completedCost(
+          policy,
+          route.provider,
+          route.execution.freeEvidenceRef,
+          generated,
+        );
         const blocked = blockAfter(
           execution,
           policy,
@@ -394,19 +411,19 @@ export class AiResearchSdkExecution {
                 {
                   code: 'persistence_failed',
                   phase: 'persistence',
-                  summary: error instanceof Error ? error.message.slice(0, 500) : '研究结果保存失败',
+                  summary:
+                    error instanceof Error ? error.message.slice(0, 500) : '研究结果保存失败',
                   externalResult: 'unknown',
                   requestId,
                 },
                 { status: 'unknown', inputTokens: null, outputTokens: null },
                 { cause: error },
               );
-        const cost = completedCost(
-          policy,
-          route.provider,
-          route.execution.freeEvidenceRef,
-          { providerCost: null, providerCostCurrency: null, usage: sdkError.usage },
-        );
+        const cost = completedCost(policy, route.provider, route.execution.freeEvidenceRef, {
+          providerCost: null,
+          providerCostCurrency: null,
+          usage: sdkError.usage,
+        });
         if (sdkError.fact.externalResult === 'unknown') {
           let continuationBlockedReason: 'expired' | 'cancelled' | undefined;
           if (Date.now() >= deadline) continuationBlockedReason = 'expired';

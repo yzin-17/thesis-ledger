@@ -25,7 +25,6 @@ import {
   providerCapabilityOptions,
   providerCredentialLabel,
   providerCredentialPlaceholder,
-  providerDraftForType,
   providerTypeLabel,
 } from './providers.types.js';
 
@@ -34,6 +33,12 @@ import type { AiProviderModelDetail, ProviderDraft } from './providers.types.js'
 const saveProviderLabel = (saving: boolean, editing: boolean) => {
   if (saving) return '保存中…';
   return editing ? '保存修改' : '保存 Provider';
+};
+
+const providerTestLabel = (testing: boolean, type: string) => {
+  if (testing) return '测试中…';
+  if (type === 'ai') return '最小生成测试';
+  return '测试连接';
 };
 
 const providerSheetTitle = (
@@ -60,7 +65,7 @@ export const ProviderEditorSheet = ({
   onUpdateDraft,
   onResetTest,
   onSetCredentialInputOpen,
-  onAiTypeSelected,
+  onTypeChange,
   onFetchAiModels = () => undefined,
   onClose,
   onTest,
@@ -80,7 +85,7 @@ export const ProviderEditorSheet = ({
   onUpdateDraft: (updater: (current: ProviderDraft) => ProviderDraft) => void;
   onResetTest: () => void;
   onSetCredentialInputOpen: (open: boolean) => void;
-  onAiTypeSelected: () => void;
+  onTypeChange: (type: string) => void;
   onFetchAiModels?: () => void;
   onClose: () => void;
   onTest: () => void;
@@ -135,14 +140,7 @@ export const ProviderEditorSheet = ({
                   <FieldLabel htmlFor="provider-type">类型</FieldLabel>
                   <Select
                     value={providerDraft.type}
-                    disabled={providerDraft.type === 'ai'}
-                    onValueChange={(value) => {
-                      if (value === 'ai') {
-                        onAiTypeSelected();
-                        return;
-                      }
-                      if (value) onUpdateDraft((current) => providerDraftForType(value, current));
-                    }}
+                    onValueChange={(value) => value && onTypeChange(value)}
                   >
                     <SelectTrigger id="provider-type" aria-label="类型" className="w-full">
                       <SelectValue>{providerTypeLabel(providerDraft.type)}</SelectValue>
@@ -287,7 +285,7 @@ export const ProviderEditorSheet = ({
                     aria-hidden="true"
                   />
                 )}
-                {providerTestState === 'testing' ? '测试中…' : '测试连接'}
+                {providerTestLabel(providerTestState === 'testing', providerDraft.type)}
               </Button>
               <Button
                 disabled={providerTestState === 'testing' || savingProviderDraft}

@@ -40,8 +40,12 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
   let handler: Handler = (_request, response) => writeJson(response, 500, {});
   let requestCount = 0;
   let lastBody: unknown;
+  let lastUrl: string | undefined;
+  let lastHeaders: IncomingMessage['headers'];
   const server = createServer(async (request, response) => {
     requestCount += 1;
+    lastUrl = request.url;
+    lastHeaders = request.headers;
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const text = Buffer.concat(chunks).toString('utf8');
@@ -83,6 +87,8 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
   beforeEach(() => {
     requestCount = 0;
     lastBody = null;
+    lastUrl = undefined;
+    lastHeaders = {};
   });
 
   afterAll(async () => {
@@ -119,6 +125,103 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(JSON.stringify(lastBody)).toContain('json_schema');
   });
 
+  it('uses the official OpenAI Chat provider and Chat Completions endpoint', async () => {
+    handler = (_request, response) =>
+      writeJson(
+        response,
+        200,
+        completion('{"answer":"openai-chat"}', 'stop', {
+          prompt_tokens: 5,
+          completion_tokens: 2,
+          total_tokens: 7,
+        }),
+      );
+    const result = await adapter.generate(request({ adapter: 'openai-chat' }));
+    expect(result).toMatchObject({
+      output: { answer: 'openai-chat' },
+      usage: { status: 'reported', inputTokens: 5, outputTokens: 2 },
+    });
+    expect(lastUrl).toBe('/v1/chat/completions');
+    expect(lastHeaders.authorization).toBe('Bearer local-secret');
+    expect(lastBody).toMatchObject({ model: 'fixture-model' });
+    expect(JSON.stringify(lastBody)).toContain('json_schema');
+    expect(requestCount).toBe(1);
+  });
+
+  it('uses the official OpenAI Responses provider and Responses endpoint', async () => {
+    handler = (_request, response) =>
+      writeJson(response, 200, {
+        id: 'response-fixture',
+        created_at: 1,
+        model: 'fixture-model',
+        output: [
+          {
+            type: 'message',
+            role: 'assistant',
+            id: 'message-fixture',
+            content: [
+              {
+                type: 'output_text',
+                text: '{"answer":"responses"}',
+                annotations: [],
+              },
+            ],
+          },
+        ],
+        incomplete_details: null,
+        usage: {
+          input_tokens: 8,
+          output_tokens: 3,
+          total_tokens: 11,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      });
+    const result = await adapter.generate(request({ adapter: 'openai-responses' }));
+    expect(result).toMatchObject({
+      output: { answer: 'responses' },
+      usage: { status: 'reported', inputTokens: 8, outputTokens: 3 },
+    });
+    expect(lastUrl).toBe('/v1/responses');
+    expect(lastHeaders.authorization).toBe('Bearer local-secret');
+    expect(lastBody).toMatchObject({ model: 'fixture-model' });
+    expect(JSON.stringify(lastBody)).toContain('json_schema');
+    expect(requestCount).toBe(1);
+  });
+
+  it('uses the official Anthropic Messages provider and API-key headers', async () => {
+    handler = (_request, response) =>
+      writeJson(response, 200, {
+        type: 'message',
+        id: 'message-fixture',
+        model: 'fixture-model',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-fixture',
+            name: 'json',
+            input: { answer: 'anthropic' },
+          },
+        ],
+        stop_reason: 'tool_use',
+        stop_sequence: null,
+        usage: { input_tokens: 6, output_tokens: 2 },
+      });
+    const result = await adapter.generate(request({ adapter: 'anthropic-messages' }));
+    expect(result).toMatchObject({
+      output: { answer: 'anthropic' },
+      usage: { status: 'reported', inputTokens: 6, outputTokens: 2 },
+    });
+    expect(lastUrl).toBe('/v1/messages');
+    expect(lastHeaders['x-api-key']).toBe('local-secret');
+    expect(lastHeaders['anthropic-version']).toBeTruthy();
+    expect(lastBody).toMatchObject({ model: 'fixture-model' });
+    expect(lastBody).toMatchObject({
+      tools: [expect.objectContaining({ name: 'json' })],
+    });
+    expect(requestCount).toBe(1);
+  });
+
   it('supports explicit json_validated mode without accepting invalid domain output', async () => {
     handler = (_request, response) =>
       writeJson(
@@ -130,9 +233,9 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
           total_tokens: 6,
         }),
       );
-    await expect(
-      adapter.generate(request({ mode: 'json_validated' })),
-    ).resolves.toMatchObject({ output: { answer: 'validated' } });
+    await expect(adapter.generate(request({ mode: 'json_validated' }))).resolves.toMatchObject({
+      output: { answer: 'validated' },
+    });
     expect(JSON.stringify(lastBody)).not.toContain('json_schema');
 
     handler = (_request, response) =>
@@ -155,7 +258,7 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     });
   });
 
-  it('uses the OpenRouter adapter with explicit usage and reasoning settings', async () => {
+  it('migrates approved OpenRouter extensions through the compatible provider', async () => {
     handler = (_request, response) =>
       writeJson(
         response,
@@ -164,23 +267,65 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
           prompt_tokens: 6,
           completion_tokens: 4,
           total_tokens: 10,
+          cost: 0.004,
         }),
       );
     const result = await adapter.generate(
       request({
-        adapter: 'openrouter',
+        adapter: 'openai-compatible-chat',
+        compatibilityExtensionProfile: 'openrouter-v1',
         baseURL: `${baseURL}/v1`,
         reasoningEffort: 'high',
         allowedUpstreams: ['fixture-upstream'],
       }),
     );
-    expect(result.output).toEqual({ answer: 'openrouter' });
+    expect(result).toMatchObject({
+      output: { answer: 'openrouter' },
+      providerCost: '0.004',
+      providerCostCurrency: 'USD',
+    });
     expect(lastBody).toMatchObject({
       model: 'fixture-model',
-      reasoning: { effort: 'high' },
+      reasoning_effort: 'high',
       provider: { require_parameters: true, only: ['fixture-upstream'] },
     });
     expect(requestCount).toBe(1);
+  });
+
+  it('does not grant OpenRouter extensions to a new compatible connection', async () => {
+    handler = (_request, response) =>
+      writeJson(response, 200, completion('{"answer":"plain-compatible"}'));
+    await adapter.generate(
+      request({
+        adapter: 'openai-compatible-chat',
+        providerId: 'openrouter-looking-name',
+        baseURL: `${baseURL}/v1`,
+        mode: 'json_validated',
+        allowedUpstreams: ['must-not-be-forwarded'],
+      }),
+    );
+    expect(lastBody).not.toHaveProperty('provider');
+    expect(requestCount).toBe(1);
+  });
+
+  it('blocks an unmapped legacy OpenRouter reasoning effort before sending', async () => {
+    const error = await adapter
+      .generate(
+        request({
+          adapter: 'openai-compatible-chat',
+          compatibilityExtensionProfile: 'openrouter-v1',
+          reasoningEffort: 'max',
+        }),
+      )
+      .catch((reason: unknown) => reason);
+    expect(error).toMatchObject({
+      fact: {
+        code: 'capability_unsupported',
+        phase: 'preflight',
+        externalResult: 'not_sent',
+      },
+    });
+    expect(requestCount).toBe(0);
   });
 
   it('consumes the complete SSE stream including a usage-only tail frame', async () => {
@@ -221,12 +366,18 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
           created: 1,
           model: 'fixture-model',
           choices: [],
-          usage: { prompt_tokens: 9, completion_tokens: 5, total_tokens: 14 },
+          usage: {
+            prompt_tokens: 9,
+            completion_tokens: 5,
+            total_tokens: 14,
+            cost: 0.006,
+          },
         },
       ]);
     const result = await adapter.generate(
       request({
-        adapter: 'openrouter',
+        adapter: 'openai-compatible-chat',
+        compatibilityExtensionProfile: 'openrouter-v1',
         mode: 'json_validated',
         transport: 'stream',
         onProgress: (event) => progress.push(event.type),
@@ -235,6 +386,7 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(result).toMatchObject({
       output: { answer: 'stream' },
       usage: { status: 'reported', inputTokens: 9, outputTokens: 5 },
+      providerCost: '0.006',
     });
     expect(result.timeToFirstEventMs).not.toBeNull();
     expect(result.timeToFirstTextMs).not.toBeNull();
@@ -392,9 +544,7 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
             object: 'chat.completion.chunk',
             created: 1,
             model: 'fixture-model',
-            choices: [
-              { index: 0, delta: { content: '{"answer":"late"}' }, finish_reason: 'stop' },
-            ],
+            choices: [{ index: 0, delta: { content: '{"answer":"late"}' }, finish_reason: 'stop' }],
           })}\n\n`,
         );
         response.end('data: [DONE]\n\n');

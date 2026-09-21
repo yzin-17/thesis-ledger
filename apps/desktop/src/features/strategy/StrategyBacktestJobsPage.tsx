@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatDateTime } from '@/lib/date-display';
 import { EmptyListState } from '../shared/EmptyStates.js';
 import { fetchStrategyBacktestGroups } from './strategy-optimization.api.js';
 import { backtestIdentity, resolveBacktestVersion } from './strategy-backtest-detail.model.js';
@@ -20,7 +21,6 @@ import {
   backtestPeriodLabel,
   backtestStatusSummary,
   experimentStageLabel,
-  formatCompactDateTime,
 } from './strategy-list-presentation.js';
 import {
   BacktestResultCell,
@@ -243,7 +243,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                           {title}
                         </Link>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          用户任务 · {formatCompactDateTime(latest.createdAt)} 发起
+                          用户任务 · {formatDateTime(latest.createdAt, '时间未记录')} 发起
                         </p>
                       </td>
                       <td className="overflow-hidden px-4 py-3">
@@ -287,7 +287,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                       </button>
                       <p className="mt-1 pl-6 text-xs text-muted-foreground">
                         AI 实验 · {group.jobs.length} 个匹配任务 ·{' '}
-                        {formatCompactDateTime(latest.createdAt)} 更新
+                        {formatDateTime(latest.createdAt, '时间未记录')} 更新
                       </p>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">多个候选区间</td>

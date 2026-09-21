@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatDateTimeInTimeZone } from '@/lib/date-display';
 import {
   Select,
   SelectContent,
@@ -14,17 +15,6 @@ import {
   visibleBacktestPoints,
   type BacktestChartModel,
 } from './strategy-backtest-chart.model.js';
-
-const formatTime = (time: number, timezone: string) =>
-  new Intl.DateTimeFormat('zh-CN', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(time));
 
 const moneyFormatter = (currency: BacktestChartModel['currency']) => {
   if (!currency) return (value: number | null) => (value === null ? '不可用' : String(value));
@@ -134,7 +124,9 @@ export function StrategyBacktestEquityDetails({
                   const drawdown = drawdownByTime.get(point.time);
                   return (
                     <tr key={point.time} className="border-b last:border-0">
-                      <td className="px-3 py-2">{formatTime(point.time, model.timezone)}</td>
+                      <td className="px-3 py-2">
+                        {formatDateTimeInTimeZone(point.time, model.timezone)}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(point.value)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(point.cash)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">

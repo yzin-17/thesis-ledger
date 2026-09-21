@@ -10,7 +10,16 @@ export const AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION = 'optimization-paramete
 export const AI_STRATEGY_DISCOVERY_CONTRACT_VERSION = 'strategy-discovery-v2' as const;
 export const AI_RESEARCH_GENERATION_CONTRACT_VERSION = 'research-generation-v1' as const;
 
-export const aiAdapterSchema = z.enum(['openrouter', 'openai-compatible']);
+export const aiLegacyAdapterSchema = z.enum(['openrouter', 'openai-compatible']);
+export type AiLegacyAdapter = z.infer<typeof aiLegacyAdapterSchema>;
+
+export const aiAdapterSchema = z.enum([
+  ...aiLegacyAdapterSchema.options,
+  'openai-compatible-chat',
+  'openai-chat',
+  'openai-responses',
+  'anthropic-messages',
+]);
 export type AiAdapter = z.infer<typeof aiAdapterSchema>;
 
 export const aiGenerationModeSchema = z.enum(['native_schema', 'json_validated']);
@@ -431,6 +440,7 @@ export const aiProviderModelExecutionSchema = z
   .object({
     model: z.string().trim().min(1).max(200),
     adapter: aiAdapterSchema,
+    compatibilityExtensionProfile: z.literal('openrouter-v1').optional(),
     mode: aiGenerationModeSchema,
     contract: aiGenerationContractRefSchema,
     capabilityDeclaration: aiCapabilityDeclarationSchema.nullable(),

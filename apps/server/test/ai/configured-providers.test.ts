@@ -13,10 +13,28 @@ const baseEnvironment = {
 
 describe('configured AI providers', () => {
   it('registers multiple explicit provider/model identities', () => {
-    const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-      { id: 'alpha', baseUrl: 'https://alpha.example/v1', apiKey: 'a', models: ['a1', 'a2'], costPer1kInput: 0.1, costPer1kOutput: 0.2, costCurrency: 'USD', pricingVersion: '2026-09' },
-      { id: 'beta', baseUrl: 'https://beta.example/v1', apiKey: 'b', models: ['b1'], timeoutMs: 1234 },
-    ]) });
+    const config = parseConfig({
+      ...baseEnvironment,
+      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
+        {
+          id: 'alpha',
+          baseUrl: 'https://alpha.example/v1',
+          apiKey: 'a',
+          models: ['a1', 'a2'],
+          costPer1kInput: 0.1,
+          costPer1kOutput: 0.2,
+          costCurrency: 'USD',
+          pricingVersion: '2026-09',
+        },
+        {
+          id: 'beta',
+          baseUrl: 'https://beta.example/v1',
+          apiKey: 'b',
+          models: ['b1'],
+          timeoutMs: 1234,
+        },
+      ]),
+    });
     const providers = createConfiguredAiProviders(config);
     expect(providers.map(({ id, models }) => ({ id, models: [...models] }))).toEqual([
       { id: 'alpha', models: ['a1', 'a2'] },
@@ -31,15 +49,93 @@ describe('configured AI providers', () => {
   });
 
   it('rejects duplicate provider identities', () => {
-    const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-      { id: 'alpha', baseUrl: 'https://one.example/v1', apiKey: 'a', models: ['a1'] },
-      { id: 'alpha', baseUrl: 'https://two.example/v1', apiKey: 'b', models: ['a2'] },
-    ]) });
+    const config = parseConfig({
+      ...baseEnvironment,
+      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
+        { id: 'alpha', baseUrl: 'https://one.example/v1', apiKey: 'a', models: ['a1'] },
+        { id: 'alpha', baseUrl: 'https://two.example/v1', apiKey: 'b', models: ['a2'] },
+      ]),
+    });
     expect(() => createConfiguredAiProviders(config)).toThrow(/AI_PROVIDER_CONFIGS_JSON 配置无效/);
   });
 
   it('keeps the legacy single-provider configuration compatible', () => {
-    const config = parseConfig({ ...baseEnvironment, AI_PROVIDER_ID: 'legacy', AI_BASE_URL: 'https://legacy.example/v1', AI_API_KEY: 'legacy-key', AI_MODEL: 'legacy-model' });
-    expect(createConfiguredAiProviders(config).map(({ id, models }) => ({ id, models: [...models] }))).toEqual([{ id: 'legacy', models: ['legacy-model'] }]);
+    const config = parseConfig({
+      ...baseEnvironment,
+      AI_PROVIDER_ID: 'legacy',
+      AI_BASE_URL: 'https://legacy.example/v1',
+      AI_API_KEY: 'legacy-key',
+      AI_MODEL: 'legacy-model',
+    });
+    expect(
+      createConfiguredAiProviders(config).map(({ id, models, metadata }) => ({
+        id,
+        models: [...models],
+        upstreamFormat: metadata?.upstreamFormat,
+        chatImplementation: metadata?.chatImplementation,
+        adapter: metadata?.adapter,
+      })),
+    ).toEqual([
+      {
+        id: 'legacy',
+        models: ['legacy-model'],
+        upstreamFormat: 'chat-completions',
+        chatImplementation: 'compatible',
+        adapter: 'openai-compatible-chat',
+      },
+    ]);
+  });
+
+  it('maps legacy environment adapters only at the read boundary', () => {
+    const config = parseConfig({
+      ...baseEnvironment,
+      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
+        {
+          id: 'legacy-openrouter',
+          baseUrl: 'https://gateway.example/v1',
+          apiKey: 'secret',
+          models: ['model-a'],
+          adapter: 'openrouter',
+          executionRoutes: [
+            {
+              model: 'model-a',
+              mode: 'json_validated',
+              contract: { id: 'research', version: 'research-generation-v1' },
+              capabilityDeclaration: null,
+              allowedUpstreams: ['legacy-openrouter'],
+              freeEvidence: null,
+            },
+          ],
+        },
+      ]),
+    });
+    const provider = createConfiguredAiProviders(config)[0];
+    expect(provider?.metadata).toMatchObject({
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'compatible',
+      adapter: 'openai-compatible-chat',
+      compatibilityExtensionProfile: 'openrouter-v1',
+    });
+  });
+
+  it('selects the official provider for explicit non-compatible formats', () => {
+    const config = parseConfig({
+      ...baseEnvironment,
+      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
+        {
+          id: 'responses',
+          baseUrl: 'https://same.example/v1',
+          apiKey: 'secret',
+          models: ['model-a'],
+          upstreamFormat: 'responses',
+        },
+      ]),
+    });
+    expect(createConfiguredAiProviders(config)[0]?.metadata).toMatchObject({
+      upstreamFormat: 'responses',
+    });
+    expect(createConfiguredAiProviders(config)[0]?.metadata).toMatchObject({
+      adapter: 'openai-responses',
+    });
   });
 });

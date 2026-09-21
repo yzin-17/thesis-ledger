@@ -266,6 +266,12 @@ export class StrategyOptimizationSdkExecutor {
         this.adapter.generate({
           requestId,
           adapter: input.resolved.execution.adapter,
+          ...(input.resolved.execution.compatibilityExtensionProfile === undefined
+            ? {}
+            : {
+                compatibilityExtensionProfile:
+                  input.resolved.execution.compatibilityExtensionProfile,
+              }),
           providerId: input.route.provider,
           baseURL: runtime.baseURL,
           apiKey: runtime.apiKey,

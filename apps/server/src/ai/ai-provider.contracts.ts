@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import {
-  aiAdapterSchema,
   aiCapabilityDeclarationSchema,
+  aiChatImplementationSchema,
   aiGenerationContractRefSchema,
   aiGenerationModeSchema,
+  aiUpstreamFormatSchema,
+  aiUpstreamSelectionSchema,
   type AiProviderModelExecution,
 } from '@thesis-ledger/schemas';
 import type { ProviderState } from '../providers/provider-health.service.js';
@@ -86,7 +88,8 @@ export const aiProviderInputSchema = z
     name: z.string().trim().min(1).max(120),
     baseUrl: httpUrl,
     models: z.array(z.string().trim().min(1).max(200)).min(1).max(32),
-    adapter: aiAdapterSchema.optional(),
+    upstreamFormat: aiUpstreamFormatSchema.default('chat-completions'),
+    chatImplementation: aiChatImplementationSchema.optional(),
     executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
     modelReasoning: modelReasoningSchema,
     apiKey: z.string().trim().min(1).max(10_000).optional(),
@@ -103,6 +106,19 @@ export const aiProviderInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    const selection = aiUpstreamSelectionSchema.safeParse({
+      upstreamFormat: value.upstreamFormat,
+      ...(value.chatImplementation === undefined
+        ? {}
+        : { chatImplementation: value.chatImplementation }),
+    });
+    if (!selection.success)
+      for (const issue of selection.error.issues)
+        context.addIssue({
+          code: 'custom',
+          path: issue.path,
+          message: issue.message,
+        });
     const models = value.models.map((model) => model.trim());
     if (new Set(models).size !== models.length)
       context.addIssue({ code: 'custom', path: ['models'], message: '模型不得重复' });
@@ -142,6 +158,7 @@ export const aiProviderModelCatalogInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     baseUrl: httpUrl,
+    upstreamFormat: aiUpstreamFormatSchema.optional(),
     apiKey: z.string().trim().min(1).max(10_000).optional(),
     credentialsRef: z.string().trim().min(1).max(10_000).optional(),
     timeoutMs: z.number().int().positive().max(120_000).optional(),
@@ -174,7 +191,8 @@ export interface AiProviderSummary {
   capabilities: string[];
   baseUrl: string | null;
   models: string[];
-  adapter?: z.infer<typeof aiAdapterSchema>;
+  upstreamFormat?: z.infer<typeof aiUpstreamFormatSchema>;
+  chatImplementation?: z.infer<typeof aiChatImplementationSchema>;
   executionRouteConfigs?: AiProviderExecutionRouteInput[];
   executionRoutes?: AiProviderModelExecution[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;

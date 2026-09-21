@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -32,6 +32,7 @@ import {
   modelsToText,
 } from './ai-provider.actions.js';
 import { AiProviderExecutionFields } from './AiProviderExecutionFields.js';
+import { AiProviderUpstreamFields } from './AiProviderUpstreamFields.js';
 import type {
   AiProviderModelDetail,
   AiProviderModelReasoning,
@@ -84,6 +85,7 @@ export function AiProviderEditorFields({
   onFetchModels?: () => void;
 }) {
   const modelAnchor = useComboboxAnchor();
+  const [manualModel, setManualModel] = useState('');
   const selectedModels = useMemo(() => modelsFromText(draft.modelsText), [draft.modelsText]);
   const selectedModelSet = useMemo(() => new Set(selectedModels), [selectedModels]);
   const modelOptions = useMemo(
@@ -113,6 +115,13 @@ export function AiProviderEditorFields({
     }));
   };
 
+  const addManualModel = () => {
+    const model = manualModel.trim();
+    if (!model || selectedModelSet.has(model) || selectedModels.length >= MAX_SELECTED_MODELS) return;
+    updateModels([...selectedModels, model]);
+    setManualModel('');
+  };
+
   return (
     <FieldGroup>
       {takingOverEnvironmentName && (
@@ -123,6 +132,7 @@ export function AiProviderEditorFields({
           </FieldDescription>
         </Field>
       )}
+      <AiProviderUpstreamFields draft={draft} onUpdateDraft={onUpdateDraft} />
       <Field>
         <FieldLabel htmlFor="ai-base-url">API Base URL</FieldLabel>
         <Input
@@ -130,7 +140,7 @@ export function AiProviderEditorFields({
           aria-label="API Base URL"
           type="url"
           value={draft.baseUrl}
-          placeholder="https://openrouter.ai/api/v1"
+          placeholder="https://api.example.com/v1"
           onChange={(event) =>
             onUpdateDraft((current) => ({ ...current, baseUrl: event.target.value }))
           }
@@ -223,6 +233,31 @@ export function AiProviderEditorFields({
           已选择 {selectedModels.length}/{MAX_SELECTED_MODELS} 个；已获取 {availableModels.length}{' '}
           个可用模型。
         </FieldDescription>
+        <div className="flex items-center gap-2">
+          <Input
+            aria-label="手动模型 ID"
+            value={manualModel}
+            placeholder="目录不可用时手动填写模型 ID"
+            onChange={(event) => setManualModel(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              addManualModel();
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={
+              !manualModel.trim() ||
+              selectedModelSet.has(manualModel.trim()) ||
+              selectedModels.length >= MAX_SELECTED_MODELS
+            }
+            onClick={addManualModel}
+          >
+            添加模型
+          </Button>
+        </div>
       </Field>
       <AiProviderExecutionFields draft={draft} onUpdateDraft={onUpdateDraft} />
       {credentialInputOpen ? (

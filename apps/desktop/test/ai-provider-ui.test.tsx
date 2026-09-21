@@ -1,17 +1,21 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
   aiProviderDraftError,
   aiProviderDraftFromRecord,
   aiProviderInputFromDraft,
+  aiUpstreamFormatOptions,
   mergeSelectedModelReasoning,
   modelDetailsFromCatalog,
   modelReasoningBadgeLabels,
   mergeModelOptions,
   modelsToText,
   requestAiProviderDeletion,
+  withAiUpstreamFormat,
 } from '../src/features/providers/ai-provider.actions.js';
 import { newAiProviderExecutionRouteDraft } from '../src/features/providers/ai-provider-execution.js';
+import { createLatestRequestGate } from '../src/features/providers/ai-provider-editor-async.js';
 import {
   deleteAiProvider,
   fetchAiProviderModels,
@@ -39,6 +43,8 @@ import { ProviderTable } from '../src/features/providers/ProviderSettingsSection
 import { ProviderModelList } from '../src/features/providers/ProviderModelSummary.js';
 import {
   newAiProviderDraft,
+  newProviderDraft,
+  providerDraftForType,
   type ProviderRecord,
 } from '../src/features/providers/providers.types.js';
 
@@ -107,7 +113,13 @@ describe('AI Provider 专用请求与密钥边界', () => {
   });
 
   it('专用 CRUD 与测试端点使用冻结的 AI 路由', async () => {
-    const draft = { ...newAiProviderDraft(), name: 'openrouter', credentialsRef: 'ui-secret' };
+    const draft = {
+      ...newAiProviderDraft(),
+      name: 'openrouter',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelsText: 'nvidia/nemotron-3-super-120b-a12b:free',
+      credentialsRef: 'ui-secret',
+    };
     const input = aiProviderInputFromDraft(draft);
     const requestClient = client(aiProvider());
 
@@ -118,6 +130,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
       {
         name: 'openrouter',
         baseUrl: 'https://openrouter.ai/api/v1',
+        upstreamFormat: 'chat-completions',
         apiKey: 'ui-secret',
       },
       requestClient,
@@ -139,10 +152,13 @@ describe('AI Provider 专用请求与密钥边界', () => {
     expect(JSON.parse(requestClient.request.mock.calls[1]?.[1]?.body as string)).toMatchObject({
       apiKey: 'ui-secret',
       models: ['nvidia/nemotron-3-super-120b-a12b:free'],
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'compatible',
     });
     expect(JSON.parse(requestClient.request.mock.calls[3]?.[1]?.body as string)).toMatchObject({
       name: 'openrouter',
       baseUrl: 'https://openrouter.ai/api/v1',
+      upstreamFormat: 'chat-completions',
       apiKey: 'ui-secret',
     });
   });
@@ -168,6 +184,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
     const createInput = aiProviderInputFromDraft({
       ...newAiProviderDraft(),
       name: 'openrouter',
+      baseUrl: 'https://openrouter.ai/api/v1',
       credentialsRef: 'ui-secret',
       modelsText: 'model-a\nmodel-b',
     });
@@ -175,6 +192,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
 
     expect(createInput).toMatchObject({ apiKey: 'ui-secret', models: ['model-a', 'model-b'] });
     expect(editInput).not.toHaveProperty('apiKey');
+    expect(editInput).not.toHaveProperty('adapter');
     expect(JSON.stringify(editInput)).not.toContain('ui-secret');
     expect(editInput).toMatchObject({
       timeoutMs: 45000,
@@ -183,13 +201,15 @@ describe('AI Provider 专用请求与密钥边界', () => {
       costCurrency: 'USD',
       pricingVersion: '2026-09',
       modelReasoning: aiProvider().modelReasoning,
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'compatible',
     });
     expect(aiProviderDraftError({ ...createInput, models: ['same', 'same'] })).toBe(
       '模型不得重复。',
     );
   });
 
-  it('执行路由可保存未就绪声明，并保留 adapter、模式、参数和免费依据', () => {
+  it('执行路由可保存未就绪声明，并保留上游格式、模式、参数和免费依据', () => {
     const route = {
       ...newAiProviderExecutionRouteDraft('model-a'),
       mode: 'native_schema' as const,
@@ -207,13 +227,16 @@ describe('AI Provider 专用请求与密钥边界', () => {
     const input = aiProviderInputFromDraft({
       ...newAiProviderDraft(),
       name: 'local-provider',
+      baseUrl: 'http://127.0.0.1:4318/v1',
       modelsText: 'model-a',
-      adapter: 'openai-compatible',
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'compatible',
       executionRoutes: [route],
     });
 
     expect(input).toMatchObject({
-      adapter: 'openai-compatible',
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'compatible',
       executionRoutes: [
         {
           model: 'model-a',
@@ -233,6 +256,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
         },
       ],
     });
+    expect(input).not.toHaveProperty('adapter');
     expect(aiProviderDraftError(input)).toBeNull();
     expect(
       aiProviderDraftError({
@@ -268,6 +292,125 @@ describe('AI Provider 专用请求与密钥边界', () => {
 });
 
 describe('AI Provider 页面操作', () => {
+  it('从已命名的普通 Provider 切换到 AI 时保留名称并使用中性默认值', () => {
+    const ordinaryDraft = { ...newProviderDraft(), name: '我的模型服务' };
+    const aiDraft = providerDraftForType('ai', ordinaryDraft);
+
+    expect(aiDraft).toMatchObject({
+      name: '我的模型服务',
+      type: 'ai',
+      baseUrl: '',
+      modelsText: '',
+      credentialsRef: '',
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'compatible',
+    });
+    expect(JSON.stringify(aiDraft)).not.toContain('openrouter.ai');
+    expect(JSON.stringify(aiDraft)).not.toContain('nemotron');
+    const markup = renderToStaticMarkup(
+      <AiProviderEditorFields
+        draft={aiDraft}
+        credentialInputOpen
+        takingOverEnvironmentName={null}
+        onUpdateDraft={() => undefined}
+        onResetTest={() => undefined}
+        onSetCredentialInputOpen={() => undefined}
+      />,
+    );
+    expect(markup).not.toContain('openrouter.ai');
+    expect(markup).not.toContain('nemotron');
+  });
+
+  it('从 AI 切回普通 Provider 时保留公共字段并清理 AI 专属字段', () => {
+    const aiDraft = {
+      ...newAiProviderDraft(),
+      name: '可切换服务',
+      priority: 7,
+      enabled: false,
+      baseUrl: 'https://example.test/v1',
+      modelsText: 'model-a',
+      credentialsRef: 'secret',
+    };
+    const ordinaryDraft = providerDraftForType('notification', aiDraft);
+
+    expect(ordinaryDraft).toMatchObject({
+      name: '可切换服务',
+      type: 'notification',
+      capabilities: ['notification'],
+      priority: 7,
+      enabled: false,
+      baseUrl: '',
+      modelsText: '',
+      credentialsRef: '',
+    });
+    expect(ordinaryDraft.executionRoutes).toEqual([]);
+  });
+
+  it('上游格式使用中文标签，格式切换保留公共字段并清除 Chat 条件字段', () => {
+    expect(aiUpstreamFormatOptions.map((option) => option.label)).toEqual([
+      'Chat Completions（需支持对应接口）',
+      'Responses（原生）',
+      'Anthropic Messages（需支持对应接口）',
+    ]);
+    const chatDraft = {
+      ...newAiProviderDraft(),
+      name: '保留名称',
+      baseUrl: 'https://example.test/v1',
+      credentialsRef: 'secret',
+      modelsText: 'model-a',
+      chatImplementation: 'openai-native' as const,
+    };
+    const responsesDraft = withAiUpstreamFormat(chatDraft, 'responses');
+    expect(responsesDraft).toMatchObject({
+      name: '保留名称',
+      baseUrl: 'https://example.test/v1',
+      credentialsRef: 'secret',
+      modelsText: 'model-a',
+      upstreamFormat: 'responses',
+    });
+    expect(responsesDraft.chatImplementation).toBeUndefined();
+    expect(withAiUpstreamFormat(responsesDraft, 'chat-completions').chatImplementation).toBe(
+      'compatible',
+    );
+  });
+
+  it('后发请求或草稿变化会使旧模型目录与最小生成结果失效', () => {
+    const gate = createLatestRequestGate();
+    const firstRequest = gate.begin();
+    const secondRequest = gate.begin();
+    expect(gate.isCurrent(firstRequest)).toBe(false);
+    expect(gate.isCurrent(secondRequest)).toBe(true);
+
+    gate.invalidate();
+    expect(gate.isCurrent(secondRequest)).toBe(false);
+  });
+
+  it('Provider 页面使用一个统一 Sheet，AI 字段不暴露 OpenRouter 或内部 adapter', () => {
+    const settingsSource = readFileSync(
+      new URL('../src/features/providers/ProviderSettings.tsx', import.meta.url),
+      'utf8',
+    );
+    const executionSource = readFileSync(
+      new URL('../src/features/providers/AiProviderExecutionFields.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(settingsSource.match(/<ProviderEditorSheet/g)).toHaveLength(1);
+    expect(settingsSource).toContain('onTypeChange={aiEditor.changeType}');
+    expect(executionSource).not.toContain('SDK adapter');
+    expect(executionSource).not.toContain('OpenRouter');
+    const editorSource = readFileSync(
+      new URL('../src/features/providers/useAiProviderEditor.ts', import.meta.url),
+      'utf8',
+    );
+    const sheetSource = readFileSync(
+      new URL('../src/features/providers/ProviderEditorSheet.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(sheetSource).not.toContain("disabled={providerDraft.type === 'ai'}");
+    expect(sheetSource).toContain('onTypeChange(value)');
+    expect(editorSource).toContain('仅证明连接与最小生成可用，不代表业务结构化生成已通过');
+  });
+
   it('专用表单显示 AI 字段，数据库编辑草稿不回显已保存 Key', () => {
     const draft = aiProviderDraftFromRecord(aiProvider());
     const markup = renderToStaticMarkup(
@@ -286,6 +429,11 @@ describe('AI Provider 页面操作', () => {
     );
 
     expect(markup).toContain('API Base URL');
+    expect(markup).toContain('上游格式');
+    expect(markup).toContain('Chat Completions（需支持对应接口）');
+    expect(markup).toContain('高级选项 · Chat 实现');
+    expect(markup).toContain('通用兼容');
+    expect(markup).toContain('手动模型 ID');
     expect(markup).toContain('模型列表');
     expect(markup).toContain('从接口获取');
     expect(markup).toContain('搜索并选择模型');
@@ -300,6 +448,24 @@ describe('AI Provider 页面操作', () => {
     expect(markup).toContain('>USD<');
     expect(draft.credentialsRef).toBe('');
     expect(markup).not.toContain('server-secret');
+    expect(markup).not.toContain('OpenRouter');
+  });
+
+  it('Responses 与 Anthropic 格式不显示 Chat 实现条件字段', () => {
+    for (const upstreamFormat of ['responses', 'anthropic-messages'] as const) {
+      const markup = renderToStaticMarkup(
+        <AiProviderEditorFields
+          draft={{ ...newAiProviderDraft(), upstreamFormat, chatImplementation: undefined }}
+          credentialInputOpen
+          takingOverEnvironmentName={null}
+          onUpdateDraft={() => undefined}
+          onResetTest={() => undefined}
+          onSetCredentialInputOpen={() => undefined}
+        />,
+      );
+      expect(markup).not.toContain('高级选项 · Chat 实现');
+      expect(markup).not.toContain('aria-label="Chat 实现"');
+    }
   });
 
   it('接口模型与已有选择合并，写回时去重并限制最多 32 个', () => {

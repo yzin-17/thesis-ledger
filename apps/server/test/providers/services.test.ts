@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProviderHealthService } from '../../src/providers/provider-health.service.js';
 import { ProviderHealthScheduler } from '../../src/providers/provider-health.scheduler.js';
 import { ProviderConfigService } from '../../src/providers/provider-config.service.js';
+import { encryptProviderCredential } from '../../src/platform/credential-security.js';
 
 describe('Provider 健康状态', () => {
   it('连续失败进入 down，恢复后回到 healthy，并持久化最近状态', async () => {
@@ -170,6 +171,55 @@ describe('专业 Provider 配置', () => {
       state: 'warning',
       remaining: 5,
     });
+  });
+
+  it('统一流程允许数据库 AI Provider 转换为普通 Provider 并保留凭证', async () => {
+    const stored = {
+      name: 'shared',
+      type: 'ai',
+      enabled: true,
+      priority: 100,
+      capabilities: ['chat'],
+      settings: { baseUrl: 'https://ai.example/v1', models: ['model'] },
+      encryptedCredentials: encryptProviderCredential('existing-key'),
+      health: 'healthy',
+    };
+    const upsert = vi.fn(async ({ update }: { update: Record<string, unknown> }) => ({
+      ...stored,
+      ...update,
+    }));
+    const prisma = {
+      providerConfig: {
+        findUnique: vi.fn(async () => stored),
+        upsert,
+      },
+    };
+    const service = new ProviderConfigService(prisma as never, createProviderHealthStub() as never);
+
+    const saved = await service.save({
+      name: 'shared',
+      type: 'notification',
+      priority: 2,
+      capabilities: ['notification'],
+    });
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { name: 'shared' },
+        update: expect.objectContaining({
+          type: 'notification',
+          capabilities: ['notification'],
+          settings: {},
+        }),
+      }),
+    );
+    expect(saved).toMatchObject({
+      type: 'notification',
+      priority: 2,
+      capabilities: ['notification'],
+      credentialConfigured: true,
+    });
+    expect(saved).not.toHaveProperty('encryptedCredentials');
   });
 
   it('连接测试按凭证形态识别渠道，Provider 名称不影响结果', async () => {

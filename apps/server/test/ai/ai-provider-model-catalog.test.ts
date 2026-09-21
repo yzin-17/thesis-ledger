@@ -4,6 +4,39 @@ import { aiProviderInputSchema } from '../../src/ai/ai-provider.contracts.js';
 import { parseAiProviderSettings } from '../../src/ai/ai-provider-summary.js';
 
 describe('AI Provider 模型目录推理能力', () => {
+  it('按上游格式选择模型目录鉴权头且不切换协议', async () => {
+    let capturedHeaders: HeadersInit | undefined;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      capturedHeaders = init?.headers;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ id: 'model-a' }] }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await fetchAiProviderModelCatalog(
+        'https://anthropic.example/v1',
+        'secret',
+        1_000,
+        'anthropic-messages',
+      );
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://anthropic.example/v1/models',
+        expect.objectContaining({
+          headers: {
+            'x-api-key': 'secret',
+            'anthropic-version': '2023-06-01',
+          },
+        }),
+      );
+      expect(capturedHeaders).not.toHaveProperty('authorization');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('保留兼容模型数组并规范化已知推理字段', async () => {
     vi.stubGlobal(
       'fetch',
@@ -140,6 +173,8 @@ describe('AI Provider 模型目录推理能力', () => {
       parseAiProviderSettings({
         baseUrl: 'https://ai.example/v1',
         models: ['selected-model'],
+        upstreamFormat: 'chat-completions',
+        chatImplementation: 'compatible',
         modelReasoning: {
           'selected-model': { supportedEfforts: ['high'] },
           'removed-model': { supportedEfforts: ['high'] },
@@ -152,6 +187,8 @@ describe('AI Provider 模型目录推理能力', () => {
       parseAiProviderSettings({
         baseUrl: 'https://ai.example/v1',
         models: ['selected-model'],
+        upstreamFormat: 'chat-completions',
+        chatImplementation: 'compatible',
         modelReasoning: {
           'selected-model': { supportedEfforts: ['high'], upstream: 'ignored' },
         },

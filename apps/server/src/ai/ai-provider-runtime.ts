@@ -8,7 +8,6 @@ import {
   healthValue,
   parseAiProviderSettings,
 } from './ai-provider-summary.js';
-import { inferLegacyAiAdapter } from './ai-provider-readiness.js';
 
 export const createStoredAiProvider = async (
   row: ProviderConfig,
@@ -18,7 +17,6 @@ export const createStoredAiProvider = async (
   const settings = parseAiProviderSettings(row.settings);
   const credential = await configs.readCredential(row).catch(() => '');
   if (!settings || !credential || !row.enabled) return null;
-  const adapter = settings.adapter ?? inferLegacyAiAdapter(settings.baseUrl);
   return new OpenAiCompatibleProvider(
     row.name,
     settings.models,
@@ -26,9 +24,7 @@ export const createStoredAiProvider = async (
     credential,
     settings.timeoutMs ?? fallbackTimeoutMs,
     {
-      ...(settings.costPer1kInput === undefined
-        ? {}
-        : { costPer1kInput: settings.costPer1kInput }),
+      ...(settings.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
       ...(settings.costPer1kOutput === undefined
         ? {}
         : { costPer1kOutput: settings.costPer1kOutput }),
@@ -41,7 +37,12 @@ export const createStoredAiProvider = async (
       health: healthValue(row.health),
       source: 'database',
       ...(settings.modelReasoning ? { modelReasoning: settings.modelReasoning } : {}),
-      ...(adapter ? { adapter } : {}),
+      upstreamFormat: settings.upstreamFormat,
+      ...(settings.chatImplementation ? { chatImplementation: settings.chatImplementation } : {}),
+      ...(settings.compatibilityExtensionProfile
+        ? { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }
+        : {}),
+      ...(settings.adapter ? { adapter: settings.adapter } : {}),
       ...(settings.executionRoutes ? { executionRoutes: settings.executionRoutes } : {}),
       ...(settings.capabilityRevocations
         ? { capabilityRevocations: settings.capabilityRevocations }

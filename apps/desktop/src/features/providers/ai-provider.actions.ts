@@ -12,13 +12,14 @@ import {
   aiProviderExecutionRouteDraftFromConfig,
   aiProviderExecutionRouteInputFromDraft,
 } from './ai-provider-execution.js';
-import type { AiAdapter } from '@thesis-ledger/schemas';
+import type { AiChatImplementation, AiUpstreamFormat } from '@thesis-ledger/schemas';
 
 export type AiProviderInput = {
   name: string;
   baseUrl: string;
   models: string[];
-  adapter?: AiAdapter;
+  upstreamFormat: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
   executionRoutes?: AiProviderExecutionRouteConfig[];
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   apiKey?: string;
@@ -53,6 +54,33 @@ export const modelsToText = (models: string[], limit = 32) =>
 
 export const mergeModelOptions = (selectedModels: string[], availableModels: string[]) =>
   Array.from(new Set([...availableModels, ...selectedModels]));
+
+export const aiUpstreamFormatOptions = [
+  { value: 'chat-completions', label: 'Chat Completions（需支持对应接口）' },
+  { value: 'responses', label: 'Responses（原生）' },
+  { value: 'anthropic-messages', label: 'Anthropic Messages（需支持对应接口）' },
+] as const satisfies ReadonlyArray<{ value: AiUpstreamFormat; label: string }>;
+
+export const aiChatImplementationOptions = [
+  { value: 'compatible', label: '通用兼容' },
+  { value: 'openai-native', label: 'OpenAI 原生' },
+] as const satisfies ReadonlyArray<{ value: AiChatImplementation; label: string }>;
+
+export const aiUpstreamFormatLabel = (value: AiUpstreamFormat) =>
+  aiUpstreamFormatOptions.find((option) => option.value === value)?.label ?? value;
+
+export const aiChatImplementationLabel = (value: AiChatImplementation) =>
+  aiChatImplementationOptions.find((option) => option.value === value)?.label ?? value;
+
+export const withAiUpstreamFormat = (
+  draft: ProviderDraft,
+  upstreamFormat: AiUpstreamFormat,
+): ProviderDraft => ({
+  ...draft,
+  upstreamFormat,
+  chatImplementation:
+    upstreamFormat === 'chat-completions' ? (draft.chatImplementation ?? 'compatible') : undefined,
+});
 
 export const modelDetailsFromCatalog = (value: unknown): AiProviderModelDetail[] => {
   if (!Array.isArray(value)) return [];
@@ -141,7 +169,10 @@ export const aiProviderInputFromDraft = (
     enabled: draft.enabled,
     priority: Number(draft.priority),
     capabilities: draft.capabilities,
-    adapter: draft.adapter,
+    upstreamFormat: draft.upstreamFormat,
+    ...(draft.upstreamFormat === 'chat-completions'
+      ? { chatImplementation: draft.chatImplementation ?? 'compatible' }
+      : {}),
     executionRoutes,
     ...(apiKey ? { apiKey } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
@@ -164,7 +195,11 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
   baseUrl: provider.baseUrl ?? '',
   modelsText: (provider.models ?? []).join('\n'),
   modelReasoning: selectedModelReasoning(provider.models ?? [], provider.modelReasoning ?? {}),
-  adapter: provider.adapter ?? 'openrouter',
+  upstreamFormat: provider.upstreamFormat ?? 'chat-completions',
+  chatImplementation:
+    (provider.upstreamFormat ?? 'chat-completions') === 'chat-completions'
+      ? (provider.chatImplementation ?? 'compatible')
+      : undefined,
   executionRoutes: (provider.executionRouteConfigs ?? []).map(
     aiProviderExecutionRouteDraftFromConfig,
   ),

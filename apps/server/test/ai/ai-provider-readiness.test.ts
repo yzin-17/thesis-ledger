@@ -6,13 +6,16 @@ import {
 } from '@thesis-ledger/schemas';
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { aiProviderInputSchema, type AiProviderExecutionRouteInput } from '../../src/ai/ai-provider.contracts.js';
+import {
+  aiProviderInputSchema,
+  type AiProviderExecutionRouteInput,
+} from '../../src/ai/ai-provider.contracts.js';
 import {
   configurationFingerprint,
   evaluateAiProviderReadiness,
-  inferLegacyAiAdapter,
   type AiProviderRouteSnapshot,
 } from '../../src/ai/ai-provider-readiness.js';
+import { resolveAiSdkProviderImplementation } from '../../src/ai/ai-provider-upstream.js';
 import type { AiProvider } from '../../src/ai/contracts.js';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { AiProviderController } from '../../src/ai/ai-provider.controller.js';
@@ -37,12 +40,12 @@ const route = (
   ...overrides,
 });
 
-const snapshot = (
-  overrides: Partial<AiProviderRouteSnapshot> = {},
-): AiProviderRouteSnapshot => ({
+const snapshot = (overrides: Partial<AiProviderRouteSnapshot> = {}): AiProviderRouteSnapshot => ({
   providerId: 'provider-a',
   baseUrl: 'https://proxy.example.test/v1',
-  adapter: 'openai-compatible',
+  upstreamFormat: 'chat-completions',
+  chatImplementation: 'compatible',
+  adapter: 'openai-compatible-chat',
   models: ['model-a', 'model-b'],
   route: route(),
   enabled: true,
@@ -52,18 +55,22 @@ const snapshot = (
   ...overrides,
 });
 
-const provider = (input: {
-  baseUrl?: string;
-  adapter?: AiAdapter;
-  routes?: AiProviderExecutionRouteInput[];
-  health?: 'unknown' | 'healthy' | 'degraded' | 'down';
-  revocations?: AiProviderRouteSnapshot['revocations'];
-} = {}): AiProvider => ({
+const provider = (
+  input: {
+    baseUrl?: string;
+    adapter?: AiAdapter;
+    routes?: AiProviderExecutionRouteInput[];
+    health?: 'unknown' | 'healthy' | 'degraded' | 'down';
+    revocations?: AiProviderRouteSnapshot['revocations'];
+  } = {},
+): AiProvider => ({
   id: 'provider-a',
   models: ['model-a', 'model-b'],
   metadata: {
     baseURL: input.baseUrl ?? 'https://proxy.example.test/v1',
-    adapter: input.adapter ?? 'openai-compatible',
+    upstreamFormat: 'chat-completions',
+    chatImplementation: 'compatible',
+    adapter: input.adapter ?? 'openai-compatible-chat',
     executionRoutes: input.routes ?? [route()],
     capabilityRevocations: input.revocations ?? [],
     credentialFingerprint: 'credential-v1',
@@ -78,7 +85,7 @@ describe('AI Provider 接入就绪门禁', () => {
       name: 'provider-a',
       baseUrl: 'https://proxy.example.test/v1',
       models: ['model-a'],
-      adapter: 'openai-compatible',
+      adapter: 'openai-compatible-chat',
       executionRoutes: [route()],
       ready: true,
       adapterEvidence: { releaseFingerprint: 'forged' },
@@ -96,11 +103,11 @@ describe('AI Provider 接入就绪门禁', () => {
   it('由服务端发布证据、配置指纹和预算授权共同计算 ready', () => {
     const result = evaluateAiProviderReadiness(snapshot(), { budgetAuthorized: true });
     expect(result).toMatchObject({
-      adapter: 'openai-compatible',
+      adapter: 'openai-compatible-chat',
       capabilityDeclaration: { source: 'manual' },
       adapterEvidence: {
-        sdkVersion: '7.0.95',
-        adapterVersion: '3.0.45',
+        sdkVersion: '7.0.107',
+        adapterVersion: '3.0.53',
         mode: 'native_schema',
       },
       readiness: { state: 'ready', reasons: [] },
@@ -118,13 +125,16 @@ describe('AI Provider 接入就绪门禁', () => {
     expect(packageJson.dependencies.ai).toBe(evidence?.sdkVersion);
     expect(packageJson.dependencies['@ai-sdk/openai-compatible']).toBe(evidence?.adapterVersion);
 
-    const openrouter = evaluateAiProviderReadiness(
-      snapshot({ adapter: 'openrouter' }),
-      { budgetAuthorized: true },
-    ).adapterEvidence;
-    expect(packageJson.dependencies['@openrouter/ai-sdk-provider']).toBe(
-      openrouter?.adapterVersion,
-    );
+    const openai = evaluateAiProviderReadiness(snapshot({ adapter: 'openai-responses' }), {
+      budgetAuthorized: true,
+    }).adapterEvidence;
+    expect(packageJson.dependencies['@ai-sdk/openai']).toBe(openai?.adapterVersion);
+
+    const anthropic = evaluateAiProviderReadiness(snapshot({ adapter: 'anthropic-messages' }), {
+      budgetAuthorized: true,
+    }).adapterEvidence;
+    expect(packageJson.dependencies['@ai-sdk/anthropic']).toBe(anthropic?.adapterVersion);
+    expect(packageJson.dependencies).not.toHaveProperty('@openrouter/ai-sdk-provider');
   });
 
   it('普通零价格不能替代免费证据，受控免费证据可以独立授权', () => {
@@ -149,10 +159,25 @@ describe('AI Provider 接入就绪门禁', () => {
     expect(controlledFree.freeEvidenceRef).toContain('controlled_local:');
   });
 
-  it('严格推导已知官方主机，自建代理必须显式选择 adapter', () => {
-    expect(inferLegacyAiAdapter('https://openrouter.ai/api/v1')).toBe('openrouter');
-    expect(inferLegacyAiAdapter('https://api.openai.com/v1')).toBe('openai-compatible');
-    expect(inferLegacyAiAdapter('https://openrouter.example.test/v1')).toBeNull();
+  it('只按显式上游格式和 Chat 实现选择 Provider，base URL 不参与选择', () => {
+    expect(
+      resolveAiSdkProviderImplementation({
+        upstreamFormat: 'chat-completions',
+        chatImplementation: 'compatible',
+      }),
+    ).toBe('openai-compatible-chat');
+    expect(
+      resolveAiSdkProviderImplementation({
+        upstreamFormat: 'chat-completions',
+        chatImplementation: 'openai-native',
+      }),
+    ).toBe('openai-chat');
+    expect(resolveAiSdkProviderImplementation({ upstreamFormat: 'responses' })).toBe(
+      'openai-responses',
+    );
+    expect(resolveAiSdkProviderImplementation({ upstreamFormat: 'anthropic-messages' })).toBe(
+      'anthropic-messages',
+    );
     const blocked = evaluateAiProviderReadiness(snapshot({ adapter: null }), {
       budgetAuthorized: true,
     });
@@ -169,10 +194,7 @@ describe('AI Provider 接入就绪门禁', () => {
     const registry = new AiProviderRegistry();
     registry.replace([
       provider({
-        routes: [
-          route(),
-          route({ model: 'model-b', capabilityDeclaration: null }),
-        ],
+        routes: [route(), route({ model: 'model-b', capabilityDeclaration: null })],
       }),
     ]);
     const mixed = registry.readiness('provider-a', true);
@@ -183,9 +205,7 @@ describe('AI Provider 接入就绪门禁', () => {
     );
 
     registry.replace([provider({ health: 'down' })]);
-    expect(registry.readiness('provider-a', true)[0]?.readiness.reasons).toContain(
-      'provider_down',
-    );
+    expect(registry.readiness('provider-a', true)[0]?.readiness.reasons).toContain('provider_down');
   });
 
   it('配置热更新不改写已返回快照，旧指纹撤销不污染新配置', () => {
@@ -269,10 +289,9 @@ describe('AI Provider 接入就绪门禁', () => {
     ['native_schema', aiGenerationContracts.strategyDiscovery.ref],
     ['json_validated', aiGenerationContracts.parameterOptimization.ref],
   ])('发布证据绑定模式与契约：%s', (mode, contract) => {
-    const result = evaluateAiProviderReadiness(
-      snapshot({ route: route({ mode, contract }) }),
-      { budgetAuthorized: true },
-    );
+    const result = evaluateAiProviderReadiness(snapshot({ route: route({ mode, contract }) }), {
+      budgetAuthorized: true,
+    });
     expect(result.adapterEvidence).toMatchObject({ mode, contract });
   });
 });

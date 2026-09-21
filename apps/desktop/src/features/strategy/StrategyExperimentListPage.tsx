@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToastManager } from '@/components/ui/toast';
+import { formatDateTime } from '@/lib/date-display';
 import {
   cloneOptimizationExperiment,
   fetchOptimizationExperiments,
@@ -42,7 +43,6 @@ import {
   experimentStageLabel,
   experimentStatusLabel,
   experimentStatusVariant,
-  formatCompactDateTime,
 } from './strategy-list-presentation.js';
 import { StrategyListSearchField } from './StrategyListPresentation.js';
 
@@ -310,7 +310,7 @@ export function StrategyExperimentListPage() {
                     {experimentProgressLabel(experiment)}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {formatCompactDateTime(experiment.updatedAt)}
+                    {formatDateTime(experiment.updatedAt, '时间未记录')}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <DropdownMenu>

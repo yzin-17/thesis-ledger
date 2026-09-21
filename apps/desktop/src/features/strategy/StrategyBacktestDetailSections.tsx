@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatDateTime } from '@/lib/date-display';
+import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { Metric } from '../shared/DesktopPrimitives.js';
 import {
   backtestBaseCurrency,
@@ -29,6 +29,12 @@ const display = (value: unknown) => {
     return String(value);
   return JSON.stringify(value);
 };
+
+const displayDateTime = (value: unknown) =>
+  typeof value === 'string' ? formatDateTime(value, '未记录') : '未记录';
+
+const displayDateOnly = (value: unknown) =>
+  typeof value === 'string' ? formatDateOnly(value, '未记录') : '未记录';
 
 const metricText = (
   metrics: Record<string, unknown> | null,
@@ -204,26 +210,26 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
   const { trades, fills, orders, rejectedOrders, rejectedNavRequests } =
     backtestResultCollections(result);
   const tradeRows = trades.map((trade) => [
-    display(trade.closedAt ?? trade.date ?? trade.occurredAt),
+    displayDateTime(trade.closedAt ?? trade.date ?? trade.occurredAt),
     display(trade.executionSymbol ?? trade.symbol),
     display(trade.side ?? trade.closeReason),
     display(trade.quantity ?? trade.exitQuantity),
   ]);
   const fillRows = fills.map((fill) => [
-    display(fill.occurredAt ?? fill.date),
+    displayDateTime(fill.occurredAt ?? fill.date),
     display(fill.executionSymbol ?? fill.symbol),
     display(fill.side),
     display(fill.quantity),
     display(record(fill.price)?.amount ?? fill.price),
   ]);
   const orderRows = orders.map((order) => [
-    display(order.occurredAt ?? order.createdAt),
+    displayDateTime(order.occurredAt ?? order.createdAt),
     display(order.executionSymbol ?? order.symbol),
     display(order.side),
     display(order.status),
   ]);
   const rejectionRows = [...rejectedOrders, ...rejectedNavRequests].map((item) => [
-    display(item.occurredAt),
+    displayDateTime(item.occurredAt),
     display(item.executionSymbol),
     display(item.side),
     display(item.reasonCode),
@@ -270,18 +276,17 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
 function DataAndAssumptions({ job, result }: { job: BacktestJob; result: BacktestJobResult }) {
   const input = record(job.input);
   const runConfig = record(input?.runConfig);
+  const periodStart = displayDateOnly(job.period?.start ?? job.periodStart);
+  const periodEnd = displayDateOnly(job.period?.end ?? job.periodEnd);
   const fields = [
-    [
-      '请求区间',
-      `${job.period?.start ?? job.periodStart ?? '未记录'} 至 ${job.period?.end ?? job.periodEnd ?? '未记录'}`,
-    ],
-    ['数据冻结时点', display(job.dataAsOf ?? result.dataAsOf)],
+    ['请求区间', `${periodStart} 至 ${periodEnd}`],
+    ['数据冻结时点', displayDateTime(job.dataAsOf ?? result.dataAsOf)],
     ['基准币种', backtestBaseCurrency(job, result) ?? '未记录'],
     ['初始资金', display(runConfig?.initialCash ?? input?.initialCash)],
     ['估值策略', display(runConfig?.valuationPolicy)],
     ['执行模型', display(runConfig?.executionModel ?? job.executionModelDisclosure)],
     ['数据完整性', display(result.completeness)],
-    ['任务完成时间', job.finishedAt ? formatDateTime(job.finishedAt) : '未完成'],
+    ['任务完成时间', job.finishedAt ? displayDateTime(job.finishedAt) : '未完成'],
   ];
   return (
     <div className="grid gap-3 md:grid-cols-2">

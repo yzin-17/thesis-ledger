@@ -5,11 +5,13 @@ import type {
   ProviderRecord,
 } from './providers.types.js';
 import type { AiProviderInput } from './ai-provider.actions.js';
+import type { AiUpstreamFormat } from '@thesis-ledger/schemas';
 
 export type AiProviderTestResult = ProviderConnectionTestResult & { testToken?: string };
 export type AiProviderModelCatalogInput = {
   name?: string;
   baseUrl: string;
+  upstreamFormat?: AiUpstreamFormat;
   apiKey?: string;
   timeoutMs?: number;
 };

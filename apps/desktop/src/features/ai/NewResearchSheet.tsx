@@ -208,6 +208,8 @@ export function NewResearchSheet({
     capabilityMessage = `${missing}${impact}`;
   } else if (capabilitiesQuery.data?.providers.some((provider) => provider.state === 'demo'))
     capabilityMessage = '当前使用演示 Provider，结果会明确标记为演示数据。';
+  else if (capabilitiesQuery.data?.canStart)
+    capabilityMessage = 'Provider、Tool 和执行 Worker 已就绪。';
 
   const handleScopeChange = (next: string[]) => {
     const nextScope = next[0] as AiResearchScope | undefined;

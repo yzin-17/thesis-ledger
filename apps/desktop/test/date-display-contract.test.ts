@@ -1,6 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { formatDateOnly, formatDateTime } from '../src/lib/date-display.js';
+import {
+  formatDateOnly,
+  formatDateTime,
+  formatDateTimeInTimeZone,
+} from '../src/lib/date-display.js';
 
 const sourceRoot = new URL('../src/features/', import.meta.url);
 
@@ -26,6 +30,9 @@ describe('用户可见日期时间展示契约', () => {
     expect(formatDateTime(null, '未知')).toBe('未知');
     expect(formatDateOnly(timestamp, '未知')).toBe('2026-09-08');
     expect(formatDateOnly('2026-09-08', '未知')).toBe('2026-09-08');
+    expect(formatDateTimeInTimeZone(timestamp, 'Asia/Shanghai', '未知')).toBe(
+      '2026/09/08 17:31',
+    );
   });
 
   it('证据链和回测数据时点不得直接插入原始时间字段', () => {

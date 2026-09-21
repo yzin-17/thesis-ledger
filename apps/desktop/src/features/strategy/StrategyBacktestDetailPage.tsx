@@ -10,7 +10,7 @@ import {
   ProgressLabel,
   ProgressTrack,
 } from '@/components/ui/progress';
-import { formatDateTime } from '@/lib/date-display';
+import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { fetchStrategyBacktestGroups } from './strategy-optimization.api.js';
 import {
   backtestExecutionSymbol,
@@ -109,6 +109,10 @@ export function StrategyBacktestDetailPage({
   if (!exact) rerunMissing.push('原策略版本');
   const periodStart = job.period?.start ?? job.periodStart;
   const periodEnd = job.period?.end ?? job.periodEnd;
+  const periodLabel =
+    periodStart && periodEnd
+      ? `${formatDateOnly(periodStart)} 至 ${formatDateOnly(periodEnd)}`
+      : '区间未记录';
   const progress =
     typeof job.progress === 'number' ? Math.max(0, Math.min(100, job.progress)) : null;
   const terminal = terminalStatuses.has(job.status);
@@ -153,7 +157,7 @@ export function StrategyBacktestDetailPage({
             <p className="mt-1 text-sm text-muted-foreground">{identity.subtitle}</p>
             <p className="mt-3 text-sm">
               {symbol ?? '执行标的未记录'} · {timeframe ?? '周期未记录'} ·{' '}
-              {periodStart && periodEnd ? `${periodStart} 至 ${periodEnd}` : '区间未记录'}
+              {periodLabel}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

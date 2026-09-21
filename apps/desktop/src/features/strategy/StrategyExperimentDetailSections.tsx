@@ -4,6 +4,7 @@ import { ExternalLink, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDateTime } from '@/lib/date-display';
 import { AiExecutionFacts } from '../ai/AiExecutionFacts.js';
 import type {
   OptimizationCandidate,
@@ -264,10 +265,10 @@ export function ExperimentRuntimeDetails({
             </span>
           </div>
           <div className="rounded border p-2">
-            创建时间：{new Date(experiment.createdAt).toLocaleString()}
+            创建时间：{formatDateTime(experiment.createdAt, '未知')}
           </div>
           <div className="rounded border p-2">
-            更新时间：{new Date(experiment.updatedAt).toLocaleString()}
+            更新时间：{formatDateTime(experiment.updatedAt, '未知')}
           </div>
         </CardContent>
       </Card>

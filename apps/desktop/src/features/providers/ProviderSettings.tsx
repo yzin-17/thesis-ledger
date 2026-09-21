@@ -49,10 +49,10 @@ export function ProviderSettings() {
   const [automationHistoryPage, setAutomationHistoryPage] = useState(1);
   const [tab, setTab] = useState<ProviderSettingsTab>('providers');
   const [providerDraft, setProviderDraft] = useState(newProviderDraft);
-  const [providerSheetOpen, setProviderSheetOpen] = useState(false);
-  const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
+  const [, setProviderSheetOpen] = useState(false);
+  const [, setEditingProviderName] = useState<string | null>(null);
   const [credentialInputOpen, setCredentialInputOpen] = useState(true);
-  const [providerTestState, setProviderTestState] = useState<ProviderTestState>('idle');
+  const [, setProviderTestState] = useState<ProviderTestState>('idle');
   const [providerTestEvidence, setProviderTestEvidence] = useState<ProviderTestEvidence | null>(
     null,
   );
@@ -115,12 +115,6 @@ export function ProviderSettings() {
     setProviderTestState('idle');
     setProviderTestEvidence(null);
   };
-  const updateProviderDraft = (
-    updater: (current: typeof providerDraft) => typeof providerDraft,
-  ) => {
-    setProviderDraft(updater);
-    resetProviderTest();
-  };
   const actions = createProviderActionHandlers({
     providerDraft,
     credentialInputOpen,
@@ -164,9 +158,10 @@ export function ProviderSettings() {
   const providerRefreshing = Object.values(providerQueries).some((query) => query.isFetching);
   const handleHealthPage = (page: number) => setHealthHistoryPage(page);
   const handleAutomationHistoryPage = (page: number) => setAutomationHistoryPage(page);
+  const providerEditorOpen = aiEditor.editor.open;
 
   return (
-    <section className="module-page" data-provider-sheet-open={String(providerSheetOpen)}>
+    <section className="module-page" data-provider-sheet-open={String(providerEditorOpen)}>
       <PageHeader
         eyebrow="DATA & AUTOMATION"
         title="数据与自动化"
@@ -182,27 +177,7 @@ export function ProviderSettings() {
         }
       />
       <ProviderEditorSheet
-        open={providerSheetOpen}
-        editingProviderName={editingProviderName}
-        providerDraft={providerDraft}
-        credentialInputOpen={credentialInputOpen}
-        takingOverEnvironmentName={null}
-        providerTestState={providerTestState}
-        savingProviderDraft={savingProviderDraft}
-        onOpenChange={(open) => (open ? setProviderSheetOpen(true) : actions.closeProviderSheet())}
-        onUpdateDraft={updateProviderDraft}
-        onResetTest={resetProviderTest}
-        onSetCredentialInputOpen={setCredentialInputOpen}
-        onAiTypeSelected={() => {
-          actions.closeProviderSheet();
-          aiEditor.openEditor();
-        }}
-        onClose={actions.closeProviderSheet}
-        onTest={() => void actions.testProviderDraft()}
-        onSave={(event) => void actions.saveProviderDraft(event)}
-      />
-      <ProviderEditorSheet
-        open={aiEditor.editor.open}
+        open={providerEditorOpen}
         editingProviderName={aiEditor.editor.editingProviderName}
         providerDraft={aiEditor.editor.providerDraft}
         credentialInputOpen={aiEditor.editor.credentialInputOpen}
@@ -216,7 +191,7 @@ export function ProviderSettings() {
         onUpdateDraft={aiEditor.updateDraft}
         onResetTest={aiEditor.editor.onResetTest}
         onSetCredentialInputOpen={aiEditor.editor.onSetCredentialInputOpen}
-        onAiTypeSelected={() => undefined}
+        onTypeChange={aiEditor.changeType}
         onFetchAiModels={() => void aiEditor.fetchModels()}
         onClose={aiEditor.close}
         onTest={() => void aiEditor.testDraft()}
@@ -256,10 +231,7 @@ export function ProviderSettings() {
               onPrioritySave={(provider) => {
                 if (!isAiProvider(provider)) void actions.saveProvider(provider);
               }}
-              onEdit={(provider) => {
-                if (isAiProvider(provider)) aiEditor.openEditor(provider);
-                else actions.openProviderSheet(provider);
-              }}
+              onEdit={(provider) => aiEditor.openEditor(provider)}
               onTest={(provider) => {
                 if (isAiProvider(provider)) void aiEditor.testSaved(provider);
                 else void actions.test(provider.name);
@@ -274,7 +246,7 @@ export function ProviderSettings() {
                   );
               }}
               onDelete={(provider) => void aiEditor.remove(provider)}
-              onCreate={() => actions.openProviderSheet()}
+              onCreate={() => aiEditor.openEditor()}
             />
             <HealthHistoryTable
               loadState={loadState}

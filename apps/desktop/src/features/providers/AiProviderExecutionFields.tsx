@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -23,11 +23,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { modelsFromText } from './ai-provider.actions.js';
 import { aiContractOptions, newAiProviderExecutionRouteDraft } from './ai-provider-execution.js';
 import type { AiProviderExecutionRouteDraft, ProviderDraft } from './providers.types.js';
-
-const adapterOptions = [
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'openai-compatible', label: 'OpenAI 兼容接口' },
-] as const;
 
 const modeOptions = [
   { value: 'json_validated', label: 'JSON 输出后严格校验' },
@@ -68,32 +63,6 @@ export function AiProviderExecutionFields({
 
   return (
     <FieldGroup>
-      <Field>
-        <FieldLabel htmlFor="ai-adapter">SDK adapter</FieldLabel>
-        <Select
-          items={adapterOptions}
-          value={draft.adapter}
-          onValueChange={(value) => {
-            if (!value) return;
-            onUpdateDraft((current) => ({ ...current, adapter: value }));
-          }}
-        >
-          <SelectTrigger id="ai-adapter" aria-label="SDK adapter" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {adapterOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <FieldDescription>adapter 与生成模式共同决定发送协议和本地契约证据。</FieldDescription>
-      </Field>
-
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-medium">执行路由与能力声明</h3>

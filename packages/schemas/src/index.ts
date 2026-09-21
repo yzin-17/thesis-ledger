@@ -8,6 +8,7 @@ export * from './backtest-v2.js';
 export * from './backtest-indicators.js';
 export * from './automation.js';
 export * from './ai.js';
+export * from './ai-provider.js';
 export * from './ai-execution.js';
 export * from './research.js';
 export * from './research-display.js';

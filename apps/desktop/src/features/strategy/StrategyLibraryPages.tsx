@@ -37,7 +37,6 @@ import {
   strategyCenterPath,
   strategyCenterTriggerId,
 } from './strategy-center.navigation.js';
-import { formatCompactDateTime } from './strategy-list-presentation.js';
 import { StrategyLibraryToolbar, StrategyRecentBacktest } from './StrategyListPresentation.js';
 import {
   strategyStatusLabel,
@@ -218,7 +217,7 @@ export function StrategyLibraryPage({
                       className="px-4 py-3 align-top text-muted-foreground"
                       title={formatDateTime(latest?.createdAt ?? strategy.updatedAt, '未知')}
                     >
-                      {formatCompactDateTime(latest?.createdAt ?? strategy.updatedAt)}
+                      {formatDateTime(latest?.createdAt ?? strategy.updatedAt, '时间未记录')}
                     </td>
                     <td className="px-4 py-3 text-right align-top">
                       <Button
