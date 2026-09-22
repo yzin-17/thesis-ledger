@@ -29,6 +29,10 @@
 - `check-boundaries.mjs`、`check-workspace-dependencies.mjs`：通过；增加 Provider storage 不反向依赖 AI、AI 不反向依赖策略编排的门禁。
 - `GUARDRAIL_BASE_REF=HEAD node scripts/check-file-size-guardrails.mjs`：ratchet 通过，14 项已有超限 warning；未上调阈值。
 
+## 提交与远端核验
+
+实际实现已提交为 `47a2b366f3d9b078e91960335a2d004dd09eb4ae`。与本次 main 基线比较为 ahead、behind 0，共 38 个业务源码/测试/文档文件变化。最终 diff 不含临时工作流或补丁传输文件，未改变正式 CI、依赖锁文件或数据库 migration。此前 docs-only 或补丁传输提交上的 CI 不构成实际实现验证，须以包含完整实现的后续提交 Checks 为准。
+
 ## 证据限制
 
 服务测试使用受控存储替身；HTTP/SSE 测试使用真实锁定 SDK 和本地真实 HTTP 服务，不访问真实模型。尚无真实 PostgreSQL 竞争、Docker、浏览器或真实供应商可用性证据。不能据此将 T6 勾选。
