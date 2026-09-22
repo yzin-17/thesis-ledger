@@ -101,8 +101,6 @@ describe('configured AI providers', () => {
               model: 'model-a',
               mode: 'json_validated',
               contract: { id: 'research', version: 'research-generation-v1' },
-              capabilityDeclaration: null,
-              allowedUpstreams: ['legacy-openrouter'],
               freeEvidence: null,
             },
           ],

@@ -22,8 +22,6 @@ import { createStrategyFixture } from './strategy-optimization-postgres-fixtures
 
 const databaseUrl = process.env.AI_EXECUTION_DATABASE_URL;
 const postgresDescribe = databaseUrl ? describe : describe.skip;
-const declaredAt = '2026-09-19T00:00:00.000Z';
-
 const writeSse = (response: ServerResponse, content: string) => {
   response.writeHead(200, { 'content-type': 'text/event-stream' });
   const common = {
@@ -104,29 +102,11 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
             model: 'fixture-model',
             mode: 'json_validated',
             contract: aiGenerationContracts.parameterOptimization.ref,
-            capabilityDeclaration: {
-              source: 'manual',
-              sourceRef: 'isolated-postgres-test',
-              declaredAt,
-              declaredBy: 'test@local.invalid',
-              sourceVersion: 'fixture-v1',
-            },
-            allowedUpstreams: [],
-            freeEvidence: null,
           },
           {
             model: 'fixture-model',
             mode: 'json_validated',
             contract: aiGenerationContracts.strategyDiscovery.ref,
-            capabilityDeclaration: {
-              source: 'manual',
-              sourceRef: 'isolated-postgres-test',
-              declaredAt,
-              declaredBy: 'test@local.invalid',
-              sourceVersion: 'fixture-v1',
-            },
-            allowedUpstreams: [],
-            freeEvidence: null,
           },
         ],
       },
@@ -234,8 +214,7 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
     if (discoveryStrategyId)
       await prisma.strategyVersion.deleteMany({ where: { strategyId: discoveryStrategyId } });
     if (strategyId) await prisma.strategy.delete({ where: { id: strategyId } });
-    if (discoveryStrategyId)
-      await prisma.strategy.delete({ where: { id: discoveryStrategyId } });
+    if (discoveryStrategyId) await prisma.strategy.delete({ where: { id: discoveryStrategyId } });
     await prisma.$disconnect();
     server.close();
     await once(server, 'close');

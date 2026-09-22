@@ -13,14 +13,15 @@ import {
 import {
   configurationFingerprint,
   evaluateAiProviderReadiness,
+  resolveAiRouteTimeouts,
   type AiProviderRouteSnapshot,
 } from '../../src/ai/ai-provider-readiness.js';
 import { resolveAiSdkProviderImplementation } from '../../src/ai/ai-provider-upstream.js';
 import type { AiProvider } from '../../src/ai/contracts.js';
-import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
+import { AiProviderRegistry, routeSnapshotsFromProvider } from '../../src/ai/provider-registry.js';
 import { AiProviderController } from '../../src/ai/ai-provider.controller.js';
 
-const declaredAt = '2026-09-19T00:00:00.000Z';
+const revokedAt = '2026-09-19T00:00:00.000Z';
 
 const route = (
   overrides: Partial<AiProviderExecutionRouteInput> = {},
@@ -28,15 +29,6 @@ const route = (
   model: 'model-a',
   mode: 'native_schema',
   contract: aiGenerationContracts.research.ref,
-  capabilityDeclaration: {
-    source: 'manual',
-    sourceRef: 'provider-settings',
-    declaredAt,
-    declaredBy: 'operator@example.test',
-    sourceVersion: 'declaration-v1',
-  },
-  allowedUpstreams: [],
-  freeEvidence: null,
   ...overrides,
 });
 
@@ -80,6 +72,39 @@ const provider = (
 });
 
 describe('AI Provider 接入就绪门禁', () => {
+  it('超时按用途覆盖、Provider 默认、系统默认的顺序解析', () => {
+    expect(
+      resolveAiRouteTimeouts(
+        snapshot({ firstOutputTimeoutMs: 20_000, outputIdleTimeoutMs: 25_000 }),
+      ),
+    ).toEqual({
+      firstOutputTimeoutMs: 20_000,
+      outputIdleTimeoutMs: 25_000,
+      firstOutputTimeoutSource: 'provider',
+      outputIdleTimeoutSource: 'provider',
+    });
+    expect(
+      resolveAiRouteTimeouts(
+        snapshot({
+          firstOutputTimeoutMs: 20_000,
+          outputIdleTimeoutMs: 25_000,
+          route: route({ firstOutputTimeoutMs: 5_000 }),
+        }),
+      ),
+    ).toMatchObject({
+      firstOutputTimeoutMs: 5_000,
+      firstOutputTimeoutSource: 'route',
+      outputIdleTimeoutMs: 25_000,
+      outputIdleTimeoutSource: 'provider',
+    });
+    expect(resolveAiRouteTimeouts(snapshot())).toMatchObject({
+      firstOutputTimeoutMs: 30_000,
+      outputIdleTimeoutMs: 30_000,
+      firstOutputTimeoutSource: 'system',
+      outputIdleTimeoutSource: 'system',
+    });
+  });
+
   it('拒绝客户端伪造 ready 与本地 adapter 证据', () => {
     const parsed = aiProviderInputSchema.safeParse({
       name: 'provider-a',
@@ -93,6 +118,58 @@ describe('AI Provider 接入就绪门禁', () => {
     expect(parsed.success).toBe(false);
   });
 
+  it('模型默认输出方式与用途显式覆盖可分别提交，默认不能指向未选择模型', () => {
+    const input = {
+      name: 'provider-a',
+      baseUrl: 'https://proxy.example.test/v1',
+      models: ['model-a'],
+      modelDefaults: { 'model-a': { mode: 'json_validated' } },
+      executionRoutes: [route({ modeOverridden: true })],
+    };
+
+    expect(aiProviderInputSchema.parse(input)).toMatchObject({
+      modelDefaults: { 'model-a': { mode: 'json_validated' } },
+      executionRoutes: [{ modeOverridden: true }],
+    });
+    expect(
+      aiProviderInputSchema.safeParse({
+        ...input,
+        modelDefaults: { 'missing-model': { mode: 'json_validated' } },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('用途路由兼容历史启用记录，并接受停用后保留的配置', () => {
+    const legacy = aiProviderInputSchema.parse({
+      name: 'provider-a',
+      baseUrl: 'https://proxy.example.test/v1',
+      models: ['model-a'],
+      executionRoutes: [route()],
+    });
+    const disabled = aiProviderInputSchema.parse({
+      name: 'provider-a',
+      baseUrl: 'https://proxy.example.test/v1',
+      models: ['model-a'],
+      executionRoutes: [route({ enabled: false })],
+    });
+
+    expect(legacy.executionRoutes?.[0]?.enabled).toBeUndefined();
+    expect(disabled.executionRoutes?.[0]).toMatchObject({ enabled: false, mode: 'native_schema' });
+  });
+
+  it('执行候选快照排除停用用途，但保留历史记录的兼容启用语义', () => {
+    const snapshots = routeSnapshotsFromProvider(
+      provider({
+        routes: [
+          route(),
+          route({ contract: aiGenerationContracts.parameterOptimization.ref, enabled: false }),
+        ],
+      }),
+    );
+
+    expect(snapshots.map((snapshot) => snapshot.route.contract.id)).toEqual(['research']);
+  });
+
   it('管理 API 只读取服务端计算的就绪结果', () => {
     const readiness = vi.fn(() => [{ model: 'model-a' }]);
     const controller = new AiProviderController({ readiness } as never);
@@ -104,7 +181,6 @@ describe('AI Provider 接入就绪门禁', () => {
     const result = evaluateAiProviderReadiness(snapshot(), { budgetAuthorized: true });
     expect(result).toMatchObject({
       adapter: 'openai-compatible-chat',
-      capabilityDeclaration: { source: 'manual' },
       adapterEvidence: {
         sdkVersion: '7.0.107',
         adapterVersion: '3.0.53',
@@ -137,26 +213,28 @@ describe('AI Provider 接入就绪门禁', () => {
     expect(packageJson.dependencies).not.toHaveProperty('@openrouter/ai-sdk-provider');
   });
 
-  it('普通零价格不能替代免费证据，受控免费证据可以独立授权', () => {
-    const paidWithoutAuthorization = evaluateAiProviderReadiness(snapshot(), {
+  it('用户填写的零费率可以授权零费用路由，其他费用仍需预算授权', () => {
+    const missingPricing = evaluateAiProviderReadiness(snapshot(), {
       budgetAuthorized: false,
     });
-    expect(paidWithoutAuthorization.readiness.reasons).toContain('budget_not_authorized');
+    expect(missingPricing.readiness.reasons).toContain('budget_not_authorized');
 
-    const controlledFree = evaluateAiProviderReadiness(
+    const userConfiguredZeroCost = evaluateAiProviderReadiness(
       snapshot({
-        route: route({
-          freeEvidence: {
-            source: 'controlled_local',
-            sourceRef: 'local-llm-service',
-            sourceVersion: '2026-09',
-          },
-        }),
+        costPer1kInput: 0,
+        costPer1kOutput: 0,
+        costCurrency: 'USD',
       }),
       { budgetAuthorized: false },
     );
-    expect(controlledFree.readiness.state).toBe('ready');
-    expect(controlledFree.freeEvidenceRef).toContain('controlled_local:');
+    expect(userConfiguredZeroCost.readiness.state).toBe('ready');
+    expect(userConfiguredZeroCost).not.toHaveProperty('freeEvidenceRef');
+
+    const incompletePricing = evaluateAiProviderReadiness(
+      snapshot({ costPer1kInput: 0, costCurrency: 'USD' }),
+      { budgetAuthorized: false },
+    );
+    expect(incompletePricing.readiness.reasons).toContain('budget_not_authorized');
   });
 
   it('只按显式上游格式和 Chat 实现选择 Provider，base URL 不参与选择', () => {
@@ -182,27 +260,19 @@ describe('AI Provider 接入就绪门禁', () => {
       budgetAuthorized: true,
     });
     expect(blocked.readiness.reasons).toContain('configuration_invalid');
-
-    const disallowedRoute = evaluateAiProviderReadiness(
-      snapshot({ route: route({ allowedUpstreams: ['other.example.test'] }) }),
-      { budgetAuthorized: true },
-    );
-    expect(disallowedRoute.readiness.reasons).toContain('route_not_allowed');
   });
 
   it('health=down 只阻断对应 Provider，混合模型各自保留原因', () => {
     const registry = new AiProviderRegistry();
     registry.replace([
       provider({
-        routes: [route(), route({ model: 'model-b', capabilityDeclaration: null })],
+        routes: [route(), route({ model: 'model-b' })],
       }),
     ]);
     const mixed = registry.readiness('provider-a', true);
     expect(mixed).toHaveLength(2);
     expect(mixed.find((entry) => entry.model === 'model-a')?.readiness.state).toBe('ready');
-    expect(mixed.find((entry) => entry.model === 'model-b')?.readiness.reasons).toContain(
-      'capability_declaration_missing',
-    );
+    expect(mixed.find((entry) => entry.model === 'model-b')?.readiness.state).toBe('ready');
 
     registry.replace([provider({ health: 'down' })]);
     expect(registry.readiness('provider-a', true)[0]?.readiness.reasons).toContain('provider_down');
@@ -225,7 +295,7 @@ describe('AI Provider 接入就绪门禁', () => {
       contract: aiGenerationContracts.research.ref,
       configurationFingerprint: configurationFingerprint(oldSnapshot),
       reason: 'upstream rejected json_schema',
-      revokedAt: declaredAt,
+      revokedAt,
     };
     registry.replace([
       provider({
@@ -255,7 +325,7 @@ describe('AI Provider 接入就绪门禁', () => {
       contract: current.route.contract,
       configurationFingerprint: configurationFingerprint(current),
       reason: 'provider rejected required parameter',
-      revokedAt: declaredAt,
+      revokedAt,
     };
     const result = evaluateAiProviderReadiness(
       { ...current, revocations: [revoked] },

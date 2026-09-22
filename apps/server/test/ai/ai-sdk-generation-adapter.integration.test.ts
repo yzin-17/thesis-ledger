@@ -148,6 +148,34 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(requestCount).toBe(1);
   });
 
+  it('explicit none mode strips OpenAI authorization and ignores environment fallback', async () => {
+    handler = (_request, response) =>
+      writeJson(
+        response,
+        200,
+        completion('{"answer":"no-auth"}', 'stop', {
+          prompt_tokens: 5,
+          completion_tokens: 2,
+          total_tokens: 7,
+        }),
+      );
+    const previous = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = 'environment-secret-must-not-be-sent';
+    try {
+      await expect(
+        adapter.generate(
+          request({ adapter: 'openai-chat', authMode: 'none', apiKey: 'stale-secret' }),
+        ),
+      ).resolves.toMatchObject({ output: { answer: 'no-auth' } });
+      expect(lastHeaders.authorization).toBeUndefined();
+      expect(lastHeaders['x-api-key']).toBeUndefined();
+      expect(requestCount).toBe(1);
+    } finally {
+      if (previous === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previous;
+    }
+  });
+
   it('uses the official OpenAI Responses provider and Responses endpoint', async () => {
     handler = (_request, response) =>
       writeJson(response, 200, {
@@ -222,6 +250,42 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(requestCount).toBe(1);
   });
 
+  it('explicit none mode strips Anthropic API-key headers', async () => {
+    handler = (_request, response) =>
+      writeJson(response, 200, {
+        type: 'message',
+        id: 'message-fixture',
+        model: 'fixture-model',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-fixture',
+            name: 'json',
+            input: { answer: 'anthropic-no-auth' },
+          },
+        ],
+        stop_reason: 'tool_use',
+        stop_sequence: null,
+        usage: { input_tokens: 6, output_tokens: 2 },
+      });
+    const previous = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = 'environment-secret-must-not-be-sent';
+    try {
+      await expect(
+        adapter.generate(
+          request({ adapter: 'anthropic-messages', authMode: 'none', apiKey: 'stale-secret' }),
+        ),
+      ).resolves.toMatchObject({ output: { answer: 'anthropic-no-auth' } });
+      expect(lastHeaders['x-api-key']).toBeUndefined();
+      expect(lastHeaders.authorization).toBeUndefined();
+      expect(lastHeaders['anthropic-version']).toBeTruthy();
+      expect(requestCount).toBe(1);
+    } finally {
+      if (previous === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = previous;
+    }
+  });
+
   it('supports explicit json_validated mode without accepting invalid domain output', async () => {
     handler = (_request, response) =>
       writeJson(
@@ -276,7 +340,6 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
         compatibilityExtensionProfile: 'openrouter-v1',
         baseURL: `${baseURL}/v1`,
         reasoningEffort: 'high',
-        allowedUpstreams: ['fixture-upstream'],
       }),
     );
     expect(result).toMatchObject({
@@ -287,8 +350,9 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(lastBody).toMatchObject({
       model: 'fixture-model',
       reasoning_effort: 'high',
-      provider: { require_parameters: true, only: ['fixture-upstream'] },
+      provider: { require_parameters: true },
     });
+    expect(lastBody).not.toHaveProperty('provider.only');
     expect(requestCount).toBe(1);
   });
 
@@ -301,7 +365,6 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
         providerId: 'openrouter-looking-name',
         baseURL: `${baseURL}/v1`,
         mode: 'json_validated',
-        allowedUpstreams: ['must-not-be-forwarded'],
       }),
     );
     expect(lastBody).not.toHaveProperty('provider');

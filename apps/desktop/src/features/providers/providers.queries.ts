@@ -7,10 +7,12 @@ import {
   fetchProviderIssues,
   fetchProviders,
 } from './providers.api.js';
+import { fetchAiRoutingSettings } from './ai-provider.api.js';
 
 export const providerKeys = {
   root: ['desktop', 'providers'] as const,
   providers: () => [...providerKeys.root, 'config'] as const,
+  routingSettings: () => [...providerKeys.root, 'routing-settings'] as const,
   issues: () => [...providerKeys.root, 'issues'] as const,
   jobs: () => [...providerKeys.root, 'automations'] as const,
   healthHistoryRoot: () => [...providerKeys.root, 'health-history'] as const,
@@ -24,6 +26,10 @@ export const useProviderQueries = (healthHistoryPage: number, automationHistoryP
   providers: useQuery({
     queryKey: providerKeys.providers(),
     queryFn: () => fetchProviders(),
+  }),
+  routingSettings: useQuery({
+    queryKey: providerKeys.routingSettings(),
+    queryFn: () => fetchAiRoutingSettings(),
   }),
   issues: useQuery({
     queryKey: providerKeys.issues(),

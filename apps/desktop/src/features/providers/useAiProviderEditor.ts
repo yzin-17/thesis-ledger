@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 import {
   aiProviderDraftError,
   aiProviderDraftFromRecord,
   aiProviderInputFromDraft,
+  aiProviderTestPricingState,
+  aiProviderTestInputFromDraft,
   mergeSelectedModelReasoning,
   modelDetailsFromCatalog,
   modelsFromText,
@@ -18,25 +20,40 @@ import {
   useTestAiProviderDraftMutation,
   useTestSavedAiProviderMutation,
 } from './ai-provider.mutations.js';
-import {
-  useSaveProviderMutation,
-  useTestProviderDraftMutation,
-} from './providers.mutations.js';
+import { useSaveProviderMutation, useTestProviderDraftMutation } from './providers.mutations.js';
 import {
   newProviderDraft,
   providerCredentialForSave,
   providerDraftForType,
+  type AiAuthMode,
   type AiProviderModelDetail,
   type ProviderDraft,
   type ProviderRecord,
   type ProviderTestEvidence,
   type ProviderTestState,
 } from './providers.types.js';
-import { createLatestRequestGate } from './ai-provider-editor-async.js';
+import { createLatestRequestGate, createSingleFlightGate } from './ai-provider-editor-async.js';
+import {
+  cancelAiProviderTest,
+  type AiProviderLifecycleOptions,
+  type AiRoutingSettings,
+} from './ai-provider.api.js';
 
 const testSucceeded = (status: string | undefined) => status === 'healthy';
 
-export const useAiProviderEditor = () => {
+type ActiveAiTest = {
+  name: string;
+  requestId: string;
+  controller: AbortController;
+};
+
+const newTestRequestId = () => {
+  const requestId = globalThis.crypto?.randomUUID?.();
+  if (!requestId) throw new Error('当前环境不支持可取消的测试请求');
+  return requestId;
+};
+
+export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   const [draft, setDraft] = useState<ProviderDraft>(newProviderDraft);
   const [open, setOpen] = useState(false);
   const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
@@ -50,6 +67,8 @@ export const useAiProviderEditor = () => {
   const [modelDetails, setModelDetails] = useState<AiProviderModelDetail[]>([]);
   const [modelRequestGate] = useState(createLatestRequestGate);
   const [testRequestGate] = useState(createLatestRequestGate);
+  const [testFlight] = useState(createSingleFlightGate);
+  const activeAiTestRef = useRef<ActiveAiTest | null>(null);
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const saveMutation = useSaveAiProviderMutation();
@@ -60,6 +79,39 @@ export const useAiProviderEditor = () => {
   const setEnabledMutation = useSetAiProviderEnabledMutation();
   const deleteMutation = useDeleteAiProviderMutation();
   const modelCatalogMutation = useFetchAiProviderModelsMutation();
+
+  const beginAiTest = (name: string): ActiveAiTest => {
+    const active: ActiveAiTest = {
+      name,
+      requestId: newTestRequestId(),
+      controller: new AbortController(),
+    };
+    activeAiTestRef.current = active;
+    return active;
+  };
+
+  const finishAiTest = (active: ActiveAiTest) => {
+    if (activeAiTestRef.current === active) activeAiTestRef.current = null;
+  };
+
+  const cancelTest = () => {
+    const active = activeAiTestRef.current;
+    if (!active) return;
+    void cancelAiProviderTest(active.name, active.requestId).catch(() => undefined);
+    active.controller.abort();
+    activeAiTestRef.current = null;
+    testRequestGate.invalidate();
+    testFlight.end();
+    setTestState('idle');
+    setTestEvidence(null);
+    setTestingProviderName((current) => (current === active.name ? null : current));
+    toastManager.add({
+      title: `${active.name} 测试已取消`,
+      description: '外部结果未知，已知用量会保留，费用不会按零处理。',
+      type: 'info',
+      timeout: 3200,
+    });
+  };
 
   const resetTest = () => {
     testRequestGate.invalidate();
@@ -107,7 +159,8 @@ export const useAiProviderEditor = () => {
       setTakingOverEnvironmentName(null);
       setCredentialInputOpen(true);
     } else {
-      setDraft(providerDraftFromRecord(provider));
+      const nextDraft = providerDraftFromRecord(provider);
+      setDraft(nextDraft);
       if (provider.source === 'environment') {
         setEditingProviderName(null);
         setTakingOverEnvironmentName(provider.name);
@@ -131,6 +184,27 @@ export const useAiProviderEditor = () => {
     invalidateDraftResults();
     setAvailableModels([]);
     setModelDetails([]);
+  };
+
+  const changeAuthMode = async (authMode: AiAuthMode) => {
+    if (authMode === draft.authMode) return;
+    const hasExistingCredential = !credentialInputOpen || Boolean(draft.credentialsRef.trim());
+    if (authMode === 'none' && hasExistingCredential) {
+      const confirmed = await confirm({
+        title: '切换为无需认证？',
+        description: '保存后会清除已保存的 API Key，并且请求不会再发送认证信息。',
+        confirmLabel: '清除并切换',
+        variant: 'destructive',
+      });
+      if (!confirmed) return;
+    }
+    setDraft((current) => ({
+      ...current,
+      authMode,
+      credentialsRef: '',
+    }));
+    setCredentialInputOpen(authMode === 'api_key');
+    invalidateDraftResults();
   };
 
   const updateDraft = (updater: (current: ProviderDraft) => ProviderDraft) => {
@@ -200,13 +274,14 @@ export const useAiProviderEditor = () => {
       return;
     }
     const name = draft.name.trim();
-    const apiKey = draft.credentialsRef.trim();
+    const apiKey = draft.authMode === 'api_key' ? draft.credentialsRef.trim() : '';
     const timeoutMs = Number(draft.timeoutMs);
     const requestSequence = modelRequestGate.begin();
     try {
       const result = await modelCatalogMutation.mutateAsync({
         ...(name ? { name } : {}),
         baseUrl,
+        authMode: draft.authMode,
         upstreamFormat: draft.upstreamFormat,
         ...(apiKey ? { apiKey } : {}),
         ...(Number.isInteger(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : {}),
@@ -291,22 +366,60 @@ export const useAiProviderEditor = () => {
     }
   };
 
-  const testDraft = async () => {
+  const testDraft = async (
+    model?: string,
+    purpose?: ProviderDraft['executionRoutes'][number]['contractId'],
+    mode?: ProviderDraft['executionRoutes'][number]['mode'],
+  ) => {
+    if (!testFlight.tryBegin()) return;
     if (draft.type !== 'ai') {
-      await testOrdinaryDraft();
+      try {
+        await testOrdinaryDraft();
+      } finally {
+        testFlight.end();
+      }
       return;
     }
-    const input = aiProviderInputFromDraft(draft);
-    if (invalidDraft(input)) return;
+    const testKind = model === undefined ? 'connection' : 'generation';
+    const pricingState =
+      model === undefined ? 'zero' : aiProviderTestPricingState(draft.modelPricing[model]);
+    if (pricingState === 'paid') {
+      const confirmed = await confirm({
+        title: '授权生成测试费用？',
+        description: '本次测试会向指定模型发起一次最小结构化生成请求，可能产生上游费用。',
+        confirmLabel: '授权并测试',
+      });
+      if (!confirmed) {
+        testFlight.end();
+        return;
+      }
+    }
+    const input = aiProviderTestInputFromDraft(
+      draft,
+      model,
+      testKind,
+      pricingState === 'paid' ? true : undefined,
+      purpose,
+      mode,
+    );
+    if (invalidDraft(input)) {
+      testFlight.end();
+      return;
+    }
     const requestSequence = testRequestGate.begin();
     setTestState('testing');
+    const active = beginAiTest(input.name);
     try {
-      const result = await testDraftMutation.mutateAsync(input);
+      const result = await testDraftMutation.mutateAsync({
+        input: { ...input, requestId: active.requestId },
+        signal: active.controller.signal,
+      });
       if (!testRequestGate.isCurrent(requestSequence)) return;
       setTestEvidence(
         result.testToken
           ? {
               token: result.testToken,
+              ...(model === undefined ? {} : { model }),
               ...(draft.credentialsRef.trim()
                 ? { credentialsRef: draft.credentialsRef.trim() }
                 : {}),
@@ -316,15 +429,18 @@ export const useAiProviderEditor = () => {
       if (testSucceeded(result.status)) {
         setTestState('success');
         toastManager.add({
-          title: `${input.name} 最小生成测试成功`,
-          description: `仅证明连接与最小生成可用，不代表业务结构化生成已通过。${result.message ? ` ${result.message}` : ''}`,
+          title: `${input.name} ${testKind === 'generation' ? '生成测试' : '连通性测试'}成功`,
+          description:
+            testKind === 'generation'
+              ? `仅证明指定模型的最小生成请求可用。${result.message ? ` ${result.message}` : ''}`
+              : `仅证明测试连接可用，不代表业务结构化生成已通过。${result.message ? ` ${result.message}` : ''}`,
           type: 'success',
           timeout: 2800,
         });
       } else {
         setTestState('error');
         toastManager.add({
-          title: `${input.name} 连通性测试失败`,
+          title: `${input.name} ${testKind === 'generation' ? '生成测试' : '连通性测试'}失败`,
           description: result.message ?? '连接异常。',
           type: 'error',
           timeout: 0,
@@ -335,12 +451,15 @@ export const useAiProviderEditor = () => {
       if (!testRequestGate.isCurrent(requestSequence)) return;
       setTestState('error');
       toastManager.add({
-        title: `${input.name} 连通性测试失败`,
+        title: `${input.name} ${testKind === 'generation' ? '生成测试' : '连通性测试'}失败`,
         description: error instanceof Error ? error.message : '连接测试失败。',
         type: 'error',
         timeout: 0,
         priority: 'high',
       });
+    } finally {
+      finishAiTest(active);
+      testFlight.end();
     }
   };
 
@@ -380,9 +499,10 @@ export const useAiProviderEditor = () => {
       }
       return;
     }
-    const input = aiProviderInputFromDraft(draft, testEvidence?.token);
+    const reusableTestToken = testEvidence?.model ? undefined : testEvidence?.token;
+    const input = aiProviderInputFromDraft(draft, reusableTestToken);
     if (invalidDraft(input)) return;
-    if (takingOverEnvironmentName && !input.apiKey) {
+    if (takingOverEnvironmentName && draft.authMode === 'api_key' && !input.apiKey) {
       toastManager.add({
         title: '接管部署配置需要 API Key',
         description: '请填写新的 API Key 后保存。',
@@ -412,19 +532,63 @@ export const useAiProviderEditor = () => {
     }
   };
 
-  const testSaved = async (provider: ProviderRecord) => {
+  const testSaved = async (
+    provider: ProviderRecord,
+    model?: string,
+    purpose?: ProviderDraft['executionRoutes'][number]['contractId'],
+    mode?: ProviderDraft['executionRoutes'][number]['mode'],
+  ) => {
+    if (!testFlight.tryBegin()) return;
+    const selectedModel = model ?? provider.models?.[0];
+    let pricing: Parameters<typeof aiProviderTestPricingState>[0];
+    if (provider.modelPricing === undefined) {
+      pricing = {
+        ...(provider.costPer1kInput === undefined
+          ? {}
+          : { costPer1kInput: provider.costPer1kInput }),
+        ...(provider.costPer1kOutput === undefined
+          ? {}
+          : { costPer1kOutput: provider.costPer1kOutput }),
+        ...(provider.costCurrency === undefined ? {} : { costCurrency: provider.costCurrency }),
+      };
+    } else if (selectedModel !== undefined) {
+      pricing = provider.modelPricing[selectedModel];
+    }
+    const pricingState = aiProviderTestPricingState(pricing);
+    if (pricingState === 'paid') {
+      const confirmed = await confirm({
+        title: '授权生成测试费用？',
+        description: '本次测试会向指定模型发起一次最小结构化生成请求，可能产生上游费用。',
+        confirmLabel: '授权并测试',
+      });
+      if (!confirmed) {
+        testFlight.end();
+        return;
+      }
+    }
     setTestingProviderName(provider.name);
+    const requestSequence = testRequestGate.begin();
+    const active = beginAiTest(provider.name);
     try {
-      const result = await testSavedMutation.mutateAsync(provider.name);
+      const result = await testSavedMutation.mutateAsync({
+        name: provider.name,
+        ...(model === undefined ? {} : { model }),
+        ...(purpose === undefined ? {} : { purpose }),
+        ...(mode === undefined ? {} : { mode }),
+        ...(pricingState === 'paid' ? { budgetAuthorized: true } : {}),
+        requestId: active.requestId,
+        signal: active.controller.signal,
+      });
+      if (!testRequestGate.isCurrent(requestSequence)) return;
       if (testSucceeded(result.status)) {
         toastManager.add({
-          title: `${provider.name} 连通性测试成功`,
+          title: `${provider.name} 生成测试成功`,
           type: 'success',
           timeout: 2800,
         });
       } else {
         toastManager.add({
-          title: `${provider.name} 连通性测试失败`,
+          title: `${provider.name} 生成测试失败`,
           description: result.message ?? '连接异常。',
           type: 'error',
           timeout: 0,
@@ -432,23 +596,49 @@ export const useAiProviderEditor = () => {
         });
       }
     } catch (error) {
+      if (!testRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
-        title: `${provider.name} 连通性测试失败`,
+        title: `${provider.name} 生成测试失败`,
         description: error instanceof Error ? error.message : '请检查服务连接。',
         type: 'error',
         timeout: 0,
         priority: 'high',
       });
     } finally {
+      finishAiTest(active);
       setTestingProviderName((current) => (current === provider.name ? null : current));
+      testFlight.end();
     }
   };
 
   const toggle = async (provider: ProviderRecord) => {
     if (provider.source === 'environment') return;
+    const isResearchDefault = routingSettings?.researchDefault?.providerId === provider.name;
+    let lifecycle: AiProviderLifecycleOptions = provider.updatedAt
+      ? { expectedRevision: provider.updatedAt }
+      : {};
+    if (provider.enabled && isResearchDefault && routingSettings) {
+      const confirmed = await confirm({
+        title: `停用 ${provider.name} 并清除研究默认？`,
+        description: '停用默认 Provider 会同时清除研究默认引用，两个变更会原子提交。',
+        confirmLabel: '清除默认并停用',
+        cancelLabel: '取消',
+        variant: 'destructive',
+      });
+      if (!confirmed) return;
+      lifecycle = {
+        ...lifecycle,
+        clearResearchDefault: true,
+        expectedSettingsRevision: routingSettings.revision,
+      };
+    }
     setTestingProviderName(provider.name);
     try {
-      await setEnabledMutation.mutateAsync({ name: provider.name, enabled: !provider.enabled });
+      await setEnabledMutation.mutateAsync({
+        name: provider.name,
+        enabled: !provider.enabled,
+        ...lifecycle,
+      });
       toastManager.add({
         title: `${provider.name} 已${provider.enabled ? '停用' : '启用'}`,
         type: 'success',
@@ -470,8 +660,20 @@ export const useAiProviderEditor = () => {
   const remove = async (provider: ProviderRecord) => {
     setDeletingProviderName(provider.name);
     try {
-      const deleted = await requestAiProviderDeletion(provider, confirm, (name) =>
-        deleteMutation.mutateAsync(name),
+      const lifecycle =
+        routingSettings?.researchDefault?.providerId === provider.name
+          ? {
+              clearResearchDefault: true,
+              expectedSettingsRevision: routingSettings.revision,
+            }
+          : undefined;
+      const deleted = await requestAiProviderDeletion(provider, confirm, (name, expectedRevision) =>
+        deleteMutation.mutateAsync({
+          name,
+          ...(expectedRevision ? { expectedRevision } : {}),
+          ...(lifecycle ?? {}),
+        }),
+      lifecycle,
       );
       if (deleted)
         toastManager.add({ title: `${provider.name} 已删除`, type: 'success', timeout: 2800 });
@@ -495,6 +697,7 @@ export const useAiProviderEditor = () => {
     updateDraft,
     fetchModels,
     testDraft,
+    cancelTest,
     saveDraft,
     testSaved,
     toggle,
@@ -513,6 +716,7 @@ export const useAiProviderEditor = () => {
       onOpenChange: (nextOpen: boolean) => (nextOpen ? setOpen(true) : close()),
       onResetTest: resetTest,
       onSetCredentialInputOpen: setCredentialInputOpen,
+      onAuthModeChange: changeAuthMode,
     },
     testingProviderName,
     deletingProviderName,

@@ -212,6 +212,63 @@ describe('AI 运行审计', () => {
     );
   });
 
+  it('研究创建严格使用显式默认，不按 Provider 列表顺序替换', async () => {
+    const create = vi.fn(async ({ data }: { data: object }) => ({ id: 'run-default', ...data }));
+    const providers = {
+      strictReadyContract: vi.fn(() => ({
+        provider: { id: 'selected-provider' },
+        execution: {
+          adapter: 'openai-compatible',
+          mode: 'json_validated',
+          readiness: { configurationFingerprint: 'selected-fingerprint' },
+        },
+      })),
+    };
+    const routingSettings = {
+      read: vi.fn(async () => ({
+        researchDefault: { providerId: 'selected-provider', model: 'selected-model' },
+        revision: '7',
+      })),
+    };
+    const service = new AiRunService(
+      { aiRun: { create } } as never,
+      providers as never,
+      routingSettings as never,
+    );
+
+    await service.startResearch({ question: '风险？', context: { scope: 'portfolio' } });
+
+    expect(providers.strictReadyContract).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'selected-provider', model: 'selected-model' }),
+    );
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          provider: 'selected-provider',
+          model: 'selected-model',
+          modelMetadata: expect.objectContaining({
+            researchDefault: { providerId: 'selected-provider', model: 'selected-model' },
+            researchSettingsRevision: '7',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('未设置研究默认时阻断新研究创建', async () => {
+    const create = vi.fn();
+    const service = new AiRunService(
+      { aiRun: { create } } as never,
+      { defaultModel: () => 'legacy-model' } as never,
+      { read: vi.fn(async () => ({ researchDefault: null, revision: '0' })) } as never,
+    );
+
+    await expect(
+      service.startResearch({ question: '风险？', context: { scope: 'portfolio' } }),
+    ).rejects.toThrow('请先选择研究默认模型');
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('过期 Optimization AiRun 标记 unknown outcome，不能进入 Research 自动重试', async () => {
     const updateMany = vi
       .fn()

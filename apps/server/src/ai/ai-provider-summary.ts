@@ -21,23 +21,34 @@ import {
   aiProviderModelReasoningSchema,
   aiProviderCapabilityRevocationSchema,
   aiProviderExecutionRouteInputSchema,
+  aiProviderModelDefaultConfigSchema,
+  aiAuthModeSchema,
+  parseAiProviderModelPricing,
   type AiProviderCapabilityRevocation,
   type AiProviderExecutionRouteInput,
+  type AiProviderModelDefaultConfig,
+  type AiProviderModelPricingView,
   type AiProviderModelReasoning,
   type AiProviderSummary,
 } from './ai-provider.contracts.js';
+import type { AiAuthMode } from '@thesis-ledger/schemas';
 
 export interface ParsedAiProviderSettings {
   baseUrl: string;
   models: string[];
+  authMode: AiAuthMode;
   upstreamFormat: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
   adapter: AiAdapter;
   executionRoutes?: AiProviderExecutionRouteInput[];
+  modelDefaults?: Record<string, AiProviderModelDefaultConfig>;
   capabilityRevocations?: AiProviderCapabilityRevocation[];
+  modelPricing?: Record<string, AiProviderModelPricingView>;
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   timeoutMs?: number;
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
   costPer1kInput?: number;
   costPer1kOutput?: number;
   costCurrency?: string;
@@ -50,9 +61,13 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   const baseUrl = record.baseUrl;
   const models = stringArray(record.models);
   if (typeof baseUrl !== 'string' || !httpUrl.safeParse(baseUrl).success || !models) return null;
+  const authMode = aiAuthModeSchema.safeParse(record.authMode ?? 'api_key');
+  if (!authMode.success) return null;
   const modelReasoning = parseModelReasoning(record.modelReasoning, models);
+  const modelPricing = parseAiProviderModelPricing(record.modelPricing, models);
   const legacyAdapter = aiLegacyAdapterSchema.safeParse(record.adapter);
   const executionRoutes = parseExecutionRoutes(record.executionRoutes, models);
+  const modelDefaults = parseModelDefaults(record.modelDefaults, models);
   const capabilityRevocations = parseCapabilityRevocations(record.capabilityRevocations);
   const explicitSelection = aiUpstreamSelectionSchema.safeParse({
     upstreamFormat: record.upstreamFormat,
@@ -85,6 +100,7 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   return {
     baseUrl,
     models,
+    authMode: authMode.data,
     upstreamFormat: selection.upstreamFormat,
     ...(selection.upstreamFormat === 'chat-completions'
       ? { chatImplementation: selection.chatImplementation }
@@ -92,9 +108,17 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
     ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
     adapter,
     ...(executionRoutes ? { executionRoutes } : {}),
+    ...(modelDefaults ? { modelDefaults } : {}),
     ...(capabilityRevocations ? { capabilityRevocations } : {}),
+    ...(modelPricing ? { modelPricing } : {}),
     ...(modelReasoning ? { modelReasoning } : {}),
     ...(typeof record.timeoutMs === 'number' ? { timeoutMs: record.timeoutMs } : {}),
+    ...(typeof record.firstOutputTimeoutMs === 'number'
+      ? { firstOutputTimeoutMs: record.firstOutputTimeoutMs }
+      : {}),
+    ...(typeof record.outputIdleTimeoutMs === 'number'
+      ? { outputIdleTimeoutMs: record.outputIdleTimeoutMs }
+      : {}),
     ...(typeof record.costPer1kInput === 'number' ? { costPer1kInput: record.costPer1kInput } : {}),
     ...(typeof record.costPer1kOutput === 'number'
       ? { costPer1kOutput: record.costPer1kOutput }
@@ -116,6 +140,23 @@ const parseExecutionRoutes = (
     .map((result) => result.data)
     .filter((route) => selected.has(route.model));
   return parsed.length > 0 ? parsed : null;
+};
+
+const parseModelDefaults = (
+  value: unknown,
+  models: readonly string[],
+): Record<string, AiProviderModelDefaultConfig> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  const selected = new Set(models);
+  const entries = Object.entries(record)
+    .filter(([model]) => selected.has(model))
+    .slice(0, 32)
+    .flatMap(([model, defaults]) => {
+      const parsed = aiProviderModelDefaultConfigSchema.safeParse(defaults);
+      return parsed.success ? [[model, parsed.data] as const] : [];
+    });
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
 };
 
 const parseCapabilityRevocations = (value: unknown): AiProviderCapabilityRevocation[] | null => {
@@ -153,21 +194,61 @@ type HealthSnapshot = {
   errorCode?: string | null;
 } | null;
 
-const settingsSummary = (settings: ParsedAiProviderSettings | null) => ({
-  ...(settings?.upstreamFormat === undefined ? {} : { upstreamFormat: settings.upstreamFormat }),
-  ...(settings?.chatImplementation === undefined
-    ? {}
-    : { chatImplementation: settings.chatImplementation }),
-  ...(settings?.executionRoutes === undefined
-    ? {}
-    : { executionRouteConfigs: settings.executionRoutes }),
-  ...(settings?.modelReasoning === undefined ? {} : { modelReasoning: settings.modelReasoning }),
-  ...(settings?.timeoutMs === undefined ? {} : { timeoutMs: settings.timeoutMs }),
-  ...(settings?.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
-  ...(settings?.costPer1kOutput === undefined ? {} : { costPer1kOutput: settings.costPer1kOutput }),
-  ...(settings?.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
-  ...(settings?.pricingVersion === undefined ? {} : { pricingVersion: settings.pricingVersion }),
-});
+const settingsSummary = (settings: ParsedAiProviderSettings | null) => {
+  const modelPricing = settings?.modelPricing;
+  return {
+    authMode: settings?.authMode ?? 'api_key',
+    ...(settings?.upstreamFormat === undefined ? {} : { upstreamFormat: settings.upstreamFormat }),
+    ...(settings?.chatImplementation === undefined
+      ? {}
+      : { chatImplementation: settings.chatImplementation }),
+    ...(settings?.executionRoutes === undefined
+      ? {}
+      : { executionRouteConfigs: settings.executionRoutes }),
+    ...(settings?.modelDefaults === undefined ? {} : { modelDefaults: settings.modelDefaults }),
+    ...(modelPricing ? { modelPricing } : {}),
+    ...(settings?.modelReasoning === undefined ? {} : { modelReasoning: settings.modelReasoning }),
+    ...(settings?.timeoutMs === undefined ? {} : { timeoutMs: settings.timeoutMs }),
+    ...(settings?.firstOutputTimeoutMs === undefined
+      ? {}
+      : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
+    ...(settings?.outputIdleTimeoutMs === undefined
+      ? {}
+      : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
+    ...(settings?.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
+    ...(settings?.costPer1kOutput === undefined
+      ? {}
+      : { costPer1kOutput: settings.costPer1kOutput }),
+    ...(settings?.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
+    ...(settings?.pricingVersion === undefined ? {} : { pricingVersion: settings.pricingVersion }),
+  };
+};
+
+const legacyModelPricing = (settings: ParsedAiProviderSettings | null) => {
+  if (!settings || settings.modelPricing) return undefined;
+  const hasLegacyValue =
+    settings.costPer1kInput !== undefined ||
+    settings.costPer1kOutput !== undefined ||
+    settings.costCurrency !== undefined;
+  if (!hasLegacyValue) return undefined;
+  return Object.fromEntries(
+    settings.models.map((model) => [
+      model,
+      {
+        ...(settings.costPer1kInput === undefined
+          ? {}
+          : { costPer1kInput: settings.costPer1kInput }),
+        ...(settings.costPer1kOutput === undefined
+          ? {}
+          : { costPer1kOutput: settings.costPer1kOutput }),
+        ...(settings.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
+        pricingVersion: settings.pricingVersion ?? 'legacy-provider',
+        updatedAt: '1970-01-01T00:00:00.000Z',
+        source: 'legacy_provider' as const,
+      },
+    ]),
+  );
+};
 
 export const aiProviderSummaryFromRow = (
   row: ProviderConfig,
@@ -183,6 +264,7 @@ export const aiProviderSummaryFromRow = (
   baseUrl: settings?.baseUrl ?? null,
   models: settings?.models ?? [],
   ...settingsSummary(settings),
+  ...(legacyModelPricing(settings) ? { modelPricing: legacyModelPricing(settings) } : {}),
   credentialConfigured: Boolean(row.encryptedCredentials),
   health: health?.state ?? row.health ?? 'unknown',
   updatedAt: row.updatedAt?.toISOString?.() ?? null,
@@ -201,6 +283,7 @@ export const aiProviderSummaryFromProvider = (provider: AiProvider): AiProviderS
   capabilities: [...(provider.metadata?.capabilities ?? ['chat'])],
   baseUrl: provider.metadata?.baseURL ?? null,
   models: [...provider.models],
+  authMode: provider.metadata?.authMode ?? 'api_key',
   ...(provider.metadata?.upstreamFormat === undefined
     ? {}
     : { upstreamFormat: provider.metadata.upstreamFormat }),
@@ -210,7 +293,16 @@ export const aiProviderSummaryFromProvider = (provider: AiProvider): AiProviderS
   ...(provider.metadata?.executionRoutes === undefined
     ? {}
     : { executionRouteConfigs: [...provider.metadata.executionRoutes] }),
+  ...(provider.metadata?.modelPricing === undefined
+    ? {}
+    : { modelPricing: provider.metadata.modelPricing }),
   ...(provider.metadata?.timeoutMs === undefined ? {} : { timeoutMs: provider.metadata.timeoutMs }),
+  ...(provider.metadata?.firstOutputTimeoutMs === undefined
+    ? {}
+    : { firstOutputTimeoutMs: provider.metadata.firstOutputTimeoutMs }),
+  ...(provider.metadata?.outputIdleTimeoutMs === undefined
+    ? {}
+    : { outputIdleTimeoutMs: provider.metadata.outputIdleTimeoutMs }),
   ...(provider.metadata?.costPer1kInput === undefined
     ? {}
     : { costPer1kInput: provider.metadata.costPer1kInput }),

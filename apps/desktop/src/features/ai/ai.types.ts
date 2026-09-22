@@ -128,11 +128,26 @@ export interface AiCapabilitiesResponse {
   checkedAt: string;
 }
 
+export interface AiRoutingSettings {
+  researchDefault: { providerId: string; model: string } | null;
+  revision: string;
+  candidates: Array<{
+    providerId: string;
+    providerName: string;
+    model: string;
+    enabled: boolean;
+    health: string;
+    authMode: 'api_key' | 'none';
+    priceConfigured: boolean;
+  }>;
+}
+
 export interface StartResearchInput {
   question: string;
   context: AiResearchContext;
   templateId?: 'primary-risks' | 'recent-changes' | 'counter-evidence' | 'stress-scenario';
   retryOfRunId?: string;
+  researchSettingsRevision?: string;
   retryConfirmation?: {
     contextConfirmed: true;
     acknowledgeUnknownOutcomeRisk: boolean;

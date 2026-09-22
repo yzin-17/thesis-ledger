@@ -17,6 +17,10 @@ import {
 } from './ai-sdk-generation.adapter.js';
 import { researchRoutePaidAuthorized } from './ai-research-policy.js';
 import { AiProviderRegistry } from './provider-registry.js';
+import {
+  aiProviderPricingForModel,
+  type AiProviderPricing,
+} from './ai-provider-pricing.js';
 
 type ResearchRun = {
   provider: string;
@@ -28,6 +32,7 @@ type FrozenRoute = {
   provider: string;
   model: string;
   configurationFingerprint: string;
+  pricing?: AiProviderPricing;
 };
 
 type ResearchExecutionInput = {
@@ -44,11 +49,29 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const pricingSnapshot = (value: unknown): AiProviderPricing | undefined => {
+  const pricing = asRecord(value);
+  if (!pricing) return undefined;
+  return {
+    ...(typeof pricing.costPer1kInput === 'number'
+      ? { costPer1kInput: pricing.costPer1kInput }
+      : {}),
+    ...(typeof pricing.costPer1kOutput === 'number'
+      ? { costPer1kOutput: pricing.costPer1kOutput }
+      : {}),
+    ...(typeof pricing.costCurrency === 'string' ? { costCurrency: pricing.costCurrency } : {}),
+    ...(typeof pricing.pricingVersion === 'string'
+      ? { pricingVersion: pricing.pricingVersion }
+      : {}),
+  };
+};
+
 const frozenRoutes = (metadata: unknown): FrozenRoute[] => {
   const value = asRecord(metadata)?.researchRoutes;
   if (!Array.isArray(value)) return [];
   return value.flatMap((candidate) => {
     const route = asRecord(candidate);
+    const pricing = pricingSnapshot(route?.pricing);
     return typeof route?.provider === 'string' &&
       typeof route.model === 'string' &&
       typeof route.configurationFingerprint === 'string'
@@ -57,6 +80,7 @@ const frozenRoutes = (metadata: unknown): FrozenRoute[] => {
             provider: route.provider,
             model: route.model,
             configurationFingerprint: route.configurationFingerprint,
+            ...(pricing === undefined ? {} : { pricing }),
           },
         ]
       : [];
@@ -99,65 +123,49 @@ const requestTotals = (execution: AiExecutionSummary) =>
 
 const routeCost = (
   policy: AiResearchPolicyV1,
-  provider: {
-    metadata?: {
-      costPer1kInput?: number;
-      costPer1kOutput?: number;
-      costCurrency?: string;
-      pricingVersion?: string;
-    };
-  },
-  freeEvidenceRef: string | null,
+  pricing: AiProviderPricing,
   inputTokens: number,
   outputTokens: number,
 ): AiCostFacts | null => {
-  if (freeEvidenceRef) return unknownCost(`free_evidence:${freeEvidenceRef}`.slice(0, 120));
-  const metadata = provider.metadata;
   if (
-    metadata?.costPer1kInput === undefined ||
-    metadata.costPer1kOutput === undefined ||
-    !metadata.costCurrency ||
-    metadata.costCurrency !== policy.costCurrency
+    pricing.costPer1kInput === undefined ||
+    pricing.costPer1kOutput === undefined ||
+    !pricing.costCurrency ||
+    (policy.costCurrency !== null && pricing.costCurrency !== policy.costCurrency)
   )
     return null;
   return {
     status: 'estimated',
     amount: decimal(
-      (inputTokens * metadata.costPer1kInput + outputTokens * metadata.costPer1kOutput) / 1_000,
+      (inputTokens * pricing.costPer1kInput + outputTokens * pricing.costPer1kOutput) / 1_000,
     ),
-    currency: metadata.costCurrency,
+    currency: pricing.costCurrency,
     source: 'frozen_provider_pricing',
-    pricingVersion: metadata.pricingVersion ?? 'unversioned',
+    pricingVersion: pricing.pricingVersion ?? 'unversioned',
   };
 };
 
 const completedCost = (
   policy: AiResearchPolicyV1,
-  provider: {
-    metadata?: {
-      costPer1kInput?: number;
-      costPer1kOutput?: number;
-      costCurrency?: string;
-      pricingVersion?: string;
-    };
-  },
-  freeEvidenceRef: string | null,
+  pricing: AiProviderPricing,
   result: Pick<AiSdkGenerationResult<unknown>, 'providerCost' | 'providerCostCurrency' | 'usage'>,
 ): AiCostFacts => {
-  if (freeEvidenceRef) return unknownCost(`free_evidence:${freeEvidenceRef}`.slice(0, 120));
-  if (result.providerCost !== null && result.providerCostCurrency === policy.costCurrency)
+  if (
+    result.providerCost !== null &&
+    result.providerCostCurrency !== null &&
+    (policy.costCurrency === null || result.providerCostCurrency === policy.costCurrency)
+  )
     return {
       status: 'known',
       amount: result.providerCost,
       currency: result.providerCostCurrency,
       source: 'provider_reported',
-      pricingVersion: provider.metadata?.pricingVersion ?? null,
+      pricingVersion: pricing.pricingVersion ?? null,
     };
   if (result.usage.inputTokens !== null && result.usage.outputTokens !== null) {
     const estimate = routeCost(
       policy,
-      provider,
-      null,
+      pricing,
       result.usage.inputTokens,
       result.usage.outputTokens,
     );
@@ -190,7 +198,6 @@ const waitFor = (milliseconds: number, signal: AbortSignal) =>
 const blockAfter = (
   execution: AiExecutionSummary,
   policy: AiResearchPolicyV1,
-  routeIsFree: boolean,
   usage: AiUsageFacts,
   cost: AiCostFacts,
   reservation: { inputTokens: number; outputTokens: number; cost: AiCostFacts },
@@ -205,7 +212,7 @@ const blockAfter = (
     amount > Number(policy.maxCost)
   )
     return 'budget_exceeded';
-  if (!routeIsFree && cost.status === 'unknown') return 'cost_unknown';
+  if (cost.status === 'unknown') return 'cost_unknown';
   return execution.continuationBlockedReason;
 };
 
@@ -230,8 +237,8 @@ export class AiResearchSdkExecution {
       });
       return;
     }
-    const model = input.run.model === 'pending' ? this.providers.defaultModel() : input.run.model;
-    if (!model) throw new Error('没有配置可用的 AI Provider/Model');
+    const model = input.run.model;
+    if (!model || model === 'pending') throw new Error('研究任务未冻结可执行的 Provider/Model');
     const frozen = frozenRoutes(input.run.modelMetadata);
     const attemptedProviders = new Set(
       execution.requests
@@ -244,7 +251,14 @@ export class AiResearchSdkExecution {
         contract: aiGenerationContracts.research.ref,
         ...(input.run.provider === 'pending' ? {} : { preferred: input.run.provider }),
         budgetAuthorized: (providerId, candidateModel) =>
-          researchRoutePaidAuthorized(policy, providerId, candidateModel),
+          frozen.some(
+            (candidate) =>
+              candidate.provider === providerId &&
+              candidate.model === candidateModel &&
+              candidate.pricing !== undefined,
+          )
+            ? true
+            : researchRoutePaidAuthorized(policy, providerId, candidateModel),
       })
       .filter(({ provider, execution: route }) => {
         if (attemptedProviders.has(provider.id)) return false;
@@ -287,13 +301,14 @@ export class AiResearchSdkExecution {
         outputTokens <= 0
       )
         throw new Error('研究任务累计 Token 或请求次数预算不足');
-      const reservationCost = routeCost(
-        policy,
-        route.provider,
-        route.execution.freeEvidenceRef,
-        inputTokens,
-        outputTokens,
+      const frozenRoute = frozen.find(
+        (candidate) =>
+          candidate.provider === route.provider.id &&
+          candidate.model === model &&
+          candidate.configurationFingerprint === route.execution.readiness.configurationFingerprint,
       );
+      const pricing = frozenRoute?.pricing ?? aiProviderPricingForModel(route.provider, model);
+      const reservationCost = routeCost(policy, pricing, inputTokens, outputTokens);
       if (!reservationCost) continue;
       if (
         reservationCost.amount !== null &&
@@ -332,6 +347,7 @@ export class AiResearchSdkExecution {
               }),
           providerId: route.provider.id,
           baseURL: runtime.baseURL,
+          authMode: runtime.authMode ?? 'api_key',
           apiKey: runtime.apiKey,
           model,
           messages: input.messages,
@@ -340,7 +356,6 @@ export class AiResearchSdkExecution {
           mode: route.execution.mode,
           transport: 'stream',
           maxOutputTokens: outputTokens,
-          allowedUpstreams: route.execution.allowedUpstreams,
           timeout: {
             totalMs: Math.min(runtime.timeoutMs, remainingMs),
             ...(route.execution.firstOutputTimeoutMs === undefined
@@ -369,20 +384,12 @@ export class AiResearchSdkExecution {
             { cause: error },
           );
         }
-        const cost = completedCost(
-          policy,
-          route.provider,
-          route.execution.freeEvidenceRef,
-          generated,
-        );
-        const blocked = blockAfter(
-          execution,
-          policy,
-          route.execution.freeEvidenceRef !== null,
-          generated.usage,
-          cost,
-          { inputTokens, outputTokens, cost: reservationCost },
-        );
+        const cost = completedCost(policy, pricing, generated);
+        const blocked = blockAfter(execution, policy, generated.usage, cost, {
+          inputTokens,
+          outputTokens,
+          cost: reservationCost,
+        });
         const settled = await this.executions.completeAndSettle({
           ...input.ownership,
           requestId,
@@ -419,7 +426,7 @@ export class AiResearchSdkExecution {
                 { status: 'unknown', inputTokens: null, outputTokens: null },
                 { cause: error },
               );
-        const cost = completedCost(policy, route.provider, route.execution.freeEvidenceRef, {
+        const cost = completedCost(policy, pricing, {
           providerCost: null,
           providerCostCurrency: null,
           usage: sdkError.usage,

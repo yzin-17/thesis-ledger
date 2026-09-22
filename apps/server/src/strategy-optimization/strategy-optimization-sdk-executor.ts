@@ -6,7 +6,6 @@ import {
   aiGenerationContracts,
   aiGenerationErrorSchema,
   type AiCostFacts,
-  type AiProviderModelExecution,
   type AiUsageFacts,
   type OptimizationDiscoveryProposal,
   type OptimizationProposal,
@@ -24,7 +23,13 @@ import {
   type OptimizationStepRow,
 } from './strategy-optimization-attempt-lifecycle.js';
 import { StrategyOptimizationAiSettlementStore } from './strategy-optimization-ai-settlement.store.js';
-import { normalizeCostCurrency, normalizePricingVersion } from './strategy-optimization-cost.js';
+import {
+  isKnownCostAmount,
+  normalizeCostCurrency,
+  normalizePricingVersion,
+  optimizationPricingForExperimentRoute,
+  type OptimizationPricing,
+} from './strategy-optimization-cost.js';
 import { toRecord, type ExperimentRow } from './strategy-optimization-common.js';
 import type { OptimizationModelRoute } from './strategy-optimization-model-routing.js';
 
@@ -69,23 +74,23 @@ const unknownCost = (source: string | null = null): AiCostFacts => ({
   pricingVersion: null,
 });
 
-const freeEvidenceCost = (reference: string) =>
-  unknownCost(`free_evidence:${reference}`.slice(0, 120));
-
 const reservationCost = (
-  execution: AiProviderModelExecution,
   estimatedCost: number,
-  metadata: ResolvedOptimizationRoute['provider']['metadata'],
+  pricing: OptimizationPricing | undefined,
 ): AiCostFacts => {
-  if (execution.freeEvidenceRef) return freeEvidenceCost(execution.freeEvidenceRef);
-  const currency = normalizeCostCurrency(metadata?.costCurrency);
-  if (!currency) return unknownCost();
+  const currency = normalizeCostCurrency(pricing?.costCurrency);
+  if (
+    !currency ||
+    !isKnownCostAmount(pricing?.costPer1kInput) ||
+    !isKnownCostAmount(pricing?.costPer1kOutput)
+  )
+    return unknownCost();
   return {
     status: 'estimated',
     amount: decimalString(estimatedCost),
     currency,
     source: 'frozen_provider_rates',
-    pricingVersion: normalizePricingVersion(metadata?.pricingVersion),
+    pricingVersion: normalizePricingVersion(pricing?.pricingVersion),
   };
 };
 
@@ -93,8 +98,7 @@ const completedCost = (
   providerCost: string | null,
   providerCurrency: string | null,
   usage: AiUsageFacts,
-  metadata: ResolvedOptimizationRoute['provider']['metadata'],
-  execution: AiProviderModelExecution,
+  pricing: OptimizationPricing | undefined,
 ): AiCostFacts => {
   const reportedCurrency = normalizeCostCurrency(providerCurrency);
   if (providerCost !== null && reportedCurrency)
@@ -103,11 +107,11 @@ const completedCost = (
       amount: decimalString(providerCost),
       currency: reportedCurrency,
       source: 'provider_reported',
-      pricingVersion: normalizePricingVersion(metadata?.pricingVersion),
+      pricingVersion: normalizePricingVersion(pricing?.pricingVersion),
     };
-  const currency = normalizeCostCurrency(metadata?.costCurrency);
-  const inputRate = metadata?.costPer1kInput;
-  const outputRate = metadata?.costPer1kOutput;
+  const currency = normalizeCostCurrency(pricing?.costCurrency);
+  const inputRate = pricing?.costPer1kInput;
+  const outputRate = pricing?.costPer1kOutput;
   if (
     usage.inputTokens !== null &&
     usage.outputTokens !== null &&
@@ -122,9 +126,8 @@ const completedCost = (
       ),
       currency,
       source: 'frozen_provider_rates',
-      pricingVersion: normalizePricingVersion(metadata?.pricingVersion),
+      pricingVersion: normalizePricingVersion(pricing?.pricingVersion),
     };
-  if (execution.freeEvidenceRef) return freeEvidenceCost(execution.freeEvidenceRef);
   return unknownCost('provider_usage_incomplete');
 };
 
@@ -151,12 +154,33 @@ export class StrategyOptimizationSdkExecutor {
     private readonly settlements: StrategyOptimizationAiSettlementStore,
   ) {}
 
+  private pricing(input: Pick<OptimizationSdkExecutionInput, 'experiment' | 'route' | 'resolved'>) {
+    return optimizationPricingForExperimentRoute(
+      input.experiment.modelConfig,
+      input.route.provider,
+      input.route.model,
+      input.resolved.provider.metadata,
+    );
+  }
+
   resolveRoute(experiment: ExperimentRow, route: OptimizationModelRoute) {
+    const resolvedProvider = this.providers.strict(route.provider, route.model);
+    const pricing = optimizationPricingForExperimentRoute(
+      experiment.modelConfig,
+      route.provider,
+      route.model,
+      resolvedProvider.metadata,
+    );
     const resolved = this.providers.strictReadyContract({
       providerId: route.provider,
       model: route.model,
       contract: contractFor(experiment).ref,
-      budgetAuthorized: paidBudgetAuthorized(experiment),
+      budgetAuthorized:
+        isKnownCostAmount(pricing?.costPer1kInput) &&
+        isKnownCostAmount(pricing?.costPer1kOutput) &&
+        normalizeCostCurrency(pricing?.costCurrency) !== null
+          ? true
+          : paidBudgetAuthorized(experiment),
     });
     if (!resolved.provider.sdkRuntime) throw new Error('AI Provider 缺少 SDK 运行配置');
     return resolved;
@@ -190,9 +214,8 @@ export class StrategyOptimizationSdkExecutor {
         inputTokens: input.inputTokenReservation,
         outputTokens: input.outputTokenReservation,
         cost: reservationCost(
-          input.resolved.execution,
           input.estimatedCost,
-          input.resolved.provider.metadata,
+          this.pricing(input),
         ),
       },
     });
@@ -238,8 +261,7 @@ export class StrategyOptimizationSdkExecutor {
           null,
           null,
           error.usage,
-          input.resolved.provider.metadata,
-          input.resolved.execution,
+          this.pricing(input),
         ),
       }),
       outcome: {
@@ -274,6 +296,7 @@ export class StrategyOptimizationSdkExecutor {
               }),
           providerId: input.route.provider,
           baseURL: runtime.baseURL,
+          authMode: runtime.authMode ?? 'api_key',
           apiKey: runtime.apiKey,
           model: input.route.model,
           messages: input.messages,
@@ -285,7 +308,6 @@ export class StrategyOptimizationSdkExecutor {
           ...(input.route.reasoningEffort === undefined
             ? {}
             : { reasoningEffort: input.route.reasoningEffort }),
-          allowedUpstreams: input.resolved.execution.allowedUpstreams,
           timeout: {
             totalMs: Math.min(runtime.timeoutMs, input.requestTimeoutMs),
             firstChunkMs:
@@ -303,8 +325,7 @@ export class StrategyOptimizationSdkExecutor {
         generation.providerCost,
         generation.providerCostCurrency,
         generation.usage,
-        input.resolved.provider.metadata,
-        input.resolved.execution,
+        this.pricing(input),
       );
       let settled;
       try {

@@ -32,7 +32,11 @@ import { strategyKeys } from '../strategy/strategy.queries.js';
 import type { StrategyRecord } from '../strategy/strategy.types.js';
 import { useToastManager } from '@/components/ui/toast';
 import { useCreateAiRunMutation } from './ai.mutations.js';
-import { useAiCapabilitiesQuery, useAiResearchRetryPrefillQuery } from './ai.queries.js';
+import {
+  useAiCapabilitiesQuery,
+  useAiResearchRetryPrefillQuery,
+  useAiRoutingSettingsQuery,
+} from './ai.queries.js';
 import { researchQuestionTemplates } from './ai.templates.js';
 import type { AiResearchScope, AiRunResult, StartResearchInput } from './ai.types.js';
 
@@ -97,6 +101,7 @@ export function NewResearchSheet({
   const [unknownRiskConfirmed, setUnknownRiskConfirmed] = useState(false);
   const mutation = useCreateAiRunMutation();
   const capabilitiesQuery = useAiCapabilitiesQuery(open);
+  const routingSettingsQuery = useAiRoutingSettingsQuery(open);
   const retryPrefillQuery = useAiResearchRetryPrefillQuery(retryOfRunId, open);
   const toastManager = useToastManager();
 
@@ -175,6 +180,12 @@ export function NewResearchSheet({
     (!retryOfRunId || retryConfirmed) &&
     (!retryPrefillQuery.data?.requiresUnknownOutcomeAcknowledgement || unknownRiskConfirmed) &&
     capabilitiesQuery.data?.canStart === true;
+  const hasResearchDefault = routingSettingsQuery.data?.researchDefault !== null;
+  const canSubmitWithDefault =
+    canSubmit &&
+    !routingSettingsQuery.isPending &&
+    !routingSettingsQuery.isError &&
+    hasResearchDefault;
 
   const expectedTools = {
     portfolio: ['getPortfolio', 'getPositions', 'getRisk'],
@@ -225,7 +236,7 @@ export function NewResearchSheet({
 
   const submit = async () => {
     setHasAttemptedSubmit(true);
-    if (!canSubmit) return;
+    if (!canSubmitWithDefault) return;
     let context = buildContext({ scope, accountId, symbol, strategyVersionId });
     if (retryPrefillQuery.data && !retryContextReselected) {
       context = retryPrefillQuery.data.context;
@@ -235,6 +246,9 @@ export function NewResearchSheet({
       const run = await mutation.mutateAsync({
         question: question.trim(),
         context,
+        ...(routingSettingsQuery.data?.revision === undefined
+          ? {}
+          : { researchSettingsRevision: routingSettingsQuery.data.revision }),
         ...(templateId ? { templateId } : {}),
         ...(retryOfRunId
           ? {
@@ -517,6 +531,28 @@ export function NewResearchSheet({
               {` ${capabilityMessage}`}
             </AlertDescription>
           </Alert>
+          {routingSettingsQuery.isPending ? (
+            <Alert>
+              <AlertTitle>正在读取研究默认模型</AlertTitle>
+              <AlertDescription>提交前会固定当前显示的 Provider、模型和设置版本。</AlertDescription>
+            </Alert>
+          ) : routingSettingsQuery.isError || !hasResearchDefault ? (
+            <Alert variant="destructive">
+              <AlertTitle>尚未选择研究默认模型</AlertTitle>
+              <AlertDescription>
+                请先在数据与自动化的 Provider 设置中选择研究默认模型；系统不会按列表顺序自动替换。
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <AlertTitle>本次研究默认</AlertTitle>
+              <AlertDescription>
+                {routingSettingsQuery.data?.researchDefault?.providerId} /{' '}
+                {routingSettingsQuery.data?.researchDefault?.model}
+                。提交时会校验设置版本，变化后需要重新确认。
+              </AlertDescription>
+            </Alert>
+          )}
           {retryOfRunId && retryPrefillQuery.isPending && (
             <Alert>
               <AlertTitle>正在核对来源任务</AlertTitle>
@@ -585,7 +621,7 @@ export function NewResearchSheet({
           <Button
             type="button"
             onClick={() => void submit()}
-            disabled={!canSubmit}
+            disabled={!canSubmitWithDefault}
             className="w-full"
           >
             {mutation.isPending && (

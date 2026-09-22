@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  freezeAiResearchRoutes,
   parseAiResearchPolicy,
   researchRoutePaidAuthorized,
 } from '../../src/ai/ai-research-policy.js';
@@ -45,5 +46,57 @@ describe('AI research policy', () => {
         }),
       ),
     ).toThrow();
+  });
+
+  it('冻结研究候选时按目标模型保存价格快照和版本', () => {
+    const provider = {
+      id: 'provider-a',
+      models: ['model-a'],
+      metadata: {
+        modelPricing: {
+          'model-a': {
+            costPer1kInput: 0.1,
+            costPer1kOutput: 0.2,
+            costCurrency: 'USD',
+            pricingVersion: 'pricing-model-a-v1',
+          },
+        },
+      },
+    };
+    const registry = {
+      strictReadyContract: () => ({
+        provider,
+        execution: {
+          adapter: 'openai-compatible-chat' as const,
+          mode: 'json_validated' as const,
+          readiness: { configurationFingerprint: 'route-v1' },
+        },
+      }),
+    };
+    const result = freezeAiResearchRoutes(
+      registry as never,
+      parseAiResearchPolicy(
+        JSON.stringify({
+          maxCost: '5',
+          costCurrency: 'USD',
+          paidRoutes: [{ provider: 'provider-a', models: ['model-a'] }],
+        }),
+      ),
+      { providerId: 'provider-a', model: 'model-a' },
+    );
+
+    expect(result.routes).toEqual([
+      expect.objectContaining({
+        provider: 'provider-a',
+        model: 'model-a',
+        pricing: {
+          costPer1kInput: 0.1,
+          costPer1kOutput: 0.2,
+          costCurrency: 'USD',
+          pricingVersion: 'pricing-model-a-v1',
+        },
+      }),
+    ]);
+    expect(result.routes[0]).not.toHaveProperty('pricingVersion');
   });
 });

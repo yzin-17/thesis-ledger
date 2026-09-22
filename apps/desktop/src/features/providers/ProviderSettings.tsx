@@ -9,6 +9,7 @@ import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import { AutomationEditorSheet } from './AutomationEditorSheet.js';
 import { ProviderEditorSheet } from './ProviderEditorSheet.js';
+import { AiResearchDefaultSettings } from './AiResearchDefaultSettings.js';
 import { useAiProviderEditor } from './useAiProviderEditor.js';
 import { isAiProvider } from './providers.types.js';
 import { createProviderActionHandlers } from './providers.actions.js';
@@ -68,8 +69,8 @@ export function ProviderSettings() {
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const toastManager = useToastManager();
   const { confirm } = useConfirmDialog();
-  const aiEditor = useAiProviderEditor();
   const providerQueries = useProviderQueries(healthHistoryPage, automationHistoryPage);
+  const aiEditor = useAiProviderEditor(providerQueries.routingSettings.data);
   const providerMutation = useSaveProviderMutation();
   const testProviderMutation = useTestProviderConnectionMutation();
   const testProviderDraftMutation = useTestProviderDraftMutation();
@@ -191,6 +192,10 @@ export function ProviderSettings() {
         onUpdateDraft={aiEditor.updateDraft}
         onResetTest={aiEditor.editor.onResetTest}
         onSetCredentialInputOpen={aiEditor.editor.onSetCredentialInputOpen}
+        onAuthModeChange={aiEditor.editor.onAuthModeChange}
+        onTestModel={(model) => void aiEditor.testDraft(model)}
+        onTestPurpose={(model, purpose, mode) => void aiEditor.testDraft(model, purpose, mode)}
+        onCancelTest={aiEditor.cancelTest}
         onTypeChange={aiEditor.changeType}
         onFetchAiModels={() => void aiEditor.fetchModels()}
         onClose={aiEditor.close}
@@ -218,6 +223,7 @@ export function ProviderSettings() {
         </TabsList>
         <TabsContent value="providers">
           <div className="space-y-6">
+            <AiResearchDefaultSettings settings={providerQueries.routingSettings.data} />
             <ProviderTable
               loadState={loadState}
               providers={providers}
@@ -233,7 +239,7 @@ export function ProviderSettings() {
               }}
               onEdit={(provider) => aiEditor.openEditor(provider)}
               onTest={(provider) => {
-                if (isAiProvider(provider)) void aiEditor.testSaved(provider);
+                if (isAiProvider(provider)) aiEditor.openEditor(provider);
                 else void actions.test(provider.name);
               }}
               onToggle={(provider) => {

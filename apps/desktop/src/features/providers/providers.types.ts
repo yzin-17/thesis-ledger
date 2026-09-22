@@ -1,42 +1,38 @@
 import type {
   AiChatImplementation,
+  AiAuthMode,
   AiGenerationContractRef,
   AiGenerationMode,
+  AiCostFacts,
   AiProviderModelExecution,
+  AiUsageFacts,
   AiUpstreamFormat,
 } from '@thesis-ledger/schemas';
 
 export type AiProviderExecutionRouteConfig = {
   model: string;
   mode: AiGenerationMode;
+  /** Legacy records without this field remain enabled. */
+  enabled?: boolean;
+  modeOverridden?: boolean;
   contract: AiGenerationContractRef;
-  capabilityDeclaration: AiProviderModelExecution['capabilityDeclaration'];
-  allowedUpstreams: string[];
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;
-  freeEvidence: {
-    source: 'trusted_catalog' | 'controlled_local';
-    sourceRef: string;
-    sourceVersion: string;
-  } | null;
 };
 
 export type AiProviderExecutionRouteDraft = {
   key: string;
   model: string;
   mode: AiGenerationMode;
+  enabled: boolean;
+  modeOverridden: boolean;
   contractId: AiGenerationContractRef['id'];
-  declarationSource: 'none' | 'trusted_catalog' | 'manual';
-  declarationSourceRef: string;
-  declarationSourceVersion: string;
-  declaredAt: string;
-  declaredBy: string;
-  allowedUpstreamsText: string;
   firstOutputTimeoutMs: string;
   outputIdleTimeoutMs: string;
-  freeEvidenceSource: 'none' | 'trusted_catalog' | 'controlled_local';
-  freeEvidenceSourceRef: string;
-  freeEvidenceSourceVersion: string;
+};
+
+export type AiProviderModelDefaultConfig = {
+  mode: AiGenerationMode;
 };
 
 export type ProviderHealthHistoryRecord = {
@@ -45,6 +41,18 @@ export type ProviderHealthHistoryRecord = {
   latencyMs: number | null;
   checkedAt: string;
   source?: string;
+  details?: {
+    kind?: 'ai_provider_test';
+    testKind?: 'connection' | 'generation';
+    model?: string;
+    mode?: AiProviderModelExecution['mode'];
+    contract?: AiProviderModelExecution['contract'];
+    configurationFingerprint?: string;
+    usage?: AiUsageFacts;
+    cost?: AiCostFacts;
+    errorCode?: string;
+    status?: 'healthy' | 'degraded' | 'down' | 'cancelled';
+  };
 };
 
 export type ProviderHealthHistoryPage = {
@@ -62,6 +70,7 @@ export type ProviderTestState = 'idle' | 'testing' | 'success' | 'warning' | 'er
 export interface ProviderTestEvidence {
   token: string;
   credentialsRef?: string;
+  model?: string;
 }
 
 export type AiProviderReasoningEffort =
@@ -80,6 +89,14 @@ export type AiProviderModelDetail = {
   reasoning?: AiProviderModelReasoning;
 };
 
+export type AiProviderModelPricingDraft = {
+  costPer1kInput: string;
+  costPer1kOutput: string;
+  costCurrency: string;
+};
+
+export type { AiAuthMode } from '@thesis-ledger/schemas';
+
 export interface ProviderRecord {
   name: string;
   type: string;
@@ -90,13 +107,28 @@ export interface ProviderRecord {
   credentialConfigured?: boolean;
   source?: 'database' | 'environment';
   baseUrl?: string | null;
+  authMode?: AiAuthMode;
   models?: string[];
   upstreamFormat?: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   executionRouteConfigs?: AiProviderExecutionRouteConfig[];
+  modelDefaults?: Record<string, AiProviderModelDefaultConfig>;
   executionRoutes?: AiProviderModelExecution[];
+  modelPricing?: Record<
+    string,
+    {
+      costPer1kInput?: number;
+      costPer1kOutput?: number;
+      costCurrency?: string;
+      pricingVersion?: string;
+      updatedAt?: string;
+      source?: 'user' | 'legacy_provider';
+    }
+  >;
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   timeoutMs?: number;
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
   costPer1kInput?: number;
   costPer1kOutput?: number;
   costCurrency?: string;
@@ -188,6 +220,13 @@ export interface ProviderConnectionTestResult {
   status?: string;
   message?: string;
   credentialConfigured?: boolean;
+  testKind?: 'connection' | 'generation';
+  purpose?: AiGenerationContractRef['id'];
+  mode?: AiGenerationMode;
+  model?: string;
+  usage?: AiUsageFacts;
+  cost?: AiCostFacts;
+  requestId?: string;
   healthCheck?: ProviderHealthHistoryRecord;
 }
 
@@ -443,16 +482,22 @@ export const newProviderDraft = () => ({
   priority: 1,
   enabled: true,
   baseUrl: '',
+  authMode: 'api_key' as AiAuthMode,
   modelsText: '',
   timeoutMs: '30000',
+  firstOutputTimeoutMs: '',
+  outputIdleTimeoutMs: '',
   costPer1kInput: '',
   costPer1kOutput: '',
   costCurrency: 'USD',
   pricingVersion: '',
   modelReasoning: {} as Record<string, AiProviderModelReasoning>,
+  modelPricing: {} as Record<string, AiProviderModelPricingDraft>,
   upstreamFormat: 'chat-completions' as AiUpstreamFormat,
   chatImplementation: 'compatible' as AiChatImplementation | undefined,
   executionRoutes: [] as AiProviderExecutionRouteDraft[],
+  modelDefaults: {} as Record<string, AiProviderModelDefaultConfig>,
+  updatedAt: '',
 });
 
 export type ProviderDraft = ReturnType<typeof newProviderDraft>;
@@ -462,6 +507,8 @@ export const newAiProviderDraft = () => ({
   type: 'ai',
   capabilities: ['chat'],
   priority: 100,
+  costCurrency: '',
+  authMode: 'api_key' as AiAuthMode,
 });
 
 export const providerDraftForType = (type: string, current: ProviderDraft): ProviderDraft => {

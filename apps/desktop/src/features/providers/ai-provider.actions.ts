@@ -3,6 +3,7 @@ import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
 import type {
   AiProviderExecutionRouteConfig,
   AiProviderModelDetail,
+  AiProviderModelPricingDraft,
   AiProviderModelReasoning,
   AiProviderReasoningEffort,
   ProviderDraft,
@@ -12,26 +13,53 @@ import {
   aiProviderExecutionRouteDraftFromConfig,
   aiProviderExecutionRouteInputFromDraft,
 } from './ai-provider-execution.js';
-import type { AiChatImplementation, AiUpstreamFormat } from '@thesis-ledger/schemas';
+import type {
+  AiAuthMode,
+  AiChatImplementation,
+  AiGenerationContractRef,
+  AiGenerationMode,
+  AiProviderTestKind,
+  AiUpstreamFormat,
+} from '@thesis-ledger/schemas';
 
 export type AiProviderInput = {
   name: string;
   baseUrl: string;
   models: string[];
+  authMode: AiAuthMode;
   upstreamFormat: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   executionRoutes?: AiProviderExecutionRouteConfig[];
+  modelPricing?: Record<
+    string,
+    {
+      costPer1kInput?: number;
+      costPer1kOutput?: number;
+      costCurrency?: string;
+    }
+  >;
   modelReasoning?: Record<string, AiProviderModelReasoning>;
   apiKey?: string;
   enabled: boolean;
   priority: number;
   capabilities: string[];
   timeoutMs?: number;
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
   costPer1kInput?: number;
   costPer1kOutput?: number;
   costCurrency?: string;
-  pricingVersion?: string;
   connectionTestToken?: string;
+  expectedRevision?: string;
+};
+
+export type AiProviderTestInput = AiProviderInput & {
+  model?: string;
+  testKind?: AiProviderTestKind;
+  purpose?: AiGenerationContractRef['id'];
+  mode?: AiGenerationMode;
+  budgetAuthorized?: boolean;
+  requestId?: string;
 };
 
 const optionalNumber = (value: string) => {
@@ -39,6 +67,34 @@ const optionalNumber = (value: string) => {
   if (!trimmed) return undefined;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
+
+export type AiProviderTestPricingState = 'unknown' | 'zero' | 'paid';
+
+const numericPricingValue = (value: number | string | undefined) => {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  return Number(value);
+};
+
+export const aiProviderTestPricingState = (pricing?: {
+  costPer1kInput?: number | string;
+  costPer1kOutput?: number | string;
+  costCurrency?: string;
+}): AiProviderTestPricingState => {
+  const input = numericPricingValue(pricing?.costPer1kInput);
+  const output = numericPricingValue(pricing?.costPer1kOutput);
+  if (
+    input === undefined ||
+    output === undefined ||
+    !Number.isFinite(input) ||
+    !Number.isFinite(output) ||
+    input < 0 ||
+    output < 0 ||
+    !pricing?.costCurrency?.trim()
+  )
+    return 'unknown';
+  return input === 0 && output === 0 ? 'zero' : 'paid';
 };
 
 export const modelsFromText = (value: string) =>
@@ -152,20 +208,55 @@ export const modelReasoningBadgeLabels = (reasoning?: AiProviderModelReasoning) 
 export const aiProviderInputFromDraft = (
   draft: ProviderDraft,
   connectionTestToken?: string,
+  options?: { includeExpectedRevision?: boolean },
 ): AiProviderInput => {
   const apiKey = draft.credentialsRef.trim();
   const timeoutMs = optionalNumber(draft.timeoutMs);
+  const firstOutputTimeoutMs = optionalNumber(draft.firstOutputTimeoutMs);
+  const outputIdleTimeoutMs = optionalNumber(draft.outputIdleTimeoutMs);
   const costPer1kInput = optionalNumber(draft.costPer1kInput);
   const costPer1kOutput = optionalNumber(draft.costPer1kOutput);
   const costCurrency = draft.costCurrency.trim();
-  const pricingVersion = draft.pricingVersion.trim();
   const models = modelsFromText(draft.modelsText);
   const modelReasoning = selectedModelReasoning(models, draft.modelReasoning);
   const executionRoutes = draft.executionRoutes.map(aiProviderExecutionRouteInputFromDraft);
+  const modelDefaults = Object.fromEntries(
+    models.flatMap((model) => {
+      const defaults = draft.modelDefaults[model];
+      return defaults ? [[model, { mode: defaults.mode }] as const] : [];
+    }),
+  );
+  const expectedRevision = draft.updatedAt.trim();
+  const modelPricing = Object.fromEntries(
+    models.flatMap((model) => {
+      const pricing = draft.modelPricing[model];
+      if (!pricing) return [];
+      const costPer1kInput = optionalNumber(pricing.costPer1kInput);
+      const costPer1kOutput = optionalNumber(pricing.costPer1kOutput);
+      const costCurrency = pricing.costCurrency.trim();
+      if (
+        costPer1kInput === undefined &&
+        costPer1kOutput === undefined &&
+        costCurrency.length === 0
+      )
+        return [];
+      return [
+        [
+          model,
+          {
+            ...(costPer1kInput === undefined ? {} : { costPer1kInput }),
+            ...(costPer1kOutput === undefined ? {} : { costPer1kOutput }),
+            ...(costCurrency ? { costCurrency } : {}),
+          },
+        ] as const,
+      ];
+    }),
+  );
   return {
     name: draft.name.trim(),
     baseUrl: draft.baseUrl.trim(),
     models,
+    authMode: draft.authMode,
     enabled: draft.enabled,
     priority: Number(draft.priority),
     capabilities: draft.capabilities,
@@ -174,14 +265,61 @@ export const aiProviderInputFromDraft = (
       ? { chatImplementation: draft.chatImplementation ?? 'compatible' }
       : {}),
     executionRoutes,
-    ...(apiKey ? { apiKey } : {}),
+    ...(Object.keys(modelDefaults).length > 0 ? { modelDefaults } : {}),
+    modelPricing,
+    ...(draft.authMode === 'api_key' && apiKey ? { apiKey } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(firstOutputTimeoutMs === undefined ? {} : { firstOutputTimeoutMs }),
+    ...(outputIdleTimeoutMs === undefined ? {} : { outputIdleTimeoutMs }),
     ...(costPer1kInput === undefined ? {} : { costPer1kInput }),
     ...(costPer1kOutput === undefined ? {} : { costPer1kOutput }),
     ...(costCurrency ? { costCurrency } : {}),
-    ...(pricingVersion ? { pricingVersion } : {}),
     ...(Object.keys(modelReasoning).length > 0 ? { modelReasoning } : {}),
+    ...(options?.includeExpectedRevision === false || !expectedRevision
+      ? {}
+      : { expectedRevision }),
     ...(connectionTestToken ? { connectionTestToken } : {}),
+  };
+};
+
+export const aiProviderTestInputFromDraft = (
+  draft: ProviderDraft,
+  model?: string,
+  testKind: AiProviderTestKind = 'connection',
+  budgetAuthorized?: boolean,
+  purpose?: AiGenerationContractRef['id'],
+  mode?: AiGenerationMode,
+): AiProviderTestInput => ({
+  ...aiProviderInputFromDraft(draft, undefined, { includeExpectedRevision: false }),
+  ...(model === undefined ? {} : { model }),
+  testKind,
+  ...(budgetAuthorized === undefined ? {} : { budgetAuthorized }),
+  ...(purpose === undefined ? {} : { purpose }),
+  ...(mode === undefined ? {} : { mode }),
+});
+
+const modelPricingDraftFromRecord = (
+  provider: ProviderRecord,
+  model: string,
+): AiProviderModelPricingDraft | undefined => {
+  const pricing = provider.modelPricing?.[model];
+  if (pricing) {
+    return {
+      costPer1kInput: pricing.costPer1kInput?.toString() ?? '',
+      costPer1kOutput: pricing.costPer1kOutput?.toString() ?? '',
+      costCurrency: pricing.costCurrency ?? '',
+    };
+  }
+
+  const hasLegacyPricing =
+    provider.costPer1kInput !== undefined ||
+    provider.costPer1kOutput !== undefined ||
+    Boolean(provider.costCurrency);
+  if (!hasLegacyPricing) return undefined;
+  return {
+    costPer1kInput: provider.costPer1kInput?.toString() ?? '',
+    costPer1kOutput: provider.costPer1kOutput?.toString() ?? '',
+    costCurrency: provider.costCurrency ?? '',
   };
 };
 
@@ -193,6 +331,7 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
   priority: provider.priority,
   enabled: provider.enabled,
   baseUrl: provider.baseUrl ?? '',
+  authMode: provider.authMode ?? 'api_key',
   modelsText: (provider.models ?? []).join('\n'),
   modelReasoning: selectedModelReasoning(provider.models ?? [], provider.modelReasoning ?? {}),
   upstreamFormat: provider.upstreamFormat ?? 'chat-completions',
@@ -203,11 +342,22 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
   executionRoutes: (provider.executionRouteConfigs ?? []).map(
     aiProviderExecutionRouteDraftFromConfig,
   ),
+  modelDefaults: provider.modelDefaults ?? {},
+  modelPricing: Object.fromEntries(
+    (provider.models ?? []).flatMap((model) => {
+      const pricing = modelPricingDraftFromRecord(provider, model);
+      if (!pricing) return [];
+      return [[model, pricing] as const];
+    }),
+  ),
   timeoutMs: provider.timeoutMs?.toString() ?? '',
+  firstOutputTimeoutMs: provider.firstOutputTimeoutMs?.toString() ?? '',
+  outputIdleTimeoutMs: provider.outputIdleTimeoutMs?.toString() ?? '',
   costPer1kInput: provider.costPer1kInput?.toString() ?? '',
   costPer1kOutput: provider.costPer1kOutput?.toString() ?? '',
   costCurrency: provider.costCurrency ?? '',
   pricingVersion: provider.pricingVersion ?? '',
+  updatedAt: provider.updatedAt ?? '',
 });
 
 export const aiProviderDraftError = (input: AiProviderInput) => {
@@ -220,34 +370,44 @@ export const aiProviderDraftError = (input: AiProviderInput) => {
   const routeKeys = new Set<string>();
   for (const route of input.executionRoutes ?? []) {
     if (!selectedModels.has(route.model)) return '执行路由必须选择已配置的模型。';
-    const routeKey = `${route.model}:${route.mode}:${route.contract.id}:${route.contract.version}`;
-    if (routeKeys.has(routeKey)) return '模型、生成模式和契约相同的执行路由不得重复。';
+    const routeKey = `${route.model}:${route.contract.id}`;
+    if (routeKeys.has(routeKey)) return '同一模型、同一业务用途只能配置一条执行路由。';
     routeKeys.add(routeKey);
     if (
       route.firstOutputTimeoutMs !== undefined &&
-      (!Number.isInteger(route.firstOutputTimeoutMs) || route.firstOutputTimeoutMs <= 0)
+      (!Number.isInteger(route.firstOutputTimeoutMs) ||
+        route.firstOutputTimeoutMs <= 0 ||
+        route.firstOutputTimeoutMs > 120_000)
     )
-      return '首输出超时必须是正整数毫秒。';
+      return '首输出超时必须是 1 到 120000 毫秒的整数。';
     if (
       route.outputIdleTimeoutMs !== undefined &&
-      (!Number.isInteger(route.outputIdleTimeoutMs) || route.outputIdleTimeoutMs <= 0)
+      (!Number.isInteger(route.outputIdleTimeoutMs) ||
+        route.outputIdleTimeoutMs <= 0 ||
+        route.outputIdleTimeoutMs > 120_000)
     )
-      return '输出空闲超时必须是正整数毫秒。';
-    if (route.capabilityDeclaration) {
-      if (!route.capabilityDeclaration.sourceRef || !route.capabilityDeclaration.sourceVersion)
-        return '能力声明必须填写来源引用和来源版本。';
-      if (
-        route.capabilityDeclaration.source === 'manual' &&
-        !route.capabilityDeclaration.declaredBy
-      )
-        return '人工能力声明必须填写声明者。';
-    }
-    if (route.freeEvidence && (!route.freeEvidence.sourceRef || !route.freeEvidence.sourceVersion))
-      return '免费依据必须填写来源引用和来源版本。';
+      return '输出空闲超时必须是 1 到 120000 毫秒的整数。';
   }
   if (!Number.isInteger(input.priority) || input.priority < 0) return '优先级必须是非负整数。';
-  if (input.timeoutMs !== undefined && (!Number.isInteger(input.timeoutMs) || input.timeoutMs <= 0))
-    return '超时必须是正整数毫秒。';
+  if (
+    input.timeoutMs !== undefined &&
+    (!Number.isInteger(input.timeoutMs) || input.timeoutMs <= 0 || input.timeoutMs > 120_000)
+  )
+    return '超时必须是 1 到 120000 毫秒的整数。';
+  if (
+    input.firstOutputTimeoutMs !== undefined &&
+    (!Number.isInteger(input.firstOutputTimeoutMs) ||
+      input.firstOutputTimeoutMs <= 0 ||
+      input.firstOutputTimeoutMs > 120_000)
+  )
+    return '首输出默认超时必须是 1 到 120000 毫秒的整数。';
+  if (
+    input.outputIdleTimeoutMs !== undefined &&
+    (!Number.isInteger(input.outputIdleTimeoutMs) ||
+      input.outputIdleTimeoutMs <= 0 ||
+      input.outputIdleTimeoutMs > 120_000)
+  )
+    return '输出空闲默认超时必须是 1 到 120000 毫秒的整数。';
   if (input.costPer1kInput !== undefined && input.costPer1kInput < 0) return '输入费用不能为负数。';
   if (input.costPer1kOutput !== undefined && input.costPer1kOutput < 0)
     return '输出费用不能为负数。';
@@ -257,17 +417,29 @@ export const aiProviderDraftError = (input: AiProviderInput) => {
 export const requestAiProviderDeletion = async (
   provider: ProviderRecord,
   confirm: (options: ConfirmDialogOptions) => Promise<boolean>,
-  remove: (name: string) => Promise<unknown>,
+  remove: (
+    name: string,
+    expectedRevision?: string,
+    lifecycle?: { clearResearchDefault?: boolean; expectedSettingsRevision?: string },
+  ) => Promise<unknown>,
+  lifecycle?: { clearResearchDefault?: boolean; expectedSettingsRevision?: string },
 ) => {
   if (provider.source === 'environment') return false;
   const confirmed = await confirm({
     title: `删除 ${provider.name}？`,
-    description: '删除后该 Provider 不再参与后续 AI 请求；同名部署配置可能重新出现。',
+    description:
+      lifecycle?.clearResearchDefault === true
+        ? '该 Provider 是研究默认模型；确认后会在同一事务清除默认引用并删除 Provider。'
+        : '删除后该 Provider 不再参与后续 AI 请求；同名部署配置可能重新出现。',
     confirmLabel: '删除 Provider',
     cancelLabel: '取消',
     variant: 'destructive',
   });
   if (!confirmed) return false;
-  await remove(provider.name);
+  if (provider.updatedAt) {
+    if (lifecycle) await remove(provider.name, provider.updatedAt, lifecycle);
+    else await remove(provider.name, provider.updatedAt);
+  } else if (lifecycle) await remove(provider.name, undefined, lifecycle);
+  else await remove(provider.name);
   return true;
 };

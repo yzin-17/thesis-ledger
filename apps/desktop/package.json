@@ -25,6 +25,7 @@
     "@thesis-ledger/schemas": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cn": "^0.3.0",
     "es-toolkit": "^1.51.0",
     "lightweight-charts": "^5.2.1",
     "lucide-react": "^1.28.0",

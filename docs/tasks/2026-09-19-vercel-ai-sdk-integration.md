@@ -5,6 +5,8 @@
 > 对应 Spec：[AI 接入层迁移至 Vercel AI SDK](../specs/2026-09-19-vercel-ai-sdk-integration.md)
 > 状态：实施中；T0–T13、G0、G0.1 与 G2 已完成，T13 的统一流程待浏览器/目标运行态重新验收，G1 因真实上游连续限流阻塞。
 
+2026-09-21 范围修订：执行路由能力声明配置已移交至[移除 AI 执行路由能力声明任务](2026-09-21-remove-ai-capability-declaration.md)，上游服务限制配置已移交至[移除 AI 执行路由上游服务限制任务](2026-09-21-remove-ai-upstream-restriction.md)，费用依据与授权已移交至[移除 AI 执行路由免费依据任务](2026-09-21-remove-ai-free-evidence.md)实施；本任务中相关旧运行态证据保留为历史事实，不作为新的配置门槛。
+
 ## 1. 执行边界
 
 - 2026-09-19 已完成 T0–T11 与原 G0。2026-09-20 用户要求先完成方案，先只修订 Spec/Task，不修改源码、依赖、容器或外部配置；随后在确认统一流程后进入 T13 实施。T12 完成前，原 adapter/UI 实现不满足新增 AC41–AC46；原 G0 仅保留为旧输入的历史证据，不能证明纠偏后的运行态。
@@ -35,7 +37,7 @@
   - 范围：ai/contracts.ts、所属业务生成 Schema、共享 API 类型及 api-client；SDK 类型只留在接入模块。
   - 交付与完成条件：三类版本化生成契约、错误/计量、声明/就绪、冻结研究策略、请求/结算修订、读模型、再次生成确认字段都有唯一所有者和共享样例。精简 discovery 与白名单归一化遵守 Spec §7。
   - 验证方式：Schema、序列化与兼容投影测试，包含 null/partial/legacy_unknown、估算/币种、固定字段拒绝、引用补全边界；禁止客户端预算覆盖或伪造 ready。
-  - 实现状态：已完成。`packages/schemas/src/ai-execution.ts` 统一拥有三类生成契约版本、项目错误分类、结果确定性、Token/费用完整性、请求生命周期、计量/结算修订、研究冻结策略、能力声明、本地 adapter 证据、接入就绪、真实验收、执行/汇总读模型与再次生成预填；SDK 类型未进入共享包。api-client 只复用并导出项目自有类型。
+  - 实现状态：已完成。`packages/schemas/src/ai-execution.ts` 统一拥有三类生成契约版本、项目错误分类、结果确定性、Token/费用完整性、请求生命周期、计量/结算修订、研究冻结策略、本地 adapter 证据、接入就绪、真实验收、执行/汇总读模型与再次生成预填；SDK 类型未进入共享包。api-client 只复用并导出项目自有类型。
   - 业务契约：参数优化继续复用严格 changes 契约；discovery 新增只允许 `name/description/series/entry/exit/sizing/risk` 的精简生成 DTO，固定标的、周期、执行、成本及 SignalSource ID 不可由模型提交；研究生成 DTO 不允许模型提交 Provider、context、版本或审计时间，只允许通过 toolCallId/sourceId 进入后续确定性引用补全。冻结 seed 的交易成本来源及零成本假设另有读模型。
   - 安全与兼容：研究默认策略固定为 300 秒、2 次、100000/20000 Token、`maxCost: "0"`；付费策略必须同时具备正金额、币种和 Provider/模型范围。Token 用 `reported/partial/unknown` 与 nullable 值表达，历史读模型另有 `legacy_unknown`；费用区分 known/estimated/unknown 和币种/来源。客户端研究创建 Schema 仍严格拒绝预算及 `ready` 字段；再次生成确认字段已进入共享契约，但强制来源状态与访问权校验留给 T8，未提前破坏现有入口。
   - 定向验证：通过；共享契约 28 项定向测试覆盖 null/partial/legacy_unknown、估算/币种、请求修订连续性、发送授权、默认/付费策略、声明/就绪/真实验收分层、固定字段拒绝、引用边界、再次生成预填与客户端伪造；`strategy-optimization-discovery.test.ts` 7 项通过，包含 `benchmark:null` 白名单归一化。`@thesis-ledger/schemas` 全量 22 文件/207 项通过并完成 typecheck/build；api-client 18 项、typecheck/build 与 Server build 通过。
@@ -61,20 +63,20 @@
   - 验证方式：SDK mock 加本地 HTTP/SSE 经过真实 adapter 包；断言请求形态/次数、推理进度/心跳、尾帧、HTTP 200 error、EOF、拒绝、截断、坏 Schema、未知计量与脱敏。
   - 实现状态：已完成。AI 模块新增 `AiSdkGenerationAdapter`，只暴露项目自有请求、结果与错误类型；按配置选择锁定版本的 OpenRouter 或 OpenAI-compatible adapter，显式区分 `native_schema` 与 `json_validated`，并统一关闭 SDK 遥测输入/输出记录、SDK 重试和流重试。单请求在完整结果返回后校验结束原因与 Schema；流请求完整消费 reasoning/text/error/abort 和最终 output、usage、响应元数据，未从 SSE 注释伪造业务心跳。
   - 生命周期与事实：组合调用方取消信号与 SDK 的 total/first-chunk/chunk timeout；`length`、拒绝、HTTP 错误、HTTP 200 error、提前 EOF 和取消均进入项目错误分类。兼容 adapter 自定义 usage 转换，保留缺失 token 为 null/partial 而不是 SDK 默认的 0；失败后已观察到的 usage 继续随错误返回。错误摘要裁剪并脱敏 Authorization/API key，OpenRouter 的 Provider cost 只在实际元数据存在时记录。
-  - 定向验证：SDK boundary mock 1/1 与真实 adapter 的本地 HTTP/SSE 13/13 通过；覆盖两种请求形态、OpenRouter reasoning、`provider.require_parameters=true` 与允许上游参数、请求次数为 1、完整流和 usage-only 尾帧、reasoning 进度、SSE 注释、三类 timeout、调用方取消、HTTP 401 脱敏、HTTP 200 error、EOF、拒绝、截断、坏 Schema、失败计量、部分/未知 usage 和不支持能力的请求前拒绝。定向 ESLint 与 Server build 通过。
+  - 定向验证：SDK boundary mock 1/1 与真实 adapter 的本地 HTTP/SSE 13/13 通过；覆盖两种请求形态、OpenRouter reasoning、`provider.require_parameters=true` 与兼容参数白名单、请求次数为 1、完整流和 usage-only 尾帧、reasoning 进度、SSE 注释、三类 timeout、调用方取消、HTTP 401 脱敏、HTTP 200 error、EOF、拒绝、截断、坏 Schema、失败计量、部分/未知 usage 和不支持能力的请求前拒绝。定向 ESLint 与 Server build 通过。
   - 包级与门禁：Server 全量 116 个文件/733 项测试通过，12 个需显式环境的集成文件共 40 项保持跳过；import boundaries、workspace dependency graph、文件尺寸 ratchet 与 `git diff --check` 通过。文件尺寸入口仅报告 13 个既有超阈值 warning。该证据不等于 Provider 接入就绪、真实 Provider 验收或业务链路切换；这些分别留给 T4、G1 与 T5/T6。
 
 - [x] T4：建立配置、接入就绪与能力撤销门禁。
   - 覆盖验收：AC15、AC19、AC20、AC24、AC28、AC34、AC35。
   - 依赖：T1、T3。
   - 范围：AiProviderService、Registry、AI 专用配置/连接测试 API 和环境读取；不修改 DSA Provider 系统。
-  - 交付与完成条件：就绪由声明、发布版本本地契约证据及配置指纹计算；未就绪阻断，人工声明与真实验收分离。免费需依据，付费需授权；明确失配仅撤销受影响组合。热更新不替换在途参数，撤销阻断下一次发送。
-  - 验证方式：API/registry/HTTP 测试：伪造 ready、指纹变化、旧配置、代理、免费证据、health=down 排除、混合就绪模型；连接测试不得隐式再生成或授予 Schema 能力，就绪检查不发真实请求。
-  - 实现状态：已完成。AI Provider 配置新增显式 `adapter` 与按模型/模式/生成契约保存的 `executionRoutes`，包含能力声明、允许上游、超时覆盖和结构化免费依据；数据库 JSON 与 `AI_PROVIDER_CONFIGS_JSON` 复用同一输入结构。旧配置只对 `openrouter.ai` 子域和 `api.openai.com` 做严格主机推导，自建代理必须显式选 adapter。管理输入为 strict Schema，不接受 `ready`、adapter 契约证据或真实验收结果。
-  - 就绪与证据：服务端用精确锁定的 `ai@7.0.95`、OpenRouter adapter `3.0.0`、OpenAI-compatible adapter `3.0.45` 生成受控发布证据，并按 Provider、端点、凭证指纹、adapter、模型、模式、契约、声明、允许上游、超时与免费依据计算配置指纹。Registry 的 `strictReady` 在发送前重新检查启用、health、路由、声明、发布证据、免费证据或业务付费授权及撤销；管理 API 只返回计算结果，凭证指纹不进入公开快照。人工声明、`liveValidation:not_run` 与运行健康保持分层。
+  - 交付与完成条件：就绪由发布版本本地契约证据及配置指纹计算；未就绪阻断，接入就绪与真实验收分离。零费率路由可直接通过零费用策略，正费用需显式预算授权；明确失配仅撤销受影响组合。热更新不替换在途参数，撤销阻断下一次发送。
+  - 验证方式：API/registry/HTTP 测试：伪造 ready、指纹变化、旧配置、代理、用户费用、health=down 排除、混合就绪模型；连接测试不得隐式再生成或授予 Schema 能力，就绪检查不发真实请求。
+  - 实现状态：已完成。AI Provider 配置新增显式 `adapter` 与按模型/模式/生成契约保存的 `executionRoutes`，包含超时覆盖；费用单价、币种和定价版本由 Provider 配置统一提供。数据库 JSON 与 `AI_PROVIDER_CONFIGS_JSON` 复用同一输入结构。旧配置只对 `openrouter.ai` 子域和 `api.openai.com` 做严格主机推导，自建代理必须显式选 adapter。管理输入为 strict Schema，不接受 `ready`、adapter 契约证据或真实验收结果。
+  - 就绪与证据：服务端用精确锁定的 `ai@7.0.95`、OpenRouter adapter `3.0.0`、OpenAI-compatible adapter `3.0.45` 生成受控发布证据，并按 Provider、端点、凭证指纹、adapter、模型、模式、契约、超时、用户费用和定价版本计算配置指纹。Registry 的 `strictReady` 在发送前重新检查启用、health、路由、发布证据、零费率或业务付费授权及撤销；管理 API 只返回计算结果，凭证指纹不进入公开摘要。接入就绪、`liveValidation:not_run` 与运行健康保持分层。
   - 撤销与热更新：明确能力失配通过数据库配置 JSON 持久化到当前配置指纹，只阻断匹配的模型、模式和契约；重复撤销幂等。已返回的在途执行快照不被 Registry 热更新改写，下一次领取使用新快照；端点或凭证等配置变化产生新指纹，旧撤销不污染更正后的组合。设置归一化、路由快照、撤销持久化与运行 Provider 装配已从既有 `AiProviderService` 提取，主服务保持 600 行阈值以内。
   - 连接测试：探针固定为单次请求；对必须推理的模型预先给出安全输出预算，reasoning-only、空内容或非法对象直接失败，不再隐式发出第二或第三次生成。连接成功/失败只更新健康事实，不授予结构化能力、免费资格、adapter 证据或真实业务验收；就绪读取本身不发网络请求。
-  - 验证证据：T4 定向 36 项通过，覆盖伪造 ready/证据、锁定版本一致性、配置指纹、旧配置严格推导、自建代理、允许上游、免费/付费、health=down、混合模型、环境配置、单请求连接测试、无能力授予、热更新、定点撤销、API 只读计算及敏感指纹裁剪。共享 Schema 全量 22 文件/207 项通过；Server 全量 117 个文件/746 项通过，12 个需显式环境的集成文件共 40 项保持跳过；Server build、定向 ESLint、import boundaries、workspace dependency graph、文件尺寸 ratchet 与 `git diff --check` 通过，文件尺寸仅保留 13 个既有 warning。T5/T6 尚未消费 `strictReady` 与撤销入口，真实 Provider 验收仍留给 G1。
+  - 验证证据：T4 定向 36 项通过，覆盖伪造 ready/证据、锁定版本一致性、配置指纹、旧配置严格推导、自建代理、用户费用、health=down、混合模型、环境配置、单请求连接测试、无能力授予、热更新、定点撤销、API 只读计算及敏感指纹裁剪。共享 Schema 全量 22 文件/207 项通过；Server 全量 117 个文件/746 项通过，12 个需显式环境的集成文件共 40 项保持跳过；Server build、定向 ESLint、import boundaries、workspace dependency graph、文件尺寸 ratchet 与 `git diff --check` 通过，文件尺寸仅保留 13 个既有 warning。T5/T6 尚未消费 `strictReady` 与撤销入口，真实 Provider 验收仍留给 G1。
 
 - [x] T5：完成参数优化与探索的本地纵向闭环。
   - 覆盖验收：AC01、AC11–AC16、AC19、AC21–AC23、AC27、AC31、AC32、AC36、AC38。
@@ -83,9 +85,9 @@
   - 交付与完成条件：两模式均贯通严格路由→完整接收→领域校验→结果/计量保存→查询。固定字段和成本取 seed 快照；series 可探索且引用合法。旧 proposal 按版本复用；超额候选可读但不继续回测或生成。
   - 验证方式：真实业务服务＋本地 Provider HTTP＋隔离 PostgreSQL；验证取消、保存失败、未知/失败重投、回测失败缓存与请求数。此验收不代表真实上游或原策略 G2 全流程通过。
   - 实现状态：候选编排已切换到 `strictReadyContract` 的单一 ready route，领取前冻结 adapter、模式、生成契约与配置指纹，领取后的热更不改写在途快照。参数优化保留严格 changes 契约；discovery 只让模型输出 `name/description/series/entry/exit/sizing/risk`，服务端从 seed 装配 `schemaVersion`、SignalSource ID/标的/周期、execution 与 cost，并拒绝越权字段、错误 source ID 及未声明 series。
-  - 事实与恢复：每次 SDK 请求经 `prepared → dispatching → completed/unknown`，Provider 返回的 Token/费用与合法结果在同一事务中结算；免费路由只接受结构化 `freeEvidenceRef`。传输结果未知、保存失败或旧 Worker 失去执行权均不会自动重放 Provider；完整缓存仅在同契约/同配置指纹且 Schema 合法时复用，并保留 `budget_exceeded/cost_unknown` 阻断事实。超额时先保存结果与计量，然后直接停止候选创建、回测和后续生成。
+  - 事实与恢复：每次 SDK 请求经 `prepared → dispatching → completed/unknown`，Provider 返回的 Token/费用与合法结果在同一事务中结算；当前使用 Provider 用户费率生成明确标记的估算成本，未知费用仍阻断需要费用事实的后续流程。传输结果未知、保存失败或旧 Worker 失去执行权均不会自动重放 Provider；完整缓存仅在同契约/同配置指纹且 Schema 合法时复用，并保留 `budget_exceeded/cost_unknown` 阻断事实。超额时先保存结果与计量，然后直接停止候选创建、回测和后续生成。
   - SDK 兼容修正：本地业务纵向发现 AI SDK v7 不接受 `messages` 中的 `system` 角色，共享 adapter 已将其稳定映射到 `instructions`，其他消息保持原顺序；回归证明 OpenAI-compatible 请求仍仅发送一次。
-  - 定向与隔离验收：本地 HTTP/SSE 与领域定向 31 项通过，覆盖两种模式、精简装配、单请求、非法输出、传输未知、保存失败、缓存指纹和超额下游阻断。专用 `thesis_ledger_t05` 隔离 PostgreSQL 按顺序应用当前 13 条 migration 后 10 项通过：其中业务纵向 2 项真实经 Registry、SDK adapter、本地 HTTP、候选服务、事实 Store 与 PostgreSQL，验证参数/discovery 持久化、回测失败后缓存零新请求、配置变更拒绝旧缓存和取消后零新请求；事实库 8 项覆盖超额先保存、免费依据、币种不一致、冲突修订回滚、旧领取与授权后崩溃。
+  - 定向与隔离验收：本地 HTTP/SSE 与领域定向 31 项通过，覆盖两种模式、精简装配、单请求、非法输出、传输未知、保存失败、缓存指纹和超额下游阻断。专用 `thesis_ledger_t05` 隔离 PostgreSQL 按顺序应用当前 13 条 migration 后 10 项通过：其中业务纵向 2 项真实经 Registry、SDK adapter、本地 HTTP、候选服务、事实 Store 与 PostgreSQL，验证参数/discovery 持久化、回测失败后缓存零新请求、配置变更拒绝旧缓存和取消后零新请求；事实库 8 项覆盖超额先保存、费用授权、币种不一致、冲突修订回滚、旧领取与授权后崩溃。
   - 包级与门禁：Server 全量 120 个文件/758 项测试通过，13 个需显式环境的集成文件共 43 项在普通全量入口保持跳过；Server build、定向 ESLint、import boundaries、workspace dependency graph、文件尺寸 ratchet 与 `git diff --check` 通过。候选服务拆出 Prompt 和 SDK 缓存职责后降至 598 行，策略编排服务保持在本轮前的 933 行；文件尺寸入口仅保留 12 个存量 warning。真实上游 Provider 与原策略全流程仍留给 G1/G2，本项不越界声称通过。
 
 - [x] T6：完成研究任务执行策略、生成与安全恢复。
@@ -127,9 +129,9 @@
   - 覆盖验收：AC20、AC24、AC34、AC35。
   - 依赖：T4。
   - 范围：既有 Provider 编辑器/列表，复用 shadcn/ui、原子类与 TanStack Query。
-  - 交付与完成条件：可设置 adapter/模型模式、声明来源及相关参数/免费依据；明确就绪阻断与恢复入口。允许保存未就绪配置；连接健康、接入就绪、真实验收独立回显，中文标签一致。
+  - 交付与完成条件：可设置 adapter、模型模式、生成契约、超时和 Provider 费用；明确就绪阻断与恢复入口。允许保存未就绪配置；连接健康、接入就绪、真实验收独立回显，中文标签一致。
   - 验证方式：组件/API 交互回归；实施前按 shadcn skill 核对已安装组件和文档。真实就绪阻断由 T4/G2 验证，不以截图代替。
-  - 实现状态：已完成。既有 Provider 编辑器可维护 adapter、执行模型、`json_validated`/`native_schema` 模式、契约版本、声明来源/引用/版本/声明人、首包与空闲超时、允许的上游及免费依据；服务端摘要同时返回配置声明和实际评估结果，因此未就绪配置可以保存而不会被伪装成可执行路由。
+  - 实现状态：已完成。既有 Provider 编辑器可维护 adapter、执行模型、`json_validated`/`native_schema` 模式、契约版本、首包与空闲超时及 Provider 费用；服务端摘要同时返回配置和实际评估结果，因此未就绪配置可以保存而不会被伪装成可执行路由。
   - 状态回显：列表独立显示连接健康、接入就绪和真实验收，阻断原因、恢复入口及枚举标签统一使用中文；凭证仍保持只写，不进入摘要、测试或 UI 回显。
   - 验证证据与边界：Provider API、输入往返、未就绪保存及三类状态独立回显已包含在 Server 773 项和 Desktop 442 项通过证据中；已复用项目现有 shadcn/ui 组件与原子类。真实 Provider 就绪及目标浏览器行为仍由 G1/G2 验收。
 
@@ -230,17 +232,17 @@ T1 的契约与共享样例通过后才是下游契约就绪点；消费者不�
   - 证据与放行：记录源码、依赖、配置、镜像与容器指纹、显式上游格式/Chat 实现、实际 Provider、请求 URL/次数、迁移结果、三类验证状态及任务/预算事实。原 G0 证据只证明 T12 之前的输入，不能替代本门禁。
   - 2026-09-20 更新证据：在研究与策略优化停领开关均为 `false` 的条件下，使用相邻 infra 的 `AI_RESEARCH_EXECUTION_ENABLED=false STRATEGY_AI_OPTIMIZATION_ENABLED=false ./scripts/update.sh thesis-ledger` 完整构建并更新一次，没有使用 `sync-code.sh`、直接 Compose 或 `docker cp`。受限环境中的首次构建在 Buildx 活动文件写入前因权限拒绝退出，未改变容器；同一标准入口获准后成功完成。目标镜像摘要为 `sha256:fad589088df3ffd87fb4a6aaffead57b74b58037d75339226d235d95d2a3c8b1`，Server 容器为 `6af81bee34de43f67f17184c0110ed62728ccc37b4a18b28e257e80eebcea84e`；Server、backtest-worker、PostgreSQL、Redis 与 DSA 均 healthy，健康 API 报告版本 `0.1.0`、Schema `20260918153000_strategy_optimization_adoption_context`。容器内实际版本为 `ai@7.0.107`、`@ai-sdk/openai-compatible@3.0.53`、`@ai-sdk/openai@4.0.71`、`@ai-sdk/anthropic@4.0.58`，OpenRouter 专用包不存在。
   - 兼容读取与显式选择：目标 API 将存量数据库 OpenRouter 配置读取为 `upstreamFormat=chat-completions`、`chatImplementation=compatible`，三条路由均解析为 `openai-compatible-chat` 并保留只读 `openrouter-v1`。目标镜像内纯解析器证明同一 base URL 的通用兼容与 OpenAI 原生分别选择 `openai-compatible-chat`、`openai-chat`，同一通用兼容配置更换两个不同 base URL 后实现仍保持 `openai-compatible-chat`，地址不参与 Provider 选择。
-  - 受控出站与阻断：目标容器连接同一受控本地端点，通用 Chat、OpenAI Chat、Responses、Anthropic Messages 分别命中 `/v1/chat/completions`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages`，四条路径各 1 次并取得合法结构化结果及 reported usage；前三者使用 Bearer，Anthropic 使用 `x-api-key` 与 `anthropic-version`。旧 `openrouter-v1` 路径把 `reasoning_effort=high`、`provider.require_parameters=true` 和单一允许上游等价写入；无扩展标记的新兼容连接即使名称类似 OpenRouter 也不携带 `provider` 字段；旧 `max` 推理强度以 `capability_unsupported/preflight/not_sent` 阻断，总请求数仍为 6。缺少能力声明的路由经 `strictReady` 以 `capability_declaration_missing` 阻断。
+  - 受控出站与阻断：目标容器连接同一受控本地端点，通用 Chat、OpenAI Chat、Responses、Anthropic Messages 分别命中 `/v1/chat/completions`、`/v1/chat/completions`、`/v1/responses`、`/v1/messages`，四条路径各 1 次并取得合法结构化结果及 reported usage；前三者使用 Bearer，Anthropic 使用 `x-api-key` 与 `anthropic-version`。旧 `openrouter-v1` 路径把 `reasoning_effort=high` 和 `provider.require_parameters=true` 等价写入；无扩展标记的新兼容连接即使名称类似 OpenRouter 也不携带 `provider` 字段；旧 `max` 推理强度以 `capability_unsupported/preflight/not_sent` 阻断，总请求数仍为 6。能力声明缺失阻断属于本次修订前的历史运行态证据，不再作为当前 `strictReady` 门禁。
   - 分层与回滚：目标公开摘要同时保留连接健康 `healthy`、本地接入就绪 `ready` 与真实业务验收 `not_run`，没有相互冒充。回滚 CLI 实际读取 19 个 AiRun，其中新 SDK 事实 7 个、legacy 事实 12 个；当前目标库存在 1 条未结算 SDK 请求和 1 个活动优化 attempt，因此正确返回 `keep_tasks_disabled`，并继续保护 8 个 unknown run 与 7 个 unknown attempt。该结果证明新旧事实可读和防重放门禁生效，不将真实在途/未知事实删除为“通过”；两个执行开关继续保持关闭。受控 fixture 已停止，未保存临时 Provider 配置，也未改变真实请求账本或预算。
 
 - [ ] G1：三类真实免费模型验收。
   - 覆盖验收：AC01、AC19、AC25、AC28、AC36、AC40 的真实接入断言。
-  - 依赖：G0.1；正式路由满足接入就绪、免费依据、允许列表与凭证前提。历史 6/10 请求账本保持原记录，不因 T12 重新开始或扩充预算。
+  - 依赖：G0.1；正式路由满足接入就绪、Provider 用户费用或显式预算授权与凭证前提。历史 6/10 请求账本保持原记录，不因 T12 重新开始或扩充预算。
   - 责任与入口：Provider 业务集成；参数优化、discovery、研究助手各使用业务等价完整提示词，分别取得一个可追溯合法结果。
   - 预算与停止：总费用零，三类共用不超过 10 次生成的账本，探针/手动连接测试/fallback 均计入。额度耗尽或同类外部错误连续 3 次立即停止，不切付费、不另起账本。就绪检查本身不需要额外真实探针。
   - 证据与放行：逐次记录业务/request ID、源码/SDK/配置/Schema 版本、请求/实际模型、首输出/总耗时、完整率、Schema 合法率、错误分布、用量/费用未知占比及每个合法结果的请求数。三类分别记录；外部阻塞保持未通过，少量样本不证明长期 SLA 或整个回测闭环。
-  - 执行结果（2026-09-20）：外部阻塞，保持未通过。使用 OpenRouter 官方模型目录 `catalog-fetched-2026-09-20T07:25:44.730Z` 作为免费与能力依据，参数优化、discovery、research 三条合同路由在发起前均为 `ready`；配置指纹分别为 `ed2177a5…`、`2a1f752e…`、`f0503f69…`。目标运行态通过标准 `./scripts/update.sh thesis-ledger` 更新，研究/优化执行开关为 `true`、fixture 为 `false`，镜像摘要为 `sha256:6063993e5e9300c756c70fdc582ffd32d62973d977fa7bf6ea079b177c578401`。
-  - 运行前缺陷与修复：首个参数优化实验 `76688267-5b80-4c51-ac83-c313ff07c5e9` 在 Provider 发送前因完整免费证据 URL 超过 `AiCostFacts.source` 的 120 字符上限而失败，`requests=[]`，不计入真实生成账本。优化执行路径已与研究路径一致地截断 `free_evidence:` 来源，并增加超长引用、`maxCost=0`、单请求回归。`rtk pnpm --filter @thesis-ledger/server test -- strategy-optimization-sdk-executor.integration.test.ts` 实际运行 Server 全套，124 个文件、768 项通过，15 个文件共49 项按环境跳过；`rtk pnpm --filter @thesis-ledger/server build` 通过。
+  - 执行结果（2026-09-20，免费依据移除前的历史配置语义）：外部阻塞，保持未通过。使用 OpenRouter 官方模型目录 `catalog-fetched-2026-09-20T07:25:44.730Z` 作为当时的免费与能力依据，参数优化、discovery、research 三条合同路由在发起前均为 `ready`；配置指纹分别为 `ed2177a5…`、`2a1f752e…`、`f0503f69…`。目标运行态通过标准 `./scripts/update.sh thesis-ledger` 更新，研究/优化执行开关为 `true`、fixture 为 `false`，镜像摘要为 `sha256:6063993e5e9300c756c70fdc582ffd32d62973d977fa7bf6ea079b177c578401`。
+  - 运行前缺陷与修复（历史配置语义）：首个参数优化实验 `76688267-5b80-4c51-ac83-c313ff07c5e9` 在 Provider 发送前因完整免费证据 URL 超过 `AiCostFacts.source` 的 120 字符上限而失败，`requests=[]`，不计入真实生成账本。该历史执行路径曾截断 `free_evidence:` 来源并增加超长引用、`maxCost=0`、单请求回归；当前实现已由用户费率估算成本替代。`rtk pnpm --filter @thesis-ledger/server test -- strategy-optimization-sdk-executor.integration.test.ts` 实际运行 Server 全套，124 个文件、768 项通过，15 个文件共49 项按环境跳过；`rtk pnpm --filter @thesis-ledger/server build` 通过。
   - 真实请求账本：共 6/10 次，全部属于参数优化完整业务提示词，每个实验 `maxAiCalls=1`、`maxCost=0`，没有连接测试、隐藏重试或付费 fallback。依次为：
 
     | # | 业务实验 / request ID | 请求模型 | 结果 | 总耗时 | 用量 / 费用事实 |
@@ -296,7 +298,7 @@ AC01–AC29 保留初稿稳定编号，AC30–AC40 对应第一轮新增决策�
 | AC31 超额事实 | T2、T5、T6、T7、T10 | 事务/结果可读/调度停止；G0、G2 |
 | AC32 未知后的门禁 | T2、T5、T6、T7、T10 | 有余额/不足/不可核算费用 |
 | AC33 估算/历史/币种 | T1、T2、T7、T10 | 差额对账/汇总；G2 |
-| AC34 声明与就绪 | T1、T4、T9、T12.1 | 发布证据、人工声明、伪造拒绝；G0.1、G2 |
+| AC34 adapter 证据与就绪 | T1、T4、T9、T12.1 | 发布证据、伪造拒绝；G0.1、G2 |
 | AC35 两种生成模式 | T1、T3、T4、T9、T12.1、T12.2 | 两模式请求/校验；G0.1、G2 配置 |
 | AC36 精简探索 | T1、T5、T7、T10 | seed/series/固定字段/旧结果；G1、G2 |
 | AC37 再次生成 | T1、T8 | API/表单/提交竞态；G2 |

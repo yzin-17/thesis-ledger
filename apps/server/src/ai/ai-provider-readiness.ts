@@ -13,7 +13,6 @@ import type {
   AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
 import {
-  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
   resolveAiSdkProviderImplementation,
   type AiCompatibilityExtensionProfile,
 } from './ai-provider-upstream.js';
@@ -37,11 +36,57 @@ export type AiProviderRouteSnapshot = {
   adapter: AiAdapter | null;
   models: readonly string[];
   route: AiProviderExecutionRouteInput;
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
+  costPer1kInput?: number;
+  costPer1kOutput?: number;
+  costCurrency?: string;
+  pricingVersion?: string;
   enabled: boolean;
   health: string;
   credentialFingerprint: string | null;
   revocations: readonly AiProviderCapabilityRevocation[];
 };
+
+export const DEFAULT_AI_FIRST_OUTPUT_TIMEOUT_MS = 30_000;
+export const DEFAULT_AI_OUTPUT_IDLE_TIMEOUT_MS = 30_000;
+
+export type AiRouteTimeoutResolution = {
+  firstOutputTimeoutMs: number;
+  outputIdleTimeoutMs: number;
+  firstOutputTimeoutSource: 'route' | 'provider' | 'system';
+  outputIdleTimeoutSource: 'route' | 'provider' | 'system';
+};
+
+const timeoutSource = (
+  routeValue: number | undefined,
+  providerValue: number | undefined,
+): 'route' | 'provider' | 'system' => {
+  if (routeValue !== undefined) return 'route';
+  if (providerValue !== undefined) return 'provider';
+  return 'system';
+};
+
+export const resolveAiRouteTimeouts = (
+  snapshot: Pick<AiProviderRouteSnapshot, 'route' | 'firstOutputTimeoutMs' | 'outputIdleTimeoutMs'>,
+): AiRouteTimeoutResolution => ({
+  firstOutputTimeoutMs:
+    snapshot.route.firstOutputTimeoutMs ??
+    snapshot.firstOutputTimeoutMs ??
+    DEFAULT_AI_FIRST_OUTPUT_TIMEOUT_MS,
+  outputIdleTimeoutMs:
+    snapshot.route.outputIdleTimeoutMs ??
+    snapshot.outputIdleTimeoutMs ??
+    DEFAULT_AI_OUTPUT_IDLE_TIMEOUT_MS,
+  firstOutputTimeoutSource: timeoutSource(
+    snapshot.route.firstOutputTimeoutMs,
+    snapshot.firstOutputTimeoutMs,
+  ),
+  outputIdleTimeoutSource: timeoutSource(
+    snapshot.route.outputIdleTimeoutMs,
+    snapshot.outputIdleTimeoutMs,
+  ),
+});
 
 export type AiProviderReadinessRequest = {
   budgetAuthorized: boolean;
@@ -85,27 +130,13 @@ const adapterEvidence = (adapter: AiAdapter | null, route: AiProviderExecutionRo
   };
 };
 
-const routeAllowed = (snapshot: AiProviderRouteSnapshot, baseUrl: string | null) => {
-  if (snapshot.route.allowedUpstreams.length === 0) return true;
-  if (snapshot.compatibilityExtensionProfile === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1)
-    return true;
-  if (!baseUrl) return false;
-  const endpoint = new URL(baseUrl);
-  return snapshot.route.allowedUpstreams.some((allowed) => {
-    try {
-      const candidate = new URL(allowed);
-      return candidate.origin === endpoint.origin;
-    } catch {
-      return allowed.toLowerCase() === endpoint.hostname.toLowerCase();
-    }
-  });
-};
+const hasValidCurrency = (currency: string | undefined) =>
+  typeof currency === 'string' && /^[A-Z]{3}$/u.test(currency.trim().toUpperCase());
 
-const freeEvidenceRef = (route: AiProviderExecutionRouteInput) => {
-  const evidence = route.freeEvidence;
-  if (!evidence) return null;
-  return `${evidence.source}:${evidence.sourceRef}@${evidence.sourceVersion}`;
-};
+export const hasUserConfiguredZeroCost = (snapshot: AiProviderRouteSnapshot) =>
+  snapshot.costPer1kInput === 0 &&
+  snapshot.costPer1kOutput === 0 &&
+  hasValidCurrency(snapshot.costCurrency);
 
 export const configurationFingerprint = (snapshot: AiProviderRouteSnapshot) =>
   fingerprint({
@@ -124,11 +155,10 @@ export const configurationFingerprint = (snapshot: AiProviderRouteSnapshot) =>
     model: snapshot.route.model,
     mode: snapshot.route.mode,
     contract: snapshot.route.contract,
-    declaration: snapshot.route.capabilityDeclaration,
-    allowedUpstreams: [...snapshot.route.allowedUpstreams].sort(),
     firstOutputTimeoutMs: snapshot.route.firstOutputTimeoutMs ?? null,
     outputIdleTimeoutMs: snapshot.route.outputIdleTimeoutMs ?? null,
-    freeEvidence: snapshot.route.freeEvidence,
+    providerFirstOutputTimeoutMs: snapshot.firstOutputTimeoutMs ?? null,
+    providerOutputIdleTimeoutMs: snapshot.outputIdleTimeoutMs ?? null,
     credentialFingerprint: snapshot.credentialFingerprint,
   });
 
@@ -150,10 +180,8 @@ export const evaluateAiProviderReadiness = (
     reasons.push('configuration_invalid');
   if (!snapshot.enabled) reasons.push('provider_disabled');
   if (snapshot.health === 'down') reasons.push('provider_down');
-  if (!snapshot.route.capabilityDeclaration) reasons.push('capability_declaration_missing');
   if (!evidence) reasons.push('adapter_contract_evidence_missing');
-  if (!routeAllowed(snapshot, baseUrl)) reasons.push('route_not_allowed');
-  if (!snapshot.route.freeEvidence && !request.budgetAuthorized)
+  if (!request.budgetAuthorized && !hasUserConfiguredZeroCost(snapshot))
     reasons.push('budget_not_authorized');
   if (
     snapshot.revocations.some(
@@ -168,6 +196,7 @@ export const evaluateAiProviderReadiness = (
     reasons.push('capability_revoked');
 
   const uniqueReasons = [...new Set(reasons)];
+  const timeouts = resolveAiRouteTimeouts(snapshot);
   return aiProviderModelExecutionSchema.parse({
     model: snapshot.route.model,
     adapter: snapshot.adapter ?? 'openai-compatible',
@@ -176,7 +205,6 @@ export const evaluateAiProviderReadiness = (
       : { compatibilityExtensionProfile: snapshot.compatibilityExtensionProfile }),
     mode: snapshot.route.mode,
     contract: snapshot.route.contract,
-    capabilityDeclaration: snapshot.route.capabilityDeclaration,
     adapterEvidence: evidence,
     readiness: {
       state: uniqueReasons.length === 0 ? 'ready' : 'blocked',
@@ -185,14 +213,10 @@ export const evaluateAiProviderReadiness = (
       evaluatedAt: evaluatedAt.toISOString(),
     },
     liveValidation: { status: 'not_run', checkedAt: null, requestId: null },
-    allowedUpstreams: snapshot.route.allowedUpstreams,
-    ...(snapshot.route.firstOutputTimeoutMs === undefined
-      ? {}
-      : { firstOutputTimeoutMs: snapshot.route.firstOutputTimeoutMs }),
-    ...(snapshot.route.outputIdleTimeoutMs === undefined
-      ? {}
-      : { outputIdleTimeoutMs: snapshot.route.outputIdleTimeoutMs }),
-    freeEvidenceRef: freeEvidenceRef(snapshot.route),
+    firstOutputTimeoutMs: timeouts.firstOutputTimeoutMs,
+    outputIdleTimeoutMs: timeouts.outputIdleTimeoutMs,
+    firstOutputTimeoutSource: timeouts.firstOutputTimeoutSource,
+    outputIdleTimeoutSource: timeouts.outputIdleTimeoutSource,
   });
 };
 

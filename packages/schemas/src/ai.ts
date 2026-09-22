@@ -84,6 +84,7 @@ export const aiResearchStartInputSchema = z
     context: aiResearchContextSchema,
     templateId: aiResearchTemplateIdSchema.optional(),
     retryOfRunId: z.uuid().optional(),
+    researchSettingsRevision: z.string().trim().min(1).max(120).optional(),
     retryConfirmation: z
       .object({
         contextConfirmed: z.literal(true),

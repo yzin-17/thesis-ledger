@@ -17,6 +17,7 @@ describe('AI Provider adapters', () => {
     expect(provider.sdkRuntime()).toEqual({
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: 'secret',
+      authMode: 'api_key',
       timeoutMs: 30_000,
     });
     expect(provider.metadata).toMatchObject({ adapter: 'openrouter' });

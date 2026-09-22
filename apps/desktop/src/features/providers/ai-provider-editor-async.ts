@@ -17,3 +17,22 @@ export const createLatestRequestGate = (): LatestRequestGate => {
     isCurrent: (requestSequence) => requestSequence === sequence,
   };
 };
+
+export type SingleFlightGate = {
+  tryBegin: () => boolean;
+  end: () => void;
+};
+
+export const createSingleFlightGate = (): SingleFlightGate => {
+  let active = false;
+  return {
+    tryBegin: () => {
+      if (active) return false;
+      active = true;
+      return true;
+    },
+    end: () => {
+      active = false;
+    },
+  };
+};

@@ -200,7 +200,9 @@ export function StrategyOptimizationModelSelector({
         </div>
       ) : null}
       {hasInvalidReasoningSelection ? (
-        <p className="text-sm text-destructive">所选模型的推理强度不可用，请按能力声明选择。</p>
+        <p className="text-sm text-destructive">
+          所选模型的推理强度不可用，请按 Provider 能力配置选择。
+        </p>
       ) : null}
     </div>
   );

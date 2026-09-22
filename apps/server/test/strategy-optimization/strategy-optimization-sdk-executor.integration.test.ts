@@ -109,18 +109,13 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     await once(server, 'close');
   });
 
-  const resolved = (
-    contract: { id: string; version: string },
-    freeEvidenceRef: string | null = null,
-  ) => ({
+  const resolved = (contract: { id: string; version: string }) => ({
     provider,
     execution: {
       adapter: 'openai-compatible',
       model: 'fixture-model',
       mode: 'json_validated',
       contract,
-      allowedUpstreams: [],
-      freeEvidenceRef,
       firstOutputTimeoutMs: 1_000,
       outputIdleTimeoutMs: 1_000,
       readiness: { state: 'ready', reasons: [], configurationFingerprint: 'fixture-fingerprint' },
@@ -192,10 +187,10 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     );
   });
 
-  it('免费证据引用超长时截断费用来源并仍只发一次请求', async () => {
+  it('使用 Provider 用户费率估算费用并仍只发一次请求', async () => {
     responseContent = JSON.stringify({
       changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
-      reason: '免费 Provider 参数候选',
+      reason: '用户费率 Provider 参数候选',
       evidenceRefs: [],
     });
     const input = common(
@@ -203,10 +198,10 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       {},
       { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
     );
-    input.resolved = resolved(
-      { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
-      `https://openrouter.ai/api/v1/models#${'free-model-segment-'.repeat(10)}`,
-    );
+    input.resolved = resolved({
+      id: 'parameter_optimization',
+      version: 'optimization-parameter-v1',
+    });
 
     await executor().completeProposal(input as never);
 
@@ -215,15 +210,61 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       expect.objectContaining({
         reservation: expect.objectContaining({
           cost: expect.objectContaining({
-            status: 'unknown',
-            amount: null,
-            source: expect.stringMatching(/^free_evidence:/u),
+            status: 'estimated',
+            amount: '0.003',
+            currency: 'USD',
+            source: 'frozen_provider_rates',
+            pricingVersion: 'fixture-v1',
           }),
         }),
       }),
     );
-    const prepared = executions.prepareRequest.mock.calls.at(-1)?.[0];
-    expect(prepared?.reservation.cost.source).toHaveLength(120);
+  });
+
+  it('策略步骤结算使用实验创建时冻结的模型价格版本', async () => {
+    responseContent = JSON.stringify({
+      changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
+      reason: '冻结费率 Provider 参数候选',
+      evidenceRefs: [],
+    });
+    const input = common(
+      {
+        sourceMode: 'existing',
+        modelConfig: [
+          {
+            provider: 'local-fixture',
+            model: 'fixture-model',
+            costStatus: 'known',
+            costPer1kInput: 0.1,
+            costPer1kOutput: 0.2,
+            costCurrency: 'USD',
+            pricingVersion: 'frozen-v2',
+          },
+        ],
+      },
+      {},
+      { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+    );
+
+    await executor().completeProposal(input as never);
+
+    expect(executions.prepareRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reservation: expect.objectContaining({
+          cost: expect.objectContaining({
+            pricingVersion: 'frozen-v2',
+            source: 'frozen_provider_rates',
+          }),
+        }),
+      }),
+    );
+    expect(settlements.completeAndSettle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        revision: expect.objectContaining({
+          cost: expect.objectContaining({ pricingVersion: 'frozen-v2' }),
+        }),
+      }),
+    );
   });
 
   it('discovery 由服务端装配 seed，非法引用保存用量后失败且不重试', async () => {

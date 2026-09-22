@@ -3,6 +3,7 @@ import {
   fetchAiCapabilities,
   fetchAiRun,
   fetchAiResearchRetryPrefill,
+  fetchAiRoutingSettings,
   fetchAiRuns,
   fetchAiToolCalls,
   type AiRunListFilter,
@@ -27,6 +28,7 @@ export const aiKeys = {
   run: (id: string) => [...aiKeys.root, 'run', id] as const,
   toolCalls: (id: string, cursor = '') => [...aiKeys.root, 'tool-calls', id, cursor] as const,
   capabilities: () => [...aiKeys.root, 'capabilities'] as const,
+  routingSettings: () => [...aiKeys.root, 'routing-settings'] as const,
   retryPrefill: (id: string) => [...aiKeys.root, 'retry-prefill', id] as const,
 };
 
@@ -99,6 +101,14 @@ export const useAiCapabilitiesQuery = (enabled = true) =>
     queryFn: () => fetchAiCapabilities(),
     enabled,
     staleTime: 30_000,
+  });
+
+export const useAiRoutingSettingsQuery = (enabled = true) =>
+  useQuery({
+    queryKey: aiKeys.routingSettings(),
+    queryFn: () => fetchAiRoutingSettings(),
+    enabled,
+    staleTime: 15_000,
   });
 
 export const useAiResearchRetryPrefillQuery = (id: string | undefined, enabled = true) =>

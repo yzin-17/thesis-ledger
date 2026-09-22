@@ -1,11 +1,15 @@
 import { createServer, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
-import { aiGenerationContracts, type AiExecutionSummary } from '@thesis-ledger/schemas';
+import {
+  aiGenerationContracts,
+  type AiExecutionSummary,
+  type AiResearchPolicyV1,
+} from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiResearchSdkExecution } from '../../src/ai/ai-research-sdk-execution.js';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 
-const policy = {
+const policy: AiResearchPolicyV1 = {
   version: 'research-policy-v1' as const,
   maxAiCalls: 2,
   maxInputTokens: 100_000,
@@ -16,10 +20,13 @@ const policy = {
   paidRoutes: [],
 };
 
-const summary = (deadlineAt = new Date(Date.now() + 60_000).toISOString()): AiExecutionSummary => ({
+const summary = (
+  frozenPolicy = policy,
+  deadlineAt = new Date(Date.now() + 60_000).toISOString(),
+): AiExecutionSummary => ({
   version: 'sdk-execution-v1',
   contract: aiGenerationContracts.research.ref,
-  frozenPolicy: policy,
+  frozenPolicy,
   deadlineAt,
   generationStatus: 'pending',
   usageCompleteness: 'unknown',
@@ -102,40 +109,42 @@ const stateStore = (initial: AiExecutionSummary) => {
     };
     return true;
   });
-  const completeAndSettle = vi.fn(async (input: {
-    requestId: string;
-    revision: AiExecutionSummary['requests'][number]['usageRevisions'][number];
-    outcome: AiExecutionSummary['requests'][number]['outcome'];
-    error?: AiExecutionSummary['requests'][number]['error'];
-    continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
-  }) => {
-    execution = {
-      ...execution,
-      generationStatus: input.outcome?.status ?? 'incomplete',
-      usageCompleteness: input.revision.usage.status,
-      continuationBlockedReason:
-        input.continuationBlockedReason ?? execution.continuationBlockedReason,
-      requests: execution.requests.map((request) =>
-        request.requestId === input.requestId
-          ? {
-              ...request,
-              state: 'completed' as const,
-              completedAt: new Date().toISOString(),
-              outcome: input.outcome,
-              error: input.error ?? null,
-              usageRevisions: [input.revision],
-              settledRevision: 1,
-            }
-          : request,
-      ),
-    };
-    return {
-      applied: true,
-      idempotent: false,
-      continuationBlockedReason: execution.continuationBlockedReason,
-      execution,
-    };
-  });
+  const completeAndSettle = vi.fn(
+    async (input: {
+      requestId: string;
+      revision: AiExecutionSummary['requests'][number]['usageRevisions'][number];
+      outcome: AiExecutionSummary['requests'][number]['outcome'];
+      error?: AiExecutionSummary['requests'][number]['error'];
+      continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
+    }) => {
+      execution = {
+        ...execution,
+        generationStatus: input.outcome?.status ?? 'incomplete',
+        usageCompleteness: input.revision.usage.status,
+        continuationBlockedReason:
+          input.continuationBlockedReason ?? execution.continuationBlockedReason,
+        requests: execution.requests.map((request) =>
+          request.requestId === input.requestId
+            ? {
+                ...request,
+                state: 'completed' as const,
+                completedAt: new Date().toISOString(),
+                outcome: input.outcome,
+                error: input.error ?? null,
+                usageRevisions: [input.revision],
+                settledRevision: 1,
+              }
+            : request,
+        ),
+      };
+      return {
+        applied: true,
+        idempotent: false,
+        continuationBlockedReason: execution.continuationBlockedReason,
+        execution,
+      };
+    },
+  );
   const markUnknown = vi.fn(async () => {
     execution = { ...execution, generationStatus: 'unknown' };
     return true;
@@ -195,32 +204,53 @@ describe('Research SDK local HTTP vertical', () => {
     await once(server, 'close');
   });
 
-  const provider = (id: string, path: string) => ({
+  const provider = (
+    id: string,
+    path: string,
+    pricing = { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
+  ) => ({
     id,
     models: ['fixture-model'],
-    metadata: { health: 'healthy' as const },
+    metadata: {
+      health: 'healthy' as const,
+      ...pricing,
+    },
     sdkRuntime: () => ({ baseURL: `${baseURL}/${path}/v1`, apiKey: 'secret', timeoutMs: 2_000 }),
   });
 
-  const route = (id: string, path: string) => ({
-    provider: provider(id, path),
+  const route = (
+    id: string,
+    path: string,
+    pricing = { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
+  ) => ({
+    provider: provider(id, path, pricing),
     execution: {
       adapter: 'openai-compatible' as const,
       mode: 'json_validated' as const,
-      allowedUpstreams: [],
-      freeEvidenceRef: `${id}-free`,
       readiness: { configurationFingerprint: `${id}-fingerprint` },
     },
   });
 
-  const run = (execution: AiExecutionSummary) => ({
+  const run = (
+    execution: AiExecutionSummary,
+    frozenPricing?: Record<string, number | string>,
+  ) => ({
     provider: 'primary',
     model: 'fixture-model',
     modelMetadata: {
       sdkExecution: execution,
       researchRoutes: [
-        { provider: 'primary', model: 'fixture-model', configurationFingerprint: 'primary-fingerprint' },
-        { provider: 'fallback', model: 'fixture-model', configurationFingerprint: 'fallback-fingerprint' },
+        {
+          provider: 'primary',
+          model: 'fixture-model',
+          configurationFingerprint: 'primary-fingerprint',
+          ...(frozenPricing === undefined ? {} : { pricing: frozenPricing }),
+        },
+        {
+          provider: 'fallback',
+          model: 'fixture-model',
+          configurationFingerprint: 'fallback-fingerprint',
+        },
       ],
     },
   });
@@ -228,11 +258,18 @@ describe('Research SDK local HTTP vertical', () => {
   const execute = async (
     execution: AiExecutionSummary,
     signal = new AbortController().signal,
+    options: {
+      currentPricing?: { costPer1kInput: number; costPer1kOutput: number; costCurrency: string };
+      frozenPricing?: Record<string, number | string>;
+    } = {},
   ) => {
     const state = stateStore(execution);
     const registry = {
       defaultModel: () => 'fixture-model',
-      readyContractCandidates: () => [route('primary', 'primary'), route('fallback', 'fallback')],
+      readyContractCandidates: () => [
+        route('primary', 'primary', options.currentPricing),
+        route('fallback', 'fallback', options.currentPricing),
+      ],
     };
     const service = new AiResearchSdkExecution(
       registry as never,
@@ -241,7 +278,7 @@ describe('Research SDK local HTTP vertical', () => {
     );
     await service.execute({
       ownership: { runId: '11111111-1111-4111-8111-111111111111', executionAttempt: 1 },
-      run: run(execution),
+      run: run(execution, options.frozenPricing),
       messages: [{ role: 'user', content: 'Return research JSON.' }],
       startedAt: Date.now(),
       signal,
@@ -279,14 +316,14 @@ describe('Research SDK local HTTP vertical', () => {
 
   it('Retry-After 超过剩余绝对期限时终止，不发送 fallback', async () => {
     mode = 'retryAfterDeadline';
-    await expect(
-      execute(summary(new Date(Date.now() + 1_000).toISOString())),
-    ).rejects.toThrow('Retry-After 超过研究任务剩余期限');
+    await expect(execute(summary(policy, new Date(Date.now() + 1_000).toISOString()))).rejects.toThrow(
+      'Retry-After 超过研究任务剩余期限',
+    );
     expect(requestCount).toBe(1);
   });
 
   it('创建起绝对期限已过时零 Provider 请求', async () => {
-    const state = await execute(summary(new Date(Date.now() - 1_000).toISOString()));
+    const state = await execute(summary(policy, new Date(Date.now() - 1_000).toISOString()));
     expect(requestCount).toBe(0);
     expect(state.failOwned).toHaveBeenCalledWith(
       expect.anything(),
@@ -310,5 +347,35 @@ describe('Research SDK local HTTP vertical', () => {
       expect.anything(),
       expect.objectContaining({ continuationBlockedReason: 'cancelled' }),
     );
+  });
+
+  it('执行时 Provider 价格变化仍使用创建时冻结的模型价格', async () => {
+    const frozenPolicy = {
+      ...policy,
+      maxCost: '10',
+      costCurrency: 'USD',
+      paidRoutes: [{ provider: 'primary', models: ['fixture-model'] }],
+    };
+    const state = await execute(summary(frozenPolicy), new AbortController().signal, {
+      currentPricing: { costPer1kInput: 9, costPer1kOutput: 9, costCurrency: 'USD' },
+      frozenPricing: {
+        costPer1kInput: 0.1,
+        costPer1kOutput: 0.2,
+        costCurrency: 'USD',
+        pricingVersion: 'pricing-frozen-v1',
+      },
+    });
+
+    expect(state.execution().requests[0]?.reservation.cost).toEqual({
+      status: 'estimated',
+      amount: '2.0013',
+      currency: 'USD',
+      source: 'frozen_provider_pricing',
+      pricingVersion: 'pricing-frozen-v1',
+    });
+    expect(state.execution().requests[0]?.usageRevisions[0]?.cost).toMatchObject({
+      amount: '0.0021',
+      pricingVersion: 'pricing-frozen-v1',
+    });
   });
 });

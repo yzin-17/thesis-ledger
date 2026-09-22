@@ -54,7 +54,7 @@ try:
     sql('review_a', 'CREATE DATABASE review_empty; CREATE DATABASE review_b;')
     sql('review_empty', generate('review_empty'))
     count = sql('review_empty', "SELECT count(*) FROM pg_tables WHERE schemaname='public';").stdout.strip()
-    assert count == '65', count
+    assert count == '66', count
     results['空库完整重建'] = {'表数': int(count), 'head': head}
 
     sql('review_a', migrations[0].read_text())

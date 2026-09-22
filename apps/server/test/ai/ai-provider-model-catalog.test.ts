@@ -37,6 +37,33 @@ describe('AI Provider 模型目录推理能力', () => {
     }
   });
 
+  it('无需认证获取目录时不发送任何认证头', async () => {
+    let capturedHeaders: HeadersInit | undefined;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      capturedHeaders = init?.headers;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ id: 'model-a' }] }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await fetchAiProviderModelCatalog(
+        'http://lmstudio.example/v1',
+        'stale-secret-must-not-be-used',
+        1_000,
+        'chat-completions',
+        'none',
+      );
+      expect(capturedHeaders).not.toHaveProperty('authorization');
+      expect(capturedHeaders).not.toHaveProperty('x-api-key');
+      expect(capturedHeaders).not.toHaveProperty('api-key');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('保留兼容模型数组并规范化已知推理字段', async () => {
     vi.stubGlobal(
       'fetch',

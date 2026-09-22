@@ -27,7 +27,10 @@ import {
   parseDiscoveryOutput,
 } from './strategy-optimization-discovery.js';
 import { recordOptimizationAttempt } from './strategy-optimization-attempt.store.js';
-import { optimizationCostFacts } from './strategy-optimization-cost.js';
+import {
+  normalizeCostCurrency,
+  optimizationPricingForExperimentRoute,
+} from './strategy-optimization-cost.js';
 import {
   markOptimizationUnknownOutcome,
   type OptimizationStepRow,
@@ -265,11 +268,17 @@ export class StrategyOptimizationCandidateService {
     const provider = resolved.provider;
     const inputTokenReservation = this.runs.conservativeInputTokenReservation(messages);
     const outputTokenReservation = this.runs.outputTokenReservation(experiment);
-    const costFacts = optimizationCostFacts(provider.metadata);
-    const inputRate = provider.metadata?.costPer1kInput;
-    const outputRate = provider.metadata?.costPer1kOutput;
+    const pricing = optimizationPricingForExperimentRoute(
+      experiment.modelConfig,
+      route.provider,
+      route.model,
+      provider.metadata,
+    );
+    const currency = normalizeCostCurrency(pricing?.costCurrency);
+    const inputRate = pricing?.costPer1kInput;
+    const outputRate = pricing?.costPer1kOutput;
     const estimatedCost =
-      costFacts.costStatus === 'known' &&
+      currency &&
       typeof inputRate === 'number' &&
       typeof outputRate === 'number'
         ? (inputTokenReservation * inputRate + outputTokenReservation * outputRate) / 1_000

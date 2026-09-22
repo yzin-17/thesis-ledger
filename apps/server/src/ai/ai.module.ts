@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ProviderModule } from '../providers/provider.module.js';
 import { AiController } from './ai.controller.js';
 import { AiProviderController } from './ai-provider.controller.js';
+import { AiSettingsController } from './ai-settings.controller.js';
 import { AiProviderService } from './ai-provider.service.js';
 import { AiRunService } from './ai-run.service.js';
 import { AiResearchExecutor } from './ai-research.executor.js';
@@ -12,16 +13,18 @@ import { AiProviderRegistry } from './provider-registry.js';
 import { PromptVersionRegistry } from './prompt-registry.js';
 import { createConfiguredAiProviders } from './provider-adapters.js';
 import { loadConfig } from '../platform/config.js';
+import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
 
 @Module({
   imports: [ProviderModule],
-  controllers: [AiController, AiProviderController],
+  controllers: [AiController, AiProviderController, AiSettingsController],
   providers: [
     AiRunService,
     AiExecutionStateStore,
     AiSdkGenerationAdapter,
     AiResearchSdkExecution,
     AiProviderService,
+    AiRoutingSettingsService,
     {
       provide: AiProviderRegistry,
       useFactory: () => {

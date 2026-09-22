@@ -15,8 +15,10 @@ export const createStoredAiProvider = async (
   fallbackTimeoutMs: number,
 ): Promise<AiProvider | null> => {
   const settings = parseAiProviderSettings(row.settings);
-  const credential = await configs.readCredential(row).catch(() => '');
-  if (!settings || !credential || !row.enabled) return null;
+  if (!settings || !row.enabled) return null;
+  const credential =
+    settings.authMode === 'none' ? '' : await configs.readCredential(row).catch(() => '');
+  if (settings.authMode === 'api_key' && !credential) return null;
   return new OpenAiCompatibleProvider(
     row.name,
     settings.models,
@@ -36,6 +38,13 @@ export const createStoredAiProvider = async (
       capabilities: aiProviderCapabilities(row.capabilities),
       health: healthValue(row.health),
       source: 'database',
+      authMode: settings.authMode,
+      ...(settings.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
+      ...(settings.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
       ...(settings.modelReasoning ? { modelReasoning: settings.modelReasoning } : {}),
       upstreamFormat: settings.upstreamFormat,
       ...(settings.chatImplementation ? { chatImplementation: settings.chatImplementation } : {}),
@@ -44,10 +53,13 @@ export const createStoredAiProvider = async (
         : {}),
       ...(settings.adapter ? { adapter: settings.adapter } : {}),
       ...(settings.executionRoutes ? { executionRoutes: settings.executionRoutes } : {}),
+      ...(settings.modelPricing ? { modelPricing: settings.modelPricing } : {}),
       ...(settings.capabilityRevocations
         ? { capabilityRevocations: settings.capabilityRevocations }
         : {}),
-      credentialFingerprint: createHash('sha256').update(credential, 'utf8').digest('hex'),
+      ...(credential
+        ? { credentialFingerprint: createHash('sha256').update(credential, 'utf8').digest('hex') }
+        : {}),
     },
   );
 };

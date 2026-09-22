@@ -11,6 +11,7 @@ import {
   type AttemptRow,
   type ExperimentRow,
 } from './strategy-optimization-common.js';
+import type { AiProviderModelPricingView } from '../ai/ai-provider.contracts.js';
 
 export type OptimizationCostFacts = {
   costStatus: 'known' | 'unknown';
@@ -18,11 +19,31 @@ export type OptimizationCostFacts = {
   pricingVersion?: string;
 };
 
-type ProviderMetadata = {
+export type OptimizationPricing = {
   costPer1kInput?: number;
   costPer1kOutput?: number;
   costCurrency?: string;
   pricingVersion?: string;
+};
+
+type ProviderMetadata = OptimizationPricing & {
+  modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
+};
+
+export const optimizationPricingForModel = (
+  metadata: ProviderMetadata | undefined,
+  model?: string,
+): OptimizationPricing | undefined => {
+  const pricing = model && metadata?.modelPricing?.[model] ? metadata.modelPricing[model] : metadata;
+  if (!pricing) return undefined;
+  return {
+    ...(pricing.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
+    ...(pricing.costPer1kOutput === undefined
+      ? {}
+      : { costPer1kOutput: pricing.costPer1kOutput }),
+    ...(pricing.costCurrency === undefined ? {} : { costCurrency: pricing.costCurrency }),
+    ...(pricing.pricingVersion === undefined ? {} : { pricingVersion: pricing.pricingVersion }),
+  };
 };
 
 export const normalizeCostCurrency = (value: unknown) => {
@@ -42,16 +63,18 @@ export const isKnownCostAmount = (value: unknown): value is number =>
 
 export const optimizationCostFacts = (
   metadata: ProviderMetadata | undefined,
+  model?: string,
 ): OptimizationCostFacts => {
-  const currency = normalizeCostCurrency(metadata?.costCurrency);
+  const pricing = optimizationPricingForModel(metadata, model);
+  const currency = normalizeCostCurrency(pricing?.costCurrency);
   const hasRates =
-    typeof metadata?.costPer1kInput === 'number' &&
-    Number.isFinite(metadata.costPer1kInput) &&
-    metadata.costPer1kInput >= 0 &&
-    typeof metadata?.costPer1kOutput === 'number' &&
-    Number.isFinite(metadata.costPer1kOutput) &&
-    metadata.costPer1kOutput >= 0;
-  const pricingVersion = normalizePricingVersion(metadata?.pricingVersion);
+    typeof pricing?.costPer1kInput === 'number' &&
+    Number.isFinite(pricing.costPer1kInput) &&
+    pricing.costPer1kInput >= 0 &&
+    typeof pricing?.costPer1kOutput === 'number' &&
+    Number.isFinite(pricing.costPer1kOutput) &&
+    pricing.costPer1kOutput >= 0;
+  const pricingVersion = normalizePricingVersion(pricing?.pricingVersion);
   return {
     costStatus: hasRates && currency ? 'known' : 'unknown',
     ...(currency ? { costCurrency: currency } : {}),
@@ -75,12 +98,53 @@ export const optimizationCostError = (
 type ModelConfigRoute = OptimizationCostFacts & {
   provider?: unknown;
   model?: unknown;
+  costPer1kInput?: unknown;
+  costPer1kOutput?: unknown;
 };
 
 const modelConfigRoutes = (value: unknown): ModelConfigRoute[] =>
   Array.isArray(value)
     ? value.filter((item): item is ModelConfigRoute => Boolean(item && typeof item === 'object'))
     : [];
+
+export const optimizationPricingForExperimentRoute = (
+  modelConfig: unknown,
+  provider: string,
+  model: string,
+  fallback?: ProviderMetadata,
+): OptimizationPricing | undefined => {
+  const route = modelConfigRoutes(modelConfig).find(
+    (candidate) => candidate.provider === provider && candidate.model === model,
+  );
+  if (!route) return optimizationPricingForModel(fallback, model);
+  if (route.costStatus === 'unknown')
+    return {
+      ...(typeof route.costPer1kInput === 'number'
+        ? { costPer1kInput: route.costPer1kInput }
+        : {}),
+      ...(typeof route.costPer1kOutput === 'number'
+        ? { costPer1kOutput: route.costPer1kOutput }
+        : {}),
+      ...(typeof route.costCurrency === 'string' ? { costCurrency: route.costCurrency } : {}),
+      ...(typeof route.pricingVersion === 'string'
+        ? { pricingVersion: route.pricingVersion }
+        : {}),
+    };
+  if (typeof route.costPer1kInput === 'number' || typeof route.costPer1kOutput === 'number')
+    return {
+      ...(typeof route.costPer1kInput === 'number'
+        ? { costPer1kInput: route.costPer1kInput }
+        : {}),
+      ...(typeof route.costPer1kOutput === 'number'
+        ? { costPer1kOutput: route.costPer1kOutput }
+        : {}),
+      ...(typeof route.costCurrency === 'string' ? { costCurrency: route.costCurrency } : {}),
+      ...(typeof route.pricingVersion === 'string'
+        ? { pricingVersion: route.pricingVersion }
+        : {}),
+    };
+  return optimizationPricingForModel(fallback, model);
+};
 
 export const assertOptimizationModelConfigCost = (value: unknown) => {
   const routes = modelConfigRoutes(value);
@@ -125,8 +189,9 @@ export const sameOptimizationCostConfirmation = (
 export const normalizeCostAmountText = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return String(value);
   if (typeof value === 'string' && /^\d+(?:\.\d+)?$/u.test(value)) return value;
-  if (value && typeof value === 'object' && 'toString' in value) {
-    const text = String(value);
+  if (value && typeof value === 'object' && typeof value.toString === 'function') {
+    const stringifiable = value as { toString: () => string };
+    const text = stringifiable.toString();
     if (/^\d+(?:\.\d+)?$/u.test(text)) return text;
   }
   return null;

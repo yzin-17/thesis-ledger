@@ -8,8 +8,82 @@ import {
 } from '@thesis-ledger/schemas';
 import type { ProviderConfigService } from '../providers/provider-config.service.js';
 import { aiProviderCapabilities, parseAiProviderSettings } from './ai-provider-summary.js';
-import { asRecord, type AiProviderInput } from './ai-provider.contracts.js';
+import {
+  asRecord,
+  type AiProviderInput,
+  type AiProviderModelPricingInput,
+  type AiProviderModelPricingView,
+} from './ai-provider.contracts.js';
 import { configurationFingerprint, type AiProviderRouteSnapshot } from './ai-provider-readiness.js';
+
+const pricingVersionFor = (model: string, pricing: AiProviderModelPricingInput) =>
+  `pricing-${createHash('sha256')
+    .update(JSON.stringify({ model, ...pricing }), 'utf8')
+    .digest('hex')
+    .slice(0, 16)}`;
+
+const samePricing = (
+  left: AiProviderModelPricingInput | undefined,
+  right: AiProviderModelPricingInput | undefined,
+) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+
+const pricingFields = (
+  value: AiProviderModelPricingInput | AiProviderModelPricingView | undefined,
+) => {
+  if (!value) return undefined;
+  return {
+    ...(value.costPer1kInput === undefined ? {} : { costPer1kInput: value.costPer1kInput }),
+    ...(value.costPer1kOutput === undefined ? {} : { costPer1kOutput: value.costPer1kOutput }),
+    ...(value.costCurrency === undefined ? {} : { costCurrency: value.costCurrency }),
+  } satisfies AiProviderModelPricingInput;
+};
+
+const legacyPricing = (
+  input: AiProviderInput,
+  existing: ReturnType<typeof parseAiProviderSettings>,
+): AiProviderModelPricingInput | undefined => {
+  const costPer1kInput = input.costPer1kInput ?? existing?.costPer1kInput;
+  const costPer1kOutput = input.costPer1kOutput ?? existing?.costPer1kOutput;
+  const costCurrency = input.costCurrency ?? existing?.costCurrency;
+  if (costPer1kInput === undefined && costPer1kOutput === undefined && costCurrency === undefined)
+    return undefined;
+  return {
+    ...(costPer1kInput === undefined ? {} : { costPer1kInput }),
+    ...(costPer1kOutput === undefined ? {} : { costPer1kOutput }),
+    ...(costCurrency === undefined ? {} : { costCurrency }),
+  };
+};
+
+const modelPricingFromInput = (
+  input: AiProviderInput,
+  models: readonly string[],
+  existing: ReturnType<typeof parseAiProviderSettings>,
+): Record<string, AiProviderModelPricingView> => {
+  const explicit = input.modelPricing !== undefined;
+  const oldPricing = legacyPricing(input, existing);
+  return Object.fromEntries(
+    models.flatMap((model) => {
+      const previous = existing?.modelPricing?.[model];
+      const sourcePricing = explicit
+        ? input.modelPricing?.[model]
+        : (pricingFields(previous) ?? oldPricing);
+      if (!sourcePricing) return [];
+      if (previous && samePricing(pricingFields(previous), sourcePricing))
+        return [[model, previous] as const];
+      return [
+        [
+          model,
+          {
+            ...sourcePricing,
+            pricingVersion: pricingVersionFor(model, sourcePricing),
+            updatedAt: new Date().toISOString(),
+            source: explicit ? ('user' as const) : ('legacy_provider' as const),
+          },
+        ] as const,
+      ];
+    }),
+  );
+};
 
 export const settingsFromAiProviderInput = (input: AiProviderInput, existingSettings?: unknown) => {
   const existing = parseAiProviderSettings(existingSettings);
@@ -21,9 +95,23 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
   });
   const executionRoutes =
     input.executionRoutes !== undefined ? input.executionRoutes : existing?.executionRoutes;
+  const modelDefaults = input.modelDefaults ?? existing?.modelDefaults;
+  const models = [...new Set(input.models.map((model) => model.trim()))];
+  const modelPricing = modelPricingFromInput(input, models, existing);
+  const legacySettingsFields =
+    input.modelPricing === undefined
+      ? {
+          ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
+          ...(input.costPer1kOutput === undefined
+            ? {}
+            : { costPer1kOutput: input.costPer1kOutput }),
+          ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
+        }
+      : {};
   return {
     baseUrl: input.baseUrl,
-    models: [...new Set(input.models.map((model) => model.trim()))],
+    models,
+    authMode: input.authMode,
     upstreamFormat: selection.upstreamFormat,
     ...(selection.upstreamFormat === 'chat-completions'
       ? { chatImplementation: selection.chatImplementation }
@@ -32,6 +120,8 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
       ? { compatibilityExtensionProfile: existing.compatibilityExtensionProfile }
       : {}),
     ...(executionRoutes === undefined ? {} : { executionRoutes }),
+    ...(modelDefaults === undefined ? {} : { modelDefaults }),
+    modelPricing,
     ...(existing?.capabilityRevocations
       ? { capabilityRevocations: existing.capabilityRevocations }
       : {}),
@@ -43,10 +133,13 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
         }
       : {}),
     ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
-    ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-    ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
-    ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
-    ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+    ...(input.firstOutputTimeoutMs === undefined
+      ? {}
+      : { firstOutputTimeoutMs: input.firstOutputTimeoutMs }),
+    ...(input.outputIdleTimeoutMs === undefined
+      ? {}
+      : { outputIdleTimeoutMs: input.outputIdleTimeoutMs }),
+    ...legacySettingsFields,
   };
 };
 
@@ -59,24 +152,59 @@ export const routeSnapshotsFromProviderRow = (
   const credentialFingerprint = row.encryptedCredentials
     ? createHash('sha256').update(row.encryptedCredentials).digest('hex')
     : null;
-  return settings.executionRoutes.map((route) => ({
-    providerId: row.name,
-    baseUrl: settings.baseUrl,
-    upstreamFormat: settings.upstreamFormat,
-    ...(settings.chatImplementation === undefined
-      ? {}
-      : { chatImplementation: settings.chatImplementation }),
-    ...(settings.compatibilityExtensionProfile === undefined
-      ? {}
-      : { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }),
-    adapter: settings.adapter ?? null,
-    models: settings.models,
-    route,
-    enabled: row.enabled,
-    health,
-    credentialFingerprint,
-    revocations: settings.capabilityRevocations ?? [],
-  }));
+  return settings.executionRoutes.filter((route) => route.enabled !== false).map((route) => {
+    const modelPricing = settings.modelPricing?.[route.model];
+    const legacyPricing = {
+      ...(settings.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
+      ...(settings.costPer1kOutput === undefined
+        ? {}
+        : { costPer1kOutput: settings.costPer1kOutput }),
+      ...(settings.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
+      ...(settings.pricingVersion === undefined ? {} : { pricingVersion: settings.pricingVersion }),
+    };
+    const routePricing = modelPricing
+      ? {
+          ...pricingFields(modelPricing),
+          pricingVersion: modelPricing.pricingVersion,
+        }
+      : legacyPricing;
+    return {
+      providerId: row.name,
+      baseUrl: settings.baseUrl,
+      upstreamFormat: settings.upstreamFormat,
+      ...(settings.chatImplementation === undefined
+        ? {}
+        : { chatImplementation: settings.chatImplementation }),
+      ...(settings.compatibilityExtensionProfile === undefined
+        ? {}
+        : { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }),
+      adapter: settings.adapter ?? null,
+      models: settings.models,
+      route,
+      ...(settings.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
+      ...(settings.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
+      ...(routePricing.costPer1kInput === undefined
+        ? {}
+        : { costPer1kInput: routePricing.costPer1kInput }),
+      ...(routePricing.costPer1kOutput === undefined
+        ? {}
+        : { costPer1kOutput: routePricing.costPer1kOutput }),
+      ...(routePricing.costCurrency === undefined
+        ? {}
+        : { costCurrency: routePricing.costCurrency }),
+      ...(routePricing.pricingVersion === undefined
+        ? {}
+        : { pricingVersion: routePricing.pricingVersion }),
+      enabled: row.enabled,
+      health,
+      credentialFingerprint,
+      revocations: settings.capabilityRevocations ?? [],
+    };
+  });
 };
 
 export type AiCapabilityRevocationInput = {
@@ -127,6 +255,7 @@ export const persistAiCapabilityRevocation = async (
     enabled: row.enabled,
     priority: row.priority,
     capabilities: aiProviderCapabilities(row.capabilities),
+    expectedRevision: row.updatedAt.toISOString(),
     settings: {
       ...(asRecord(row.settings) ?? {}),
       capabilityRevocations: duplicate ? existing : [...existing, nextRevocation],

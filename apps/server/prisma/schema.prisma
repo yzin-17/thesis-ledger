@@ -673,6 +673,7 @@ model ProviderHealthCheck {
   latencyMs Int?
   errorCode String?
   source    String   @default("manual")
+  details   Json?
   checkedAt DateTime
 
   @@index([provider, checkedAt])
@@ -1135,6 +1136,15 @@ model ProviderConfig {
   cost                 Json?
   health               String   @default("unknown")
   updatedAt            DateTime @updatedAt
+}
+
+model AiRoutingSettings {
+  id                       String   @id @default("global")
+  researchDefaultProvider String?
+  researchDefaultModel    String?
+  revision                 Int      @default(1)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 model AutomationJob {

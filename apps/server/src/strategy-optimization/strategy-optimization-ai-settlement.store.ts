@@ -103,7 +103,6 @@ export class StrategyOptimizationAiSettlementStore {
     const maxOutput = budgetNumber(budget.maxOutputTokens);
     const maxCost = typeof budget.maxCost === 'string' ? new Prisma.Decimal(budget.maxCost) : null;
     const latest = request.usageRevisions[revision - 1];
-    const freeEvidenceAuthorized = request.reservation.cost.source?.startsWith('free_evidence:');
     let blocked: AiExecutionSummary['continuationBlockedReason'] = null;
     if (
       (maxInput !== null && nextInput > maxInput) ||
@@ -115,8 +114,7 @@ export class StrategyOptimizationAiSettlementStore {
       currencyMismatch ||
       (maxCost !== null &&
         latest?.cost.status === 'unknown' &&
-        request.reservation.cost.amount === null &&
-        !freeEvidenceAuthorized)
+        request.reservation.cost.amount === null)
     )
       blocked = 'cost_unknown';
     await transaction.$executeRaw(Prisma.sql`

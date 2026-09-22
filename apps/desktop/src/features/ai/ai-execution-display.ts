@@ -37,7 +37,7 @@ export const aiContinuationBlockedLabels: Record<
   cost_unknown: '费用无法确认，后续执行已停止',
   cancelled: '任务已取消',
   expired: '绝对执行期限已到',
-  capability_revoked: 'Provider 能力声明已撤销',
+  capability_revoked: 'Provider 能力已撤销',
 };
 
 export type AiExecutionDisplay = {
@@ -141,7 +141,7 @@ export const aiExecutionDisplay = (
       `最多 ${policy.maxAiCalls} 次请求，输入 / 输出上限 ${policy.maxInputTokens.toLocaleString('zh-CN')} / ${policy.maxOutputTokens.toLocaleString('zh-CN')} Token`,
     );
     policyLines.push(`总期限 ${policy.maxDurationSeconds} 秒，排队与恢复不会重置`);
-    if (Number(policy.maxCost) === 0) policyLines.push('费用上限 0，仅允许具有免费依据的路由');
+    if (Number(policy.maxCost) === 0) policyLines.push('费用上限 0，仅允许用户填写为零费用的路由');
     else policyLines.push(`费用上限 ${policy.costCurrency ?? '币种未知'} ${policy.maxCost}`);
   } else policyLines.push('该流程没有研究策略预算，费用边界由实验策略管理');
 

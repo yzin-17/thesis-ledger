@@ -41,6 +41,11 @@ const toggleLabel = (busy: boolean, enabled: boolean) => {
   return enabled ? '停用' : '启用';
 };
 
+const providerTestActionLabel = (busy: boolean, isAi: boolean) => {
+  if (busy) return '测试中…';
+  return isAi ? '选择模型测试' : '测试连接';
+};
+
 export function ProviderTable({
   loadState,
   providers,
@@ -180,7 +185,7 @@ export function ProviderTable({
                             aria-hidden="true"
                           />
                         )}
-                        {testingProviderName === provider.name ? '测试中…' : '连通性测试'}
+                        {providerTestActionLabel(testingProviderName === provider.name, isAi)}
                       </Button>
                       {!environmentSource && (
                         <Button

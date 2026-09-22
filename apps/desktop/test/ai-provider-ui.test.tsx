@@ -5,6 +5,7 @@ import {
   aiProviderDraftError,
   aiProviderDraftFromRecord,
   aiProviderInputFromDraft,
+  aiProviderTestInputFromDraft,
   aiUpstreamFormatOptions,
   mergeSelectedModelReasoning,
   modelDetailsFromCatalog,
@@ -14,9 +15,18 @@ import {
   requestAiProviderDeletion,
   withAiUpstreamFormat,
 } from '../src/features/providers/ai-provider.actions.js';
-import { newAiProviderExecutionRouteDraft } from '../src/features/providers/ai-provider-execution.js';
-import { createLatestRequestGate } from '../src/features/providers/ai-provider-editor-async.js';
 import {
+  aiProviderExecutionModeState,
+  aiProviderExecutionTimeoutLabel,
+  newAiProviderExecutionRouteDraft,
+  nextActivePurposeAfterRemoval,
+} from '../src/features/providers/ai-provider-execution.js';
+import {
+  createLatestRequestGate,
+  createSingleFlightGate,
+} from '../src/features/providers/ai-provider-editor-async.js';
+import {
+  cancelAiProviderTest,
   deleteAiProvider,
   fetchAiProviderModels,
   fetchAiProviders,
@@ -33,6 +43,7 @@ import {
   AiProviderEditorFields,
   ModelReasoningBadges,
 } from '../src/features/providers/AiProviderEditorFields.js';
+import { AiProviderExecutionFields } from '../src/features/providers/AiProviderExecutionFields.js';
 import {
   fetchProviders,
   saveProvider,
@@ -136,6 +147,11 @@ describe('AI Provider 专用请求与密钥边界', () => {
       requestClient,
     );
     await testSavedAiProvider('open/router', requestClient);
+    await cancelAiProviderTest(
+      'open/router',
+      '7f8d8c0e-b6b8-4a5f-a2f2-2e1b7d2f6f77',
+      requestClient,
+    );
     await setAiProviderEnabled('open/router', false, requestClient);
     await deleteAiProvider('open/router', requestClient);
 
@@ -146,6 +162,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
       '/ai/providers/test',
       '/ai/providers/models',
       '/ai/providers/open%2Frouter/test',
+      '/ai/providers/open%2Frouter/test/cancel',
       '/ai/providers/open%2Frouter/enabled',
       '/ai/providers/open%2Frouter',
     ]);
@@ -160,6 +177,25 @@ describe('AI Provider 专用请求与密钥边界', () => {
       baseUrl: 'https://openrouter.ai/api/v1',
       upstreamFormat: 'chat-completions',
       apiKey: 'ui-secret',
+    });
+    expect(JSON.parse(requestClient.request.mock.calls[5]?.[1]?.body as string)).toEqual({
+      requestId: '7f8d8c0e-b6b8-4a5f-a2f2-2e1b7d2f6f77',
+    });
+  });
+
+  it('Provider 生命周期请求携带当前版本，删除请求也不丢失版本条件', async () => {
+    const requestClient = client(aiProvider());
+    const expectedRevision = '2026-09-14T00:00:00.000Z';
+
+    await setAiProviderEnabled('open/router', false, expectedRevision, requestClient);
+    await deleteAiProvider('open/router', expectedRevision, requestClient);
+
+    expect(JSON.parse(requestClient.request.mock.calls[0]?.[1]?.body as string)).toEqual({
+      enabled: false,
+      expectedRevision,
+    });
+    expect(JSON.parse(requestClient.request.mock.calls[1]?.[1]?.body as string)).toEqual({
+      expectedRevision,
     });
   });
 
@@ -199,30 +235,75 @@ describe('AI Provider 专用请求与密钥边界', () => {
       costPer1kInput: 0.00125,
       costPer1kOutput: 0.0045,
       costCurrency: 'USD',
-      pricingVersion: '2026-09',
       modelReasoning: aiProvider().modelReasoning,
       upstreamFormat: 'chat-completions',
       chatImplementation: 'compatible',
     });
+    expect(editInput).not.toHaveProperty('pricingVersion');
+    const versionedInput = aiProviderInputFromDraft(
+      aiProviderDraftFromRecord(
+        aiProvider({ updatedAt: '2026-09-14T00:00:00.000Z' }),
+      ),
+    );
+    expect(versionedInput.expectedRevision).toBe('2026-09-14T00:00:00.000Z');
     expect(aiProviderDraftError({ ...createInput, models: ['same', 'same'] })).toBe(
       '模型不得重复。',
     );
   });
 
-  it('执行路由可保存未就绪声明，并保留上游格式、模式、参数和免费依据', () => {
+  it('无需认证模式只提交认证模式，不提交草稿中的旧 Key', () => {
+    const input = aiProviderInputFromDraft({
+      ...newAiProviderDraft(),
+      name: 'local-provider',
+      authMode: 'none',
+      credentialsRef: 'stale-secret',
+      modelsText: 'model-a',
+    });
+
+    expect(input).toMatchObject({ authMode: 'none', models: ['model-a'] });
+    expect(input).not.toHaveProperty('apiKey');
+  });
+
+  it('指定模型测试请求携带目标模型和测试类型', () => {
+    const input = aiProviderTestInputFromDraft(
+      {
+        ...newAiProviderDraft(),
+        name: 'local-provider',
+        modelsText: 'first-model\ntarget-model',
+      },
+      'target-model',
+      'generation',
+    );
+
+    expect(input).toMatchObject({ model: 'target-model', testKind: 'generation' });
+  });
+
+  it('保存模型用途时只提交已选择模型的价格，空白费用保持未知', () => {
+    const input = aiProviderInputFromDraft({
+      ...newAiProviderDraft(),
+      name: 'local-provider',
+      baseUrl: 'http://127.0.0.1:4318/v1',
+      modelsText: 'model-a\nmodel-b',
+      modelPricing: {
+        'model-a': { costPer1kInput: '0', costPer1kOutput: '0.2', costCurrency: 'USD' },
+        'model-b': { costPer1kInput: '', costPer1kOutput: '', costCurrency: '' },
+        'removed-model': { costPer1kInput: '1', costPer1kOutput: '2', costCurrency: 'USD' },
+      },
+    });
+
+    expect(input.modelPricing).toEqual({
+      'model-a': { costPer1kInput: 0, costPer1kOutput: 0.2, costCurrency: 'USD' },
+    });
+    expect(input).not.toHaveProperty('costCurrency');
+  });
+
+  it('执行路由保留模型、模式、契约和超时参数', () => {
     const route = {
       ...newAiProviderExecutionRouteDraft('model-a'),
       mode: 'native_schema' as const,
       contractId: 'strategy_discovery' as const,
-      declarationSource: 'manual' as const,
-      declarationSourceRef: 'provider-docs',
-      declarationSourceVersion: '2026-09',
-      declaredBy: 'local-operator',
       firstOutputTimeoutMs: '10000',
       outputIdleTimeoutMs: '30000',
-      freeEvidenceSource: 'controlled_local' as const,
-      freeEvidenceSourceRef: 'controlled-run-1',
-      freeEvidenceSourceVersion: 'v1',
     };
     const input = aiProviderInputFromDraft({
       ...newAiProviderDraft(),
@@ -242,34 +323,103 @@ describe('AI Provider 专用请求与密钥边界', () => {
           model: 'model-a',
           mode: 'native_schema',
           contract: { id: 'strategy_discovery' },
-          capabilityDeclaration: {
-            source: 'manual',
-            sourceRef: 'provider-docs',
-            declaredBy: 'local-operator',
-          },
           firstOutputTimeoutMs: 10000,
           outputIdleTimeoutMs: 30000,
-          freeEvidence: {
-            source: 'controlled_local',
-            sourceRef: 'controlled-run-1',
-          },
         },
       ],
     });
     expect(input).not.toHaveProperty('adapter');
+    expect(JSON.stringify(input)).not.toContain('allowedUpstreams');
+    expect(JSON.stringify(input)).not.toContain('freeEvidence');
     expect(aiProviderDraftError(input)).toBeNull();
-    expect(
-      aiProviderDraftError({
-        ...input,
-        executionRoutes: [
-          {
-            ...input.executionRoutes![0]!,
-            capabilityDeclaration: null,
-            freeEvidence: null,
-          },
-        ],
+    expect(input.executionRoutes![0]).not.toHaveProperty('capabilityDeclaration');
+  });
+
+  it('混合输出方式保持按用途配置，空超时保持继承而不是转换成零', () => {
+    const research = newAiProviderExecutionRouteDraft('model-a');
+    const strategy = { ...newAiProviderExecutionRouteDraft('model-a'), mode: 'native_schema' as const };
+
+    expect(aiProviderExecutionModeState([research])).toEqual({
+      kind: 'shared',
+      mode: 'json_validated',
+    });
+    expect(aiProviderExecutionModeState([research, strategy])).toEqual({ kind: 'mixed' });
+    expect(aiProviderExecutionTimeoutLabel('')).toContain('继承 Provider');
+    expect(aiProviderExecutionTimeoutLabel('1000')).toBe('当前用途覆盖');
+    expect(aiProviderDraftError({
+      ...aiProviderInputFromDraft({
+        ...newAiProviderDraft(),
+        name: 'local-provider',
+        baseUrl: 'http://127.0.0.1:4318/v1',
+        modelsText: 'model-a',
+        executionRoutes: [{ ...research, firstOutputTimeoutMs: '120.001' }],
       }),
-    ).toBeNull();
+    })).toContain('120000');
+  });
+
+  it('模型默认输出方式与用途覆盖分别保存，移除当前用途会选择相邻用途', () => {
+    const research = newAiProviderExecutionRouteDraft('model-a');
+    const strategy = {
+      ...newAiProviderExecutionRouteDraft('model-a'),
+      contractId: 'strategy_discovery' as const,
+      mode: 'native_schema' as const,
+      modeOverridden: true,
+      enabled: false,
+    };
+    const input = aiProviderInputFromDraft({
+      ...newAiProviderDraft(),
+      name: 'local-provider',
+      baseUrl: 'http://127.0.0.1:4318/v1',
+      modelsText: 'model-a',
+      modelDefaults: { 'model-a': { mode: 'json_validated' } },
+      executionRoutes: [research, strategy],
+    });
+
+    expect(input.modelDefaults).toEqual({ 'model-a': { mode: 'json_validated' } });
+    expect(input.executionRoutes).toMatchObject([
+      { contract: { id: 'research' } },
+      { contract: { id: 'strategy_discovery' }, modeOverridden: true, enabled: false },
+    ]);
+    expect(nextActivePurposeAfterRemoval([research, strategy], research.key)).toBe(
+      'strategy_discovery',
+    );
+    expect(nextActivePurposeAfterRemoval([research], research.key)).toBeUndefined();
+  });
+
+  it('用途编辑使用单一详情面板与紧凑控件，并交给父级表单保存', () => {
+    const research = newAiProviderExecutionRouteDraft('model-a');
+    const optimization = {
+      ...newAiProviderExecutionRouteDraft('model-a'),
+      contractId: 'parameter_optimization' as const,
+    };
+    const markup = renderToStaticMarkup(
+      <AiProviderExecutionFields
+        draft={{
+          ...newAiProviderDraft(),
+          modelsText: 'model-a',
+          executionRoutes: [research, optimization],
+        }}
+        onUpdateDraft={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain('研究报告配置');
+    expect(markup).toContain('当前配置');
+    expect(markup).toContain('默认配置');
+    expect(markup).not.toContain('保存更改');
+    expect(markup).not.toContain('有未保存的更改');
+    expect(markup).toContain('跟随默认');
+    expect(markup).toContain('w-80');
+    expect(markup).toContain('w-52');
+    expect(markup).toContain('md:border-r');
+    const source = readFileSync(
+      new URL('../src/features/providers/AiProviderExecutionFields.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain('Checkbox');
+    expect(source).toContain('enabled: nextEnabled');
+    expect(source).not.toContain('onSaveModelUsage');
+    expect(source).toContain('flex-row flex-wrap');
   });
 
   it('通知 Provider 仍使用通用保存与草稿测试端点', async () => {
@@ -374,7 +524,7 @@ describe('AI Provider 页面操作', () => {
     );
   });
 
-  it('后发请求或草稿变化会使旧模型目录与最小生成结果失效', () => {
+  it('后发请求或草稿变化会使旧模型目录与测试连接结果失效', () => {
     const gate = createLatestRequestGate();
     const firstRequest = gate.begin();
     const secondRequest = gate.begin();
@@ -383,6 +533,14 @@ describe('AI Provider 页面操作', () => {
 
     gate.invalidate();
     expect(gate.isCurrent(secondRequest)).toBe(false);
+  });
+
+  it('生成测试单飞门阻止确认框或请求期间的重复调用', () => {
+    const gate = createSingleFlightGate();
+    expect(gate.tryBegin()).toBe(true);
+    expect(gate.tryBegin()).toBe(false);
+    gate.end();
+    expect(gate.tryBegin()).toBe(true);
   });
 
   it('Provider 页面使用一个统一 Sheet，AI 字段不暴露 OpenRouter 或内部 adapter', () => {
@@ -408,7 +566,7 @@ describe('AI Provider 页面操作', () => {
     );
     expect(sheetSource).not.toContain("disabled={providerDraft.type === 'ai'}");
     expect(sheetSource).toContain('onTypeChange(value)');
-    expect(editorSource).toContain('仅证明连接与最小生成可用，不代表业务结构化生成已通过');
+    expect(editorSource).toContain('仅证明测试连接可用，不代表业务结构化生成已通过');
   });
 
   it('专用表单显示 AI 字段，数据库编辑草稿不回显已保存 Key', () => {
@@ -443,7 +601,9 @@ describe('AI Provider 页面操作', () => {
     expect(markup).not.toContain('<textarea');
     expect(markup).toContain('API Key');
     expect(markup).toContain('超时（毫秒）');
-    expect(markup).toContain('id="ai-cost-currency"');
+    expect(markup).toContain('模型价格');
+    expect(markup).toContain('留空不是零费用');
+    expect(markup).toContain('费用币种');
     expect(markup).toContain('data-slot="select-trigger"');
     expect(markup).toContain('>USD<');
     expect(draft.credentialsRef).toBe('');
@@ -610,17 +770,14 @@ describe('AI Provider 页面操作', () => {
                 adapter: 'openai-compatible',
                 mode: 'json_validated',
                 contract: { id: 'research', version: 'research-generation-v1' },
-                capabilityDeclaration: null,
                 adapterEvidence: null,
                 readiness: {
                   state: 'blocked',
-                  reasons: ['capability_declaration_missing'],
+                  reasons: ['adapter_contract_evidence_missing'],
                   configurationFingerprint: 'fingerprint',
                   evaluatedAt: '2026-09-19T00:00:00.000Z',
                 },
                 liveValidation: { status: 'not_run', checkedAt: null, requestId: null },
-                allowedUpstreams: [],
-                freeEvidenceRef: null,
               },
             ],
           }),
@@ -641,7 +798,7 @@ describe('AI Provider 页面操作', () => {
     expect(markup).toContain('连接健康：健康');
     expect(markup).toContain('接入阻断 1/1');
     expect(markup).toContain('真实验收未执行');
-    expect(markup).toContain('缺少能力声明。编辑配置后会重新评估。');
+    expect(markup).toContain('缺少本地 adapter 契约证据。编辑配置后会重新评估。');
     expect(markup).not.toContain('>ready<');
     expect(markup).not.toContain('>not_run<');
   });
@@ -689,7 +846,7 @@ describe('AI Provider 页面操作', () => {
     });
   });
 
-  it('AI 已保存测试只刷新 Provider、健康历史和 AI 能力查询', async () => {
+  it('AI 已保存测试只刷新 Provider、默认设置、健康历史和 AI 能力查询', async () => {
     const invalidateQueries = vi.fn(async () => undefined);
     await invalidateAiProviderHealthState({ invalidateQueries });
 
@@ -698,6 +855,12 @@ describe('AI Provider 页面操作', () => {
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['desktop', 'providers', 'health-history'],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['desktop', 'providers', 'routing-settings'],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['desktop', 'ai', 'routing-settings'],
     });
     expect(invalidateQueries).not.toHaveBeenCalledWith({
       queryKey: ['desktop', 'providers'],
@@ -708,7 +871,7 @@ describe('AI Provider 页面操作', () => {
     expect(invalidateQueries).not.toHaveBeenCalledWith({
       queryKey: ['desktop', 'providers', 'issues'],
     });
-    expect(invalidateQueries).toHaveBeenCalledTimes(4);
+    expect(invalidateQueries).toHaveBeenCalledTimes(6);
   });
 
   it('通知 Provider 已保存测试不刷新自动化、诊断或通知失败查询', async () => {

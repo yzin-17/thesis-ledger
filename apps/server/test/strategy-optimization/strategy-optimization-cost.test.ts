@@ -3,8 +3,10 @@ import {
   assertOptimizationModelConfigCost,
   optimizationCostFacts,
   optimizationCostSummary,
+  optimizationPricingForExperimentRoute,
   sameOptimizationCostConfirmation,
 } from '../../src/strategy-optimization/strategy-optimization-cost.js';
+import { buildOptimizationModelConfig } from '../../src/strategy-optimization/strategy-optimization-model-routing.js';
 
 describe('strategy optimization cost contract', () => {
   it('treats zero price with a currency as known and missing currency as unknown', () => {
@@ -19,6 +21,72 @@ describe('strategy optimization cost contract', () => {
     expect(optimizationCostFacts({ costPer1kInput: 0, costPer1kOutput: 0 })).toMatchObject({
       costStatus: 'unknown',
     });
+  });
+
+  it('uses the experiment model snapshot instead of current Provider pricing', () => {
+    expect(
+      optimizationPricingForExperimentRoute(
+        [
+          {
+            provider: 'provider-a',
+            model: 'model-a',
+            costStatus: 'known',
+            costPer1kInput: 0.1,
+            costPer1kOutput: 0.2,
+            costCurrency: 'USD',
+            pricingVersion: 'frozen-v1',
+          },
+        ],
+        'provider-a',
+        'model-a',
+        { costPer1kInput: 9, costPer1kOutput: 9, costCurrency: 'USD', pricingVersion: 'current-v2' },
+      ),
+    ).toEqual({
+      costPer1kInput: 0.1,
+      costPer1kOutput: 0.2,
+      costCurrency: 'USD',
+      pricingVersion: 'frozen-v1',
+    });
+    expect(
+      optimizationPricingForExperimentRoute(
+        [{ provider: 'provider-a', model: 'model-a', costStatus: 'unknown' }],
+        'provider-a',
+        'model-a',
+        { costPer1kInput: 9, costPer1kOutput: 9, costCurrency: 'USD' },
+      ),
+    ).toEqual({});
+  });
+
+  it('builds model configuration with the model-level rates needed by later freezes', () => {
+    expect(
+      buildOptimizationModelConfig(
+        [{ provider: 'provider-a', model: 'model-a' }],
+        {
+          strict: () => ({
+            metadata: {
+              modelPricing: {
+                'model-a': {
+                  costPer1kInput: 0.1,
+                  costPer1kOutput: 0.2,
+                  costCurrency: 'USD',
+                  pricingVersion: 'pricing-v1',
+                },
+              },
+            },
+          }),
+        } as never,
+      ),
+    ).toEqual([
+      {
+        provider: 'provider-a',
+        model: 'model-a',
+        costStatus: 'known',
+        costPer1kInput: 0.1,
+        costPer1kOutput: 0.2,
+        costCurrency: 'USD',
+        pricingVersion: 'pricing-v1',
+      },
+    ]);
   });
 
   it('rejects known mixed currencies before an experiment is persisted', () => {

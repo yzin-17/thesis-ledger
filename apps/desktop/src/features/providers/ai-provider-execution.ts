@@ -44,28 +44,15 @@ const optionalNumber = (value: string) => {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 };
 
-const lines = (value: string) =>
-  value
-    .split(/\r?\n/u)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 export const newAiProviderExecutionRouteDraft = (model = ''): AiProviderExecutionRouteDraft => ({
   key: nextRouteKey(),
   model,
   mode: 'json_validated',
+  enabled: true,
+  modeOverridden: false,
   contractId: 'research',
-  declarationSource: 'none',
-  declarationSourceRef: '',
-  declarationSourceVersion: '',
-  declaredAt: new Date().toISOString(),
-  declaredBy: '',
-  allowedUpstreamsText: '',
   firstOutputTimeoutMs: '',
   outputIdleTimeoutMs: '',
-  freeEvidenceSource: 'none',
-  freeEvidenceSourceRef: '',
-  freeEvidenceSourceVersion: '',
 });
 
 export const aiProviderExecutionRouteDraftFromConfig = (
@@ -74,18 +61,11 @@ export const aiProviderExecutionRouteDraftFromConfig = (
   key: nextRouteKey(),
   model: route.model,
   mode: route.mode,
+  enabled: route.enabled !== false,
+  modeOverridden: route.modeOverridden ?? true,
   contractId: route.contract.id,
-  declarationSource: route.capabilityDeclaration?.source ?? 'none',
-  declarationSourceRef: route.capabilityDeclaration?.sourceRef ?? '',
-  declarationSourceVersion: route.capabilityDeclaration?.sourceVersion ?? '',
-  declaredAt: route.capabilityDeclaration?.declaredAt ?? new Date().toISOString(),
-  declaredBy: route.capabilityDeclaration?.declaredBy ?? '',
-  allowedUpstreamsText: route.allowedUpstreams.join('\n'),
   firstOutputTimeoutMs: route.firstOutputTimeoutMs?.toString() ?? '',
   outputIdleTimeoutMs: route.outputIdleTimeoutMs?.toString() ?? '',
-  freeEvidenceSource: route.freeEvidence?.source ?? 'none',
-  freeEvidenceSourceRef: route.freeEvidence?.sourceRef ?? '',
-  freeEvidenceSourceVersion: route.freeEvidence?.sourceVersion ?? '',
 });
 
 export const aiProviderExecutionRouteInputFromDraft = (
@@ -93,36 +73,51 @@ export const aiProviderExecutionRouteInputFromDraft = (
 ): AiProviderExecutionRouteConfig => {
   const firstOutputTimeoutMs = optionalNumber(draft.firstOutputTimeoutMs);
   const outputIdleTimeoutMs = optionalNumber(draft.outputIdleTimeoutMs);
-  let capabilityDeclaration: AiProviderExecutionRouteConfig['capabilityDeclaration'] = null;
-  if (draft.declarationSource !== 'none') {
-    let declaredBy: string | null = null;
-    if (draft.declarationSource === 'manual') declaredBy = draft.declaredBy.trim() || null;
-    capabilityDeclaration = {
-      source: draft.declarationSource,
-      sourceRef: draft.declarationSourceRef.trim(),
-      sourceVersion: draft.declarationSourceVersion.trim(),
-      declaredAt: draft.declaredAt,
-      declaredBy,
-    };
-  }
-  const freeEvidence =
-    draft.freeEvidenceSource === 'none'
-      ? null
-      : {
-          source: draft.freeEvidenceSource,
-          sourceRef: draft.freeEvidenceSourceRef.trim(),
-          sourceVersion: draft.freeEvidenceSourceVersion.trim(),
-        };
   return {
     model: draft.model.trim(),
     mode: draft.mode,
+    ...(draft.enabled ? {} : { enabled: false }),
+    ...(draft.modeOverridden ? { modeOverridden: true } : {}),
     contract: contractRefs[draft.contractId],
-    capabilityDeclaration,
-    allowedUpstreams: lines(draft.allowedUpstreamsText),
     ...(firstOutputTimeoutMs === undefined ? {} : { firstOutputTimeoutMs }),
     ...(outputIdleTimeoutMs === undefined ? {} : { outputIdleTimeoutMs }),
-    freeEvidence,
   };
+};
+
+export type AiProviderExecutionModeState =
+  | { kind: 'none' }
+  | { kind: 'shared'; mode: AiProviderExecutionRouteDraft['mode'] }
+  | { kind: 'mixed' };
+
+export const aiProviderExecutionModeState = (
+  routes: readonly AiProviderExecutionRouteDraft[],
+): AiProviderExecutionModeState => {
+  if (routes.length === 0) return { kind: 'none' };
+  const first = routes[0]?.mode;
+  if (routes.every((route) => route.mode === first) && first !== undefined)
+    return { kind: 'shared', mode: first };
+  return { kind: 'mixed' };
+};
+
+export const nextActivePurposeAfterRemoval = (
+  routes: readonly AiProviderExecutionRouteDraft[],
+  removedKey: string,
+) => {
+  const routeIndex = routes.findIndex((route) => route.key === removedKey);
+  const remainingRoutes = routes.filter((route) => route.key !== removedKey);
+  return (
+    remainingRoutes[routeIndex]?.contractId ??
+    remainingRoutes[routeIndex - 1]?.contractId ??
+    remainingRoutes[0]?.contractId
+  );
+};
+
+export const aiProviderExecutionTimeoutLabel = (
+  value: string,
+  scope: 'route' | 'provider' = 'route',
+) => {
+  if (value.trim()) return '当前用途覆盖';
+  return scope === 'provider' ? '系统默认' : '继承 Provider 默认；未设置时使用系统默认';
 };
 
 export const aiReadinessReasonLabels: Record<
@@ -132,10 +127,8 @@ export const aiReadinessReasonLabels: Record<
   configuration_invalid: '配置不完整',
   provider_disabled: 'Provider 已停用',
   provider_down: '连接状态不可用',
-  capability_declaration_missing: '缺少能力声明',
   adapter_contract_evidence_missing: '缺少本地 adapter 契约证据',
-  route_not_allowed: '上游路由不在允许范围',
-  budget_not_authorized: '费用预算未授权或缺少免费依据',
+  budget_not_authorized: '费用预算未授权',
   capability_revoked: '该配置组合的能力已撤销',
 };
 

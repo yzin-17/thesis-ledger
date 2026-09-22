@@ -189,7 +189,7 @@ describe('AI 生成与执行共享契约', () => {
 });
 
 describe('AI Provider 与消费端共享契约', () => {
-  it('将声明、本地契约证据、接入就绪和真实验收分开', () => {
+  it('将本地契约证据、接入就绪和真实验收分开', () => {
     const adapterEvidence = aiAdapterContractEvidenceSchema.parse({
       adapter: 'openrouter',
       adapterVersion: '3.0.0',
@@ -203,13 +203,6 @@ describe('AI Provider 与消费端共享契约', () => {
       adapter: 'openrouter',
       mode: 'native_schema',
       contract: aiGenerationContracts.research.ref,
-      capabilityDeclaration: {
-        source: 'manual',
-        sourceRef: 'provider-doc',
-        declaredAt: time,
-        declaredBy: 'operator-1',
-        sourceVersion: 'catalog-v1',
-      },
       adapterEvidence,
       readiness: {
         state: 'ready',
@@ -218,8 +211,6 @@ describe('AI Provider 与消费端共享契约', () => {
         evaluatedAt: time,
       },
       liveValidation: { status: 'not_run', checkedAt: null, requestId: null },
-      allowedUpstreams: ['provider-a'],
-      freeEvidenceRef: 'price-catalog-v1',
     });
     expect(model.readiness.state).toBe('ready');
     expect(model.liveValidation.status).toBe('not_run');
@@ -229,12 +220,13 @@ describe('AI Provider 与消费端共享契约', () => {
         readiness: { ...model.readiness, state: 'blocked', reasons: [] },
       }),
     ).toThrow();
+    expect(model).not.toHaveProperty('capabilityDeclaration');
     expect(() =>
       aiProviderModelExecutionSchema.parse({
         ...model,
         capabilityDeclaration: null,
       }),
-    ).toThrow(/接入就绪必须同时具备/);
+    ).toThrow();
     expect(() =>
       aiProviderModelExecutionSchema.parse({
         ...model,

@@ -189,7 +189,7 @@ export function StrategyOptimizationExperimentPanel({
       if (sourceMode === 'existing' && selectedParameters.length === 0)
         throw new Error('至少授权一个参数');
       if (hasInvalidReasoningSelection)
-        throw new Error('所选模型的推理强度不受 Provider 能力声明支持');
+        throw new Error('所选模型的推理强度不受 Provider 能力配置支持');
       const models = selectedProviderRoutes.map((route) => {
         const effort = reasoningEfforts[routeKey(route.provider, route.model)];
         return {

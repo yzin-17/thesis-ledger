@@ -1,6 +1,8 @@
 import type { AiAdapter, AiChatImplementation, AiUpstreamFormat } from '@thesis-ledger/schemas';
 import type {
+  AiAuthMode,
   AiProviderCapabilityRevocation,
+  AiProviderModelPricingView,
   AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
@@ -35,10 +37,14 @@ export interface AiProviderMetadata {
   priority?: number;
   health?: AiProviderHealth;
   source?: 'database' | 'environment';
+  authMode?: AiAuthMode;
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
   costPer1kInput?: number;
   costPer1kOutput?: number;
   costCurrency?: string;
   pricingVersion?: string;
+  modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
   modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
   upstreamFormat?: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
@@ -60,7 +66,14 @@ export interface AiProvider {
   readonly id: string;
   readonly models: readonly string[];
   readonly metadata?: AiProviderMetadata;
-  sdkRuntime?(): { baseURL: string; apiKey: string; timeoutMs: number };
+  sdkRuntime?(): {
+    baseURL: string;
+    apiKey: string;
+    authMode?: AiAuthMode;
+    timeoutMs: number;
+    firstOutputTimeoutMs?: number;
+    outputIdleTimeoutMs?: number;
+  };
   /** 仅供显式进程内 fixture 使用；远程业务生成统一走 AiSdkGenerationAdapter。 */
   complete?: (
     input: {

@@ -20,6 +20,7 @@ import {
   type AiGenerationError,
   type AiGenerationMode,
   type AiUsageFacts,
+  type AiAuthMode,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
 import {
@@ -38,6 +39,7 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   requestId: string;
   adapter: AiAdapter;
   compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
+  authMode?: AiAuthMode;
   providerId: string;
   baseURL: string;
   apiKey: string;
@@ -49,7 +51,6 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   transport: 'single' | 'stream';
   maxOutputTokens?: number;
   reasoningEffort?: ReasoningEffort;
-  allowedUpstreams?: string[];
   timeout: {
     totalMs: number;
     firstChunkMs?: number;
@@ -248,16 +249,23 @@ const compatibilityProfile = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) =>
   input.compatibilityExtensionProfile ??
   (input.adapter === 'openrouter' ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 : undefined);
 
-const openRouterTransform = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) =>
-  compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-    ? (body: Record<string, unknown>) => ({
-        ...body,
-        provider: {
-          ...(input.mode === 'native_schema' ? { require_parameters: true } : {}),
-          ...(input.allowedUpstreams?.length ? { only: input.allowedUpstreams } : {}),
-        },
-      })
-    : undefined;
+const openRouterTransform = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
+  if (compatibilityProfile(input) !== AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1)
+    return undefined;
+  return (body: Record<string, unknown>) => {
+    if (input.mode !== 'native_schema') return body;
+    return { ...body, provider: { require_parameters: true } };
+  };
+};
+
+const noAuthFetch = async (
+  input: Parameters<typeof fetch>[0],
+  init?: Parameters<typeof fetch>[1],
+) => {
+  const headers = new Headers(init?.headers);
+  for (const header of ['authorization', 'x-api-key', 'api-key']) headers.delete(header);
+  return globalThis.fetch(input, { ...init, headers });
+};
 
 const modelFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>): LanguageModel => {
   if (
@@ -274,20 +282,28 @@ const modelFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>): LanguageModel 
       }),
       { status: 'unknown', inputTokens: null, outputTokens: null },
     );
+  const noAuth = input.authMode === 'none' ? { fetch: noAuthFetch } : {};
   if (input.adapter === 'openai-chat') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey }).chat(input.model);
+    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).chat(
+      input.model,
+    );
   }
   if (input.adapter === 'openai-responses') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey }).responses(input.model);
+    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).responses(
+      input.model,
+    );
   }
   if (input.adapter === 'anthropic-messages') {
-    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey }).messages(input.model);
+    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).messages(
+      input.model,
+    );
   }
   const transformRequestBody = openRouterTransform(input);
   return createOpenAICompatible({
     name: 'compatible',
     baseURL: input.baseURL,
     apiKey: input.apiKey,
+    ...noAuth,
     includeUsage: true,
     supportsStructuredOutputs: input.mode === 'native_schema',
     convertUsage: convertCompatibleUsage,

@@ -6,18 +6,28 @@ import {
   setAiProviderEnabled,
   testAiProviderDraft,
   testSavedAiProvider,
+  updateAiRoutingSettings,
 } from './ai-provider.api.js';
-import type { AiProviderInput } from './ai-provider.actions.js';
-import type { AiProviderModelCatalogInput } from './ai-provider.api.js';
+import type { AiProviderInput, AiProviderTestInput } from './ai-provider.actions.js';
+import type {
+  AiProviderModelCatalogInput,
+  AiProviderLifecycleOptions,
+  AiProviderTestRequestOptions,
+  AiRoutingSettings,
+  AiRoutingSettingsUpdate,
+} from './ai-provider.api.js';
 import { providerKeys } from './providers.queries.js';
 
 const aiCapabilityKey = ['desktop', 'ai', 'capabilities'] as const;
+const aiRoutingSettingsKey = ['desktop', 'ai', 'routing-settings'] as const;
 const optimizationCapabilityKey = ['desktop', 'strategy', 'optimization', 'capabilities'] as const;
 
 export const invalidateAiProviderState = (client: Pick<QueryClient, 'invalidateQueries'>) =>
   Promise.all([
     client.invalidateQueries({ queryKey: providerKeys.providers() }),
+    client.invalidateQueries({ queryKey: providerKeys.routingSettings() }),
     client.invalidateQueries({ queryKey: aiCapabilityKey }),
+    client.invalidateQueries({ queryKey: aiRoutingSettingsKey }),
     client.invalidateQueries({ queryKey: optimizationCapabilityKey }),
   ]);
 
@@ -44,10 +54,24 @@ export const useSaveAiProviderMutation = () => {
   });
 };
 
+export const useUpdateAiRoutingSettingsMutation = () => {
+  const client = useQueryClient();
+  return useMutation<AiRoutingSettings, unknown, AiRoutingSettingsUpdate>({
+    ...aiMutationOptions,
+    mutationFn: (input) => updateAiRoutingSettings(input),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: providerKeys.routingSettings() }),
+        client.invalidateQueries({ queryKey: aiRoutingSettingsKey }),
+      ]),
+  });
+};
+
 export const useTestAiProviderDraftMutation = () => {
   return useMutation({
     ...aiMutationOptions,
-    mutationFn: (input: AiProviderInput) => testAiProviderDraft(input),
+    mutationFn: ({ input, signal }: { input: AiProviderTestInput; signal?: AbortSignal }) =>
+      testAiProviderDraft(input, undefined, signal),
   });
 };
 
@@ -61,7 +85,24 @@ export const useTestSavedAiProviderMutation = () => {
   const client = useQueryClient();
   return useMutation({
     ...aiMutationOptions,
-    mutationFn: (name: string) => testSavedAiProvider(name),
+    mutationFn: ({
+      name,
+      model,
+      purpose,
+      mode,
+      budgetAuthorized,
+      requestId,
+      signal,
+    }: { name: string } & Omit<AiProviderTestRequestOptions, 'testKind'>) =>
+      testSavedAiProvider(name, {
+        ...(model === undefined ? {} : { model }),
+        testKind: 'generation',
+        ...(purpose === undefined ? {} : { purpose }),
+        ...(mode === undefined ? {} : { mode }),
+        ...(budgetAuthorized === undefined ? {} : { budgetAuthorized }),
+        ...(requestId === undefined ? {} : { requestId }),
+        ...(signal === undefined ? {} : { signal }),
+      }),
     onSuccess: () => invalidateAiProviderHealthState(client),
   });
 };
@@ -70,8 +111,10 @@ export const useSetAiProviderEnabledMutation = () => {
   const client = useQueryClient();
   return useMutation({
     ...aiMutationOptions,
-    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
-      setAiProviderEnabled(name, enabled),
+    mutationFn: ({ name, enabled, ...lifecycle }: {
+      name: string;
+      enabled: boolean;
+    } & AiProviderLifecycleOptions) => setAiProviderEnabled(name, enabled, lifecycle),
     onSuccess: () => invalidateAiProviderState(client),
   });
 };
@@ -80,7 +123,8 @@ export const useDeleteAiProviderMutation = () => {
   const client = useQueryClient();
   return useMutation({
     ...aiMutationOptions,
-    mutationFn: (name: string) => deleteAiProvider(name),
+    mutationFn: ({ name, ...lifecycle }: { name: string } & AiProviderLifecycleOptions) =>
+      deleteAiProvider(name, lifecycle),
     onSuccess: () => invalidateAiProviderState(client),
   });
 };

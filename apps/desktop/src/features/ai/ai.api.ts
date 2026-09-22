@@ -10,6 +10,7 @@ import type {
   AiToolCallsPage,
   AiCapabilitiesResponse,
   CreateAiRunInput,
+  AiRoutingSettings,
 } from './ai.types.js';
 
 export interface AiRunListFilter {
@@ -83,6 +84,9 @@ export const fetchAiToolCalls = (
 
 export const fetchAiCapabilities = (client?: DesktopRequestClient) =>
   requestDesktopJson<AiCapabilitiesResponse>('/ai/runs/capabilities', undefined, client);
+
+export const fetchAiRoutingSettings = (client?: DesktopRequestClient) =>
+  requestDesktopJson<AiRoutingSettings>('/ai/settings', undefined, client);
 
 export const fetchAiResearchRetryPrefill = (id: string, client?: DesktopRequestClient) =>
   requestDesktopJson<AiResearchRetryPrefill>(

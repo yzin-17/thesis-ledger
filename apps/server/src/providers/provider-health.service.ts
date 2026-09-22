@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { PrismaService } from '../platform/prisma.service.js';
 
@@ -32,6 +33,7 @@ export class ProviderHealthService {
     errorCode?: string,
     checkedAt = new Date(),
     source: ProviderHealthSource = 'manual',
+    details?: Prisma.InputJsonValue,
   ) {
     const providerKey = normalizeProviderName(provider);
     const previous = await this.prisma.providerHealth.findUnique({
@@ -71,11 +73,36 @@ export class ProviderHealthService {
           latencyMs,
           errorCode: errorCode ?? null,
           source,
+          ...(details === undefined ? {} : { details }),
           checkedAt,
         },
       });
     }
     return result;
+  }
+
+  async recordHistory(
+    provider: string,
+    state: ProviderState,
+    latencyMs: number,
+    errorCode?: string,
+    checkedAt = new Date(),
+    source: ProviderHealthSource = 'manual',
+    details?: Prisma.InputJsonValue,
+  ) {
+    const providerKey = normalizeProviderName(provider);
+    if (!this.prisma.providerHealthCheck) return null;
+    return this.prisma.providerHealthCheck.create({
+      data: {
+        provider: providerKey,
+        state,
+        latencyMs,
+        errorCode: errorCode ?? null,
+        source,
+        ...(details === undefined ? {} : { details }),
+        checkedAt,
+      },
+    });
   }
 
   list() {

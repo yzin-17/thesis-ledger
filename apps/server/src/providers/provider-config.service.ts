@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   assertAllowedFeishuWebhookUrl,
@@ -28,6 +33,8 @@ export interface ProviderConfigInput {
   quota?: { limit?: number; used?: number; resetsAt?: string };
   cost?: { currency: string; amount: number; period: 'request' | 'month' | 'year' };
   connectionTestToken?: string;
+  clearCredentials?: boolean;
+  expectedRevision?: string;
 }
 
 export type ProviderConnectionTestStatus =
@@ -144,12 +151,26 @@ export class ProviderConfigService {
     return this.prisma.providerConfig.findUnique({ where: { name } });
   }
 
-  async setEnabled(name: string, enabled: boolean) {
-    return this.prisma.providerConfig.update({ where: { name }, data: { enabled } });
+  async setEnabled(name: string, enabled: boolean, expectedRevision?: string) {
+    if (expectedRevision === undefined)
+      return this.prisma.providerConfig.update({ where: { name }, data: { enabled } });
+    const result = await this.prisma.providerConfig.updateMany({
+      where: { name, updatedAt: new Date(expectedRevision) },
+      data: { enabled },
+    });
+    if (result.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
+    return this.prisma.providerConfig.findUnique({ where: { name } });
   }
 
-  async deleteStored(name: string) {
-    return this.prisma.providerConfig.delete({ where: { name } });
+  async deleteStored(name: string, expectedRevision?: string) {
+    if (expectedRevision === undefined)
+      return this.prisma.providerConfig.delete({ where: { name } });
+    const current = await this.prisma.providerConfig.findUnique({ where: { name } });
+    const result = await this.prisma.providerConfig.deleteMany({
+      where: { name, updatedAt: new Date(expectedRevision) },
+    });
+    if (result.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
+    return current;
   }
 
   async setHealth(name: string, health: string) {
@@ -164,44 +185,62 @@ export class ProviderConfigService {
     const value = validate(input);
     const existing = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
     const tested = this.consumeDraftTest(value);
-    let credentialPayload = tested?.encryptedCredential;
+    let credentialPayload = value.clearCredentials ? undefined : tested?.encryptedCredential;
     const rawCredential = value.credentialsRef?.trim();
-    if (!credentialPayload && rawCredential)
+    if (!value.clearCredentials && !credentialPayload && rawCredential)
       credentialPayload = encryptProviderCredential(rawCredential);
-    if (!credentialPayload && existing?.encryptedCredentials) {
+    if (!value.clearCredentials && !credentialPayload && existing?.encryptedCredentials) {
       const normalized = normalizeProviderCredential(existing.encryptedCredentials);
       if (normalized.needsRotation) credentialPayload = normalized.payload;
     }
+    const credentialUpdate: { encryptedCredentials?: CredentialPayload | null } = {};
+    if (value.clearCredentials) credentialUpdate.encryptedCredentials = null;
+    else if (credentialPayload) credentialUpdate.encryptedCredentials = credentialPayload;
 
     const testedHealthy = Boolean(tested);
     const enabled = value.enabled ?? true;
     const healthReset = existing && existing.enabled !== enabled;
-    const saved = await this.prisma.providerConfig.upsert({
-      where: { name: value.name },
-      update: {
-        type: value.type,
-        enabled,
-        priority: value.priority,
-        capabilities: value.capabilities,
-        ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
-        settings: (value.settings ?? {}) as Prisma.InputJsonValue,
-        ...(value.quota === undefined ? {} : { quota: value.quota }),
-        ...(value.cost === undefined ? {} : { cost: value.cost }),
-        ...(testedHealthy ? { health: 'healthy' } : healthReset ? { health: 'unknown' } : {}),
-      },
-      create: {
-        name: value.name,
-        type: value.type,
-        enabled,
-        priority: value.priority,
-        capabilities: value.capabilities,
-        ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
-        settings: (value.settings ?? {}) as Prisma.InputJsonValue,
-        ...(value.quota === undefined ? {} : { quota: value.quota }),
-        ...(value.cost === undefined ? {} : { cost: value.cost }),
-        ...(testedHealthy ? { health: 'healthy' } : {}),
-      },
-    });
+    const updateData = {
+      type: value.type,
+      enabled,
+      priority: value.priority,
+      capabilities: value.capabilities,
+      ...credentialUpdate,
+      settings: (value.settings ?? {}) as Prisma.InputJsonValue,
+      ...(value.quota === undefined ? {} : { quota: value.quota }),
+      ...(value.cost === undefined ? {} : { cost: value.cost }),
+      ...(testedHealthy ? { health: 'healthy' } : healthReset ? { health: 'unknown' } : {}),
+    };
+    const createData = {
+      name: value.name,
+      type: value.type,
+      enabled,
+      priority: value.priority,
+      capabilities: value.capabilities,
+      ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
+      settings: (value.settings ?? {}) as Prisma.InputJsonValue,
+      ...(value.quota === undefined ? {} : { quota: value.quota }),
+      ...(value.cost === undefined ? {} : { cost: value.cost }),
+      ...(testedHealthy ? { health: 'healthy' } : {}),
+    };
+    let saved;
+    if (existing && value.type === 'ai') {
+      if (!value.expectedRevision)
+        throw new ConflictException('Provider 配置已存在，请基于当前版本保存');
+      const result = await this.prisma.providerConfig.updateMany({
+        where: { name: value.name, updatedAt: new Date(value.expectedRevision) },
+        data: updateData,
+      });
+      if (result.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
+      saved = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
+      if (!saved) throw new NotFoundException('Provider 配置保存后不存在');
+    } else {
+      saved = await this.prisma.providerConfig.upsert({
+        where: { name: value.name },
+        update: updateData,
+        create: createData,
+      });
+    }
     let finalSaved = saved;
     let healthCheck: ProviderHealthObservation | undefined;
     if (tested) {

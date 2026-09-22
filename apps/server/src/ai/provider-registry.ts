@@ -29,9 +29,14 @@ export class AiProviderRegistry {
       next.set(provider.id, provider);
     }
     const nextRoutes = new Map<string, AiProviderRouteSnapshot>();
+    const contractKeys = new Set<string>();
     const snapshots =
       routeSnapshots ?? providers.flatMap((provider) => routeSnapshotsFromProvider(provider));
     for (const snapshot of snapshots) {
+      const contractKey = `${snapshot.providerId}\u0000${snapshot.route.model}\u0000${snapshot.route.contract.id}`;
+      if (contractKeys.has(contractKey))
+        throw new Error(`AI Provider 业务用途路由重复: ${contractKey}`);
+      contractKeys.add(contractKey);
       const key = routeKey(
         snapshot.providerId,
         snapshot.route.model,
@@ -89,6 +94,16 @@ export class AiProviderRegistry {
       throw new Error(`AI Provider ${providerId} 不支持模型 ${model}`);
     if (provider.metadata?.health === 'down') throw new Error(`AI Provider 不可用: ${providerId}`);
     return provider;
+  }
+
+  hasContractRoute(providerId: string, model: string, contract: AiGenerationContractRef) {
+    return [...this.routes.values()].some(
+      (snapshot) =>
+        snapshot.providerId === providerId &&
+        snapshot.route.model === model &&
+        snapshot.route.contract.id === contract.id &&
+        snapshot.route.contract.version === contract.version,
+    );
   }
 
   readiness(providerId: string, budgetAuthorized = false) {
@@ -201,7 +216,35 @@ export const routeSnapshotsFromProvider = (provider: AiProvider): AiProviderRout
     upstreamFormat === 'chat-completions'
       ? (metadata?.chatImplementation ?? 'compatible')
       : undefined;
-  return (metadata?.executionRoutes ?? []).map((route) => ({
+  return (metadata?.executionRoutes ?? []).filter((route) => route.enabled !== false).map((route) => ({
+    ...(() => {
+      const modelPricing = metadata?.modelPricing?.[route.model];
+      if (modelPricing)
+        return {
+          ...(modelPricing.costPer1kInput === undefined
+            ? {}
+            : { costPer1kInput: modelPricing.costPer1kInput }),
+          ...(modelPricing.costPer1kOutput === undefined
+            ? {}
+            : { costPer1kOutput: modelPricing.costPer1kOutput }),
+          ...(modelPricing.costCurrency === undefined
+            ? {}
+            : { costCurrency: modelPricing.costCurrency }),
+          pricingVersion: modelPricing.pricingVersion,
+        };
+      return {
+        ...(metadata?.costPer1kInput === undefined
+          ? {}
+          : { costPer1kInput: metadata.costPer1kInput }),
+        ...(metadata?.costPer1kOutput === undefined
+          ? {}
+          : { costPer1kOutput: metadata.costPer1kOutput }),
+        ...(metadata?.costCurrency === undefined ? {} : { costCurrency: metadata.costCurrency }),
+        ...(metadata?.pricingVersion === undefined
+          ? {}
+          : { pricingVersion: metadata.pricingVersion }),
+      };
+    })(),
     providerId: provider.id,
     baseUrl,
     upstreamFormat,
@@ -212,6 +255,12 @@ export const routeSnapshotsFromProvider = (provider: AiProvider): AiProviderRout
     adapter: metadata?.adapter ?? null,
     models: provider.models,
     route,
+    ...(metadata?.firstOutputTimeoutMs === undefined
+      ? {}
+      : { firstOutputTimeoutMs: metadata.firstOutputTimeoutMs }),
+    ...(metadata?.outputIdleTimeoutMs === undefined
+      ? {}
+      : { outputIdleTimeoutMs: metadata.outputIdleTimeoutMs }),
     enabled: true,
     health: metadata?.health ?? 'unknown',
     credentialFingerprint: metadata?.credentialFingerprint ?? null,

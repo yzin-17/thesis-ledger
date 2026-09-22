@@ -4,9 +4,16 @@ import { AiProviderService } from './ai-provider.service.js';
 import {
   aiProviderInputSchema,
   aiProviderModelCatalogInputSchema,
+  aiProviderTestOptionsSchema,
+  aiProviderTestInputSchema,
+  aiProviderTestCancelInputSchema,
+  aiProviderLifecycleOptionsSchema,
 } from './ai-provider.contracts.js';
 
-const enabledSchema = z.object({ enabled: z.boolean() }).strict();
+const enabledSchema = z
+  .object({ enabled: z.boolean() })
+  .merge(aiProviderLifecycleOptionsSchema)
+  .strict();
 
 @Controller('ai/providers')
 export class AiProviderController {
@@ -17,6 +24,11 @@ export class AiProviderController {
     return this.providers.list();
   }
 
+  @Post('migration/dry-run')
+  migrationDryRun() {
+    return this.providers.migrationDryRun();
+  }
+
   @Post()
   save(@Body() input: unknown) {
     return this.providers.save(aiProviderInputSchema.parse(input));
@@ -24,7 +36,7 @@ export class AiProviderController {
 
   @Post('test')
   testDraft(@Body() input: unknown) {
-    return this.providers.testDraft(aiProviderInputSchema.parse(input));
+    return this.providers.testDraft(aiProviderTestInputSchema.parse(input));
   }
 
   @Post('models')
@@ -33,8 +45,24 @@ export class AiProviderController {
   }
 
   @Post(':name/test')
-  testSaved(@Param('name') name: string) {
-    return this.providers.testSaved(name);
+  testSaved(@Param('name') name: string, @Body() input: unknown) {
+    const options = aiProviderTestOptionsSchema.parse(input ?? {});
+    return this.providers.testSaved(name, {
+      ...(options.model === undefined ? {} : { model: options.model }),
+      ...(options.testKind === undefined ? {} : { testKind: options.testKind }),
+      ...(options.purpose === undefined ? {} : { purpose: options.purpose }),
+      ...(options.mode === undefined ? {} : { mode: options.mode }),
+      ...(options.budgetAuthorized === undefined
+        ? {}
+        : { budgetAuthorized: options.budgetAuthorized }),
+      ...(options.requestId === undefined ? {} : { requestId: options.requestId }),
+    });
+  }
+
+  @Post(':name/test/cancel')
+  cancelTest(@Param('name') name: string, @Body() input: unknown) {
+    const parsed = aiProviderTestCancelInputSchema.parse(input);
+    return this.providers.cancelTest(name, parsed.requestId);
   }
 
   @Get(':name/readiness')
@@ -45,11 +73,12 @@ export class AiProviderController {
   @Patch(':name/enabled')
   setEnabled(@Param('name') name: string, @Body() input: unknown) {
     const parsed = enabledSchema.parse(input);
-    return this.providers.setEnabled(name, parsed.enabled);
+    return this.providers.setEnabled(name, parsed.enabled, parsed);
   }
 
   @Delete(':name')
-  remove(@Param('name') name: string) {
-    return this.providers.remove(name);
+  remove(@Param('name') name: string, @Body() input: unknown) {
+    const parsed = aiProviderLifecycleOptionsSchema.parse(input ?? {});
+    return this.providers.remove(name, parsed);
   }
 }

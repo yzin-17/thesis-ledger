@@ -4,7 +4,10 @@ import type {
   OptimizationReasoningEffort,
 } from '@thesis-ledger/schemas';
 import type { AiProviderRegistry } from '../ai/provider-registry.js';
-import { optimizationCostFacts } from './strategy-optimization-cost.js';
+import {
+  optimizationCostFacts,
+  optimizationPricingForModel,
+} from './strategy-optimization-cost.js';
 
 export type OptimizationModelRoute = {
   provider: string;
@@ -41,11 +44,18 @@ export const buildOptimizationModelConfig = (
       throw new BadRequestException(
         `模型 ${route.provider}:${route.model} 未声明支持推理强度 ${route.reasoningEffort}`,
       );
-    const costFacts = optimizationCostFacts(provider.metadata);
+    const costFacts = optimizationCostFacts(provider.metadata, route.model);
+    const pricing = optimizationPricingForModel(provider.metadata, route.model);
     return {
       provider: route.provider,
       model: route.model,
       ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
       ...costFacts,
+      ...(pricing?.costPer1kInput === undefined
+        ? {}
+        : { costPer1kInput: pricing.costPer1kInput }),
+      ...(pricing?.costPer1kOutput === undefined
+        ? {}
+        : { costPer1kOutput: pricing.costPer1kOutput }),
     };
   });

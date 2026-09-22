@@ -79,7 +79,7 @@ describe('AI 执行事实展示', () => {
       '未确认 Token 预留 100 / 20',
       '未确认费用预留 USD 0.25',
     ]);
-    expect(display.policyLines).toContain('费用上限 0，仅允许具有免费依据的路由');
+    expect(display.policyLines).toContain('费用上限 0，仅允许用户填写为零费用的路由');
   });
 
   it('不同币种分开显示，超预算只停止后续执行而不抹除结果事实', () => {

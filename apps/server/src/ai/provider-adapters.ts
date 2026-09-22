@@ -9,14 +9,18 @@ import type {
 import {
   aiProviderExecutionRouteInputSchema,
   aiProviderModelReasoningSchema,
+  aiProviderModelPricingViewSchema,
   type AiProviderExecutionRouteInput,
+  type AiProviderModelPricingView,
 } from './ai-provider.contracts.js';
 import {
   aiLegacyAdapterSchema,
+  aiAuthModeSchema as sharedAiAuthModeSchema,
   aiChatImplementationSchema,
   aiUpstreamFormatSchema,
   aiUpstreamSelectionSchema,
   type AiAdapter,
+  type AiAuthMode,
   type AiChatImplementation,
   type AiUpstreamFormat,
 } from '@thesis-ledger/schemas';
@@ -41,17 +45,23 @@ const providerConfigSchema = z
       .object({
         id: z.string().trim().min(1).max(120),
         baseUrl: z.url(),
-        apiKey: z.string().trim().min(1),
+        authMode: sharedAiAuthModeSchema.default('api_key'),
+        apiKey: z.string().trim().min(1).optional(),
         models: z.array(z.string().trim().min(1).max(200)).min(1),
         upstreamFormat: aiUpstreamFormatSchema.optional(),
         chatImplementation: aiChatImplementationSchema.optional(),
         adapter: aiLegacyAdapterSchema.optional(),
         executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
         timeoutMs: z.number().int().positive().optional(),
+        firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
+        outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
         costPer1kInput: z.number().nonnegative().optional(),
         costPer1kOutput: z.number().nonnegative().optional(),
         costCurrency: z.string().trim().min(1).max(16).optional(),
         pricingVersion: z.string().trim().min(1).max(120).optional(),
+        modelPricing: z
+          .record(z.string().trim().min(1).max(200), aiProviderModelPricingViewSchema)
+          .optional(),
         modelReasoning: z
           .record(z.string().trim().min(1).max(200), aiProviderModelReasoningSchema)
           .optional(),
@@ -89,6 +99,18 @@ const providerConfigSchema = z
           path: [index, 'executionRoutes'],
           message: '执行路由只能配置同一 Provider 已选择的模型',
         });
+      if (provider.authMode === 'api_key' && !provider.apiKey)
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'apiKey'],
+          message: 'API Key 模式必须配置 API Key',
+        });
+      if (provider.authMode === 'none' && provider.apiKey)
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'authMode'],
+          message: '无需认证模式不能配置 API Key',
+        });
     });
   });
 
@@ -124,7 +146,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
       chatImplementation?: AiChatImplementation;
       compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
       adapter?: AiAdapter;
+      authMode?: AiAuthMode;
       executionRoutes?: readonly AiProviderExecutionRouteInput[];
+      firstOutputTimeoutMs?: number;
+      outputIdleTimeoutMs?: number;
+      modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
       credentialFingerprint?: string;
     },
   ) {
@@ -142,7 +168,15 @@ export class OpenAiCompatibleProvider implements AiProvider {
         ? { compatibilityExtensionProfile: options.compatibilityExtensionProfile }
         : {}),
       ...(options?.adapter ? { adapter: options.adapter } : {}),
+      authMode: options?.authMode ?? 'api_key',
+      ...(options?.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: options.firstOutputTimeoutMs }),
+      ...(options?.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: options.outputIdleTimeoutMs }),
       ...(options?.executionRoutes ? { executionRoutes: options.executionRoutes } : {}),
+      ...(options?.modelPricing ? { modelPricing: options.modelPricing } : {}),
       ...(options?.credentialFingerprint
         ? { credentialFingerprint: options.credentialFingerprint }
         : {}),
@@ -156,7 +190,18 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 
   sdkRuntime() {
-    return { baseURL: this.baseUrl, apiKey: this.apiKey, timeoutMs: this.timeoutMs };
+    return {
+      baseURL: this.baseUrl,
+      apiKey: this.apiKey,
+      authMode: this.metadata.authMode,
+      timeoutMs: this.timeoutMs,
+      ...(this.metadata.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: this.metadata.firstOutputTimeoutMs }),
+      ...(this.metadata.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: this.metadata.outputIdleTimeoutMs }),
+    };
   }
 }
 
@@ -326,7 +371,7 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
     input.id,
     input.models,
     input.baseUrl,
-    input.apiKey,
+    input.authMode === 'none' ? '' : (input.apiKey ?? ''),
     input.timeoutMs ?? defaultTimeoutMs,
     {
       ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
@@ -335,6 +380,7 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
       ...(input.pricingVersion ? { pricingVersion: input.pricingVersion } : {}),
     },
     {
+      authMode: input.authMode,
       ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
       upstreamFormat: selection.upstreamFormat,
       ...(selection.upstreamFormat === 'chat-completions'
@@ -343,7 +389,16 @@ const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: n
       ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
       ...(adapter ? { adapter } : {}),
       ...(input.executionRoutes ? { executionRoutes: input.executionRoutes } : {}),
-      credentialFingerprint: createHash('sha256').update(input.apiKey, 'utf8').digest('hex'),
+      ...(input.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: input.firstOutputTimeoutMs }),
+      ...(input.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: input.outputIdleTimeoutMs }),
+      ...(input.modelPricing ? { modelPricing: input.modelPricing } : {}),
+      ...(input.apiKey
+        ? { credentialFingerprint: createHash('sha256').update(input.apiKey, 'utf8').digest('hex') }
+        : {}),
     },
   );
 };
@@ -368,6 +423,7 @@ export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => 
             upstreamFormat: 'chat-completions',
             chatImplementation: 'compatible',
             adapter: 'openai-compatible-chat',
+            authMode: 'api_key',
           },
         ),
       );

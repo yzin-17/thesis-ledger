@@ -197,7 +197,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
             (route.reasoning?.mandatory === true && effort === 'none'))
         );
       });
-      if (invalidReasoning) errors.models = '推理强度不符合 Provider 能力声明。';
+      if (invalidReasoning) errors.models = '推理强度不符合 Provider 能力配置。';
     }
     if (targetStep >= 3) {
       if (

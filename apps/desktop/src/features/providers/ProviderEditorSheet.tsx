@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoaderCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AiProviderEditorFields } from './AiProviderEditorFields.js';
 import {
   providerCapabilityOptions,
@@ -28,16 +29,15 @@ import {
   providerTypeLabel,
 } from './providers.types.js';
 
-import type { AiProviderModelDetail, ProviderDraft } from './providers.types.js';
+import type { AiAuthMode, AiProviderModelDetail, ProviderDraft } from './providers.types.js';
 
 const saveProviderLabel = (saving: boolean, editing: boolean) => {
   if (saving) return '保存中…';
   return editing ? '保存修改' : '保存 Provider';
 };
 
-const providerTestLabel = (testing: boolean, type: string) => {
+const providerTestLabel = (testing: boolean) => {
   if (testing) return '测试中…';
-  if (type === 'ai') return '最小生成测试';
   return '测试连接';
 };
 
@@ -65,8 +65,12 @@ export const ProviderEditorSheet = ({
   onUpdateDraft,
   onResetTest,
   onSetCredentialInputOpen,
+  onAuthModeChange,
   onTypeChange,
   onFetchAiModels = () => undefined,
+  onTestModel,
+  onTestPurpose,
+  onCancelTest,
   onClose,
   onTest,
   onSave,
@@ -85,8 +89,16 @@ export const ProviderEditorSheet = ({
   onUpdateDraft: (updater: (current: ProviderDraft) => ProviderDraft) => void;
   onResetTest: () => void;
   onSetCredentialInputOpen: (open: boolean) => void;
+  onAuthModeChange: (value: AiAuthMode) => void | Promise<void>;
   onTypeChange: (type: string) => void;
   onFetchAiModels?: () => void;
+  onTestModel?: (model: string) => void;
+  onTestPurpose?: (
+    model: string,
+    purpose: ProviderDraft['executionRoutes'][number]['contractId'],
+    mode: ProviderDraft['executionRoutes'][number]['mode'],
+  ) => void;
+  onCancelTest?: () => void;
   onClose: () => void;
   onTest: () => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
@@ -149,26 +161,12 @@ export const ProviderEditorSheet = ({
                       <SelectGroup>
                         <SelectItem value="notification">通知</SelectItem>
                         <SelectItem value="market">行情</SelectItem>
-                        <SelectItem value="ai">人工智能</SelectItem>
+                        <SelectItem value="ai">AI</SelectItem>
                         <SelectItem value="vision">图像</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
                 </Field>
-                {providerDraft.type === 'ai' && (
-                  <AiProviderEditorFields
-                    draft={providerDraft}
-                    credentialInputOpen={credentialInputOpen}
-                    takingOverEnvironmentName={takingOverEnvironmentName}
-                    onUpdateDraft={onUpdateDraft}
-                    onResetTest={onResetTest}
-                    onSetCredentialInputOpen={onSetCredentialInputOpen}
-                    availableModels={availableAiModels}
-                    modelDetails={aiModelDetails}
-                    modelCatalogState={aiModelCatalogState}
-                    onFetchModels={onFetchAiModels}
-                  />
-                )}
                 <Field>
                   <FieldLabel htmlFor="provider-capabilities">能力（可多选）</FieldLabel>
                   <Select
@@ -215,6 +213,50 @@ export const ProviderEditorSheet = ({
                     required
                   />
                 </Field>
+                {providerDraft.type === 'ai' && (
+                  <Tabs defaultValue="connection" className="w-full">
+                    <TabsList variant="line" className="w-full">
+                      <TabsTrigger value="connection">连接配置</TabsTrigger>
+                      <TabsTrigger value="model">模型与用途</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="connection" className="pt-4">
+                      <AiProviderEditorFields
+                        section="connection"
+                        draft={providerDraft}
+                        credentialInputOpen={credentialInputOpen}
+                        takingOverEnvironmentName={takingOverEnvironmentName}
+                        onUpdateDraft={onUpdateDraft}
+                        onResetTest={onResetTest}
+                        onSetCredentialInputOpen={onSetCredentialInputOpen}
+                        onAuthModeChange={onAuthModeChange}
+                        availableModels={availableAiModels}
+                        modelDetails={aiModelDetails}
+                        modelCatalogState={aiModelCatalogState}
+                        onFetchModels={onFetchAiModels}
+                        {...(onTestModel ? { onTestModel } : {})}
+                        {...(onTestPurpose ? { onTestPurpose } : {})}
+                      />
+                    </TabsContent>
+                    <TabsContent value="model" className="pt-4">
+                      <AiProviderEditorFields
+                        section="model"
+                        draft={providerDraft}
+                        credentialInputOpen={credentialInputOpen}
+                        takingOverEnvironmentName={takingOverEnvironmentName}
+                        onUpdateDraft={onUpdateDraft}
+                        onResetTest={onResetTest}
+                        onSetCredentialInputOpen={onSetCredentialInputOpen}
+                        onAuthModeChange={onAuthModeChange}
+                        availableModels={availableAiModels}
+                        modelDetails={aiModelDetails}
+                        modelCatalogState={aiModelCatalogState}
+                        onFetchModels={onFetchAiModels}
+                        {...(onTestModel ? { onTestModel } : {})}
+                        {...(onTestPurpose ? { onTestPurpose } : {})}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                )}
                 {providerDraft.type !== 'ai' && (
                   <>
                     {credentialInputOpen ? (
@@ -271,22 +313,29 @@ export const ProviderEditorSheet = ({
               >
                 取消
               </Button>
-              <Button
-                disabled={providerTestState === 'testing' || savingProviderDraft}
-                aria-busy={providerTestState === 'testing'}
-                type="button"
-                variant="outline"
-                onClick={onTest}
-              >
-                {providerTestState === 'testing' && (
-                  <LoaderCircle
-                    data-icon="inline-start"
-                    className="animate-spin"
-                    aria-hidden="true"
-                  />
-                )}
-                {providerTestLabel(providerTestState === 'testing', providerDraft.type)}
-              </Button>
+              {providerDraft.type === 'ai' && providerTestState === 'testing' && onCancelTest ? (
+                <Button type="button" variant="outline" onClick={onCancelTest}>
+                  取消测试
+                </Button>
+              ) : null}
+              {providerDraft.type !== 'ai' ? (
+                <Button
+                  disabled={providerTestState === 'testing' || savingProviderDraft}
+                  aria-busy={providerTestState === 'testing'}
+                  type="button"
+                  variant="outline"
+                  onClick={onTest}
+                >
+                  {providerTestState === 'testing' && (
+                    <LoaderCircle
+                      data-icon="inline-start"
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {providerTestLabel(providerTestState === 'testing')}
+                </Button>
+              ) : null}
               <Button
                 disabled={providerTestState === 'testing' || savingProviderDraft}
                 type="submit"

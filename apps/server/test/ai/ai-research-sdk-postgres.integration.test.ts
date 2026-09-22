@@ -120,7 +120,12 @@ postgresDescribe('Research SDK isolated PostgreSQL vertical', () => {
     const provider = {
       id: 'fixture',
       models: ['fixture-model'],
-      metadata: { health: 'healthy' as const },
+      metadata: {
+        health: 'healthy' as const,
+        costPer1kInput: 0,
+        costPer1kOutput: 0,
+        costCurrency: 'USD',
+      },
       sdkRuntime: () => ({ baseURL: `${baseURL}/v1`, apiKey: 'secret', timeoutMs: 2_000 }),
     };
     const registry = {
@@ -131,8 +136,6 @@ postgresDescribe('Research SDK isolated PostgreSQL vertical', () => {
           execution: {
             adapter: 'openai-compatible' as const,
             mode: 'json_validated' as const,
-            allowedUpstreams: [],
-            freeEvidenceRef: 'postgres-fixture-free',
             readiness: { configurationFingerprint: 'fixture-fingerprint' },
           },
         },
@@ -154,7 +157,8 @@ postgresDescribe('Research SDK isolated PostgreSQL vertical', () => {
     });
 
     const stored = await prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } });
-    const saved = (stored.modelMetadata as Record<string, unknown>).sdkExecution as AiExecutionSummary;
+    const saved = (stored.modelMetadata as Record<string, unknown>)
+      .sdkExecution as AiExecutionSummary;
     expect(requestCount).toBe(1);
     expect(stored).toMatchObject({
       status: 'succeeded',

@@ -346,7 +346,7 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     expect(account[0]?.costUsed.toString()).toBe('1');
   });
 
-  it('免费路由的结构化依据允许保留未知 Provider 费用', async () => {
+  it('未知 Provider 费用不再因历史免费依据而放行后续执行', async () => {
     const runId = await createRun();
     const requestId = randomUUID();
     await store.prepareRequest({
@@ -361,7 +361,7 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
           status: 'unknown',
           amount: null,
           currency: null,
-          source: 'free_evidence:fixture-free-route',
+          source: 'provider_cost_unavailable',
           pricingVersion: null,
         },
       },
@@ -386,14 +386,14 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
           status: 'unknown',
           amount: null,
           currency: null,
-          source: 'free_evidence:fixture-free-route',
+          source: 'provider_cost_unavailable',
           pricingVersion: null,
         },
       ),
       attemptId: optimization.attemptId,
     });
 
-    expect(settled?.continuationBlockedReason).toBeNull();
+    expect(settled?.continuationBlockedReason).toBe('cost_unknown');
     const account = await prisma.$queryRaw<Array<{ costUsed: Prisma.Decimal }>>(Prisma.sql`
       SELECT "costUsed" FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
     `);

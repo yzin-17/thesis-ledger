@@ -181,11 +181,10 @@ export class StrategyOptimizationReadService {
       riskApplicationsEnabled: process.env.STRATEGY_RISK_APPLICATIONS_ENABLED !== 'false',
       aiOptimizationEnabled: process.env.STRATEGY_AI_OPTIMIZATION_ENABLED !== 'false',
       providers: this.providers.list().flatMap((provider) => {
-        const costFacts = optimizationCostFacts(provider.metadata);
         return provider.models.map((model) => ({
           provider: provider.id,
           model,
-          ...costFacts,
+          ...optimizationCostFacts(provider.metadata, model),
           ...(provider.metadata?.modelReasoning?.[model]
             ? {
                 reasoning: {

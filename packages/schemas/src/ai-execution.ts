@@ -25,6 +25,28 @@ export type AiAdapter = z.infer<typeof aiAdapterSchema>;
 export const aiGenerationModeSchema = z.enum(['native_schema', 'json_validated']);
 export type AiGenerationMode = z.infer<typeof aiGenerationModeSchema>;
 
+export const aiAuthModeSchema = z.enum(['api_key', 'none']);
+export type AiAuthMode = z.infer<typeof aiAuthModeSchema>;
+
+export const aiProviderTestKindSchema = z.enum(['connection', 'generation']);
+export type AiProviderTestKind = z.infer<typeof aiProviderTestKindSchema>;
+
+export const aiResearchDefaultSchema = z
+  .object({
+    providerId: z.string().trim().min(1).max(120),
+    model: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export type AiResearchDefault = z.infer<typeof aiResearchDefaultSchema>;
+
+export const aiRoutingSettingsSchema = z
+  .object({
+    researchDefault: aiResearchDefaultSchema.nullable(),
+    revision: z.string().trim().min(1).max(120),
+  })
+  .strict();
+export type AiRoutingSettings = z.infer<typeof aiRoutingSettingsSchema>;
+
 export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
   z
     .object({
@@ -362,20 +384,6 @@ export type AiResearchPolicyV1 = z.infer<typeof aiResearchPolicyV1Schema>;
 
 export const DEFAULT_AI_RESEARCH_POLICY_V1: AiResearchPolicyV1 = aiResearchPolicyV1Schema.parse({});
 
-export const aiCapabilityDeclarationSchema = z
-  .object({
-    source: z.enum(['trusted_catalog', 'manual']),
-    sourceRef: z.string().trim().min(1).max(500),
-    declaredAt: z.iso.datetime({ offset: true }),
-    declaredBy: z.string().trim().min(1).max(200).nullable(),
-    sourceVersion: z.string().trim().min(1).max(120),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    if (value.source === 'manual' && !value.declaredBy)
-      context.addIssue({ code: 'custom', path: ['declaredBy'], message: '人工声明必须记录声明者' });
-  });
-
 export const aiAdapterContractEvidenceSchema = z
   .object({
     adapter: aiAdapterSchema,
@@ -391,9 +399,7 @@ export const aiReadinessReasonSchema = z.enum([
   'configuration_invalid',
   'provider_disabled',
   'provider_down',
-  'capability_declaration_missing',
   'adapter_contract_evidence_missing',
-  'route_not_allowed',
   'budget_not_authorized',
   'capability_revoked',
 ]);
@@ -443,14 +449,13 @@ export const aiProviderModelExecutionSchema = z
     compatibilityExtensionProfile: z.literal('openrouter-v1').optional(),
     mode: aiGenerationModeSchema,
     contract: aiGenerationContractRefSchema,
-    capabilityDeclaration: aiCapabilityDeclarationSchema.nullable(),
     adapterEvidence: aiAdapterContractEvidenceSchema.nullable(),
     readiness: aiReadinessSchema,
     liveValidation: aiLiveValidationSchema,
-    allowedUpstreams: z.array(z.string().trim().min(1).max(200)).max(32),
     firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
     outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
-    freeEvidenceRef: z.string().trim().min(1).max(500).nullable(),
+    firstOutputTimeoutSource: z.enum(['route', 'provider', 'system']).optional(),
+    outputIdleTimeoutSource: z.enum(['route', 'provider', 'system']).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -467,14 +472,11 @@ export const aiProviderModelExecutionSchema = z
         message: '本地契约证据必须匹配 adapter、模式和生成契约',
       });
     }
-    if (
-      value.readiness.state === 'ready' &&
-      (!value.capabilityDeclaration || !value.adapterEvidence)
-    ) {
+    if (value.readiness.state === 'ready' && !value.adapterEvidence) {
       context.addIssue({
         code: 'custom',
         path: ['readiness'],
-        message: '接入就绪必须同时具备能力声明和本地 adapter 契约证据',
+        message: '接入就绪必须具备本地 adapter 契约证据',
       });
     }
   });

@@ -204,6 +204,8 @@ export const optimizationModelConfigSnapshotSchema = z
     model: z.string().trim().min(1).max(200),
     reasoningEffort: optimizationReasoningEffortSchema.optional(),
     costStatus: optimizationCostStatusSchema,
+    costPer1kInput: z.number().finite().nonnegative().optional(),
+    costPer1kOutput: z.number().finite().nonnegative().optional(),
     costCurrency: z
       .string()
       .trim()
