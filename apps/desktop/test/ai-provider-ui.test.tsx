@@ -336,7 +336,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
   });
 
   it('混合输出方式保持按用途配置，空超时保持继承而不是转换成零', () => {
-    const research = newAiProviderExecutionRouteDraft('model-a');
+    const research = { ...newAiProviderExecutionRouteDraft('model-a'), mode: 'json_validated' as const };
     const strategy = { ...newAiProviderExecutionRouteDraft('model-a'), mode: 'native_schema' as const };
 
     expect(aiProviderExecutionModeState([research])).toEqual({
@@ -403,23 +403,23 @@ describe('AI Provider 专用请求与密钥边界', () => {
       />,
     );
 
-    expect(markup).toContain('研究报告配置');
-    expect(markup).toContain('当前配置');
-    expect(markup).toContain('默认配置');
+    expect(markup).toContain('各用途的单独设置');
+    expect(markup).toContain('高级连接设置');
+    expect(markup).toContain('自动选择（推荐）');
     expect(markup).not.toContain('保存更改');
     expect(markup).not.toContain('有未保存的更改');
-    expect(markup).toContain('跟随默认');
-    expect(markup).toContain('w-80');
-    expect(markup).toContain('w-52');
-    expect(markup).toContain('md:border-r');
+    expect(markup).toContain('跟随模型设置');
+    expect(markup).not.toContain('<form');
+    expect(markup).not.toContain('<details open');
+    expect(markup).toContain('sm:grid-cols-2');
     const source = readFileSync(
       new URL('../src/features/providers/AiProviderExecutionFields.tsx', import.meta.url),
       'utf8',
     );
     expect(source).toContain('Checkbox');
-    expect(source).toContain('enabled: nextEnabled');
+    expect(source).toContain('enabled: !item.enabled');
     expect(source).not.toContain('onSaveModelUsage');
-    expect(source).toContain('flex-row flex-wrap');
+    expect(source).toContain('flex flex-wrap');
   });
 
   it('通知 Provider 仍使用通用保存与草稿测试端点', async () => {
@@ -797,7 +797,7 @@ describe('AI Provider 页面操作', () => {
     );
     expect(markup).toContain('连接健康：健康');
     expect(markup).toContain('接入阻断 1/1');
-    expect(markup).toContain('真实验收未执行');
+    expect(markup).toContain('用途尚未验证');
     expect(markup).toContain('缺少本地 adapter 契约证据。编辑配置后会重新评估。');
     expect(markup).not.toContain('>ready<');
     expect(markup).not.toContain('>not_run<');

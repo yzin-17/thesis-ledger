@@ -36,7 +36,10 @@ export const validateGenerationRequest = (input: {
 };
 
 /** One SDK output strategy for both single and streaming requests. */
-export const generationOutput = <OUTPUT>(mode: AiGenerationMode, schema: z.ZodType<OUTPUT>) => {
+export const generationOutput = <OUTPUT>(
+  mode: AiGenerationMode,
+  schema: z.ZodType<OUTPUT>,
+): Output.Output<unknown, unknown, never> => {
   if (mode === 'native_schema') return Output.object({ schema });
   if (mode === 'json_mode') return Output.json();
   return Output.text();

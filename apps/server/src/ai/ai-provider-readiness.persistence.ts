@@ -1,3 +1,4 @@
+import { readVerifiedRoutes } from './ai-provider-validation-policy.js';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ProviderConfig } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -152,59 +153,81 @@ export const routeSnapshotsFromProviderRow = (
   const credentialFingerprint = row.encryptedCredentials
     ? createHash('sha256').update(row.encryptedCredentials).digest('hex')
     : null;
-  return settings.executionRoutes.filter((route) => route.enabled !== false).map((route) => {
-    const modelPricing = settings.modelPricing?.[route.model];
-    const legacyPricing = {
-      ...(settings.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
-      ...(settings.costPer1kOutput === undefined
-        ? {}
-        : { costPer1kOutput: settings.costPer1kOutput }),
-      ...(settings.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
-      ...(settings.pricingVersion === undefined ? {} : { pricingVersion: settings.pricingVersion }),
-    };
-    const routePricing = modelPricing
-      ? {
-          ...pricingFields(modelPricing),
-          pricingVersion: modelPricing.pricingVersion,
-        }
-      : legacyPricing;
-    return {
-      providerId: row.name,
-      baseUrl: settings.baseUrl,
-      upstreamFormat: settings.upstreamFormat,
-      ...(settings.chatImplementation === undefined
-        ? {}
-        : { chatImplementation: settings.chatImplementation }),
-      ...(settings.compatibilityExtensionProfile === undefined
-        ? {}
-        : { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }),
-      adapter: settings.adapter ?? null,
-      models: settings.models,
-      route,
-      ...(settings.firstOutputTimeoutMs === undefined
-        ? {}
-        : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
-      ...(settings.outputIdleTimeoutMs === undefined
-        ? {}
-        : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
-      ...(routePricing.costPer1kInput === undefined
-        ? {}
-        : { costPer1kInput: routePricing.costPer1kInput }),
-      ...(routePricing.costPer1kOutput === undefined
-        ? {}
-        : { costPer1kOutput: routePricing.costPer1kOutput }),
-      ...(routePricing.costCurrency === undefined
-        ? {}
-        : { costCurrency: routePricing.costCurrency }),
-      ...(routePricing.pricingVersion === undefined
-        ? {}
-        : { pricingVersion: routePricing.pricingVersion }),
-      enabled: row.enabled,
-      health,
-      credentialFingerprint,
-      revocations: settings.capabilityRevocations ?? [],
-    };
-  });
+  return settings.executionRoutes
+    .filter((route) => route.enabled !== false)
+    .map((route) => {
+      const verified = readVerifiedRoutes(row.settings).find(
+        (item) =>
+          item.model === route.model &&
+          item.purpose === route.contract.id &&
+          item.mode === route.mode,
+      );
+      const modelPricing = settings.modelPricing?.[route.model];
+      const legacyPricing = {
+        ...(settings.costPer1kInput === undefined
+          ? {}
+          : { costPer1kInput: settings.costPer1kInput }),
+        ...(settings.costPer1kOutput === undefined
+          ? {}
+          : { costPer1kOutput: settings.costPer1kOutput }),
+        ...(settings.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
+        ...(settings.pricingVersion === undefined
+          ? {}
+          : { pricingVersion: settings.pricingVersion }),
+      };
+      const routePricing = modelPricing
+        ? {
+            ...pricingFields(modelPricing),
+            pricingVersion: modelPricing.pricingVersion,
+          }
+        : legacyPricing;
+      return {
+        providerId: row.name,
+        authMode: settings.authMode,
+        ...(verified
+          ? {
+              liveValidation: {
+                status: 'passed' as const,
+                checkedAt: verified.checkedAt,
+                requestId: verified.requestId,
+              },
+            }
+          : {}),
+        baseUrl: settings.baseUrl,
+        upstreamFormat: settings.upstreamFormat,
+        ...(settings.chatImplementation === undefined
+          ? {}
+          : { chatImplementation: settings.chatImplementation }),
+        ...(settings.compatibilityExtensionProfile === undefined
+          ? {}
+          : { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }),
+        adapter: settings.adapter ?? null,
+        models: settings.models,
+        route,
+        ...(settings.firstOutputTimeoutMs === undefined
+          ? {}
+          : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
+        ...(settings.outputIdleTimeoutMs === undefined
+          ? {}
+          : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
+        ...(routePricing.costPer1kInput === undefined
+          ? {}
+          : { costPer1kInput: routePricing.costPer1kInput }),
+        ...(routePricing.costPer1kOutput === undefined
+          ? {}
+          : { costPer1kOutput: routePricing.costPer1kOutput }),
+        ...(routePricing.costCurrency === undefined
+          ? {}
+          : { costCurrency: routePricing.costCurrency }),
+        ...(routePricing.pricingVersion === undefined
+          ? {}
+          : { pricingVersion: routePricing.pricingVersion }),
+        enabled: row.enabled,
+        health,
+        credentialFingerprint,
+        revocations: settings.capabilityRevocations ?? [],
+      };
+    });
 };
 
 export type AiCapabilityRevocationInput = {

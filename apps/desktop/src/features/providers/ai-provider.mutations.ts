@@ -1,8 +1,10 @@
+import { useRef } from 'react';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
+import { saveWithValidation, cancelValidatedSave } from './ai-provider-validated-save.js';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   deleteAiProvider,
   fetchAiProviderModels,
-  saveAiProvider,
   setAiProviderEnabled,
   testAiProviderDraft,
   testSavedAiProvider,
@@ -44,14 +46,42 @@ const aiMutationOptions = {
 
 export const useSaveAiProviderMutation = () => {
   const client = useQueryClient();
-  return useMutation({
+  const { confirm } = useConfirmDialog();
+  const active = useRef<{ name: string; operationId: string; controller: AbortController } | null>(
+    null,
+  );
+  const mutation = useMutation({
     ...aiMutationOptions,
-    mutationFn: (input: AiProviderInput) => saveAiProvider(input),
-    onSuccess: (_result, input) =>
-      input.connectionTestToken
-        ? invalidateAiProviderHealthState(client)
-        : invalidateAiProviderState(client),
+    mutationFn: async (input: AiProviderInput) => {
+      if (active.current) throw new Error('验证正在进行，请勿重复保存');
+      const request = {
+        name: input.name,
+        operationId: crypto.randomUUID(),
+        controller: new AbortController(),
+      };
+      active.current = request;
+      try {
+        return await saveWithValidation(
+          input,
+          confirm,
+          request.operationId,
+          request.controller.signal,
+        );
+      } finally {
+        if (active.current === request) active.current = null;
+      }
+    },
+    onSettled: () => invalidateAiProviderHealthState(client),
   });
+  return {
+    ...mutation,
+    cancelSave: () => {
+      const request = active.current;
+      if (!request) return;
+      void cancelValidatedSave(request.name, request.operationId).catch(() => undefined);
+      request.controller.abort();
+    },
+  };
 };
 
 export const useUpdateAiRoutingSettingsMutation = () => {
@@ -111,7 +141,11 @@ export const useSetAiProviderEnabledMutation = () => {
   const client = useQueryClient();
   return useMutation({
     ...aiMutationOptions,
-    mutationFn: ({ name, enabled, ...lifecycle }: {
+    mutationFn: ({
+      name,
+      enabled,
+      ...lifecycle
+    }: {
       name: string;
       enabled: boolean;
     } & AiProviderLifecycleOptions) => setAiProviderEnabled(name, enabled, lifecycle),

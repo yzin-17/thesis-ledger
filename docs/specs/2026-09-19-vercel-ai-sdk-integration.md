@@ -14,6 +14,8 @@
 
 2026-09-21 范围修订：用户确认移除执行路由的“能力声明来源”配置，以及暂不需要的“上游服务限制”配置。相关稳定契约、readiness 门禁和兼容边界分别由[移除 AI 执行路由能力声明 Spec](2026-09-21-remove-ai-capability-declaration.md)与[移除 AI 执行路由上游服务限制 Spec](2026-09-21-remove-ai-upstream-restriction.md)修订；费用依据与授权语义由[移除 AI 执行路由免费依据 Spec](2026-09-21-remove-ai-free-evidence.md)修订。本文其余 AI SDK、adapter、预算和真实验收要求继续有效。
 
+2026-09-23 增量修订：自动/手动选择策略与启用配置保存前用途验证由[自动选择与测试后保存](2026-09-23-ai-provider-auto-test-save.md)定义；本文既有具体生成模式、预算与任务执行边界继续有效。
+
 ## 1. 决策摘要
 
 采用 **Vercel AI SDK Core** 作为服务端模型调用基础设施，服务端依赖收敛为 `ai` 与官方 `@ai-sdk/openai`、`@ai-sdk/anthropic`、`@ai-sdk/openai-compatible`。页面配置三种上游格式；Chat Completions 额外显式选择“通用兼容”或“OpenAI 原生”，服务端据此确定 Provider 实现。base URL 只决定请求地址，不按域名自动切换 SDK。OpenRouter 可继续作为通用 Chat Completions 服务使用，但不作为默认服务商、接口格式或专用依赖。保留项目自己的 `AiProvider` 接口、Provider 注册与配置、`AiRun`、`OptimizationAttempt`、预算、工具审计和业务校验。

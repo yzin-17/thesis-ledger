@@ -1,3 +1,4 @@
+import { aiTestRuntimeFingerprint } from './ai-provider-test-fingerprint.js';
 import {
   BadRequestException,
   BadGatewayException,
@@ -78,6 +79,8 @@ import type {
   AiRoutingSettingsUpdate,
 } from './ai-routing-settings.contracts.js';
 
+import type { VerifiedRoute } from './ai-provider-validation-policy.js';
+
 export { aiProviderInputSchema, sanitizeAiProviderError } from './ai-provider.contracts.js';
 
 interface DraftTest {
@@ -94,7 +97,7 @@ interface DraftTest {
   expiresAt: number;
 }
 
-interface AiTestRuntimeInput {
+export interface AiTestRuntimeInput {
   name: string;
   requestId?: string;
   baseUrl: string;
@@ -125,9 +128,7 @@ interface AiTestRuntimeInput {
   executionRoutes?: AiProviderExecutionRouteInput[];
 }
 
-type StoredProviderLifecycleAction =
-  | { kind: 'set-enabled'; enabled: boolean }
-  | { kind: 'delete' };
+type StoredProviderLifecycleAction = { kind: 'set-enabled'; enabled: boolean } | { kind: 'delete' };
 
 type AiTestModelPricing = {
   costPer1kInput?: number | undefined;
@@ -153,8 +154,7 @@ const unknownTestCost = (source: string | null = null): AiCostFacts => ({
   pricingVersion: null,
 });
 
-const decimalTestCost = (value: number) =>
-  value.toFixed(8).replace(/\.?0+$/u, '') || '0';
+const decimalTestCost = (value: number) => value.toFixed(8).replace(/\.?0+$/u, '') || '0';
 
 const configuredTimeout = () => {
   try {
@@ -223,7 +223,9 @@ export class AiProviderService implements OnModuleInit {
 
   async migrationDryRun() {
     const rows = await this.configs.listStored();
-    return planAiProviderMigrations(rows.map((row) => ({ name: row.name, settings: row.settings })));
+    return planAiProviderMigrations(
+      rows.map((row) => ({ name: row.name, settings: row.settings })),
+    );
   }
 
   async getRoutingSettings(): Promise<AiRoutingSettingsResponse> {
@@ -262,7 +264,7 @@ export class AiProviderService implements OnModuleInit {
     };
   }
 
-  async save(rawInput: unknown) {
+  async save(rawInput: unknown, verifiedRoutes?: VerifiedRoute[]) {
     const input = aiProviderInputSchema.parse(rawInput);
     const existing = await this.configs.findStored(input.name);
     if (existing) {
@@ -288,7 +290,7 @@ export class AiProviderService implements OnModuleInit {
     const draft = this.consumeDraft(
       input.connectionTestToken,
       input.name,
-      this.runtimeFingerprint(runtimeInput),
+      aiTestRuntimeFingerprint(runtimeInput),
       input.apiKey?.trim() || input.credentialsRef?.trim(),
     );
     const credential = input.apiKey?.trim() || input.credentialsRef?.trim() || draft?.credential;
@@ -299,13 +301,25 @@ export class AiProviderService implements OnModuleInit {
       capabilities: input.capabilities ?? ['chat'],
       ...(credential ? { credentialsRef: credential } : {}),
       ...(input.authMode === 'none' ? { clearCredentials: true } : {}),
-      settings: settingsFromAiProviderInput(input, existing?.settings),
-      ...(input.expectedRevision === undefined
-        ? {}
-        : { expectedRevision: input.expectedRevision }),
-      ...(draft ? {} : {}),
+      settings: {
+        ...settingsFromAiProviderInput(input, existing?.settings),
+        ...(verifiedRoutes === undefined ? {} : { generationValidation: verifiedRoutes }),
+      },
+      ...(input.expectedRevision === undefined ? {} : { expectedRevision: input.expectedRevision }),
     });
     if (draft) await this.recordSavedHealth(input.name, true, draft.latencyMs, draft.checkedAt);
+    const observed = verifiedRoutes?.find(
+      (record) =>
+        record.latencyMs !== undefined &&
+        (!existing || Date.parse(record.checkedAt) > existing.updatedAt.getTime()),
+    );
+    if (observed)
+      await this.recordSavedHealth(
+        input.name,
+        true,
+        observed.latencyMs!,
+        new Date(observed.checkedAt),
+      );
     await this.refreshOrThrow();
     return this.findSummary(input.name, saved.updatedAt?.toISOString?.() ?? null);
   }
@@ -330,7 +344,7 @@ export class AiProviderService implements OnModuleInit {
       input.mode,
       input.requestId,
     );
-    return this.executeTest(runtimeInput, false, this.runtimeFingerprint(runtimeInput));
+    return this.executeTest(runtimeInput, false, aiTestRuntimeFingerprint(runtimeInput));
   }
 
   async testSaved(
@@ -413,11 +427,7 @@ export class AiProviderService implements OnModuleInit {
     }
   }
 
-  async setEnabled(
-    name: string,
-    enabled: boolean,
-    options: AiProviderLifecycleOptions = {},
-  ) {
+  async setEnabled(name: string, enabled: boolean, options: AiProviderLifecycleOptions = {}) {
     const config = await this.configs.findStored(name);
     if (!config || config.type !== 'ai') {
       if (this.environmentProviders().some((provider) => provider.id === name))
@@ -426,11 +436,7 @@ export class AiProviderService implements OnModuleInit {
     }
     if (options.expectedRevision && options.expectedRevision !== config.updatedAt.toISOString())
       throw new ConflictException('Provider 配置已变化，请刷新后重试');
-    await this.mutateStoredProvider(
-      name,
-      { kind: 'set-enabled', enabled },
-      options,
-    );
+    await this.mutateStoredProvider(name, { kind: 'set-enabled', enabled }, options);
     await this.refreshOrThrow();
     return this.findSummary(name);
   }
@@ -547,8 +553,7 @@ export class AiProviderService implements OnModuleInit {
     options: AiProviderLifecycleOptions,
   ) {
     const expectedRevision = options.expectedRevision;
-    if (!expectedRevision)
-      throw new ConflictException('Provider 配置版本缺失，请刷新后重试');
+    if (!expectedRevision) throw new ConflictException('Provider 配置版本缺失，请刷新后重试');
 
     if (!this.prisma) {
       const settings = await this.routingSettings?.read();
@@ -594,8 +599,7 @@ export class AiProviderService implements OnModuleInit {
             revision: settings.revision + 1,
           },
         });
-        if (cleared.count !== 1)
-          throw new ConflictException('AI 默认模型设置已变化，请刷新后重试');
+        if (cleared.count !== 1) throw new ConflictException('AI 默认模型设置已变化，请刷新后重试');
       } else if (options.clearResearchDefault) {
         throw new ConflictException('当前 Provider 不是研究默认模型，不能清除默认路由');
       }
@@ -605,16 +609,14 @@ export class AiProviderService implements OnModuleInit {
           where: { name, updatedAt: expectedDate },
           data: { enabled: action.enabled },
         });
-        if (updated.count !== 1)
-          throw new ConflictException('Provider 配置已变化，请刷新后重试');
+        if (updated.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
         return transaction.providerConfig.findUnique({ where: { name } });
       }
 
       const deleted = await transaction.providerConfig.deleteMany({
         where: { name, updatedAt: expectedDate },
       });
-      if (deleted.count !== 1)
-        throw new ConflictException('Provider 配置已变化，请刷新后重试');
+      if (deleted.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
       return null;
     });
   }
@@ -686,7 +688,10 @@ export class AiProviderService implements OnModuleInit {
           errorCode: 'invalid_config',
         };
     }
-    if (input.testKind !== 'generation' && (input.purpose !== undefined || input.mode !== undefined))
+    if (
+      input.testKind !== 'generation' &&
+      (input.purpose !== undefined || input.mode !== undefined)
+    )
       return {
         name: input.name,
         status: 'config_error',
@@ -738,6 +743,15 @@ export class AiProviderService implements OnModuleInit {
         signal: controller.signal,
         ...(purpose === undefined ? {} : { purpose }),
         mode,
+        ...((purposeRoute?.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs)
+          ? {
+              firstOutputTimeoutMs:
+                purposeRoute?.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs,
+            }
+          : {}),
+        ...((purposeRoute?.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs)
+          ? { outputIdleTimeoutMs: purposeRoute?.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs }
+          : {}),
       });
       if (controller.signal.aborted) throw new Error('AI provider test cancelled');
       const facts = this.testFacts(input, model, result);
@@ -745,7 +759,7 @@ export class AiProviderService implements OnModuleInit {
         const testToken = randomUUID();
         this.drafts.set(testToken, {
           name: input.name,
-          fingerprint: fingerprint ?? this.runtimeFingerprint(input),
+          fingerprint: fingerprint ?? aiTestRuntimeFingerprint(input),
           credentialHash: this.credentialHash(input.credential),
           credential: input.credential,
           ...(input.testModel === undefined ? {} : { model: input.testModel }),
@@ -936,7 +950,15 @@ export class AiProviderService implements OnModuleInit {
         ? current.state
         : 'degraded';
     if (typeof this.health.recordHistory === 'function')
-      await this.health.recordHistory(name, state, latencyMs, 'cancelled', checkedAt, 'manual', details);
+      await this.health.recordHistory(
+        name,
+        state,
+        latencyMs,
+        'cancelled',
+        checkedAt,
+        'manual',
+        details,
+      );
     return {
       status: 'cancelled' as const,
       healthCheck: {
@@ -1033,30 +1055,6 @@ export class AiProviderService implements OnModuleInit {
     };
   }
 
-  private runtimeFingerprint(input: AiTestRuntimeInput) {
-    return JSON.stringify({
-      name: input.name,
-      baseUrl: input.baseUrl,
-      models: input.models,
-      modelReasoning: input.modelReasoning ?? null,
-      enabled: input.enabled,
-      priority: input.priority,
-      capabilities: input.capabilities,
-      authMode: input.authMode,
-      timeoutMs: input.timeoutMs ?? null,
-      firstOutputTimeoutMs: input.firstOutputTimeoutMs ?? null,
-      outputIdleTimeoutMs: input.outputIdleTimeoutMs ?? null,
-      modelPricing: input.modelPricing ?? null,
-      costPer1kInput: input.costPer1kInput ?? null,
-      costPer1kOutput: input.costPer1kOutput ?? null,
-      costCurrency: input.costCurrency ?? null,
-      upstreamFormat: input.upstreamFormat,
-      chatImplementation: input.chatImplementation ?? null,
-      compatibilityExtensionProfile: input.compatibilityExtensionProfile ?? null,
-      executionRoutes: input.executionRoutes ?? null,
-    });
-  }
-
   private generationPricingError(input: AiTestRuntimeInput, model: string) {
     if (input.testKind !== 'generation') return undefined;
     const pricing = this.pricingForModel(input, model);
@@ -1097,18 +1095,12 @@ export class AiProviderService implements OnModuleInit {
   private testFacts(
     input: AiTestRuntimeInput,
     model: string,
-    result: Pick<
-      AiSdkGenerationResult<unknown>,
-      'usage' | 'providerCost' | 'providerCostCurrency'
-    >,
+    result: Pick<AiSdkGenerationResult<unknown>, 'usage' | 'providerCost' | 'providerCostCurrency'>,
   ): { usage: AiUsageFacts; cost: AiCostFacts } {
     const usage = result.usage ?? unknownTestUsage();
     const pricing = this.pricingForModel(input, model);
     const providerCurrency = result.providerCostCurrency?.trim().toUpperCase();
-    if (
-      typeof result.providerCost === 'string' &&
-      /^[A-Z]{3}$/u.test(providerCurrency ?? '')
-    ) {
+    if (typeof result.providerCost === 'string' && /^[A-Z]{3}$/u.test(providerCurrency ?? '')) {
       const reported = aiCostFactsSchema.safeParse({
         status: 'known',
         amount: result.providerCost,
@@ -1172,7 +1164,7 @@ export class AiProviderService implements OnModuleInit {
             contract: route.contract,
           }
         : {}),
-      configurationFingerprint: this.runtimeFingerprint(input),
+      configurationFingerprint: aiTestRuntimeFingerprint(input),
       usage: facts.usage,
       cost: facts.cost,
       ...(errorCode ? { errorCode } : {}),

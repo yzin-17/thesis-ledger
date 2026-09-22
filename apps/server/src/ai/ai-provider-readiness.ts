@@ -46,6 +46,8 @@ export type AiProviderRouteSnapshot = {
   enabled: boolean;
   health: string;
   credentialFingerprint: string | null;
+  authMode?: 'api_key' | 'none';
+  liveValidation?: { status: 'passed'; checkedAt: string; requestId: string };
   revocations: readonly AiProviderCapabilityRevocation[];
 };
 
@@ -162,6 +164,7 @@ export const configurationFingerprint = (snapshot: AiProviderRouteSnapshot) =>
     providerFirstOutputTimeoutMs: snapshot.firstOutputTimeoutMs ?? null,
     providerOutputIdleTimeoutMs: snapshot.outputIdleTimeoutMs ?? null,
     credentialFingerprint: snapshot.credentialFingerprint,
+    authMode: snapshot.authMode ?? 'api_key',
   });
 
 export const evaluateAiProviderReadiness = (
@@ -177,7 +180,7 @@ export const evaluateAiProviderReadiness = (
     !baseUrl ||
     !snapshot.adapter ||
     !snapshot.models.includes(snapshot.route.model) ||
-    !snapshot.credentialFingerprint
+    (snapshot.authMode !== 'none' && !snapshot.credentialFingerprint)
   )
     reasons.push('configuration_invalid');
   if (!snapshot.enabled) reasons.push('provider_disabled');
@@ -214,7 +217,11 @@ export const evaluateAiProviderReadiness = (
       configurationFingerprint: configuration,
       evaluatedAt: evaluatedAt.toISOString(),
     },
-    liveValidation: { status: 'not_run', checkedAt: null, requestId: null },
+    liveValidation: snapshot.liveValidation ?? {
+      status: 'not_run',
+      checkedAt: null,
+      requestId: null,
+    },
     firstOutputTimeoutMs: timeouts.firstOutputTimeoutMs,
     outputIdleTimeoutMs: timeouts.outputIdleTimeoutMs,
     firstOutputTimeoutSource: timeouts.firstOutputTimeoutSource,

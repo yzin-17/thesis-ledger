@@ -12,6 +12,7 @@ import type {
 export type AiProviderExecutionRouteConfig = {
   model: string;
   mode: AiGenerationMode;
+  outputPolicy?: 'auto' | 'manual';
   /** Legacy records without this field remain enabled. */
   enabled?: boolean;
   modeOverridden?: boolean;
@@ -24,6 +25,7 @@ export type AiProviderExecutionRouteDraft = {
   key: string;
   model: string;
   mode: AiGenerationMode;
+  outputPolicy?: 'auto' | 'manual';
   enabled: boolean;
   modeOverridden: boolean;
   contractId: AiGenerationContractRef['id'];
@@ -33,6 +35,7 @@ export type AiProviderExecutionRouteDraft = {
 
 export type AiProviderModelDefaultConfig = {
   mode: AiGenerationMode;
+  outputPolicy?: 'auto' | 'manual';
 };
 
 export type ProviderHealthHistoryRecord = {
@@ -411,6 +414,7 @@ export const newAutomationJobDraft = (type = 'market-sync'): AutomationJobDraft 
 export type ProviderStatusTone = 'normal' | 'error' | 'warning' | 'neutral';
 
 export interface ProviderStatusInput {
+  authMode?: AiAuthMode;
   enabled: boolean;
   health: string;
   credentialConfigured?: boolean;
@@ -420,7 +424,8 @@ export const providerDisplayStatus = (
   provider: ProviderStatusInput,
 ): { label: string; tone: ProviderStatusTone } => {
   if (!provider.enabled) return { label: '已停用', tone: 'neutral' };
-  if (!provider.credentialConfigured) return { label: '未配置', tone: 'warning' };
+  if (provider.authMode !== 'none' && !provider.credentialConfigured)
+    return { label: '未配置', tone: 'warning' };
   if (provider.health === 'healthy') return { label: '正常', tone: 'normal' };
   if (provider.health === 'degraded' || provider.health === 'down') {
     return { label: '异常', tone: 'error' };

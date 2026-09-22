@@ -1,5 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Optional,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { z } from 'zod';
+import { aiProviderValidationAuthorizationSchema } from '@thesis-ledger/schemas';
+import { AiProviderSaveService } from './ai-provider-save.service.js';
 import { AiProviderService } from './ai-provider.service.js';
 import {
   aiProviderInputSchema,
@@ -17,7 +29,35 @@ const enabledSchema = z
 
 @Controller('ai/providers')
 export class AiProviderController {
-  constructor(private readonly providers: AiProviderService) {}
+  constructor(
+    private readonly providers: AiProviderService,
+    @Optional() private readonly validated?: AiProviderSaveService,
+  ) {}
+
+  private verifiedSave() {
+    if (!this.validated) throw new BadRequestException('验证服务未装配，不能保存启用配置');
+    return this.validated;
+  }
+
+  @Post('validation-plan')
+  validationPlan(@Body() input: unknown) {
+    return this.verifiedSave().plan(input);
+  }
+
+  @Post('test-and-save')
+  testAndSave(@Body() body: unknown) {
+    const input = z
+      .object({ provider: z.unknown(), authorization: aiProviderValidationAuthorizationSchema })
+      .strict()
+      .parse(body);
+    return this.verifiedSave().testAndSave(input.provider, input.authorization);
+  }
+
+  @Post(':name/validation/cancel')
+  cancelValidation(@Param('name') name: string, @Body() body: unknown) {
+    const input = z.object({ operationId: z.uuid() }).strict().parse(body);
+    return this.verifiedSave().cancel(name, input.operationId);
+  }
 
   @Get()
   list() {
@@ -31,7 +71,7 @@ export class AiProviderController {
 
   @Post()
   save(@Body() input: unknown) {
-    return this.providers.save(aiProviderInputSchema.parse(input));
+    return this.verifiedSave().save(aiProviderInputSchema.parse(input));
   }
 
   @Post('test')
@@ -73,7 +113,7 @@ export class AiProviderController {
   @Patch(':name/enabled')
   setEnabled(@Param('name') name: string, @Body() input: unknown) {
     const parsed = enabledSchema.parse(input);
-    return this.providers.setEnabled(name, parsed.enabled, parsed);
+    return this.verifiedSave().setEnabled(name, parsed.enabled, parsed);
   }
 
   @Delete(':name')

@@ -216,54 +216,57 @@ export const routeSnapshotsFromProvider = (provider: AiProvider): AiProviderRout
     upstreamFormat === 'chat-completions'
       ? (metadata?.chatImplementation ?? 'compatible')
       : undefined;
-  return (metadata?.executionRoutes ?? []).filter((route) => route.enabled !== false).map((route) => ({
-    ...(() => {
-      const modelPricing = metadata?.modelPricing?.[route.model];
-      if (modelPricing)
+  return (metadata?.executionRoutes ?? [])
+    .filter((route) => route.enabled !== false)
+    .map((route) => ({
+      ...(() => {
+        const modelPricing = metadata?.modelPricing?.[route.model];
+        if (modelPricing)
+          return {
+            ...(modelPricing.costPer1kInput === undefined
+              ? {}
+              : { costPer1kInput: modelPricing.costPer1kInput }),
+            ...(modelPricing.costPer1kOutput === undefined
+              ? {}
+              : { costPer1kOutput: modelPricing.costPer1kOutput }),
+            ...(modelPricing.costCurrency === undefined
+              ? {}
+              : { costCurrency: modelPricing.costCurrency }),
+            pricingVersion: modelPricing.pricingVersion,
+          };
         return {
-          ...(modelPricing.costPer1kInput === undefined
+          ...(metadata?.costPer1kInput === undefined
             ? {}
-            : { costPer1kInput: modelPricing.costPer1kInput }),
-          ...(modelPricing.costPer1kOutput === undefined
+            : { costPer1kInput: metadata.costPer1kInput }),
+          ...(metadata?.costPer1kOutput === undefined
             ? {}
-            : { costPer1kOutput: modelPricing.costPer1kOutput }),
-          ...(modelPricing.costCurrency === undefined
+            : { costPer1kOutput: metadata.costPer1kOutput }),
+          ...(metadata?.costCurrency === undefined ? {} : { costCurrency: metadata.costCurrency }),
+          ...(metadata?.pricingVersion === undefined
             ? {}
-            : { costCurrency: modelPricing.costCurrency }),
-          pricingVersion: modelPricing.pricingVersion,
+            : { pricingVersion: metadata.pricingVersion }),
         };
-      return {
-        ...(metadata?.costPer1kInput === undefined
-          ? {}
-          : { costPer1kInput: metadata.costPer1kInput }),
-        ...(metadata?.costPer1kOutput === undefined
-          ? {}
-          : { costPer1kOutput: metadata.costPer1kOutput }),
-        ...(metadata?.costCurrency === undefined ? {} : { costCurrency: metadata.costCurrency }),
-        ...(metadata?.pricingVersion === undefined
-          ? {}
-          : { pricingVersion: metadata.pricingVersion }),
-      };
-    })(),
-    providerId: provider.id,
-    baseUrl,
-    upstreamFormat,
-    ...(chatImplementation === undefined ? {} : { chatImplementation }),
-    ...(metadata?.compatibilityExtensionProfile === undefined
-      ? {}
-      : { compatibilityExtensionProfile: metadata.compatibilityExtensionProfile }),
-    adapter: metadata?.adapter ?? null,
-    models: provider.models,
-    route,
-    ...(metadata?.firstOutputTimeoutMs === undefined
-      ? {}
-      : { firstOutputTimeoutMs: metadata.firstOutputTimeoutMs }),
-    ...(metadata?.outputIdleTimeoutMs === undefined
-      ? {}
-      : { outputIdleTimeoutMs: metadata.outputIdleTimeoutMs }),
-    enabled: true,
-    health: metadata?.health ?? 'unknown',
-    credentialFingerprint: metadata?.credentialFingerprint ?? null,
-    revocations: metadata?.capabilityRevocations ?? [],
-  }));
+      })(),
+      providerId: provider.id,
+      authMode: metadata?.authMode ?? 'api_key',
+      baseUrl,
+      upstreamFormat,
+      ...(chatImplementation === undefined ? {} : { chatImplementation }),
+      ...(metadata?.compatibilityExtensionProfile === undefined
+        ? {}
+        : { compatibilityExtensionProfile: metadata.compatibilityExtensionProfile }),
+      adapter: metadata?.adapter ?? null,
+      models: provider.models,
+      route,
+      ...(metadata?.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: metadata.firstOutputTimeoutMs }),
+      ...(metadata?.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: metadata.outputIdleTimeoutMs }),
+      enabled: true,
+      health: metadata?.health ?? 'unknown',
+      credentialFingerprint: metadata?.credentialFingerprint ?? null,
+      revocations: metadata?.capabilityRevocations ?? [],
+    }));
 };
