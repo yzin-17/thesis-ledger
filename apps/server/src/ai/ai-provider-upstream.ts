@@ -1,6 +1,8 @@
 import {
   aiCompatibilityExtensionProfileSchema,
   aiUpstreamSelectionSchema,
+  type AiAdapter,
+  type AiGenerationMode,
   type AiChatImplementation,
   type AiCompatibilityExtensionProfile,
   type AiLegacyAdapter,
@@ -12,6 +14,10 @@ import {
 export const AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 =
   aiCompatibilityExtensionProfileSchema.value;
 export type { AiCompatibilityExtensionProfile, AiSdkProviderImplementation };
+
+/** Adapter support only; remote model compatibility still requires validation. */
+export const adapterSupportsGenerationMode = (adapter: AiAdapter, mode: AiGenerationMode) =>
+  mode !== 'json_mode' || adapter !== 'anthropic-messages';
 
 export const resolveAiSdkProviderImplementation = (input: {
   upstreamFormat: AiUpstreamFormat;
