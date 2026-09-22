@@ -13,6 +13,7 @@ import type {
   AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
 import {
+  adapterSupportsGenerationMode,
   resolveAiSdkProviderImplementation,
   type AiCompatibilityExtensionProfile,
 } from './ai-provider-upstream.js';
@@ -112,7 +113,8 @@ const knownContract = (route: AiProviderExecutionRouteInput) =>
   );
 
 const adapterEvidence = (adapter: AiAdapter | null, route: AiProviderExecutionRouteInput) => {
-  if (!adapter || !knownContract(route)) return null;
+  if (!adapter || !knownContract(route) || !adapterSupportsGenerationMode(adapter, route.mode))
+    return null;
   const adapterVersion = ADAPTER_VERSIONS[adapter];
   return {
     adapter,

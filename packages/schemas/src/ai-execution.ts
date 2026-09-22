@@ -22,7 +22,7 @@ export const aiAdapterSchema = z.enum([
 ]);
 export type AiAdapter = z.infer<typeof aiAdapterSchema>;
 
-export const aiGenerationModeSchema = z.enum(['native_schema', 'json_validated']);
+export const aiGenerationModeSchema = z.enum(['native_schema', 'json_validated', 'json_mode']);
 export type AiGenerationMode = z.infer<typeof aiGenerationModeSchema>;
 
 export const aiAuthModeSchema = z.enum(['api_key', 'none']);

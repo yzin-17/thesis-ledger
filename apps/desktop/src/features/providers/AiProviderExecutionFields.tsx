@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
@@ -8,13 +8,9 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { useState } from 'react';
 import { modelsFromText } from './ai-provider.actions.js';
 import { aiContractOptions, newAiProviderExecutionRouteDraft } from './ai-provider-execution.js';
+import { aiOutputModeOptionsFor } from './ai-output-mode-options.js';
 import type { AiProviderExecutionRouteDraft, ProviderDraft } from './providers.types.js';
 
-const modeOptions = [
-  { value: 'json_validated', label: '通用 JSON（应用校验）' },
-  { value: 'native_schema', label: '原生结构化输出' },
-] as const;
-const purposeModeOptions = [{ value: 'inherit', label: '跟随默认' }, ...modeOptions] as const;
 const updateRoute = (routes: AiProviderExecutionRouteDraft[], key: string, update: Partial<AiProviderExecutionRouteDraft>) =>
   routes.map((route) => (route.key === key ? { ...route, ...update } : route));
 const timeoutSeconds = (value: string) => {
@@ -42,6 +38,8 @@ export function AiProviderExecutionFields({
 }) {
   const [activePurposeByModel, setActivePurposeByModel] = useState<Partial<Record<string, AiProviderExecutionRouteDraft['contractId']>>>({});
   const models = modelsFromText(draft.modelsText);
+  const modeOptions = aiOutputModeOptionsFor(draft.upstreamFormat);
+  const purposeModeOptions = [{ value: 'inherit', label: '跟随默认', disabled: false }, ...modeOptions] as const;
   const routesForModel = (model: string) => draft.executionRoutes.filter((route) => route.model === model);
   const setRoute = (key: string, update: Partial<AiProviderExecutionRouteDraft>) =>
     onUpdateDraft((current) => ({ ...current, executionRoutes: updateRoute(current.executionRoutes, key, update) }));
@@ -104,7 +102,6 @@ export function AiProviderExecutionFields({
                 <CardTitle className="min-w-0 truncate font-mono text-sm" title={model}>{model}</CardTitle>
                 {onTestModel ? <Button type="button" size="sm" variant="outline" onClick={() => onTestModel(model)}>测试模型</Button> : null}
               </div>
-              <CardDescription>选择模型可以参与的业务任务。</CardDescription>
             </CardHeader>
             <CardContent>
               <FieldGroup className="grid gap-0 md:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.4fr)]">
@@ -132,9 +129,9 @@ export function AiProviderExecutionFields({
                   <p className="text-xs font-medium">输出方式</p>
                   <Select items={modeOptions} value={defaultMode} onValueChange={(value) => value && setDefaultMode(model, value)}>
                     <SelectTrigger aria-label={`${model} 默认输出方式`} className="w-80 max-w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectGroup>{modeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
+                    <SelectContent><SelectGroup>{modeOptions.map((option) => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">默认应用于所有用途，用途可单独覆盖。</p>
+                  <p className="text-xs text-muted-foreground">用途可覆盖默认值；所有方式均校验完整结果。</p>
                 </Field>
                 </div>
                 <div className="flex min-w-0 flex-col gap-3 pt-4 md:pl-5 md:pt-0">
@@ -153,7 +150,7 @@ export function AiProviderExecutionFields({
                             else setRoute(activeRoute.key, { mode: value as AiProviderExecutionRouteDraft['mode'], modeOverridden: true });
                           }}>
                             <SelectTrigger aria-label={`${model} ${activeRoute.contractId} 输出方式`}><SelectValue /></SelectTrigger>
-                            <SelectContent className="min-w-52"><SelectGroup>{purposeModeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
+                            <SelectContent className="min-w-52"><SelectGroup>{purposeModeOptions.map((option) => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
                           </Select>
                         </Field>
                         <Field className="w-52 max-w-full">

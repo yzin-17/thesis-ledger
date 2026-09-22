@@ -23,11 +23,11 @@
 | `json_mode` | 新增 `Output.json()`；上游只约束 JSON 语法，完整结果仍按业务生成 Schema 校验 |
 | `json_validated` | 保留历史文本生成语义；界面称“文本 JSON（应用校验）”，仍兼容已有整段 JSON 代码围栏 |
 
-不得将旧 `json_validated` 原地解释成 JSON Mode，不改写历史任务或默认配置。三种模式均不允许未验收内容进入正式结果；JSON Mode 不保证字段、引用或业务规则正确。
+不得将旧 `json_validated` 原地解释成 JSON Mode，不改写历史任务或默认配置。三种模式均不允许未验收内容进入正式结果；JSON Mode 不保证字段、引用或业务规则正确。`native_schema` 的完整生成 Schema 已由 SDK 校验，应用不再次执行同一 Zod transform；原有业务校验仍继续执行。
 
 本阶段 JSON Mode 仅支持现有 Chat Completions 与 Responses 适配路径。Anthropic Messages 不得静默把无 Schema JSON 请求降为普通文本；该组合必须在出站前被拒绝，readiness 不得报告已有 adapter 契约证据。其他服务是否支持对应请求参数，仍需用途验证，不能按域名或模型名推断。
 
-JSON Mode 的提示必须明确要求 JSON，并包含从当前生成 Schema 派生的结构要求。不得另行维护一份手写业务字段列表。不改变历史文本模式提示语义，不把业务 `superRefine` 视为已由 JSON Schema 完全表达。
+沿用现有业务提示对 JSON 及结果结构的说明。JSON Mode 预检要求消息明确提到 JSON；这只检查必要调用条件，不声称自动证明提示充分。适配器不得在调用方完成预算预留之后追加 Schema 或提示词，避免增加未被预留的输入 Token。生成 Schema 仍是本地最终校验事实源；从 Schema 统一生成各业务提示不属于本阶段交付。
 
 ## 3. 流式与验收
 
@@ -37,9 +37,13 @@ JSON Mode 的提示必须明确要求 JSON，并包含从当前生成 Schema 派
 
 必须保留已观察到的用量：完整输出是非法 JSON、字段无效或 SDK 输出解析失败，不应把已报告用量退化为 unknown；缺失用量仍保持 unknown，不能补零。输出 Promise 的拒绝需要被消费，不能产生未处理拒绝。截断/拒答优先于内容解析成功，不能接受 `finishReason=length` 的合法 JSON。
 
+错误/用量/结果元数据的归一化仍属于 AI 适配层。提取 helper 时保留原 `AiSdkGenerationError` 导出位置及同一类实例，不影响研究和策略执行的 `instanceof` 检查。
+
 ## 4. 本次非目标
 
-本 PR 不实现自动能力探测、自动模式决策、模式失败后的重试、前端逐字预览、Agent 工具循环、费用模型重建或其他 Provider 安全/健康问题。自动决策必须在可信能力记录、冻结有效模式和成本授权闭环建立后另行实现；不能作为本 PR 已交付功能。
+本 PR 不实现自动能力探测、自动模式决策、模式失败后的重试、前端逐字预览、Agent 工具循环、费用模型重建或其他 Provider 安全/健康问题。自动决策必须在可信能力记录、冻结有效模式和成本授权闭环建立后另行设计；不能作为本 PR 已交付功能。
+
+本次也不修改用途探针与正式任务的传输配置差异，不把新适配器测试当成两条业务链路的真实运行验收。
 
 ## 5. 验收
 
@@ -52,7 +56,15 @@ JSON Mode 的提示必须明确要求 JSON，并包含从当前生成 Schema 派
 - AC7：界面清楚区分文本 JSON、API JSON Mode 与接口结构化能力；不要求用户为已有连接重新配置。
 - AC8：验证报告分别记录静态检查、定向测试、包级构建、CI 和真实 Provider 验收，未执行项不标为通过。
 
-## 6. 技术依据
+## 6. 发布与回滚
+
+先部署能识别 `json_mode` 的共享契约与服务端，再启用新版客户端选项。已有 `json_validated` 和 `native_schema` 路由维持原值；新方式由用户明确选择，不批量转换配置，不升级数据库或依赖。
+
+回滚至不识别 `json_mode` 的旧版本之前，必须暂停新 AI 任务并处理在途/未结算请求，显式检查数据库及环境配置中的 `executionRoutes` 和 `modelDefaults`。使用新模式的配置须由管理员改回经验证的旧模式或移除，不能直接部署旧版让解析器丢弃路由。历史审计事实不应重新解释或抹去。
+
+现有 `assessAiSdkRollbackReadiness` 只检查任务/请求结算事实，不能替代上述输出模式配置兼容检查。回滚检查通过也不代表旧版支持新配置。
+
+## 7. 技术依据
 
 - 锁定 `ai@7.0.107` 的 `packages/ai/src/generate-text/output.ts`：`Output.json()` 的 responseFormat 为无 schema 的 `type: 'json'`，完整结果仍需要应用生成契约验收。
 - [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)：区分 JSON Mode 与 Schema 约束，支持流式，要求处理不完整结果。
