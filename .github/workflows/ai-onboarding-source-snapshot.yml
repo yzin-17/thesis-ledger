@@ -1,0 +1,21 @@
+name: AI onboarding source snapshot
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    if: github.head_ref == 'codex/ai-provider-auto-test-save'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: git archive --format=tar.gz HEAD -o /tmp/source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-onboarding-source
+          path: /tmp/source.tar.gz
+          retention-days: 1
