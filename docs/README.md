@@ -8,6 +8,7 @@
 
 以下只列当前仍在实施或仍承担当前验收门禁的主题。详细完成状态以各 Task 文件头部和任务清单为准，README 不重复维护逐步进度。
 
+- AI 自动选择与测试后保存：[规格](specs/2026-09-23-ai-provider-auto-test-save.md) · [任务](tasks/2026-09-23-ai-provider-auto-test-save.md)
 - AI 输出模式与完整流验收（增量修订）：[规格](specs/2026-09-22-ai-json-mode-stream-validation.md) · [任务](tasks/2026-09-22-ai-json-mode-stream-validation.md)
 - AI 接入层迁移至 Vercel AI SDK：[规格](specs/2026-09-19-vercel-ai-sdk-integration.md) · [任务](tasks/2026-09-19-vercel-ai-sdk-integration.md)
   - 发布与回滚输入：[AI SDK 切换与兼容回滚手册](operations/2026-09-19-ai-sdk-cutover-and-rollback.md)

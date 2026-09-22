@@ -92,6 +92,12 @@ const providerConfigSchema = z
           path: [index, 'models'],
           message: '同一 Provider 的模型不得重复',
         });
+      if (provider.executionRoutes?.some((route) => route.outputPolicy === 'auto'))
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'executionRoutes'],
+          message: '部署配置只能指定具体方式；自动选择请通过页面测试并保存',
+        });
       const selectedModels = new Set(provider.models);
       if (provider.executionRoutes?.some((route) => !selectedModels.has(route.model)))
         context.addIssue({

@@ -30,6 +30,7 @@ export type AiProviderInput = {
   upstreamFormat: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   executionRoutes?: AiProviderExecutionRouteConfig[];
+  modelDefaults?: Record<string, { mode: AiGenerationMode; outputPolicy?: 'auto' | 'manual' }>;
   modelPricing?: Record<
     string,
     {
@@ -223,7 +224,7 @@ export const aiProviderInputFromDraft = (
   const modelDefaults = Object.fromEntries(
     models.flatMap((model) => {
       const defaults = draft.modelDefaults[model];
-      return defaults ? [[model, { mode: defaults.mode }] as const] : [];
+      return defaults ? [[model, { ...defaults }] as const] : [];
     }),
   );
   const expectedRevision = draft.updatedAt.trim();

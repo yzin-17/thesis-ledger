@@ -234,6 +234,14 @@ export class ProviderConfigService {
       if (result.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
       saved = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
       if (!saved) throw new NotFoundException('Provider 配置保存后不存在');
+    } else if (value.type === 'ai') {
+      try {
+        saved = await this.prisma.providerConfig.create({ data: createData });
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002')
+          throw new ConflictException('同名接入配置已创建，请刷新后重试');
+        throw error;
+      }
     } else {
       saved = await this.prisma.providerConfig.upsert({
         where: { name: value.name },

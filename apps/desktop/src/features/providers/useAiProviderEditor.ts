@@ -95,6 +95,10 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   };
 
   const cancelTest = () => {
+    if (saveMutation.isPending) {
+      saveMutation.cancelSave();
+      return;
+    }
     const active = activeAiTestRef.current;
     if (!active) return;
     void cancelAiProviderTest(active.name, active.requestId).catch(() => undefined);
@@ -667,13 +671,16 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
               expectedSettingsRevision: routingSettings.revision,
             }
           : undefined;
-      const deleted = await requestAiProviderDeletion(provider, confirm, (name, expectedRevision) =>
-        deleteMutation.mutateAsync({
-          name,
-          ...(expectedRevision ? { expectedRevision } : {}),
-          ...(lifecycle ?? {}),
-        }),
-      lifecycle,
+      const deleted = await requestAiProviderDeletion(
+        provider,
+        confirm,
+        (name, expectedRevision) =>
+          deleteMutation.mutateAsync({
+            name,
+            ...(expectedRevision ? { expectedRevision } : {}),
+            ...(lifecycle ?? {}),
+          }),
+        lifecycle,
       );
       if (deleted)
         toastManager.add({ title: `${provider.name} 已删除`, type: 'success', timeout: 2800 });

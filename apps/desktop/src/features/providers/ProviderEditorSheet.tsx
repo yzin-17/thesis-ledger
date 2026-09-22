@@ -31,7 +31,8 @@ import {
 
 import type { AiAuthMode, AiProviderModelDetail, ProviderDraft } from './providers.types.js';
 
-const saveProviderLabel = (saving: boolean, editing: boolean) => {
+const saveProviderLabel = (saving: boolean, editing: boolean, ai: boolean) => {
+  if (ai) return saving ? '正在检查并保存…' : '测试并保存';
   if (saving) return '保存中…';
   return editing ? '保存修改' : '保存 Provider';
 };
@@ -313,7 +314,9 @@ export const ProviderEditorSheet = ({
               >
                 取消
               </Button>
-              {providerDraft.type === 'ai' && providerTestState === 'testing' && onCancelTest ? (
+              {providerDraft.type === 'ai' &&
+              (providerTestState === 'testing' || savingProviderDraft) &&
+              onCancelTest ? (
                 <Button type="button" variant="outline" onClick={onCancelTest}>
                   取消测试
                 </Button>
@@ -348,7 +351,11 @@ export const ProviderEditorSheet = ({
                     aria-hidden="true"
                   />
                 )}
-                {saveProviderLabel(savingProviderDraft, Boolean(editingProviderName))}
+                {saveProviderLabel(
+                  savingProviderDraft,
+                  Boolean(editingProviderName),
+                  providerDraft.type === 'ai' && providerDraft.enabled,
+                )}
               </Button>
             </SheetFooter>
           </form>

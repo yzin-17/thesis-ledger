@@ -35,6 +35,8 @@ type ProbeInput = {
   signal?: AbortSignal;
   purpose?: AiGenerationContractRef['id'];
   mode?: AiGenerationMode;
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
 };
 
 const contractForPurpose = (purpose: AiGenerationContractRef['id'] | undefined) => {
@@ -51,7 +53,7 @@ const contractForPurpose = (purpose: AiGenerationContractRef['id'] | undefined) 
  * 内联契约 JSON Schema 是因为契约带 `superRefine` 语义约束（例如 sizing 金额必须大于 0），
  * 只给 schema 而不给取值要求时模型会输出 0 或占位符而被契约拒绝。
  */
-const probeMessages = (purpose: AiGenerationContractRef['id'] | undefined) => {
+export const probeMessages = (purpose: AiGenerationContractRef['id'] | undefined) => {
   if (purpose === undefined)
     return [{ role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' }];
   const schema = z.toJSONSchema(contractForPurpose(purpose).schema, { io: 'output' });
@@ -87,6 +89,8 @@ export const runProviderConnectionTest = async ({
   signal,
   purpose,
   mode = 'json_validated',
+  firstOutputTimeoutMs = 30000,
+  outputIdleTimeoutMs = 30000,
 }: ProbeInput) => {
   const started = Date.now();
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -101,14 +105,15 @@ export const runProviderConnectionTest = async ({
     model,
     messages: probeMessages(purpose),
     contract: purpose ? contractForPurpose(purpose).ref : aiGenerationContracts.research.ref,
-    schema: purpose
-      ? (contractForPurpose(purpose).schema as z.ZodTypeAny)
-      : connectionProbeSchema,
+    schema: purpose ? (contractForPurpose(purpose).schema as z.ZodTypeAny) : connectionProbeSchema,
     mode,
-    transport: 'single',
+    transport: purpose ? 'stream' : 'single',
     maxOutputTokens:
       purpose === undefined ? CONNECTION_PROBE_MAX_OUTPUT_TOKENS : PURPOSE_PROBE_MAX_OUTPUT_TOKENS,
-    timeout: { totalMs: timeoutMs },
+    timeout: {
+      totalMs: timeoutMs,
+      ...(purpose ? { firstChunkMs: firstOutputTimeoutMs, chunkMs: outputIdleTimeoutMs } : {}),
+    },
     signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
   return { result, latencyMs: Date.now() - started };

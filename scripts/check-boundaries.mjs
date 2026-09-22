@@ -9,6 +9,16 @@ const serverImportsPrefix = 'apps/server/src/imports/';
 const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const forbiddenServerFeatureDependencies = [
+  [
+    serverProvidersPrefix,
+    'apps/server/src/ai/',
+    'provider storage must not depend on AI orchestration',
+  ],
+  [
+    'apps/server/src/ai/',
+    'apps/server/src/strategy-optimization/',
+    'AI adapters must not depend on strategy orchestration',
+  ],
   [serverLedgerPrefix, serverImportsPrefix, 'ledger must not depend on imports adapter'],
   [
     serverProvidersPrefix,
@@ -32,7 +42,11 @@ const forbiddenServerFeatureDependencies = [
     'notification outbox must not depend on cash plan callers',
   ],
   [serverBacktestPrefix, serverLedgerPrefix, 'backtest must not depend on real ledger facts'],
-  [serverBacktestPrefix, 'apps/server/src/portfolio/', 'backtest must not read portfolio projection'],
+  [
+    serverBacktestPrefix,
+    'apps/server/src/portfolio/',
+    'backtest must not read portfolio projection',
+  ],
   [serverBacktestPrefix, 'apps/server/src/journal/', 'backtest must not write journal projection'],
   [serverLedgerPrefix, serverBacktestPrefix, 'real ledger must not consume backtest results'],
   [
@@ -70,10 +84,21 @@ async function inspect(path) {
   const isServerSource = file.startsWith('apps/server/src/');
   const isMarketFeature = file.startsWith('apps/server/src/market/');
   const isDsaBoundary = file.startsWith('apps/server/src/integration/dsa/');
-  if (isServerSource && !isMarketFeature && /prisma\.marketBar\.(?:find|count|groupBy|aggregate)\b|import\s+(?:type\s+)?\{[^}]*\bMarketBar\b/u.test(source)) {
+  if (
+    isServerSource &&
+    !isMarketFeature &&
+    /prisma\.marketBar\.(?:find|count|groupBy|aggregate)\b|import\s+(?:type\s+)?\{[^}]*\bMarketBar\b/u.test(
+      source,
+    )
+  ) {
     violations.push(`${file} -> MarketBar (行情事实只能由 MarketBarReader 读取)`);
   }
-  if (isServerSource && !isMarketFeature && !isDsaBoundary && /\b(?:this\.)?dsa\.(?:marketBarsV2|backtestBars)\s*\(/u.test(source)) {
+  if (
+    isServerSource &&
+    !isMarketFeature &&
+    !isDsaBoundary &&
+    /\b(?:this\.)?dsa\.(?:marketBarsV2|backtestBars)\s*\(/u.test(source)
+  ) {
     violations.push(`${file} -> DsaClient market bars (必须通过 MarketBarReader)`);
   }
   for (const specifier of imports) {

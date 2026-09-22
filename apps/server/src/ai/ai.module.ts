@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AiProviderValidationJournal } from './ai-provider-validation-journal.js';
+import { AiProviderSaveService } from './ai-provider-save.service.js';
 import { ProviderModule } from '../providers/provider.module.js';
 import { AiController } from './ai.controller.js';
 import { AiProviderController } from './ai-provider.controller.js';
@@ -24,6 +26,8 @@ import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
     AiSdkGenerationAdapter,
     AiResearchSdkExecution,
     AiProviderService,
+    AiProviderSaveService,
+    AiProviderValidationJournal,
     AiRoutingSettingsService,
     {
       provide: AiProviderRegistry,

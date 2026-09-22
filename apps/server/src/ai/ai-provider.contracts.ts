@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  aiOutputPolicySchema,
   aiChatImplementationSchema,
   aiAuthModeSchema,
   aiProviderTestKindSchema,
@@ -69,7 +70,7 @@ export const aiProviderModelPricingInputSchema = z
 export type AiProviderModelPricingInput = z.infer<typeof aiProviderModelPricingInputSchema>;
 
 export const aiProviderModelDefaultConfigSchema = z
-  .object({ mode: aiGenerationModeSchema })
+  .object({ mode: aiGenerationModeSchema, outputPolicy: aiOutputPolicySchema.optional() })
   .strict();
 export type AiProviderModelDefaultConfig = z.infer<typeof aiProviderModelDefaultConfigSchema>;
 
@@ -123,6 +124,7 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
     .object({
       model: z.string().trim().min(1).max(200),
       mode: aiGenerationModeSchema,
+      outputPolicy: aiOutputPolicySchema.optional(),
       // Undefined is the persisted representation for legacy enabled routes.
       enabled: z.boolean().optional(),
       modeOverridden: z.boolean().optional(),
@@ -344,13 +346,7 @@ export interface AiProviderSummary {
 }
 
 export type AiProviderTestStatus =
-  | 'healthy'
-  | 'degraded'
-  | 'down'
-  | 'disabled'
-  | 'unconfigured'
-  | 'config_error'
-  | 'cancelled';
+  'healthy' | 'degraded' | 'down' | 'disabled' | 'unconfigured' | 'config_error' | 'cancelled';
 
 export interface AiProviderTestResult {
   name: string;

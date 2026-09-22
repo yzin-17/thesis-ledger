@@ -47,7 +47,8 @@ const optionalNumber = (value: string) => {
 export const newAiProviderExecutionRouteDraft = (model = ''): AiProviderExecutionRouteDraft => ({
   key: nextRouteKey(),
   model,
-  mode: 'json_validated',
+  mode: 'native_schema',
+  outputPolicy: 'auto',
   enabled: true,
   modeOverridden: false,
   contractId: 'research',
@@ -61,6 +62,7 @@ export const aiProviderExecutionRouteDraftFromConfig = (
   key: nextRouteKey(),
   model: route.model,
   mode: route.mode,
+  outputPolicy: route.outputPolicy ?? 'manual',
   enabled: route.enabled !== false,
   modeOverridden: route.modeOverridden ?? true,
   contractId: route.contract.id,
@@ -76,8 +78,9 @@ export const aiProviderExecutionRouteInputFromDraft = (
   return {
     model: draft.model.trim(),
     mode: draft.mode,
+    outputPolicy: draft.outputPolicy ?? 'manual',
     ...(draft.enabled ? {} : { enabled: false }),
-    ...(draft.modeOverridden ? { modeOverridden: true } : {}),
+    modeOverridden: draft.modeOverridden,
     contract: contractRefs[draft.contractId],
     ...(firstOutputTimeoutMs === undefined ? {} : { firstOutputTimeoutMs }),
     ...(outputIdleTimeoutMs === undefined ? {} : { outputIdleTimeoutMs }),
@@ -144,8 +147,8 @@ export const aiExecutionReadinessLabel = (routes: AiProviderModelExecution[] | u
 };
 
 export const aiLiveValidationLabel = (routes: AiProviderModelExecution[] | undefined) => {
-  if (!routes || routes.length === 0) return '真实验收未执行';
-  if (routes.some((route) => route.liveValidation.status === 'failed')) return '真实验收失败';
-  if (routes.every((route) => route.liveValidation.status === 'passed')) return '真实验收通过';
-  return '真实验收未执行';
+  if (!routes || routes.length === 0) return '用途尚未验证';
+  if (routes.some((route) => route.liveValidation.status === 'failed')) return '用途验证未通过';
+  if (routes.every((route) => route.liveValidation.status === 'passed')) return '用途验证通过';
+  return '用途尚未验证';
 };
