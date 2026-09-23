@@ -76,7 +76,10 @@ export function AiProviderExecutionFields({
                     {aiContractOptions.map((option) => {
                       const route = routes.find((item) => item.contractId === option.value);
                       return (
-                        <label key={option.value} className="flex items-center gap-2 text-sm">
+                        <FieldLabel
+                          key={option.value}
+                          className="flex w-fit items-center gap-2 text-sm font-normal"
+                        >
                           <Checkbox
                             aria-label={`${model} ${option.label}用途`}
                             checked={route?.enabled ?? false}
@@ -101,7 +104,7 @@ export function AiProviderExecutionFields({
                             }
                           />
                           {option.label}
-                        </label>
+                        </FieldLabel>
                       );
                     })}
                   </div>
@@ -150,21 +153,23 @@ export function AiProviderExecutionFields({
                     </div>
                     {selected ? (
                       <>
-                        <label className="flex items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={!selected.modeOverridden}
-                            aria-label={`${model} ${title}跟随模型设置`}
-                            onCheckedChange={(checked) =>
-                              updateRoute(
-                                selected.key,
-                                checked
-                                  ? { ...defaults, modeOverridden: false }
-                                  : { modeOverridden: true },
-                              )
-                            }
-                          />
-                          跟随模型设置
-                        </label>
+                        <Field>
+                          <FieldLabel className="flex w-fit items-center gap-2 text-sm font-normal">
+                            <Checkbox
+                              checked={!selected.modeOverridden}
+                              aria-label={`${model} ${title}跟随模型设置`}
+                              onCheckedChange={(checked) =>
+                                updateRoute(
+                                  selected.key,
+                                  checked
+                                    ? { ...defaults, modeOverridden: false }
+                                    : { modeOverridden: true },
+                                )
+                              }
+                            />
+                            跟随模型设置
+                          </FieldLabel>
+                        </Field>
                         {selected.modeOverridden ? (
                           <AiGenerationSettings
                             value={{

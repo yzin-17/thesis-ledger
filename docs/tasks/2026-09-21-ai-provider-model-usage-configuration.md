@@ -28,6 +28,8 @@
 
 本次记录的自动化结果来自 2026-09-22 的本轮实现后回归；后续源码或配置变化仍必须重新确认受影响证据。目标 PostgreSQL 与 Docker 已执行；Provider 凭证和 Electron 实机验收仍未执行。内建浏览器本地 Web 预览已于 2026-09-22 执行，不能替代 Electron 实机证据。
 
+2026-09-23 复核（评审基线 `main@272eaa27`，工作区干净）：本机实测 Server `tsc` / Desktop `tsc` / Schemas 209 项 / Server 876 项（49 项 PostgreSQL 集成按环境跳过）/ Desktop 464 项全部通过，其中 Desktop 在此前的 `272eaa27` 上存在 1 项由该文件引入的真实失败（原生 `<label>` 违反 `test/ui-contract.test.tsx` 既有契约），已于本次复核修复；`check-boundaries.mjs`、`check-migration-matrix.mjs`（15 migrations / 66 tables）与 `git diff --check` 通过。本节其余 2026-09-22 的测试计数（813 / 814 / 455 / 457）为历史快照，不再代表当前基线。
+
 ## 2. 分阶段任务
 
 父任务 T1～T5 是验收责任组，不单独计数；只有子任务的复选框表示可独立接受的里程碑或交付物。
@@ -91,7 +93,11 @@
     - 实现：`provider-connection-test.ts` 用途探针改为 system（只返回满足给定 JSON Schema 的 JSON 对象，禁 Markdown/围栏/解释/额外字段）+ user（最小可用实例、内联 `z.toJSONSchema(契约)`、并要求数值大于 0 与枚举取值合法）；用途探针输出预算 1024 → 8192（`PURPOSE_PROBE_MAX_OUTPUT_TOKENS`）。连接探针保持单次中性契约不变（1024、不注入 `reasoningEffort`），既有断言 `连接测试统一通过 SDK adapter 发出单次中性探针` 继续成立；用途预算上调依据 `tasks/2026-09-19-vercel-ai-sdk-integration.md`“对必须推理的模型预先给出安全输出预算”。内联 schema 与数值要求是必需的：契约的 `superRefine` 语义约束（`strategy.sizing.amount > 0`、`entry.conditions` 最短长度）无法由 JSON Schema 表达，只给结构会让模型输出 0 或空数组被拒。
     - 观测性修复：`ai-provider.service.ts` 中探针 total 超时此前被适配器统一归为 `cancelled`，即使调用方没有取消；现在该情形报 `errorCode: provider_timeout` 与“Provider 未在 N ms 内返回结果，已按超时中断”，不再显示成用户取消。
     - 定向验证：Server `tsc -p tsconfig.json` 通过；`vitest run test/ai/ai-provider-management.test.ts` 26 项通过（新增用途探针消息/预算/中性断言、连接探针最小指令、探针超时 errorCode 三项）；`vitest run test/ai` 146 项通过、17 项 PostgreSQL 集成按环境跳过；受影响文件 ESLint 通过。真实 Provider 复验（本地 LM Studio 推理模型，草稿显式 `timeoutMs=120000`）：连接 2.7s、研究 80.4s、参数优化 30.5s、策略发现 62.4s、研究（`native_schema`）76.7s 全部 `healthy`；同一探针在 Provider 默认 30000ms 超时下三个用途均如实报 `provider_timeout`。
-    - 遗留（已记入 `docs/TODO.md`）：单次探针只消费 Provider 总超时，用途级/Provider 级 `firstOutputTimeoutMs`、`outputIdleTimeoutMs` 与路由级 `reasoningEffort` 都不参与，因此用途面板的“首输出等待 / 输出空闲等待”对“测试”按钮无效；推理模型需按用途匹配超时，本次由使用方把该 Provider 超时提到 120000ms。
+    - 遗留（已记入 `docs/TODO.md`）：**2026-09-23 复核修正**——`272eaa27` 已在 `ai-provider.service.ts:746-754` 把 `purposeRoute.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs` 与对应 idle 值透传给用途探针，`provider-connection-test.ts:110,113-116` 在 `purpose` 下使用 `transport: 'stream'` 并传 `firstChunkMs/chunkMs`，`ai-sdk-generation.adapter.ts:232-241` 在 stream 下使其生效，因此“用途面板的首输出等待 / 输出空闲等待对测试按钮无效”已不再成立。仍成立的只有两点：连接探针（`purpose` 为空）保持 `single` 且只消费 Provider 总超时；探针不注入路由级 `reasoningEffort`。`docs/TODO.md` 的同名条目已同步收窄。
+    - **2026-09-23 真实 Provider 复验（lmstudio，`chat-completions` / `compatible` / `authMode: none`，模型 `qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive`，baseUrl `http://192.168.5.20:6789/v1`，通过目标容器 `http://127.0.0.1:3000/api/v1` 调用）**：
+      - 已保存 Provider 连接测试 `POST /ai/providers/lmstudio/test`（`{}`）：`healthy`，`latencyMs=2909`，`credentialConfigured=false`，`authMode=none`，`usage={status:'reported',inputTokens:21,outputTokens:147}`，`cost={status:'estimated',amount:'0',currency:'USD',source:'configured_model_pricing',pricingVersion:'pricing-612c2b5d10c1ebd9'}`。证明 AC-15（无认证不发 Key、不回退环境 Key）与服务端维护的 `pricingVersion` 只读回流。
+      - 草稿用途测试 `POST /ai/providers/test`（`testKind:'generation'`，`timeoutMs=120000`，草稿内三条 `executionRoutes` 分别绑定 research / parameter_optimization / strategy_discovery，`mode=json_validated`）：research `healthy` 67035ms（in 603 / out 3973）、parameter_optimization `healthy` 57793ms（in 351 / out 3450）、strategy_discovery `healthy` 76780ms（in 1445 / out 4532），三者 `usage.status='reported'`、`cost.status='estimated'`、`source='configured_model_pricing'`（草稿价为零，故 `pricingVersion=null`）。证明用途探针的 system + 内联 JSON Schema + 数值/枚举要求在本机真实推理模型上可通过契约校验，即 2026-09-22 的 JSON 探针修复在真实 Provider 上成立。
+      - 证据边界：本次**未产生真实计费**（配置为零价、Provider 不上报费用），因此 AC-13 的“用户零价与上游真实非零费用分别保留”仍未获真实证据；有认证请求、Electron 实机、真实非零费率预算授权仍待验证。`researchDefault` 当前为 `null`，研究创建处于 AC-17 预期的阻断态，未为了跑通而写入默认设置。
 
 ### T4：显式研究默认与引用生命周期
 
@@ -124,13 +130,15 @@
   - 验证方式：隔离 PostgreSQL、迁移报告、重复执行和旧客户端契约测试。
   - 定向验证：通过；`ai-provider-migration.test.ts` 3 项覆盖零值精度、已有模型价格保留、缺字段 / 重复用途冲突、重复规划稳定；Server 保存路径拒绝旧客户端省略已有模型级价格；dry-run 端点只读读取存量 Provider。
   - 证据边界：已证明纯函数报告和写入保护；仓库隔离 PostgreSQL 重建脚本已通过 66 表、当前 head、回滚、重复重建、权限和错误目标保护；另有隔离 PostgreSQL 任务执行集成 16 项通过。目标开发库已在明确授权后通过 `update.sh thesis-ledger` 重建到当前 head，并完成结构与服务 smoke。
+  - 2026-09-23 复核补充：迁移**只有 dry-run 端点**（`POST /ai/providers/migration/dry-run`）与纯函数 `ai-provider-migration.ts`，**仓库内不存在 apply 路径**。因此“重复执行幂等”目前只有“同一输入重复调用纯函数结果一致”这一平凡证据，持久化层幂等未证明；本任务保持为**局部里程碑**，完整 AC-25～27 仍需目标数据库 apply 证据。
 
 - [ ] **T5.2：能力移除回归与真实运行态门禁**
   - 覆盖：完整 AC-29～30，以及 AC-03、AC-15、AC-23 的真实环境部分。
   - 依赖：T1～T4 的实现和 T5.1 迁移；目标 Server / Worker、Docker、Electron 和 Provider 环境可用。
   - 完成条件：不恢复能力声明、免费依据、上游限制或按域名切 SDK；通过实际 Server / Worker 地址完成无认证、有认证、指定模型测试、显式默认和业务用途输出闭环；Desktop 布局、滚动、保存和错误反馈可操作。
   - 验证方式：仓库门禁、`thesis-ledger-infra` 正确更新入口、目标 Docker、Electron / 浏览器人工验收和真实 Provider；没有凭证或环境时必须记录为未通过门禁。
-  - 当前证据：目标 `thesis-ledger` 镜像已由授权的 `./scripts/update.sh thesis-ledger` 构建并启动；目标 `SchemaVersion=20260922100000_ai_provider_test_facts`、public 表数 66，Server / Worker / PostgreSQL / Redis / DSA 均 healthy，目标 HTTP/Redis/完整性 smoke 通过。另有一次目标无认证 Provider 探测实际进入测试链路，返回 `credentialConfigured=false`、unknown usage/cost，并因容器到 OpenRouter 的 TLS 网络断开收敛为 `down`；未发送 Key，也未产生计费生成。内建浏览器已通过 `http://127.0.0.1:5174` 访问当前 Desktop Web 预览，检查了 Provider 列表、连接配置 / 模型与用途双页签、模型价格未知提示、研究报告用途选择、未保存修改保护、自动化、诊断、研究默认缺失时的创建阻断和策略 AI 实验参数校验；所有浏览器改动均未保存，未填写凭证，未触发 Provider 生成。真实 Provider 成功生成/计费请求和 Electron 实机仍未执行。本机应用清单未发现 ThesisLedger Electron 应用，Edge 的 Computer Use 控制未获批准，未绕过权限进行 UI 操作。
+  - 当前证据：目标 `thesis-ledger` 镜像已由授权的 `./scripts/update.sh thesis-ledger` 构建并启动；目标 `SchemaVersion=20260922100000_ai_provider_test_facts`、public 表数 66，Server / Worker / PostgreSQL / Redis / DSA 均 healthy，目标 HTTP/Redis/完整性 smoke 通过。另有一次目标无认证 Provider 探测实际进入测试链路，返回 `credentialConfigured=false`、unknown usage/cost，并因容器到 OpenRouter 的 TLS 网络断开收敛为 `down`；未发送 Key，也未产生计费生成。内建浏览器已通过 `http://127.0.0.1:5174` 访问当前 Desktop Web 预览，检查了 Provider 列表、连接配置 / 模型与用途双页签、模型价格未知提示、研究报告用途选择、未保存修改保护、自动化、诊断、研究默认缺失时的创建阻断和策略 AI 实验参数校验；所有浏览器改动均未保存，未填写凭证，未触发 Provider 生成。真实 Provider 成功生成请求和 Electron 实机仍未执行。本机应用清单未发现 ThesisLedger Electron 应用，Edge 的 Computer Use 控制未获批准，未绕过权限进行 UI 操作。
+  - 2026-09-23 真实 Provider 补充证据（lmstudio）：通过目标容器 `http://127.0.0.1:3000/api/v1` 完成无认证连接测试（`healthy`，2.9s，usage reported 21/147）与 research / parameter_optimization / strategy_discovery 三个用途的真实生成（67.0s / 57.8s / 76.8s，均 `healthy`，usage reported，cost 按配置零价 `estimated`）。这使 AC-03、AC-15、AC-23 的“无认证 / 指定用途真实生成”部分获得真实证据；**仍未覆盖**：有认证请求、非零费率的预算授权与真实计费、显式默认下的研究创建（`researchDefault` 当前为 `null`，处于预期阻断态）、Electron 实机。
 
 ## 3. 完整设计稿 AC-01～30 基线矩阵
 
@@ -140,7 +148,7 @@
 | --- | --- | --- | --- | --- |
 | AC-01 | 同一 Drawer 双页签切换不丢草稿，关闭有未保存保护 | T3.2 | Desktop 交互、Electron | 内建浏览器已检查双页签与未保存保护；Electron 待验证 |
 | AC-02 | 切换 Provider 类型不重建 Drawer，非 AI 功能不回归 | T3.2 | Desktop 交互回归 | 局部实现；待验证 |
-| AC-03 | 连接配置与目录获取分离，不要求先填价格或用途 | T3.2 | Server adapter、真实连接 | 局部实现；真实环境待验证 |
+| AC-03 | 连接配置与目录获取分离，不要求先填价格或用途 | T3.2 | Server adapter、真实连接 | 2026-09-23 已用 lmstudio 无认证真实连接 + 三个用途生成验证；有认证连接仍待验证 |
 | AC-04 | 目录刷新不自动选用途、改价格、删模型或设默认 | T3.2 | 目录定向测试、Electron | 局部实现；待补竞态证据 |
 | AC-05 | 连接参数变化后，晚到目录响应不能覆盖新草稿 | T3.2 | 请求竞态测试、Desktop | 局部实现；请求竞态已有门控，Electron 待验证 |
 | AC-06 | 一个模型的多用途转换为唯一用途路由，模式和覆盖值不丢 | T2.1、T2.2 | 路由转换、Desktop 交互 | 内建浏览器已检查用途选择与覆盖面板；保存后完整路由和 Electron 待验证 |
@@ -152,7 +160,7 @@
 | AC-12 | 新价格不重算旧任务的冻结价格和结算 | T1.2 | 快照、历史任务集成 | 研究 / 策略冻结路径已补；历史集成待验证 |
 | AC-13 | 用户零价与上游真实非零费用分别保留 | T1.2 | Provider 报告、费用结算 | 测试响应 / 历史详情已保留上游报告费用；真实结算待验证 |
 | AC-14 | 非零模型未获本次预算授权时阻断调用 | T1.2 | 预算门禁、生成测试 | 任务创建、策略基础门禁、指定模型生成测试和隔离费用闭环已补；真实服务待验证 |
-| AC-15 | 无认证连接不发 Key，不读取环境 Key 兜底 | T3.1、T5.2 | adapter 定向测试、真实服务 | 目标无认证探测以 `credentialConfigured=false` 进入链路，但上游 TLS 失败；无认证成功连接仍待验证 |
+| AC-15 | 无认证连接不发 Key，不读取环境 Key 兜底 | T3.1、T5.2 | adapter 定向测试、真实服务 | 2026-09-23 用 lmstudio（`authMode: none`）真实成功：`credentialConfigured=false` 且返回 `healthy` 与 reported usage；有认证路径仍待验证 |
 | AC-16 | 留空保留 Key；切换认证方式有确认和重新输入边界 | T3.1、T3.2 | Server、Desktop、Electron | 内建浏览器已确认 Key 输入不回显与留空说明；实机切换确认和保存后行为待验证 |
 | AC-17 | 默认失效或预算不足时明确阻断，不按顺序换模型 | T4.1、T4.2 | Server、研究创建、真实服务 | 内建浏览器已确认无研究默认时创建按钮禁用且给出明确提示；并发与真实运行态待验证 |
 | AC-18 | 调整排序不改变显式默认 | T4.2 | settings / 研究创建测试 | 实施中 |
@@ -160,7 +168,7 @@
 | AC-20 | 研究和策略只使用允许且冻结的模型，不自动换模型 | T4.2 | Server 执行集成 | 待补验证 |
 | AC-21 | 删除、停用或移除默认引用时确认并原子提交 | T4.2 | Provider 生命周期、PostgreSQL | 本地 transaction 与确认已实现；PostgreSQL 待验证 |
 | AC-22 | 保存、切页、详情打开不产生生成请求，未测试为中性状态 | T3.2 | Desktop 请求断言 | 内建浏览器切页、打开编辑器和撤销均未触发生成；完整请求断言仍以自动化测试为准 |
-| AC-23 | 指定模型测试只调用目标模型，付费先授权，重复点击不重复调用 | T1.2、T3.2 | 生成生命周期、费用、取消 | 目标模型、付费授权、单飞、取消和事实留存已本地验证；真实上游待验证 |
+| AC-23 | 指定模型测试只调用目标模型，付费先授权，重复点击不重复调用 | T1.2、T3.2 | 生成生命周期、费用、取消 | 目标模型、付费授权、单飞、取消和事实留存已本地验证；2026-09-23 已用 lmstudio 完成三个用途的真实生成（零价，未触发计费授权）；非零费率的真实授权路径待验证 |
 | AC-24 | 配置变化和测试失败按正确粒度过期、归因 | T3.2 | 请求竞态、状态测试 | 待补验证 |
 | AC-25 | 价格迁移保留值、缺失不补零、重复执行幂等 | T5.1 | 隔离 PostgreSQL、迁移 dry-run | dry-run 规划、冲突保护和隔离结构输入已验证；目标数据库 apply 待验证 |
 | AC-26 | 旧路由冲突保留原值并可定位，不静默合并 | T5.1 | 迁移报告、冲突 fixture | 冲突 fixture 和隔离结构验证已通过；目标数据库 apply 待验证 |
@@ -212,9 +220,10 @@
 
 - 结论：**本地实现完成，外部运行态门禁未通过**。T1～T4 与 T5.1 的本地交付物已完成，不能据此宣称完整 AC-01～30 全部通过。
 - 已确认的默认决策：完整设计稿 AC-01～30 为主编号；客户端不得提交 `pricingVersion`；影响默认引用的变更必须有版本保护和原子提交；取消不等于零消耗；真实环境缺失不豁免运行态门禁。
-- 当前剩余门禁：真实 Provider 成功计费请求、有认证请求和 Electron / 浏览器人工验收；无认证探测已执行但被目标容器外联 TLS 失败阻断。当前环境虽有 `openrouter` 配置，但未将其配置状态或 readiness 读取当作真实调用证据。
+- 当前剩余门禁：Electron / 浏览器人工验收、有认证请求、真实计费（非零费率）请求、真实 PostgreSQL 并发；无认证成功连接与指定用途的真实生成已于 2026-09-23 用 lmstudio Provider 执行（见 T3.2）。
 - 规划风险：完整设计稿位于 Downloads，后续若源文件发生变化，必须重新检查 AC-01～30 映射和受影响证据。
-- 本次验证：Server 完整测试 813 通过 / 49 个 PostgreSQL 集成用例按环境跳过，Desktop 455 通过，Schemas 209 通过；另有隔离 PostgreSQL 任务执行集成 16 项、重建 7 项、结构测试 9 项通过，目标库重建到当前 head、目标 Compose 全部 healthy、目标 HTTP/Redis/完整性 smoke 和无认证 fail-closed 探测通过；migration matrix、Prisma validate / generate、两端 build / typecheck、受影响文件 ESLint 和 `git diff --check` 通过。`pnpm lint` 的 build、边界和工作区依赖门禁通过，但全仓 ESLint 仍被既有 mobile React Native Flow 解析错误及未修改的 Desktop / Server 文件 22 项错误阻断；未执行真实 Provider 成功生成/计费请求或 Electron 验收。
+- 本次验证（2026-09-22 快照，已被下一行取代）：Server 完整测试 813 通过 / 49 个 PostgreSQL 集成用例按环境跳过，Desktop 455 通过，Schemas 209 通过；另有隔离 PostgreSQL 任务执行集成 16 项、重建 7 项、结构测试 9 项通过，目标库重建到当前 head、目标 Compose 全部 healthy、目标 HTTP/Redis/完整性 smoke 和无认证 fail-closed 探测通过；migration matrix、Prisma validate / generate、两端 build / typecheck、受影响文件 ESLint 和 `git diff --check` 通过。`pnpm lint` 的 build、边界和工作区依赖门禁通过，但全仓 ESLint 仍被既有 mobile React Native Flow 解析错误及未修改的 Desktop / Server 文件 22 项错误阻断（“22 项”本次未实测，旁证文档 `2026-09-21-remove-ai-free-evidence.md`、`2026-09-21-remove-ai-upstream-restriction.md` 各只记录 3 个未改动文件的既有错误，数量口径需后续统一）；未执行真实 Provider 成功生成/计费请求或 Electron 验收。
+- 2026-09-23 复核验证（基线 `main@272eaa27`）：Schemas 209 通过；Server 876 通过 / 49 个 PostgreSQL 集成用例按环境跳过；Desktop 464 通过（修复 `272eaa27` 引入的原生 `<label>` 违例后 0 失败）；两端 `tsc --noEmit`、`check-boundaries.mjs`、`check-migration-matrix.mjs`（15 migrations / 66 tables）、受影响文件 ESLint、`git diff --check` 通过。目标 Compose（thesis-ledger / backtest-worker / dsa / postgres / redis）全部 healthy。真实 Provider 复验见 T3.2“2026-09-23 真实 Provider 复验”一行。Electron 实机、有认证请求、真实计费与 PostgreSQL 并发仍未执行。
 
 ## 7. 2026-09-22 模型用途交互收敛增量
 
@@ -222,7 +231,7 @@
   - 覆盖：仓库局部 AC-07～09；完整设计稿中用途编辑、详情切换与输出配置相关断言的本地实现部分。
   - 实现：Desktop 将已启用用途与当前编辑用途拆分；用途 Chip 不再用于取消，详情面板是唯一取消入口；每个模型只渲染当前详情。Server 设置契约新增 `modelDefaults` 与路由 `modeOverridden`，默认变更仅同步未覆盖路由的有效 `mode`。
   - 兼容：缺少新字段的旧路由按显式覆盖读取，避免保存时改变已有输出方式；运行时仍消费已经解析的有效 `mode`，未改变业务路由、预算或测试执行路径。
-  - 定向验证：`cd apps/desktop && pnpm typecheck`、`pnpm test -- ai-provider-ui.test.tsx` 通过（457 项）；`cd apps/server && pnpm typecheck`、`pnpm test -- ai-provider-readiness.test.ts` 通过（814 项，49 项 PostgreSQL 集成按环境跳过）。
+  - 定向验证（2026-09-22 快照）：Desktop typecheck、Desktop 全量 457 项通过；Server typecheck、Server 全量 814 项通过（49 项 PostgreSQL 集成按环境跳过）。2026-09-23 复核：Desktop 全量 464 项通过，Server 全量 876 项通过（49 项跳过）。
   - 证据边界：自动化证明本地状态、序列化、Server Schema 与静态组件结构；未执行 Electron 实机交互、保存后浏览器回读或真实 Provider 调用。
 
 - [ ] **T2.4：模型用途紧凑布局与降权操作**（已被 T2.5 的复选框 / 父表单保存交互替代；浏览器视觉门禁未验证）
@@ -234,5 +243,5 @@
 - [ ] **T2.5：用途 Draft、父表单统一保存与停用配置保留**（代码与自动化验证完成；浏览器 / Electron 门禁未验证）
   - 契约：`executionRoutes.enabled?: boolean` 保持向后兼容；未设置按启用处理。停用路由继续保存专属输出与超时配置，运行时快照仅过滤显式 `enabled: false`。
   - Desktop：复选框和表单只写父级 Provider Draft；模型用途不提供自己的保存、取消或 Dirty 提示。父级表单的既有保存、取消与关闭保护统一覆盖用途、价格和连接参数。用途测试继续使用当前 Draft，不隐式保存。
-  - 验证：Desktop `pnpm typecheck`、完整 457 项测试和受影响 ESLint 通过；Server `pnpm typecheck`、`pnpm exec vitest run test/ai/ai-provider-readiness.test.ts`（16 项）与受影响 ESLint 通过。
+  - 验证（2026-09-22 快照）：Desktop typecheck、Desktop 全量 457 项与受影响 ESLint 通过；Server typecheck、`test/ai/ai-provider-readiness.test.ts`（16 项）与受影响 ESLint 通过。2026-09-23 复核：Desktop 全量 464 项通过（含修复原生 `<label>` 违例后 `test/ui-contract.test.tsx` 恢复通过）。
   - 证据边界：自动化不证明真实浏览器中的复选、保存失败回填、离开确认或 Electron 视觉；这些门禁保持未验证。
