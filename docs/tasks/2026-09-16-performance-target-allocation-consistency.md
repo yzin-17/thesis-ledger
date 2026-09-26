@@ -1,7 +1,7 @@
 # 目标配置版本与并发一致性加固任务
 
 - 日期：2026-09-16
-- 复审更新：2026-09-23
+- 复审更新：2026-09-26
 - 状态：待实施
 - 对应 Spec：`docs/specs/2026-09-16-performance-target-allocation-consistency.md`
 - Review 基线：`main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e`
@@ -10,9 +10,9 @@
 
 将 `TargetAllocation` 从“应用层约定的版本记录”收敛为具备数据库 identity 约束、原子版本切换、同 identity 并发串行化和真实 PostgreSQL 验收的持久化配置事实，同时保持当前 Performance UI、再平衡语义和合法 Desktop/API 调用兼容。
 
-## 2026-09-23 全仓复审确认
+## 2026-09-26 全仓复审确认
 
-本轮重新检查当前 main 的 `apps`、`packages`、`services`、scripts、Prisma schema/migrations、测试、CI/工程守卫以及 specs/tasks/architecture 后，确认本 Task 仍是当前最值得推进的收敛问题：
+本轮重新以当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的全仓状态检查 `apps`、`packages`、`services`、scripts、Prisma schema/migrations、测试、CI/工程守卫以及 specs/tasks/architecture。虽然 main SHA 与上一轮相同，但本次重新核对完整工程区域，而不是只复查 #41；确认本 Task 仍是当前最值得推进的收敛问题：
 
 - `saveTargets()` 仍未进入单 transaction，也没有同 identity 并发串行化；
 - `TargetAllocation` 仍没有 identity / version / single-active 数据库不变量；
@@ -20,7 +20,7 @@
 - Performance target 测试仍没有真实 PostgreSQL 并发、rollback、constraint、migration preflight 证据；
 - CI 已具备 PostgreSQL 16 基础设施，新增本任务数据库验收无需另建 workflow；
 - 近期 AI Provider / Market 等变化有各自 active Task / TODO 承接，没有发现比本问题更高且尚无方案的新增 P0/P1 架构缺口；
-- `apps/server/src/integrity` 未装配且与 Quality 历史重叠仍是 P2 清理项，不并入本任务。
+- `QualityModule` 当前已显式注册 `../integrity` 的 controller/service；因此 Integrity 不是“未装配”，而是 Quality/Integrity 的目录与所有权表达不一致，属于 P2 架构清理，不并入本任务。
 
 上一轮 PR #41 尚未处理，因此本轮继续迭代 #41，不创建重复 PR。
 
@@ -280,7 +280,7 @@ git diff --check
 
 - `apps/server/src/integrity` 未装配且与 Quality 的历史重叠；后续独立清理。
 - 周期现金 / 基金计划一致性已有独立设计，不在本 PR 重复。
-- Backtest / Automation / Strategy Optimization durable lifecycle 按各自边界继续演进。
+- Automation 已具备 durable occurrence/ownerAttempt/lease/fencing；Backtest reconciler 已按游标分页并使用 durable `executionAttempt`；Strategy Optimization 继续使用独立 attempt/lease 生命周期。这些边界按各自专项继续演进，不抽象通用 Job Framework。
 - Market V2 的路由、分页、分钟线等后续事项由对应 active Task / `docs/TODO.md` 承接。
 - AI Provider 的 probe 参数、JSON validated 语义约束、空内容分类与 prompt guard 已由当前 Task / TODO 承接；本轮没有新增信息，不重复开题。
 

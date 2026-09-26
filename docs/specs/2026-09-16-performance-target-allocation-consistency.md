@@ -1,7 +1,7 @@
 # 目标配置版本与并发一致性加固
 
 - 日期：2026-09-16
-- 复审更新：2026-09-23
+- 复审更新：2026-09-26
 - 状态：待实施
 - 来源：当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 全仓架构复审
 - 主要范围：`apps/server/src/performance`、`packages/schemas`、`apps/server/prisma`、Performance 相关测试与 CI
@@ -28,15 +28,15 @@
 本轮重新比较当前 main 的候选问题后，优先级如下：
 
 1. **P1：`TargetAllocation` 持久化一致性。** 当前仍存在非原子 active 切换、并发重复 version / 多 active、非法 identity 可进入服务层、读取通过排序掩盖损坏状态，并且没有真实 PostgreSQL 验收。该问题直接影响再平衡目标这一持久配置事实的正确性，且修复范围集中、可独立验证，因此继续作为本轮推进项。
-2. **P2：`apps/server/src/integrity` 未装配且与 Quality 存在历史重叠。** 当前 `AppModule` 只装配 `QualityModule`，`integrity` 目录仍保留 controller/service；这是清理与所有权表达问题，但当前不会形成比 TargetAllocation 更高的运行时正确性风险。
+2. **P2：Quality / Integrity 的源码目录与模块所有权表达不一致。** `AppModule` 只装配 `QualityModule`，但 `QualityModule` 会显式注册 `../integrity` 下的 `IntegrityController` / `IntegrityService`，所以 Integrity 能力并未失装；真实问题是运行时所有权已经归 Quality、源码仍拆成两个 feature 目录，容易让工程守卫、文档和后续维护误判边界。这是所有权表达与目录治理问题，不是当前运行时正确性故障，优先级低于 TargetAllocation。
 3. **P2 / 已有承接：近期 AI Provider 生成模式、探针参数、JSON validated 输出分类等。** 2026-09-21～23 的 AI Provider 变化已由 active Task / review / `docs/TODO.md` 承接；已知 probe 参数、JSON 语义约束、空内容错误分类和 JSON prompt guard 均已有明确触发条件。本轮没有新增足以越过 TargetAllocation 的独立 P0/P1 证据，不重复创建方案。
 4. **已有专项：** 周期现金/基金计划、Backtest、Automation、Strategy Optimization、Market V2 均已有当前 Spec/Task 或已实现的 durable lifecycle / reader boundary，不因最近改动而重复开题。
 
 因此，上一轮 PR #41 尚未处理时，本轮继续迭代原 PR，而不是制造新的重复 PR。
 
-### 1.2 2026-09-23 复审确认
+### 1.2 2026-09-26 复审确认
 
-相对上一次 #41 review，当前 main 又合入了 AI SDK / Provider mode、自动能力选择与 verified-save 等实现，但以下关键事实未变化：
+本轮再次从当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的完整树重新检查，而不是沿用 #41 的旧结论。当前 main SHA 与 2026-09-23 基线相同，但重新核对了 1,448 个仓库文件的主要工程区域、59 个 Prisma model、15 个 migration、Server 模块装配、workspace/runtime 依赖、Desktop/Mobile 客户端边界、CI/guardrails 与 active docs。以下关键事实仍未变化：
 
 - `PerformanceTargetService.saveTargets()` 仍是三个彼此独立的 Prisma 操作，没有 transaction 或 identity lock；
 - `TargetAllocation` 仍只有普通索引，没有 identity CHECK、正 version CHECK、版本唯一和单 active 数据库约束；
@@ -45,7 +45,9 @@
 - `apps/server/test/performance/` 当前只有普通 Performance 单元/服务测试，没有 TargetAllocation PostgreSQL 并发测试；
 - CI 的 PostgreSQL 16 job 已运行 Strategy Optimization / Automation 数据库 E2E，但尚未运行 TargetAllocation 数据库验收。
 
-所以本 Spec 的问题定义与方案仍成立，不需要因当前 main 的后续变化扩大范围。
+同时，本轮重新核对了其它高风险候选：Automation 已具备 PostgreSQL occurrence/ownerAttempt/lease/fencing；Backtest reconciler 已按 `(createdAt, id)` 游标分页而非只处理最老 100 条；Ledger 复合写继续通过 `FOR UPDATE` 与单事务维护 revision/projection generation；workspace graph 与 MarketBar reader 均有机器守卫。周期现金/基金计划当前仍可见已知 CAS/通知一致性缺口，但已有独立专项，不重复开题。另纠正上一轮文档中的一个事实错误：`integrity` 并非未装配，而是由 `QualityModule` 显式注册，只是目录所有权表达仍可后续清理。
+
+所以本 Spec 的问题定义与方案仍成立，且本轮没有发现比它更高、尚无既有专项承接的新增 P0/P1 架构缺口。
 
 ## 2. 当前实现证据
 
