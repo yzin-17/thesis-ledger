@@ -278,7 +278,7 @@ git diff --check
 
 以下事项在当前全仓复审中被重新检查，但不属于本任务：
 
-- `apps/server/src/integrity` 未装配且与 Quality 的历史重叠；后续独立清理。
+- Quality / Integrity 当前运行时由 `QualityModule` 统一装配，但源码目录与所有权表达仍分散；后续独立清理，不把它误判为功能未装配。
 - 周期现金 / 基金计划一致性已有独立设计，不在本 PR 重复。
 - Automation 已具备 durable occurrence/ownerAttempt/lease/fencing；Backtest reconciler 已按游标分页并使用 durable `executionAttempt`；Strategy Optimization 继续使用独立 attempt/lease 生命周期。这些边界按各自专项继续演进，不抽象通用 Job Framework。
 - Market V2 的路由、分页、分钟线等后续事项由对应 active Task / `docs/TODO.md` 承接。
