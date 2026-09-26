@@ -12,6 +12,7 @@
 - [AI 自动选择与测试后保存](2026-09-23-ai-provider-auto-test-save.md)
 
 - [AI 接入层迁移至 Vercel AI SDK](2026-09-19-vercel-ai-sdk-integration.md)
+- [目标配置版本与并发一致性加固](2026-09-16-performance-target-allocation-consistency.md)
 
 - [自然语言创建与修改回测策略](2026-09-18-natural-language-strategy-authoring.md)
 - [数据源即时启停与页面凭证配置](2026-09-14-market-provider-credentials.md)
