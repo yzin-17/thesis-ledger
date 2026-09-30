@@ -1,7 +1,7 @@
 # 目标配置版本与并发一致性加固
 
 - 日期：2026-09-16
-- 复审更新：2026-09-26
+- 复审更新：2026-09-30
 - 状态：待实施
 - 来源：当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 全仓架构复审
 - 主要范围：`apps/server/src/performance`、`packages/schemas`、`apps/server/prisma`、Performance 相关测试与 CI
@@ -48,6 +48,21 @@
 同时，本轮重新核对了其它高风险候选：Automation 已具备 PostgreSQL occurrence/ownerAttempt/lease/fencing；Backtest reconciler 已按 `(createdAt, id)` 游标分页而非只处理最老 100 条；Ledger 复合写继续通过 `FOR UPDATE` 与单事务维护 revision/projection generation；workspace graph 与 MarketBar reader 均有机器守卫。周期现金/基金计划当前仍可见已知 CAS/通知一致性缺口，但已有独立专项，不重复开题。另纠正上一轮文档中的一个事实错误：`integrity` 并非未装配，而是由 `QualityModule` 显式注册，只是目录所有权表达仍可后续清理。
 
 所以本 Spec 的问题定义与方案仍成立，且本轮没有发现比它更高、尚无既有专项承接的新增 P0/P1 架构缺口。
+
+
+### 1.3 2026-09-30 复审确认
+
+本轮再次以同一个当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的完整 1,448 文件仓库树为审查对象。虽然 main SHA 没有变化，仍重新覆盖了 Server 各 Nest 模块、Desktop/Mobile、workspace packages、DSA adapter、全部 15 个 migration、59 个 Prisma model、测试分布、CI/guardrails 和 active docs，而不是把“没有新提交”当作无需全仓复查。
+
+本轮新增确认：
+
+- Server 模块图没有出现新的循环：Risk → Notifications → Provider、Portfolio → Ledger/Market、Performance → Portfolio/Market、Strategy Optimization → AI/Backtest/Risk 等当前方向与 Architecture SSOT 一致；`QualityModule` 实际注册 Integrity controller/service，Integrity 不是失装问题。
+- Ledger 复合写仍由 PostgreSQL transaction + `AccountLedgerState FOR UPDATE` 维护 revision/projection generation；Automation、AI Run、Backtest 与 Strategy Optimization 也继续保有各自 durable owner / lease / fencing，不需要为了本任务引入通用事务或 Job Framework。
+- 周期现金/基金 materialization 的 CAS / 通知一致性仍属于已有专项，不重复进入本方案。
+- **文档完成度新增发现（P2）：** `docs/tasks/README.md` 把“投资复盘工作台（统一 Trade Projection）”归为“主要是运行时或外部门禁”，但对应 Task 的 T1–T7 与最终一致性 Review 仍全部未勾选，末尾还写着“可从 T1 开始实施”；与此同时当前 `JournalService` 已有 Trade Projection 候选编排、Snapshot 读取/保存与 STALE 判断等实现。说明该 Task 的完成状态已明显落后于代码，需要后续单独按证据回填/归档，而不是把这类文档治理混入 TargetAllocation correctness PR。
+- 全部 migrations 再次核对后，仓库对复杂结构变更已有显式事务的惯例。TargetAllocation 的 preflight、CHECK 与 partial unique DDL 应位于同一 migration transaction 中，避免把“检查通过”和“约束落地”拆成可产生时间窗的两个步骤；真正的正确性仍由数据库约束和真实 PostgreSQL 行为测试证明，不能只依赖 migration matrix 的静态表覆盖检查。
+
+因此本轮仍未发现比 TargetAllocation 更高、且没有既有专项承接的新增 P0/P1。继续迭代 #41 是收敛选择；Journal 文档状态漂移等候选记录为后续独立治理证据，不扩大本 PR。
 
 ## 2. 当前实现证据
 
@@ -250,6 +265,8 @@ WHERE "scope" = 'portfolio' AND "accountId" IS NULL AND "active" = true;
 
 发现任一脏数据时 migration 失败，并输出足够定位问题的 identity / version / id 信息。不得自动删除、覆盖、重新编号或任意选择“赢家”。如果真实环境存在脏数据，先通过独立、可审计的一次性修复明确决策，再重新执行约束 migration。
 
+preflight 与本 migration 的 CHECK / partial unique index DDL 必须放在同一个显式 PostgreSQL transaction 中完成，遵循仓库现有复杂 migration 的事务惯例；不要把 preflight 做成先行脚本后再单独部署约束，从而重新暴露“检查后、约束前”的竞争窗口。migration matrix 只负责结构链静态守卫，不能替代真实 PostgreSQL 对这些约束行为的验收。
+
 ### 7.4 保存收敛为 transaction + 同 identity 串行化
 
 权重规范化与 100% 校验继续在进入数据库写事务前完成。数据库流程：
@@ -361,6 +378,7 @@ pnpm migration:matrix
 | advisory key 冲突或范围过大 | identity 级稳定 key；DB constraint 为最终 fencing；禁止全局锁 |
 | create 失败后旧 target 消失 | 失活与创建位于同一 transaction，异常整体 rollback |
 | Prisma DSL 不能表达 partial index / CHECK | raw migration 为数据库不变量 SSOT，并由 migration / Postgres test 验证 |
+| preflight 与约束落地之间出现时间窗 | preflight 与 CHECK / partial unique DDL 位于同一显式 migration transaction；DB 约束为最终 fencing |
 | API 收紧影响客户端 | 只拒绝领域非法组合；当前 Desktop 显式构造合法 scope/accountId |
 | 为复用引入过度抽象 | helper 保持 Performance 内部，不建设通用版本/锁框架 |
 

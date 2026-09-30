@@ -1,7 +1,7 @@
 # 目标配置版本与并发一致性加固任务
 
 - 日期：2026-09-16
-- 复审更新：2026-09-26
+- 复审更新：2026-09-30
 - 状态：待实施
 - 对应 Spec：`docs/specs/2026-09-16-performance-target-allocation-consistency.md`
 - Review 基线：`main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e`
@@ -23,6 +23,18 @@
 - `QualityModule` 当前已显式注册 `../integrity` 的 controller/service；因此 Integrity 不是“未装配”，而是 Quality/Integrity 的目录与所有权表达不一致，属于 P2 架构清理，不并入本任务。
 
 上一轮 PR #41 尚未处理，因此本轮继续迭代 #41，不创建重复 PR。
+
+
+## 2026-09-30 全仓复审增量
+
+本轮在 main SHA 未变化的情况下仍重新检查完整仓库，而不是只确认 #41 diff。新增证据如下：
+
+- 当前 Server 模块图、workspace 依赖方向、Ledger transaction/lock、Automation/AI/Backtest/Strategy Optimization durable lifecycle 均未出现新的未承接 P0/P1；
+- 周期现金/基金的 materialization/通知一致性已有独立专项，继续排除在本 Task 之外；
+- Journal 的代码与任务完成状态存在新的 P2 文档漂移证据：README 将其归为主要运行时门禁，但对应 Task 仍把 T1–T7 全部留为未实施并写“可从 T1 开始实施”，而当前 JournalService 已实现大量候选与 Snapshot 链路；后续应独立按实现证据收敛文档状态，不与 TargetAllocation correctness 混做；
+- migration 链显示复杂结构变更普遍使用显式事务。因此 T2 进一步要求 TargetAllocation 的 preflight 与 CHECK / partial unique index DDL 在同一 migration transaction 内完成；不能把静态 migration matrix 当作数据库约束行为测试。
+
+结论仍为：TargetAllocation 是当前风险最高、边界最收敛、且没有其他专项承接的 P1，本 Task 继续保持优先。
 
 ## 执行约束
 
@@ -85,6 +97,8 @@
 4. 不使用普通 `(scope, accountId, version)` unique 假设 NULL 自动具备 singleton 语义。
 5. 在创建约束前执行 fail-closed preflight，检查非法 scope/accountId、非正 version、同 identity 同 version 重复、同 identity 多 active。
 6. preflight 错误必须输出足以定位问题的 identity / version / record id；不得静默修复历史。
+7. preflight 与 CHECK / partial unique index DDL 必须位于同一显式 PostgreSQL migration transaction；不得先运行独立检查脚本、再在另一部署步骤创建约束。
+8. `migration:matrix` 继续承担迁移链静态守卫，但约束的实际拒绝行为必须由真实 PostgreSQL 测试证明。
 
 ### 验收
 
@@ -97,6 +111,8 @@
 - [ ] 同 account 第二个 active 被拒绝。
 - [ ] portfolio 第二个 active 被拒绝。
 - [ ] 预置历史脏数据时 migration fail closed。
+- [ ] preflight 与约束 DDL 位于同一 migration transaction，失败时不留下半应用结构。
+- [ ] 约束行为由真实 PostgreSQL 测试验证，而不是只以 migration matrix 通过作为证据。
 
 ## T3：将保存收敛为同 identity 串行化的单 transaction
 
@@ -266,6 +282,7 @@ git diff --check
 | 历史已有非法 identity / 重复 version / 多 active | migration preflight fail closed，人工明确修复 |
 | PostgreSQL NULL 绕过普通 unique | account / portfolio 使用各自 partial unique index |
 | Prisma DSL 不表达 partial index / CHECK | raw migration 为数据库 SSOT，并由真实 DB 测试守护 |
+| preflight 与 DDL 分步部署产生竞争窗口 | 放入同一显式 PostgreSQL migration transaction，失败整体回滚 |
 | 第一次保存无 target 行可锁 | transaction-scoped advisory lock |
 | 锁范围过大 | key 按规范化 identity 生成，不使用全局锁 |
 | advisory key 偶发碰撞 | 最多额外串行；DB constraints 继续负责 correctness |
@@ -283,5 +300,6 @@ git diff --check
 - Automation 已具备 durable occurrence/ownerAttempt/lease/fencing；Backtest reconciler 已按游标分页并使用 durable `executionAttempt`；Strategy Optimization 继续使用独立 attempt/lease 生命周期。这些边界按各自专项继续演进，不抽象通用 Job Framework。
 - Market V2 的路由、分页、分钟线等后续事项由对应 active Task / `docs/TODO.md` 承接。
 - AI Provider 的 probe 参数、JSON validated 语义约束、空内容分类与 prompt guard 已由当前 Task / TODO 承接；本轮没有新增信息，不重复开题。
+- Journal Task 的代码/文档完成度漂移是本轮新增 P2 证据，后续单独核对 AC/T 实现证据并修正文档生命周期；不把文档治理夹带进本 Performance correctness Task。
 
 这些候选项不应被混入本 PR，以免把一个可独立验证的持久化正确性任务扩大为无关重构。
