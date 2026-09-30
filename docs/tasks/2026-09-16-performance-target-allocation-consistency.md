@@ -31,10 +31,11 @@
 
 - 当前 Server 模块图、workspace 依赖方向、Ledger transaction/lock、Automation/AI/Backtest/Strategy Optimization durable lifecycle 均未出现新的未承接 P0/P1；
 - 周期现金/基金的 materialization/通知一致性已有独立专项，继续排除在本 Task 之外；
+- 当前新触发的 `contracts-and-guardrails` 显示 Strategy Optimization PostgreSQL E2E 为红：测试 fixture 仍按 legacy Provider 构造 CandidateService，而当前实现要求 SDK executor；另一个恢复用例超时。由于 #41 只有文档 diff，该失败属于当前 main / 既有 AI SDK 迁移闭环，必须回到 `2026-09-19-vercel-ai-sdk-integration` Task 修复，不能把它误归因于本 Task；
 - Journal 的代码与任务完成状态存在新的 P2 文档漂移证据：README 将其归为主要运行时门禁，但对应 Task 仍把 T1–T7 全部留为未实施并写“可从 T1 开始实施”，而当前 JournalService 已实现大量候选与 Snapshot 链路；后续应独立按实现证据收敛文档状态，不与 TargetAllocation correctness 混做；
 - migration 链显示复杂结构变更普遍使用显式事务。因此 T2 进一步要求 TargetAllocation 的 preflight 与 CHECK / partial unique index DDL 在同一 migration transaction 内完成；不能把静态 migration matrix 当作数据库约束行为测试。
 
-结论仍为：TargetAllocation 是当前风险最高、边界最收敛、且没有其他专项承接的 P1，本 Task 继续保持优先。
+结论调整为：当前整体 CI 的直接阻塞是已有 AI SDK Task 所有的 Strategy Optimization PostgreSQL E2E 回归；在没有既有专项承接的架构 correctness 问题中，TargetAllocation 仍是最高优先级且边界最收敛的 P1，本 Task 继续推进但不得掩盖该 guardrail 红灯。
 
 ## 执行约束
 
@@ -299,7 +300,7 @@ git diff --check
 - 周期现金 / 基金计划一致性已有独立设计，不在本 PR 重复。
 - Automation 已具备 durable occurrence/ownerAttempt/lease/fencing；Backtest reconciler 已按游标分页并使用 durable `executionAttempt`；Strategy Optimization 继续使用独立 attempt/lease 生命周期。这些边界按各自专项继续演进，不抽象通用 Job Framework。
 - Market V2 的路由、分页、分钟线等后续事项由对应 active Task / `docs/TODO.md` 承接。
-- AI Provider 的 probe 参数、JSON validated 语义约束、空内容分类与 prompt guard 已由当前 Task / TODO 承接；本轮没有新增信息，不重复开题。
+- AI SDK/Provider 事项已有 `2026-09-19-vercel-ai-sdk-integration` 等 active Task 承接；本轮新增的 Strategy Optimization PostgreSQL E2E 红灯必须回到该 Task 修正 SDK executor 测试装配/恢复用例，不为同一问题新建方案。
 - Journal Task 的代码/文档完成度漂移是本轮新增 P2 证据，后续单独核对 AC/T 实现证据并修正文档生命周期；不把文档治理夹带进本 Performance correctness Task。
 
 这些候选项不应被混入本 PR，以免把一个可独立验证的持久化正确性任务扩大为无关重构。

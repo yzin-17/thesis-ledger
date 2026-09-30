@@ -59,10 +59,11 @@
 - Server 模块图没有出现新的循环：Risk → Notifications → Provider、Portfolio → Ledger/Market、Performance → Portfolio/Market、Strategy Optimization → AI/Backtest/Risk 等当前方向与 Architecture SSOT 一致；`QualityModule` 实际注册 Integrity controller/service，Integrity 不是失装问题。
 - Ledger 复合写仍由 PostgreSQL transaction + `AccountLedgerState FOR UPDATE` 维护 revision/projection generation；Automation、AI Run、Backtest 与 Strategy Optimization 也继续保有各自 durable owner / lease / fencing，不需要为了本任务引入通用事务或 Job Framework。
 - 周期现金/基金 materialization 的 CAS / 通知一致性仍属于已有专项，不重复进入本方案。
+- **当前工程守卫新增阻塞（P1 / 已有专项承接）：** 本轮文档提交触发的 `contracts-and-guardrails` 在 Strategy Optimization PostgreSQL E2E 为红；当前测试仍按 legacy Provider 方式构造 `StrategyOptimizationCandidateService`，而生产服务已要求 SDK executor，因此报错“策略优化 SDK 执行器未装配；禁止回退 legacy Provider 调用”，同文件另一个恢复测试同时发生 5 秒超时。因为本 PR 相对 main 只有文档 diff，这不是 #41 引入的代码回归，而是当前 main 的 AI SDK 迁移/测试闭环与“Vercel AI SDK 集成”Task 中 T5 已完成表述不一致。它应回到既有 AI SDK Task 内修复并恢复绿色 guardrail，不复制进 TargetAllocation 方案。
 - **文档完成度新增发现（P2）：** `docs/tasks/README.md` 把“投资复盘工作台（统一 Trade Projection）”归为“主要是运行时或外部门禁”，但对应 Task 的 T1–T7 与最终一致性 Review 仍全部未勾选，末尾还写着“可从 T1 开始实施”；与此同时当前 `JournalService` 已有 Trade Projection 候选编排、Snapshot 读取/保存与 STALE 判断等实现。说明该 Task 的完成状态已明显落后于代码，需要后续单独按证据回填/归档，而不是把这类文档治理混入 TargetAllocation correctness PR。
 - 全部 migrations 再次核对后，仓库对复杂结构变更已有显式事务的惯例。TargetAllocation 的 preflight、CHECK 与 partial unique DDL 应位于同一 migration transaction 中，避免把“检查通过”和“约束落地”拆成可产生时间窗的两个步骤；真正的正确性仍由数据库约束和真实 PostgreSQL 行为测试证明，不能只依赖 migration matrix 的静态表覆盖检查。
 
-因此本轮仍未发现比 TargetAllocation 更高、且没有既有专项承接的新增 P0/P1。继续迭代 #41 是收敛选择；Journal 文档状态漂移等候选记录为后续独立治理证据，不扩大本 PR。
+因此，当前整体工程的直接阻塞是上述 Strategy Optimization PostgreSQL E2E 红灯，但它已有明确 AI SDK Task 所有者；在**没有既有专项承接的架构 correctness 问题**中，TargetAllocation 仍是最高优先级。继续迭代 #41 是收敛选择；AI guardrail 回归应在既有 Task 中修复，Journal 文档状态漂移等候选记录为后续独立治理证据，不扩大本 PR。
 
 ## 2. 当前实现证据
 
