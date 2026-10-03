@@ -1,7 +1,7 @@
 # 目标配置版本与并发一致性加固
 
 - 日期：2026-09-16
-- 复审更新：2026-09-30
+- 复审更新：2026-10-03
 - 状态：待实施
 - 来源：当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 全仓架构复审
 - 主要范围：`apps/server/src/performance`、`packages/schemas`、`apps/server/prisma`、Performance 相关测试与 CI
@@ -64,6 +64,20 @@
 - 全部 migrations 再次核对后，仓库对复杂结构变更已有显式事务的惯例。TargetAllocation 的 preflight、CHECK 与 partial unique DDL 应位于同一 migration transaction 中，避免把“检查通过”和“约束落地”拆成可产生时间窗的两个步骤；真正的正确性仍由数据库约束和真实 PostgreSQL 行为测试证明，不能只依赖 migration matrix 的静态表覆盖检查。
 
 因此，当前整体工程的直接阻塞是上述 Strategy Optimization PostgreSQL E2E 红灯，但它已有明确 AI SDK Task 所有者；在**没有既有专项承接的架构 correctness 问题**中，TargetAllocation 仍是最高优先级。继续迭代 #41 是收敛选择；AI guardrail 回归应在既有 Task 中修复，Journal 文档状态漂移等候选记录为后续独立治理证据，不扩大本 PR。
+
+### 1.4 2026-10-03 复审确认
+
+本轮继续以当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的**全仓状态**重新检查，而不是把 #41、最近 CI 或上一轮遗留项当作审查范围。递归 tree 当前包含 1,625 个条目，重新覆盖了 `apps`、`packages`、`services`、scripts、59 个 Prisma model、15 个 migration、测试、CI/guardrails 与 specs/tasks/architecture。Server 模块装配、workspace runtime dependency、MarketBar reader、Ledger 复合写与各后台长任务 durable lifecycle 的主体边界未出现新的未承接 P0/P1；本轮也再次确认 `QualityModule` 会实际注册 `IntegrityController` / `IntegrityService`，Integrity 不是失装能力。
+
+本轮新增的高价值证据来自 #41 的**纯文档 diff**触发的完整 CI。由于该分支相对当前 main 只修改本 Spec、对应 Task 与 task index，下列失败可以作为当前 main 的基线问题，而不是 TargetAllocation 文档改动引入的回归：
+
+- `quality -> pnpm lint` 当前失败，共 22 个 ESLint error。主要集中在 `apps/desktop/src/features/market-detail/MarketDetailDialog.latest.integration.test.tsx`（type import、unsafe return、prefer-const、多个无 await 的 async fixture）以及 `apps/server/src/platform/result-read-policy.service.ts`（用于 redaction 的未使用解构变量）。同一 job 中 `Import boundaries: OK` 与 `Workspace dependency graph: OK (8 packages)` 已通过，因此这是当前源码 lint 基线问题，不是模块依赖守卫失效。
+- `contracts-and-guardrails -> PostgreSQL service E2E` 当前仍失败：Strategy Optimization PostgreSQL 集成测试一处仍按 legacy Provider 装配 CandidateService，生产实现已经要求 SDK executor，因此报“策略优化 SDK 执行器未装配；禁止回退 legacy Provider 调用”；另一个 recovery/adoption 用例在 5 秒超时。Automation durable PostgreSQL 测试、Strategy Optimization reconciler 测试、migration matrix 与 strategy database smoke 同轮均通过。
+- Mobile Android native job 已通过；但由于 quality / contracts 前置失败，后续部分 CI 步骤被跳过，所以当前仓库不能把“全量 CI 绿色”作为已经成立的事实。
+
+这会调整**执行优先级而不扩大本 Spec 范围**：恢复现有 lint 与 Strategy Optimization PostgreSQL gate 的绿色状态，是当前更直接的工程门禁；其中 Strategy Optimization 已有 `2026-09-19-vercel-ai-sdk-integration` Task 承接，lint 错误也应作为独立源码/测试基线修复，不应塞进 TargetAllocation correctness 改造。对于“尚无既有专项承接的架构正确性问题”，TargetAllocation 仍是本轮最高优先级 P1，因此继续迭代 #41，而不是制造新的重复 PR。
+
+对本 Spec 的验收含义也因此进一步收紧：TargetAllocation 实施必须让新增的 PostgreSQL 定向测试独立稳定通过，并且不得通过跳过 lint、放宽测试或删除 guardrail 来制造绿色；在本 Task 被标记“已实施/完成”前，应先恢复或确认全量 CI 已恢复绿色，并明确区分既有基线失败与本改动新增失败。
 
 ## 2. 当前实现证据
 

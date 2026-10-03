@@ -1,7 +1,7 @@
 # 目标配置版本与并发一致性加固任务
 
 - 日期：2026-09-16
-- 复审更新：2026-09-30
+- 复审更新：2026-10-03
 - 状态：待实施
 - 对应 Spec：`docs/specs/2026-09-16-performance-target-allocation-consistency.md`
 - Review 基线：`main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e`
@@ -36,6 +36,21 @@
 - migration 链显示复杂结构变更普遍使用显式事务。因此 T2 进一步要求 TargetAllocation 的 preflight 与 CHECK / partial unique index DDL 在同一 migration transaction 内完成；不能把静态 migration matrix 当作数据库约束行为测试。
 
 结论调整为：当前整体 CI 的直接阻塞是已有 AI SDK Task 所有的 Strategy Optimization PostgreSQL E2E 回归；在没有既有专项承接的架构 correctness 问题中，TargetAllocation 仍是最高优先级且边界最收敛的 P1，本 Task 继续推进但不得掩盖该 guardrail 红灯。
+
+## 2026-10-03 全仓复审增量
+
+本轮再次以当前 `main@fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的完整仓库状态重新审查。递归 tree 当前包含 1,625 个条目；重新覆盖 Server / Desktop / Mobile、workspace packages、DSA adapter、scripts、59 个 Prisma model、15 个 migration、测试、CI/guardrails 和实现相关 docs，而不是只检查 #41 或上一轮遗留项。
+
+新增证据：
+
+- Server 模块装配、workspace 依赖方向、MarketBar reader、Ledger 事务/锁边界和 Automation / Backtest / Strategy Optimization 等 durable lifecycle 没有出现新的未承接 P0/P1；`QualityModule` 仍实际注册 Integrity 能力，Quality/Integrity 的问题仍只是 P2 目录/所有权表达。
+- #41 仍只有文档 diff，但最新完整 CI 显示当前 base 不是绿色：`quality -> pnpm lint` 有 22 个 ESLint error，集中在 MarketDetail 最新窗口 integration test 与 `ResultReadPolicyService` 的 redaction 解构；同轮 Import boundary 与 workspace dependency graph 均通过。
+- `contracts-and-guardrails -> PostgreSQL service E2E` 仍有 2 个 Strategy Optimization 失败：SDK executor 未装配，以及 recovery/adoption 用例 5 秒超时；Automation durable PostgreSQL、Strategy Optimization reconciler、migration matrix 与 strategy DB smoke 同轮通过。
+- Mobile Android native job 通过；后续部分 CI 因前置失败被跳过，因此不能把当前仓库描述成“全量 CI 已通过”。
+
+优先级据此收敛为：**恢复当前 lint / Strategy Optimization guardrail 是更直接的工程门禁，但它们分别属于源码基线修复和既有 AI SDK Task；TargetAllocation 仍是没有其它专项承接的最高优先级架构 correctness P1。** 因上一轮 PR #41 尚未处理，本轮继续迭代 #41，不另建重复 PR，也不把无关 gate 修复混入本 Task。
+
+本 Task 的质量门禁同时加严：新增 TargetAllocation PostgreSQL 定向测试必须独立绿色；不得通过跳过 lint、降低 ESLint/Test 规则、移除 PostgreSQL E2E 或放宽 guardrail 来通过；在本 Task 标记“已实施/完成”前，应恢复全量 CI 绿色并明确证明没有把既有基线失败误当成本改动验收通过。
 
 ## 执行约束
 
@@ -275,6 +290,8 @@ git diff --check
 - [ ] migration 能从当前支持的历史矩阵升级。
 - [ ] 合法 Desktop 流程兼容。
 - [ ] 本 Spec 每个验收项都有代码、migration 或测试证据。
+- [ ] 新增 TargetAllocation PostgreSQL 定向测试可独立稳定通过，不依赖跳过任何既有 guardrail。
+- [ ] 全量 CI 在任务完成前恢复绿色；若仍存在已知 base failure，不得把本 Task 标记为“已实施/完成”。
 
 ## 风险清单
 
