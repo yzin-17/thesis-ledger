@@ -1,14 +1,14 @@
 import type {
-  BaselineReconciliationCandidatesResponseV2,
-  ConfirmBaselineReconciliationCommandV2,
-  CreateExecutionCommandV2,
-  LedgerAuditResponseV2,
-  LedgerCommandResponseV2,
-  LedgerEventsResponseV2,
-  ReplaceExecutionCommandV2,
-  RestoreExecutionCommandV2,
+  BaselineReconciliationCandidatesResponse,
+  ConfirmBaselineReconciliationCommand,
+  CreateExecutionCommand,
+  LedgerAuditResponse,
+  LedgerCommandResponse,
+  LedgerEventsResponse,
+  ReplaceExecutionCommand,
+  RestoreExecutionCommand,
   ThesisLedgerApiClient,
-  VoidExecutionCommandV2,
+  VoidExecutionCommand,
 } from '@thesis-ledger/api-client';
 
 import { getDesktopApiClient } from '../../shared/api/client.js';
@@ -30,40 +30,40 @@ const defaultLedgerClient = () => getDesktopApiClient().ledger;
 export const fetchAccountLedgerEvents = (
   accountId: string,
   client: Pick<AccountDataLedgerClient, 'getEvents'> = defaultLedgerClient(),
-): Promise<LedgerEventsResponseV2> => client.getEvents(accountId);
+): Promise<LedgerEventsResponse> => client.getEvents(accountId);
 
 export const fetchAccountLedgerAudit = (
   accountId: string,
   client: Pick<AccountDataLedgerClient, 'getEventAudit'> = defaultLedgerClient(),
-): Promise<LedgerAuditResponseV2> => client.getEventAudit(accountId);
+): Promise<LedgerAuditResponse> => client.getEventAudit(accountId);
 
 export const fetchReconciliationCandidates = (
   accountId: string,
   client: Pick<AccountDataLedgerClient, 'getReconciliationCandidates'> = defaultLedgerClient(),
-): Promise<BaselineReconciliationCandidatesResponseV2> =>
+): Promise<BaselineReconciliationCandidatesResponse> =>
   client.getReconciliationCandidates(accountId);
 
 export const createExecution = (
-  command: CreateExecutionCommandV2,
+  command: CreateExecutionCommand,
   client: Pick<AccountDataLedgerClient, 'createExecution'> = defaultLedgerClient(),
-): Promise<LedgerCommandResponseV2> => client.createExecution(command);
+): Promise<LedgerCommandResponse> => client.createExecution(command);
 
 export const replaceExecution = (
-  command: ReplaceExecutionCommandV2,
+  command: ReplaceExecutionCommand,
   client: Pick<AccountDataLedgerClient, 'replaceExecution'> = defaultLedgerClient(),
-): Promise<LedgerCommandResponseV2> => client.replaceExecution(command);
+): Promise<LedgerCommandResponse> => client.replaceExecution(command);
 
 export const voidExecution = (
-  command: VoidExecutionCommandV2,
+  command: VoidExecutionCommand,
   client: Pick<AccountDataLedgerClient, 'voidExecution'> = defaultLedgerClient(),
-): Promise<LedgerCommandResponseV2> => client.voidExecution(command);
+): Promise<LedgerCommandResponse> => client.voidExecution(command);
 
 export const restoreExecution = (
-  command: RestoreExecutionCommandV2,
+  command: RestoreExecutionCommand,
   client: Pick<AccountDataLedgerClient, 'restoreExecution'> = defaultLedgerClient(),
-): Promise<LedgerCommandResponseV2> => client.restoreExecution(command);
+): Promise<LedgerCommandResponse> => client.restoreExecution(command);
 
 export const confirmBaselineReconciliation = (
-  command: ConfirmBaselineReconciliationCommandV2,
+  command: ConfirmBaselineReconciliationCommand,
   client: Pick<AccountDataLedgerClient, 'confirmBaselineReconciliation'> = defaultLedgerClient(),
-): Promise<LedgerCommandResponseV2> => client.confirmBaselineReconciliation(command);
+): Promise<LedgerCommandResponse> => client.confirmBaselineReconciliation(command);

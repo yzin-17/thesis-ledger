@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { latestLedgerEventByFact, ledgerEventPositionOperation } from './ledger-event-v2.js';
 import { toLedgerEventV2 } from './ledger-v2.repository.js';
+import { requireCurrentLedgerEnvelope } from './ledger-stored-envelope-version.js';
 import { rebuildCoreProjections, type CoreProjectionClient } from './core-projection.js';
 
 // PostgreSQL Decimal(24,8) permits more significant digits than Decimal.js's
@@ -62,6 +63,7 @@ const compareOperationOrder = (left: PositionOperation, right: PositionOperation
 };
 
 const v2Operations = (stored: StoredLedgerEvent[]): PositionOperation[] => {
+  stored.forEach((event) => requireCurrentLedgerEnvelope(event.envelopeVersion));
   // VOID revisions must participate in tip selection; filtering them first
   // would resurrect the superseded version in the materialized position.
   const v2Stored = stored.filter((event) => event.factId != null);

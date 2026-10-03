@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 import type { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
+import { VALIDATION_DURATION_SECONDS } from './ai-provider-validation-policy.js';
 
 const connectionProbeSchema = z.object({ ok: z.literal(true) }).strict();
 const CONNECTION_PROBE_MAX_OUTPUT_TOKENS = 1_024;
@@ -20,6 +21,15 @@ const CONNECTION_PROBE_MAX_OUTPUT_TOKENS = 1_024;
  * `Provider 结束原因为 length`，因此按“对必须推理的模型预先给出安全输出预算”给用途探针更宽的边界。
  */
 const PURPOSE_PROBE_MAX_OUTPUT_TOKENS = 8_192;
+
+/**
+ * 流式用途探针的总时长兜底：与授权页公示的 `maxDurationSeconds` 同源，而不是 Provider 的
+ * 「超时（毫秒）」。用途探针是流式的，判活应该看“还在不在出字”：只要还在产出就不该被掐断
+ * （本地推理模型 research 探针实测 63～103 秒，thinking token 与正文共用输出预算，
+ * 用 30 秒总时长当墙必然把正常的慢生成误杀成失败）。
+ * 「卡住」由 firstChunkMs / outputIdleTimeoutMs 负责，这里的兜底只防“一直在出字却不收敛”。
+ */
+const STREAM_PROBE_CEILING_MS = VALIDATION_DURATION_SECONDS * 1_000;
 
 type ProbeInput = {
   sdk: AiSdkGenerationAdapter;
@@ -93,7 +103,8 @@ export const runProviderConnectionTest = async ({
   outputIdleTimeoutMs = 30000,
 }: ProbeInput) => {
   const started = Date.now();
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const streamingProbe = purpose !== undefined;
+  const ceilingSignal = AbortSignal.timeout(streamingProbe ? STREAM_PROBE_CEILING_MS : timeoutMs);
   const result = await sdk.generate({
     requestId: requestId ?? randomUUID(),
     adapter,
@@ -111,10 +122,11 @@ export const runProviderConnectionTest = async ({
     maxOutputTokens:
       purpose === undefined ? CONNECTION_PROBE_MAX_OUTPUT_TOKENS : PURPOSE_PROBE_MAX_OUTPUT_TOKENS,
     timeout: {
-      totalMs: timeoutMs,
-      ...(purpose ? { firstChunkMs: firstOutputTimeoutMs, chunkMs: outputIdleTimeoutMs } : {}),
+      // 一次性返回的连接探针仍以 Provider 超时为总时长上限；流式用途探针不设总时长墙。
+      ...(streamingProbe ? {} : { totalMs: timeoutMs }),
+      ...(streamingProbe ? { firstChunkMs: firstOutputTimeoutMs, chunkMs: outputIdleTimeoutMs } : {}),
     },
-    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+    signal: signal ? AbortSignal.any([signal, ceilingSignal]) : ceilingSignal,
   });
   return { result, latencyMs: Date.now() - started };
 };

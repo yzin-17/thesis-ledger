@@ -27,13 +27,12 @@ const storedBar = (timestamp: string, close: string, fetchedAt = timestamp) => (
 });
 
 const marketReader = (rows: ReturnType<typeof storedBar>[]) => ({
-  read: vi.fn(
-    async (input: {
-      identity: { symbol: string; assetType: string; timeframe: string; adjustment: string };
-    }) => ({
-      contractVersion: 2,
-      identity: input.identity,
-      points: rows.map((row) => ({
+  read: vi.fn(),
+  readV3: vi.fn(async () => ({
+    status: 'selected' as const,
+    selection: {
+      response: {
+        bars: rows.map((row) => ({
         timestamp: row.timestamp.toISOString(),
         open: Number(row.open),
         high: Number(row.high),
@@ -43,27 +42,11 @@ const marketReader = (rows: ReturnType<typeof storedBar>[]) => ({
         amount: Number(row.amount),
         completionStatus: 'complete' as const,
         availableAt: row.fetchedAt.toISOString(),
-      })),
-      coverage: {
-        actualStart: rows[0]?.timestamp.toISOString() ?? null,
-        actualEnd: rows.at(-1)?.timestamp.toISOString() ?? null,
-        hasMoreBefore: false,
-        latestCompleteTradingDate: null,
+        })),
+        provenance: { providerId: 'fixture' },
       },
-      provenance: {
-        providerId: 'fixture',
-        upstreamSource: 'fixture',
-        routeIndex: 0,
-        effectivePolicyRevision: 1,
-        providerRevision: 'fixture',
-        fetchedAt: rows.at(-1)?.fetchedAt.toISOString() ?? new Date().toISOString(),
-        freshUntil: '2099-01-01T00:00:00.000Z',
-        servedFromCache: false,
-        cacheStatus: 'miss' as const,
-      },
-      inputFingerprint: 'fixture-fingerprint',
-    }),
-  ),
+    },
+  })),
 });
 
 describe('统一策略风险运行时', () => {
@@ -220,7 +203,10 @@ describe('统一策略风险运行时', () => {
       evaluatedAt,
     );
 
-    expect(reader.read).toHaveBeenCalledWith(expect.objectContaining({ acceptance: 'complete' }));
+    expect(reader.readV3).toHaveBeenCalledWith(expect.objectContaining({
+      routeKey: expect.objectContaining({ capability: 'DAILY_BAR', adjustment: 'none' }),
+    }));
+    expect(reader.read).not.toHaveBeenCalled();
     expect(actual.context).toMatchObject({ price: '92', averageCost: '100' });
     expect(actual.context.holdingPeriods).toBeUndefined();
   });
@@ -240,7 +226,7 @@ describe('统一策略风险运行时', () => {
         trade: { findFirst: vi.fn(async () => null) },
       };
       const reader = {
-        read: vi.fn(async () => {
+        readV3: vi.fn(async () => {
           throw new DsaError('V2 BarSeries 暂时不可用', code, 503);
         }),
       };
@@ -267,7 +253,7 @@ describe('统一策略风险运行时', () => {
       trade: { findFirst: vi.fn(async () => null) },
     };
     const reader = {
-      read: vi.fn(async () => {
+        readV3: vi.fn(async () => {
         throw new DsaError('BarSeries 响应不完整', 'invalid-response', 502);
       }),
     };
@@ -319,7 +305,7 @@ describe('统一策略风险运行时', () => {
     expect(actual.context.occurredAt).toBe('2026-09-10T00:00:00.000Z');
   });
 
-  it('5m 策略复用 V2 1m 聚合语义，不要求持久化派生 Bar', async () => {
+  it('5m 策略在分钟线缺少现行来源时不读取旧缓存', async () => {
     const minuteBars = [
       ['2026-09-11T01:30:00.000Z', '100'],
       ['2026-09-11T01:31:00.000Z', '101'],
@@ -351,9 +337,9 @@ describe('统一策略风险运行时', () => {
       new Date('2026-09-11T01:35:01.000Z'),
     );
 
-    expect(reader.read).toHaveBeenCalledWith(expect.objectContaining({ acceptance: 'complete' }));
-    expect(actual.context.price).toBe('104');
-    expect(actual.context.occurredAt).toBe('2026-09-11T01:35:00.000Z');
+    expect(reader.read).not.toHaveBeenCalled();
+    expect(actual.context.price).toBeUndefined();
+    expect(actual.context.occurredAt).toBeUndefined();
   });
 
   it('策略 fixedStop 在等于阈值时仍按 V2 Monitoring 语义触发', async () => {

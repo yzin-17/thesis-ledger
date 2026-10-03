@@ -5,11 +5,13 @@
 ```bash
 cd ../thesis-ledger-infra
 test -f .env || cp .env.example .env
-docker compose --env-file .env -f compose.yml -f compose.dev.yml up --build -d
+./scripts/update.sh all
 curl http://localhost:3000/api/v1/health
 ```
 
 健康响应分别报告 PostgreSQL、Redis 和 DSA，并声明 Account model、actual/shadow 和 `fund-nav` capability。任一依赖失败时 Server 应返回 `degraded`，并保留其余可用能力；缺少 Fund NAV capability 时不得用 Quote 或截图净值替代。
+
+后续更新按变更选择最小目标 `all|dsa|thesis-ledger`。目标已运行且仅应用代码或可宿主构建的前端资源变化时，可使用 `./scripts/sync-code.sh <目标>`，必须通过其兼容性预检；运行时依赖、Schema/migration、Dockerfile、系统依赖变化，目标未运行或预检拒绝时使用 `./scripts/update.sh <目标>`。不绕过入口手工替换或重建应用容器。代码同步只更新容器可写层，容器重建后需重新应用，不能作为镜像发布证据。
 
 ## 数据库初始化与 Schema 版本
 
@@ -22,6 +24,18 @@ docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-led
 开发阶段可显式接受历史数据丢失并重建指定数据库的 `public` schema，保留 external volume；该流程使用全部 SQL 作为结构输入，不维护 Prisma 迁移历史。已验收设计见 [归档规格](../archive/specs/2026-09-14-dev-database-rebuild.md)，部署证据见 [验证记录](../reviews/2026-09-14-dev-database-rebuild.md)，操作入口以 infra 运维说明为准。未开启重建时应保留数据，并在结构不匹配时停止更新。
 
 正式发布需要独立的保留数据升级流程、备份与隔离演练，完成结构与权限校验后再发布匹配的版本标记。开发重建不能作为正式发布的升级入口；本主题未实现或验证正式环境的 Prisma Migrate 升级。禁止脚本或 entrypoint 自动删除卷。
+
+当前已有显式保留数据升级入口及开发目标验收，见[保留数据升级任务](../archive/tasks/2026-09-27-preserve-data-database-upgrade.md)。默认更新仍保留数据并检查结构；升级需按 infra 说明核对精确目标、停止消费者、备份与隔离恢复演练，再执行事务和逐表权限校验。该次开发目标通过不等同于所有正式环境已完成发布验收。
+
+## V3 回测与来源故障
+
+先区分协议、来源和业务执行三个层次。infra `scripts/market-v3-contract-test.sh` 只验证 Data/Control V3 与独立鉴权；Control 使用 `/api/v3/thesis-ledger/control/*`，与 Data Token 分开。`scripts/contract-test.sh` 还要求当前 Data 正向读取，来源未准入时失败；两者均不能替代 Server/Worker 与真实客户端验收。
+
+遇到 `NO_ELIGIBLE_PROVIDER`，先核对精确市场、资产、能力、周期、价格口径对应的 Desired/Effective Policy、启用状态及凭据。基础 ETF 日线 `hithink/fund-market-historical` 的 qfq 和 `tencent/tencent` 的 none/qfq/hfq 已按共同能力启用，不要求逐标的、逐窗口或短期有效的人工 RouteAdmission；HiThink 仍须有实际 API Key。日级状态由系统根据实际行情自动整理。其他高级能力仍按自身必要条件检查，不能通过打开 fixture mode 冒充真实来源。
+
+固定快照归一化价格研究和图表可在 HiThink/腾讯已配置的同口径主备间整窗切换，无需算法等价证明。排查时检查返回的实际 `providerId/upstreamSource/routeIndex`、日期覆盖和请求口径，不能拼接两家价格。图表 `chart-bars` 可显示未收盘条目，其响应不作为回测输入。新规则的真实运行、恢复操作和重放见[共同价格能力验收](../tasks/evidence/2026-10-03-common-price-baseline.md)。
+
+任务执行以 PostgreSQL 业务状态为准，队列不可用或查询失败不代表任务不存在。排查时关联任务 ID、attempt、稳定错误码、Worker 状态和冻结快照；不要直接改终态或让晚到结果覆盖新 attempt。记录诊断摘要，不输出 Token、凭据或原始 Provider 响应。已冻结重放失败应核验输入摘要与版本，不通过在线补取改写比较数据。当前已验证和未通过条件见[目标运行态记录](../tasks/evidence/2026-09-27-target-runtime-gates.md)与[主任务](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 
 ## Provider 故障
 

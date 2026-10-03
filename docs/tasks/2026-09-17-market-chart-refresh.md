@@ -2,7 +2,7 @@
 
 > 任务标识：market-chart-refresh
 > 日期：2026-09-17
-> 状态：实施与运行验收进行中；T1 运行版本基线、T2 最新端和 T3 历史端本地闭环已完成。目标容器已与当前 Server 源码对齐，G1 的浏览器基础路径已复核；盘中 Provider 能力、真实失败重试与运行态乱序仍未完成
+> 状态：实施与运行验收进行中；T1 运行版本基线、T2 最新端和 T3 历史端本地闭环已完成。2026-09-28 已取得 ETF 未收盘日线的在线证据，但现有完整窗口未选到该快照；股票日线、同日二次快照及 G1 仍未完成
 > 对应规格：[Spec](../specs/2026-09-17-market-chart-refresh.md)
 
 ## 执行边界
@@ -63,10 +63,14 @@
   - 条件分支：现有能力无法实施时，记录目标标的、Provider、限制原因和复现证据，在 `docs/TODO.md` 登记盘中日线快照后续项及启动/验收条件，区别于分钟线 backlog。该分支证明降级与范围处置，不证明盘中能力已通过。
   - 验证方式：同日两次快照、`incomplete → complete`、缺少当日 bar、指标不足、来源不一致的定向测试；交易时段可用时执行一次在线能力核查。核心跨日故障不能转入该 TODO 分支。
   - 实施进度：已支持同日 OHLC/成交量/指标/完成状态修订，并在 `completionStatus=incomplete` 时显示“未收盘（当日未完成）”；无更新反馈包含实际截止日期。
-  - 定向验证：fixture/组件测试通过，证明展示和同日替换逻辑；未执行交易时段在线 Provider 核查。
-  - 剩余条件：尚不知道股票、ETF 现有 Provider 是否返回真实盘中日线；未取得受限证据前不登记 TODO，也不宣称盘中能力通过，T4 保持未完成。
+  - 定向验证：fixture/组件测试通过，证明展示和同日替换逻辑；交易时段在线 Provider 核查见下，尚未通过完整交付验收。
+  - 当前能力边界：ETF 的 AkShare／东方财富备用源已证实返回真实 `incomplete` 日线，但正常完整窗口和以最近完整日为 `start` 的最新探测仍选中只截至 2026-09-24 的腾讯源，未将盘中快照送达图表；股票日线持续返回 503，尚不能判定其能力。同日二次快照因 Provider 暂时不可用未完成。当前图表路径的盘中日线暂不作为已可用能力；后续路由/窗口选择和来源可比性收敛列入独立 TODO。本轮 T4 只按条件分支继续验收无当日 bar 的真实截止日期降级，不以已获单条快照勾选 T4。
   - 在线核查：510300.SH 的现有 ETF Provider 返回截至 2026-09-17 的 complete 日线，未返回 2026-09-18 未收盘 bar；验收发生在 00:32–00:42，非交易时段，该结果不能证明或否定盘中快照能力。600519.SH bars 调用返回 `market_data_unavailable`，DSA 日志为上游 transient failure/503，不能归类为 capability unsupported。ETF `chip` 为 `unsupported/capability_unsupported`，与日线盘中能力无关。
   - 条件分支结论：本轮没有形成“现有 Provider 不支持盘中日线”的充分证据，不新增 TODO；需在真实交易时段重新核查股票与 ETF 的 incomplete bar。
+  - 2026-09-28 盘中复核：上交所[休市安排公告](https://www.sse.com.cn/disclosure/announcement/general/c/c_20260915_10832273.shtml)确认 9 月 28 日照常开市。13:06 启动当时已停止的 Docker Desktop 及既有 PostgreSQL、Redis、DSA、Server 容器；未重建镜像。Server 镜像 `sha256:f51e7f52e3ce141fa29517afae0005ff9c9c19d12009b0a6d8b3f4539ea49b7a`、DSA 镜像 `sha256:a9afed6adcadff81b776132790a743db90c422a1bc97fb96697ab32e47ca7b20` 均健康，Server Schema 为 `20260927090000_market_derived_series_snapshot`。DSA 的 `api/thesis_ledger.py` 宿主机与容器 SHA-256 相同；Server 的 `market-bar-reader.ts` 宿主机 `0162a2ed33f559bc46d8c7c2c25b18b633f049969c392b53f95c1e76dbe476bc` 与容器 `44b0012b95b3265a9504d15a9342accc79905b97af9fa3e1a3168f2cdb7910be` 不同，本次仅证明已部署版本的在线 Provider 路径。
+  - ETF 请求证据：13:09–13:15，510300.SH 的 `GET /api/v2/market/510300.SH/bars?assetType=ETF&limit=90&refresh=1` 由 `tencent/tencent` 返回 90 条，末日 2026-09-24、`complete`；`start=2026-09-24&refresh=1` 仍仅返回该日。改为 `start=2026-09-28&refresh=1` 后，腾讯源为空并由现有 `akshare/eastmoney` RouteTarget 返回 1 条 2026-09-28 日线，`completionStatus=incomplete`、开 4.499、高 4.503、低 4.407、收 4.418、量 6,284,756，`fetchedAt=2026-09-28T05:14:34Z`、`cacheStatus=miss`。同时独立 quote 返回 2026-09-28 13:11 左右的 4.426，说明查询发生于有当日报价的交易时段。159516.SZ 的完整窗口同样由腾讯源返回至 9 月 24 日。由请求差异和现有网关按首个非空结果选源的代码可推断：当前完整窗口不会因存在更晚的备用源快照而自动切换。此推断尚未构成图表已展示盘中 bar 的证据。
+  - 股票与二次快照：600519.SH 的完整窗口及 `start=2026-09-28`、601318.SH 的完整窗口均返回 HTTP 503／`unavailable`；600519.SH 的独立 quote 于 13:15 返回当日价格 1234.3，DSA 日志将日线失败归为 transient failure，不能据此认定股票 Provider 不支持。13:19 与 13:25 再次请求 510300.SH 当日窗口、13:25 再试 600519.SH 当日窗口仍返回 503；DSA 日志出现腾讯空历史、ETF `REALTIME_QUOTE` 的 600 秒请求预算冷却及日线上游 transient failure。冷却与日线属于不同能力，不能据此推断备用日线源有相同的频率限制；尚无第二条可比较的盘中快照。Catalog 刷新因所有目录 Provider 不可用而保持 stale，详情接口将标的识别为 UNKNOWN，故本轮也未取得真实页面展示证据。当前工作区的 Desktop 定向测试 `pnpm --filter @thesis-ledger/desktop exec vitest run` 指定 4 个 market-detail 测试文件，23 个测试通过；DSA 本机和容器均未安装 pytest，未运行其测试。
+  - 盘中结论：在线证据证明现有 ETF 备用源曾返回真实未收盘日线，不能把所有 Provider 记为不支持；但当前完整窗口、上游稳定性与页面链路不足以交付可靠的盘中日线。按 Spec 的受限能力分支，将稳定交付另列 `docs/TODO.md` 的 `market-chart-intraday-daily-bar`，当前只承诺缺少当日 bar 时保留最近完整日线并准确说明截止日期；该降级尚待目标页面复核，T4 与 G1 均保持未勾选。
 
 - [ ] G1：完成目标运行态与浏览器验收
   - 覆盖验收标准：AC1–AC8 的产品组合行为与在线证据。

@@ -42,7 +42,10 @@ const bootstrap = async () => {
   });
   app.useGlobalFilters(new ApiExceptionFilter(app.get(ErrorTrackingService)));
   app.setGlobalPrefix('api/v1', {
-    exclude: [{ path: 'api/v2/(.*)', method: RequestMethod.ALL }],
+    exclude: [
+      { path: 'api/market/(.*)', method: RequestMethod.ALL },
+      { path: 'api/market-data/(.*)', method: RequestMethod.ALL },
+    ],
   });
   await app.listen(config.port, network.host);
 };

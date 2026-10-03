@@ -333,6 +333,7 @@ describe('Ledger transactional migration', () => {
           sourceTimezone: event.sourceTimezone,
           economicOrderKey: event.economicOrderKey,
           recordedAt: new Date(event.recordedAt as string),
+          envelopeVersion: 3,
           payloadVersion: event.payloadVersion,
           payload: event.payload,
           sourceCategory: (event.source as { category: string }).category,

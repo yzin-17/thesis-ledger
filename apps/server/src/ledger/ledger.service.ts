@@ -6,13 +6,14 @@ import {
   assetIdentityStatusSchema,
   currencySchema,
   nonNegativeDecimalStringSchema,
-  type CurrencyV1,
+  type Currency,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { assertAccountCanHoldAsset } from '../portfolio/accounts.service.js';
 import { inferAssetType } from './asset-type.js';
 import { LedgerV2Repository } from './ledger-v2.repository.js';
 import { rebuildLedgerProjection } from './ledger-projection.js';
+import { requireCurrentLedgerEnvelope } from './ledger-stored-envelope-version.js';
 
 const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
 const MANUAL_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.manual;
@@ -148,8 +149,9 @@ export class LedgerService {
         payload: { path: ['symbol'], equals: symbol },
       },
       orderBy: { ledgerRevision: 'desc' },
-      select: { occurredAt: true, payload: true },
+      select: { occurredAt: true, payload: true, envelopeVersion: true },
     });
+    if (latest) requireCurrentLedgerEnvelope(latest.envelopeVersion);
     if (
       !latest?.occurredAt ||
       typeof latest.payload !== 'object' ||
@@ -222,7 +224,7 @@ export class LedgerService {
       },
     });
     return this.repository.appendRevision(context, {
-      version: 2,
+      version: 3,
       eventId: randomUUID(),
       factId: randomUUID(),
       accountId,
@@ -439,7 +441,7 @@ export class LedgerService {
     accountId: string,
     amount: string,
     source: 'manual' | 'screenshot' = 'manual',
-    currency?: CurrencyV1,
+    currency?: Currency,
     capturedAt?: string,
   ) {
     nonNegativeDecimalStringSchema.parse(amount);
@@ -456,7 +458,7 @@ export class LedgerService {
       const account = await this.assertAccountWithClient(context.transaction, accountId);
       const cashCurrency = currency ?? currencySchema.parse(account.currency);
       const event = await this.repository.appendRevision(context, {
-        version: 2,
+        version: 3,
         eventId: randomUUID(),
         factId: randomUUID(),
         accountId,
@@ -574,9 +576,11 @@ export class LedgerService {
   }
 
   async list(accountId: string) {
-    return this.prisma.ledgerEvent.findMany({
+    const events = await this.prisma.ledgerEvent.findMany({
       where: { accountId },
       orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
     });
+    events.forEach((event) => requireCurrentLedgerEnvelope(event.envelopeVersion));
+    return events;
   }
 }

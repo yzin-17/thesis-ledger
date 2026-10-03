@@ -7,7 +7,6 @@ export type MarketCachePolicy = {
 
 export const MARKET_CACHE_POLICIES = {
   realtimeQuote: { freshSeconds: 15, lastValidSeconds: 86_400 },
-  indicator: { freshSeconds: 60, lastValidSeconds: 86_400 },
   chipSummary: { freshSeconds: 15 * 60, lastValidSeconds: 7 * 86_400 },
   fundNavHistoryLastValidSeconds: 90 * 86_400,
 } as const;

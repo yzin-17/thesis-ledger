@@ -9,6 +9,8 @@
 
 ## 背景与问题
 
+2026-09-26 增量边界：本文的 raw 成交与公司行动处理适用于 V2 及原始实际份额记账。V3 的显式价格协议、归一化份额、按需事件与固定供应商快照研究由[多源复权感知回测规格](2026-09-25-multi-source-adjustment-aware-backtest.md)扩展；独立模拟账本、成交时序与冻结重放约束继续保留。实现和真实门禁分别记录于该主题 Task。
+
 2026-08-28 立项时，回测能力以 V1 策略 Schema、单标的日线 Bar 和进程内引擎为主。回测任务可以直接携带 bars 和数值型初始资金，Server 尚未以冻结数据快照作为运行输入；市场规则主要集中在 A 股模拟函数中，跨市场、跨时区和跨周期语义不完整。
 
 当前仓库已经落地另一套交易与成交记录系统。它以不可变 `LedgerEventV2` 为真实账户唯一经济事实源，并重建 `Position`、`Trade`、`Cash` 和 `FX Conversion View`，同时支持实际账户与影子账户、账户级 `Projection Generation`、修正链和 Journal 事实引用。
@@ -519,7 +521,7 @@ full fill or reject
 - 信号在事实可用后生成 TargetIntent，订单在下一个符合规则的 Bar 开盘尝试；
 - DAY 订单在目标交易日因停牌、价格、现金、持仓或资格失败时 Reject，不跨日保留；
 - 不检查盘口、成交量和 Partial Fill；
-- 成交使用 raw price，加 StrategyVersion 配置的滑点/佣金；法定税费、交易费和市场侧收费由冻结 ExecutionRules 模型决定，明确是否已含在佣金内，不重复扣费；保留最低收费、费用币种及统一 Decimal/Money 舍入与扣收粒度；
+- 原始实际份额记账的成交使用 raw price，加 StrategyVersion 配置的滑点/佣金；法定税费、交易费和市场侧收费由冻结 ExecutionRules 模型决定，明确是否已含在佣金内，不重复扣费；保留最低收费、费用币种及统一 Decimal/Money 舍入与扣收粒度。V3 归一化路径使用冻结复权序列与显式归一化执行模型，数量为模拟单位；
 - `minimumCommission` 如配置必须使用 Execution Instrument 币种；
 - 不支持 Limit、GTC、算法订单、成交量参与率或复杂流动性模型；
 - 只支持多头，不支持做空、融资和保证金。
@@ -581,7 +583,7 @@ cash dividend
 split
 ```
 
-场内执行使用 raw price，Indicator 使用由公司行动事实派生的 adjusted Series。Runner 在每个评价时点只纳入 `occurredAt <= evaluationAt` 且 `availableAt <= evaluationAt` 的公司行动，并为该时点重建指标输入；已公告但尚未生效、尚未获知或后来追加的行动不得改写此前指标与信号。现金分红对各价格字段使用同一 close 参考因子，成交和风险价格仍保持 raw。分红进入原币种现金，拆分调整数量和单位成本；同一公司行动不得重复计入复权收益和 Ledger。影响持仓或信号但不在支持范围内的公司行动必须显式失败或使结果不可发布。
+原始实际份额记账的场内执行使用 raw price，Indicator 使用由公司行动事实派生的 adjusted Series。Runner 在每个评价时点只纳入 `occurredAt <= evaluationAt` 且 `availableAt <= evaluationAt` 的公司行动，并为该时点重建指标输入；已公告但尚未生效、尚未获知或后来追加的行动不得改写此前指标与信号。现金分红对各价格字段使用同一 close 参考因子，成交和风险价格仍保持 raw。分红进入原币种现金，拆分调整数量和单位成本；同一公司行动不得重复计入复权收益和 Ledger。影响持仓或信号但不在支持范围内的公司行动必须显式失败或使结果不可发布。V3 归一化路径不再次向模拟账本注入分红或拆分；没有事件信号依赖时，不以独立事件表完整性作为价格研究的前置门禁。
 
 ### 11. BacktestResult 与基础分析
 

@@ -81,6 +81,16 @@ try {
   });
   if (execution.status !== 0 || !execution.stdout.includes(currentHead))
     throw new Error(`runtime 结构执行器验证失败:\n${execution.stderr || execution.stdout}`);
+  const exported = spawnSync(process.execPath, [join(runtimePackageRoot, 'dist/src/platform/database-upgrade-export.js')], {
+    cwd: root, encoding: 'utf8',
+    env: { ...process.env, THESIS_LEDGER_SCHEMA_INPUT_ROOT: join(runtimePackageRoot, 'prisma') },
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (exported.status !== 0) throw new Error('runtime 升级输入导出入口不可用');
+  const exportedInput = JSON.parse(exported.stdout);
+  if (exportedInput.currentHead !== currentHead ||
+      JSON.stringify(exportedInput.migrations.map((entry) => entry.name)) !== JSON.stringify(entries))
+    throw new Error('runtime 升级输入导出结果不一致');
 } finally {
   await rm(stagingRoot, { recursive: true, force: true });
 }

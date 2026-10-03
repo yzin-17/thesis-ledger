@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ExperimentReadRow } from '../../src/strategy-optimization/strategy-optimization-common.js';
 import { StrategyOptimizationReadService } from '../../src/strategy-optimization/strategy-optimization-read.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
+import { runConfig, runConfigV3 } from '../backtest/v2-execution.fixtures.js';
 
 const uuid = (number: number) => `00000000-0000-4000-8000-${number.toString(16).padStart(12, '0')}`;
 
@@ -201,9 +202,9 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
     const backtestJob = {
       id: jobId,
       strategyVersionId,
-      mode: 'V2',
-      status: 'succeeded',
-      stage: 'succeeded',
+      mode: 'V3',
+      status: 'queued',
+      stage: 'queued',
       progress: 100,
       periodStart: new Date('2025-01-01T00:00:00.000Z'),
       periodEnd: new Date('2025-12-31T00:00:00.000Z'),
@@ -219,13 +220,31 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
       startedAt: new Date('2026-01-01T00:00:00.000Z'),
       finishedAt: new Date('2026-01-01T00:01:00.000Z'),
       engineVersion: 'engine-1',
-      resultChecksum: 'checksum',
-      snapshotId: 'snapshot',
+      resultChecksum: null,
+      snapshotId: null,
       diagnostics: null,
-      input: null,
+      input: {
+        contractVersion: 3,
+        schemaVersion: '3',
+        runConfig: runConfigV3(runConfig, 'raw-events'),
+      },
+      runConfig: runConfigV3(runConfig, 'raw-events'),
+      snapshotManifest: null,
+      result: null,
     };
     const prisma = {
-      backtestJob: { findMany: vi.fn().mockResolvedValue([backtestJob]) },
+      backtestJob: {
+        findMany: vi.fn().mockResolvedValue([
+          backtestJob,
+          {
+            ...backtestJob,
+            id: uuid(6010),
+            mode: 'V2',
+            result: { metrics: { totalReturn: 999 } },
+          },
+          { ...backtestJob, id: uuid(6011), runConfig: { schemaVersion: '2' } },
+        ]),
+      },
       strategyVersion: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -245,6 +264,8 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
     );
 
     const page = await service.listBacktestGroups({ search: '均线', limit: 10 });
+    expect(page.items).toHaveLength(1);
+    expect(JSON.stringify(page)).not.toContain('999');
 
     expect(page.items[0]).toMatchObject({
       id: jobId,

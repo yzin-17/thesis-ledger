@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { BacktestQueueReconciler } from '../../src/backtest/backtest-queue.reconciler.js';
 import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
 
-const createFixture = (executionAttempt: number, queueState: string | null) => {
+const createFixture = (executionAttempt: number, queueState: string | null, mode = 'V3') => {
   let state: Record<string, unknown> = {
     id: '11111111-1111-4111-8111-111111111130',
+    mode,
+    input: mode === 'V3' ? { contractVersion: 3, schemaVersion: '3' } : { schemaVersion: '2' },
     status: 'running',
     executionAttempt,
     createdAt: new Date('2026-09-09T00:00:00Z'),
@@ -27,7 +29,13 @@ const createFixture = (executionAttempt: number, queueState: string | null) => {
       findMany: vi.fn(async () => [state]),
       findUnique: vi.fn(async () => state),
       updateMany: vi.fn(
-        async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        async ({
+          where,
+          data,
+        }: {
+          where: Record<string, unknown>;
+          data: Record<string, unknown>;
+        }) => {
           if (!matches(where)) return { count: 0 };
           state = { ...state, ...data };
           return { count: 1 };
@@ -54,6 +62,20 @@ const createFixture = (executionAttempt: number, queueState: string | null) => {
 };
 
 describe('Backtest 队列协调器', () => {
+  it('旧合同记录不进入恢复查询', async () => {
+    const fixture = createFixture(1, null, 'V2');
+    await fixture.reconciler.reconcile();
+    const query = fixture.reconciler as unknown as {
+      prisma: { backtestJob: { findMany: ReturnType<typeof vi.fn> } };
+    };
+    expect(query.prisma.backtestJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ mode: 'V3' }) }),
+    );
+    expect(fixture.queue.getState).not.toHaveBeenCalled();
+    expect(fixture.queue.add).not.toHaveBeenCalled();
+    expect(fixture.state()).toMatchObject({ mode: 'V2', status: 'running' });
+  });
+
   it('Worker 中断且 BullMQ 留下失败记录时移除旧记录并重新排队', async () => {
     const fixture = createFixture(1, 'failed');
 
@@ -89,9 +111,13 @@ describe('Backtest 队列协调器', () => {
   it('分页处理超过 100 条非终态任务，不让后续任务长期饥饿', async () => {
     const states = Array.from({ length: 101 }, (_, index) => ({
       id: `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`,
+      mode: 'V3',
+      input: { contractVersion: 3, schemaVersion: '3' },
       status: 'queued',
       executionAttempt: 0,
-      createdAt: new Date(`2026-09-09T00:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}Z`),
+      createdAt: new Date(
+        `2026-09-09T00:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}Z`,
+      ),
       dispatchedAt: null as Date | null,
       errorCode: null as string | null,
       errorSummary: null as string | null,
@@ -103,10 +129,18 @@ describe('Backtest 队列协调器', () => {
     const prisma = {
       backtestJob: {
         findMany,
-        findUnique: vi.fn(async ({ where }: { where: { id: string } }) => byId.get(where.id) ?? null),
+        findUnique: vi.fn(
+          async ({ where }: { where: { id: string } }) => byId.get(where.id) ?? null,
+        ),
         updateMany: vi.fn(async () => ({ count: 1 })),
         update: vi.fn(
-          async ({ where, data }: { where: { id: string }; data: Partial<(typeof states)[number]> }) => {
+          async ({
+            where,
+            data,
+          }: {
+            where: { id: string };
+            data: Partial<(typeof states)[number]>;
+          }) => {
             const state = byId.get(where.id);
             if (!state) throw new Error('missing test job');
             Object.assign(state, data);

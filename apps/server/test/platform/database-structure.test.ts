@@ -22,14 +22,67 @@ describe('database structure input', () => {
   it('自动发现全部 migration、Prisma 表和 raw-owned 表', async () => {
     const input = await discoverDatabaseStructure();
 
-    expect(input.currentHead).toBe('20260922100000_ai_provider_test_facts');
-    expect(input.migrations).toHaveLength(15);
-    expect(input.prismaTables).toHaveLength(59);
-    expect(input.rawOwnedTables).toHaveLength(7);
-    expect(input.expectedTables).toHaveLength(66);
+    expect(input.currentHead).toBe('20261001120000_require_explicit_strategy_contract');
+    expect(input.migrations).toHaveLength(26);
+    expect(input.prismaTables).toHaveLength(60);
+    expect(input.rawOwnedTables).toHaveLength(11);
+    expect(input.expectedTables).toHaveLength(71);
     expect(input.expectedTables).toEqual(
-      expect.arrayContaining(['StrategyRiskApplication', 'AutomationRunLease', 'LedgerEvent']),
+      expect.arrayContaining([
+        'StrategyRiskApplication',
+        'AutomationRunLease',
+        'LedgerEvent',
+        'NavBacktestPreparation',
+      ]),
     );
+  });
+
+  it('移除停用的行情事实与覆盖表', async () => {
+    const input = await discoverDatabaseStructure();
+    const migrationSql = input.migrations.find(
+      ({ name }) => name === '20260929114800_drop_market_bar_series_v2',
+    )?.sql;
+    const normalizedMigrationSql = migrationSql?.replace(/\s+/gu, ' ') ?? '';
+
+    expect(migrationSql).toBeDefined();
+    expect(normalizedMigrationSql).toContain('DROP TABLE "MarketBarSeriesCoverage";');
+    expect(normalizedMigrationSql).toContain('DROP TABLE "MarketBarSeriesFact";');
+    expect(normalizedMigrationSql).toContain(
+      'CREATE TABLE "MarketBarSeriesCoverageArchive" AS TABLE "MarketBarSeriesCoverage";',
+    );
+    expect(normalizedMigrationSql).toContain(
+      'CREATE TABLE "MarketBarSeriesFactArchive" AS TABLE "MarketBarSeriesFact";',
+    );
+    expect(input.prismaTables).not.toContain('MarketBarSeriesCoverage');
+    expect(input.prismaTables).not.toContain('MarketBarSeriesFact');
+    expect(input.rawOwnedTables).toEqual(
+      expect.arrayContaining(['MarketBarSeriesCoverageArchive', 'MarketBarSeriesFactArchive']),
+    );
+  });
+
+  it('把 V3 来源基准和覆盖证明绑定到单个精确窗口响应', async () => {
+    const input = await discoverDatabaseStructure();
+    const migrationSql = input.migrations.find(
+      ({ name }) => name === '20260925110000_market_bar_window_evidence_v3',
+    )?.sql;
+    const normalizedMigrationSql = migrationSql?.replace(/\s+/gu, ' ') ?? '';
+
+    expect(input.prismaTables).toContain('MarketBarWindowEvidenceV3');
+    expect(normalizedMigrationSql).toContain('CREATE TABLE "MarketBarWindowEvidenceV3"');
+    expect(normalizedMigrationSql).toContain('"identityFingerprint" CHAR(64) NOT NULL');
+    expect(normalizedMigrationSql).toContain('"routeKind" VARCHAR(8) NOT NULL DEFAULT \'bar\'');
+    expect(normalizedMigrationSql).toContain('"market" VARCHAR(2) NOT NULL');
+    expect(normalizedMigrationSql).toContain('"providerId" VARCHAR(128) NOT NULL');
+    expect(normalizedMigrationSql).toContain('"upstreamSource" VARCHAR(128) NOT NULL');
+    expect(normalizedMigrationSql).toContain('"requestedStart" DATE NOT NULL');
+    expect(normalizedMigrationSql).toContain('"requestedEnd" DATE NOT NULL');
+    expect(normalizedMigrationSql).toContain('"seriesVersion" VARCHAR(128) NOT NULL');
+    expect(normalizedMigrationSql).toContain('"inputFingerprint" TEXT NOT NULL');
+    expect(normalizedMigrationSql).toContain('"sourcePriceBasis" JSONB NOT NULL');
+    expect(normalizedMigrationSql).toContain('"coverageProof" JSONB NOT NULL');
+    expect(normalizedMigrationSql).toContain('"routeIndex" IN (0, 1)');
+    expect(normalizedMigrationSql).toContain('"requestedStart" <= "requestedEnd"');
+    expect(normalizedMigrationSql).not.toContain('ALTER TABLE "MarketBarSeriesCoverage"');
   });
 
   it('只移除合法的首尾事务边界并保留迁移内容', () => {

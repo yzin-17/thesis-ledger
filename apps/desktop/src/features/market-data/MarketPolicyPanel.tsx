@@ -1,75 +1,82 @@
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
+import { MarketPolicyTargetSelect } from './MarketPolicyTargetSelect.js';
+import { MarketPolicyPreset } from './MarketPolicyPreset.js';
 import {
-  compatibleRouteTargets,
-  dataSourceDisplay,
-  routeCandidates,
-  routeDefinitions,
-  routeLabel,
-  routeTargetKey,
-  sameRouteTarget,
-  updateRouteRole,
-  type MarketPolicy,
+  marketPolicyRouteRowsV3,
+  policyRouteTargetsV3,
+  readyRouteTargetsV3,
+  routeAvailabilityLabelV3,
+  routeAvailabilityMessageV3,
+  routeCatalogMessageV3,
+  routeKeyLabelV3,
+  updatePolicyRouteTargetV3,
+  type MarketPolicyRouteRowV3,
+} from './market-data-routes-v3.js';
+import {
+  effectivePolicyV3,
+  effectiveRouteLabelV3,
+  policySyncLabelV3,
+} from './market-policy-status-v3.js';
+import {
+  type MarketPolicyDraftV3,
+  type MarketPolicyResponse,
+  type MarketRouteCatalogReadV3,
   type ProviderManifest,
-  type RouteTarget,
 } from './market-data.types.js';
 
-const NONE = '__none__';
-
-const targetName = (
-  providers: readonly ProviderManifest[],
-  target: RouteTarget | undefined,
-) =>
-  target
-    ? dataSourceDisplay(target.providerId, target.upstreamSource, providers)
-    : '未配置';
-
-const providerOptionLabel = (provider: ProviderManifest) => {
-  const states: string[] = [];
-  if (!provider.configured) states.push('未配置');
-  if (!provider.enabled) states.push('已停用');
-  return states.length > 0
-    ? `${provider.displayName} · ${states.join('、')}`
-    : provider.displayName;
-};
-
-const targetOptionLabel = (
-  provider: ProviderManifest,
-  sourceDisplayName: string,
-) => {
-  const providerLabel = providerOptionLabel(provider);
-  return provider.displayName === sourceDisplayName
-    ? providerLabel
-    : `${providerLabel} · ${sourceDisplayName}`;
-};
-
-const saveLabel = (saving: boolean) => (saving ? '保存中…' : '保存路由策略');
+const savedTargets = (policy: MarketPolicyDraftV3, row: MarketPolicyRouteRowV3) =>
+  policyRouteTargetsV3(policy, row.key);
 
 export function MarketPolicyPanel({
   policy,
+  serverPolicy,
+  catalog,
+  catalogPending,
+  catalogQueryFailed,
   providers,
   disabled,
   saving,
+  retrying,
+  dirty,
   onChange,
   onSave,
+  onRetry,
 }: {
-  policy: MarketPolicy | null;
+  policy: MarketPolicyDraftV3 | null;
+  serverPolicy: MarketPolicyResponse | null;
+  catalog: MarketRouteCatalogReadV3 | undefined;
+  catalogPending: boolean;
+  catalogQueryFailed: boolean;
   providers: ProviderManifest[];
   disabled: boolean;
   saving: boolean;
-  onChange: (policy: MarketPolicy) => void;
+  retrying: boolean;
+  dirty: boolean;
+  onChange: (policy: MarketPolicyDraftV3) => void;
   onSave: () => void;
+  onRetry: () => void;
 }) {
+  const rows = marketPolicyRouteRowsV3(catalog, policy);
+  const catalogMessage = catalogPending
+    ? '正在读取 DSA 精确路由能力目录。'
+    : routeCatalogMessageV3(catalog, catalogQueryFailed);
+  const effective = effectivePolicyV3(serverPolicy);
+  const effectiveRevision = effective?.revision ?? null;
+  const effectiveSourceRevision = effective?.sourceDesiredRevision ?? null;
+  const canRetry = Boolean(serverPolicy && (serverPolicy.syncState !== 'applied' || serverPolicy.effectiveStale));
+  let statusBadgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+  if (serverPolicy?.syncState === 'rejected') statusBadgeVariant = 'destructive';
+  else if (dirty) statusBadgeVariant = 'default';
+  const errorMessage =
+    !dirty && serverPolicy && serverPolicy.syncState !== 'applied'
+      ? routeAvailabilityLabelV3(serverPolicy.lastError?.code ?? 'policy_not_applied')
+      : null;
+
   return (
     <Card>
       <CardHeader>
@@ -86,7 +93,7 @@ export function MarketPolicyPanel({
               variant="risk"
               aria-label="启用路由"
               checked={policy?.enabled ?? false}
-              disabled={disabled || !policy}
+              disabled={disabled || !policy || catalog?.status !== 'complete'}
               onCheckedChange={(checked) => policy && onChange({ ...policy, enabled: checked })}
             >
               <SwitchThumb variant="risk" />
@@ -95,140 +102,143 @@ export function MarketPolicyPanel({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={statusBadgeVariant}>{policySyncLabelV3(serverPolicy, dirty)}</Badge>
+          {serverPolicy && (
+            <span className="text-xs text-muted-foreground">
+              期望修订：{serverPolicy.revision}
+              {dirty
+                ? `（保存后为 ${policy?.revision ? policy.revision + 1 : serverPolicy.revision + 1}）`
+                : ''}
+            </span>
+          )}
+          {serverPolicy && (
+            <span className="text-xs text-muted-foreground">
+              生效修订：{effectiveRevision ?? '尚无'}
+              {effectiveSourceRevision !== null ? `（对应期望 ${effectiveSourceRevision}）` : ''}
+            </span>
+          )}
+        </div>
+
+        {catalogMessage && (
+          <Alert>
+            <AlertTitle>{catalogPending ? '正在读取路由能力' : '暂不能修改路由'}</AlertTitle>
+            <AlertDescription>{catalogMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {errorMessage && (
+          <Alert variant={serverPolicy?.syncState === 'rejected' ? 'destructive' : 'default'}>
+            <AlertTitle>
+              {serverPolicy?.syncState === 'rejected' ? '路由尚未应用' : '路由同步状态'}
+            </AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {policy && (
+          <MarketPolicyPreset
+            policy={policy}
+            catalog={catalog}
+            providers={providers}
+            disabled={disabled || saving || retrying || catalogPending || catalogQueryFailed}
+            onChange={onChange}
+          />
+        )}
+
         {policy ? (
-          <div className="divide-y rounded-lg border border-border">
-            {routeDefinitions.map(([capability, instrumentType]) => {
-              const [primary, fallback] = routeCandidates(policy, capability, instrumentType);
-              const compatible = compatibleRouteTargets(
-                providers,
-                capability,
-                instrumentType,
-              );
-              const fallbackOptions = compatible.filter(
-                (option) => !sameRouteTarget(option.target, primary),
-              );
-              const primaryItems = [
-                { label: '未配置', value: NONE },
-                ...compatible.map((option) => ({ label: option.label, value: option.key })),
-              ];
-              const fallbackItems = [
-                { label: '不设备用', value: NONE },
-                ...fallbackOptions.map((option) => ({ label: option.label, value: option.key })),
-              ];
-              return (
-                <div
-                  key={`${capability}:${instrumentType}`}
-                  className="grid gap-4 p-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
-                >
-                  <div className="self-center">
-                    <strong className="block text-sm font-medium">
-                      {routeLabel(capability, instrumentType)}
-                    </strong>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {capability} / {instrumentType}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <span className="block text-xs font-medium text-muted-foreground">
-                      主数据源
-                    </span>
-                    <Select
-                      items={primaryItems}
-                      value={primary ? routeTargetKey(primary) : NONE}
+          rows.length > 0 ? (
+            <div className="divide-y rounded-lg border border-border">
+              {rows.map((row) => {
+                const [primary, fallback] = savedTargets(policy, row);
+                const candidates = readyRouteTargetsV3(catalog, row.key, providers);
+                const routeMessage = routeAvailabilityMessageV3(catalog, row.key);
+                return (
+                  <div
+                    key={row.id}
+                    className="grid gap-4 p-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
+                  >
+                    <div className="flex flex-col gap-1 self-center">
+                      <strong className="block text-sm font-medium">
+                        {routeKeyLabelV3(row.key)}
+                      </strong>
+                      <span className="text-xs text-muted-foreground">
+                        {effectiveRouteLabelV3(serverPolicy, row, dirty)}
+                      </span>
+                      {candidates.length === 0 && routeMessage && (
+                        <span className="text-xs text-muted-foreground">{routeMessage}</span>
+                      )}
+                    </div>
+                    <MarketPolicyTargetSelect
+                      row={row}
+                      role="primary"
+                      selected={primary}
+                      other={fallback}
+                      catalog={catalog}
+                      providers={providers}
                       disabled={disabled}
-                      onValueChange={(value) =>
-                        onChange(
-                          updateRouteRole(
-                            policy,
-                            capability,
-                            instrumentType,
-                            'primary',
-                            value === NONE
-                              ? null
-                              : (compatible.find((option) => option.key === value)?.target ?? null),
-                          ),
-                        )
+                      onChange={(target) =>
+                        onChange(updatePolicyRouteTargetV3(policy, row.key, 'primary', target))
                       }
-                    >
-                      <SelectTrigger
-                        className="w-full"
-                        aria-label={`${routeLabel(capability, instrumentType)} 主数据源`}
-                      >
-                        <SelectValue>{targetName(providers, primary)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        <SelectGroup>
-                          <SelectItem value={NONE}>未配置</SelectItem>
-                          {compatible.map((option) => (
-                            <SelectItem key={option.key} value={option.key}>
-                              {targetOptionLabel(option.provider, option.sourceDisplayName)}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <span className="block text-xs font-medium text-muted-foreground">
-                      备用数据源
-                    </span>
-                    <Select
-                      items={fallbackItems}
-                      value={fallback ? routeTargetKey(fallback) : NONE}
-                      disabled={disabled || !primary}
-                      onValueChange={(value) =>
-                        onChange(
-                          updateRouteRole(
-                            policy,
-                            capability,
-                            instrumentType,
-                            'fallback',
-                            value === NONE
-                              ? null
-                              : (fallbackOptions.find((option) => option.key === value)?.target ??
-                                null),
-                          ),
-                        )
+                    />
+                    <MarketPolicyTargetSelect
+                      row={row}
+                      role="fallback"
+                      selected={fallback}
+                      other={primary}
+                      catalog={catalog}
+                      providers={providers}
+                      disabled={disabled}
+                      onChange={(target) =>
+                        onChange(updatePolicyRouteTargetV3(policy, row.key, 'fallback', target))
                       }
-                    >
-                      <SelectTrigger
-                        className="w-full"
-                        aria-label={`${routeLabel(capability, instrumentType)} 备用数据源`}
-                      >
-                        <SelectValue>{targetName(providers, fallback)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        <SelectGroup>
-                          <SelectItem value={NONE}>不设备用</SelectItem>
-                          {fallbackOptions.map((option) => (
-                            <SelectItem key={option.key} value={option.key}>
-                              {targetOptionLabel(option.provider, option.sourceDisplayName)}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {catalog?.status === 'complete'
+                ? '当前目录没有可配置的数据能力。'
+                : '正在读取路由策略与精确能力目录…'}
+            </p>
+          )
         ) : (
           <p className="text-sm text-muted-foreground">正在读取路由策略…</p>
         )}
-        {policy?.lastError && (
-          <p className="text-sm text-destructive">
-            最近同步错误：{policy.lastError.message ?? policy.lastError.code}
-          </p>
-        )}
+
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" onClick={onSave} disabled={disabled || !policy}>
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={disabled || saving || !policy || !dirty || catalog?.status !== 'complete'}
+          >
             {saving && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
             )}
-            {saveLabel(saving)}
+            {saving ? '保存中…' : '保存路由策略'}
           </Button>
-          <span className="text-xs text-muted-foreground">保存后自动应用新的主备顺序。</span>
+          {canRetry && !dirty && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onRetry}
+              disabled={disabled || retrying}
+            >
+              {retrying && (
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              {retrying ? '重试中…' : '重试应用'}
+            </Button>
+          )}
+          <span className="text-xs text-muted-foreground">
+            保存后自动应用新的主备顺序；失败后可显式重试。
+          </span>
         </div>
       </CardContent>
     </Card>

@@ -2,10 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 import {
   optimizationDiscoveryGenerationOutputSchema,
   optimizationDiscoveryProposalSchema,
-  strategySchemaV2,
+  strategySchema,
   type OptimizationDiscoveryProposal,
   type OptimizationDiscoveryScope,
-  type StrategySchemaV2,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import type { ExperimentRow } from './strategy-optimization-common.js';
 
@@ -13,7 +13,7 @@ export const STRATEGY_SPACE_VERSION = 'strategy-space-v1' as const;
 const MAX_AST_DEPTH = 8;
 
 const sameInstrument = (
-  left: StrategySchemaV2['executionInstrument'],
+  left: BacktestStrategy['executionInstrument'],
   right: OptimizationDiscoveryScope['executionInstrument'],
 ) =>
   left.symbol === right.symbol &&
@@ -38,7 +38,7 @@ const astDepth = (value: unknown, depth = 0): number => {
   }, depth);
 };
 
-export const createDiscoverySeed = (scope: OptimizationDiscoveryScope): StrategySchemaV2 => {
+export const createDiscoverySeed = (scope: OptimizationDiscoveryScope): BacktestStrategy => {
   const sourceId = 'discovery-primary';
   const isFund = scope.executionInstrument.assetType === 'fund';
   return {
@@ -79,10 +79,10 @@ export const createDiscoverySeed = (scope: OptimizationDiscoveryScope): Strategy
 export const validateDiscoveryStrategy = (
   candidate: unknown,
   scope: OptimizationDiscoveryScope,
-): StrategySchemaV2 => {
-  const parsed = strategySchemaV2.safeParse(candidate);
-  if (!parsed.success) throw new BadRequestException('AI 探索候选不是合法的 StrategySchemaV2');
-  const strategy = parsed.data as StrategySchemaV2;
+): BacktestStrategy => {
+  const parsed = strategySchema.safeParse(candidate);
+  if (!parsed.success) throw new BadRequestException('AI 探索候选不是合法的 BacktestStrategy');
+  const strategy = parsed.data as BacktestStrategy;
   if (!sameInstrument(strategy.executionInstrument, scope.executionInstrument))
     throw new BadRequestException('探索候选不得改变执行标的、市场或资产类型');
   if (strategy.primaryTimeframe !== scope.primaryTimeframe)
@@ -126,21 +126,21 @@ export const parseDiscoveryProposal = (
       return `${path}: ${issue.message}`;
     });
     const suffix = details.length > 0 ? `；校验问题：${details.join('；')}` : '';
-    throw new BadRequestException(`AI 探索输出必须包含完整 StrategySchemaV2 候选${suffix}`);
+    throw new BadRequestException(`AI 探索输出必须包含完整 BacktestStrategy 候选${suffix}`);
   }
   return { ...parsed.data, strategy: validateDiscoveryStrategy(parsed.data.strategy, scope) };
 };
 
 export const discoveryPrompt = (
   experiment: ExperimentRow,
-  strategy: StrategySchemaV2,
+  strategy: BacktestStrategy,
   round: number,
   priorCandidates: Array<{ diff: unknown; metrics: unknown }>,
 ) => [
   {
     role: 'system',
     content:
-      '你是策略探索器。只能在 strategy-space-v1 内生成完整 StrategySchemaV2 JSON；输出前必须先把 responseTemplate 完整复制为响应，不得省略任何 strategy 顶层字段、不得使用省略号或只返回修改片段，再仅修改允许探索的策略字段。必须复制 seed 中固定的执行标的、市场、资产类型、主周期和 execution，生成合法完整对象。策略顶层只能包含 schemaVersion/name/description/signalSources/executionInstrument/primaryTimeframe/entry/exit/sizing/risk/execution/cost/benchmark，首版禁止 benchmark；只能使用一个与执行标的和主周期一致的 SignalSource，不得生成代码、外部标的或未声明数据。entry 和 exit 必须是 BooleanExpression：只能使用 {type:all,conditions:[...]}/{type:any,conditions:[...]}/{type:not,expression:{...}}、{type:compare,operator:eq|neq|gt|gte|lt|lte,left:NumericExpression,right:NumericExpression}、{type:cross,direction:above|below,left:NumericExpression,right:NumericExpression} 或 {type:positionState,field:isOpen}；NumericExpression 只能使用 {type:constant,value:decimal string}、{type:series,sourceId,field}、{type:indicator,name,input,params,可选 MACD output} 或 {type:positionState,field:quantity|averageCost|holdingPeriods}。indicator.input 必须是完整 NumericExpression，例如 {"type":"series","sourceId":"discovery-primary","field":"close"}；周期必须放在 indicator.params，例如 {"period":20}。禁止 and/or/condition/rule 等未声明 type。sizing 必须是严格对象，例如 {"type":"percentOfEquity","percent":"0.9"}；risk 必须是数组，例如 [{"type":"fixedStop","percent":"0.05"}]，不得输出以 fixedStop/fixedTakeProfit 为键的对象。percentOfEquity.percent、targetWeight.weight、fixedStop.percent、fixedTakeProfit.percent 都必须是字符串比例，范围为 (0,1]，例如 "0.9" 而不是 90；maxHoldingPeriod.periods 只能使用正整数。响应 envelope 只能包含 strategy、reason、evidenceRefs；objective、round、priorCandidates 是输入上下文，不得复制到 strategy。只输出合法完整的 {"strategy":完整策略,"reason":说明,"evidenceRefs":[]} JSON，绩效由服务端真实回测。',
+      '你是策略探索器。只能在 strategy-space-v1 内生成完整 BacktestStrategy JSON；输出前必须先把 responseTemplate 完整复制为响应，不得省略任何 strategy 顶层字段、不得使用省略号或只返回修改片段，再仅修改允许探索的策略字段。必须复制 seed 中固定的执行标的、市场、资产类型、主周期和 execution，生成合法完整对象。策略顶层只能包含 schemaVersion/name/description/signalSources/executionInstrument/primaryTimeframe/entry/exit/sizing/risk/execution/cost/benchmark，首版禁止 benchmark；只能使用一个与执行标的和主周期一致的 SignalSource，不得生成代码、外部标的或未声明数据。entry 和 exit 必须是 BooleanExpression：只能使用 {type:all,conditions:[...]}/{type:any,conditions:[...]}/{type:not,expression:{...}}、{type:compare,operator:eq|neq|gt|gte|lt|lte,left:NumericExpression,right:NumericExpression}、{type:cross,direction:above|below,left:NumericExpression,right:NumericExpression} 或 {type:positionState,field:isOpen}；NumericExpression 只能使用 {type:constant,value:decimal string}、{type:series,sourceId,field}、{type:indicator,name,input,params,可选 MACD output} 或 {type:positionState,field:quantity|averageCost|holdingPeriods}。indicator.input 必须是完整 NumericExpression，例如 {"type":"series","sourceId":"discovery-primary","field":"close"}；周期必须放在 indicator.params，例如 {"period":20}。禁止 and/or/condition/rule 等未声明 type。sizing 必须是严格对象，例如 {"type":"percentOfEquity","percent":"0.9"}；risk 必须是数组，例如 [{"type":"fixedStop","percent":"0.05"}]，不得输出以 fixedStop/fixedTakeProfit 为键的对象。percentOfEquity.percent、targetWeight.weight、fixedStop.percent、fixedTakeProfit.percent 都必须是字符串比例，范围为 (0,1]，例如 "0.9" 而不是 90；maxHoldingPeriod.periods 只能使用正整数。响应 envelope 只能包含 strategy、reason、evidenceRefs；objective、round、priorCandidates 是输入上下文，不得复制到 strategy。只输出合法完整的 {"strategy":完整策略,"reason":说明,"evidenceRefs":[]} JSON，绩效由服务端真实回测。',
   },
   {
     role: 'user',
@@ -155,7 +155,7 @@ export const discoveryPrompt = (
         strategyTopLevelKeys:
           'only schemaVersion/name/description/signalSources/executionInstrument/primaryTimeframe/entry/exit/sizing/risk/execution/cost/benchmark; benchmark forbidden in first version',
         fixedScopeAndExecution:
-          'copy seed executionInstrument, primaryTimeframe, and execution exactly; emit a complete valid StrategySchemaV2 object',
+          'copy seed executionInstrument, primaryTimeframe, and execution exactly; emit a complete valid BacktestStrategy object',
         booleanExpression:
           "entry/exit must be BooleanExpression: {type:'all',conditions:[...]}, {type:'any',conditions:[...]}, {type:'not',expression:{...}}, {type:'compare',operator:'eq|neq|gt|gte|lt|lte',left:NumericExpression,right:NumericExpression}, {type:'cross',direction:'above|below',left:NumericExpression,right:NumericExpression}, or {type:'positionState',field:'isOpen'}",
         numericExpression:
@@ -230,7 +230,7 @@ const assertGeneratedSeriesReferences = (
 
 export const assembleDiscoveryGeneration = (
   experiment: ExperimentRow,
-  seed: StrategySchemaV2,
+  seed: BacktestStrategy,
   value: unknown,
 ): OptimizationDiscoveryProposal => {
   const generated = optimizationDiscoveryGenerationOutputSchema.parse(value);
@@ -271,7 +271,7 @@ export const assembleDiscoveryGeneration = (
 
 export const discoveryGenerationPrompt = (
   experiment: ExperimentRow,
-  seed: StrategySchemaV2,
+  seed: BacktestStrategy,
   round: number,
   priorCandidates: Array<{ diff: unknown; metrics: unknown }>,
 ) => [

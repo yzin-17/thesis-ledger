@@ -153,11 +153,14 @@ export function RiskRuleWorkbench({
       <Button
         key={rule.id}
         type="button"
-        variant={selected ? 'secondary' : 'ghost'}
+        variant="ghost"
         className={cn(
           'h-auto min-h-16 justify-start whitespace-normal px-3 py-2 text-left',
           muted && 'opacity-60',
-          selected && 'ring-1 ring-border',
+          // 不用 secondary 变体表示选中：它的文字色是次要灰（#6a6d78），选中反而像禁用。
+          // 这里保持 ghost 的可读性，只给选中叠底色 + 主文字色；
+          // hover:bg-secondary 是防止 ghost 自带的 hover 底色把选中态盖掉。
+          selected && 'bg-secondary text-foreground ring-1 ring-border hover:bg-secondary',
         )}
         onClick={() => setSelectedRuleId(rule.id)}
         aria-current={selected ? 'true' : undefined}

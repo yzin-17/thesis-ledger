@@ -1,17 +1,17 @@
-import type { BacktestEquityPoint } from '@thesis-ledger/domain';
 import {
-  createCorporateActionPort,
-  createExchangeSizingAdapter,
+  runExchangeSimulation,
+  availabilityForDecision,
+  type BacktestEquityPoint,
+} from '@thesis-ledger/domain';
+import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
+import {
   buildBacktestAnalytics,
   projectBacktestTrades,
   SimulationLedger,
   tradingCalendarFromFact,
   VersionedExecutionRules,
-  runDeterministicSimulation,
   createRiskEvaluationAdapter,
   type BacktestSeries,
-  type SimulationFillRecord,
-  type SimulationSettlement,
   type SimulationTargetIntent,
   type BacktestVerticalInput,
   type ExchangeVerticalResult,
@@ -31,6 +31,7 @@ import {
   toCorporateAction,
 } from './backtest-v2-execution-shared.js';
 import { buildPointInTimeIndicatorSeries } from './backtest-adjusted-indicators.js';
+import { prepareEventAccountingV3 } from './backtest-event-accounting-v3.js';
 import {
   annualizationFactorFromValuations,
   buildDailyValuationTicks,
@@ -38,8 +39,23 @@ import {
 } from './backtest-equity-curve.js';
 import { requireFrozenExecutionRules } from './backtest-market-rules.js';
 import { buildBacktestSizingEquity } from './backtest-sizing-equity.js';
+import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
+import { requireV3EventSignalVisibility } from './backtest-v3-event-signal-clock.js';
 
-export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerticalResult => {
+type ExchangeVerticalInput = BacktestVerticalInput;
+
+const runConfigVersion = (runConfig: ExchangeVerticalInput['runConfig']) => {
+  const parsed = runConfigSchemaV3.safeParse(runConfig);
+  if (!parsed.success) {
+    throw new Error('SNAPSHOT_VERSION_MISMATCH: 缺少一致的现行冻结价格协议');
+  }
+  return { accountingBasis: parsed.data.executionPriceProtocol.accountingBasis };
+};
+
+export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerticalResult => {
+  const snapshotProtocol = runConfigVersion(input.runConfig);
+  const isNormalizedSeries = snapshotProtocol.accountingBasis === 'normalized-series';
+  const v3Config = input.runConfig;
   if (input.strategy.executionInstrument.assetType === 'fund') {
     throw new Error('NAV Fund 必须走 CN NAV simulation');
   }
@@ -50,7 +66,9 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
     (row) => row.symbol === instrument.symbol && row.market === instrument.market,
   );
   const fact = instrumentFact(instrumentRow);
-  const executionModel = input.runConfig.executionModel;
+  const executionModel = input.runConfig.executionModel as
+    | NonNullable<Parameters<typeof runExchangeSimulation>[0]['exchange']['executionModel']>
+    | undefined;
   const ruleSnapshot = executionModel
     ? undefined
     : requireFrozenExecutionRules(executionRuleSnapshot(instrumentRow), input.marketRuleVersion, {
@@ -104,17 +122,26 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
           ...(charge.minimum === null ? {} : { minimum: charge.minimum }),
         })),
   });
-  const ledgerConfig = initialLedgerConfig(input.strategy, input.runConfig);
+  const ledgerConfig = {
+    ...initialLedgerConfig(input.strategy, input.runConfig),
+    accountingBasis: snapshotProtocol.accountingBasis,
+  };
   const ledger = new SimulationLedger(ledgerConfig);
   const barRows = rowsForPurpose(input.rows, 'execution');
   const bars = executionBars(
     rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar),
     calendar,
+    v3Config,
   );
   const fxRates = fxRatesFrom(input.rows);
   const sourceSeries = new Map<string, BacktestSeries>();
   for (const source of input.strategy.signalSources) {
-    const ref = signalArtifactFor(input.artifacts, source.asset.market, source.asset.symbol);
+    const binding = v3Config.priceInputBindings?.signals.find(
+      (alias) => alias.sourceId === source.id,
+    );
+    const ref = binding
+      ? input.artifacts.find((artifact) => artifact.key.endsWith('/execution/bars.parquet'))
+      : signalArtifactFor(input.artifacts, source.asset.market, source.asset.symbol);
     if (ref) {
       const sourceCalendar = tradingCalendarFromFact(
         calendarFact(rowFor(calendarRows, (row) => row.market === source.asset.market)),
@@ -128,7 +155,7 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
           assetType: source.asset.assetType,
           field,
           timeframe: source.timeframe,
-          adjusted: false,
+          adjusted: isNormalizedSeries,
           points: rows.flatMap((row) => {
             if (typeof row.occurredAt !== 'string' || typeof row.availableAt !== 'string')
               return [];
@@ -138,6 +165,7 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
               {
                 occurredAt: row.occurredAt,
                 availableAt: row.availableAt,
+                ...barResearchClocksV3(row, sourceCalendar, v3Config),
                 value,
                 status: 'available' as const,
               },
@@ -147,103 +175,24 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
       }
     }
   }
-  const adapter = createExchangeSizingAdapter({
-    sizingForIntent: (intent: SimulationTargetIntent) => {
-      const next = bars.find((bar) => Date.parse(bar.openedAt) > Date.parse(intent.occurredAt));
-      const state = ledger.snapshot();
-      const evaluationAt = next?.openAvailableAt ?? intent.occurredAt;
-      const sizingEquity = next
-        ? buildBacktestSizingEquity({
-            state,
-            executionCurrency: fact.currency,
-            evaluationAt,
-            policy: input.runConfig.valuationPolicy,
-            price: {
-              symbol: instrument.symbol,
-              market: instrument.market,
-              assetType: instrument.assetType,
-              currency: fact.currency,
-              price: next.open,
-              occurredAt: next.openedAt,
-              availableAt: next.openAvailableAt,
-            },
-            fxRates,
-          })
-        : undefined;
-      return {
-        rule:
-          intent.side === 'sell'
-            ? { type: 'fixedQuantity', quantity: state.position.quantity }
-            : input.strategy.sizing,
-        executionCurrency: fact.currency,
-        lotSize: fact.lotSize,
-        currentQuantity: state.position.quantity,
-        evaluationAt,
-        ...(next
-          ? {
-              price: {
-                value: next.open,
-                occurredAt: next.openedAt,
-                availableAt: next.openAvailableAt,
-              },
-            }
-          : {}),
-        ...(sizingEquity ?? {}),
-      };
-    },
-    orderDefaults: () => ({
-      market: instrument.market,
-      orderType: 'Market' as const,
-      timeInForce: 'DAY' as const,
-      executionTiming: 'nextEligibleBarOpen' as const,
-    }),
-    exchangeInputForOrder: () => ({
-      rules,
-      calendar,
-      currency: fact.currency,
-      bars,
-      account: {
-        settledCash: ledger.availableCash(fact.currency),
-        availableQuantity: executionModel
-          ? ledger.snapshot().position.quantity
-          : ledger.snapshot().position.settledQuantity,
-        ...(executionModel && positionOpenedAt
-          ? { acquiredOn: calendar.status(positionOpenedAt).date }
-          : {}),
-      },
-      costs: {
-        version: executionModel
-          ? `execution-model-v1:${executionModel.id}:${executionModel.version}`
-          : 'snapshot-cost-v1',
-        commissionRate: executionModel ? '0' : input.strategy.cost.commissionRate,
-        slippageRate: input.strategy.cost.slippageRate,
-        ...(executionModel || input.strategy.cost.minimumCommission === undefined
-          ? {}
-          : { minimumCommission: input.strategy.cost.minimumCommission }),
-      },
-      ...(executionModel ? { executionModel, dataAsOf: input.runConfig.dataAsOf } : {}),
-    }),
-    reserveCashForOrder: (_order, plan) => {
-      if (!plan.cashReservation) return { accepted: true };
-      const reservation = ledger.reserveCash(
-        plan.cashReservation.reservationId,
-        plan.cashReservation.currency,
-        plan.cashReservation.amount,
-      );
-      if (reservation.accepted) return { accepted: true };
-      return {
-        accepted: false,
-        code: reservation.code,
-        reason: reservation.reason,
-        inputFacts: [
-          `cash.currency=${plan.cashReservation.currency}`,
-          `cash.required=${plan.cashReservation.amount}`,
-        ],
-      };
-    },
-  });
+  const costs = {
+    version: executionModel
+      ? `execution-model-v1:${executionModel.id}:${executionModel.version}`
+      : 'snapshot-cost-v1',
+    commissionRate: executionModel ? '0' : input.strategy.cost.commissionRate,
+    slippageRate: input.strategy.cost.slippageRate,
+    ...(executionModel || input.strategy.cost.minimumCommission === undefined
+      ? {}
+      : { minimumCommission: input.strategy.cost.minimumCommission }),
+  };
   const actionRows = rowsForPurpose(input.rows, 'corporateActions');
-  const corporateActions = actionRows.map(toCorporateAction);
+  const corporateActions = actionRows
+    .filter((row) => row.kind !== 'empty-dataset')
+    .map(toCorporateAction);
+  const accountingActions = !isNormalizedSeries
+    ? prepareEventAccountingV3(corporateActions, { calendar, bars,
+        startDate: input.runConfig.startDate, endDate: input.runConfig.endDate, dataAsOf: input.runConfig.dataAsOf })
+    : corporateActions;
   const executionSeries: BacktestSeries = {
     sourceId: `execution:${instrument.market}:${instrument.symbol}`,
     symbol: instrument.symbol,
@@ -251,10 +200,11 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
     assetType: instrument.assetType,
     field: 'close',
     timeframe: input.strategy.primaryTimeframe,
-    adjusted: false,
+    adjusted: isNormalizedSeries,
     points: bars.map((bar) => ({
       occurredAt: bar.occurredAt,
       availableAt: bar.availableAt,
+      ...(bar.researchClock ? { researchClock: bar.researchClock } : {}),
       value: bar.close,
       status: bar.status,
     })),
@@ -267,29 +217,34 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
     const tradingDate = calendar.status(bar.occurredAt).date;
     return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
   });
-  const ticks = executionRangeBars
-    .slice(0, -1)
-    .map((bar) => ({
-      occurredAt: bar.availableAt,
-      availableAt: bar.availableAt,
-      timeframe: input.strategy.primaryTimeframe,
-    }));
+  const decisionBars = executionRangeBars;
+  const ticks = decisionBars.map((bar) => ({
+    occurredAt: availabilityForDecision(bar)!,
+    tradingDate: calendar.status(bar.occurredAt).date,
+    availableAt: availabilityForDecision(bar)!,
+    timeframe: input.strategy.primaryTimeframe,
+  }));
+  requireV3EventSignalVisibility({
+      strategy: input.strategy,
+      facts: corporateActions,
+      ticks,
+      symbol: instrument.symbol,
+      market: instrument.market,
+  });
   const indicatorSeries = buildPointInTimeIndicatorSeries({
     expressions: [input.strategy.entry, input.strategy.exit],
     sourceSeries,
-    corporateActions,
+    corporateActions: isNormalizedSeries ? [] : corporateActions,
     ticks,
   });
   const equityCurve: BacktestEquityPoint[] = [];
   const valuationUnavailableReasons: string[] = [];
-  const ledgerUnavailableReasons: string[] = [];
   const valuationTicks = buildDailyValuationTicks({
     startDate: input.runConfig.startDate,
     endDate: input.runConfig.endDate,
     policy: input.runConfig.valuationPolicy,
     calendar,
   });
-  let positionOpenedAt: string | undefined;
   const riskAdapter = createRiskEvaluationAdapter({
     riskInputAt: (context) => {
       const position = context.positionState ?? {
@@ -299,7 +254,8 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
         isOpen: false,
         availableAt: context.tick.occurredAt,
       };
-      const price = latestPointAt(executionSeries, context.tick.occurredAt)?.value;
+      const pricePoint = latestPointAt(executionSeries, context.tick.occurredAt);
+      const price = pricePoint?.value;
       return {
         runId: input.runId,
         executionSymbol: instrument.symbol,
@@ -315,6 +271,13 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
           value: price ?? '0',
           occurredAt: context.tick.occurredAt,
           availableAt: context.tick.availableAt ?? context.tick.occurredAt,
+          ...(pricePoint?.researchClock
+            ? {
+                occurredAt: pricePoint.occurredAt,
+                availableAt: pricePoint.availableAt,
+                researchClock: pricePoint.researchClock,
+              }
+            : {}),
           completed: price !== undefined,
           ...(price === undefined
             ? { status: 'unavailable' as const, reason: '执行价格缺失' }
@@ -324,129 +287,172 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
       };
     },
   });
-  const simulation = runDeterministicSimulation({
-    runId: input.runId,
-    strategy: {
-      entry: input.strategy.entry,
-      exit: input.strategy.exit,
-      executionInstrument: input.strategy.executionInstrument,
-      primaryTimeframe: input.strategy.primaryTimeframe,
+  let positionOpenedAt: string | undefined;
+  let positionWasOpen = false;
+  const positionStateAt: NonNullable<
+    Parameters<typeof runExchangeSimulation>[0]['simulation']['positionStateAt']
+  > = (tick) => {
+    const position = ledger.snapshot().position;
+    if (position.quantity === '0') {
+      positionWasOpen = false;
+      positionOpenedAt = undefined;
+    } else if (!positionWasOpen) {
+      positionWasOpen = true;
+      positionOpenedAt = tick.occurredAt;
+    }
+    const holdingPeriods = positionOpenedAt
+      ? ticks.filter(
+          (candidate) =>
+            Date.parse(candidate.occurredAt) >= Date.parse(positionOpenedAt!) &&
+            Date.parse(candidate.occurredAt) <= Date.parse(tick.occurredAt),
+        ).length
+      : 0;
+    return {
+      isOpen: position.quantity !== '0',
+      quantity: position.quantity,
+      averageCost: position.averageCost,
+      holdingPeriods,
+      availableAt: tick.occurredAt,
+    };
+  };
+  const simulation = runExchangeSimulation({
+    simulation: {
+      runId: input.runId,
+      strategy: {
+        entry: input.strategy.entry,
+        exit: input.strategy.exit,
+        executionInstrument: input.strategy.executionInstrument,
+        primaryTimeframe: input.strategy.primaryTimeframe,
+      },
+      ticks,
+      sourceSeries,
+      indicatorSeries,
+      portfolioValuation: {
+        ticks: valuationTicks,
+        valueAt: (tick) => {
+          const point = latestPointAt(valuationPriceSeries, tick.occurredAt);
+          const valuation = buildBacktestEquityPoint({
+            state: ledger.snapshot(),
+            valuationAt: tick.occurredAt,
+            policy: input.runConfig.valuationPolicy,
+            fxRates,
+            ...(point?.status === 'available' && point.value !== undefined
+              ? {
+                  price: {
+                    symbol: instrument.symbol,
+                    market: instrument.market,
+                    assetType: instrument.assetType,
+                    currency: fact.currency,
+                    price: point.value,
+                    occurredAt: point.occurredAt,
+                    availableAt: point.availableAt,
+                    ...(point.researchClock ? { researchClock: point.researchClock } : {}),
+                  },
+                }
+              : {}),
+          });
+          if (valuation.status === 'available') equityCurve.push(valuation.point);
+          else valuationUnavailableReasons.push(valuation.reason);
+        },
+      },
+      risk: (context) => riskAdapter.asSimulationRisk(context),
+      positionStateAt,
+      corporateActions: isNormalizedSeries ? [] : accountingActions,
+      corporateActionSignalFacts: corporateActions,
     },
-    ticks,
-    sourceSeries,
-    indicatorSeries,
-    portfolioValuation: {
-      ticks: valuationTicks,
-      valueAt: (tick) => {
-        const point = latestPointAt(valuationPriceSeries, tick.occurredAt);
-        const valuation = buildBacktestEquityPoint({
-          state: ledger.snapshot(),
-          valuationAt: tick.occurredAt,
-          policy: input.runConfig.valuationPolicy,
-          fxRates,
-          ...(point?.status === 'available' && point.value !== undefined
+    ledger,
+    accountingBasis: snapshotProtocol.accountingBasis,
+    exchange: {
+      rules,
+      calendar,
+      bars,
+      costs,
+      ...(executionModel ? { executionModel, dataAsOf: input.runConfig.dataAsOf } : {}),
+      sizingForIntent: (intent: SimulationTargetIntent, state) => {
+        const next = bars.find(
+          (bar) =>
+            Date.parse(bar.openedAt) > Date.parse(intent.occurredAt) &&
+            calendar.isTradingSession(bar.openedAt),
+        );
+        const openAvailability = next
+          ? {
+              availableAt: next.openAvailableAt,
+              ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
+            }
+          : undefined;
+        const evaluationAt = openAvailability
+          ? availabilityForDecision(openAvailability)!
+          : intent.occurredAt;
+        const sizingEquity = next
+          ? buildBacktestSizingEquity({
+              state,
+              executionCurrency: fact.currency,
+              evaluationAt,
+              policy: input.runConfig.valuationPolicy,
+              price: {
+                symbol: instrument.symbol,
+                market: instrument.market,
+                assetType: instrument.assetType,
+                currency: fact.currency,
+                price: next.open,
+                occurredAt: next.openedAt,
+                availableAt: next.openAvailableAt,
+                ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
+              },
+              fxRates,
+            })
+          : undefined;
+        let sizingRule = input.strategy.sizing;
+        if (intent.side === 'sell') {
+          if (isNormalizedSeries) sizingRule = { type: 'targetWeight', weight: '0' };
+          else sizingRule = { type: 'fixedQuantity', quantity: state.position.quantity };
+        }
+        return {
+          rule: sizingRule,
+          executionCurrency: fact.currency,
+          lotSize: fact.lotSize,
+          currentQuantity: state.position.quantity,
+          evaluationAt,
+          ...(next
             ? {
                 price: {
-                  symbol: instrument.symbol,
-                  market: instrument.market,
-                  assetType: instrument.assetType,
-                  currency: fact.currency,
-                  price: point.value,
-                  occurredAt: point.occurredAt,
-                  availableAt: point.availableAt,
+                  value: next.open,
+                  occurredAt: next.openedAt,
+                  availableAt: next.openAvailableAt,
+                  ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
                 },
               }
             : {}),
-        });
-        if (valuation.status === 'available') equityCurve.push(valuation.point);
-        else valuationUnavailableReasons.push(valuation.reason);
-      },
-    },
-    risk: (context) => riskAdapter.asSimulationRisk(context),
-    positionStateAt: (tick) => {
-      const state = ledger.snapshot().position;
-      const holdingPeriods =
-        positionOpenedAt === undefined
-          ? 0
-          : ticks.filter(
-              (candidate) =>
-                Date.parse(candidate.occurredAt) >= Date.parse(positionOpenedAt!) &&
-                Date.parse(candidate.occurredAt) <= Date.parse(tick.occurredAt),
-            ).length;
-      return {
-        isOpen: state.quantity !== '0',
-        quantity: state.quantity,
-        averageCost: state.averageCost,
-        holdingPeriods,
-        availableAt: tick.occurredAt,
-      };
-    },
-    corporateActions,
-    corporateActionPort: createCorporateActionPort(
-      ledger,
-      ledgerConfig.executionInstrument,
-      input.runId,
-    ),
-    execution: {
-      ...adapter.port,
-      onMutation: (mutation: { type: string; payload: Record<string, unknown> }) => {
-        if (mutation.type === 'simulationFill') {
-          const fill = mutation.payload as unknown as SimulationFillRecord;
-          const plan = adapter.planFor(`${fill.orderId}`);
-          const result =
-            plan?.status === 'filled'
-              ? ledger.applyEvent({ type: 'fill', payload: plan.ledgerFill }, fill.availableAt)
-              : undefined;
-          if (result && !result.applied) {
-            ledgerUnavailableReasons.push(`LEDGER_${result.code}:${result.reason}`);
-            if (plan?.status === 'filled' && plan.cashReservation) {
-              ledger.releaseCash(plan.cashReservation.reservationId);
-            }
-          }
-          if (result?.applied && fill.side === 'buy' && positionOpenedAt === undefined)
-            positionOpenedAt = fill.occurredAt;
-          if (
-            result?.applied &&
-            fill.side === 'sell' &&
-            ledger.snapshot().position.quantity === '0'
-          )
-            positionOpenedAt = undefined;
-        } else if (mutation.type === 'cashSettlement') {
-          const settlement = mutation.payload as unknown as SimulationSettlement;
-          const result = ledger.applyEvent(
-            { type: 'settlement', payload: settlement },
-            settlement.availableAt,
-          );
-          if (!result.applied)
-            ledgerUnavailableReasons.push(`LEDGER_${result.code}:${result.reason}`);
-        }
-      },
-      scheduledMutationsForFill: (fill: SimulationFillRecord) => {
-        const plan = adapter.planFor(fill.orderId);
-        if (!plan || plan.status !== 'filled') return [];
-        return plan.settlement.ledgerSettlements.map((settlement: SimulationSettlement) => ({
-          type: 'cashSettlement' as const,
-          eventId: settlement.eventId,
-          occurredAt: settlement.occurredAt,
-          availableAt: settlement.availableAt,
-          payload: settlement as unknown as Record<string, unknown>,
-        }));
+          ...(sizingEquity ?? {}),
+        };
       },
     },
   });
   const fills = simulation.fills;
+  const rejects = simulation.rejects.filter(
+    (reject) => !isNormalizedSeries || reject.code !== 'CORPORATE_ACTION_IGNORED',
+  );
   const trades = projectBacktestTrades(
     fills.map((fill) => ({ ...fill, charges: [...fill.charges] })),
     { executionSymbol: instrument.symbol, currency: fact.currency },
   );
+  const ledgerUnavailableReasons = simulation.ledgerMutations.flatMap((mutation) =>
+    mutation.applied ? [] : [`LEDGER_${mutation.code}:${mutation.reason}`],
+  );
+  const executionUnavailableReasons = rejects.flatMap((reject) => {
+    const expiredAtRangeEnd =
+      reject.code === 'DAY_EXPIRED' &&
+      reject.occurredAt === ticks.at(-1)?.occurredAt;
+    return expiredAtRangeEnd ? [] : [`${reject.code}:${reject.reason}`];
+  });
   const unavailableReasons = [
     ...valuationUnavailableReasons,
     ...(executionModel ? ledgerUnavailableReasons : []),
-    ...(executionModel
-      ? simulation.rejects.map((reject) => `${reject.code}:${reject.reason}`)
-      : []),
+    ...(executionModel ? executionUnavailableReasons : []),
     ...simulation.corporateActionResults.flatMap((result) =>
-      result.applied ? [] : [`CORPORATE_ACTION_REJECTED:${result.code}`],
+      result.applied || (isNormalizedSeries && result.code === 'CORPORATE_ACTION_IGNORED')
+        ? []
+        : [`CORPORATE_ACTION_REJECTED:${result.code}`],
     ),
   ];
   const analytics = buildBacktestAnalytics({
@@ -465,7 +471,7 @@ export const runExchangeVertical = (input: BacktestVerticalInput): ExchangeVerti
     trades: trades.trades,
     equityCurve,
   });
-  return { fills, rejects: simulation.rejects, trades: trades.trades, analytics };
+  return { fills, rejects, trades: trades.trades, analytics };
 };
 
 export type { ExchangeVerticalResult };

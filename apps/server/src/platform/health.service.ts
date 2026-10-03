@@ -24,15 +24,12 @@ export class HealthService {
       this.prisma.$queryRaw`SELECT "version" FROM "SchemaVersion" WHERE "id" = 1 LIMIT 1`,
       this.redis.ping(),
       this.dsa.health(),
-      this.dsa.capabilities(),
+      this.dsa.marketDataCapabilitiesV3(),
     ]);
     const databaseVersion =
       checks[0].status === 'fulfilled' ? parseDatabaseSchemaVersion(checks[0].value) : null;
-    const dsaCapabilities =
-      checks[3].status === 'fulfilled' ? checks[3].value.capabilities : undefined;
     const fundNavAvailable =
-      dsaCapabilities !== undefined &&
-      Object.prototype.hasOwnProperty.call(dsaCapabilities, 'fund-nav');
+      checks[3].status === 'fulfilled' && checks[3].value.serviceCapabilities.fundNav;
     const dependencies = {
       database:
         checks[0].status === 'fulfilled' && isCurrentDatabaseSchemaVersion(databaseVersion)

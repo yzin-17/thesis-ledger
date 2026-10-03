@@ -1,15 +1,15 @@
 import type { ReactNode } from 'react';
 import type {
-  BarSeriesV2,
-  ChipDistributionV1,
-  FundNavHistoryV1,
-  FundNavV1,
-  QuoteV1,
+  BarSeries,
+  ChipDistribution,
+  FundNavHistory,
+  FundNav,
+  Quote,
 } from '@thesis-ledger/schemas';
 import type {
   MarketDetailCapability,
-  MarketDetailResponseV2,
-  MarketDetailSectionV2,
+  MarketDetailResponse,
+  MarketDetailSection,
 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -42,20 +42,20 @@ import {
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
-export const sectionIsDataReady = (section: MarketDetailSectionV2 | undefined) =>
+export const sectionIsDataReady = (section: MarketDetailSection | undefined) =>
   section?.status === 'ready' || section?.status === 'stale';
 
 export const sectionIsVisible = (
-  section: MarketDetailSectionV2 | undefined,
-): section is MarketDetailSectionV2 => section !== undefined && section.status !== 'unsupported';
+  section: MarketDetailSection | undefined,
+): section is MarketDetailSection => section !== undefined && section.status !== 'unsupported';
 
-const renderReadyOrEmpty = (section: MarketDetailSectionV2, ready: ReactNode, empty: ReactNode) => {
+const renderReadyOrEmpty = (section: MarketDetailSection, ready: ReactNode, empty: ReactNode) => {
   if (sectionIsDataReady(section)) return ready;
   if (section.status === 'empty') return empty;
   return null;
 };
 
-const retryProps = (section: MarketDetailSectionV2, onRetry: () => void) =>
+const retryProps = (section: MarketDetailSection, onRetry: () => void) =>
   isRetryableMarketDetailSection(section) ? { onRetry } : {};
 
 const providerOf = (data: unknown) => {
@@ -163,9 +163,9 @@ export const DetailMetric = ({
 );
 
 /** 行情分段在上游刷新间隔内的回退不是故障，徽标与横幅保持一致，不显示告警色。 */
-const quoteUpstreamWindowLabel = (section: MarketDetailSectionV2) => {
+const quoteUpstreamWindowLabel = (section: MarketDetailSection) => {
   if (section.capability !== 'quote' || section.status !== 'stale') return null;
-  return isQuoteWithinUpstreamRefreshWindow(section.data as QuoteV1 | undefined)
+  return isQuoteWithinUpstreamRefreshWindow(section.data as Quote | undefined)
     ? '按上游间隔'
     : null;
 };
@@ -176,7 +176,7 @@ const SectionStatus = ({
   retrying,
   showErrorMessage = true,
 }: {
-  section: MarketDetailSectionV2;
+  section: MarketDetailSection;
   onRetry?: () => void;
   retrying: boolean;
   showErrorMessage?: boolean;
@@ -221,7 +221,7 @@ const SectionHeading = ({
   retrying,
 }: {
   capability: MarketDetailCapability;
-  section: MarketDetailSectionV2;
+  section: MarketDetailSection;
   onRetry?: () => void;
   retrying: boolean;
 }) => (
@@ -244,12 +244,12 @@ export const QuoteSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSectionV2;
+  section: MarketDetailSection;
   notice?: ReactNode;
   onRetry: () => void;
   retrying: boolean;
 }) => {
-  const quote = section.data as QuoteV1 | undefined;
+  const quote = section.data as Quote | undefined;
   const quoteDetail = quote?.stale
     ? isQuoteWithinUpstreamRefreshWindow(quote)
       ? '按上游间隔刷新'
@@ -282,7 +282,7 @@ export const QuoteSection = ({
             <DetailMetric label="涨跌前收" value={money.format(quote.previousClose)} />
             <DetailMetric
               label="行情时点"
-              value={new Date(quote.marketTime).toLocaleString('zh-CN')}
+              value={quote.marketTime ? new Date(quote.marketTime).toLocaleString('zh-CN') : '未知'}
               {...(quoteDetail ? { detail: quoteDetail } : {})}
             />
           </div>
@@ -312,7 +312,7 @@ export const BarsSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSectionV2;
+  section: MarketDetailSection;
   indicators?: MarketChartIndicator[];
   chartPoints?: ChartPoint[];
   onIndicatorParamsChange?: (params: MarketIndicatorParams) => void;
@@ -330,7 +330,7 @@ export const BarsSection = ({
   onRetry: () => void;
   retrying: boolean;
 }) => {
-  const series = section.data as BarSeriesV2 | undefined;
+  const series = section.data as BarSeries | undefined;
   const bars = series ? chartBarsFromSeries(series) : [];
   return (
     <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="bars">
@@ -373,7 +373,7 @@ export const IndicatorSection = ({
   onRetry,
   retrying,
 }: {
-  detail: MarketDetailResponseV2;
+  detail: MarketDetailResponse;
   capabilities: readonly MarketDetailCapability[];
   onRetry: (capability: MarketDetailCapability) => void;
   retrying: string | null;
@@ -382,7 +382,7 @@ export const IndicatorSection = ({
     .map((capability) => ({ capability, section: detail.sections[capability] }))
     .filter(({ section }) => section !== undefined) as Array<{
     capability: MarketDetailCapability;
-    section: MarketDetailSectionV2;
+    section: MarketDetailSection;
   }>;
   const firstProblem = sections.find(({ section }) => section.status !== 'ready');
   const missingHistory = sections.filter(({ section }) => {
@@ -435,11 +435,11 @@ export const ChipSection = ({
   onRetry,
   retrying,
 }: {
-    section: MarketDetailSectionV2;
+    section: MarketDetailSection;
   onRetry: () => void;
   retrying: boolean;
 }) => {
-  const chip = section.data as ChipDistributionV1 | undefined;
+  const chip = section.data as ChipDistribution | undefined;
   return (
     <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="chip">
       <SectionHeading
@@ -468,11 +468,11 @@ export const FundNavSection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSectionV2;
+  section: MarketDetailSection;
   onRetry: () => void;
   retrying: boolean;
 }) => {
-  const nav = section.data as FundNavV1 | undefined;
+  const nav = section.data as FundNav | undefined;
   return (
     <section
       className="grid gap-3 border-t border-border pt-4"
@@ -510,11 +510,11 @@ export const FundNavHistorySection = ({
   onRetry,
   retrying,
 }: {
-  section: MarketDetailSectionV2;
+  section: MarketDetailSection;
   onRetry: () => void;
   retrying: boolean;
 }) => {
-  const history = (section.data as FundNavHistoryV1 | undefined) ?? [];
+  const history = (section.data as FundNavHistory | undefined) ?? [];
   return (
     <section
       className="grid gap-3 border-t border-border pt-4"

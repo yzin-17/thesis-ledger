@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createBaselineObservationBatchCommandSchemaV2,
-  createImportDraftRevisionCommandSchemaV2,
-  submitImportDraftRevisionCommandSchemaV2,
+  createBaselineObservationBatchCommandSchema,
+  createImportDraftRevisionCommandSchema,
+  submitImportDraftRevisionCommandSchema,
 } from '../src/baseline-import.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
@@ -32,9 +32,9 @@ describe('历史基线与导入契约', () => {
         },
       ],
     };
-    expect(createBaselineObservationBatchCommandSchemaV2.parse(command).scope).toBe('FULL');
+    expect(createBaselineObservationBatchCommandSchema.parse(command).scope).toBe('FULL');
     expect(() =>
-      createBaselineObservationBatchCommandSchemaV2.parse({
+      createBaselineObservationBatchCommandSchema.parse({
         ...command,
         observations: [...command.observations, ...command.observations],
       }),
@@ -63,11 +63,11 @@ describe('历史基线与导入契约', () => {
         },
       ],
     };
-    expect(createBaselineObservationBatchCommandSchemaV2.parse(command).observedAt).toBe(
+    expect(createBaselineObservationBatchCommandSchema.parse(command).observedAt).toBe(
       '2026-08-26',
     );
     expect(() =>
-      createBaselineObservationBatchCommandSchemaV2.parse({
+      createBaselineObservationBatchCommandSchema.parse({
         ...command,
         timePrecision: 'INSTANT',
       }),
@@ -98,18 +98,18 @@ describe('历史基线与导入契约', () => {
       ],
     };
 
-    expect(createBaselineObservationBatchCommandSchemaV2.parse(command)).toMatchObject({
+    expect(createBaselineObservationBatchCommandSchema.parse(command)).toMatchObject({
       observedAt: null,
       capturedAt: null,
       timePrecision: 'UNKNOWN',
     });
     expect(() =>
-      createBaselineObservationBatchCommandSchemaV2.parse({ ...command, timePrecision: 'INSTANT' }),
+      createBaselineObservationBatchCommandSchema.parse({ ...command, timePrecision: 'INSTANT' }),
     ).toThrow('未知业务时间必须使用 UNKNOWN 精度');
   });
 
   it('导入草稿保留来源行、原始证据与问题列表', () => {
-    const parsed = createImportDraftRevisionCommandSchemaV2.parse({
+    const parsed = createImportDraftRevisionCommandSchema.parse({
       command: 'CREATE_IMPORT_DRAFT_REVISION',
       draftId: '33333333-3333-4333-8333-333333333333',
       accountId,
@@ -137,7 +137,7 @@ describe('历史基线与导入契约', () => {
   });
 
   it('历史成交可保留 DATE 精度和来源时区', () => {
-    const parsed = createImportDraftRevisionCommandSchemaV2.parse({
+    const parsed = createImportDraftRevisionCommandSchema.parse({
       command: 'CREATE_IMPORT_DRAFT_REVISION',
       draftId: '33333333-3333-4333-8333-333333333334',
       accountId,
@@ -172,7 +172,7 @@ describe('历史基线与导入契约', () => {
 
   it('提交命令要求唯一选中行和预期 Ledger Revision', () => {
     expect(() =>
-      submitImportDraftRevisionCommandSchemaV2.parse({
+      submitImportDraftRevisionCommandSchema.parse({
         command: 'SUBMIT_IMPORT_DRAFT_REVISION',
         draftId: '33333333-3333-4333-8333-333333333333',
         revision: 1,

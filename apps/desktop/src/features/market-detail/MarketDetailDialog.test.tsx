@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
-import type { BarSeriesV2 } from '@thesis-ledger/schemas';
+import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { BarSeries } from '@thesis-ledger/schemas';
+vi.mock('./MarketChartAdjustment.js', () => ({ MarketChartAdjustment: () => null }));
 
 const { useQueryMock, useQueryClientMock } = vi.hoisted(() => ({
   useQueryMock: vi.fn(),
@@ -48,8 +49,8 @@ const position = {
   asset: { name: '示例股票', assetType: 'stock' as const },
 };
 
-const detail = (input: Partial<MarketDetailResponseV2>): MarketDetailResponseV2 => ({
-  contractVersion: 2,
+const detail = (input: Partial<MarketDetailResponse>): MarketDetailResponse => ({
+  contractVersion: 3,
   symbol: '600519.SH',
   assetType: 'STOCK',
   identity: { source: 'asset', status: 'confirmed' },
@@ -64,7 +65,7 @@ const detail = (input: Partial<MarketDetailResponseV2>): MarketDetailResponseV2 
 });
 
 const readyQuote = {
-  version: 1 as const,
+  version: 3 as const,
   symbol: '600519.SH',
   open: 100,
   high: 110,
@@ -87,8 +88,8 @@ const readyIndicator = (name: 'MA' | 'MACD' | 'RSI') => ({
   points: [],
 });
 
-const readySeries: BarSeriesV2 = {
-  contractVersion: 2,
+const readySeries: BarSeries = {
+  contractVersion: 3,
   identity: { symbol: '600519.SH', assetType: 'STOCK', timeframe: '1d', adjustment: 'qfq' },
   points: [
     { timestamp: '2026-08-20T00:00:00.000Z', open: 99, high: 102, low: 98, close: 100, volume: 100, amount: 10_000, completionStatus: 'complete', availableAt: time },
@@ -112,7 +113,7 @@ const staleQuoteWithinUpstreamWindow = (fetchedAt: string) => ({
   fetchedAt,
 });
 
-const detailWithStaleQuote = (fetchedAt: string): MarketDetailResponseV2 =>
+const detailWithStaleQuote = (fetchedAt: string): MarketDetailResponse =>
   detail({
     requested: ['quote'],
     capabilities: { supported: ['quote'], unsupported: [] },
@@ -155,8 +156,8 @@ describe('MarketDetailDialog UI contract', () => {
 
   it('参数变化后拒绝延迟完成的旧重试提交', async () => {
     let generation = 1;
-    let resolveRequest!: (value: MarketDetailResponseV2) => void;
-    const request = new Promise<MarketDetailResponseV2>((resolve) => {
+    let resolveRequest!: (value: MarketDetailResponse) => void;
+    const request = new Promise<MarketDetailResponse>((resolve) => {
       resolveRequest = resolve;
     });
     const commit = vi.fn();
@@ -241,6 +242,26 @@ describe('MarketDetailDialog UI contract', () => {
     expect(html).toContain('数据可用性');
   });
 
+  it('目录行情不需要持仓，省略数量、成本和盈亏', () => {
+    useQueryMock.mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    const html = renderToStaticMarkup(
+      <MarketDetailDialog
+        position={{ symbol: '159516.SZ', asset: { name: '半导体 ETF', assetType: 'etf' } }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(html).toContain('159516.SZ');
+    expect(html).toContain('行情详情');
+    expect(html).not.toContain('持仓数量');
+    expect(html).not.toContain('持仓成本');
+    expect(html).not.toContain('持仓盈亏');
+  });
+
   it('ETF 隐藏 unsupported chip，而基金只渲染 NAV 分段', () => {
     useQueryMock.mockReturnValue({
       data: null,
@@ -274,7 +295,7 @@ describe('MarketDetailDialog UI contract', () => {
             capability: 'fund-nav',
             status: 'ready',
             data: {
-              version: 1,
+              version: 3,
               symbol: '000001.OF',
               unitNav: 1.2,
               navDate: time,

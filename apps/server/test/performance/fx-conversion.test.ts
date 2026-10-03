@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveFx } from '../../src/market/fx-conversion.js';
 
 const fxResponse = (rate: number, provider: string) => ({
-  version: 1 as const,
+  version: 3 as const,
   baseCurrency: 'CNY' as const,
   asOf: '2025-01-02',
   fetchedAt: '2025-01-02T00:00:00.000Z',

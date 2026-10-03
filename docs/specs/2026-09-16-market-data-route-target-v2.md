@@ -7,6 +7,8 @@
 
 ## 背景与问题
 
+V3 增量由[多源复权感知回测规格](2026-09-25-multi-source-adjustment-aware-backtest.md)定义：匹配键显式包含市场、资产类型、数据能力、周期及价格口径，三种口径独立保存有序主备。V2 的默认 ETF 目标不自动成为 V3 路由；新路由须由能力目录与用户配置确定，最多一个备用且不得隐式增加来源。V2 envelope 仅用于原兼容路径，不能补字段冒充 V3。当前源码与目标部署验收分别见该主题 Task。
+
 当前 ThesisLedger Control Contract 使用 `ProviderId[]`。`akshare` 适配器同时拥有多个上游，并在适配器内部自行回退，导致配置中的 Provider、实际请求上游、健康状态、熔断状态和响应 provenance 不能一一对应。ETF 日线还需要将主目标切换为 `tencent/tencent`，备用目标为 `akshare/eastmoney`。
 
 ## 目标

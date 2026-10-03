@@ -344,6 +344,93 @@ describe('SimulationLedger', () => {
     expect(duplicate).toMatchObject({ applied: false, code: 'DUPLICATE_EVENT' });
   });
 
+  it('keeps fractional normalized units and suppresses split and dividend mutations', () => {
+    const ledger = new SimulationLedger({
+      executionInstrument: config.executionInstrument,
+      baseCurrency: 'USD',
+      accountingBasis: 'normalized-series',
+      initialCash: { USD: '20' },
+    });
+    expect(ledger.reserveCash('normalized-reservation', 'USD', '10')).toMatchObject({
+      accepted: true,
+      amount: '10',
+    });
+    expect(ledger.availableCash('USD')).toBe('10');
+    expect(
+      ledger.applyFill({
+        eventId: 'normalized-fractional-buy',
+        fillId: 'normalized-fractional-buy',
+        executionSymbol: 'AAPL.US',
+        side: 'buy',
+        quantity: '0.25',
+        price: '40',
+        charges: [],
+        currency: 'USD',
+        occurredAt: '2026-09-08T14:00:00Z',
+        availableAt: '2026-09-08T14:00:00Z',
+        cashReservationId: 'normalized-reservation',
+      }),
+    ).toMatchObject({ applied: true, state: { position: { quantity: '0.25' } } });
+    expect(ledger.snapshot().cash.USD).toMatchObject({ settled: '20', unsettled: '-10' });
+    expect(ledger.availableCash('USD')).toBe('10');
+
+    const valuation = valueSimulationLedger(ledger.snapshot(), {
+      valuationAt: '2026-09-09T14:00:00Z',
+      policy: {
+        baseTimezone: 'Asia/Shanghai',
+        dailyValuationTime: '16:00',
+        pricePolicy: 'latestAvailable',
+        fxPolicy: 'latestAvailable',
+      },
+      prices: [
+        {
+          symbol: 'AAPL.US',
+          market: 'US',
+          assetType: 'stock',
+          currency: 'USD',
+          price: '40',
+          occurredAt: '2026-09-09T13:59:00Z',
+          availableAt: '2026-09-09T14:00:00Z',
+        },
+      ],
+      fxRates: [],
+    });
+    expect(valuation.originalCurrency.USD).toMatchObject({
+      cash: '10',
+      position: '10',
+      total: '20',
+    });
+
+    const before = ledger.snapshot();
+    expect(
+      ledger.applyEvent({
+        type: 'split',
+        payload: {
+          eventId: 'normalized-split',
+          executionSymbol: 'AAPL.US',
+          ratio: '2',
+          occurredAt: '2026-09-09T14:00:00Z',
+          availableAt: '2026-09-09T14:00:00Z',
+        },
+      }),
+    ).toMatchObject({ applied: false, code: 'CORPORATE_ACTION_IGNORED' });
+    expect(
+      ledger.applyEvent({
+        type: 'cashDividend',
+        payload: {
+          eventId: 'normalized-dividend',
+          executionSymbol: 'AAPL.US',
+          amountPerShare: '1',
+          currency: 'USD',
+          occurredAt: '2026-09-09T14:00:00Z',
+          availableAt: '2026-09-09T14:00:00Z',
+        },
+      }),
+    ).toMatchObject({ applied: false, code: 'CORPORATE_ACTION_IGNORED' });
+    expect(ledger.snapshot()).toEqual(before);
+    expect(ledger.availableCash('USD')).toBe('10');
+  });
+
   it('preserves HKD cash and position conservation independently from other currencies', () => {
     const ledger = new SimulationLedger({
       executionInstrument: {

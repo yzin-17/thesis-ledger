@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { portfolioTradeKeys } from './portfolio-trade.queries.js';
 import { createPortfolioTradeOpeningBoundary } from './portfolio-trade.api.js';
-import type { CreateTradeOpeningBoundaryAssertionCommandV2 } from '@thesis-ledger/api-client';
+import type { CreateTradeOpeningBoundaryAssertionCommand } from '@thesis-ledger/api-client';
 
 export const useCreatePortfolioTradeOpeningBoundaryMutation = () => {
   const queryClient = useQueryClient();
@@ -11,7 +11,7 @@ export const useCreatePortfolioTradeOpeningBoundaryMutation = () => {
       command,
     }: {
       tradeId: string;
-      command: CreateTradeOpeningBoundaryAssertionCommandV2;
+      command: CreateTradeOpeningBoundaryAssertionCommand;
     }) => createPortfolioTradeOpeningBoundary(tradeId, command),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: portfolioTradeKeys.root });

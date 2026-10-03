@@ -1,10 +1,14 @@
 import { DecimalValue } from './decimal.js';
-import type { StrategySchemaV2 } from './backtest-v2.js';
+import {
+  availabilityForDecision,
+  isAvailableForDecisionAt,
+  type BacktestAvailability,
+} from './backtest-observation-clock.js';
+import type { BacktestStrategy } from './backtest-contract.js';
 
-export interface RiskEvaluationFact {
+export interface RiskEvaluationFact extends BacktestAvailability {
   value: string;
   occurredAt: string;
-  availableAt: string;
   completed: boolean;
   status?: 'available' | 'unavailable';
   reason?: string;
@@ -21,7 +25,7 @@ export interface RiskPosition {
 export interface RiskEvaluationInput {
   runId: string;
   executionSymbol: string;
-  rules: StrategySchemaV2['risk'];
+  rules: BacktestStrategy['risk'];
   position: RiskPosition;
   evaluation: RiskEvaluationFact;
   evaluationAt: string;
@@ -132,7 +136,7 @@ const validateEvaluation = (
   }
   if (
     instant(input.evaluation.occurredAt) > instant(input.evaluationAt) ||
-    instant(input.evaluation.availableAt) > instant(input.evaluationAt)
+    !isAvailableForDecisionAt(input.evaluation, input.evaluationAt)
   ) {
     return unavailable('FUTURE_DATA', 'evaluation fact 在 evaluationAt 后才可用', [
       `evaluation.occurredAt=${input.evaluation.occurredAt}`,
@@ -242,7 +246,7 @@ const riskInputFacts = (input: RiskEvaluationInput) =>
   );
 
 const consumedAvailableAt = (input: RiskEvaluationInput) =>
-  [input.evaluation.availableAt, input.position.availableAt]
+  [availabilityForDecision(input.evaluation), input.position.availableAt]
     .filter((value): value is string => Boolean(value))
     .sort((left, right) => instant(right) - instant(left))[0] ?? input.evaluationAt;
 
@@ -281,13 +285,13 @@ const riskAvailable = (
     return {
       status: 'available',
       triggeredRules,
-      occurredAt: input.evaluation.occurredAt,
+      occurredAt: input.evaluationAt,
       availableAt,
       inputFacts,
     };
   }
   const trigger = triggeredRules[0]!;
-  const signalId = `${input.runId}:risk:${input.executionSymbol}:${input.evaluation.occurredAt}:${trigger}`;
+  const signalId = `${input.runId}:risk:${input.executionSymbol}:${input.evaluationAt}:${trigger}`;
   return {
     status: 'available',
     triggeredRules,
@@ -298,11 +302,11 @@ const riskAvailable = (
       side: 'sell',
       reason: 'risk',
       trigger,
-      occurredAt: input.evaluation.occurredAt,
+      occurredAt: input.evaluationAt,
       availableAt,
       inputFacts,
     },
-    occurredAt: input.evaluation.occurredAt,
+    occurredAt: input.evaluationAt,
     availableAt,
     inputFacts,
   };

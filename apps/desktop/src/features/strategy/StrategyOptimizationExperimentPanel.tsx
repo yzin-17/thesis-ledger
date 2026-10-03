@@ -1,8 +1,13 @@
+import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
+import {
+  experimentPreparationTarget,
+  requirePreparedOptimizationConfiguration,
+  type PreparedOptimizationConfiguration,
+} from './optimization.preparation.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  runConfigSchemaV2,
-  strategySchemaV2,
+  strategySchema,
   type OptimizationReasoningEffort,
   type OptimizationExperimentCreate,
 } from '@thesis-ledger/schemas';
@@ -20,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   cancelOptimizationExperiment,
@@ -93,6 +97,9 @@ export function StrategyOptimizationExperimentPanel({
   const [validationEnd, setValidationEnd] = useState(daysAgo(91));
   const [endDate, setEndDate] = useState(daysAgo(1));
   const [initialCash, setInitialCash] = useState('100000');
+  const [preparedConfig, setPreparedConfig] = useState<PreparedOptimizationConfiguration | null>(
+    null,
+  );
   const [maxAiCalls, setMaxAiCalls] = useState('6');
   const [maxBacktestRuns, setMaxBacktestRuns] = useState('20');
   const [maxInputTokens, setMaxInputTokens] = useState('100000');
@@ -100,7 +107,6 @@ export function StrategyOptimizationExperimentPanel({
   const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');
   const [maxCost, setMaxCost] = useState('');
   const [acknowledgeUnknownCost, setAcknowledgeUnknownCost] = useState(false);
-  const [executionModelJson, setExecutionModelJson] = useState('');
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
   const [reasoningEfforts, setReasoningEfforts] = useState<
     Record<string, OptimizationReasoningEffort | undefined>
@@ -168,7 +174,7 @@ export function StrategyOptimizationExperimentPanel({
   const selectedVersion =
     versions.find((entry) => entry.version.id === strategyVersionId) ?? versions[0];
   const parsedStrategy = selectedVersion?.version.schema
-    ? strategySchemaV2.safeParse(selectedVersion.version.schema)
+    ? strategySchema.safeParse(selectedVersion.version.schema)
     : null;
   let market: 'CN' | 'HK' | 'US' = discoveryMarket;
   if (sourceMode !== 'discovery') {
@@ -181,6 +187,14 @@ export function StrategyOptimizationExperimentPanel({
     await queryClient.invalidateQueries({ queryKey: ['desktop', 'strategy', 'strategies'] });
   };
 
+  const preparationTarget = experimentPreparationTarget(sourceMode, strategyVersionId, {
+    executionInstrument: {
+      symbol: discoverySymbol.trim(),
+      market: discoveryMarket,
+      assetType: discoveryAssetType,
+    },
+    primaryTimeframe: discoveryTimeframe,
+  });
   const createMutation = useMutation({
     mutationFn: () => {
       if (sourceMode === 'existing' && !strategyVersionId) throw new Error('请选择策略版本');
@@ -198,37 +212,18 @@ export function StrategyOptimizationExperimentPanel({
           ...(effort === undefined ? {} : { reasoningEffort: effort }),
         };
       });
-      const executionModel = executionModelJson.trim()
-        ? (JSON.parse(executionModelJson) as unknown)
-        : undefined;
-      const runConfig = runConfigSchemaV2.parse({
+      const runConfig = requirePreparedOptimizationConfiguration(
+        preparedConfig,
+        preparationTarget,
         startDate,
         endDate,
-        dataAsOf: new Date().toISOString(),
-        baseCurrency: currency,
-        initialCash: { [currency]: initialCash },
-        valuationPolicy: {
-          baseTimezone: 'Asia/Shanghai',
-          dailyValuationTime: '15:00',
-          pricePolicy: 'latestAvailable',
-          fxPolicy: 'latestAvailable',
-        },
-        ...(executionModel === undefined ? {} : { executionModel }),
-      });
+        currency,
+        initialCash,
+      );
       const input: OptimizationExperimentCreate = {
-        sourceMode,
-        ...(sourceMode === 'existing'
-          ? { strategyVersionId, allowedParameterIds: selectedParameters }
-          : {
-              discoveryScope: {
-                executionInstrument: {
-                  symbol: discoverySymbol.trim(),
-                  market: discoveryMarket,
-                  assetType: discoveryAssetType,
-                },
-                primaryTimeframe: discoveryTimeframe,
-              },
-            }),
+        contractVersion: 3,
+        ...preparationTarget,
+        ...(sourceMode === 'existing' ? { allowedParameterIds: selectedParameters } : {}),
         models,
         objective: { mode: objective, minClosedTrades: 1 },
         split: {
@@ -636,20 +631,19 @@ export function StrategyOptimizationExperimentPanel({
               </FieldLabel>
               <Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} />
             </Field>
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">执行模型 JSON（可选）</span>
-              </FieldLabel>
-              <Textarea
-                value={executionModelJson}
-                onChange={(event) => setExecutionModelJson(event.target.value)}
-                placeholder="留空则完全依赖 Provider executionRules"
-              />
-            </Field>
+            <OptimizationPricePreparation
+              target={preparationTarget}
+              startDate={startDate}
+              endDate={endDate}
+              currency={currency}
+              initialCash={initialCash}
+              onPrepared={setPreparedConfig}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               disabled={
+                !preparedConfig ||
                 createMutation.isPending ||
                 !capabilities.data?.aiOptimizationEnabled ||
                 hasInvalidReasoningSelection ||

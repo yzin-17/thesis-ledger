@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencySchema, fxRateSchemaV1, instrumentDirectorySchema } from './market.js';
+import { currencySchema, fxRateSchema, instrumentDirectorySchema } from './market.js';
 
 export const apiErrorResponseSchema = z
   .object({
@@ -94,7 +94,7 @@ export const portfolioValuationResponseSchema = z.object({
   baseCurrency: currencySchema.optional(),
   fx: z
     .object({
-      version: z.literal(1).optional(),
+      version: z.literal(3).optional(),
       evidenceVersion: z.string().min(1).optional(),
       enabled: z.boolean(),
       status: z.enum(['disabled', 'not_needed', 'ready', 'stale', 'blocked']),
@@ -106,7 +106,7 @@ export const portfolioValuationResponseSchema = z.object({
       stale: z.boolean().optional(),
       fxStale: z.boolean().optional(),
       missingCurrencies: z.array(currencySchema),
-      rates: z.array(fxRateSchemaV1),
+      rates: z.array(fxRateSchema),
     })
     .passthrough()
     .optional(),
@@ -260,8 +260,8 @@ export const automationWeeklyStrategyInputSchema = z.object({
 });
 export const automationCloseSyncInputSchema = z.object({
   symbols: z.array(z.string().min(1)),
-  timeframe: z.enum(['1d', '1m']).optional(),
-  end: z.iso.datetime({ offset: true }).optional(),
+  timeframe: z.literal('1d').optional(),
+  end: z.iso.datetime({ offset: true }),
 });
 export const automationCloseSnapshotsInputSchema = z.object({
   accountIds: z.array(z.uuid()),

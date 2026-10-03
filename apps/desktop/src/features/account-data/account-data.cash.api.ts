@@ -1,20 +1,20 @@
 import type {
-  CashFlowPayloadV2,
-  CashTransferMetadataV2,
+  CashFlowPayload,
+  CashTransferMetadata,
   ConfirmRecurringCashDepositOccurrence,
-  CreateCashFlowCommandV2,
-  CreateCashTransferCommandV2,
+  CreateCashFlowCommand,
+  CreateCashTransferCommand,
   CreateRecurringCashDepositPlan,
-  LedgerAuditResponseV2,
-  LedgerCommandResponseV2,
-  LedgerEventV2,
+  LedgerAuditResponse,
+  LedgerCommandResponse,
+  LedgerEvent,
   RecurringCashDepositOccurrence,
   RecurringCashDepositPlan,
-  ReplaceCashTransferCommandV2,
-  RestoreCashTransferCommandV2,
+  ReplaceCashTransferCommand,
+  RestoreCashTransferCommand,
   ThesisLedgerApiClient,
   UpdateRecurringCashDepositPlan,
-  VoidCashTransferCommandV2,
+  VoidCashTransferCommand,
 } from '@thesis-ledger/api-client';
 
 import { getDesktopApiClient } from '../../shared/api/client.js';
@@ -48,9 +48,9 @@ export const createManualCashDeposit = async (
     commandId?: string;
   },
   client: CashOperationsClient = defaultClient(),
-): Promise<LedgerCommandResponseV2> => {
+): Promise<LedgerCommandResponse> => {
   const commandId = input.commandId ?? createClientCommandId();
-  const command: CreateCashFlowCommandV2 = {
+  const command: CreateCashFlowCommand = {
     command: 'CREATE_CASH_FLOW',
     accountId: input.accountId,
     occurredAt: input.occurredAt,
@@ -86,13 +86,13 @@ export const createManualCashTransfer = async (
     note?: string;
   },
   client: CashOperationsClient = defaultClient(),
-): Promise<LedgerCommandResponseV2> => {
+): Promise<LedgerCommandResponse> => {
   const transferId = crypto.randomUUID();
   const [sourceLedger, targetLedger] = await Promise.all([
     client.ledger.getEvents(input.sourceAccountId),
     client.ledger.getEvents(input.targetAccountId),
   ]);
-  const command: CreateCashTransferCommandV2 = {
+  const command: CreateCashTransferCommand = {
     command: 'CREATE_CASH_TRANSFER',
     transferId,
     sourceAccountId: input.sourceAccountId,
@@ -116,25 +116,22 @@ export const createManualCashTransfer = async (
   return client.ledger.createCashTransfer(command);
 };
 
-type CashTransferPayload = CashFlowPayloadV2 & {
+type CashTransferPayload = CashFlowPayload & {
   category: 'TRANSFER';
-  transfer: CashTransferMetadataV2;
+  transfer: CashTransferMetadata;
 };
 
 export type TransferEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   { type: 'CASH_FLOW'; revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE' }
 > & {
   type: 'CASH_FLOW';
   payload: CashTransferPayload;
 };
 
-type LedgerAuditEvent = LedgerAuditResponseV2['events'][number];
-
-const isLedgerEventV2 = (event: LedgerAuditEvent): event is LedgerEventV2 => event.version === 2;
+type LedgerAuditEvent = LedgerAuditResponse['events'][number];
 
 const isActiveCashTransferEvent = (event: LedgerAuditEvent): event is TransferEvent =>
-  isLedgerEventV2(event) &&
   event.type === 'CASH_FLOW' &&
   event.revisionAction !== 'VOID' &&
   event.payload.category === 'TRANSFER' &&
@@ -142,8 +139,8 @@ const isActiveCashTransferEvent = (event: LedgerAuditEvent): event is TransferEv
 
 const isVoidLedgerEvent = (
   event: LedgerAuditEvent | undefined,
-): event is Extract<LedgerEventV2, { revisionAction: 'VOID' }> =>
-  event !== undefined && isLedgerEventV2(event) && event.revisionAction === 'VOID';
+): event is Extract<LedgerEvent, { revisionAction: 'VOID' }> =>
+  event !== undefined && event.revisionAction === 'VOID';
 
 const loadTransferContext = async (event: TransferEvent, client: CashOperationsClient) => {
   const transfer = event.payload.transfer;
@@ -189,7 +186,7 @@ export const replaceManualCashTransfer = async (
 ) => {
   const context = await loadTransferContext(input.event, client);
   const externalId = crypto.randomUUID();
-  const command: ReplaceCashTransferCommandV2 = {
+  const command: ReplaceCashTransferCommand = {
     command: 'REPLACE_CASH_TRANSFER',
     transferId: context.transfer.transferId,
     sourceAccountId: context.sourceAccountId,
@@ -218,7 +215,7 @@ export const voidManualCashTransfer = async (
 ) => {
   const context = await loadTransferContext(input.event, client);
   const externalId = crypto.randomUUID();
-  const command: VoidCashTransferCommandV2 = {
+  const command: VoidCashTransferCommand = {
     command: 'VOID_CASH_TRANSFER',
     transferId: context.transfer.transferId,
     sourceAccountId: context.sourceAccountId,
@@ -261,10 +258,7 @@ export const restoreManualCashTransfer = async (
   const targetFact = findFact(targetAudit.events, 'INFLOW');
   const findTip = (events: typeof sourceAudit.events, factId: string | undefined) =>
     events
-      .filter(
-        (candidate): candidate is LedgerEventV2 =>
-          isLedgerEventV2(candidate) && candidate.factId === factId,
-      )
+      .filter((candidate) => candidate.factId === factId)
       .sort((left, right) => Number(left.ledgerRevision) - Number(right.ledgerRevision))
       .at(-1);
   const sourceTip = findTip(sourceAudit.events, sourceFact?.factId);
@@ -274,7 +268,7 @@ export const restoreManualCashTransfer = async (
   const externalId = crypto.randomUUID();
   const occurredAt = input.event.occurredAt ?? new Date().toISOString();
   const timePrecision = input.event.timePrecision === 'DATE' ? 'DATE' : 'INSTANT';
-  const command: RestoreCashTransferCommandV2 = {
+  const command: RestoreCashTransferCommand = {
     command: 'RESTORE_CASH_TRANSFER',
     transferId: transfer.transferId,
     sourceAccountId,

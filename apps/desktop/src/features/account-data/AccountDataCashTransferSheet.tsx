@@ -19,8 +19,13 @@ import { useToastManager } from '@/components/ui/toast';
 import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
 import { currentLocalDateTime, errorCode } from './account-data.helpers.js';
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
+import {
+  ledgerContractRejected,
+  ledgerContractErrorMessage,
+} from './account-data.ledger-contract.js';
 
 export const cashTransferErrorMessage = (error: unknown) => {
+  if (ledgerContractRejected(error)) return ledgerContractErrorMessage;
   if (errorCode(error) === 'LEDGER_INSUFFICIENT_CASH') {
     return '可用现金余额不足，请调整金额后重试。';
   }

@@ -31,15 +31,23 @@ const readyStatus = (syncedAt = new Date()): LocalStatus => ({
 });
 
 const succeededJob = (overrides: Partial<CatalogJob> = {}): CatalogJob => ({
+  contractVersion: 3,
+  consumer: 'thesis-ledger',
   id: 'catalog-job-1',
   status: 'succeeded',
   generation: 1,
   checksum: 'checksum-1',
+  owner: 'isolated-worker',
+  leaseExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+  leaseValid: false,
+  retryable: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
   ...overrides,
 });
 
 const snapshot = {
-  contractVersion: 1,
+  contractVersion: 3,
   generation: 1,
   checksum: 'checksum-1',
   cursor: 'generation:1',
@@ -101,7 +109,13 @@ const createHarness = (initialStatus = emptyStatus()) => {
     triggerCatalogJob: vi.fn(async () => succeededJob()),
     catalogJob: vi.fn(async () => succeededJob()),
     catalogSnapshot: vi.fn(async () => snapshot),
-    catalogDelta: vi.fn(async () => ({ ...snapshot, fromCursor: 'generation:0' })),
+    catalogDelta: vi.fn(async () => ({
+      ...snapshot,
+      generation: 2,
+      checksum: 'checksum-2',
+      cursor: 'generation:2',
+      fromCursor: 'generation:1',
+    })),
     acknowledgeCatalog: vi.fn(async () => ({ acknowledged: true })),
   };
   return {
@@ -115,6 +129,20 @@ const createHarness = (initialStatus = emptyStatus()) => {
 };
 
 describe('CatalogReadinessService', () => {
+  it.each([{ generation: 2 }, { checksum: 'other' }, { cursor: 'generation:9' }])(
+    '投影前拒绝成功 Job 错配 %j',
+    async (change) => {
+      const harness = createHarness();
+      harness.dsa.catalogSnapshot = vi.fn(async () => ({ ...snapshot, ...change }));
+      const service = new CatalogReadinessService(
+        harness.instruments as never,
+        harness.dsa as never,
+      );
+      await expect(service.projectSucceededJob(succeededJob())).rejects.toThrow('不匹配');
+      expect(harness.instruments.syncCatalog).not.toHaveBeenCalled();
+      expect(harness.dsa.acknowledgeCatalog).not.toHaveBeenCalled();
+    },
+  );
   it('automatically projects an empty local catalog through the DSA job contract', async () => {
     const harness = createHarness();
     const service = new CatalogReadinessService(harness.instruments as never, harness.dsa as never);

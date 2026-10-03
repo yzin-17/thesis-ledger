@@ -10,6 +10,7 @@ import { ImportReview } from '../src/features/import/ImportReview.js';
 import { FirstRunOnboarding } from '../src/features/onboarding/FirstRunOnboarding.js';
 import { ProviderSettings } from '../src/features/providers/ProviderSettings.js';
 import { hasConfiguredProviderSetup } from '../src/features/onboarding/onboarding.types.js';
+import type { MarketPolicy } from '../src/features/market-data/market-data.types.js';
 import {
   normalizeProviderHealthHistory,
   providerCredentialConfiguredAfterSave,
@@ -238,16 +239,32 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
         },
       ],
       policy: {
-        contractVersion: 2 as const,
+        contractVersion: 3 as const,
+        consumer: 'thesis-ledger' as const,
+        requestId: 'policy-11',
         revision: 11,
         enabled: true,
         syncState: 'applied' as const,
-        routes: {
-          REALTIME_QUOTE: {
-            STOCK: [{ providerId: 'akshare', upstreamSource: 'eastmoney' }],
-          },
+        effectiveStale: false,
+        routes: [{
+          key: { kind: 'data' as const, market: 'CN' as const, assetType: 'STOCK' as const, capability: 'REALTIME_QUOTE' },
+          targets: [{ providerId: 'akshare', upstreamSource: 'eastmoney' }],
+        }],
+        effectiveProjection: {
+          contractVersion: 3 as const,
+          consumer: 'thesis-ledger' as const,
+          requestId: 'effective-4',
+          revision: 4,
+          sourceDesiredRevision: 11,
+          enabled: true,
+          routes: [{
+            key: { kind: 'data' as const, market: 'CN' as const, assetType: 'STOCK' as const, capability: 'REALTIME_QUOTE' },
+            targets: [{ providerId: 'akshare', upstreamSource: 'eastmoney', routeIndex: 0, eligible: true, reason: null }],
+            reason: null,
+          }],
+          appliedAt: '2026-09-29T00:00:00Z',
         },
-      },
+      } satisfies MarketPolicy,
     };
 
     expect(hasConfiguredProviderSetup([notificationProvider], marketData)).toBe(true);

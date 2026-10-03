@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { TradeSummaryResponseV2 } from '@thesis-ledger/api-client';
+import type { TradeSummaryResponse } from '@thesis-ledger/api-client';
 import { PortfolioTradeDetailDialog } from './PortfolioTradeDetailDialog.js';
 import type { PortfolioTradeReviewTarget } from './portfolio-trade.types.js';
 import {
@@ -44,7 +44,7 @@ export function PortfolioTradeView({
   const [accountId, setAccountId] = useState('');
   const [symbol, setSymbol] = useState('');
   const [lifecycle, setLifecycle] = useState<PortfolioTradeLifecycle>('ALL');
-  const [selectedTrade, setSelectedTrade] = useState<TradeSummaryResponseV2 | null>(null);
+  const [selectedTrade, setSelectedTrade] = useState<TradeSummaryResponse | null>(null);
   const query = usePortfolioTradesQuery({
     mode,
     ...(accountId ? { accountId } : {}),

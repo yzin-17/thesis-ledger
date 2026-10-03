@@ -36,6 +36,7 @@ import {
   candidateAdoptionEligibility,
   candidateDiffSummary,
   candidateMetric,
+  canSelectCandidateForTest,
   canRevealTestMetrics,
   experimentStageLabels,
   experimentStopReasonText,
@@ -440,10 +441,6 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                       const candidateAdoptedVersion = candidate.adoptedStrategyVersionId
                         ? findStrategyVersion(strategies, candidate.adoptedStrategyVersionId)
                         : null;
-                      const canSelect =
-                        experiment.stage === 'awaiting_finalization' &&
-                        candidate.validationStatus === 'valid' &&
-                        !retryRequired;
                       return (
                         <tr key={candidate.id} className="align-top">
                           <td className="px-3 py-3">
@@ -473,7 +470,8 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                           </td>
                           <td className="px-3 py-3">
                             {metricValue(validation, ['closedTradeCount', 'tradeCount'])}
-                            {testRevealed ? (
+                            {testRevealed &&
+                            experiment.lockedCandidateIds?.includes(candidate.id) ? (
                               <div className="mt-1 text-xs text-muted-foreground">
                                 测试：{metricValue(test, ['closedTradeCount', 'tradeCount'])}
                               </div>
@@ -487,7 +485,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                           <td className="px-3 py-3">
                             <div className="flex flex-col items-start gap-2">
                               <ExperimentRunLinks runRefs={candidate.runRefs} />
-                              {canSelect ? (
+                              {canSelectCandidateForTest(experiment, candidate, retryRequired) ? (
                                 <div className="flex gap-2">
                                   <Button
                                     size="xs"

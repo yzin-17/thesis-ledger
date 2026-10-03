@@ -69,12 +69,13 @@ const seedPosition = (target: SimulationLedger) => {
 };
 
 describe('backtest corporate actions', () => {
-  it('waits until the economic effective time for an action announced in advance', () => {
+  it.each([false, true])('waits until the economic effective time (explicit clock: %s)', (explicit) => {
     const target = ledger();
     seedPosition(target);
     const announcedEarly = fact({
-      occurredAt: '2025-01-10T00:00:00Z',
+      occurredAt: explicit ? '2025-01-03T00:00:00Z' : '2025-01-10T00:00:00Z',
       availableAt: '2025-01-03T00:00:00Z',
+      ...(explicit ? { effectiveDate: '2025-01-10', accountingAt: '2025-01-10T00:00:00Z' } : {}),
     });
     const result = new DeterministicSimulationEngine().run({
       runId: 'run-announced-early',
@@ -103,11 +104,13 @@ describe('backtest corporate actions', () => {
     expect(result.corporateActionResults).toHaveLength(1);
     expect(result.corporateActionResults[0]).toMatchObject({ applied: true, published: true });
     expect(result.corporateActionResults[0]).toMatchObject({
-      mutation: { fact: { availableAt: announcedEarly.availableAt } },
+      mutation: { fact: { availableAt: announcedEarly.availableAt, occurredAt: announcedEarly.occurredAt },
+        ledgerEvent: { payload: { occurredAt: '2025-01-10T00:00:00Z', availableAt: announcedEarly.availableAt } },
+      },
     });
     expect(result.events.find((event) => event.type === 'corporateAction')).toMatchObject({
-      occurredAt: announcedEarly.occurredAt,
-      availableAt: announcedEarly.occurredAt,
+      occurredAt: '2025-01-10T00:00:00Z',
+      availableAt: '2025-01-10T00:00:00Z',
     });
     expect(target.snapshot().cash.CNY.unsettled).toBe('10');
   });
@@ -235,6 +238,42 @@ describe('backtest corporate actions', () => {
     expect(result.mutations.filter((value) => value.type === 'corporateAction')).toHaveLength(1);
     expect(mutations).toHaveLength(1);
     expect(target.snapshot().position.quantity).toBe('20');
+  });
+
+  it('reports but does not book corporate actions for normalized-series ledgers', () => {
+    const normalizedLedger = new SimulationLedger({
+      executionInstrument: instrument,
+      baseCurrency: 'CNY',
+      initialCash: { CNY: '100' },
+      accountingBasis: 'normalized-series',
+    });
+    seedPosition(normalizedLedger);
+    const before = normalizedLedger.snapshot();
+    const port = createCorporateActionPort(normalizedLedger, instrument, 'run-normalized');
+    const normalizedSplit = fact({
+      type: 'SPLIT',
+      cashAmount: undefined,
+      currency: undefined,
+      ratio: '2',
+      occurredAt: '2025-01-04T00:00:00Z',
+      availableAt: '2025-01-04T00:00:00Z',
+    });
+    const normalizedDividend = fact({
+      occurredAt: '2025-01-04T00:00:00Z',
+      availableAt: '2025-01-04T00:00:00Z',
+    });
+
+    expect(port.apply(normalizedSplit, normalizedSplit.availableAt)).toMatchObject({
+      applied: false,
+      published: false,
+      code: 'CORPORATE_ACTION_IGNORED',
+    });
+    expect(port.apply(normalizedDividend, normalizedDividend.availableAt)).toMatchObject({
+      applied: false,
+      published: false,
+      code: 'CORPORATE_ACTION_IGNORED',
+    });
+    expect(normalizedLedger.snapshot()).toEqual(before);
   });
 
   it('rejects identity and currency mismatches without publishing a mutation', () => {

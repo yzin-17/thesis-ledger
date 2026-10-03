@@ -1,17 +1,26 @@
+import { backtestRunClient } from './backtest-run-client.js';
+import { marketControlClient } from './market-control-client.js';
+import { backtestRunConfigClient } from './backtest-run-config-client.js';
+import { backtestNavRunClient } from './backtest-nav-run-client.js';
 import {
   apiErrorResponseSchema,
   accountsResponseSchema,
-  baselineReconciliationCandidatesResponseSchemaV2,
+  baselineReconciliationCandidatesResponseSchema,
   instrumentSearchResponseSchema,
-  importDraftCommandResponseSchemaV2,
-  importDraftRevisionResponseSchemaV2,
+  importDraftCommandResponseSchema,
+  importDraftRevisionResponseSchema,
   journalReviewCandidatesResponseSchema,
   journalReviewSnapshotResponseSchema,
-  ledgerCommandResponseSchemaV2,
-  ledgerAuditResponseSchemaV2,
-  ledgerEventsResponseSchemaV2,
-  ledgerReplayResponseSchemaV2,
-  marketDetailResponseV2Schema,
+  ledgerCommandResponseSchema,
+  ledgerAuditResponseSchema,
+  ledgerEventsResponseSchema,
+  ledgerReplayResponseSchema,
+  marketDetailResponseSchema,
+  marketChartOptionsV3Schema,
+  marketChartOptionsWindowV3Schema,
+  type MarketChartOptionsWindowV3,
+  marketChartPlanV3Schema,
+  type MarketChartPlanV3,
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
@@ -23,55 +32,54 @@ import {
   recurringFundInvestmentOccurrencesResponseSchema,
   recurringFundInvestmentPlanSchema,
   recurringFundInvestmentPlansResponseSchema,
-  tradeCloseSliceQueryResponseSchemaV2,
-  tradeDetailResponseSchemaV2,
-  tradeListResponseSchemaV2,
-  tradeReferenceResolveResponseSchemaV2,
-  backtestRunResponseSchemaV2,
+  tradeCloseSliceQueryResponseSchema,
+  tradeDetailResponseSchema,
+  tradeListResponseSchema,
+  tradeReferenceResolveResponseSchema,
   type ApiErrorResponse,
   type AccountResponse,
   type AccountMode,
-  type CreateBaselineObservationBatchCommandV2,
-  type CreateCashFlowCommandV2,
-  type CreateCashTransferCommandV2,
-  type CreateExecutionCommandV2,
-  type CreateTradeOpeningBoundaryAssertionCommandV2,
-  type CreateImportDraftRevisionCommandV2,
-  type MoveExecutionAccountCommandV2,
-  type ReplaceExecutionCommandV2,
-  type ReplaceCashFlowCommandV2,
-  type ReplaceCashTransferCommandV2,
-  type RestoreExecutionCommandV2,
-  type RestoreCashFlowCommandV2,
-  type RestoreCashTransferCommandV2,
-  type ReviseImportDraftCommandV2,
-  type SubmitImportDraftRevisionCommandV2,
-  type VoidExecutionCommandV2,
-  type VoidCashFlowCommandV2,
-  type VoidCashTransferCommandV2,
+  type CreateBaselineObservationBatchCommand,
+  type CreateCashFlowCommand,
+  type CreateCashTransferCommand,
+  type CreateExecutionCommand,
+  type CreateTradeOpeningBoundaryAssertionCommand,
+  type CreateImportDraftRevisionCommand,
+  type MoveExecutionAccountCommand,
+  type ReplaceExecutionCommand,
+  type ReplaceCashFlowCommand,
+  type ReplaceCashTransferCommand,
+  type RestoreExecutionCommand,
+  type RestoreCashFlowCommand,
+  type RestoreCashTransferCommand,
+  type ReviseImportDraftCommand,
+  type SubmitImportDraftRevisionCommand,
+  type VoidExecutionCommand,
+  type VoidCashFlowCommand,
+  type VoidCashTransferCommand,
   type MarketDetailRequest,
-  type MarketDetailResponseV2,
+  type MarketDetailResponse,
   type JournalReviewCandidatesQuery,
   type JournalReviewCandidatesResponse,
   type JournalReviewSnapshotInput,
   type JournalReviewSnapshotResponse,
-  type BaselineReconciliationCandidatesResponseV2,
-  type ConfirmBaselineReconciliationCommandV2,
-  type RestoreBaselineReconciliationCommandV2,
-  type VoidBaselineReconciliationCommandV2,
-  type LedgerCommandResponseV2,
-  type LedgerAuditResponseV2,
-  type LedgerEventsResponseV2,
-  type LedgerReplayResponseV2,
-  type ImportDraftCommandResponseV2,
-  type ImportDraftRevisionResponseV2,
-  type TradeCloseSliceQueryResponseV2,
-  type TradeDetailResponseV2,
-  type TradeListQueryV2,
-  type TradeListResponseV2,
-  type TradeReferenceResolveRequestV2,
-  type TradeReferenceResolveResponseV2,
-  type CurrencyV1,
+  type BaselineReconciliationCandidatesResponse,
+  type ConfirmBaselineReconciliationCommand,
+  type RestoreBaselineReconciliationCommand,
+  type VoidBaselineReconciliationCommand,
+  type LedgerCommandResponse,
+  type LedgerAuditResponse,
+  type LedgerEventsResponse,
+  type LedgerReplayResponse,
+  type ImportDraftCommandResponse,
+  type ImportDraftRevisionResponse,
+  type TradeCloseSliceQueryResponse,
+  type TradeDetailResponse,
+  type TradeListQuery,
+  type TradeListResponse,
+  type TradeReferenceResolveRequest,
+  type TradeReferenceResolveResponse,
+  type Currency,
   type ConfirmRecurringCashDepositOccurrence,
   type CreateRecurringCashDepositPlan,
   type RecurringCashDepositOccurrence,
@@ -82,8 +90,6 @@ import {
   type RecurringFundInvestmentOccurrence,
   type RecurringFundInvestmentPlan,
   type UpdateRecurringFundInvestmentPlan,
-  type BacktestRunCreateV2,
-  type BacktestRunResponseV2,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -94,63 +100,63 @@ export type {
   RiskEventResponse,
   MarketDetailCapability,
   MarketDetailRequest,
-  MarketDetailResponseV2,
-  MarketDetailSectionV2,
+  MarketDetailResponse,
+  MarketDetailSection,
   MarketDetailSectionStatus,
   JournalReviewCandidate,
   JournalReviewCandidatesQuery,
   JournalReviewCandidatesResponse,
   JournalReviewSnapshotInput,
   JournalReviewSnapshotResponse,
-  LedgerEventV2,
+  LedgerEvent,
   DecimalString,
-  ExecutionChargeV2,
-  LedgerCommandErrorCodeV2,
-  LedgerCommandErrorV2,
-  MoneyV2,
-  CashFlowPayloadV2,
-  CashTransferMetadataV2,
-  CreateCashFlowCommandV2,
-  ReplaceCashFlowCommandV2,
-  VoidCashFlowCommandV2,
-  RestoreCashFlowCommandV2,
-  CashFlowCommandV2,
-  CreateCashTransferCommandV2,
-  ReplaceCashTransferCommandV2,
-  VoidCashTransferCommandV2,
-  RestoreCashTransferCommandV2,
-  CashTransferCommandV2,
-  CreateExecutionCommandV2,
-  CreateTradeOpeningBoundaryAssertionCommandV2,
-  ReplaceExecutionCommandV2,
-  VoidExecutionCommandV2,
-  RestoreExecutionCommandV2,
-  MoveExecutionAccountCommandV2,
-  ExecutionCommandV2,
-  CreateBaselineObservationBatchCommandV2,
-  CreateImportDraftRevisionCommandV2,
-  ReviseImportDraftCommandV2,
-  SubmitImportDraftRevisionCommandV2,
-  LedgerCommandResponseV2,
-  LedgerAuditResponseV2,
-  LedgerEventsResponseV2,
-  LedgerReplayResponseV2,
-  ImportDraftCommandResponseV2,
-  ImportDraftRevisionResponseV2,
-  TradeCloseSliceQueryResponseV2,
-  TradeDetailResponseV2,
-  TradeSummaryResponseV2,
-  TradeListQueryV2,
-  TradeListResponseV2,
-  TradeReferenceResolveRequestV2,
-  TradeReferenceResolveResponseV2,
-  BaselineReconciliationCandidateV2,
-  BaselineReconciliationCheckpointV2,
-  BaselineReconciliationCandidatesResponseV2,
-  BaselineReconciliationCommandV2,
-  ConfirmBaselineReconciliationCommandV2,
-  VoidBaselineReconciliationCommandV2,
-  RestoreBaselineReconciliationCommandV2,
+  ExecutionCharge,
+  LedgerCommandErrorCode,
+  LedgerCommandError,
+  LedgerMoney,
+  CashFlowPayload,
+  CashTransferMetadata,
+  CreateCashFlowCommand,
+  ReplaceCashFlowCommand,
+  VoidCashFlowCommand,
+  RestoreCashFlowCommand,
+  CashFlowCommand,
+  CreateCashTransferCommand,
+  ReplaceCashTransferCommand,
+  VoidCashTransferCommand,
+  RestoreCashTransferCommand,
+  CashTransferCommand,
+  CreateExecutionCommand,
+  CreateTradeOpeningBoundaryAssertionCommand,
+  ReplaceExecutionCommand,
+  VoidExecutionCommand,
+  RestoreExecutionCommand,
+  MoveExecutionAccountCommand,
+  ExecutionCommand,
+  CreateBaselineObservationBatchCommand,
+  CreateImportDraftRevisionCommand,
+  ReviseImportDraftCommand,
+  SubmitImportDraftRevisionCommand,
+  LedgerCommandResponse,
+  LedgerAuditResponse,
+  LedgerEventsResponse,
+  LedgerReplayResponse,
+  ImportDraftCommandResponse,
+  ImportDraftRevisionResponse,
+  TradeCloseSliceQueryResponse,
+  TradeDetailResponse,
+  TradeSummaryResponse,
+  TradeListQuery,
+  TradeListResponse,
+  TradeReferenceResolveRequest,
+  TradeReferenceResolveResponse,
+  BaselineReconciliationCandidate,
+  BaselineReconciliationCheckpoint,
+  BaselineReconciliationCandidatesResponse,
+  BaselineReconciliationCommand,
+  ConfirmBaselineReconciliationCommand,
+  VoidBaselineReconciliationCommand,
+  RestoreBaselineReconciliationCommand,
   ConfirmRecurringCashDepositOccurrence,
   CreateRecurringCashDepositPlan,
   RecurringCashDepositOccurrence,
@@ -161,8 +167,17 @@ export type {
   RecurringFundInvestmentOccurrence,
   RecurringFundInvestmentPlan,
   UpdateRecurringFundInvestmentPlan,
-  BacktestRunCreateV2,
-  BacktestRunResponseV2,
+  BacktestRunCreateV3,
+  BacktestRunPreparationRequestV3,
+  BacktestRunPreparationResultV3,
+  BacktestRunPreflightRequestV3,
+  BacktestPreflightResultV3,
+  BacktestRunResponseV3,
+  BacktestNavPreparationRequestV3,
+  BacktestNavPreparationResultV3,
+  BacktestNavRunCreateV3,
+  BacktestNavRunResponseV3,
+  BacktestNavRunSummaryV3,
   AiCostFacts,
   AiExecutionSummary,
   AiGenerationContractRef,
@@ -236,7 +251,7 @@ export class ThesisLedgerApiClient {
         mode?: 'actual' | 'shadow';
         accountId?: string;
         fxMerge?: boolean;
-        baseCurrency?: CurrencyV1;
+        baseCurrency?: Currency;
         t?: number;
       } = {},
     ) =>
@@ -244,43 +259,43 @@ export class ThesisLedgerApiClient {
         `/portfolio/valuation${queryString(params)}`,
         portfolioValuationResponseSchema,
       ),
-    getTrades: (params: Partial<TradeListQueryV2> = {}): Promise<TradeListResponseV2> =>
-      this.requestParsed(`/portfolio/trades${queryString(params)}`, tradeListResponseSchemaV2),
+    getTrades: (params: Partial<TradeListQuery> = {}): Promise<TradeListResponse> =>
+      this.requestParsed(`/portfolio/trades${queryString(params)}`, tradeListResponseSchema),
     getTrade: (
       accountId: string,
       tradeId: string,
       mode: 'actual' | 'shadow' = 'actual',
-    ): Promise<TradeDetailResponseV2> =>
+    ): Promise<TradeDetailResponse> =>
       this.requestParsed(
         `/portfolio/trades/${encodeURIComponent(tradeId)}${queryString({ accountId, mode })}`,
-        tradeDetailResponseSchemaV2,
+        tradeDetailResponseSchema,
       ),
     getCloseSlice: (
       accountId: string,
       tradeId: string,
       sliceId: string,
       mode: 'actual' | 'shadow' = 'actual',
-    ): Promise<TradeCloseSliceQueryResponseV2> =>
+    ): Promise<TradeCloseSliceQueryResponse> =>
       this.requestParsed(
         `/portfolio/trades/${encodeURIComponent(tradeId)}/close-slices/${encodeURIComponent(sliceId)}${queryString({ accountId, mode })}`,
-        tradeCloseSliceQueryResponseSchemaV2,
+        tradeCloseSliceQueryResponseSchema,
       ),
     resolveTradeReference: (
-      request: TradeReferenceResolveRequestV2,
-    ): Promise<TradeReferenceResolveResponseV2> =>
+      request: TradeReferenceResolveRequest,
+    ): Promise<TradeReferenceResolveResponse> =>
       this.postParsed(
         '/portfolio/trades/resolve-reference',
         request,
-        tradeReferenceResolveResponseSchemaV2,
+        tradeReferenceResolveResponseSchema,
       ),
     createTradeOpeningBoundary: (
       tradeId: string,
-      command: CreateTradeOpeningBoundaryAssertionCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
+      command: CreateTradeOpeningBoundaryAssertionCommand,
+    ): Promise<LedgerCommandResponse> =>
       this.postParsed(
         `/portfolio/trades/${encodeURIComponent(tradeId)}/opening-boundary`,
         command,
-        ledgerCommandResponseSchemaV2,
+        ledgerCommandResponseSchema,
       ),
   };
 
@@ -452,7 +467,7 @@ export class ThesisLedgerApiClient {
         end?: string;
         mode?: 'actual' | 'shadow';
         fxMerge?: boolean;
-        baseCurrency?: CurrencyV1;
+        baseCurrency?: Currency;
       } = {},
     ) =>
       this.requestParsed(
@@ -462,21 +477,79 @@ export class ThesisLedgerApiClient {
   };
 
   readonly market = {
+    ...marketControlClient(this.requestParsed.bind(this)),
+    getPlannedChartOptions: async (
+      symbol: string,
+      input: MarketChartPlanV3,
+      signal?: AbortSignal,
+    ) => {
+      const plan = marketChartPlanV3Schema.parse(input);
+      const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString({
+        barsLimit: plan.barsLimit,
+        indicatorParams: JSON.stringify(plan.indicatorParams),
+        planEnd: plan.end,
+      })}`;
+      const response = await this.requestParsed(
+        path,
+        marketChartOptionsV3Schema,
+        signal ? { signal } : undefined,
+      );
+      const actual = response.plan;
+      if (
+        response.symbol !== symbol ||
+        !response.window ||
+        !actual ||
+        actual.barsLimit !== plan.barsLimit ||
+        actual.end !== plan.end ||
+        Object.keys(actual.indicatorParams).length !== Object.keys(plan.indicatorParams).length ||
+        Object.entries(plan.indicatorParams).some(
+          ([key, value]) => actual.indicatorParams[key] !== value,
+        )
+      ) {
+        throw new ThesisLedgerContractError(path);
+      }
+      return response;
+    },
+    getChartOptions: async (
+      symbol: string,
+      signal?: AbortSignal,
+      requestedWindow?: MarketChartOptionsWindowV3,
+    ) => {
+      const window = requestedWindow
+        ? marketChartOptionsWindowV3Schema.parse(requestedWindow)
+        : undefined;
+      const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString(window ?? {})}`;
+      const response = await this.requestParsed(
+        path,
+        marketChartOptionsV3Schema,
+        signal ? { signal } : undefined,
+      );
+      if (
+        response.symbol !== symbol ||
+        response.window?.start !== window?.start ||
+        response.window?.end !== window?.end
+      ) {
+        throw new ThesisLedgerContractError(path);
+      }
+      return response;
+    },
     searchInstruments: (params: { q: string; limit?: number }) =>
       this.requestParsed(
-        `/api/v2/market-data/instruments/search${queryString(params)}`,
+        `/api/market-data/instruments/search${queryString(params)}`,
         instrumentSearchResponseSchema,
       ),
     getDetail: (symbol: string, params: MarketDetailQuery = {}) => {
-      const { signal, refresh, include, indicatorParams, ...query } = params;
-      return this.requestParsed<MarketDetailResponseV2>(
-        `/api/v2/market/${encodeURIComponent(symbol)}/detail${queryString({
+      const { signal, refresh, include, indicatorParams, adjustment, ...query } = params;
+      return this.requestParsed<MarketDetailResponse>(
+        `/api/market/${encodeURIComponent(symbol)}/detail${queryString({
           ...query,
+          chartContractVersion: 3,
+          ...(adjustment === undefined ? {} : { adjustment }),
           ...(indicatorParams ? { indicatorParams: JSON.stringify(indicatorParams) } : {}),
           ...(refresh ? { refresh: 1 } : {}),
           ...(include ? { include } : {}),
         })}`,
-        marketDetailResponseV2Schema,
+        marketDetailResponseSchema,
         signal ? { signal } : undefined,
       );
     },
@@ -497,132 +570,100 @@ export class ThesisLedgerApiClient {
   };
 
   readonly ledger = {
-    createCashFlow: (command: CreateCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-flows', command, ledgerCommandResponseSchemaV2),
-    replaceCashFlow: (command: ReplaceCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-flows/replace', command, ledgerCommandResponseSchemaV2),
-    voidCashFlow: (command: VoidCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-flows/void', command, ledgerCommandResponseSchemaV2),
-    restoreCashFlow: (command: RestoreCashFlowCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-flows/restore', command, ledgerCommandResponseSchemaV2),
-    createCashTransfer: (command: CreateCashTransferCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-transfers', command, ledgerCommandResponseSchemaV2),
-    replaceCashTransfer: (
-      command: ReplaceCashTransferCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-transfers/replace', command, ledgerCommandResponseSchemaV2),
-    voidCashTransfer: (command: VoidCashTransferCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-transfers/void', command, ledgerCommandResponseSchemaV2),
-    restoreCashTransfer: (
-      command: RestoreCashTransferCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/cash-transfers/restore', command, ledgerCommandResponseSchemaV2),
-    createExecution: (command: CreateExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/executions', command, ledgerCommandResponseSchemaV2),
-    replaceExecution: (command: ReplaceExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/executions/replace', command, ledgerCommandResponseSchemaV2),
-    voidExecution: (command: VoidExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/executions/void', command, ledgerCommandResponseSchemaV2),
-    restoreExecution: (command: RestoreExecutionCommandV2): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/executions/restore', command, ledgerCommandResponseSchemaV2),
-    moveExecutionAccount: (
-      command: MoveExecutionAccountCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/executions/move-account', command, ledgerCommandResponseSchemaV2),
+    createCashFlow: (command: CreateCashFlowCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-flows', command, ledgerCommandResponseSchema),
+    replaceCashFlow: (command: ReplaceCashFlowCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-flows/replace', command, ledgerCommandResponseSchema),
+    voidCashFlow: (command: VoidCashFlowCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-flows/void', command, ledgerCommandResponseSchema),
+    restoreCashFlow: (command: RestoreCashFlowCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-flows/restore', command, ledgerCommandResponseSchema),
+    createCashTransfer: (command: CreateCashTransferCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-transfers', command, ledgerCommandResponseSchema),
+    replaceCashTransfer: (command: ReplaceCashTransferCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-transfers/replace', command, ledgerCommandResponseSchema),
+    voidCashTransfer: (command: VoidCashTransferCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-transfers/void', command, ledgerCommandResponseSchema),
+    restoreCashTransfer: (command: RestoreCashTransferCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/cash-transfers/restore', command, ledgerCommandResponseSchema),
+    createExecution: (command: CreateExecutionCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/executions', command, ledgerCommandResponseSchema),
+    replaceExecution: (command: ReplaceExecutionCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/executions/replace', command, ledgerCommandResponseSchema),
+    voidExecution: (command: VoidExecutionCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/executions/void', command, ledgerCommandResponseSchema),
+    restoreExecution: (command: RestoreExecutionCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/executions/restore', command, ledgerCommandResponseSchema),
+    moveExecutionAccount: (command: MoveExecutionAccountCommand): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/executions/move-account', command, ledgerCommandResponseSchema),
     createBaselineObservationBatch: (
-      command: CreateBaselineObservationBatchCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed(
-        '/ledger/baseline-observation-batches',
-        command,
-        ledgerCommandResponseSchemaV2,
-      ),
+      command: CreateBaselineObservationBatchCommand,
+    ): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/baseline-observation-batches', command, ledgerCommandResponseSchema),
     createImportDraftRevision: (
-      command: CreateImportDraftRevisionCommandV2,
-    ): Promise<ImportDraftCommandResponseV2> =>
-      this.postParsed(
-        '/ledger/import-draft-revisions',
-        command,
-        importDraftCommandResponseSchemaV2,
-      ),
-    reviseImportDraft: (
-      command: ReviseImportDraftCommandV2,
-    ): Promise<ImportDraftRevisionResponseV2> =>
+      command: CreateImportDraftRevisionCommand,
+    ): Promise<ImportDraftCommandResponse> =>
+      this.postParsed('/ledger/import-draft-revisions', command, importDraftCommandResponseSchema),
+    reviseImportDraft: (command: ReviseImportDraftCommand): Promise<ImportDraftRevisionResponse> =>
       this.postParsed(
         '/ledger/import-draft-revisions/revise',
         command,
-        importDraftRevisionResponseSchemaV2,
+        importDraftRevisionResponseSchema,
       ),
     submitImportDraftRevision: (
-      command: SubmitImportDraftRevisionCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
+      command: SubmitImportDraftRevisionCommand,
+    ): Promise<LedgerCommandResponse> =>
       this.postParsed(
         '/ledger/import-draft-revisions/submit',
         command,
-        ledgerCommandResponseSchemaV2,
+        ledgerCommandResponseSchema,
       ),
     getEvents: (
       accountId: string,
       params: { asOfRevision?: string } = {},
-    ): Promise<LedgerEventsResponseV2> =>
+    ): Promise<LedgerEventsResponse> =>
       this.requestParsed(
         `/ledger/${encodeURIComponent(accountId)}/events${queryString(params)}`,
-        ledgerEventsResponseSchemaV2,
+        ledgerEventsResponseSchema,
       ),
     getEventAudit: (
       accountId: string,
       params: { asOfRevision?: string } = {},
-    ): Promise<LedgerAuditResponseV2> =>
+    ): Promise<LedgerAuditResponse> =>
       this.requestParsed(
         `/ledger/${encodeURIComponent(accountId)}/events/audit${queryString(params)}`,
-        ledgerAuditResponseSchemaV2,
+        ledgerAuditResponseSchema,
       ),
-    replayEvents: (accountId: string, asOfRevision: string): Promise<LedgerReplayResponseV2> =>
+    replayEvents: (accountId: string, asOfRevision: string): Promise<LedgerReplayResponse> =>
       this.requestParsed(
         `/ledger/${encodeURIComponent(accountId)}/events/replay${queryString({ asOfRevision })}`,
-        ledgerReplayResponseSchemaV2,
+        ledgerReplayResponseSchema,
       ),
     getReconciliationCandidates: (
       accountId: string,
-    ): Promise<BaselineReconciliationCandidatesResponseV2> =>
+    ): Promise<BaselineReconciliationCandidatesResponse> =>
       this.requestParsed(
         `/ledger/${encodeURIComponent(accountId)}/reconciliation-candidates`,
-        baselineReconciliationCandidatesResponseSchemaV2,
+        baselineReconciliationCandidatesResponseSchema,
       ),
     confirmBaselineReconciliation: (
-      command: ConfirmBaselineReconciliationCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/reconciliations/confirm', command, ledgerCommandResponseSchemaV2),
+      command: ConfirmBaselineReconciliationCommand,
+    ): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/reconciliations/confirm', command, ledgerCommandResponseSchema),
     voidBaselineReconciliation: (
-      command: VoidBaselineReconciliationCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/reconciliations/void', command, ledgerCommandResponseSchemaV2),
+      command: VoidBaselineReconciliationCommand,
+    ): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/reconciliations/void', command, ledgerCommandResponseSchema),
     restoreBaselineReconciliation: (
-      command: RestoreBaselineReconciliationCommandV2,
-    ): Promise<LedgerCommandResponseV2> =>
-      this.postParsed('/ledger/reconciliations/restore', command, ledgerCommandResponseSchemaV2),
+      command: RestoreBaselineReconciliationCommand,
+    ): Promise<LedgerCommandResponse> =>
+      this.postParsed('/ledger/reconciliations/restore', command, ledgerCommandResponseSchema),
   };
 
   readonly backtests = {
-    createRun: (input: BacktestRunCreateV2): Promise<BacktestRunResponseV2> =>
-      this.postParsed('/backtests/runs', input, backtestRunResponseSchemaV2),
-    getRun: (runId: string): Promise<BacktestRunResponseV2> =>
-      this.requestParsed(
-        `/backtests/runs/${encodeURIComponent(runId)}`,
-        backtestRunResponseSchemaV2,
-      ),
-    cancelRun: (runId: string): Promise<BacktestRunResponseV2> =>
-      this.postParsed(
-        `/backtests/runs/${encodeURIComponent(runId)}/cancel`,
-        {},
-        backtestRunResponseSchemaV2,
-      ),
-    retryRun: (runId: string): Promise<BacktestRunResponseV2> =>
-      this.postParsed(
-        `/backtests/runs/${encodeURIComponent(runId)}/retry`,
-        {},
-        backtestRunResponseSchemaV2,
-      ),
+    ...backtestNavRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
+    ...backtestRunConfigClient(this.postParsed.bind(this)),
+    ...backtestRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
   };
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {

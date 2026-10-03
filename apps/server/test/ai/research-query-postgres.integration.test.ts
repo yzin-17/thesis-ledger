@@ -19,7 +19,7 @@ describeDatabase('研究助手 PostgreSQL 查询', () => {
 
   beforeAll(async () => {
     await prisma.strategy.create({
-      data: { id: strategyId, name: '查询集成策略' },
+      data: { schemaVersion: 2, id: strategyId, name: '查询集成策略' },
     });
     await prisma.strategyVersion.create({
       data: {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { StrategyOptimizationCandidateService } from '../../src/strategy-optimization/strategy-optimization-candidate.service.js';
@@ -22,7 +22,7 @@ const proposal = {
   reason: '恢复已完成 Provider step',
   evidenceRefs: ['postgres-reconciler-e2e'],
 };
-const baselineStrategy = strategySchemaV2.parse({
+const baselineStrategy = strategySchema.parse({
   schemaVersion: '2',
   name: `Reconciler replay ${suffix}`,
   signalSources: [
@@ -56,7 +56,7 @@ const baselineStrategy = strategySchemaV2.parse({
     timing: 'nextEligibleBarOpen',
   },
   cost: { commissionRate: '0', slippageRate: '0' },
-}) as StrategySchemaV2;
+}) as BacktestStrategy;
 const runConfig = {
   startDate: '2026-01-01',
   endDate: '2026-09-10',

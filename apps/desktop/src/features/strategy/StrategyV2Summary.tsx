@@ -13,6 +13,11 @@ import {
 } from '@/components/ui/select';
 import type { StrategySchema } from './strategy.types.js';
 import {
+  setStrategyExecutionAssetType,
+  setStrategyExecutionSymbol,
+  setStrategyPrimaryTimeframe,
+} from './strategy.schema.js';
+import {
   strategyAssetTypeLabel,
   strategyExecutionModeLabel,
   strategyExecutionTimingLabel,
@@ -33,9 +38,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 
 const text = (value: unknown, fallback = '未配置') =>
   typeof value === 'string' && value.trim() ? value : fallback;
-
-export const isV2StrategySchema = (schema: StrategySchema | null | undefined) =>
-  schema?.schemaVersion === '2';
 
 export function StrategyV2Summary({
   schema,
@@ -82,7 +84,7 @@ export function StrategyV2Summary({
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <Badge variant="secondary">V2 · v{version ?? '?'}</Badge>
+            <Badge variant="secondary">策略 v{version ?? '?'}</Badge>
             <Badge variant="outline">
               {strategyTimeframeLabel(schema.primaryTimeframe, '未配置')}
             </Badge>
@@ -117,12 +119,12 @@ export function StrategyV2Summary({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>统一回测 V2 策略</CardTitle>
+        <CardTitle>回测策略</CardTitle>
         <CardDescription>运行时只使用已保存的策略版本与运行配置，不上传行情数据。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">策略版本 2</Badge>
+          <Badge variant="secondary">当前策略合同</Badge>
           <Badge variant="outline">
             {strategyTimeframeLabel(schema.primaryTimeframe, '未配置')}
           </Badge>
@@ -137,7 +139,9 @@ export function StrategyV2Summary({
               <FieldLabel htmlFor="strategy-v2-timeframe">主周期</FieldLabel>
               <Select
                 value={text(schema.primaryTimeframe, '1d')}
-                onValueChange={(value) => value && update('primaryTimeframe', value)}
+                onValueChange={(value) =>
+                  value && onChange?.(setStrategyPrimaryTimeframe(schema, value))
+                }
               >
                 <SelectTrigger id="strategy-v2-timeframe">
                   <SelectValue>
@@ -161,10 +165,33 @@ export function StrategyV2Summary({
                 id="strategy-v2-symbol"
                 value={text(instrument.symbol, '')}
                 onChange={(event) =>
-                  updateNested('executionInstrument', 'symbol', event.target.value)
+                  onChange?.(setStrategyExecutionSymbol(schema, event.target.value))
                 }
               />
             </Field>
+            {execution.mode === 'exchange' && (
+              <Field>
+                <FieldLabel htmlFor="strategy-asset-type">资产类型</FieldLabel>
+                <Select
+                  value={text(instrument.assetType, 'stock')}
+                  onValueChange={(value) => {
+                    if (value === 'stock' || value === 'etf') {
+                      onChange?.(setStrategyExecutionAssetType(schema, value));
+                    }
+                  }}
+                >
+                  <SelectTrigger id="strategy-asset-type">
+                    <SelectValue>{strategyAssetTypeLabel(instrument.assetType)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="stock">股票</SelectItem>
+                      <SelectItem value="etf">ETF</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <Field>
               <FieldLabel htmlFor="strategy-v2-sizing">仓位数值</FieldLabel>
               <Input

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { LedgerCommandResponseV2 } from '@thesis-ledger/api-client';
+import type { LedgerCommandResponse } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -236,7 +236,7 @@ export function ExecutionFormSheet({
       ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
     } as const;
     try {
-      let response: LedgerCommandResponseV2;
+      let response: LedgerCommandResponse;
       if (editingEvent) {
         response = await replaceMutation.mutateAsync({
           command: 'REPLACE_EXECUTION',

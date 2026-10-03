@@ -2,10 +2,10 @@ import { z } from 'zod';
 import {
   currencyCodeSchema,
   decimalStringSchema,
-  executionChargeSchemaV2,
-  ledgerEventSourceSchemaV2,
-  ledgerEventEnvelopeSchemaV2,
-} from './ledger-v2.js';
+  executionChargeSchema,
+  ledgerEventSourceSchema,
+  ledgerEventEnvelopeSchema,
+} from './ledger-contract.js';
 import { instrumentDirectorySchema } from './market.js';
 
 const nonNegativeIntegerStringSchema = z.string().regex(/^\d+$/);
@@ -17,7 +17,7 @@ const tradeExitProgressSchema = z.enum(['NONE', 'PARTIAL', 'FULL']);
 const tradeEndEvidenceSchema = z.enum(['SELL_EXECUTION', 'BALANCE_OBSERVATION', 'UNKNOWN']);
 const tradeCompletenessSchema = z.enum(['COMPLETE', 'PARTIAL', 'CONFLICTED']);
 
-const tradeSourceSchema = ledgerEventSourceSchemaV2;
+const tradeSourceSchema = ledgerEventSourceSchema;
 
 const tradeSummaryShape = {
   id: z.string().trim().min(1),
@@ -47,9 +47,9 @@ const tradeSummaryShape = {
   excludedReasons: z.array(z.string().trim().min(1)),
 };
 
-export const tradeSummaryResponseSchemaV2 = z.object(tradeSummaryShape).strict();
+export const tradeSummaryResponseSchema = z.object(tradeSummaryShape).strict();
 
-export const tradeEntryLegResponseSchemaV2 = z
+export const tradeEntryLegResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     eventId: z.uuid(),
@@ -63,11 +63,11 @@ export const tradeEntryLegResponseSchemaV2 = z
     rawCost: decimalStringSchema.nullable(),
     remainingCost: decimalStringSchema.nullable(),
     rawCostEstimated: z.boolean(),
-    charges: z.array(executionChargeSchemaV2),
+    charges: z.array(executionChargeSchema),
   })
   .strict();
 
-export const tradeBaselineComponentResponseSchemaV2 = z
+export const tradeBaselineComponentResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     eventId: z.uuid(),
@@ -89,7 +89,7 @@ export const tradeBaselineComponentResponseSchemaV2 = z
   })
   .strict();
 
-export const tradeCorporateActionResponseSchemaV2 = z
+export const tradeCorporateActionResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     eventId: z.uuid(),
@@ -104,7 +104,7 @@ export const tradeCorporateActionResponseSchemaV2 = z
   })
   .strict();
 
-export const tradeCloseAllocationResponseSchemaV2 = z
+export const tradeCloseAllocationResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     source: z.enum(['ENTRY_LEG', 'BASELINE_COMPONENT']),
@@ -112,11 +112,11 @@ export const tradeCloseAllocationResponseSchemaV2 = z
     sourceFactId: z.uuid(),
     quantity: decimalStringSchema,
     originalCost: decimalStringSchema.nullable(),
-    allocatedBuyCharges: z.array(executionChargeSchemaV2),
+    allocatedBuyCharges: z.array(executionChargeSchema),
   })
   .strict();
 
-export const tradeCloseSliceResponseSchemaV2 = z
+export const tradeCloseSliceResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     eventId: z.uuid(),
@@ -126,16 +126,16 @@ export const tradeCloseSliceResponseSchemaV2 = z
     price: decimalStringSchema.nullable(),
     quantity: decimalStringSchema,
     remainingQuantityAfter: decimalStringSchema,
-    charges: z.array(executionChargeSchemaV2),
+    charges: z.array(executionChargeSchema),
     grossRealizedPnl: decimalStringSchema.nullable(),
     netRealizedPnl: decimalStringSchema.nullable(),
     realizedNetReturnRate: decimalStringSchema.nullable(),
     costEstimated: z.boolean(),
-    allocations: z.array(tradeCloseAllocationResponseSchemaV2),
+    allocations: z.array(tradeCloseAllocationResponseSchema),
   })
   .strict();
 
-export const tradeDividendResponseSchemaV2 = z
+export const tradeDividendResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     eventId: z.uuid(),
@@ -146,7 +146,7 @@ export const tradeDividendResponseSchemaV2 = z
   })
   .strict();
 
-export const tradeEvidenceSourceResponseSchemaV2 = z
+export const tradeEvidenceSourceResponseSchema = z
   .object({
     id: z.string().trim().min(1),
     kind: z.enum([
@@ -163,19 +163,19 @@ export const tradeEvidenceSourceResponseSchemaV2 = z
   })
   .strict();
 
-export const tradeDetailResponseSchemaV2 = z
+export const tradeDetailResponseSchema = z
   .object({
     ...tradeSummaryShape,
-    entryLegs: z.array(tradeEntryLegResponseSchemaV2),
-    baselineComponents: z.array(tradeBaselineComponentResponseSchemaV2),
-    corporateActions: z.array(tradeCorporateActionResponseSchemaV2),
-    closeSlices: z.array(tradeCloseSliceResponseSchemaV2),
-    dividendAttributions: z.array(tradeDividendResponseSchemaV2),
-    evidenceSources: z.array(tradeEvidenceSourceResponseSchemaV2),
+    entryLegs: z.array(tradeEntryLegResponseSchema),
+    baselineComponents: z.array(tradeBaselineComponentResponseSchema),
+    corporateActions: z.array(tradeCorporateActionResponseSchema),
+    closeSlices: z.array(tradeCloseSliceResponseSchema),
+    dividendAttributions: z.array(tradeDividendResponseSchema),
+    evidenceSources: z.array(tradeEvidenceSourceResponseSchema),
   })
   .strict();
 
-export const tradeListQuerySchemaV2 = z
+export const tradeListQuerySchema = z
   .object({
     accountId: z.uuid().optional(),
     mode: tradeModeSchema.default('actual'),
@@ -186,21 +186,21 @@ export const tradeListQuerySchemaV2 = z
   })
   .strict();
 
-export const tradeListResponseSchemaV2 = z
+export const tradeListResponseSchema = z
   .object({
     accountId: z.uuid().nullable(),
     mode: tradeModeSchema,
-    items: z.array(tradeSummaryResponseSchemaV2),
+    items: z.array(tradeSummaryResponseSchema),
     nextCursor: z.string().nullable(),
     projectionGenerations: z.record(z.uuid(), nonNegativeIntegerStringSchema),
   })
   .strict();
 
-export const tradeModeQuerySchemaV2 = z
+export const tradeModeQuerySchema = z
   .object({ mode: tradeModeSchema.default('actual') })
   .strict();
 
-export const tradeReferenceResolveRequestSchemaV2 = z
+export const tradeReferenceResolveRequestSchema = z
   .object({
     accountId: z.uuid(),
     mode: tradeModeSchema.default('actual'),
@@ -214,48 +214,25 @@ export const tradeReferenceResolveRequestSchemaV2 = z
       context.addIssue({ code: 'custom', path: ['factIds'], message: 'factIds 不能重复' });
   });
 
-export const tradeReferenceResolveResponseSchemaV2 = z
+export const tradeReferenceResolveResponseSchema = z
   .object({
     accountId: z.uuid(),
     mode: tradeModeSchema,
     status: z.enum(['RESOLVED', 'LEGACY', 'AMBIGUOUS', 'NOT_FOUND']),
-    trade: tradeDetailResponseSchemaV2.optional(),
+    trade: tradeDetailResponseSchema.optional(),
     snapshot: z.unknown().optional(),
     matchedFactIds: z.array(z.uuid()),
     candidateTradeIds: z.array(z.string().trim().min(1)),
   })
   .strict();
 
-export const tradeCloseSliceQueryResponseSchemaV2 = z
+export const tradeCloseSliceQueryResponseSchema = z
   .object({
     accountId: z.uuid(),
     mode: tradeModeSchema,
     tradeId: z.string().trim().min(1),
     projectionGeneration: nonNegativeIntegerStringSchema,
-    slice: tradeCloseSliceResponseSchemaV2,
-  })
-  .strict();
-
-export const legacyLedgerEventResponseSchemaV2 = z
-  .object({
-    version: z.literal(1),
-    id: z.uuid(),
-    accountId: z.uuid(),
-    type: z.string().trim().min(1),
-    occurredAt: isoDateTimeSchema.nullable(),
-    symbol: z.string().trim().min(1).nullable(),
-    quantity: decimalStringSchema.nullable(),
-    price: decimalStringSchema.nullable(),
-    amount: decimalStringSchema.nullable(),
-    fee: decimalStringSchema.nullable(),
-    tax: decimalStringSchema.nullable(),
-    externalId: z.string().nullable(),
-    source: z.string().trim().min(1),
-    sourceRowId: z.string().nullable(),
-    currency: currencyCodeSchema,
-    note: z.string().nullable(),
-    metadata: z.record(z.string(), z.unknown()).nullable(),
-    createdAt: isoDateTimeSchema,
+    slice: tradeCloseSliceResponseSchema,
   })
   .strict();
 
@@ -263,11 +240,11 @@ const ledgerReadBaseShape = {
   accountId: z.uuid(),
   ledgerRevision: nonNegativeIntegerStringSchema,
   projectionGeneration: nonNegativeIntegerStringSchema,
-  events: z.array(ledgerEventEnvelopeSchemaV2),
+  events: z.array(ledgerEventEnvelopeSchema),
   instrumentDirectory: instrumentDirectorySchema,
 };
 
-export const ledgerEventsResponseSchemaV2 = z
+export const ledgerEventsResponseSchema = z
   .object({
     ...ledgerReadBaseShape,
     asOfLedgerRevision: nonNegativeIntegerStringSchema.optional(),
@@ -275,19 +252,19 @@ export const ledgerEventsResponseSchemaV2 = z
   })
   .strict();
 
-export const ledgerAuditResponseSchemaV2 = z
+export const ledgerAuditResponseSchema = z
   .object({
     accountId: z.uuid(),
     asOfLedgerRevision: nonNegativeIntegerStringSchema,
     ledgerRevision: nonNegativeIntegerStringSchema,
     projectionGeneration: nonNegativeIntegerStringSchema,
-    events: z.array(z.union([ledgerEventEnvelopeSchemaV2, legacyLedgerEventResponseSchemaV2])),
+    events: z.array(ledgerEventEnvelopeSchema),
     instrumentDirectory: instrumentDirectorySchema,
     effective: z.literal(false),
   })
   .strict();
 
-export const ledgerReplayResponseSchemaV2 = z
+export const ledgerReplayResponseSchema = z
   .object({
     ...ledgerReadBaseShape,
     asOfLedgerRevision: nonNegativeIntegerStringSchema,
@@ -295,7 +272,7 @@ export const ledgerReplayResponseSchemaV2 = z
   })
   .strict();
 
-export const importDraftRevisionResponseSchemaV2 = z
+export const importDraftRevisionResponseSchema = z
   .object({
     draftId: z.uuid(),
     revision: z.number().int().positive(),
@@ -303,7 +280,7 @@ export const importDraftRevisionResponseSchemaV2 = z
   })
   .strict();
 
-export const importDraftCommandResponseSchemaV2 = z
+export const importDraftCommandResponseSchema = z
   .object({
     draftId: z.uuid(),
     revision: z.number().int().positive(),
@@ -311,7 +288,7 @@ export const importDraftCommandResponseSchemaV2 = z
   })
   .strict();
 
-export const importDraftResponseSchemaV2 = z
+export const importDraftResponseSchema = z
   .object({
     id: z.uuid(),
     accountId: z.uuid(),
@@ -332,17 +309,16 @@ export const importDraftResponseSchemaV2 = z
   })
   .strict();
 
-export type TradeSummaryResponseV2 = z.infer<typeof tradeSummaryResponseSchemaV2>;
-export type TradeDetailResponseV2 = z.infer<typeof tradeDetailResponseSchemaV2>;
-export type TradeListQueryV2 = z.infer<typeof tradeListQuerySchemaV2>;
-export type TradeListResponseV2 = z.infer<typeof tradeListResponseSchemaV2>;
-export type TradeReferenceResolveRequestV2 = z.infer<typeof tradeReferenceResolveRequestSchemaV2>;
-export type TradeReferenceResolveResponseV2 = z.infer<typeof tradeReferenceResolveResponseSchemaV2>;
-export type TradeCloseSliceQueryResponseV2 = z.infer<typeof tradeCloseSliceQueryResponseSchemaV2>;
-export type LegacyLedgerEventResponseV2 = z.infer<typeof legacyLedgerEventResponseSchemaV2>;
-export type LedgerEventsResponseV2 = z.infer<typeof ledgerEventsResponseSchemaV2>;
-export type LedgerAuditResponseV2 = z.infer<typeof ledgerAuditResponseSchemaV2>;
-export type LedgerReplayResponseV2 = z.infer<typeof ledgerReplayResponseSchemaV2>;
-export type ImportDraftRevisionResponseV2 = z.infer<typeof importDraftRevisionResponseSchemaV2>;
-export type ImportDraftCommandResponseV2 = z.infer<typeof importDraftCommandResponseSchemaV2>;
-export type ImportDraftResponseV2 = z.infer<typeof importDraftResponseSchemaV2>;
+export type TradeSummaryResponse = z.infer<typeof tradeSummaryResponseSchema>;
+export type TradeDetailResponse = z.infer<typeof tradeDetailResponseSchema>;
+export type TradeListQuery = z.infer<typeof tradeListQuerySchema>;
+export type TradeListResponse = z.infer<typeof tradeListResponseSchema>;
+export type TradeReferenceResolveRequest = z.infer<typeof tradeReferenceResolveRequestSchema>;
+export type TradeReferenceResolveResponse = z.infer<typeof tradeReferenceResolveResponseSchema>;
+export type TradeCloseSliceQueryResponse = z.infer<typeof tradeCloseSliceQueryResponseSchema>;
+export type LedgerEventsResponse = z.infer<typeof ledgerEventsResponseSchema>;
+export type LedgerAuditResponse = z.infer<typeof ledgerAuditResponseSchema>;
+export type LedgerReplayResponse = z.infer<typeof ledgerReplayResponseSchema>;
+export type ImportDraftRevisionResponse = z.infer<typeof importDraftRevisionResponseSchema>;
+export type ImportDraftCommandResponse = z.infer<typeof importDraftCommandResponseSchema>;
+export type ImportDraftResponse = z.infer<typeof importDraftResponseSchema>;

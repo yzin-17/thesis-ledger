@@ -12,10 +12,10 @@ import {
 } from '../src/features/account-data/account-data.api.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
 import type {
-  ConfirmBaselineReconciliationCommandV2,
-  ReplaceExecutionCommandV2,
-  RestoreExecutionCommandV2,
-  VoidExecutionCommandV2,
+  ConfirmBaselineReconciliationCommand,
+  ReplaceExecutionCommand,
+  RestoreExecutionCommand,
+  VoidExecutionCommand,
 } from '@thesis-ledger/api-client';
 
 const response = {
@@ -122,10 +122,10 @@ describe('账户数据查询与命令边界', () => {
     const voidCommand = vi.fn().mockResolvedValue({});
     const restore = vi.fn().mockResolvedValue({});
     const confirm = vi.fn().mockResolvedValue({});
-    const replaceInput = {} as ReplaceExecutionCommandV2;
-    const voidInput = {} as VoidExecutionCommandV2;
-    const restoreInput = {} as RestoreExecutionCommandV2;
-    const confirmInput = {} as ConfirmBaselineReconciliationCommandV2;
+    const replaceInput = {} as ReplaceExecutionCommand;
+    const voidInput = {} as VoidExecutionCommand;
+    const restoreInput = {} as RestoreExecutionCommand;
+    const confirmInput = {} as ConfirmBaselineReconciliationCommand;
 
     await replaceExecution(replaceInput, { replaceExecution: replace });
     await voidExecution(voidInput, { voidExecution: voidCommand });

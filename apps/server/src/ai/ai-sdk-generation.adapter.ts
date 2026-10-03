@@ -63,7 +63,8 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   maxOutputTokens?: number;
   reasoningEffort?: ReasoningEffort;
   timeout: {
-    totalMs: number;
+    /** 总时长上限；流式请求可以不设，此时由 firstChunkMs / chunkMs 判活。 */
+    totalMs?: number;
     firstChunkMs?: number;
     chunkMs?: number;
   };
@@ -230,7 +231,7 @@ const providerOptionsFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
 };
 
 const timeoutFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => ({
-  totalMs: input.timeout.totalMs,
+  ...(input.timeout.totalMs === undefined ? {} : { totalMs: input.timeout.totalMs }),
   ...(input.transport === 'stream' && input.timeout.firstChunkMs !== undefined
     ? { firstChunkMs: input.timeout.firstChunkMs }
     : {}),

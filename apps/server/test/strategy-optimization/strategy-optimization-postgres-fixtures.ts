@@ -1,9 +1,16 @@
-import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { readFileSync } from 'node:fs';
+import {
+  backtestExecutionModelSchemaV3,
+  runConfigSchemaV3,
+  strategySchema,
+  type BacktestStrategy,
+} from '@thesis-ledger/schemas';
 
 /** PostgreSQL 服务级测试的确定性输入，不承担 Service、数据库或并发断言。 */
-export const createStrategyFixture = (symbol: string, suffix: string) =>
-  (stopPercent: string, takeProfit?: string): StrategySchemaV2 =>
-    strategySchemaV2.parse({
+export const createStrategyFixture =
+  (symbol: string, suffix: string) =>
+  (stopPercent: string, takeProfit?: string): BacktestStrategy =>
+    strategySchema.parse({
       schemaVersion: '2',
       name: `PostgreSQL 服务级 E2E ${suffix}`,
       signalSources: [
@@ -40,9 +47,10 @@ export const createStrategyFixture = (symbol: string, suffix: string) =>
         timing: 'nextEligibleBarOpen',
       },
       cost: { commissionRate: '0', slippageRate: '0' },
-    }) as StrategySchemaV2;
+    }) as BacktestStrategy;
 
 export const runConfig = {
+  schemaVersion: '3' as const,
   startDate: '2026-01-01',
   endDate: '2026-09-10',
   dataAsOf: '2026-09-11T08:00:00.000Z',
@@ -54,7 +62,72 @@ export const runConfig = {
     pricePolicy: 'latestAvailable' as const,
     fxPolicy: 'latestAvailable' as const,
   },
+  executionPriceProtocol: {
+    protocolVersion: 'execution-price-v1' as const,
+    priceBasis: {
+      adjustment: 'qfq' as const,
+      method: 'provider-native' as const,
+      methodVersion: 'provider-defined-v1',
+      basisScope: 'provider-defined' as const,
+      anchor: null,
+      revision: { origin: 'local-observation' as const, contentHash: 'a'.repeat(64) },
+      observedAt: '2026-09-11T08:00:00.000Z',
+      quantityBasis: 'normalized-units' as const,
+      volumeBasis: 'unknown' as const,
+      dividendMeaning: 'provider-defined' as const,
+      dividendEvidenceRef: null,
+      conversionAvailable: false,
+      conversionEvidenceRef: null,
+      derivation: null,
+    },
+    accountingBasis: 'normalized-series' as const,
+    history: { basis: 'fixed-provider-snapshot' as const },
+  },
 };
+
+const executionModelTemplate = backtestExecutionModelSchemaV3.parse(
+  JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../../packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  ) as unknown,
+);
+
+export const createNormalizedRunConfig = () =>
+  runConfigSchemaV3.parse({
+    ...runConfig,
+    executionModel: backtestExecutionModelSchemaV3.parse({
+      ...executionModelTemplate,
+      scope: {
+        ...executionModelTemplate.scope,
+        range: { start: runConfig.startDate, end: runConfig.endDate },
+      },
+      segments: executionModelTemplate.segments.map((segment) => {
+        if (segment.execution.mode !== 'exchange') return segment;
+        return {
+          ...segment,
+          range: { start: runConfig.startDate, end: runConfig.endDate },
+          execution: {
+            ...segment.execution,
+            price: { kind: 'noDailyLimit', reason: '价格已处于归一化连续坐标' },
+            normalizedExecution: {
+              priceCoordinate: 'continuous-decimal',
+              quantityUnits: 'continuous-normalized-decimal',
+              lotSizeConstraint: 'not-applied',
+              tickSizeConstraint: 'not-applied',
+              dailyPriceLimit: 'not-applied',
+              feeBasis: 'simulatedTurnover',
+            },
+          },
+        };
+      }),
+    }),
+  });
+
 export const split = {
   development: { start: '2026-01-01', end: '2026-04-30' },
   validation: { start: '2026-05-01', end: '2026-07-31' },

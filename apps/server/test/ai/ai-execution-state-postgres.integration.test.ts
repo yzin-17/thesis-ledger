@@ -115,7 +115,7 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
   };
 
   beforeAll(async () => {
-    const strategy = await prisma.strategy.create({ data: { name: `AI execution ${suffix}` } });
+    const strategy = await prisma.strategy.create({ data: { schemaVersion: 2, name: `AI execution ${suffix}` } });
     strategyId = strategy.id;
     const version = await prisma.strategyVersion.create({
       data: { strategyId, version: 1, schemaVersion: 2, schema: {} },

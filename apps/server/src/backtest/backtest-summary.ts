@@ -28,13 +28,18 @@ export const backtestJobSummarySelect = {
   diagnostics: true,
   input: true,
   result: true,
+  runConfig: true,
+  snapshotManifest: true,
 } satisfies Prisma.BacktestJobSelect;
 
 type BacktestJobSummaryRecord = Prisma.BacktestJobGetPayload<{
   select: typeof backtestJobSummarySelect;
 }>;
 
-export type BacktestJobSummary = Omit<BacktestJobSummaryRecord, 'input' | 'result'> & {
+export type BacktestJobSummary = Omit<
+  BacktestJobSummaryRecord,
+  'input' | 'result' | 'runConfig' | 'snapshotManifest'
+> & {
   initialCash: number | null;
   resultMetrics: Record<string, unknown> | null;
   readEligibility?: ResultReadEligibility;
@@ -49,22 +54,25 @@ const resultMetrics = (result: Prisma.JsonValue | null): Record<string, unknown>
 };
 
 export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): BacktestJobSummary => {
-  const { input, result, ...summary } = withBacktestModelDisclosure(record);
-  let initialCashValue: unknown;
-  if (input && typeof input === 'object' && !Array.isArray(input) && 'initialCash' in input) {
-    initialCashValue = input.initialCash;
-  } else if (input && typeof input === 'object' && !Array.isArray(input) && 'runConfig' in input) {
-    const runConfig = input.runConfig as {
-      baseCurrency?: 'CNY' | 'HKD' | 'USD';
-      initialCash?: Partial<Record<'CNY' | 'HKD' | 'USD', string>>;
-    };
-    const initialCash = runConfig.initialCash;
-    if (runConfig.baseCurrency && initialCash?.[runConfig.baseCurrency] !== undefined) {
-      initialCashValue = initialCash[runConfig.baseCurrency];
-    } else {
-      initialCashValue = Object.values(initialCash ?? {}).find((amount) => amount !== undefined);
-    }
-  }
+  const {
+    input,
+    result,
+    runConfig: storedConfig,
+    snapshotManifest,
+    ...summary
+  } = withBacktestModelDisclosure(record);
+  void storedConfig;
+  void snapshotManifest;
+  const currentInput = input && typeof input === 'object' && !Array.isArray(input) ? input : null;
+  const config = currentInput?.runConfig as
+    | {
+        baseCurrency?: string;
+        initialCash?: Record<string, string>;
+      }
+    | undefined;
+  const initialCashValue = config?.baseCurrency
+    ? config.initialCash?.[config.baseCurrency]
+    : undefined;
   const initialCash = Number(initialCashValue);
   return {
     ...summary,

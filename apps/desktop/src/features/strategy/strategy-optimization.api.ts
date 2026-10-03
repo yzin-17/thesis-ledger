@@ -33,6 +33,7 @@ export type OptimizationCapabilities = {
 };
 
 export type OptimizationExperimentSummary = {
+  runConfig?: unknown;
   readEligibility?: ResultReadEligibility;
   id: string;
   name: string;

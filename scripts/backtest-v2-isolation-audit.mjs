@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const roots = [resolve(root, 'apps/server/src/backtest'), resolve(root, 'packages/domain/src')];
 const forbiddenImport =
-  /(?:from|import\s*\()\s*['"][^'"]*(?:ledger-v2|trade-projection|\/ledger\/|\/portfolio\/|\/journal\/)[^'"]*['"]/u;
-const forbiddenType = /\b(?:LedgerEventV2|TradeProjection|CASH_FLOW)\b/u;
+  /(?:from|import\s*\()\s*['"][^'"]*(?:ledger-contract|ledger-v2|trade-projection|\/ledger\/|\/portfolio\/|\/journal\/)[^'"]*['"]/u;
+const forbiddenType = /\b(?:LedgerEvent|TradeProjection|CASH_FLOW)\b/u;
 
 const filesUnder = async (directory) => {
   const entries = await readdir(directory, { withFileTypes: true });

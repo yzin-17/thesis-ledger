@@ -15,7 +15,7 @@ const model = JSON.parse(
 describe('回测模型响应与摘要', () => {
   const record = {
     id: 'run',
-    mode: 'V2',
+    mode: 'V3',
     status: 'failed',
     errorCode: 'DATA_UNAVAILABLE',
     errorSummary: 'historical trading status unavailable: 600519.SH',
@@ -51,17 +51,16 @@ describe('回测模型响应与摘要', () => {
       expect(withBacktestModelDisclosure(old)).toEqual(old);
     }
   });
-  it('创建和两条详情路由返回同一披露契约', async () => {
+  it('创建和现行详情路由返回同一披露契约', async () => {
     const controller = new BacktestController(
       {
         createRun: vi.fn(async () => record),
-        statusForRead: vi.fn(async () => record),
+        currentRunForRead: vi.fn(async () => record),
       } as never,
       {} as never,
     );
     for (const response of [
       await controller.createRun({}),
-      await controller.status('run'),
       await controller.runStatus('run'),
     ]) {
       expect(response).toMatchObject({

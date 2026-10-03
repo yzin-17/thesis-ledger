@@ -17,6 +17,7 @@ import { buildBacktestChartModel } from './strategy-backtest-chart.model.js';
 import { StrategyBacktestEquityChart } from './StrategyBacktestEquityChart.js';
 import { StrategyBacktestEquityDetails } from './StrategyBacktestEquityDetails.js';
 import { StrategyBacktestDiagnostics } from './StrategyBacktestDiagnostics.js';
+import { BacktestRunDisclosure } from './BacktestModelDisclosure.js';
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -153,7 +154,7 @@ function ResultOverview({ job, result }: { job: BacktestJob; result: BacktestJob
       </div>
       {chartModel.limitation && (
         <Alert>
-          <AlertTitle>图表数据范围受限</AlertTitle>
+          <AlertTitle>图表覆盖说明</AlertTitle>
           <AlertDescription>{chartModel.limitation}</AlertDescription>
         </Alert>
       )}
@@ -323,14 +324,17 @@ export function StrategyBacktestResultTabs({ job }: { job: BacktestJob }) {
       </div>
     );
   }
-  const incomplete = job.status !== 'succeeded' || record(result)?.completeness === 'partial';
+  const unsuccessful = job.status !== 'succeeded';
+  const partial = record(result)?.completeness === 'partial';
   return (
     <div className="space-y-4">
-      {incomplete && (
+      {(unsuccessful || partial) && (
         <Alert>
-          <AlertTitle>未完成结果</AlertTitle>
+          <AlertTitle>{unsuccessful ? '未完成结果' : '结果部分可用'}</AlertTitle>
           <AlertDescription>
-            当前产物来自未成功收敛或部分完整的任务，仅用于诊断，不能视为完整回测结果。
+            {unsuccessful
+              ? '任务未成功完成，当前产物仅用于诊断。'
+              : '任务已完成，但部分指标或比较项尚未核实；请查看数据与假设中的完整度与来源说明。'}
           </AlertDescription>
         </Alert>
       )}
@@ -348,6 +352,7 @@ export function StrategyBacktestResultTabs({ job }: { job: BacktestJob }) {
           <TradesAndOrders result={result} />
         </TabsContent>
         <TabsContent value="data" className="pt-4">
+          <BacktestRunDisclosure job={job} />
           <DataAndAssumptions job={job} result={result} />
         </TabsContent>
         <TabsContent value="diagnostics" className="pt-4">

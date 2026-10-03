@@ -1,202 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ledgerEventEnvelopeSchemaV2, type LedgerEventV2 } from '@thesis-ledger/schemas';
+import { ledgerEventEnvelopeSchema, type LedgerEvent } from '@thesis-ledger/schemas';
 import {
   BaselineImportService,
   createImportDraftContentFingerprint,
 } from '../../src/ledger/baseline-import.service.js';
 
-const accountId = '11111111-1111-4111-8111-111111111111';
-const batchId = '22222222-2222-4222-8222-222222222222';
-
-const knownEvent = ledgerEventEnvelopeSchemaV2.parse({
-  version: 2,
-  eventId: '33333333-3333-4333-8333-333333333333',
-  factId: '44444444-4444-4444-8444-444444444444',
-  accountId,
-  ledgerRevision: '1',
-  type: 'BUY_EXECUTION',
-  occurredAt: '2026-08-20T01:00:00.000Z',
-  timePrecision: 'INSTANT',
-  sourceTimezone: 'Asia/Shanghai',
-  economicOrderKey: 'a0',
-  recordedAt: '2026-08-20T01:00:01.000Z',
-  payloadVersion: 1,
-  source: { category: 'MANUAL', channel: 'desktop', externalId: 'known-buy' },
-  actorId: 'user-1',
-  revisionAction: 'CREATE',
-  payload: {
-    symbol: '0700.HK',
-    quantity: '10',
-    price: '500',
-    currency: 'HKD',
-    capabilityVerification: 'VERIFIED',
-    charges: [],
-  },
-});
-
-const storedFromEvent = (event: LedgerEventV2) => ({
-  id: event.eventId,
-  accountId: event.accountId,
-  type: event.type,
-  occurredAt: event.occurredAt === null ? null : new Date(event.occurredAt),
-  factId: event.factId,
-  ledgerRevision: BigInt(event.ledgerRevision),
-  timePrecision: event.timePrecision,
-  sourceTimezone: event.sourceTimezone,
-  economicOrderKey: event.economicOrderKey,
-  recordedAt: new Date(event.recordedAt),
-  payloadVersion: event.payloadVersion,
-  payload: event.revisionAction === 'VOID' ? null : event.payload,
-  sourceCategory: event.source.category,
-  sourceChannel: event.source.channel,
-  externalId: event.source.externalId ?? null,
-  sourceRowId: event.source.sourceRowId ?? null,
-  actorId: event.actorId,
-  revisionAction: event.revisionAction,
-  supersedesEventId: event.supersedesEventId ?? null,
-  reason: event.reason ?? null,
-});
-
-const baselineCommand = {
-  command: 'CREATE_BASELINE_OBSERVATION_BATCH',
-  batchId,
-  accountId,
-  scope: 'FULL',
-  observedAt: '2026-08-26T02:30:00.000Z',
-  capturedAt: '2026-08-26T02:31:00.000Z',
-  sourceTimezone: 'Asia/Shanghai',
-  source: { category: 'IMPORT', channel: 'screenshot', externalId: 'baseline-1' },
-  actorId: 'user-1',
-  evidenceRef: 'evidence://controlled/1',
-  contentHash: 'a'.repeat(64),
-  observations: [
-    {
-      symbol: 'AAPL.US',
-      quantity: '5',
-      averageCost: '200',
-      currency: 'USD',
-      costIncludesFees: 'UNKNOWN',
-    },
-  ],
-};
-
-const createBaselineHarness = () => {
-  const appended: LedgerEventV2[] = [];
-  const transaction = {
-    baselineObservationBatch: {
-      findUnique: vi.fn(async () => null),
-      create: vi.fn(async ({ data }: { data: object }) => data),
-    },
-    ledgerEvent: { findMany: vi.fn(async () => [storedFromEvent(knownEvent)]) },
-    position: {
-      findMany: vi.fn(async () => [{ id: 'position-1', symbol: '600519.SH' }]),
-      update: vi.fn(async ({ data }: { data: object }) => data),
-      delete: vi.fn(async () => undefined),
-      create: vi.fn(async ({ data }: { data: object }) => data),
-    },
-    asset: {
-      findMany: vi.fn(async () => [
-        { symbol: '0700.HK', currency: 'HKD' },
-        { symbol: '600519.SH', currency: 'CNY' },
-      ]),
-    },
-  };
-  const repository = {
-    withAccountWrite: async (
-      requestedAccountId: string,
-      operation: (context: object) => Promise<{ value: unknown; advanceRevision: boolean }>,
-    ) => {
-      const mutation = await operation({
-        transaction,
-        accountId: requestedAccountId,
-        currentLedgerRevision: 1n,
-        nextLedgerRevision: 2n,
-        currentProjectionGeneration: 1n,
-        nextProjectionGeneration: 2n,
-      });
-      return {
-        value: mutation.value,
-        ledgerRevision: mutation.advanceRevision ? '2' : '1',
-        projectionGeneration: mutation.advanceRevision ? '2' : '1',
-      };
-    },
-    appendRevision: vi.fn(async (_context: object, rawEvent: unknown) => {
-      const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
-      appended.push(event);
-      return event;
-    }),
-  };
-  const prisma = { importDraft: { findUnique: vi.fn() }, $transaction: vi.fn() };
-  return {
-    service: new BaselineImportService(prisma as never, repository as never),
-    transaction,
-    repository,
-    appended,
-  };
-};
-
-describe('Baseline Observation Batch', () => {
-  it('FULL 为未出现的已知资产补齐原币种 0 观察', async () => {
-    const harness = createBaselineHarness();
-    const result = await harness.service.createBaselineBatch(baselineCommand);
-
-    expect(result).toMatchObject({
-      ledgerRevisions: { [accountId]: '2' },
-      affectedSymbols: ['AAPL.US', '0700.HK', '600519.SH'],
-      idempotentReplay: false,
-    });
-    expect(harness.appended).toHaveLength(3);
-    expect(harness.appended[1]).toMatchObject({
-      payload: { symbol: '0700.HK', quantity: '0', currency: 'HKD' },
-    });
-    expect(harness.appended[2]).toMatchObject({
-      payload: { symbol: '600519.SH', quantity: '0', currency: 'CNY' },
-    });
-  });
-
-  it('PARTIAL 不查询或影响未明确提供的资产', async () => {
-    const harness = createBaselineHarness();
-    await harness.service.createBaselineBatch({ ...baselineCommand, scope: 'PARTIAL' });
-
-    expect(harness.appended).toHaveLength(1);
-    expect(harness.transaction.asset.findMany).not.toHaveBeenCalled();
-  });
-
-  it('同一批次的所有资产事件共享一个 Ledger Revision', async () => {
-    const harness = createBaselineHarness();
-    await harness.service.createBaselineBatch(baselineCommand);
-    expect(new Set(harness.appended.map((event) => event.ledgerRevision))).toEqual(new Set(['2']));
-  });
-
-  it('FULL 批次业务观察时间和采集时间未知时仍创建 UNKNOWN 批次和事件', async () => {
-    const harness = createBaselineHarness();
-    await harness.service.createBaselineBatch({
-      ...baselineCommand,
-      scope: 'FULL',
-      observedAt: null,
-      capturedAt: null,
-      timePrecision: 'UNKNOWN',
-      sourceTimezone: 'UNKNOWN',
-    });
-
-    expect(harness.transaction.baselineObservationBatch.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        id: batchId,
-        timePrecision: 'UNKNOWN',
-        status: 'SUBMITTED',
-      }),
-    });
-    const batchData = harness.transaction.baselineObservationBatch.create.mock.calls[0]?.[0].data;
-    expect(batchData).not.toHaveProperty('observedAt');
-    expect(batchData).not.toHaveProperty('capturedAt');
-    expect(harness.appended[0]).toMatchObject({
-      occurredAt: null,
-      timePrecision: 'UNKNOWN',
-      sourceTimezone: 'UNKNOWN',
-      payload: expect.not.objectContaining({ capturedAt: expect.anything() }),
-    });
-  });
-});
+import { accountId, knownEvent, storedFromEvent } from './baseline-import-ledger.fixture.js';
 
 describe('Reviewed Import Commit', () => {
   it('在账户写锁内重新检查基线，账本变化时不创建 Revision', async () => {
@@ -309,7 +118,7 @@ describe('Reviewed Import Commit', () => {
         },
       ],
     ]);
-    const appended: LedgerEventV2[] = [];
+    const appended: LedgerEvent[] = [];
     const transaction = {
       importDraft: {
         findUnique: vi.fn(async () => draft),
@@ -381,7 +190,7 @@ describe('Reviewed Import Commit', () => {
       },
     );
     const appendRevision = vi.fn(async (_context: object, rawEvent: unknown) => {
-      const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+      const event = ledgerEventEnvelopeSchema.parse(rawEvent);
       appended.push(event);
       return event;
     });
@@ -560,7 +369,7 @@ describe('ImportDraft Revision', () => {
       submittedAt: null as Date | null,
       submittedRowIds: null as string[] | null,
     };
-    const appended: LedgerEventV2[] = [];
+    const appended: LedgerEvent[] = [];
     const transaction = {
       importDraft: {
         findUnique: vi.fn(async () => ({
@@ -618,7 +427,7 @@ describe('ImportDraft Revision', () => {
         };
       },
       appendRevision: vi.fn(async (_context: object, rawEvent: unknown) => {
-        const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+        const event = ledgerEventEnvelopeSchema.parse(rawEvent);
         appended.push(event);
         return event;
       }),
@@ -1110,7 +919,7 @@ describe('ImportDraft Revision', () => {
       submittedAt: null as Date | null,
       submittedRowIds: null as string[] | null,
     };
-    const appended: LedgerEventV2[] = [];
+    const appended: LedgerEvent[] = [];
     const transaction = {
       importDraftRevision: {
         findUnique: vi.fn(async () => revision),
@@ -1173,7 +982,7 @@ describe('ImportDraft Revision', () => {
         };
       },
       appendRevision: vi.fn(async (_context: object, rawEvent: unknown) => {
-        const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+        const event = ledgerEventEnvelopeSchema.parse(rawEvent);
         appended.push(event);
         return event;
       }),
@@ -1369,7 +1178,7 @@ describe('ImportDraft Revision', () => {
         create: vi.fn(),
       },
     };
-    const appended: LedgerEventV2[] = [];
+    const appended: LedgerEvent[] = [];
     const repository = {
       withAccountWrite: async (
         requestedAccountId: string,
@@ -1386,7 +1195,7 @@ describe('ImportDraft Revision', () => {
         return { value: mutation.value, ledgerRevision: '2', projectionGeneration: '2' };
       },
       appendRevision: vi.fn(async (_context: object, rawEvent: unknown) => {
-        const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+        const event = ledgerEventEnvelopeSchema.parse(rawEvent);
         appended.push(event);
         return event;
       }),
@@ -1468,7 +1277,7 @@ describe('ImportDraft Revision', () => {
       rows: [firstRow, secondRow],
       committedAt: null as Date | null,
     };
-    const appended: LedgerEventV2[] = [];
+    const appended: LedgerEvent[] = [];
     const transaction = {
       importDraftRevision: {
         findUnique: vi.fn(async () => revision),
@@ -1521,7 +1330,7 @@ describe('ImportDraft Revision', () => {
         };
       },
       appendRevision: vi.fn(async (_context: object, rawEvent: unknown) => {
-        const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+        const event = ledgerEventEnvelopeSchema.parse(rawEvent);
         appended.push(event);
         return event;
       }),

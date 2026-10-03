@@ -50,6 +50,17 @@ const unsupported = () =>
       },
     },
   );
+const schemaMismatch = () =>
+  new AiSdkGenerationError(
+    {
+      code: 'schema_invalid',
+      phase: 'validation',
+      summary: 'No object generated: response did not match schema.',
+      externalResult: 'complete',
+      requestId: randomUUID(),
+    },
+    { status: 'reported', inputTokens: 8, outputTokens: 4 },
+  );
 const fixture = () => {
   let row: {
     name: string;
@@ -133,7 +144,8 @@ describe('verified provider save', () => {
         transport: 'stream',
         authMode: 'none',
         contract: aiGenerationContracts.research.ref,
-        timeout: { totalMs: 120000, firstChunkMs: 30000, chunkMs: 30000 },
+        // 流式用途探针不设总时长墙：判活交给首块与块间停顿，慢生成不该被 Provider 超时掐断。
+        timeout: { firstChunkMs: 30000, chunkMs: 30000 },
       }),
     );
     expect(f.providers.save).toHaveBeenCalledWith(
@@ -158,19 +170,51 @@ describe('verified provider save', () => {
       f.sdk.generate.mock.calls.map(([request]) => (request as { mode: string }).mode),
     ).toEqual(['native_schema', 'json_mode']);
   });
-  it.each(['timeout', 'rate limit', 'schema_invalid'])(
-    'does not fallback after %s',
-    async (message) => {
-      const f = fixture();
-      f.sdk.generate.mockRejectedValueOnce(new Error(message));
-      const value = input();
-      await expect(f.service.testAndSave(value, await f.authorize(value))).rejects.toThrow(
-        '原配置未修改',
-      );
-      expect(f.sdk.generate).toHaveBeenCalledTimes(1);
-      expect(f.providers.save).not.toHaveBeenCalled();
-    },
-  );
+  it.each(['timeout', 'rate limit'])('does not fallback after %s', async (message) => {
+    const f = fixture();
+    f.sdk.generate.mockRejectedValueOnce(new Error(message));
+    const value = input();
+    await expect(f.service.testAndSave(value, await f.authorize(value))).rejects.toThrow(
+      '原配置未修改',
+    );
+    expect(f.sdk.generate).toHaveBeenCalledTimes(1);
+    expect(f.providers.save).not.toHaveBeenCalled();
+  });
+  it('does not infer a schema mismatch from error prose', async () => {
+    const f = fixture();
+    // 错误文案既不能证明输出方式不受支持，也不能触发自动切换。
+    f.sdk.generate.mockRejectedValueOnce(new Error('schema_invalid'));
+    const value = input();
+    await expect(f.service.testAndSave(value, await f.authorize(value))).rejects.toThrow(
+      '原配置未修改',
+    );
+    expect(f.sdk.generate).toHaveBeenCalledTimes(1);
+    expect(f.providers.save).not.toHaveBeenCalled();
+  });
+  it('does not retry another output mode after schema validation fails', async () => {
+    const f = fixture();
+    f.sdk.generate.mockRejectedValueOnce(schemaMismatch());
+    const value = input();
+    await expect(f.service.testAndSave(value, await f.authorize(value))).rejects.toThrow(
+      '原配置未修改',
+    );
+    expect(
+      f.sdk.generate.mock.calls.map(([request]) => (request as { mode: string }).mode),
+    ).toEqual(['native_schema']);
+    expect(f.providers.save).not.toHaveBeenCalled();
+    expect(f.health.recordHistory).toHaveBeenLastCalledWith(
+      'local',
+      'degraded',
+      expect.any(Number),
+      'schema_mismatch',
+      expect.any(Date),
+      'manual',
+      expect.objectContaining({
+        status: 'failed',
+        usage: { status: 'reported', inputTokens: 8, outputTokens: 4 },
+      }),
+    );
+  });
   it('does not silently use text after both structured methods are rejected', async () => {
     const f = fixture();
     f.sdk.generate.mockRejectedValue(unsupported());
@@ -299,6 +343,71 @@ describe('verified provider save', () => {
     expect(await result).toBeInstanceOf(Error);
     expect(f.providers.save).not.toHaveBeenCalled();
     expect(f.sdk.generate).toHaveBeenCalledTimes(1);
+  });
+  it('reports a probe timeout honestly instead of as a user cancellation', async () => {
+    const f = fixture();
+    // 探针超时只会让合并 signal 变成 aborted，适配器只能给出 “cancelled / 生成请求已取消”。
+    f.sdk.generate.mockRejectedValueOnce(
+      new AiSdkGenerationError({
+        code: 'cancelled',
+        phase: 'cancellation',
+        summary: '生成请求已取消',
+        externalResult: 'unknown',
+        requestId: randomUUID(),
+      }),
+    );
+    const value = input();
+    let message = '';
+    await f.service
+      .testAndSave(value, await f.authorize(value))
+      .catch((error: unknown) => {
+        message = error instanceof Error ? error.message : String(error);
+      });
+    expect(message).toContain('已按超时中断');
+    expect(message).toContain('首块 30000 ms / 间隔 30000 ms');
+    expect(message).not.toContain('生成请求已取消');
+    expect(f.health.recordHistory).toHaveBeenLastCalledWith(
+      'local',
+      'degraded',
+      expect.any(Number),
+      'provider_timeout',
+      expect.any(Date),
+      'manual',
+      expect.objectContaining({ status: 'failed' }),
+    );
+  });
+  it('still reports a caller cancellation as cancelled', async () => {
+    const f = fixture();
+    const value = input();
+    const auth = await f.authorize(value);
+    let start!: () => void;
+    const started = new Promise<void>((resolve) => {
+      start = resolve;
+    });
+    f.sdk.generate.mockImplementationOnce(async (request) => {
+      const signal = (request as { signal: AbortSignal }).signal;
+      start();
+      await new Promise<void>((resolve) =>
+        signal.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      throw new AiSdkGenerationError({
+        code: 'cancelled',
+        phase: 'cancellation',
+        summary: '生成请求已取消',
+        externalResult: 'unknown',
+        requestId: randomUUID(),
+      });
+    });
+    let message = '';
+    const result = f.service.testAndSave(value, auth).catch((error: unknown) => {
+      message = error instanceof Error ? error.message : String(error);
+      return null;
+    });
+    await started;
+    expect(f.service.cancel(value.name, auth.operationId)).toEqual({ cancelled: true });
+    await result;
+    expect(message).toContain('生成请求已取消');
+    expect(message).not.toContain('已按超时中断');
   });
   it('reuses a passed purpose after another purpose fails, without hiding the failed one', async () => {
     const f = fixture();

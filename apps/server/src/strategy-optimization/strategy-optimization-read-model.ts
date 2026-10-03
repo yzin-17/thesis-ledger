@@ -2,8 +2,8 @@ import {
   optimizationDiscoveryScopeSchema,
   optimizationTradingCostReadModelSchema,
   resultReadEligibilityForExperiment,
-  strategySchemaV2,
-  type StrategySchemaV2,
+  strategySchema,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { aiExecutionReadModel, safeAttemptMetadata } from '../ai/ai-execution-read-model.js';
 import {
@@ -21,7 +21,7 @@ const zeroDecimal = (value: string) => /^0+(?:\.0+)?$/u.test(value);
 
 export const optimizationTradingCostReadModel = (row: ExperimentReadRow) => {
   let source: 'baseline_strategy' | 'discovery_seed' | 'unavailable' = 'unavailable';
-  let strategy: StrategySchemaV2 | null = null;
+  let strategy: BacktestStrategy | null = null;
   if (row.sourceMode === 'discovery') {
     const scope = optimizationDiscoveryScopeSchema.safeParse(row.discoveryScope);
     if (scope.success) {
@@ -29,10 +29,10 @@ export const optimizationTradingCostReadModel = (row: ExperimentReadRow) => {
       strategy = createDiscoverySeed(scope.data);
     }
   } else {
-    const parsed = strategySchemaV2.safeParse(row.baselineStrategySchema);
+    const parsed = strategySchema.safeParse(row.baselineStrategySchema);
     if (parsed.success) {
       source = 'baseline_strategy';
-      strategy = parsed.data as StrategySchemaV2;
+      strategy = parsed.data as BacktestStrategy;
     }
   }
   return optimizationTradingCostReadModelSchema.parse({

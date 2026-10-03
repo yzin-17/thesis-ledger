@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { strategySchemaV2, type OptimizationAdoptionErrorCode } from '@thesis-ledger/schemas';
+import { strategySchema, type OptimizationAdoptionErrorCode } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import { optimizationSha256 } from './strategy-optimization-common.js';
 
@@ -193,7 +193,7 @@ export async function formalizeOptimizationCandidate(
     });
     if (!baseline || baseline.strategyId !== candidate.candidateStrategyId)
       throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '实验基线与候选不属于同一策略来源');
-    const candidateStrategy = strategySchemaV2.safeParse(candidate.candidateSchema);
+    const candidateStrategy = strategySchema.safeParse(candidate.candidateSchema);
     if (!candidateStrategy.success || candidate.candidateSchemaVersion !== 2)
       throw adoptionRejected('ADOPTION_NOT_ELIGIBLE', '候选不是可入库的正式 V2 策略定义');
     if (optimizationSha256(candidateStrategy.data) !== candidate.executionHash)

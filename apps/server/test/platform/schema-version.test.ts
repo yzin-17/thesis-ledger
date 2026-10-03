@@ -80,7 +80,10 @@ describe('HealthService schema reporting', () => {
       { ping: vi.fn(async () => 'PONG') } as never,
       {
         health: vi.fn(async () => ({ ok: true })),
-        capabilities: vi.fn(async () => ({ capabilities: { 'fund-nav': true } })),
+        marketDataCapabilitiesV3: vi.fn(async () => ({
+          dataContractVersions: [3],
+          serviceCapabilities: { fundNav: true },
+        })),
       } as never,
     );
 

@@ -7,17 +7,17 @@ import {
 } from '@nestjs/common';
 import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
-  createBaselineObservationBatchCommandSchemaV2,
-  createImportDraftRevisionCommandSchemaV2,
+  createBaselineObservationBatchCommandSchema,
+  createImportDraftRevisionCommandSchema,
   currencySchema,
   importDraftSchema,
-  reviseImportDraftCommandSchemaV2,
-  submitImportDraftRevisionCommandSchemaV2,
-  type ImportDraftRowV2,
-  type LedgerCommandResponseV2,
-  type LedgerEventV2,
-  type ReviseImportDraftCommandV2,
-  type SubmitImportDraftRevisionCommandV2,
+  reviseImportDraftCommandSchema,
+  submitImportDraftRevisionCommandSchema,
+  type ImportDraftRow,
+  type LedgerCommandResponse,
+  type LedgerEvent,
+  type ReviseImportDraftCommand,
+  type SubmitImportDraftRevisionCommand,
 } from '@thesis-ledger/schemas';
 import { Prisma } from '@prisma/client';
 import { isEqual } from 'es-toolkit';
@@ -60,7 +60,7 @@ const conflict = (errorCode: string, message: string, details?: Record<string, u
 
 const ORPHAN_SELL = 'ORPHAN_SELL';
 
-const withoutComputedIssues = (rows: ImportDraftRowV2[]) =>
+const withoutComputedIssues = (rows: ImportDraftRow[]) =>
   rows.map((row) => ({ ...row, issues: row.issues.filter((issue) => issue !== ORPHAN_SELL) }));
 
 const IMPORT_DRAFT_TRANSACTION_OPTIONS = {
@@ -162,11 +162,11 @@ export const createImportDraftContentFingerprint = (input: ImportDraftContentFin
 const normalizeScope = (value?: string | null): 'FULL' | 'PARTIAL' =>
   value === 'PARTIAL' ? 'PARTIAL' : 'FULL';
 
-const isGeneratedBaselineRow = (row: ImportDraftRowV2) =>
+const isGeneratedBaselineRow = (row: ImportDraftRow) =>
   row.kind === 'POSITION_BASELINE' && row.rowId.startsWith('baseline-zero:');
 
-const readDraftRows = (value: Prisma.JsonValue | null | undefined): ImportDraftRowV2[] =>
-  Array.isArray(value) ? (value as unknown as ImportDraftRowV2[]) : [];
+const readDraftRows = (value: Prisma.JsonValue | null | undefined): ImportDraftRow[] =>
+  Array.isArray(value) ? (value as unknown as ImportDraftRow[]) : [];
 
 type ExistingImportDraft = {
   id: string;
@@ -253,8 +253,8 @@ const assignStableRowId = (
 };
 
 const mergeDraftRows = (
-  existingRows: ImportDraftRowV2[],
-  incomingRows: ImportDraftRowV2[],
+  existingRows: ImportDraftRow[],
+  incomingRows: ImportDraftRow[],
   frozenRowIds: Set<string>,
 ) => {
   const incomingById = new Map(incomingRows.map((row) => [row.rowId, row]));
@@ -275,14 +275,14 @@ const mergeDraftRows = (
 };
 
 interface DraftSubmissionResult {
-  events: LedgerEventV2[];
+  events: LedgerEvent[];
   replay: boolean;
   blockedRowIds: string[] | null;
   projectionGenerations?: Record<string, string>;
 }
 
 interface BaselineBatchResult {
-  events: LedgerEventV2[];
+  events: LedgerEvent[];
   replay: boolean;
   projectionGenerations?: Record<string, string>;
 }
@@ -294,8 +294,8 @@ export class BaselineImportService {
     private readonly repository: LedgerV2Repository,
   ) {}
 
-  async createBaselineBatch(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = createBaselineObservationBatchCommandSchemaV2.parse(rawCommand);
+  async createBaselineBatch(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = createBaselineObservationBatchCommandSchema.parse(rawCommand);
     const result = await this.repository.withAccountWrite<BaselineBatchResult>(
       command.accountId,
       async (context) => {
@@ -360,7 +360,7 @@ export class BaselineImportService {
         for (const [index, observation] of observations.entries()) {
           events.push(
             await this.repository.appendRevision(context, {
-              version: 2,
+              version: 3,
               eventId: randomUUID(),
               factId: randomUUID(),
               accountId: command.accountId,
@@ -412,7 +412,7 @@ export class BaselineImportService {
   }
 
   async createImportDraft(rawCommand: unknown) {
-    const command = createImportDraftRevisionCommandSchemaV2.parse(rawCommand);
+    const command = createImportDraftRevisionCommandSchema.parse(rawCommand);
     const rows = withoutComputedIssues(command.rows);
     const timePrecision =
       command.timePrecision ??
@@ -693,7 +693,7 @@ export class BaselineImportService {
   }
 
   async reviseImportDraft(rawCommand: unknown) {
-    const command = reviseImportDraftCommandSchemaV2.parse(rawCommand);
+    const command = reviseImportDraftCommandSchema.parse(rawCommand);
     return this.prisma.$transaction((transaction) =>
       this.reviseImportDraftWithTransaction(transaction, command),
     );
@@ -701,7 +701,7 @@ export class BaselineImportService {
 
   private async reviseImportDraftWithTransaction(
     transaction: Prisma.TransactionClient,
-    command: ReviseImportDraftCommandV2,
+    command: ReviseImportDraftCommand,
   ) {
     const rows = withoutComputedIssues(command.rows);
     const draft = await transaction.importDraft.findUnique({ where: { id: command.draftId } });
@@ -804,8 +804,8 @@ export class BaselineImportService {
     };
   }
 
-  async submitImportDraft(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = submitImportDraftRevisionCommandSchemaV2.parse(rawCommand);
+  async submitImportDraft(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = submitImportDraftRevisionCommandSchema.parse(rawCommand);
     const draft = await this.prisma.importDraft.findUnique({ where: { id: command.draftId } });
     if (!draft) throw new NotFoundException('导入草稿不存在');
     const result = await this.repository.withAccountWrite(draft.accountId, (context) =>
@@ -825,7 +825,7 @@ export class BaselineImportService {
 
   private async submitImportDraftWithContext(
     context: AccountLedgerWriteContext,
-    command: SubmitImportDraftRevisionCommandV2,
+    command: SubmitImportDraftRevisionCommand,
   ): Promise<AccountLedgerMutation<DraftSubmissionResult>> {
     const lockedDraft = await context.transaction.importDraft.findUnique({
       where: { id: command.draftId },
@@ -979,7 +979,7 @@ export class BaselineImportService {
     }
 
     const scope = normalizeScope(revision.scope ?? lockedDraft.scope);
-    let generatedRows: ImportDraftRowV2[] = [];
+    let generatedRows: ImportDraftRow[] = [];
     if (baselineRows.length > 0 && scope === 'FULL')
       generatedRows = (
         await completeDraftBaselineRows(
@@ -1110,7 +1110,7 @@ export class BaselineImportService {
     ledgerRevisions: Record<string, string>,
     projectionGenerations: Record<string, string>,
     idempotentReplay: boolean,
-  ): LedgerCommandResponseV2 {
+  ): LedgerCommandResponse {
     const symbols = events.flatMap((event) => {
       const symbol = ledgerEventSymbol(event);
       return symbol ? [symbol] : [];

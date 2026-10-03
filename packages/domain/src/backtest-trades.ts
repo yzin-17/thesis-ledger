@@ -2,10 +2,10 @@ import { DecimalValue } from './decimal.js';
 import type {
   BacktestCurrency,
   BacktestMoney,
-  BacktestTradeV2,
+  SimulationTrade,
   BacktestMetric,
   SimulationFill,
-} from './backtest-v2.js';
+} from './backtest-contract.js';
 
 export interface BacktestTradeProjectionOptions {
   executionSymbol: string;
@@ -20,7 +20,7 @@ export interface OpenBacktestPosition {
 
 export interface BacktestTradeProjection {
   source: 'BACKTEST';
-  trades: BacktestTradeV2[];
+  trades: SimulationTrade[];
   openPositions: OpenBacktestPosition[];
   status: 'complete' | 'partial' | 'unavailable';
   warnings: string[];
@@ -85,7 +85,7 @@ const addCharges = (
 const sumCharges = (charges: readonly BacktestMoney[]) =>
   charges.reduce((total, charge) => total.plus(charge.amount), DecimalValue.from('0'));
 
-const closeTrade = (lifecycle: OpenLifecycle, closedAt: string): BacktestTradeV2 => {
+const closeTrade = (lifecycle: OpenLifecycle, closedAt: string): SimulationTrade => {
   const charges = sumCharges(lifecycle.charges);
   const realizedPnl = lifecycle.exitValue.minus(lifecycle.entryValue).minus(charges);
   const returnRate = realizedPnl.dividedBy(lifecycle.entryValue, 20);
@@ -122,7 +122,7 @@ export const projectBacktestTrades = (
   options: BacktestTradeProjectionOptions,
 ): BacktestTradeProjection => {
   const warnings: string[] = [];
-  const trades: BacktestTradeV2[] = [];
+  const trades: SimulationTrade[] = [];
   let lifecycle: OpenLifecycle | undefined;
   const seenFillIds = new Set<string>();
   let validFills = 0;
@@ -207,7 +207,7 @@ const unavailable = (reason: string): BacktestMetric => ({ status: 'unavailable'
 
 /** Metrics deliberately consume projected closed trades only. */
 export const calculateBacktestTradeMetrics = (
-  trades: readonly BacktestTradeV2[],
+  trades: readonly SimulationTrade[],
 ): BacktestTradeMetrics => {
   const wins = trades.filter((trade) => DecimalValue.from(trade.realizedPnl.amount).isPositive());
   const losses = trades.filter((trade) => DecimalValue.from(trade.realizedPnl.amount).isNegative());

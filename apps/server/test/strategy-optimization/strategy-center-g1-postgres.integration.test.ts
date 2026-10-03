@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { BacktestController } from '../../src/backtest/backtest.controller.js';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
@@ -131,7 +130,7 @@ const controlledBacktests = {
   ),
   status: vi.fn((id: string) => prisma.backtestJob.findUnique({ where: { id } })),
   retryRun: vi.fn((id: string) => prisma.backtestJob.findUnique({ where: { id } })),
-  runV2: vi.fn(async () => undefined),
+  runCurrentRunForRead: vi.fn(async () => undefined),
   comparableDataFingerprint: vi.fn(async () => 'g1-comparable-data-fingerprint'),
 };
 
@@ -160,10 +159,7 @@ const optimizationController = new StrategyOptimizationController(
   riskApplications as never,
   {} as never,
 );
-const backtestController = new BacktestController(
-  new BacktestService(prisma, undefined, undefined, policy),
-  {} as never,
-);
+const backtestService = new BacktestService(prisma, undefined, undefined, policy);
 
 isolatedDescribe('G1 Controller boundary PostgreSQL vertical workflow', () => {
   beforeAll(async () => {
@@ -267,7 +263,7 @@ isolatedDescribe('G1 Controller boundary PostgreSQL vertical workflow', () => {
     `);
     const testBaselineRunId = persistedAfterFailure[0]?.baselineRunRefs.test;
     expect(testBaselineRunId).toBeTruthy();
-    const protectedRun = await backtestController.status(testBaselineRunId!);
+    const protectedRun = await backtestService.statusForRead(testBaselineRunId!);
     expect(protectedRun).toMatchObject({
       id: testBaselineRunId,
       readEligibility: { state: 'restricted', code: 'TEST_NOT_REVEALED' },
@@ -287,7 +283,7 @@ isolatedDescribe('G1 Controller boundary PostgreSQL vertical workflow', () => {
     });
     const baselineFinalCalls = runCreateKeys.filter((key) => key.includes(':baseline-final:test'));
     expect(baselineFinalCalls).toHaveLength(1);
-    const revealedRun = await backtestController.status(testBaselineRunId!);
+    const revealedRun = await backtestService.statusForRead(testBaselineRunId!);
     expect(revealedRun).toMatchObject({
       id: testBaselineRunId,
       readEligibility: { state: 'readable' },

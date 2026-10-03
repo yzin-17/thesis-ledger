@@ -1,5 +1,6 @@
+import { parseCurrentQuote } from './market-current-data.js';
 import { normalizeSymbol } from '@thesis-ledger/domain';
-import { quoteSchemaV1, type QuoteV1 } from '@thesis-ledger/schemas';
+import { type Quote } from '@thesis-ledger/schemas';
 import { type DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 import { type RedisService, redisKey } from '../platform/redis.service.js';
 import { StructuredLogger, currentTraceId } from '../platform/structured-logger.js';
@@ -29,14 +30,14 @@ type QuoteRedisMulti = {
  */
 export class MarketQuoteReader {
   private readonly logger = new StructuredLogger('thesis-ledger.market');
-  private readonly flights = new Map<string, Promise<QuoteV1>>();
+  private readonly flights = new Map<string, Promise<Quote>>();
 
   constructor(
     private readonly dsa: DsaClient,
     private readonly redis: RedisService,
   ) {}
 
-  private singleFlight(key: string, work: () => Promise<QuoteV1>) {
+  private singleFlight(key: string, work: () => Promise<Quote>) {
     const existing = this.flights.get(key);
     if (existing) return existing;
     const pending = work().finally(() => {
@@ -63,7 +64,7 @@ export class MarketQuoteReader {
     symbol: string,
     startedAt: number,
     status: string,
-  ): Promise<QuoteV1> {
+  ): Promise<Quote> {
     const client = this.client();
     let fresh: string | null = null;
     try {
@@ -73,7 +74,7 @@ export class MarketQuoteReader {
     }
     if (fresh) {
       try {
-        const parsed = quoteSchemaV1.parse({ ...JSON.parse(fresh), servedFromCache: true });
+        const parsed = parseCurrentQuote({ ...JSON.parse(fresh), servedFromCache: true }, symbol);
         this.logStage(symbol, 'fresh-hit', startedAt, 'cache');
         return parsed;
       } catch {
@@ -88,12 +89,15 @@ export class MarketQuoteReader {
     }
     if (lastValid) {
       try {
-        const parsed = quoteSchemaV1.parse({
-          ...JSON.parse(lastValid),
-          stale: true,
-          freshness: 'stale',
-          servedFromCache: true,
-        });
+        const parsed = parseCurrentQuote(
+          {
+            ...JSON.parse(lastValid),
+            stale: true,
+            freshness: 'stale',
+            servedFromCache: true,
+          },
+          symbol,
+        );
         this.logStage(symbol, 'last-valid', startedAt, 'stale');
         return parsed;
       } catch {
@@ -117,9 +121,9 @@ export class MarketQuoteReader {
 
   private async withQuoteLock(
     key: string,
-    work: () => Promise<QuoteV1>,
-    onWait: () => Promise<QuoteV1>,
-    onUnavailable: () => Promise<QuoteV1>,
+    work: () => Promise<Quote>,
+    onWait: () => Promise<Quote>,
+    onUnavailable: () => Promise<Quote>,
     onAcquired: () => void,
   ) {
     const client = this.client();
@@ -166,11 +170,11 @@ export class MarketQuoteReader {
     }
   }
 
-  async getQuote(input: string, options: QuoteReadOptions = {}): Promise<QuoteV1> {
+  async getQuote(input: string, options: QuoteReadOptions = {}): Promise<Quote> {
     const { symbol } = normalizeSymbol(input);
-    const flightKey = `quote:${symbol}`;
-    const freshKey = redisKey('cache', `quote:${symbol}:fresh`);
-    const lastValidKey = redisKey('cache', `quote:${symbol}:last-valid`);
+    const flightKey = `quote:3:${symbol}`;
+    const freshKey = redisKey('cache', `quote:3:${symbol}:fresh`);
+    const lastValidKey = redisKey('cache', `quote:3:${symbol}:last-valid`);
     const startedAt = Date.now();
     const readFallback = (status: string) =>
       this.readFreshOrLastValid(freshKey, lastValidKey, symbol, startedAt, status);
@@ -179,7 +183,10 @@ export class MarketQuoteReader {
       try {
         const cached = await this.client()?.get?.(freshKey);
         if (cached) {
-          const parsed = quoteSchemaV1.parse({ ...JSON.parse(cached), servedFromCache: true });
+          const parsed = parseCurrentQuote(
+            { ...JSON.parse(cached), servedFromCache: true },
+            symbol,
+          );
           this.logStage(symbol, 'fresh-hit', startedAt, 'cache');
           return parsed;
         }
@@ -196,10 +203,13 @@ export class MarketQuoteReader {
             try {
               const cached = await this.client()?.get?.(freshKey);
               if (cached) {
-                const parsed = quoteSchemaV1.parse({
-                  ...JSON.parse(cached),
-                  servedFromCache: true,
-                });
+                const parsed = parseCurrentQuote(
+                  {
+                    ...JSON.parse(cached),
+                    servedFromCache: true,
+                  },
+                  symbol,
+                );
                 this.logStage(symbol, 'fresh-hit', startedAt, 'cache');
                 return parsed;
               }
@@ -213,7 +223,7 @@ export class MarketQuoteReader {
           let raw: Record<string, unknown>;
           try {
             raw = await this.dsa.get<Record<string, unknown>>(
-              `/api/v1/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}`,
+              `/api/v3/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}`,
               1,
             );
             this.logStage(symbol, 'dsa-call', dsaStartedAt, 'success');
@@ -228,12 +238,13 @@ export class MarketQuoteReader {
           }
 
           try {
-            const quote = quoteSchemaV1.parse({
-              ...raw,
-              version: 1,
+            const quote = parseCurrentQuote(
+              {
+                ...raw,
+                servedFromCache: false,
+              },
               symbol,
-              servedFromCache: false,
-            });
+            );
             const serialized = JSON.stringify(quote);
             const multi = this.client()?.multi;
             if (typeof multi !== 'function') return readFallback('cache-unavailable');

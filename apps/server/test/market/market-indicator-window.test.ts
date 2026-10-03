@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { BarSeriesV2, IndicatorCalculateRequestV2 } from '@thesis-ledger/schemas';
-import { MarketV2Controller } from '../../src/market/market-v2.controller.js';
+import type { BarSeries, IndicatorCalculateRequest } from '@thesis-ledger/schemas';
+import { MarketController } from '../../src/market/market.controller.js';
 import { barSeriesInputFingerprint, sliceBarSeries, type BarReadInput } from '../../src/market/market-bar-reader.js';
 
 const fixture = () => {
@@ -12,8 +12,8 @@ const fixture = () => {
       open: 1, high: 2, low: 1, close: 2, volume: 100, amount: 200, completionStatus: 'complete' as const,
     } };
   }).filter(({ date }) => date.getUTCDay() !== 0 && date.getUTCDay() !== 6).map(({ point }) => point);
-  const series: BarSeriesV2 = {
-    contractVersion: 2, identity, points, inputFingerprint: barSeriesInputFingerprint(identity, points),
+  const series: BarSeries = {
+    contractVersion: 3, identity, points, inputFingerprint: barSeriesInputFingerprint(identity, points),
     coverage: { actualStart: points[0]!.timestamp, actualEnd: points.at(-1)!.timestamp, hasMoreBefore: false,
       latestCompleteTradingDate: points.at(-1)!.timestamp.slice(0, 10) },
     provenance: { providerId: 'tencent', upstreamSource: 'tencent', routeIndex: 0, effectivePolicyRevision: 7,
@@ -21,13 +21,13 @@ const fixture = () => {
       servedFromCache: false, cacheStatus: 'miss' },
   };
   const read = vi.fn(async (input: BarReadInput) => sliceBarSeries(series, input.window));
-  const calculate = vi.fn(async (request: Omit<IndicatorCalculateRequestV2, 'contractVersion'>) => ({
-    contractVersion: 2 as const, engineVersion: 'dsa-indicator-v2', inputFingerprint: request.inputFingerprint,
+  const calculate = vi.fn(async (request: Omit<IndicatorCalculateRequest, 'contractVersion'>) => ({
+    contractVersion: 3 as const, engineVersion: 'dsa-indicator-v3', inputFingerprint: request.inputFingerprint,
     // fixture 仅证明输入、投影及来源对应，不替代 DSA 指标公式测试。
     results: request.requests.map((item) => ({ ...item, inputFingerprint: request.inputFingerprint,
       points: request.points.map((point) => ({ timestamp: point.timestamp, values: { value: 123 } })) })),
   }));
-  const controller = new MarketV2Controller({ read } as never, { calculateIndicatorsV2: calculate } as never,
+  const controller = new MarketController({ read, readChartV3: read } as never, { calculateIndicators: calculate } as never,
     undefined, { resolveIdentity: vi.fn(async () => ({ symbol: identity.symbol, assetType: 'ETF', source: 'asset', status: 'confirmed' })) } as never);
   return { controller, read, calculate, series };
 };
@@ -87,8 +87,8 @@ describe('指标预热和部分成功回归', () => {
   it('DSA 回传带偏移的 ISO 时间戳时仍投影出可见窗口，并归一为 BarSeries 写法', async () => {
     const { controller, calculate } = fixture();
     calculate.mockImplementation(async (request) => ({
-      contractVersion: 2 as const,
-      engineVersion: 'dsa-indicator-v2',
+      contractVersion: 3 as const,
+      engineVersion: 'dsa-indicator-v3',
       inputFingerprint: request.inputFingerprint,
       // 真实 DSA 返回 `2026-03-18T00:00:00+00:00`，与 BarSeries 的 `…000Z` 不同串同时刻。
       results: request.requests.map((item) => ({ ...item, inputFingerprint: request.inputFingerprint,
@@ -104,13 +104,13 @@ describe('指标预热和部分成功回归', () => {
     expect(section.data.calculationInput?.pointCount).toBe(65);
   });
 
-  it('显示加预热超上限时返回参数错误，不静默截断或请求上游', async () => {
+  it('当前图表窗口保留长指标预热，不静默截断', async () => {
     const { controller, read, calculate } = fixture();
-    await expect(controller.detail('510300.SH', 'bars,indicator:MACD', '90', undefined, 'qfq',
-      undefined, undefined, undefined, JSON.stringify({ fast: 12, slow: 200, signal: 200 })))
-      .rejects.toThrow('可见窗口加预热窗口不能超过 365');
-    expect(read).not.toHaveBeenCalled();
-    expect(calculate).not.toHaveBeenCalled();
+    const result = await controller.detail('510300.SH', 'bars,indicator:MACD', '90', undefined, 'qfq',
+      undefined, undefined, undefined, JSON.stringify({ fast: 12, slow: 200, signal: 200 }));
+    expect(read.mock.calls[0]![0].window.limit).toBe(490);
+    expect(result.barSeries?.points).toHaveLength(90);
+    expect(calculate).toHaveBeenCalledOnce();
   });
 
   it('指标失败只降级指标，保留成功的日线、顶层 BarSeries 和 DAILY_BAR', async () => {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nonNegativeDecimalStringSchema, positiveDecimalStringSchema } from './ledger-v2.js';
+import { nonNegativeDecimalStringSchema, positiveDecimalStringSchema } from './monetary-values.js';
 
 const currency = z.enum(['CNY', 'HKD', 'USD']);
 const dateRange = z
@@ -143,6 +143,21 @@ const segment = z.union([
   z.strictObject({ ...segmentMetadata, fees: z.null(), execution: nav }),
 ]);
 
+/**
+ * Explicit assumptions for normalized-series simulations. These values are
+ * deliberately literals: normalized units must never inherit real lot, tick,
+ * or daily-limit rules from an instrument fact by accident.
+ */
+export const normalizedExecutionAssumptionsSchema = z.strictObject({
+  priceCoordinate: z.literal('continuous-decimal'),
+  quantityUnits: z.literal('continuous-normalized-decimal'),
+  lotSizeConstraint: z.literal('not-applied'),
+  tickSizeConstraint: z.literal('not-applied'),
+  dailyPriceLimit: z.literal('not-applied'),
+  feeBasis: z.literal('simulatedTurnover'),
+});
+export type NormalizedExecutionAssumptions = z.infer<typeof normalizedExecutionAssumptionsSchema>;
+
 export const backtestExecutionModelSchema = z
   .strictObject({
     schemaVersion: z.literal('execution-model-v1'),
@@ -205,12 +220,85 @@ export const backtestExecutionModelSchema = z
   });
 
 export type BacktestExecutionModel = z.infer<typeof backtestExecutionModelSchema>;
+
+/** V3 decoder: accepts the optional normalized assumptions while V1/V2 stay strict. */
+export const backtestExecutionModelSchemaV3 = backtestExecutionModelSchema.safeExtend({
+  segments: z.array(
+    z.union([
+      z.strictObject({
+        ...segmentMetadata,
+        fees: executionModelFeesSchema,
+        execution: exchange.extend({
+          normalizedExecution: normalizedExecutionAssumptionsSchema.optional(),
+        }),
+      }),
+      z.strictObject({ ...segmentMetadata, fees: z.null(), execution: nav }),
+    ]),
+  ).min(1),
+});
+export type BacktestExecutionModelV3 = z.infer<typeof backtestExecutionModelSchemaV3>;
+
+export const executionModelSnapshotRefSchema = z.strictObject({
+  schemaVersion: z.literal('execution-model-v1'),
+  id: text,
+  version: text,
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+  artifactKey: text,
+});
+export type ExecutionModelSnapshotRef = z.infer<typeof executionModelSnapshotRefSchema>;
+
 export const executionModelDisclosureSchema = z.strictObject({
   model: backtestExecutionModelSchema,
   contentHash: text.optional(),
 });
 export type ExecutionModelDisclosure = z.infer<typeof executionModelDisclosureSchema>;
+export const executionModelDisclosureSchemaV3 = z.strictObject({
+  model: backtestExecutionModelSchemaV3,
+  contentHash: text.optional(),
+});
+export type ExecutionModelDisclosureV3 = z.infer<typeof executionModelDisclosureSchemaV3>;
 export type ExecutionModelFees = z.infer<typeof executionModelFeesSchema>;
+
+/** Checks the V3 RunConfig accounting declaration against the frozen model. */
+export const executionModelAccountingIssuesV3 = (
+  model: BacktestExecutionModelV3 | undefined,
+  run: { startDate: string; endDate: string },
+  accountingBasis: 'raw-events' | 'normalized-series',
+): { path: (string | number)[]; message: string }[] => {
+  const issues: { path: (string | number)[]; message: string }[] = [];
+  const add = (path: (string | number)[], message: string) => issues.push({ path, message });
+  if (accountingBasis === 'normalized-series' && !model) {
+    add(['executionModel'], '归一化记账必须冻结完整执行模型');
+    return issues;
+  }
+  if (!model) return issues;
+
+  const overlapping = model.segments
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => segment.range.end >= run.startDate && segment.range.start <= run.endDate);
+  if (accountingBasis === 'normalized-series' && model.scope.instrumentType === 'NAV_FUND') {
+    add(['executionModel', 'scope', 'instrumentType'], '净值基金不能使用归一化日线执行模型');
+  }
+  for (const { segment, index } of overlapping) {
+    const assumptions = segment.execution.mode === 'exchange'
+      ? segment.execution.normalizedExecution
+      : undefined;
+    if (accountingBasis === 'normalized-series') {
+      if (!assumptions) {
+        add(['executionModel', 'segments', index, 'execution', 'normalizedExecution'], '运行区间内的每个执行分段都必须声明归一化研究假设');
+        continue;
+      }
+      if (segment.execution.mode !== 'exchange') {
+        add(['executionModel', 'segments', index, 'execution', 'mode'], '归一化序列只支持交易所日线执行');
+      } else if (segment.execution.price.kind !== 'noDailyLimit') {
+        add(['executionModel', 'segments', index, 'execution', 'price'], '归一化序列不能套用真实价格 tick 或涨跌停规则');
+      }
+    } else if (assumptions) {
+      add(['executionModel', 'segments', index, 'execution', 'normalizedExecution'], '原始份额记账不能携带归一化执行假设');
+    }
+  }
+  return issues;
+};
 
 /** Date-scoped historical rules must be known before their first applicable day. */
 export const executionModelRunIssues = (

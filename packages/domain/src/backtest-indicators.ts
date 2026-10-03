@@ -1,4 +1,5 @@
 import { DecimalValue } from './decimal.js';
+import { mergeBacktestAvailability } from './backtest-observation-clock.js';
 import {
   type BacktestSeriesPoint,
   type BacktestSeries,
@@ -9,7 +10,7 @@ import {
   type BooleanExpression,
   type Expression,
   type NumericExpression,
-} from './backtest-v2.js';
+} from './backtest-contract.js';
 
 export type BacktestIndicatorName =
   | 'MA'
@@ -73,11 +74,7 @@ const available = (
     ...rest,
     value: stableOutput(value).toString(),
     status: 'available',
-    availableAt: inputs.reduce(
-      (latest, input) =>
-        dateValue(input.availableAt) > dateValue(latest) ? input.availableAt : latest,
-      inputs[0]?.availableAt ?? point.availableAt,
-    ),
+    ...mergeBacktestAvailability(inputs.length > 0 ? inputs : [point]),
   };
 };
 
@@ -337,6 +334,7 @@ export const evaluateIndicatorWithWarmup = (
 
 const expressionLookback = (expression: Expression): number => {
   if (expression.type === 'constant' || expression.type === 'series' || expression.type === 'positionState') return 1;
+  if (expression.type === 'corporateActionEvent') return 1;
   if (expression.type === 'all' || expression.type === 'any') {
     return Math.max(...expression.conditions.map(expressionLookback));
   }

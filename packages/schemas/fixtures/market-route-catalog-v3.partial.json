@@ -1,0 +1,24 @@
+{
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "catalogRevision": 8,
+  "generatedAt": "2026-09-25T06:31:00.000Z",
+  "integrity": "partial",
+  "entries": [
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "DAILY_BAR",
+        "timeframe": "1d",
+        "adjustment": "qfq"
+      },
+      "target": {
+        "providerId": "hithink",
+        "upstreamSource": "hithink-financial-api"
+      },
+      "state": "ready"
+    }
+  ]
+}

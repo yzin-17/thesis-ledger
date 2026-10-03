@@ -1,15 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   backtestErrorCodes,
   backtestErrorSchema,
-  backtestRunCreateSchemaV2,
-  backtestTradeSchemaV2,
-  backtestResultSchemaV2,
-  expressionSchemaV2,
-  runConfigSchemaV2,
-  strategySchemaV2,
+  backtestTradeSchema,
+  backtestResultSchemaV3,
+  expressionSchema,
+  runConfigSchemaV3,
+  strategySchema,
   validateStrategyRunConfig,
-} from '../src/backtest-v2.js';
+} from '../src/backtest-contract.js';
 
 const exchangeStrategy = {
   schemaVersion: '2' as const,
@@ -53,9 +53,64 @@ const exchangeStrategy = {
   cost: { commissionRate: '0.0003', slippageRate: '0.001' },
 };
 
-describe('StrategySchemaV2', () => {
+const normalizedExecutionModel = () => {
+  const model = JSON.parse(
+    readFileSync(
+      new URL('../fixtures/backtest-execution-model.cn-2024q1.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  model.segments[0].execution.price = {
+    kind: 'noDailyLimit',
+    reason: '归一化价格坐标不适用真实限制',
+  };
+  model.segments[0].execution.normalizedExecution = {
+    priceCoordinate: 'continuous-decimal',
+    quantityUnits: 'continuous-normalized-decimal',
+    lotSizeConstraint: 'not-applied',
+    tickSizeConstraint: 'not-applied',
+    dailyPriceLimit: 'not-applied',
+    feeBasis: 'simulatedTurnover',
+  };
+  return model;
+};
+
+const createV3BacktestResult = () => {
+  const snapshot = JSON.parse(
+    readFileSync(
+      new URL('../fixtures/backtest-snapshot-v3.manifest.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  return {
+    source: 'BACKTEST',
+    runId: 'run-v3-benchmark',
+    strategyVersionId: 'strategy-v3',
+    snapshotId: 'snapshot-v3',
+    engineVersion: 'engine-v3',
+    schemaVersion: '3',
+    snapshotVersion: 'snapshot-manifest-v3',
+    marketRuleVersion: 'rules-v3',
+    calendarVersion: 'calendar-v3',
+    aggregationVersion: 'aggregation-v3',
+    contentHash: '1'.repeat(64),
+    resultChecksum: '2'.repeat(64),
+    completeness: 'complete',
+    executionPriceProtocol: snapshot.executionPriceProtocol,
+    comparableDataFingerprint: snapshot.comparableDataFingerprint,
+    actualSources: snapshot.actualSources,
+    warnings: [],
+    rejectedOrders: [],
+    simulationFills: [],
+    trades: [],
+    equityCurve: [],
+    metrics: { totalReturn: { status: 'available', value: '0.1' } },
+  };
+};
+
+describe('BacktestStrategy', () => {
   it('accepts multi-source exchange strategy and typed AST', () => {
-    expect(strategySchemaV2.parse(exchangeStrategy)).toMatchObject({ schemaVersion: '2' });
+    expect(strategySchema.parse(exchangeStrategy)).toMatchObject({ schemaVersion: '2' });
   });
 
   it('accepts CN NAV Fund only through daily NavExecution', () => {
@@ -86,11 +141,11 @@ describe('StrategySchemaV2', () => {
         timing: 'nextAvailableNav' as const,
       },
     };
-    expect(strategySchemaV2.parse(strategy).execution.mode).toBe('nav');
+    expect(strategySchema.parse(strategy).execution.mode).toBe('nav');
   });
 
   it('reports source, indicator, AST type, and non-goal errors with paths', () => {
-    const result = strategySchemaV2.safeParse({
+    const result = strategySchema.safeParse({
       ...exchangeStrategy,
       entry: {
         type: 'compare',
@@ -120,7 +175,7 @@ describe('StrategySchemaV2', () => {
   });
 
   it('rejects HK/US NAV and invalid source fields', () => {
-    const result = strategySchemaV2.safeParse({
+    const result = strategySchema.safeParse({
       ...exchangeStrategy,
       executionInstrument: { symbol: 'FUND.US', market: 'US', assetType: 'fund' },
       execution: { mode: 'nav', requestTypes: ['subscribe'], timing: 'nextAvailableNav' },
@@ -141,16 +196,16 @@ describe('StrategySchemaV2', () => {
       { type: 'percentOfEquity', percent: '1.01' },
       { type: 'targetWeight', weight: '2' },
     ]) {
-      expect(strategySchemaV2.safeParse({ ...exchangeStrategy, sizing: rule }).success).toBe(false);
+      expect(strategySchema.safeParse({ ...exchangeStrategy, sizing: rule }).success).toBe(false);
     }
     for (const rule of [
       { type: 'fixedStop', percent: '1.01' },
       { type: 'fixedTakeProfit', percent: '2' },
     ]) {
-      expect(strategySchemaV2.safeParse({ ...exchangeStrategy, risk: [rule] }).success).toBe(false);
+      expect(strategySchema.safeParse({ ...exchangeStrategy, risk: [rule] }).success).toBe(false);
     }
     expect(
-      strategySchemaV2.safeParse({
+      strategySchema.safeParse({
         ...exchangeStrategy,
         sizing: { type: 'targetWeight', weight: '1' },
         risk: [{ type: 'fixedStop', percent: '1' }],
@@ -162,7 +217,7 @@ describe('StrategySchemaV2', () => {
       }).success,
     ).toBe(true);
     expect(
-      strategySchemaV2.safeParse({
+      strategySchema.safeParse({
         ...exchangeStrategy,
         cost: {
           commissionRate: '0',
@@ -174,10 +229,126 @@ describe('StrategySchemaV2', () => {
   });
 });
 
+describe('V3 benchmark compatibility reports', () => {
+  it('keeps report fingerprints distinct from the SHA-256 data fingerprint', () => {
+    const result = backtestResultSchemaV3.parse({
+      ...createV3BacktestResult(),
+      benchmarkCompatibility: {
+        status: 'compatible',
+        strategyFingerprint: 'a'.repeat(16),
+        benchmarkFingerprint: 'a'.repeat(16),
+        missingFields: [],
+        differentFields: [],
+        costAssumption: {
+          kind: 'proportional',
+          version: 'cost-v3',
+          commissionRate: '0.001',
+          slippageRate: '0.002',
+        },
+      },
+    });
+
+    expect(result.comparableDataFingerprint).toHaveLength(64);
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'compatible',
+      strategyFingerprint: 'a'.repeat(16),
+      benchmarkFingerprint: 'a'.repeat(16),
+      costAssumption: { kind: 'proportional', version: 'cost-v3' },
+    });
+    expect(
+      backtestResultSchemaV3.safeParse({
+        ...result,
+        benchmarkCompatibility: {
+          ...result.benchmarkCompatibility,
+          strategyFingerprint: 'b'.repeat(64),
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires an explicit unavailable cost assumption when V3 cost identity is missing', () => {
+    const unavailable = {
+      status: 'unverified',
+      missingFields: ['costAssumption', 'source'],
+      differentFields: [],
+      costAssumption: { kind: 'unavailable' },
+    } as const;
+    expect(
+      backtestResultSchemaV3.safeParse({
+        ...createV3BacktestResult(),
+        benchmarkCompatibility: unavailable,
+      }).success,
+    ).toBe(true);
+    expect(
+      backtestResultSchemaV3.safeParse({
+        ...createV3BacktestResult(),
+        benchmarkCompatibility: {
+          ...unavailable,
+          costAssumption: { kind: 'zero-cost', version: 'legacy-v2-zero-cost' },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires status and missing/different field lists to agree', () => {
+    expect(
+      backtestResultSchemaV3.safeParse({
+        ...createV3BacktestResult(),
+        benchmarkCompatibility: {
+          status: 'compatible',
+          missingFields: [],
+          differentFields: ['source'],
+          costAssumption: { kind: 'zero-cost', version: 'source-confirmed-v3' },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      backtestResultSchemaV3.safeParse({
+        ...createV3BacktestResult(),
+        benchmarkCompatibility: {
+          status: 'future-status',
+          missingFields: [],
+          differentFields: [],
+          costAssumption: { kind: 'unavailable' },
+          futureField: true,
+        },
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('V2 public decimal and result contracts', () => {
   it('keeps DecimalString and Money values as strings', () => {
     expect(
-      runConfigSchemaV2.parse({
+      runConfigSchemaV3.parse({
+        schemaVersion: '3',
+        executionPriceProtocol: {
+          protocolVersion: 'execution-price-v1',
+          priceBasis: {
+            adjustment: 'none',
+            method: 'provider-native',
+            methodVersion: 'provider-reported-v1',
+            basisScope: 'provider-defined',
+            anchor: null,
+            revision: {
+              origin: 'local-observation',
+              contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            },
+            observedAt: '2024-01-01T00:00:00.000Z',
+            quantityBasis: 'actual-units',
+            volumeBasis: 'original',
+            dividendMeaning: 'explicit-cash',
+            dividendEvidenceRef: null,
+            conversionAvailable: false,
+            conversionEvidenceRef: null,
+            derivation: null,
+          },
+          accountingBasis: 'raw-events',
+          history: {
+            basis: 'point-in-time',
+            reconstructionEvidenceRef: 'original-bar-availability-v1',
+          },
+        },
         startDate: '2025-01-01',
         endDate: '2025-12-31',
         dataAsOf: '2025-12-31T00:00:00Z',
@@ -212,7 +383,35 @@ describe('V2 public decimal and result contracts', () => {
       expect(backtestErrorSchema.parse({ code, message: '诊断', path: [] }).code).toBe(code);
     }
     expect(() =>
-      runConfigSchemaV2.parse({
+      runConfigSchemaV3.parse({
+        schemaVersion: '3',
+        executionPriceProtocol: {
+          protocolVersion: 'execution-price-v1',
+          priceBasis: {
+            adjustment: 'none',
+            method: 'provider-native',
+            methodVersion: 'provider-reported-v1',
+            basisScope: 'provider-defined',
+            anchor: null,
+            revision: {
+              origin: 'local-observation',
+              contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            },
+            observedAt: '2024-01-01T00:00:00.000Z',
+            quantityBasis: 'actual-units',
+            volumeBasis: 'original',
+            dividendMeaning: 'explicit-cash',
+            dividendEvidenceRef: null,
+            conversionAvailable: false,
+            conversionEvidenceRef: null,
+            derivation: null,
+          },
+          accountingBasis: 'raw-events',
+          history: {
+            basis: 'point-in-time',
+            reconstructionEvidenceRef: 'original-bar-availability-v1',
+          },
+        },
         startDate: '2025-01-01',
         endDate: '2025-01-01',
         dataAsOf: '2025-01-01T00:00:00Z',
@@ -229,8 +428,36 @@ describe('V2 public decimal and result contracts', () => {
   });
 
   it('checks execution-currency cash after parsing separate contracts', () => {
-    const parsedStrategy = strategySchemaV2.parse(exchangeStrategy);
-    const parsedRunConfig = runConfigSchemaV2.parse({
+    const parsedStrategy = strategySchema.parse(exchangeStrategy);
+    const parsedRunConfig = runConfigSchemaV3.parse({
+      schemaVersion: '3',
+      executionPriceProtocol: {
+        protocolVersion: 'execution-price-v1',
+        priceBasis: {
+          adjustment: 'none',
+          method: 'provider-native',
+          methodVersion: 'provider-reported-v1',
+          basisScope: 'provider-defined',
+          anchor: null,
+          revision: {
+            origin: 'local-observation',
+            contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+          observedAt: '2024-01-01T00:00:00.000Z',
+          quantityBasis: 'actual-units',
+          volumeBasis: 'original',
+          dividendMeaning: 'explicit-cash',
+          dividendEvidenceRef: null,
+          conversionAvailable: false,
+          conversionEvidenceRef: null,
+          derivation: null,
+        },
+        accountingBasis: 'raw-events',
+        history: {
+          basis: 'point-in-time',
+          reconstructionEvidenceRef: 'original-bar-availability-v1',
+        },
+      },
       startDate: '2025-01-01',
       endDate: '2025-01-01',
       dataAsOf: '2025-01-01T00:00:00Z',
@@ -255,22 +482,9 @@ describe('V2 public decimal and result contracts', () => {
     expect(valid).toEqual({ valid: true, errors: [] });
   });
 
-  it('accepts independent BacktestResult metadata and fills', () => {
-    const result = backtestResultSchemaV2.parse({
-      source: 'BACKTEST',
-      runId: 'run-1',
-      strategyVersionId: 'strategy-1',
-      snapshotId: 'snapshot-1',
-      engineVersion: 'v2',
-      schemaVersion: '2',
-      marketRuleVersion: 'rules-1',
-      calendarVersion: 'calendar-1',
-      aggregationVersion: 'aggregation-1',
-      contentHash: 'sha256:abc',
-      resultChecksum: 'sha256:def',
-      completeness: 'complete',
-      warnings: [],
-      rejectedOrders: [],
+  it('accepts current BacktestResult fills and rejects the old result format', () => {
+    const result = backtestResultSchemaV3.parse({
+      ...createV3BacktestResult(),
       simulationFills: [
         {
           fillId: 'fill-1',
@@ -285,7 +499,6 @@ describe('V2 public decimal and result contracts', () => {
           reason: 'signal',
         },
       ],
-      trades: [],
       equityCurve: [
         { occurredAt: '2025-01-02T07:00:00Z', value: { amount: '10000.00', currency: 'CNY' } },
       ],
@@ -297,15 +510,26 @@ describe('V2 public decimal and result contracts', () => {
           drawdown: '-0.0099009900990099',
         },
       ],
-      metrics: { totalReturn: { status: 'available', value: '0.1' } },
     });
     expect(result.simulationFills[0]?.quantity).toBe('100');
     expect(result.drawdownCurve?.[0]?.drawdown).toBe('-0.0099009900990099');
+    expect(backtestResultSchemaV3.safeParse({ ...result, schemaVersion: '2' }).success).toBe(false);
+    expect(
+      backtestResultSchemaV3.safeParse({
+        ...result,
+        benchmarkCompatibility: {
+          status: 'compatible',
+          missingFields: ['costAssumption'],
+          differentFields: [],
+          costAssumption: { kind: 'unavailable' },
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it('requires closed-trade return and fill provenance fields', () => {
     expect(
-      backtestTradeSchemaV2.parse({
+      backtestTradeSchema.parse({
         source: 'BACKTEST',
         executionSymbol: '600519.SH',
         openedAt: '2025-01-02T07:00:00Z',
@@ -324,39 +548,83 @@ describe('V2 public decimal and result contracts', () => {
   });
 
   it('exposes standalone AST schema', () => {
-    expect(expressionSchemaV2.parse({ type: 'positionState', field: 'isOpen' })).toMatchObject({
+    expect(expressionSchema.parse({ type: 'positionState', field: 'isOpen' })).toMatchObject({
       type: 'positionState',
     });
   });
 
-  it('keeps V2 Run creation strict and excludes Desktop bars/strategy payloads', () => {
-    const runConfig = {
-      startDate: '2025-01-01',
-      endDate: '2025-01-03',
-      dataAsOf: '2025-01-04T00:00:00Z',
-      baseCurrency: 'CNY' as const,
+  it('accepts corporate-action event dependencies in the Boolean AST', () => {
+    const event = { type: 'corporateActionEvent', eventType: 'SPLIT' } as const;
+    expect(expressionSchema.parse(event)).toEqual(event);
+    expect(() =>
+      expressionSchema.parse({ type: 'corporateActionEvent', eventType: 'DIVIDEND' }),
+    ).toThrow();
+    expect(strategySchema.parse({ ...exchangeStrategy, entry: event }).entry).toEqual(event);
+  });
+
+  it('V3 normalized RunConfig requires a matching frozen model and rejects V1/V2 configurations', () => {
+    const normalizedProtocol = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/execution-price.normalized-snapshot.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    const legacyModel = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/backtest-execution-model.cn-2024q1.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    const config = {
+      schemaVersion: '3',
+      startDate: '2024-01-02',
+      endDate: '2024-03-29',
+      dataAsOf: '2024-03-30T00:00:00.000Z',
+      baseCurrency: 'CNY',
       initialCash: { CNY: '10000' },
       valuationPolicy: {
         baseTimezone: 'Asia/Shanghai',
         dailyValuationTime: '15:00',
-        pricePolicy: 'latestAvailable' as const,
-        fxPolicy: 'latestAvailable' as const,
+        pricePolicy: 'latestAvailable',
+        fxPolicy: 'latestAvailable',
       },
+      executionPriceProtocol: normalizedProtocol,
     };
+    expect(runConfigSchemaV3.safeParse(config).success).toBe(false);
     expect(
-      backtestRunCreateSchemaV2.parse({
-        strategyVersionId: '11111111-1111-4111-8111-111111111111',
-        runConfig,
-        idempotencyKey: 'run-once',
-      }),
-    ).toMatchObject({ idempotencyKey: 'run-once' });
-    expect(() =>
-      backtestRunCreateSchemaV2.parse({
-        strategyVersionId: '11111111-1111-4111-8111-111111111111',
-        runConfig,
-        idempotencyKey: 'run-once',
-        bars: [],
-      }),
-    ).toThrow();
+      runConfigSchemaV3.safeParse({
+        ...config,
+        executionModel: normalizedExecutionModel(),
+      }).success,
+    ).toBe(true);
+    expect(
+      runConfigSchemaV3.safeParse({
+        ...config,
+        executionModel: legacyModel,
+      }).success,
+    ).toBe(false);
+    expect(
+      runConfigSchemaV3.safeParse({
+        ...config,
+        executionPriceProtocol: JSON.parse(
+          readFileSync(
+            new URL('../fixtures/execution-price.raw-events.json', import.meta.url),
+            'utf8',
+          ),
+        ),
+        executionModel: normalizedExecutionModel(),
+      }).success,
+    ).toBe(false);
+    expect(
+      runConfigSchemaV3.safeParse({
+        startDate: '2024-01-02',
+        endDate: '2024-03-29',
+        dataAsOf: '2024-03-30T00:00:00.000Z',
+        baseCurrency: 'CNY',
+        initialCash: { CNY: '10000' },
+        valuationPolicy: config.valuationPolicy,
+        executionModel: legacyModel,
+      }).success,
+    ).toBe(false);
   });
 });

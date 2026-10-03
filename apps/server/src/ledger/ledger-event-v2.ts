@@ -1,4 +1,4 @@
-import type { LedgerEventV2 } from '@thesis-ledger/schemas';
+import type { LedgerEvent } from '@thesis-ledger/schemas';
 
 type RevisionedFactEvent = {
   factId?: string | null;
@@ -41,7 +41,7 @@ export const latestLedgerEventByFact = <T extends RevisionedFactEvent>(events: T
   return tips;
 };
 
-export const ledgerEventSymbol = (event: LedgerEventV2) => {
+export const ledgerEventSymbol = (event: LedgerEvent) => {
   if (event.revisionAction === 'VOID') return undefined;
   if ('symbol' in event.payload) return event.payload.symbol;
   return undefined;
@@ -52,7 +52,7 @@ export type LedgerPositionOperation =
   | { symbol: string; kind: 'RATIO'; fromUnits: string; toUnits: string };
 
 export const ledgerEventPositionOperation = (
-  event: LedgerEventV2,
+  event: LedgerEvent,
 ): LedgerPositionOperation | undefined => {
   const symbol = ledgerEventSymbol(event);
   if (!symbol || event.revisionAction === 'VOID') return undefined;

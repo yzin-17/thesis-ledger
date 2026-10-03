@@ -2,9 +2,30 @@ import { describe, expect, it, vi } from 'vitest';
 import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
 
 describe('Backtest BullMQ 生命周期', () => {
+  it('旧合同记录不会投递到现行队列', async () => {
+    const oldRun = {
+      id: 'old-run',
+      mode: 'V2',
+      status: 'queued',
+      input: { schemaVersion: '2' },
+    };
+    const update = vi.fn();
+    const queue = { add: vi.fn() };
+    const service = new BacktestQueueService(
+      { backtestJob: { findUnique: vi.fn(async () => oldRun), update } } as never,
+      queue as never,
+      { publishJob: vi.fn() } as never,
+    );
+    await expect(service.ensureEnqueued(oldRun.id)).resolves.toBe(oldRun);
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('Redis 暂时不可用时保留 queued 任务并记录可恢复错误', async () => {
     let state = {
       id: '11111111-1111-4111-8111-111111111117',
+      mode: 'V3',
+      input: { contractVersion: 3, schemaVersion: '3' },
       status: 'queued',
       executionAttempt: 0,
       dispatchedAt: null,
@@ -41,6 +62,8 @@ describe('Backtest BullMQ 生命周期', () => {
   it('queued 取消立即进入终态并移除等待消息', async () => {
     let state = {
       id: '11111111-1111-4111-8111-111111111118',
+      mode: 'V3',
+      input: { contractVersion: 3, schemaVersion: '3' },
       status: 'queued',
       executionAttempt: 0,
       dispatchedAt: new Date('2025-01-03'),
@@ -73,6 +96,8 @@ describe('Backtest BullMQ 生命周期', () => {
   it('running 取消只登记请求，由 Worker 在安全边界收敛终态', async () => {
     let state = {
       id: '11111111-1111-4111-8111-111111111119',
+      mode: 'V3',
+      input: { contractVersion: 3, schemaVersion: '3' },
       status: 'running',
       cancelRequestedAt: null as Date | null,
     };

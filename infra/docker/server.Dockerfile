@@ -9,7 +9,7 @@ COPY packages/domain/package.json packages/domain/package.json
 COPY packages/schemas/package.json packages/schemas/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY patches ./patches
-RUN pnpm install --frozen-lockfile
+RUN pnpm --filter thesis-ledger --filter @thesis-ledger/server... install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @thesis-ledger/server exec prisma generate
 RUN pnpm --filter @thesis-ledger/server... build

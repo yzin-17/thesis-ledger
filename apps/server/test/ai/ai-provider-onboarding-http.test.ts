@@ -158,17 +158,19 @@ describe('provider onboarding with the real locked HTTP/SSE adapter', () => {
       [expect.objectContaining({ mode: 'json_mode' })],
     );
   });
-  it('does not fallback, save, or erase reported usage after complete invalid output', async () => {
+  it('does not fallback to prose, save, or erase reported usage after complete invalid output', async () => {
     const f = fixture();
+    // 完整对象不符合契约不是“不支持格式”；保留该次失败和用量，不再生成第二次结果。
     handle = (_body, response) => stream(response, { ...report, conclusion: '' });
     await expect(f.run()).rejects.toThrow('验证未通过');
     expect(requests).toHaveLength(1);
+    expect(requests[0]?.response_format).toEqual(expect.objectContaining({ type: 'json_schema' }));
     expect(f.saved.save).not.toHaveBeenCalled();
     expect(f.checks.recordHistory).toHaveBeenLastCalledWith(
       'local',
       'degraded',
       expect.any(Number),
-      'validation_failed',
+      'schema_mismatch',
       expect.any(Date),
       'manual',
       expect.objectContaining({

@@ -1,6 +1,9 @@
 import { act, useEffect, useState, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
+import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDetailFetcher } from './market-detail.coordinator.js';
+import type * as MarketDetailTypes from './market-detail.types.js';
+vi.mock('./MarketChartAdjustment.js', () => ({ MarketChartAdjustment: () => null }));
 
 type Listener = (event: { type: string; target?: FakeNode; cancelBubble?: boolean }) => void;
 
@@ -217,7 +220,7 @@ const installDom = () => {
 };
 
 const { requestMarketDetailMock, useQueryMock, mergeMarketDetailMock, queryClient } = vi.hoisted(() => ({
-  requestMarketDetailMock: vi.fn(),
+  requestMarketDetailMock: vi.fn<MarketDetailFetcher>(),
   useQueryMock: vi.fn(),
   mergeMarketDetailMock: vi.fn(),
   queryClient: { cancelQueries: vi.fn(), fetchQuery: vi.fn() },
@@ -225,7 +228,7 @@ const { requestMarketDetailMock, useQueryMock, mergeMarketDetailMock, queryClien
 
 vi.mock('./market-detail.api.js', () => ({ requestMarketDetail: requestMarketDetailMock }));
 vi.mock('./market-detail.types.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./market-detail.types.js')>();
+  const actual = await importOriginal<typeof MarketDetailTypes>();
   return {
     ...actual,
     mergeMarketDetail: (...args: Parameters<typeof actual.mergeMarketDetail>) => {
@@ -235,7 +238,7 @@ vi.mock('./market-detail.types.js', async (importOriginal) => {
   };
 });
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: unknown) => useQueryMock(options),
+  useQuery: (options: unknown): unknown => useQueryMock(options),
   useQueryClient: () => queryClient,
 }));
 vi.mock('@/components/market-color-menu', () => ({ MarketColorMenu: () => null }));
@@ -254,12 +257,14 @@ vi.mock('./MarketDetailSections.js', () => {
   const BarsSection = ({
     section,
     onLoadLater,
+    onLoadEarlier,
     onRetryLater,
     onRetry,
     latestNotice,
     latestError,
   }: {
     onLoadLater?: () => void;
+    onLoadEarlier?: () => void;
     onRetryLater?: () => void;
     onRetry?: () => void;
     section?: { data?: { points?: Array<{ close?: number }> } | null };
@@ -268,6 +273,7 @@ vi.mock('./MarketDetailSections.js', () => {
   }) => (
     <div data-market-detail-section="bars">
       <button data-market-probe onClick={onLoadLater}>探测</button>
+      <button data-market-earlier onClick={onLoadEarlier}>更早</button>
       <button data-market-retry onClick={onRetryLater}>重试</button>
       <button data-market-section-retry onClick={onRetry}>分段重试</button>
       <span data-market-latest-state>{latestNotice ?? latestError ?? ''}</span>
@@ -299,9 +305,9 @@ const position = {
   asset: { name: '测试股票', assetType: 'stock' as const },
 };
 
-const response = (symbol: string, dates: string[], close = 10): MarketDetailResponseV2 => {
+const response = (symbol: string, dates: string[], close = 10): MarketDetailResponse => {
   const series = {
-    contractVersion: 2 as const,
+    contractVersion: 3 as const,
     identity: { symbol, assetType: 'STOCK' as const, timeframe: '1d' as const, adjustment: 'qfq' as const },
     points: dates.map((date) => ({
       timestamp: `${date}T00:00:00.000Z`,
@@ -334,7 +340,7 @@ const response = (symbol: string, dates: string[], close = 10): MarketDetailResp
     inputFingerprint: `input-${dates.at(-1)}`,
   };
   return {
-    contractVersion: 2,
+    contractVersion: 3,
     symbol,
     assetType: 'STOCK',
     identity: { source: 'asset', status: 'confirmed' },
@@ -364,11 +370,15 @@ const flushAsync = async () => {
   await Promise.resolve();
 };
 
-const mount = async (cached: MarketDetailResponseV2) => {
+const mount = async (
+  cached: MarketDetailResponse,
+  adjustment?: 'none' | 'qfq' | 'hfq',
+  activePosition: MarketDetailTypes.MarketDetailPosition = position,
+) => {
   const document = installDom();
-  let opening = deferred<MarketDetailResponseV2>();
+  const opening = deferred<MarketDetailResponse>();
   requestMarketDetailMock.mockImplementationOnce(() => opening.promise);
-  useQueryMock.mockImplementation((options: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponseV2> }) => {
+  useQueryMock.mockImplementation((options: { queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => {
     const [state, setState] = useState({ data: cached, isPending: false, isError: false, isFetching: true });
     useEffect(() => {
       const controller = new AbortController();
@@ -377,14 +387,14 @@ const mount = async (cached: MarketDetailResponseV2) => {
         () => setState({ data: cached, isPending: false, isError: true, isFetching: false }),
       );
       return () => controller.abort();
-    }, []);
+    }, [JSON.stringify(options.queryKey)]);
     return state;
   });
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container as unknown as Element);
   await act(async () => {
-    root.render(<MarketDetailDialog position={position} onClose={() => undefined} />);
+    root.render(<MarketDetailDialog position={activePosition} onClose={() => undefined} {...(adjustment ? { adjustment } : {})} />);
     await Promise.resolve();
   });
   return { container, root, opening };
@@ -399,6 +409,86 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
     mergeMarketDetailMock.mockReset();
   });
 
+  it('基金首次打开只请求净值能力，不触发日线口径计划', async () => {
+    const symbol = '000001.OF';
+    const current: MarketDetailResponse = {
+      ...response(symbol, ['2026-09-15']),
+      assetType: 'MUTUAL_FUND',
+      requested: ['fund-nav', 'fund-nav-history'],
+      capabilities: { supported: ['fund-nav', 'fund-nav-history'], unsupported: [] },
+      sections: {
+        'fund-nav': { capability: 'fund-nav', status: 'empty', data: null },
+        'fund-nav-history': { capability: 'fund-nav-history', status: 'empty', data: [] },
+      },
+      dependencies: {},
+    };
+    delete current.barSeries;
+    const mounted = await mount(current, undefined, {
+      ...position,
+      symbol,
+      asset: { name: '测试基金', assetType: 'fund' },
+    });
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({
+      symbol,
+      include: ['fund-nav', 'fund-nav-history'],
+      navLimit: 90,
+    });
+    mounted.opening.resolve(current);
+    await act(flushAsync);
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
+  });
+
+  it('V3 历史扩窗、最新检查和指标重试都读取当前整窗', async () => {
+    const current = response(position.symbol, ['2026-09-15', '2026-09-16']);
+    const mounted = await mount(current, 'qfq');
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 3, barsLimit: 90 });
+    mounted.opening.resolve(current);
+    await act(flushAsync);
+    requestMarketDetailMock.mockResolvedValue(current);
+    await act(async () => {
+      mounted.container.querySelector('[data-market-earlier]')!.dispatchEvent({ type: 'click' });
+      await flushAsync();
+    });
+    await act(flushAsync);
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 3, barsLimit: 180 });
+    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => queryFn({ signal: new AbortController().signal }));
+    for (const selector of ['[data-market-retry]', '[data-market-section-retry]']) {
+      await act(async () => { mounted.container.querySelector(selector)!.dispatchEvent({ type: 'click' }); await flushAsync(); });
+      await act(flushAsync);
+      const request = requestMarketDetailMock.mock.calls.at(-1)![0];
+      expect(request).toMatchObject({ chartContractVersion: 3, barsLimit: 180, refresh: true,
+        include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] });
+      expect(request.start).toBeUndefined();
+      expect(request.end).toBeUndefined();
+    }
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
+  });
+
+  it.each(['none', 'qfq', 'hfq'] as const)('%s 口径贯穿打开、最新检查与分段重试', async (adjustment) => {
+    const current = response(position.symbol, ['2026-09-15']);
+    const mounted = await mount(current, adjustment);
+    expect(requestMarketDetailMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ adjustment }), expect.any(AbortSignal),
+    );
+    const openingOptions = useQueryMock.mock.calls.at(-1)?.[0] as { queryKey: readonly unknown[] };
+    expect(openingOptions.queryKey.at(-3)).toBe(adjustment);
+    mounted.opening.resolve(current);
+    await act(flushAsync);
+    requestMarketDetailMock.mockResolvedValue(current);
+    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => queryFn({ signal: new AbortController().signal }));
+    for (const selector of ['[data-market-retry]', '[data-market-section-retry]']) {
+      const retry = mounted.container.querySelector(selector)!;
+      await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
+      await act(flushAsync);
+      expect(requestMarketDetailMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ adjustment }), expect.any(AbortSignal),
+      );
+      const retryOptions = queryClient.fetchQuery.mock.calls.at(-1)?.[0] as { queryKey: readonly unknown[] };
+      expect(retryOptions.queryKey.at(-3)).toBe(adjustment);
+    }
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
+  });
+
   it('打开刷新进行中时拖动不重复请求，完成后立即拖动受冷却保护', async () => {
     const cached = response(position.symbol, ['2026-09-15']);
     const mounted = await mount(cached);
@@ -407,64 +497,65 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
       expect.any(AbortSignal),
     );
     const probe = mounted.container.querySelector('[data-market-probe]')!;
-    await act(async () => probe.dispatchEvent({ type: 'click' }));
+    await act(async () => { probe.dispatchEvent({ type: 'click' }); await flushAsync(); });
     expect(queryClient.fetchQuery).not.toHaveBeenCalled();
     mounted.opening.resolve(response(position.symbol, ['2026-09-16']));
     await act(flushAsync);
-    await act(async () => probe.dispatchEvent({ type: 'click' }));
+    await act(async () => { probe.dispatchEvent({ type: 'click' }); await flushAsync(); });
     expect(queryClient.fetchQuery).not.toHaveBeenCalled();
-    await act(async () => mounted.root.unmount());
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
   });
 
-  it('失败后显式重试绕过冷却，且最新请求参数包含 start 与 refresh', async () => {
+  it('失败后显式重试绕过冷却，当前整窗请求带 refresh', async () => {
     const mounted = await mount(response(position.symbol, ['2026-09-15']));
     mounted.opening.resolve(response(position.symbol, ['2026-09-15']));
     await act(flushAsync);
-    const failed = deferred<MarketDetailResponseV2>();
-    const retried = deferred<MarketDetailResponseV2>();
+    const failed = deferred<MarketDetailResponse>();
+    const retried = deferred<MarketDetailResponse>();
     requestMarketDetailMock.mockImplementationOnce(() => failed.promise).mockImplementationOnce(() => retried.promise);
-    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponseV2> }) => queryFn({ signal: new AbortController().signal }));
+    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => queryFn({ signal: new AbortController().signal }));
     const probe = mounted.container.querySelector('[data-market-probe]')!;
-    await act(async () => probe.dispatchEvent({ type: 'click' }));
+    await act(async () => { probe.dispatchEvent({ type: 'click' }); await flushAsync(); });
     void failed.promise.catch(() => undefined);
     failed.reject(new Error('fixture failure'));
     await act(flushAsync);
     const retry = mounted.container.querySelector('[data-market-retry]')!;
-    await act(async () => retry.dispatchEvent({ type: 'click' }));
+    await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
     expect(requestMarketDetailMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ symbol: position.symbol, start: '2026-09-15', refresh: true }),
+      expect.objectContaining({ symbol: position.symbol, chartContractVersion: 3, barsLimit: 90, refresh: true }),
       expect.any(AbortSignal),
     );
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0].start).toBeUndefined();
     retried.resolve(response(position.symbol, ['2026-09-15']));
     await act(async () => Promise.resolve());
-    await act(async () => mounted.root.unmount());
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
   });
 
   it('顺序推进基线后较新的 latest 响应可覆盖同日修订，卸载后迟到响应不提交', async () => {
     const mounted = await mount(response(position.symbol, ['2026-09-15']));
     mounted.opening.resolve(response(position.symbol, ['2026-09-15']));
     await act(flushAsync);
-    const first = deferred<MarketDetailResponseV2>();
-    const second = deferred<MarketDetailResponseV2>();
+    const first = deferred<MarketDetailResponse>();
+    const second = deferred<MarketDetailResponse>();
     requestMarketDetailMock.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise);
-    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponseV2> }) => queryFn({ signal: new AbortController().signal }));
+    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => queryFn({ signal: new AbortController().signal }));
     const retry = mounted.container.querySelector('[data-market-retry]')!;
-    await act(async () => retry.dispatchEvent({ type: 'click' }));
+    await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
     first.resolve(response(position.symbol, ['2026-09-15', '2026-09-16'], 11));
     await act(flushAsync);
     expect(queryClient.fetchQuery).toHaveBeenCalledTimes(1);
-    await act(async () => retry.dispatchEvent({ type: 'click' }));
+    await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
     expect(queryClient.fetchQuery).toHaveBeenCalledTimes(2);
     second.resolve(response(position.symbol, ['2026-09-16'], 12));
     await act(flushAsync);
     expect(mounted.container.querySelector('[data-market-latest-state]')?.textContent).toContain('已更新最新日线');
     expect(mounted.container.querySelector('[data-market-latest-close]')?.textContent).toBe('12');
     const committedClose = mounted.container.querySelector('[data-market-latest-close]')!;
-    const late = deferred<MarketDetailResponseV2>();
+    const late = deferred<MarketDetailResponse>();
     mergeMarketDetailMock.mockClear();
     requestMarketDetailMock.mockImplementationOnce(() => late.promise);
-    await act(async () => retry.dispatchEvent({ type: 'click' }));
-    await act(async () => mounted.root.unmount());
+    await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
     late.resolve(response(position.symbol, ['2026-09-16'], 99));
     await act(flushAsync);
     expect(mergeMarketDetailMock).not.toHaveBeenCalled();
@@ -475,15 +566,15 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
     const mounted = await mount(response(position.symbol, ['2026-09-15']));
     mounted.opening.resolve(response(position.symbol, ['2026-09-15']));
     await act(flushAsync);
-    const retryResponse = deferred<MarketDetailResponseV2>();
+    const retryResponse = deferred<MarketDetailResponse>();
     requestMarketDetailMock.mockImplementationOnce(() => retryResponse.promise);
-    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponseV2> }) =>
+    queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) =>
       queryFn({ signal: new AbortController().signal }),
     );
     mergeMarketDetailMock.mockClear();
     const retry = mounted.container.querySelector('[data-market-section-retry]')!;
-    await act(async () => retry.dispatchEvent({ type: 'click' }));
-    await act(async () => mounted.root.unmount());
+    await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
+    await act(async () => { mounted.root.unmount(); await flushAsync(); });
     retryResponse.resolve(response(position.symbol, ['2026-09-15'], 99));
     await act(flushAsync);
     expect(mergeMarketDetailMock).not.toHaveBeenCalled();

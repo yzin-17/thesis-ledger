@@ -4,7 +4,7 @@
 >
 > 首次创建：2026-09-21
 >
-> 当前状态：本地实现、隔离 PostgreSQL、目标 Docker / Server / Worker 与内建浏览器本地 Web 预览门禁已通过；真实 Provider 计费请求与 Electron 实机验收仍需独立验收。完整设计输入来自用户上传的 `/Users/yzin/Downloads/2026-09-21-ai-provider-model-usage-configuration.md`
+> 当前状态：既有本地实现、隔离 PostgreSQL、目标 Docker / Server / Worker 与内建浏览器本地 Web 预览有历史证据；2026-09-24 修订的超时契约仍需按当前源码补充验证，真实 Provider 计费请求与 Electron 实机仍需独立验收。完整设计输入来自用户上传的 `/Users/yzin/Downloads/2026-09-21-ai-provider-model-usage-configuration.md`
 >
 > 对应任务：[实施任务](../tasks/2026-09-21-ai-provider-model-usage-configuration.md)
 
@@ -41,6 +41,8 @@
 测试生命周期契约：每次实际 Provider 测试携带 UUID `requestId`；服务端只允许同一请求单飞，取消通过 `POST /ai/providers/:name/test/cancel` 触发；取消结果为 `cancelled`，已知 usage 保留，外部费用和未知 usage 保持 unknown，不自动重试。保存 Provider 的测试历史复用 `ProviderHealthCheck.details`，取消只写历史，不更新当前 Provider 健康状态。
 
 兼容迁移契约：`POST /ai/providers/migration/dry-run` 只读生成逐 Provider 报告；完整旧价格、零值和已有模型级价格必须保留，缺字段、重复用途路由和无法安全转换的值报告为冲突，不静默补零、合并或覆盖。已有 Provider 的保存、启停和删除使用 `expectedRevision` 条件更新；涉及研究默认时同时校验设置修订并在同一事务内清除引用。
+
+超时契约：Provider 的 `timeoutMs` 用于目录获取和非流式连接探针的单次总超时，留空时继承系统默认；它不截断持续产生输出的流式用途验证、研究生成或策略优化生成。流式请求的首次输出与输出间隔分别按“用途覆盖 → Provider 默认 → 系统默认”解析。用途验证仍受本次操作的总期限、调用次数和 Token 上限约束；研究与策略生成分别受冻结任务期限和实验剩余请求期限约束。持续输出不能越过这些绝对期限，停顿超时与绝对期限超时也不能冒充用户取消。界面须说明各字段的适用请求和生效来源。
 
 ## 验收标准
 
@@ -103,3 +105,9 @@ Schema / Server / Desktop 定向测试只能证明本地契约、转换和组件
 
 - AC-12：历史 route 缺少 `enabled` 时仍可执行；`enabled: false` route 可回读但不会进入业务执行候选集。
 - AC-13：同一模型的用途参数可先修改、测试，再由父级表单一次写入；失败时父级 Draft 保留，取消统一还原所有 Provider 配置。
+
+### 超时语义修订（2026-09-24）
+
+本节对应完整设计稿 AC-09 的执行边界，稳定契约见上文“超时契约”。
+
+- AC-14：Provider `timeoutMs` 只约束目录与非流式连接请求；流式用途验证和正式生成分别按首输出、输出间隔与各自绝对期限收敛。空值继承、非法值拒绝，界面显示适用范围和来源，超时归因准确。

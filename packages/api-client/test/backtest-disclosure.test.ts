@@ -7,12 +7,12 @@ const model = JSON.parse(
     'utf8',
   ),
 );
-describe('回测客户端披露兼容', () => {
+describe('回测客户端披露', () => {
   it.each([false, true])('读取失败响应时保留原因和可选模型：%s', async (withModel) => {
     const payload = {
       id: 'run',
       strategyVersionId: 'version',
-      mode: 'V2',
+      mode: 'V3',
       status: 'failed',
       errorCode: 'DATA_UNAVAILABLE',
       errorSummary: 'historical status unavailable',

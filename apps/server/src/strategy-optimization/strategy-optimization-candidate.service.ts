@@ -6,7 +6,7 @@ import {
   type OptimizationProposal,
   type OptimizationDiscoveryProposal,
   type StrategyParameterDescriptor,
-  type StrategySchemaV2,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { AiProviderRegistry } from '../ai/provider-registry.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -113,7 +113,7 @@ export class StrategyOptimizationCandidateService {
   private async claimStep(input: {
     step: OptimizationStepRow;
     experiment: ExperimentRow;
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 };
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy };
     route: ProviderRoute;
     inputTokenReservation: number;
     outputTokenReservation: number;
@@ -178,7 +178,7 @@ export class StrategyOptimizationCandidateService {
 
   private async claimedOrCachedStep(input: {
     experiment: ExperimentRow;
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 };
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy };
     route: ProviderRoute;
     modelKey: string;
     round: number;
@@ -242,7 +242,7 @@ export class StrategyOptimizationCandidateService {
 
   async generateProposal(
     experiment: ExperimentRow,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
     descriptors: StrategyParameterDescriptor[],
     route: ProviderRoute,
     round: number,
@@ -329,7 +329,7 @@ export class StrategyOptimizationCandidateService {
 
   private async createCandidateVersion(
     baseline: StrategyVersionRecord,
-    strategy: StrategySchemaV2,
+    strategy: BacktestStrategy,
   ) {
     return this.prisma.strategyVersion.create({
       data: {
@@ -351,11 +351,11 @@ export class StrategyOptimizationCandidateService {
 
   private async insertCandidate(
     experiment: ExperimentRow,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
     descriptors: StrategyParameterDescriptor[],
     modelKey: string,
     proposal: OptimizationProposal | OptimizationDiscoveryProposal,
-    strategy: StrategySchemaV2,
+    strategy: BacktestStrategy,
     executionHash: string,
   ) {
     const version = await this.createCandidateVersion(baseline, strategy);
@@ -423,7 +423,7 @@ export class StrategyOptimizationCandidateService {
 
   async createAndEvaluateCandidate(
     experiment: ExperimentRow,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
     descriptors: StrategyParameterDescriptor[],
     modelKey: string,
     proposal: OptimizationProposal | OptimizationDiscoveryProposal,

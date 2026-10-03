@@ -1,10 +1,10 @@
-import type { CurrencyV1, FxRateV1, FxRatesResponseV1 } from '@thesis-ledger/schemas';
+import type { Currency, FxRate, FxRatesResponse } from '@thesis-ledger/schemas';
 
 export type FxConversionMode = 'current-rate' | 'historical-rate';
 
 export type FxConversionOptions = {
   fxMerge?: boolean;
-  baseCurrency?: CurrencyV1;
+  baseCurrency?: Currency;
 };
 
 export type FxConversionMeta = {
@@ -12,32 +12,32 @@ export type FxConversionMeta = {
   evidenceVersion: string;
   enabled: boolean;
   status: 'disabled' | 'not_needed' | 'ready' | 'stale' | 'blocked';
-  baseCurrency?: CurrencyV1;
+  baseCurrency?: Currency;
   asOf?: string;
   fxAsOf?: string;
   estimated?: boolean;
   conversionMode?: FxConversionMode;
   stale?: boolean;
   fxStale?: boolean;
-  missingCurrencies: CurrencyV1[];
-  rates: FxRateV1[];
+  missingCurrencies: Currency[];
+  rates: FxRate[];
 };
 
 export type ResolvedFx = {
   meta: FxConversionMeta;
-  rates: Map<CurrencyV1, number>;
+  rates: Map<Currency, number>;
 };
 
 type FxMarketClient = {
   getFxRates(input: {
-    baseCurrency: CurrencyV1;
-    currencies: readonly CurrencyV1[];
+    baseCurrency: Currency;
+    currencies: readonly Currency[];
     asOf?: string;
-  }): Promise<FxRatesResponseV1>;
+  }): Promise<FxRatesResponse>;
 };
 
 export type CurrencyAmount = {
-  currency: CurrencyV1;
+  currency: Currency;
   amount: number;
 };
 
@@ -45,18 +45,18 @@ export type CurrencyAggregate = {
   value: number | null;
   knownValue: number;
   complete: boolean;
-  missingCurrencies: CurrencyV1[];
+  missingCurrencies: Currency[];
 };
 
-const fxVersion = 1;
+const fxVersion = 3;
 
-export const supportedCurrency = (value: unknown): CurrencyV1 | undefined =>
+export const supportedCurrency = (value: unknown): Currency | undefined =>
   value === 'CNY' || value === 'HKD' || value === 'USD' ? value : undefined;
 
 const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
 const evidenceVersion = (
-  response: Pick<FxRatesResponseV1, 'version' | 'baseCurrency' | 'asOf' | 'rates'>,
+  response: Pick<FxRatesResponse, 'version' | 'baseCurrency' | 'asOf' | 'rates'>,
 ) =>
   [
     `fx-v${response.version}`,
@@ -81,18 +81,18 @@ const evidenceVersion = (
       ),
   ].join('|');
 
-const unavailableEvidenceVersion = (baseCurrency: CurrencyV1, asOf: Date) =>
+const unavailableEvidenceVersion = (baseCurrency: Currency, asOf: Date) =>
   `fx-v${fxVersion}:unavailable:${baseCurrency}:${dateOnly(asOf)}`;
 
-const statusFor = (missingCurrencies: readonly CurrencyV1[], stale: boolean) => {
+const statusFor = (missingCurrencies: readonly Currency[], stale: boolean) => {
   if (missingCurrencies.length > 0) return 'blocked' as const;
   if (stale) return 'stale' as const;
   return 'ready' as const;
 };
 
 const disabledMeta = (
-  currencies: readonly CurrencyV1[],
-  baseCurrency: CurrencyV1,
+  currencies: readonly Currency[],
+  baseCurrency: Currency,
   conversionMode: FxConversionMode,
 ): FxConversionMeta => ({
   version: fxVersion,
@@ -112,7 +112,7 @@ const disabledMeta = (
 
 export const resolveFx = async (
   market: FxMarketClient,
-  currencies: readonly CurrencyV1[],
+  currencies: readonly Currency[],
   options: FxConversionOptions,
   asOf: Date,
   conversionMode: FxConversionMode = 'current-rate',
@@ -142,7 +142,7 @@ export const resolveFx = async (
     };
   }
 
-  let response: FxRatesResponseV1;
+  let response: FxRatesResponse;
   try {
     response = await market.getFxRates({
       baseCurrency,
@@ -171,7 +171,7 @@ export const resolveFx = async (
   const available = response.rates.filter(
     (rate) => rate.available && rate.rate !== undefined && rate.rate > 0,
   );
-  const rates = new Map<CurrencyV1, number>(
+  const rates = new Map<Currency, number>(
     available.map((rate) => [rate.fromCurrency, rate.rate!]),
   );
   rates.set(baseCurrency, 1);
@@ -199,7 +199,7 @@ export const resolveFx = async (
   };
 };
 
-export const convertAmount = (amount: number, currency: CurrencyV1, fx: ResolvedFx) => {
+export const convertAmount = (amount: number, currency: Currency, fx: ResolvedFx) => {
   if (!fx.meta.enabled || fx.meta.status === 'disabled' || fx.meta.status === 'not_needed')
     return amount;
   const rate = fx.rates.get(currency);
@@ -228,7 +228,7 @@ export const aggregateCurrencyAmounts = (
   }
 
   let knownValue = 0;
-  const missingCurrencies = new Set<CurrencyV1>();
+  const missingCurrencies = new Set<Currency>();
   for (const item of amounts) {
     const converted = convertAmount(item.amount, item.currency, fx);
     if (converted === null) missingCurrencies.add(item.currency);

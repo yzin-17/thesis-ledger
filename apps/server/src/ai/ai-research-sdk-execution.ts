@@ -357,7 +357,12 @@ export class AiResearchSdkExecution {
           transport: 'stream',
           maxOutputTokens: outputTokens,
           timeout: {
-            totalMs: Math.min(runtime.timeoutMs, remainingMs),
+            // 「超时（毫秒）」是 Provider 级的一次性探测预算，不能当成流式研究生成的总时长墙：
+            // 本地推理模型的 research 用途探针实测 43～103 秒（思考 token 与正文共用输出预算），
+            // 用 30 秒总时长必然把正常生成误杀成「生成请求已取消」。
+            // 「卡住」交给首块 / 块间停顿（firstChunkMs / chunkMs）判活，
+            // 这里的总时长只兜住创建时冻结的绝对期限——一直在出字就不该被掐断。
+            totalMs: remainingMs,
             ...(route.execution.firstOutputTimeoutMs === undefined
               ? {}
               : { firstChunkMs: route.execution.firstOutputTimeoutMs }),

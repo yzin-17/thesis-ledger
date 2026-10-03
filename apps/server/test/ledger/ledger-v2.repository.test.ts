@@ -17,7 +17,10 @@ const createTransaction = (
     return state ? [{ accountId, ...state }] : [];
   }),
   accountLedgerState: { update: vi.fn(async ({ data }: { data: object }) => data) },
-  ledgerEvent: { create: vi.fn(async ({ data }: { data: object }) => data) },
+  ledgerEvent: {
+    create: vi.fn(async ({ data }: { data: object }) => data),
+    findFirst: vi.fn(async () => null as { id: string } | null),
+  },
 });
 
 const createRepository = (
@@ -26,13 +29,16 @@ const createRepository = (
 ) => {
   const prisma = {
     $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
-    ledgerEvent: { findMany: vi.fn(async () => storedEvents) },
+    ledgerEvent: {
+      findFirst: vi.fn(async () => null as { id: string } | null),
+      findMany: vi.fn(async () => storedEvents),
+    },
   };
   return { repository: new LedgerV2Repository(prisma as never), prisma };
 };
 
 const createEvent = (revision: string, overrides: Record<string, unknown> = {}) => ({
-  version: 2,
+  version: 3,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId,
@@ -121,6 +127,20 @@ describe('Ledger V2 不可变持久化', () => {
     expect(transaction.accountLedgerState.update).not.toHaveBeenCalled();
   });
 
+  it('旧账本行存在时，在执行写入操作前拒绝', async () => {
+    const transaction = createTransaction([{ ledgerRevision: 1n, projectionGeneration: 1n }]);
+    transaction.ledgerEvent.findFirst.mockResolvedValueOnce({ id: createEvent('1').eventId });
+    const { repository } = createRepository(transaction);
+    const operation = vi.fn(async () => ({ value: 'unused', advanceRevision: true }));
+
+    await expect(repository.withAccountWrite(accountId, operation)).rejects.toMatchObject({
+      response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
+    });
+    expect(operation).not.toHaveBeenCalled();
+    expect(transaction.ledgerEvent.create).not.toHaveBeenCalled();
+    expect(transaction.accountLedgerState.update).not.toHaveBeenCalled();
+  });
+
   it('只能在已锁定账户的下一 Revision 追加事件', async () => {
     const transaction = createTransaction([]);
     const { repository } = createRepository(transaction);
@@ -154,6 +174,7 @@ describe('Ledger V2 不可变持久化', () => {
       sourceTimezone: 'Asia/Shanghai',
       economicOrderKey: 'a0',
       recordedAt: new Date('2026-08-26T02:31:00.000Z'),
+      envelopeVersion: 3,
       payloadVersion: 1,
       payload: createEvent('1').payload,
       sourceCategory: 'MANUAL',
@@ -196,6 +217,7 @@ describe('Ledger V2 不可变持久化', () => {
       sourceTimezone: 'Asia/Shanghai',
       economicOrderKey: 'a0',
       recordedAt: new Date('2026-08-26T02:31:00.000Z'),
+      envelopeVersion: 3,
       payloadVersion: 1,
       payload: createEvent('1').payload,
       sourceCategory: 'MIGRATION',
@@ -233,7 +255,7 @@ describe('Ledger V2 不可变持久化', () => {
     await repository.appendRevision(context, event);
 
     expect(transaction.ledgerEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ sourceRowId: 'row-2' }),
+      data: expect.objectContaining({ sourceRowId: 'row-2', envelopeVersion: 3 }),
     });
     const effective = await repository.readEffectiveEvents(accountId);
     expect(effective.find((item) => item.eventId === importedStored.id)?.source.sourceRowId).toBe(
@@ -242,6 +264,32 @@ describe('Ledger V2 不可变持久化', () => {
     expect(effective.find((item) => item.eventId === baseStored.id)?.source).not.toHaveProperty(
       'sourceRowId',
     );
+  });
+
+  it('拒绝读取缺少当前 envelopeVersion 的旧事件', async () => {
+    const transaction = createTransaction([]);
+    const oldEvent = {
+      id: createEvent('1').eventId,
+      accountId,
+      type: 'BUY_EXECUTION',
+      envelopeVersion: null,
+    };
+    const { repository } = createRepository(transaction, [oldEvent]);
+
+    await expect(repository.readEffectiveEvents(accountId)).rejects.toMatchObject({
+      response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
+    });
+  });
+
+  it('无 factId 的旧行也阻断有效事件读取', async () => {
+    const transaction = createTransaction([]);
+    const { repository, prisma } = createRepository(transaction);
+    prisma.ledgerEvent.findFirst.mockResolvedValueOnce({ id: createEvent('1').eventId });
+
+    await expect(repository.readEffectiveEvents(accountId, '1')).rejects.toMatchObject({
+      response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
+    });
+    expect(prisma.ledgerEvent.findMany).not.toHaveBeenCalled();
   });
 
   it('current baseline 通过触发器禁止 LedgerEvent 修改和删除', async () => {

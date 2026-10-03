@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
-import type { BarSeriesV2, IndicatorResultV2 } from '@thesis-ledger/schemas';
+import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { BarSeries, MarketIndicatorResult } from '@thesis-ledger/schemas';
 import { buildChartPoints, indicatorValue, mergeChartPoints } from './market-chart-model.js';
 import {
   chartBarsFromSeries,
@@ -14,8 +14,8 @@ const GENERATED_AT = '2026-09-15T08:00:00.000Z';
 const RECENT = ['2026-09-14', '2026-09-15'];
 const OLDER = ['2026-09-10', '2026-09-11'];
 
-const series = (dates: readonly string[], fingerprint: string): BarSeriesV2 => ({
-  contractVersion: 2,
+const series = (dates: readonly string[], fingerprint: string): BarSeries => ({
+  contractVersion: 3,
   identity: { symbol: SYMBOL, assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
   points: dates.map((date, index) => ({
     timestamp: `${date}T00:00:00.000Z`,
@@ -53,7 +53,7 @@ const indicator = (
   name: 'MA' | 'MACD',
   dates: readonly string[],
   fingerprint: string,
-): IndicatorResultV2 => ({
+): MarketIndicatorResult => ({
   name,
   parameters: name === 'MA' ? { period: 5 } : { fast: 12, slow: 26, signal: 9 },
   inputFingerprint: fingerprint,
@@ -70,12 +70,12 @@ const page = (
   dates: readonly string[],
   fingerprint: string,
   requestId: string,
-): MarketDetailResponseV2 => {
+): MarketDetailResponse => {
   const barSeries = series(dates, fingerprint);
   const maResult = indicator('MA', dates, fingerprint);
   const macdResult = indicator('MACD', dates, fingerprint);
   return {
-    contractVersion: 2,
+    contractVersion: 3,
     symbol: SYMBOL,
     assetType: 'ETF',
     identity: { source: 'asset', status: 'confirmed' },

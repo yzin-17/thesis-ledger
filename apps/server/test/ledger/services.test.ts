@@ -95,6 +95,7 @@ describe('Ledger Service', () => {
         sourceTimezone: 'UTC',
         economicOrderKey: 'cash-flow:1',
         recordedAt: new Date('2026-08-20T01:00:01.000Z'),
+        envelopeVersion: 3,
         payloadVersion: 1,
         payload: {
           direction: 'INFLOW',

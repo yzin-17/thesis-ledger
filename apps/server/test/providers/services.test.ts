@@ -62,6 +62,29 @@ describe('Provider 健康状态', () => {
     });
   });
 
+  it('成功但“慢”的判定按调用方给的阈值，默认 3 秒只适用于轻量连接测试', async () => {
+    const prisma = {
+      providerHealth: {
+        findUnique: vi.fn(async () => null),
+        upsert: vi.fn(async ({ create }: { create: object }) => create),
+      },
+    };
+    const service = new ProviderHealthService(prisma as never, {} as never);
+
+    // 默认阈值仍按轻量连接测试：4 秒的 webhook 是 degraded。
+    await expect(service.record('dsa', true, 4_000)).resolves.toMatchObject({
+      state: 'degraded',
+    });
+    // AI 生成探针一次 74 秒属正常（思考 token 与正文共用输出预算），按授权预算判慢就是 healthy。
+    await expect(
+      service.record('local-ai', true, 74_270, undefined, new Date(), 'manual', undefined, 300_000),
+    ).resolves.toMatchObject({ state: 'healthy' });
+    // 同一延迟不传阈值 → 落到默认 3 秒，被误判成 degraded（这就是 health 列卡在 degraded 的原因）。
+    await expect(service.record('local-ai', true, 74_270)).resolves.toMatchObject({
+      state: 'degraded',
+    });
+  });
+
   it('按页读取健康历史并限制每页数量', async () => {
     const count = vi.fn(async () => 45);
     const findMany = vi.fn(async () => [

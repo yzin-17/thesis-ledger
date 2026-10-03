@@ -6,7 +6,21 @@ import type { ProviderManifest } from '../src/features/market-data/market-data.t
 
 const request = vi.hoisted(() => vi.fn());
 vi.mock('../src/shared/api/client.js', () => ({
-  getDesktopApiClient: () => ({ request }),
+  getDesktopApiClient: () => ({
+    market: {
+      configureProvider: (id: string, input: unknown) =>
+        request(`/api/market-data/providers/${id}/config`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      testProvider: (id: string, input: unknown, signal: AbortSignal) =>
+        request(`/api/market-data/providers/${id}/test`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+          signal,
+        }),
+    },
+  }),
 }));
 
 const provider = (providerId: string): ProviderManifest => ({
@@ -52,7 +66,7 @@ describe('数据源即时启停', () => {
       providerId: 'finnhub',
       enabled: false,
     });
-    expect(request).toHaveBeenCalledWith('/api/v2/market-data/providers/finnhub/config', {
+    expect(request).toHaveBeenCalledWith('/api/market-data/providers/finnhub/config', {
       method: 'POST',
       body: JSON.stringify({ enabled: false }),
     });

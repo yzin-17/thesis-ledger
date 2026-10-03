@@ -1,0 +1,6 @@
+{
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "requestId": "market-control-v3-handshake-fixture",
+  "supportedVersions": [3]
+}

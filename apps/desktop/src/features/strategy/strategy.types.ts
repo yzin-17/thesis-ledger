@@ -1,17 +1,16 @@
 import type {
   BacktestExecutionModel,
   ExecutionModelDisclosure,
-  BacktestResultV2,
-  RunConfig,
+  BacktestResultV3,
+  BacktestRunPreparationResultV3,
+  BacktestRunCreateV3,
   ResultReadEligibility,
-  StrategySchemaV2,
 } from '@thesis-ledger/schemas';
 
 export type StrategyStatus = 'draft' | 'active' | 'archived';
 export type BacktestJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export type StrategySchema = Record<string, unknown>;
-export type V2StrategySchema = StrategySchemaV2;
 
 export interface StrategyVersion {
   id: string;
@@ -53,7 +52,7 @@ export interface BacktestJobSummary {
   executionModelDisclosure?: ExecutionModelDisclosure;
   id: string;
   strategyVersionId: string;
-  mode?: 'V1' | 'V2';
+  mode?: 'V3';
   status: BacktestJobStatus | (string & {});
   progress?: number | null;
   period?: { start: string; end: string };
@@ -84,7 +83,7 @@ export interface BacktestJobSummary {
 export interface BacktestJob extends BacktestJobSummary {
   inSampleEnd?: string;
   input?: Record<string, unknown> | null;
-  result?: BacktestJobResult | BacktestResultV2 | null;
+  result?: BacktestJobResult | BacktestResultV3 | null;
 }
 
 export interface CreateStrategyInput {
@@ -99,6 +98,8 @@ export interface CreateStrategyVersionInput {
 }
 
 export interface BacktestSetupInput {
+  adjustment?: 'none' | 'qfq' | 'hfq';
+  prepared?: Extract<BacktestRunPreparationResultV3, { status: 'prepared' }>;
   executionModel?: BacktestExecutionModel;
   period: { start: string; end: string };
   initialCash: number;
@@ -107,28 +108,4 @@ export interface BacktestSetupInput {
   baseCurrency?: 'CNY' | 'HKD' | 'USD';
 }
 
-export interface FetchStrategyBarsInput {
-  symbol: string;
-  period: { start: string; end: string };
-}
-
-export interface QueueBacktestInput {
-  id: string;
-  strategyVersionId: string;
-  status: 'queued';
-  period: { start: string; end: string };
-  inSampleEnd?: string;
-  dataAsOf: string;
-  warnings: string[];
-  strategy: StrategySchema;
-  bars: unknown[];
-  benchmarkBars?: unknown[];
-  initialCash: number;
-  allowStale?: boolean;
-}
-
-export interface QueueBacktestV2Input {
-  strategyVersionId: string;
-  runConfig: RunConfig;
-  idempotencyKey: string;
-}
+export type QueueBacktestV3Input = BacktestRunCreateV3;

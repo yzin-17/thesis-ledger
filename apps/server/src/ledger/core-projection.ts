@@ -3,11 +3,12 @@ import { Prisma } from '@prisma/client';
 import {
   projectTradeCostProjections,
   type TradeCostMethod,
-  type LedgerEventV2,
+  type LedgerEvent,
   type TradeProjection,
 } from '@thesis-ledger/domain';
 import { projectCashMaterialization, type StoredCashEvent } from './cash-projection.js';
 import { toLedgerEventV2 } from './ledger-v2.repository.js';
+import { requireCurrentLedgerEnvelope } from './ledger-stored-envelope-version.js';
 
 Prisma.Decimal.set({ precision: 40 });
 
@@ -81,7 +82,7 @@ const deterministicUuid = (key: string) => {
   ].join('-');
 };
 
-const toV2Event = (event: StoredLedgerEvent) =>
+const toCurrentLedgerEvent = (event: StoredLedgerEvent) =>
   toLedgerEventV2({
     id: event.id,
     accountId: event.accountId,
@@ -93,6 +94,7 @@ const toV2Event = (event: StoredLedgerEvent) =>
     sourceTimezone: event.sourceTimezone,
     economicOrderKey: event.economicOrderKey,
     recordedAt: event.recordedAt,
+    envelopeVersion: event.envelopeVersion,
     payloadVersion: event.payloadVersion,
     payload: event.payload ?? {},
     sourceCategory: event.sourceCategory,
@@ -103,10 +105,10 @@ const toV2Event = (event: StoredLedgerEvent) =>
     revisionAction: event.revisionAction,
     supersedesEventId: event.supersedesEventId,
     reason: event.reason,
-  }) as unknown as LedgerEventV2;
+  }) as unknown as LedgerEvent;
 
-const readV2Events = (stored: readonly StoredLedgerEvent[]) =>
-  stored.filter((event) => event.factId !== null).map(toV2Event);
+const readCurrentLedgerEvents = (stored: readonly StoredLedgerEvent[]) =>
+  stored.filter((event) => event.factId !== null).map(toCurrentLedgerEvent);
 
 const strategyMethod = (value: string): TradeCostMethod => {
   if (value === 'AVG' || value === 'FIFO') return value;
@@ -493,8 +495,9 @@ export const rebuildCoreProjections = async (
     where: { accountId },
     orderBy: [{ ledgerRevision: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
   });
+  stored.forEach((event) => requireCurrentLedgerEnvelope(event.envelopeVersion));
   const inputs = await loadProjectionInputs(client, accountId, options.method, stored);
-  const events = readV2Events(stored);
+  const events = readCurrentLedgerEvents(stored);
   const trades = projectTradeCostProjections(events, {
     accountModeByAccountId: { [accountId]: inputs.accountMode },
     costStrategyRevisionsByAccountId: { [accountId]: inputs.strategies },

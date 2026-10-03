@@ -6,12 +6,11 @@ import {
 } from '@nestjs/common';
 import { normalizeSymbol } from '@thesis-ledger/domain';
 import {
-  marketDetailResponseSchema,
+  marketDetailSectionSchema,
   type MarketDetailAssetType,
   type MarketDetailCapability,
   type MarketDetailDataByCapability,
   type MarketDetailDiagnostic,
-  type MarketDetailResponse,
   type MarketDetailSection,
   type MarketDetailSectionStatus,
 } from '@thesis-ledger/schemas';
@@ -82,6 +81,11 @@ export const MARKET_DETAIL_CAPABILITY_MATRIX: Record<
 
 type DetailInclude = string | readonly string[] | undefined;
 type DetailLimit = number | string | undefined;
+type NonBarDetailResult = {
+  requested: MarketDetailCapability[];
+  sections: Partial<Record<MarketDetailCapability, MarketDetailSection>>;
+  dependencies: Record<string, { status: MarketDetailSectionStatus; error?: MarketDetailDiagnostic }>;
+};
 export type ResolvedMarketDetailIdentity = {
   symbol: string;
   assetType: MarketDetailAssetType;
@@ -166,16 +170,12 @@ export class MarketDetailService {
     input: string,
     options: {
       include?: DetailInclude;
-      barsLimit?: DetailLimit;
       navLimit?: DetailLimit;
       start?: string;
       end?: string;
-      indicatorParams?: string | Readonly<Record<string, number>>;
-      calculationAnchor?: string;
       refresh?: boolean;
     } = {},
-  ): Promise<MarketDetailResponse> {
-    this.parseLimit(options.barsLimit, 'barsLimit');
+  ): Promise<NonBarDetailResult> {
     const navLimit = this.parseLimit(options.navLimit, 'navLimit');
     parseMarketDetailDateRange(options.start, options.end);
     const identity = await this.resolveIdentity(input);
@@ -264,24 +264,8 @@ export class MarketDetailService {
     }
     await Promise.all(tasks);
 
-    return marketDetailResponseSchema.parse({
-      version: 1,
-      symbol: identity.symbol,
-      assetType: identity.assetType,
-      identity: { source: identity.source, status: identity.status },
-      requested,
-      capabilities: {
-        supported: [...baseSupported],
-        unsupported: MARKET_DETAIL_CAPABILITIES.filter(
-          (capability) => !baseSupported.includes(capability),
-        ),
-      },
-      limits: { bars: 30, nav: navLimit, barsHasMoreBefore: false },
-      sections,
-      dependencies,
-      requestId,
-      generatedAt: new Date().toISOString(),
-    });
+    for (const section of Object.values(sections)) marketDetailSectionSchema.parse(section);
+    return { requested, sections, dependencies };
   }
 
   private async readPolicy(): Promise<PolicySnapshot | null> {

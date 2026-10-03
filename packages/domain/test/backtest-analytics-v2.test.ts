@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { buildBacktestAnalytics, type BacktestAnalyticsInput } from '../src/index.js';
 
+const comparisonIdentity = {
+  priceProtocol: { version: 'execution-price-v1', adjustment: 'none' },
+  returnProtocol: { version: 'total-return-v1', range: 'same-run-window' },
+  historyProtocol: { basis: 'point-in-time' },
+  costAssumption: { kind: 'zero-cost', version: 'benchmark-cost-v1' },
+  source: { fingerprint: 'execution-source-a' },
+  dividendAssumption: { treatment: 'explicit-cash' },
+} as const;
+
 const baseInput = (overrides: Partial<BacktestAnalyticsInput> = {}): BacktestAnalyticsInput => ({
   runId: 'run-1',
   strategyVersionId: 'strategy-version-1',
@@ -40,9 +49,11 @@ describe('V2 backtest analytics', () => {
       volatility: { status: 'available' },
       sharpe: { status: 'available' },
     });
+    expect(result.benchmark).toBeUndefined();
+    expect(result.benchmarkCompatibility).toBeUndefined();
   });
 
-  it('uses the execution instrument as the default buy-and-hold benchmark', () => {
+  it('未冻结费用假设时拒绝计算执行标的基准收益', () => {
     const result = buildBacktestAnalytics(
       baseInput({
         executionInstrument: {
@@ -57,7 +68,180 @@ describe('V2 backtest analytics', () => {
         },
       }),
     );
-    expect(result.benchmark).toEqual({ totalReturn: { status: 'available', value: '0.3' } });
+    expect(result.benchmark).toEqual({
+      totalReturn: { status: 'unavailable', reason: 'BENCHMARK_COST_ASSUMPTION_UNAVAILABLE' },
+    });
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'unverified',
+      costAssumption: { kind: 'unavailable' },
+    });
+    expect(result.benchmark?.excessReturn).toBeUndefined();
+  });
+
+  it('calculates excess return only when the frozen benchmark identity matches', () => {
+    const result = buildBacktestAnalytics(
+      baseInput({
+        executionInstrument: {
+          symbol: '600519.SH',
+          currency: 'CNY',
+          prices: [
+            { occurredAt: '2025-01-01T00:00:00Z', value: '10' },
+            { occurredAt: '2025-01-02T00:00:00Z', value: '11' },
+            { occurredAt: '2025-01-03T00:00:00Z', value: '12' },
+            { occurredAt: '2025-01-04T00:00:00Z', value: '13' },
+          ],
+        },
+        benchmarkComparison: { strategy: comparisonIdentity },
+      }),
+    );
+
+    expect(result.benchmark).toEqual({
+      totalReturn: { status: 'available', value: '0.3' },
+      excessReturn: { status: 'available', value: '0.05' },
+    });
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'compatible',
+      costAssumption: { kind: 'zero-cost', version: 'benchmark-cost-v1' },
+      strategyFingerprint: expect.any(String),
+      benchmarkFingerprint: expect.any(String),
+    });
+    expect(result.benchmarkCompatibility?.strategyFingerprint).toBe(
+      result.benchmarkCompatibility?.benchmarkFingerprint,
+    );
+  });
+
+  it('keeps standalone benchmark return but refuses excess return across sources', () => {
+    const result = buildBacktestAnalytics(
+      baseInput({
+        benchmark: {
+          symbol: '600519.SH',
+          currency: 'CNY',
+          points: [
+            { occurredAt: '2025-01-01T00:00:00Z', value: '10' },
+            { occurredAt: '2025-01-02T00:00:00Z', value: '11' },
+            { occurredAt: '2025-01-03T00:00:00Z', value: '12' },
+            { occurredAt: '2025-01-04T00:00:00Z', value: '13' },
+          ],
+        },
+        benchmarkComparison: {
+          strategy: comparisonIdentity,
+          benchmark: { ...comparisonIdentity, source: { fingerprint: 'benchmark-source-b' } },
+        },
+      }),
+    );
+
+    expect(result.benchmark).toEqual({
+      totalReturn: { status: 'available', value: '0.3' },
+      excessReturn: { status: 'unavailable', reason: 'BENCHMARK_COMPARISON_INCOMPATIBLE' },
+    });
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'incompatible',
+      differentFields: ['source'],
+    });
+  });
+
+  it('does not assume zero costs when a new comparison omits frozen cost facts', () => {
+    const result = buildBacktestAnalytics(
+      baseInput({
+        executionInstrument: {
+          symbol: '600519.SH',
+          currency: 'CNY',
+          prices: [
+            { occurredAt: '2025-01-01T00:00:00Z', value: '10' },
+            { occurredAt: '2025-01-02T00:00:00Z', value: '11' },
+            { occurredAt: '2025-01-03T00:00:00Z', value: '12' },
+            { occurredAt: '2025-01-04T00:00:00Z', value: '13' },
+          ],
+        },
+        benchmarkComparison: { strategy: { priceProtocol: comparisonIdentity.priceProtocol } },
+      }),
+    );
+
+    expect(result.benchmark).toMatchObject({
+      totalReturn: { status: 'unavailable', reason: 'BENCHMARK_COST_ASSUMPTION_UNAVAILABLE' },
+      excessReturn: { status: 'unavailable', reason: 'BENCHMARK_COMPARISON_UNVERIFIED' },
+    });
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'unverified',
+      costAssumption: { kind: 'unavailable' },
+      missingFields: [
+        'returnProtocol',
+        'historyProtocol',
+        'costAssumption',
+        'source',
+        'dividendAssumption',
+      ],
+    });
+  });
+
+  it('leaves an explicit benchmark unverified when its identity is missing', () => {
+    const result = buildBacktestAnalytics(
+      baseInput({
+        benchmark: {
+          symbol: '600519.SH',
+          currency: 'CNY',
+          points: [
+            { occurredAt: '2025-01-01T00:00:00Z', value: '10' },
+            { occurredAt: '2025-01-02T00:00:00Z', value: '11' },
+            { occurredAt: '2025-01-03T00:00:00Z', value: '12' },
+            { occurredAt: '2025-01-04T00:00:00Z', value: '13' },
+          ],
+        },
+        benchmarkComparison: { strategy: comparisonIdentity },
+      }),
+    );
+
+    expect(result.benchmark).toMatchObject({
+      totalReturn: { status: 'unavailable', reason: 'BENCHMARK_COST_ASSUMPTION_UNAVAILABLE' },
+      excessReturn: { status: 'unavailable', reason: 'BENCHMARK_COMPARISON_UNVERIFIED' },
+    });
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'unverified',
+      missingFields: [
+        'priceProtocol',
+        'returnProtocol',
+        'historyProtocol',
+        'costAssumption',
+        'source',
+        'dividendAssumption',
+      ],
+      costAssumption: { kind: 'unavailable' },
+    });
+  });
+
+  it('rejects fixed-cost benchmark models until their order sizing is modeled', () => {
+    const fixedFeeIdentity = {
+      ...comparisonIdentity,
+      costAssumption: {
+        kind: 'unsupported',
+        version: 'fixed-minimum-fee-v1',
+        fingerprint: 'frozen-fixed-fee-input',
+      },
+    } as const;
+    const result = buildBacktestAnalytics(
+      baseInput({
+        executionInstrument: {
+          symbol: '600519.SH',
+          currency: 'CNY',
+          prices: [
+            { occurredAt: '2025-01-01T00:00:00Z', value: '10' },
+            { occurredAt: '2025-01-02T00:00:00Z', value: '11' },
+            { occurredAt: '2025-01-03T00:00:00Z', value: '12' },
+            { occurredAt: '2025-01-04T00:00:00Z', value: '13' },
+          ],
+        },
+        benchmarkComparison: { strategy: fixedFeeIdentity },
+      }),
+    );
+
+    expect(result.benchmark).toMatchObject({
+      totalReturn: { status: 'unavailable', reason: 'BENCHMARK_COST_MODEL_UNSUPPORTED' },
+      excessReturn: { status: 'unavailable', reason: 'BENCHMARK_RETURN_UNAVAILABLE' },
+    });
+    expect(result.benchmarkCompatibility).toMatchObject({
+      status: 'compatible',
+      costAssumption: fixedFeeIdentity.costAssumption,
+    });
   });
 
   it('全胜交易仅使 profit factor 为无穷，不降低数据完整性', () => {

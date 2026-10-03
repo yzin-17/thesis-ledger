@@ -37,6 +37,7 @@ const execution = (input: {
   sourceTimezone: 'UTC',
   economicOrderKey: `execution:${input.revision}`,
   recordedAt: new Date(input.occurredAt),
+  envelopeVersion: 3,
   payloadVersion: 1,
   payload: {
     symbol: 'AAPL.US',
@@ -144,7 +145,7 @@ const fakeCoreClient = (events: StoredCashEvent[]) => ({
 });
 
 describe('core ledger projection', () => {
-  it('兼容旧迁移产生的无 transfer 元数据现金划转，并保留进出金额效果', () => {
+  it('拒绝旧迁移产生的无 transfer 元数据现金划转', () => {
     const legacyEvent = (input: {
       id: string;
       accountId: string;
@@ -179,7 +180,7 @@ describe('core ledger projection', () => {
       reason: null,
     });
 
-    const balances = projectCashBalances([
+    expect(() => projectCashBalances([
       legacyEvent({
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         accountId,
@@ -194,14 +195,12 @@ describe('core ledger projection', () => {
         direction: 'INFLOW',
         amount: '75',
       }),
-    ]);
-
-    expect(balances.get(accountId)?.get('CNY')?.toString()).toBe('-40');
-    expect(balances.get(strategyId)?.get('CNY')?.toString()).toBe('75');
+    ])).toThrow('旧账本事件不支持读取或修订');
   });
 
   it('当前事件载荷解析失败时显式中止现金投影', () => {
     const malformed: StoredCashEvent = {
+      envelopeVersion: 3,
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
       accountId,
       type: 'CASH_FLOW',
@@ -248,6 +247,9 @@ describe('core ledger projection', () => {
     }) as StoredCashEvent;
 
     expect(projectCashMaterialization([assertion])).toEqual({ balances: [], settlements: [] });
+    expect(() => projectCashMaterialization([{ ...assertion, factId: null }])).toThrow(
+      '账本事件缺少 factId',
+    );
   });
 
   it('建仓时间补录事件不产生 Position 或 Cash 物化结果', async () => {
@@ -293,6 +295,7 @@ describe('core ledger projection', () => {
       sourceTimezone: 'Asia/Shanghai',
       economicOrderKey: 'desktop-cash-deposit:future-1',
       recordedAt: new Date('2026-08-03T01:00:00.000Z'),
+      envelopeVersion: 3,
       payloadVersion: 1,
       payload: {
         direction: 'INFLOW',
@@ -589,6 +592,7 @@ describe('core ledger projection', () => {
         sourceTimezone: 'UTC',
         economicOrderKey: 'cash:1',
         recordedAt: new Date('2026-08-01T00:00:00.000Z'),
+        envelopeVersion: 3,
         payloadVersion: 1,
         payload: {
           currency: 'USD',

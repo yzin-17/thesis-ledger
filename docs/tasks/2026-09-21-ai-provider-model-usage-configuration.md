@@ -2,7 +2,7 @@
 
 对应 Spec：[AI Provider 配置与模型用途配置优化](../specs/2026-09-21-ai-provider-model-usage-configuration.md)
 
-> 状态：本地实现、自动门禁、隔离 PostgreSQL、目标 Docker / Server / Worker 与内建浏览器本地 Web 预览已完成收口；完整设计稿 AC-01～30 仍有真实 Provider 与 Electron 实机门禁未通过。本文记录统一 G0→G5 基线、已验证证据和未授权外部门禁，不把 Provider 配置或自动化结果宣称为真实计费调用通过。
+> 状态：既有本地实现、自动门禁、隔离 PostgreSQL、目标 Docker / Server / Worker 与内建浏览器本地 Web 预览有历史证据；2026-09-24 修订的完整 AC-09 超时语义仍需对当前源码做定向及目标运行态验证，真实 Provider 与 Electron 实机门禁也未通过。本文记录统一 G0→G5 基线、已验证证据和未授权外部门禁，不把 Provider 配置或自动化结果宣称为真实计费调用通过。
 
 ## 1. 验收基线与编号约定
 
@@ -67,10 +67,10 @@
 - [x] **T2.2：混合模式、用途覆盖与超时继承**（本地实现里程碑已完成；Electron 视觉待验证）
   - 覆盖：完整 AC-06～09 中未由 T2.1 证明的部分。
   - 依赖：T2.1；共享输出模式和超时契约就绪。
-  - 完成条件：多用途模式不被打开即保存静默归一；共用模式与逐用途覆盖的影响范围明确；空超时表示继承、零值和越界被拒绝，单位与实际生效来源准确展示。
+  - 完成条件：多用途模式不被打开即保存静默归一；共用模式与逐用途覆盖的影响范围明确；空超时表示继承、零值和越界被拒绝，单位与实际生效来源准确展示。流式执行与探针的期限行为另由 T1.2、T3.2 和 G2 / G5 验证。
   - 验证方式：Schema / 纯函数、Server 路由转换、Desktop 交互测试；覆盖旧混合模式、用途切换和继承链。
   - 定向验证：通过；Server readiness / upstream、Schemas AI execution、Desktop Provider UI 定向测试和两端 typecheck / build 通过。Provider 默认、用途覆盖、系统默认三层解析会返回生效来源；空值表示继承，零值和越界在 Schema 与编辑器边界拒绝。
-  - 证据边界：已证明契约、转换和静态 UI 行为；内建浏览器本地 Web 预览已检查模型与用途页签、价格未知提示、用途选择和未保存修改保护；仍未证明 Electron 实机在旧混合配置、长 ID、滚动和保存后的视觉 / 交互结果。
+  - 证据边界：已证明契约、转换和静态 UI 行为；内建浏览器本地 Web 预览已检查模型与用途页签、价格未知提示、用途选择和未保存修改保护；仍未证明 Electron 实机在旧混合配置、长 ID、滚动和保存后的视觉 / 交互结果。2026-09-24 确定的流式超时语义另按完整 AC-09 和仓库局部 AC-14 验证，既有 UI 定向测试不自动证明执行侧期限行为。
 
 ### T3：Provider 连接、目录和测试生命周期
 
@@ -92,7 +92,7 @@
   - 2026-09-22 回归修复（业务用途生成测试的 JSON 探针）：用途探针只发散文指令（不要求 JSON、不给字段名），而 `json_validated` 在适配器里是 `Output.text()` → `parseJsonText`（`JSON.parse` + 契约 `schema.parse`），因此真实 Provider 必然以 `Unexpected token '*', "**Research"... is not valid JSON` 失败（推理型模型另有一次表现为 `Provider 结束原因为 length`）。
     - 实现：`provider-connection-test.ts` 用途探针改为 system（只返回满足给定 JSON Schema 的 JSON 对象，禁 Markdown/围栏/解释/额外字段）+ user（最小可用实例、内联 `z.toJSONSchema(契约)`、并要求数值大于 0 与枚举取值合法）；用途探针输出预算 1024 → 8192（`PURPOSE_PROBE_MAX_OUTPUT_TOKENS`）。连接探针保持单次中性契约不变（1024、不注入 `reasoningEffort`），既有断言 `连接测试统一通过 SDK adapter 发出单次中性探针` 继续成立；用途预算上调依据 `tasks/2026-09-19-vercel-ai-sdk-integration.md`“对必须推理的模型预先给出安全输出预算”。内联 schema 与数值要求是必需的：契约的 `superRefine` 语义约束（`strategy.sizing.amount > 0`、`entry.conditions` 最短长度）无法由 JSON Schema 表达，只给结构会让模型输出 0 或空数组被拒。
     - 观测性修复：`ai-provider.service.ts` 中探针 total 超时此前被适配器统一归为 `cancelled`，即使调用方没有取消；现在该情形报 `errorCode: provider_timeout` 与“Provider 未在 N ms 内返回结果，已按超时中断”，不再显示成用户取消。
-    - 定向验证：Server `tsc -p tsconfig.json` 通过；`vitest run test/ai/ai-provider-management.test.ts` 26 项通过（新增用途探针消息/预算/中性断言、连接探针最小指令、探针超时 errorCode 三项）；`vitest run test/ai` 146 项通过、17 项 PostgreSQL 集成按环境跳过；受影响文件 ESLint 通过。真实 Provider 复验（本地 LM Studio 推理模型，草稿显式 `timeoutMs=120000`）：连接 2.7s、研究 80.4s、参数优化 30.5s、策略发现 62.4s、研究（`native_schema`）76.7s 全部 `healthy`；同一探针在 Provider 默认 30000ms 超时下三个用途均如实报 `provider_timeout`。
+    - 定向验证（2026-09-22 历史基线）：Server `tsc -p tsconfig.json` 通过；`vitest run test/ai/ai-provider-management.test.ts` 26 项通过（新增用途探针消息/预算/中性断言、连接探针最小指令、探针超时 errorCode 三项）；`vitest run test/ai` 146 项通过、17 项 PostgreSQL 集成按环境跳过；受影响文件 ESLint 通过。真实 Provider 复验（本地 LM Studio 推理模型，草稿显式 `timeoutMs=120000`）：连接 2.7s、研究 80.4s、参数优化 30.5s、策略发现 62.4s、研究（`native_schema`）76.7s 全部 `healthy`；当时同一探针在 Provider 默认 30000ms 超时下三个用途均报 `provider_timeout`。该结果保留为历史观测，不作为 2026-09-24 流式期限语义的通过证据。
     - 遗留（已记入 `docs/TODO.md`）：**2026-09-23 复核修正**——`272eaa27` 已在 `ai-provider.service.ts:746-754` 把 `purposeRoute.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs` 与对应 idle 值透传给用途探针，`provider-connection-test.ts:110,113-116` 在 `purpose` 下使用 `transport: 'stream'` 并传 `firstChunkMs/chunkMs`，`ai-sdk-generation.adapter.ts:232-241` 在 stream 下使其生效，因此“用途面板的首输出等待 / 输出空闲等待对测试按钮无效”已不再成立。仍成立的只有两点：连接探针（`purpose` 为空）保持 `single` 且只消费 Provider 总超时；探针不注入路由级 `reasoningEffort`。`docs/TODO.md` 的同名条目已同步收窄。
     - **2026-09-23 真实 Provider 复验（lmstudio，`chat-completions` / `compatible` / `authMode: none`，模型 `qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive`，baseUrl `http://192.168.5.20:6789/v1`，通过目标容器 `http://127.0.0.1:3000/api/v1` 调用）**：
       - 已保存 Provider 连接测试 `POST /ai/providers/lmstudio/test`（`{}`）：`healthy`，`latencyMs=2909`，`credentialConfigured=false`，`authMode=none`，`usage={status:'reported',inputTokens:21,outputTokens:147}`，`cost={status:'estimated',amount:'0',currency:'USD',source:'configured_model_pricing',pricingVersion:'pricing-612c2b5d10c1ebd9'}`。证明 AC-15（无认证不发 Key、不回退环境 Key）与服务端维护的 `pricingVersion` 只读回流。
@@ -154,7 +154,7 @@
 | AC-06 | 一个模型的多用途转换为唯一用途路由，模式和覆盖值不丢 | T2.1、T2.2 | 路由转换、Desktop 交互 | 内建浏览器已检查用途选择与覆盖面板；保存后完整路由和 Electron 待验证 |
 | AC-07 | API 拒绝同模型同用途的多模式活跃路由 | T2.1 | Server Schema / HTTP 契约 | 局部实现；完整证据待补 |
 | AC-08 | 旧配置模式混合时显示按用途配置，不打开保存即覆盖 | T2.2 | 旧配置 fixture、Desktop | 本地契约与组件已验证；内建浏览器已检查用途展开与撤销；旧混合配置和 Electron 待验证 |
-| AC-09 | 空超时继承，零值 / 越界拒绝，单位和来源准确 | T2.2 | Schema、Server、Desktop | 本地实现与定向测试通过；内建浏览器已看到 Provider / 用途覆盖超时字段；Electron 保存后视觉与交互待验证 |
+| AC-09 | 空值继承、非法值拒绝；Provider `timeoutMs` 约束目录 / 非流式连接，流式请求按首输出、输出间隔和操作 / 任务绝对期限收敛，超时归因准确 | T2.2、T3.2、T1.2 | Schema、Server 非流式与流式定向测试、Desktop 字段来源、G2 / G5 | 输入与路由解析已有局部证据；2026-09-24 新语义下的跨执行面验证及 Electron 展示仍待补齐 |
 | AC-10 | 不同模型按目标模型冻结价格并预留、结算 | T1.2 | Server / 费用 / 任务集成 | 研究、策略冻结与隔离任务执行费用闭环已验证；目标运行态待验证 |
 | AC-11 | 零费率、未知、非零和单边零价严格区分 | T1.1、T1.2 | Schema、费用门禁 | 生成前门禁与隔离执行费用事实已覆盖；真实 Provider 费用待验证 |
 | AC-12 | 新价格不重算旧任务的冻结价格和结算 | T1.2 | 快照、历史任务集成 | 研究 / 策略冻结路径已补；历史集成待验证 |
@@ -183,10 +183,10 @@
 | --- | --- | --- | --- |
 | G0 基线一致性 | 本 Task、Spec、完整设计稿可访问 | 编号、任务责任、证据类型和状态无冲突 | 已完成；继续保留完整 AC 与局部里程碑边界 |
 | G1 契约与纯函数 | T1.1、T2.1、T3.1、T4.1 的共享契约稳定 | 价格状态、用途唯一性、认证组合、超时、取消和默认引用的本地语义一致 | 已通过；Schema、Server / Desktop 定向测试和 typecheck/build 通过 |
-| G2 Server / PostgreSQL 集成 | T1.2、T3.2、T4.2 的实现可运行 | 冻结、预算、测试状态、默认事务、版本冲突和历史事实正确 | Server 自动化、隔离 PostgreSQL 16 项和目标结构 / HTTP smoke 已通过；真实 Provider 费用事实未验证 |
+| G2 Server / PostgreSQL 集成 | T1.2、T3.2、T4.2 的实现可运行 | 冻结、预算、测试状态、默认事务、版本冲突和历史事实正确；按 AC-09 区分非流式总超时、流式停顿超时与绝对期限，并正确归因取消 | 既有 Server 自动化、隔离 PostgreSQL 16 项和目标结构 / HTTP smoke 已通过；2026-09-24 超时契约的受影响执行路径及真实 Provider 费用事实待验证 |
 | G3 Desktop / Electron | G1 和相关 API 契约就绪 | 双页签、目录竞态、错误定位、用途编辑、取消、默认展示和长 ID 可操作 | Desktop 自动化与内建浏览器本地 Web 预览已通过；Electron 实机未执行 |
 | G4 迁移与兼容 | G2 完成，迁移输入和旧数据样本明确 | 迁移可重复、冲突可定位、旧任务不改写、旧客户端有损写入被拒绝 | dry-run、保护逻辑、隔离 PostgreSQL 重建和目标库 apply 已通过；真实 Provider 兼容输入未执行 |
-| G5 真实运行态 | G2、G3、G4 完成；目标服务、凭证和预算可用 | 无认证、有认证、指定模型、显式默认和业务用途输出通过实际 Server / Worker / Desktop | 目标服务健康、AI 配置只读接口、无认证 fail-closed 探测和内建浏览器本地 Web 预览已通过；真实 Provider 成功计费与 Electron 实机仍未执行 |
+| G5 真实运行态 | G2、G3、G4 完成；目标服务、凭证和预算可用 | 无认证、有认证、指定模型、显式默认和业务用途输出通过实际 Server / Worker / Desktop；长时间持续输出不被 Provider `timeoutMs` 截断，停顿或绝对期限到达时正确终止 | 目标服务健康、AI 配置只读接口、无认证 fail-closed 探测和内建浏览器本地 Web 预览已通过；2026-09-24 超时契约的目标运行态、真实 Provider 成功计费与 Electron 实机仍未执行 |
 
 执行顺序固定为：`G0 → G1 → G2 → G3 / G4 → G5 → 最终一致性 Review`。G3 和 G4 在各自依赖满足后可以并行，但 G5 必须等待两者以及 G2 全部完成。
 
@@ -200,6 +200,7 @@
 | 仓库 AC-04：用途路由唯一性 | AC-06～08 | 仍需覆盖旧混合模式和 API 冲突场景 |
 | 仓库 AC-05：模型用途编辑和目录行为 | AC-04～06、AC-22～24 | 仍需覆盖竞态、测试生命周期和真实请求 |
 | 仓库 AC-06：已移除能力不回归 | AC-29 | 需要源码、边界和运行态回归证据 |
+| 仓库 AC-14：非流式与流式超时边界 | AC-09 | 输入、继承与显示归 T2.2；执行侧停顿 / 绝对期限归 T1.2、T3.2 和 G2 / G5 |
 
 ## 6. 最终一致性 Review
 
@@ -218,9 +219,9 @@
 
 ### Planning Review 结论
 
-- 结论：**本地实现完成，外部运行态门禁未通过**。T1～T4 与 T5.1 的本地交付物已完成，不能据此宣称完整 AC-01～30 全部通过。
+- 结论：**既有局部里程碑有本地证据；修订后的 AC-09 与外部运行态门禁未通过**。T1～T4 与 T5.1 的历史本地交付物不能据此宣称完整 AC-01～30 全部通过。
 - 已确认的默认决策：完整设计稿 AC-01～30 为主编号；客户端不得提交 `pricingVersion`；影响默认引用的变更必须有版本保护和原子提交；取消不等于零消耗；真实环境缺失不豁免运行态门禁。
-- 当前剩余门禁：Electron / 浏览器人工验收、有认证请求、真实计费（非零费率）请求、真实 PostgreSQL 并发；无认证成功连接与指定用途的真实生成已于 2026-09-23 用 lmstudio Provider 执行（见 T3.2）。
+- 当前剩余门禁：修订后 AC-09 的非流式 / 流式超时与取消归因、Electron / 浏览器人工验收、有认证请求、真实计费（非零费率）请求、真实 PostgreSQL 并发；无认证成功连接与指定用途的真实生成已于 2026-09-23 用 lmstudio Provider 执行（见 T3.2）。
 - 规划风险：完整设计稿位于 Downloads，后续若源文件发生变化，必须重新检查 AC-01～30 映射和受影响证据。
 - 本次验证（2026-09-22 快照，已被下一行取代）：Server 完整测试 813 通过 / 49 个 PostgreSQL 集成用例按环境跳过，Desktop 455 通过，Schemas 209 通过；另有隔离 PostgreSQL 任务执行集成 16 项、重建 7 项、结构测试 9 项通过，目标库重建到当前 head、目标 Compose 全部 healthy、目标 HTTP/Redis/完整性 smoke 和无认证 fail-closed 探测通过；migration matrix、Prisma validate / generate、两端 build / typecheck、受影响文件 ESLint 和 `git diff --check` 通过。`pnpm lint` 的 build、边界和工作区依赖门禁通过，但全仓 ESLint 仍被既有 mobile React Native Flow 解析错误及未修改的 Desktop / Server 文件 22 项错误阻断（“22 项”本次未实测，旁证文档 `2026-09-21-remove-ai-free-evidence.md`、`2026-09-21-remove-ai-upstream-restriction.md` 各只记录 3 个未改动文件的既有错误，数量口径需后续统一）；未执行真实 Provider 成功生成/计费请求或 Electron 验收。
 - 2026-09-23 复核验证（基线 `main@272eaa27`）：Schemas 209 通过；Server 876 通过 / 49 个 PostgreSQL 集成用例按环境跳过；Desktop 464 通过（修复 `272eaa27` 引入的原生 `<label>` 违例后 0 失败）；两端 `tsc --noEmit`、`check-boundaries.mjs`、`check-migration-matrix.mjs`（15 migrations / 66 tables）、受影响文件 ESLint、`git diff --check` 通过。目标 Compose（thesis-ledger / backtest-worker / dsa / postgres / redis）全部 healthy。真实 Provider 复验见 T3.2“2026-09-23 真实 Provider 复验”一行。Electron 实机、有认证请求、真实计费与 PostgreSQL 并发仍未执行。

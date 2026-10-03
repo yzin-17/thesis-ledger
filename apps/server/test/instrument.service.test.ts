@@ -69,7 +69,7 @@ const checksumFor = (items: CatalogItem[]) =>
     .digest('hex');
 
 const snapshotFor = (generation: number, items: CatalogItem[]) => ({
-  contractVersion: 1 as const,
+  contractVersion: 3 as const,
   generation,
   checksum: checksumFor(items),
   cursor: `generation:${generation}`,

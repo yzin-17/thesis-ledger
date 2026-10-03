@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ledgerEventEnvelopeSchemaV2, type LedgerEventV2 } from '@thesis-ledger/schemas';
+import { ledgerEventEnvelopeSchema, type LedgerEvent } from '@thesis-ledger/schemas';
 import { BaselineReconciliationService } from '../../src/ledger/baseline-reconciliation.service.js';
 import {
   generateBaselineReconciliationCandidates,
@@ -69,8 +69,8 @@ const makeBaselineEvent = (input: {
   economicOrderKey?: string;
   sourceExternalId?: string;
 }) =>
-  ledgerEventEnvelopeSchemaV2.parse({
-    version: 2,
+  ledgerEventEnvelopeSchema.parse({
+    version: 3,
     eventId: input.eventId,
     factId: input.factId,
     accountId: accountA,
@@ -112,8 +112,8 @@ const makeBuyEvent = (input: {
   economicOrderKey?: string;
   sourceExternalId?: string;
 }) =>
-  ledgerEventEnvelopeSchemaV2.parse({
-    version: 2,
+  ledgerEventEnvelopeSchema.parse({
+    version: 3,
     eventId: input.eventId,
     factId: input.factId,
     accountId: accountA,
@@ -142,7 +142,7 @@ const makeBuyEvent = (input: {
     },
   });
 
-const storedFromEvent = (event: LedgerEventV2) => ({
+const storedFromEvent = (event: LedgerEvent) => ({
   id: event.eventId,
   accountId: event.accountId,
   type: event.type,
@@ -153,6 +153,7 @@ const storedFromEvent = (event: LedgerEventV2) => ({
   sourceTimezone: event.sourceTimezone,
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
+  envelopeVersion: 3,
   payloadVersion: event.payloadVersion,
   payload: event.revisionAction === 'VOID' ? null : event.payload,
   sourceCategory: event.source.category,
@@ -165,12 +166,12 @@ const storedFromEvent = (event: LedgerEventV2) => ({
   reason: event.reason ?? null,
 });
 
-const effectiveEvents = (events: readonly LedgerEventV2[]) =>
+const effectiveEvents = (events: readonly LedgerEvent[]) =>
   [...latestLedgerEventByFact(events.map(storedFromEvent)).values()]
     .map(toLedgerEventV2)
     .filter((event) => event.revisionAction !== 'VOID');
 
-const createRepositoryHarness = (initialEvents: readonly LedgerEventV2[]) => {
+const createRepositoryHarness = (initialEvents: readonly LedgerEvent[]) => {
   const events = [...initialEvents];
   let ledgerRevision = initialEvents.reduce(
     (maximum, event) =>
@@ -181,7 +182,7 @@ const createRepositoryHarness = (initialEvents: readonly LedgerEventV2[]) => {
   const ledgerEvent = {
     findMany: vi.fn(async () => events.map(storedFromEvent)),
     findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-      let event: LedgerEventV2 | undefined;
+      let event: LedgerEvent | undefined;
       if (typeof where.id === 'string')
         event = events.find((candidate) => candidate.eventId === where.id);
       else if (typeof where.supersedesEventId === 'string')
@@ -237,7 +238,7 @@ const createRepositoryHarness = (initialEvents: readonly LedgerEventV2[]) => {
     }
   };
   const appendRevision = vi.fn(async (_context: AccountLedgerWriteContext, rawEvent: unknown) => {
-    const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+    const event = ledgerEventEnvelopeSchema.parse(rawEvent);
     events.push(event);
     return event;
   });

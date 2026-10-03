@@ -1,25 +1,25 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
-  confirmBaselineReconciliationCommandSchemaV2,
-  createCashFlowCommandSchemaV2,
-  createCashTransferCommandSchemaV2,
-  createBaselineObservationBatchCommandSchemaV2,
-  createExecutionCommandSchemaV2,
-  createImportDraftRevisionCommandSchemaV2,
-  moveExecutionAccountCommandSchemaV2,
-  replaceExecutionCommandSchemaV2,
-  replaceCashFlowCommandSchemaV2,
-  replaceCashTransferCommandSchemaV2,
-  restoreBaselineReconciliationCommandSchemaV2,
-  restoreExecutionCommandSchemaV2,
-  restoreCashFlowCommandSchemaV2,
-  restoreCashTransferCommandSchemaV2,
-  reviseImportDraftCommandSchemaV2,
-  submitImportDraftRevisionCommandSchemaV2,
-  voidBaselineReconciliationCommandSchemaV2,
-  voidExecutionCommandSchemaV2,
-  voidCashFlowCommandSchemaV2,
-  voidCashTransferCommandSchemaV2,
+  confirmBaselineReconciliationCommandSchema,
+  createCashFlowCommandSchema,
+  createCashTransferCommandSchema,
+  createBaselineObservationBatchCommandSchema,
+  createExecutionCommandSchema,
+  createImportDraftRevisionCommandSchema,
+  moveExecutionAccountCommandSchema,
+  replaceExecutionCommandSchema,
+  replaceCashFlowCommandSchema,
+  replaceCashTransferCommandSchema,
+  restoreBaselineReconciliationCommandSchema,
+  restoreExecutionCommandSchema,
+  restoreCashFlowCommandSchema,
+  restoreCashTransferCommandSchema,
+  reviseImportDraftCommandSchema,
+  submitImportDraftRevisionCommandSchema,
+  voidBaselineReconciliationCommandSchema,
+  voidExecutionCommandSchema,
+  voidCashFlowCommandSchema,
+  voidCashTransferCommandSchema,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { BaselineReconciliationService } from './baseline-reconciliation.service.js';
@@ -50,93 +50,93 @@ export class LedgerController {
 
   @Post('executions')
   createExecution(@Body() command: unknown) {
-    return this.commands.createExecution(createExecutionCommandSchemaV2.parse(command));
+    return this.commands.createExecution(createExecutionCommandSchema.parse(command));
   }
 
   @Post('executions/replace')
   replaceExecution(@Body() command: unknown) {
-    return this.commands.replaceExecution(replaceExecutionCommandSchemaV2.parse(command));
+    return this.commands.replaceExecution(replaceExecutionCommandSchema.parse(command));
   }
 
   @Post('executions/void')
   voidExecution(@Body() command: unknown) {
-    return this.commands.voidExecution(voidExecutionCommandSchemaV2.parse(command));
+    return this.commands.voidExecution(voidExecutionCommandSchema.parse(command));
   }
 
   @Post('executions/restore')
   restoreExecution(@Body() command: unknown) {
-    return this.commands.restoreExecution(restoreExecutionCommandSchemaV2.parse(command));
+    return this.commands.restoreExecution(restoreExecutionCommandSchema.parse(command));
   }
 
   @Post('executions/move-account')
   moveExecutionAccount(@Body() command: unknown) {
-    return this.commands.moveExecutionAccount(moveExecutionAccountCommandSchemaV2.parse(command));
+    return this.commands.moveExecutionAccount(moveExecutionAccountCommandSchema.parse(command));
   }
 
   @Post('cash-flows')
   createCashFlow(@Body() command: unknown) {
-    return this.cashCommands.createCashFlow(createCashFlowCommandSchemaV2.parse(command));
+    return this.cashCommands.createCashFlow(createCashFlowCommandSchema.parse(command));
   }
 
   @Post('cash-flows/replace')
   replaceCashFlow(@Body() command: unknown) {
-    return this.cashCommands.replaceCashFlow(replaceCashFlowCommandSchemaV2.parse(command));
+    return this.cashCommands.replaceCashFlow(replaceCashFlowCommandSchema.parse(command));
   }
 
   @Post('cash-flows/void')
   voidCashFlow(@Body() command: unknown) {
-    return this.cashCommands.voidCashFlow(voidCashFlowCommandSchemaV2.parse(command));
+    return this.cashCommands.voidCashFlow(voidCashFlowCommandSchema.parse(command));
   }
 
   @Post('cash-flows/restore')
   restoreCashFlow(@Body() command: unknown) {
-    return this.cashCommands.restoreCashFlow(restoreCashFlowCommandSchemaV2.parse(command));
+    return this.cashCommands.restoreCashFlow(restoreCashFlowCommandSchema.parse(command));
   }
 
   @Post('cash-transfers')
   createCashTransfer(@Body() command: unknown) {
-    return this.cashCommands.createCashTransfer(createCashTransferCommandSchemaV2.parse(command));
+    return this.cashCommands.createCashTransfer(createCashTransferCommandSchema.parse(command));
   }
 
   @Post('cash-transfers/replace')
   replaceCashTransfer(@Body() command: unknown) {
     return this.cashCommands.replaceCashTransfer(
-      replaceCashTransferCommandSchemaV2.parse(command),
+      replaceCashTransferCommandSchema.parse(command),
     );
   }
 
   @Post('cash-transfers/void')
   voidCashTransfer(@Body() command: unknown) {
-    return this.cashCommands.voidCashTransfer(voidCashTransferCommandSchemaV2.parse(command));
+    return this.cashCommands.voidCashTransfer(voidCashTransferCommandSchema.parse(command));
   }
 
   @Post('cash-transfers/restore')
   restoreCashTransfer(@Body() command: unknown) {
     return this.cashCommands.restoreCashTransfer(
-      restoreCashTransferCommandSchemaV2.parse(command),
+      restoreCashTransferCommandSchema.parse(command),
     );
   }
 
   @Post('baseline-observation-batches')
   createBaselineObservationBatch(@Body() command: unknown) {
     return this.imports.createBaselineBatch(
-      createBaselineObservationBatchCommandSchemaV2.parse(command),
+      createBaselineObservationBatchCommandSchema.parse(command),
     );
   }
 
   @Post('import-draft-revisions')
   createImportDraftRevision(@Body() command: unknown) {
-    return this.imports.createImportDraft(createImportDraftRevisionCommandSchemaV2.parse(command));
+    return this.imports.createImportDraft(createImportDraftRevisionCommandSchema.parse(command));
   }
 
   @Post('import-draft-revisions/revise')
   reviseImportDraft(@Body() command: unknown) {
-    return this.imports.reviseImportDraft(reviseImportDraftCommandSchemaV2.parse(command));
+    return this.imports.reviseImportDraft(reviseImportDraftCommandSchema.parse(command));
   }
 
   @Post('import-draft-revisions/submit')
   submitImportDraftRevision(@Body() command: unknown) {
-    return this.imports.submitImportDraft(submitImportDraftRevisionCommandSchemaV2.parse(command));
+    return this.imports.submitImportDraft(submitImportDraftRevisionCommandSchema.parse(command));
   }
 
   @Post(':accountId/rebuild')
@@ -183,16 +183,16 @@ export class LedgerController {
 
   @Post('reconciliations/confirm')
   confirmReconciliation(@Body() command: unknown) {
-    return this.reconciliation.confirm(confirmBaselineReconciliationCommandSchemaV2.parse(command));
+    return this.reconciliation.confirm(confirmBaselineReconciliationCommandSchema.parse(command));
   }
 
   @Post('reconciliations/void')
   voidReconciliation(@Body() command: unknown) {
-    return this.reconciliation.void(voidBaselineReconciliationCommandSchemaV2.parse(command));
+    return this.reconciliation.void(voidBaselineReconciliationCommandSchema.parse(command));
   }
 
   @Post('reconciliations/restore')
   restoreReconciliation(@Body() command: unknown) {
-    return this.reconciliation.restore(restoreBaselineReconciliationCommandSchemaV2.parse(command));
+    return this.reconciliation.restore(restoreBaselineReconciliationCommandSchema.parse(command));
   }
 }

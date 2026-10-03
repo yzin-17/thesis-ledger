@@ -1,9 +1,9 @@
 import { Prisma } from '@prisma/client';
 import {
-  baselineReconciliationRuleVersionV2,
-  type BaselineReconciliationCandidateV2,
-  type BaselineReconciliationCheckpointV2,
-  type BaselineReconciliationConflictReasonV2,
+  baselineReconciliationRuleVersion,
+  type BaselineReconciliationCandidate,
+  type BaselineReconciliationCheckpoint,
+  type BaselineReconciliationConflictReason,
 } from '@thesis-ledger/schemas';
 
 Prisma.Decimal.set({ precision: 40 });
@@ -49,13 +49,13 @@ export type BaselineReconciliationEngineInput = {
 type ReplayState = {
   quantity: Prisma.Decimal;
   cost: Prisma.Decimal;
-  conflictReasons: Set<BaselineReconciliationConflictReasonV2>;
+  conflictReasons: Set<BaselineReconciliationConflictReason>;
 };
 
 type AssignmentIndex = {
   executionOwners: Map<string, string[]>;
   assignedExecutionFactIds: Set<string>;
-  conflictReasonsByBaseline: Map<string, Set<BaselineReconciliationConflictReasonV2>>;
+  conflictReasonsByBaseline: Map<string, Set<BaselineReconciliationConflictReason>>;
 };
 
 const decimal = (value: string) => new Prisma.Decimal(value);
@@ -97,8 +97,8 @@ const buildAssignmentIndex = (
   executionById: Map<string, BaselineReconciliationExecution>,
 ): AssignmentIndex => {
   const executionOwners = new Map<string, string[]>();
-  const conflictReasonsByBaseline = new Map<string, Set<BaselineReconciliationConflictReasonV2>>();
-  const addConflict = (baselineFactId: string, reason: BaselineReconciliationConflictReasonV2) => {
+  const conflictReasonsByBaseline = new Map<string, Set<BaselineReconciliationConflictReason>>();
+  const addConflict = (baselineFactId: string, reason: BaselineReconciliationConflictReason) => {
     const reasons = conflictReasonsByBaseline.get(baselineFactId) ?? new Set();
     reasons.add(reason);
     conflictReasonsByBaseline.set(baselineFactId, reasons);
@@ -186,8 +186,8 @@ const checkpointFor = (
   baseline: BaselineReconciliationBaseline,
   assignedExecutionFactIds: ReadonlySet<string>,
   executions: readonly BaselineReconciliationExecution[],
-  baselineConflictReasons: ReadonlySet<BaselineReconciliationConflictReasonV2>,
-): BaselineReconciliationCheckpointV2 => {
+  baselineConflictReasons: ReadonlySet<BaselineReconciliationConflictReason>,
+): BaselineReconciliationCheckpoint => {
   const relevantExecutions = sortExecutions(
     executions.filter(
       (execution) =>
@@ -198,7 +198,7 @@ const checkpointFor = (
     ),
   );
   const replay = replayExecutions(relevantExecutions, baseline.currency);
-  const conflictReasons = new Set<BaselineReconciliationConflictReasonV2>();
+  const conflictReasons = new Set<BaselineReconciliationConflictReason>();
   for (const reason of baselineConflictReasons) conflictReasons.add(reason);
   for (const reason of replay.conflictReasons) conflictReasons.add(reason);
   if (baseline.occurredAt === null) conflictReasons.add('BASELINE_TIME_UNKNOWN');
@@ -209,7 +209,7 @@ const checkpointFor = (
   const remainingCost = cost === undefined ? undefined : cost.minus(replay.cost);
   if (remainingQuantity.isNegative()) conflictReasons.add('NEGATIVE_REMAINING_QUANTITY');
   if (remainingCost?.isNegative()) conflictReasons.add('NEGATIVE_REMAINING_COST');
-  let status: BaselineReconciliationCheckpointV2['status'] = 'PARTIAL';
+  let status: BaselineReconciliationCheckpoint['status'] = 'PARTIAL';
   if (conflictReasons.size > 0) status = 'CONFLICTED';
   else if (remainingQuantity.isZero() && (remainingCost === undefined || remainingCost.isZero()))
     status = 'MATCHED';
@@ -255,7 +255,7 @@ export const generateBaselineReconciliationCandidates = (
   const executionById = new Map(input.executions.map((execution) => [execution.factId, execution]));
   const assignmentIndex = buildAssignmentIndex(input, baselineById, executionById);
   const checkpoints = replayBaselineCheckpoints(input);
-  const candidates: BaselineReconciliationCandidateV2[] = [];
+  const candidates: BaselineReconciliationCandidate[] = [];
 
   for (const baseline of baselines) {
     const eligible = sortExecutions(
@@ -277,7 +277,7 @@ export const generateBaselineReconciliationCandidates = (
       );
       if (!target) continue;
       if (decimal(target.reconciledActualQuantity).isZero()) continue;
-      const reasons = new Set<BaselineReconciliationConflictReasonV2>();
+      const reasons = new Set<BaselineReconciliationConflictReason>();
       for (const checkpoint of hypotheticalCheckpoints) {
         const checkpointBaseline = baselineById.get(checkpoint.baselineFactId);
         if (
@@ -318,7 +318,7 @@ export const generateBaselineReconciliationCandidates = (
     }
   }
   return {
-    ruleVersion: baselineReconciliationRuleVersionV2,
+    ruleVersion: baselineReconciliationRuleVersion,
     checkpoints,
     candidates,
   };

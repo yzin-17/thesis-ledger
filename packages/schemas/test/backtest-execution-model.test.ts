@@ -1,16 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { calculateExecutionModelFees, resolveExecutionModelSegment } from '@thesis-ledger/domain';
-import { backtestExecutionModelSchema } from '../src/backtest-execution-model.js';
+import {
+  backtestExecutionModelSchema,
+  backtestExecutionModelSchemaV3,
+} from '../src/backtest-execution-model.js';
 import {
   backtestInstrumentFactsRequestSchema,
   executionRuleSnapshotSchema,
 } from '../src/backtest-data.js';
 import {
-  runConfigSchemaV2,
+  runConfigSchemaV3,
   validateStrategyRunConfig,
-  type StrategySchemaV2,
-} from '../src/backtest-v2.js';
+  type BacktestStrategy,
+} from '../src/backtest-contract.js';
 
 const fixture = () =>
   JSON.parse(
@@ -307,6 +310,34 @@ describe('研究模型共享契约与真实 Domain 计算', () => {
     };
     expect(executionRuleSnapshotSchema.parse(legacy)).toEqual(legacy);
     const config = {
+      schemaVersion: '3',
+      executionPriceProtocol: {
+        protocolVersion: 'execution-price-v1',
+        priceBasis: {
+          adjustment: 'none',
+          method: 'provider-native',
+          methodVersion: 'provider-reported-v1',
+          basisScope: 'provider-defined',
+          anchor: null,
+          revision: {
+            origin: 'local-observation',
+            contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+          observedAt: '2024-01-01T00:00:00.000Z',
+          quantityBasis: 'actual-units',
+          volumeBasis: 'original',
+          dividendMeaning: 'explicit-cash',
+          dividendEvidenceRef: null,
+          conversionAvailable: false,
+          conversionEvidenceRef: null,
+          derivation: null,
+        },
+        accountingBasis: 'raw-events',
+        history: {
+          basis: 'point-in-time',
+          reconstructionEvidenceRef: 'original-bar-availability-v1',
+        },
+      },
       startDate: '2024-01-02',
       endDate: '2024-03-29',
       dataAsOf: event.dataAsOf,
@@ -319,11 +350,42 @@ describe('研究模型共享契约与真实 Domain 计算', () => {
         fxPolicy: 'latestAvailable',
       },
     };
-    expect(runConfigSchemaV2.parse(config)).toEqual(config);
-    const selected = runConfigSchemaV2.parse({ ...config, executionModel: fixture() });
+    expect(runConfigSchemaV3.parse(config)).toEqual(config);
+    const selected = runConfigSchemaV3.parse({
+      schemaVersion: '3',
+      executionPriceProtocol: {
+        protocolVersion: 'execution-price-v1',
+        priceBasis: {
+          adjustment: 'none',
+          method: 'provider-native',
+          methodVersion: 'provider-reported-v1',
+          basisScope: 'provider-defined',
+          anchor: null,
+          revision: {
+            origin: 'local-observation',
+            contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+          observedAt: '2024-01-01T00:00:00.000Z',
+          quantityBasis: 'actual-units',
+          volumeBasis: 'original',
+          dividendMeaning: 'explicit-cash',
+          dividendEvidenceRef: null,
+          conversionAvailable: false,
+          conversionEvidenceRef: null,
+          derivation: null,
+        },
+        accountingBasis: 'raw-events',
+        history: {
+          basis: 'point-in-time',
+          reconstructionEvidenceRef: 'original-bar-availability-v1',
+        },
+      },
+      ...config,
+      executionModel: fixture(),
+    });
     const strategy = JSON.parse(
       readFileSync(new URL('../fixtures/backtest-v2.exchange.json', import.meta.url), 'utf8'),
-    ) as StrategySchemaV2;
+    ) as BacktestStrategy;
     expect(validateStrategyRunConfig(strategy, selected).valid).toBe(true);
     for (const executionInstrument of [
       { ...strategy.executionInstrument, symbol: '000001.SZ' },
@@ -334,7 +396,7 @@ describe('研究模型共享契约与真实 Domain 计算', () => {
         false,
       );
     }
-    expect(runConfigSchemaV2.safeParse({ ...selected, endDate: '2024-04-01' }).success).toBe(false);
+    expect(runConfigSchemaV3.safeParse({ ...selected, endDate: '2024-04-01' }).success).toBe(false);
     const historical = fixture();
     historical.segments[0].source = {
       kind: 'historicalFact',
@@ -343,12 +405,77 @@ describe('研究模型共享契约与真实 Domain 计算', () => {
       revision: '1',
       knownAt: '2024-01-02T00:00:00+08:00',
     };
-    expect(runConfigSchemaV2.safeParse({ ...config, executionModel: historical }).success).toBe(
+    expect(runConfigSchemaV3.safeParse({ ...config, executionModel: historical }).success).toBe(
       false,
     );
     historical.segments[0].source.knownAt = '2024-01-01T23:59:59+08:00';
-    expect(runConfigSchemaV2.safeParse({ ...config, executionModel: historical }).success).toBe(
+    expect(runConfigSchemaV3.safeParse({ ...config, executionModel: historical }).success).toBe(
       true,
     );
+  });
+
+  it('V3 归一化执行模型只允许连续数量与价格，并与记账协议绑定', () => {
+    const normalized = fixture();
+    normalized.segments[0].assumptions.push('在供应商复权坐标中按连续 Decimal 数量模拟');
+    normalized.segments[0].execution.price = {
+      kind: 'noDailyLimit',
+      reason: '复权坐标不套用真实价格涨跌幅规则',
+    };
+    normalized.segments[0].execution.normalizedExecution = {
+      priceCoordinate: 'continuous-decimal',
+      quantityUnits: 'continuous-normalized-decimal',
+      lotSizeConstraint: 'not-applied',
+      tickSizeConstraint: 'not-applied',
+      dailyPriceLimit: 'not-applied',
+      feeBasis: 'simulatedTurnover',
+    };
+
+    expect(backtestExecutionModelSchema.safeParse(normalized).success).toBe(false);
+    expect(backtestExecutionModelSchemaV3.safeParse(normalized).success).toBe(true);
+    const config = {
+      schemaVersion: '3',
+      startDate: '2024-01-02',
+      endDate: '2024-03-29',
+      dataAsOf: event.dataAsOf,
+      baseCurrency: 'CNY',
+      initialCash: { CNY: '1000000' },
+      valuationPolicy: {
+        baseTimezone: 'Asia/Shanghai',
+        dailyValuationTime: '15:00',
+        pricePolicy: 'latestAvailable',
+        fxPolicy: 'latestAvailable',
+      },
+      executionModel: normalized,
+      executionPriceProtocol: JSON.parse(
+        readFileSync(
+          new URL('../fixtures/execution-price.normalized-snapshot.json', import.meta.url),
+          'utf8',
+        ),
+      ),
+    };
+    expect(runConfigSchemaV3.safeParse(config).success).toBe(true);
+    expect(runConfigSchemaV3.safeParse({ ...config, executionModel: undefined }).success).toBe(
+      false,
+    );
+
+    const missingAssumption = structuredClone(config);
+    delete missingAssumption.executionModel.segments[0].execution.normalizedExecution;
+    expect(runConfigSchemaV3.safeParse(missingAssumption).success).toBe(false);
+    const realLimit = structuredClone(config);
+    realLimit.executionModel.segments[0].execution.price = fixture().segments[0].execution.price;
+    expect(runConfigSchemaV3.safeParse(realLimit).success).toBe(false);
+    const legacyConfig = {
+      startDate: '2024-01-02',
+      endDate: '2024-03-29',
+      dataAsOf: event.dataAsOf,
+      baseCurrency: 'CNY',
+      initialCash: { CNY: '1000000' },
+      valuationPolicy: config.valuationPolicy,
+      executionModel: fixture(),
+    };
+    expect(runConfigSchemaV3.safeParse(legacyConfig).success).toBe(false);
+    expect(
+      runConfigSchemaV3.safeParse({ ...legacyConfig, executionModel: normalized }).success,
+    ).toBe(false);
   });
 });

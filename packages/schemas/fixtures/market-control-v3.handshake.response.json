@@ -1,0 +1,9 @@
+{
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "accepted": true,
+  "providerRegistry": true,
+  "policyApply": true,
+  "catalogSync": true,
+  "requestId": "market-control-v3-handshake-fixture"
+}

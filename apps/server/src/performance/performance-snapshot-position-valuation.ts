@@ -10,8 +10,12 @@ type SnapshotPosition = {
   asset: { assetType: string };
 };
 
-const seriesFreshness = (cacheStatus: 'miss' | 'memory' | 'redis' | 'postgres' | 'stale') =>
-  cacheStatus === 'stale' ? 'stale' as const : 'delayed' as const;
+const marketForSymbol = (symbol: string): 'CN' | 'HK' | 'US' => {
+  if (/\.(SH|SZ|BJ)$/.test(symbol)) return 'CN';
+  if (/\.HK$/.test(symbol)) return 'HK';
+  if (/\.US$/.test(symbol)) return 'US';
+  throw new Error(`无法识别正式估值市场: ${symbol}`);
+};
 
 const basePositionValue = (position: SnapshotPosition, currency: Currency) => ({
   symbol: position.symbol,
@@ -61,20 +65,27 @@ export async function valueSnapshotPosition(
     if (context.valuationBasis === 'OFFICIAL') {
       if (!bars) throw new Error('正式绩效校准缺少 MarketBarReader');
       const assetType = position.asset.assetType === 'etf' ? 'ETF' : 'STOCK';
-      const series = await bars.read({
-        identity: { symbol: position.symbol, assetType, timeframe: '1d', adjustment: 'none' },
-        window: { start: `${valuationDateKey}T00:00:00.000Z`, end: `${valuationDateKey}T23:59:59.999Z` },
-        acceptance: 'complete',
+      const marketCode = marketForSymbol(position.symbol);
+      const selected = await bars.readV3({
+        market: marketCode,
+        symbol: position.symbol,
+        routeKey: {
+          kind: 'bar', market: marketCode, assetType,
+          capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'none',
+        },
+        window: { start: valuationDateKey, end: valuationDateKey },
       });
-      const official = series.points.find((bar) => bar.timestamp.slice(0, 10) === valuationDateKey);
+      if (selected.status !== 'selected') throw new Error(`${valuationDateKey} 正式收盘价不可用`);
+      const official = selected.selection.response.bars.find(
+        (bar) => bar.timestamp.slice(0, 10) === valuationDateKey && bar.completionStatus === 'complete',
+      );
       if (!official) throw new Error(`${valuationDateKey} 正式收盘价尚未发布`);
       return {
         ...base,
         marketValue: base.quantity * official.close,
-        provider: series.provenance.providerId,
+        provider: selected.selection.response.provenance.providerId,
         stale: false,
-        // 完整收盘 bar 的 freshness 由 Reader 的缓存状态推导；正式估值本身是 delayed。
-        freshness: seriesFreshness(series.provenance.cacheStatus),
+        freshness: 'delayed' as const,
       };
     }
     const quote = await market.getQuote(position.symbol, { allowStale: false });

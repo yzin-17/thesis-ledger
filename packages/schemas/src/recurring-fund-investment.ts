@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencyCodeSchema, positiveDecimalStringSchema } from './ledger-v2.js';
+import { currencyCodeSchema, positiveDecimalStringSchema } from './monetary-values.js';
 
 export const recurringFundInvestmentPlanStatuses = ['ACTIVE', 'PAUSED', 'ENDED'] as const;
 export const recurringFundInvestmentOccurrenceStatuses = [

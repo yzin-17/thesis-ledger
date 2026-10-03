@@ -14,6 +14,10 @@
 
 新持仓优先从目录搜索 Instrument 并确认标准 Asset；Stock、ETF 和场外基金使用各自明确的数据能力。Quote、Bar、Indicator、Chip 和 Fund NAV 都必须保留实际 Provider、marketTime、freshness/data-quality；`stale`、`partial`、`unsupported` 和 `unavailable` 不得被零值或旧缓存伪装成完整实时数据。
 
+在“标的目录”搜索后点击“行情详情”，无需先录入持仓。已有持仓入口继续显示数量、成本和盈亏；目录入口只展示行情。ETF 日线当前可配置 HiThink 前复权，以及腾讯不复权、前复权、后复权。HiThink 可在数据源页面保存 API Key；腾讯无需此类凭证。保存对应口径的主备路由即可使用基础价格能力，无需逐标的申请人工准入或日级证明。
+
+图表口径独立于回测配置，切换、扩窗和刷新沿用同一口径；实际来源以图表标注为准。HiThink 前复权不可用时，已配置的腾讯前复权备源可接替完整窗口。报价、分红、净值等能力分别显示可用状态，日线成功不保证其他分段可用。
+
 当前实现边界见 [`市场数据与标的中心 v1.2`](../specs/2026-08-18-market-data-provider-spec-v1.2.md) 和 [`实施说明`](../architecture/2026-08-18-market-data-provider-v1-2-implementation.md)。
 
 ## Portfolio、Trade 与投资复盘
@@ -41,15 +45,21 @@ RiskRule 负责确定性判断，RiskEvent 保存规则版本、触发值、阈�
 
 ## Strategy 与 Backtest
 
-当前已运行的回测仍以 V1 Strategy/Backtest 能力为主；统一回测 V2 已完成 Spec/Task 评审并进入实施阶段。V2 的核心边界是把回测作为独立模拟事实域：
+回测以独立模拟事实域处理策略与冻结输入，Server 和 Worker 读取现行版本的冻结配置与结果。核心数据边界为：
 
 ```text
 DSA → DataSnapshot → Simulation Event Engine → SimulationLedger → BacktestResult
 ```
 
-回测不得写入真实 `LedgerEventV2`、actual/shadow 账户、Portfolio Trade 或 Journal。V2 目标覆盖中国内地/香港/美国 Stock 与 ETF，以及中国内地 NAV Fund，并逐步补齐分钟周期、冻结数据快照、Decimal、跨市场日历和执行规则。
+回测不得写入真实 `LedgerEventV2`、actual/shadow 账户、Portfolio Trade 或 Journal。具体市场、资产类型、周期和价格口径的可用性由来源能力、路由与覆盖证据共同决定，配置成功或服务健康不代表该区间能够运行。
 
-不要把 V2 规划能力当成已经上线的当前功能。详细状态见 [`策略与回测领域边界`](../domain/2026-08-18-strategy-and-backtest.md) 和 [`统一回测系统 V2`](../specs/2026-08-28-unified-backtest-v2.md)。
+复权研究需明确价格口径、记账方式和历史性质。原始实际份额路径要求与成交和持仓有关的事件事实；归一化路径使用模拟单位，不重复注入已计入价格序列的分红或拆分，事件按策略依赖读取。固定供应商快照研究保留实际观测时刻，不等同于历史当时已知的数据，也不能宣称严格无前视。
+
+使用时先在 `/market-data` 核对对应市场、资产、周期和价格口径的配置，再检查回测窗口与数据预检结果。来源不可用或必要覆盖不足时保留失败原因，不通过换用未声明来源或缩短区间把失败变成成功。重放使用已冻结输入；新的来源或参数应形成新的运行配置，不改写既有结果。
+
+HiThink/腾讯的固定快照归一化价格研究由系统自动整理实际 Bar、交易日状态、来源摘要和采集时间。缺日按显式“不交易”研究假设处理，不补造价格。已配置的同口径备用按整个窗口选取；信号、成交和基准继续使用本次冻结的同一序列。真实份额、严格历史 PIT、公司行动和量额规则只在计算实际依赖它们时检查，详见 Spec §1.1。
+
+AI 候选共享冻结比较数据和假设，封存测试内容不得进入模型提示词。归一化绝对价格和模拟数量不能直接生成真实账户风险规则；真实风险采纳需重新编译和验证其依据。详细行为见[多源复权感知回测规格](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)，实际完成与未通过门禁见[当前任务](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。真实来源、普通回测、图表/Electron 与 AI 验收仍分开记录。
 
 ## AI Research
 

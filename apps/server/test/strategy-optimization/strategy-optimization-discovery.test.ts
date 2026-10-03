@@ -1,5 +1,6 @@
-import { optimizationExperimentCreateSchema, strategySchemaV2 } from '@thesis-ledger/schemas';
+import { optimizationExperimentCreateSchema, strategySchema } from '@thesis-ledger/schemas';
 import { describe, expect, it, vi } from 'vitest';
+import { createNormalizedRunConfig } from './strategy-optimization-postgres-fixtures.js';
 import {
   assembleDiscoveryGeneration,
   createDiscoverySeed,
@@ -23,7 +24,7 @@ const scope = {
 describe('AI discovery strategy space', () => {
   it('creates a valid hidden v0 seed in the fixed space', () => {
     const seed = createDiscoverySeed(scope);
-    expect(strategySchemaV2.parse(seed).executionInstrument).toEqual(scope.executionInstrument);
+    expect(strategySchema.parse(seed).executionInstrument).toEqual(scope.executionInstrument);
     expect(seed.sizing).toEqual({ type: 'percentOfEquity', percent: '0.5' });
     expect(seed.exit).toEqual({ type: 'positionState', field: 'isOpen' });
     expect(STRATEGY_SPACE_VERSION).toBe('strategy-space-v1');
@@ -75,7 +76,7 @@ describe('AI discovery strategy space', () => {
     expect(() => parseDiscoveryProposal({ strategy: {} }, scope)).toThrowError(
       expect.objectContaining({
         message: expect.stringMatching(
-          /^AI 探索输出必须包含完整 StrategySchemaV2 候选；校验问题：/u,
+          /^AI 探索输出必须包含完整 BacktestStrategy 候选；校验问题：/u,
         ),
       }),
     );
@@ -251,8 +252,9 @@ describe('AI discovery strategy space', () => {
 });
 
 describe('AI discovery persistence', () => {
-  it('uses the persisted StrategySchemaV2 seed for the experiment fingerprint', async () => {
+  it('uses the persisted BacktestStrategy seed for the experiment fingerprint', async () => {
     const input = optimizationExperimentCreateSchema.parse({
+      contractVersion: 3,
       sourceMode: 'discovery',
       discoveryScope: scope,
       models: [{ provider: 'fixture', model: 'discovery-model' }],
@@ -262,19 +264,7 @@ describe('AI discovery persistence', () => {
         validation: { start: '2026-05-01', end: '2026-07-31' },
         test: { start: '2026-08-01', end: '2026-09-10' },
       },
-      runConfig: {
-        startDate: '2026-01-01',
-        endDate: '2026-09-10',
-        dataAsOf: '2026-09-11T08:00:00.000Z',
-        baseCurrency: 'CNY',
-        initialCash: { CNY: '100000' },
-        valuationPolicy: {
-          baseTimezone: 'Asia/Shanghai',
-          dailyValuationTime: '15:00',
-          pricePolicy: 'latestAvailable',
-          fxPolicy: 'latestAvailable',
-        },
-      },
+      runConfig: createNormalizedRunConfig(),
       budget: {
         maxAiCalls: 10,
         maxBacktestRuns: 30,

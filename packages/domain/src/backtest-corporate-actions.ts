@@ -5,7 +5,7 @@ import type {
   SimulationLedgerEvent,
   LedgerMutationResult,
 } from './simulation-ledger.js';
-import type { BacktestAssetType, BacktestCurrency } from './backtest-v2.js';
+import type { BacktestAssetType, BacktestCurrency } from './backtest-contract.js';
 
 /** Runtime shape kept identical to schemas' corporateActionFactSchema. */
 export interface BacktestCorporateActionFact {
@@ -13,6 +13,13 @@ export interface BacktestCorporateActionFact {
   market: 'CN' | 'HK' | 'US';
   instrumentType: 'STOCK' | 'ETF' | 'NAV_FUND';
   type: 'CASH_DIVIDEND' | 'SPLIT' | 'REVERSE_SPLIT';
+  effectiveDate?: string;
+  /** 内部经济调度时刻；源 occurredAt/availableAt 不被改写。 */
+  accountingAt?: string;
+  recordDate?: string;
+  paymentDate?: string;
+  strategyVisibility?: { kind: 'announcement'; announcedAt: string }
+    | { kind: 'conservative-day'; visibleDate: string };
   ratio?: string;
   cashAmount?: string;
   currency?: BacktestCurrency;
@@ -30,6 +37,7 @@ export type CorporateActionRejectCode =
   | 'INSTRUMENT_MISMATCH'
   | 'CURRENCY_MISMATCH'
   | 'UNSUPPORTED_CORPORATE_ACTION'
+  | 'CORPORATE_ACTION_IGNORED'
   | 'RULE_REJECTED';
 
 export interface CorporateActionMutation {
@@ -78,6 +86,8 @@ const stableSerialize = (value: unknown): string => {
     .join(',')}}`;
 };
 
+export const corporateActionAccountingAt = (fact: BacktestCorporateActionFact) => fact.accountingAt ?? fact.occurredAt;
+
 /** The fact identity, not array position, is the retry/deduplication key. */
 export const corporateActionEventId = (fact: BacktestCorporateActionFact, runId: string) =>
   `corporate-action:${runId}:${stableSerialize({
@@ -89,6 +99,7 @@ export const corporateActionEventId = (fact: BacktestCorporateActionFact, runId:
     cashAmount: fact.cashAmount,
     currency: fact.currency,
     occurredAt: fact.occurredAt,
+    ...(fact.accountingAt ? { effectiveDate: fact.effectiveDate, accountingAt: fact.accountingAt } : {}),
     availableAt: fact.availableAt,
     provider: fact.provider,
     providerRevision: fact.providerRevision,
@@ -115,7 +126,7 @@ const validateTimes = (
   evaluationAt: string,
   runId: string,
 ): CorporateActionRejected | undefined => {
-  const occurredAt = parseTime(fact.occurredAt);
+  const occurredAt = parseTime(corporateActionAccountingAt(fact));
   const availableAt = parseTime(fact.availableAt);
   const evaluation = parseTime(evaluationAt);
   const eventId = corporateActionEventId(fact, runId);
@@ -165,7 +176,7 @@ const toLedgerEvent = (
             executionSymbol: instrument.symbol,
             amountPerShare: amount.toString(),
             currency: fact.currency,
-            occurredAt: fact.occurredAt,
+            occurredAt: corporateActionAccountingAt(fact),
             availableAt: fact.availableAt,
           },
         },
@@ -195,7 +206,7 @@ const toLedgerEvent = (
           eventId,
           executionSymbol: instrument.symbol,
           ratio: multiplier.toString(),
-          occurredAt: fact.occurredAt,
+          occurredAt: corporateActionAccountingAt(fact),
           availableAt: fact.availableAt,
         },
       },
@@ -224,7 +235,9 @@ export const createCorporateActionPort = (
         let code: CorporateActionRejectCode = 'RULE_REJECTED';
         if (ledgerResult.code === 'DUPLICATE_EVENT') code = 'DUPLICATE_EVENT';
         else if (ledgerResult.code === 'FUTURE_DATA') code = 'FUTURE_DATA';
-        else if (
+        else if (ledgerResult.code === 'CORPORATE_ACTION_IGNORED') {
+          code = 'CORPORATE_ACTION_IGNORED';
+        } else if (
           ledgerResult.code === 'INVALID_TIME' ||
           ledgerResult.code === 'INVALID_AMOUNT' ||
           ledgerResult.code === 'INSTRUMENT_MISMATCH' ||

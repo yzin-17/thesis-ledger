@@ -9,6 +9,8 @@
 
 ## 当前仍在实施
 
+- [市场数据多源接入、手动路由与复权感知回测](2026-09-25-multi-source-adjustment-aware-backtest.md)
+
 - [AI 自动选择与测试后保存](2026-09-23-ai-provider-auto-test-save.md)
 
 - [AI 接入层迁移至 Vercel AI SDK](2026-09-19-vercel-ai-sdk-integration.md)

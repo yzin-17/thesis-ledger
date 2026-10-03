@@ -8,8 +8,8 @@ import {
   optimizationExperimentRenameSchema,
   optimizationFinalizeSchema,
   type OptimizationAdoptionContext,
-  strategySchemaV2,
-  type StrategySchemaV2,
+  strategySchema,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { AiProviderRegistry } from '../ai/provider-registry.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -43,7 +43,6 @@ import {
   assertOptimizationModelConfigCost,
   normalizeCostCurrency,
   optimizationCostError,
-  sameOptimizationCostConfirmation,
 } from './strategy-optimization-cost.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
@@ -52,6 +51,8 @@ import {
   createDiscoveryExperiment,
 } from './strategy-optimization-discovery-store.js';
 import { insertOptimizationExperiment } from './strategy-optimization-experiment.store.js';
+import { assertOptimizationCreateIdentity } from './strategy-optimization-create-identity.js';
+import { concludeOptimizationProposalStage } from './strategy-optimization-proposal-stage.js';
 
 @Injectable()
 export class StrategyOptimizationService implements OnModuleInit {
@@ -97,17 +98,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       SELECT * FROM "OptimizationExperiment" WHERE "idempotencyKey"=${parsed.idempotencyKey} LIMIT 1
     `);
     if (previous[0]) {
-      if (
-        !sameOptimizationCostConfirmation(previous[0], {
-          modelConfig,
-          budget: parsed.budget,
-          maxRounds: parsed.maxRounds,
-        })
-      )
-        throw optimizationCostError(
-          'OPTIMIZATION_COST_CONFIRMATION_STALE',
-          '模型路线或费用预算已变化，不能复用旧费用确认；请重新创建实验',
-        );
+      assertOptimizationCreateIdentity(previous[0], parsed, modelConfig);
       return this.reads.experiment(previous[0].id);
     }
     const hasUnknownCost = modelConfig.some((route) => route.costStatus === 'unknown');
@@ -126,7 +117,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       void this.process(created.id).catch(() => undefined);
       return this.reads.experiment(created.id);
     }
-    const baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 } =
+    const baseline: StrategyVersionRecord & { strategy: BacktestStrategy } =
       await this.reads.formalStrategyVersion(parsed.strategyVersionId!);
     const descriptors = describeStrategyParameters(baseline.strategy);
     this.candidateService.validateAuthorizedParameters(descriptors, parsed.allowedParameterIds!);
@@ -262,7 +253,7 @@ export class StrategyOptimizationService implements OnModuleInit {
 
   private async processRound(
     experiment: ExperimentRow,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
     descriptors: ReturnType<typeof describeStrategyParameters>,
     route: OptimizationModelRoute,
     round: number,
@@ -320,7 +311,7 @@ export class StrategyOptimizationService implements OnModuleInit {
 
   private async processModelRounds(
     experiment: ExperimentRow,
-    baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+    baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
   ) {
     const descriptors = describeStrategyParameters(baseline.strategy);
     const routes = experiment.modelConfig as OptimizationModelRoute[];
@@ -344,18 +335,12 @@ export class StrategyOptimizationService implements OnModuleInit {
     }
   }
   private async finishProposalStage(id: string) {
-    const candidates = await this.candidates(id);
-    const hasValid = candidates.some((candidate) => candidate.validationStatus === 'valid');
-    if (!hasValid) {
-      await this.fail(id, 'no_valid_candidate');
-      return;
-    }
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "status"='awaiting_finalization', "stage"='awaiting_finalization', "leaseUntil"=NULL,
-          "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL
-    `);
+    const reason = await concludeOptimizationProposalStage(
+      this.prisma,
+      id,
+      await this.candidates(id),
+    );
+    if (reason) await this.fail(id, reason);
   }
 
   private async processClaimed(id: string) {
@@ -365,7 +350,7 @@ export class StrategyOptimizationService implements OnModuleInit {
       include: { strategy: true },
     });
     if (!baselineVersion) throw new NotFoundException('实验基线策略版本不存在');
-    const parsedBaseline = strategySchemaV2.parse(baselineVersion.schema) as StrategySchemaV2;
+    const parsedBaseline = strategySchema.parse(baselineVersion.schema) as BacktestStrategy;
     const baseline = { ...baselineVersion, strategy: parsedBaseline };
     experiment = await this.ensureBaselines(experiment);
     await this.setStage(id, 'proposing');
@@ -765,7 +750,7 @@ export class StrategyOptimizationService implements OnModuleInit {
   private async adoptionVersionSnapshot(id: string) {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源版本不存在');
-    const parsed = strategySchemaV2.safeParse(version.schema);
+    const parsed = strategySchema.safeParse(version.schema);
     if (!parsed.success || version.schemaVersion !== 2)
       throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源不是可审阅的正式 V2 策略定义');
     return {

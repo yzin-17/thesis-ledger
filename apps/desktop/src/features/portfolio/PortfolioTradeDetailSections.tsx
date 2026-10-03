@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { TradeDetailResponseV2 } from '@thesis-ledger/api-client';
+import type { TradeDetailResponse } from '@thesis-ledger/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,7 +87,7 @@ function TradeOverview({
   onReview,
   onSupplementOpening,
 }: {
-  detail: TradeDetailResponseV2;
+  detail: TradeDetailResponse;
   accountLabel: string;
   onReview: (target: PortfolioTradeReviewTarget) => void;
   onSupplementOpening?: () => void;
@@ -153,7 +153,7 @@ function TradeOverview({
   );
 }
 
-function EntryLegs({ detail }: { detail: TradeDetailResponseV2 }) {
+function EntryLegs({ detail }: { detail: TradeDetailResponse }) {
   return (
     <section className="grid gap-2" aria-labelledby="trade-entry-legs-title">
       <SectionHeading
@@ -195,7 +195,7 @@ function EntryLegs({ detail }: { detail: TradeDetailResponseV2 }) {
   );
 }
 
-function BaselineComponents({ detail }: { detail: TradeDetailResponseV2 }) {
+function BaselineComponents({ detail }: { detail: TradeDetailResponse }) {
   if (detail.baselineComponents.length === 0) return null;
 
   return (
@@ -237,7 +237,7 @@ function CloseSlices({
   detail,
   onReview,
 }: {
-  detail: TradeDetailResponseV2;
+  detail: TradeDetailResponse;
   onReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
   return (
@@ -328,7 +328,7 @@ function EvidenceList({
   );
 }
 
-function TradeEvidence({ detail }: { detail: TradeDetailResponseV2 }) {
+function TradeEvidence({ detail }: { detail: TradeDetailResponse }) {
   const issueDescriptions = tradeIssueLabels(detail);
   const exclusionDescriptions = tradeExclusionLabels(detail.excludedReasons);
   return (
@@ -394,7 +394,7 @@ export function PortfolioTradeDetailTabs({
   onReview,
   onSupplementOpening,
 }: {
-  detail: TradeDetailResponseV2;
+  detail: TradeDetailResponse;
   accountLabel: string;
   onReview: (target: PortfolioTradeReviewTarget) => void;
   onSupplementOpening?: () => void;

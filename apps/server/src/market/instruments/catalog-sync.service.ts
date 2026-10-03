@@ -20,6 +20,8 @@ export class CatalogSyncService {
         throw new BadRequestException('目录快照 generation 不得倒退');
       if (state && snapshot.generation === state.generation && snapshot.checksum !== state.checksum)
         throw new ConflictException('目录快照同 generation 但 checksum 冲突');
+      if (state && snapshot.generation === state.generation && snapshot.cursor !== state.cursor)
+        throw new ConflictException('目录快照同 generation 但 cursor 冲突');
       for (const item of snapshot.items) {
         const searchFields = searchFieldsForInstrument(item);
         await transaction.instrument.upsert({
@@ -148,26 +150,34 @@ export class CatalogSyncService {
   }
 
   async latestGeneration() {
-    const [latest, instrumentCount, syncState] = await Promise.all([
-      this.prisma.instrument.findFirst({
-        orderBy: { generation: 'desc' },
-        select: { generation: true },
-      }),
+    const [instrumentCount, syncState] = await Promise.all([
       this.prisma.instrument.count({ where: { active: true } }),
       this.prisma.catalogSyncState.findUnique({ where: { consumer: 'thesis-ledger' } }),
     ]);
+    const current =
+      syncState &&
+      syncState.generation > 0 &&
+      syncState.cursor === `generation:${syncState.generation}` &&
+      /^[a-f0-9]{64}$/.test(syncState.checksum)
+        ? syncState
+        : null;
     return {
-      generation: syncState?.generation ?? latest?.generation ?? 0,
-      checksum: syncState?.checksum ?? null,
-      cursor: syncState?.cursor ?? null,
-      syncedAt: syncState?.syncedAt ?? null,
+      generation: current?.generation ?? 0,
+      checksum: current?.checksum ?? null,
+      cursor: current?.cursor ?? null,
+      syncedAt: current?.syncedAt ?? null,
       instrumentCount,
     };
   }
 
   async markCatalogChecked(generation: number, checksum: string) {
     const result = await this.prisma.catalogSyncState.updateMany({
-      where: { consumer: 'thesis-ledger', generation, checksum },
+      where: {
+        consumer: 'thesis-ledger',
+        generation,
+        checksum,
+        cursor: `generation:${generation}`,
+      },
       data: { syncedAt: new Date() },
     });
     if (result.count !== 1)

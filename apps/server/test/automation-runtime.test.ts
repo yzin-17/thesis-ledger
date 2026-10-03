@@ -519,6 +519,47 @@ describe('AutomationService failure notification', () => {
 });
 
 describe('AutomationWorkflowRunner closeSnapshots', () => {
+  it('分钟线缺少现行来源时拒绝同步且不读取旧 Reader', async () => {
+    const bars = { read: vi.fn() };
+    const runner = new AutomationWorkflowRunner(bars as never, {} as never, {} as never, {} as never, {} as never);
+    await expect(runner.closeSync({ symbols: ['600519.SH'], timeframe: '1m', end: '2026-09-11T08:00:00.000Z' }))
+      .rejects.toThrow('分钟线尚无现行精确来源');
+    expect(bars.read).not.toHaveBeenCalled();
+  });
+  it('收盘同步对股票读取精确日线，对基金读取净值历史', async () => {
+    const bars = {
+      read: vi.fn(),
+      readV3: vi.fn(async () => ({ status: 'selected', selection: { response: {
+        bars: [{ timestamp: '2026-09-11T00:00:00.000Z' }],
+      } } })),
+    };
+    const market = { getFundNavHistory: vi.fn(async () => [{
+      navDate: '2026-09-11T00:00:00.000Z', freshness: 'delayed', fallbackUsed: false,
+    }]) };
+    const runner = new AutomationWorkflowRunner(bars as never, {} as never, {} as never, {} as never, market as never);
+    const result = await runner.closeSync({
+      symbols: ['600519.SH', '000001.OF'], timeframe: '1d', end: '2026-09-11T08:00:00.000Z',
+    });
+    expect(bars.readV3).toHaveBeenCalledWith(expect.objectContaining({
+      routeKey: { kind: 'bar', market: 'CN', assetType: 'STOCK', capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'none' },
+      window: { start: '2026-09-11', end: '2026-09-11' },
+    }));
+    expect(bars.read).not.toHaveBeenCalled();
+    expect(market.getFundNavHistory).toHaveBeenCalledWith('000001.OF',
+      { end: '2026-09-11', limit: 1 }, { refresh: true });
+    expect(result).toMatchObject({ complete: true, results: [{ count: 1 }, { count: 1 }] });
+  });
+  it('基金只回退到陈旧净值时拒绝完成收盘同步', async () => {
+    const bars = { read: vi.fn(), readV3: vi.fn() };
+    const market = { getFundNavHistory: vi.fn(async () => [{
+      navDate: '2026-09-10T00:00:00.000Z', freshness: 'stale', fallbackUsed: true,
+    }]) };
+    const runner = new AutomationWorkflowRunner(bars as never, {} as never, {} as never, {} as never, market as never);
+    await expect(runner.closeSync({ symbols: ['000001.OF'], end: '2026-09-11T08:00:00.000Z' }))
+      .rejects.toThrow('基金净值未完成同步');
+    expect(bars.read).not.toHaveBeenCalled();
+    expect(bars.readV3).not.toHaveBeenCalled();
+  });
   it('逐账户拍摄后按出现的数据模式追加组合聚合快照，未知账户跳过', async () => {
     const capturedAt = '2026-09-06T08:00:00.000Z';
     const prisma = {
@@ -535,6 +576,7 @@ describe('AutomationWorkflowRunner closeSnapshots', () => {
       performance as never,
       {} as never,
       prisma as never,
+      {} as never,
     );
 
     const result = await runner.closeSnapshots({

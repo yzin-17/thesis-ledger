@@ -95,7 +95,7 @@ describe('回测权益与回撤图表模型', () => {
       }),
     );
     expect(model.equity).toHaveLength(2);
-    expect(model.limitation).toContain('缺口位置未记录');
+    expect(model.limitation).toContain('覆盖范围请以冻结数据证据为准');
   });
 
   it.each([50, 250, 5_000])('完整保留 %i 个真实点用于绘制、悬停和导出', (count) => {

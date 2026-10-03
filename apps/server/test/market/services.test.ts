@@ -5,6 +5,8 @@ import { DataQualityService } from '../../src/quality/data-quality.service.js';
 
 describe('行情缓存', () => {
   const quote = {
+    version: 3,
+    symbol: '600519.SH',
     open: 10,
     high: 11,
     low: 9,
@@ -89,10 +91,27 @@ describe('行情缓存', () => {
     resolveProvider(quote);
     await expect(Promise.all([regular, refresh])).resolves.toHaveLength(2);
   });
+  it('基金净值拒绝上游旧版本，不补写为当前版本', async () => {
+    const dsa = {
+      get: vi.fn(async () => ({
+        version: 1,
+        symbol: '000001.OF',
+        unitNav: 1.1,
+        navDate: '2025-01-01T00:00:00Z',
+        provider: 'fixture',
+        fetchedAt: '2025-01-01T00:00:01Z',
+        freshness: 'delayed',
+      })),
+    };
+    const redis = { client: { get: vi.fn(async () => null), set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 0) } };
+    const service = new MarketService(dsa as never, redis as never);
+    await expect(service.getFundNav('000001.OF')).rejects.toThrow();
+    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/fund-nav?symbol=000001.OF');
+  });
   it('基金净值历史相同范围并发请求只调用一次 DSA 并使用完整锁 key', async () => {
     const points = [
       {
-        version: 1,
+        version: 3,
         symbol: '000001.OF',
         unitNav: 1.1,
         navDate: '2025-01-01T00:00:00Z',
@@ -137,7 +156,7 @@ describe('行情缓存', () => {
     const ttls = new Map<string, number>();
     const points = [
       {
-        version: 1,
+        version: 3,
         symbol: '000001.OF',
         unitNav: 1.1,
         navDate: '2025-01-01T00:00:00Z',
@@ -200,7 +219,7 @@ describe('行情缓存', () => {
   it('基金净值历史不同范围不会合并 single-flight', async () => {
     const points = [
       {
-        version: 1,
+        version: 3,
         symbol: '000001.OF',
         unitNav: 1.1,
         navDate: '2025-01-01T00:00:00Z',
@@ -227,39 +246,25 @@ describe('行情缓存', () => {
     expect(paths[0]).toContain('start=2025-01-01');
     expect(paths[1]).toContain('start=2025-02-01');
   });
-  it('把 DSA Bar、Indicator 和 Chip 映射为统一契约', async () => {
+  it('把 DSA Chip 映射为统一契约', async () => {
     const timestamp = '2025-01-01T00:00:00Z';
     const dsa = {
-      get: vi.fn(async (path: string) => {
-        if (path.includes('/indicators/'))
-          return {
-            parameters: { period: 14 },
-            timeframe: '1d',
-            marketTime: timestamp,
-            calculatedAt: timestamp,
-            values: { rsi14: 50 },
-            engineVersion: 'fixture',
-            provider: 'dsa-fork',
-          };
-        return {
-          buckets: [{ price: 10, weight: 1 }],
-          averageCost: 10,
-          mainPeak: 10,
-          profitRatio: 0.5,
-          range70: [9, 11],
-          range90: [8, 12],
-          concentration: 0.4,
-          engineVersion: 'fixture',
-          provider: 'dsa-fork',
-          calculatedAt: timestamp,
-        };
-      }),
+      get: vi.fn(async () => ({
+        version: 3,
+        symbol: '600519.SH',
+        buckets: [{ price: 10, weight: 1 }],
+        averageCost: 10,
+        mainPeak: 10,
+        profitRatio: 0.5,
+        range70: [9, 11],
+        range90: [8, 12],
+        concentration: 0.4,
+        engineVersion: 'fixture',
+        provider: 'dsa-fork',
+        calculatedAt: timestamp,
+      })),
     };
     const service = new MarketService(dsa as never, {} as never);
-    await expect(service.getIndicator('600519', 'RSI')).resolves.toMatchObject({
-      name: 'RSI',
-      provider: 'dsa-fork',
-    });
     await expect(service.getChip('600519')).resolves.toMatchObject({
       symbol: '600519.SH',
       provider: 'dsa-fork',
@@ -273,6 +278,8 @@ describe('行情缓存', () => {
     const timestamp = '2025-01-01T00:00:00Z';
     const dsa = {
       get: vi.fn(async () => ({
+        version: 3,
+        symbol: '600519.SH',
         buckets: [{ price: 10, weight: 1 }],
         averageCost: 10,
         mainPeak: 10,
@@ -318,57 +325,6 @@ describe('行情缓存', () => {
     expect(dsa.get).toHaveBeenCalledOnce();
     const freshEntry = [...ttls.entries()].find(([key]) => key.endsWith(':fresh'));
     expect(freshEntry?.[1]).toBe(15 * 60);
-  });
-
-  it('Indicator 使用缓存并在 refresh 失败时返回 stale fallback', async () => {
-    const values = new Map<string, string>();
-    const indicatorRaw = {
-      parameters: { period: 14 },
-      timeframe: '1d',
-      marketTime: '2025-01-01T00:00:00Z',
-      calculatedAt: '2025-01-01T00:00:00Z',
-      values: { rsi14: 50 },
-      engineVersion: 'fixture',
-      provider: 'dsa-fork',
-    };
-    const dsa = { get: vi.fn(async () => indicatorRaw) };
-    const redis = {
-      client: {
-        get: vi.fn(async (key: string) => values.get(key) ?? null),
-        multi: () => {
-          const writes: Array<[string, string]> = [];
-          const chain = {
-            set: (key: string, value: string) => {
-              writes.push([key, value]);
-              return chain;
-            },
-            exec: async () => {
-              for (const [key, value] of writes) values.set(key, value);
-            },
-          };
-          return chain;
-        },
-      },
-    };
-    const service = new MarketService(dsa as never, redis as never);
-
-    await expect(service.getIndicator('600519', 'RSI')).resolves.toMatchObject({
-      provider: 'dsa-fork',
-    });
-    await service.getIndicator('600519', 'RSI');
-    expect(dsa.get).toHaveBeenCalledTimes(1);
-
-    await service.getIndicator('600519', 'RSI', {
-      start: '2025-01-01',
-      parameters: { period: 14 },
-    });
-    expect(dsa.get).toHaveBeenCalledTimes(2);
-
-    dsa.get.mockRejectedValueOnce(new Error('offline'));
-    await expect(service.getIndicator('600519', 'RSI', { refresh: true })).resolves.toMatchObject({
-      fallbackUsed: true,
-    });
-    expect(dsa.get).toHaveBeenCalledTimes(3);
   });
 
   it('旧 MarketBar storage/backfill 入口已移除', () => {

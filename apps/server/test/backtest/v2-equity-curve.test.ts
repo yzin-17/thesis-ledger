@@ -1,5 +1,5 @@
 import { tradingCalendarFromFact, type SimulationLedgerState } from '@thesis-ledger/domain';
-import { runConfigSchemaV2, strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { runConfigSchemaV3, strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { describe, expect, it } from 'vitest';
 import type { ArtifactRef, ArtifactRow } from '../../src/backtest/backtest-artifact-store.js';
 import {
@@ -7,7 +7,7 @@ import {
   buildDailyValuationTicks,
   buildBacktestEquityPoint,
 } from '../../src/backtest/backtest-equity-curve.js';
-import { runExchangeVertical } from '../../src/backtest/backtest-v2-execution.js';
+import { runExchangeVertical } from '../../src/backtest/backtest-v2-execution-exchange.js';
 
 const artifact = (key: string): ArtifactRef => ({
   artifactId: key,
@@ -100,7 +100,7 @@ describe('实际 Exchange Runner 权益序列', () => {
         ],
       ],
     ]);
-    const strategy = strategySchemaV2.parse({
+    const strategy = strategySchema.parse({
       schemaVersion: '2',
       name: '完整权益序列回归',
       signalSources: [
@@ -129,13 +129,41 @@ describe('实际 Exchange Runner 权益序列', () => {
         timing: 'nextEligibleBarOpen',
       },
       cost: { commissionRate: '0', slippageRate: '0' },
-    }) as StrategySchemaV2;
+    }) as BacktestStrategy;
     const result = runExchangeVertical({
       runId: 'run-equity-curve',
       strategyVersionId: 'strategy-equity-curve',
       snapshotId: 'snapshot-equity-curve',
       strategy,
-      runConfig: runConfigSchemaV2.parse({
+      runConfig: runConfigSchemaV3.parse({
+        schemaVersion: '3',
+        executionPriceProtocol: {
+          protocolVersion: 'execution-price-v1',
+          priceBasis: {
+            adjustment: 'none',
+            method: 'provider-native',
+            methodVersion: 'provider-reported-v1',
+            basisScope: 'provider-defined',
+            anchor: null,
+            revision: {
+              origin: 'local-observation',
+              contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            },
+            observedAt: '2024-01-01T00:00:00.000Z',
+            quantityBasis: 'actual-units',
+            volumeBasis: 'original',
+            dividendMeaning: 'explicit-cash',
+            dividendEvidenceRef: null,
+            conversionAvailable: false,
+            conversionEvidenceRef: null,
+            derivation: null,
+          },
+          accountingBasis: 'raw-events',
+          history: {
+            basis: 'point-in-time',
+            reconstructionEvidenceRef: 'original-bar-availability-v1',
+          },
+        },
         startDate: '2026-09-07',
         endDate: '2026-09-10',
         dataAsOf: '2026-09-11T00:00:00Z',

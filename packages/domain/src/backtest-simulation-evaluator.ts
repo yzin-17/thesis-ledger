@@ -1,6 +1,8 @@
 import { alignSeriesAt, type BacktestSeries, type BacktestSeriesPoint } from './backtest-series.js';
-import { type BooleanExpression, type NumericExpression } from './backtest-v2.js';
+import { type BooleanExpression, type NumericExpression } from './backtest-contract.js';
 import { DecimalValue } from './decimal.js';
+import { mergeBacktestAvailability } from './backtest-observation-clock.js';
+import { evaluateCorporateActionSignal } from './backtest-event-signal.js';
 import type {
   AvailableEvaluation,
   BooleanEvaluation,
@@ -8,12 +10,6 @@ import type {
   SimulationExpressionContext,
   UnavailableEvaluation,
 } from './backtest-simulation.js';
-
-const instant = (value: string) => {
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) throw new Error(`无效时间: ${value}`);
-  return parsed;
-};
 
 const stableSerialize = (value: unknown): string => {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -66,14 +62,15 @@ const pointEvaluation = (point: BacktestSeriesPoint, occurredAt: string): Numeri
     value: point.value,
     occurredAt,
     availableAt: point.availableAt,
+    ...(point.researchClock ? { researchClock: point.researchClock } : {}),
   };
 };
 
-const maxAvailableAt = (values: readonly AvailableEvaluation<unknown>[]) =>
-  values.reduce(
-    (latest, value) => (instant(value.availableAt) > instant(latest) ? value.availableAt : latest),
-    values[0]?.availableAt ?? '1970-01-01T00:00:00.000Z',
-  );
+const corporateActionEventType = (expression: BooleanExpression): string | undefined => {
+  const candidate = expression as unknown as { type?: unknown; eventType?: unknown };
+  if (candidate.type !== 'corporateActionEvent') return undefined;
+  return typeof candidate.eventType === 'string' ? candidate.eventType : 'unknown';
+};
 
 export const evaluateNumericExpression = (
   expression: NumericExpression,
@@ -146,7 +143,7 @@ const evaluateNumericBoolean = (
       status: 'available',
       value: result,
       occurredAt,
-      availableAt: maxAvailableAt([left, right]),
+      ...mergeBacktestAvailability([left, right]),
     };
   }
   const previousLeft = context.previousNumeric?.get(numericExpressionKey(expression.left));
@@ -164,7 +161,7 @@ const evaluateNumericBoolean = (
     status: 'available',
     value: crossed,
     occurredAt,
-    availableAt: maxAvailableAt([left, right, previousLeft, previousRight]),
+    ...mergeBacktestAvailability([left, right, previousLeft, previousRight]),
   };
 };
 
@@ -173,6 +170,10 @@ export const evaluateBooleanExpression = (
   context: SimulationExpressionContext,
 ): BooleanEvaluation => {
   const occurredAt = context.tick.occurredAt;
+  const actionEventType = corporateActionEventType(expression);
+  if (actionEventType !== undefined) {
+    return evaluateCorporateActionSignal(actionEventType, context);
+  }
   if (expression.type === 'positionState') {
     const position = context.positionState;
     if (!position) return unavailable(occurredAt, 'PositionState unavailable');
@@ -200,8 +201,11 @@ export const evaluateBooleanExpression = (
       status: 'available',
       value: result,
       occurredAt,
-      availableAt: maxAvailableAt(availableValues),
+      ...mergeBacktestAvailability(availableValues),
     };
   }
-  return evaluateNumericBoolean(expression, context);
+  if (expression.type === 'compare' || expression.type === 'cross') {
+    return evaluateNumericBoolean(expression, context);
+  }
+  return unavailable(occurredAt, 'Boolean expression 的执行语义尚未实现');
 };

@@ -1,668 +1,333 @@
 import {
-  compareBenchmark,
-  periodMetrics,
-  quantStatsAnalytics,
-  tradeMetrics,
-  type ReturnPoint,
-} from './backtest-analytics.js';
-import { simulateAStockExecution, type ExecutionConstraint } from './backtest.js';
+  createCorporateActionPort,
+  type CorporateActionMutation,
+} from './backtest-corporate-actions.js';
+import { DecimalValue } from './decimal.js';
+import {
+  resolveNormalizedExecutionModelSegment,
+  type FrozenExecutionModel,
+} from './backtest-execution-model.js';
+import type { ExchangeBarFact, ExchangeCostModel } from './backtest-exchange.js';
+import type { SimulationAccountingBasis } from './backtest-normalized-accounting.js';
+import { createExchangeSizingAdapter } from './backtest-sizing-risk-adapter.js';
+import type { SizingInput } from './backtest-sizing.js';
+import {
+  runDeterministicSimulation,
+  type SimulationEngineInput,
+  type SimulationFillRecord,
+  type SimulationMutationCommand,
+  type SimulationMutationDecision,
+  type SimulationRunResult,
+  type SimulationTargetIntent,
+} from './backtest-simulation.js';
+import type { VersionedExecutionRules } from './execution-rules.js';
+import type {
+  SimulationLedger,
+  LedgerMutationResult,
+  SimulationLedgerState,
+  SimulationSettlement,
+} from './simulation-ledger.js';
+import type { TradingCalendar } from './trading-calendar.js';
 
-export interface BacktestBar {
-  symbol: string;
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume?: number;
-  previousClose?: number;
-  suspended?: boolean;
-  availableAt?: string;
-  assetType?: 'stock' | 'etf' | 'fund' | 'index' | 'convertible';
-  dividend?: number;
-  splitFactor?: number;
-}
-
-export interface SignalExpression {
-  indicator?: string;
-  operator?: string;
-  value?: number | string;
-  all?: SignalExpression[];
-  any?: SignalExpression[];
-  not?: SignalExpression;
-}
-
-export interface BacktestStrategy {
-  universe: {
-    symbols: string[];
-    asOf: string;
-    assetTypes?: Array<'stock' | 'etf' | 'fund' | 'index' | 'convertible'>;
-    filterRef?: string;
-    validFrom?: string;
-    validTo?: string;
+export interface ExchangeSimulationRunInput {
+  simulation: Omit<SimulationEngineInput, 'execution' | 'corporateActionPort'>;
+  ledger: SimulationLedger;
+  accountingBasis: SimulationAccountingBasis;
+  exchange: {
+    rules: VersionedExecutionRules;
+    calendar: TradingCalendar;
+    /** Frozen execution prices and their session/availability times. */
+    bars: readonly ExchangeBarFact[];
+    costs: ExchangeCostModel;
+    executionModel?: FrozenExecutionModel;
+    dataAsOf?: string;
+    sizingForIntent: (intent: SimulationTargetIntent, ledger: SimulationLedgerState) => SizingInput;
   };
-  entrySignals: Array<{ indicator: string; operator: string; value: number | string }>;
-  exitSignals: Array<{ indicator: string; operator: string; value: number | string }>;
-  entryCondition?: SignalExpression;
-  exitCondition?: SignalExpression;
-  stopLoss: { type: 'fixed' | 'trailing' | 'atr'; value: number };
-  takeProfit?: { type: 'fixed' | 'trailing'; value: number };
-  sizing: { type: 'fixed' | 'weight' | 'risk'; value: number };
-  execution: { price: 'open' | 'close' | 'nextOpen'; tPlusOne: boolean; lotSize: number };
-  cost: {
-    commissionRate: number;
-    minimumCommission: number;
-    stampDutyRate: number;
-    slippageRate: number;
-  };
-  riskConstraints?: Array<{ kind: string; threshold: number }>;
-  benchmark?: string;
 }
 
-export interface BacktestTrade {
-  symbol: string;
-  side: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-  fees: number;
-  commission?: number;
-  stampDuty?: number;
-  slippageCost?: number;
-  date: string;
-  reason: 'signal' | 'stop' | 'takeprofit' | 'end';
+export interface ExchangeSimulationRunResult extends SimulationRunResult {
+  ledger: SimulationLedgerState;
+  ledgerMutations: readonly LedgerMutationResult[];
 }
 
-export interface RejectedOrder {
-  symbol: string;
-  side: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-  date: string;
-  reason: string;
-}
-
-export interface BacktestMetadata {
-  strategyVersionId?: string;
-  strategyVersion?: number;
-  schemaVersion?: number;
-  dataVersion?: string;
-  provider?: string;
-  engineVersion: string;
-  parameters?: Record<string, unknown>;
-  costModel?: BacktestStrategy['cost'];
-}
-
-export interface BacktestResult {
-  engineVersion: string;
-  dataAsOf: string;
-  initialCash: number;
-  finalValue: number;
-  trades: BacktestTrade[];
-  equityCurve: ReturnPoint[];
-  returns: number[];
-  metrics: ReturnType<typeof periodMetrics> & ReturnType<typeof tradeMetrics>;
-  analytics: ReturnType<typeof quantStatsAnalytics>;
-  inSample?: ReturnType<typeof periodMetrics>;
-  outOfSample?: ReturnType<typeof periodMetrics>;
-  warnings: string[];
-  limitations: string[];
-  rejectedOrders: RejectedOrder[];
-  completeness: {
-    complete: boolean;
-    missingSymbols: string[];
-    missingDates: Array<{ symbol: string; dates: string[] }>;
-  };
-  benchmark?: ReturnType<typeof compareBenchmark>;
-  metadata: BacktestMetadata;
-}
-
-type Signal = BacktestStrategy['entrySignals'][number];
-type Holding = {
-  quantity: number;
-  entryPrice: number;
-  entryFees: number;
-  boughtAt: string;
-  peakDecisionPrice: number;
-};
-type PendingOrder = {
-  symbol: string;
-  side: 'buy' | 'sell';
-  reason: BacktestTrade['reason'];
-};
-type TradeMetricRecord = { pnl: number; holdingDays: number; turnover: number };
-
-const signalValue = (bar: BacktestBar, indicator: string) => {
-  if (indicator === 'close' || indicator === 'price') return bar.close;
-  if (indicator === 'open') return bar.open;
-  if (indicator === 'high') return bar.high;
-  if (indicator === 'low') return bar.low;
-  if (indicator === 'volume') return bar.volume ?? 0;
-  return undefined;
-};
-
-const matchesSignal = (bar: BacktestBar, previousBar: BacktestBar | undefined, signal: Signal) => {
-  const left = signalValue(bar, signal.indicator);
-  const right = typeof signal.value === 'number' ? signal.value : signalValue(bar, signal.value);
-  if (left === undefined || right === undefined) return false;
-  if (signal.operator === 'gt') return left > right;
-  if (signal.operator === 'gte') return left >= right;
-  if (signal.operator === 'lt') return left < right;
-  if (signal.operator === 'lte') return left <= right;
-  if (signal.operator === 'crossesAbove' || signal.operator === 'crossesBelow') {
-    if (!previousBar) return false;
-    const previousLeft = signalValue(previousBar, signal.indicator);
-    const previousRight =
-      typeof signal.value === 'number' ? signal.value : signalValue(previousBar, signal.value);
-    if (previousLeft === undefined || previousRight === undefined) return false;
-    return signal.operator === 'crossesAbove'
-      ? previousLeft <= previousRight && left > right
-      : previousLeft >= previousRight && left < right;
+const assertExchangeSimulationInput = (input: ExchangeSimulationRunInput) => {
+  const strategyInstrument = input.simulation.strategy.executionInstrument;
+  const ledgerInstrument = input.ledger.snapshot().position;
+  const ruleInstrument = input.exchange.rules.instrumentFact;
+  const ruleMarket = ruleInstrument.market;
+  const orderRules = input.exchange.rules.orderRules;
+  if (input.ledger.accountingBasis !== input.accountingBasis) {
+    throw new Error('SimulationLedger accountingBasis 与运行口径不一致');
   }
-  return false;
-};
-
-const matchesExpression = (
-  bar: BacktestBar,
-  previousBar: BacktestBar | undefined,
-  expression: SignalExpression,
-): boolean => {
-  if (expression.all)
-    return expression.all.every((item) => matchesExpression(bar, previousBar, item));
-  if (expression.any)
-    return expression.any.some((item) => matchesExpression(bar, previousBar, item));
-  if (expression.not) return !matchesExpression(bar, previousBar, expression.not);
-  if (expression.indicator && expression.operator && expression.value !== undefined) {
-    return matchesSignal(bar, previousBar, {
-      indicator: expression.indicator,
-      operator: expression.operator,
-      value: expression.value,
-    });
+  if (
+    strategyInstrument.symbol !== ledgerInstrument.symbol ||
+    strategyInstrument.market !== ledgerInstrument.market ||
+    strategyInstrument.assetType !== ledgerInstrument.assetType ||
+    strategyInstrument.symbol !== ruleInstrument.symbol ||
+    strategyInstrument.market !== ruleMarket ||
+    input.ledger.snapshot().position.currency !== ruleInstrument.currency
+  ) {
+    throw new Error('策略、SimulationLedger 与执行规则必须指向同一执行标的');
   }
-  return false;
+  if (input.exchange.calendar.market !== ruleMarket) {
+    throw new Error('Exchange session calendar 与执行规则市场不一致');
+  }
+  if (
+    orderRules.type !== 'Market' ||
+    orderRules.timeInForce !== 'DAY' ||
+    orderRules.executionTiming !== 'nextEligibleBarOpen' ||
+    orderRules.fillPolicy !== 'full-or-reject' ||
+    !orderRules.longOnly
+  ) {
+    throw new Error('回测 Exchange 仅支持只做多、DAY、下一有效开盘及整单成交');
+  }
 };
 
-const matchesSignals = (
-  bar: BacktestBar,
-  previousBar: BacktestBar | undefined,
-  signals: BacktestStrategy['entrySignals'],
-  expression?: SignalExpression,
-) =>
-  expression
-    ? matchesExpression(bar, previousBar, expression)
-    : signals.every((signal) => matchesSignal(bar, previousBar, signal));
+const ledgerDecision = (result: LedgerMutationResult): SimulationMutationDecision =>
+  result.applied
+    ? { accepted: true }
+    : {
+        accepted: false,
+        reason: result.reason,
+        ruleVersion: 'simulation-ledger-v1',
+        inputFacts: [`ledger.code=${result.code}`, `ledger.eventId=${result.eventId}`],
+      };
 
-const constraintFor = (strategy: BacktestStrategy): ExecutionConstraint => ({
-  tPlusOne: strategy.execution.tPlusOne,
-  lotSize: strategy.execution.lotSize,
-  commissionRate: strategy.cost.commissionRate,
-  minimumCommission: strategy.cost.minimumCommission,
-  stampDutyRate: strategy.cost.stampDutyRate,
-  slippageRate: strategy.cost.slippageRate,
-});
-
-const calendarDaysBetween = (start: string, end: string) => {
-  const startMs = Date.parse(`${start}T00:00:00Z`);
-  const endMs = Date.parse(`${end}T00:00:00Z`);
-  return Number.isFinite(startMs) && Number.isFinite(endMs)
-    ? Math.max(0, Math.round((endMs - startMs) / 86_400_000))
-    : 0;
-};
-
-export const checkUniverseCompleteness = (
-  bars: readonly BacktestBar[],
-  symbols: readonly string[],
-  start: string,
-  end: string,
+const nextEligibleExchangeFillAt = (
+  order: { occurredAt: string },
+  calendar: TradingCalendar,
+  bars: readonly ExchangeBarFact[],
 ) => {
-  const bySymbol = new Map<string, Set<string>>();
-  const allDates = new Set<string>();
-  for (const bar of bars) {
-    if (bar.date < start || bar.date > end) continue;
-    allDates.add(bar.date);
-    const dates = bySymbol.get(bar.symbol) ?? new Set<string>();
-    dates.add(bar.date);
-    bySymbol.set(bar.symbol, dates);
-  }
-  const missingSymbols = symbols.filter((symbol) => !bySymbol.has(symbol));
-  const expectedDates = [...allDates].sort();
-  const missingDates = symbols.flatMap((symbol) => {
-    const dates = bySymbol.get(symbol);
-    return dates
-      ? [{ symbol, dates: expectedDates.filter((date) => !dates.has(date)) }].filter(
-          (entry) => entry.dates.length > 0,
-        )
-      : [];
-  });
-  return {
-    complete: missingSymbols.length === 0 && missingDates.length === 0,
-    missingSymbols,
-    missingDates,
-  };
-};
-
-export const runBacktest = (input: {
-  strategy: BacktestStrategy;
-  bars: readonly BacktestBar[];
-  start: string;
-  end: string;
-  dataAsOf: string;
-  initialCash: number;
-  inSampleEnd?: string;
-  engineVersion?: string;
-  benchmarkBars?: readonly BacktestBar[];
-  metadata?: Omit<BacktestMetadata, 'engineVersion'>;
-}): BacktestResult => {
-  const strategy = input.strategy;
-  const bars = input.bars
+  const eligibleBars = [...bars]
     .filter(
       (bar) =>
-        strategy.universe.symbols.includes(bar.symbol) &&
-        bar.date >= input.start &&
-        bar.date <= input.end &&
-        (!bar.availableAt || bar.availableAt <= input.dataAsOf),
+        Date.parse(bar.openedAt) > Date.parse(order.occurredAt) &&
+        calendar.isTradingSession(bar.openedAt),
     )
-    .sort(
-      (left, right) =>
-        left.date.localeCompare(right.date) || left.symbol.localeCompare(right.symbol),
-    );
-  const completeness = checkUniverseCompleteness(
-    bars,
-    strategy.universe.symbols,
-    input.start,
-    input.end,
-  );
-  const warnings = completeness.complete
-    ? []
-    : [`Universe 缺少标的: ${completeness.missingSymbols.join(',')}`];
-  const limitations = ['survivorship_coverage_unknown'];
-  const rejectedOrders: RejectedOrder[] = [];
-  const constraint = constraintFor(strategy);
-  const holdings = new Map<string, Holding>();
-  const trades: BacktestTrade[] = [];
-  const completedTrades: TradeMetricRecord[] = [];
-  const equityCurve: ReturnPoint[] = [];
-  const previousBarBySymbol = new Map<string, BacktestBar>();
-  const latestCloseBySymbol = new Map<string, number>();
-  const pendingOrders = new Map<string, PendingOrder>();
-  const barsByDate = new Map<string, BacktestBar[]>();
-  const trueRangesBySymbol = new Map<string, number[]>();
-  const atrBySymbol = new Map<string, number | undefined>();
-  for (const bar of bars) {
-    const dailyBars = barsByDate.get(bar.date) ?? [];
-    dailyBars.push(bar);
-    barsByDate.set(bar.date, dailyBars);
-  }
+    .sort((left, right) => Date.parse(left.openedAt) - Date.parse(right.openedAt));
+  const firstEligibleBar = eligibleBars[0];
+  if (!firstEligibleBar) return undefined;
+  const targetDate = calendar.status(firstEligibleBar.openedAt).date;
+  return eligibleBars.find((bar) => calendar.status(bar.openedAt).date === targetDate)?.openedAt;
+};
 
-  let cash = input.initialCash;
-  let previousValue = input.initialCash;
+const sellableQuantityAt = (
+  state: SimulationLedgerState,
+  fillAt: string | undefined,
+  pendingPositionSettlements: ReadonlyMap<string, { quantity: string; availableAt: string }>,
+) => {
+  const settledQuantity = DecimalValue.from(state.position.settledQuantity);
+  if (!fillAt) return settledQuantity.toString();
+  return [...pendingPositionSettlements.values()]
+    .filter((settlement) => Date.parse(settlement.availableAt) <= Date.parse(fillAt))
+    .reduce((quantity, settlement) => quantity.plus(settlement.quantity), settledQuantity)
+    .toString();
+};
 
-  const addTrueRange = (bar: BacktestBar, previousBar: BacktestBar | undefined) => {
-    if (!previousBar) return undefined;
-    const trueRange = Math.max(
-      bar.high - bar.low,
-      Math.abs(bar.high - (bar.previousClose ?? previousBar.close)),
-      Math.abs(bar.low - (bar.previousClose ?? previousBar.close)),
-    );
-    const ranges = trueRangesBySymbol.get(bar.symbol) ?? [];
-    ranges.push(trueRange);
-    if (ranges.length > 14) ranges.shift();
-    trueRangesBySymbol.set(bar.symbol, ranges);
-    if (ranges.length < 14) return undefined;
-    return ranges.reduce((sum, value) => sum + value, 0) / ranges.length;
-  };
-
-  const portfolioValue = (prices: ReadonlyMap<string, number>) =>
-    cash +
-    [...holdings.entries()].reduce(
-      (sum, [symbol, holding]) =>
-        sum +
-        holding.quantity *
-          (prices.get(symbol) ?? latestCloseBySymbol.get(symbol) ?? holding.entryPrice),
-      0,
-    );
-
-  const decisionPriceFor = (bar: BacktestBar) =>
-    strategy.execution.price === 'open' ? bar.open : bar.close;
-
-  const buy = (
-    bar: BacktestBar,
-    price: number,
-    valuationPrices: ReadonlyMap<string, number>,
-    atr: number | undefined,
-  ) => {
-    if (holdings.has(bar.symbol)) return;
-    const currentValue = portfolioValue(valuationPrices);
-    let budget = strategy.sizing.value;
-    let riskDistance: number | undefined;
-    if (strategy.sizing.type === 'weight') {
-      budget = cash * strategy.sizing.value;
-    } else if (strategy.sizing.type === 'risk') {
-      if (strategy.stopLoss.type === 'fixed' || strategy.stopLoss.type === 'trailing') {
-        riskDistance = price * strategy.stopLoss.value;
-      } else if (atr !== undefined) {
-        riskDistance = atr * strategy.stopLoss.value;
-      }
-      if (riskDistance === undefined || riskDistance <= 0) {
-        rejectedOrders.push({
-          symbol: bar.symbol,
-          side: 'buy',
-          quantity: 0,
-          price,
-          date: bar.date,
-          reason: '缺少可计算的止损距离',
-        });
-        return;
-      }
-      budget = (currentValue * strategy.sizing.value) / riskDistance;
+/** 连接现行事件引擎、单标的 Exchange 与模拟账本。 */
+export const runExchangeSimulation = (
+  input: ExchangeSimulationRunInput,
+): ExchangeSimulationRunResult => {
+  assertExchangeSimulationInput(input);
+  const { ledger } = input;
+  const { rules, calendar, bars, costs, executionModel, dataAsOf } = input.exchange;
+  const currency = rules.instrumentCurrency;
+  const ledgerMutations: LedgerMutationResult[] = [];
+  const pendingPositionSettlements = new Map<string, { quantity: string; availableAt: string }>();
+  const sizingInputForIntent = (
+    intent: SimulationTargetIntent,
+    state: SimulationLedgerState,
+  ): SizingInput => {
+    const sizing = input.exchange.sizingForIntent(intent, state);
+    if (sizing.accountingBasis !== undefined && sizing.accountingBasis !== input.accountingBasis) {
+      throw new Error('Sizing 与 ExchangeSimulationRunInput 的 accountingBasis 不一致');
     }
-    const quantityBudget =
-      strategy.sizing.type === 'risk' ? budget : budget / Math.max(price, 0.000001);
-    const decision = simulateAStockExecution(
-      {
-        side: 'buy',
-        quantity: quantityBudget,
-        price,
-        previousClose: bar.previousClose ?? price,
-        tradingDate: bar.date,
-        ...(bar.suspended === undefined ? {} : { suspended: bar.suspended }),
+    if (input.accountingBasis !== 'normalized-series') {
+      return { ...sizing, accountingBasis: input.accountingBasis };
+    }
+
+    const normalizedSizing = { ...sizing };
+    delete normalizedSizing.normalizedExecution;
+    let normalizedExecution: SizingInput['normalizedExecution'];
+    const evaluatedAt = nextEligibleExchangeFillAt(intent, calendar, bars) ?? intent.occurredAt;
+    if (executionModel && dataAsOf) {
+      try {
+        normalizedExecution = resolveNormalizedExecutionModelSegment(executionModel, {
+          expectedVersion: executionModel.version,
+          symbol: rules.instrumentFact.symbol,
+          market: rules.instrumentFact.market,
+          instrumentType: rules.instrumentFact.instrumentType,
+          currency,
+          evaluatedAt,
+          dataAsOf,
+        }).execution.normalizedExecution;
+      } catch {
+        // Missing, stale, or incompatible frozen segments make normalized sizing unavailable.
+      }
+    }
+    return {
+      ...normalizedSizing,
+      accountingBasis: input.accountingBasis,
+      ...(normalizedExecution ? { normalizedExecution } : {}),
+    };
+  };
+  const adapter = createExchangeSizingAdapter({
+    sizingForIntent: (intent) => sizingInputForIntent(intent, ledger.snapshot()),
+    orderDefaults: () => ({
+      market: rules.instrumentFact.market,
+      orderType: 'Market',
+      timeInForce: 'DAY',
+      executionTiming: 'nextEligibleBarOpen',
+    }),
+    exchangeInputForOrder: (order) => ({
+      accountingBasis: input.accountingBasis,
+      rules,
+      calendar,
+      currency,
+      bars,
+      account: {
+        settledCash: ledger.availableCash(currency),
+        availableQuantity: sellableQuantityAt(
+          ledger.snapshot(),
+          nextEligibleExchangeFillAt(order, calendar, bars),
+          pendingPositionSettlements,
+        ),
       },
-      constraint,
-    );
-    const required = decision.quantity * decision.fillPrice + decision.fees;
-    const maxPositionWeight = strategy.riskConstraints?.find(
-      (item) => item.kind === 'maxPositionWeight',
-    )?.threshold;
-    const cashFloor = strategy.riskConstraints?.find(
-      (item) => item.kind === 'cashFloor',
-    )?.threshold;
-    const positionValue = decision.quantity * decision.fillPrice;
-    const violatesWeight =
-      maxPositionWeight !== undefined &&
-      currentValue > 0 &&
-      positionValue / currentValue > maxPositionWeight;
-    const violatesCashFloor =
-      cashFloor !== undefined &&
-      cash - required < (cashFloor <= 1 ? input.initialCash * cashFloor : cashFloor);
-    if (decision.accepted && required <= cash && !violatesWeight && !violatesCashFloor) {
-      cash -= required;
-      holdings.set(bar.symbol, {
-        quantity: decision.quantity,
-        entryPrice: decision.fillPrice,
-        entryFees: decision.fees,
-        boughtAt: bar.date,
-        peakDecisionPrice: price,
-      });
-      trades.push({
-        symbol: bar.symbol,
-        side: 'buy',
-        quantity: decision.quantity,
-        price: decision.fillPrice,
-        fees: decision.fees,
-        ...(decision.commission === undefined ? {} : { commission: decision.commission }),
-        ...(decision.stampDuty === undefined ? {} : { stampDuty: decision.stampDuty }),
-        ...(decision.slippageCost === undefined ? {} : { slippageCost: decision.slippageCost }),
-        date: bar.date,
-        reason: 'signal',
-      });
-      return;
+      costs,
+      ...(executionModel ? { executionModel } : {}),
+      ...(dataAsOf ? { dataAsOf } : {}),
+    }),
+    reserveCashForOrder: (order, plan) => {
+      if (order.side === 'sell') return { accepted: true };
+      if (!plan.cashReservation) {
+        return {
+          accepted: false,
+          code: 'MISSING_RESERVATION',
+          reason: '买入成交计划缺少现金占款',
+          inputFacts: [`orderId=${order.orderId}`],
+        };
+      }
+      const reservation = plan.cashReservation;
+      const result = ledger.reserveCash(
+        reservation.reservationId,
+        reservation.currency,
+        reservation.amount,
+      );
+      return result.accepted
+        ? { accepted: true }
+        : {
+            accepted: false,
+            code: result.code,
+            reason: result.reason,
+            inputFacts: [
+              `cash.currency=${reservation.currency}`,
+              `cash.required=${reservation.amount}`,
+            ],
+          };
+    },
+  });
+  const onMutation = (command: {
+    type: string;
+    payload: Record<string, unknown>;
+  }): SimulationMutationDecision => {
+    if (command.type === 'simulationFill') {
+      const fill = command.payload as unknown as SimulationFillRecord;
+      const plan = adapter.planFor(fill.orderId);
+      if (plan?.status !== 'filled' || plan.fill.fillId !== fill.fillId) {
+        return {
+          accepted: false,
+          reason: 'Simulation Fill 与 Exchange 成交计划不匹配',
+          inputFacts: [`orderId=${fill.orderId}`, `fillId=${fill.fillId}`],
+        };
+      }
+      const result = ledger.applyEvent(
+        { type: 'fill', payload: plan.ledgerFill },
+        fill.availableAt,
+      );
+      ledgerMutations.push(result);
+      if (!result.applied && plan.cashReservation) {
+        ledger.releaseCash(plan.cashReservation.reservationId);
+      }
+      return ledgerDecision(result);
     }
-    rejectedOrders.push({
-      symbol: bar.symbol,
-      side: 'buy',
-      quantity: decision.quantity,
-      price,
-      date: bar.date,
-      reason: violatesWeight
-        ? '超过单标的仓位上限'
-        : violatesCashFloor
-          ? '低于现金下限'
-          : (decision.reason ?? (required > cash ? '资金不足' : '订单被拒绝')),
-    });
+    if (command.type === 'cashSettlement') {
+      const settlement = command.payload as unknown as SimulationSettlement;
+      const result = ledger.applyEvent(
+        { type: 'settlement', payload: settlement },
+        settlement.availableAt,
+      );
+      ledgerMutations.push(result);
+      if (result.applied && (settlement.kind === 'position' || settlement.kind === 'both')) {
+        pendingPositionSettlements.delete(settlement.sourceEventId);
+      }
+      return ledgerDecision(result);
+    }
+    return { accepted: true };
   };
-
-  const sell = (bar: BacktestBar, price: number, reason: BacktestTrade['reason']) => {
-    const holding = holdings.get(bar.symbol);
-    if (!holding) return;
-    const decision = simulateAStockExecution(
-      {
-        side: 'sell',
-        quantity: holding.quantity,
-        price,
-        previousClose: bar.previousClose ?? price,
-        boughtAt: holding.boughtAt,
-        tradingDate: bar.date,
-        ...(bar.suspended === undefined ? {} : { suspended: bar.suspended }),
-      },
-      constraint,
-    );
-    if (!decision.accepted) {
-      rejectedOrders.push({
-        symbol: bar.symbol,
-        side: 'sell',
-        quantity: holding.quantity,
-        price,
-        date: bar.date,
-        reason: decision.reason ?? '订单被拒绝',
+  const observeMutation = (command: SimulationMutationCommand) => {
+    if (command.type !== 'corporateAction') return;
+    const ledgerEvent = (command.payload as unknown as CorporateActionMutation).ledgerEvent;
+    if (ledgerEvent.type !== 'split') return;
+    const ratio = DecimalValue.from(ledgerEvent.payload.ratio);
+    for (const [sourceEventId, settlement] of pendingPositionSettlements) {
+      pendingPositionSettlements.set(sourceEventId, {
+        ...settlement,
+        quantity: DecimalValue.from(settlement.quantity).times(ratio).toString(),
       });
-      return;
-    }
-    cash += decision.quantity * decision.fillPrice - decision.fees;
-    const soldFraction = decision.quantity / holding.quantity;
-    const allocatedEntryFees = holding.entryFees * soldFraction;
-    completedTrades.push({
-      pnl:
-        decision.quantity * decision.fillPrice -
-        decision.fees -
-        decision.quantity * holding.entryPrice -
-        allocatedEntryFees,
-      holdingDays: calendarDaysBetween(holding.boughtAt, bar.date),
-      turnover: decision.quantity * decision.fillPrice,
-    });
-    trades.push({
-      symbol: bar.symbol,
-      side: 'sell',
-      quantity: decision.quantity,
-      price: decision.fillPrice,
-      fees: decision.fees,
-      ...(decision.commission === undefined ? {} : { commission: decision.commission }),
-      ...(decision.stampDuty === undefined ? {} : { stampDuty: decision.stampDuty }),
-      ...(decision.slippageCost === undefined ? {} : { slippageCost: decision.slippageCost }),
-      date: bar.date,
-      reason,
-    });
-    const remaining = holding.quantity - decision.quantity;
-    if (remaining <= 1e-8) holdings.delete(bar.symbol);
-    else {
-      holding.quantity = remaining;
-      holding.entryFees -= allocatedEntryFees;
     }
   };
-
-  for (const [date, dailyBars] of barsByDate) {
-    const valuationPrices = new Map(latestCloseBySymbol);
-    for (const bar of dailyBars) {
-      valuationPrices.set(bar.symbol, strategy.execution.price === 'close' ? bar.close : bar.open);
-    }
-
-    for (const bar of dailyBars) {
-      const holding = holdings.get(bar.symbol);
-      if (!holding) continue;
-      if (bar.splitFactor && bar.splitFactor > 0 && bar.splitFactor !== 1) {
-        holding.quantity *= bar.splitFactor;
-        holding.entryPrice /= bar.splitFactor;
-      }
-      if (bar.dividend && bar.dividend > 0) cash += holding.quantity * bar.dividend;
-    }
-
-    for (const bar of dailyBars) {
-      const previousBar = previousBarBySymbol.get(bar.symbol);
-      atrBySymbol.set(bar.symbol, addTrueRange(bar, previousBar));
-    }
-
-    if (strategy.execution.price === 'nextOpen') {
-      for (const bar of dailyBars) {
-        const pending = pendingOrders.get(bar.symbol);
-        if (!pending || bar.suspended) continue;
-        if (pending.side === 'buy')
-          buy(bar, bar.open, valuationPrices, atrBySymbol.get(bar.symbol));
-        else sell(bar, bar.open, pending.reason);
-        pendingOrders.delete(bar.symbol);
-      }
-    }
-
-    for (const bar of dailyBars) {
-      const previousBar = previousBarBySymbol.get(bar.symbol);
-      const holding = holdings.get(bar.symbol);
-      const decisionPrice = decisionPriceFor(bar);
-      const atr = atrBySymbol.get(bar.symbol);
-      if (
-        strategy.stopLoss.type === 'atr' &&
-        atr === undefined &&
-        !warnings.includes('ATR 止损样本不足，未触发')
-      ) {
-        warnings.push('ATR 止损样本不足，未触发');
-      }
-      if (holding) {
-        holding.peakDecisionPrice = Math.max(holding.peakDecisionPrice, decisionPrice);
-        let reason: BacktestTrade['reason'] | null = null;
-        if (
-          strategy.stopLoss.type === 'fixed' &&
-          decisionPrice <= holding.entryPrice * (1 - strategy.stopLoss.value)
-        ) {
-          reason = 'stop';
-        } else if (
-          strategy.stopLoss.type === 'trailing' &&
-          decisionPrice <= holding.peakDecisionPrice * (1 - strategy.stopLoss.value)
-        ) {
-          reason = 'stop';
-        } else if (
-          strategy.stopLoss.type === 'atr' &&
-          atr !== undefined &&
-          decisionPrice <= holding.entryPrice - atr * strategy.stopLoss.value
-        ) {
-          reason = 'stop';
-        } else if (
-          strategy.takeProfit?.type === 'fixed' &&
-          decisionPrice >= holding.entryPrice * (1 + strategy.takeProfit.value)
-        ) {
-          reason = 'takeprofit';
-        } else if (
-          strategy.takeProfit?.type === 'trailing' &&
-          holding.peakDecisionPrice > holding.entryPrice &&
-          decisionPrice <= holding.peakDecisionPrice * (1 - strategy.takeProfit.value)
-        ) {
-          reason = 'takeprofit';
-        } else if (matchesSignals(bar, previousBar, strategy.exitSignals, strategy.exitCondition)) {
-          reason = 'signal';
-        }
-        if (bar.date === input.end && reason === null) reason = 'end';
-        if (reason) {
-          if (strategy.execution.price === 'nextOpen') {
-            if (!pendingOrders.has(bar.symbol))
-              pendingOrders.set(bar.symbol, { symbol: bar.symbol, side: 'sell', reason });
-          } else {
-            sell(bar, decisionPrice, reason);
+  const originalPositionStateAt = input.simulation.positionStateAt;
+  const positionStateAt: NonNullable<SimulationEngineInput['positionStateAt']> = (tick) => {
+    const position = ledger.snapshot().position;
+    const supplied = originalPositionStateAt?.(tick) ?? input.simulation.positionState;
+    return {
+      isOpen: position.quantity !== '0',
+      quantity: position.quantity,
+      averageCost: position.averageCost,
+      holdingPeriods: supplied?.holdingPeriods ?? 0,
+      availableAt: tick.availableAt ?? tick.occurredAt,
+    };
+  };
+  const execution = {
+    ...adapter.port,
+    applyMutation: onMutation,
+    onMutation: observeMutation,
+    scheduledMutationsForFill: (fill: SimulationFillRecord) => {
+      const plan = adapter.planFor(fill.orderId);
+      if (plan?.status !== 'filled') return [];
+      if (plan.ledgerFill.side === 'buy') {
+        for (const settlement of plan.settlement.ledgerSettlements) {
+          if (settlement.kind === 'position' || settlement.kind === 'both') {
+            pendingPositionSettlements.set(settlement.sourceEventId, {
+              quantity: plan.ledgerFill.quantity,
+              availableAt: settlement.availableAt,
+            });
           }
         }
-      } else if (
-        matchesSignals(bar, previousBar, strategy.entrySignals, strategy.entryCondition) &&
-        !bar.suspended
-      ) {
-        if (strategy.execution.price === 'nextOpen') {
-          if (!pendingOrders.has(bar.symbol))
-            pendingOrders.set(bar.symbol, { symbol: bar.symbol, side: 'buy', reason: 'signal' });
-        } else {
-          buy(bar, decisionPrice, valuationPrices, atr);
-        }
       }
-      previousBarBySymbol.set(bar.symbol, bar);
-    }
-
-    for (const bar of dailyBars) latestCloseBySymbol.set(bar.symbol, bar.close);
-    const value = portfolioValue(latestCloseBySymbol);
-    equityCurve.push({ date, value });
-    previousValue = value;
-  }
-
-  const returns = equityCurve.map((point, index) =>
-    index === 0
-      ? point.value / input.initialCash - 1
-      : point.value / equityCurve[index - 1]!.value - 1,
-  );
-  const metrics = {
-    ...periodMetrics(returns),
-    ...tradeMetrics(completedTrades),
-  };
-  const result: BacktestResult = {
-    engineVersion: input.engineVersion ?? 'thesis-ledger-engine-v1',
-    dataAsOf: input.dataAsOf,
-    initialCash: input.initialCash,
-    finalValue: previousValue,
-    trades,
-    equityCurve,
-    returns,
-    metrics,
-    analytics: quantStatsAnalytics(returns),
-    warnings,
-    limitations,
-    rejectedOrders,
-    completeness,
-    metadata: {
-      engineVersion: input.engineVersion ?? 'thesis-ledger-engine-v1',
-      ...(input.metadata ?? {}),
-      costModel: input.metadata?.costModel ?? strategy.cost,
+      return plan.settlement.ledgerSettlements.map((settlement: SimulationSettlement) => ({
+        type: 'cashSettlement' as const,
+        eventId: settlement.eventId,
+        occurredAt: settlement.occurredAt,
+        availableAt: settlement.availableAt,
+        payload: settlement as unknown as Record<string, unknown>,
+      }));
     },
   };
-  if (input.inSampleEnd) {
-    const split = equityCurve.reduce<{ inSample: ReturnPoint[]; outOfSample: ReturnPoint[] }>(
-      (sample, point) => {
-        (point.date <= input.inSampleEnd! ? sample.inSample : sample.outOfSample).push(point);
-        return sample;
+  const result = runDeterministicSimulation({
+    ...input.simulation,
+    positionStateAt,
+    corporateActionPort: createCorporateActionPort(
+      ledger,
+      {
+        symbol: ledger.snapshot().position.symbol,
+        market: ledger.snapshot().position.market,
+        assetType: ledger.snapshot().position.assetType,
+        currency,
       },
-      { inSample: [], outOfSample: [] },
-    );
-    result.inSample = periodMetrics(
-      split.inSample.map((point, index) =>
-        index === 0
-          ? point.value / input.initialCash - 1
-          : point.value / split.inSample[index - 1]!.value - 1,
-      ),
-    );
-    result.outOfSample = periodMetrics(
-      split.outOfSample.map((point, index) =>
-        index === 0 ? 0 : point.value / split.outOfSample[index - 1]!.value - 1,
-      ),
-    );
-  }
-  if (strategy.benchmark && !input.benchmarkBars?.length) {
-    warnings.push('基准行情不可用，已跳过基准比较');
-  } else if (input.benchmarkBars?.length) {
-    const benchmark = input.benchmarkBars.filter(
-      (bar) =>
-        bar.symbol === strategy.benchmark &&
-        bar.date >= input.start &&
-        bar.date <= input.end &&
-        (!bar.availableAt || bar.availableAt <= input.dataAsOf),
-    );
-    const strategyValues = new Map(equityCurve.map((point) => [point.date, point.value]));
-    const benchmarkValues = new Map(benchmark.map((bar) => [bar.date, bar.close]));
-    const commonDates = [...strategyValues.keys()]
-      .filter((date) => benchmarkValues.has(date))
-      .sort();
-    if (commonDates.length < 2) warnings.push('benchmark 数据不足');
-    else {
-      const strategyReturns = commonDates.slice(1).map((date, index) => {
-        const previous = strategyValues.get(commonDates[index]!) ?? 0;
-        const current = strategyValues.get(date) ?? previous;
-        return previous === 0 ? 0 : current / previous - 1;
-      });
-      const benchmarkReturns = commonDates.slice(1).map((date, index) => {
-        const previous = benchmarkValues.get(commonDates[index]!) ?? 0;
-        const current = benchmarkValues.get(date) ?? previous;
-        return previous === 0 ? 0 : current / previous - 1;
-      });
-      result.benchmark = compareBenchmark(strategyReturns, benchmarkReturns);
-    }
-  }
-  return result;
+      input.simulation.runId,
+    ),
+    execution,
+  });
+  return { ...result, ledger: ledger.snapshot(), ledgerMutations };
 };

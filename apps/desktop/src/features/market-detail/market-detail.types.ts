@@ -1,28 +1,39 @@
 import type {
   MarketDetailCapability,
-  MarketDetailResponseV2,
-  MarketDetailSectionV2,
+  MarketDetailResponse,
+  MarketDetailSection,
   MarketDetailSectionStatus,
 } from '@thesis-ledger/api-client';
-import type { BarSeriesV2, QuoteV1 } from '@thesis-ledger/schemas';
+import type { BarSeries, Quote } from '@thesis-ledger/schemas';
+import { canCombineChartSeries } from './market-chart-acquisition.js';
 
 export interface MarketDetailPosition {
   symbol: string;
-  quantity: number;
-  costPrice: number;
-  pnl: number | null;
+  quantity?: number;
+  costPrice?: number;
+  pnl?: number | null;
   asset: { name: string; assetType?: 'stock' | 'etf' | 'fund' };
 }
 
 export const mergeMarketDetail = (
-  current: MarketDetailResponseV2 | null,
-  next: MarketDetailResponseV2,
-): MarketDetailResponseV2 => {
+  current: MarketDetailResponse | null,
+  next: MarketDetailResponse,
+): MarketDetailResponse => {
   if (!current) return next;
   if (current.symbol !== next.symbol) return current;
+  const currentSeries = current.barSeries;
+  const nextSeries = next.barSeries?.points.length === 0 && currentSeries?.points.length
+    ? undefined : next.barSeries;
+  const canCombine = Boolean(currentSeries && nextSeries && canCombineChartSeries(currentSeries, nextSeries));
   const sections = { ...current.sections };
+  if (currentSeries && nextSeries && !canCombine) {
+    delete sections.bars;
+    delete sections['indicator:MA'];
+    delete sections['indicator:MACD'];
+    delete sections['indicator:RSI'];
+  }
   Object.entries(next.sections).forEach(([capability, nextSection]) => {
-    const currentSection = current.sections[capability as MarketDetailCapability];
+    const currentSection = sections[capability as MarketDetailCapability];
     const currentHasData =
       currentSection?.data !== undefined && currentSection.data !== null &&
       (currentSection.status === 'ready' || currentSection.status === 'stale');
@@ -36,16 +47,14 @@ export const mergeMarketDetail = (
     if (!preserveCurrent)
       sections[capability as MarketDetailCapability] = nextSection;
   });
-  const currentSeries = current.barSeries;
-  const nextSeries = next.barSeries;
   let mergedBarSeries = nextSeries ?? currentSeries;
-  if (currentSeries && nextSeries) {
+  if (currentSeries && nextSeries && canCombine) {
     // BarSeries 的 timestamp 可能在不同适配器间使用不同 ISO 表达，但图表语义按交易日
     // 合并；同日重叠项必须由本次有效响应替换，不能因时刻字符串不同而重复一根 bar。
     const byDate = new Map(currentSeries.points.map((bar) => [bar.timestamp.slice(0, 10), bar]));
     nextSeries.points.forEach((bar) => byDate.set(bar.timestamp.slice(0, 10), bar));
     const points = [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    const mergedSeries: BarSeriesV2 = {
+    const mergedSeries: BarSeries = {
       ...nextSeries,
       points,
       coverage: {
@@ -59,7 +68,7 @@ export const mergeMarketDetail = (
     sections.bars = {
       ...next.sections.bars!,
       data: mergedSeries,
-    } as MarketDetailSectionV2;
+    } as MarketDetailSection;
   }
   return {
     ...next,
@@ -71,8 +80,8 @@ export const mergeMarketDetail = (
 };
 
 export const getVisibleMarketDetail = (
-  detail: MarketDetailResponseV2 | null,
-  queryData: MarketDetailResponseV2 | undefined,
+  detail: MarketDetailResponse | null,
+  queryData: MarketDetailResponse | undefined,
   symbol: string,
 ) => {
   if (detail?.symbol === symbol) return detail;
@@ -81,7 +90,7 @@ export const getVisibleMarketDetail = (
 };
 
 export const getMarketDetailSection = <T>(
-  detail: MarketDetailResponseV2 | null,
+  detail: MarketDetailResponse | null,
   capability: MarketDetailCapability,
 ) => {
   const section = detail?.sections[capability];
@@ -112,7 +121,7 @@ export const marketDetailSectionTitle = (capability: MarketDetailCapability) => 
   return `技术指标 ${capability.slice('indicator:'.length)}`;
 };
 
-export const isRetryableMarketDetailSection = (section: MarketDetailSectionV2 | undefined) =>
+export const isRetryableMarketDetailSection = (section: MarketDetailSection | undefined) =>
   section?.status === 'unavailable';
 
 /**
@@ -127,7 +136,7 @@ export const isRetryableMarketDetailSection = (section: MarketDetailSectionV2 | 
 export const MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS = 600;
 
 /** 以「这份行情被取回多久了」为口径，市场休市时 marketTime 可能远早于当前时间。 */
-export const quoteServedAgeMs = (quote: QuoteV1 | undefined, now = Date.now()) => {
+export const quoteServedAgeMs = (quote: Quote | undefined, now = Date.now()) => {
   if (!quote) return null;
   const parsed = Date.parse(quote.fetchedAt ?? quote.marketTime);
   if (!Number.isFinite(parsed)) return null;
@@ -135,7 +144,7 @@ export const quoteServedAgeMs = (quote: QuoteV1 | undefined, now = Date.now()) =
 };
 
 export const isQuoteWithinUpstreamRefreshWindow = (
-  quote: QuoteV1 | undefined,
+  quote: Quote | undefined,
   now = Date.now(),
 ) => {
   const age = quoteServedAgeMs(quote, now);

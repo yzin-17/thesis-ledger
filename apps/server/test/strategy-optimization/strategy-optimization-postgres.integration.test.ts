@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
@@ -173,7 +173,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   const insertAdoptableCandidate = async (
     baselineVersionId: string,
     version: number,
-    candidateSchema: StrategySchemaV2,
+    candidateSchema: BacktestStrategy,
   ) => {
     const candidateVersion = await prisma.strategyVersion.create({
       data: {
@@ -447,7 +447,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
 
   it('Provider 调用步骤在 PostgreSQL 中 crash-safe：调用前持久化、单 worker、成功去重、过期转 unknown 且预算不重复扣除', async () => {
     const baselineVersion = await prisma.strategyVersion.findUniqueOrThrow({ where: { id: version2Id } });
-    const baseline = { ...baselineVersion, strategy: strategySchemaV2.parse(baselineVersion.schema) as StrategySchemaV2 };
+    const baseline = { ...baselineVersion, strategy: strategySchema.parse(baselineVersion.schema) as BacktestStrategy };
     const descriptors = describeStrategyParameters(baseline.strategy);
     const runs = new StrategyOptimizationRunService(prisma, backtests as never);
     const route = { provider: provider.id, model: provider.models[0]! };

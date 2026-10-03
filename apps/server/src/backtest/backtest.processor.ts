@@ -29,9 +29,9 @@ export default async function processBacktest(job: Job<BacktestQueueData>) {
   }
 
   try {
-    return await service.run(job.data.jobId, undefined, {
+    return await service.runCurrent(job.data.jobId, {
       attempt: prepared.ownerAttempt,
-      maxAttempts: BACKTEST_MAX_ATTEMPTS,
+      maxAttempts: prepared.maxAttempts,
     });
   } catch (error) {
     if (error && typeof error === 'object' && 'unrecoverable' in error) {

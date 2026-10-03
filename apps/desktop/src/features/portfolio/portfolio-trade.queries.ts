@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import type { TradeListQueryV2 } from '@thesis-ledger/api-client';
+import type { TradeListQuery } from '@thesis-ledger/api-client';
 import { fetchPortfolioTrade, fetchPortfolioTrades } from './portfolio-trade.api.js';
 import type { PortfolioMode } from './portfolio.types.js';
 
@@ -36,7 +36,7 @@ export const usePortfolioTradesQuery = ({
     queryKey: portfolioTradeKeys.list(mode, accountId ?? '', normalizedSymbol, normalizedLifecycle),
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => {
-      const params: Partial<TradeListQueryV2> = {
+      const params: Partial<TradeListQuery> = {
         mode,
         ...(accountId ? { accountId } : {}),
         ...(normalizedSymbol ? { symbol: normalizedSymbol } : {}),

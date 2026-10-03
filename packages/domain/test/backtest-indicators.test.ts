@@ -97,6 +97,7 @@ describe('backtest Series and Indicator domain', () => {
       params: { period: 2 },
     };
     expect(requiredLookback(expression)).toBe(5);
+    expect(requiredLookback({ type: 'corporateActionEvent', eventType: 'CASH_DIVIDEND' })).toBe(1);
     const result = evaluateIndicatorWithWarmup(
       'MA',
       series([point('2025-01-01', '1'), point('2025-01-02', '2')]),

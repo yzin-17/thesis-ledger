@@ -1,25 +1,23 @@
-import type { LedgerEventV2 as DomainLedgerEventV2 } from '@thesis-ledger/domain';
+import type { LedgerEvent as DomainLedgerEventV2 } from '@thesis-ledger/domain';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
-  createCashFlowCommandSchemaV2,
-  createCashTransferCommandSchemaV2,
-  createExecutionCommandSchemaV2,
-  createTradeOpeningBoundaryAssertionCommandSchemaV2,
-  cashFlowPayloadSchemaV2,
+  createCashFlowCommandSchema,
+  createCashTransferCommandSchema,
+  createExecutionCommandSchema,
+  createTradeOpeningBoundaryAssertionCommandSchema,
+  cashFlowPayloadSchema,
   decimalStringSchema,
-  legacyMigratedCashTransferEventSchemaV2,
-  legacyMigratedCashTransferPayloadSchemaV2,
-  ledgerCommandErrorSchemaV2,
-  ledgerEventEnvelopeSchemaV2,
-  ledgerCommandResponseSchemaV2,
-  moneySchemaV2,
-  moveExecutionAccountCommandSchemaV2,
+  ledgerCommandErrorSchema,
+  ledgerEventEnvelopeSchema,
+  ledgerCommandResponseSchema,
+  moneySchema,
+  moveExecutionAccountCommandSchema,
   positiveDecimalStringSchema,
-  type LedgerEventV2,
-} from '../src/ledger-v2.js';
+  type LedgerEvent,
+} from '../src/ledger-contract.js';
 
 const baseEnvelope = {
-  version: 2 as const,
+  version: 3 as const,
   eventId: '11111111-1111-4111-8111-111111111111',
   factId: '22222222-2222-4222-8222-222222222222',
   accountId: '33333333-3333-4333-8333-333333333333',
@@ -38,14 +36,32 @@ const baseEnvelope = {
   actorId: 'user-1',
 };
 
-describe('LedgerEvent V2 契约', () => {
+describe('Ledger 当前事件信封', () => {
+  it('旧信封版本不能作为当前事件读取', () => {
+    const event = {
+      ...baseEnvelope,
+      version: 2,
+      type: 'BUY_EXECUTION',
+      revisionAction: 'CREATE',
+      payload: {
+        symbol: 'AAPL.US',
+        quantity: '1',
+        price: '200',
+        currency: 'USD',
+        capabilityVerification: 'VERIFIED',
+        charges: [],
+      },
+    };
+    expect(ledgerEventEnvelopeSchema.safeParse(event).success).toBe(false);
+  });
+
   it('与领域层 LedgerEvent 类型保持双向兼容', () => {
-    expectTypeOf<LedgerEventV2>().toMatchTypeOf<DomainLedgerEventV2>();
-    expectTypeOf<DomainLedgerEventV2>().toMatchTypeOf<LedgerEventV2>();
+    expectTypeOf<LedgerEvent>().toMatchTypeOf<DomainLedgerEventV2>();
+    expectTypeOf<DomainLedgerEventV2>().toMatchTypeOf<LedgerEvent>();
   });
 
   it('接受使用十进制字符串和多币种费用的真实买入', () => {
-    const parsed = ledgerEventEnvelopeSchemaV2.parse({
+    const parsed = ledgerEventEnvelopeSchema.parse({
       ...baseEnvelope,
       type: 'BUY_EXECUTION',
       revisionAction: 'CREATE',
@@ -73,7 +89,7 @@ describe('LedgerEvent V2 契约', () => {
   });
 
   it('接受精确建仓时间补录事件并保留目标快照引用', () => {
-    const parsed = ledgerEventEnvelopeSchemaV2.parse({
+    const parsed = ledgerEventEnvelopeSchema.parse({
       ...baseEnvelope,
       type: 'TRADE_OPENING_BOUNDARY_ASSERTION',
       revisionAction: 'CREATE',
@@ -90,7 +106,7 @@ describe('LedgerEvent V2 契约', () => {
   });
 
   it('接受日期级精度和明确经济排序键', () => {
-    const parsed = ledgerEventEnvelopeSchemaV2.parse({
+    const parsed = ledgerEventEnvelopeSchema.parse({
       ...baseEnvelope,
       occurredAt: '2025-06-01',
       timePrecision: 'DATE',
@@ -112,7 +128,7 @@ describe('LedgerEvent V2 契约', () => {
   });
 
   it('允许迁移事实保留未知来源时间精度和时区', () => {
-    const parsed = ledgerEventEnvelopeSchemaV2.parse({
+    const parsed = ledgerEventEnvelopeSchema.parse({
       ...baseEnvelope,
       timePrecision: 'UNKNOWN',
       sourceTimezone: 'UNKNOWN',
@@ -147,7 +163,7 @@ describe('LedgerEvent V2 契约', () => {
       },
     };
 
-    expect(() => ledgerEventEnvelopeSchemaV2.parse(event)).toThrow();
+    expect(() => ledgerEventEnvelopeSchema.parse(event)).toThrow();
   });
 
   it('要求替代版本引用链末端并填写原因', () => {
@@ -166,9 +182,9 @@ describe('LedgerEvent V2 契约', () => {
       },
     };
 
-    expect(() => ledgerEventEnvelopeSchemaV2.parse(replacement)).toThrow('supersedesEventId');
+    expect(() => ledgerEventEnvelopeSchema.parse(replacement)).toThrow('supersedesEventId');
     expect(() =>
-      ledgerEventEnvelopeSchemaV2.parse({
+      ledgerEventEnvelopeSchema.parse({
         ...replacement,
         supersedesEventId: baseEnvelope.eventId,
       }),
@@ -176,7 +192,7 @@ describe('LedgerEvent V2 契约', () => {
   });
 
   it('作废版本不携带 payload，恢复版本必须携带完整 payload', () => {
-    const voided = ledgerEventEnvelopeSchemaV2.parse({
+    const voided = ledgerEventEnvelopeSchema.parse({
       ...baseEnvelope,
       eventId: '44444444-4444-4444-8444-444444444444',
       type: 'BUY_EXECUTION',
@@ -188,7 +204,7 @@ describe('LedgerEvent V2 契约', () => {
     expect('payload' in voided).toBe(false);
 
     expect(() =>
-      ledgerEventEnvelopeSchemaV2.parse({
+      ledgerEventEnvelopeSchema.parse({
         ...baseEnvelope,
         eventId: '55555555-5555-4555-8555-555555555555',
         type: 'BUY_EXECUTION',
@@ -201,7 +217,7 @@ describe('LedgerEvent V2 契约', () => {
 
   it('验证 Baseline 对账和拆股的类型化载荷', () => {
     expect(
-      ledgerEventEnvelopeSchemaV2.parse({
+      ledgerEventEnvelopeSchema.parse({
         ...baseEnvelope,
         type: 'BASELINE_RECONCILIATION',
         revisionAction: 'CREATE',
@@ -217,7 +233,7 @@ describe('LedgerEvent V2 契约', () => {
     ).toBe('BASELINE_RECONCILIATION');
 
     expect(
-      ledgerEventEnvelopeSchemaV2.parse({
+      ledgerEventEnvelopeSchema.parse({
         ...baseEnvelope,
         type: 'SPLIT',
         revisionAction: 'CREATE',
@@ -271,7 +287,7 @@ describe('LedgerEvent V2 契约', () => {
       },
     ],
   ] as const)('接受 %s 的专用载荷', (type, payload) => {
-    const parsed = ledgerEventEnvelopeSchemaV2.parse({
+    const parsed = ledgerEventEnvelopeSchema.parse({
       ...baseEnvelope,
       type,
       revisionAction: 'CREATE',
@@ -283,7 +299,7 @@ describe('LedgerEvent V2 契约', () => {
 
   it('拒绝事件类型与载荷字段混用', () => {
     expect(() =>
-      ledgerEventEnvelopeSchemaV2.parse({
+      ledgerEventEnvelopeSchema.parse({
         ...baseEnvelope,
         type: 'DIVIDEND',
         revisionAction: 'CREATE',
@@ -301,7 +317,7 @@ describe('LedgerEvent V2 契约', () => {
 
   it('拒绝现金余额观察携带基线批次引用', () => {
     expect(() =>
-      ledgerEventEnvelopeSchemaV2.parse({
+      ledgerEventEnvelopeSchema.parse({
         ...baseEnvelope,
         type: 'CASH_BALANCE_OBSERVATION',
         revisionAction: 'CREATE',
@@ -318,7 +334,7 @@ describe('LedgerEvent V2 契约', () => {
 describe('账本命令错误码', () => {
   it('接受稳定错误码和字符串 Revision', () => {
     expect(
-      ledgerCommandErrorSchemaV2.parse({
+      ledgerCommandErrorSchema.parse({
         errorCode: 'LEDGER_REVISION_CONFLICT',
         message: '账本已变更，请刷新后重试',
         accountId: baseEnvelope.accountId,
@@ -329,7 +345,7 @@ describe('账本命令错误码', () => {
 
   it('拒绝未定义错误码和数字 Revision', () => {
     expect(() =>
-      ledgerCommandErrorSchemaV2.parse({
+      ledgerCommandErrorSchema.parse({
         errorCode: 'CONFLICT',
         message: '冲突',
         currentLedgerRevision: 2,
@@ -360,9 +376,9 @@ describe('成交命令契约', () => {
   };
 
   it('接受专用成交命令并要求稳定 externalId', () => {
-    expect(createExecutionCommandSchemaV2.parse(command).side).toBe('BUY');
+    expect(createExecutionCommandSchema.parse(command).side).toBe('BUY');
     expect(() =>
-      createExecutionCommandSchemaV2.parse({
+      createExecutionCommandSchema.parse({
         ...command,
         source: { category: 'MANUAL', channel: 'desktop' },
       }),
@@ -371,7 +387,7 @@ describe('成交命令契约', () => {
 
   it('拒绝命令时间值与精度不一致', () => {
     expect(() =>
-      createExecutionCommandSchemaV2.parse({
+      createExecutionCommandSchema.parse({
         ...command,
         occurredAt: '2026-08-26',
         timePrecision: 'INSTANT',
@@ -381,7 +397,7 @@ describe('成交命令契约', () => {
 
   it('跨账户更正必须使用两个不同账户与字符串 Revision', () => {
     expect(() =>
-      moveExecutionAccountCommandSchemaV2.parse({
+      moveExecutionAccountCommandSchema.parse({
         ...command,
         command: 'MOVE_EXECUTION_ACCOUNT',
         sourceAccountId: baseEnvelope.accountId,
@@ -396,7 +412,7 @@ describe('成交命令契约', () => {
 
   it('命令响应保留超过 JavaScript 安全整数的版本', () => {
     expect(
-      ledgerCommandResponseSchemaV2.parse({
+      ledgerCommandResponseSchema.parse({
         eventIds: [baseEnvelope.eventId],
         factIds: [baseEnvelope.factId],
         ledgerRevisions: { [baseEnvelope.accountId]: '9007199254740993' },
@@ -426,7 +442,7 @@ describe('建仓时间补录命令契约', () => {
   };
 
   it('接受精确时间和补录依据', () => {
-    expect(createTradeOpeningBoundaryAssertionCommandSchemaV2.parse(command)).toMatchObject({
+    expect(createTradeOpeningBoundaryAssertionCommandSchema.parse(command)).toMatchObject({
       command: 'CREATE_TRADE_OPENING_BOUNDARY_ASSERTION',
       timePrecision: 'INSTANT',
     });
@@ -434,17 +450,17 @@ describe('建仓时间补录命令契约', () => {
 
   it('拒绝日期精度、缺少原因或客户端传入 tradeId', () => {
     expect(() =>
-      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse({
+      createTradeOpeningBoundaryAssertionCommandSchema.parse({
         ...command,
         timePrecision: 'DATE',
         occurredAt: '2026-08-26',
       }),
     ).toThrow();
     expect(() =>
-      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse({ ...command, reason: '' }),
+      createTradeOpeningBoundaryAssertionCommandSchema.parse({ ...command, reason: '' }),
     ).toThrow();
     expect(() =>
-      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse({
+      createTradeOpeningBoundaryAssertionCommandSchema.parse({
         ...command,
         payload: { ...command.payload, tradeId: 'client-controlled-trade' },
       }),
@@ -473,12 +489,12 @@ describe('现金流与现金划转命令契约', () => {
   };
 
   it('外部现金流命令拒绝 TRANSFER 类别', () => {
-    expect(createCashFlowCommandSchemaV2.parse(cashCommand).payload).toMatchObject({
+    expect(createCashFlowCommandSchema.parse(cashCommand).payload).toMatchObject({
       category: 'DEPOSIT',
       expectedAt: '2026-08-27T02:30:00.000Z',
     });
     expect(() =>
-      createCashFlowCommandSchemaV2.parse({
+      createCashFlowCommandSchema.parse({
         ...cashCommand,
         payload: {
           ...cashCommand.payload,
@@ -511,20 +527,20 @@ describe('现金流与现金划转命令契约', () => {
       source: baseEnvelope.source,
       actorId: baseEnvelope.actorId,
     };
-    expect(createCashTransferCommandSchemaV2.parse(transfer)).toMatchObject({
+    expect(createCashTransferCommandSchema.parse(transfer)).toMatchObject({
       amount: '500.00',
       expectedAt: '2026-08-27T02:30:00.000Z',
     });
     expect(() =>
-      createCashTransferCommandSchemaV2.parse({
+      createCashTransferCommandSchema.parse({
         ...transfer,
         targetAccountId: transfer.sourceAccountId,
       }),
     ).toThrow('源账户');
-    expect(() => createCashTransferCommandSchemaV2.parse({ ...transfer, amount: '0' })).toThrow();
+    expect(() => createCashTransferCommandSchema.parse({ ...transfer, amount: '0' })).toThrow();
   });
 
-  it('将历史迁移划转兼容契约与新的划转载荷契约隔离', () => {
+  it('拒绝缺少 transfer 元数据的历史划转载荷', () => {
     const legacyPayload = {
       direction: 'INFLOW' as const,
       category: 'TRANSFER' as const,
@@ -532,23 +548,22 @@ describe('现金流与现金划转命令契约', () => {
       currency: 'CNY' as const,
     };
 
-    expect(() => cashFlowPayloadSchemaV2.parse(legacyPayload)).toThrow('transfer');
-    expect(legacyMigratedCashTransferPayloadSchemaV2.parse(legacyPayload)).toEqual(legacyPayload);
+    expect(() => cashFlowPayloadSchema.parse(legacyPayload)).toThrow('transfer');
     expect(
-      legacyMigratedCashTransferEventSchemaV2.parse({
+      ledgerEventEnvelopeSchema.safeParse({
         ...baseEnvelope,
         actorId: 'migration:legacy-ledger-v2',
         type: 'CASH_FLOW',
         revisionAction: 'CREATE',
         payload: legacyPayload,
-      }).payload,
-    ).toEqual(legacyPayload);
+      }).success,
+    ).toBe(false);
   });
 });
 
 describe('十进制字符串', () => {
   it('保留 Money 金额的原始十进制精度', () => {
-    expect(moneySchemaV2.parse({ amount: '100.2300', currency: 'CNY' })).toEqual({
+    expect(moneySchema.parse({ amount: '100.2300', currency: 'CNY' })).toEqual({
       amount: '100.2300',
       currency: 'CNY',
     });

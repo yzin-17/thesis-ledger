@@ -1,8 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
-  type LedgerCommandErrorCodeV2,
-  type LedgerCommandResponseV2,
-  type LedgerEventV2,
+  type LedgerCommandErrorCode,
+  type LedgerCommandResponse,
+  type LedgerEvent,
 } from '@thesis-ledger/schemas';
 import { Prisma } from '@prisma/client';
 import { isEqual } from 'es-toolkit';
@@ -15,34 +15,34 @@ import {
 import { rebuildLedgerProjection } from './ledger-projection.js';
 
 export type CashFlowPayloadEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   { type: 'CASH_FLOW'; revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE' }
 >;
 export type CashFlowVoidEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   { revisionAction: 'VOID' }
 > & { type: 'CASH_FLOW' };
 export type CashFlowLedgerEvent = CashFlowPayloadEvent | CashFlowVoidEvent;
 
 export type SingleCashMutation = {
-  event: LedgerEventV2;
+  event: LedgerEvent;
   replay: boolean;
   projectionGeneration?: string;
 };
 
 export type PairedCashMutation = {
-  events: LedgerEventV2[];
+  events: LedgerEvent[];
   replay: boolean;
   projectionGenerations?: Record<string, string>;
 };
 
 type IdempotentReplay = {
-  event: LedgerEventV2;
+  event: LedgerEvent;
   projectionGeneration: string;
 };
 
 export const cashLedgerConflict = (
-  errorCode: LedgerCommandErrorCodeV2,
+  errorCode: LedgerCommandErrorCode,
   message: string,
   accountId?: string,
   currentLedgerRevision?: string,
@@ -71,16 +71,16 @@ type LedgerEventBaseInput = {
   accountId: string;
   ledgerRevision: bigint;
   occurredAt: string | null;
-  timePrecision: LedgerEventV2['timePrecision'];
+  timePrecision: LedgerEvent['timePrecision'];
   sourceTimezone: string;
   economicOrderKey: string;
-  source: LedgerEventV2['source'];
+  source: LedgerEvent['source'];
   actorId: string;
   payloadVersion?: number;
 };
 
 export const createCashLedgerEventBase = (input: LedgerEventBaseInput) => ({
-  version: 2 as const,
+  version: 3 as const,
   accountId: input.accountId,
   ledgerRevision: input.ledgerRevision.toString(),
   occurredAt: input.occurredAt,
@@ -93,7 +93,7 @@ export const createCashLedgerEventBase = (input: LedgerEventBaseInput) => ({
   actorId: input.actorId,
 });
 
-const eventFingerprint = (event: LedgerEventV2) => ({
+const eventFingerprint = (event: LedgerEvent) => ({
   accountId: event.accountId,
   type: event.type,
   occurredAt: event.occurredAt,
@@ -231,7 +231,7 @@ export class CashLedgerCommandSupport {
 
   async findIdempotentReplay(
     context: AccountLedgerWriteContext,
-    desired: LedgerEventV2,
+    desired: LedgerEvent,
   ): Promise<IdempotentReplay | undefined> {
     const externalId = desired.source.externalId;
     if (externalId === undefined) return undefined;
@@ -271,7 +271,7 @@ export class CashLedgerCommandSupport {
   singleResponse(
     mutation: SingleCashMutation,
     result: { ledgerRevision: string; projectionGeneration: string },
-  ): LedgerCommandResponseV2 {
+  ): LedgerCommandResponse {
     const event = mutation.event;
     return {
       eventIds: [event.eventId],
@@ -291,7 +291,7 @@ export class CashLedgerCommandSupport {
       ledgerRevisions: Record<string, string>;
       projectionGenerations: Record<string, string>;
     },
-  ): LedgerCommandResponseV2 {
+  ): LedgerCommandResponse {
     return {
       eventIds: mutation.events.map((event) => event.eventId),
       factIds: mutation.events.map((event) => event.factId),

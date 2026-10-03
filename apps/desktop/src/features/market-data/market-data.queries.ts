@@ -4,14 +4,16 @@ import {
   fetchCatalogStatus,
   fetchMarketPolicy,
   fetchMarketProviders,
+  fetchMarketRouteCapabilitiesV3,
   searchMarketInstruments,
 } from './market-data.api.js';
-import type { CatalogStatus } from './market-data.types.js';
+import { catalogJobPollingInterval } from './catalog-job-response.js';
 
 export const marketDataKeys = {
   root: ['desktop', 'market-data'] as const,
   policy: () => [...marketDataKeys.root, 'policy'] as const,
   providers: () => [...marketDataKeys.root, 'providers'] as const,
+  routeCapabilities: () => [...marketDataKeys.root, 'route-capabilities-v3'] as const,
   catalog: () => [...marketDataKeys.root, 'catalog'] as const,
   catalogJob: (jobId: string) => [...marketDataKeys.catalog(), 'job', jobId] as const,
   search: (query: string) => [...marketDataKeys.root, 'instruments', query] as const,
@@ -23,12 +25,15 @@ export const useMarketDataQueries = () => {
     queryKey: marketDataKeys.providers(),
     queryFn: fetchMarketProviders,
   });
+  const routeCapabilities = useQuery({
+    queryKey: marketDataKeys.routeCapabilities(),
+    queryFn: fetchMarketRouteCapabilitiesV3,
+    retry: false,
+    staleTime: 0,
+  });
   const catalog = useQuery({ queryKey: marketDataKeys.catalog(), queryFn: fetchCatalogStatus });
-  return { policy, providers, catalog };
+  return { policy, providers, routeCapabilities, catalog };
 };
-
-const terminalCatalogState = (status: CatalogStatus | undefined) =>
-  Boolean(status?.acknowledged) || status?.status === 'failed' || status?.status === 'timeout';
 
 export const useCatalogJobQuery = (jobId: string | null) =>
   useQuery({
@@ -38,7 +43,11 @@ export const useCatalogJobQuery = (jobId: string | null) =>
       return fetchCatalogJob(jobId);
     },
     enabled: Boolean(jobId),
-    refetchInterval: (query) => (terminalCatalogState(query.state.data) ? false : 1_500),
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: (query) =>
+      catalogJobPollingInterval(query.state.data, query.state.status === 'error'),
     refetchIntervalInBackground: true,
   });
 

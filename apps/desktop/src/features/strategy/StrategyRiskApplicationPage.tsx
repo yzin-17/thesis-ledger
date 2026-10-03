@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { strategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema } from '@thesis-ledger/schemas';
 import { AlertTriangle, ArrowLeft, Bell, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Link, useBeforeUnload, useBlocker, useNavigate, useParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -84,7 +84,7 @@ export function StrategyRiskApplicationPage({
   const queryClient = useQueryClient();
   const toast = useToastManager();
   const source = findStrategyVersion(strategies, strategyId, versionId);
-  const parsed = source?.version.schema ? strategySchemaV2.safeParse(source.version.schema) : null;
+  const parsed = source?.version.schema ? strategySchema.safeParse(source.version.schema) : null;
   const symbol = parsed?.success ? parsed.data.executionInstrument.symbol : '';
   const [accountId, setAccountId] = useState('');
   const [cycleMode, setCycleMode] = useState<RiskCycleMode>('existingAndFuture');

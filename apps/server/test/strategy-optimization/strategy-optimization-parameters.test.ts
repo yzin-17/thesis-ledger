@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import {
   applyOptimizationProposal,
   describeStrategyParameters,
 } from '../../src/strategy-optimization/strategy-optimization-parameters.js';
 
-const baseline = strategySchemaV2.parse({
+const baseline = strategySchema.parse({
   schemaVersion: '2',
   name: '参数优化基线',
   signalSources: [
@@ -37,7 +37,7 @@ const baseline = strategySchemaV2.parse({
     timing: 'nextEligibleBarOpen',
   },
   cost: { commissionRate: '0.0003', slippageRate: '0.001' },
-}) as StrategySchemaV2;
+}) as BacktestStrategy;
 
 describe('strategy optimization parameters', () => {
   it('exposes stable parameter ids and authorized optimization ranges', () => {

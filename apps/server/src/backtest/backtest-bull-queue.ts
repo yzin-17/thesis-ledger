@@ -4,7 +4,7 @@ import { Redis } from 'ioredis';
 import { loadConfig } from '../platform/config.js';
 import type { BacktestQueueTransport } from './backtest-queue.service.js';
 
-export const BACKTEST_QUEUE_NAME = 'backtest-v1';
+export const BACKTEST_QUEUE_NAME = 'backtest-run';
 export const BACKTEST_JOB_NAME = 'run';
 export const BACKTEST_MAX_ATTEMPTS = 3;
 
@@ -52,6 +52,10 @@ export class BacktestBullQueue implements BacktestQueueTransport, OnModuleDestro
   }
 
   async onModuleDestroy() {
-    await this.queue.close();
+    try {
+      await this.queue.close();
+    } finally {
+      this.connection.disconnect();
+    }
   }
 }

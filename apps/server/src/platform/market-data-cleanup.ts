@@ -15,20 +15,14 @@ export const MARKET_CLEANUP_TABLES = [
   'PortfolioSnapshot',
   'BacktestJob',
   'BackfillJob',
-  'MarketBarSeriesCoverage',
-  'MarketBarSeriesFact',
   'MarketBar',
 ] as const;
 
 /** Redis 只清理行情模块自己的前缀，禁止使用 FLUSHDB。 */
 export const MARKET_CLEANUP_REDIS_PREFIXES = [
   redisKey('cache', 'bars:'),
-  redisKey('cache', 'bars-v2:'),
-  redisKey('cache', 'indicator:'),
   redisKey('cache', 'market-indicators-v2:'),
-  redisKey('lock', 'market-bars-v2:'),
-  redisKey('lock', 'market-circuit-v2:'),
-  redisKey('cache', 'market-circuit-v2:'),
+  redisKey('cache', 'market-indicators-v3:'),
 ] as const;
 
 const CLEANUP_SQL = [
@@ -44,8 +38,6 @@ const CLEANUP_SQL = [
        EXECUTE 'DELETE FROM "BackfillJob"';
      END IF;
    END $$`,
-  'DELETE FROM "MarketBarSeriesCoverage"',
-  'DELETE FROM "MarketBarSeriesFact"',
   `DO $$ BEGIN
      IF to_regclass('public."MarketBar"') IS NOT NULL THEN
        EXECUTE 'DELETE FROM "MarketBar"';

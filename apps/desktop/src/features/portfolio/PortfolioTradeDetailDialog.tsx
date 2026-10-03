@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { TradeSummaryResponseV2 } from '@thesis-ledger/api-client';
+import type { TradeSummaryResponse } from '@thesis-ledger/api-client';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,7 +26,7 @@ export function PortfolioTradeDetailDialog({
   onOpenChange,
   onReview,
 }: {
-  trade: TradeSummaryResponseV2 | null;
+  trade: TradeSummaryResponse | null;
   accounts: Account[];
   mode: PortfolioMode;
   open: boolean;

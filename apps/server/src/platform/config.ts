@@ -1,37 +1,61 @@
 import { z } from 'zod';
+import { isAbsolute } from 'node:path';
 
 export const DEFAULT_AI_TIMEOUT_MS = 120_000;
 
-const configSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
-  DATABASE_URL: z.url(),
-  REDIS_URL: z.url(),
-  DSA_BASE_URL: z.url(),
-  DSA_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
-  PROVIDER_HEALTH_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
-  THESIS_LEDGER_DSA_TOKEN: z.string().min(1),
-  THESIS_LEDGER_CONTROL_TOKEN: z.string().min(1).optional(),
-  CORS_ORIGINS: z.string().default(''),
-  CREDENTIAL_ENCRYPTION_KEY: z.string().min(16),
-  ERROR_TRACKING_URL: z.url().optional().or(z.literal('')),
-  AI_PROVIDER_ID: z.string().trim().min(1).optional(),
-  AI_BASE_URL: z.url().optional(),
-  AI_API_KEY: z.string().trim().min(1).optional(),
-  AI_MODEL: z.string().trim().min(1).optional(),
-  AI_PROVIDER_CONFIGS_JSON: z.string().trim().min(1).optional(),
-  AI_RESEARCH_POLICY_JSON: z.string().trim().min(1).optional(),
-  AI_GENERATION_RUNTIME: z.literal('sdk').default('sdk'),
-  AI_RESEARCH_EXECUTION_ENABLED: z.enum(['true', 'false']).default('true'),
-  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(DEFAULT_AI_TIMEOUT_MS),
-  AI_FIXTURE_ENABLED: z.enum(['true', 'false']).default('false'),
-  STRATEGY_RISK_APPLICATIONS_ENABLED: z.enum(['true', 'false']).default('true'),
-  STRATEGY_AI_OPTIMIZATION_ENABLED: z.enum(['true', 'false']).default('true'),
-  PROJECTION_READ_MODE: z.enum(['legacy', 'shadow', 'unified']).default('unified'),
-  PROJECTION_SWITCH_STAGE: z
-    .enum(['trade-query', 'account-data', 'portfolio', 'journal'])
-    .default('journal'),
-});
+const configSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    PORT: z.coerce.number().int().positive().default(3000),
+    DATABASE_URL: z.url(),
+    REDIS_URL: z.url(),
+    DSA_BASE_URL: z.url(),
+    DSA_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+    MARKET_CHART_COMPATIBILITY_FILE: z.string().min(1).refine(isAbsolute).optional(),
+    MARKET_CHART_COMPATIBILITY_SHA256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    MARKET_PIT_RECONSTRUCTION_FILE: z.string().min(1).refine(isAbsolute).optional(),
+    MARKET_PIT_RECONSTRUCTION_SHA256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    PROVIDER_HEALTH_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
+    THESIS_LEDGER_DSA_TOKEN: z.string().min(1),
+    THESIS_LEDGER_CONTROL_TOKEN: z.string().min(1).optional(),
+    CORS_ORIGINS: z.string().default(''),
+    CREDENTIAL_ENCRYPTION_KEY: z.string().min(16),
+    ERROR_TRACKING_URL: z.url().optional().or(z.literal('')),
+    AI_PROVIDER_ID: z.string().trim().min(1).optional(),
+    AI_BASE_URL: z.url().optional(),
+    AI_API_KEY: z.string().trim().min(1).optional(),
+    AI_MODEL: z.string().trim().min(1).optional(),
+    AI_PROVIDER_CONFIGS_JSON: z.string().trim().min(1).optional(),
+    AI_RESEARCH_POLICY_JSON: z.string().trim().min(1).optional(),
+    AI_GENERATION_RUNTIME: z.literal('sdk').default('sdk'),
+    AI_RESEARCH_EXECUTION_ENABLED: z.enum(['true', 'false']).default('true'),
+    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(DEFAULT_AI_TIMEOUT_MS),
+    AI_FIXTURE_ENABLED: z.enum(['true', 'false']).default('false'),
+    STRATEGY_RISK_APPLICATIONS_ENABLED: z.enum(['true', 'false']).default('true'),
+    STRATEGY_AI_OPTIMIZATION_ENABLED: z.enum(['true', 'false']).default('true'),
+    PROJECTION_READ_MODE: z.enum(['legacy', 'shadow', 'unified']).default('unified'),
+    PROJECTION_SWITCH_STAGE: z
+      .enum(['trade-query', 'account-data', 'portfolio', 'journal'])
+      .default('journal'),
+  })
+  .superRefine((value, context) => {
+    if (
+      Boolean(value.MARKET_CHART_COMPATIBILITY_FILE) !==
+      Boolean(value.MARKET_CHART_COMPATIBILITY_SHA256)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['MARKET_CHART_COMPATIBILITY_FILE'],
+        message: '证明文件与摘要必须成对配置',
+      });
+    }
+    if (Boolean(value.MARKET_PIT_RECONSTRUCTION_FILE) !== Boolean(value.MARKET_PIT_RECONSTRUCTION_SHA256)) {
+      context.addIssue({ code: 'custom', path: ['MARKET_PIT_RECONSTRUCTION_FILE'], message: '历史重建清单与摘要必须成对配置' });
+    }
+  });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
 
@@ -48,7 +72,17 @@ export const parseConfig = (environment: Record<string, string | undefined>) => 
     redisUrl: parsed.data.REDIS_URL,
     dsaBaseUrl: parsed.data.DSA_BASE_URL,
     dsaTimeoutMs: parsed.data.DSA_TIMEOUT_MS,
+    ...(parsed.data.MARKET_CHART_COMPATIBILITY_FILE
+      ? {
+          marketChartCompatibilityFile: parsed.data.MARKET_CHART_COMPATIBILITY_FILE,
+          marketChartCompatibilitySha256: parsed.data.MARKET_CHART_COMPATIBILITY_SHA256!,
+        }
+      : {}),
     providerHealthCheckIntervalMs: parsed.data.PROVIDER_HEALTH_CHECK_INTERVAL_MS,
+    ...(parsed.data.MARKET_PIT_RECONSTRUCTION_FILE
+      ? { marketPitReconstructionFile: parsed.data.MARKET_PIT_RECONSTRUCTION_FILE,
+          marketPitReconstructionSha256: parsed.data.MARKET_PIT_RECONSTRUCTION_SHA256! }
+      : {}),
     dsaToken: parsed.data.THESIS_LEDGER_DSA_TOKEN,
     controlToken: parsed.data.THESIS_LEDGER_CONTROL_TOKEN || undefined,
     corsOrigins: parsed.data.CORS_ORIGINS.split(',')

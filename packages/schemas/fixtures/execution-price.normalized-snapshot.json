@@ -1,0 +1,21 @@
+{
+  "protocolVersion": "execution-price-v1",
+  "priceBasis": {
+    "adjustment": "qfq",
+    "method": "provider-native",
+    "methodVersion": "hithink-etf-qfq-provider-defined-v1",
+    "basisScope": "provider-defined",
+    "anchor": null,
+    "revision": { "origin": "local-observation", "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+    "observedAt": "2026-08-10T00:00:00.000Z",
+    "quantityBasis": "normalized-units",
+    "volumeBasis": "unknown",
+    "dividendMeaning": "provider-defined",
+    "dividendEvidenceRef": null,
+    "conversionAvailable": false,
+    "conversionEvidenceRef": null,
+    "derivation": null
+  },
+  "accountingBasis": "normalized-series",
+  "history": { "basis": "fixed-provider-snapshot" }
+}

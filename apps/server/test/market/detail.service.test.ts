@@ -4,7 +4,7 @@ import { MarketDetailService } from '../../src/market/market-detail.service.js';
 const time = '2026-08-21T00:00:00.000Z';
 const route = [{ providerId: 'fixture', upstreamSource: 'fixture' }];
 const quote = {
-  version: 1,
+  version: 3,
   symbol: '600519.SH',
   open: 10,
   high: 12,
@@ -20,7 +20,7 @@ const quote = {
   freshness: 'live' as const,
 };
 const chip = {
-  version: 1,
+  version: 3,
   symbol: '600519.SH',
   averageCost: 10,
   profitRatio: 0.5,

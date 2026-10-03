@@ -1,10 +1,10 @@
 import type {
-  CreateTradeOpeningBoundaryAssertionCommandV2,
-  LedgerCommandResponseV2,
+  CreateTradeOpeningBoundaryAssertionCommand,
+  LedgerCommandResponse,
   ThesisLedgerApiClient,
-  TradeDetailResponseV2,
-  TradeListQueryV2,
-  TradeListResponseV2,
+  TradeDetailResponse,
+  TradeListQuery,
+  TradeListResponse,
 } from '@thesis-ledger/api-client';
 
 import { getDesktopApiClient } from '../../shared/api/client.js';
@@ -17,19 +17,19 @@ export type PortfolioTradeClient = Pick<
 const defaultPortfolioClient = () => getDesktopApiClient().portfolio;
 
 export const fetchPortfolioTrades = (
-  params: Partial<TradeListQueryV2>,
+  params: Partial<TradeListQuery>,
   client: Pick<PortfolioTradeClient, 'getTrades'> = defaultPortfolioClient(),
-): Promise<TradeListResponseV2> => client.getTrades(params);
+): Promise<TradeListResponse> => client.getTrades(params);
 
 export const fetchPortfolioTrade = (
   accountId: string,
   tradeId: string,
   mode: 'actual' | 'shadow',
   client: Pick<PortfolioTradeClient, 'getTrade'> = defaultPortfolioClient(),
-): Promise<TradeDetailResponseV2> => client.getTrade(accountId, tradeId, mode);
+): Promise<TradeDetailResponse> => client.getTrade(accountId, tradeId, mode);
 
 export const createPortfolioTradeOpeningBoundary = (
   tradeId: string,
-  command: CreateTradeOpeningBoundaryAssertionCommandV2,
+  command: CreateTradeOpeningBoundaryAssertionCommand,
   client: Pick<PortfolioTradeClient, 'createTradeOpeningBoundary'> = defaultPortfolioClient(),
-): Promise<LedgerCommandResponseV2> => client.createTradeOpeningBoundary(tradeId, command);
+): Promise<LedgerCommandResponse> => client.createTradeOpeningBoundary(tradeId, command);

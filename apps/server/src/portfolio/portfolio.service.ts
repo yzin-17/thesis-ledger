@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { projectCashMaterialization, type StoredCashEvent } from '../ledger/cash-projection.js';
-import { positionInputSchema, type CurrencyV1 } from '@thesis-ledger/schemas';
+import { positionInputSchema, type Currency } from '@thesis-ledger/schemas';
 import { roundMoney } from '@thesis-ledger/shared';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
@@ -91,7 +91,7 @@ export class PortfolioService {
         }
       | undefined;
     if (typeof accountDelegate?.findMany !== 'function')
-      return new Map<string, CurrencyV1>(accountId ? [[accountId, 'CNY']] : []);
+      return new Map<string, Currency>(accountId ? [[accountId, 'CNY']] : []);
     const rows = await accountDelegate.findMany({
       where: accountId ? { id: accountId, mode } : investmentAccountWhere(mode),
       select: { id: true, currency: true },
@@ -160,7 +160,7 @@ export class PortfolioService {
     accountId: string,
     amount: string,
     source: 'manual' | 'screenshot' = 'manual',
-    currency?: CurrencyV1,
+    currency?: Currency,
     capturedAt?: string,
   ) {
     await this.requireLedger().setCashBalance(accountId, amount, source, currency, capturedAt);
@@ -280,8 +280,8 @@ export class PortfolioService {
     );
     valuationTrace.mark('position-valuation');
 
-    const cashByAccountAmounts = new Map<string, Array<{ currency: CurrencyV1; amount: number }>>();
-    const cashAmounts: Array<{ accountId: string; currency: CurrencyV1; amount: number }> = [];
+    const cashByAccountAmounts = new Map<string, Array<{ currency: Currency; amount: number }>>();
+    const cashAmounts: Array<{ accountId: string; currency: Currency; amount: number }> = [];
     const ledgerDelegate = this.prisma.ledgerEvent as
       | {
           findMany?: (args: unknown) => Promise<unknown[]>;
@@ -314,14 +314,14 @@ export class PortfolioService {
         ...realizedSummary.cost.map((item) => item.currency),
         ...realizedSummary.missingCurrencies
           .map((currency) => supportedCurrency(currency))
-          .filter((currency): currency is CurrencyV1 => currency !== undefined),
+          .filter((currency): currency is Currency => currency !== undefined),
       ]),
-    ] as CurrencyV1[];
+    ] as Currency[];
     const fx = await resolveFx(this.market, currencies, valuationOptions, valuedAt, 'current-rate');
     valuationTrace.mark('fx');
     const aggregateWithScope = (
-      amounts: readonly { currency: CurrencyV1; amount: number }[],
-      expectedBaseCurrency: CurrencyV1,
+      amounts: readonly { currency: Currency; amount: number }[],
+      expectedBaseCurrency: Currency,
     ) => {
       const aggregate = aggregateCurrencyAmounts(amounts, fx);
       if (valuationOptions.fxMerge === true) return aggregate;
@@ -350,7 +350,7 @@ export class PortfolioService {
     );
     const realizedPnlAggregate = aggregateWithScope(realizedSummary.pnl, baseCurrency);
     const realizedCostAggregate = aggregateWithScope(realizedSummary.cost, baseCurrency);
-    const convertToBase = (amount: number, currency: CurrencyV1) => {
+    const convertToBase = (amount: number, currency: Currency) => {
       if (valuationOptions.fxMerge !== true && currency !== baseCurrency) return null;
       return convertAmount(amount, currency, fx);
     };
@@ -395,7 +395,7 @@ export class PortfolioService {
         missingCurrencies: aggregate.missingCurrencies,
       };
     });
-    const cashByCurrencyMap = new Map<CurrencyV1, number>();
+    const cashByCurrencyMap = new Map<Currency, number>();
     for (const item of cashAmounts) {
       cashByCurrencyMap.set(
         item.currency,

@@ -9,7 +9,7 @@ import {
   type AiUsageFacts,
   type OptimizationDiscoveryProposal,
   type OptimizationProposal,
-  type StrategySchemaV2,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { AiExecutionStateStore } from '../ai/ai-execution-state.store.js';
 import { AiSdkGenerationAdapter, AiSdkGenerationError } from '../ai/ai-sdk-generation.adapter.js';
@@ -37,7 +37,7 @@ type ResolvedOptimizationRoute = ReturnType<AiProviderRegistry['strictReadyContr
 
 export type OptimizationSdkExecutionInput = {
   experiment: ExperimentRow;
-  baseline: StrategySchemaV2;
+  baseline: BacktestStrategy;
   route: OptimizationModelRoute;
   modelKey: string;
   step: OptimizationStepRow;
@@ -227,7 +227,7 @@ export class StrategyOptimizationSdkExecutor {
 
   private output(
     experiment: ExperimentRow,
-    baseline: StrategySchemaV2,
+    baseline: BacktestStrategy,
     value: unknown,
   ): OptimizationProposal | OptimizationDiscoveryProposal {
     if (experiment.sourceMode === 'discovery')
@@ -309,7 +309,9 @@ export class StrategyOptimizationSdkExecutor {
             ? {}
             : { reasoningEffort: input.route.reasoningEffort }),
           timeout: {
-            totalMs: Math.min(runtime.timeoutMs, input.requestTimeoutMs),
+            // 同研究链路：Provider 级「超时（毫秒）」不当成流式优化生成的总时长墙，
+            // 总墙由下面同步的 AbortSignal.timeout(requestTimeoutMs)（实验剩余期限）承担，
+            // 判活交给首块 / 块间停顿。
             firstChunkMs:
               input.resolved.execution.firstOutputTimeoutMs ??
               Math.min(90_000, input.requestTimeoutMs),

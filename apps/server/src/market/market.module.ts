@@ -8,22 +8,26 @@ import { InstrumentDirectoryService } from './instruments/instrument-directory.s
 import { InstrumentSearchService } from './instruments/instrument-search.service.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { MarketControlService } from './market-control.service.js';
+import { MarketRouteRevisionService } from './market-route-revision.service.js';
 import { MarketDataController } from './market-data.controller.js';
 import { MarketDetailService } from './market-detail.service.js';
 import { MarketService } from './market.service.js';
-import { BacktestBarAggregationService } from './backtest-bar-aggregation.service.js';
-import {
-  DsaMarketBarPolicyPort,
-  DsaMarketBarRemotePort,
-  MarketBarReader,
-  PrismaMarketBarFactStore,
-} from './market-bar-reader.js';
-import { MarketV2Controller } from './market-v2.controller.js';
+import { MarketBarWindowReaderV3 } from './market-bar-reader-v3.js';
+import { MarketWindowEvidenceV3Repository } from './market-window-evidence-v3.repository.js';
+import { MarketDerivedSeriesRepository } from './market-derived-series.repository.js';
+import { MarketFrozenWindowReaderV3 } from './market-frozen-window-reader-v3.js';
+import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
+import { MarketChartProofRepository } from './market-chart-proof.repository.js';
+import { MarketPitReconstructionRepository } from './market-pit-reconstruction.repository.js';
+import { MarketBarReader } from './market-bar-reader.js';
+import { MarketController } from './market.controller.js';
+import { MarketNavReaderV3 } from './market-nav-reader-v3.js';
 
 @Module({
   imports: [QualityModule, DsaModule],
-  controllers: [MarketDataController, MarketV2Controller],
+  controllers: [MarketDataController, MarketController],
   providers: [
+    MarketNavReaderV3,
     MarketService,
     MarketDetailService,
     CatalogSyncService,
@@ -33,13 +37,20 @@ import { MarketV2Controller } from './market-v2.controller.js';
     InstrumentDirectoryService,
     InstrumentService,
     MarketControlService,
-    BacktestBarAggregationService,
-    DsaMarketBarPolicyPort,
-    DsaMarketBarRemotePort,
-    PrismaMarketBarFactStore,
+    MarketRouteRevisionService,
+    MarketWindowEvidenceV3Repository,
+    MarketDerivedSeriesRepository,
+    MarketFrozenWindowReaderV3,
+    MarketBarWindowReaderV3,
+    MarketChartReaderV3,
+    MarketChartProofRepository,
+    MarketPitReconstructionRepository,
     MarketBarReader,
   ],
   exports: [
+    MarketNavReaderV3,
+    MarketPitReconstructionRepository,
+    MarketRouteRevisionService,
     MarketService,
     MarketDetailService,
     InstrumentService,
@@ -48,7 +59,6 @@ import { MarketV2Controller } from './market-v2.controller.js';
     InstrumentAssociationService,
     InstrumentDirectoryService,
     MarketControlService,
-    BacktestBarAggregationService,
     MarketBarReader,
   ],
 })

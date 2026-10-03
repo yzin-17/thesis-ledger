@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import type { AiSdkGenerationError } from '../ai/ai-sdk-generation.adapter.js';
 import type { PrismaService } from '../platform/prisma.service.js';
 import { redactOptimizationError } from './strategy-optimization-common.js';
 
@@ -49,7 +50,7 @@ export const markOptimizationUnknownOutcome = async (
 export const markOptimizationKnownFailure = async (
   prisma: PrismaService,
   step: OptimizationStepRow,
-  error: unknown,
+  error: AiSdkGenerationError,
   durationMs?: number,
 ) => {
   const summary = redactOptimizationError(error);
@@ -63,7 +64,7 @@ export const markOptimizationKnownFailure = async (
     where: { id: step.aiRunId, status: 'running' },
     data: {
       status: 'failed',
-      errorCode: 'optimization_proposal_failed',
+      errorCode: `optimization_${error.fact.code}`,
       errorSummary: summary,
       completedAt: new Date(),
       claimedAt: null,

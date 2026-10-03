@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateExecutionModelFees,
   calculateNavExecutionModelFee,
+  hasVerifiedExecutionModelConversion,
+  resolveNormalizedExecutionModelSegment,
+  type FrozenExecutionModel,
   type FrozenExecutionModelFees,
   type FrozenNavExecutionModelChargedFee,
 } from '../src/backtest-execution-model.js';
@@ -53,7 +56,68 @@ const navFee = (
   collectedAt: 'confirmation',
 });
 
+const normalizedModel = (): FrozenExecutionModel => ({
+  schemaVersion: 'execution-model-v1',
+  id: 'normalized-cn-research',
+  version: '1',
+  scope: {
+    symbol: '159516.SZ',
+    market: 'CN',
+    instrumentType: 'ETF',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+    range: { start: '2026-05-16', end: '2026-08-09' },
+  },
+  segments: [
+    {
+      id: 'normalized-range',
+      range: { start: '2026-05-16', end: '2026-08-09' },
+      source: { kind: 'researchPreset', configuredAt: '2026-09-01T00:00:00Z' },
+      assumptions: ['复权坐标中以连续 Decimal 数量计算模拟成交额'],
+      fees: fees(),
+      execution: {
+        mode: 'exchange',
+        calendarMarket: 'CN',
+        reserveCashAt: 'orderAccepted',
+        buyDebitAt: 'fill',
+        sellableAfterTradingDays: 1,
+        saleReinvestableAfterTradingDays: 0,
+        price: { kind: 'noDailyLimit', reason: '复权坐标不适用真实价格限制' },
+        normalizedExecution: {
+          priceCoordinate: 'continuous-decimal',
+          quantityUnits: 'continuous-normalized-decimal',
+          lotSizeConstraint: 'not-applied',
+          tickSizeConstraint: 'not-applied',
+          dailyPriceLimit: 'not-applied',
+          feeBasis: 'simulatedTurnover',
+        },
+      },
+    },
+  ],
+});
+
+const normalizedEvent = {
+  expectedVersion: '1',
+  symbol: '159516.SZ',
+  market: 'CN',
+  instrumentType: 'ETF',
+  currency: 'CNY' as const,
+  evaluatedAt: '2026-06-01T01:30:00Z',
+  dataAsOf: '2026-08-10T00:00:00Z',
+};
+
 describe('研究费用模型', () => {
+  it('只把带证据引用的实际单位转换视为可用', () => {
+    expect(hasVerifiedExecutionModelConversion({ available: true, evidenceRef: 'factor:v1' })).toBe(
+      true,
+    );
+    expect(hasVerifiedExecutionModelConversion({ available: true, evidenceRef: null })).toBe(false);
+    expect(hasVerifiedExecutionModelConversion({ available: true, evidenceRef: '  ' })).toBe(false);
+    expect(
+      hasVerifiedExecutionModelConversion({ available: false, evidenceRef: 'factor:v1' }),
+    ).toBe(false);
+  });
+
   it('先逐项舍入再汇总，不通过二进制浮点数计算', () => {
     const result = calculateExecutionModelFees(fees(), {
       side: 'sell',
@@ -133,6 +197,55 @@ describe('研究费用模型', () => {
         },
       ),
     ).toEqual({ code: 'subscriptionFee', amount: '0', currency: 'CNY' });
+  });
+
+  it('归一化模型解析只接收连续坐标假设和模拟成交额费用', () => {
+    const model = normalizedModel();
+    const selected = resolveNormalizedExecutionModelSegment(model, normalizedEvent);
+    expect(selected.execution.normalizedExecution).toMatchObject({
+      priceCoordinate: 'continuous-decimal',
+      quantityUnits: 'continuous-normalized-decimal',
+      lotSizeConstraint: 'not-applied',
+      tickSizeConstraint: 'not-applied',
+      dailyPriceLimit: 'not-applied',
+      feeBasis: 'simulatedTurnover',
+    });
+    expect(selected.execution.price.kind).toBe('noDailyLimit');
+    expect(
+      calculateExecutionModelFees(selected.fees, {
+        side: 'buy',
+        turnover: '1000.1234567',
+        currency: 'CNY',
+      }).total,
+    ).toBe('5.01');
+    model.segments[0]!.execution.normalizedExecution!.quantityUnits = 'bad' as never;
+    expect(selected.execution.normalizedExecution.quantityUnits).toBe(
+      'continuous-normalized-decimal',
+    );
+
+    const missing = normalizedModel();
+    delete missing.segments[0]!.execution.normalizedExecution;
+    expect(() => resolveNormalizedExecutionModelSegment(missing, normalizedEvent)).toThrow(
+      '未声明归一化',
+    );
+    const limited = normalizedModel();
+    limited.segments[0]!.execution.price = {
+      kind: 'dailyLimit',
+      reference: 'previousRawClose',
+      maxUpRatio: '0.1',
+      maxDownRatio: '0.1',
+      rounding: 'halfUpToTick',
+      minimumDistanceTicks: 1,
+      minimumPriceTicks: 1,
+    };
+    expect(() => resolveNormalizedExecutionModelSegment(limited, normalizedEvent)).toThrow(
+      '不能使用真实价格 tick',
+    );
+    const realUnitFee = normalizedModel();
+    realUnitFee.segments[0]!.fees.commission.basis = 'actualQuantity';
+    expect(() => resolveNormalizedExecutionModelSegment(realUnitFee, normalizedEvent)).toThrow(
+      '模拟成交额',
+    );
   });
 
   it.each([

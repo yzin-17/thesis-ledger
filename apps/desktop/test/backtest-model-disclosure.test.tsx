@@ -6,10 +6,7 @@ import {
   parseBacktestModelConfiguration,
 } from '../src/features/strategy/BacktestModelConfiguration.js';
 import { BacktestRunDisclosure } from '../src/features/strategy/BacktestModelDisclosure.js';
-import {
-  runConfigForV2,
-  createStrategyActionHandlers,
-} from '../src/features/strategy/strategy.actions.js';
+import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
 import type { BacktestJob } from '../src/features/strategy/strategy.types.js';
 const fixture = (name: string) =>
   JSON.parse(
@@ -30,23 +27,12 @@ describe('策略回测模型披露', () => {
     expect(html).toContain('ARTIFACT_INVALID');
     expect(html).toContain('snapshot');
   });
-  it('空配置兼容旧运行，完整配置透传并拒绝不适用范围', () => {
+  it('执行模型配置拒绝无效 JSON', () => {
     expect(parseBacktestModelConfiguration('')).toEqual({ model: undefined, error: null });
     expect(parseBacktestModelConfiguration('{')).toMatchObject({
       model: undefined,
       error: expect.any(String),
     });
-    expect(runConfigForV2(strategy, setup)).not.toHaveProperty('executionModel');
-    expect(runConfigForV2(strategy, { ...setup, executionModel: model }).executionModel).toEqual(
-      model,
-    );
-    expect(() =>
-      runConfigForV2(strategy, {
-        ...setup,
-        period: { ...setup.period, end: '2025-01-01' },
-        executionModel: model,
-      }),
-    ).toThrow(/模型未覆盖/);
   });
   it('配置展示范围、来源、假设并提供显式确认', () => {
     const markup = renderToStaticMarkup(
@@ -111,7 +97,7 @@ describe('策略回测模型披露', () => {
     ])
       expect(failed).toContain(text);
   });
-  it('HTTP 成功返回 failed 时显示失败并刷新任务，不提示排队成功', async () => {
+  it('未准备的配置不会提交回测', async () => {
     const add = vi.fn();
     const load = vi.fn(async () => undefined);
     const queue = vi.fn(async () => ({
@@ -132,20 +118,19 @@ describe('策略回测模型披露', () => {
       queueMutation: { mutateAsync: queue },
       runMutation: { mutateAsync: vi.fn() },
       cancelMutation: { mutateAsync: vi.fn() },
+      retryMutation: { mutateAsync: vi.fn() },
       load,
     });
     await handlers.startBacktest(
       { id: 'version', version: 1, schema: strategy },
       { ...setup, executionModel: model },
     );
-    await vi.waitFor(() => expect(load).toHaveBeenCalled());
-    expect(queue).toHaveBeenCalledWith(
-      expect.objectContaining({ runConfig: expect.objectContaining({ executionModel: model }) }),
-    );
+    expect(load).not.toHaveBeenCalled();
+    expect(queue).not.toHaveBeenCalled();
     expect(add).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: '回测失败',
-        description: 'DATA_UNAVAILABLE：历史可交易性缺失',
+        title: '回测排队失败',
+        description: '请先准备并确认回测配置。',
         type: 'error',
       }),
     );

@@ -1,12 +1,8 @@
 import { Prisma } from '@prisma/client';
-import {
-  legacyMigratedCashTransferEventSchemaV2,
-  type LegacyMigratedCashTransferEventV2,
-  type LedgerEventV2,
-} from '@thesis-ledger/schemas';
+import { type LedgerEvent } from '@thesis-ledger/schemas';
 import { latestLedgerEventByFact } from './ledger-event-v2.js';
 import { toLedgerEventV2 } from './ledger-v2.repository.js';
-
+import { requireCurrentLedgerEnvelope } from './ledger-stored-envelope-version.js';
 Prisma.Decimal.set({ precision: 40 });
 
 export type StoredCashEvent = {
@@ -21,6 +17,7 @@ export type StoredCashEvent = {
   sourceTimezone?: string | null;
   economicOrderKey?: string | null;
   recordedAt?: Date;
+  envelopeVersion?: number | null;
   payloadVersion?: number | null;
   payload?: Prisma.JsonValue;
   sourceCategory?: string | null;
@@ -80,10 +77,6 @@ export type CashProjectionMaterialization = {
   settlements: CashMaterializedSettlement[];
 };
 
-const LEGACY_LEDGER_MIGRATION_ACTOR = 'migration:legacy-ledger-v2';
-
-type CashProjectionEvent = LedgerEventV2 | LegacyMigratedCashTransferEventV2;
-
 const decimal = (value: unknown) => new Prisma.Decimal(decimalString(value));
 
 const decimalString = (value: unknown) => {
@@ -139,6 +132,7 @@ const storedEventInput = (event: StoredCashEvent) => ({
   sourceTimezone: event.sourceTimezone ?? null,
   economicOrderKey: event.economicOrderKey ?? null,
   recordedAt: event.recordedAt ?? event.createdAt ?? new Date(0),
+  envelopeVersion: event.envelopeVersion ?? null,
   payloadVersion: event.payloadVersion ?? null,
   payload: event.payload ?? {},
   sourceCategory: event.sourceCategory ?? null,
@@ -149,45 +143,6 @@ const storedEventInput = (event: StoredCashEvent) => ({
   revisionAction: event.revisionAction ?? null,
   supersedesEventId: event.supersedesEventId ?? null,
   reason: event.reason ?? null,
-});
-
-const normalizedStoredOccurredAt = (event: StoredCashEvent) => {
-  if (event.occurredAt === null || event.occurredAt === undefined) return null;
-  const value = event.occurredAt.toISOString();
-  if (event.timePrecision === 'DATE') return value.slice(0, 10);
-  return value;
-};
-
-const storedEnvelopeInput = (event: StoredCashEvent) => ({
-  version: 2,
-  eventId: event.id,
-  factId: event.factId,
-  accountId: event.accountId,
-  ledgerRevision: event.ledgerRevision?.toString(),
-  type: event.type,
-  occurredAt: normalizedStoredOccurredAt(event),
-  timePrecision: event.timePrecision,
-  sourceTimezone: event.sourceTimezone,
-  economicOrderKey: event.economicOrderKey,
-  recordedAt: (event.recordedAt ?? event.createdAt ?? new Date(0)).toISOString(),
-  payloadVersion: event.payloadVersion,
-  source: {
-    category: event.sourceCategory,
-    channel: event.sourceChannel,
-    ...(event.externalId === null || event.externalId === undefined
-      ? {}
-      : { externalId: event.externalId }),
-    ...(event.sourceRowId === null || event.sourceRowId === undefined
-      ? {}
-      : { sourceRowId: event.sourceRowId }),
-  },
-  actorId: event.actorId,
-  revisionAction: event.revisionAction,
-  ...(event.supersedesEventId === null || event.supersedesEventId === undefined
-    ? {}
-    : { supersedesEventId: event.supersedesEventId }),
-  ...(event.reason === null || event.reason === undefined ? {} : { reason: event.reason }),
-  payload: event.payload ?? {},
 });
 
 type ParsedLedgerEventV2 = ReturnType<typeof toLedgerEventV2>;
@@ -275,7 +230,7 @@ const normalizeCashFlowPayload = (
   };
 };
 
-const normalizeLedgerEventV2 = (event: ParsedLedgerEventV2): LedgerEventV2 => {
+const normalizeLedgerEventV2 = (event: ParsedLedgerEventV2): LedgerEvent => {
   if (event.revisionAction === 'VOID') {
     const { source, ...base } = event;
     return {
@@ -367,22 +322,6 @@ const normalizeLedgerEventV2 = (event: ParsedLedgerEventV2): LedgerEventV2 => {
   throw new Error('无法规范化未知账本事件类型');
 };
 
-const legacyMigratedCashTransfer = (
-  event: StoredCashEvent,
-): LegacyMigratedCashTransferEventV2 | undefined => {
-  // The historical migration preserves the original source category, so its actor marker is the
-  // canonical discriminator for this read-only compatibility path.
-  if (
-    event.type !== 'CASH_FLOW' ||
-    event.payloadVersion !== 1 ||
-    event.revisionAction !== 'CREATE' ||
-    event.actorId !== LEGACY_LEDGER_MIGRATION_ACTOR
-  )
-    return undefined;
-  const parsed = legacyMigratedCashTransferEventSchemaV2.safeParse(storedEnvelopeInput(event));
-  return parsed.success ? parsed.data : undefined;
-};
-
 class CashProjectionEventError extends Error {
   constructor(eventId: string, cause: unknown) {
     super(
@@ -392,22 +331,20 @@ class CashProjectionEventError extends Error {
   }
 }
 
-const toStoredV2Event = (event: StoredCashEvent): CashProjectionEvent | undefined => {
-  if (event.factId == null) return undefined;
-  const input = storedEventInput(event);
+const toStoredV2Event = (event: StoredCashEvent): LedgerEvent => {
+  requireCurrentLedgerEnvelope(event.envelopeVersion);
+  if (event.factId == null)
+    throw new CashProjectionEventError(event.id, new Error('账本事件缺少 factId'));
   try {
-    return normalizeLedgerEventV2(toLedgerEventV2(input));
+    return normalizeLedgerEventV2(toLedgerEventV2(storedEventInput(event)));
   } catch (error) {
-    const legacy = legacyMigratedCashTransfer(event);
-    if (legacy) return legacy;
     throw new CashProjectionEventError(event.id, error);
   }
 };
 
-const v2Events = (stored: StoredCashEvent[]) =>
-  stored.map(toStoredV2Event).filter((event): event is CashProjectionEvent => event !== undefined);
+const v2Events = (stored: StoredCashEvent[]) => stored.map(toStoredV2Event);
 
-type ExecutionEvent = Extract<LedgerEventV2, { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }>;
+type ExecutionEvent = Extract<LedgerEvent, { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }>;
 
 const executionCashOperations = (event: ExecutionEvent): CashOperation[] => {
   const base = {
@@ -465,9 +402,8 @@ const executionCashOperations = (event: ExecutionEvent): CashOperation[] => {
 };
 
 const v2Operations = (stored: StoredCashEvent[]): CashOperation[] => {
-  const candidates = stored.filter((event) => event.factId != null);
-  if (candidates.length === 0) return [];
-  const valid = v2Events(candidates);
+  if (stored.length === 0) return [];
+  const valid = v2Events(stored);
   const tips = latestLedgerEventByFact(valid);
   const operations: CashOperation[] = [];
   for (const event of tips.values()) {

@@ -151,7 +151,7 @@ describe('账户现金操作', () => {
   it('现金页读模型只展示明确结算时间并按时间排序', () => {
     const now = new Date('2026-09-03T00:00:00.000Z');
     const futureDeposit = {
-      version: 2,
+      version: 3,
       eventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       factId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       accountId: cashAccount.id,
@@ -283,7 +283,7 @@ describe('账户现金操作', () => {
   it('划转更正和作废会解析两端当前事件并成对提交', async () => {
     const transferId = '55555555-5555-4555-8555-555555555555';
     const sourceEvent = {
-      version: 2,
+      version: 3,
       eventId: '66666666-6666-4666-8666-666666666666',
       accountId: cashAccount.id,
       type: 'CASH_FLOW',
@@ -354,7 +354,7 @@ describe('账户现金操作', () => {
     const sourceFactId = '88888888-8888-4888-8888-888888888888';
     const targetFactId = '99999999-9999-4999-8999-999999999999';
     const sourceEvent = {
-      version: 2,
+      version: 3,
       eventId: '66666666-6666-4666-8666-666666666666',
       factId: sourceFactId,
       accountId: cashAccount.id,
@@ -642,7 +642,7 @@ describe('账户现金操作', () => {
         occurredAt: '2026-07-31T02:00:00.000Z',
         ledgerEventId: '66666666-6666-4666-8666-666666666666',
         ledgerFactId: '77777777-7777-4777-8777-777777777777',
-        version: 2,
+        version: 3,
         skippedReason: null,
         confirmedAt: '2026-07-31T02:01:00.000Z',
         skippedAt: null,
@@ -663,7 +663,7 @@ describe('账户现金操作', () => {
         occurredAt: null,
         ledgerEventId: null,
         ledgerFactId: null,
-        version: 2,
+        version: 3,
         skippedReason: '本期未到账',
         confirmedAt: null,
         skippedAt: '2026-06-30T02:00:00.000Z',

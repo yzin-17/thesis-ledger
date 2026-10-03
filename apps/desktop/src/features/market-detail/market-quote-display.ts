@@ -1,7 +1,7 @@
-import type { QuoteV1 } from '@thesis-ledger/schemas';
+import type { Quote } from '@thesis-ledger/schemas';
 import { marketToneForValue, type MarketTone } from '@/ui/market-color';
 
-type QuotePrice = Pick<QuoteV1, 'price' | 'previousClose'>;
+type QuotePrice = Pick<Quote, 'price' | 'previousClose'>;
 
 export const quoteChangePercent = (quote: QuotePrice): number | null => {
   if (

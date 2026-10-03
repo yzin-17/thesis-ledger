@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { LedgerEventV2 } from '@thesis-ledger/schemas';
+import type { LedgerEvent } from '@thesis-ledger/schemas';
 import { LedgerCommandService } from '../../src/ledger/ledger-command.service.js';
 import type {
   AccountLedgerMutation,
@@ -33,7 +33,7 @@ const commandBase = {
   actorId: 'user-1',
 };
 
-const storedFromEvent = (event: LedgerEventV2) => ({
+const storedFromEvent = (event: LedgerEvent) => ({
   id: event.eventId,
   accountId: event.accountId,
   type: event.type,
@@ -44,6 +44,7 @@ const storedFromEvent = (event: LedgerEventV2) => ({
   sourceTimezone: event.sourceTimezone,
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
+  envelopeVersion: 3,
   payloadVersion: event.payloadVersion,
   payload: event.revisionAction === 'VOID' ? null : event.payload,
   sourceCategory: event.source.category,
@@ -65,7 +66,7 @@ class InMemoryLedgerRepository {
     [accountA, 0n],
     [accountB, 0n],
   ]);
-  readonly events: LedgerEventV2[] = [];
+  readonly events: LedgerEvent[] = [];
   readonly lockedAccountOrders: string[][] = [];
   failAppendForAccount?: string;
 
@@ -112,7 +113,7 @@ class InMemoryLedgerRepository {
     }
   }
 
-  async appendRevision(context: AccountLedgerWriteContext, event: LedgerEventV2) {
+  async appendRevision(context: AccountLedgerWriteContext, event: LedgerEvent) {
     if (this.failAppendForAccount === context.accountId) throw new Error('append failed');
     this.events.push(event);
     return event;
@@ -122,7 +123,7 @@ class InMemoryLedgerRepository {
     const contexts = new Map<string, AccountLedgerWriteContext>();
     const ledgerEvent = {
       findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        let event: LedgerEventV2 | undefined;
+        let event: LedgerEvent | undefined;
         if (typeof where.id === 'string') {
           event = this.events.find((candidate) => candidate.eventId === where.id);
         } else if (typeof where.supersedesEventId === 'string') {

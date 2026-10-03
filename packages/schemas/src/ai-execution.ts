@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nonNegativeDecimalStringSchema } from './ledger-v2.js';
+import { nonNegativeDecimalStringSchema } from './monetary-values.js';
 import { aiResearchContextSchema, aiResearchTemplateIdSchema } from './ai.js';
 import {
   optimizationDiscoveryGenerationOutputSchema,

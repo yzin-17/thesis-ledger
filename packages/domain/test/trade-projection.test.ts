@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   projectTradeProjections,
-  type LedgerEventTypeV2,
-  type LedgerEventV2,
+  type LedgerEventType,
+  type LedgerEvent,
 } from '../src/index.js';
 
-type PayloadEvent = Exclude<LedgerEventV2, { revisionAction: 'VOID' }>;
+type PayloadEvent = Exclude<LedgerEvent, { revisionAction: 'VOID' }>;
 
 let sequence = 0;
 
 const event = (
-  type: LedgerEventTypeV2,
+  type: LedgerEventType,
   payload: unknown,
   overrides: Partial<
     Pick<
@@ -22,7 +22,7 @@ const event = (
   const id = overrides.eventId ?? `${type.toLowerCase()}-${sequence + 1}`;
   sequence += 1;
   return {
-    version: 2,
+    version: 3,
     eventId: id,
     factId: overrides.factId ?? id,
     accountId: overrides.accountId ?? 'account-actual',
@@ -101,7 +101,7 @@ const openingBoundary = (id: string, tradeId: string, baselineFactId: string, oc
   );
 
 const projection = (
-  events: readonly LedgerEventV2[],
+  events: readonly LedgerEvent[],
   accountModeByAccountId: Record<string, 'actual' | 'shadow'> = { 'account-actual': 'actual' },
 ) => projectTradeProjections(events, { accountModeByAccountId });
 
@@ -391,7 +391,7 @@ describe('Trade Projection 领域引擎', () => {
       supersedesEventId: 'buy-1',
       reason: '更正数量',
       payload: { ...original.payload, quantity: '12' },
-    } as LedgerEventV2;
+    } as LedgerEvent;
     const voidSell = {
       ...sell('sell-1', '12', '2026-01-02'),
       ledgerRevision: '3',
@@ -403,7 +403,7 @@ describe('Trade Projection 领域引擎', () => {
       revisionAction: 'VOID' as const,
       supersedesEventId: 'sell-1',
       reason: '撤销错误卖出',
-    } as LedgerEventV2;
+    } as LedgerEvent;
     const ordered = projection([original, replacement, voidSell, voidRevision]);
     const shuffled = projection([voidRevision, voidSell, replacement, original]);
 

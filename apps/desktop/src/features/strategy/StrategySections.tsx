@@ -5,16 +5,8 @@ export {
 } from './BacktestSetupDialog.js';
 import { useMemo, useState } from 'react';
 import { Eye, LoaderCircle, Play, X } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { EmptyListState, EmptyTableRow } from '../shared/EmptyStates.js';
 import {
   Progress,
@@ -22,7 +14,6 @@ import {
   ProgressLabel,
   ProgressTrack,
 } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -31,18 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { money, displayValue, isDataLoaded } from '../shared/display.js';
+import { money, isDataLoaded } from '../shared/display.js';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
-import { Metric } from '../shared/DesktopPrimitives.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { schemaAsOf, schemaSymbols, latestVersion } from './strategy.schema.js';
-import {
-  BacktestRunDisclosure,
-  completenessLabel,
-  diagnosticText,
-  localizeBacktestMessage,
-} from './BacktestModelDisclosure.js';
-export { completenessLabel } from './BacktestModelDisclosure.js';
+import { diagnosticText, localizeBacktestMessage } from './BacktestModelDisclosure.js';
 import type {
   BacktestJob,
   BacktestJobSummary,
@@ -70,38 +54,6 @@ export const jobStatusVariant = (
   return 'outline';
 };
 
-export const formatBacktestDataAsOf = (value: unknown) =>
-  typeof value === 'string' ? formatDateTime(value, '未知') : '未知';
-
-export const decimalNumber = (value: unknown): number | null => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  if (value && typeof value === 'object' && 'amount' in value) {
-    return decimalNumber((value as { amount?: unknown }).amount);
-  }
-  return null;
-};
-
-export const metricNumber = (value: unknown) => {
-  if (value && typeof value === 'object' && 'status' in value) {
-    const metric = value as { status?: unknown; value?: unknown };
-    return metric.status === 'available' ? decimalNumber(metric.value) : null;
-  }
-  return decimalNumber(value);
-};
-
-export const formatBacktestMetric = (metric: unknown, percent = true) => {
-  const value = metricNumber(metric);
-  if (value !== null) return percent ? `${(value * 100).toFixed(2)}%` : String(value);
-  if (metric && typeof metric === 'object' && 'reason' in metric) {
-    return `不可用：${displayValue((metric as { reason?: unknown }).reason)}`;
-  }
-  return '不可用';
-};
-
 export const backtestStageLabel = (stage: unknown) => {
   const labels: Record<string, string> = {
     queued: '排队中',
@@ -118,37 +70,6 @@ export const backtestStageLabel = (stage: unknown) => {
   };
   if (typeof stage !== 'string' || !stage.trim()) return '未配置';
   return labels[stage] ?? '其他阶段';
-};
-
-export const tradeSideLabel = (side: unknown) => {
-  if (side === 'buy') return '买入';
-  if (side === 'sell') return '卖出';
-  return typeof side === 'string' && side ? '未知方向' : '未配置';
-};
-
-export const tradeReasonLabel = (reason: unknown) => {
-  const labels: Record<string, string> = {
-    signal: '信号触发',
-    risk: '风险规则触发',
-    fixedStop: '固定止损',
-    fixedTakeProfit: '固定止盈',
-    maxHoldingPeriod: '最大持有期',
-  };
-  if (typeof reason !== 'string' || !reason) return '未配置';
-  return labels[reason] ?? '其他原因';
-};
-
-const backtestWarningKey = (value: string) => value.trim().replace(/[。；;]+$/u, '');
-
-export const uniqueBacktestWarnings = (...values: unknown[]) => {
-  const warnings = values.flatMap((value) => (Array.isArray(value) ? value.map(String) : []));
-  const seen = new Set<string>();
-  return warnings.filter((warning) => {
-    const key = backtestWarningKey(warning);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 };
 
 const strategyStatusLabel = (status: unknown) => {
@@ -547,7 +468,7 @@ export function StrategyJobs({
                             {job.status === 'failed' ? '查看失败详情' : '查看结果'}
                           </Button>
                         )}
-                        {job.mode === 'V2' && job.status === 'failed' && onRetry && (
+                        {job.mode === 'V3' && job.status === 'failed' && onRetry && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -569,320 +490,5 @@ export function StrategyJobs({
         </table>
       </div>
     </section>
-  );
-}
-
-export function StrategyResultDialog({
-  job,
-  strategy,
-  version,
-  open,
-  onOpenChange,
-}: {
-  job: BacktestJob | null;
-  strategy?: StrategyRecord | null;
-  version?: StrategyVersion | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const result =
-    job?.result && typeof job.result === 'object' ? (job.result as Record<string, unknown>) : null;
-  const metrics =
-    result?.metrics && typeof result.metrics === 'object'
-      ? (result.metrics as Record<string, unknown>)
-      : null;
-  const isV2Result = result?.schemaVersion === '2';
-  const equityCurve = Array.isArray(result?.equityCurve)
-    ? result.equityCurve.flatMap((point) => {
-        if (!point || typeof point !== 'object') return [];
-        const value = point as { date?: unknown; occurredAt?: unknown; value?: unknown };
-        const date = typeof value.date === 'string' ? value.date : value.occurredAt;
-        const number = decimalNumber(value.value);
-        return typeof date === 'string' && number !== null ? [{ date, value: number }] : [];
-      })
-    : [];
-  const trades = Array.isArray(result?.trades)
-    ? (result.trades as Array<Record<string, unknown>>)
-    : [];
-  const metricValue = (key: string, v2Key = key, percent = true) => {
-    const metric = metrics?.[isV2Result ? v2Key : key];
-    return formatBacktestMetric(metric, percent);
-  };
-  const rejectedOrders = Array.isArray(result?.rejectedOrders) ? result.rejectedOrders : [];
-  const rejectedNavRequests = Array.isArray(result?.rejectedNavRequests)
-    ? result.rejectedNavRequests
-    : [];
-  const totalFees =
-    metricNumber(metrics?.fees) !== null
-      ? metricNumber(metrics?.fees)!
-      : trades.reduce((sum, trade) => {
-          if (typeof trade.fees === 'number') return sum + trade.fees;
-          if (!Array.isArray(trade.charges)) return sum;
-          const charges = trade.charges as unknown[];
-          return (
-            sum +
-            charges.reduce<number>(
-              (chargeSum, charge) => chargeSum + (decimalNumber(charge) ?? 0),
-              0,
-            )
-          );
-        }, 0);
-  const hasFeeData =
-    metricNumber(metrics?.fees) !== null ||
-    trades.some((trade) => 'fees' in trade || Array.isArray(trade.charges));
-  const drawdown = equityCurve.map((point, index) => {
-    const peak = Math.max(...equityCurve.slice(0, index + 1).map((item) => item.value));
-    return { date: point.date, value: peak > 0 ? point.value / peak - 1 : 0 };
-  });
-  const warnings = uniqueBacktestWarnings(job?.warnings, result?.warnings);
-  const benchmark =
-    result?.benchmark && typeof result.benchmark === 'object'
-      ? (result.benchmark as Record<string, unknown>)
-      : null;
-  const benchmarkValue = (key: string) => formatBacktestMetric(benchmark?.[key]);
-  const benchmarkSummary = () => {
-    if (!benchmark) return '不可用（基准行情缺失）';
-    if (isV2Result) return `基准收益 ${benchmarkValue('totalReturn')}`;
-    return `策略 ${benchmarkValue('strategyReturn')} · 基准 ${benchmarkValue('benchmarkReturn')} · 超额 ${benchmarkValue('excessReturn')}`;
-  };
-  const finalValue = decimalNumber(result?.finalValue) ?? equityCurve.at(-1)?.value ?? null;
-  const seriesPoints = (series: Array<{ value: number }>) => {
-    if (series.length === 0) return '';
-    const values = series.map((point) => point.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const span = max - min || 1;
-    return series
-      .map((point, index) => {
-        const x = (index / Math.max(series.length - 1, 1)) * 100;
-        const y = 100 - ((point.value - min) / span) * 100;
-        return `${x},${y}`;
-      })
-      .join(' ');
-  };
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-48px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-4xl">
-        <DialogHeader className="pr-10">
-          <DialogTitle>
-            回测结果 · {strategy?.name ?? '未知策略'} · v{version?.version ?? '?'}
-          </DialogTitle>
-          <DialogDescription>
-            标的：{version?.schema ? (schemaSymbols(version.schema)[0] ?? '不可用') : '不可用'} ·
-            区间：
-            {job ? `${jobPeriod(job).start} 至 ${jobPeriod(job).end}` : '不可用'}
-          </DialogDescription>
-        </DialogHeader>
-        <div data-testid="backtest-result-scroll" className="min-h-0 overflow-y-auto">
-          {job && <BacktestRunDisclosure job={job} />}
-          {!job || !result ? (
-            <p className="empty-state">任务尚未生成结果。</p>
-          ) : (
-            <Tabs defaultValue="summary">
-              <TabsList variant="line" className="w-full">
-                <TabsTrigger value="summary">摘要</TabsTrigger>
-                <TabsTrigger value="equity">权益数据</TabsTrigger>
-                <TabsTrigger value="trades">交易明细</TabsTrigger>
-                <TabsTrigger value="repro">复现信息</TabsTrigger>
-              </TabsList>
-              <TabsContent value="summary" className="grid gap-5 pt-4">
-                <div className="metrics">
-                  <Metric
-                    label="最终资产"
-                    value={finalValue !== null ? money.format(finalValue) : '暂无'}
-                  />
-                  <Metric label="累计收益" value={metricValue('cumulativeReturn', 'totalReturn')} />
-                  <Metric label="最大回撤" value={metricValue('maxDrawdown')} tone="down" />
-                  <Metric label="交易胜率" value={metricValue('tradeWinRate', 'winRate')} />
-                  {isV2Result && <Metric label="年化收益" value={metricValue('cagr')} />}
-                  {isV2Result && <Metric label="波动率" value={metricValue('volatility')} />}
-                  {isV2Result && (
-                    <Metric label="夏普比率" value={metricValue('sharpe', 'sharpe', false)} />
-                  )}
-                  {isV2Result && (
-                    <Metric
-                      label="利润因子"
-                      value={metricValue('profitFactor', 'profitFactor', false)}
-                    />
-                  )}
-                </div>
-                <div className="module-grid">
-                  <div>
-                    <span>权益曲线</span>
-                    <strong>{equityCurve.length} 个数据点</strong>
-                  </div>
-                  <div>
-                    <span>交易明细</span>
-                    <strong>{trades.length} 笔</strong>
-                  </div>
-                  <div>
-                    <span>引擎</span>
-                    <strong>
-                      {displayValue(result.engineVersion ?? job.engineVersion ?? '未知')}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>数据时点</span>
-                    <strong>{formatBacktestDataAsOf(result.dataAsOf ?? job.dataAsOf)}</strong>
-                  </div>
-                </div>
-                {warnings.length > 0 && (
-                  <Alert>
-                    <AlertTitle>运行提示</AlertTitle>
-                    <AlertDescription>{warnings.join('；')}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-md border border-border p-3">
-                    <p className="text-sm font-medium">数据完整性</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {completenessLabel(result.completeness)}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border p-3">
-                    <p className="text-sm font-medium">拒单</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      场内 {rejectedOrders.length} 笔 · NAV {rejectedNavRequests.length} 笔
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border p-3">
-                    <p className="text-sm font-medium">费用 / 换手</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {hasFeeData ? money.format(totalFees) : '费用不可用'} ·{' '}
-                      {metricNumber(metrics?.turnover) !== null
-                        ? money.format(metricNumber(metrics?.turnover)!)
-                        : '换手不可用'}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border p-3">
-                    <p className="text-sm font-medium">基准比较</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{benchmarkSummary()}</p>
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="equity" className="pt-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <figure className="rounded-md border border-border p-3">
-                    <svg
-                      viewBox="0 0 100 100"
-                      role="img"
-                      aria-label="权益曲线"
-                      className="h-40 w-full"
-                      preserveAspectRatio="none"
-                    >
-                      <polyline
-                        points={seriesPoints(equityCurve)}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    </svg>
-                    <figcaption className="text-xs text-muted-foreground">
-                      权益曲线，共 {equityCurve.length} 个数据点。
-                    </figcaption>
-                  </figure>
-                  <figure className="rounded-md border border-border p-3">
-                    <svg
-                      viewBox="0 0 100 100"
-                      role="img"
-                      aria-label="回撤曲线"
-                      className="h-40 w-full"
-                      preserveAspectRatio="none"
-                    >
-                      <polyline
-                        points={seriesPoints(drawdown)}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    </svg>
-                    <figcaption className="text-xs text-muted-foreground">
-                      回撤曲线，最大回撤 {metricValue('maxDrawdown')}。
-                    </figcaption>
-                  </figure>
-                </div>
-                <ResultTable
-                  headers={['日期', '组合价值']}
-                  rows={equityCurve
-                    .slice(-100)
-                    .map((point) => [formatDateOnly(point.date), money.format(point.value)])}
-                />
-              </TabsContent>
-              <TabsContent value="trades" className="pt-4">
-                <ResultTable
-                  headers={['日期', '方向', '数量', '价格', '原因']}
-                  rows={trades.map((trade) => [
-                    typeof (trade.closedAt ?? trade.date) === 'string'
-                      ? formatDateOnly(String(trade.closedAt ?? trade.date))
-                      : '—',
-                    tradeSideLabel(trade.side ?? (trade.closedAt ? 'sell' : null)),
-                    displayValue(trade.quantity ?? trade.exitQuantity ?? '—'),
-                    displayValue(trade.price ?? decimalNumber(trade.exitValue) ?? '—'),
-                    tradeReasonLabel(trade.reason ?? trade.closeReason),
-                  ])}
-                />
-              </TabsContent>
-              <TabsContent value="repro" className="grid gap-3 pt-4">
-                <ReproField label="策略版本" value={job.strategyVersionId} />
-                <ReproField
-                  label="引擎版本"
-                  value={job.engineVersion ?? result.engineVersion ?? '未知'}
-                />
-                <ReproField
-                  label="数据时点"
-                  value={formatBacktestDataAsOf(job.dataAsOf ?? result.dataAsOf)}
-                />
-                <ReproField label="结果校验和" value={job.resultChecksum ?? '未返回'} />
-                <ReproField label="数据快照" value={result.snapshotId ?? '未返回'} />
-                <ReproField label="市场规则版本" value={result.marketRuleVersion ?? '未返回'} />
-                <ReproField label="日历版本" value={result.calendarVersion ?? '未返回'} />
-                <ReproField label="聚合版本" value={result.aggregationVersion ?? '未返回'} />
-                <ReproField label="内容哈希" value={result.contentHash ?? '未返回'} />
-              </TabsContent>
-            </Tabs>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ResultTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th key={header}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <EmptyTableRow colSpan={headers.length} label="暂无数据" />
-          ) : (
-            rows.map((row, index) => (
-              <tr key={`${row[0] ?? 'row'}-${index}`}>
-                {row.map((cell, cellIndex) => (
-                  <td key={`${cell}-${cellIndex}`}>{cell}</td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ReproField({ label, value }: { label: string; value: unknown }) {
-  return (
-    <div className="rounded-md border border-border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <code className="mt-1 block break-all text-xs">{displayValue(value)}</code>
-    </div>
   );
 }

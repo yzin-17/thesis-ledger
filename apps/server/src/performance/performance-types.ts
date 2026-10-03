@@ -1,4 +1,4 @@
-import type { CurrencyV1 } from '@thesis-ledger/schemas';
+import type { Currency as MarketCurrency } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import {
   supportedCurrency,
@@ -19,7 +19,7 @@ export type SnapshotCaptureContext = {
   disclosureCoverage?: number;
   pricedCoverage?: number;
 };
-export type Currency = CurrencyV1;
+export type Currency = MarketCurrency;
 export type PerformanceFxOptions = FxConversionOptions;
 export type PerformanceFxMeta = FxConversionMeta;
 

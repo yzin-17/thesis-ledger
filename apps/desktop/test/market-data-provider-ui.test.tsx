@@ -4,13 +4,22 @@ import { MarketPolicyPanel } from '../src/features/market-data/MarketPolicyPanel
 import { MarketProviderPanel } from '../src/features/market-data/MarketProviderPanel.js';
 import { MarketDataSectionTabs } from '../src/features/market-data/MarketDataSectionTabs.js';
 import { InstrumentCatalogPanel } from '../src/features/market-data/InstrumentCatalogPanel.js';
+import { parseMarketPolicyResponse } from '../src/features/market-data/market-data.api.js';
 import {
   compatibleRouteTargets,
   compatibleProviders,
-  updateRouteRole,
-  type MarketPolicy,
+  type MarketPolicyDraftV3,
+  type MarketRouteCatalogReadV3,
+  type MarketPolicyV3,
   type ProviderManifest,
 } from '../src/features/market-data/market-data.types.js';
+import {
+  marketPolicyRouteRowsV3,
+  readyRouteTargetsV3,
+  routeAvailabilityLabelV3,
+  routeAvailabilityMessageV3,
+  updatePolicyRouteTargetV3,
+} from '../src/features/market-data/market-data-routes-v3.js';
 
 const routeProvider = (
   providerId: string,
@@ -31,9 +40,15 @@ const routeProvider = (
   configurationMode,
   upstreamSources: [{ sourceId: providerId, displayName, capabilities: { DAILY_BAR: ['STOCK'] } }],
   credentialSchema: {
-    methods: configurationMode === 'dsa_environment' ? [{
-      method: 'api_key', fields: [{ name: 'apiKey', required: true, secret: true }],
-    }] : [],
+    methods:
+      configurationMode === 'dsa_environment'
+        ? [
+            {
+              method: 'api_key',
+              fields: [{ name: 'apiKey', required: true, secret: true }],
+            },
+          ]
+        : [],
   },
 });
 
@@ -50,8 +65,16 @@ const providers: ProviderManifest[] = [
     markets: ['CN'],
     configurationMode: 'control',
     upstreamSources: [
-      { sourceId: 'eastmoney', displayName: '东方财富', capabilities: { DAILY_BAR: ['STOCK', 'ETF'] } },
-      { sourceId: 'tencent', displayName: '腾讯财经', capabilities: { DAILY_BAR: ['STOCK', 'ETF'] } },
+      {
+        sourceId: 'eastmoney',
+        displayName: '东方财富',
+        capabilities: { DAILY_BAR: ['STOCK', 'ETF'] },
+      },
+      {
+        sourceId: 'tencent',
+        displayName: '腾讯财经',
+        capabilities: { DAILY_BAR: ['STOCK', 'ETF'] },
+      },
     ],
   },
   {
@@ -65,7 +88,13 @@ const providers: ProviderManifest[] = [
     origin: 'dsa',
     markets: ['CN'],
     configurationMode: 'control',
-    upstreamSources: [{ sourceId: 'tencent', displayName: '腾讯财经', capabilities: { DAILY_BAR: ['STOCK', 'ETF'] } }],
+    upstreamSources: [
+      {
+        sourceId: 'tencent',
+        displayName: '腾讯财经',
+        capabilities: { DAILY_BAR: ['STOCK', 'ETF'] },
+      },
+    ],
     updatedAt: '2026-09-08T00:00:00Z',
   },
   {
@@ -89,26 +118,87 @@ const providers: ProviderManifest[] = [
   routeProvider('alphavantage', 'Alpha Vantage', ['US'], 'dsa_environment'),
 ];
 
-const policy: MarketPolicy = {
-  contractVersion: 2,
+const stockNone = {
+  kind: 'bar',
+  market: 'CN',
+  assetType: 'STOCK',
+  capability: 'DAILY_BAR',
+  timeframe: '1d',
+  adjustment: 'none',
+} as const;
+const stockQfq = { ...stockNone, adjustment: 'qfq' } as const;
+const stockHfq = { ...stockNone, adjustment: 'hfq' } as const;
+const etfQfq = { ...stockQfq, assetType: 'ETF' } as const;
+const stockDividend = {
+  kind: 'data',
+  market: 'CN',
+  assetType: 'STOCK',
+  capability: 'DIVIDEND',
+} as const;
+const akshareEastmoney = { providerId: 'akshare', upstreamSource: 'eastmoney' };
+const tencent = { providerId: 'tencent', upstreamSource: 'tencent' };
+const v3Catalog: MarketRouteCatalogReadV3 = {
+  contractVersion: 3,
+  consumer: 'thesis-ledger',
+  status: 'complete',
+  catalogRevision: 8,
+  generatedAt: '2026-09-25T00:00:00Z',
+  entries: [
+    { key: stockNone, target: akshareEastmoney, state: 'ready' },
+    { key: stockNone, target: tencent, state: 'ready' },
+    { key: stockQfq, target: akshareEastmoney, state: 'credential_missing' },
+    { key: stockQfq, target: tencent, state: 'ready' },
+    { key: etfQfq, target: akshareEastmoney, state: 'ready' },
+    { key: stockDividend, target: akshareEastmoney, state: 'ready' },
+  ],
+  reason: null,
+};
+const v3Draft: MarketPolicyDraftV3 = {
+  contractVersion: 3,
   revision: 14,
   enabled: true,
-  routes: {
-    DAILY_BAR: {
-      STOCK: [
-        { providerId: 'akshare', upstreamSource: 'eastmoney' },
-        { providerId: 'tencent', upstreamSource: 'tencent' },
-      ],
-      ETF: [
-        { providerId: 'tencent', upstreamSource: 'tencent' },
-        { providerId: 'akshare', upstreamSource: 'eastmoney' },
-      ],
-    },
-  },
+  routes: [
+    { key: stockNone, targets: [akshareEastmoney, tencent] },
+    { key: stockQfq, targets: [tencent] },
+    { key: stockHfq, targets: [akshareEastmoney] },
+  ],
+};
+const v3AppliedPolicy: MarketPolicyV3 = {
+  ...v3Draft,
+  consumer: 'thesis-ledger',
+  requestId: 'policy-14',
   syncState: 'applied',
+  dsaRevision: 9,
+  effectiveStale: false,
+  effectiveProjection: {
+    contractVersion: 3,
+    consumer: 'thesis-ledger',
+    requestId: 'policy-14',
+    revision: 9,
+    sourceDesiredRevision: 14,
+    enabled: true,
+    routes: v3Draft.routes.map((route) => ({
+      ...route,
+      targets: route.targets.map((target, routeIndex) => ({
+        ...target,
+        routeIndex,
+        eligible: true,
+        reason: null,
+      })),
+      reason: null,
+    })),
+    appliedAt: '2026-09-25T00:00:00Z',
+  },
 };
 
 describe('市场数据 Provider 与主备路由', () => {
+  it('拒绝旧合同策略响应，保留 V3 的精确路由', () => {
+    expect(parseMarketPolicyResponse(v3AppliedPolicy).routes).toEqual(v3Draft.routes);
+    expect(() => parseMarketPolicyResponse({ ...v3AppliedPolicy, contractVersion: 2 })).toThrow(
+      '需要 V3 策略',
+    );
+  });
+
   it('用三个一级 Tab 分隔任务并默认打开路由策略', () => {
     const html = renderToStaticMarkup(
       <MarketDataSectionTabs
@@ -152,29 +242,6 @@ describe('市场数据 Provider 与主备路由', () => {
     ]);
   });
 
-  it('用两个角色维护有序路由并阻止主备重复', () => {
-    const eastmoney = { providerId: 'akshare', upstreamSource: 'eastmoney' };
-    const tencent = { providerId: 'tencent', upstreamSource: 'tencent' };
-    const akshareTencent = { providerId: 'akshare', upstreamSource: 'tencent' };
-    const changedPrimary = updateRouteRole(policy, 'DAILY_BAR', 'ETF', 'primary', eastmoney);
-    expect(changedPrimary.routes.DAILY_BAR?.ETF).toEqual([eastmoney]);
-
-    const changedFallback = updateRouteRole(policy, 'DAILY_BAR', 'ETF', 'fallback', tencent);
-    expect(changedFallback.routes.DAILY_BAR?.ETF).toEqual([tencent]);
-
-    const sameProviderDifferentSource = updateRouteRole(
-      changedPrimary,
-      'DAILY_BAR',
-      'ETF',
-      'fallback',
-      akshareTencent,
-    );
-    expect(sameProviderDifferentSource.routes.DAILY_BAR?.ETF).toEqual([
-      eastmoney,
-      akshareTencent,
-    ]);
-  });
-
   it('路由候选是 manifest 声明的 adapter/source 组合', () => {
     expect(
       compatibleRouteTargets(providers, 'DAILY_BAR', 'ETF').map((option) => option.target),
@@ -183,6 +250,50 @@ describe('市场数据 Provider 与主备路由', () => {
       { providerId: 'akshare', upstreamSource: 'tencent' },
       { providerId: 'tencent', upstreamSource: 'tencent' },
     ]);
+  });
+
+  it('V3 候选只来自完整精确目录的 ready 项，并为价格口径生成独立路由', () => {
+    const rows = marketPolicyRouteRowsV3(v3Catalog, v3Draft);
+    const stockRows = rows.filter((row) => row.key.kind === 'bar' && row.key.assetType === 'STOCK');
+
+    expect(stockRows.map((row) => row.key.kind === 'bar' && row.key.adjustment)).toEqual([
+      'none',
+      'qfq',
+      'hfq',
+    ]);
+    expect(
+      readyRouteTargetsV3(v3Catalog, stockQfq, providers).map((option) => option.target),
+    ).toEqual([tencent]);
+    expect(readyRouteTargetsV3(v3Catalog, stockHfq, providers)).toEqual([]);
+    expect(
+      readyRouteTargetsV3(
+        { ...v3Catalog, status: 'partial', entries: [], reason: 'catalog_partial' },
+        stockNone,
+        providers,
+      ),
+    ).toEqual([]);
+    expect(routeAvailabilityMessageV3(v3Catalog, stockQfq)).toBe('凭据缺失');
+    expect(routeAvailabilityLabelV3('insufficient_coverage')).toBe('覆盖范围不足');
+    expect(routeAvailabilityLabelV3('policy_not_applied')).toBe('期望路由尚未生效');
+    expect(rows.find((row) => row.key.kind === 'data')?.label).toContain('现金分红');
+    expect(rows.find((row) => row.key.kind === 'data')?.label).not.toContain('复权');
+  });
+
+  it('V3 编辑只改精确 routeKey，不串改其他复权口径', () => {
+    const changed = updatePolicyRouteTargetV3(v3Draft, stockQfq, 'primary', tencent);
+
+    expect(
+      changed.routes.find((route) => route.key.kind === 'bar' && route.key.adjustment === 'none')
+        ?.targets,
+    ).toEqual([akshareEastmoney, tencent]);
+    expect(
+      changed.routes.find((route) => route.key.kind === 'bar' && route.key.adjustment === 'qfq')
+        ?.targets,
+    ).toEqual([tencent]);
+    expect(
+      changed.routes.find((route) => route.key.kind === 'bar' && route.key.adjustment === 'hfq')
+        ?.targets,
+    ).toEqual([akshareEastmoney]);
   });
 
   it('Provider 清单为全部 DSA 数据源提供路由配置操作', () => {
@@ -218,23 +329,84 @@ describe('市场数据 Provider 与主备路由', () => {
   it('路由面板明确渲染主数据源和备用数据源', () => {
     const html = renderToStaticMarkup(
       <MarketPolicyPanel
-        policy={policy}
+        policy={v3Draft}
+        serverPolicy={v3AppliedPolicy}
+        catalog={v3Catalog}
+        catalogPending={false}
+        catalogQueryFailed={false}
         providers={providers}
         disabled={false}
         saving={false}
+        retrying={false}
+        dirty={true}
         onChange={vi.fn()}
         onSave={vi.fn()}
+        onRetry={vi.fn()}
       />,
     );
 
     expect(html).toContain('主数据源');
     expect(html).toContain('备用数据源');
-    expect(html).toContain('日线 Bar 主数据源');
+    expect(html).toContain('中国内地股票 · 日线行情（日线／不复权） 主数据源');
     expect(html).toContain('AKShare · 东方财富');
     expect(html).toContain('腾讯财经');
+    expect(html).not.toContain('旧版主备设置已保留');
+    expect(html).toContain('保存后为 15');
     expect(html).toContain('保存路由策略');
     expect(html).not.toContain('第 14 版');
     expect(html).not.toContain('上移');
+  });
+
+  it('V3 面板区分期望修订和生效修订，并呈现已生效状态', () => {
+    const html = renderToStaticMarkup(
+      <MarketPolicyPanel
+        policy={v3Draft}
+        serverPolicy={v3AppliedPolicy}
+        catalog={v3Catalog}
+        catalogPending={false}
+        catalogQueryFailed={false}
+        providers={providers}
+        disabled={false}
+        saving={false}
+        retrying={false}
+        dirty={false}
+        onChange={vi.fn()}
+        onSave={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('期望修订：14');
+    expect(html).toContain('生效修订：9（对应期望 14）');
+    expect(html).toContain('已生效');
+  });
+
+  it('partial 目录下显示保存的路由但禁用选择和保存', () => {
+    const html = renderToStaticMarkup(
+      <MarketPolicyPanel
+        policy={v3Draft}
+        serverPolicy={v3AppliedPolicy}
+        catalog={{ ...v3Catalog, status: 'partial', entries: [], reason: 'catalog_partial' }}
+        catalogPending={false}
+        catalogQueryFailed={false}
+        providers={providers}
+        disabled={false}
+        saving={false}
+        retrying={false}
+        dirty={false}
+        onChange={vi.fn()}
+        onSave={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('路由能力目录尚未完整');
+    expect(html).toContain('AKShare · 东方财富');
+    const selectors = html.match(/<button\b[^>]*role="combobox"[^>]*>/g) ?? [];
+    expect(selectors).toHaveLength(6);
+    expect(selectors.every((selector) => selector.includes('disabled=""'))).toBe(true);
+    const saveButton = html.match(/<button\b[^>]*>保存路由策略<\/button>/)?.[0];
+    expect(saveButton).toContain('disabled=""');
   });
 
   it('标的目录展示有效数量但不暴露技术版本号', () => {

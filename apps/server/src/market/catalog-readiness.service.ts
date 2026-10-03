@@ -1,12 +1,12 @@
 import {
-  BadRequestException,
   Injectable,
   OnModuleDestroy,
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { DsaClient, DsaError, type CatalogJob } from '../integration/dsa/dsa.client.js';
+import { DsaClient, type CatalogJob } from '../integration/dsa/dsa.client.js';
 import { StructuredLogger } from '../platform/structured-logger.js';
+import { projectCatalogJob, type CatalogProjection } from './catalog-job-projection.js';
 import { InstrumentService } from './instrument.service.js';
 
 const CATALOG_STATUS_CHECK_INTERVAL_MS = 5 * 60_000;
@@ -18,16 +18,6 @@ const CATALOG_SEARCH_WAIT_TIMEOUT_MS = 5_000;
 const CATALOG_RETRY_COOLDOWN_MS = 30_000;
 
 type CatalogStatus = Awaited<ReturnType<InstrumentService['latestGeneration']>>;
-type CatalogProjection = {
-  generation: number;
-  checksum: string;
-  count: number;
-  cursor: string;
-  idempotent?: boolean;
-  incremental?: boolean;
-  deletedCount?: number;
-  acknowledged: boolean;
-};
 
 export type CatalogReadinessState = 'ready' | 'stale' | 'unavailable';
 
@@ -159,68 +149,8 @@ export class CatalogReadinessService implements OnModuleInit, OnModuleDestroy {
     return { ...job, ...(await this.projectSucceededJob(job)) };
   }
 
-  /** Project a succeeded DSA Job, used by both polling and status endpoints. */
   async projectSucceededJob(job: CatalogJob): Promise<CatalogProjection> {
-    if (job.status !== 'succeeded') {
-      throw new CatalogJobFailure(`目录同步任务未成功: ${job.status}`);
-    }
-
-    const status = await this.instruments.latestGeneration();
-    if (status.generation > job.generation) {
-      throw new CatalogJobFailure('本地目录 generation 高于 DSA 任务，拒绝倒退');
-    }
-
-    // DSA may return a successful no-op Job when the remote generation has not
-    // changed. Avoid asking delta for the same cursor, which is intentionally
-    // rejected by the local strictly-forward delta contract.
-    const existingProjection = await this.acknowledgeIfCurrent(status, job);
-    if (existingProjection) return existingProjection;
-
-    try {
-      let synced: Omit<CatalogProjection, 'acknowledged'>;
-      if (status.cursor) {
-        try {
-          synced = await this.instruments.applyCatalogDelta(
-            await this.dsa.catalogDelta(status.cursor),
-          );
-        } catch (error) {
-          const concurrentProjection = await this.waitForConcurrentProjection(job);
-          if (concurrentProjection) return concurrentProjection;
-          if (!(error instanceof DsaError || error instanceof BadRequestException)) throw error;
-          synced = await this.instruments.syncCatalog(await this.dsa.catalogSnapshot());
-        }
-      } else {
-        synced = await this.instruments.syncCatalog(await this.dsa.catalogSnapshot());
-      }
-
-      await this.dsa.acknowledgeCatalog(synced.generation, synced.checksum);
-      return { ...synced, acknowledged: true };
-    } catch (error) {
-      // Serializable projection can lose a race to another Server instance.
-      // Treat the already committed generation as success instead of surfacing
-      // a retryable search failure or attempting a second committed projection.
-      const concurrentProjection = await this.waitForConcurrentProjection(job);
-      if (concurrentProjection) return concurrentProjection;
-      throw error;
-    }
-  }
-
-  private async acknowledgeIfCurrent(
-    status: CatalogStatus,
-    job: CatalogJob,
-  ): Promise<CatalogProjection | undefined> {
-    if (status.generation !== job.generation || status.checksum !== job.checksum || !status.cursor)
-      return undefined;
-    await this.dsa.acknowledgeCatalog(job.generation, job.checksum);
-    const checked = await this.instruments.markCatalogChecked(job.generation, job.checksum);
-    return {
-      generation: checked.generation,
-      checksum: job.checksum,
-      count: checked.instrumentCount,
-      cursor: checked.cursor ?? status.cursor,
-      idempotent: true,
-      acknowledged: true,
-    };
+    return projectCatalogJob(this.instruments, this.dsa, job);
   }
 
   private waitForSynchronization(waitMs: number) {
@@ -301,7 +231,9 @@ export class CatalogReadinessService implements OnModuleInit, OnModuleDestroy {
       const leaseDeadline = current.leaseExpiresAt
         ? Date.parse(current.leaseExpiresAt) + CATALOG_JOB_LEASE_GRACE_MS
         : Number.NaN;
-      const deadline = Number.isFinite(leaseDeadline) ? leaseDeadline : fallbackDeadline;
+      const deadline = Number.isFinite(leaseDeadline)
+        ? Math.min(leaseDeadline, fallbackDeadline)
+        : fallbackDeadline;
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
         current = await this.dsa.catalogJob(current.id);
@@ -331,18 +263,6 @@ export class CatalogReadinessService implements OnModuleInit, OnModuleDestroy {
     if (status.instrumentCount === 0 || !status.cursor || !status.checksum || !status.syncedAt)
       return 'unavailable';
     return now - status.syncedAt.getTime() >= CATALOG_REFRESH_INTERVAL_MS ? 'stale' : 'ready';
-  }
-
-  private async waitForConcurrentProjection(
-    job: CatalogJob,
-  ): Promise<CatalogProjection | undefined> {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const current = await this.instruments.latestGeneration();
-      const projection = await this.acknowledgeIfCurrent(current, job);
-      if (projection) return projection;
-      if (attempt < 4) await delay(50 * (attempt + 1));
-    }
-    return undefined;
   }
 }
 
