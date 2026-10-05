@@ -19,7 +19,7 @@ import { StrategyRiskApplicationStoreService } from '../../src/strategy-optimiza
 import { StrategyRiskApplicationService } from '../../src/strategy-optimization/strategy-risk-application.service.js';
 import { createRiskMarketFixture } from './strategy-optimization-market-fixture.js';
 import {
-  createStrategyFixture, runConfig, split, budget, proposal, waitUntil,
+  createStrategyFixture, createNormalizedRunConfig, split, budget, proposal, waitUntil,
 } from './strategy-optimization-postgres-fixtures.js';
 
 const postgresDescribe =
@@ -28,6 +28,7 @@ const symbol = '600519.SH';
 const evaluatedAt = new Date('2026-09-11T08:00:00.000Z');
 const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const strategy = createStrategyFixture(symbol, suffix);
+const runConfig = createNormalizedRunConfig();
 
 postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   const prisma = new PrismaService();

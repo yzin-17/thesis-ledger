@@ -22,11 +22,7 @@ const researchRecovery = (metadata: unknown) => {
   return 'unknown' as const;
 };
 
-export async function recoverStaleAiRuns(
-  prisma: PrismaService,
-  now: Date,
-  maxAttempts: number,
-) {
+export async function recoverStaleAiRuns(prisma: PrismaService, now: Date, maxAttempts: number) {
   const optimizationUnknown = await prisma.aiRun.updateMany({
     where: {
       status: 'running',
@@ -44,16 +40,22 @@ export async function recoverStaleAiRuns(
   });
   const findResearchRuns = (
     prisma.aiRun as unknown as {
-      findMany?: (args: unknown) => Promise<
-        Array<{ id: string; executionAttempt: number; modelMetadata: unknown }>
-      >;
+      findMany?: (
+        args: unknown,
+      ) => Promise<Array<{ id: string; executionAttempt: number; modelMetadata: unknown }>>;
     }
   ).findMany;
   const researchRuns = findResearchRuns
     ? await findResearchRuns({
         where: {
           status: 'running',
-          promptVersion: 'research-v1',
+          OR: [
+            { promptVersion: 'research-v1' },
+            { modelMetadata: { path: ['sdkExecution', 'contract', 'id'], equals: 'research' } },
+            {
+              modelMetadata: { path: ['frozenResearch', 'version'], equals: 'frozen-research-v1' },
+            },
+          ],
           leaseUntil: { lt: now },
         },
         select: { id: true, executionAttempt: true, modelMetadata: true },
@@ -95,6 +97,7 @@ export async function recoverStaleAiRuns(
     where: {
       status: 'running',
       promptVersion: { notIn: ['strategy-optimization-v1', 'research-v1'] },
+      id: { notIn: researchRuns.map((run) => run.id) },
       leaseUntil: { lt: now },
       executionAttempt: { lt: maxAttempts },
     },
@@ -110,6 +113,7 @@ export async function recoverStaleAiRuns(
     where: {
       status: 'running',
       promptVersion: { notIn: ['strategy-optimization-v1', 'research-v1'] },
+      id: { notIn: researchRuns.map((run) => run.id) },
       leaseUntil: { lt: now },
       executionAttempt: { gte: maxAttempts },
     },

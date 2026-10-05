@@ -1,5 +1,7 @@
 # 投资复盘工作台（统一 Trade Projection）实施任务
 
+> 状态对账（2026-10-05）：T1～T3 已完成；单笔/周期交互、引用恢复与历史读取的真实挂载验证，真实默认模型 v2 内容、官方保数据更新及目标在途恢复均已通过。按用户调整后的本轮范围，T4～T7 的完整 Web 浏览器状态矩阵、全页面键盘/窄屏与远端 CI 继续开放。当前依据见[本轮对账](../reviews/2026-10-05-journal-review-completion.md)与[本轮证据](evidence/2026-10-05-journal-review-completion.md)；此前 GET 缺失描述属于历史基线。
+
 对应 Spec：[`../specs/2026-08-28-journal-review-trade-projection.md`](../specs/2026-08-28-journal-review-trade-projection.md)
 
 ## 执行约束
@@ -27,7 +29,9 @@
 
 ## 任务清单
 
-- [ ] T1：冻结 Journal 复盘对象与数据契约
+2026-10-04 实施细分见[契约与读取链路任务](2026-10-04-journal-review-contracts.md)。C1～C4 与正式 API 消费已完成；T4～T7 以本文件全部完成条件继续验收，不能用核心流程替代完整状态矩阵。
+
+- [x] T1：冻结 Journal 复盘对象与数据契约
   - 覆盖验收标准：AC2、AC3、AC4、AC6、AC7、AC9、AC10、AC12、AC16
   - 依赖：无
   - 涉及范围：`TRADE_CYCLE`/`CLOSE_SLICE`、稳定 ID、ACTIVE/ENDED、退出证据、Baseline、decimal、未知 `openedAt`、`[start,end)`、统计资格、投影版本和对象级证据指纹。
@@ -44,7 +48,7 @@
     - 示例覆盖完整 Trade、ACTIVE Trade、部分减仓、余额观察结束、Baseline 估算、成本冲突、FX 缺失、未知 `openedAt`、时间边界和 legacy adapter。
     - 验证不存在将 JS `number`、记录时间或 Desktop 本地推断重新引入主链路的路径。
 
-- [ ] T2：核对并补齐统一 Trade Projection 候选编排
+- [x] T2：核对并补齐统一 Trade Projection 候选编排
   - 覆盖验收标准：AC1、AC2、AC3、AC4、AC5、AC10、AC12、AC16
   - 依赖：T1
   - 涉及范围：Journal 候选查询、Trade 详情、Close Slice、TradePlan/Journal 证据、Projection Generation/Fingerprint、Evidence Fingerprint、legacy 候选和账户/模式筛选。
@@ -61,7 +65,7 @@
     - 增加对象级 fingerprint 测试：相关事实变化必须改变；无关标的/Trade 变化不得改变。
     - 确认候选读取无账本写入。
 
-- [ ] T3：实现确定性分析适配与复盘 Snapshot
+- [x] T3：实现确定性分析适配与复盘 Snapshot
   - 覆盖验收标准：AC6、AC7、AC11、AC12、AC13、AC14
   - 依赖：T1、T2
   - 涉及范围：Trade/Close Slice → decimal Journal 分析 DTO、legacy number adapter、时间缺失降级、复盘输入/输出 Snapshot、Snapshot 列表/详情读取和 STALE 判断。
@@ -123,6 +127,7 @@
   - 验证方式：
     - API/UI 测试覆盖 AI 成功、失败、不可用、重复触发、账户/模式切换、当前/过期 Snapshot 和历史 Snapshot。
     - 确认 AI 请求不创建交易事实、不改变 Snapshot STALE 状态。
+  - 2026-10-05 增量：真实默认模型 revision 2 的单笔/周期 v2 内容与引用已验收，旧报告与账本保持不变，见[内容证据](evidence/2026-10-05-journal-model-content-v2.md)。引用刷新恢复的挂载测试和目标进程恢复已通过；浏览器真实结果消费按[收口任务](2026-10-05-journal-review-completion.md) J8 继续。旧 revision 1 的质量不足属于保留的历史结果，不作为当前 v2 阻塞；T6 在全部消费条件满足后才关闭。
 
 - [ ] T7：完成回归验证、文档和最终一致性 Review
   - 覆盖验收标准：AC1–AC16
@@ -143,24 +148,24 @@
 
 ## 验收标准映射
 
-| Spec 验收标准 | 对应任务 |
-| --- | --- |
-| AC1 | T2、T7 |
-| AC2 | T1、T2、T4、T5 |
-| AC3 | T1、T2、T4、T5 |
-| AC4 | T1、T2、T5 |
-| AC5 | T2、T4 |
-| AC6 | T1、T3、T7 |
-| AC7 | T1、T3、T4、T7 |
-| AC8 | T4 |
-| AC9 | T1、T5 |
-| AC10 | T1、T2、T4、T5、T7 |
-| AC11 | T3、T4、T5、T6 |
-| AC12 | T1、T2、T3、T6、T7 |
-| AC13 | T3、T6、T7 |
-| AC14 | T3、T6 |
-| AC15 | T4、T5、T6、T7 |
-| AC16 | T1、T2、T4、T7 |
+| Spec 验收标准 | 对应任务           |
+| ------------- | ------------------ |
+| AC1           | T2、T7             |
+| AC2           | T1、T2、T4、T5     |
+| AC3           | T1、T2、T4、T5     |
+| AC4           | T1、T2、T5         |
+| AC5           | T2、T4             |
+| AC6           | T1、T3、T7         |
+| AC7           | T1、T3、T4、T7     |
+| AC8           | T4                 |
+| AC9           | T1、T5             |
+| AC10          | T1、T2、T4、T5、T7 |
+| AC11          | T3、T4、T5、T6     |
+| AC12          | T1、T2、T3、T6、T7 |
+| AC13          | T3、T6、T7         |
+| AC14          | T3、T6             |
+| AC15          | T4、T5、T6、T7     |
+| AC16          | T1、T2、T4、T7     |
 
 ## 当前基线与非任务范围
 
@@ -171,38 +176,23 @@
 
 ## 最终一致性 Review
 
-- [ ] Spec 中的全部验收标准均有对应实现
-- [ ] 所有已勾选任务均有验证证据
-- [ ] 所有任务依赖均已满足且无错误阻塞关系
-- [ ] T4 与 T5 在 T3 后可独立/并行实施，无隐式 UI 依赖
-- [ ] 跨任务接口、类型和命名保持一致
-- [ ] `reviewObjectId` 的稳定规则在 domain/server/Desktop 一致
-- [ ] 新主链路使用 decimal string，旧 `CompletedTrade<number>` 只存在于 legacy adapter
-- [ ] `openedAt=null` 不被任何观测时间替代
-- [ ] `[start,end)`、`effectiveClosedAt`、`executedAt` 的时间口径一致
-- [ ] `statisticsEligibility` 只由 domain/server 判断
-- [ ] Snapshot STALE 由对象级 `evidenceFingerprint` 正确驱动
-- [ ] 无关资产/Trade 变化不会导致当前对象 Snapshot STALE
-- [ ] Snapshot 保存、列表、详情读取均有实现和测试
-- [ ] 高级 JSON 不进入正式候选、统计或 Snapshot
-- [ ] 实现未超出 Spec 声明的范围
-- [ ] 测试策略、测试实现与验证结果一致
-- [ ] 测试与文档已同步更新
-- [ ] 必要实施 Step 均已验证；如已获提交授权，已形成合理 commit，否则已记录提交状态或建议边界
-- [ ] 未发现实现、Spec 与任务文档之间的不一致
+本轮按[AC1～AC16 对账](../reviews/2026-10-04-journal-review-consistency.md)检查，未完成产品门禁保持开放。
+
+- [ ] 全部验收标准和必要实施阶段均完成验证
+- [x] 已勾选的 T1～T3 均有当前实现与验证证据
+- [x] 任务依赖、跨模块契约、对象 ID、decimal、nullable 时间与窗口口径一致
+- [x] 统计资格仅由 domain/server 判断，完整周期与减仓独立
+- [x] 对象级指纹及相关/无关事实的 STALE 行为有定向与数据库证据
+- [x] 显式 Snapshot 保存、列表、详情和历史结果保留已验证
+- [x] 高级 JSON 不进入正式候选、统计或 Snapshot；未增加第三类对象
+- [x] 用户指南、当前 Task 和分层证据已同步
+- [x] 未获提交授权，未 stage/commit/push，未关联 WIP 保留
+- [x] 真实默认模型 v2、目标在途恢复、账本与旧报告保护
+- [ ] 完整 Web 浏览器状态矩阵、全页面键盘/窄屏和远端 CI
+- [ ] 所有实现、Spec、Task 与验收证据最终闭合
 
 ### Review 结论
 
-- 结论：关键契约已在 Spec 中收敛，可从 T1 开始实施。
-- 已确认：
-  - 新 Journal 确定性分析使用 decimal string DTO；
-  - `openedAt` 允许为空且不伪造；
-  - Snapshot 使用对象级 `evidenceFingerprint`；
-  - 时间窗口和统计资格由统一 domain 契约定义；
-  - 正式 Snapshot 支持保存、列表与详情读取；
-  - 高级 JSON 仅保留兼容/调试能力。
-- 遗留风险：
-  - legacy number 快照的兼容边界需在 T3 通过真实样本验证；
-  - `evidenceFingerprint` 的依赖范围需要 T2/T3 测试防止过宽或过窄；
-  - 旧报告与新 Trade Cycle/Close Slice 统计口径不可直接横向比较。
-- 验证命令与结果：本轮为文档迭代，业务测试应在对应任务实施后记录；文档提交前仍需执行 Markdown 链接检查、格式检查和 `git diff --check`。
+实现主链路已收敛，原 T1～T3 完成；T4～T7 的最终消费与外部门禁继续开放。确定性、对象读取、快照、真实挂载交互、真实默认模型和目标恢复分别有证据；按本轮范围，不以固定页或本地测试替代真实 Web 浏览器和远端 CI。
+
+2026-10-05 当前默认模型 revision 2 的单笔/周期 v2 内容及引用已通过，见[真实模型证据](evidence/2026-10-05-journal-model-content-v2.md)。本轮补齐真实 React 挂载交互、任务引用恢复与历史来源读取，Desktop 611 个测试通过；官方保数据升级、目标恢复及最终镜像更新完成，账本和旧报告保持，见[本轮证据](evidence/2026-10-05-journal-review-completion.md)与[逐项对账](../reviews/2026-10-05-journal-review-completion.md)。真实 Web 浏览器上次被保存的拒绝设置阻断，远端 CI 未执行；用户操作见[使用说明](../guides/2026-10-04-journal-review.md)。

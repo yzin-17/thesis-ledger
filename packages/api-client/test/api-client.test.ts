@@ -111,7 +111,7 @@ describe('ThesisLedgerApiClient', () => {
     await expect(client.portfolio.getValuation()).rejects.toBeInstanceOf(ThesisLedgerContractError);
   });
 
-  it('typed journal endpoint validates and serializes review candidate queries', async () => {
+  it('正式复盘入口拒绝旧 number 候选响应并序列化显式范围', async () => {
     const candidate = {
       id: `review:${accountId}:600519.SH:buy-1:sell-1`,
       accountId,
@@ -184,15 +184,15 @@ describe('ThesisLedgerApiClient', () => {
     const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
 
     await expect(
-      client.journal.getReviewCandidates({
+      client.journalReviews.candidates({
         accountId,
         start: '2026-08-01T00:00:00.000Z',
         end: '2026-08-31T00:00:00.000Z',
         limit: 10,
       }),
-    ).resolves.toMatchObject({ total: 1, items: [{ symbol: '600519.SH' }] });
+    ).rejects.toBeInstanceOf(ThesisLedgerContractError);
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(
-      '/journal/review-candidates?accountId=00000000-0000-4000-8000-000000000001&start=2026-08-01T00%3A00%3A00.000Z&end=2026-08-31T00%3A00%3A00.000Z&limit=10',
+      '/journal/review-candidates?accountId=00000000-0000-4000-8000-000000000001&mode=actual&start=2026-08-01T00%3A00%3A00.000Z&end=2026-08-31T00%3A00%3A00.000Z&limit=10',
     );
   });
 

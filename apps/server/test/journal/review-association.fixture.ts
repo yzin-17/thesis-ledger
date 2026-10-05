@@ -1,0 +1,48 @@
+import { Prisma, type TradePlan, type JournalEntry } from '@prisma/client';
+import { reviewEvidenceFixture } from './review-evidence.fixture.js';
+
+export const reviewPlanId = '00000000-0000-4000-8000-000000000010';
+export const reviewPlanFixture = (overrides: Partial<TradePlan> = {}): TradePlan => ({
+  id: reviewPlanId,
+  accountId: reviewEvidenceFixture().trade.accountId,
+  tradeId: 'trade-1',
+  symbol: 'AAPL.US',
+  side: 'BUY',
+  plannedEntry: new Prisma.Decimal('1234567890123456.00000001'),
+  plannedExit: null,
+  stopLoss: null,
+  takeProfit: null,
+  targetWeight: null,
+  expectedHoldingDays: null,
+  plannedEntryAt: null,
+  plannedExitAt: null,
+  reason: '计划原因',
+  thesis: '计划逻辑',
+  status: 'active',
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+  ...overrides,
+});
+export const reviewNoteFixture = (overrides: Partial<JournalEntry> = {}): JournalEntry => ({
+  id: '00000000-0000-4000-8000-000000000020',
+  accountId: reviewEvidenceFixture().trade.accountId,
+  entryType: 'note',
+  ledgerEventId: reviewEvidenceFixture().trade.closeSlices[0]!.eventId,
+  tradePlanId: reviewPlanId,
+  riskEventId: null,
+  strategyVersionId: null,
+  symbol: 'AAPL.US',
+  side: 'SELL',
+  reason: '退出原因',
+  content: null,
+  tags: null,
+  thesis: null,
+  catalyst: null,
+  risk: null,
+  exitReason: null,
+  emotion: null,
+  notes: '复盘说明',
+  createdAt: new Date('2026-01-03T00:00:00Z'),
+  updatedAt: new Date('2026-01-03T00:00:00Z'),
+  ...overrides,
+});

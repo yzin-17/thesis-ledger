@@ -90,7 +90,8 @@ const addIssue = (state: MutableTradeCost, issue: TradeCostIssueCode) => {
 const compareStrategyRevision = (
   left: TradeCostStrategyRevision,
   right: TradeCostStrategyRevision,
-) => left.effectiveAt.localeCompare(right.effectiveAt) || left.id.localeCompare(right.id);
+) =>
+  Date.parse(left.effectiveAt) - Date.parse(right.effectiveAt) || left.id.localeCompare(right.id);
 
 const selectStrategyRevision = (trade: TradeProjection, options: TradeCostProjectionOptions) => {
   const revisions = options.costStrategyRevisionsByAccountId[trade.accountId];
@@ -110,7 +111,10 @@ const selectStrategyRevision = (trade: TradeProjection, options: TradeCostProjec
     ? trade.earliestEvidenceAt
     : (trade.openedAt ?? trade.earliestEvidenceAt);
   if (boundary === null) return ordered[0]!;
-  const effectiveRevision = ordered.filter((revision) => revision.effectiveAt <= boundary).at(-1);
+  const boundaryAt = Date.parse(boundary);
+  const effectiveRevision = ordered
+    .filter((revision) => Date.parse(revision.effectiveAt) <= boundaryAt)
+    .at(-1);
   if (!effectiveRevision)
     throw new TradeCostProjectionError(
       'TRADE_COST_STRATEGY_REQUIRED',

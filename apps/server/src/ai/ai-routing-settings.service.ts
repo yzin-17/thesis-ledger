@@ -1,5 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import type { AiResearchDefault } from '@thesis-ledger/schemas';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 
 const GLOBAL_ID = 'global';
@@ -8,8 +9,10 @@ const GLOBAL_ID = 'global';
 export class AiRoutingSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async read() {
-    const row = await this.prisma.aiRoutingSettings.findUnique({ where: { id: GLOBAL_ID } });
+  async read(transaction?: Prisma.TransactionClient) {
+    const row = await (transaction ?? this.prisma).aiRoutingSettings.findUnique({
+      where: { id: GLOBAL_ID },
+    });
     return {
       researchDefault:
         row?.researchDefaultProvider && row.researchDefaultModel
@@ -22,8 +25,12 @@ export class AiRoutingSettingsService {
     };
   }
 
-  async update(input: { researchDefault: AiResearchDefault | null; expectedRevision: string }) {
-    const current = await this.prisma.aiRoutingSettings.findUnique({
+  async update(
+    input: { researchDefault: AiResearchDefault | null; expectedRevision: string },
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const persistence = transaction ?? this.prisma;
+    const current = await persistence.aiRoutingSettings.findUnique({
       where: { id: GLOBAL_ID },
     });
     const currentRevision = String(current?.revision ?? 0);
@@ -38,7 +45,7 @@ export class AiRoutingSettingsService {
     };
     if (!current) {
       try {
-        await this.prisma.aiRoutingSettings.create({
+        await persistence.aiRoutingSettings.create({
           data: { id: GLOBAL_ID, ...data },
         });
       } catch (error) {
@@ -47,13 +54,13 @@ export class AiRoutingSettingsService {
         throw error;
       }
     } else {
-      const result = await this.prisma.aiRoutingSettings.updateMany({
+      const result = await persistence.aiRoutingSettings.updateMany({
         where: { id: GLOBAL_ID, revision: current.revision },
         data,
       });
       if (result.count !== 1) throw new ConflictException('AI 默认模型设置已变化，请刷新后重试');
     }
-    return this.read();
+    return this.read(transaction);
   }
 
   private isUniqueConflict(error: unknown) {
