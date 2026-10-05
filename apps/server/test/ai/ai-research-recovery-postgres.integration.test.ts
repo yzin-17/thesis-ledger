@@ -50,12 +50,12 @@ postgresDescribe('Research recovery isolated PostgreSQL', () => {
   const runs = new AiRunService(prisma as never);
   const runIds: string[] = [];
 
-  const createRunning = async (withExecution = true) => {
+  const createRunning = async (withExecution = true, promptVersion = 'research-v1') => {
     const run = await prisma.aiRun.create({
       data: {
         provider: 'fixture',
         model: 'fixture-model',
-        promptVersion: 'research-v1',
+        promptVersion,
         status: 'running',
         executionAttempt: 1,
         startedAt: new Date(),
@@ -75,6 +75,37 @@ postgresDescribe('Research recovery isolated PostgreSQL', () => {
     await prisma.$disconnect();
   });
 
+  it('通用任务的 NULL 元数据不被研究 JSON 条件排除', async () => {
+    const runId = await createRunning(false, 'ordinary-fixture-v1');
+    await prisma.aiRun.update({
+      where: { id: runId },
+      data: { leaseUntil: new Date(Date.now() - 1_000) },
+    });
+    await runs.recoverStaleRuns();
+    expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({
+      status: 'queued',
+      executionAttempt: 1,
+      errorCode: 'worker_lease_expired',
+    });
+  });
+
+  it('冻结研究的 SDK 元数据损坏时按未知终态处理', async () => {
+    const runId = await createRunning(false, 'custom-frozen-fixture-v1');
+    await prisma.aiRun.update({
+      where: { id: runId },
+      data: {
+        leaseUntil: new Date(Date.now() - 1_000),
+        modelMetadata: { frozenResearch: { version: 'frozen-research-v1' }, sdkExecution: {} },
+      },
+    });
+    await runs.recoverStaleRuns();
+    expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({
+      status: 'failed',
+      executionAttempt: 1,
+      errorCode: 'research_unknown_outcome',
+    });
+  });
+
   it('只恢复未发送的 prepared 请求，并用新领取代次阻断旧 Worker', async () => {
     const runId = await createRunning();
     const requestId = randomUUID();
@@ -91,56 +122,65 @@ postgresDescribe('Research recovery isolated PostgreSQL', () => {
     });
     const claimed = await runs.claim(runId);
     expect(claimed).toMatchObject({ executionAttempt: 2, status: 'running' });
-    await expect(
-      store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId),
-    ).resolves.toBe(false);
-    await expect(
-      store.authorizeDispatch({ runId, executionAttempt: 2 }, requestId),
-    ).resolves.toBe(true);
+    await expect(store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId)).resolves.toBe(
+      false,
+    );
+    await expect(store.authorizeDispatch({ runId, executionAttempt: 2 }, requestId)).resolves.toBe(
+      true,
+    );
   });
 
-  it('发送授权后的失租收敛为 unknown，禁止自动重排和旧 Worker 晚到提交', async () => {
-    const runId = await createRunning();
-    const requestId = randomUUID();
-    await store.prepareRequest({ runId, executionAttempt: 1, requestId, reservation });
-    await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
-    await prisma.aiRun.update({
-      where: { id: runId },
-      data: { leaseUntil: new Date(Date.now() - 1_000) },
-    });
+  it.each([
+    'research-v1',
+    'journal-review-v1',
+    'journal-review-v2',
+    'journal-period-review-v1',
+    'journal-period-review-v2',
+  ])(
+    '%s 发送授权后的失租收敛为 unknown，禁止自动重排和旧 Worker 晚到提交',
+    async (promptVersion) => {
+      const runId = await createRunning(true, promptVersion);
+      const requestId = randomUUID();
+      await store.prepareRequest({ runId, executionAttempt: 1, requestId, reservation });
+      await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
+      await prisma.aiRun.update({
+        where: { id: runId },
+        data: { leaseUntil: new Date(Date.now() - 1_000) },
+      });
 
-    await runs.recoverStaleRuns();
-    expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({
-      status: 'failed',
-      errorCode: 'research_unknown_outcome',
-    });
-    await expect(
-      store.completeAndSettle({
-        runId,
-        executionAttempt: 1,
-        requestId,
-        revision: {
-          revision: 1,
-          usage: { status: 'reported', inputTokens: 1, outputTokens: 1 },
-          cost: {
-            status: 'unknown',
-            amount: null,
-            currency: null,
-            source: 'provider_cost_unavailable',
-            pricingVersion: null,
+      await runs.recoverStaleRuns();
+      expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({
+        status: 'failed',
+        errorCode: 'research_unknown_outcome',
+      });
+      await expect(
+        store.completeAndSettle({
+          runId,
+          executionAttempt: 1,
+          requestId,
+          revision: {
+            revision: 1,
+            usage: { status: 'reported', inputTokens: 1, outputTokens: 1 },
+            cost: {
+              status: 'unknown',
+              amount: null,
+              currency: null,
+              source: 'provider_cost_unavailable',
+              pricingVersion: null,
+            },
+            recordedAt: new Date().toISOString(),
           },
-          recordedAt: new Date().toISOString(),
-        },
-        outcome: {
-          status: 'complete',
-          finishReason: 'stop',
-          contract: aiGenerationContracts.research.ref,
-          schemaAccepted: true,
-        },
-        result: { late: true },
-      }),
-    ).resolves.toBeNull();
-  });
+          outcome: {
+            status: 'complete',
+            finishReason: 'stop',
+            contract: aiGenerationContracts.research.ref,
+            schemaAccepted: true,
+          },
+          result: { late: true },
+        }),
+      ).resolves.toBeNull();
+    },
+  );
 
   it('仅允许已确认生成前拒绝在剩余额度内恢复一次 fallback', async () => {
     const runId = await createRunning();

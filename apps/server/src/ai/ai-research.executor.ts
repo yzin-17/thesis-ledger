@@ -14,6 +14,13 @@ import { AiProviderRegistry } from './provider-registry.js';
 import { PromptVersionRegistry } from './prompt-registry.js';
 import { AiExecutionStateStore, type AiExecutionOwnership } from './ai-execution-state.store.js';
 import { AiResearchSdkExecution } from './ai-research-sdk-execution.js';
+import {
+  AiFrozenResearchError,
+  frozenResearchTool,
+  readFrozenResearch,
+} from './ai-frozen-research.js';
+import type { AiTool } from './contracts.js';
+import { researchOutputInstructions } from './ai-research-output-prompt.js';
 
 const allowedPermissions = new Set([
   'market:read',
@@ -325,6 +332,51 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  private sourcesForRun(
+    run: NonNullable<Awaited<ReturnType<AiRunService['claim']>>>,
+    scope: string,
+  ) {
+    const frozen = readFrozenResearch(run.modelMetadata);
+    if (frozen !== null && frozen.prompt.version !== run.promptVersion)
+      throw new AiFrozenResearchError('冻结 Prompt 版本与任务不一致');
+    const prompt = frozen?.prompt ?? this.prompts.latest('research');
+    if (!prompt) throw new Error('缺少 research prompt 注册');
+    return { prompt, tools: frozen === null ? this.tools(scope) : [frozenResearchTool(frozen)] };
+  }
+
+  private async collectEvidence(
+    id: string,
+    context: ReturnType<typeof asContext>,
+    tools: AiTool[],
+    signal: AbortSignal,
+    deadlineAt: number,
+  ) {
+    const evidence: Array<{ claim: string; citations: ReturnType<typeof evidenceCitation>[] }> = [];
+    const successfulCalls: Array<{ tool: string; data: unknown; toolCallId?: string }> = [];
+    for (const tool of tools) {
+      if (signal.aborted || Date.now() >= deadlineAt) break;
+      const result = await executeAuditedTool(
+        this.runs,
+        id,
+        tool,
+        { ...context },
+        allowedPermissions,
+      );
+      if (result.status !== 'ok') continue;
+      successfulCalls.push({
+        tool: tool.name,
+        data: result.data,
+        ...(result.toolCallId ? { toolCallId: result.toolCallId } : {}),
+      });
+      if (result.toolCallId)
+        evidence.push({
+          claim: `${tool.name} 返回可追溯的服务端结果。`,
+          citations: [evidenceCitation(tool.name, result.data, result.toolCallId)],
+        });
+    }
+    return { evidence, successfulCalls };
+  }
+
   private async execute(id: string) {
     const startedAt = Date.now();
     const run = await this.runs.claim(id);
@@ -341,38 +393,23 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     const deadlineAt = new Date(execution.data.deadlineAt).getTime();
     const lifecycle = this.startLeaseHeartbeat(ownership, deadlineAt);
     try {
-      const prompt = this.prompts.latest('research');
-      if (!prompt) throw new Error('缺少 research prompt 注册');
       if (Date.now() >= deadlineAt) throw new Error('研究任务已超过创建时冻结的绝对期限');
       const context = asContext(run.context);
+      const { prompt, tools } = this.sourcesForRun(run, context.scope);
       const input = { context, question: run.question ?? '请基于当前上下文完成研究。' };
-      const evidence: Array<{ claim: string; citations: ReturnType<typeof evidenceCitation>[] }> =
-        [];
-      const successfulCalls: Array<{ tool: string; data: unknown; toolCallId?: string }> = [];
-      const toolInput = { ...context };
-      const tools = this.tools(context.scope);
-      for (const tool of tools) {
-        if (lifecycle.signal.aborted || Date.now() >= deadlineAt) break;
-        const result = await executeAuditedTool(this.runs, id, tool, toolInput, allowedPermissions);
-        if (result.status === 'ok') {
-          successfulCalls.push({
-            tool: tool.name,
-            data: result.data,
-            ...(result.toolCallId ? { toolCallId: result.toolCallId } : {}),
-          });
-          if (result.toolCallId) {
-            evidence.push({
-              claim: `${tool.name} 返回可追溯的服务端结果。`,
-              citations: [evidenceCitation(tool.name, result.data, result.toolCallId)],
-            });
-          }
-        }
-      }
+      const { evidence, successfulCalls } = await this.collectEvidence(
+        id,
+        context,
+        tools,
+        lifecycle.signal,
+        deadlineAt,
+      );
       const messages = [
         { role: 'system', content: prompt.template },
+        { role: 'system', content: researchOutputInstructions() },
         {
           role: 'user',
-          content: `请只返回 ResearchResult V1 JSON。RESEARCH_REQUEST_JSON:${JSON.stringify({
+          content: `RESEARCH_REQUEST_JSON:${JSON.stringify({
             question: input.question,
             context,
             evidence,
@@ -427,6 +464,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       let errorCode = this.providers.hasProviders()
         ? 'research_execution_failed'
         : 'provider_unavailable';
+      if (error instanceof AiFrozenResearchError) errorCode = error.errorCode;
       let continuationBlockedReason: 'expired' | 'cancelled' | undefined;
       if (expired) {
         errorCode = 'research_deadline_expired';

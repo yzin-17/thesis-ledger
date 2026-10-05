@@ -10,6 +10,70 @@ const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
+  ['apps/server/src/ai/', 'apps/server/src/journal/', 'AI 执行层不得反向依赖 Journal 业务编排'],
+  [
+    'apps/server/src/journal/journal-review',
+    'apps/server/src/journal/journal-legacy',
+    '正式复盘不得消费旧 number 兼容分析',
+  ],
+  [
+    'apps/server/src/journal/journal-period-review',
+    'apps/server/src/journal/journal-legacy',
+    '正式周期解读不得消费旧 number 兼容分析',
+  ],
+  [
+    'apps/desktop/src/features/journal/review/',
+    'apps/desktop/src/features/journal/journal.api',
+    '正式桌面复盘不得依赖旧 number API 编排',
+  ],
+  [
+    'packages/domain/src/trade-projection.ts',
+    'packages/domain/src/journal-review',
+    '交易生命周期投影不得反向依赖复盘消费规则',
+  ],
+  [
+    'packages/domain/src/trade-costs.ts',
+    'packages/domain/src/journal-review',
+    '交易成本分配不得反向依赖复盘消费规则',
+  ],
+  [
+    'packages/schemas/src/trade-api.ts',
+    'packages/schemas/src/journal-review',
+    '交易事实契约不得反向依赖复盘契约',
+  ],
+  [
+    'packages/schemas/src/journal-review',
+    'packages/schemas/src/api',
+    '复盘事实契约不得依赖旧 number 分析及候选兼容入口',
+  ],
+  [
+    'packages/schemas/src/journal-period-review.ts',
+    'packages/schemas/src/api',
+    '周期复盘契约不得依赖旧 number 分析合同',
+  ],
+  [
+    'packages/domain/src/journal-analysis',
+    'packages/domain/src/behavior',
+    '正式复盘不得反向调用旧 number 分析',
+  ],
+  [
+    'packages/domain/src/journal-period-analysis',
+    'packages/domain/src/behavior',
+    '正式周期复盘不得调用旧 number 分析',
+  ],
+  [
+    'apps/server/src/ai/ai-provider-configuration-transaction.ts',
+    'apps/server/src/ai/ai-provider.service',
+    'AI 配置事务边界不得反向依赖 Provider 应用编排',
+  ],
+  [serverLedgerPrefix, 'apps/server/src/journal/', '交易事实投影不得反向依赖复盘消费与持久化'],
+  [serverBacktestPrefix, 'apps/server/src/journal/', 'backtest must not write journal projection'],
+  [
+    'apps/server/src/journal/',
+    serverBacktestPrefix,
+    'journal projection must not consume backtest results',
+  ],
+
   [
     'apps/desktop/src/features/market-detail/',
     'apps/desktop/src/features/market-data/InstrumentCatalogPanel',

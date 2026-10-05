@@ -1,3 +1,4 @@
+import { journalReviewClient } from './journal-review-client.js';
 import { backtestRunClient } from './backtest-run-client.js';
 import { marketControlClient } from './market-control-client.js';
 import { backtestRunConfigClient } from './backtest-run-config-client.js';
@@ -9,8 +10,6 @@ import {
   instrumentSearchResponseSchema,
   importDraftCommandResponseSchema,
   importDraftRevisionResponseSchema,
-  journalReviewCandidatesResponseSchema,
-  journalReviewSnapshotResponseSchema,
   ledgerCommandResponseSchema,
   ledgerAuditResponseSchema,
   ledgerEventsResponseSchema,
@@ -59,10 +58,6 @@ import {
   type VoidCashTransferCommand,
   type MarketDetailRequest,
   type MarketDetailResponse,
-  type JournalReviewCandidatesQuery,
-  type JournalReviewCandidatesResponse,
-  type JournalReviewSnapshotInput,
-  type JournalReviewSnapshotResponse,
   type BaselineReconciliationCandidatesResponse,
   type ConfirmBaselineReconciliationCommand,
   type RestoreBaselineReconciliationCommand,
@@ -93,6 +88,16 @@ import {
 } from '@thesis-ledger/schemas';
 
 export type {
+  JournalReviewCandidateContract,
+  JournalReviewListContract,
+  JournalReviewAnalysisResponse,
+  JournalReviewSnapshotRequest,
+  JournalDeterministicReview,
+  JournalSnapshotHistoryQuery,
+  JournalSnapshotHistoryResponse,
+  JournalStoredSnapshotView,
+  JournalPeriodReviewRequest,
+  JournalPeriodReviewResponse,
   ApiErrorResponse,
   InstrumentSearchResult,
   PerformanceSummaryResponse,
@@ -555,19 +560,11 @@ export class ThesisLedgerApiClient {
     },
   };
 
-  readonly journal = {
-    getReviewCandidates: (
-      params: Omit<JournalReviewCandidatesQuery, 'limit'> & { limit?: number },
-    ): Promise<JournalReviewCandidatesResponse> =>
-      this.requestParsed(
-        `/journal/review-candidates${queryString(params)}`,
-        journalReviewCandidatesResponseSchema,
-      ),
-    saveReviewSnapshot: (
-      input: JournalReviewSnapshotInput,
-    ): Promise<JournalReviewSnapshotResponse> =>
-      this.postParsed('/journal/review-snapshots', input, journalReviewSnapshotResponseSchema),
-  };
+  readonly journalReviews = journalReviewClient(
+    this.requestParsed.bind(this),
+    this.postParsed.bind(this),
+    queryString,
+  );
 
   readonly ledger = {
     createCashFlow: (command: CreateCashFlowCommand): Promise<LedgerCommandResponse> =>

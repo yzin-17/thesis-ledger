@@ -91,6 +91,60 @@ jobs:
         env:
           GUARDRAIL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
 
+  journal-postgres:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://fixture_owner:isolated_fixture@127.0.0.1:5432/journal_review_fixture
+      JOURNAL_REVIEW_DATABASE_URL: postgresql://fixture_owner:isolated_fixture@127.0.0.1:5432/journal_review_fixture
+      AI_EXECUTION_DATABASE_URL: postgresql://fixture_owner:isolated_fixture@127.0.0.1:5432/journal_review_fixture
+      PGPASSWORD: isolated_fixture
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: fixture_owner
+          POSTGRES_PASSWORD: isolated_fixture
+          POSTGRES_DB: journal_review_fixture
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fixture_owner -d journal_review_fixture"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 构建复盘依赖
+        run: pnpm db:generate && pnpm --filter @thesis-ledger/server... build
+      - name: 初始化专用隔离数据库
+        run: |
+          node apps/server/dist/src/platform/dev-database-rebuild.js | psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U fixture_owner -d journal_review_fixture
+        env:
+          NODE_ENV: development
+          DEV_DATABASE_MODE: rebuild
+          DEV_DATABASE_ALLOW_DATA_LOSS: 'true'
+          DEV_DATABASE_PROJECT: journal-ci
+          DEV_DATABASE_CONFIRM: journal-ci/journal_review_fixture
+          DEV_DATABASE_EXPECTED_DATABASE: journal_review_fixture
+          DEV_DATABASE_EXPECTED_OWNER: fixture_owner
+          DEV_DATABASE_PERMISSIONS_SQL: apps/server/test/journal/app-role.fixture.sql
+          THESIS_LEDGER_SCHEMA_INPUT_ROOT: apps/server/prisma
+      - name: 复盘投影、快照、AI 关联与失租恢复
+        run: |
+          pnpm --filter @thesis-ledger/server exec vitest run --no-file-parallelism \
+            test/journal/projection-postgres.integration.test.ts \
+            test/journal/snapshots-postgres.integration.test.ts \
+            test/journal/ai-postgres.integration.test.ts \
+            test/ai/ai-research-recovery-postgres.integration.test.ts
+
   mobile-android-native:
     runs-on: ubuntu-latest
     steps:
@@ -112,7 +166,7 @@ jobs:
         run: ./gradlew :app:assembleDebug --no-daemon
 
   desktop-packages:
-    needs: [quality, contracts-and-guardrails]
+    needs: [quality, contracts-and-guardrails, journal-postgres]
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
