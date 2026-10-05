@@ -17,6 +17,8 @@ import { StrategyOptimizationRunService } from '../../src/strategy-optimization/
 import { StrategyOptimizationService } from '../../src/strategy-optimization/strategy-optimization.service.js';
 import { StrategyRiskApplicationStoreService } from '../../src/strategy-optimization/strategy-risk-application-store.service.js';
 import { StrategyRiskApplicationService } from '../../src/strategy-optimization/strategy-risk-application.service.js';
+import { createPostgresOptimizationBacktests } from './strategy-optimization-postgres-run.fixture.js';
+import { createPostgresOptimizationSdk } from './strategy-optimization-postgres-sdk.fixture.js';
 import { createRiskMarketFixture } from './strategy-optimization-market-fixture.js';
 import {
   createStrategyFixture, createNormalizedRunConfig, split, budget, proposal, waitUntil,
@@ -44,6 +46,12 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   const notifications = {
     enqueue: vi.fn(async () => []),
     subjectDeliveryStatus: vi.fn(async () => ({ shouldRetry: false })),
+  };
+  const configuredRuns = {
+    resolve: async (strategyVersionId: string, config: unknown, idempotencyKey: string) => ({
+      kind: 'prepared',
+      input: { contractVersion: 3, strategyVersionId, runConfig: config, idempotencyKey },
+    }),
   };
   const makeRisk = () => new RiskService(
     prisma, notifications as never, undefined, undefined, undefined, undefined, market.reader,
@@ -76,60 +84,9 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     list: vi.fn(() => [provider]),
   };
 
-  const backtestJobs = new Map<string, Record<string, unknown>>();
-  const backtests = {
-    createRun: vi.fn(async (input: { strategyVersionId: string; idempotencyKey: string }) => {
-      const previous = backtestJobs.get(input.idempotencyKey);
-      if (previous) return previous;
-      const id = randomUUID();
-      const result = {
-        source: 'BACKTEST',
-        runId: id,
-        strategyVersionId: input.strategyVersionId,
-        snapshotId: `snapshot-${id}`,
-        engineVersion: 'postgres-e2e-engine',
-        schemaVersion: '2',
-        marketRuleVersion: 'postgres-e2e-market-rules',
-        calendarVersion: 'postgres-e2e-calendar',
-        aggregationVersion: 'postgres-e2e-aggregation',
-        contentHash: `content-${id}`,
-        resultChecksum: `checksum-${id}`,
-        completeness: 'complete',
-        warnings: [],
-        rejectedOrders: [],
-        simulationFills: [],
-        trades: [],
-        equityCurve: [],
-        metrics: {
-          totalReturn: { status: 'available', value: '0.10' },
-          maxDrawdown: { status: 'available', value: '-0.02' },
-          turnover: { status: 'available', value: '0.01' },
-        },
-      };
-      const job = {
-        id,
-        strategyVersionId: input.strategyVersionId,
-        status: 'succeeded',
-        errorCode: null,
-        errorSummary: null,
-        result,
-        snapshotManifest: {
-          artifacts: [
-            { key: 'market/600519.SH/1d.json', contentHash: 'shared-frozen-market-data' },
-          ],
-        },
-      };
-      backtestJobs.set(input.idempotencyKey, job);
-      return job;
-    }),
-    status: vi.fn(async (id: string) =>
-      [...backtestJobs.values()].find((job) => job.id === id) ?? null,
-    ),
-    retryRun: vi.fn(async (id: string) =>
-      [...backtestJobs.values()].find((job) => job.id === id) ?? null,
-    ),
-    runV2: vi.fn(async () => undefined),
-  };
+  const sdkExecutor = createPostgresOptimizationSdk(prisma, provider);
+
+  const backtests = createPostgresOptimizationBacktests(prisma);
 
   const readExperiment = async (id: string) => {
     const rows = await prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
@@ -155,7 +112,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO "OptimizationExperiment" (
         "id", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
-        "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds",
+        "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "exposure",
         "aiCallsUsed", "inputTokensUsed", "outputTokensUsed", "leaseUntil", "idempotencyKey"
       ) VALUES (
         ${id}::uuid, ${baselineStrategyVersionId}::uuid, ${options.status ?? 'running'}, ${options.stage ?? 'proposing'},
@@ -163,7 +120,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
         ${JSON.stringify(['risk.0.percent'])}::jsonb,
         ${JSON.stringify(split)}::jsonb, ${JSON.stringify(runConfig)}::jsonb,
         ${`data-${id}`}, ${JSON.stringify([{ provider: provider.id, model: provider.models[0], costStatus: 'known' }])}::jsonb,
-        ${JSON.stringify(budget)}::jsonb, 1,
+        ${JSON.stringify(budget)}::jsonb, 1, '{"testRevealed":false}'::jsonb,
         ${options.aiCallsUsed ?? 0}, ${options.inputTokensUsed ?? 0}, ${options.outputTokensUsed ?? 0},
         ${options.leaseUntil ?? null}, ${options.idempotencyKey ?? `postgres-e2e-experiment-${suffix}-${id}`}
       )
@@ -254,6 +211,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   });
 
   afterAll(async () => {
+    await prisma.backtestJob.deleteMany({ where: { strategyVersion: { strategyId } } });
     await prisma.$executeRawUnsafe('DROP TRIGGER IF EXISTS strategy_optimization_e2e_fail_rule ON "RiskRule"').catch(() => undefined);
     await prisma.$executeRawUnsafe('DROP FUNCTION IF EXISTS strategy_optimization_e2e_fail_rule()').catch(() => undefined);
     await prisma.$executeRaw(Prisma.sql`
@@ -450,7 +408,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     const baselineVersion = await prisma.strategyVersion.findUniqueOrThrow({ where: { id: version2Id } });
     const baseline = { ...baselineVersion, strategy: strategySchema.parse(baselineVersion.schema) as BacktestStrategy };
     const descriptors = describeStrategyParameters(baseline.strategy);
-    const runs = new StrategyOptimizationRunService(prisma, backtests as never);
+    const runs = new StrategyOptimizationRunService(prisma, backtests as never, configuredRuns as never);
     const route = { provider: provider.id, model: provider.models[0]! };
 
     const preCallExperimentId = await insertExperiment(version2Id);
@@ -465,7 +423,7 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
       expect(aiRun).toMatchObject({ status: 'running', leaseUntil: expect.any(Date) });
       return { content: proposal, inputTokens: 31, outputTokens: 17, cost: 0, costKnown: true, actualModel: route.model };
     });
-    const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
+    const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs, sdkExecutor);
     const first = await candidateService.generateProposal(preCallExperiment, baseline, descriptors, route, 1);
     expect(first.proposal).toEqual(proposal);
     const afterFirst = await readExperiment(preCallExperimentId);
@@ -489,8 +447,8 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
       await release;
       return { content: proposal, inputTokens: 31, outputTokens: 17, cost: 0, costKnown: true, actualModel: route.model };
     });
-    const workerA = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
-    const workerB = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
+    const workerA = new StrategyOptimizationCandidateService(prisma, providers as never, runs, sdkExecutor);
+    const workerB = new StrategyOptimizationCandidateService(prisma, providers as never, runs, sdkExecutor);
     const running = workerA.generateProposal(concurrentExperiment, baseline, descriptors, route, 1);
     await started;
     await expect(
@@ -554,8 +512,8 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
       costKnown: true,
       actualModel: 'optimizer-model',
     }));
-    const runs = new StrategyOptimizationRunService(prisma, backtests as never);
-    const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
+    const runs = new StrategyOptimizationRunService(prisma, backtests as never, configuredRuns as never);
+    const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs, sdkExecutor);
     const reads = new StrategyOptimizationReadService(
       prisma,
       providers as never,
@@ -576,10 +534,21 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
     });
     const recovery = await optimizer.reconcilePending();
     expect(recovery.scheduled).toBeGreaterThanOrEqual(1);
-    await waitUntil(async () => (await readExperiment(experimentId)).status === 'awaiting_finalization');
+    await waitUntil(async () => {
+      const current = await readExperiment(experimentId);
+      if (current.status === 'failed') throw new Error(current.stopReason ?? '实验恢复失败');
+      return current.status === 'awaiting_finalization';
+    });
     const candidates = await reads.candidates(experimentId);
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]?.validationStatus).toBe('valid');
+    expect(candidates[0]).toMatchObject({
+      validationStatus: 'restricted',
+      readEligibility: { code: 'TEST_NOT_REVEALED' },
+    });
+    const stored = await prisma.$queryRaw<Array<{ validationStatus: string }>>(Prisma.sql`
+      SELECT "validationStatus" FROM "OptimizationCandidate" WHERE "id"=${candidates[0]!.id}::uuid
+    `);
+    expect(stored[0]?.validationStatus).toBe('valid');
 
     await optimizer.finalize(experimentId, {
       candidateIds: [candidates[0]!.id],
@@ -611,8 +580,8 @@ postgresDescribe('策略风险与 AI 优化 PostgreSQL 服务级 E2E', () => {
   });
 
   it('正式采纳同 key 并发幂等、不同 key 禁止重复候选、expectedVersion fail-closed，并验证失败事务不留半套 Adoption', async () => {
-    const runs = new StrategyOptimizationRunService(prisma, backtests as never);
-    const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
+    const runs = new StrategyOptimizationRunService(prisma, backtests as never, configuredRuns as never);
+    const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs, sdkExecutor);
     const reads = new StrategyOptimizationReadService(
       prisma,
       providers as never,

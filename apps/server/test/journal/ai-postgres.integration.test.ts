@@ -84,7 +84,7 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
     expect(stored.modelMetadata).toMatchObject({
       researchSettingsRevision: '7',
       frozenResearch: {
-        prompt: { version: 'journal-review-v1' },
+        prompt: { version: 'journal-review-v2' },
         source: {
           evidence: {
             data: {
@@ -102,7 +102,7 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
       id: run.id,
       provider: 'isolated-journal-provider',
       model: 'isolated-model',
-      promptVersion: 'journal-review-v1',
+      promptVersion: 'journal-review-v2',
       status: 'queued',
     });
     await app.aiRun.update({
