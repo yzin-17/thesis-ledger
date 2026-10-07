@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { strategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,7 +86,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
   const [feedback, setFeedback] = useState<string | null>(null);
   const selected = versions.find((entry) => entry.version.id === strategyVersionId) ?? versions[0];
   const parsed = selected?.version.schema
-    ? strategySchemaV2.safeParse(selected.version.schema)
+    ? strategySchema.safeParse(selected.version.schema)
     : null;
   const symbol = parsed?.success ? parsed.data.executionInstrument.symbol : '';
 

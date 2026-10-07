@@ -1,0 +1,76 @@
+{
+  "evidenceVersion": 1,
+  "purpose": "腾讯 ETF 后复权在限定窗口内的单一来源纯价格研究准入",
+  "observedAt": "2026-10-02T17:10:19.712727Z",
+  "routeKey": {
+    "kind": "bar",
+    "market": "CN",
+    "assetType": "ETF",
+    "capability": "DAILY_BAR",
+    "timeframe": "1d",
+    "adjustment": "hfq"
+  },
+  "target": {"providerId": "tencent", "upstreamSource": "tencent"},
+  "scopeSymbols": ["159516.SZ"],
+  "scopeDateFrom": "2026-04-30",
+  "scopeDateTo": "2026-08-09",
+  "source": {
+    "endpoint": "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get",
+    "nativeResponseKey": "hfqday",
+    "adapterRevision": "dsa-v3-etf-tencent-hfq-newfqkline-adapter-v1",
+    "sourceRevision": "tencent-newfqkline-year-partitions-v2",
+    "credentialRevision": "not-required",
+    "accessObservation": "目标容器匿名读取，无付费凭据、自动重试或切源；该观察不授予再分发许可"
+  },
+  "calendar": {
+    "source": "https://www.szse.cn/disclosure/notice/t20251222_618087.html",
+    "revision": "szse-2026-holidays-t20251222_618087-year-v1",
+    "expectedSessionCount": 68,
+    "missingDateCount": 0,
+    "unexpectedDateCount": 0
+  },
+  "listing": {
+    "firstTradingDate": "2023-07-27",
+    "source": "https://www.szse.cn/disclosure/notice/fund/t20230724_602100.html"
+  },
+  "windowChecks": [
+    {
+      "start": "2026-04-30",
+      "end": "2026-08-09",
+      "rows": 68,
+      "rawResponseSha256": "79d4afc5402d0e56629ae2f45e77e77c9d598f353991aeb4075dbd87c59cf2f5",
+      "normalizedRowsSha256": "c6d65e4ba151499cf55fd249e2761aec387dcc32126acffe1723d3b1b8f8fb15"
+    },
+    {
+      "start": "2026-07-06",
+      "end": "2026-07-17",
+      "rows": 10,
+      "rawResponseSha256": "907e22c7e0e7956bd22fb9988db33fab33cf939f5fee85d7f4496d01ed4beb6d",
+      "normalizedRowsSha256": "fc95e7f399aa94df9d6a6c52d7014beb566701e5eec5cc4b4e4238ceea2abfc3"
+    }
+  ],
+  "overlap": {"days": 10, "allOhlcvAmountMatch": true},
+  "priceChecks": {
+    "finitePositiveOhlc": true,
+    "validOhlcOrdering": true,
+    "uniqueTradingDates": true,
+    "splitWindowClose": {"2026-07-09": "3.89", "2026-07-10": "3.62"},
+    "priorNativeSampleMatches": true,
+    "paginationProof": {"status": "complete", "pagesFetchedPerWindow": 1, "continuationPending": false}
+  },
+  "acceptedUse": {
+    "accountingMode": "normalized-series",
+    "researchClock": "fixed-provider-snapshot",
+    "sourceSelection": "single-source",
+    "priceMethod": "provider-native",
+    "dividendMeaning": "provider-defined",
+    "conversionAvailable": false
+  },
+  "limitations": [
+    "来源未提供已验证的供应商算法版本、固定锚点或历史修订流；使用本地观察摘要并冻结输入",
+    "成交量和成交额的独立单位证明尚未完成，原生字段存在性与合法数值不等于单位认证",
+    "volumeBasis 保持 unknown；依赖量价混合、真实份额或容量约束的规则须另行验证",
+    "不授予严格历史 PIT、完整拆分分红事件、真实现金再投资或跨源备用兼容性",
+    "准入不扩展到其他标的、日期窗口、原始价格或前复权口径"
+  ]
+}

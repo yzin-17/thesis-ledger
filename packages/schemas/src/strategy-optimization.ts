@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import {
   assetSymbolRefSchema,
+  backtestMetricSchema,
   backtestTimeframeSchema,
-  booleanExpressionSchemaV2,
-  riskRuleSchemaV2,
-  runConfigSchemaV2,
+  booleanExpressionSchema,
+  riskRuleSchema,
+  runConfigSchemaV3,
   seriesFieldSchema,
-  sizingRuleSchemaV2,
-  strategySchemaV2,
-} from './backtest-v2.js';
-import { decimalStringSchema, nonNegativeDecimalStringSchema } from './ledger-v2.js';
+  sizingRuleSchema,
+  strategySchema,
+} from './backtest-contract.js';
+import { decimalStringSchema, nonNegativeDecimalStringSchema } from './monetary-values.js';
 
 export const strategyParameterIdSchema = z
   .string()
@@ -393,10 +394,10 @@ export const optimizationDiscoveryGeneratedStrategySchema = z
     name: z.string().trim().min(1).max(200),
     description: z.string().trim().max(2_000).optional(),
     series: z.array(seriesFieldSchema).min(1).max(6),
-    entry: booleanExpressionSchemaV2,
-    exit: booleanExpressionSchemaV2,
-    sizing: sizingRuleSchemaV2,
-    risk: z.array(riskRuleSchemaV2).max(32),
+    entry: booleanExpressionSchema,
+    exit: booleanExpressionSchema,
+    sizing: sizingRuleSchema,
+    risk: z.array(riskRuleSchema).max(32),
   })
   .strict();
 
@@ -413,95 +414,122 @@ export type OptimizationDiscoveryGenerationOutput = z.infer<
 
 export const optimizationDiscoveryProposalSchema = z
   .object({
-    strategy: strategySchemaV2,
+    strategy: strategySchema,
     reason: z.string().trim().min(1).max(2_000).optional(),
     evidenceRefs: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
   })
   .strict();
 export type OptimizationDiscoveryProposal = z.infer<typeof optimizationDiscoveryProposalSchema>;
 
-export const optimizationExperimentCreateSchema = z
-  .object({
-    name: optimizationExperimentNameSchema.optional(),
-    sourceMode: optimizationSourceModeSchema.default('existing'),
-    strategyVersionId: z.uuid().optional(),
-    discoveryScope: optimizationDiscoveryScopeSchema.optional(),
-    models: z.array(optimizationModelSchema).min(1).max(3),
-    allowedParameterIds: z.array(strategyParameterIdSchema).min(1).max(64).optional(),
-    objective: optimizationObjectiveSchema,
-    split: optimizationSplitSchema,
-    runConfig: runConfigSchemaV2,
-    budget: optimizationBudgetSchema,
-    maxRounds: z.number().int().min(1).max(3).default(2),
-    acknowledgeUnknownCost: z.boolean().default(false),
-    idempotencyKey: z.string().trim().min(1).max(200),
+const optimizationExperimentCreateFields = {
+  name: optimizationExperimentNameSchema.optional(),
+  sourceMode: optimizationSourceModeSchema.default('existing'),
+  strategyVersionId: z.uuid().optional(),
+  discoveryScope: optimizationDiscoveryScopeSchema.optional(),
+  models: z.array(optimizationModelSchema).min(1).max(3),
+  allowedParameterIds: z.array(strategyParameterIdSchema).min(1).max(64).optional(),
+  objective: optimizationObjectiveSchema,
+  split: optimizationSplitSchema,
+  budget: optimizationBudgetSchema,
+  maxRounds: z.number().int().min(1).max(3).default(2),
+  acknowledgeUnknownCost: z.boolean().default(false),
+  idempotencyKey: z.string().trim().min(1).max(200),
+};
+
+type OptimizationExperimentCreateInput = {
+  name?: string | undefined;
+  sourceMode: z.infer<typeof optimizationSourceModeSchema>;
+  strategyVersionId?: string | undefined;
+  discoveryScope?: z.infer<typeof optimizationDiscoveryScopeSchema> | undefined;
+  models: z.infer<typeof optimizationModelSchema>[];
+  allowedParameterIds?: string[] | undefined;
+  objective: z.infer<typeof optimizationObjectiveSchema>;
+  split: z.infer<typeof optimizationSplitSchema>;
+  runConfig: { startDate: string; endDate: string };
+  budget: z.infer<typeof optimizationBudgetSchema>;
+  maxRounds: number;
+  idempotencyKey: string;
+};
+
+const validateOptimizationExperimentCreate = (
+  value: OptimizationExperimentCreateInput,
+  ctx: z.RefinementCtx,
+) => {
+  if (
+    value.sourceMode === 'existing' &&
+    (!value.strategyVersionId || !value.allowedParameterIds || value.discoveryScope)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['strategyVersionId'],
+      message: '现有策略优化必须选择正式策略版本和参数',
+    });
+  }
+  if (
+    value.sourceMode === 'discovery' &&
+    (!value.discoveryScope || value.strategyVersionId || value.allowedParameterIds)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['discoveryScope'],
+      message: '从零探索只能提供探索边界，不能携带策略版本或参数授权',
+    });
+  }
+  if (
+    value.sourceMode === 'discovery' &&
+    value.discoveryScope?.executionInstrument.assetType === 'fund' &&
+    (value.discoveryScope.executionInstrument.market !== 'CN' ||
+      value.discoveryScope.primaryTimeframe !== '1d')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['discoveryScope'],
+      message: 'NAV 基金探索只支持 CN 日频',
+    });
+  }
+  const modelKeys = value.models.map((item) => JSON.stringify([item.provider, item.model]));
+  if (new Set(modelKeys).size !== modelKeys.length)
+    ctx.addIssue({ code: 'custom', path: ['models'], message: 'Provider + model 必须唯一' });
+  if (
+    value.allowedParameterIds &&
+    new Set(value.allowedParameterIds).size !== value.allowedParameterIds.length
+  )
+    ctx.addIssue({ code: 'custom', path: ['allowedParameterIds'], message: '参数授权不得重复' });
+  const plannedAiCalls = value.models.length * value.maxRounds;
+  const plannedBacktestRuns = 3 + value.models.length * (value.maxRounds * 2 + 1);
+  if (value.budget.maxAiCalls < plannedAiCalls)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['budget', 'maxAiCalls'],
+      message: `AI 调用预算至少需要 ${plannedAiCalls} 次以保证各模型同额度`,
+    });
+  if (value.budget.maxBacktestRuns < plannedBacktestRuns)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['budget', 'maxBacktestRuns'],
+      message: `回测预算至少需要 ${plannedBacktestRuns} 次以预留最终验证`,
+    });
+  const splitStart = value.split.development.start;
+  const splitEnd = value.split.test.end;
+  if (splitStart < value.runConfig.startDate || splitEnd > value.runConfig.endDate)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['split'],
+      message: '数据切分必须位于 RunConfig 区间内',
+    });
+};
+
+/** Current experiments pin the frozen data and execution protocol. */
+export const optimizationExperimentCreateSchemaV3 = z
+  .strictObject({
+    contractVersion: z.literal(3),
+    ...optimizationExperimentCreateFields,
+    runConfig: runConfigSchemaV3,
   })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (
-      value.sourceMode === 'existing' &&
-      (!value.strategyVersionId || !value.allowedParameterIds || value.discoveryScope)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['strategyVersionId'],
-        message: '现有策略优化必须选择正式策略版本和参数',
-      });
-    }
-    if (
-      value.sourceMode === 'discovery' &&
-      (!value.discoveryScope || value.strategyVersionId || value.allowedParameterIds)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['discoveryScope'],
-        message: '从零探索只能提供探索边界，不能携带策略版本或参数授权',
-      });
-    }
-    if (
-      value.sourceMode === 'discovery' &&
-      value.discoveryScope?.executionInstrument.assetType === 'fund' &&
-      (value.discoveryScope.executionInstrument.market !== 'CN' ||
-        value.discoveryScope.primaryTimeframe !== '1d')
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['discoveryScope'],
-        message: 'NAV 基金探索只支持 CN 日频',
-      });
-    }
-    const modelKeys = value.models.map((item) => JSON.stringify([item.provider, item.model]));
-    if (new Set(modelKeys).size !== modelKeys.length)
-      ctx.addIssue({ code: 'custom', path: ['models'], message: 'Provider + model 必须唯一' });
-    if (
-      value.allowedParameterIds &&
-      new Set(value.allowedParameterIds).size !== value.allowedParameterIds.length
-    )
-      ctx.addIssue({ code: 'custom', path: ['allowedParameterIds'], message: '参数授权不得重复' });
-    const plannedAiCalls = value.models.length * value.maxRounds;
-    const plannedBacktestRuns = 3 + value.models.length * (value.maxRounds * 2 + 1);
-    if (value.budget.maxAiCalls < plannedAiCalls)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['budget', 'maxAiCalls'],
-        message: `AI 调用预算至少需要 ${plannedAiCalls} 次以保证各模型同额度`,
-      });
-    if (value.budget.maxBacktestRuns < plannedBacktestRuns)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['budget', 'maxBacktestRuns'],
-        message: `回测预算至少需要 ${plannedBacktestRuns} 次以预留最终验证`,
-      });
-    const splitStart = value.split.development.start;
-    const splitEnd = value.split.test.end;
-    if (splitStart < value.runConfig.startDate || splitEnd > value.runConfig.endDate)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['split'],
-        message: '数据切分必须位于 RunConfig 区间内',
-      });
-  });
-export type OptimizationExperimentCreate = z.infer<typeof optimizationExperimentCreateSchema>;
+  .superRefine(validateOptimizationExperimentCreate);
+export const optimizationExperimentCreateSchema = optimizationExperimentCreateSchemaV3;
+export type OptimizationExperimentCreateV3 = z.infer<typeof optimizationExperimentCreateSchemaV3>;
+export type OptimizationExperimentCreate = OptimizationExperimentCreateV3;
 export type OptimizationExperimentClone = z.infer<typeof optimizationExperimentCloneSchema>;
 
 export const optimizationProposalChangeSchema = z
@@ -523,6 +551,72 @@ export const optimizationProposalSchema = z
       ctx.addIssue({ code: 'custom', path: ['changes'], message: '同一提案不能重复修改同一参数' });
   });
 export type OptimizationProposal = z.infer<typeof optimizationProposalSchema>;
+
+const optimizationVisibleMetricKeysV3 = [
+  'totalReturn',
+  'cagr',
+  'maxDrawdown',
+  'volatility',
+  'sharpe',
+  'basicPeriodReturn',
+  'tradeCount',
+  'winRate',
+  'profitFactor',
+  'turnover',
+  'benchmarkTotalReturn',
+] as const;
+
+const optimizationVisibleMetricsV3Schema = z
+  .partialRecord(z.enum(optimizationVisibleMetricKeysV3), backtestMetricSchema)
+  .refine((metrics) => Object.keys(metrics).length > 0, '至少提供一个开发或验证指标');
+
+export const optimizationModelVisibleWindowV3Schema = z.strictObject({
+  split: z.enum(['development', 'validation']),
+  window: splitWindowSchema,
+  comparableDataFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  metrics: optimizationVisibleMetricsV3Schema,
+});
+export type OptimizationModelVisibleWindowV3 = z.infer<
+  typeof optimizationModelVisibleWindowV3Schema
+>;
+
+const optimizationModelVisibleWindowsV3Schema = z
+  .array(optimizationModelVisibleWindowV3Schema)
+  .min(1)
+  .max(2)
+  .superRefine((windows, context) => {
+    const splits = windows.map((window) => window.split);
+    if (new Set(splits).size !== splits.length) {
+      context.addIssue({ code: 'custom', message: '模型反馈窗口不能重复' });
+    }
+    if (!splits.includes('development')) {
+      context.addIssue({ code: 'custom', message: '模型反馈必须包含开发集' });
+    }
+  });
+
+/** Strict AI input boundary: only bounded development/validation result summaries are representable. */
+export const optimizationModelContextV3Schema = z.strictObject({
+  contractVersion: z.literal(3),
+  modelKey: z.string().trim().min(1),
+  round: z.number().int().positive(),
+  objective: optimizationObjectiveSchema,
+  authorizedParameters: z.array(strategyParameterDescriptorSchema).max(64),
+  strategy: z.strictObject({
+    name: z.string().trim().min(1).max(200),
+    primaryTimeframe: backtestTimeframeSchema,
+    executionInstrument: assetSymbolRefSchema,
+  }),
+  visibleWindows: optimizationModelVisibleWindowsV3Schema,
+  priorCandidates: z
+    .array(
+      z.strictObject({
+        changes: z.array(optimizationProposalChangeSchema).min(1).max(32),
+        visibleWindows: optimizationModelVisibleWindowsV3Schema,
+      }),
+    )
+    .max(3),
+});
+export type OptimizationModelContextV3 = z.infer<typeof optimizationModelContextV3Schema>;
 
 export const optimizationExperimentStatusSchema = z.enum([
   'queued',
@@ -600,7 +694,7 @@ export const optimizationAdoptionVersionSnapshotSchema = z
     strategyId: z.uuid(),
     version: z.number().int(),
     schemaVersion: z.number().int(),
-    schema: strategySchemaV2,
+    schema: strategySchema,
   })
   .strict();
 export type OptimizationAdoptionVersionSnapshot = z.infer<

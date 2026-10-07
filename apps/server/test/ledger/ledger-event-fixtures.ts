@@ -61,6 +61,7 @@ export const storedV2Event = ({
     economicOrderKey,
     recordedAt,
     projectionGeneration: 0n,
+    envelopeVersion: 3,
     payloadVersion: 1,
     payload: revisionAction === 'VOID' ? null : payload,
     sourceCategory,

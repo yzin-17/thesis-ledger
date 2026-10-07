@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { ledgerEventEnvelopeSchemaV2, type LedgerEventV2 } from '@thesis-ledger/schemas';
+import { ledgerEventEnvelopeSchema, type LedgerEvent } from '@thesis-ledger/schemas';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { latestLedgerEventByFact } from './ledger-event-v2.js';
+import {
+  LEDGER_STORED_ENVELOPE_VERSION,
+  requireCurrentLedgerEnvelope,
+} from './ledger-stored-envelope-version.js';
 
 type LedgerTransaction = Prisma.TransactionClient;
 
@@ -46,7 +50,7 @@ export interface MultiAccountLedgerWriteResult<T> {
 type TransactionHost = Pick<PrismaClient, '$transaction'>;
 
 const toCreateInput = (
-  event: LedgerEventV2,
+  event: LedgerEvent,
   projectionGeneration: bigint,
 ): Prisma.LedgerEventUncheckedCreateInput => {
   return {
@@ -63,6 +67,7 @@ const toCreateInput = (
     sourceTimezone: event.sourceTimezone,
     economicOrderKey: event.economicOrderKey,
     recordedAt: new Date(event.recordedAt),
+    envelopeVersion: LEDGER_STORED_ENVELOPE_VERSION,
     payloadVersion: event.payloadVersion,
     payload: event.revisionAction === 'VOID' ? Prisma.DbNull : event.payload,
     sourceCategory: event.source.category,
@@ -87,6 +92,7 @@ export const toLedgerEventV2 = (stored: {
   sourceTimezone: string | null;
   economicOrderKey: string | null;
   recordedAt: Date;
+  envelopeVersion?: number | null;
   payloadVersion: number | null;
   payload: Prisma.JsonValue;
   sourceCategory: string | null;
@@ -98,6 +104,7 @@ export const toLedgerEventV2 = (stored: {
   supersedesEventId: string | null;
   reason: string | null;
 }) => {
+  requireCurrentLedgerEnvelope(stored.envelopeVersion);
   const revisionAction = stored.revisionAction;
   let occurredAt: string | null = null;
   if (stored.occurredAt !== null) {
@@ -105,7 +112,7 @@ export const toLedgerEventV2 = (stored: {
     if (stored.timePrecision === 'DATE') occurredAt = occurredAt.slice(0, 10);
   }
   const event = {
-    version: 2,
+    version: 3,
     eventId: stored.id,
     factId: stored.factId,
     accountId: stored.accountId,
@@ -131,7 +138,7 @@ export const toLedgerEventV2 = (stored: {
     ...(stored.reason === null ? {} : { reason: stored.reason }),
     ...(revisionAction === 'VOID' ? {} : { payload: stored.payload }),
   };
-  return ledgerEventEnvelopeSchemaV2.parse(event);
+  return ledgerEventEnvelopeSchema.parse(event);
 };
 
 @Injectable()
@@ -185,6 +192,14 @@ export class LedgerV2Repository {
       `);
       if (rows.length !== orderedAccountIds.length) throw new Error('无法锁定所有账户账本状态');
 
+      for (const accountId of orderedAccountIds) {
+        const oldEvent = await client.ledgerEvent.findFirst({
+          where: { accountId, envelopeVersion: null },
+          select: { id: true },
+        });
+        if (oldEvent) requireCurrentLedgerEnvelope(null);
+      }
+
       const contexts = new Map<string, AccountLedgerWriteContext>();
       for (const state of rows) {
         contexts.set(state.accountId, {
@@ -230,8 +245,8 @@ export class LedgerV2Repository {
   async appendRevision(
     context: AccountLedgerWriteContext,
     rawEvent: unknown,
-  ): Promise<LedgerEventV2> {
-    const event = ledgerEventEnvelopeSchemaV2.parse(rawEvent);
+  ): Promise<LedgerEvent> {
+    const event = ledgerEventEnvelopeSchema.parse(rawEvent);
     if (event.accountId !== context.accountId) throw new Error('账本事件与已锁定账户不一致');
     if (event.ledgerRevision !== context.nextLedgerRevision.toString())
       throw new Error('账本事件 Revision 与事务下一版本不一致');
@@ -241,12 +256,19 @@ export class LedgerV2Repository {
     return event;
   }
 
-  async readEffectiveEvents(accountId: string, asOfRevision?: string): Promise<LedgerEventV2[]> {
+  async readEffectiveEvents(accountId: string, asOfRevision?: string): Promise<LedgerEvent[]> {
+    const revisionFilter =
+      asOfRevision === undefined ? {} : { ledgerRevision: { lte: BigInt(asOfRevision) } };
+    const oldEvent = await this.prisma.ledgerEvent.findFirst({
+      where: { accountId, envelopeVersion: null },
+      select: { id: true },
+    });
+    if (oldEvent) requireCurrentLedgerEnvelope(null);
     const stored = await this.prisma.ledgerEvent.findMany({
       where: {
         accountId,
         factId: { not: null },
-        ...(asOfRevision === undefined ? {} : { ledgerRevision: { lte: BigInt(asOfRevision) } }),
+        ...revisionFilter,
       },
       orderBy: { ledgerRevision: 'asc' },
     });

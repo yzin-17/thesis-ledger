@@ -8,46 +8,13 @@ import {
   sourceSeriesKey,
   type SimulationEngineInput,
 } from '../src/index.js';
-
-const point = (date: string, value: string, availableAt = `${date}T00:00:00Z`) => ({
-  occurredAt: `${date}T00:00:00Z`,
-  availableAt,
-  value,
-  status: 'available' as const,
-});
-
-const sourceSeries = (points: ReturnType<typeof point>[]) => ({
-  sourceId: 'close',
-  symbol: '600519.SH',
-  market: 'CN' as const,
-  assetType: 'stock' as const,
-  field: 'close' as const,
-  timeframe: '1d' as const,
-  adjusted: false,
-  points,
-});
-
-const compare = (operator: 'eq' | 'gt' | 'lt', right: string) => ({
-  type: 'compare' as const,
-  operator,
-  left: { type: 'series' as const, sourceId: 'close', field: 'close' as const },
-  right: { type: 'constant' as const, value: right },
-});
-
-const strategy = (entry = compare('gt', '10')) => ({
-  executionInstrument: { symbol: '600519.SH', market: 'CN' as const, assetType: 'stock' as const },
-  primaryTimeframe: '1d' as const,
-  entry,
-  exit: compare('lt', '0'),
-});
-
-const baseInput = (overrides: Partial<SimulationEngineInput> = {}): SimulationEngineInput => ({
-  runId: 'run-1',
-  strategy: strategy(),
-  ticks: [{ occurredAt: '2025-01-01T00:00:00Z' }],
-  sourceSeries: new Map([['close', sourceSeries([point('2025-01-01', '11')])]]),
-  ...overrides,
-});
+import {
+  point,
+  sourceSeries,
+  compare,
+  strategy,
+  baseInput,
+} from './backtest-simulation.fixtures.js';
 
 describe('deterministic simulation events', () => {
   it('orders same-time events by phase and stable sequence', () => {
@@ -91,6 +58,21 @@ describe('deterministic simulation events', () => {
     expect(result.rejects).toMatchObject([
       { code: 'FUTURE_DATA', ruleVersion: 'simulation-time-v1' },
     ]);
+  });
+
+  it('keeps unsupported corporate-action event expressions explicitly unavailable', () => {
+    const result = evaluateBooleanExpression(
+      { type: 'corporateActionEvent', eventType: 'SPLIT' },
+      {
+        tick: { occurredAt: '2025-01-01T00:00:00Z' },
+        sourceSeries: new Map(),
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: 'unavailable',
+      reason: expect.stringContaining('effectiveDate/strategyVisibility'),
+    });
   });
 
   it('evaluates distinct fields declared by the same signal source', () => {
@@ -150,7 +132,13 @@ describe('deterministic simulation events', () => {
       sourceSeries: new Map([
         [
           'close',
-          sourceSeries([{ ...point('2025-01-02', '11'), status: 'unavailable', value: undefined }]),
+          sourceSeries([
+            {
+              occurredAt: '2025-01-02T00:00:00Z',
+              availableAt: '2025-01-02T00:00:00Z',
+              status: 'unavailable',
+            },
+          ]),
         ],
       ]),
     });
@@ -203,14 +191,18 @@ describe('deterministic simulation events', () => {
     const onMutation = vi.fn();
     const execution = {
       toOrder: (
-        intent: Parameters<NonNullable<SimulationEngineInput['execution']>['toOrder']>[0],
+        intent: Parameters<
+          NonNullable<NonNullable<SimulationEngineInput['execution']>['toOrder']>
+        >[0],
       ) => ({
         ...intent,
         orderId: `${intent.intentId}:order`,
       }),
       validateOrder: () => ({ accepted: true as const, ruleVersion: 'rules-1' }),
       createFill: (
-        order: Parameters<NonNullable<SimulationEngineInput['execution']>['createFill']>[0],
+        order: Parameters<
+          NonNullable<NonNullable<SimulationEngineInput['execution']>['createFill']>
+        >[0],
       ) => ({
         fillId: `${order.orderId}:fill`,
         orderId: order.orderId,
@@ -309,14 +301,18 @@ describe('deterministic simulation events', () => {
     };
     const execution = {
       toOrder: (
-        intent: Parameters<NonNullable<SimulationEngineInput['execution']>['toOrder']>[0],
+        intent: Parameters<
+          NonNullable<NonNullable<SimulationEngineInput['execution']>['toOrder']>
+        >[0],
       ) => ({
         ...intent,
         orderId: `${intent.intentId}:order`,
       }),
       validateOrder: () => ({ accepted: true as const, ruleVersion: 'rules-1' }),
       createFill: (
-        order: Parameters<NonNullable<SimulationEngineInput['execution']>['createFill']>[0],
+        order: Parameters<
+          NonNullable<NonNullable<SimulationEngineInput['execution']>['createFill']>
+        >[0],
       ) => ({
         fillId: `${order.orderId}:fill`,
         orderId: order.orderId,
@@ -370,11 +366,15 @@ describe('deterministic simulation events', () => {
     const mutations: string[] = [];
     const execution = {
       toOrder: (
-        intent: Parameters<NonNullable<SimulationEngineInput['execution']>['toOrder']>[0],
+        intent: Parameters<
+          NonNullable<NonNullable<SimulationEngineInput['execution']>['toOrder']>
+        >[0],
       ) => ({ ...intent, orderId: `${intent.intentId}:order` }),
       validateOrder: () => ({ accepted: true as const, ruleVersion: 'rules-1' }),
       createFill: (
-        order: Parameters<NonNullable<SimulationEngineInput['execution']>['createFill']>[0],
+        order: Parameters<
+          NonNullable<NonNullable<SimulationEngineInput['execution']>['createFill']>
+        >[0],
       ) => ({
         fillId: `${order.orderId}:fill`,
         orderId: order.orderId,

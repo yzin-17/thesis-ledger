@@ -1,10 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { DecimalValue } from '@thesis-ledger/domain';
 import {
-  strategySchemaV2,
+  strategySchema,
   type OptimizationProposal,
   type StrategyParameterDescriptor,
-  type StrategySchemaV2,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 
 const decimalDescriptor = (
@@ -14,7 +14,7 @@ const decimalDescriptor = (
   },
 ): StrategyParameterDescriptor => ({ ...input, valueType: 'decimal' });
 
-export const describeStrategyParameters = (strategy: StrategySchemaV2): StrategyParameterDescriptor[] => {
+export const describeStrategyParameters = (strategy: BacktestStrategy): StrategyParameterDescriptor[] => {
   const descriptors: StrategyParameterDescriptor[] = [];
   strategy.risk.forEach((rule, index) => {
     if (rule.type === 'fixedStop' || rule.type === 'fixedTakeProfit') {
@@ -143,11 +143,11 @@ const validateParameterValue = (descriptor: StrategyParameterDescriptor, value: 
 };
 
 export const applyOptimizationProposal = (
-  baseline: StrategySchemaV2,
+  baseline: BacktestStrategy,
   descriptors: readonly StrategyParameterDescriptor[],
   allowedParameterIds: readonly string[],
   proposal: OptimizationProposal,
-): StrategySchemaV2 => {
+): BacktestStrategy => {
   const allowed = new Set(allowedParameterIds);
   const byId = new Map(descriptors.map((descriptor) => [descriptor.parameterId, descriptor]));
   const next = structuredClone(baseline);
@@ -168,12 +168,12 @@ export const applyOptimizationProposal = (
       (next.cost as unknown as Record<string, unknown>)[descriptor.target.field] = change.value;
     }
   }
-  return strategySchemaV2.parse(next) as StrategySchemaV2;
+  return strategySchema.parse(next) as BacktestStrategy;
 };
 
 export const proposalDiff = (
-  baseline: StrategySchemaV2,
-  candidate: StrategySchemaV2,
+  baseline: BacktestStrategy,
+  candidate: BacktestStrategy,
   descriptors: readonly StrategyParameterDescriptor[],
 ) => {
   const before = new Map(describeStrategyParameters(baseline).map((item) => [item.parameterId, item.currentValue]));

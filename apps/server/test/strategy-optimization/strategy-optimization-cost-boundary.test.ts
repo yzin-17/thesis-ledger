@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { StrategyOptimizationService } from '../../src/strategy-optimization/strategy-optimization.service.js';
 import { StrategyOptimizationRunService } from '../../src/strategy-optimization/strategy-optimization-run.service.js';
-import { budget, runConfig, split } from './strategy-optimization-postgres-fixtures.js';
+import {
+  budget,
+  createNormalizedRunConfig,
+  split,
+} from './strategy-optimization-postgres-fixtures.js';
 
 const scope = {
   executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
@@ -9,12 +13,13 @@ const scope = {
 };
 
 const input = (overrides: Record<string, unknown> = {}) => ({
+  contractVersion: 3,
   sourceMode: 'discovery',
   discoveryScope: scope,
   models: [{ provider: 'provider-a', model: 'model-a' }],
   objective: { mode: 'balanced', minClosedTrades: 1 },
   split,
-  runConfig,
+  runConfig: createNormalizedRunConfig(),
   budget: { ...budget },
   maxRounds: 1,
   acknowledgeUnknownCost: false,

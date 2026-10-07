@@ -1,9 +1,15 @@
 import { type BacktestSeries } from './backtest-series.js';
+import { simulationExpressionContext } from './backtest-expression-context.js';
+import {
+  availabilityForDecision,
+  isAvailableForDecisionAt,
+  type BacktestAvailability,
+} from './backtest-observation-clock.js';
 import {
   type BooleanExpression,
   type NumericExpression,
-  type StrategySchemaV2,
-} from './backtest-v2.js';
+  type BacktestStrategy,
+} from './backtest-contract.js';
 import {
   evaluateBooleanExpression,
   evaluateNumericExpression,
@@ -12,6 +18,7 @@ import {
 } from './backtest-simulation-evaluator.js';
 import {
   corporateActionEventId,
+  corporateActionAccountingAt,
   type BacktestCorporateActionFact,
   type CorporateActionPort,
   type CorporateActionResult,
@@ -65,11 +72,10 @@ export interface SimulationEvent<TPayload = unknown> {
 
 export type EvaluationStatus = 'available' | 'unavailable';
 
-export interface AvailableEvaluation<T> {
+export interface AvailableEvaluation<T> extends BacktestAvailability {
   status: 'available';
   value: T;
   occurredAt: string;
-  availableAt: string;
 }
 
 export interface UnavailableEvaluation {
@@ -84,8 +90,9 @@ export type BooleanEvaluation = Evaluation<boolean>;
 
 export interface SimulationTick {
   occurredAt: string;
+  tradingDate?: string;
   availableAt?: string;
-  timeframe?: StrategySchemaV2['primaryTimeframe'];
+  timeframe?: BacktestStrategy['primaryTimeframe'];
 }
 
 export interface SimulationPositionState {
@@ -98,6 +105,7 @@ export interface SimulationPositionState {
 
 export interface SimulationExpressionContext {
   tick: SimulationTick;
+  corporateActionSignals?: { facts: readonly BacktestCorporateActionFact[]; symbol: string; market: string };
   sourceSeries: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   indicatorSeries?: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   positionState?: SimulationPositionState;
@@ -141,10 +149,25 @@ export interface SimulationFillRecord {
   reason: 'signal' | 'risk';
 }
 
+const simulationRejectCodes = [
+  'RULE_REJECTED',
+  'FUTURE_DATA',
+  'DUPLICATE_EVENT',
+  'CANCELLED',
+  'DAY_EXPIRED',
+  'INSUFFICIENT_CASH',
+  'INVALID_COST',
+  'CORPORATE_ACTION_IGNORED',
+  'LEDGER_REJECTED',
+] as const;
+
+type SimulationRejectCode = (typeof simulationRejectCodes)[number];
+
 export interface SimulationReject {
   rejectionId: string;
   orderId?: string;
-  code: 'RULE_REJECTED' | 'FUTURE_DATA' | 'DUPLICATE_EVENT' | 'CANCELLED';
+  side?: 'buy' | 'sell';
+  code: SimulationRejectCode;
   reason: string;
   ruleVersion?: string;
   occurredAt: string;
@@ -157,6 +180,15 @@ export interface SimulationMutationCommand {
   eventId: string;
   payload: Record<string, unknown>;
 }
+
+export type SimulationMutationDecision =
+  | { accepted: true }
+  | {
+      accepted: false;
+      reason: string;
+      ruleVersion?: string;
+      inputFacts?: readonly string[];
+    };
 
 export interface SimulationExecutionPort {
   toOrder?: (intent: SimulationTargetIntent) => SimulationOrderRequest;
@@ -177,18 +209,22 @@ export interface SimulationExecutionPort {
     availableAt: string;
     payload: Record<string, unknown>;
   }[];
+  /** Return a decision when applying this fact can reject publication. */
+  applyMutation?: (command: SimulationMutationCommand) => SimulationMutationDecision;
+  /** Compatibility observer for consumers that record already-accepted mutations. */
   onMutation?: (command: SimulationMutationCommand) => void;
 }
 
 export interface SimulationEngineInput {
   runId: string;
-  strategy: Pick<StrategySchemaV2, 'entry' | 'exit' | 'executionInstrument' | 'primaryTimeframe'>;
+  strategy: Pick<BacktestStrategy, 'entry' | 'exit' | 'executionInstrument' | 'primaryTimeframe'>;
   ticks: readonly SimulationTick[];
   sourceSeries: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   indicatorSeries?: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   positionState?: SimulationPositionState;
   positionStateAt?: (tick: SimulationTick) => SimulationPositionState | undefined;
   corporateActions?: readonly BacktestCorporateActionFact[];
+  corporateActionSignalFacts?: readonly BacktestCorporateActionFact[];
   corporateActionPort?: CorporateActionPort;
   risk?: (context: SimulationExpressionContext) => BooleanEvaluation;
   portfolioValuation?: {
@@ -356,14 +392,14 @@ const edgeSignal = (
   sequence: number,
 ): SimulationSignal | undefined => {
   if (value.status !== 'available' || !value.value) return undefined;
-  if (instant(value.availableAt) > instant(value.occurredAt)) return undefined;
+  if (!isAvailableForDecisionAt(value, value.occurredAt)) return undefined;
   if (kind !== 'risk' && previous === true) return undefined;
   return {
     signalId: `${strategy.executionInstrument.symbol}:${kind}:${value.occurredAt}:${sequence}`,
     source: 'BACKTEST',
     kind,
     occurredAt: value.occurredAt,
-    availableAt: value.availableAt,
+    availableAt: availabilityForDecision(value)!,
     executionSymbol: strategy.executionInstrument.symbol,
     reason: `${kind} edge`,
   };
@@ -377,13 +413,7 @@ export const evaluateSignalAt = (
   previousNumeric?: ReadonlyMap<string, NumericEvaluation>,
 ): SignalEvaluationResult => {
   const positionState = positionStateFor(input, tick);
-  const context: SimulationExpressionContext = {
-    tick,
-    sourceSeries: input.sourceSeries,
-    ...(positionState ? { positionState } : {}),
-    ...(input.indicatorSeries ? { indicatorSeries: input.indicatorSeries } : {}),
-    ...(previousNumeric ? { previousNumeric } : {}),
-  };
+  const context = simulationExpressionContext(input, tick, positionState, previousNumeric);
   const entry = evaluateBooleanExpression(input.strategy.entry as BooleanExpression, context);
   const exit = evaluateBooleanExpression(input.strategy.exit as BooleanExpression, context);
   const risk = input.risk?.(context);
@@ -444,7 +474,7 @@ const futureFactForUnavailable = (
       latest &&
       latest.status !== 'unavailable' &&
       latest.value !== undefined &&
-      instant(latest.availableAt) > instant(context.tick.occurredAt)
+      !isAvailableForDecisionAt(latest, context.tick.occurredAt)
     ) {
       facts.push(`${series.sourceId}:${latest.occurredAt}:availableAt=${latest.availableAt}`);
     }
@@ -521,13 +551,7 @@ const processSignalEvent = (state: SimulationOrchestratorState, event: Simulatio
     return;
   }
   const positionState = positionStateFor(input, tick);
-  const context: SimulationExpressionContext = {
-    tick,
-    sourceSeries: input.sourceSeries,
-    ...(positionState ? { positionState } : {}),
-    ...(input.indicatorSeries ? { indicatorSeries: input.indicatorSeries } : {}),
-    previousNumeric: state.previousNumeric,
-  };
+  const context = simulationExpressionContext(input, tick, positionState, state.previousNumeric);
   const evaluation = evaluateSignalAt(
     input,
     tick,
@@ -541,9 +565,13 @@ const processSignalEvent = (state: SimulationOrchestratorState, event: Simulatio
     ...[evaluation.entry, evaluation.exit, evaluation.risk]
       .filter(
         (value): value is AvailableEvaluation<boolean> =>
-          value?.status === 'available' && instant(value.availableAt) > instant(value.occurredAt),
+          value?.status === 'available' && !isAvailableForDecisionAt(value, value.occurredAt),
       )
-      .map((value) => `availableAt=${value.availableAt}`),
+      .map((value) =>
+        value.researchClock
+          ? `availableAt=${value.availableAt}; decisionAt=${value.researchClock.decisionAt}; dataAsOf=${value.researchClock.dataAsOf}`
+          : `availableAt=${value.availableAt}`,
+      ),
   ];
   if (delayedFacts.length > 0) {
     enqueueFutureDataReject(state, event, delayedFacts);
@@ -622,6 +650,11 @@ const enqueueReject = (
   );
 };
 
+const simulationRejectCodeFor = (code: string): SimulationRejectCode =>
+  simulationRejectCodes.includes(code as SimulationRejectCode)
+    ? (code as SimulationRejectCode)
+    : 'RULE_REJECTED';
+
 const processOrderValidationEvent = (
   state: SimulationOrchestratorState,
   event: SimulationEvent,
@@ -634,6 +667,7 @@ const processOrderValidationEvent = (
     enqueueReject(state, event, {
       rejectionId: `${state.input.runId}:reject:${order.orderId}`,
       orderId: order.orderId,
+      side: order.side,
       code: 'RULE_REJECTED',
       reason: 'Order execution instrument 与策略不一致',
       ruleVersion: 'simulation-instrument-v1',
@@ -651,7 +685,8 @@ const processOrderValidationEvent = (
     enqueueReject(state, event, {
       rejectionId: `${state.input.runId}:reject:${order.orderId}`,
       orderId: order.orderId,
-      code: 'RULE_REJECTED',
+      side: order.side,
+      code: simulationRejectCodeFor(decision.code),
       reason: decision.reason,
       ruleVersion: decision.ruleVersion,
       occurredAt: event.occurredAt,
@@ -678,12 +713,27 @@ const processOrderValidationEvent = (
 const processFillEvent = (state: SimulationOrchestratorState, event: SimulationEvent) => {
   const fill = event.payload as SimulationFillRecord;
   if (state.fills.some((item) => item.fillId === fill.fillId)) return;
-  state.fills.push(fill);
   const mutation: SimulationMutationCommand = {
     type: 'simulationFill',
     eventId: event.eventId,
     payload: fill as unknown as Record<string, unknown>,
   };
+  const decision = state.input.execution?.applyMutation?.(mutation);
+  if (decision && !decision.accepted) {
+    enqueueReject(state, event, {
+      rejectionId: `${state.input.runId}:ledger-reject:${fill.orderId}`,
+      orderId: fill.orderId,
+      side: fill.side,
+      code: 'LEDGER_REJECTED',
+      reason: decision.reason,
+      ruleVersion: decision.ruleVersion ?? 'simulation-ledger-v1',
+      occurredAt: event.occurredAt,
+      availableAt: event.availableAt,
+      inputFacts: decision.inputFacts ?? [],
+    });
+    return;
+  }
+  state.fills.push(fill);
   state.mutations.push(mutation);
   state.input.execution?.onMutation?.(mutation);
   const scheduled = state.input.execution?.scheduledMutationsForFill?.(fill) ?? [];
@@ -693,9 +743,7 @@ const processFillEvent = (state: SimulationOrchestratorState, event: SimulationE
       sequence: state.sequence++,
       type: item.type,
       phase:
-        item.payload.kind === 'position'
-          ? 'SessionSettlementState'
-          : 'NavConfirmationSettlement',
+        item.payload.kind === 'position' ? 'SessionSettlementState' : 'NavConfirmationSettlement',
       occurredAt: item.occurredAt,
       availableAt: item.availableAt,
       payload: item.payload,
@@ -710,6 +758,19 @@ const processCashSettlementEvent = (state: SimulationOrchestratorState, event: S
     eventId: event.eventId,
     payload: event.payload as Record<string, unknown>,
   };
+  const decision = state.input.execution?.applyMutation?.(mutation);
+  if (decision && !decision.accepted) {
+    enqueueReject(state, event, {
+      rejectionId: `${state.input.runId}:settlement-reject:${event.eventId}`,
+      code: 'LEDGER_REJECTED',
+      reason: decision.reason,
+      ruleVersion: decision.ruleVersion ?? 'simulation-ledger-v1',
+      occurredAt: event.occurredAt,
+      availableAt: event.availableAt,
+      inputFacts: decision.inputFacts ?? [],
+    });
+    return;
+  }
   state.mutations.push(mutation);
   state.input.execution?.onMutation?.(mutation);
 };
@@ -737,10 +798,7 @@ const processCorporateActionEvent = (
       };
   state.corporateActionResults.push(result);
   if (!result.applied) {
-    const code: SimulationReject['code'] =
-      result.code === 'FUTURE_DATA' || result.code === 'DUPLICATE_EVENT'
-        ? result.code
-        : 'RULE_REJECTED';
+    const code = simulationRejectCodeFor(result.code);
     enqueueReject(state, event, {
       rejectionId: `${state.input.runId}:corporate-action:${result.eventId}`,
       code,
@@ -826,14 +884,15 @@ export class DeterministicSimulationEngine {
       ),
     );
     for (const fact of corporateActions) {
+      const occurredAt = corporateActionAccountingAt(fact);
       const processingAt =
-        instant(fact.occurredAt) >= instant(fact.availableAt) ? fact.occurredAt : fact.availableAt;
+        instant(occurredAt) >= instant(fact.availableAt) ? occurredAt : fact.availableAt;
       const event = createSimulationEvent({
         runId: input.runId,
         sequence: state.sequence++,
         type: 'corporateAction',
         phase: 'CorporateAction',
-        occurredAt: fact.occurredAt,
+        occurredAt,
         availableAt: processingAt,
         payload: fact,
       });

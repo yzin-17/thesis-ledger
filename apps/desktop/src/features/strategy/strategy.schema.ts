@@ -1,24 +1,36 @@
-import { strategySchemaV1 } from '@thesis-ledger/schemas';
+import { strategySchema } from '@thesis-ledger/schemas';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 
 export const createDefaultStrategySchema = (name = '我的第一条策略'): StrategySchema => ({
-  version: 1,
+  schemaVersion: '2',
   name,
-  status: 'draft',
-  description: '',
-  universe: { symbols: [], asOf: new Date().toISOString() },
-  entrySignals: [{ indicator: 'close', operator: 'gt', value: '' }],
-  exitSignals: [{ indicator: 'close', operator: 'lt', value: '' }],
-  stopLoss: { type: 'fixed', value: 0.1 },
-  sizing: { type: 'weight', value: 0.5 },
-  execution: { price: 'close', tPlusOne: true, lotSize: 100 },
-  cost: {
-    commissionRate: 0.0003,
-    minimumCommission: 5,
-    stampDutyRate: 0.0005,
-    slippageRate: 0.001,
+  description: '示例规则：收盘价高于开盘价时入场，持仓时退出；保存前请核对。',
+  signalSources: [
+    {
+      id: 'execution',
+      asset: { symbol: '', market: 'CN', assetType: 'stock' },
+      timeframe: '1d',
+      series: ['open', 'close'],
+    },
+  ],
+  executionInstrument: { symbol: '', market: 'CN', assetType: 'stock' },
+  primaryTimeframe: '1d',
+  entry: {
+    type: 'compare',
+    operator: 'gt',
+    left: { type: 'series', sourceId: 'execution', field: 'close' },
+    right: { type: 'series', sourceId: 'execution', field: 'open' },
   },
-  riskConstraints: [],
+  exit: { type: 'positionState', field: 'isOpen' },
+  sizing: { type: 'fixedAmount', amount: '10000' },
+  risk: [],
+  execution: {
+    mode: 'exchange',
+    orderType: 'market',
+    timeInForce: 'DAY',
+    timing: 'nextEligibleBarOpen',
+  },
+  cost: { commissionRate: '0.0003', slippageRate: '0.001' },
 });
 
 export const schemaFromVersion = (version: StrategyVersion | null, fallbackName?: string) => {
@@ -34,23 +46,62 @@ export const schemaName = (schema: StrategySchema, fallback = '') =>
   typeof schema.name === 'string' ? schema.name : fallback;
 
 export const schemaSymbols = (schema: StrategySchema) => {
-  const universe = schema.universe;
-  if (!universe || typeof universe !== 'object' || Array.isArray(universe)) return [];
-  const symbols = (universe as { symbols?: unknown }).symbols;
-  return Array.isArray(symbols)
-    ? symbols.filter((symbol): symbol is string => typeof symbol === 'string')
-    : [];
+  const instrument = schema.executionInstrument;
+  if (!instrument || typeof instrument !== 'object' || Array.isArray(instrument)) return [];
+  const symbol = (instrument as { symbol?: unknown }).symbol;
+  return typeof symbol === 'string' && symbol.trim() ? [symbol] : [];
 };
 
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+export const setStrategyExecutionSymbol = (schema: StrategySchema, symbol: string) => ({
+  ...schema,
+  executionInstrument: { ...asRecord(schema.executionInstrument), symbol },
+  signalSources: Array.isArray(schema.signalSources)
+    ? schema.signalSources.map((source: unknown) => {
+        const record = asRecord(source);
+        if (record.id !== 'execution') return source;
+        return { ...record, asset: { ...asRecord(record.asset), symbol } };
+      })
+    : [],
+});
+
+export const setStrategyExecutionAssetType = (
+  schema: StrategySchema,
+  assetType: 'stock' | 'etf',
+) => ({
+  ...schema,
+  executionInstrument: { ...asRecord(schema.executionInstrument), assetType },
+  signalSources: Array.isArray(schema.signalSources)
+    ? schema.signalSources.map((source: unknown) => {
+        const record = asRecord(source);
+        if (record.id !== 'execution') return source;
+        return { ...record, asset: { ...asRecord(record.asset), assetType } };
+      })
+    : [],
+});
+
+export const setStrategyPrimaryTimeframe = (schema: StrategySchema, timeframe: string) => ({
+  ...schema,
+  primaryTimeframe: timeframe,
+  signalSources: Array.isArray(schema.signalSources)
+    ? schema.signalSources.map((source: unknown) => {
+        const record = asRecord(source);
+        return record.id === 'execution' ? { ...record, timeframe } : source;
+      })
+    : [],
+});
+
 export const schemaAsOf = (schema: StrategySchema) => {
-  const universe = schema.universe;
-  if (!universe || typeof universe !== 'object' || Array.isArray(universe)) return '未知';
-  const asOf = (universe as { asOf?: unknown }).asOf;
-  return typeof asOf === 'string' ? asOf : '未知';
+  void schema;
+  return '未知';
 };
 
 export const validateStrategySchema = (schema: StrategySchema) => {
-  const parsed = strategySchemaV1.safeParse(schema);
+  const parsed = strategySchema.safeParse(schema);
   if (parsed.success) return { schema: parsed.data as StrategySchema, error: null };
   const issue = parsed.error.issues[0];
   const path = issue?.path.length ? issue.path.join('.') : 'Schema';

@@ -1,9 +1,9 @@
 import { Prisma } from '@prisma/client';
-import type { CurrencyV1 } from '@thesis-ledger/schemas';
+import type { Currency } from '@thesis-ledger/schemas';
 
 type JsonRecord = Record<string, unknown>;
 
-const supportedCurrency = (value: unknown): CurrencyV1 | undefined => {
+const supportedCurrency = (value: unknown): Currency | undefined => {
   if (value === 'CNY' || value === 'HKD' || value === 'USD') return value;
   return undefined;
 };
@@ -20,7 +20,7 @@ export type TradeRealizedPnlSlice = {
 };
 
 export type CurrencyPnlAmount = {
-  currency: CurrencyV1;
+  currency: Currency;
   amount: number;
 };
 
@@ -48,14 +48,14 @@ const record = (value: unknown): JsonRecord | null =>
     : null;
 
 const add = (
-  map: Map<CurrencyV1, Prisma.Decimal>,
-  currency: CurrencyV1,
+  map: Map<Currency, Prisma.Decimal>,
+  currency: Currency,
   amount: Prisma.Decimal,
 ) => {
   map.set(currency, (map.get(currency) ?? new Prisma.Decimal(0)).plus(amount));
 };
 
-const allocationCost = (slice: TradeRealizedPnlSlice, currency: CurrencyV1) => {
+const allocationCost = (slice: TradeRealizedPnlSlice, currency: Currency) => {
   const quantity = decimal(slice.quantity);
   if (quantity === null || quantity.isNegative()) return null;
   if (quantity.isPositive() && slice.allocations.length === 0) return null;
@@ -80,7 +80,7 @@ const allocationCost = (slice: TradeRealizedPnlSlice, currency: CurrencyV1) => {
   return total;
 };
 
-const amounts = (map: Map<CurrencyV1, Prisma.Decimal>): CurrencyPnlAmount[] =>
+const amounts = (map: Map<Currency, Prisma.Decimal>): CurrencyPnlAmount[] =>
   [...map.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([currency, amount]) => ({ currency, amount: amount.toNumber() }));
@@ -88,8 +88,8 @@ const amounts = (map: Map<CurrencyV1, Prisma.Decimal>): CurrencyPnlAmount[] =>
 export const summarizeTradeRealizedPnl = (
   slices: readonly TradeRealizedPnlSlice[],
 ): TradeRealizedPnlSummary => {
-  const pnlByCurrency = new Map<CurrencyV1, Prisma.Decimal>();
-  const costByCurrency = new Map<CurrencyV1, Prisma.Decimal>();
+  const pnlByCurrency = new Map<Currency, Prisma.Decimal>();
+  const costByCurrency = new Map<Currency, Prisma.Decimal>();
   const missingCurrencies = new Set<string>();
   let complete = true;
 

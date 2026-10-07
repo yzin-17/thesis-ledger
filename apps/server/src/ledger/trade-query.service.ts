@@ -5,16 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  tradeDetailResponseSchemaV2,
-  tradeListQuerySchemaV2,
-  tradeListResponseSchemaV2,
-  tradeReferenceResolveRequestSchemaV2,
-  tradeReferenceResolveResponseSchemaV2,
-  tradeCloseSliceQueryResponseSchemaV2,
-  type TradeDetailResponseV2,
-  type TradeListResponseV2,
-  type TradeReferenceResolveResponseV2,
-  type TradeCloseSliceQueryResponseV2,
+  tradeDetailResponseSchema,
+  tradeListQuerySchema,
+  tradeListResponseSchema,
+  tradeReferenceResolveRequestSchema,
+  tradeReferenceResolveResponseSchema,
+  tradeCloseSliceQueryResponseSchema,
+  type TradeDetailResponse,
+  type TradeListResponse,
+  type TradeReferenceResolveResponse,
+  type TradeCloseSliceQueryResponse,
 } from '@thesis-ledger/schemas';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -65,7 +65,7 @@ const stringArray = (value: unknown): string[] =>
   jsonArray(value).filter((item): item is string => typeof item === 'string');
 
 const charges = (value: unknown) =>
-  jsonArray(value) as TradeDetailResponseV2['entryLegs'][number]['charges'];
+  jsonArray(value) as TradeDetailResponse['entryLegs'][number]['charges'];
 
 const source = (value: unknown) => {
   const record = isRecord(value) ? value : {};
@@ -105,7 +105,7 @@ const tradeFactIds = (trade: PersistedTrade) =>
     ...trade.evidenceSources.map((item) => item.factId),
   ]);
 
-const mapSummary = (trade: PersistedTrade): TradeListResponseV2['items'][number] => ({
+const mapSummary = (trade: PersistedTrade): TradeListResponse['items'][number] => ({
   id: trade.id,
   accountId: trade.accountId,
   accountMode: trade.accountMode,
@@ -133,8 +133,8 @@ const mapSummary = (trade: PersistedTrade): TradeListResponseV2['items'][number]
   excludedReasons: excludedReasons(trade),
 });
 
-const mapDetail = (trade: PersistedTrade): TradeDetailResponseV2 =>
-  tradeDetailResponseSchemaV2.parse({
+const mapDetail = (trade: PersistedTrade): TradeDetailResponse =>
+  tradeDetailResponseSchema.parse({
     ...mapSummary(trade),
     entryLegs: trade.entryLegs.map((entry) => ({
       id: entry.id,
@@ -329,8 +329,8 @@ export class TradeQueryService {
     return summarizeTradeRealizedPnl(trades.flatMap((trade) => trade.closeSlices));
   }
 
-  async list(rawQuery: unknown): Promise<TradeListResponseV2> {
-    const query = tradeListQuerySchemaV2.parse(rawQuery);
+  async list(rawQuery: unknown): Promise<TradeListResponse> {
+    const query = tradeListQuerySchema.parse(rawQuery);
     const accountIds = await this.accountIds(query.accountId, query.mode);
     const projectionGenerations = await this.projectionGenerations(accountIds);
     const cursor = query.cursor === undefined ? undefined : decodeCursor(query.cursor);
@@ -376,7 +376,7 @@ export class TradeQueryService {
             after: { openedAt: openedAtKey(last), id: last.id },
           })
         : null;
-    return tradeListResponseSchemaV2.parse({
+    return tradeListResponseSchema.parse({
       accountId: query.accountId ?? null,
       mode: query.mode,
       items: page.map(mapSummary),
@@ -399,7 +399,7 @@ export class TradeQueryService {
     accountId: string;
     mode?: 'actual' | 'shadow';
     symbol?: string;
-  }): Promise<TradeDetailResponseV2[]> {
+  }): Promise<TradeDetailResponse[]> {
     const mode = input.mode ?? 'actual';
     const trades = (await this.prisma.trade.findMany({
       where: {
@@ -428,7 +428,7 @@ export class TradeQueryService {
     tradeId: string,
     sliceId: string,
     mode: 'actual' | 'shadow' = 'actual',
-  ): Promise<TradeCloseSliceQueryResponseV2> {
+  ): Promise<TradeCloseSliceQueryResponse> {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: tradeDetailInclude,
@@ -438,7 +438,7 @@ export class TradeQueryService {
     const detail = mapDetail(trade);
     const slice = detail.closeSlices.find((candidate) => candidate.id === sliceId);
     if (!slice) throw new NotFoundException('Close Slice 不存在');
-    return tradeCloseSliceQueryResponseSchemaV2.parse({
+    return tradeCloseSliceQueryResponseSchema.parse({
       accountId,
       mode,
       tradeId,
@@ -447,8 +447,8 @@ export class TradeQueryService {
     });
   }
 
-  async resolveReference(rawRequest: unknown): Promise<TradeReferenceResolveResponseV2> {
-    const request = tradeReferenceResolveRequestSchemaV2.parse(rawRequest);
+  async resolveReference(rawRequest: unknown): Promise<TradeReferenceResolveResponse> {
+    const request = tradeReferenceResolveRequestSchema.parse(rawRequest);
     const trades = (await this.prisma.trade.findMany({
       where: { accountId: request.accountId, accountMode: request.mode },
       include: tradeDetailInclude,
@@ -469,24 +469,24 @@ export class TradeQueryService {
     };
     const [match] = matches;
     if (match !== undefined && matches.length === 1)
-      return tradeReferenceResolveResponseSchemaV2.parse({
+      return tradeReferenceResolveResponseSchema.parse({
         ...base,
         status: 'RESOLVED',
         trade: mapDetail(match),
       });
     if (matches.length > 1)
-      return tradeReferenceResolveResponseSchemaV2.parse({
+      return tradeReferenceResolveResponseSchema.parse({
         ...base,
         status: 'AMBIGUOUS',
         ...(request.snapshot === undefined ? {} : { snapshot: request.snapshot }),
       });
     if (request.snapshot !== undefined)
-      return tradeReferenceResolveResponseSchemaV2.parse({
+      return tradeReferenceResolveResponseSchema.parse({
         ...base,
         status: 'LEGACY',
         snapshot: request.snapshot,
       });
-    return tradeReferenceResolveResponseSchemaV2.parse({ ...base, status: 'NOT_FOUND' });
+    return tradeReferenceResolveResponseSchema.parse({ ...base, status: 'NOT_FOUND' });
   }
 
   private async accountIds(accountId: string | undefined, mode: 'actual' | 'shadow') {

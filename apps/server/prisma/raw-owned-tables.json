@@ -34,6 +34,26 @@
       "name": "AutomationRunLease",
       "owner": "automation",
       "reason": "Automation scheduled occurrence、durable owner attempt、数据库 lease 与 recovery 需要 PostgreSQL 部分唯一索引和显式行锁；AutomationRun 继续保留公开运行历史。"
+    },
+    {
+      "name": "MarketBarSeriesCoverageArchive",
+      "owner": "market",
+      "reason": "停用旧行情覆盖缓存时保留原有行，供保数据升级校验与后续审计；运行时不得读取或写入。"
+    },
+    {
+      "name": "MarketBarSeriesFactArchive",
+      "owner": "market",
+      "reason": "停用旧行情事实缓存时保留原有行，供保数据升级校验与后续审计；运行时不得读取或写入。"
+    },
+    {
+      "name": "DesiredProviderPolicyLegacyArchive",
+      "owner": "market",
+      "reason": "策略存储从旧双格式转换时保留升级前完整行，供保数据校验与审计；运行时不得读取或写入。"
+    },
+    {
+      "name": "DesiredProviderPolicyRevisionLegacyArchive",
+      "owner": "market",
+      "reason": "策略修订转换时保留升级前完整历史，供保数据校验与审计；运行时不得读取或写入。"
     }
   ]
 }

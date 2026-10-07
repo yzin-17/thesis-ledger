@@ -1,0 +1,21 @@
+{
+  "protocolVersion": "execution-price-v1",
+  "priceBasis": {
+    "adjustment": "none",
+    "method": "provider-native",
+    "methodVersion": "provider-reported-v1",
+    "basisScope": "provider-defined",
+    "anchor": null,
+    "revision": { "origin": "local-observation", "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    "observedAt": "2026-08-10T00:00:00.000Z",
+    "quantityBasis": "actual-units",
+    "volumeBasis": "original",
+    "dividendMeaning": "explicit-cash",
+    "dividendEvidenceRef": null,
+    "conversionAvailable": false,
+    "conversionEvidenceRef": null,
+    "derivation": null
+  },
+  "accountingBasis": "raw-events",
+  "history": { "basis": "point-in-time", "reconstructionEvidenceRef": "original-bar-availability-v1" }
+}

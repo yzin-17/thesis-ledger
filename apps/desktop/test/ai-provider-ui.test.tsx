@@ -36,10 +36,6 @@ import {
   testSavedAiProvider,
 } from '../src/features/providers/ai-provider.api.js';
 import {
-  invalidateAiProviderHealthState,
-  invalidateAiProviderState,
-} from '../src/features/providers/ai-provider.mutations.js';
-import {
   AiProviderEditorFields,
   ModelReasoningBadges,
 } from '../src/features/providers/AiProviderEditorFields.js';
@@ -49,7 +45,6 @@ import {
   saveProvider,
   testProviderDraft,
 } from '../src/features/providers/providers.api.js';
-import { invalidateProviderConnectionState } from '../src/features/providers/providers.mutations.js';
 import { ProviderTable } from '../src/features/providers/ProviderSettingsSections.js';
 import { ProviderModelList } from '../src/features/providers/ProviderModelSummary.js';
 import {
@@ -420,6 +415,39 @@ describe('AI Provider 专用请求与密钥边界', () => {
     expect(source).toContain('enabled: !item.enabled');
     expect(source).not.toContain('onSaveModelUsage');
     expect(source).toContain('flex flex-wrap');
+  });
+
+  it('用途切换的选中态由 aria-pressed 表达，不再用 secondary 变体表示选中', () => {
+    const research = newAiProviderExecutionRouteDraft('model-a');
+    const optimization = {
+      ...newAiProviderExecutionRouteDraft('model-a'),
+      contractId: 'parameter_optimization' as const,
+    };
+    const markup = renderToStaticMarkup(
+      <AiProviderExecutionFields
+        draft={{
+          ...newAiProviderDraft(),
+          modelsText: 'model-a',
+          executionRoutes: [research, optimization],
+        }}
+        onUpdateDraft={() => undefined}
+      />,
+    );
+
+    expect(markup.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(markup.match(/aria-pressed="false"/g)).toHaveLength(1);
+    const source = readFileSync(
+      new URL('../src/features/providers/AiProviderExecutionFields.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).not.toContain("? 'secondary' : 'ghost'");
+    const buttonSource = readFileSync(
+      new URL('../src/components/ui/button.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(buttonSource).toContain(
+      'aria-pressed:bg-secondary aria-pressed:text-foreground',
+    );
   });
 
   it('通知 Provider 仍使用通用保存与草稿测试端点', async () => {
@@ -833,57 +861,4 @@ describe('AI Provider 页面操作', () => {
     expect(environmentConfirm).not.toHaveBeenCalled();
   });
 
-  it('AI 操作失效 Provider、AI 能力和策略优化能力查询', async () => {
-    const invalidateQueries = vi.fn(async () => undefined);
-    await invalidateAiProviderState({ invalidateQueries });
-
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'config'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['desktop', 'ai', 'capabilities'] });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'strategy', 'optimization', 'capabilities'],
-    });
-  });
-
-  it('AI 已保存测试只刷新 Provider、默认设置、健康历史和 AI 能力查询', async () => {
-    const invalidateQueries = vi.fn(async () => undefined);
-    await invalidateAiProviderHealthState({ invalidateQueries });
-
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'config'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'health-history'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'routing-settings'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'ai', 'routing-settings'],
-    });
-    expect(invalidateQueries).not.toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers'],
-    });
-    expect(invalidateQueries).not.toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'automations'],
-    });
-    expect(invalidateQueries).not.toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'issues'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledTimes(6);
-  });
-
-  it('通知 Provider 已保存测试不刷新自动化、诊断或通知失败查询', async () => {
-    const invalidateQueries = vi.fn(async () => undefined);
-    await invalidateProviderConnectionState({ invalidateQueries });
-
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'config'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['desktop', 'providers', 'health-history'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledTimes(2);
-  });
 });

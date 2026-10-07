@@ -1,4 +1,4 @@
-import type { LedgerEventV2 } from '@thesis-ledger/api-client';
+import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,9 +39,11 @@ import {
 } from './account-data.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
 import { RecurringFundInvestments } from './AccountDataRecurringFundInvestments.js';
+import { LedgerContractFailure, ledgerContractRejected } from './account-data.ledger-contract.js';
 
 type QueryLike = {
-  data: { events: LedgerEventV2[]; ledgerRevision: string } | undefined;
+  error?: unknown;
+  data: { events: LedgerEvent[]; ledgerRevision: string } | undefined;
   isPending: boolean;
   isError: boolean;
   isFetching: boolean;
@@ -68,7 +70,7 @@ export function TransactionSection({
   resolveInstrumentName,
 }: {
   account: Account;
-  events: LedgerEventV2[];
+  events: LedgerEvent[];
   query: QueryLike;
   filter: AccountDataEventFilter;
   onFilterChange: (filter: AccountDataEventFilter) => void;
@@ -77,14 +79,16 @@ export function TransactionSection({
   onVoid: (event: ExecutionEvent) => void;
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
-  onAudit: (event: LedgerEventV2) => void;
+  onAudit: (event: LedgerEvent) => void;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
-  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
-  onEditSnapshot: (event: LedgerEventV2) => void;
-  onRemoveSnapshot: (event: LedgerEventV2) => void;
+  findSnapshotPosition: (event: LedgerEvent) => Position | undefined;
+  onEditSnapshot: (event: LedgerEvent) => void;
+  onRemoveSnapshot: (event: LedgerEvent) => void;
   resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
+  if (query.isError && ledgerContractRejected(query.error))
+    return <LedgerContractFailure onRetry={query.refetch} />;
   const filteredEvents = events.filter((event) => {
     if (filter === 'all') return true;
     const execution = isExecutionEvent(event);
@@ -159,7 +163,7 @@ export function TransactionSection({
         onVoidTransfer={onVoidTransfer}
         onAudit={onAudit}
       />
-      {query.isError && query.data && (
+      {query.isError && query.data && !ledgerContractRejected(query.error) && (
         <Alert>
           <AlertTitle>显示的是上次成功读取的结果</AlertTitle>
           <AlertDescription>
@@ -190,17 +194,19 @@ function TransactionResults({
   query: QueryLike;
   filter: AccountDataEventFilter;
   emptyTitle: string;
-  filteredEvents: LedgerEventV2[];
-  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
-  onEditSnapshot: (event: LedgerEventV2) => void;
-  onRemoveSnapshot: (event: LedgerEventV2) => void;
+  filteredEvents: LedgerEvent[];
+  findSnapshotPosition: (event: LedgerEvent) => Position | undefined;
+  onEditSnapshot: (event: LedgerEvent) => void;
+  onRemoveSnapshot: (event: LedgerEvent) => void;
   resolveInstrumentName: (symbol: string) => string | undefined;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
-  onAudit: (event: LedgerEventV2) => void;
+  onAudit: (event: LedgerEvent) => void;
 }) {
+  if (query.isError && ledgerContractRejected(query.error))
+    return <LedgerContractFailure onRetry={query.refetch} />;
   if (query.isPending && !query.data) {
     return (
       <div className="flex flex-col gap-3" aria-busy="true" aria-label="正在加载成交记录">
@@ -292,15 +298,15 @@ function TransactionRow({
   onRemoveSnapshot,
   resolveInstrumentName,
 }: {
-  event: LedgerEventV2;
+  event: LedgerEvent;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
-  onAudit: (event: LedgerEventV2) => void;
-  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
-  onEditSnapshot: (event: LedgerEventV2) => void;
-  onRemoveSnapshot: (event: LedgerEventV2) => void;
+  onAudit: (event: LedgerEvent) => void;
+  findSnapshotPosition: (event: LedgerEvent) => Position | undefined;
+  onEditSnapshot: (event: LedgerEvent) => void;
+  onRemoveSnapshot: (event: LedgerEvent) => void;
   resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
   const execution = isExecutionEvent(event);

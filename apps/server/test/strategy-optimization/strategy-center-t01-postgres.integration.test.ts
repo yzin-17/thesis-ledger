@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { strategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema } from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { PrismaService } from '../../src/platform/prisma.service.js';
@@ -197,7 +197,7 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
         strategyId: baselineStrategyId,
         version: 0,
         schemaVersion: 2,
-        schema: strategySchemaV2.parse(strategy) as unknown as Prisma.InputJsonValue,
+        schema: strategySchema.parse(strategy) as unknown as Prisma.InputJsonValue,
       },
     });
     candidateVersionId = candidateStrategy.id;

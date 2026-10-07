@@ -1,45 +1,43 @@
-import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
+import type { MarketDetailResponse } from '@thesis-ledger/api-client';
 import type {
-  BarPointV2,
-  BarSeriesV2,
-  IndicatorResultV2,
+  BarPoint,
+  BarSeries,
+  MarketIndicatorResult,
 } from '@thesis-ledger/schemas';
 
 /**
- * Desktop-only chart presentation data. The API wire contract remains the V2
- * BarSeries/IndicatorResult; this model merely joins series provenance to each
- * point for the existing chart/readout behavior.
+ * Desktop 图表展示数据，将序列来源信息附在每个点上供图表和读数使用。
  */
-export type MarketChartBar = Omit<BarPointV2, 'completionStatus' | 'availableAt'> & {
-  completionStatus?: BarPointV2['completionStatus'];
+export type MarketChartBar = Omit<BarPoint, 'completionStatus' | 'availableAt'> & {
+  completionStatus?: BarPoint['completionStatus'];
   availableAt?: string;
   symbol?: string;
-  timeframe?: BarSeriesV2['identity']['timeframe'];
+  timeframe?: BarSeries['identity']['timeframe'];
   provider?: string;
   upstreamSource?: string;
   providerRevision?: string;
-  adjustment?: BarSeriesV2['identity']['adjustment'];
+  adjustment?: BarSeries['identity']['adjustment'];
   inputFingerprint?: string | undefined;
   fetchedAt?: string;
   freshness?: 'live' | 'delayed' | 'stale';
   servedFromCache?: boolean;
 };
 
-export type MarketChartIndicator = Omit<IndicatorResultV2, 'points' | 'inputFingerprint'> & {
+export type MarketChartIndicator = Omit<MarketIndicatorResult, 'points' | 'inputFingerprint'> & {
   inputFingerprint?: string | undefined;
   symbol?: string;
-  timeframe?: BarSeriesV2['identity']['timeframe'];
+  timeframe?: BarSeries['identity']['timeframe'];
   marketTime?: string;
   calculatedAt?: string;
   values?: Record<string, number | null>;
   provider?: string;
-  points: Array<IndicatorResultV2['points'][number] & { inputFingerprint?: string | undefined }>;
+  points: Array<MarketIndicatorResult['points'][number] & { inputFingerprint?: string | undefined }>;
   inputProvenance?: {
-    timeframe: BarSeriesV2['identity']['timeframe'];
+    timeframe: BarSeries['identity']['timeframe'];
     provider: string;
     upstreamSource?: string;
     providerRevision?: string;
-    adjustment?: BarSeriesV2['identity']['adjustment'];
+    adjustment?: BarSeries['identity']['adjustment'];
     inputDateRange: { start: string; end: string };
     inputFingerprint: string;
   };
@@ -54,9 +52,9 @@ export type MarketChartIndicator = Omit<IndicatorResultV2, 'points' | 'inputFing
   engineVersion?: string;
 };
 
-export const chartBarsFromSeries = (series: BarSeriesV2): MarketChartBar[] => {
+export const chartBarsFromSeries = (series: BarSeries): MarketChartBar[] => {
   const freshness = series.provenance.cacheStatus === 'stale' ? 'stale' : 'delayed';
-  return series.points.map((point: BarPointV2) => ({
+  return series.points.map((point: BarPoint) => ({
     ...point,
     symbol: series.identity.symbol,
     timeframe: series.identity.timeframe,
@@ -71,8 +69,8 @@ export const chartBarsFromSeries = (series: BarSeriesV2): MarketChartBar[] => {
 };
 
 export const chartIndicatorFromResult = (
-  result: IndicatorResultV2,
-  series: BarSeriesV2,
+  result: MarketIndicatorResult,
+  series: BarSeries,
   generatedAt: string,
 ): MarketChartIndicator => {
   const start = series.coverage.actualStart ?? series.points[0]?.timestamp ?? generatedAt;
@@ -103,7 +101,7 @@ export const chartIndicatorFromResult = (
       hasMoreBefore: series.coverage.hasMoreBefore,
     },
     servedFromCache: series.provenance.servedFromCache,
-    engineVersion: 'dsa-indicator-v2',
+    engineVersion: 'dsa-indicator-v3',
   };
 };
 
@@ -117,7 +115,7 @@ export type MarketChartPage = {
 };
 
 export const chartPageFromResponse = (
-  response: MarketDetailResponseV2,
+  response: MarketDetailResponse,
 ): MarketChartPage | null => {
   const series = response.barSeries;
   if (!series) return null;
@@ -126,7 +124,7 @@ export const chartPageFromResponse = (
     indicators: response.requested
       .filter((capability) => capability.startsWith('indicator:'))
       .flatMap((capability) => {
-        const data = response.sections[capability]?.data as IndicatorResultV2 | undefined;
+        const data = response.sections[capability]?.data as MarketIndicatorResult | undefined;
         return data ? [chartIndicatorFromResult(data, series, response.generatedAt)] : [];
       }),
   };

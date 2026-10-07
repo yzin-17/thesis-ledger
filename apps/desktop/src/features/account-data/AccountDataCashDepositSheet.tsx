@@ -24,8 +24,13 @@ import {
 } from './account-data.helpers.js';
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
 
-export const cashDepositErrorMessage: (error: unknown) => string = () =>
-  '现金入账失败，请稍后重试。';
+import {
+  ledgerContractRejected,
+  ledgerContractErrorMessage,
+} from './account-data.ledger-contract.js';
+
+export const cashDepositErrorMessage = (error: unknown) =>
+  ledgerContractRejected(error) ? ledgerContractErrorMessage : '现金入账失败，请稍后重试。';
 
 export const cashDepositSuccessDescription = (currency: Account['currency'], isFuture: boolean) =>
   isFuture ? '已列入待结算，到账后计入余额。' : `${currency} 现金余额已更新。`;

@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
+  automationCloseSyncInputSchema,
   instrumentSearchResponseSchema,
-  ledgerEventsResponseSchemaV2,
+  ledgerAuditResponseSchema,
+  ledgerEventsResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
-  tradeListResponseSchemaV2,
+  tradeListResponseSchema,
 } from '../src/index.js';
 
 const accountId = '00000000-0000-4000-8000-000000000001';
 
 describe('shared API contracts', () => {
+  it('收盘同步需要明确日期且只接收日线周期', () => {
+    const base = { symbols: ['600519.SH'], end: '2026-09-11T08:00:00.000Z' };
+    expect(automationCloseSyncInputSchema.safeParse(base).success).toBe(true);
+    expect(automationCloseSyncInputSchema.safeParse({ symbols: base.symbols }).success).toBe(false);
+    expect(automationCloseSyncInputSchema.safeParse({ ...base, timeframe: '1m' }).success).toBe(false);
+  });
   it('distinguishes cash zero from a missing cash field', () => {
     const value = {
       positions: [],
@@ -53,8 +61,8 @@ describe('shared API contracts', () => {
       mode: 'actual',
       baseCurrency: 'CNY',
       fx: {
-        version: 1,
-        evidenceVersion: 'fx-v1|CNY|2026-08-20|HKD: CNY',
+        version: 3,
+        evidenceVersion: 'fx-v3|CNY|2026-08-20|HKD: CNY',
         enabled: true,
         status: 'ready',
         baseCurrency: 'CNY',
@@ -82,7 +90,7 @@ describe('shared API contracts', () => {
     });
     expect(result).toMatchObject({
       baseCurrency: 'CNY',
-      fx: { evidenceVersion: expect.stringContaining('fx-v1') },
+      fx: { evidenceVersion: expect.stringContaining('fx-v3') },
     });
   });
 
@@ -162,7 +170,7 @@ describe('shared API contracts', () => {
 
   it('为 Ledger 和 Trade 读取接口固定 Revision、世代和十进制字符串', () => {
     expect(
-      ledgerEventsResponseSchemaV2.parse({
+      ledgerEventsResponseSchema.parse({
         accountId,
         ledgerRevision: '0',
         projectionGeneration: '0',
@@ -200,7 +208,7 @@ describe('shared API contracts', () => {
       excludedReasons: ['LIFECYCLE_ACTIVE'],
     };
     expect(
-      tradeListResponseSchemaV2.parse({
+      tradeListResponseSchema.parse({
         accountId,
         mode: 'actual',
         items: [trade],
@@ -209,12 +217,46 @@ describe('shared API contracts', () => {
       }).items[0],
     ).toMatchObject({ assetName: '贵州茅台', remainingQuantity: '100' });
     expect(
-      tradeListResponseSchemaV2.safeParse({
+      tradeListResponseSchema.safeParse({
         accountId,
         mode: 'actual',
         items: [{ ...trade, remainingQuantity: 100 }],
         nextCursor: null,
         projectionGenerations: { [accountId]: '2' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('审计响应拒绝旧事件信封', () => {
+    const oldEvent = {
+      version: 1,
+      id: '00000000-0000-4000-8000-000000000002',
+      accountId,
+      type: 'BUY',
+      occurredAt: null,
+      symbol: null,
+      quantity: null,
+      price: null,
+      amount: null,
+      fee: null,
+      tax: null,
+      externalId: null,
+      source: 'migration',
+      sourceRowId: null,
+      currency: 'CNY',
+      note: null,
+      metadata: null,
+      createdAt: '2026-08-20T00:00:00.000Z',
+    };
+    expect(
+      ledgerAuditResponseSchema.safeParse({
+        accountId,
+        asOfLedgerRevision: '1',
+        ledgerRevision: '1',
+        projectionGeneration: '1',
+        events: [oldEvent],
+        instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
+        effective: false,
       }).success,
     ).toBe(false);
   });

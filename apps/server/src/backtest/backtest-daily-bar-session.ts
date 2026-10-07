@@ -39,6 +39,26 @@ const utcForLocalMinute = (date: string, minute: number, timezone: string): Date
   return candidate;
 };
 
+export const dailyBarSessionWindow = (
+  row: Readonly<Record<string, unknown>>,
+  calendar: TradingCalendar,
+): { openedAt: string; closedAt: string } => {
+  const occurredAt = typeof row.occurredAt === 'string' ? row.occurredAt : '';
+  const sessionDate = occurredAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sessionDate)) throw new Error('日线 Bar 缺少有效交易日标签');
+  const probe = utcForLocalMinute(sessionDate, 12 * 60, calendar.timezone);
+  if (!calendar.isTradingDay(probe))
+    throw new Error(`日线 Bar 不属于冻结 Calendar 交易日: ${sessionDate}`);
+  const sessions = calendar.sessionsForDate(probe);
+  const first = sessions[0];
+  const last = sessions.at(-1);
+  if (!first || !last) throw new Error(`冻结 Calendar 缺少交易时段: ${sessionDate}`);
+  return {
+    openedAt: utcForLocalMinute(sessionDate, first.start, calendar.timezone).toISOString(),
+    closedAt: utcForLocalMinute(sessionDate, last.end, calendar.timezone).toISOString(),
+  };
+};
+
 export const dailyBarSessionTimes = (
   row: Readonly<Record<string, unknown>>,
   calendar: TradingCalendar,
@@ -53,23 +73,8 @@ export const dailyBarSessionTimes = (
     };
   }
 
-  const occurredAt = typeof row.occurredAt === 'string' ? row.occurredAt : '';
-  const sessionDate = occurredAt.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(sessionDate)) {
-    throw new Error('日线 Bar 缺少有效交易日标签');
-  }
-  const probe = utcForLocalMinute(sessionDate, 12 * 60, calendar.timezone);
-  if (!calendar.isTradingDay(probe)) {
-    throw new Error(`日线 Bar 不属于冻结 Calendar 交易日: ${sessionDate}`);
-  }
-  const firstSession = calendar.sessionsForDate(probe)[0];
-  if (!firstSession) throw new Error(`冻结 Calendar 缺少交易时段: ${sessionDate}`);
-  const derivedOpenedAt = utcForLocalMinute(
-    sessionDate,
-    firstSession.start,
-    calendar.timezone,
-  ).toISOString();
-  const openedAt = explicitOpenedAt ?? derivedOpenedAt;
+  const session = dailyBarSessionWindow(row, calendar);
+  const openedAt = explicitOpenedAt ?? session.openedAt;
   return {
     openedAt,
     openAvailableAt: explicitOpenAvailableAt ?? openedAt,

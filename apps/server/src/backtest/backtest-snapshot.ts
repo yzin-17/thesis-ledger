@@ -1,20 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { link, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { isAbsolute, resolve } from 'node:path';
 
 import { strategyRequiredLookback } from '@thesis-ledger/domain';
-import type { RunConfig, StrategySchemaV2, Timeframe } from '@thesis-ledger/schemas';
-import { backtestExecutionModelSchema, runConfigSchemaV2, validateStrategyRunConfig } from '@thesis-ledger/schemas';
-
-import {
-  ArtifactNotFoundError,
-  type ArtifactPutInput,
-  type ArtifactRef,
-  LocalArtifactStore,
-} from './backtest-artifact-store.js';
-
-export type SnapshotStatus = 'building' | 'finalized';
-export type SnapshotCompleteness = 'complete' | 'partial' | 'unavailable';
+import type { RunConfigV3, BacktestStrategy, Timeframe } from '@thesis-ledger/schemas';
+import { LocalArtifactStore } from './backtest-artifact-store.js';
+import { LocalSnapshotV3Store } from './backtest-snapshot-v3-store.js';
 
 export type SnapshotDatasetPurpose =
   | 'signal'
@@ -45,52 +35,6 @@ export interface SnapshotDependencyClosure {
   datasets: SnapshotDatasetDependency[];
 }
 
-export interface SnapshotManifest {
-  manifestVersion: string;
-  executionModel?: { schemaVersion: 'execution-model-v1'; id: string; version: string; contentHash: string; artifactKey: string };
-  runId: string;
-  strategyVersionId: string;
-  strategyVersionHash: string;
-  dataAsOf: string;
-  runConfigChecksum: string;
-  aggregationVersion: string;
-  marketRuleVersion: string;
-  calendarVersion: string;
-  corporateActionVersion: string;
-  availabilitySemanticsVersion: string;
-  providerRevisions: Record<string, string>;
-  dependencyClosure: SnapshotDependencyClosure;
-  dateRange: { startDate: string; endDate: string; warmupStartDate: string };
-  warmup: {
-    lookbackPeriods: number;
-    lookbackTimeframe: Timeframe;
-    startDate: string;
-    rangePolicyVersion: string;
-    calendarBufferDays: number;
-  };
-  quality: { completeness: SnapshotCompleteness; warnings: string[] };
-  artifacts: ArtifactRef[];
-  status: SnapshotStatus;
-  contentHash?: string;
-}
-
-export interface SnapshotBuildInput {
-  runId: string;
-  strategyVersionId: string;
-  strategyVersionHash: string;
-  strategy: StrategySchemaV2;
-  runConfig: RunConfig;
-  versions?: Partial<Pick<SnapshotManifest, 'manifestVersion' | 'aggregationVersion' | 'marketRuleVersion' | 'calendarVersion' | 'corporateActionVersion' | 'availabilitySemanticsVersion'>>;
-  providerRevisions?: Record<string, string>;
-  quality?: SnapshotManifest['quality'];
-}
-
-export interface MigrationDryRunResult {
-  allowed: boolean;
-  contract: 'expand-cutover-contract';
-  blockers: string[];
-}
-
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -113,7 +57,7 @@ export function hashCanonicalManifest(value: unknown): string {
   return sha256(canonicalize(value, true));
 }
 
-export function deriveRunConfigChecksum(runConfig: RunConfig): string {
+export function deriveRunConfigChecksum(runConfig: RunConfigV3): string {
   return hashCanonicalManifest(runConfig);
 }
 
@@ -153,9 +97,9 @@ function baseTimeframe(timeframe: Timeframe): Timeframe {
 }
 
 function deriveDatasets(
-  strategy: StrategySchemaV2,
-  sources: StrategySchemaV2['signalSources'],
-  dependencyInstruments: StrategySchemaV2['signalSources'][number]['asset'][],
+  strategy: BacktestStrategy,
+  sources: BacktestStrategy['signalSources'],
+  dependencyInstruments: BacktestStrategy['signalSources'][number]['asset'][],
   requiredFx: string[],
 ): SnapshotDatasetDependency[] {
   const datasets: SnapshotDatasetDependency[] = sources.map((source) => ({
@@ -203,7 +147,10 @@ function deriveDatasets(
   );
 }
 
-export function deriveSnapshotDependencyClosure(strategy: StrategySchemaV2, runConfig: RunConfig): SnapshotDependencyClosure & { lookbackPeriods: number; lookbackTimeframe: Timeframe } {
+export function deriveSnapshotDependencyClosure(
+  strategy: BacktestStrategy,
+  runConfig: Pick<RunConfigV3, 'baseCurrency'>,
+): SnapshotDependencyClosure & { lookbackPeriods: number; lookbackTimeframe: Timeframe } {
   const sourceIds = new Set<string>();
   collectExpressionSources(strategy.entry, sourceIds);
   collectExpressionSources(strategy.exit, sourceIds);
@@ -244,45 +191,21 @@ export function deriveSnapshotDependencyClosure(strategy: StrategySchemaV2, runC
   };
 }
 
-export function buildSnapshotManifest(input: SnapshotBuildInput): SnapshotManifest {
-  const model = input.runConfig.executionModel;
-  if (model) {
-    const config = runConfigSchemaV2.parse(input.runConfig);
-    const validation = validateStrategyRunConfig(input.strategy, config);
-    if (!validation.valid) throw new SnapshotIntegrityError(validation.errors.map((error) => error.message).join('; '));
-    for (const segment of model.segments) {
-      if (segment.source.kind !== 'historicalFact' && Date.parse(segment.source.configuredAt) > Date.now()) {
-        throw new SnapshotIntegrityError('模型 configuredAt 晚于冻结时刻');
-      }
-    }
-    if (input.versions?.manifestVersion && input.versions.manifestVersion !== 'snapshot-manifest-v2') {
-      throw new SnapshotIntegrityError('研究模型需要 snapshot-manifest-v2');
-    }
-  } else if (input.versions?.manifestVersion === 'snapshot-manifest-v2') {
-    throw new SnapshotIntegrityError('snapshot-manifest-v2 必须显式携带研究模型');
-  }
-  const closure = deriveSnapshotDependencyClosure(input.strategy, input.runConfig);
+export function buildCurrentSnapshotBase(
+  strategy: BacktestStrategy,
+  runConfig: Pick<RunConfigV3, 'startDate' | 'endDate' | 'baseCurrency'>,
+) {
+  const closure = deriveSnapshotDependencyClosure(strategy, runConfig);
   const warmupStartDate = subtractDays(
-    input.runConfig.startDate,
+    runConfig.startDate,
     closure.lookbackPeriods * 2 + WARMUP_CALENDAR_BUFFER_DAYS,
   );
   return {
-    manifestVersion: input.versions?.manifestVersion ?? (model ? 'snapshot-manifest-v2' : 'snapshot-manifest-v1'),
-    ...(model ? { executionModel: {
-      schemaVersion: model.schemaVersion, id: model.id, version: model.version,
-      contentHash: hashCanonicalManifest(model), artifactKey: `${input.runId}/metadata/execution-model.parquet`,
-    } } : {}),
-    runId: input.runId,
-    strategyVersionId: input.strategyVersionId,
-    strategyVersionHash: input.strategyVersionHash,
-    dataAsOf: input.runConfig.dataAsOf,
-    runConfigChecksum: deriveRunConfigChecksum(input.runConfig),
-    aggregationVersion: input.versions?.aggregationVersion ?? 'bar-aggregation-v1',
-    marketRuleVersion: input.versions?.marketRuleVersion ?? 'market-rules-v1',
-    calendarVersion: input.versions?.calendarVersion ?? 'calendar-v1',
-    corporateActionVersion: input.versions?.corporateActionVersion ?? 'corporate-actions-v1',
-    availabilitySemanticsVersion: input.versions?.availabilitySemanticsVersion ?? 'availability-v1',
-    providerRevisions: Object.fromEntries(Object.entries(input.providerRevisions ?? {}).sort(([left], [right]) => left.localeCompare(right))),
+    aggregationVersion: 'bar-aggregation-v1',
+    marketRuleVersion: 'market-rules-v1',
+    calendarVersion: 'calendar-v1',
+    corporateActionVersion: 'corporate-actions-v1',
+    availabilitySemanticsVersion: 'availability-v1',
     dependencyClosure: {
       signalSources: closure.signalSources,
       executionInstrument: closure.executionInstrument,
@@ -294,7 +217,11 @@ export function buildSnapshotManifest(input: SnapshotBuildInput): SnapshotManife
       datasets: closure.datasets,
       baseTimeframes: closure.baseTimeframes,
     },
-    dateRange: { startDate: input.runConfig.startDate, endDate: input.runConfig.endDate, warmupStartDate },
+    dateRange: {
+      startDate: runConfig.startDate,
+      endDate: runConfig.endDate,
+      warmupStartDate,
+    },
     warmup: {
       lookbackPeriods: closure.lookbackPeriods,
       lookbackTimeframe: closure.lookbackTimeframe,
@@ -302,31 +229,11 @@ export function buildSnapshotManifest(input: SnapshotBuildInput): SnapshotManife
       rangePolicyVersion: WARMUP_RANGE_POLICY_VERSION,
       calendarBufferDays: WARMUP_CALENDAR_BUFFER_DAYS,
     },
-    quality: input.quality ?? { completeness: 'complete', warnings: [] },
-    artifacts: [],
-    status: 'building',
+    quality: {
+      completeness: 'partial' as const,
+      warnings: ['已冻结 execution 日线；其余策略依赖数据尚未写入 Snapshot。'],
+    },
   };
-}
-
-export function finalizeSnapshotManifest(manifest: SnapshotManifest, artifacts: readonly ArtifactRef[]): SnapshotManifest {
-  const finalized = { ...manifest, artifacts: [...artifacts].sort((left, right) => left.key.localeCompare(right.key)), status: 'finalized' as const };
-  return { ...finalized, contentHash: hashCanonicalManifest(finalized) };
-}
-
-function canonicalBuildingIdentity(manifest: SnapshotManifest): string {
-  const identity = Object.fromEntries(Object.entries(manifest).filter(([key]) => !['artifacts', 'contentHash', 'status'].includes(key)));
-  return canonicalizeManifest(identity);
-}
-
-export function migrationDryRun(input: { retainedV1Rows?: number; legacyCallers?: number } = {}): MigrationDryRunResult {
-  const blockers: string[] = [];
-  if ((input.retainedV1Rows ?? 0) > 0) blockers.push('retained V1 rows require an expand step');
-  if ((input.legacyCallers ?? 0) > 0) blockers.push('legacy callers require a cutover step');
-  return { allowed: blockers.length === 0, contract: 'expand-cutover-contract', blockers };
-}
-
-export class SnapshotNotFoundError extends Error {
-  readonly code = 'SNAPSHOT_NOT_FOUND';
 }
 
 export class SnapshotIntegrityError extends Error {
@@ -335,152 +242,28 @@ export class SnapshotIntegrityError extends Error {
 
 export class LocalSnapshotStore {
   readonly artifacts: LocalArtifactStore;
+  readonly v3: LocalSnapshotV3Store;
 
-  constructor(private readonly rootDirectory: string) {
+  constructor(rootDirectory: string) {
     this.artifacts = new LocalArtifactStore(resolve(rootDirectory, 'artifacts'));
-  }
-
-  private runDirectory(runId: string): string {
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) throw new Error('Invalid runId');
-    return resolve(this.rootDirectory, 'snapshots', runId);
-  }
-
-  private async writeManifest(path: string, manifest: SnapshotManifest, exclusive = false): Promise<void> {
-    const staging = `${path}.staging-${randomUUID()}`;
-    await mkdir(dirname(path), { recursive: true });
-    try {
-      await writeFile(staging, `${canonicalizeManifest(manifest)}\n`, { flag: 'wx' });
-      if (exclusive) await link(staging, path);
-      else await rename(staging, path);
-    } finally {
-      await rm(staging, { force: true });
-    }
-  }
-
-  async startBuild(input: SnapshotBuildInput): Promise<SnapshotManifest> {
-    const finalized = await this.load(input.runId, true);
-    if (finalized?.status === 'finalized') {
-      const expectedChecksum = deriveRunConfigChecksum(input.runConfig);
-      if (
-        finalized.strategyVersionId !== input.strategyVersionId ||
-        finalized.strategyVersionHash !== input.strategyVersionHash ||
-        finalized.runConfigChecksum !== expectedChecksum
-      ) {
-        throw new SnapshotIntegrityError(`Finalized snapshot identity mismatch: ${input.runId}`);
-      }
-      return finalized;
-    }
-    await rm(this.runDirectory(input.runId), { recursive: true, force: true });
-    await rm(resolve(this.rootDirectory, 'staging', input.runId), { recursive: true, force: true });
-    await rm(resolve(this.rootDirectory, 'artifacts', input.runId), { recursive: true, force: true });
-    const manifest = buildSnapshotManifest(input);
-    await this.writeManifest(resolve(this.runDirectory(input.runId), 'building.json'), manifest);
-    return manifest;
-  }
-
-  async putArtifact(runId: string, input: Omit<ArtifactPutInput, 'key'> & { key: string }): Promise<ArtifactRef> {
-    this.runDirectory(runId);
-    if (!input.key || isAbsolute(input.key) || input.key.split(/[\\/]/).includes('..')) {
-      throw new Error('Artifact key must be relative and cannot contain parent segments');
-    }
-    const key = `${runId}/${input.key.replace(/^\/+/, '')}`;
-    return this.artifacts.put({ ...input, key });
-  }
-
-  async finalize(runId: string, manifest: SnapshotManifest, artifacts: readonly ArtifactRef[]): Promise<SnapshotManifest> {
-    if (manifest.runId !== runId || manifest.status !== 'building') throw new SnapshotIntegrityError('Snapshot is not a building manifest');
-    const persisted = await this.load(runId, true);
-    if (!persisted) throw new SnapshotIntegrityError(`Building snapshot is missing: ${runId}`);
-    if (persisted.status === 'finalized') {
-      const candidate = finalizeSnapshotManifest(manifest, artifacts);
-      if (persisted.contentHash === candidate.contentHash) return persisted;
-      throw new SnapshotIntegrityError(`Finalized snapshot already differs: ${runId}`);
-    }
-    if (canonicalBuildingIdentity(persisted) !== canonicalBuildingIdentity(manifest)) {
-      throw new SnapshotIntegrityError(`Building snapshot identity mismatch: ${runId}`);
-    }
-    if (manifest.quality.completeness !== 'unavailable' && artifacts.length === 0) {
-      throw new SnapshotIntegrityError('Complete or partial snapshots require at least one artifact');
-    }
-    for (const artifact of artifacts) {
-      if (!(await this.artifacts.exists(artifact))) throw new ArtifactNotFoundError(artifact.key);
-      if (!artifact.key.startsWith(`${runId}/`)) throw new SnapshotIntegrityError('Artifact does not belong to run');
-      await this.artifacts.inspect(artifact);
-    }
-    await this.validateExecutionModelArtifacts(manifest, artifacts);
-    const finalized = finalizeSnapshotManifest(manifest, artifacts);
-    try {
-      await this.writeManifest(resolve(this.runDirectory(runId), 'finalized.json'), finalized, true);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      const concurrent = await this.load(runId, true);
-      if (concurrent?.status === 'finalized' && concurrent.contentHash === finalized.contentHash) return concurrent;
-      throw new SnapshotIntegrityError(`Concurrent finalized snapshot differs: ${runId}`);
-    }
-    await rm(resolve(this.runDirectory(runId), 'building.json'), { force: true });
-    await rm(resolve(this.rootDirectory, 'staging', runId), { recursive: true, force: true });
-    return finalized;
-  }
-
-  async load(runId: string, allowMissing = false): Promise<SnapshotManifest | undefined> {
-    for (const filename of ['finalized.json', 'building.json']) {
-      try {
-        const raw = await readFile(resolve(this.runDirectory(runId), filename), 'utf8');
-        const manifest = JSON.parse(raw) as SnapshotManifest;
-        if (manifest.status === 'finalized' && manifest.contentHash !== hashCanonicalManifest(manifest)) {
-          throw new SnapshotIntegrityError(`Manifest hash mismatch: ${runId}`);
+    this.v3 = new LocalSnapshotV3Store({
+      rootDirectory,
+      artifacts: this.artifacts,
+      putArtifact: (runId, input) => {
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) {
+          throw new Error('Invalid runId');
         }
-        return manifest;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-        throw error;
-      }
-    }
-    if (allowMissing) return undefined;
-    throw new SnapshotNotFoundError(`Snapshot not found: ${runId}`);
-  }
-
-  async retry(runId: string): Promise<SnapshotManifest> {
-    const manifest = await this.load(runId);
-    if (!manifest) throw new SnapshotNotFoundError(`Snapshot not found: ${runId}`);
-    if (manifest.status !== 'finalized') throw new Error(`Snapshot ${runId} is not finalized`);
-    return manifest;
-  }
-
-  async replay(runId: string): Promise<SnapshotManifest> {
-    const manifest = await this.retry(runId);
-    for (const artifact of manifest.artifacts) await this.artifacts.inspect(artifact);
-    await this.validateExecutionModelArtifacts(manifest, manifest.artifacts);
-    return manifest;
-  }
-
-  private async validateExecutionModelArtifacts(manifest: SnapshotManifest, artifacts: readonly ArtifactRef[]): Promise<void> {
-    if (!manifest.executionModel && manifest.manifestVersion !== 'snapshot-manifest-v2') return;
-    const descriptor = manifest.executionModel;
-    if (!descriptor || manifest.manifestVersion !== 'snapshot-manifest-v2') throw new SnapshotIntegrityError('模型与 Manifest 版本不一致');
-    const ref = artifacts.find((artifact) => artifact.key === descriptor.artifactKey);
-    const metadata = artifacts.find((artifact) => artifact.key === `${manifest.runId}/metadata/snapshot-metadata.parquet`);
-    if (!ref || !metadata) throw new SnapshotIntegrityError('模型或配置 Artifact 缺失');
-    const modelRows = [];
-    for await (const row of await this.artifacts.openRead(ref)) modelRows.push(row);
-    if (modelRows.length !== 1 || typeof modelRows[0]?.model !== 'string') throw new SnapshotIntegrityError('模型 Artifact 结构无效');
-    const model = backtestExecutionModelSchema.parse(JSON.parse(modelRows[0].model));
-    if (hashCanonicalManifest(model) !== descriptor.contentHash || model.id !== descriptor.id || model.version !== descriptor.version || model.schemaVersion !== descriptor.schemaVersion) {
-      throw new SnapshotIntegrityError('模型内容哈希或版本不一致');
-    }
-    const metadataRows = [];
-    for await (const row of await this.artifacts.openRead(metadata)) metadataRows.push(row);
-    if (metadataRows.length !== 1 || typeof metadataRows[0]?.runConfig !== 'string') throw new SnapshotIntegrityError('模型配置元数据缺失');
-    const config = runConfigSchemaV2.parse(JSON.parse(metadataRows[0].runConfig));
-    if (!config.executionModel || deriveRunConfigChecksum(config) !== manifest.runConfigChecksum || hashCanonicalManifest(config.executionModel) !== descriptor.contentHash) {
-      throw new SnapshotIntegrityError('模型与冻结 RunConfig 不一致');
-    }
-  }
-
-  async deleteRun(runId: string): Promise<void> {
-    this.runDirectory(runId);
-    await rm(this.runDirectory(runId), { recursive: true, force: true });
-    await rm(resolve(this.rootDirectory, 'staging', runId), { recursive: true, force: true });
-    await rm(resolve(this.rootDirectory, 'artifacts', runId), { recursive: true, force: true });
+        if (!input.key || isAbsolute(input.key) || input.key.split(/[\\/]/).includes('..')) {
+          throw new Error('Artifact key must be relative and cannot contain parent segments');
+        }
+        return this.artifacts.put({
+          ...input,
+          key: `${runId}/${input.key.replace(/^\/+/, '')}`,
+        });
+      },
+      canonicalize: canonicalizeManifest,
+      hash: hashCanonicalManifest,
+      integrityError: (message) => new SnapshotIntegrityError(message),
+    });
   }
 }

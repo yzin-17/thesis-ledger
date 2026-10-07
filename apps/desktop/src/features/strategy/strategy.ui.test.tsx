@@ -1,29 +1,21 @@
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  benchmarkOptions,
-  directoryInstrumentOptions,
-  filterBenchmarkOptions,
-  normalizeSingleSymbol,
-  signalIndicatorOptions,
-} from './StrategyEditorSheet.js';
+import { strategySchema } from '@thesis-ledger/schemas';
+import { completenessLabel } from './BacktestModelDisclosure.js';
 import {
   StrategyJobs,
   StrategyLibrary,
   backtestStageLabel,
-  completenessLabel,
-  formatBacktestMetric,
-  formatBacktestDataAsOf,
   jobStatusLabel,
-  tradeReasonLabel,
-  tradeSideLabel,
-  uniqueBacktestWarnings,
 } from './StrategySections.js';
 import {
   createDefaultStrategySchema,
   schemaFromVersion,
   schemaSymbols,
+  setStrategyExecutionAssetType,
+  setStrategyExecutionSymbol,
+  setStrategyPrimaryTimeframe,
 } from './strategy.schema.js';
 import {
   fractionToPercent,
@@ -77,34 +69,10 @@ describe('策略实验工作台 UI 契约', () => {
     expect(source).toContain('提交后将在后台准备行情并启动任务，进度可在回测任务中查看。');
     expect(source).toContain('grid-rows-[auto_minmax(0,1fr)_auto]');
     expect(source).toContain('variant="compact"');
-    expect(source).toContain('<details');
-    expect(source).toContain('未填写模型时，数据源必须提供完整历史执行规则');
+    expect(source).toContain('<BacktestPricePreparation');
+    expect(source).toContain('disabled={busy || !version || !currentStrategy || !prepared}');
     expect(source).not.toContain('可选，仅在需要覆盖执行假设时填写');
     expect(source).not.toContain('排队成功后将在后台启动任务');
-  });
-
-  it('回测数据时点仅接受字符串，非法值显示未知', () => {
-    expect(formatBacktestDataAsOf('2026-09-08T09:31:12.039Z')).toMatch(/2026\/09\/08/);
-    expect(formatBacktestDataAsOf({ at: '2026-09-08T09:31:12.039Z' })).toBe('未知');
-    expect(formatBacktestDataAsOf(null)).toBe('未知');
-  });
-
-  it('回测结果对任务和引擎返回的重复提示去重', () => {
-    expect(uniqueBacktestWarnings(['基准行情不可用。'], ['基准行情不可用', '数据不完整'])).toEqual([
-      '基准行情不可用。',
-      '数据不完整',
-    ]);
-  });
-
-  it('回测结果关闭按钮位于独立于内容滚动区的固定弹窗层', () => {
-    const source = readFileSync(new URL('./StrategySections.tsx', import.meta.url), 'utf8');
-
-    expect(source).toContain(
-      'max-h-[calc(100dvh-48px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-4xl',
-    );
-    expect(source).toContain('data-testid="backtest-result-scroll"');
-    expect(source).toContain('className="min-h-0 overflow-y-auto"');
-    expect(source).not.toContain('max-h-[calc(100dvh-48px)] overflow-y-auto sm:max-w-4xl');
   });
 
   it('策略库空态只提供首条策略 CTA，非空态在标题行提供新建入口', () => {
@@ -181,13 +149,9 @@ describe('策略实验工作台 UI 契约', () => {
     expect(terminalHtml).not.toContain('100%');
   });
 
-  it('回测阶段和交易枚举只在展示层转换为中文', () => {
+  it('回测阶段在展示层转换为中文', () => {
     expect(backtestStageLabel('snapshot-finalized')).toBe('快照已完成');
     expect(backtestStageLabel('artifact-read')).toBe('其他阶段');
-    expect(tradeSideLabel('buy')).toBe('买入');
-    expect(tradeSideLabel('sell')).toBe('卖出');
-    expect(tradeReasonLabel('signal')).toBe('信号触发');
-    expect(tradeReasonLabel('risk')).toBe('风险规则触发');
   });
 
   it('V2 失败任务展示阶段、执行次数和快照重试入口', () => {
@@ -196,7 +160,7 @@ describe('策略实验工作台 UI 契约', () => {
         jobs={[
           {
             ...job,
-            mode: 'V2',
+            mode: 'V3',
             status: 'failed',
             stage: 'artifact-read',
             executionAttempt: 2,
@@ -241,59 +205,18 @@ describe('策略实验工作台 UI 契约', () => {
     expect(html).not.toContain('创建策略');
   });
 
-  it('编辑 Schema 会同步父策略名称，回测 Dialog 使用精确版本的首个标的', () => {
+  it('编辑 Schema 会同步父策略名称，执行标的来自当前合同', () => {
     const editedSchema = schemaFromVersion(version, strategy.name);
     expect(editedSchema.name).toBe(strategy.name);
-    const multiSymbolSchema = {
+    const selectedSchema = {
       ...schema,
-      universe: { symbols: ['600519.SH', '000300.SH'] },
+      executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
     };
-    const multiSymbolVersion = {
+    const selectedVersion = {
       ...version,
-      schema: multiSymbolSchema,
+      schema: selectedSchema,
     };
-    expect(schemaSymbols(multiSymbolVersion.schema)).toEqual(['600519.SH', '000300.SH']);
-  });
-
-  it('基准下拉提供默认指数列表，标的支持搜索且只保留一个', () => {
-    expect(benchmarkOptions).toHaveLength(7);
-    expect(benchmarkOptions[0]).toEqual({ value: '000300.SH', label: '沪深 300' });
-    expect(benchmarkOptions).toContainEqual({ value: '000688.SH', label: '科创 50' });
-    const csi500 = benchmarkOptions[4];
-    if (!csi500) throw new Error('默认基准列表缺少中证 500');
-    expect(filterBenchmarkOptions(csi500, '500')).toBe(true);
-    expect(filterBenchmarkOptions(csi500, '中证')).toBe(true);
-    expect(filterBenchmarkOptions(csi500, '创业板')).toBe(false);
-    expect(
-      directoryInstrumentOptions([
-        {
-          symbol: '600519.SH',
-          canonicalCode: '600519',
-          market: 'SH',
-          displayName: '贵州茅台',
-        },
-        {
-          symbol: '600519.SH',
-          canonicalCode: '600519',
-          market: 'SH',
-          displayName: '贵州茅台（重复结果）',
-        },
-      ]),
-    ).toEqual([{ value: '600519.SH', label: '贵州茅台' }]);
-    expect(
-      normalizeSingleSymbol({ universe: { symbols: ['600519.SH', '000300.SH'] } }).universe,
-    ).toEqual({ symbols: ['600519.SH'] });
-  });
-
-  it('信号指标使用回测引擎支持的下拉枚举', () => {
-    expect(signalIndicatorOptions).toEqual([
-      { value: 'close', label: '收盘价' },
-      { value: 'price', label: '收盘价' },
-      { value: 'open', label: '开盘价' },
-      { value: 'high', label: '最高价' },
-      { value: 'low', label: '最低价' },
-      { value: 'volume', label: '成交量' },
-    ]);
+    expect(schemaSymbols(selectedVersion.schema)).toEqual(['600519.SH']);
   });
 
   it('结果任务保留引擎、数据时点和结果校验和字段', () => {
@@ -314,16 +237,8 @@ describe('策略实验工作台 UI 契约', () => {
     expect(resultJob.result).toMatchObject({ finalValue: 101_000 });
   });
 
-  it('V2 结果展示指标可用性、NAV 拒绝与复现元数据', () => {
-    expect(formatBacktestMetric({ status: 'available', value: '0.125' })).toBe('12.50%');
-    expect(
-      formatBacktestMetric({ status: 'unavailable', reason: 'INSUFFICIENT_RETURN_SAMPLES' }),
-    ).toBe('不可用：INSUFFICIENT_RETURN_SAMPLES');
-    expect(formatBacktestMetric({ status: 'available', value: '1.5' }, false)).toBe('1.5');
+  it('数据完整性标签保持中文', () => {
     expect(completenessLabel('partial')).toBe('部分完整');
-    const source = readFileSync(new URL('./StrategySections.tsx', import.meta.url), 'utf8');
-    expect(source).toContain('NAV {rejectedNavRequests.length} 笔');
-    expect(source).toContain('result.snapshotId');
   });
 
   it('回测配置拒绝反向日期和非正资金', () => {
@@ -338,16 +253,20 @@ describe('策略实验工作台 UI 契约', () => {
     ).toContain('初始资金');
   });
 
-  it('新建策略不预填具体标的或价格阈值，比例显示与存储转换一致', () => {
+  it('新建策略使用当前合同且不预填标的，比例显示与存储转换一致', () => {
     const emptySchema = createDefaultStrategySchema();
-    expect(emptySchema.universe).toMatchObject({ symbols: [] });
-    expect(Array.isArray(emptySchema.entrySignals)).toBe(true);
-    expect((emptySchema.entrySignals as Array<Record<string, unknown>>)[0]).toMatchObject({
-      value: '',
-    });
-    expect((emptySchema.exitSignals as Array<Record<string, unknown>>)[0]).toMatchObject({
-      value: '',
-    });
+    expect(emptySchema.schemaVersion).toBe('2');
+    expect(emptySchema.description).toContain('示例规则');
+    expect(schemaSymbols(emptySchema)).toEqual([]);
+    expect(strategySchema.safeParse(emptySchema).success).toBe(false);
+    const selectedSchema = setStrategyExecutionSymbol(emptySchema, '600519.SH');
+    expect(strategySchema.safeParse(selectedSchema).success).toBe(true);
+    const etfSchema = setStrategyExecutionAssetType(selectedSchema, 'etf');
+    expect(strategySchema.safeParse(etfSchema).success).toBe(true);
+    expect(etfSchema.signalSources).toMatchObject([{ asset: { assetType: 'etf' } }]);
+    expect(setStrategyPrimaryTimeframe(selectedSchema, '60m').signalSources).toMatchObject([
+      { timeframe: '60m' },
+    ]);
     expect(fractionToPercent(0.125)).toBe('12.5');
     expect(percentToFraction('12.5')).toBeCloseTo(0.125);
     expect(stopLossFieldLabel('atr')).toBe('ATR 倍数');

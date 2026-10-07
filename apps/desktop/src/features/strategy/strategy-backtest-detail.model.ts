@@ -177,10 +177,14 @@ export const deriveBacktestRerun = (job: BacktestJob) => {
   if (cash === null) missing.push('初始资金');
 
   const executionModel = runConfig?.executionModel ?? input?.executionModel;
+  const adjustment = asRecord(asRecord(runConfig?.executionPriceProtocol)?.priceBasis)?.adjustment;
+  const validAdjustment = adjustment === 'none' || adjustment === 'qfq' || adjustment === 'hfq';
+  if (runConfig?.schemaVersion === '3' && !validAdjustment) missing.push('价格口径');
   if (missing.length > 0 || !start || !end || cash === null) return { setup: null, missing };
   const setup: BacktestSetupInput = {
     period: { start, end },
     initialCash: cash,
+    ...(validAdjustment ? { adjustment } : {}),
     ...(currency === 'CNY' || currency === 'HKD' || currency === 'USD'
       ? { baseCurrency: currency }
       : {}),

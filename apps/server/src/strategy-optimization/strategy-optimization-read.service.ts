@@ -3,19 +3,16 @@ import { Prisma } from '@prisma/client';
 import {
   optimizationDiscoveryScopeSchema,
   resultReadEligibilityForExperiment,
-  strategySchemaV2,
-  type StrategySchemaV2,
+  strategySchema,
+  type BacktestStrategy,
   type OptimizationExperimentSource,
   type OptimizationCandidateSource,
 } from '@thesis-ledger/schemas';
 import { AiProviderRegistry } from '../ai/provider-registry.js';
-import {
-  backtestJobSummarySelect,
-  toBacktestJobSummary,
-  type BacktestJobSummary,
-} from '../backtest/backtest-summary.js';
+import { toBacktestJobSummary, type BacktestJobSummary } from '../backtest/backtest-summary.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { ResultReadPolicyService } from '../platform/result-read-policy.service.js';
+import { currentBacktestGroupRecords } from './strategy-optimization-backtest-records.js';
 import {
   experimentDisplayName,
   toRecord,
@@ -173,7 +170,7 @@ export class StrategyOptimizationReadService {
     if (!version) throw new NotFoundException('策略版本不存在');
     if (version.schemaVersion !== 2 || version.version <= 0)
       throw new BadRequestException('AI 优化只能从正式 V2 策略版本开始');
-    return { ...version, strategy: strategySchemaV2.parse(version.schema) as StrategySchemaV2 };
+    return { ...version, strategy: strategySchema.parse(version.schema) as BacktestStrategy };
   }
 
   capabilities() {
@@ -214,7 +211,7 @@ export class StrategyOptimizationReadService {
     if (!version) throw new NotFoundException('策略版本不存在');
     if (version.schemaVersion !== 2 || version.version <= 0)
       throw new BadRequestException('只有正式 V2 策略版本可以配置优化参数');
-    return describeStrategyParameters(strategySchemaV2.parse(version.schema) as StrategySchemaV2);
+    return describeStrategyParameters(strategySchema.parse(version.schema) as BacktestStrategy);
   }
 
   async experiment(id: string) {
@@ -361,15 +358,7 @@ export class StrategyOptimizationReadService {
     const bounded = Math.max(1, Math.min(input.limit ?? 50, 100));
     const cursor = decodeCursor(input.cursor);
     if (input.cursor && !cursor) throw new BadRequestException('回测分组游标无效');
-    const jobs = await this.prisma.backtestJob.findMany({
-      where: {
-        ...(input.jobId ? { id: input.jobId } : {}),
-        ...(input.status ? { status: input.status } : {}),
-        ...(input.strategyVersionId ? { strategyVersionId: input.strategyVersionId } : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: backtestJobSummarySelect,
-    });
+    const jobs = await currentBacktestGroupRecords(this.prisma, input);
     const [associations, strategyVersions] = await Promise.all([
       this.prisma.$queryRaw<BacktestAssociationRow[]>(Prisma.sql`
       SELECT refs."value" AS "runId", e."id" AS "experimentId", e."name" AS "experimentName",

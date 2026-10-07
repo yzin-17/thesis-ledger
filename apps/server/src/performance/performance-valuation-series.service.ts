@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { assetMarketsByTradingMarket, openTradingMarketsAt } from '@thesis-ledger/domain';
 import type {
-  FundHoldingsV1,
+  FundHoldings,
   PerformanceSeriesInterval,
   PerformanceSeriesRange,
 } from '@thesis-ledger/schemas';
@@ -52,7 +52,7 @@ type SeriesPoint = {
 
 export const estimateFundNavFromHoldings = (
   anchorNav: number,
-  holdings: FundHoldingsV1['holdings'],
+  holdings: FundHoldings['holdings'],
   returns: ReadonlyMap<string, number>,
 ) => {
   let contribution = 0;
@@ -413,7 +413,7 @@ export class PerformanceValuationSeriesService {
             this.market.getFundNav(position.symbol, { allowStale: true }),
             this.market.getFundHoldings(position.symbol),
           ]);
-          if (new Date(holdings.disclosureDate) > at) throw new Error('披露证据晚于估值时点');
+          if (!holdings.disclosureDate || new Date(holdings.disclosureDate) > at) throw new Error('披露时间未知或晚于估值时点');
           const anchorStart = new Date(nav.navDate);
           anchorStart.setUTCDate(anchorStart.getUTCDate() - 7);
           const returns = new Map<string, number>();
@@ -422,7 +422,7 @@ export class PerformanceValuationSeriesService {
               try {
                 const [quote, bars] = await Promise.all([
                   this.market.getQuote(holding.symbol, { allowStale: true }),
-                  barsReader.read({
+                  barsReader.readChartV3({
                     identity: {
                       symbol: holding.symbol,
                       assetType: inferAssetType(holding.symbol) === 'etf' ? 'ETF' : 'STOCK',

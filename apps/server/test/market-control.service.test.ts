@@ -1,376 +1,357 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  defaultMarketRoutesV2,
-  MarketControlService,
-  removeProviderTargets,
-} from '../src/market/market-control.service.js';
-import { DsaClient, DsaError } from '../src/integration/dsa/dsa.client.js';
+import { Prisma } from '@prisma/client';
+import type { DesiredProviderPolicyV3 } from '@thesis-ledger/schemas';
+import { MarketControlService } from '../src/market/market-control.service.js';
+import { encodeMarketPolicyRoutes } from '../src/market/market-policy-storage.js';
 
-type RouteTarget = { providerId: string; upstreamSource: string };
-type Routes = Record<string, Record<string, RouteTarget[]>>;
-
-const target = (providerId: string, upstreamSource = 'eastmoney'): RouteTarget => ({
-  providerId,
-  upstreamSource,
-});
+const key = {
+  kind: 'bar' as const,
+  market: 'CN' as const,
+  assetType: 'ETF' as const,
+  capability: 'DAILY_BAR' as const,
+  timeframe: '1d' as const,
+  adjustment: 'qfq' as const,
+};
+const target = { providerId: 'hithink', upstreamSource: 'hithink-financial-api' };
+const routes = [{ key, targets: [target] }];
 
 type PolicyState = {
   consumer: string;
   revision: number;
   enabled: boolean;
-  routes: Routes;
+  routes: unknown;
   syncState: string;
   history: Array<Record<string, unknown>>;
   [key: string]: unknown;
 };
 
-const historyCreateFrom = (data: Record<string, unknown>) => {
-  if (!data.history || typeof data.history !== 'object' || !('create' in data.history)) {
-    return undefined;
-  }
-  return (data.history as { create: Record<string, unknown> }).create;
-};
-
-const makeTransaction = (state: PolicyState) => {
-  const record = () => ({ ...state, history: [...state.history] });
-  return {
-    $queryRaw: vi.fn(async () => []),
-    desiredProviderPolicy: {
-      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-        const previousHistory = state.history;
-        const historyCreate = historyCreateFrom(data);
-        Object.assign(state, data);
-        state.history = historyCreate ? [...previousHistory, historyCreate] : previousHistory;
-        return record();
-      }),
-      updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-        Object.assign(state, data);
-        return { count: 1 };
-      }),
-      findUniqueOrThrow: vi.fn(async () => record()),
-    },
-    desiredProviderPolicyRevision: {
-      update: vi.fn(async () => ({})),
-    },
-  };
-};
-
-describe('MarketControlService', () => {
-  it('默认策略使用结构化 RouteTarget 且 ETF 日线为 Tencent 主源', () => {
-    expect(defaultMarketRoutesV2.DAILY_BAR.ETF).toEqual([
-      { providerId: 'tencent', upstreamSource: 'tencent' },
-      { providerId: 'akshare', upstreamSource: 'eastmoney' },
-    ]);
-    expect(defaultMarketRoutesV2.REALTIME_QUOTE.STOCK).toEqual([
-      { providerId: 'akshare', upstreamSource: 'akshare' },
-      { providerId: 'efinance', upstreamSource: 'efinance' },
-    ]);
-    expect(defaultMarketRoutesV2.FUND_NAV.MUTUAL_FUND).toEqual([
-      { providerId: 'akshare', upstreamSource: 'akshare' },
-      { providerId: 'efinance', upstreamSource: 'efinance' },
-    ]);
-  });
-
-  it('按 providerId 从所有 RouteTarget 中移除 Provider，不混淆同 Provider 的 source', () => {
-    const { nextRoutes, routeDiff } = removeProviderTargets(
-      {
-        DAILY_BAR: {
-          ETF: [
-            { providerId: 'akshare', upstreamSource: 'eastmoney' },
-            { providerId: 'akshare', upstreamSource: 'tencent' },
-          ],
-        },
-      },
-      'AKSHARE',
-    );
-    expect(nextRoutes.DAILY_BAR?.ETF).toEqual([]);
-    expect(routeDiff[0]).toMatchObject({ capability: 'DAILY_BAR', instrumentType: 'ETF' });
-  });
-
-  const policyState = (routes: Routes, enabled = false): PolicyState => ({
+const makeStore = (
+  initial: PolicyState | null = {
     consumer: 'thesis-ledger',
     revision: 4,
-    enabled,
-    routes,
+    enabled: true,
+    routes: encodeMarketPolicyRoutes([]),
     syncState: 'applied',
     history: [],
-  });
-
-  const policyPrisma = (state: PolicyState) => {
-    const transaction = makeTransaction(state);
-    return {
-      desiredProviderPolicy: {
-        findUnique: vi.fn(async () => ({ ...state, history: [...state.history] })),
-        update: transaction.desiredProviderPolicy.update,
-      },
-      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) => callback(transaction)),
-    };
+  },
+) => {
+  let state = initial;
+  const record = () => (state ? { ...state, history: [...state.history] } : null);
+  const update = ({ data }: { data: Record<string, unknown> }) => {
+    if (!state) throw new Error('missing policy');
+    const history = state.history;
+    Object.assign(state, data);
+    if (data.effectiveProjection === Prisma.JsonNull) state.effectiveProjection = null;
+    if (data.lastError === Prisma.JsonNull) state.lastError = null;
+    const next = (data.history as { create?: Record<string, unknown> } | undefined)?.create;
+    state.history = next ? [...history, next] : history;
+    return record();
   };
+  const tx = {
+    $queryRaw: vi.fn(async () => []),
+    desiredProviderPolicy: {
+      findUniqueOrThrow: vi.fn(async () => record()),
+      update: vi.fn(async (args: { data: Record<string, unknown> }) => update(args)),
+      updateMany: vi.fn(async (args: { data: Record<string, unknown> }) => {
+        update(args);
+        return { count: 1 };
+      }),
+    },
+    desiredProviderPolicyRevision: { update: vi.fn(async () => ({})) },
+  };
+  const prisma = {
+    desiredProviderPolicy: {
+      findUnique: vi.fn(async () => record()),
+      upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => {
+        if (!state)
+          state = {
+            consumer: create.consumer as string,
+            revision: create.revision as number,
+            enabled: create.enabled as boolean,
+            routes: create.routes,
+            history: [],
+            syncState: 'pending',
+          };
+        return record();
+      }),
+    },
+    desiredProviderPolicyRevision: {
+      findUnique: vi.fn(async () => null as Record<string, unknown> | null),
+    },
+    $transaction: vi.fn(async (callback: (transaction: typeof tx) => unknown) => callback(tx)),
+    providerTombstone: { upsert: vi.fn(async () => ({})) },
+  };
+  return { prisma, tx, getState: () => state };
+};
 
-  it('当前策略只接受 V2，不新增 revision 或调用 DSA', async () => {
-    const routes: Routes = {
-      DAILY_BAR: {
-        ETF: [
-          { providerId: 'tencent', upstreamSource: 'tencent' },
-          { providerId: 'akshare', upstreamSource: 'eastmoney' },
-        ],
-      },
-    };
-    const state = policyState(routes, true);
-    state.syncState = 'applied';
-    const prisma = policyPrisma(state);
-    const dsa = { applyControlPolicyV2: vi.fn() };
+const completeCatalog = () => ({
+  contractVersion: 3 as const,
+  consumer: 'thesis-ledger' as const,
+  catalogRevision: 9,
+  generatedAt: '2026-09-25T04:00:00.000Z',
+  integrity: 'complete' as const,
+  entries: [{ key, target, state: 'ready' as const }],
+});
 
-    const result = await new MarketControlService(prisma as never, dsa as never).getPolicy();
-
-    expect(result).toMatchObject({ revision: 4, enabled: true, contractVersion: 2, routes });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(dsa.applyControlPolicyV2).not.toHaveBeenCalled();
-  });
-
-  it('持久化策略仍是 providerId 数组时 fail-closed，不在运行时隐式迁移', async () => {
-    const current = {
-      consumer: 'thesis-ledger',
-      revision: 17,
-      enabled: true,
-      routes: { DAILY_BAR: { ETF: ['akshare', 'efinance'] } },
-      syncState: 'applied',
-      history: [],
-    };
-    const prisma = {
-      desiredProviderPolicy: { findUnique: vi.fn(async () => current) },
-    };
-    const dsa = { applyControlPolicyV2: vi.fn() };
-
-    await expect(new MarketControlService(prisma as never, dsa as never).getPolicy()).rejects.toThrow();
-    expect(dsa.applyControlPolicyV2).not.toHaveBeenCalled();
-  });
-
-  it('accepts a monotonic revision jump and pushes the latest policy', async () => {
-    const routes: Routes = { REALTIME_QUOTE: { STOCK: [target('akshare')] } };
-    const state: PolicyState = {
-      consumer: 'thesis-ledger',
-      revision: 1,
-      enabled: true,
-      routes,
-      syncState: 'applied',
-      history: [],
-    };
-    const record = () => ({ ...state, history: [...state.history] });
-    const transaction = {
-      $queryRaw: vi.fn(async () => []),
-      desiredProviderPolicy: {
-        findUnique: vi.fn(async () => record()),
-        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-          const previousHistory = state.history;
-          const historyCreate = historyCreateFrom(data);
-          Object.assign(state, data);
-          state.history = historyCreate ? [...previousHistory, historyCreate] : previousHistory;
-          return record();
-        }),
-        updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-          Object.assign(state, data);
-          return { count: 1 };
-        }),
-        findUniqueOrThrow: vi.fn(async () => record()),
-      },
-      desiredProviderPolicyRevision: {
-        update: vi.fn(async () => ({})),
-      },
-    };
-    const prisma = {
-      desiredProviderPolicy: {
-        findUnique: vi.fn(async () => record()),
-      },
-      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) =>
-        callback(transaction),
-      ),
-    };
-    const dsa = {
-      applyControlPolicyV2: vi.fn(async () => ({ effective: { sourceDesiredRevision: 3 } })),
-    };
-
-    const result = await new MarketControlService(prisma as never, dsa as never).applyPolicy({
-      revision: 3,
-      enabled: true,
-      routes,
-    });
-
-    expect(result.revision).toBe(3);
-    expect(result.contractVersion).toBe(2);
-    expect(dsa.applyControlPolicyV2).toHaveBeenCalledWith(
-      expect.objectContaining({ revision: 3, routes }),
-    );
-  });
-
-  it('returns a not-found error instead of an internal error for a missing rollback target', async () => {
-    const current = {
-      consumer: 'thesis-ledger',
-      revision: 3,
-      enabled: true,
-      routes: { REALTIME_QUOTE: { STOCK: [target('akshare')] } },
-      syncState: 'applied',
-      history: [],
-    };
-    const prisma = {
-      desiredProviderPolicy: {
-        findUnique: vi.fn(async () => current),
-      },
-      desiredProviderPolicyRevision: {
-        findUnique: vi.fn(async () => null),
-      },
-    };
-
-    await expect(
-      new MarketControlService(prisma as never, {} as never).rollback(2),
-    ).rejects.toMatchObject({
-      status: 404,
-      message: '找不到 revision 2',
-    });
-  });
-
-  it('revision 落后于 DSA 时自动对基：以远端 revision + 1 重推一次', async () => {
-    const routes: Routes = { REALTIME_QUOTE: { STOCK: [target('akshare')] } };
-    const state: PolicyState = {
-      consumer: 'thesis-ledger',
-      revision: 3,
-      enabled: true,
-      routes,
-      syncState: 'applied',
-      history: [],
-    };
-    const transaction = makeTransaction(state);
-    const prisma = {
-      desiredProviderPolicy: {
-        findUnique: vi.fn(async () => ({ ...state, history: [...state.history] })),
-        update: transaction.desiredProviderPolicy.update,
-      },
-      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) =>
-        callback(transaction),
-      ),
-    };
-    const staleError = new DsaError('Policy revision 4 早于当前 revision 11', 'stale-revision');
-    const dsa = {
-      applyControlPolicyV2: vi
-        .fn()
-        .mockRejectedValueOnce(staleError)
-        .mockResolvedValueOnce({ effective: { sourceDesiredRevision: 12 } }),
-      effectiveControlPolicy: vi.fn(async () => ({
-        projection: { desired: { revision: 11 } },
+const dsaReady = () => ({
+  marketRouteCatalogV3: vi.fn(async () => completeCatalog()),
+  applyControlPolicyV3: vi.fn(async (desired: DesiredProviderPolicyV3) => ({
+    status: 'applied' as const,
+    idempotent: false,
+    requestId: desired.requestId,
+    desired,
+    effective: {
+      contractVersion: 3 as const,
+      consumer: 'thesis-ledger' as const,
+      requestId: desired.requestId,
+      revision: desired.revision,
+      sourceDesiredRevision: desired.revision,
+      enabled: desired.enabled,
+      routes: desired.routes.map((route) => ({
+        key: route.key,
+        reason: null,
+        targets: route.targets.map((item, routeIndex) => ({
+          ...item,
+          routeIndex,
+          eligible: true,
+          reason: null,
+        })),
       })),
-    };
+      appliedAt: '2026-09-25T04:00:01.000Z',
+    },
+  })),
+  removeControlProvider: vi.fn(async () => ({})),
+});
 
-    const result = await new MarketControlService(prisma as never, dsa as never).applyPolicy({
+describe('MarketControlService', () => {
+  it('新库只种下当前合同的空路由并通过 V3 目录同步', async () => {
+    const store = makeStore(null);
+    const dsa = dsaReady();
+    const result = await new MarketControlService(store.prisma as never, dsa as never).getPolicy();
+    expect(store.getState()?.routes).toMatchObject({ storageVersion: 3, routes: [] });
+    expect(result).toMatchObject({
+      contractVersion: 3,
+      revision: 1,
+      routes: [],
+      syncState: 'applied',
+    });
+    expect(dsa.applyControlPolicyV3).toHaveBeenCalledOnce();
+  });
+
+  it('旧输入在查库前拒绝，旧持久化记录在读取时拒绝', async () => {
+    const store = makeStore();
+    const service = new MarketControlService(store.prisma as never, dsaReady() as never);
+    await expect(
+      service.applyPolicy({ contractVersion: 2, revision: 5, enabled: true, routes: {} }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(store.prisma.desiredProviderPolicy.findUnique).not.toHaveBeenCalled();
+
+    const old = makeStore({
+      consumer: 'thesis-ledger',
       revision: 4,
       enabled: true,
-      routes,
+      routes: { DAILY_BAR: { ETF: [target] } },
+      syncState: 'applied',
+      history: [],
     });
-
-    expect(dsa.effectiveControlPolicy).toHaveBeenCalledTimes(1);
-    expect(dsa.applyControlPolicyV2).toHaveBeenLastCalledWith(
-      expect.objectContaining({ revision: 12, routes }),
-    );
-    expect(result.revision).toBe(12);
-    expect(result.syncState).toBe('applied');
+    await expect(
+      new MarketControlService(old.prisma as never, dsaReady() as never).getPolicy(),
+    ).rejects.toMatchObject({ status: 409, message: 'Policy routes 存储格式不是当前版本' });
   });
 
-  it('远端 revision 不高于本地时不触发对基，保留失败状态', async () => {
-    const routes: Routes = { REALTIME_QUOTE: { STOCK: [target('akshare')] } };
-    const state: PolicyState = {
-      consumer: 'thesis-ledger',
-      revision: 3,
+  it('目录完整且目标就绪时，期望和生效路由身份一致才应用', async () => {
+    const store = makeStore();
+    const dsa = dsaReady();
+    const result = await new MarketControlService(store.prisma as never, dsa as never).applyPolicy({
+      contractVersion: 3,
+      revision: 5,
       enabled: true,
       routes,
-      syncState: 'pending',
-      history: [],
-    };
-    const transaction = makeTransaction(state);
-    const prisma = {
-      desiredProviderPolicy: {
-        findUnique: vi.fn(async () => ({ ...state, history: [...state.history] })),
-      },
-      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) =>
-        callback(transaction),
-      ),
-    };
-    const staleError = new DsaError('Policy revision 3 早于当前 revision 2', 'stale-revision');
+    });
+    expect(result).toMatchObject({
+      contractVersion: 3,
+      revision: 5,
+      routes,
+      syncState: 'applied',
+      effectiveStale: false,
+      catalogAudit: { catalogRevision: 9, integrity: 'complete' },
+    });
+    expect(store.getState()?.routes).toMatchObject({ storageVersion: 3, routes });
+    expect(dsa.applyControlPolicyV3).toHaveBeenCalledOnce();
+  });
+
+  it('partial 目录保留新修订但拒绝应用，重试仍执行目录门禁', async () => {
+    const store = makeStore();
     const dsa = {
-      applyControlPolicyV2: vi.fn().mockRejectedValue(staleError),
-      effectiveControlPolicy: vi.fn(async () => ({
-        projection: { desired: { revision: 2 } },
+      ...dsaReady(),
+      marketRouteCatalogV3: vi.fn(async () => ({
+        ...completeCatalog(),
+        integrity: 'partial' as const,
+        entries: [],
       })),
     };
-
-    const result = await new MarketControlService(prisma as never, dsa as never).retryLatest();
-
-    expect(dsa.applyControlPolicyV2).toHaveBeenCalledTimes(1);
-    expect(dsa.effectiveControlPolicy).toHaveBeenCalledTimes(1);
-    expect(result.syncState).toBe('rejected');
-    expect(result.revision).toBe(3);
+    const service = new MarketControlService(store.prisma as never, dsa as never);
+    const first = await service.applyPolicy({
+      contractVersion: 3,
+      revision: 5,
+      enabled: true,
+      routes,
+    });
+    const retried = await service.retryLatest();
+    expect(first).toMatchObject({
+      syncState: 'rejected',
+      lastError: { code: 'route_catalog_partial' },
+    });
+    expect(retried).toMatchObject({ revision: 5, syncState: 'rejected' });
+    expect(dsa.marketRouteCatalogV3).toHaveBeenCalledTimes(2);
+    expect(dsa.applyControlPolicyV3).not.toHaveBeenCalled();
   });
 
-  it('forwards provider config patches without inventing enabled or settings defaults', async () => {
-    const dsa = { saveControlProvider: vi.fn(async () => ({ providerId: 'tushare' })) };
+  it('数据库标记已应用但生效投影过期时重新执行精确目录门禁', async () => {
+    const store = makeStore({
+      consumer: 'thesis-ledger',
+      revision: 4,
+      enabled: true,
+      routes: encodeMarketPolicyRoutes(routes),
+      syncState: 'applied',
+      effectiveProjection: {
+        contractVersion: 3,
+        consumer: 'thesis-ledger',
+        requestId: 'previous-policy',
+        revision: 3,
+        sourceDesiredRevision: 3,
+        enabled: true,
+        routes: [],
+        appliedAt: '2026-09-25T04:00:00Z',
+      },
+      history: [],
+    });
+    const dsa = dsaReady();
+    const result = await new MarketControlService(
+      store.prisma as never,
+      dsa as never,
+    ).retryLatest();
+    expect(result).toMatchObject({ revision: 4, syncState: 'applied', effectiveStale: false });
+    expect(dsa.marketRouteCatalogV3).toHaveBeenCalledOnce();
+    expect(dsa.applyControlPolicyV3).toHaveBeenCalledOnce();
+  });
 
+  it('回滚只读取当前格式的历史修订，并产生新的修订', async () => {
+    const store = makeStore();
+    store.prisma.desiredProviderPolicyRevision.findUnique.mockResolvedValue({
+      revision: 2,
+      enabled: true,
+      routes: encodeMarketPolicyRoutes(routes),
+    });
+    const result = await new MarketControlService(
+      store.prisma as never,
+      dsaReady() as never,
+    ).rollback(2);
+    expect(result).toMatchObject({ rolledBackFrom: 4, rolledBackTo: 2, revision: 5, routes });
+    expect(store.getState()?.routes).toMatchObject({ storageVersion: 3, routes });
+  });
+
+  it('删除 Provider 从精确路由移除目标，未生效时不删除 DSA Provider', async () => {
+    const store = makeStore({
+      consumer: 'thesis-ledger',
+      revision: 4,
+      enabled: true,
+      routes: encodeMarketPolicyRoutes([
+        { key, targets: [target, { providerId: 'akshare', upstreamSource: 'eastmoney' }] },
+      ]),
+      syncState: 'rejected',
+      history: [],
+    });
+    const dsa = {
+      ...dsaReady(),
+      marketRouteCatalogV3: vi.fn(async () => ({
+        ...completeCatalog(),
+        integrity: 'partial' as const,
+        entries: [],
+      })),
+    };
+    const result = await new MarketControlService(
+      store.prisma as never,
+      dsa as never,
+    ).removeProvider('hithink');
+    expect(result).toMatchObject({
+      removed: false,
+      policy: {
+        contractVersion: 3,
+        revision: 5,
+        routes: [{ targets: [{ providerId: 'akshare', upstreamSource: 'eastmoney' }] }],
+        syncState: 'rejected',
+      },
+    });
+    expect(dsa.removeControlProvider).not.toHaveBeenCalled();
+  });
+
+  it('保留 Provider 配置的原始凭据结构', async () => {
+    const dsa = { saveControlProvider: vi.fn(async () => ({})) };
     await new MarketControlService({} as never, dsa as never).saveProvider('tushare', {
-      requestId: 'patch-request',
-      credential: 'secret',
+      requestId: 'request-1',
+      credentials: { method: 'token', values: { token: 'secret' } },
     });
-
     expect(dsa.saveControlProvider).toHaveBeenCalledWith('tushare', {
-      requestId: 'patch-request',
-      credential: 'secret',
-    });
-  });
-
-  it('forwards structured provider credentials without storing or reshaping values', async () => {
-    const dsa = { saveControlProvider: vi.fn(async () => ({ providerId: 'tushare' })) };
-
-    await new MarketControlService({} as never, dsa as never).saveProvider('tushare', {
-      requestId: 'structured-request',
-      credentials: { method: 'token', values: { token: 'secret' } },
-    });
-
-    expect(dsa.saveControlProvider).toHaveBeenCalledWith('tushare', {
-      requestId: 'structured-request',
+      requestId: 'request-1',
       credentials: { method: 'token', values: { token: 'secret' } },
     });
   });
 
-  it('forwards structured draft credentials to the provider test endpoint', async () => {
-    const dsa = { testControlProvider: vi.fn(async () => ({ providerId: 'tushare' })) };
-
-    await new MarketControlService({} as never, dsa as never).testProvider('tushare', {
-      requestId: 'draft-request',
-      credentials: { method: 'token', values: { token: 'secret' } },
-    });
-
-    expect(dsa.testControlProvider).toHaveBeenCalledWith('tushare', {
-      requestId: 'draft-request',
-      credentials: { method: 'token', values: { token: 'secret' } },
-    });
+  it('旧单字符串凭据在调用 DSA 前被拒绝', () => {
+    const dsa = {
+      saveControlProvider: vi.fn(),
+      testControlProvider: vi.fn(),
+    };
+    const service = new MarketControlService({} as never, dsa as never);
+    expect(() => service.saveProvider('tushare', { credential: 'old' })).toThrow();
+    expect(() => service.testProvider('tushare', { credential: 'old' })).toThrow();
+    for (const contractVersion of [1, 2]) {
+      expect(() => service.saveProvider('tushare', { contractVersion })).toThrow();
+      expect(() => service.testProvider('tushare', { contractVersion })).toThrow();
+    }
+    expect(dsa.saveControlProvider).not.toHaveBeenCalled();
+    expect(dsa.testControlProvider).not.toHaveBeenCalled();
   });
 
-  it('serializes structured draft credentials into the DSA HTTP payload', async () => {
-    const client = Object.create(DsaClient.prototype) as DsaClient;
-    const control = vi.spyOn(client, 'control').mockResolvedValue({});
+  it('错误移除信封在策略读取及 DSA 调用前拒绝', async () => {
+    const prisma = {
+      desiredProviderPolicy: { findUnique: vi.fn() },
+      providerTombstone: { upsert: vi.fn() },
+    };
+    const dsa = { removeControlProvider: vi.fn() };
+    const service = new MarketControlService(prisma as never, dsa as never);
+    for (const input of [
+      { contractVersion: 1 },
+      { contractVersion: 2 },
+      { consumer: 'other' },
+      { requestId: '' },
+    ]) {
+      await expect(service.removeProvider('tushare', input)).rejects.toThrow(
+        'Provider 请求不符合当前合同',
+      );
+    }
+    expect(prisma.desiredProviderPolicy.findUnique).not.toHaveBeenCalled();
+    expect(prisma.providerTombstone.upsert).not.toHaveBeenCalled();
+    expect(dsa.removeControlProvider).not.toHaveBeenCalled();
+  });
 
-    await client.testControlProvider('tushare', {
-      requestId: 'http-draft-request',
-      credentials: { method: 'token', values: { token: 'secret' } },
-    });
-
-    expect(control).toHaveBeenCalledWith(
-      '/api/v1/thesis-ledger/control/providers/tushare/test',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          contractVersion: 1,
-          consumer: 'thesis-ledger',
-          requestId: 'http-draft-request',
-          credentials: { method: 'token', values: { token: 'secret' } },
-        }),
-      }),
-    );
+  it('无效配置字段不能被静默丢弃后写入', () => {
+    const dsa = { saveControlProvider: vi.fn(), testControlProvider: vi.fn() };
+    const service = new MarketControlService({} as never, dsa as never);
+    for (const input of [
+      { credentials: null },
+      { enabled: 'true' },
+      { settings: [] },
+      { requestId: '' },
+      { consumer: 'other' },
+      { credentialVersion: 1 },
+      { clearCredentials: true, credentials: { method: 'token', values: { token: 'secret' } } },
+    ]) {
+      expect(() => service.saveProvider('tushare', input)).toThrow();
+    }
+    expect(() => service.testProvider('tushare', { credentials: [] })).toThrow();
+    expect(dsa.saveControlProvider).not.toHaveBeenCalled();
+    expect(dsa.testControlProvider).not.toHaveBeenCalled();
   });
 });

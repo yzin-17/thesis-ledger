@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { optimizationFailureLabel } from './strategy-optimization-failure.js';
 import type { Prisma } from '@prisma/client';
 import { canonicalStrategyMonitoringJson } from '@thesis-ledger/domain';
 import type {
@@ -137,6 +138,8 @@ export type EvaluationSummary = {
   turnover?: string;
   score?: number;
   reason?: string;
+  failureCategory?:
+    'data-unavailable' | 'protocol-incompatible' | 'strategy-ineligible' | 'strategy-performance';
 };
 
 export const optimizationSha256 = (value: unknown) =>
@@ -214,11 +217,13 @@ export const optimizationAttemptFailureStatus = (error: unknown) => {
   return name === 'AbortError' || name === 'TimeoutError' ? 'unknown_outcome' : 'failed';
 };
 
-export const redactOptimizationError = (error: unknown) =>
-  (error instanceof Error ? error.message : String(error))
+export const redactOptimizationError = (error: unknown) => {
+  const label = optimizationFailureLabel(error);
+  return `${label ? `[${label}] ` : ''}${error instanceof Error ? error.message : String(error)}`
     .replace(/Bearer\s+\S+/giu, 'Bearer [REDACTED]')
     .replace(/(?:sk-|api[_-]?key[=:])\S+/giu, '[REDACTED]')
     .slice(0, 500);
+};
 
 export const optimizationFeatureEnabled = () =>
   process.env.STRATEGY_AI_OPTIMIZATION_ENABLED !== 'false';

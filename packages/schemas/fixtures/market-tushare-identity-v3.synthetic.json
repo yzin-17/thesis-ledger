@@ -1,0 +1,103 @@
+{
+  "synthetic": true,
+  "description": "离线合成合同；不代表真实身份、币种审核、准入或历史完整覆盖",
+  "request": {
+    "contractVersion": 3,
+    "requestId": "offline-synthetic-tushare-identity",
+    "symbol": "159516.SZ",
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "ETF",
+      "capability": "CASH_DISTRIBUTION"
+    },
+    "routeTarget": {
+      "providerId": "tushare",
+      "upstreamSource": "tushare",
+      "routeIndex": 0
+    },
+    "desiredRevision": 1,
+    "effectivePolicyRevision": 1,
+    "catalogRevision": 1,
+    "start": "2025-02-01",
+    "end": "2025-03-01",
+    "dataAsOf": "2026-09-28T12:00:00.000000001Z"
+  },
+  "response": {
+    "contractVersion": 3,
+    "requestId": "offline-synthetic-tushare-identity",
+    "symbol": "159516.SZ",
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "ETF",
+      "capability": "CASH_DISTRIBUTION"
+    },
+    "routeTarget": {
+      "providerId": "tushare",
+      "upstreamSource": "tushare",
+      "routeIndex": 0
+    },
+    "desiredRevision": 1,
+    "effectivePolicyRevision": 1,
+    "catalogRevision": 1,
+    "start": "2025-02-01",
+    "end": "2025-03-01",
+    "dataAsOf": "2026-09-28T12:00:00.000000001Z",
+    "fetchedAt": "2026-09-28T12:00:00Z",
+    "providerRevision": "synthetic-content-v1",
+    "admission": {
+      "consumer": "thesis-ledger",
+      "routeKey": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "CASH_DISTRIBUTION"
+      },
+      "target": {
+        "providerId": "tushare",
+        "upstreamSource": "tushare"
+      },
+      "status": "admitted",
+      "admissionState": "admitted",
+      "evidenceRef": "sha256:6968df31478e972147503480e2e7c8e6438c7e7260e9200f0f27edbf3ef0d840",
+      "evidenceSha256": "6968df31478e972147503480e2e7c8e6438c7e7260e9200f0f27edbf3ef0d840",
+      "scopeSymbols": ["159516.SZ"],
+      "scopeDateFrom": "2025-01-01",
+      "scopeDateTo": "2025-12-31",
+      "adapterRevision": "synthetic-tushare-event-v1",
+      "sourceRevision": "synthetic-source-v1",
+      "credentialRevision": "synthetic-credential-v1",
+      "validFrom": "2026-09-28T11:00:00Z",
+      "validUntil": "2026-09-29T00:00:00Z",
+      "recordVersion": 1,
+      "recordedAt": "2026-09-28T11:00:00.000000001Z",
+      "invalidatedAt": null,
+      "invalidationReason": null
+    },
+    "tushareIdentityEvidence": {
+      "ref": "sha256:6968df31478e972147503480e2e7c8e6438c7e7260e9200f0f27edbf3ef0d840",
+      "sha256": "6968df31478e972147503480e2e7c8e6438c7e7260e9200f0f27edbf3ef0d840",
+      "content": "{\n  \"contractVersion\": 1,\n  \"kind\": \"tushare-fund-identity\",\n  \"mappings\": [\n    {\n      \"symbol\": \"159516.SZ\",\n      \"instrumentType\": \"ETF\",\n      \"queryFundCode\": \"159516.SZ\",\n      \"scopeDateFrom\": \"2025-01-01\",\n      \"scopeDateTo\": \"2025-12-31\",\n      \"observedAt\": \"2026-09-28T10:00:00.000000001Z\",\n      \"identityEvidence\": {\n        \"documentUrl\": \"https://identity.example.test/合成ETF\",\n        \"documentSha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n      },\n      \"dividendCurrencyEvidence\": {\n        \"currency\": \"CNY\",\n        \"documentUrl\": \"https://currency.example.test/合成分红\",\n        \"documentSha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\n      }\n    }\n  ]\n}\n"
+    },
+    "coverage": {
+      "complete": false,
+      "reason": "historical_coverage_unverified"
+    },
+    "facts": [
+      {
+        "symbol": "159516.SZ",
+        "market": "CN",
+        "instrumentType": "ETF",
+        "type": "CASH_DIVIDEND",
+        "cashAmount": "0.125",
+        "currency": "CNY",
+        "effectiveDate": "2025-02-20",
+        "occurredAt": "2025-02-20T00:00:00+08:00",
+        "availableAt": "2026-09-28T11:30:00Z",
+        "provider": "tushare",
+        "providerRevision": "synthetic-content-v1"
+      }
+    ]
+  }
+}

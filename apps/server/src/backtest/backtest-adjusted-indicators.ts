@@ -78,7 +78,12 @@ const pointAtTick = (series: BacktestSeries, tick: IndicatorTick): BacktestSerie
     return {
       ...aligned.point,
       occurredAt: tick.occurredAt,
-      availableAt: tick.availableAt,
+      availableAt: aligned.point.researchClock ? aligned.point.availableAt : tick.availableAt,
+      ...(aligned.point.researchClock
+        ? {
+            researchClock: { ...aligned.point.researchClock, decisionAt: tick.occurredAt },
+          }
+        : {}),
     };
   }
   return {

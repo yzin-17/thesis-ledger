@@ -9,6 +9,12 @@ export type ProviderHealthSource = 'manual' | 'scheduled' | 'delivery';
 const DEFAULT_HISTORY_PAGE_SIZE = 20;
 const MAX_HISTORY_PAGE_SIZE = 100;
 
+/**
+ * 默认「慢」阈值：为轻量连接测试定的（发一个 webhook / 拉一次行情，3 秒已经不可接受）。
+ * 重活（AI 生成探针）必须自己带阈值进来，否则每一次成功的慢生成都会被记成 degraded。
+ */
+export const DEFAULT_SLOW_AFTER_MS = 3_000;
+
 const providerAliases = new Set(['feishu', 'feishu-webhook', 'lark', 'lark-webhook']);
 
 export const normalizeProviderName = (provider: string) => {
@@ -34,6 +40,12 @@ export class ProviderHealthService {
     checkedAt = new Date(),
     source: ProviderHealthSource = 'manual',
     details?: Prisma.InputJsonValue,
+    /**
+     * 成功但在该延迟之上算「降级」。默认值是按轻量连接测试定的；
+     * AI 生成探针一次 40～100 秒属正常（思考 token 与正文共用输出预算），
+     * 必须按自己的授权预算判慢，否则 `ProviderConfig.health` 会永远停在 degraded。
+     */
+    slowAfterMs = DEFAULT_SLOW_AFTER_MS,
   ) {
     const providerKey = normalizeProviderName(provider);
     const previous = await this.prisma.providerHealth.findUnique({
@@ -41,7 +53,7 @@ export class ProviderHealthService {
     });
     const consecutiveFailures = success ? 0 : (previous?.consecutiveFailures ?? 0) + 1;
     const state: ProviderState = success
-      ? latencyMs > 3_000
+      ? latencyMs > slowAfterMs
         ? 'degraded'
         : 'healthy'
       : consecutiveFailures >= 3

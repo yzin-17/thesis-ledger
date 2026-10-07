@@ -8,6 +8,11 @@
 
 以下只列当前仍在实施或仍承担当前验收门禁的主题。详细完成状态以各 Task 文件头部和任务清单为准，README 不重复维护逐步进度。
 
+- 市场数据多源接入、手动路由与复权感知回测：[规格](specs/2026-09-25-multi-source-adjustment-aware-backtest.md) · [任务](tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)
+  - 多源扩展剩余实施与验收：[规格](specs/2026-10-03-multi-source-remaining-acceptance.md) · [任务](tasks/2026-10-03-multi-source-remaining-acceptance.md)
+- ThesisLedger 当前运行链：[架构与 API](architecture/canonical-runtime.md) · [已归档规格](archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) · [已完成任务](archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) · [收口证据](tasks/evidence/2026-10-02-canonical-final-completion.md)
+  - NAV 执行现行合同与已完成验收：[规格](specs/2026-10-01-n3-nav-worker.md) · [归档任务](archive/tasks/2026-10-01-n3-nav-worker.md) · [验收证据](tasks/evidence/2026-10-01-n4-nav-target.md)
+  - 工作区 lint 执行门禁：[已归档规格](archive/specs/2026-10-03-workspace-lint-process-isolation.md) · [已完成任务](archive/tasks/2026-10-03-workspace-lint-process-isolation.md)
 - AI 自动选择与测试后保存：[规格](specs/2026-09-23-ai-provider-auto-test-save.md) · [任务](tasks/2026-09-23-ai-provider-auto-test-save.md)
 - AI 输出模式与完整流验收（增量修订）：[规格](specs/2026-09-22-ai-json-mode-stream-validation.md) · [任务](tasks/2026-09-22-ai-json-mode-stream-validation.md)
 - AI 接入层迁移至 Vercel AI SDK：[规格](specs/2026-09-19-vercel-ai-sdk-integration.md) · [任务](tasks/2026-09-19-vercel-ai-sdk-integration.md)
@@ -33,7 +38,7 @@
 
 ## 当前架构入口
 
-- 市场数据 V2 当前实现：[Market Data V2 架构](architecture/2026-09-16-market-data-v2.md)
+- 市场数据 V2 与复权感知 V3：[市场数据架构与实施边界](architecture/2026-09-16-market-data-v2.md)
 - Provider 路由与可靠性领域语义：[Provider 路由与可靠性](domain/2026-09-16-provider-routing-and-reliability.md)
 - DSA 与主仓兼容边界：[DSA Contract 兼容说明](architecture/2026-08-18-thesis-ledger-dsa-compatibility.md)
 - 三仓发布级版本与兼容关系：[版本与兼容矩阵](architecture/version-matrix.md)

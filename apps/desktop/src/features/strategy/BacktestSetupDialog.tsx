@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, LoaderCircle } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
+import { strategySchema } from '@thesis-ledger/schemas';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,11 +16,9 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { schemaSymbols } from './strategy.schema.js';
 import type { BacktestSetupInput, StrategyRecord, StrategyVersion } from './strategy.types.js';
-import { StrategyV2Summary, isV2StrategySchema } from './StrategyV2Summary.js';
-import { BacktestModelConfiguration } from './BacktestModelConfiguration.js';
-import type { BacktestExecutionModel } from '@thesis-ledger/schemas';
+import { StrategyV2Summary } from './StrategyV2Summary.js';
+import { BacktestPricePreparation, type PreparedBacktest } from './BacktestPricePreparation.js';
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -67,26 +66,25 @@ export function BacktestSetupDialog({
   const [initialCash, setInitialCash] = useState('100000');
   const [baseCurrency, setBaseCurrency] = useState<'CNY' | 'HKD' | 'USD'>('CNY');
   const [error, setError] = useState<string | null>(null);
-  const [modelText, setModelText] = useState('');
-  const [executionModel, setExecutionModel] = useState<BacktestExecutionModel>();
+  const [adjustment, setAdjustment] = useState<'none' | 'qfq' | 'hfq'>('none');
+  const [prepared, setPrepared] = useState<PreparedBacktest | null>(null);
   useEffect(() => {
     if (open) {
       setPeriod(initialSetup?.period ?? defaultBacktestPeriod());
       setInitialCash(String(initialSetup?.initialCash ?? 100000));
       setBaseCurrency(initialSetup?.baseCurrency ?? 'CNY');
       setError(null);
-      setModelText(
-        initialSetup?.executionModel ? JSON.stringify(initialSetup.executionModel, null, 2) : '',
-      );
-      setExecutionModel(initialSetup?.executionModel);
+      setAdjustment(initialSetup?.adjustment ?? 'none');
+      setPrepared(null);
     }
   }, [initialSetup, open, version?.id]);
-  const symbols = version?.schema ? schemaSymbols(version.schema) : [];
   const presets = backtestPeriodPresets();
   const activePreset = presets.find(
     (preset) => preset.period.start === period.start && preset.period.end === period.end,
   );
-  const isV2 = version?.schema ? isV2StrategySchema(version.schema) : false;
+  const currentStrategy = version?.schema
+    ? strategySchema.safeParse(version.schema).success
+    : false;
   const submit = async () => {
     const cash = Number(initialCash);
     if (!period.start || !period.end || period.start > period.end) {
@@ -98,15 +96,28 @@ export function BacktestSetupDialog({
       return;
     }
     setError(null);
-    if (modelText.trim() && !executionModel) {
-      setError('请校验并确认执行模型的范围与假设。');
+    if (!currentStrategy) {
+      setError('策略定义不可用，请先保存有效的当前策略版本。');
+      return;
+    }
+    if (
+      !prepared ||
+      prepared.executionPreflight.revisionStamp?.strategyVersionId !== version?.id ||
+      prepared.runConfig.startDate !== period.start ||
+      prepared.runConfig.endDate !== period.end ||
+      prepared.runConfig.baseCurrency !== baseCurrency ||
+      Number(prepared.runConfig.initialCash[baseCurrency]) !== cash ||
+      prepared.runConfig.executionPriceProtocol.priceBasis.adjustment !== adjustment
+    ) {
+      setError('当前配置尚未准备或已经改变，请重新准备配置。');
       return;
     }
     const succeeded = await onSubmit({
       period,
       initialCash: cash,
       baseCurrency,
-      ...(executionModel ? { executionModel } : {}),
+      adjustment,
+      prepared,
     });
     if (!succeeded) return;
     onOpenChange(false);
@@ -123,7 +134,7 @@ export function BacktestSetupDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
-          {version?.schema && isV2 && (
+          {version?.schema && currentStrategy && (
             <StrategyV2Summary
               schema={version.schema}
               variant="compact"
@@ -131,22 +142,10 @@ export function BacktestSetupDialog({
               {...(strategy?.name ? { strategyName: strategy.name } : {})}
             />
           )}
-          {!isV2 && (
-            <div className="rounded-md border border-border bg-muted/30 px-4 py-3">
-              <p className="text-sm font-medium">
-                {strategy?.name ?? '未知策略'} · v{version?.version ?? '?'}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                首个标的：{symbols[0] ?? '未配置'}
-              </p>
-            </div>
-          )}
-          {symbols.length > 1 && (
-            <Alert>
-              <AlertTitle>多标的策略</AlertTitle>
-              <AlertDescription>
-                当前回测只会使用首个标的 {symbols[0]}，其余标的不会进入本次任务。
-              </AlertDescription>
+          {!currentStrategy && (
+            <Alert variant="destructive">
+              <AlertTitle>策略定义不可用</AlertTitle>
+              <AlertDescription>请先保存有效的当前策略版本，再创建回测。</AlertDescription>
             </Alert>
           )}
           <div>
@@ -205,32 +204,39 @@ export function BacktestSetupDialog({
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-          {version?.schema && isV2 && (
-            <details className="group rounded-md border border-border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                <span className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium">执行规则来源</span>
-                  <span className="text-xs text-muted-foreground">
-                    未填写模型时，数据源必须提供完整历史执行规则
-                  </span>
-                </span>
-                <ChevronDown
-                  className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-                  aria-hidden="true"
-                />
-              </summary>
-              <div className="border-t border-border px-4 py-4">
-                <BacktestModelConfiguration
-                  text={modelText}
-                  confirmed={Boolean(executionModel)}
-                  onChange={(text) => {
-                    setModelText(text);
-                    setExecutionModel(undefined);
-                  }}
-                  onConfirm={setExecutionModel}
-                />
-              </div>
-            </details>
+          {version?.schema && currentStrategy && (
+            <Field>
+              <FieldLabel>价格口径与记账</FieldLabel>
+              <ToggleGroup
+                value={[adjustment]}
+                aria-label="价格口径与记账"
+                onValueChange={(values) => {
+                  const value = values[0];
+                  if (value === 'none' || value === 'qfq' || value === 'hfq') {
+                    setAdjustment(value);
+                    setPrepared(null);
+                  }
+                }}
+              >
+                <ToggleGroupItem value="none">不复权 · 原始份额</ToggleGroupItem>
+                <ToggleGroupItem value="qfq">前复权 · 归一化研究</ToggleGroupItem>
+                <ToggleGroupItem value="hfq">后复权 · 归一化研究</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+          )}
+          {open && version && currentStrategy && (
+            <BacktestPricePreparation
+              key={`${version.id}:${adjustment}`}
+              strategyVersionId={version.id}
+              adjustment={adjustment}
+              period={period}
+              initialCash={initialCash}
+              currency={baseCurrency}
+              {...(initialSetup?.executionModel
+                ? { initialModel: initialSetup.executionModel }
+                : {})}
+              onPrepared={setPrepared}
+            />
           )}
           {error && <FieldError>{error}</FieldError>}
         </div>
@@ -240,7 +246,11 @@ export function BacktestSetupDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消
             </Button>
-            <Button type="button" disabled={busy || !version} onClick={() => void submit()}>
+            <Button
+              type="button"
+              disabled={busy || !version || !currentStrategy || !prepared}
+              onClick={() => void submit()}
+            >
               {busy && (
                 <LoaderCircle
                   data-icon="inline-start"

@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('DSA instrument-facts 范围与缺失原因', () => {
   it('传递实际范围并保留 Provider 不可用信息', async () => {
     const raw = {
-      version: 2,
+      version: 3,
       status: 'unavailable',
       provider: 'dsa-market-rules',
       providerRevision: 'static-lot-tick',
@@ -41,7 +41,7 @@ describe('DSA instrument-facts 范围与缺失原因', () => {
     const client = new DsaClient();
     expect(await client.backtestInstrumentFacts(request)).toEqual(raw);
     const url = fetch.mock.calls[0]![0] as URL;
-    expect(url.pathname).toBe('/api/v1/thesis-ledger/v2/instrument-facts');
+    expect(url.pathname).toBe('/api/v3/thesis-ledger/backtest/instrument-facts');
     expect(Object.fromEntries(url.searchParams)).toEqual(request);
     expect(() => client.backtestInstrumentFacts({ ...request, start: '2025-01-01' })).toThrow();
     expect(fetch).toHaveBeenCalledOnce();

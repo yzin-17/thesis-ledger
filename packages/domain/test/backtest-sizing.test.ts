@@ -25,7 +25,45 @@ const input = (rule: SizingInput['rule'], overrides: Partial<SizingInput> = {}):
   ...overrides,
 });
 
+const normalizedExecution = {
+  priceCoordinate: 'continuous-decimal',
+  quantityUnits: 'continuous-normalized-decimal',
+  lotSizeConstraint: 'not-applied',
+  tickSizeConstraint: 'not-applied',
+  dailyPriceLimit: 'not-applied',
+  feeBasis: 'simulatedTurnover',
+} as const;
+
+const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
+
 describe('computeSizing', () => {
+  it('通过归一化账本的零目标仓位平仓，保留小数单位且不要求额外定仓价格', () => {
+    const result = computeSizing({
+      rule: { type: 'targetWeight', weight: '0' },
+      accountingBasis: 'normalized-series',
+      normalizedExecution,
+      executionCurrency: 'CNY',
+      currentQuantity: '10.125',
+      evaluationAt,
+    });
+    expect(result).toMatchObject({
+      status: 'available',
+      side: 'sell',
+      normalizedQuantity: '10.125',
+      targetQuantity: '0',
+    });
+    expect(
+      computeSizing(
+        input(
+          { type: 'fixedQuantity', quantity: '10.125' },
+          {
+            accountingBasis: 'normalized-series',
+            normalizedExecution,
+          },
+        ),
+      ),
+    ).toMatchObject({ status: 'rejected', reasonCode: 'UNSUPPORTED_UNIT' });
+  });
   it('uses Decimal formulas for all four sizing rules', () => {
     const fixedAmount = computeSizing(input({ type: 'fixedAmount', amount: '1050' }));
     const percent = computeSizing(input({ type: 'percentOfEquity', percent: '0.5' }));
@@ -85,7 +123,7 @@ describe('computeSizing', () => {
       const result = computeSizing(
         input(
           { type: 'fixedQuantity', quantity },
-          { lotSize, executionCurrency: market === 'CN' ? 'CNY' : market === 'HK' ? 'HKD' : 'USD' },
+          { lotSize, executionCurrency: currencyByMarket[market] },
         ),
       );
 
@@ -99,6 +137,24 @@ describe('computeSizing', () => {
 
     expect(zero).toMatchObject({ status: 'rejected', reasonCode: 'INVALID_PARAMETER' });
     expect(insufficient).toMatchObject({ status: 'rejected', reasonCode: 'QUANTITY_BELOW_LOT' });
+  });
+
+  it('floors decimal lots exactly and supports normalized fractional units', () => {
+    const justBelowOneLot = computeSizing(
+      input(
+        { type: 'fixedQuantity', quantity: '1' },
+        { lotSize: '1.00000000000000000000000000000000000000001' },
+      ),
+    );
+    const fractional = computeSizing(
+      input({ type: 'fixedQuantity', quantity: '0.0000123456789' }, { lotSize: '0.000000001' }),
+    );
+
+    expect(justBelowOneLot).toMatchObject({ status: 'rejected', reasonCode: 'QUANTITY_BELOW_LOT' });
+    expect(fractional).toMatchObject({
+      status: 'available',
+      normalizedQuantity: '0.000012345',
+    });
   });
 
   it('converts direct and inverse FX using only consumed facts', () => {
@@ -218,5 +274,90 @@ describe('computeSizing', () => {
 
     expect(stale).toMatchObject({ status: 'unavailable', reasonCode: 'FX_STALE' });
     expect(mismatch).toMatchObject({ status: 'rejected', reasonCode: 'CURRENCY_MISMATCH' });
+  });
+
+  it('sizes continuous normalized units without applying the supplied real lot size', () => {
+    const buy = computeSizing(
+      input(
+        { type: 'targetWeight', weight: '0.5' },
+        {
+          accountingBasis: 'normalized-series',
+          normalizedExecution,
+          lotSize: '100',
+          currentQuantity: '0.125',
+          price: price('100'),
+        },
+      ),
+    );
+    const sell = computeSizing(
+      input(
+        { type: 'targetWeight', weight: '0.1' },
+        {
+          accountingBasis: 'normalized-series',
+          normalizedExecution,
+          lotSize: '100',
+          currentQuantity: '10.625',
+          price: price('100'),
+        },
+      ),
+    );
+    const none = computeSizing(
+      input(
+        { type: 'targetWeight', weight: '0.5' },
+        {
+          accountingBasis: 'normalized-series',
+          normalizedExecution,
+          currentQuantity: '50',
+          price: price('100'),
+        },
+      ),
+    );
+
+    expect(buy).toMatchObject({
+      status: 'available',
+      accountingBasis: 'normalized-series',
+      side: 'buy',
+      targetQuantity: '50',
+      normalizedQuantity: '49.875',
+    });
+    expect(sell).toMatchObject({
+      status: 'available',
+      accountingBasis: 'normalized-series',
+      side: 'sell',
+      targetQuantity: '10',
+      normalizedQuantity: '0.625',
+    });
+    expect(none).toMatchObject({ status: 'available', side: 'none', normalizedQuantity: '0' });
+  });
+
+  it('fails closed without normalized assumptions and rejects fixed actual quantities', () => {
+    const missing = computeSizing(
+      input({ type: 'percentOfEquity', percent: '0.5' }, { accountingBasis: 'normalized-series' }),
+    );
+    const wrongAssumptions = computeSizing(
+      input(
+        { type: 'percentOfEquity', percent: '0.5' },
+        {
+          accountingBasis: 'normalized-series',
+          normalizedExecution: { ...normalizedExecution, lotSizeConstraint: 'applied' } as never,
+        },
+      ),
+    );
+    const fixedQuantity = computeSizing(
+      input(
+        { type: 'fixedQuantity', quantity: '100' },
+        { accountingBasis: 'normalized-series', normalizedExecution },
+      ),
+    );
+
+    expect(missing).toMatchObject({
+      status: 'rejected',
+      reasonCode: 'EXECUTION_MODEL_UNAVAILABLE',
+    });
+    expect(wrongAssumptions).toMatchObject({
+      status: 'rejected',
+      reasonCode: 'EXECUTION_MODEL_UNAVAILABLE',
+    });
+    expect(fixedQuantity).toMatchObject({ status: 'rejected', reasonCode: 'UNSUPPORTED_UNIT' });
   });
 });

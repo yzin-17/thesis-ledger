@@ -1,5 +1,5 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -16,29 +16,30 @@ import {
   useCatalogSyncMutation,
   useConfirmInstrumentMutation,
   useRemoveMarketProviderMutation,
-  useSaveMarketPolicyMutation,
   useTestMarketProviderMutation,
 } from './market-data.mutations.js';
 import {
   marketDataKeys,
-  useCatalogJobQuery,
   useInstrumentSearchQuery,
   useMarketDataQueries,
 } from './market-data.queries.js';
-import type { MarketPolicy, ProviderManifest } from './market-data.types.js';
+import type { ProviderManifest } from './market-data.types.js';
+import { useCatalogJobProgress } from './useCatalogJobProgress.js';
+import { routePolicySummaryV3 } from './market-policy-status-v3.js';
+import { useMarketPolicyWorkflow } from './useMarketPolicyWorkflow.js';
+import { marketProviderProbeFeedback } from './market-provider-probe-feedback.js';
 
 export function MarketDataPage() {
   const queryClient = useQueryClient();
   const { confirm } = useConfirmDialog();
-  const { policy, providers, catalog } = useMarketDataQueries();
-  const marketDataRefreshing = policy.isFetching || providers.isFetching || catalog.isFetching;
-  const savePolicy = useSaveMarketPolicyMutation();
+  const { policy, providers, routeCapabilities, catalog } = useMarketDataQueries();
+  const marketDataRefreshing =
+    policy.isFetching || providers.isFetching || routeCapabilities.isFetching || catalog.isFetching;
   const testProvider = useTestMarketProviderMutation();
   const removeProvider = useRemoveMarketProviderMutation();
   const syncCatalog = useCatalogSyncMutation();
   const confirmInstrument = useConfirmInstrumentMutation();
 
-  const [policyDraft, setPolicyDraft] = useState<MarketPolicy | null>(null);
   const providerEnabled = useMarketProviderEnabled(providers.data ?? []);
   const providerDrafts = providerEnabled.providers;
   const [credentialProviderId, setCredentialProviderId] = useState<string | null>(null);
@@ -59,25 +60,15 @@ export function MarketDataPage() {
   const [catalogJobId, setCatalogJobId] = useState<string | null>(null);
   const [submittedSearch, setSubmittedSearch] = useState('');
 
-  useEffect(() => {
-    if (policy.data) setPolicyDraft(policy.data);
-  }, [policy.data]);
+  const marketPolicy = useMarketPolicyWorkflow({
+    policy: policy.data,
+    catalogComplete: routeCapabilities.data?.status === 'complete',
+    setBusyAction,
+    setMessage,
+  });
 
-  const catalogJob = useCatalogJobQuery(catalogJobId);
-  useEffect(() => {
-    const result = catalogJob.data;
-    if (!catalogJobId || !result) return;
-    if (result.acknowledged) {
-      setMessage({ type: 'success', text: '标的目录已同步。' });
-      setCatalogJobId(null);
-      void queryClient.invalidateQueries({ queryKey: marketDataKeys.catalog() });
-      return;
-    }
-    if (result.status === 'failed' || result.status === 'timeout') {
-      setMessage({ type: 'error', text: '标的目录同步任务失败，请稍后重试。' });
-      setCatalogJobId(null);
-    }
-  }, [catalogJob.data, catalogJobId, queryClient, setMessage]);
+  const clearCatalogJob = useCallback(() => setCatalogJobId(null), []);
+  const catalogJob = useCatalogJobProgress(catalogJobId, clearCatalogJob, setMessage);
 
   const instrumentSearch = useInstrumentSearchQuery(submittedSearch);
   let loadState: 'degraded' | 'loading' | 'ready' = 'ready';
@@ -97,29 +88,16 @@ export function MarketDataPage() {
     await queryClient.invalidateQueries({ queryKey: marketDataKeys.root });
   };
 
-  const handleSavePolicy = async () => {
-    if (!policyDraft) return;
-    setBusyAction('policy-save');
-    setMessage(null);
+  const replaceProvider = async (provider: ProviderManifest) => {
     try {
-      setPolicyDraft(await savePolicy.mutateAsync(policyDraft));
+      await providerEnabled.setEnabled(provider);
+      await queryClient.invalidateQueries({ queryKey: marketDataKeys.routeCapabilities() });
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : '路由策略提交失败。',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const replaceProvider = (provider: ProviderManifest) => {
-    void providerEnabled.setEnabled(provider).catch((error: unknown) => {
       setMessage({
         type: 'error',
         text: error instanceof Error ? error.message : '启停保存失败。',
       });
-    });
+    }
   };
 
   const handleTestProvider = async (provider: ProviderManifest) => {
@@ -129,14 +107,7 @@ export function MarketDataPage() {
       const result = await testProvider.mutateAsync({
         provider,
       });
-      if (result.status !== 'healthy') {
-        const details = Object.entries(result.capabilityResults ?? {})
-          .filter(([, item]) => item.status !== 'healthy')
-          .map(([capability, item]) => `${capability}: ${item.errorCode ?? item.status ?? '失败'}`)
-          .join('；');
-        throw new Error(details || `Provider 状态：${result.status ?? 'unknown'}`);
-      }
-      setMessage({ type: 'success', text: `${provider.displayName} 只读连通性测试通过。` });
+      setMessage(marketProviderProbeFeedback(result, provider.displayName));
     } catch (error) {
       setMessage({
         type: 'error',
@@ -162,14 +133,13 @@ export function MarketDataPage() {
     try {
       const result = await removeProvider.mutateAsync(provider);
       if (!result.removed)
-        throw new Error(
-          result.message ??
-            (result.pending ? 'Policy 尚未在 DSA 生效，请稍后重试。' : 'Provider 未被移除。'),
-        );
-      if (result.policy) setPolicyDraft(result.policy);
+        throw new Error(result.pending ? '路由策略尚未生效，请稍后重试。' : '数据源未被移除。');
+      if (result.policy) {
+        marketPolicy.acceptPolicy(result.policy);
+      }
       setMessage({
         type: 'success',
-        text: `${provider.displayName} 已从路由移除，并保留 tombstone。`,
+        text: `${provider.displayName} 已从路由移除。`,
       });
     } catch (error) {
       setMessage({
@@ -221,11 +191,6 @@ export function MarketDataPage() {
     }
   };
 
-  let policySyncLabel = '等待策略数据';
-  if (policyDraft?.syncState === 'applied') policySyncLabel = '已同步';
-  else if (policyDraft?.syncState === 'pending') policySyncLabel = '等待同步';
-  else if (policyDraft) policySyncLabel = '需要检查';
-
   return (
     <section className="module-page" aria-labelledby="market-data-title">
       <PageHeader
@@ -260,7 +225,7 @@ export function MarketDataPage() {
       )}
 
       <section className="mt-5 flex flex-wrap items-center gap-2" aria-label="市场数据概况">
-        <Badge variant="outline">路由状态：{policySyncLabel}</Badge>
+        <Badge variant="outline">路由状态：{routePolicySummaryV3(policy.data)}</Badge>
         <Badge variant="outline">
           {providers.data
             ? `${routeProviderSummary.configured}/${routeProviderSummary.total} 个数据源可用`
@@ -288,7 +253,7 @@ export function MarketDataPage() {
             disabled={controlsDisabled}
             busyAction={busyAction}
             pendingProviderIds={providerEnabled.pendingProviderIds}
-            onProviderChange={replaceProvider}
+            onProviderChange={(provider) => void replaceProvider(provider)}
             onConfigure={(provider) => setCredentialProviderId(provider.providerId)}
             onTest={(provider) => void handleTestProvider(provider)}
             onRemove={(provider) => void handleRemoveProvider(provider)}
@@ -296,12 +261,19 @@ export function MarketDataPage() {
         }
         policyPanel={
           <MarketPolicyPanel
-            policy={policyDraft}
+            policy={marketPolicy.draft}
+            serverPolicy={policy.data ?? null}
+            catalog={routeCapabilities.data}
+            catalogPending={routeCapabilities.isPending}
+            catalogQueryFailed={routeCapabilities.isError}
             providers={providerDrafts}
-            disabled={controlsDisabled}
-            saving={savePolicy.isPending}
-            onChange={setPolicyDraft}
-            onSave={() => void handleSavePolicy()}
+            disabled={controlsDisabled || routeCapabilities.isPending}
+            saving={marketPolicy.saving}
+            retrying={marketPolicy.retrying}
+            dirty={marketPolicy.dirty}
+            onChange={marketPolicy.changeDraft}
+            onSave={() => void marketPolicy.save()}
+            onRetry={() => void marketPolicy.retry()}
           />
         }
         catalogPanel={

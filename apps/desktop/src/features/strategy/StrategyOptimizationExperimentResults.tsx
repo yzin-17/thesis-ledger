@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
+import { OptimizationResearchDisclosure } from './OptimizationResearchDisclosure.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type {
@@ -229,6 +230,7 @@ export function StrategyOptimizationExperimentResults({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            <OptimizationResearchDisclosure runConfig={compare.experiment.runConfig} />
             <div className="rounded-md border p-3 text-xs text-muted-foreground">
               <div className="font-medium text-foreground">回测交易成本假设（与 AI 费用分开）</div>
               {tradingCostText(compare.experiment.tradingCost).map((line) => (
@@ -333,7 +335,7 @@ export function StrategyOptimizationExperimentResults({
                     ? candidate.diff
                         .map((item) =>
                           item.kind === 'full-strategy'
-                            ? '完整 StrategySchemaV2 候选'
+                            ? '完整 BacktestStrategy 候选'
                             : `${String(item.label ?? item.parameterId)}: ${String(item.before)} → ${String(item.after)}`,
                         )
                         .join('；')

@@ -1,0 +1,9 @@
+[
+  {
+    "contractVersion": 1,
+    "code": "CONTROL_CONTRACT_UNSUPPORTED",
+    "message": "Control Contract 版本不兼容",
+    "requestId": "market-control-v3-handshake-fixture",
+    "diagnosticId": "market-control-v3-handshake-fixture"
+  }
+]

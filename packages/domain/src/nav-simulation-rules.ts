@@ -52,11 +52,7 @@ export const nextTradingDate = (calendar: TradingCalendar, date: string) => {
   return undefined;
 };
 
-export const tradingDateAfter = (
-  calendar: TradingCalendar,
-  date: string,
-  tradingDays: number,
-) => {
+export const tradingDateAfter = (calendar: TradingCalendar, date: string, tradingDays: number) => {
   if (!Number.isInteger(tradingDays) || tradingDays < 0) return undefined;
   let current = date;
   for (let index = 0; index < tradingDays; index += 1) {
@@ -148,12 +144,10 @@ export const expectedCutoffSchedule = (
   )
     return undefined;
   const trading = calendar.isTradingDay(`${date}T12:00:00Z`);
-  const beforeCutoff = !trading || requestSeconds <= cutoffSeconds;
+  const beforeCutoff = !trading || requestSeconds < cutoffSeconds;
   const cutoffDate = trading ? date : nextTradingDate(calendar, date);
   if (!cutoffDate) return undefined;
-  const valuationDate = beforeCutoff
-    ? cutoffDate
-    : (nextTradingDate(calendar, cutoffDate) ?? cutoffDate);
+  const valuationDate = beforeCutoff ? cutoffDate : nextTradingDate(calendar, cutoffDate);
   const cutoffAt = localTimestamp(cutoffDate, cutoffLocalTime, calendar.timezone);
   if (!cutoffAt || !valuationDate) return undefined;
   return { cutoffAt, valuationDate };

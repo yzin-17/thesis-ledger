@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { strategySchemaV2 } from '../src/backtest-v2.js';
+import { strategySchema } from '../src/backtest-contract.js';
 
 const fixture = (name: string) =>
   JSON.parse(readFileSync(resolve(process.cwd(), 'fixtures', name), 'utf8')) as Record<
@@ -11,8 +11,8 @@ const fixture = (name: string) =>
 
 describe('T13 跨仓 Golden 与非目标边界', () => {
   it('解析 Exchange 与 CN NAV fixture，并保持唯一 execution instrument', () => {
-    const exchange = strategySchemaV2.parse(fixture('backtest-v2.exchange.json'));
-    const nav = strategySchemaV2.parse(fixture('backtest-v2.cn-nav.json'));
+    const exchange = strategySchema.parse(fixture('backtest-v2.exchange.json'));
+    const nav = strategySchema.parse(fixture('backtest-v2.cn-nav.json'));
     expect(exchange.executionInstrument).toEqual(exchange.signalSources[0]?.asset);
     expect(exchange.execution.mode).toBe('exchange');
     expect(nav.executionInstrument).toMatchObject({ market: 'CN', assetType: 'fund' });
@@ -35,9 +35,9 @@ describe('T13 跨仓 Golden 与非目标边界', () => {
       ],
       execution: { mode: 'nav', requestTypes: ['subscribe'], timing: 'nextAvailableNav' },
     };
-    expect(strategySchemaV2.safeParse(base).success).toBe(false);
+    expect(strategySchema.safeParse(base).success).toBe(false);
     expect(
-      strategySchemaV2.safeParse({
+      strategySchema.safeParse({
         ...exchange,
         execution: {
           mode: 'exchange',
@@ -48,7 +48,7 @@ describe('T13 跨仓 Golden 与非目标边界', () => {
       }).success,
     ).toBe(false);
     expect(
-      strategySchemaV2.safeParse({ ...exchange, risk: [{ type: 'trailingStop', percent: '0.1' }] })
+      strategySchema.safeParse({ ...exchange, risk: [{ type: 'trailingStop', percent: '0.1' }] })
         .success,
     ).toBe(false);
   });

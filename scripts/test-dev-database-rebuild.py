@@ -53,9 +53,18 @@ try:
     head = migrations[-1].parent.name
     sql('review_a', 'CREATE DATABASE review_empty; CREATE DATABASE review_b;')
     sql('review_empty', generate('review_empty'))
-    count = sql('review_empty', "SELECT count(*) FROM pg_tables WHERE schemaname='public';").stdout.strip()
-    assert count == '66', count
-    results['空库完整重建'] = {'表数': int(count), 'head': head}
+    expected_tables = json.loads(run([
+        'node', '--input-type=module', '-e',
+        "import { discoverDatabaseStructure } from './apps/server/dist/src/platform/database-structure.js';"
+        "console.log(JSON.stringify((await discoverDatabaseStructure(process.argv[1])).expectedTables));",
+        str(root / 'apps/server/prisma'),
+    ], cwd=root).stdout)
+    actual_tables = sql('review_empty', "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename;").stdout.splitlines()
+    assert set(actual_tables) == set(expected_tables), {
+        '缺少表': sorted(set(expected_tables) - set(actual_tables)),
+        '额外表': sorted(set(actual_tables) - set(expected_tables)),
+    }
+    results['空库完整重建'] = {'表数': len(actual_tables), 'head': head}
 
     sql('review_a', migrations[0].read_text())
     old_head = sql('review_a', 'SELECT "version" FROM "SchemaVersion";').stdout.strip()

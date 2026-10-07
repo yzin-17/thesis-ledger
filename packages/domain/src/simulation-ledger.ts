@@ -1,10 +1,14 @@
 import { DecimalValue } from './decimal.js';
+import {
+  shouldApplySimulationCorporateAction,
+  type SimulationAccountingBasis,
+} from './backtest-normalized-accounting.js';
 import type {
   BacktestAssetType,
   BacktestCurrency,
   BacktestMoney,
-  V2BacktestMarket,
-} from './backtest-v2.js';
+  BacktestMarket,
+} from './backtest-contract.js';
 
 export const backtestCurrencies = ['CNY', 'HKD', 'USD'] as const;
 
@@ -17,11 +21,12 @@ export type SimulationLedgerRejectCode =
   | 'INVALID_AMOUNT'
   | 'INVALID_TIME'
   | 'SETTLEMENT_SOURCE_NOT_FOUND'
-  | 'FUTURE_DATA';
+  | 'FUTURE_DATA'
+  | 'CORPORATE_ACTION_IGNORED';
 
 export interface SimulationExecutionInstrument {
   symbol: string;
-  market: V2BacktestMarket;
+  market: BacktestMarket;
   assetType: BacktestAssetType;
   currency: BacktestCurrency;
 }
@@ -34,7 +39,7 @@ export interface SimulationCashBalance {
 
 export interface SimulationPosition {
   symbol: string;
-  market: V2BacktestMarket;
+  market: BacktestMarket;
   assetType: BacktestAssetType;
   currency: BacktestCurrency;
   quantity: string;
@@ -53,6 +58,8 @@ export interface SimulationLedgerConfig {
   executionInstrument: SimulationExecutionInstrument;
   baseCurrency: BacktestCurrency;
   initialCash: Partial<Record<BacktestCurrency, string>>;
+  /** Defaults to the legacy raw-share event accounting path. */
+  accountingBasis?: SimulationAccountingBasis;
 }
 
 export type SimulationLedgerCharge = BacktestMoney;
@@ -248,6 +255,10 @@ export class SimulationLedger {
     };
   }
 
+  get accountingBasis(): SimulationAccountingBasis {
+    return this.config.accountingBasis ?? 'raw-events';
+  }
+
   snapshot(): SimulationLedgerState {
     return {
       baseCurrency: this.config.baseCurrency,
@@ -426,6 +437,13 @@ export class SimulationLedger {
           '分红币种必须与执行标的币种一致',
         );
       }
+      if (!shouldApplySimulationCorporateAction(this.accountingBasis)) {
+        return this.rejection(
+          dividend.eventId,
+          'CORPORATE_ACTION_IGNORED',
+          'normalized-series 已在价格序列中表达公司行动，不重复记入现金',
+        );
+      }
       const amount = amountPerShare.times(this.position.settledQuantity);
       this.pendingCredits[dividend.currency] = this.pendingCredits[dividend.currency].plus(amount);
       this.pendingCashEffects.set(dividend.eventId, {
@@ -460,6 +478,13 @@ export class SimulationLedger {
       const ratio = parseAmount(split.ratio, '拆分比例');
       if (!ratio.isPositive()) {
         return this.rejection(split.eventId, 'INVALID_AMOUNT', '拆分比例必须为正数');
+      }
+      if (!shouldApplySimulationCorporateAction(this.accountingBasis)) {
+        return this.rejection(
+          split.eventId,
+          'CORPORATE_ACTION_IGNORED',
+          'normalized-series 已在价格序列中表达公司行动，不重复调整持仓数量',
+        );
       }
       this.position.settledQuantity = DecimalValue.from(this.position.settledQuantity)
         .times(ratio)

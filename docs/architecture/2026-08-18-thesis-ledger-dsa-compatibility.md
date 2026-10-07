@@ -1,5 +1,7 @@
 # DSA Contract V1 兼容说明
 
+> 历史设计记录。ThesisLedger 专属接口和回测的现行合同以[单一现行链路替换 Spec](../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)及其 Task 为准。下述 `backtest-v2-t13-gate.mjs` 随旧 V2 能力汇总端点退役；历史性能记录只说明当时的输入和结果，不是当前部署门禁。
+
 本文记录 Data Contract V1 与 Control Contract V1 的能力级兼容边界和验证规则。三仓发布版本、镜像和数据库基线以 [三仓版本与兼容矩阵](version-matrix.md) 为准，避免在两份文档中重复维护版本号。
 
 ## Data Contract V1 能力
@@ -38,7 +40,7 @@ DSA 市场事实 → ThesisLedger DataSnapshot → Simulation Event Engine → S
 
 ### T13 第一阶段门禁
 
-主仓保留两个可离线复现的门禁：`scripts/backtest-v2-t13-gate.mjs` 校验跨仓共享 fixture 的支持矩阵与非目标 NAV 边界；`scripts/backtest-v2-isolation-audit.mjs` 校验回测/Simulation 源码没有真实账户事实域 import。两者只证明契约和源码隔离，不宣称真实 DSA Provider 或账户数据库运行态通过。性能输入、结果摘要和未完成运行态验收记录在 [`统一回测 V2 T13 性能与功能基线`](../benchmarks/2026-09-09-unified-backtest-v2-t13.md)。
+当时的离线门禁包括 `scripts/backtest-v2-t13-gate.mjs`，用于校验旧能力汇总 fixture；该脚本和端点现已退役。`scripts/backtest-v2-isolation-audit.mjs` 检查回测/Simulation 源码与真实账户事实域的隔离。性能输入、结果摘要和未完成运行态验收记录在 [`统一回测 V2 T13 性能与功能基线`](../benchmarks/2026-09-09-unified-backtest-v2-t13.md)。
 
 ## 发布与验证规则
 

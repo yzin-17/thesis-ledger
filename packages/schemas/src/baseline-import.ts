@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import {
   currencyCodeSchema,
-  executionChargeSchemaV2,
+  executionChargeSchema,
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
-} from './ledger-v2.js';
+} from './ledger-contract.js';
 import { isDateOnly } from './temporal.js';
 
 const economicTimeSchema = z.union([z.iso.date(), z.iso.datetime()]);
@@ -37,7 +37,7 @@ const refineEconomicTime = (
     });
 };
 
-export const baselineObservationInputSchemaV2 = z
+export const baselineObservationInputSchema = z
   .object({
     symbol: z.string().trim().min(1),
     quantity: nonNegativeDecimalStringSchema,
@@ -48,7 +48,7 @@ export const baselineObservationInputSchemaV2 = z
   })
   .strict();
 
-export const createBaselineObservationBatchCommandSchemaV2 = z
+export const createBaselineObservationBatchCommandSchema = z
   .object({
     command: z.literal('CREATE_BASELINE_OBSERVATION_BATCH'),
     batchId: z.uuid(),
@@ -68,7 +68,7 @@ export const createBaselineObservationBatchCommandSchemaV2 = z
     actorId: z.string().trim().min(1).max(255),
     evidenceRef: z.string().trim().min(1).max(2000),
     contentHash: z.string().regex(/^[a-f0-9]{64}$/),
-    observations: z.array(baselineObservationInputSchemaV2).min(1),
+    observations: z.array(baselineObservationInputSchema).min(1),
   })
   .strict()
   .superRefine((command, context) => {
@@ -78,7 +78,7 @@ export const createBaselineObservationBatchCommandSchemaV2 = z
       context.addIssue({ code: 'custom', path: ['observations'], message: '同一批次标的不能重复' });
   });
 
-const draftExecutionRowSchemaV2 = z
+const draftExecutionRowSchema = z
   .object({
     rowId: z.string().trim().min(1).max(255),
     kind: z.literal('EXECUTION'),
@@ -90,7 +90,7 @@ const draftExecutionRowSchemaV2 = z
     quantity: positiveDecimalStringSchema,
     price: positiveDecimalStringSchema,
     currency: currencyCodeSchema,
-    charges: z.array(executionChargeSchemaV2).default([]),
+    charges: z.array(executionChargeSchema).default([]),
     assetName: z.string().trim().min(1).max(255).optional(),
     assetType: z.enum(['stock', 'etf', 'fund']).optional(),
     issues: z.array(z.string().trim().min(1)).default([]),
@@ -98,7 +98,7 @@ const draftExecutionRowSchemaV2 = z
   .strict()
   .superRefine(refineEconomicTime);
 
-const draftBaselineRowSchemaV2 = baselineObservationInputSchemaV2
+const draftBaselineRowSchema = baselineObservationInputSchema
   .omit({ sourceRowId: true })
   .extend({
     rowId: z.string().trim().min(1).max(255),
@@ -114,7 +114,7 @@ const draftBaselineRowSchemaV2 = baselineObservationInputSchemaV2
   .strict()
   .superRefine(refineEconomicTime);
 
-const draftUnresolvedRowSchemaV2 = z
+const draftUnresolvedRowSchema = z
   .object({
     rowId: z.string().trim().min(1).max(255),
     kind: z.literal('UNRESOLVED'),
@@ -123,10 +123,10 @@ const draftUnresolvedRowSchemaV2 = z
   })
   .strict();
 
-export const importDraftRowSchemaV2 = z.discriminatedUnion('kind', [
-  draftExecutionRowSchemaV2,
-  draftBaselineRowSchemaV2,
-  draftUnresolvedRowSchemaV2,
+export const importDraftRowSchema = z.discriminatedUnion('kind', [
+  draftExecutionRowSchema,
+  draftBaselineRowSchema,
+  draftUnresolvedRowSchema,
 ]);
 
 const refineDraftRows = (
@@ -147,7 +147,7 @@ const refineDraftRows = (
     });
 };
 
-export const createImportDraftRevisionCommandSchemaV2 = z
+export const createImportDraftRevisionCommandSchema = z
   .object({
     command: z.literal('CREATE_IMPORT_DRAFT_REVISION'),
     draftId: z.uuid(),
@@ -162,7 +162,7 @@ export const createImportDraftRevisionCommandSchemaV2 = z
     capturedAt: z.iso.datetime().optional(),
     timePrecision: z.enum(['INSTANT', 'DATE']).optional(),
     sourceTimezone: z.string().trim().min(1).max(100).optional(),
-    rows: z.array(importDraftRowSchemaV2).min(1),
+    rows: z.array(importDraftRowSchema).min(1),
   })
   .strict()
   .superRefine((command, context) => {
@@ -170,7 +170,7 @@ export const createImportDraftRevisionCommandSchemaV2 = z
     refineDraftRows(command.rows, context);
   });
 
-export const submitImportDraftRevisionCommandSchemaV2 = z
+export const submitImportDraftRevisionCommandSchema = z
   .object({
     command: z.literal('SUBMIT_IMPORT_DRAFT_REVISION'),
     draftId: z.uuid(),
@@ -185,7 +185,7 @@ export const submitImportDraftRevisionCommandSchemaV2 = z
       context.addIssue({ code: 'custom', path: ['selectedRowIds'], message: '选中行 ID 不能重复' });
   });
 
-export const reviseImportDraftCommandSchemaV2 = z
+export const reviseImportDraftCommandSchema = z
   .object({
     command: z.literal('REVISE_IMPORT_DRAFT'),
     draftId: z.uuid(),
@@ -199,7 +199,7 @@ export const reviseImportDraftCommandSchemaV2 = z
     timePrecision: z.enum(['INSTANT', 'DATE']).optional(),
     sourceTimezone: z.string().trim().min(1).max(100).optional(),
     sourceChannel: z.string().trim().min(1).max(100).optional(),
-    rows: z.array(importDraftRowSchemaV2).min(1),
+    rows: z.array(importDraftRowSchema).min(1),
   })
   .strict()
   .superRefine((command, context) => {
@@ -207,15 +207,15 @@ export const reviseImportDraftCommandSchemaV2 = z
     refineDraftRows(command.rows, context);
   });
 
-export type BaselineObservationInputV2 = z.infer<typeof baselineObservationInputSchemaV2>;
-export type CreateBaselineObservationBatchCommandV2 = z.infer<
-  typeof createBaselineObservationBatchCommandSchemaV2
+export type BaselineObservationInput = z.infer<typeof baselineObservationInputSchema>;
+export type CreateBaselineObservationBatchCommand = z.infer<
+  typeof createBaselineObservationBatchCommandSchema
 >;
-export type ImportDraftRowV2 = z.infer<typeof importDraftRowSchemaV2>;
-export type CreateImportDraftRevisionCommandV2 = z.infer<
-  typeof createImportDraftRevisionCommandSchemaV2
+export type ImportDraftRow = z.infer<typeof importDraftRowSchema>;
+export type CreateImportDraftRevisionCommand = z.infer<
+  typeof createImportDraftRevisionCommandSchema
 >;
-export type SubmitImportDraftRevisionCommandV2 = z.infer<
-  typeof submitImportDraftRevisionCommandSchemaV2
+export type SubmitImportDraftRevisionCommand = z.infer<
+  typeof submitImportDraftRevisionCommandSchema
 >;
-export type ReviseImportDraftCommandV2 = z.infer<typeof reviseImportDraftCommandSchemaV2>;
+export type ReviseImportDraftCommand = z.infer<typeof reviseImportDraftCommandSchema>;

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import type { OptimizationExperimentCreate, StrategySchemaV2 } from '@thesis-ledger/schemas';
+import type { OptimizationExperimentCreate, BacktestStrategy } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import {
   defaultExperimentName,
@@ -14,7 +14,7 @@ import type { OptimizationModelConfig } from './strategy-optimization-model-rout
 export async function insertOptimizationExperiment(
   prisma: Prisma.TransactionClient | PrismaService,
   parsed: OptimizationExperimentCreate,
-  baseline: StrategyVersionRecord & { strategy: StrategySchemaV2 },
+  baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
   modelConfig: OptimizationModelConfig[],
 ) {
   const id = randomUUID();

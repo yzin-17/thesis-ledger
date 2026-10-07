@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PerformanceService } from '../performance/performance.service.js';
-import { MarketBarReader } from '../market/market-bar-reader.js';
+import { MarketBarReader, MarketBarUnavailableError } from '../market/market-bar-reader.js';
+import { MarketService } from '../market/market.service.js';
 import { inferAssetType } from '../ledger/asset-type.js';
 import { RiskService } from '../risk/risk.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -12,9 +13,12 @@ export class AutomationWorkflowRunner {
     private readonly performance: PerformanceService,
     private readonly risk: RiskService,
     private readonly prisma: PrismaService,
+    private readonly market: MarketService,
   ) {}
 
-  async closeSync(input: { symbols: readonly string[]; timeframe?: '1d' | '1m'; end?: string }) {
+  async closeSync(input: { symbols: readonly string[]; timeframe?: '1d' | '1m'; end: string }) {
+    if (input.timeframe === '1m') throw new MarketBarUnavailableError('分钟线尚无现行精确来源');
+    const date = input.end.slice(0, 10);
     const results = [];
     for (const symbol of input.symbols) {
       const normalized = symbol.trim().toUpperCase();
@@ -22,21 +26,31 @@ export class AutomationWorkflowRunner {
       const assetType = inferred === 'fund' ? 'MUTUAL_FUND' : inferred?.toUpperCase();
       if (assetType !== 'STOCK' && assetType !== 'ETF' && assetType !== 'MUTUAL_FUND')
         throw new Error(`无法可靠识别行情标的类型: ${symbol}`);
-      const series = await this.bars.read({
-        identity: {
-          symbol: normalized,
-          assetType,
-          timeframe: input.timeframe ?? '1d',
-          adjustment: 'none',
-        },
-        window: input.end ? { end: input.end } : {},
-        acceptance: 'complete',
-      });
-      results.push({
+      if (assetType === 'MUTUAL_FUND') {
+        const history = await this.market.getFundNavHistory(normalized, { end: date, limit: 1 }, { refresh: true });
+        const latest = history.at(-1);
+        if (!latest || latest.freshness === 'stale' || latest.freshness === 'unavailable' || latest.fallbackUsed)
+          throw new MarketBarUnavailableError(`基金净值未完成同步: ${normalized}`);
+        results.push({ symbol: normalized, count: 1, lastTimestamp: latest.navDate });
+        continue;
+      }
+      let market: 'CN' | 'HK' | 'US';
+      if (/\.(SH|SZ|BJ)$/.test(normalized)) market = 'CN';
+      else if (/\.HK$/.test(normalized)) market = 'HK';
+      else if (/\.US$/.test(normalized)) market = 'US';
+      else throw new Error(`无法可靠识别行情标的市场: ${symbol}`);
+      const selected = await this.bars.readV3({
+        market,
         symbol: normalized,
-        count: series.points.length,
-        lastTimestamp: series.points.at(-1)?.timestamp ?? null,
+        routeKey: {
+          kind: 'bar', market, assetType,
+          capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'none',
+        },
+        window: { start: date, end: date },
       });
+      if (selected.status !== 'selected') throw new MarketBarUnavailableError(`日线未完成同步: ${normalized}`);
+      const points = selected.selection.response.bars;
+      results.push({ symbol: normalized, count: points.length, lastTimestamp: points.at(-1)?.timestamp ?? null });
     }
     return {
       symbols: input.symbols,

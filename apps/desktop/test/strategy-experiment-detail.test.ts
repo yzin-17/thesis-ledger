@@ -104,6 +104,12 @@ describe('策略实验详情', () => {
     ).toBe('实验尚未完成封存测试');
     expect(
       candidateAdoptionEligibility(experiment(), candidate({ validationStatus: 'test_invalid' })),
+    ).toBe('未进入封存测试');
+    expect(
+      candidateAdoptionEligibility(
+        experiment({ lockedCandidateIds: ['candidate-1'] }),
+        candidate({ validationStatus: 'test_invalid' }),
+      ),
     ).toBe('候选未通过封存测试');
   });
 

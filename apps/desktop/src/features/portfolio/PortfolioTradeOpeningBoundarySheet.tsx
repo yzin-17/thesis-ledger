@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ThesisLedgerApiError,
-  type CreateTradeOpeningBoundaryAssertionCommandV2,
-  type TradeDetailResponseV2,
+  type CreateTradeOpeningBoundaryAssertionCommand,
+  type TradeDetailResponse,
 } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -54,7 +54,7 @@ export function PortfolioTradeOpeningBoundarySheet({
   open,
   onOpenChange,
 }: {
-  detail: TradeDetailResponseV2;
+  detail: TradeDetailResponse;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -118,7 +118,7 @@ export function PortfolioTradeOpeningBoundarySheet({
 
     const clientCommandId = commandIdRef.current ?? commandId();
     commandIdRef.current = clientCommandId;
-    const command: CreateTradeOpeningBoundaryAssertionCommandV2 = {
+    const command: CreateTradeOpeningBoundaryAssertionCommand = {
       command: 'CREATE_TRADE_OPENING_BOUNDARY_ASSERTION',
       accountId: detail.accountId,
       occurredAt: parsedOpeningAt.toISOString(),

@@ -4,6 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { createDiscoverySeed } from '../../src/strategy-optimization/strategy-optimization-discovery.js';
 import { StrategyOptimizationSdkExecutor } from '../../src/strategy-optimization/strategy-optimization-sdk-executor.js';
+import { strategyOptimizationPrompt } from '../../src/strategy-optimization/strategy-optimization-prompt.js';
+import { completeSnapshotFixture } from '../backtest/v3-complete-snapshot-fixtures.js';
 
 const writeSse = (response: ServerResponse, content: string) => {
   response.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -39,7 +41,11 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
   let responseContent = '';
   let requestCount = 0;
   let baseURL = '';
-  const server = createServer((_request, response) => {
+  let receivedBody = '';
+  const server = createServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    receivedBody = Buffer.concat(chunks).toString('utf8');
     requestCount += 1;
     if (responseContent === '__disconnect__') {
       response.destroy();
@@ -100,6 +106,7 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
 
   beforeEach(() => {
     requestCount = 0;
+    receivedBody = '';
     vi.clearAllMocks();
     settlements.completeAndSettle.mockResolvedValue({ continuationBlockedReason: null });
   });
@@ -184,6 +191,96 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
         }),
         outcome: expect.objectContaining({ status: 'complete', schemaAccepted: true }),
       }),
+    );
+  });
+
+  it('模型返回完整但格式无效的响应时只结算一次格式失败并保留已报告用量', async () => {
+    responseContent = '{"changes": "not-an-array"}';
+
+    await expect(
+      executor().completeProposal(
+        common(
+          { sourceMode: 'existing' },
+          {},
+          { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+        ) as never,
+      ),
+    ).rejects.toMatchObject({
+      fact: { code: 'schema_invalid', phase: 'validation', externalResult: 'complete' },
+    });
+
+    expect(requestCount).toBe(1);
+    expect(executions.markUnknown).not.toHaveBeenCalled();
+    expect(settlements.completeAndSettle).toHaveBeenCalledTimes(1);
+    expect(settlements.completeAndSettle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        revision: expect.objectContaining({
+          usage: { status: 'reported', inputTokens: 11, outputTokens: 7 },
+        }),
+        outcome: expect.objectContaining({ status: 'incomplete', schemaAccepted: false }),
+        error: expect.objectContaining({ code: 'schema_invalid', externalResult: 'complete' }),
+      }),
+    );
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'failed',
+          errorCode: 'optimization_schema_invalid',
+        }),
+      }),
+    );
+  });
+
+  it('本地HTTP实际请求只发送投影后的开发验证指标和固定快照说明', async () => {
+    const { input } = await completeSnapshotFixture();
+    const experiment = {
+      sourceMode: 'existing',
+      allowedParameterIds: [],
+      objective: { mode: 'return' },
+      runConfig: input.runConfig,
+      baselineMetrics: {
+        development: { status: 'valid', totalReturn: '-0.2', futureHigh: 'SEALED_HIGH' },
+        test: { status: 'valid', totalReturn: 'SEALED_TEST_RETURN' },
+      },
+    };
+    const messages = await strategyOptimizationPrompt({
+      prisma: {
+        $queryRaw: async () => [
+          {
+            diff: [],
+            metrics: {
+              validation: { status: 'invalid', reason: 'SEALED_DATE_2035' },
+              test: { totalReturn: 'SEALED_HISTORY' },
+            },
+          },
+        ],
+      } as never,
+      experiment: { id: step.experimentId, ...experiment } as never,
+      strategy: input.strategy,
+      descriptors: [],
+      modelKey: step.modelKey,
+      round: 2,
+      useSdkContract: true,
+    });
+    responseContent = JSON.stringify({
+      changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
+      reason: '本地投影测试',
+      evidenceRefs: [],
+    });
+    await executor().completeProposal({
+      ...common(experiment, input.strategy, {
+        id: 'parameter_optimization',
+        version: 'optimization-parameter-v1',
+      }),
+      messages,
+    } as never);
+    expect(requestCount).toBe(1);
+    expect(receivedBody).not.toContain('SEALED_');
+    expect(receivedBody).toContain('-0.2');
+    expect(receivedBody).toContain('不得描述为严格无前视样本外');
+    expect(JSON.parse(receivedBody).messages).toEqual(
+      expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
     );
   });
 

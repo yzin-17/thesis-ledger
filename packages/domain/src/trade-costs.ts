@@ -1,4 +1,4 @@
-import type { DecimalString, ExecutionChargeV2, LedgerEventV2 } from './ledger-v2.js';
+import type { DecimalString, ExecutionCharge, LedgerEvent } from './ledger-contract.js';
 import { DecimalValue } from './decimal.js';
 import {
   projectTradeProjections,
@@ -11,7 +11,7 @@ import {
   type TradeProjectionOptions,
 } from './trade-projection.js';
 
-type EffectiveLedgerEvent = Exclude<LedgerEventV2, { revisionAction: 'VOID' }>;
+type EffectiveLedgerEvent = Exclude<LedgerEvent, { revisionAction: 'VOID' }>;
 
 export interface TradeCostProjectionOptions extends TradeProjectionOptions {
   costStrategyRevisionsByAccountId: Readonly<Record<string, readonly TradeCostStrategyRevision[]>>;
@@ -34,7 +34,7 @@ export class TradeCostProjectionError extends Error {
 }
 
 type FeeLineState = {
-  charge: ExecutionChargeV2;
+  charge: ExecutionCharge;
   remainingAmount: DecimalValue;
 };
 
@@ -55,7 +55,7 @@ type SourceAllocation = {
   source: CostSourceState;
   quantity: DecimalValue;
   originalCost: DecimalValue | null;
-  allocatedBuyCharges: ExecutionChargeV2[];
+  allocatedBuyCharges: ExecutionCharge[];
 };
 
 type MutableTradeCost = {
@@ -72,15 +72,15 @@ type MutableTradeCost = {
 const decimal = (value: DecimalString) => DecimalValue.from(value);
 const zero = () => decimal('0');
 
-const copyCharges = (charges: readonly ExecutionChargeV2[]) =>
+const copyCharges = (charges: readonly ExecutionCharge[]) =>
   charges.map((charge) => ({ ...charge }));
 
-const sumCharges = (charges: readonly ExecutionChargeV2[], currency: string) =>
+const sumCharges = (charges: readonly ExecutionCharge[], currency: string) =>
   charges
     .filter((charge) => charge.currency === currency)
     .reduce((total, charge) => total.plus(charge.amount), zero());
 
-const hasCurrencyMismatch = (charges: readonly ExecutionChargeV2[], currency: string) =>
+const hasCurrencyMismatch = (charges: readonly ExecutionCharge[], currency: string) =>
   charges.some((charge) => charge.currency !== currency);
 
 const addIssue = (state: MutableTradeCost, issue: TradeCostIssueCode) => {
@@ -135,7 +135,7 @@ const createTradeCost = (
   issues: new Set(),
 });
 
-const createChargeStates = (charges: readonly ExecutionChargeV2[]) =>
+const createChargeStates = (charges: readonly ExecutionCharge[]) =>
   charges.map((charge) => ({
     charge: { ...charge },
     remainingAmount: decimal(charge.amount),
@@ -599,7 +599,7 @@ const enrichTrade = (trade: TradeProjection, state: MutableTradeCost): TradeProj
 };
 
 export const projectTradeCostProjections = (
-  events: readonly LedgerEventV2[],
+  events: readonly LedgerEvent[],
   options: TradeCostProjectionOptions,
 ): TradeProjection[] => {
   const trades = projectTradeProjections(events, options);

@@ -1,9 +1,9 @@
 import type {
   DecimalString,
-  ExecutionChargeV2,
-  LedgerEventV2,
-  LedgerEventSourceV2,
-} from './ledger-v2.js';
+  ExecutionCharge,
+  LedgerEvent,
+  LedgerEventSource,
+} from './ledger-contract.js';
 import { DecimalValue } from './decimal.js';
 
 export type TradeAccountMode = 'actual' | 'shadow';
@@ -48,7 +48,7 @@ export interface TradeEvidenceSource {
   kind: TradeEvidenceSourceKind;
   eventId: string;
   factId: string;
-  source: LedgerEventSourceV2;
+  source: LedgerEventSource;
 }
 
 export interface TradeEntryLeg {
@@ -60,7 +60,7 @@ export interface TradeEntryLeg {
   originalQuantity: DecimalString;
   quantity: DecimalString;
   remainingQuantity: DecimalString;
-  charges?: ExecutionChargeV2[];
+  charges?: ExecutionCharge[];
   rawCost?: DecimalString | null;
   remainingCost?: DecimalString | null;
   rawCostEstimated?: boolean;
@@ -93,7 +93,7 @@ export interface TradeCloseAllocation {
   sourceFactId: string;
   quantity: DecimalString;
   originalCost?: DecimalString | null;
-  allocatedBuyCharges?: ExecutionChargeV2[];
+  allocatedBuyCharges?: ExecutionCharge[];
 }
 
 export interface TradeCloseSlice {
@@ -106,7 +106,7 @@ export interface TradeCloseSlice {
   quantity: DecimalString;
   remainingQuantityAfter: DecimalString;
   allocations: TradeCloseAllocation[];
-  charges?: ExecutionChargeV2[];
+  charges?: ExecutionCharge[];
   grossRealizedPnl?: DecimalString | null;
   netRealizedPnl?: DecimalString | null;
   realizedNetReturnRate?: DecimalString | null;
@@ -249,7 +249,7 @@ const defaultAlgorithmVersion = 'trade-projection-v1';
 const decimal = (value: string) => DecimalValue.from(value);
 const zero = () => decimal('0');
 
-const compareLedgerEventOrder = (left: LedgerEventV2, right: LedgerEventV2) => {
+const compareLedgerEventOrder = (left: LedgerEvent, right: LedgerEvent) => {
   if (left.occurredAt === null && right.occurredAt !== null) return -1;
   if (left.occurredAt !== null && right.occurredAt === null) return 1;
   if (left.occurredAt !== right.occurredAt)
@@ -260,7 +260,7 @@ const compareLedgerEventOrder = (left: LedgerEventV2, right: LedgerEventV2) => {
   );
 };
 
-const compareRevision = (left: LedgerEventV2, right: LedgerEventV2) => {
+const compareRevision = (left: LedgerEvent, right: LedgerEvent) => {
   const leftRevision = BigInt(left.ledgerRevision);
   const rightRevision = BigInt(right.ledgerRevision);
   return leftRevision === rightRevision
@@ -270,8 +270,8 @@ const compareRevision = (left: LedgerEventV2, right: LedgerEventV2) => {
       : 1;
 };
 
-const effectiveEvents = (events: readonly LedgerEventV2[]) => {
-  const latestByFact = new Map<string, LedgerEventV2>();
+const effectiveEvents = (events: readonly LedgerEvent[]) => {
+  const latestByFact = new Map<string, LedgerEvent>();
   for (const event of events) {
     const current = latestByFact.get(event.factId);
     if (!current || compareRevision(current, event) < 0) latestByFact.set(event.factId, event);
@@ -281,10 +281,10 @@ const effectiveEvents = (events: readonly LedgerEventV2[]) => {
     .sort(compareLedgerEventOrder);
 };
 
-export const selectEffectiveLedgerEvents = (events: readonly LedgerEventV2[]) =>
+export const selectEffectiveLedgerEvents = (events: readonly LedgerEvent[]) =>
   effectiveEvents(events);
 
-const eventSymbol = (event: Exclude<LedgerEventV2, { revisionAction: 'VOID' }>) =>
+const eventSymbol = (event: Exclude<LedgerEvent, { revisionAction: 'VOID' }>) =>
   'symbol' in event.payload ? event.payload.symbol : undefined;
 
 const updateEarliestEvidenceAt = (trade: MutableTrade, occurredAt: string | null) => {
@@ -301,7 +301,7 @@ const addIssue = (trade: MutableTrade, issue: TradeProjectionIssueCode) => {
 
 const addEvidence = (
   trade: MutableTrade,
-  event: Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+  event: Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
   kind: TradeEvidenceSourceKind,
   updateEarliest = true,
 ) => {
@@ -325,7 +325,7 @@ const currentQuantity = (trade: MutableTrade) =>
   trade.sources.reduce((total, source) => total.plus(source.remainingQuantity), zero());
 
 const createTrade = (input: {
-  event: Exclude<LedgerEventV2, { revisionAction: 'VOID' }>;
+  event: Exclude<LedgerEvent, { revisionAction: 'VOID' }>;
   accountMode: TradeAccountMode;
   symbol: string;
   algorithmVersion: string;
@@ -364,7 +364,7 @@ const addSource = (trade: MutableTrade, source: MutableSource) => {
 };
 
 const createEntrySource = (
-  event: Extract<Exclude<LedgerEventV2, { revisionAction: 'VOID' }>, { type: 'BUY_EXECUTION' }>,
+  event: Extract<Exclude<LedgerEvent, { revisionAction: 'VOID' }>, { type: 'BUY_EXECUTION' }>,
 ): MutableSource => {
   const quantity = decimal(event.payload.quantity);
   return {
@@ -384,7 +384,7 @@ const createEntrySource = (
 
 const createBaselineSource = (input: {
   event: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     {
       type: 'POSITION_BASELINE_OBSERVATION';
     }
@@ -413,7 +413,7 @@ const createBaselineSource = (input: {
 };
 
 const processBuy = (input: {
-  event: Extract<Exclude<LedgerEventV2, { revisionAction: 'VOID' }>, { type: 'BUY_EXECUTION' }>;
+  event: Extract<Exclude<LedgerEvent, { revisionAction: 'VOID' }>, { type: 'BUY_EXECUTION' }>;
   current: MutableTrade | undefined;
   trades: MutableTrade[];
   accountMode: TradeAccountMode;
@@ -441,7 +441,7 @@ const processBuy = (input: {
 
 const processBaseline = (input: {
   event: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     {
       type: 'POSITION_BASELINE_OBSERVATION';
     }
@@ -500,7 +500,7 @@ const processBaseline = (input: {
 
 const processOpeningBoundaryAssertion = (input: {
   event: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     { type: 'TRADE_OPENING_BOUNDARY_ASSERTION' }
   >;
   trades: MutableTrade[];
@@ -524,7 +524,7 @@ const processOpeningBoundaryAssertion = (input: {
 };
 
 const processSell = (input: {
-  event: Extract<Exclude<LedgerEventV2, { revisionAction: 'VOID' }>, { type: 'SELL_EXECUTION' }>;
+  event: Extract<Exclude<LedgerEvent, { revisionAction: 'VOID' }>, { type: 'SELL_EXECUTION' }>;
   current: MutableTrade | undefined;
 }) => {
   const { event, current: trade } = input;
@@ -590,7 +590,7 @@ const multiplySources = (trade: MutableTrade, multiplier: DecimalValue) => {
 
 const processCorporateAction = (input: {
   event: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     {
       type: 'BONUS_SHARE' | 'SPLIT' | 'MERGE';
     }
@@ -658,7 +658,7 @@ const processCorporateAction = (input: {
 };
 
 const processDividend = (input: {
-  event: Extract<Exclude<LedgerEventV2, { revisionAction: 'VOID' }>, { type: 'DIVIDEND' }>;
+  event: Extract<Exclude<LedgerEvent, { revisionAction: 'VOID' }>, { type: 'DIVIDEND' }>;
   current: MutableTrade | undefined;
 }) => {
   const { event, current: trade } = input;
@@ -676,7 +676,7 @@ const processDividend = (input: {
 
 const processReconciliation = (input: {
   event: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     {
       type: 'BASELINE_RECONCILIATION';
     }
@@ -786,18 +786,18 @@ const projectGroup = (input: {
   accountId: string;
   accountMode: TradeAccountMode;
   symbol: string;
-  events: readonly Exclude<LedgerEventV2, { revisionAction: 'VOID' }>[];
+  events: readonly Exclude<LedgerEvent, { revisionAction: 'VOID' }>[];
   algorithmVersion: string;
 }) => {
   const { accountId, accountMode, symbol, events, algorithmVersion } = input;
   const trades: MutableTrade[] = [];
   const tradesByBaselineFact = new Map<string, MutableTrade>();
   const pendingReconciliations: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     { type: 'BASELINE_RECONCILIATION' }
   >[] = [];
   const pendingOpeningBoundaryAssertions: Extract<
-    Exclude<LedgerEventV2, { revisionAction: 'VOID' }>,
+    Exclude<LedgerEvent, { revisionAction: 'VOID' }>,
     { type: 'TRADE_OPENING_BOUNDARY_ASSERTION' }
   >[] = [];
   let current: MutableTrade | undefined;
@@ -859,7 +859,7 @@ const projectGroup = (input: {
 };
 
 export const projectTradeProjections = (
-  events: readonly LedgerEventV2[],
+  events: readonly LedgerEvent[],
   options: TradeProjectionOptions,
 ): TradeProjection[] => {
   const algorithmVersion = options.algorithmVersion ?? defaultAlgorithmVersion;
@@ -869,7 +869,7 @@ export const projectTradeProjections = (
       accountId: string;
       accountMode: TradeAccountMode;
       symbol: string;
-      events: Exclude<LedgerEventV2, { revisionAction: 'VOID' }>[];
+      events: Exclude<LedgerEvent, { revisionAction: 'VOID' }>[];
     }
   >();
   for (const event of effectiveEvents(events)) {

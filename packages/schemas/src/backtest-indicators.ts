@@ -3,8 +3,8 @@ import {
   decimalStringSchema,
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
-} from './ledger-v2.js';
-import { backtestTimeframeSchema, seriesFieldSchema } from './backtest-v2.js';
+} from './monetary-values.js';
+import { backtestTimeframeSchema, seriesFieldSchema } from './backtest-contract.js';
 
 const isoDateTime = z.iso.datetime({ offset: true });
 

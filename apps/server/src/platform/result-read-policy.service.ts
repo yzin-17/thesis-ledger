@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { omit } from 'es-toolkit';
 import {
   resultReadEligibilityForExperiment,
   resultReadEligibilityForRun,
@@ -21,11 +22,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
-const withoutTestSplit = (value: unknown) => {
-  const record = asRecord(value);
-  const { test: _test, ...visible } = record;
-  return visible;
-};
+const withoutTestSplit = (value: unknown) => omit(asRecord(value), ['test']);
 
 /**
  * 统一封存结果读取边界。此服务只读取授权事实，不推进实验状态、不记录访问、也不重试任务。
@@ -114,14 +111,13 @@ export class ResultReadPolicyService {
   ): T & { readEligibility: ResultReadEligibility } {
     const readEligibility = known ?? resultReadEligibilityForRun({ associated: false });
     if (readEligibility.state === 'readable') return { ...job, readEligibility };
-    const {
-      result: _result,
-      resultChecksum: _resultChecksum,
-      snapshotId: _snapshotId,
-      snapshotManifest: _snapshotManifest,
-      diagnostics: _diagnostics,
-      ...redacted
-    } = job as T & Record<string, unknown>;
+    const redacted = omit(job as T & Record<string, unknown>, [
+      'result',
+      'resultChecksum',
+      'snapshotId',
+      'snapshotManifest',
+      'diagnostics',
+    ]);
     return { ...redacted, readEligibility } as T & { readEligibility: ResultReadEligibility };
   }
 
@@ -130,16 +126,12 @@ export class ResultReadPolicyService {
   ): T & { readEligibility: ResultReadEligibility } {
     const readEligibility = this.experiment(experiment);
     if (readEligibility.state === 'readable') return { ...experiment, readEligibility };
-    const {
-      baselineRunRefs,
-      baselineMetrics,
-      selectedCandidateId: _selectedCandidateId,
-      ...visible
-    } = experiment as T & Record<string, unknown>;
+    const record = experiment as T & Record<string, unknown>;
+    const visible = omit(record, ['baselineRunRefs', 'baselineMetrics', 'selectedCandidateId']);
     return {
       ...visible,
-      baselineRunRefs: withoutTestSplit(baselineRunRefs),
-      baselineMetrics: withoutTestSplit(baselineMetrics),
+      baselineRunRefs: withoutTestSplit(record.baselineRunRefs),
+      baselineMetrics: withoutTestSplit(record.baselineMetrics),
       selectedCandidateId: null,
       readEligibility,
     } as T & { readEligibility: ResultReadEligibility };

@@ -35,6 +35,25 @@ export const metricRecord = (value: unknown) => {
 export const candidateMetric = (candidate: OptimizationCandidate, split: 'validation' | 'test') =>
   metricRecord(metricRecord(candidate.metrics)[split]);
 
+export const canSelectCandidateForTest = (
+  experiment: OptimizationExperimentSummary,
+  candidate: OptimizationCandidate,
+  retryRequired: boolean,
+) => {
+  if (experiment.stage !== 'awaiting_finalization' || retryRequired) return false;
+  if (candidate.validationStatus === 'valid') return true;
+  if (
+    candidate.validationStatus !== 'restricted' ||
+    candidate.readEligibility?.state !== 'restricted'
+  )
+    return false;
+  const metrics = metricRecord(candidate.metrics);
+  return (
+    metricRecord(metrics.development).status === 'valid' &&
+    metricRecord(metrics.validation).status === 'valid'
+  );
+};
+
 export const metricValue = (metrics: Record<string, unknown>, keys: string[]) => {
   for (const key of keys) {
     if (metrics[key] !== undefined && metrics[key] !== null) return scalarText(metrics[key]);
@@ -58,8 +77,9 @@ export const candidateAdoptionEligibility = (
   if (!canRevealTestMetrics(experiment, candidate)) return '封存测试结果尚未揭示';
   if (experiment.status !== 'succeeded' || experiment.stage !== 'completed')
     return '实验尚未完成封存测试';
-  if (candidate.validationStatus !== 'test_valid') return '候选未通过封存测试';
-  return null;
+  if (candidate.validationStatus === 'test_valid') return null;
+  if (!experiment.lockedCandidateIds?.includes(candidate.id)) return '未进入封存测试';
+  return '候选未通过封存测试';
 };
 
 export const experimentCostText = (summary: OptimizationCostSummary) => {
@@ -111,6 +131,8 @@ export const tradingCostText = (cost: OptimizationTradingCostReadModel) => {
 
 export const experimentStopReasonText = (reason: string) => {
   if (reason === 'no_valid_candidate') return '所有候选均未通过验证';
+  if (reason === 'model_format_failure') return '模型输出格式无效，未生成候选';
+  if (reason === 'model_generation_failed') return '模型未生成可验证候选';
   if (reason === 'user_cancelled') return '用户已取消实验';
   if (reason.startsWith('final_test_retry_required:')) return '封存测试部分发生技术失败';
   return `实验因技术或预算限制停止：${reason}`;

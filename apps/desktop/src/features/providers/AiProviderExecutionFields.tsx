@@ -139,7 +139,8 @@ export function AiProviderExecutionFields({
                           type="button"
                           key={route.key}
                           size="sm"
-                          variant={selected?.key === route.key ? 'secondary' : 'ghost'}
+                          variant="tab"
+                          aria-pressed={selected?.key === route.key}
                           onClick={() =>
                             setActive((current) => ({ ...current, [model]: route.contractId }))
                           }

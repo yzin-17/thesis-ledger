@@ -86,6 +86,7 @@ const storedAssertion = () => ({
   sourceTimezone: 'Asia/Shanghai',
   economicOrderKey: 'opening-boundary-1',
   recordedAt: new Date('2026-01-03T00:00:00.000Z'),
+  envelopeVersion: 3,
   payloadVersion: 1,
   payload: { symbol: 'AAPL.US', tradeId, baselineFactId },
   sourceCategory: 'MANUAL',

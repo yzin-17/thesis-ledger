@@ -1,12 +1,19 @@
 import {
   executionModelDisclosureSchema,
+  executionModelDisclosureSchemaV3,
   type ExecutionModelDisclosure,
+  type ExecutionModelDisclosureV3,
 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import type { BacktestJob } from './strategy.types.js';
+import { BacktestPriceDisclosure } from './BacktestPriceDisclosure.js';
 
-export function BacktestModelDisclosure({ disclosure }: { disclosure: ExecutionModelDisclosure }) {
+export function BacktestModelDisclosure({
+  disclosure,
+}: {
+  disclosure: ExecutionModelDisclosure | ExecutionModelDisclosureV3;
+}) {
   const { model, contentHash } = disclosure;
   const { scope } = model;
   return (
@@ -62,11 +69,13 @@ function sourceLabel(kind: string) {
 
 export function BacktestRunDisclosure({ job }: { job: BacktestJob }) {
   const result = job.result;
-  const parsed = executionModelDisclosureSchema.safeParse(
-    result?.executionModelDisclosure ?? job.executionModelDisclosure,
-  );
+  const isV3 = result && 'schemaVersion' in result && result.schemaVersion === '3';
+  const parsed = (
+    isV3 ? executionModelDisclosureSchemaV3 : executionModelDisclosureSchema
+  ).safeParse(result?.executionModelDisclosure ?? job.executionModelDisclosure);
   return (
     <div className="flex flex-col gap-3 pb-4">
+      {isV3 && <BacktestPriceDisclosure result={result} />}
       {job.status === 'failed' && (
         <Alert variant="destructive">
           <AlertTitle>回测失败 · {job.errorCode ?? '未提供错误码'}</AlertTitle>

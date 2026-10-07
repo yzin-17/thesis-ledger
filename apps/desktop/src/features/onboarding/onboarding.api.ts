@@ -5,7 +5,8 @@ import {
   type OnboardingProviderRecord,
   type OnboardingRiskRuleRecord,
 } from './onboarding.types.js';
-import type { MarketPolicy, ProviderManifest } from '../market-data/market-data.types.js';
+import type { ProviderManifest } from '../market-data/market-data.types.js';
+import { parseMarketPolicyResponse } from '../market-data/market-data.api.js';
 
 export interface OnboardingStatus {
   hasProviderSetup: boolean;
@@ -19,15 +20,15 @@ export const fetchOnboardingStatus = async (
     requestDesktopJson<OnboardingProviderRecord[]>('/providers/config', undefined, client),
     requestDesktopJson<OnboardingRiskRuleRecord[]>('/risk/rules', undefined, client),
     requestDesktopJson<{ providers?: ProviderManifest[] }>(
-      '/api/v2/market-data/providers',
+      '/api/market-data/providers',
       undefined,
       client,
     ),
-    requestDesktopJson<MarketPolicy>('/api/v2/market-data/policy', undefined, client),
+    requestDesktopJson<unknown>('/api/market-data/policy', undefined, client),
   ]);
   const marketData: OnboardingMarketData = {
     providers: marketProviders.providers ?? [],
-    policy: marketPolicy,
+    policy: parseMarketPolicyResponse(marketPolicy),
   };
   return {
     hasProviderSetup: hasConfiguredProviderSetup(providers, marketData),

@@ -1,0 +1,4 @@
+{
+  "dataContractVersions": [3],
+  "serviceCapabilities": { "fundNav": true }
+}

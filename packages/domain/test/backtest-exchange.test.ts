@@ -2,133 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ExchangeMarketSimulation,
   SimulationLedger,
-  tradingCalendars,
-  VersionedExecutionRules,
   type ExchangeMarketSimulationInput,
-  type ExecutionRuleFacts,
-  type ExchangeOrderRequest,
-  type TradingMarket,
 } from '../src/index.js';
-
-const currency = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
-const symbol = { CN: '600000.SH', HK: '00005.HK', US: 'AAPL.US' } as const;
-const openAt = {
-  CN: '2026-09-08T01:30:00.000Z',
-  HK: '2026-09-08T01:30:00.000Z',
-  US: '2026-09-08T13:30:00.000Z',
-} as const;
-const lotSize = (market: TradingMarket) => {
-  if (market === 'CN') return '100';
-  if (market === 'HK') return '500';
-  return '1';
-};
-
-const facts = (market: TradingMarket): ExecutionRuleFacts => {
-  const statutoryCharges =
-    market === 'CN'
-      ? [{ code: 'STAMP_DUTY', side: 'sell' as const, rate: '0.0005' }]
-      : [{ code: market === 'HK' ? 'LEVY' : 'SEC_FEE', side: 'sell' as const, rate: '0.0001' }];
-  return {
-    version: `${market.toLowerCase()}-exchange-2026-1`,
-    calendar: tradingCalendars[market],
-    calendarProvider: 'exchange-fixture',
-    calendarProviderRevision: `${market.toLowerCase()}-calendar-1`,
-    calendarAvailableAt: '2026-09-01T00:00:00.000Z',
-    instrument: {
-      symbol: symbol[market],
-      market,
-      instrumentType: market === 'US' ? 'ETF' : 'STOCK',
-      currency: currency[market],
-      lotSize: lotSize(market),
-      tickSize: '0.01',
-      tradable: true,
-      provider: 'exchange-fixture',
-      providerRevision: 'instrument-1',
-      occurredAt: '2026-09-01T00:00:00.000Z',
-      availableAt: '2026-09-01T00:00:00.000Z',
-    },
-    order: {
-      type: 'Market',
-      timeInForce: 'DAY',
-      executionTiming: 'nextEligibleBarOpen',
-      fillPolicy: 'full-or-reject',
-      longOnly: true,
-    },
-    price:
-      market === 'CN'
-        ? { reference: 'previousClose', maxUpRatio: '0.1', maxDownRatio: '0.1' }
-        : { reference: 'previousClose' },
-    positionSettlement: { sellableAfterTradingDays: market === 'CN' ? 1 : 0 },
-    cashSettlement: {
-      buyDebitAfterTradingDays: 0,
-      sellCreditAfterTradingDays: market === 'US' ? 1 : 0,
-    },
-    statutoryCharges,
-  };
-};
-
-const order = (
-  market: TradingMarket,
-  overrides: Partial<ExchangeOrderRequest> = {},
-): ExchangeOrderRequest => ({
-  intentId: 'intent-1',
-  signalId: 'signal-1',
-  orderId: 'order-1',
-  executionSymbol: symbol[market],
-  market,
-  side: 'buy',
-  reason: 'signal',
-  occurredAt: new Date(Date.parse(openAt[market]) + 5 * 60_000).toISOString(),
-  availableAt: new Date(Date.parse(openAt[market]) + 5 * 60_000).toISOString(),
-  quantity: lotSize(market),
-  ...overrides,
-});
-
-const input = (
-  market: TradingMarket,
-  overrides: Partial<ExchangeMarketSimulationInput> = {},
-): ExchangeMarketSimulationInput => {
-  const ruleFacts = facts(market);
-  const rules = new VersionedExecutionRules(ruleFacts);
-  const firstOpen = openAt[market];
-  const firstCompleted = new Date(Date.parse(firstOpen) + 5 * 60_000).toISOString();
-  const secondOpen = new Date(Date.parse(firstOpen) + 10 * 60_000).toISOString();
-  const secondCompleted = new Date(Date.parse(firstOpen) + 15 * 60_000).toISOString();
-  return {
-    rules,
-    calendar: ruleFacts.calendar,
-    currency: currency[market],
-    bars: [
-      {
-        occurredAt: firstCompleted,
-        availableAt: firstCompleted,
-        openedAt: firstOpen,
-        openAvailableAt: firstOpen,
-        previousCloseAvailableAt: firstOpen,
-        open: '10.00',
-        previousClose: '9.90',
-      },
-      {
-        occurredAt: secondCompleted,
-        availableAt: secondCompleted,
-        openedAt: secondOpen,
-        openAvailableAt: secondOpen,
-        previousCloseAvailableAt: secondOpen,
-        open: '10.10',
-        previousClose: '10.00',
-      },
-    ],
-    account: { settledCash: '100000', availableQuantity: '1000' },
-    costs: {
-      version: 'strategy-cost-1',
-      slippageRate: '0.01',
-      commissionRate: '0.001',
-      minimumCommission: { amount: '1', currency: currency[market] },
-    },
-    order: order(market),
-    ...overrides,
-  };
-};
+import { currency, symbol, openAt, lotSize, order, input } from './backtest-exchange.fixtures.js';
 
 describe('ExchangeMarketSimulation', () => {
   it.each(['CN', 'HK', 'US'] as const)('creates deterministic raw-open fills for %s', (market) => {
@@ -144,6 +20,9 @@ describe('ExchangeMarketSimulation', () => {
     expect(first.fill.price).toBe('10.201');
     expect(first.fill.quantity).toBe(lotSize(market));
     expect(first.fill.charges.every((charge) => charge.currency === currency[market])).toBe(true);
+    expect(first.ledgerFill.cashReservationId).toBe('order-1:cash-reservation');
+    expect(first.cashReservation).toMatchObject({ currency: currency[market] });
+    if (market === 'US') expect(first.chargeBreakdown[0]?.amount).toBe('1');
     expect(first.settlement.sourceEventId).toBe(first.ledgerFill.eventId);
     expect(
       first.settlement.ledgerSettlements.every(
@@ -180,9 +59,9 @@ describe('ExchangeMarketSimulation', () => {
     expect(expired).toMatchObject({ status: 'rejected', reject: { code: 'DAY_EXPIRED' } });
   });
 
-  it('rejects insufficient cash with stable facts', () => {
+  it.each(['0', '1'])('rejects insufficient cash with stable facts at %s', (settledCash) => {
     const cash = new ExchangeMarketSimulation().plan(
-      input('US', { account: { settledCash: '1', availableQuantity: '1' } }),
+      input('US', { account: { settledCash, availableQuantity: '1' } }),
     );
     expect(cash).toMatchObject({ status: 'rejected', reject: { code: 'INSUFFICIENT_CASH' } });
   });
@@ -265,6 +144,61 @@ describe('ExchangeMarketSimulation', () => {
       'executionRules',
     ]);
   });
+
+  it('applies slippage adversely by side and rounds fees only under an explicit policy', () => {
+    const exact = new ExchangeMarketSimulation().plan(
+      input('US', {
+        costs: {
+          version: 'strategy-cost-1',
+          slippageRate: '0',
+          commissionRate: '0.001',
+        },
+      }),
+    );
+    const buy = new ExchangeMarketSimulation().plan(
+      input('US', {
+        costs: {
+          version: 'strategy-cost-1',
+          slippageRate: '0.01',
+          commissionRate: '0.001',
+          feeRounding: { mode: 'halfUp', decimalPlaces: 2 },
+        },
+      }),
+    );
+    const sell = new ExchangeMarketSimulation().plan(
+      input('US', {
+        order: order('US', { side: 'sell' }),
+        costs: {
+          version: 'strategy-cost-1',
+          slippageRate: '0.01',
+          commissionRate: '0.001',
+          feeRounding: { mode: 'halfUp', decimalPlaces: 2 },
+        },
+      }),
+    );
+
+    expect(exact.status).toBe('filled');
+    expect(buy.status).toBe('filled');
+    expect(sell.status).toBe('filled');
+    if (exact.status !== 'filled' || buy.status !== 'filled' || sell.status !== 'filled') return;
+    expect(exact.fill.charges[0]?.amount).toBe('0.0101');
+    expect(buy.fill.price).toBe('10.201');
+    expect(buy.fill.charges[0]).toMatchObject({ amount: '0.01', currency: 'USD' });
+    expect(sell.fill.price).toBe('9.999');
+    expect(sell.fill.charges[0]).toMatchObject({ amount: '0.01', currency: 'USD' });
+  });
+
+  it('rejects unrecognized fixed-per-trade fee models instead of ignoring them', () => {
+    const costs = {
+      version: 'strategy-cost-1',
+      slippageRate: '0',
+      commissionRate: '0',
+      fixedCommission: { amount: '1', currency: 'USD' },
+    } as ExchangeMarketSimulationInput['costs'];
+    const planned = new ExchangeMarketSimulation().plan(input('US', { costs }));
+
+    expect(planned).toMatchObject({ status: 'rejected', reject: { code: 'INVALID_COST' } });
+  });
 });
 
 describe('ExchangeMarketSimulation costs and ledger adapter', () => {
@@ -303,12 +237,22 @@ describe('ExchangeMarketSimulation costs and ledger adapter', () => {
       executionInstrument: {
         symbol: symbol.US,
         market: 'US',
-        assetType: 'ETF',
+        assetType: 'etf',
         currency: 'USD',
       },
       baseCurrency: 'USD',
       initialCash: { USD: '100000' },
     });
+    expect(planned.cashReservation).toBeDefined();
+    if (planned.cashReservation) {
+      expect(
+        ledger.reserveCash(
+          planned.cashReservation.reservationId,
+          planned.cashReservation.currency,
+          planned.cashReservation.amount,
+        ),
+      ).toMatchObject({ accepted: true });
+    }
     const appliedFill = ledger.applyEvent({ type: 'fill', payload: planned.ledgerFill });
     expect(appliedFill).toMatchObject({ applied: true });
     for (const settlement of planned.settlement.ledgerSettlements) {
@@ -344,7 +288,7 @@ describe('ExchangeMarketSimulation costs and ledger adapter', () => {
       executionInstrument: {
         symbol: symbol.US,
         market: 'US',
-        assetType: 'ETF',
+        assetType: 'etf',
         currency: 'USD',
       },
       baseCurrency: 'USD',
@@ -384,11 +328,10 @@ describe('ExchangeMarketSimulation costs and ledger adapter', () => {
     expect(ledger.applyEvent({ type: 'fill', payload: planned.ledgerFill })).toMatchObject({
       applied: true,
     });
+    const settlement = planned.settlement.ledgerSettlements[0];
+    if (!settlement) throw new Error('fixture 缺少结算事件');
     expect(
-      ledger.applyEvent(
-        { type: 'settlement', payload: planned.settlement.ledgerSettlements[0] },
-        planned.settlement.ledgerSettlements[0].availableAt,
-      ),
+      ledger.applyEvent({ type: 'settlement', payload: settlement }, settlement.availableAt),
     ).toMatchObject({ applied: true });
     expect(ledger.snapshot().position.quantity).toBe('0');
   });
@@ -490,5 +433,77 @@ describe('ExchangeMarketSimulation timing facts', () => {
       status: 'rejected',
       reject: { code: 'RULE_REJECTED' },
     });
+  });
+});
+
+describe('SimulationLedger cash reuse', () => {
+  it('makes sell proceeds available only after settlement and releases an unused reservation', () => {
+    const ledger = new SimulationLedger({
+      executionInstrument: {
+        symbol: symbol.US,
+        market: 'US',
+        assetType: 'etf',
+        currency: 'USD',
+      },
+      baseCurrency: 'USD',
+      initialCash: { USD: '100' },
+    });
+    expect(
+      ledger.applyFill({
+        eventId: 'reuse-buy',
+        fillId: 'reuse-buy',
+        executionSymbol: symbol.US,
+        side: 'buy',
+        quantity: '5',
+        price: '10',
+        charges: [{ amount: '1', currency: 'USD' }],
+        currency: 'USD',
+        occurredAt: '2026-09-07T13:30:00.000Z',
+        availableAt: '2026-09-07T13:30:00.000Z',
+      }),
+    ).toMatchObject({ applied: true });
+    expect(
+      ledger.applySettlement({
+        eventId: 'reuse-buy-settlement',
+        sourceEventId: 'reuse-buy',
+        kind: 'both',
+        currency: 'USD',
+        symbol: symbol.US,
+        occurredAt: '2026-09-07T13:30:00.000Z',
+        availableAt: '2026-09-07T13:30:00.000Z',
+      }),
+    ).toMatchObject({ applied: true });
+    expect(
+      ledger.applyFill({
+        eventId: 'reuse-sell',
+        fillId: 'reuse-sell',
+        executionSymbol: symbol.US,
+        side: 'sell',
+        quantity: '5',
+        price: '12',
+        charges: [{ amount: '0.2', currency: 'USD' }],
+        currency: 'USD',
+        occurredAt: '2026-09-08T13:30:00.000Z',
+        availableAt: '2026-09-08T13:30:00.000Z',
+      }),
+    ).toMatchObject({ applied: true });
+    expect(ledger.availableCash('USD')).toBe('49');
+    expect(
+      ledger.applySettlement({
+        eventId: 'reuse-sell-settlement',
+        sourceEventId: 'reuse-sell',
+        kind: 'cash',
+        currency: 'USD',
+        symbol: symbol.US,
+        occurredAt: '2026-09-09T13:30:00.000Z',
+        availableAt: '2026-09-09T13:30:00.000Z',
+      }),
+    ).toMatchObject({ applied: true });
+
+    expect(ledger.availableCash('USD')).toBe('108.8');
+    expect(ledger.reserveCash('next-order', 'USD', '100')).toMatchObject({ accepted: true });
+    expect(ledger.availableCash('USD')).toBe('8.8');
+    expect(ledger.releaseCash('next-order')).toBe(true);
+    expect(ledger.availableCash('USD')).toBe('108.8');
   });
 });

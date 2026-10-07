@@ -106,17 +106,6 @@ export const tradeMetrics = (trades: readonly TradeMetricInput[]) => {
   };
 };
 
-export const compareBenchmark = (strategy: readonly number[], benchmark: readonly number[]) => {
-  if (strategy.length !== benchmark.length) throw new Error('策略与基准序列长度不同');
-  const strategyMetrics = periodMetrics(strategy);
-  const benchmarkMetrics = periodMetrics(benchmark);
-  return {
-    strategyReturn: strategyMetrics.cumulativeReturn,
-    benchmarkReturn: benchmarkMetrics.cumulativeReturn,
-    excessReturn: strategyMetrics.cumulativeReturn - benchmarkMetrics.cumulativeReturn,
-  };
-};
-
 export const monteCarloTradePaths = (
   returns: readonly number[],
   paths: number,

@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Header,
+  Inject,
   Optional,
   Param,
   Post,
@@ -14,12 +15,17 @@ import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { InstrumentService } from './instrument.service.js';
 import { MarketControlService } from './market-control.service.js';
+import { assertProviderControlEnvelope } from './market-provider-input.js';
+import { assertCatalogSyncInput } from './market-catalog-input.js';
 
-@Controller('api/v2/market-data')
+@Controller('api/market-data')
 export class MarketDataController {
   constructor(
+    @Inject(MarketControlService)
     private readonly control: MarketControlService,
+    @Inject(InstrumentService)
     private readonly instruments: InstrumentService,
+    @Inject(DsaClient)
     private readonly dsa: DsaClient,
     @Optional() private readonly catalogReadiness?: CatalogReadinessService,
   ) {}
@@ -30,6 +36,13 @@ export class MarketDataController {
 
   @Get('policy') policy() {
     return this.control.getPolicy();
+  }
+
+  @Get('routes/capabilities')
+  @Header('Cache-Control', 'no-store')
+  routeCapabilities(@Query('contractVersion') contractVersion?: string) {
+    if (contractVersion !== '3') throw new BadRequestException('contractVersion 必须为 3');
+    return this.control.routeCapabilitiesV3();
   }
 
   @Put('policy') applyPolicy(@Body() body: unknown) {
@@ -62,8 +75,11 @@ export class MarketDataController {
     return this.control.testProvider(providerId, body);
   }
 
-  @Post('providers/:providerId/remove') removeProvider(@Param('providerId') providerId: string) {
-    return this.control.removeProvider(providerId);
+  @Post('providers/:providerId/remove') removeProvider(
+    @Param('providerId') providerId: string,
+    @Body() body: unknown,
+  ) {
+    return this.control.removeProvider(providerId, body);
   }
 
   @Post('providers/longbridge/oauth/sessions')
@@ -93,7 +109,8 @@ export class MarketDataController {
 
   @Post('providers/longbridge/oauth/sessions/:sessionId/cancel')
   @Header('Cache-Control', 'no-store')
-  cancelProviderOAuth(@Param('sessionId') sessionId: string) {
+  cancelProviderOAuth(@Param('sessionId') sessionId: string, @Body() body?: unknown) {
+    assertProviderControlEnvelope(body);
     return this.dsa.longbridgeOAuth({ kind: 'cancel', sessionId });
   }
 
@@ -121,7 +138,8 @@ export class MarketDataController {
     return { ...job, ...(await this.readiness().projectSucceededJob(job)) };
   }
 
-  @Post('catalog/sync') async syncCatalog() {
+  @Post('catalog/sync') async syncCatalog(@Body() body?: unknown) {
+    assertCatalogSyncInput(body);
     return this.readiness().triggerAndProject();
   }
 }

@@ -2,17 +2,17 @@ import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
-  baselineReconciliationCandidatesResponseSchemaV2,
-  confirmBaselineReconciliationCommandSchemaV2,
-  ledgerCommandResponseSchemaV2,
-  restoreBaselineReconciliationCommandSchemaV2,
-  type BaselineReconciliationCandidatesResponseV2,
-  type ConfirmBaselineReconciliationCommandV2,
-  type LedgerCommandResponseV2,
-  type LedgerEventV2,
-  type RestoreBaselineReconciliationCommandV2,
-  type VoidBaselineReconciliationCommandV2,
-  voidBaselineReconciliationCommandSchemaV2,
+  baselineReconciliationCandidatesResponseSchema,
+  confirmBaselineReconciliationCommandSchema,
+  ledgerCommandResponseSchema,
+  restoreBaselineReconciliationCommandSchema,
+  type BaselineReconciliationCandidatesResponse,
+  type ConfirmBaselineReconciliationCommand,
+  type LedgerCommandResponse,
+  type LedgerEvent,
+  type RestoreBaselineReconciliationCommand,
+  type VoidBaselineReconciliationCommand,
+  voidBaselineReconciliationCommandSchema,
 } from '@thesis-ledger/schemas';
 import { isEqual } from 'es-toolkit';
 import {
@@ -31,19 +31,19 @@ import {
 import { rebuildLedgerProjection } from './ledger-projection.js';
 
 type ReconciliationPayloadEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   { type: 'BASELINE_RECONCILIATION'; revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE' }
 >;
-type ReconciliationVoidEvent = Extract<LedgerEventV2, { revisionAction: 'VOID' }> & {
+type ReconciliationVoidEvent = Extract<LedgerEvent, { revisionAction: 'VOID' }> & {
   type: 'BASELINE_RECONCILIATION';
 };
 type ReconciliationEvent = ReconciliationPayloadEvent | ReconciliationVoidEvent;
 type BaselinePayloadEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   { type: 'POSITION_BASELINE_OBSERVATION'; revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE' }
 >;
 type ExecutionPayloadEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   {
     type: 'BUY_EXECUTION' | 'SELL_EXECUTION';
     revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE';
@@ -51,7 +51,7 @@ type ExecutionPayloadEvent = Extract<
 >;
 
 type ReconciliationMutation = {
-  event: LedgerEventV2;
+  event: LedgerEvent;
   replay: boolean;
   projectionGeneration?: string;
 };
@@ -63,7 +63,7 @@ const conflict = (message: string, details?: Record<string, unknown>) =>
     ...(details === undefined ? {} : { details }),
   });
 
-const eventCommandFingerprint = (event: LedgerEventV2) => ({
+const eventCommandFingerprint = (event: LedgerEvent) => ({
   accountId: event.accountId,
   type: event.type,
   occurredAt: event.occurredAt,
@@ -77,20 +77,20 @@ const eventCommandFingerprint = (event: LedgerEventV2) => ({
   ...(event.revisionAction === 'VOID' ? {} : { payload: event.payload }),
 });
 
-const isBaselineEvent = (event: LedgerEventV2): event is BaselinePayloadEvent =>
+const isBaselineEvent = (event: LedgerEvent): event is BaselinePayloadEvent =>
   event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID';
 
-const isExecutionEvent = (event: LedgerEventV2): event is ExecutionPayloadEvent =>
+const isExecutionEvent = (event: LedgerEvent): event is ExecutionPayloadEvent =>
   (event.type === 'BUY_EXECUTION' || event.type === 'SELL_EXECUTION') &&
   event.revisionAction !== 'VOID';
 
-const isReconciliationEvent = (event: LedgerEventV2): event is ReconciliationEvent =>
+const isReconciliationEvent = (event: LedgerEvent): event is ReconciliationEvent =>
   event.type === 'BASELINE_RECONCILIATION';
 
-const isReconciliationPayloadEvent = (event: LedgerEventV2): event is ReconciliationPayloadEvent =>
+const isReconciliationPayloadEvent = (event: LedgerEvent): event is ReconciliationPayloadEvent =>
   event.type === 'BASELINE_RECONCILIATION' && event.revisionAction !== 'VOID';
 
-const toEngineInput = (events: readonly LedgerEventV2[]): BaselineReconciliationEngineInput => {
+const toEngineInput = (events: readonly LedgerEvent[]): BaselineReconciliationEngineInput => {
   const baselines: BaselineReconciliationBaseline[] = events
     .filter(isBaselineEvent)
     .map((event) => ({
@@ -167,17 +167,17 @@ const assertExpectedRevision = (
 export class BaselineReconciliationService {
   constructor(private readonly repository: LedgerV2Repository) {}
 
-  async candidates(accountId: string): Promise<BaselineReconciliationCandidatesResponseV2> {
+  async candidates(accountId: string): Promise<BaselineReconciliationCandidatesResponse> {
     const events = await this.repository.readEffectiveEvents(accountId);
     const input = toEngineInput(events);
-    return baselineReconciliationCandidatesResponseSchemaV2.parse({
+    return baselineReconciliationCandidatesResponseSchema.parse({
       accountId,
       ...generateBaselineReconciliationCandidates(input),
     });
   }
 
-  async confirm(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = confirmBaselineReconciliationCommandSchemaV2.parse(rawCommand);
+  async confirm(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = confirmBaselineReconciliationCommandSchema.parse(rawCommand);
     const result = await this.repository.withAccountWrite<ReconciliationMutation>(
       command.accountId,
       async (context) => {
@@ -228,19 +228,19 @@ export class BaselineReconciliationService {
     return this.eventResponse(result.value, result);
   }
 
-  async void(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = voidBaselineReconciliationCommandSchemaV2.parse(rawCommand);
+  async void(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = voidBaselineReconciliationCommandSchema.parse(rawCommand);
     return this.correct(command);
   }
 
-  async restore(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = restoreBaselineReconciliationCommandSchemaV2.parse(rawCommand);
+  async restore(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = restoreBaselineReconciliationCommandSchema.parse(rawCommand);
     return this.correct(command);
   }
 
   private async correct(
-    command: VoidBaselineReconciliationCommandV2 | RestoreBaselineReconciliationCommandV2,
-  ): Promise<LedgerCommandResponseV2> {
+    command: VoidBaselineReconciliationCommand | RestoreBaselineReconciliationCommand,
+  ): Promise<LedgerCommandResponse> {
     const result = await this.repository.withAccountWrite<ReconciliationMutation>(
       command.accountId,
       async (context) => {
@@ -283,13 +283,13 @@ export class BaselineReconciliationService {
   }
 
   private createConfirmationEvent(
-    command: ConfirmBaselineReconciliationCommandV2,
+    command: ConfirmBaselineReconciliationCommand,
     context: AccountLedgerWriteContext,
     baseline: BaselineReconciliationBaseline,
   ): ReconciliationPayloadEvent {
     const recordedAt = new Date().toISOString();
     return {
-      version: 2,
+      version: 3,
       eventId: randomUUID(),
       factId: randomUUID(),
       accountId: command.accountId,
@@ -317,12 +317,12 @@ export class BaselineReconciliationService {
   }
 
   private createVoidEvent(
-    command: VoidBaselineReconciliationCommandV2,
+    command: VoidBaselineReconciliationCommand,
     context: AccountLedgerWriteContext,
     target: ReconciliationEvent,
   ): ReconciliationVoidEvent {
     return {
-      version: 2,
+      version: 3,
       eventId: randomUUID(),
       factId: target.factId,
       accountId: command.accountId,
@@ -343,7 +343,7 @@ export class BaselineReconciliationService {
   }
 
   private async createRestoreEvent(
-    command: RestoreBaselineReconciliationCommandV2,
+    command: RestoreBaselineReconciliationCommand,
     context: AccountLedgerWriteContext,
     target: ReconciliationEvent,
   ): Promise<ReconciliationPayloadEvent> {
@@ -367,7 +367,7 @@ export class BaselineReconciliationService {
     if (duplicateExecutionFactIds.length > 0)
       throw conflict('恢复对账会重复纳入已覆盖成交', { duplicateExecutionFactIds });
     return {
-      version: 2,
+      version: 3,
       eventId: randomUUID(),
       factId: previous.factId,
       accountId: command.accountId,
@@ -391,7 +391,7 @@ export class BaselineReconciliationService {
   private async requireEvent(
     context: AccountLedgerWriteContext,
     eventId: string,
-  ): Promise<LedgerEventV2> {
+  ): Promise<LedgerEvent> {
     const stored = await context.transaction.ledgerEvent.findUnique({ where: { id: eventId } });
     if (!stored || stored.factId === null)
       throw new NotFoundException({
@@ -416,8 +416,8 @@ export class BaselineReconciliationService {
 
   private async findIdempotentReplay(
     context: AccountLedgerWriteContext,
-    desired: LedgerEventV2,
-  ): Promise<{ event: LedgerEventV2; projectionGeneration: string } | undefined> {
+    desired: LedgerEvent,
+  ): Promise<{ event: LedgerEvent; projectionGeneration: string } | undefined> {
     const externalId = desired.source.externalId;
     if (externalId === undefined) return undefined;
     const stored = await context.transaction.ledgerEvent.findUnique({
@@ -450,11 +450,11 @@ export class BaselineReconciliationService {
       ledgerRevision: string;
       projectionGeneration: string;
     },
-  ): LedgerCommandResponseV2 {
+  ): LedgerCommandResponse {
     const eventSymbol = isReconciliationPayloadEvent(mutation.event)
       ? mutation.event.payload.symbol
       : undefined;
-    return ledgerCommandResponseSchemaV2.parse({
+    return ledgerCommandResponseSchema.parse({
       eventIds: [mutation.event.eventId],
       factIds: [mutation.event.factId],
       ledgerRevisions: { [mutation.event.accountId]: result.ledgerRevision },

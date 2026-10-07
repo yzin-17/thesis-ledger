@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import type { LedgerCommandResponseV2, LedgerEventV2 } from '@thesis-ledger/api-client';
+import type { LedgerCommandResponse, LedgerEvent } from '@thesis-ledger/api-client';
+import { LedgerContractFailure, ledgerContractRejected } from './account-data.ledger-contract.js';
 import { useToastManager } from '@/components/ui/toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +29,6 @@ import {
   eventTypeLabel,
   formatDate,
   isExecutionEvent,
-  isLegacyAuditEvent,
   isVoidEvent,
   revisionBadgeVariant,
   revisionLabel,
@@ -54,12 +54,12 @@ export function AuditSheet({
   onRestore,
   onRestoreTransfer,
 }: {
-  target: LedgerEventV2 | null;
+  target: LedgerEvent | null;
   query: ReturnType<typeof useAccountLedgerAuditQuery>;
   snapshotPositions?: Position[] | undefined;
   onOpenChange: (open: boolean) => void;
-  onEditSnapshot?: ((event: LedgerEventV2) => void) | undefined;
-  onRemoveSnapshot?: ((event: LedgerEventV2) => void) | undefined;
+  onEditSnapshot?: ((event: LedgerEvent) => void) | undefined;
+  onRemoveSnapshot?: ((event: LedgerEvent) => void) | undefined;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
@@ -67,13 +67,8 @@ export function AuditSheet({
 }) {
   const events = query.data?.events ?? [];
   const targetFactId = target?.factId;
-  const chain = targetFactId
-    ? events.filter(
-        (event): event is LedgerEventV2 =>
-          !isLegacyAuditEvent(event) && event.factId === targetFactId,
-      )
-    : [];
-  const findSnapshotPosition = (event: LedgerEventV2) =>
+  const chain = targetFactId ? events.filter((event) => event.factId === targetFactId) : [];
+  const findSnapshotPosition = (event: LedgerEvent) =>
     event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID'
       ? snapshotPositions.find(
           (position) =>
@@ -103,7 +98,7 @@ export function AuditSheet({
           onRestore={onRestore}
           onRestoreTransfer={onRestoreTransfer}
         />
-        {query.isError && query.data && (
+        {query.isError && query.data && !ledgerContractRejected(query.error) && (
           <Alert>
             <AlertTitle>审计链可能陈旧</AlertTitle>
             <AlertDescription>当前显示上次成功读取的审计结果。</AlertDescription>
@@ -127,16 +122,18 @@ function AuditResults({
   onRestoreTransfer,
 }: {
   query: ReturnType<typeof useAccountLedgerAuditQuery>;
-  chain: LedgerEventV2[];
+  chain: LedgerEvent[];
   targetEventId: string | undefined;
-  findSnapshotPosition: (event: LedgerEventV2) => Position | undefined;
-  onEditSnapshot?: ((event: LedgerEventV2) => void) | undefined;
-  onRemoveSnapshot?: ((event: LedgerEventV2) => void) | undefined;
+  findSnapshotPosition: (event: LedgerEvent) => Position | undefined;
+  onEditSnapshot?: ((event: LedgerEvent) => void) | undefined;
+  onRemoveSnapshot?: ((event: LedgerEvent) => void) | undefined;
   onCorrect: (event: ExecutionEvent) => void;
   onVoid: (event: ExecutionEvent) => void;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
   onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
 }) {
+  if (query.isError && ledgerContractRejected(query.error))
+    return <LedgerContractFailure onRetry={query.refetch} />;
   if (query.isPending && !query.data) {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
@@ -196,7 +193,7 @@ function AuditResults({
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-1">
-                {isExecutionEvent(event) && event.eventId === targetEventId && (
+                {isExecutionEvent(event) && event.eventId === targetEventId && !childExists && (
                   <>
                     <Button
                       type="button"
@@ -262,8 +259,8 @@ function RestoreAuditAction({
   onRestore,
   onRestoreTransfer,
 }: {
-  event: LedgerEventV2;
-  source: LedgerEventV2 | undefined;
+  event: LedgerEvent;
+  source: LedgerEvent | undefined;
   childExists: boolean;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
   onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
@@ -296,13 +293,15 @@ export function CorrectionReasonSheet({
   restoreSource,
   ledgerRevision,
   onOpenChange,
+  onSaved,
 }: {
   account: Account;
   action: 'void' | 'restore';
-  target: LedgerEventV2 | null;
+  target: LedgerEvent | null;
   restoreSource?: ExecutionEvent;
   ledgerRevision: string;
   onOpenChange: (open: boolean) => void;
+  onSaved?: ((event: ExecutionEvent | VoidEvent) => void) | undefined;
 }) {
   const toastManager = useToastManager();
   const voidMutation = useVoidExecutionMutation(account.mode);
@@ -327,7 +326,7 @@ export function CorrectionReasonSheet({
     }
     const commandId = createClientCommandId();
     try {
-      let response: LedgerCommandResponseV2;
+      let response: LedgerCommandResponse;
       if (action === 'void') {
         if (!isExecutionEvent(target)) {
           setError('当前事实不是可作废的成交。');
@@ -373,6 +372,7 @@ export function CorrectionReasonSheet({
         type: 'success',
         timeout: 2800,
       });
+      onSaved?.(target);
       onOpenChange(false);
     } catch (caught) {
       const conflict = errorCode(caught) === 'LEDGER_REVISION_CONFLICT';

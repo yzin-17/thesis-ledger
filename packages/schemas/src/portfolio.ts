@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { decimalStringSchema, nonNegativeDecimalStringSchema } from './ledger-v2.js';
+import { decimalStringSchema, nonNegativeDecimalStringSchema } from './monetary-values.js';
 
 export const accountTypeSchema = z.enum(['securities', 'fund', 'cash']);
 export const accountModeSchema = z.enum(['actual', 'shadow']);

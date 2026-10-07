@@ -16,7 +16,6 @@ import { fetchImportDrafts, uploadScreenshotImport } from '../src/features/impor
 import { importKeys } from '../src/features/import/import.queries.js';
 import { createAiRun, fetchAiRuns } from '../src/features/ai/ai.api.js';
 import { resolveAiRunsLoadState } from '../src/features/ai/ai.queries.js';
-import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { createJournalReviewActions } from '../src/features/journal/journal.actions.js';
 import { reviewBehavior, reviewSingleTrade } from '../src/features/journal/journal.api.js';
 import type {
@@ -26,16 +25,11 @@ import type {
 } from '../src/features/journal/journal.types.js';
 import {
   cancelBacktest,
-  cancelBacktestV2,
   createStrategy,
   createStrategyVersion,
   fetchBacktestJob,
   fetchBacktestJobs,
-  fetchStrategyBars,
-  queueBacktest,
-  retryBacktestV2,
   runBacktest,
-  runBacktestV2,
 } from '../src/features/strategy/strategy.api.js';
 import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
 import { jobFallbackInterval, shouldPollJobs } from '../src/features/strategy/strategy.queries.js';
@@ -43,12 +37,7 @@ import {
   applyBacktestJobSummaryEvent,
   createBacktestEventConnection,
 } from '../src/features/strategy/strategy.events.js';
-import type {
-  BacktestJob,
-  BacktestJobSummary,
-  QueueBacktestV2Input,
-  StrategyRecord,
-} from '../src/features/strategy/strategy.types.js';
+import type { BacktestJobSummary } from '../src/features/strategy/strategy.types.js';
 import {
   fetchPortfolioValuation,
   saveCashBalance,
@@ -196,7 +185,7 @@ describe('拆分后的领域请求契约', () => {
     await searchPortfolioInstruments('600519', client, controller.signal);
 
     expect(request).toHaveBeenCalledWith(
-      '/api/v2/market-data/instruments/search?q=600519',
+      '/api/market-data/instruments/search?q=600519',
       expect.objectContaining({ signal: controller.signal }),
     );
   });
@@ -303,25 +292,6 @@ describe('AI 与 Journal 行为契约', () => {
       expect.objectContaining({ method: 'POST', body: expect.stringContaining('portfolio') }),
     );
 
-    const strategy = makeClient({ id: 'job-1' });
-    await queueBacktest(
-      {
-        id: 'job-1',
-        strategyVersionId: 'version-1',
-        status: 'queued',
-        period: { start: '2026-01-01', end: '2026-08-23' },
-        dataAsOf: '2026-08-23',
-        warnings: [],
-        strategy: {},
-        bars: [],
-        initialCash: 100_000,
-      },
-      strategy.client,
-    );
-    expect(strategy.request).toHaveBeenCalledWith(
-      '/backtests/jobs',
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 
   it('AI 历史请求失败会向 Query 层传播错误', async () => {
@@ -497,402 +467,14 @@ describe('Strategy 任务行为契约', () => {
     );
     expect(strategy.request).toHaveBeenNthCalledWith(
       2,
-      '/backtests/jobs/job%2F1/run',
+      '/backtests/runs/job%2F1/run',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(strategy.request).toHaveBeenNthCalledWith(
       3,
-      '/backtests/jobs/job%2F1/cancel',
+      '/backtests/runs/job%2F1/cancel',
       expect.objectContaining({ method: 'POST' }),
     );
-  });
-
-  it('Strategy V2 Run 只提交 RunConfig，并使用独立运行生命周期接口', async () => {
-    const client = makeClient({ id: 'run-v2' });
-    const input: QueueBacktestV2Input = {
-      strategyVersionId: 'version-v2',
-      idempotencyKey: 'run-key-1',
-      runConfig: {
-        startDate: '2026-01-01',
-        endDate: '2026-01-31',
-        dataAsOf: '2026-02-01T00:00:00Z',
-        baseCurrency: 'CNY',
-        initialCash: { CNY: '100000' },
-        valuationPolicy: {
-          baseTimezone: 'Asia/Shanghai',
-          dailyValuationTime: '16:00',
-          pricePolicy: 'latestAvailable',
-          fxPolicy: 'latestAvailable',
-        },
-      },
-    };
-
-    await queueBacktest(input, client.client);
-    await runBacktestV2('run/1', client.client);
-    await cancelBacktestV2('run/1', client.client);
-    await retryBacktestV2('run/1', client.client);
-
-    expect(client.request).toHaveBeenNthCalledWith(
-      1,
-      '/backtests/runs',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
-    );
-    expect(JSON.stringify(input)).not.toContain('bars');
-    expect(client.request).toHaveBeenNthCalledWith(
-      2,
-      '/backtests/runs/run%2F1/run',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    expect(client.request).toHaveBeenNthCalledWith(
-      3,
-      '/backtests/runs/run%2F1/cancel',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    expect(client.request).toHaveBeenNthCalledWith(
-      4,
-      '/backtests/runs/run%2F1/retry',
-      expect.objectContaining({ method: 'POST' }),
-    );
-  });
-
-  it('Strategy 回测只使用版本 Schema，按版本号排序并由服务端入队', async () => {
-    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
-    const queueMutation = {
-      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-2' } as BacktestJob),
-    };
-    const runMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-2' } as BacktestJob) };
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: JSON.stringify({ universe: { symbols: ['global-symbol'] } }),
-      busyAction: null,
-      setBusyAction: vi.fn(),
-      toastManager: { add: vi.fn() },
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation,
-      queueMutation,
-      runMutation,
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-    await expect(
-      handlers.queue({
-        id: 'strategy-1',
-        name: 'fixture',
-        versions: [
-          { id: 'version-1', version: 1, schema: { universe: { symbols: ['old-symbol'] } } },
-          { id: 'version-3', version: 3, schema: { universe: { symbols: ['new-symbol'] } } },
-        ],
-      }),
-    ).resolves.toBe(true);
-    expect(fetchBarsMutation.mutateAsync).toHaveBeenCalledWith({
-      symbol: 'new-symbol',
-      period: expect.objectContaining({
-        start: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
-        end: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
-      }),
-    });
-    expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        strategyVersionId: 'version-3',
-        period: {
-          start: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
-          end: expect.stringMatching(/^20\d\d-\d\d-\d\d$/),
-        },
-        initialCash: 100_000,
-        strategy: { universe: { symbols: ['new-symbol'] } },
-      }),
-    );
-    expect(runMutation.mutateAsync).not.toHaveBeenCalled();
-  });
-
-  it('Strategy 入队成功后不再由 Desktop 触发运行接口', async () => {
-    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
-    const queueMutation = {
-      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-background' } as BacktestJob),
-    };
-    const runMutation = { mutateAsync: vi.fn() };
-    const load = vi.fn().mockResolvedValue(undefined);
-    const toastManager = { add: vi.fn() };
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: '{}',
-      busyAction: null,
-      setBusyAction: vi.fn(),
-      toastManager,
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation,
-      queueMutation,
-      runMutation,
-      cancelMutation: { mutateAsync: vi.fn() },
-      load,
-    });
-
-    await expect(
-      handlers.startBacktest(
-        { id: 'version-1', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
-        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
-      ),
-    ).resolves.toBe(true);
-    expect(runMutation.mutateAsync).not.toHaveBeenCalled();
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(toastManager.add).not.toHaveBeenCalledWith(
-      expect.objectContaining({ title: '回测已启动' }),
-    );
-  });
-
-  it('Strategy 行情尚未准备好时也立即返回，准备完成后才入队', async () => {
-    let resolveBars!: (bars: unknown[]) => void;
-    const fetchBarsMutation = {
-      mutateAsync: vi.fn(
-        () =>
-          new Promise<unknown[]>((resolve) => {
-            resolveBars = resolve;
-          }),
-      ),
-    };
-    const queueMutation = {
-      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-after-bars' } as BacktestJob),
-    };
-    const setBusyAction = vi.fn();
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: '{}',
-      busyAction: null,
-      setBusyAction,
-      toastManager: { add: vi.fn() },
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation,
-      queueMutation,
-      runMutation: { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-after-bars' }) },
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-
-    await expect(
-      handlers.startBacktest(
-        { id: 'version-bars', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
-        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
-      ),
-    ).resolves.toBe(true);
-    expect(queueMutation.mutateAsync).not.toHaveBeenCalled();
-
-    resolveBars([{ date: '2026-01-01' }]);
-    await vi.waitFor(() => expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(setBusyAction).toHaveBeenLastCalledWith(null));
-  });
-
-  it('Strategy V2 提交不读取 Desktop bars，且并发双击复用一次提交生命周期', async () => {
-    const fetchBarsMutation = { mutateAsync: vi.fn() };
-    const queueMutation = {
-      mutateAsync: vi.fn().mockResolvedValue({ id: 'run-v2' } as BacktestJob),
-    };
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: '{}',
-      busyAction: null,
-      setBusyAction: vi.fn(),
-      toastManager: { add: vi.fn() },
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation,
-      queueMutation,
-      runMutation: { mutateAsync: vi.fn() },
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-    const version = {
-      id: 'version-v2',
-      version: 2,
-      schema: {
-        schemaVersion: '2',
-        executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
-      },
-    };
-    const setup = {
-      period: { start: '2026-01-01', end: '2026-01-31' },
-      initialCash: 100_000,
-      dataAsOf: '2026-02-01T00:00:00Z',
-    };
-
-    const firstSubmit = handlers.startBacktest(version, setup);
-    const duplicateSubmit = handlers.startBacktest(version, setup);
-    await expect(firstSubmit).resolves.toBe(true);
-    await expect(duplicateSubmit).resolves.toBe(false);
-    await vi.waitFor(() => expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1));
-    expect(fetchBarsMutation.mutateAsync).not.toHaveBeenCalled();
-    expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        strategyVersionId: 'version-v2',
-        idempotencyKey: expect.any(String),
-        runConfig: expect.objectContaining({ initialCash: { CNY: '100000' } }),
-      }),
-    );
-  });
-
-  it('后台行情失败或为空时反馈错误并释放 busy，不产生未处理拒绝', async () => {
-    const setBusyAction = vi.fn();
-    const toastManager = { add: vi.fn() };
-    const queueMutation = { mutateAsync: vi.fn() };
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: '{}',
-      busyAction: null,
-      setBusyAction,
-      toastManager,
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation: { mutateAsync: vi.fn().mockRejectedValue(new Error('bars unavailable')) },
-      queueMutation,
-      runMutation: { mutateAsync: vi.fn() },
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-
-    await expect(
-      handlers.startBacktest(
-        { id: 'version-failed-bars', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
-        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
-      ),
-    ).resolves.toBe(true);
-    await vi.waitFor(() =>
-      expect(toastManager.add).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '回测排队失败' }),
-      ),
-    );
-    expect(queueMutation.mutateAsync).not.toHaveBeenCalled();
-    expect(setBusyAction).toHaveBeenLastCalledWith(null);
-  });
-
-  it('Strategy 服务端入队后不依赖运行接口，资金和日期无效时不请求 bars', async () => {
-    const setBusyAction = vi.fn();
-    const fetchBarsMutation = { mutateAsync: vi.fn().mockResolvedValue([{ date: '2026-01-01' }]) };
-    const queueMutation = {
-      mutateAsync: vi.fn().mockResolvedValue({ id: 'job-3' } as BacktestJob),
-    };
-    const toastManager = { add: vi.fn() };
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: '{}',
-      busyAction: null,
-      setBusyAction,
-      toastManager,
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation,
-      queueMutation,
-      runMutation: { mutateAsync: vi.fn().mockRejectedValue(new Error('worker unavailable')) },
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-    await expect(
-      handlers.startBacktest(
-        { id: 'version-1', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
-        { period: { start: '2026-02-01', end: '2026-01-01' }, initialCash: 0 },
-      ),
-    ).resolves.toBe(false);
-    expect(fetchBarsMutation.mutateAsync).not.toHaveBeenCalled();
-    await expect(
-      handlers.startBacktest(
-        { id: 'version-1', version: 1, schema: { universe: { symbols: ['600519.SH'] } } },
-        { period: { start: '2026-01-01', end: '2026-01-31' }, initialCash: 100_000 },
-      ),
-    ).resolves.toBe(true);
-    expect(queueMutation.mutateAsync).toHaveBeenCalledTimes(1);
-    expect(toastManager.add).toHaveBeenCalledWith(expect.objectContaining({ title: '回测已排队' }));
-    expect(setBusyAction).toHaveBeenLastCalledWith(null);
-  });
-
-  it('Strategy bars 网络异常不会继续排队，HTTP 错误仍回退为空 bars', async () => {
-    const networkRequest = vi.fn().mockRejectedValue(new Error('network down'));
-    const networkClient = { request: networkRequest } as unknown as DesktopRequestClient;
-    const input = {
-      symbol: '600519',
-      period: { start: '2026-01-01', end: '2026-01-31' },
-    };
-    await expect(fetchStrategyBars(input, networkClient)).rejects.toThrow('network down');
-
-    const httpRequest = vi.fn().mockRejectedValue(new ThesisLedgerApiError(503, null));
-    const httpClient = { request: httpRequest } as unknown as DesktopRequestClient;
-    await expect(fetchStrategyBars(input, httpClient)).resolves.toEqual([]);
-
-    const queueMutation = { mutateAsync: vi.fn().mockResolvedValue({} as BacktestJob) };
-    const handlers = createStrategyActionHandlers({
-      name: 'fixture',
-      schemaText: JSON.stringify({ universe: { symbols: ['600519'] } }),
-      busyAction: null,
-      setBusyAction: vi.fn(),
-      toastManager: { add: vi.fn() },
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation: { mutateAsync: vi.fn().mockRejectedValue(new Error('network down')) },
-      queueMutation,
-      runMutation: { mutateAsync: vi.fn() },
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-    const strategy = { id: 'strategy-1', versions: [{ id: 'version-1' }] } as StrategyRecord;
-    await handlers.queue(strategy);
-    expect(queueMutation.mutateAsync).not.toHaveBeenCalled();
-  });
-
-  it('Strategy 行情请求携带用户选择的回测区间', async () => {
-    const request = vi.fn().mockResolvedValue({
-      contractVersion: 2,
-      identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'none' },
-      points: [{
-        timestamp: '2025-09-08T00:00:00+00:00',
-        open: 4.43,
-        high: 4.45,
-        low: 4.4,
-        close: 4.44,
-        volume: 1_000,
-        amount: 4_440,
-        completionStatus: 'complete',
-        availableAt: '2025-09-08T08:00:00+00:00',
-      }],
-      coverage: {
-        actualStart: '2025-09-08T00:00:00+00:00',
-        actualEnd: '2025-09-08T00:00:00+00:00',
-        hasMoreBefore: false,
-        latestCompleteTradingDate: '2025-09-08',
-      },
-      provenance: {
-        providerId: 'akshare',
-        upstreamSource: 'eastmoney',
-        routeIndex: 1,
-        effectivePolicyRevision: 2,
-        providerRevision: 'akshare:2',
-        fetchedAt: '2026-09-08T00:00:00Z',
-        servedFromCache: false,
-        freshUntil: '2026-09-15T00:00:00Z',
-        cacheStatus: 'miss',
-      },
-      inputFingerprint: 'strategy-bars-v2',
-    });
-    const client = { request } as unknown as DesktopRequestClient;
-
-    const bars = await fetchStrategyBars(
-      {
-        symbol: '510300.SH',
-        period: { start: '2025-09-08', end: '2026-09-08' },
-      },
-      client,
-    );
-
-    expect(request).toHaveBeenCalledWith(
-      expect.stringContaining(
-        '/api/v2/market/510300.SH/bars?timeframe=1d&start=2025-09-08&end=2026-09-08&limit=365',
-      ),
-      expect.objectContaining({ cache: 'no-store' }),
-    );
-    expect(bars).toEqual([
-      {
-        symbol: '510300.SH',
-        date: '2025-09-08',
-        availableAt: '2025-09-08T08:00:00+00:00',
-        open: 4.43,
-        high: 4.45,
-        low: 4.4,
-        close: 4.44,
-        volume: 1_000,
-      },
-    ]);
   });
 
   it('Strategy 任务取消调用 Mutation、刷新列表并清理 busy 状态', async () => {
@@ -933,20 +515,28 @@ describe('Strategy 任务行为契约', () => {
   it('Strategy 摘要与详情使用分离接口，SSE 更新按任务 id 合并缓存', async () => {
     const summaryClient = makeClient([]);
     await fetchBacktestJobs(summaryClient.client);
-    expect(summaryClient.request).toHaveBeenCalledWith('/backtests/jobs/summary', undefined);
+    expect(summaryClient.request).toHaveBeenCalledWith('/backtests/runs', undefined);
 
     const detailClient = makeClient({ id: 'job/1' });
     await fetchBacktestJob('job/1', detailClient.client);
-    expect(detailClient.request).toHaveBeenCalledWith('/backtests/jobs/job%2F1', undefined);
+    expect(detailClient.request).toHaveBeenCalledWith('/backtests/runs/job%2F1', undefined);
 
     const existing = [{ id: 'job-1', status: 'queued' }] as BacktestJobSummary[];
     expect(
       applyBacktestJobSummaryEvent(existing, {
         id: 'job-1',
+        mode: 'V3',
         strategyVersionId: 'version-1',
         status: 'running',
       }),
-    ).toEqual([{ id: 'job-1', strategyVersionId: 'version-1', status: 'running' }]);
+    ).toEqual([{ id: 'job-1', mode: 'V3', strategyVersionId: 'version-1', status: 'running' }]);
+    expect(
+      applyBacktestJobSummaryEvent(existing, {
+        id: 'old-job',
+        strategyVersionId: 'version-1',
+        status: 'running',
+      }),
+    ).toBe(existing);
   });
 
   it('Strategy 多个订阅者共享一个 SSE 连接并在最后退订时关闭', () => {
@@ -981,55 +571,5 @@ describe('Strategy 任务行为契约', () => {
     expect(source.close).toHaveBeenCalledOnce();
   });
 
-  it('Strategy 回测使用版本数据截止时间并透传基准行情', async () => {
-    const fetchBarsMutation = {
-      mutateAsync: vi
-        .fn()
-        .mockImplementation(async (input: { symbol: string }) => [
-          { symbol: input.symbol, date: '2025-01-01' },
-        ]),
-    };
-    const queueMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-4' }) };
-    const runMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'job-4' }) };
-    const handlers = createStrategyActionHandlers({
-      name: '',
-      schemaText: '{}',
-      busyAction: null,
-      setBusyAction: vi.fn(),
-      toastManager: { add: vi.fn() },
-      createMutation: { mutateAsync: vi.fn() },
-      fetchBarsMutation,
-      queueMutation,
-      runMutation,
-      cancelMutation: { mutateAsync: vi.fn() },
-      load: vi.fn().mockResolvedValue(undefined),
-    });
-    await expect(
-      handlers.startBacktest(
-        {
-          id: 'version-4',
-          version: 4,
-          schema: {
-            universe: { symbols: ['A'], asOf: '2025-01-01T00:00:00Z' },
-            benchmark: 'B',
-          },
-        },
-        { period: { start: '2025-01-01', end: '2025-01-02' }, initialCash: 1000 },
-      ),
-    ).resolves.toBe(true);
-    expect(fetchBarsMutation.mutateAsync).toHaveBeenNthCalledWith(1, {
-      symbol: 'A',
-      period: { start: '2025-01-01', end: '2025-01-02' },
-    });
-    expect(fetchBarsMutation.mutateAsync).toHaveBeenNthCalledWith(2, {
-      symbol: 'B',
-      period: { start: '2025-01-01', end: '2025-01-02' },
-    });
-    expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dataAsOf: '2025-01-01T00:00:00Z',
-        benchmarkBars: [{ symbol: 'B', date: '2025-01-01' }],
-      }),
-    );
-  });
+
 });

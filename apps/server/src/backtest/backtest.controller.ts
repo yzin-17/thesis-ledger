@@ -29,11 +29,6 @@ export class BacktestController {
     return this.backtests.createVersion(id, createVersionHttpSchema.parse(input).schema);
   }
 
-  @Post('jobs')
-  queue(@Body() body: unknown) {
-    return this.backtests.queue(body);
-  }
-
   @Post('runs')
   createRun(@Body() body: unknown) {
     return this.backtests.createRun(body).then(withBacktestModelDisclosure);
@@ -41,52 +36,32 @@ export class BacktestController {
 
   @Post('runs/:id/cancel')
   cancelRun(@Param('id') id: string) {
-    return this.backtests.cancelForRead(id);
+    return this.backtests.cancelCurrentRunForRead(id);
   }
 
   @Post('runs/:id/retry')
   retryRun(@Param('id') id: string) {
-    return this.backtests.retryRunForRead(id);
+    return this.backtests.retryCurrentRunForRead(id);
   }
 
   @Post('runs/:id/run')
-  runV2(@Param('id') id: string) {
-    return this.backtests.runV2ForRead(id);
+  runCurrent(@Param('id') id: string) {
+    return this.backtests.runCurrentRunForRead(id);
+  }
+
+  @Get('runs')
+  runs() {
+    return this.backtests.listCurrentRunSummaries();
   }
 
   @Get('runs/:id')
   runStatus(@Param('id') id: string) {
-    return this.backtests.statusForRead(id).then(withBacktestModelDisclosure);
-  }
-
-  @Post('jobs/:id/cancel')
-  cancel(@Param('id') id: string) {
-    return this.backtests.cancelForRead(id);
-  }
-
-  @Post('jobs/:id/run')
-  run(@Param('id') id: string) {
-    return this.backtests.runForRead(id);
-  }
-
-  @Get('jobs')
-  jobs() {
-    return this.backtests.listJobs();
-  }
-
-  @Get('jobs/summary')
-  jobSummaries() {
-    return this.backtests.listJobSummaries();
+    return this.backtests.currentRunForRead(id).then(withBacktestModelDisclosure);
   }
 
   @Sse('events')
   events() {
     return this.jobEvents.stream();
-  }
-
-  @Get('jobs/:id')
-  status(@Param('id') id: string) {
-    return this.backtests.statusForRead(id).then(withBacktestModelDisclosure);
   }
 
   @Get('strategies')

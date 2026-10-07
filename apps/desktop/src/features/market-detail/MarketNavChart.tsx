@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FundNavHistoryV1 } from '@thesis-ledger/schemas';
+import type { FundNavHistory } from '@thesis-ledger/schemas';
 import { CrosshairMode, LineSeries, createChart } from 'lightweight-charts';
 import { Button } from '@/components/ui/button';
 import { MarketChartAttribution } from './MarketChartAttribution.js';
@@ -21,7 +21,7 @@ export const navChartLayoutOptions = {
   attributionLogo: false,
 } as const;
 
-export const navRangeAvailability = (history: FundNavHistoryV1, months: number) => {
+export const navRangeAvailability = (history: FundNavHistory, months: number) => {
   const earliest = history[0];
   const latest = history.at(-1);
   if (!earliest || !latest) {
@@ -38,7 +38,7 @@ export const navRangeAvailability = (history: FundNavHistoryV1, months: number) 
   };
 };
 
-export function FundNavHistoryChart({ history }: { history: FundNavHistoryV1 }) {
+export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
   const containerRef = useRef<HTMLDivElement>(null);
   type ChartApi = ReturnType<typeof createChart>;
   type TimeScaleApi = ReturnType<ChartApi['timeScale']>;
@@ -220,7 +220,8 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistoryV1 }) 
             key={range.months}
             type="button"
             size="sm"
-            variant={rangeMonths === range.months ? 'secondary' : 'ghost'}
+            // 与用途切换同一套语义：未选中弱化为次要文字，选中用底色 + 主文字色，由 aria-pressed 驱动。
+            variant="tab"
             aria-pressed={rangeMonths === range.months}
             disabled={!range.available}
             title={range.title}

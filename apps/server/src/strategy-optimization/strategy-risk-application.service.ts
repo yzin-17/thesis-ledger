@@ -8,7 +8,6 @@ import {
 import { Prisma } from '@prisma/client';
 import {
   canonicalStrategyMonitoringJson,
-  compileStrategyMonitoringPlan,
   evaluateStrategyMonitoringPlan,
   type StrategyMonitoringEvaluation,
   type StrategyMonitoringPlan,
@@ -20,8 +19,7 @@ import {
   riskApplicationPreviewInputSchema,
   riskApplicationUpdateSchema,
   riskApplicationUpgradeSchema,
-  strategySchemaV2,
-  type StrategySchemaV2,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RiskService } from '../risk/risk.service.js';
@@ -35,6 +33,7 @@ import type {
   StrategyRiskApplicationResolution,
 } from './strategy-risk-application.types.js';
 import { StrategyRiskContextService } from './strategy-risk-context.service.js';
+import { compileRiskApplicationPlan, validatedRiskStrategy } from './strategy-risk-plan.js';
 
 type StrategyVersionRecord = {
   id: string;
@@ -92,14 +91,12 @@ export class StrategyRiskApplicationService {
 
   private async strategyVersion(
     id: string,
-  ): Promise<StrategyVersionRecord & { strategy: StrategySchemaV2 }> {
+  ): Promise<StrategyVersionRecord & { strategy: BacktestStrategy }> {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (version.schemaVersion !== 2 || version.version <= 0)
-      throw new BadRequestException('风险应用只能来源于正式 V2 策略版本');
     return {
       ...version,
-      strategy: strategySchemaV2.parse(version.schema) as StrategySchemaV2,
+      strategy: validatedRiskStrategy(version.schema, version.schemaVersion, version.version),
     };
   }
 
@@ -113,9 +110,7 @@ export class StrategyRiskApplicationService {
 
   async monitoringPlan(strategyVersionId: string) {
     const version = await this.strategyVersion(strategyVersionId);
-    const strategyHash = sha256(version.strategy);
-    const plan = compileStrategyMonitoringPlan(version.strategy, strategyHash, strategyVersionId);
-    return { ...plan, planHash: sha256({ ...plan, planHash: undefined }) };
+    return compileRiskApplicationPlan(version.strategy, strategyVersionId);
   }
 
   private previewHash(input: {

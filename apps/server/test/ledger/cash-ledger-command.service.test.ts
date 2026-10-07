@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { LedgerEventV2 } from '@thesis-ledger/schemas';
+import type { LedgerEvent } from '@thesis-ledger/schemas';
 import { CashLedgerCommandService } from '../../src/ledger/cash-ledger-command.service.js';
 import { projectCashBalances, type StoredCashEvent } from '../../src/ledger/cash-projection.js';
 import type {
@@ -15,7 +15,7 @@ vi.mock('../../src/ledger/ledger-projection.js', () => ({
 const cashAccount = '11111111-1111-4111-8111-111111111111';
 const investmentAccount = '22222222-2222-4222-8222-222222222222';
 
-const storedFromEvent = (event: LedgerEventV2) => ({
+const storedFromEvent = (event: LedgerEvent) => ({
   id: event.eventId,
   accountId: event.accountId,
   type: event.type,
@@ -28,6 +28,7 @@ const storedFromEvent = (event: LedgerEventV2) => ({
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
   projectionGeneration: BigInt(event.ledgerRevision),
+  envelopeVersion: 3,
   payloadVersion: event.payloadVersion,
   payload: event.revisionAction === 'VOID' ? null : event.payload,
   sourceCategory: event.source.category,
@@ -41,7 +42,7 @@ const storedFromEvent = (event: LedgerEventV2) => ({
 });
 
 class InMemoryCashRepository {
-  readonly events: LedgerEventV2[] = [];
+  readonly events: LedgerEvent[] = [];
   readonly revisions = new Map([
     [cashAccount, 0n],
     [investmentAccount, 0n],
@@ -112,7 +113,7 @@ class InMemoryCashRepository {
     }
   }
 
-  async appendRevision(context: AccountLedgerWriteContext, event: LedgerEventV2) {
+  async appendRevision(context: AccountLedgerWriteContext, event: LedgerEvent) {
     if (this.failAppendForAccount === context.accountId) throw new Error('append failed');
     this.events.push(event);
     return event;
@@ -125,7 +126,7 @@ class InMemoryCashRepository {
   private context(accountId: string): AccountLedgerWriteContext {
     const ledgerEvent = {
       findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        let event: LedgerEventV2 | undefined;
+        let event: LedgerEvent | undefined;
         if (typeof where.id === 'string')
           event = this.events.find((candidate) => candidate.eventId === where.id);
         else if (typeof where.supersedesEventId === 'string')

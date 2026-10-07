@@ -15,7 +15,23 @@ import type { ProviderManifest } from '../src/features/market-data/market-data.t
 import { safeOAuthUrl } from '../src/features/market-data/provider-oauth.api.js';
 
 const request = vi.hoisted(() => vi.fn().mockResolvedValue({}));
-vi.mock('../src/shared/api/client.js', () => ({ getDesktopApiClient: () => ({ request }) }));
+vi.mock('../src/shared/api/client.js', () => ({
+  getDesktopApiClient: () => ({
+    market: {
+      configureProvider: (id: string, input: unknown) =>
+        request(`/api/market-data/providers/${id}/config`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      testProvider: (id: string, input: unknown, signal: AbortSignal) =>
+        request(`/api/market-data/providers/${id}/test`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+          signal,
+        }),
+    },
+  }),
+}));
 
 const provider: ProviderManifest = {
   providerId: 'longbridge',
@@ -89,7 +105,7 @@ describe('页面凭证配置', () => {
     const controller = new AbortController();
     const draft = { method: 'legacy', values: { appKey: 'draft-only' } };
     await testMarketProvider(provider, draft, controller.signal);
-    expect(request).toHaveBeenLastCalledWith('/api/v2/market-data/providers/longbridge/test', {
+    expect(request).toHaveBeenLastCalledWith('/api/market-data/providers/longbridge/test', {
       method: 'POST',
       body: JSON.stringify({ credentials: draft }),
       signal: controller.signal,
@@ -145,12 +161,12 @@ describe('页面凭证配置', () => {
       values: { appKey: 'a', appSecret: 'b', accessToken: 'c' },
     };
     await saveMarketProviderCredentials('longbridge', credentials);
-    expect(request).toHaveBeenLastCalledWith('/api/v2/market-data/providers/longbridge/config', {
+    expect(request).toHaveBeenLastCalledWith('/api/market-data/providers/longbridge/config', {
       method: 'POST',
       body: JSON.stringify({ credentials }),
     });
     await clearMarketProviderCredential(provider);
-    expect(request).toHaveBeenLastCalledWith('/api/v2/market-data/providers/longbridge/config', {
+    expect(request).toHaveBeenLastCalledWith('/api/market-data/providers/longbridge/config', {
       method: 'POST',
       body: JSON.stringify({ clearCredentials: true }),
     });

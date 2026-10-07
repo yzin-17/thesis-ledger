@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  ledgerAuditResponseSchemaV2,
-  ledgerEventsResponseSchemaV2,
-  ledgerReplayResponseSchemaV2,
-  type LedgerAuditResponseV2,
-  type LedgerEventsResponseV2,
-  type LedgerReplayResponseV2,
+  ledgerAuditResponseSchema,
+  ledgerEventsResponseSchema,
+  ledgerReplayResponseSchema,
+  type LedgerAuditResponse,
+  type LedgerEventsResponse,
+  type LedgerReplayResponse,
 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -82,13 +82,13 @@ export class LedgerQueryService {
     private readonly instrumentDirectory: InstrumentDirectoryService,
   ) {}
 
-  async effectiveEvents(accountId: string, asOfRevision?: string): Promise<LedgerEventsResponseV2> {
+  async effectiveEvents(accountId: string, asOfRevision?: string): Promise<LedgerEventsResponse> {
     const asOf = assertRevision(asOfRevision);
     await this.requireAccount(accountId);
     const events = sortEffectiveEvents(await this.repository.readEffectiveEvents(accountId, asOf));
     const state = await this.readState(accountId);
     const directory = await this.resolveInstrumentDirectory(events);
-    return ledgerEventsResponseSchemaV2.parse({
+    return ledgerEventsResponseSchema.parse({
       accountId,
       ledgerRevision: state.ledgerRevision,
       projectionGeneration: state.projectionGeneration,
@@ -99,7 +99,7 @@ export class LedgerQueryService {
     });
   }
 
-  async auditEvents(accountId: string, asOfRevision?: string): Promise<LedgerAuditResponseV2> {
+  async auditEvents(accountId: string, asOfRevision?: string): Promise<LedgerAuditResponse> {
     const requestedRevision = assertRevision(asOfRevision);
     await this.requireAccount(accountId);
     const state = await this.readState(accountId);
@@ -115,7 +115,7 @@ export class LedgerQueryService {
     })) as StoredLedgerEvent[];
     const events = stored.map(toLedgerEventV2);
     const directory = await this.resolveInstrumentDirectory(events);
-    return ledgerAuditResponseSchemaV2.parse({
+    return ledgerAuditResponseSchema.parse({
       accountId,
       asOfLedgerRevision: asOf,
       ledgerRevision: state.ledgerRevision,
@@ -126,11 +126,11 @@ export class LedgerQueryService {
     });
   }
 
-  async replay(accountId: string, asOfRevision: string): Promise<LedgerReplayResponseV2> {
+  async replay(accountId: string, asOfRevision: string): Promise<LedgerReplayResponse> {
     const asOf = assertRevision(asOfRevision);
     if (asOf === undefined) throw new BadRequestException('审计重放必须提供 Ledger Revision');
     const effective = await this.effectiveEvents(accountId, asOf);
-    return ledgerReplayResponseSchemaV2.parse({
+    return ledgerReplayResponseSchema.parse({
       accountId: effective.accountId,
       ledgerRevision: effective.ledgerRevision,
       projectionGeneration: effective.projectionGeneration,

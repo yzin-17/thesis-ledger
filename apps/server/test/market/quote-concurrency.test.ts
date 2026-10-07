@@ -4,7 +4,7 @@ import { MarketService } from '../../src/market/market.service.js';
 import { StructuredLogger } from '../../src/platform/structured-logger.js';
 
 const quote = {
-  version: 1,
+  version: 3,
   symbol: '600519.SH',
   open: 10,
   high: 11,
@@ -78,6 +78,54 @@ const createDsa = (implementation: () => Promise<unknown>) => ({
 });
 
 describe('Quote 分布式锁并发保护', () => {
+  it.each([
+    ['600519.SH', 'a-share-prices-snapshot'],
+    ['510300.SH', 'fund-market-snapshot'],
+  ])('HiThink %s 未知来源时点经 DSA 与 fresh 缓存保持可空', async (symbol, upstreamSource) => {
+    const redis = createSharedRedis();
+    const dsa = createDsa(async () => ({
+      ...quote,
+      symbol,
+      provider: 'hithink',
+      upstreamSource,
+      marketTime: null,
+      fetchedAt: '2026-09-29T01:00:00Z',
+      freshness: 'unknown',
+      units: {
+        priceCurrency: 'CNY',
+        volume: symbol === '600519.SH' ? 'share' : 'unknown',
+        turnoverCurrency: symbol === '600519.SH' ? 'CNY' : 'unknown',
+      },
+    }));
+    const service = new MarketService(dsa as never, redis as never);
+    const first = await service.getQuote(symbol);
+    const cached = await service.getQuote(symbol);
+
+    expect(dsa.get).toHaveBeenCalledWith(
+      `/api/v3/thesis-ledger/market/quote?symbol=${symbol}`,
+      1,
+    );
+    expect(dsa.get).toHaveBeenCalledTimes(1);
+    expect(first).toMatchObject({
+      symbol, provider: 'hithink', upstreamSource,
+      marketTime: null, freshness: 'unknown', servedFromCache: false,
+      units: { volume: symbol === '600519.SH' ? 'share' : 'unknown' },
+    });
+    expect(cached).toMatchObject({
+      symbol, provider: 'hithink', upstreamSource,
+      marketTime: null, freshness: 'unknown', servedFromCache: true,
+      units: { volume: symbol === '600519.SH' ? 'share' : 'unknown' },
+    });
+    redis.values.delete(`thesis-ledger:cache:v1:quote:3:${symbol}:fresh`);
+    dsa.get.mockRejectedValueOnce(new DsaError('报价暂不可用', 'unavailable'));
+    const stale = await service.getQuote(symbol, { refresh: true });
+    expect(stale).toMatchObject({
+      symbol, provider: 'hithink', upstreamSource,
+      marketTime: null, freshness: 'stale', stale: true, servedFromCache: true,
+      units: { volume: symbol === '600519.SH' ? 'share' : 'unknown' },
+    });
+  });
+
   it('共享 Redis 时只允许一个 DSA 请求，waiter 重读 fresh 且租约随 timeout 派生', async () => {
     const redis = createSharedRedis();
     const dsa = createDsa(async () => {
@@ -93,7 +141,7 @@ describe('Quote 分布式锁并发保护', () => {
     const [ownerResult, waiterResult] = await Promise.all([owner, waiter]);
 
     expect(dsa.get).toHaveBeenCalledTimes(1);
-    expect(dsa.get).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/quote?symbol=600519.SH', 1);
+    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/quote?symbol=600519.SH', 1);
     expect(redis.ttl).toBe(12_000);
     expect(ownerResult.servedFromCache).toBe(false);
     expect(waiterResult).toMatchObject({ servedFromCache: true, stale: false, freshness: 'live' });
@@ -132,7 +180,7 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('owner 失败时 waiter 只读 last-valid，且不会再次调用 DSA', async () => {
     const redis = createSharedRedis();
-    const lastValidKey = 'thesis-ledger:cache:v1:quote:600519.SH:last-valid';
+    const lastValidKey = 'thesis-ledger:cache:v1:quote:3:600519.SH:last-valid';
     redis.values.set(lastValidKey, JSON.stringify(quote));
     const dsa = createDsa(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -207,7 +255,7 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('锁设施异常时只返回 last-valid，不以异常扩大为 DSA 请求', async () => {
     const values = new Map([
-      ['thesis-ledger:cache:v1:quote:600519.SH:last-valid', JSON.stringify(quote)],
+      ['thesis-ledger:cache:v1:quote:3:600519.SH:last-valid', JSON.stringify(quote)],
     ]);
     const dsa = createDsa(async () => quote);
     const redis = {
@@ -230,7 +278,7 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('Redis client 缺少 set 时 fail-closed，只返回 last-valid 且不调用 DSA', async () => {
     const values = new Map([
-      ['thesis-ledger:cache:v1:quote:600519.SH:last-valid', JSON.stringify(quote)],
+      ['thesis-ledger:cache:v1:quote:3:600519.SH:last-valid', JSON.stringify(quote)],
     ]);
     const dsa = createDsa(async () => quote);
     const redis = {
@@ -250,8 +298,8 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('fresh 缓存损坏时继续尝试 last-valid，且不触发 DSA', async () => {
     const redis = createSharedRedis();
-    redis.values.set('thesis-ledger:cache:v1:quote:600519.SH:fresh', '{broken-json');
-    redis.values.set('thesis-ledger:cache:v1:quote:600519.SH:last-valid', JSON.stringify(quote));
+    redis.values.set('thesis-ledger:cache:v1:quote:3:600519.SH:fresh', '{broken-json');
+    redis.values.set('thesis-ledger:cache:v1:quote:3:600519.SH:last-valid', JSON.stringify(quote));
     const dsa = createDsa(async () => quote);
     const logs: Array<Record<string, unknown>> = [];
     const logger = vi

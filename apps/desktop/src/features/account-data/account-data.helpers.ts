@@ -1,7 +1,7 @@
 import type {
   InstrumentDirectory,
-  LedgerCommandResponseV2,
-  LedgerEventV2,
+  LedgerCommandResponse,
+  LedgerEvent,
 } from '@thesis-ledger/api-client';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 
@@ -12,7 +12,6 @@ import type {
   Currency,
   ExecutionEvent,
   ExecutionDraft,
-  LedgerAuditEvent,
   TimePrecision,
   VoidEvent,
 } from './account-data.types.js';
@@ -36,16 +35,12 @@ export const transactionFilters: Array<{ value: AccountDataEventFilter; label: s
   { value: 'all', label: '全部事件' },
 ];
 
-export const isExecutionEvent = (event: LedgerEventV2): event is ExecutionEvent =>
+export const isExecutionEvent = (event: LedgerEvent): event is ExecutionEvent =>
   event.revisionAction !== 'VOID' &&
   (event.type === 'BUY_EXECUTION' || event.type === 'SELL_EXECUTION');
 
-export const isVoidEvent = (event: LedgerEventV2): event is VoidEvent =>
+export const isVoidEvent = (event: LedgerEvent): event is VoidEvent =>
   event.revisionAction === 'VOID';
-
-export const isLegacyAuditEvent = (
-  event: LedgerAuditEvent,
-): event is Extract<LedgerAuditEvent, { version: 1 }> => event.version === 1;
 
 export const isCurrency = (value: string | null): value is Currency =>
   value === 'CNY' || value === 'HKD' || value === 'USD';
@@ -109,7 +104,7 @@ export const cashFlowCategoryLabel = (category: string) => {
   return '现金流';
 };
 
-export const eventTypeLabel = (event: LedgerEventV2) => {
+export const eventTypeLabel = (event: LedgerEvent) => {
   if (event.type === 'BUY_EXECUTION') return '买入成交';
   if (event.type === 'SELL_EXECUTION') return '卖出成交';
   if (event.type === 'POSITION_BASELINE_OBSERVATION') return '持仓快照';
@@ -123,13 +118,13 @@ export const eventTypeLabel = (event: LedgerEventV2) => {
   return '现金流';
 };
 
-export const revisionLabel = (event: LedgerEventV2) => {
+export const revisionLabel = (event: LedgerEvent) => {
   if (event.revisionAction === 'REPLACE') return '已更正';
   if (event.revisionAction === 'RESTORE') return '已恢复';
   return '当前有效';
 };
 
-export const revisionBadgeVariant = (event: LedgerEventV2): 'default' | 'secondary' | 'outline' => {
+export const revisionBadgeVariant = (event: LedgerEvent): 'default' | 'secondary' | 'outline' => {
   if (event.revisionAction === 'REPLACE') return 'secondary';
   if (event.revisionAction === 'RESTORE') return 'default';
   return 'outline';
@@ -145,7 +140,7 @@ export const instrumentNameLookup = (directory: InstrumentDirectory | undefined)
   return (symbol: string) => nameBySymbol.get(symbol.trim().toUpperCase());
 };
 
-export const eventSymbol = (event: LedgerEventV2): string | null => {
+export const eventSymbol = (event: LedgerEvent): string | null => {
   if (event.revisionAction === 'VOID') return null;
   switch (event.type) {
     case 'BUY_EXECUTION':
@@ -163,7 +158,7 @@ export const eventSymbol = (event: LedgerEventV2): string | null => {
   }
 };
 
-export const eventSubjectDetail = (event: LedgerEventV2): string | null => {
+export const eventSubjectDetail = (event: LedgerEvent): string | null => {
   if (event.revisionAction === 'VOID') return null;
   switch (event.type) {
     case 'POSITION_BASELINE_OBSERVATION': {
@@ -216,7 +211,7 @@ const multiplyDecimalStrings = (left: string, right: string) => {
   return fraction ? `${sign}${integer}.${fraction}` : `${sign}${integer}`;
 };
 
-export const transactionAmount = (event: LedgerEventV2, execution: ExecutionEvent | null) => {
+export const transactionAmount = (event: LedgerEvent, execution: ExecutionEvent | null) => {
   if (execution) {
     try {
       const gross = multiplyDecimalStrings(execution.payload.quantity, execution.payload.price);
@@ -296,7 +291,7 @@ export const errorMessage = (error: unknown, fallback: string) => {
 export const errorCode = (error: unknown) =>
   error instanceof ThesisLedgerApiError ? error.payload?.errorCode : undefined;
 
-export const commandFeedback = (response: LedgerCommandResponseV2, action: string) =>
+export const commandFeedback = (response: LedgerCommandResponse, action: string) =>
   response.idempotentReplay ? `${action}已存在，未重复写入` : `${action}已写入账本`;
 
 export const executionSubmitLabel = (submitting: boolean, editing: boolean) => {

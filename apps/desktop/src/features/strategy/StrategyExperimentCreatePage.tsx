@@ -1,9 +1,15 @@
+import { StrategyExperimentConfigurationReview } from './StrategyExperimentConfigurationReview.js';
+import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
+import {
+  experimentPreparationTarget,
+  requirePreparedOptimizationConfiguration,
+  type PreparedOptimizationConfiguration,
+} from './optimization.preparation.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useBeforeUnload, useBlocker, useNavigate, useSearchParams } from 'react-router';
 import {
-  runConfigSchemaV2,
-  strategySchemaV2,
+  strategySchema,
   type OptimizationExperimentCreate,
   type OptimizationReasoningEffort,
 } from '@thesis-ledger/schemas';
@@ -16,7 +22,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
@@ -113,6 +118,9 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   const [validationEnd, setValidationEnd] = useState(daysAgo(91));
   const [endDate, setEndDate] = useState(daysAgo(1));
   const [initialCash, setInitialCash] = useState('100000');
+  const [preparedConfig, setPreparedConfig] = useState<PreparedOptimizationConfiguration | null>(
+    null,
+  );
   const [maxAiCalls, setMaxAiCalls] = useState('6');
   const [maxBacktestRuns, setMaxBacktestRuns] = useState('20');
   const [maxInputTokens, setMaxInputTokens] = useState('100000');
@@ -164,7 +172,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   const { hasUnknownCost, knownCurrencies, mixedCurrencies } = experimentCostPolicy(selectedRoutes);
   const selectedVersion = versions.find((entry) => entry.version.id === strategyVersionId) ?? null;
   const parsedStrategy = selectedVersion?.version.schema
-    ? strategySchemaV2.safeParse(selectedVersion.version.schema)
+    ? strategySchema.safeParse(selectedVersion.version.schema)
     : null;
   let market: 'CN' | 'HK' | 'US' = discoveryMarket;
   if (sourceMode === 'existing') {
@@ -217,6 +225,14 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
+  const preparationTarget = experimentPreparationTarget(sourceMode, strategyVersionId, {
+    executionInstrument: {
+      symbol: discoverySymbol.trim(),
+      market: discoveryMarket,
+      assetType: discoveryAssetType,
+    },
+    primaryTimeframe: '1d',
+  });
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!validateStep(3)) throw new Error('请修正表单中的问题。');
@@ -228,33 +244,18 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
           ...(effort === undefined ? {} : { reasoningEffort: effort }),
         };
       });
-      const runConfig = runConfigSchemaV2.parse({
+      const runConfig = requirePreparedOptimizationConfiguration(
+        preparedConfig,
+        preparationTarget,
         startDate,
         endDate,
-        dataAsOf: new Date().toISOString(),
-        baseCurrency: currency,
-        initialCash: { [currency]: initialCash },
-        valuationPolicy: {
-          baseTimezone: 'Asia/Shanghai',
-          dailyValuationTime: '15:00',
-          pricePolicy: 'latestAvailable',
-          fxPolicy: 'latestAvailable',
-        },
-      });
+        currency,
+        initialCash,
+      );
       const input: OptimizationExperimentCreate = {
-        sourceMode,
-        ...(sourceMode === 'existing'
-          ? { strategyVersionId, allowedParameterIds: selectedParameters }
-          : {
-              discoveryScope: {
-                executionInstrument: {
-                  symbol: discoverySymbol.trim(),
-                  market: discoveryMarket,
-                  assetType: discoveryAssetType,
-                },
-                primaryTimeframe: '1d',
-              },
-            }),
+        contractVersion: 3,
+        ...preparationTarget,
+        ...(sourceMode === 'existing' ? { allowedParameterIds: selectedParameters } : {}),
         models,
         objective: { mode: objective, minClosedTrades: 1 },
         split: {
@@ -657,41 +658,30 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                   </AlertDescription>
                 </Alert>
               ) : null}
-              <div className="rounded-lg border bg-muted/20 p-4 text-sm">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">
-                    {sourceMode === 'existing'
-                      ? `${selectedVersion?.strategy.name ?? '策略'} v${selectedVersion?.version.version ?? '?'}`
-                      : `${discoverySymbol || '未填写标的'} 从零探索`}
-                  </Badge>
-                  <Badge variant="outline">{selectedRoutes.length} 个模型</Badge>
-                  <Badge variant="outline">{currency}</Badge>
-                </div>
-                <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-muted-foreground">开发集</dt>
-                    <dd>
-                      {startDate} 至 {developmentEnd}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">验证集</dt>
-                    <dd>
-                      {nextExperimentDay(developmentEnd)} 至 {validationEnd}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">封存测试</dt>
-                    <dd>
-                      {nextExperimentDay(validationEnd)} 至 {endDate}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">提交意图</dt>
-                    <dd className="truncate font-mono text-xs">{submitIntentId}</dd>
-                  </div>
-                </dl>
-              </div>
+              <OptimizationPricePreparation
+                target={preparationTarget}
+                startDate={startDate}
+                endDate={endDate}
+                currency={currency}
+                initialCash={initialCash}
+                onPrepared={setPreparedConfig}
+              />
+              <StrategyExperimentConfigurationReview
+                label={
+                  sourceMode === 'existing'
+                    ? `${selectedVersion?.strategy.name ?? '策略'} v${selectedVersion?.version.version ?? '?'}`
+                    : `${discoverySymbol || '未填写标的'} 从零探索`
+                }
+                modelCount={selectedRoutes.length}
+                currency={currency}
+                startDate={startDate}
+                developmentEnd={developmentEnd}
+                validationStart={nextExperimentDay(developmentEnd)}
+                validationEnd={validationEnd}
+                testStart={nextExperimentDay(validationEnd)}
+                endDate={endDate}
+                submitIntentId={submitIntentId}
+              />
               {fieldErrors.budget ? (
                 <p className="text-sm text-destructive" role="alert">
                   {fieldErrors.budget}
@@ -716,7 +706,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
               <Button onClick={next}>下一步</Button>
             ) : (
               <Button
-                disabled={createMutation.isPending}
+                disabled={!preparedConfig || createMutation.isPending}
                 aria-busy={createMutation.isPending}
                 onClick={() => createMutation.mutate()}
               >

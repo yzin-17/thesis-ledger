@@ -9,8 +9,8 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 - `apps/mobile`：React Native 客户端边界，目前为只读能力入口。
 - `packages/domain`：无基础设施依赖的确定性计算。
 - `packages/schemas`：跨模块版本化契约。
-- `services/dsa-adapter`：可替换行情 Provider、路由、健康和凭证类型；实际 Contract V1 兼容层在独立 DSA Fork 中。
-- `../daily-stock-analysis`：同级 DSA Fork，不属于主仓源码；通过 `DSA_BASE_URL` 和 `/api/v1/thesis-ledger` Contract V1 接入。
+- `services/dsa-adapter`：可替换行情 Provider、路由、健康和凭证类型。
+- `../daily-stock-analysis`：同级 DSA Fork，不属于主仓源码；Server 通过 `DSA_BASE_URL` 调用 `/api/v3/thesis-ledger` 的 Data/Control 合同。
 - `../thesis-ledger-infra`：固定镜像和同级源码开发编排，不纳入主仓。
 - PostgreSQL 保存事实；Redis 只保存缓存、锁和可重建状态。
 

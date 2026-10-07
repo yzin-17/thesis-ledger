@@ -7,6 +7,7 @@ import { StrategyOptimizationCandidateService } from './strategy-optimization-ca
 import { StrategyOptimizationAiSettlementStore } from './strategy-optimization-ai-settlement.store.js';
 import { StrategyOptimizationSdkExecutor } from './strategy-optimization-sdk-executor.js';
 import { StrategyOptimizationController } from './strategy-optimization.controller.js';
+import { StrategyOptimizationPreparationController } from './strategy-optimization-preparation.controller.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
 import { StrategyOptimizationReconciler } from './strategy-optimization-reconciler.service.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
@@ -16,7 +17,7 @@ import { StrategyRiskApplicationService } from './strategy-risk-application.serv
 
 @Module({
   imports: [AiModule, BacktestModule, RiskModule, PlatformModule],
-  controllers: [StrategyOptimizationController],
+  controllers: [StrategyOptimizationController, StrategyOptimizationPreparationController],
   providers: [
     StrategyOptimizationReadService,
     StrategyOptimizationRunService,

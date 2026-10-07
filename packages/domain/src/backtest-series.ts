@@ -1,11 +1,14 @@
 import { DecimalValue } from './decimal.js';
-import type { BacktestAssetType, V2BacktestMarket } from './backtest-v2.js';
+import type { BacktestAssetType, BacktestMarket } from './backtest-contract.js';
+import {
+  isAvailableForDecisionAt,
+  type BacktestAvailability,
+} from './backtest-observation-clock.js';
 
 export type BacktestSeriesStatus = 'available' | 'unavailable';
 
-export interface BacktestSeriesPoint {
+export interface BacktestSeriesPoint extends BacktestAvailability {
   occurredAt: string;
-  availableAt: string;
   value?: string;
   status?: BacktestSeriesStatus;
   reason?: string;
@@ -18,7 +21,7 @@ export interface BacktestSeriesPoint {
 export interface BacktestSeries {
   sourceId: string;
   symbol: string;
-  market: V2BacktestMarket;
+  market: BacktestMarket;
   assetType: BacktestAssetType;
   field: 'open' | 'high' | 'low' | 'close' | 'volume' | 'nav';
   timeframe: '1d' | '60m' | '30m' | '15m' | '5m' | '1m';
@@ -28,7 +31,7 @@ export interface BacktestSeries {
 
 interface CorporateActionForSeriesBase {
   symbol: string;
-  market: V2BacktestMarket;
+  market: BacktestMarket;
   assetType: BacktestAssetType;
   occurredAt: string;
   availableAt: string;
@@ -104,7 +107,7 @@ export const buildSeriesVariantsAt = (
     ...series,
     adjusted: false,
     points: [...series.points].sort(comparePoints).map((point) => {
-      if (time(point.availableAt) <= evaluationTime) return point;
+      if (isAvailableForDecisionAt(point, evaluationAt)) return point;
       const rest = { ...point };
       delete rest.value;
       return {
@@ -175,7 +178,7 @@ export const alignSeriesAt = (
           point.status !== 'unavailable' &&
           point.value !== undefined &&
           time(point.occurredAt) <= at &&
-          time(point.availableAt) <= at,
+          isAvailableForDecisionAt(point, evaluationAt),
       )
       .at(-1);
     return candidate

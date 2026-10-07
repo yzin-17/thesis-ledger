@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ledgerEventEnvelopeSchemaV2, type LedgerEventV2 } from '@thesis-ledger/schemas';
+import { ledgerEventEnvelopeSchema, type LedgerEvent } from '@thesis-ledger/schemas';
 import { LedgerQueryService } from '../../src/ledger/ledger-query.service.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
@@ -23,8 +23,8 @@ const instrumentDirectory = {
   })),
 };
 
-const event = ledgerEventEnvelopeSchemaV2.parse({
-  version: 2,
+const event = ledgerEventEnvelopeSchema.parse({
+  version: 3,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId,
@@ -49,7 +49,7 @@ const event = ledgerEventEnvelopeSchemaV2.parse({
   },
 });
 
-const storedEvent = (value: LedgerEventV2) => ({
+const storedEvent = (value: LedgerEvent) => ({
   id: value.eventId,
   accountId: value.accountId,
   type: value.type,
@@ -64,6 +64,7 @@ const storedEvent = (value: LedgerEventV2) => ({
   economicOrderKey: value.economicOrderKey,
   recordedAt: new Date(value.recordedAt),
   projectionGeneration: 4n,
+  envelopeVersion: 3,
   payloadVersion: value.payloadVersion,
   payload: value.revisionAction === 'VOID' ? null : value.payload,
   sourceCategory: value.source.category,
@@ -104,7 +105,7 @@ describe('Ledger 查询 API 服务', () => {
       effective: false,
       events: [
         expect.objectContaining({
-          version: 2,
+          version: 3,
           payload: expect.objectContaining({ quantity: '1.25' }),
         }),
       ],

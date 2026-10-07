@@ -1,0 +1,2 @@
+ALTER TABLE "BacktestJob"
+ALTER COLUMN "mode" SET DEFAULT 'V3';

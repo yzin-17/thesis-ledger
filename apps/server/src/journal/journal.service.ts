@@ -19,7 +19,7 @@ import {
   type JournalReviewCandidate,
   type JournalReviewCandidatesInput,
   type JournalReviewSnapshotInput,
-  type TradeDetailResponseV2,
+  type TradeDetailResponse,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { TradeQueryService } from '../ledger/trade-query.service.js';
@@ -101,7 +101,7 @@ const weightedAverage = (values: Array<{ value: number; weight: number }>) => {
   return Number.isFinite(total) ? total / totalWeight : undefined;
 };
 
-const dateValues = (detail: TradeDetailResponseV2) =>
+const dateValues = (detail: TradeDetailResponse) =>
   [
     detail.openedAt,
     detail.closedAt,
@@ -116,7 +116,7 @@ const dateValues = (detail: TradeDetailResponseV2) =>
 const firstDate = (values: string[]) => [...values].sort()[0];
 const lastDate = (values: string[]) => [...values].sort().at(-1);
 
-const projectionEventIds = (detail: TradeDetailResponseV2) =>
+const projectionEventIds = (detail: TradeDetailResponse) =>
   unique([
     ...detail.entryLegs.map((item) => item.eventId),
     ...detail.baselineComponents.map((item) => item.eventId),
@@ -126,7 +126,7 @@ const projectionEventIds = (detail: TradeDetailResponseV2) =>
     ...detail.evidenceSources.map((item) => item.eventId),
   ]);
 
-const projectionFactIds = (detail: TradeDetailResponseV2) =>
+const projectionFactIds = (detail: TradeDetailResponse) =>
   unique([
     ...detail.entryLegs.map((item) => item.factId),
     ...detail.baselineComponents.map((item) => item.factId),
@@ -136,15 +136,15 @@ const projectionFactIds = (detail: TradeDetailResponseV2) =>
     ...detail.evidenceSources.map((item) => item.factId),
   ]);
 
-const entryEventIds = (detail: TradeDetailResponseV2) =>
+const entryEventIds = (detail: TradeDetailResponse) =>
   unique([
     ...detail.entryLegs.map((item) => item.eventId),
     ...detail.baselineComponents.map((item) => item.eventId),
   ]);
 
 const entryPrice = (
-  detail: TradeDetailResponseV2,
-  slice?: TradeDetailResponseV2['closeSlices'][number],
+  detail: TradeDetailResponse,
+  slice?: TradeDetailResponse['closeSlices'][number],
 ) => {
   const allocations = slice?.allocations ?? detail.closeSlices.flatMap((item) => item.allocations);
   const allocationValues = allocations.flatMap((allocation) => {
@@ -167,7 +167,7 @@ const entryPrice = (
   );
 };
 
-const cycleExitPrice = (detail: TradeDetailResponseV2) =>
+const cycleExitPrice = (detail: TradeDetailResponse) =>
   weightedAverage(
     detail.closeSlices.flatMap((slice) => {
       const price = numberValue(slice.price);
@@ -178,7 +178,7 @@ const cycleExitPrice = (detail: TradeDetailResponseV2) =>
     }),
   );
 
-const planForTrade = (detail: TradeDetailResponseV2, plans: PlanRow[], entries: JournalRow[]) => {
+const planForTrade = (detail: TradeDetailResponse, plans: PlanRow[], entries: JournalRow[]) => {
   const directPlans = plans
     .filter((plan) => plan.accountId === detail.accountId && plan.tradeId === detail.id)
     .sort(
@@ -199,7 +199,7 @@ const planForTrade = (detail: TradeDetailResponseV2, plans: PlanRow[], entries: 
 };
 
 const candidateJournalEntries = (
-  detail: TradeDetailResponseV2,
+  detail: TradeDetailResponse,
   plan: PlanRow | undefined,
   entries: JournalRow[],
 ) => {
@@ -222,8 +222,8 @@ const legacyItem = (
   accountId: string,
   mode: 'actual' | 'shadow',
   matchingSlices: Array<{
-    trade: TradeDetailResponseV2;
-    slice: TradeDetailResponseV2['closeSlices'][number];
+    trade: TradeDetailResponse;
+    slice: TradeDetailResponse['closeSlices'][number];
   }>,
 ) => ({
   id: `legacy:${entry.id}`,
@@ -241,8 +241,8 @@ const legacyItem = (
 });
 
 const toCandidate = (input: {
-  detail: TradeDetailResponseV2;
-  slice?: TradeDetailResponseV2['closeSlices'][number];
+  detail: TradeDetailResponse;
+  slice?: TradeDetailResponse['closeSlices'][number];
   plan?: PlanRow;
   journalEntries: JournalRow[];
   ledgerRevision: string;

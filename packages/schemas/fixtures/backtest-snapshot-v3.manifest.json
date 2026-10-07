@@ -1,0 +1,102 @@
+{
+  "manifestVersion": "snapshot-manifest-v3",
+  "runId": "run-v3-159516",
+  "strategyVersionId": "strategy-version-1",
+  "strategyVersionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "dataAsOf": "2026-08-10T00:00:00.000Z",
+  "runConfigChecksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "executionPriceProtocol": {
+    "protocolVersion": "execution-price-v1",
+    "priceBasis": {
+      "adjustment": "qfq",
+      "method": "provider-native",
+      "methodVersion": "hithink-etf-qfq-provider-defined-v1",
+      "basisScope": "provider-defined",
+      "anchor": null,
+      "revision": {
+        "origin": "local-observation",
+        "contentHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "observedAt": "2026-08-10T00:00:00.000Z",
+      "quantityBasis": "normalized-units",
+      "volumeBasis": "unknown",
+      "dividendMeaning": "provider-defined",
+      "dividendEvidenceRef": null,
+      "conversionAvailable": false,
+      "conversionEvidenceRef": null,
+      "derivation": null
+    },
+    "accountingBasis": "normalized-series",
+    "history": { "basis": "fixed-provider-snapshot" }
+  },
+  "comparableDataFingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "actualSources": [
+    {
+      "purpose": "execution",
+      "symbol": "159516.SZ",
+      "routeKey": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "DAILY_BAR",
+        "timeframe": "1d",
+        "adjustment": "qfq"
+      },
+      "provenance": {
+        "providerId": "hithink",
+        "upstreamSource": "hithink-financial-api",
+        "routeIndex": 0,
+        "effectivePolicyRevision": 1
+      },
+      "inputFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "aggregationVersion": "bar-aggregation-v1",
+  "marketRuleVersion": "market-rules-v1",
+  "calendarVersion": "calendar-v1",
+  "corporateActionVersion": "corporate-actions-v1",
+  "availabilitySemanticsVersion": "availability-v1",
+  "providerRevisions": { "hithink": "revision-1" },
+  "dependencyClosure": {
+    "signalSources": ["CN:159516.SZ:ETF"],
+    "executionInstrument": "CN:159516.SZ:ETF",
+    "requiredFx": [],
+    "corporateActions": [],
+    "calendars": ["CN"],
+    "instrumentFacts": ["CN:159516.SZ:ETF"],
+    "baseTimeframes": ["1d"],
+    "datasets": [
+      {
+        "instrument": "CN:159516.SZ:ETF",
+        "purpose": "execution",
+        "requestedTimeframe": "1d",
+        "baseTimeframe": "1d"
+      }
+    ]
+  },
+  "dateRange": {
+    "startDate": "2026-05-16",
+    "endDate": "2026-08-09",
+    "warmupStartDate": "2026-05-01"
+  },
+  "warmup": {
+    "lookbackPeriods": 5,
+    "lookbackTimeframe": "1d",
+    "startDate": "2026-05-01",
+    "rangePolicyVersion": "calendar-aware-conservative-v1",
+    "calendarBufferDays": 14
+  },
+  "quality": { "completeness": "complete", "warnings": [] },
+  "artifacts": [
+    {
+      "artifactId": "artifact-1",
+      "key": "run-v3-159516/bars.parquet",
+      "format": "parquet",
+      "compression": "zstd",
+      "contentHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "sizeBytes": 1024
+    }
+  ],
+  "status": "finalized",
+  "contentHash": "1111111111111111111111111111111111111111111111111111111111111111"
+}

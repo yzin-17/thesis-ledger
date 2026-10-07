@@ -1,7 +1,7 @@
 import { PageHeader } from '../shared/PageHeader.js';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { LedgerEventV2 } from '@thesis-ledger/api-client';
+import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -74,7 +74,7 @@ export function AccountDataPage({
   const [transactionFilter, setTransactionFilter] = useState<AccountDataEventFilter>('executions');
   const [executionOpen, setExecutionOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ExecutionEvent | null>(null);
-  const [auditEvent, setAuditEvent] = useState<LedgerEventV2 | null>(null);
+  const [auditEvent, setAuditEvent] = useState<LedgerEvent | null>(null);
   const [voidEvent, setVoidEvent] = useState<ExecutionEvent | null>(null);
   const [restoreEvent, setRestoreEvent] = useState<{
     event: VoidEvent;
@@ -251,7 +251,7 @@ export function AccountDataPage({
     updateLocation({ entry: null });
   };
 
-  const openAudit = (event: LedgerEventV2) => {
+  const openAudit = (event: LedgerEvent) => {
     setAuditEvent(event);
   };
 
@@ -266,7 +266,7 @@ export function AccountDataPage({
   const cashValue = valuationQuery.data?.cashValue ?? 0;
   const resolveInstrumentName = instrumentNameLookup(ledgerEventsQuery.data?.instrumentDirectory);
 
-  const findSnapshotPosition = (event: LedgerEventV2) =>
+  const findSnapshotPosition = (event: LedgerEvent) =>
     event.type === 'POSITION_BASELINE_OBSERVATION' && event.revisionAction !== 'VOID'
       ? accountPositions.find(
           (position) =>
@@ -274,7 +274,7 @@ export function AccountDataPage({
         )
       : undefined;
 
-  const openSnapshotEditor = (event: LedgerEventV2) => {
+  const openSnapshotEditor = (event: LedgerEvent) => {
     const position = findSnapshotPosition(event);
     if (!position) return;
     setPositionSheetEditing(position);
@@ -282,7 +282,7 @@ export function AccountDataPage({
     void selectTab('positions');
   };
 
-  const removeSnapshot = async (event: LedgerEventV2) => {
+  const removeSnapshot = async (event: LedgerEvent) => {
     const position = findSnapshotPosition(event);
     if (!position) return;
     if (
@@ -496,6 +496,7 @@ export function AccountDataPage({
         account={selectedAccount}
         action="void"
         target={voidEvent}
+        onSaved={setAuditEvent}
         ledgerRevision={currentLedgerRevision}
         onOpenChange={(open) => {
           if (!open) setVoidEvent(null);

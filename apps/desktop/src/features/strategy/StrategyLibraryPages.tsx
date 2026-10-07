@@ -33,6 +33,7 @@ import type {
 import {
   findStrategyVersion,
   latestStrategyVersion,
+  navFundSymbolForStrategyVersion,
   strategyCenterFocusTarget,
   strategyCenterPath,
   strategyCenterTriggerId,
@@ -65,17 +66,11 @@ const schemaRecord = (value: unknown) =>
     ? (value as Record<string, unknown>)
     : {};
 
-const isV2Version = (version: StrategyVersion | null | undefined) =>
-  version?.schemaVersion === 2 || schemaRecord(version?.schema).schemaVersion === 2;
-
 const schemaSymbols = (schema: StrategySchema | undefined) => {
-  const universe = schemaRecord(schema?.universe);
   const executionInstrument = schemaRecord(schema?.executionInstrument);
-  const symbols = Array.isArray(universe.symbols)
-    ? universe.symbols.filter((value): value is string => typeof value === 'string')
+  return typeof executionInstrument.symbol === 'string' && executionInstrument.symbol.trim()
+    ? [executionInstrument.symbol]
     : [];
-  if (symbols.length > 0) return symbols;
-  return typeof executionInstrument.symbol === 'string' ? [executionInstrument.symbol] : [];
 };
 
 const definitionRows = (version: StrategyVersion) => {
@@ -84,12 +79,13 @@ const definitionRows = (version: StrategyVersion) => {
     ['策略说明', typeof schema.description === 'string' ? schema.description : '未填写'],
     ['执行标的', schemaSymbols(version.schema).join('、') || '未配置'],
     ['主周期', typeof schema.primaryTimeframe === 'string' ? schema.primaryTimeframe : '未配置'],
-    ['状态', typeof schema.status === 'string' ? schema.status : '未标注'],
+    [
+      '信号来源',
+      Array.isArray(schema.signalSources) ? `${schema.signalSources.length} 个` : '未配置',
+    ],
   ];
-  const entrySignals = Array.isArray(schema.entrySignals) ? schema.entrySignals.length : 0;
-  const exitSignals = Array.isArray(schema.exitSignals) ? schema.exitSignals.length : 0;
-  rows.push(['入场条件', entrySignals > 0 ? `${entrySignals} 条结构化条件` : '未配置']);
-  rows.push(['退出条件', exitSignals > 0 ? `${exitSignals} 条结构化条件` : '未配置']);
+  rows.push(['入场条件', schema.entry ? '已配置' : '未配置']);
+  rows.push(['退出条件', schema.exit ? '已配置' : '未配置']);
   return rows;
 };
 
@@ -178,6 +174,7 @@ export function StrategyLibraryPage({
             <tbody>
               {visible.map((strategy) => {
                 const latest = latestStrategyVersion(strategy.versions);
+                const navSymbol = latest ? navFundSymbolForStrategyVersion(latest) : null;
                 const recentJob = latest
                   ? (jobs
                       .filter((job) => job.strategyVersionId === latest.id)
@@ -220,14 +217,27 @@ export function StrategyLibraryPage({
                       {formatDateTime(latest?.createdAt ?? strategy.updatedAt, '时间未记录')}
                     </td>
                     <td className="px-4 py-3 text-right align-top">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={!latest}
-                        onClick={() => latest && onBacktest(strategy, latest)}
-                      >
-                        回测
-                      </Button>
+                      {latest && navSymbol ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          nativeButton={false}
+                          render={
+                            <Link to={strategyCenterPath.navBacktestSetup(strategy.id, latest.id)}>
+                              基金净值回测
+                            </Link>
+                          }
+                        />
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={!latest}
+                          onClick={() => latest && onBacktest(strategy, latest)}
+                        >
+                          回测
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -313,20 +323,17 @@ export function StrategyVersionPage({
   }
   const { strategy, version } = selection;
   const versions = [...strategy.versions].sort((left, right) => right.version - left.version);
-  const isV2 = isV2Version(version);
   const summary = strategyVersionSummary(version);
   const versionLabel = strategyVersionDisplayLabel(version);
   const versionOptions = versions.map((candidate) => ({
     value: candidate.id,
     label: strategyVersionDisplayLabel(candidate),
   }));
-  const v2ActionsAvailable = !isV2 || summary.kind === 'ready';
+  const actionsAvailable = summary.kind === 'ready';
   const sourceKey = `${strategy.id}:${version.id}`;
   const requestedTab = tabState.sourceKey === sourceKey ? tabState.value : 'definition';
   const activeTab =
-    requestedTab === 'experiments' && (!isV2 || summary.kind !== 'ready')
-      ? 'definition'
-      : requestedTab;
+    requestedTab === 'experiments' && !actionsAvailable ? 'definition' : requestedTab;
   const savedRiskApplicationId = searchParams.get('riskApplicationId');
   const definitionSections =
     summary.kind === 'ready'
@@ -385,7 +392,7 @@ export function StrategyVersionPage({
             }
             variant="outline"
           />
-          {isV2 && summary.kind === 'ready' ? (
+          {actionsAvailable ? (
             <Button
               id={strategyCenterTriggerId.riskApplication}
               nativeButton={false}
@@ -397,23 +404,14 @@ export function StrategyVersionPage({
               variant="outline"
             />
           ) : null}
-          <Button
-            disabled={!v2ActionsAvailable}
-            title={!v2ActionsAvailable ? '当前定义需要修复后才能回测' : undefined}
-            onClick={() => onBacktest(strategy, version)}
-          >
-            开始回测
-          </Button>
+          <StrategyVersionBacktestAction
+            strategy={strategy}
+            version={version}
+            actionsAvailable={actionsAvailable}
+            onBacktest={onBacktest}
+          />
         </div>
       </div>
-      {!isV2 ? (
-        <Alert>
-          <AlertTitle>V1 能力边界</AlertTitle>
-          <AlertDescription>
-            此版本可继续查看、编辑和回测。AI 优化与风险生成仅支持正式 V2 策略。
-          </AlertDescription>
-        </Alert>
-      ) : null}
       {summary.kind === 'missing' ? (
         <Alert variant="destructive">
           <AlertTitle>策略定义缺少必需信息</AlertTitle>
@@ -468,7 +466,7 @@ export function StrategyVersionPage({
           <TabsTrigger value="definition">策略定义</TabsTrigger>
           <TabsTrigger value="versions">版本记录</TabsTrigger>
           <TabsTrigger value="backtests">回测记录</TabsTrigger>
-          <TabsTrigger value="experiments" disabled={!isV2 || summary.kind !== 'ready'}>
+          <TabsTrigger value="experiments" disabled={!actionsAvailable}>
             AI 实验
           </TabsTrigger>
         </TabsList>
@@ -492,7 +490,7 @@ export function StrategyVersionPage({
               </div>
               <div>
                 <dt className="text-muted-foreground">定义格式</dt>
-                <dd>{isV2 ? 'Strategy Schema V2' : 'Strategy Schema V1'}</dd>
+                <dd>当前策略合同</dd>
               </div>
             </dl>
             <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-4 text-xs">
@@ -563,5 +561,39 @@ export function StrategyVersionPage({
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function StrategyVersionBacktestAction({
+  strategy,
+  version,
+  actionsAvailable,
+  onBacktest,
+}: {
+  strategy: StrategyRecord;
+  version: StrategyVersion;
+  actionsAvailable: boolean;
+  onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
+}) {
+  if (navFundSymbolForStrategyVersion(version)) {
+    return (
+      <Button
+        nativeButton={false}
+        render={
+          <Link to={strategyCenterPath.navBacktestSetup(strategy.id, version.id)}>
+            基金净值回测
+          </Link>
+        }
+      />
+    );
+  }
+  return (
+    <Button
+      disabled={!actionsAvailable}
+      title={!actionsAvailable ? '当前定义需要修复后才能回测' : undefined}
+      onClick={() => onBacktest(strategy, version)}
+    >
+      开始回测
+    </Button>
   );
 }

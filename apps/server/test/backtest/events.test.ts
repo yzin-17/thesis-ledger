@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BacktestEventPublisher } from '../../src/backtest/backtest-event.publisher.js';
 import { BacktestEventService } from '../../src/backtest/backtest-event.service.js';
 import { testResultReadPolicy } from './test-result-read-policy.js';
+import { toBacktestJobSummary } from '../../src/backtest/backtest-summary.js';
 
 describe('Backtest SSE 事件', () => {
   it('发布的摘要不携带 input/result，并保留列表所需初始资金', async () => {
@@ -16,7 +17,7 @@ describe('Backtest SSE 事件', () => {
           id: 'job-1',
           strategyVersionId: 'version-1',
           status: 'running',
-          input: { initialCash: 100_000, bars: [{ close: 1 }] },
+          input: { runConfig: { baseCurrency: 'CNY', initialCash: { CNY: '100000' } } },
           result: { large: true },
         })),
       },
@@ -35,6 +36,15 @@ describe('Backtest SSE 事件', () => {
     expect(payload).toMatchObject({ id: 'job-1', initialCash: 100_000 });
     expect(payload).not.toHaveProperty('input');
     expect(payload).not.toHaveProperty('result');
+  });
+
+  it('旧资金输入或缺少本币资金不能补成当前摘要', () => {
+    for (const input of [
+      { initialCash: 100_000 },
+      { runConfig: { baseCurrency: 'CNY', initialCash: { USD: '100000' } } },
+    ]) {
+      expect(toBacktestJobSummary({ input } as never).initialCash).toBeNull();
+    }
   });
 
   it('Redis Pub/Sub 更新转换为带 10 秒重连建议的命名 SSE', async () => {

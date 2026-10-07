@@ -65,7 +65,7 @@ describe('策略中心生产路由兼容性', () => {
     expect(html).toContain('编辑当前版本');
     expect(html).toContain('基于 v1 编辑');
     expect(html).toContain('编辑 路由夹具 的新版本');
-    expect(html).toContain('统一回测 V2 策略');
+    expect(html).toContain('回测策略');
   });
 
   it('在 Data Router 根上下文中直接打开实验创建页可以渲染第一步', () => {

@@ -1,0 +1,20 @@
+{
+  "contractVersion": 3,
+  "requestId": "market-data-v3-etf-qfq-fixture",
+  "symbol": "159516.SZ",
+  "routeKey": {
+    "kind": "bar",
+    "market": "CN",
+    "assetType": "ETF",
+    "capability": "DAILY_BAR",
+    "timeframe": "1d",
+    "adjustment": "qfq"
+  },
+  "routeTarget": {
+    "providerId": "hithink",
+    "upstreamSource": "hithink-financial-api",
+    "routeIndex": 0
+  },
+  "start": "2026-05-18",
+  "end": "2026-05-20"
+}

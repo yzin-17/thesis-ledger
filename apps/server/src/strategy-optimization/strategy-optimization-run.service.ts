@@ -1,12 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { DecimalValue } from '@thesis-ledger/domain';
-import {
-  backtestResultSchemaV2,
-  type BacktestResultV2,
-  type RunConfig,
-} from '@thesis-ledger/schemas';
+import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
+import { evaluateOptimizationResult } from './strategy-optimization-evaluation.js';
+export { calculateOptimizationScore } from './strategy-optimization-evaluation.js';
 import { BacktestService } from '../backtest/backtest.service.js';
+import { assertCurrentRunForRead } from '../backtest/backtest-current-run-read.js';
+import { BacktestConfiguredRunService } from '../backtest/backtest-configured-run.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
   optimizationRemainingDurationMs,
@@ -25,65 +24,14 @@ type BacktestJob = NonNullable<Awaited<ReturnType<BacktestService['status']>>>;
 
 const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-const metricValue = (result: BacktestResultV2, aliases: string[]) => {
-  for (const key of aliases) {
-    const item = result.metrics[key];
-    if (item?.status === 'available' && item.value !== undefined) return item.value;
-  }
-  return undefined;
-};
-
-const executionDiagnostics = (result: BacktestResultV2) => {
-  const rejected = [...result.rejectedOrders, ...(result.rejectedNavRequests ?? [])];
-  const rejectionReasons = rejected.reduce<Record<string, number>>((counts, item) => {
-    counts[item.reasonCode] = (counts[item.reasonCode] ?? 0) + 1;
-    return counts;
-  }, {});
-  return {
-    fillCount: result.simulationFills.length,
-    rejectedOrderCount: rejected.length,
-    ...(Object.keys(rejectionReasons).length > 0 ? { rejectionReasons } : {}),
-  };
-};
-
-const invalidSummary = (
-  runId: string,
-  result: BacktestResultV2,
-  reason: string,
-): EvaluationSummary => ({
-  runId,
-  status: 'invalid',
-  completeness: result.completeness,
-  tradeCount: result.trades.length,
-  ...executionDiagnostics(result),
-  reason,
-});
-
-const drawdownMagnitude = (value: string) => {
-  const parsed = DecimalValue.from(value);
-  return parsed.isNegative() ? DecimalValue.from('0').minus(parsed) : parsed;
-};
-
-export const calculateOptimizationScore = (
-  mode: unknown,
-  totalReturn: string,
-  maxDrawdown: string,
-  turnover?: string,
-) => {
-  const returnNumber = Number(totalReturn);
-  const drawdownNumber = Number(drawdownMagnitude(maxDrawdown).toString());
-  const turnoverNumber = turnover ? Number(turnover) : 0;
-  if (mode === 'return') return returnNumber;
-  if (mode === 'drawdown') return -drawdownNumber;
-  if (mode === 'lowTurnover') return -turnoverNumber;
-  return returnNumber - drawdownNumber - turnoverNumber * 0.05;
-};
-
 @Injectable()
 export class StrategyOptimizationRunService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly backtests: BacktestService,
+    @Optional()
+    @Inject(BacktestConfiguredRunService)
+    private readonly configuredRuns?: BacktestConfiguredRunService,
   ) {}
 
   async reserveBudget(
@@ -231,9 +179,9 @@ export class StrategyOptimizationRunService {
   }
 
   private runConfigForSplit(experiment: ExperimentRow, splitName: SplitName) {
-    const base = experiment.runConfig as RunConfig;
+    const base = runConfigSchemaV3.parse(experiment.runConfig);
     const split = this.splitRangeFor(experiment, splitName);
-    return { ...base, startDate: split.start, endDate: split.end } satisfies RunConfig;
+    return { ...base, startDate: split.start, endDate: split.end };
   }
 
   private async touchLease(id: string) {
@@ -256,7 +204,7 @@ export class StrategyOptimizationRunService {
       if (job && ['succeeded', 'failed', 'cancelled'].includes(job.status)) return job;
       await sleep(200);
     }
-    throw new Error(`V2 Run 等待超时: ${id}`);
+    throw new Error(`回测 Run 等待超时: ${id}`);
   }
 
   async executeRun(
@@ -266,24 +214,34 @@ export class StrategyOptimizationRunService {
     identity: string,
   ): Promise<BacktestJob> {
     await this.touchLease(experiment.id);
-    await this.reserveBudget(experiment.id, { backtestRuns: 1 });
-    let run = await this.backtests.createRun({
+    const runConfig = this.runConfigForSplit(experiment, splitName);
+    const idempotencyKey = `optimization:${experiment.id}:${identity}:${splitName}`;
+    let run: Awaited<ReturnType<BacktestService['createRun']>> | null;
+    if (!this.configuredRuns) throw new BadRequestException('配置预检服务未就绪');
+    const resolved = await this.configuredRuns.resolve(
       strategyVersionId,
-      runConfig: this.runConfigForSplit(experiment, splitName),
-      idempotencyKey: `optimization:${experiment.id}:${identity}:${splitName}`,
-    });
-    if (!run) throw new Error('V2 Run 创建后未找到持久化记录');
+      runConfig,
+      idempotencyKey,
+      { rebindStrategyInputs: true },
+    );
+    if (resolved.kind === 'existing') run = resolved.job;
+    else {
+      await this.reserveBudget(experiment.id, { backtestRuns: 1 });
+      run = await this.backtests.createRun(resolved.input);
+    }
+    if (!run) throw new Error('Run 创建后未找到持久化记录');
     if (run.status === 'failed' && run.errorCode === 'INTERNAL_ERROR') {
       run = await this.backtests.retryRun(run.id);
-      if (!run) throw new Error('V2 Run retry 后未找到持久化记录');
+      if (!run) throw new Error('Run retry 后未找到持久化记录');
     }
-    if (run.status === 'queued') await this.backtests.runV2(run.id);
+    if (run.status === 'queued') await this.backtests.runCurrentRunForRead(run.id);
     const terminal = ['succeeded', 'failed', 'cancelled'].includes(run.status)
       ? run
       : await this.waitForRun(run.id, this.requestTimeoutMs(experiment, 180_000));
     if (terminal.status !== 'succeeded')
-      throw new Error(
-        `V2 Run ${terminal.id} ${terminal.status}: ${terminal.errorSummary ?? terminal.errorCode ?? 'unknown'}`,
+      throw new OptimizationBacktestFailure(
+        terminal.errorCode ?? 'INTERNAL_ERROR',
+        `回测 Run ${terminal.id} ${terminal.status}: ${terminal.errorSummary ?? terminal.errorCode ?? 'unknown'}`,
       );
     return terminal;
   }
@@ -293,46 +251,15 @@ export class StrategyOptimizationRunService {
   }
 
   async requireCompletedRun(id: string, label: string) {
-    const run = await this.backtests.status(id);
+    const run = await this.backtests.statusForRead(id);
     if (!run || run.status !== 'succeeded' || run.result === null || run.result === undefined)
       throw new Error(`${label}冻结 Run 不可访问`);
     return run;
   }
 
   evaluateResult(run: BacktestJob, objectiveValue: unknown): EvaluationSummary {
-    const result = backtestResultSchemaV2.parse(run.result);
-    if (result.completeness !== 'complete')
-      return invalidSummary(run.id, result, '回测数据完整性不是 complete');
-    const objective = toRecord(objectiveValue);
-    const minimumTrades =
-      typeof objective.minClosedTrades === 'number' ? objective.minClosedTrades : 1;
-    if (result.trades.length < minimumTrades)
-      return invalidSummary(run.id, result, `闭合交易少于 ${minimumTrades}`);
-    const totalReturn = metricValue(result, ['totalReturn', 'cumulativeReturn', 'return']);
-    const maxDrawdown = metricValue(result, ['maxDrawdown', 'drawdown']);
-    if (!totalReturn || !maxDrawdown)
-      return invalidSummary(run.id, result, '关键收益/回撤指标不可用');
-    const turnover = metricValue(result, ['turnover', 'turnoverRate']);
-    const maxAllowed =
-      typeof objective.maxDrawdown === 'string' ? objective.maxDrawdown : undefined;
-    if (maxAllowed && drawdownMagnitude(maxDrawdown).compareTo(maxAllowed) > 0)
-      return {
-        ...invalidSummary(run.id, result, '最大回撤超过硬约束'),
-        totalReturn,
-        maxDrawdown,
-        ...(turnover ? { turnover } : {}),
-      };
-    return {
-      runId: run.id,
-      status: 'valid',
-      completeness: result.completeness,
-      tradeCount: result.trades.length,
-      ...executionDiagnostics(result),
-      totalReturn,
-      maxDrawdown,
-      ...(turnover ? { turnover } : {}),
-      score: calculateOptimizationScore(objective.mode, totalReturn, maxDrawdown, turnover),
-    };
+    assertCurrentRunForRead(run);
+    return evaluateOptimizationResult(run, objectiveValue);
   }
 
   async recordBaseline(experiment: ExperimentRow, splitName: 'development' | 'validation') {
@@ -382,9 +309,11 @@ export class StrategyOptimizationRunService {
         completeness: 'unavailable',
         tradeCount: 0,
         reason: '候选与基准的数据 Artifact 指纹不一致，实验 fail-closed',
+        failureCategory: 'protocol-incompatible',
       };
       return { run, summary, fingerprint };
     }
     return { run, summary: this.evaluateResult(run, experiment.objective), fingerprint };
   }
 }
+import { OptimizationBacktestFailure } from './strategy-optimization-failure.js';

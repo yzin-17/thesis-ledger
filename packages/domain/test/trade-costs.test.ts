@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ExecutionChargeV2, LedgerEventTypeV2, LedgerEventV2 } from '../src/index.js';
+import type { ExecutionCharge, LedgerEventType, LedgerEvent } from '../src/index.js';
 import { DecimalValue } from '../src/decimal.js';
 import {
   projectTradeCostProjections,
@@ -7,12 +7,12 @@ import {
   type TradeCostStrategyRevision,
 } from '../src/index.js';
 
-type PayloadEvent = Exclude<LedgerEventV2, { revisionAction: 'VOID' }>;
+type PayloadEvent = Exclude<LedgerEvent, { revisionAction: 'VOID' }>;
 
 let sequence = 0;
 
 const event = (
-  type: LedgerEventTypeV2,
+  type: LedgerEventType,
   payload: unknown,
   overrides: Partial<
     Pick<PayloadEvent, 'accountId' | 'eventId' | 'factId' | 'ledgerRevision' | 'occurredAt'>
@@ -21,7 +21,7 @@ const event = (
   const id = overrides.eventId ?? `${type.toLowerCase()}-${sequence + 1}`;
   sequence += 1;
   return {
-    version: 2,
+    version: 3,
     eventId: id,
     factId: overrides.factId ?? id,
     accountId: overrides.accountId ?? 'account-actual',
@@ -44,10 +44,10 @@ const event = (
 };
 
 const charge = (
-  category: ExecutionChargeV2['category'],
+  category: ExecutionCharge['category'],
   amount: string,
   currency: string,
-): ExecutionChargeV2 => ({ category, amount, currency });
+): ExecutionCharge => ({ category, amount, currency });
 
 const execution = (
   type: 'BUY_EXECUTION' | 'SELL_EXECUTION',
@@ -55,7 +55,7 @@ const execution = (
   quantity: string,
   price: string,
   occurredAt: string,
-  charges: ExecutionChargeV2[] = [],
+  charges: ExecutionCharge[] = [],
 ) =>
   event(
     type,
@@ -114,7 +114,7 @@ const strategy = (
 });
 
 const projectCosts = (
-  events: readonly LedgerEventV2[],
+  events: readonly LedgerEvent[],
   revisions: readonly TradeCostStrategyRevision[],
 ) =>
   projectTradeCostProjections(events, {

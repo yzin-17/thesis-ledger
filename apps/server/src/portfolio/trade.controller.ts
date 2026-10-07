@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
-  createTradeOpeningBoundaryAssertionCommandSchemaV2,
-  tradeListQuerySchemaV2,
-  tradeModeQuerySchemaV2,
-  tradeReferenceResolveRequestSchemaV2,
+  createTradeOpeningBoundaryAssertionCommandSchema,
+  tradeListQuerySchema,
+  tradeModeQuerySchema,
+  tradeReferenceResolveRequestSchema,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { TradeQueryService } from '../ledger/trade-query.service.js';
@@ -20,19 +20,19 @@ export class TradeController {
 
   @Get()
   list(@Query() query: Record<string, string | undefined>) {
-    return this.trades.list(tradeListQuerySchemaV2.parse(query));
+    return this.trades.list(tradeListQuerySchema.parse(query));
   }
 
   @Post('resolve-reference')
   resolveReference(@Body() request: unknown) {
-    return this.trades.resolveReference(tradeReferenceResolveRequestSchemaV2.parse(request));
+    return this.trades.resolveReference(tradeReferenceResolveRequestSchema.parse(request));
   }
 
   @Post(':tradeId/opening-boundary')
   createOpeningBoundary(@Param('tradeId') tradeId: string, @Body() request: unknown) {
     return this.openingBoundaries.createOpeningBoundary(
       tradeId,
-      createTradeOpeningBoundaryAssertionCommandSchemaV2.parse(request),
+      createTradeOpeningBoundaryAssertionCommandSchema.parse(request),
     );
   }
 
@@ -42,7 +42,7 @@ export class TradeController {
     @Query('accountId') accountId: string,
     @Query('mode') mode?: string,
   ) {
-    const parsedMode = tradeModeQuerySchemaV2.parse({
+    const parsedMode = tradeModeQuerySchema.parse({
       ...(mode === undefined ? {} : { mode }),
     }).mode;
     return this.trades.get(accountIdSchema.parse(accountId), tradeId, parsedMode);
@@ -55,7 +55,7 @@ export class TradeController {
     @Query('accountId') accountId: string,
     @Query('mode') mode?: string,
   ) {
-    const parsedMode = tradeModeQuerySchemaV2.parse({
+    const parsedMode = tradeModeQuerySchema.parse({
       ...(mode === undefined ? {} : { mode }),
     }).mode;
     return this.trades.closeSlice(accountIdSchema.parse(accountId), tradeId, sliceId, parsedMode);

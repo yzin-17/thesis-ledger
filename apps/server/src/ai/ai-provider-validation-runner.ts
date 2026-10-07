@@ -128,6 +128,8 @@ export const validateProviderRoute = async (
     });
     let observedUsage = unknownUsage;
     let observedCost: AiCostFacts | undefined;
+    const firstOutputTimeoutMs = route.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs ?? 30000;
+    const outputIdleTimeoutMs = route.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs ?? 30000;
     try {
       const { result, latencyMs } = await runProviderConnectionTest({
         sdk,
@@ -142,8 +144,8 @@ export const validateProviderRoute = async (
         requestId,
         signal: context.signal,
         timeoutMs: Math.min(input.timeoutMs ?? 120000, context.deadline - Date.now()),
-        firstOutputTimeoutMs: route.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs ?? 30000,
-        outputIdleTimeoutMs: route.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs ?? 30000,
+        firstOutputTimeoutMs,
+        outputIdleTimeoutMs,
         ...(context.profile === undefined
           ? {}
           : { compatibilityExtensionProfile: context.profile }),
@@ -184,11 +186,25 @@ export const validateProviderRoute = async (
     } catch (error) {
       const usage = error instanceof AiSdkGenerationError ? error.usage : observedUsage;
       const unsupported = explicitlyUnsupportedFormat(error);
+      // 探针超时只会让合并后的 signal 变成 aborted，适配器看不到是谁掐的，会归为 “cancelled”。
+      // 调用方没有取消时（context.signal 未 abort）必须如实报超时，不能显示成“生成请求已取消”。
+      const timedOut =
+        error instanceof AiSdkGenerationError &&
+        error.fact.code === 'cancelled' &&
+        !context.signal.aborted;
+      const schemaMismatch =
+        error instanceof AiSdkGenerationError && error.fact.code === 'schema_invalid';
       await health.recordHistory(
         input.name,
         'degraded',
         Date.now() - startedAt,
-        unsupported ? 'format_unsupported' : 'validation_failed',
+        unsupported
+          ? 'format_unsupported'
+          : schemaMismatch
+            ? 'schema_mismatch'
+            : timedOut
+              ? 'provider_timeout'
+              : 'validation_failed',
         new Date(),
         'manual',
         {
@@ -200,7 +216,11 @@ export const validateProviderRoute = async (
       );
       if (route.outputPolicy === 'auto' && unsupported && !context.signal.aborted) continue;
       throw new BadRequestException(
-        `${route.model} / ${route.contract.id} 验证未通过：${sanitizeAiProviderError(error, context.credential)}。原配置未修改。`,
+        `${route.model} / ${route.contract.id} 验证未通过：${
+          timedOut
+            ? `Provider 在限时内没有继续产出（首块 ${firstOutputTimeoutMs} ms / 间隔 ${outputIdleTimeoutMs} ms），已按超时中断`
+            : sanitizeAiProviderError(error, context.credential)
+        }。原配置未修改。`,
       );
     }
   }

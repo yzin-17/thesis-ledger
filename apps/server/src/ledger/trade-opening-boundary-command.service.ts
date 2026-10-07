@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
-  createTradeOpeningBoundaryAssertionCommandSchemaV2,
-  type CreateTradeOpeningBoundaryAssertionCommandV2,
-  type LedgerCommandErrorCodeV2,
-  type LedgerCommandResponseV2,
-  type LedgerEventV2,
+  createTradeOpeningBoundaryAssertionCommandSchema,
+  type CreateTradeOpeningBoundaryAssertionCommand,
+  type LedgerCommandErrorCode,
+  type LedgerCommandResponse,
+  type LedgerEvent,
 } from '@thesis-ledger/schemas';
 import { isEqual } from 'es-toolkit';
 import { rebuildLedgerProjection } from './ledger-projection.js';
@@ -17,7 +17,7 @@ import {
 } from './ledger-v2.repository.js';
 
 type OpeningBoundaryEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   {
     type: 'TRADE_OPENING_BOUNDARY_ASSERTION';
     revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE';
@@ -30,14 +30,14 @@ type OpeningBoundaryMutation = {
   projectionGeneration?: string;
 };
 
-const ledgerConflict = (errorCode: LedgerCommandErrorCodeV2, message: string, accountId?: string) =>
+const ledgerConflict = (errorCode: LedgerCommandErrorCode, message: string, accountId?: string) =>
   new ConflictException({
     errorCode,
     message,
     ...(accountId === undefined ? {} : { accountId }),
   });
 
-const eventFingerprint = (event: LedgerEventV2) => ({
+const eventFingerprint = (event: LedgerEvent) => ({
   accountId: event.accountId,
   type: event.type,
   occurredAt: event.occurredAt,
@@ -55,10 +55,10 @@ const eventFingerprint = (event: LedgerEventV2) => ({
 
 const createOpeningBoundaryEvent = (
   tradeId: string,
-  command: CreateTradeOpeningBoundaryAssertionCommandV2,
+  command: CreateTradeOpeningBoundaryAssertionCommand,
   ledgerRevision: bigint,
 ): OpeningBoundaryEvent => ({
-  version: 2,
+  version: 3,
   eventId: randomUUID(),
   factId: randomUUID(),
   accountId: command.accountId,
@@ -94,8 +94,8 @@ export class TradeOpeningBoundaryCommandService {
   async createOpeningBoundary(
     tradeId: string,
     rawCommand: unknown,
-  ): Promise<LedgerCommandResponseV2> {
-    const command = createTradeOpeningBoundaryAssertionCommandSchemaV2.parse(rawCommand);
+  ): Promise<LedgerCommandResponse> {
+    const command = createTradeOpeningBoundaryAssertionCommandSchema.parse(rawCommand);
     const result = await this.repository.withAccountWrite<OpeningBoundaryMutation>(
       command.accountId,
       async (context) => {
@@ -171,7 +171,7 @@ export class TradeOpeningBoundaryCommandService {
   private async assertTargetIsEligible(
     context: AccountLedgerWriteContext,
     tradeId: string,
-    command: CreateTradeOpeningBoundaryAssertionCommandV2,
+    command: CreateTradeOpeningBoundaryAssertionCommand,
   ) {
     const trade = await context.transaction.trade.findUnique({
       where: { id: tradeId },

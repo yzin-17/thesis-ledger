@@ -2,19 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
-  createExecutionCommandSchemaV2,
-  moveExecutionAccountCommandSchemaV2,
-  replaceExecutionCommandSchemaV2,
-  restoreExecutionCommandSchemaV2,
-  voidExecutionCommandSchemaV2,
-  type CreateExecutionCommandV2,
-  type LedgerCommandErrorCodeV2,
-  type LedgerCommandResponseV2,
-  type LedgerEventV2,
-  type MoveExecutionAccountCommandV2,
-  type ReplaceExecutionCommandV2,
-  type RestoreExecutionCommandV2,
-  type VoidExecutionCommandV2,
+  createExecutionCommandSchema,
+  moveExecutionAccountCommandSchema,
+  replaceExecutionCommandSchema,
+  restoreExecutionCommandSchema,
+  voidExecutionCommandSchema,
+  type CreateExecutionCommand,
+  type LedgerCommandErrorCode,
+  type LedgerCommandResponse,
+  type LedgerEvent,
+  type MoveExecutionAccountCommand,
+  type ReplaceExecutionCommand,
+  type RestoreExecutionCommand,
+  type VoidExecutionCommand,
 } from '@thesis-ledger/schemas';
 import { isEqual } from 'es-toolkit';
 import { assertAccountCanHoldAsset } from '../portfolio/accounts.service.js';
@@ -29,32 +29,32 @@ import { assertSymbolMatchesAssetType, assertWritableAccount } from './ledger.se
 import { rebuildLedgerProjection } from './ledger-projection.js';
 
 type ExecutionCorrectionCommand =
-  ReplaceExecutionCommandV2 | RestoreExecutionCommandV2 | VoidExecutionCommandV2;
+  ReplaceExecutionCommand | RestoreExecutionCommand | VoidExecutionCommand;
 type ExecutionPayloadEvent = Extract<
-  LedgerEventV2,
+  LedgerEvent,
   { type: 'BUY_EXECUTION' | 'SELL_EXECUTION'; revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE' }
 >;
-type ExecutionVoidEvent = Extract<LedgerEventV2, { revisionAction: 'VOID' }>;
+type ExecutionVoidEvent = Extract<LedgerEvent, { revisionAction: 'VOID' }>;
 type ExecutionLedgerEvent = ExecutionPayloadEvent | ExecutionVoidEvent;
 type IdempotentReplay = {
-  event: LedgerEventV2;
+  event: LedgerEvent;
   projectionGeneration: string;
 };
 
 type SingleExecutionMutation = {
-  event: LedgerEventV2;
+  event: LedgerEvent;
   replay: boolean;
   projectionGeneration?: string;
 };
 
 type MoveExecutionMutation = {
-  events: LedgerEventV2[];
+  events: LedgerEvent[];
   replay: boolean;
   projectionGenerations?: Record<string, string>;
 };
 
 const ledgerConflict = (
-  errorCode: LedgerCommandErrorCodeV2,
+  errorCode: LedgerCommandErrorCode,
   message: string,
   accountId?: string,
   currentLedgerRevision?: string,
@@ -66,7 +66,7 @@ const ledgerConflict = (
     ...(currentLedgerRevision === undefined ? {} : { currentLedgerRevision }),
   });
 
-const eventFingerprint = (event: LedgerEventV2) => ({
+const eventFingerprint = (event: LedgerEvent) => ({
   accountId: event.accountId,
   type: event.type,
   occurredAt: event.occurredAt,
@@ -99,17 +99,17 @@ type LedgerEventBaseInput = {
   accountId: string;
   ledgerRevision: bigint;
   occurredAt: string | null;
-  timePrecision: LedgerEventV2['timePrecision'];
+  timePrecision: LedgerEvent['timePrecision'];
   sourceTimezone: string;
   economicOrderKey: string;
-  source: LedgerEventV2['source'];
+  source: LedgerEvent['source'];
   actorId: string;
   payloadVersion?: number;
   recordedAt?: string;
 };
 
 const createLedgerEventBase = (input: LedgerEventBaseInput) => ({
-  version: 2 as const,
+  version: 3 as const,
   accountId: input.accountId,
   ledgerRevision: input.ledgerRevision.toString(),
   occurredAt: input.occurredAt,
@@ -122,7 +122,7 @@ const createLedgerEventBase = (input: LedgerEventBaseInput) => ({
   actorId: input.actorId,
 });
 
-type ExecutionSide = CreateExecutionCommandV2['side'];
+type ExecutionSide = CreateExecutionCommand['side'];
 
 type ExecutionRevisionInput =
   | {
@@ -130,7 +130,7 @@ type ExecutionRevisionInput =
       side: ExecutionSide;
       factId: string;
       revisionAction: 'CREATE';
-      payload: CreateExecutionCommandV2['payload'];
+      payload: CreateExecutionCommand['payload'];
     }
   | {
       envelope: ReturnType<typeof createLedgerEventBase>;
@@ -139,7 +139,7 @@ type ExecutionRevisionInput =
       revisionAction: 'REPLACE' | 'RESTORE';
       supersedesEventId: string;
       reason: string;
-      payload: CreateExecutionCommandV2['payload'];
+      payload: CreateExecutionCommand['payload'];
     };
 
 const executionTypeBySide = {
@@ -199,15 +199,15 @@ export class LedgerCommandService {
     assertAccountCanHoldAsset(account, assetType);
   }
 
-  async createExecution(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
+  async createExecution(rawCommand: unknown): Promise<LedgerCommandResponse> {
     return (await this.createExecutionWithEffect(rawCommand)).response;
   }
 
   async createExecutionWithEffect<T = undefined>(
     rawCommand: unknown,
-    effect?: (transaction: Prisma.TransactionClient, event: LedgerEventV2) => Promise<T>,
-  ): Promise<{ response: LedgerCommandResponseV2; effectResult: T | undefined }> {
-    const command = createExecutionCommandSchemaV2.parse(rawCommand);
+    effect?: (transaction: Prisma.TransactionClient, event: LedgerEvent) => Promise<T>,
+  ): Promise<{ response: LedgerCommandResponse; effectResult: T | undefined }> {
+    const command = createExecutionCommandSchema.parse(rawCommand);
     const result = await this.repository.withAccountWrite<
       SingleExecutionMutation & { effectResult: T | undefined }
     >(command.accountId, async (context) => {
@@ -241,20 +241,20 @@ export class LedgerCommandService {
     };
   }
 
-  async replaceExecution(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    return this.correctExecution(replaceExecutionCommandSchemaV2.parse(rawCommand), 'REPLACE');
+  async replaceExecution(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    return this.correctExecution(replaceExecutionCommandSchema.parse(rawCommand), 'REPLACE');
   }
 
-  async voidExecution(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    return this.correctExecution(voidExecutionCommandSchemaV2.parse(rawCommand), 'VOID');
+  async voidExecution(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    return this.correctExecution(voidExecutionCommandSchema.parse(rawCommand), 'VOID');
   }
 
-  async restoreExecution(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    return this.correctExecution(restoreExecutionCommandSchemaV2.parse(rawCommand), 'RESTORE');
+  async restoreExecution(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    return this.correctExecution(restoreExecutionCommandSchema.parse(rawCommand), 'RESTORE');
   }
 
-  async moveExecutionAccount(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = moveExecutionAccountCommandSchemaV2.parse(rawCommand);
+  async moveExecutionAccount(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = moveExecutionAccountCommandSchema.parse(rawCommand);
     const result = await this.repository.withAccountsWrite<MoveExecutionMutation>(
       [command.sourceAccountId, command.targetAccountId],
       async (contexts) => {
@@ -337,7 +337,7 @@ export class LedgerCommandService {
   private async correctExecution(
     command: ExecutionCorrectionCommand,
     action: 'REPLACE' | 'VOID' | 'RESTORE',
-  ): Promise<LedgerCommandResponseV2> {
+  ): Promise<LedgerCommandResponse> {
     const result = await this.repository.withAccountWrite<SingleExecutionMutation>(
       command.accountId,
       async (context) => {
@@ -421,7 +421,7 @@ export class LedgerCommandService {
       );
   }
 
-  private assertExecutionEvent(event: LedgerEventV2, accountId: string) {
+  private assertExecutionEvent(event: LedgerEvent, accountId: string) {
     if (event.type === 'BUY_EXECUTION' || event.type === 'SELL_EXECUTION') return;
     throw ledgerConflict(
       'LEDGER_VALIDATION_FAILED',
@@ -432,7 +432,7 @@ export class LedgerCommandService {
 
   private async findIdempotentReplay(
     context: AccountLedgerWriteContext,
-    desired: LedgerEventV2,
+    desired: LedgerEvent,
   ): Promise<IdempotentReplay | undefined> {
     const externalId = desired.source.externalId;
     if (externalId === undefined) return undefined;
@@ -461,7 +461,7 @@ export class LedgerCommandService {
   }
 
   private createExecutionEvent(
-    command: CreateExecutionCommandV2,
+    command: CreateExecutionCommand,
     ledgerRevision: bigint,
   ): ExecutionPayloadEvent {
     const envelope = createLedgerEventBase({
@@ -487,7 +487,7 @@ export class LedgerCommandService {
     command: ExecutionCorrectionCommand,
     action: 'REPLACE' | 'VOID' | 'RESTORE',
     ledgerRevision: bigint,
-    target: LedgerEventV2,
+    target: LedgerEvent,
   ): ExecutionLedgerEvent {
     if (action === 'VOID') {
       if (command.command !== 'VOID_EXECUTION') throw new Error('VOID 动作需要 VOID 命令');
@@ -516,9 +516,9 @@ export class LedgerCommandService {
   }
 
   private createVoidEvent(
-    command: VoidExecutionCommandV2 | MoveExecutionAccountCommandV2,
+    command: VoidExecutionCommand | MoveExecutionAccountCommand,
     ledgerRevision: bigint,
-    target: LedgerEventV2,
+    target: LedgerEvent,
   ): ExecutionVoidEvent {
     return {
       ...createLedgerEventBase({
@@ -545,7 +545,7 @@ export class LedgerCommandService {
   }
 
   private createMovedExecutionEvent(
-    command: MoveExecutionAccountCommandV2,
+    command: MoveExecutionAccountCommand,
     ledgerRevision: bigint,
   ): ExecutionPayloadEvent {
     const envelope = createLedgerEventBase({
@@ -568,11 +568,11 @@ export class LedgerCommandService {
   }
 
   private singleResponse(
-    event: LedgerEventV2,
+    event: LedgerEvent,
     result: { ledgerRevision: string; projectionGeneration: string },
     idempotentReplay: boolean,
     replayProjectionGeneration?: string,
-  ): LedgerCommandResponseV2 {
+  ): LedgerCommandResponse {
     const symbol = ledgerEventSymbol(event);
     return {
       eventIds: [event.eventId],

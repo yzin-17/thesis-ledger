@@ -13,7 +13,7 @@ Risk 目前可能直接读取 `MarketBar`，绕过当前路由、完整性和 pr
 
 - Strategy Risk 只使用 `complete` 的 `MarketBarReader` 结果，缺数据时 fail-closed。
 - 绩效预估使用 `interactive`，正式校准使用 `complete`。
-- Backtest V2 使用 `point-in-time`，要求 `availableAt <= asOf`，并冻结实际路由、Provider/source revision 和 fingerprint。
+- Backtest V2 使用 `point-in-time`，要求 `availableAt <= asOf`，并冻结实际路由、Provider/source revision 和 fingerprint。V3 按[多源复权感知回测规格](2026-09-25-multi-source-adjustment-aware-backtest.md)显式区分严格历史时点与固定供应商快照：后者保留实际观察时间，不把当前复权历史伪装成历史当时可见数据；冻结后重放及候选切分复用同一事实窗口。
 - Portfolio、Performance、Automation 继续单向消费 Market 模块；Catalog/Asset identity 保持 provider-neutral。
 - DSA native analysis 保留独立策略、缓存和熔断 namespace；其他 feature 不得直读 `MarketBar` 或绕过 Reader 调用 DSA bars。
 - 提供受保护的开发行情与衍生产物清理模式，为不迁移旧行情的 V2 切换建立可审计入口。
@@ -48,7 +48,7 @@ Market 模块提供深模块 `MarketBarReader.read`，消费者只选择 accepta
 
 - AC1：Risk 使用 complete reader 并对不完整数据 fail-closed。
 - AC2：绩效预估/正式校准使用规定 acceptance。
-- AC3：Backtest 满足 point-in-time 并冻结实际 provenance/fingerprint。
+- AC3：Backtest V2 满足 point-in-time 并冻结实际 provenance/fingerprint；V3 的固定供应商快照采用增量规格的显式历史性质与完整窗口门禁，不覆盖或放松 V2 历史时点语义。
 - AC4：Portfolio、Performance、Automation 单向消费 Market；Catalog/Asset identity 不携带 Provider 依赖。
 - AC5：边界门禁阻止直读 MarketBar 或绕过 Reader 调用 bars。
 - AC6：跨模块定向测试、包级检查和当前 Docker 运行态门禁按任务完成；未完成门禁保持未通过。

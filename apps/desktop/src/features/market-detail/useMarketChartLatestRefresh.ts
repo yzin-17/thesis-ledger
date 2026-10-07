@@ -1,11 +1,12 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { MarketDetailCapability, MarketDetailResponseV2 } from '@thesis-ledger/api-client';
-import type { IndicatorResultV2 } from '@thesis-ledger/schemas';
+import type { MarketDetailCapability, MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketIndicatorResult } from '@thesis-ledger/schemas';
 import { requestMarketDetail } from './market-detail.api.js';
 import {
   latestDetailQueryKey,
   useMarketChartLatestBoundary,
+  type ChartWindowV3,
 } from './useMarketChartLatestBoundary.js';
 import {
   useMarketChartRefreshLifecycle,
@@ -22,28 +23,24 @@ export type LatestRefreshQueryContext = {
 export type UseMarketChartLatestRefreshOptions = {
   queryClient: QueryClient;
   symbol: string;
+  navFund: boolean;
+  adjustment?: 'none' | 'qfq' | 'hfq' | undefined;
+  chartWindowV3: ChartWindowV3;
   refreshSequence: number;
-  historyEnd?: string | undefined;
-  historyCalculationAnchor?: string | undefined;
   indicatorParams: MarketIndicatorParams;
   paramsKey: string;
-  detail: MarketDetailResponseV2 | null;
+  detail: MarketDetailResponse | null;
   chartPointsRef: MutableRefObject<ChartPoint[]>;
   requestGeneration: number;
-  onLatestDetail: (response: MarketDetailResponseV2) => void;
-  onSectionRetry: (
-    response: MarketDetailResponseV2,
-    capability: MarketDetailCapability,
-    end: string | undefined,
-    paramsKey: string,
-  ) => void;
+  onLatestDetail: (response: MarketDetailResponse) => void;
+  onSectionRetry: (response: MarketDetailResponse) => void;
 };
 
 export const responseMatchesIndicatorParams = (
-  response: MarketDetailResponseV2,
+  response: MarketDetailResponse,
   params: MarketIndicatorParams,
 ) => {
-  const data = response.sections['indicator:MACD']?.data as IndicatorResultV2 | undefined;
+  const data = response.sections['indicator:MACD']?.data as MarketIndicatorResult | undefined;
   if (!data) return true;
   return Object.entries(params).every(([name, value]) => {
     const actual = data.parameters[name];
@@ -59,9 +56,10 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
   const {
     queryClient,
     symbol,
+    navFund,
+    adjustment,
+    chartWindowV3,
     refreshSequence,
-    historyEnd,
-    historyCalculationAnchor,
     indicatorParams,
     paramsKey,
     detail,
@@ -74,8 +72,9 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
   const boundary = useMarketChartLatestBoundary({
     queryClient,
     symbol,
+    adjustment,
+    chartWindowV3,
     refreshSequence,
-    historyEnd,
     indicatorParams,
     paramsKey,
     chartPointsRef,
@@ -94,8 +93,8 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
       symbol,
       refreshSequence,
       indicatorParams,
-      historyEnd,
-      historyCalculationAnchor,
+      adjustment,
+      chartWindowV3,
     );
     const { refresh, latestCheck } = boundary.openingState();
     const attemptStartedAt = Date.now();
@@ -105,14 +104,14 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
       const response = await requestMarketDetail(
         {
           symbol,
-          ...(historyEnd
-            ? { include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] as const }
+          ...(navFund
+            ? { include: ['fund-nav', 'fund-nav-history'] as MarketDetailCapability[] }
             : {}),
-          barsLimit: 90,
+          ...(adjustment ? { adjustment } : {}),
+          barsLimit: chartWindowV3.barsLimit,
+          chartContractVersion: 3,
           navLimit: 90,
           indicatorParams,
-          ...(historyEnd ? { end: historyEnd } : {}),
-          ...(historyCalculationAnchor ? { calculationAnchor: historyCalculationAnchor } : {}),
           ...(refresh ? { refresh: true } : {}),
         },
         signal,
@@ -134,7 +133,6 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
   };
 
   const retrySection = async (capability: MarketDetailCapability) => {
-    const end = historyEnd;
     const queryKey = [
       'desktop',
       'market-detail',
@@ -142,7 +140,8 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
       'section',
       capability,
       paramsKey,
-      end ?? null,
+      adjustment ?? null,
+      'chart-v3', chartWindowV3.barsLimit,
     ] as const;
     const requestToken = lifecycle.beginRequest();
     retryQueryKeysRef.current.push(queryKey);
@@ -156,11 +155,13 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
           requestMarketDetail(
             {
               symbol,
-              include: [capability],
-              barsLimit: 90,
+              ...(adjustment ? { adjustment } : {}),
+              include: capability === 'bars' || capability.startsWith('indicator:')
+                ? ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] : [capability],
+              barsLimit: chartWindowV3.barsLimit,
+              chartContractVersion: 3,
               navLimit: 90,
               indicatorParams,
-              ...(end ? { end } : {}),
               refresh: true,
             },
             signal,
@@ -172,7 +173,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
         next.symbol === symbol &&
         responseMatchesIndicatorParams(next, indicatorParams)
       )
-        onSectionRetry(next, capability, end, paramsKey);
+        onSectionRetry(next);
     } catch (error) {
       const aborted = error instanceof DOMException && error.name === 'AbortError';
       if (

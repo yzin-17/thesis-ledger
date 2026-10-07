@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BaselineReconciliationCandidateV2 } from '@thesis-ledger/api-client';
+import type { BaselineReconciliationCandidate } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -142,11 +142,11 @@ function ReconciliationResults({
 }: {
   query: ReturnType<typeof useReconciliationCandidatesQuery>;
   selectedCandidateId: string | null;
-  selectedCandidate: BaselineReconciliationCandidateV2 | undefined;
+  selectedCandidate: BaselineReconciliationCandidate | undefined;
   reason: string;
   error: string | null;
   mutation: ReturnType<typeof useConfirmBaselineReconciliationMutation>;
-  onSelectCandidate: (candidate: BaselineReconciliationCandidateV2) => void;
+  onSelectCandidate: (candidate: BaselineReconciliationCandidate) => void;
   onReasonChange: (reason: string) => void;
   onSubmit: () => void;
 }) {
@@ -235,7 +235,7 @@ function ReconciliationCandidate({
   selected,
   onSelect,
 }: {
-  candidate: BaselineReconciliationCandidateV2;
+  candidate: BaselineReconciliationCandidate;
   selected: boolean;
   onSelect: () => void;
 }) {

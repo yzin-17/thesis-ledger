@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import {
-  indicatorCalculateResponseV2Schema,
-  type BarSeriesV2,
-  type IndicatorCalculateResponseV2,
+  indicatorCalculateResponseSchema,
+  type BarSeries,
+  type IndicatorCalculateResponse,
 } from '@thesis-ledger/schemas';
 import { sliceBarSeries, type BarReadInput } from './market-bar-reader.js';
 
@@ -11,6 +11,7 @@ export type MarketIndicatorRequest = {
   parameters: Record<string, number>;
 };
 export const MAX_INDICATOR_INPUT_POINTS = 365;
+export const MAX_CHART_V3_INDICATOR_INPUT_POINTS = 3650;
 /**
  * DSA 的 MA 结果固定回传 ma5/ma10/ma20/ma60，与请求的 period 无关。
  * 预热多读不会出错，少读会在显示窗口左边缘留下均线空档，因此按最长默认均线取上限。
@@ -33,11 +34,12 @@ export const indicatorWarmupPoints = (requests: readonly MarketIndicatorRequest[
 export const indicatorReadInput = (
   input: BarReadInput,
   requests: readonly MarketIndicatorRequest[],
+  maximumInputPoints = MAX_INDICATOR_INPUT_POINTS,
 ): BarReadInput => {
   const visibleLimit = input.window.limit ?? 90;
   const limit = visibleLimit + indicatorWarmupPoints(requests);
-  if (limit > MAX_INDICATOR_INPUT_POINTS)
-    throw new BadRequestException(`可见窗口加预热窗口不能超过 ${MAX_INDICATOR_INPUT_POINTS} 根 bar`);
+  if (limit > maximumInputPoints)
+    throw new BadRequestException(`可见窗口加预热窗口不能超过 ${maximumInputPoints} 根 bar`);
   return {
     ...input,
     // 不把显示起点当作计算起点；向同一结束时刻之前读取预热事实。
@@ -46,7 +48,7 @@ export const indicatorReadInput = (
 };
 
 export const indicatorWindows = (
-  acquired: BarSeriesV2,
+  acquired: BarSeries,
   input: BarReadInput,
   requests: readonly MarketIndicatorRequest[],
 ) => {
@@ -66,17 +68,17 @@ const instantOf = (value: string) => Date.parse(value);
 
 /** DSA 完整输入已经过指纹校验；投影保留该证据，不把显示指纹冒充计算指纹。 */
 export const projectIndicatorResponse = (
-  response: IndicatorCalculateResponseV2,
-  calculation: BarSeriesV2,
-  visible: BarSeriesV2,
-): IndicatorCalculateResponseV2 => {
+  response: IndicatorCalculateResponse,
+  calculation: BarSeries,
+  visible: BarSeries,
+): IndicatorCalculateResponse => {
   if (response.inputFingerprint !== calculation.inputFingerprint)
     throw new Error('指标计算输入 fingerprint 不一致');
   // 时刻 -> BarSeries 规范写法，投影同时把指标点位归一到与可见 BarSeries 相同的时间戳格式。
   const visibleTimestamps = new Map(
     visible.points.map((point) => [instantOf(point.timestamp), point.timestamp] as const),
   );
-  return indicatorCalculateResponseV2Schema.parse({
+  return indicatorCalculateResponseSchema.parse({
     ...response,
     inputFingerprint: visible.inputFingerprint,
     results: response.results.map((result) => ({

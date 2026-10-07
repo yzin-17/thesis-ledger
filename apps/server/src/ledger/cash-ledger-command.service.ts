@@ -2,25 +2,25 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
-  createCashFlowCommandSchemaV2,
-  createCashTransferCommandSchemaV2,
-  replaceCashFlowCommandSchemaV2,
-  replaceCashTransferCommandSchemaV2,
-  restoreCashFlowCommandSchemaV2,
-  restoreCashTransferCommandSchemaV2,
-  voidCashFlowCommandSchemaV2,
-  voidCashTransferCommandSchemaV2,
-  type CashFlowPayloadV2,
-  type CreateCashFlowCommandV2,
-  type CreateCashTransferCommandV2,
-  type LedgerCommandResponseV2,
-  type LedgerEventV2,
-  type ReplaceCashFlowCommandV2,
-  type ReplaceCashTransferCommandV2,
-  type RestoreCashFlowCommandV2,
-  type RestoreCashTransferCommandV2,
-  type VoidCashFlowCommandV2,
-  type VoidCashTransferCommandV2,
+  createCashFlowCommandSchema,
+  createCashTransferCommandSchema,
+  replaceCashFlowCommandSchema,
+  replaceCashTransferCommandSchema,
+  restoreCashFlowCommandSchema,
+  restoreCashTransferCommandSchema,
+  voidCashFlowCommandSchema,
+  voidCashTransferCommandSchema,
+  type CashFlowPayload,
+  type CreateCashFlowCommand,
+  type CreateCashTransferCommand,
+  type LedgerCommandResponse,
+  type LedgerEvent,
+  type ReplaceCashFlowCommand,
+  type ReplaceCashTransferCommand,
+  type RestoreCashFlowCommand,
+  type RestoreCashTransferCommand,
+  type VoidCashFlowCommand,
+  type VoidCashTransferCommand,
 } from '@thesis-ledger/schemas';
 import {
   assertCashExpectedRevision,
@@ -35,11 +35,11 @@ import {
 } from './cash-ledger-command-support.js';
 import { LedgerV2Repository, type AccountLedgerWriteContext } from './ledger-v2.repository.js';
 type StandaloneCashCorrectionCommand =
-  ReplaceCashFlowCommandV2 | RestoreCashFlowCommandV2 | VoidCashFlowCommandV2;
+  ReplaceCashFlowCommand | RestoreCashFlowCommand | VoidCashFlowCommand;
 type CashTransferPayloadCommand =
-  CreateCashTransferCommandV2 | ReplaceCashTransferCommandV2 | RestoreCashTransferCommandV2;
+  CreateCashTransferCommand | ReplaceCashTransferCommand | RestoreCashTransferCommand;
 type CashTransferCorrectionCommand =
-  ReplaceCashTransferCommandV2 | RestoreCashTransferCommandV2 | VoidCashTransferCommandV2;
+  ReplaceCashTransferCommand | RestoreCashTransferCommand | VoidCashTransferCommand;
 
 @Injectable()
 export class CashLedgerCommandService {
@@ -49,15 +49,15 @@ export class CashLedgerCommandService {
     this.support = new CashLedgerCommandSupport(repository);
   }
 
-  async createCashFlow(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
+  async createCashFlow(rawCommand: unknown): Promise<LedgerCommandResponse> {
     return (await this.createCashFlowWithEffect(rawCommand)).response;
   }
 
   async createCashFlowWithEffect<T = undefined>(
     rawCommand: unknown,
-    effect?: (transaction: Prisma.TransactionClient, event: LedgerEventV2) => Promise<T>,
-  ): Promise<{ response: LedgerCommandResponseV2; effectResult: T | undefined }> {
-    const command = createCashFlowCommandSchemaV2.parse(rawCommand);
+    effect?: (transaction: Prisma.TransactionClient, event: LedgerEvent) => Promise<T>,
+  ): Promise<{ response: LedgerCommandResponse; effectResult: T | undefined }> {
+    const command = createCashFlowCommandSchema.parse(rawCommand);
     const result = await this.repository.withAccountWrite<
       SingleCashMutation & { effectResult: T | undefined }
     >(command.accountId, async (context) => {
@@ -92,41 +92,41 @@ export class CashLedgerCommandService {
     };
   }
 
-  async replaceCashFlow(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
+  async replaceCashFlow(rawCommand: unknown): Promise<LedgerCommandResponse> {
     return this.correctStandaloneCashFlow(
-      replaceCashFlowCommandSchemaV2.parse(rawCommand),
+      replaceCashFlowCommandSchema.parse(rawCommand),
       'REPLACE',
     );
   }
 
-  async voidCashFlow(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    return this.correctStandaloneCashFlow(voidCashFlowCommandSchemaV2.parse(rawCommand), 'VOID');
+  async voidCashFlow(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    return this.correctStandaloneCashFlow(voidCashFlowCommandSchema.parse(rawCommand), 'VOID');
   }
 
-  async restoreCashFlow(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
+  async restoreCashFlow(rawCommand: unknown): Promise<LedgerCommandResponse> {
     return this.correctStandaloneCashFlow(
-      restoreCashFlowCommandSchemaV2.parse(rawCommand),
+      restoreCashFlowCommandSchema.parse(rawCommand),
       'RESTORE',
     );
   }
 
-  async createCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = createCashTransferCommandSchemaV2.parse(rawCommand);
+  async createCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = createCashTransferCommandSchema.parse(rawCommand);
     return this.writeCashTransfer(command, 'CREATE');
   }
 
-  async replaceCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = replaceCashTransferCommandSchemaV2.parse(rawCommand);
+  async replaceCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = replaceCashTransferCommandSchema.parse(rawCommand);
     return this.writeCashTransfer(command, 'REPLACE');
   }
 
-  async voidCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = voidCashTransferCommandSchemaV2.parse(rawCommand);
+  async voidCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = voidCashTransferCommandSchema.parse(rawCommand);
     return this.writeCashTransfer(command, 'VOID');
   }
 
-  async restoreCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponseV2> {
-    const command = restoreCashTransferCommandSchemaV2.parse(rawCommand);
+  async restoreCashTransfer(rawCommand: unknown): Promise<LedgerCommandResponse> {
+    const command = restoreCashTransferCommandSchema.parse(rawCommand);
     return this.writeCashTransfer(command, 'RESTORE');
   }
 
@@ -142,12 +142,12 @@ export class CashLedgerCommandService {
         const desired =
           action === 'VOID'
             ? this.createVoidEvent(
-                command as VoidCashFlowCommandV2,
+                command as VoidCashFlowCommand,
                 context.nextLedgerRevision,
                 target,
               )
             : this.createStandalonePayloadEvent(
-                command as ReplaceCashFlowCommandV2 | RestoreCashFlowCommandV2,
+                command as ReplaceCashFlowCommand | RestoreCashFlowCommand,
                 context.nextLedgerRevision,
                 target.factId,
                 action,
@@ -182,9 +182,9 @@ export class CashLedgerCommandService {
   }
 
   private async writeCashTransfer(
-    command: CreateCashTransferCommandV2 | CashTransferCorrectionCommand,
+    command: CreateCashTransferCommand | CashTransferCorrectionCommand,
     action: 'CREATE' | 'REPLACE' | 'VOID' | 'RESTORE',
-  ): Promise<LedgerCommandResponseV2> {
+  ): Promise<LedgerCommandResponse> {
     const result = await this.repository.withAccountsWrite<PairedCashMutation>(
       [command.sourceAccountId, command.targetAccountId],
       async (contexts) => {
@@ -272,7 +272,7 @@ export class CashLedgerCommandService {
   }
 
   private createStandalonePayloadEvent(
-    command: CreateCashFlowCommandV2 | ReplaceCashFlowCommandV2 | RestoreCashFlowCommandV2,
+    command: CreateCashFlowCommand | ReplaceCashFlowCommand | RestoreCashFlowCommand,
     ledgerRevision: bigint,
     factId: string,
     action: 'CREATE' | 'REPLACE' | 'RESTORE',
@@ -299,12 +299,12 @@ export class CashLedgerCommandService {
       ...common,
       revisionAction: action,
       supersedesEventId: supersedesEventId!,
-      reason: (command as ReplaceCashFlowCommandV2 | RestoreCashFlowCommandV2).reason,
+      reason: (command as ReplaceCashFlowCommand | RestoreCashFlowCommand).reason,
     };
   }
 
   private createTransferEvents(
-    command: CreateCashTransferCommandV2 | CashTransferCorrectionCommand,
+    command: CreateCashTransferCommand | CashTransferCorrectionCommand,
     action: 'CREATE' | 'REPLACE' | 'VOID' | 'RESTORE',
     sourceContext: AccountLedgerWriteContext,
     targetContext: AccountLedgerWriteContext,
@@ -312,7 +312,7 @@ export class CashLedgerCommandService {
     targetTarget?: CashFlowLedgerEvent,
   ): [CashFlowLedgerEvent, CashFlowLedgerEvent] {
     if (action === 'VOID') {
-      const correction = command as VoidCashTransferCommandV2;
+      const correction = command as VoidCashTransferCommand;
       return [
         this.createVoidEvent(correction, sourceContext.nextLedgerRevision, sourceTarget!),
         this.createVoidEvent(correction, targetContext.nextLedgerRevision, targetTarget!),
@@ -342,7 +342,7 @@ export class CashLedgerCommandService {
   private transferPayload(
     command: CashTransferPayloadCommand,
     leg: 'OUTFLOW' | 'INFLOW',
-  ): CashFlowPayloadV2 {
+  ): CashFlowPayload {
     const accountId = leg === 'OUTFLOW' ? command.targetAccountId : command.sourceAccountId;
     return {
       direction: leg,
@@ -363,7 +363,7 @@ export class CashLedgerCommandService {
   private createTransferPayloadEvent(
     command: CashTransferPayloadCommand,
     context: AccountLedgerWriteContext,
-    payload: CashFlowPayloadV2,
+    payload: CashFlowPayload,
     action: 'CREATE' | 'REPLACE' | 'RESTORE',
     target?: CashFlowLedgerEvent,
   ): CashFlowPayloadEvent {
@@ -388,12 +388,12 @@ export class CashLedgerCommandService {
       ...common,
       revisionAction: action,
       supersedesEventId: target!.eventId,
-      reason: (command as ReplaceCashTransferCommandV2 | RestoreCashTransferCommandV2).reason,
+      reason: (command as ReplaceCashTransferCommand | RestoreCashTransferCommand).reason,
     };
   }
 
   private createVoidEvent(
-    command: VoidCashFlowCommandV2 | VoidCashTransferCommandV2,
+    command: VoidCashFlowCommand | VoidCashTransferCommand,
     ledgerRevision: bigint,
     target: CashFlowLedgerEvent,
   ): CashFlowVoidEvent {

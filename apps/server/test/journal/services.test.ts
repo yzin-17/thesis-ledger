@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TradeDetailResponseV2 } from '@thesis-ledger/schemas';
+import type { TradeDetailResponse } from '@thesis-ledger/schemas';
 import { JournalService } from '../../src/journal/journal.service.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
@@ -29,7 +29,7 @@ const instrumentDirectory = {
   })),
 };
 
-const makeDetail = (overrides: Partial<TradeDetailResponseV2> = {}): TradeDetailResponseV2 => ({
+const makeDetail = (overrides: Partial<TradeDetailResponse> = {}): TradeDetailResponse => ({
   id: 'trade:test:600519.SH:1',
   accountId,
   accountMode: 'actual',
@@ -121,7 +121,7 @@ const makeDetail = (overrides: Partial<TradeDetailResponseV2> = {}): TradeDetail
   ...overrides,
 });
 
-const makeTradeQuery = (detail: TradeDetailResponseV2) => ({
+const makeTradeQuery = (detail: TradeDetailResponse) => ({
   listDetails: vi.fn(async () => [detail]),
   readVersion: vi.fn(async () => ({ ledgerRevision: '9', projectionGeneration: '7' })),
   get: vi.fn(async () => detail),

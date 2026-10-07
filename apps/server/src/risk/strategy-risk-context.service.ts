@@ -7,9 +7,15 @@ import {
   type DerivedBacktestBar,
   type TradingMarket,
 } from '@thesis-ledger/domain';
-import type { BarPointV2 } from '@thesis-ledger/schemas';
+import type { BarPoint } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { isMarketBarTemporarilyUnavailable, MarketBarReader } from '../market/market-bar-reader.js';
+import { MarketService } from '../market/market.service.js';
+import { currentFundRiskContext } from './strategy-risk-nav-context.js';
+import {
+  isMarketBarTemporarilyUnavailable,
+  MarketBarReader,
+  MarketBarUnavailableError,
+} from '../market/market-bar-reader.js';
 
 export type StrategyRiskTarget = {
   executionInstrument: { symbol: string; assetType: string; market?: string };
@@ -47,7 +53,7 @@ type ExchangeValues = {
   availableAt?: string;
 };
 
-type RiskBar = Omit<BarPointV2, 'timestamp' | 'availableAt'> & {
+type RiskBar = Omit<BarPoint, 'timestamp' | 'availableAt'> & {
   symbol: string;
   provider: string;
   timestamp: Date;
@@ -100,6 +106,7 @@ export class StrategyRiskContextService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bars?: MarketBarReader,
+    private readonly market?: MarketService,
   ) {}
 
   private async assertTarget(accountId: string, symbol: string, target: StrategyRiskTarget) {
@@ -136,52 +143,6 @@ export class StrategyRiskContextService {
       ...(source.trade?.openedAt ? { openedAt: source.trade.openedAt.toISOString() } : {}),
       quantity: source.position?.quantity.toString(),
       averageCost: source.position?.costPrice.toString(),
-    };
-  }
-
-  private async fundContext(
-    symbol: string,
-    source: StrategyRiskPositionTradeContext,
-    evaluatedAt: Date,
-    requiresHoldingPeriods: boolean,
-  ): Promise<StrategyRiskActualContext> {
-    const nav = await this.prisma.fundNavPoint.findFirst({
-      where: {
-        symbol,
-        navDate: { lte: evaluatedAt },
-        fetchedAt: { lte: evaluatedAt },
-      },
-      orderBy: [{ navDate: 'desc' }, { fetchedAt: 'desc' }],
-    });
-    const holdingPeriods =
-      requiresHoldingPeriods && source.trade?.openedAt && nav
-        ? await this.prisma.fundNavPoint.count({
-            where: {
-              symbol,
-              navDate: { gte: source.trade.openedAt, lte: nav.navDate },
-              fetchedAt: { lte: evaluatedAt },
-            },
-          })
-        : undefined;
-    const base = this.baseContext(source);
-    return {
-      ...(base.positionId ? { positionId: base.positionId } : {}),
-      ...(base.tradeId ? { tradeId: base.tradeId } : {}),
-      ...(base.openedAt ? { openedAt: base.openedAt } : {}),
-      context: {
-        ...(base.quantity ? { quantity: base.quantity } : {}),
-        ...(base.averageCost ? { averageCost: base.averageCost } : {}),
-        ...(nav ? { price: nav.unitNav.toString() } : {}),
-        ...(holdingPeriods === undefined
-          ? {}
-          : { holdingPeriods: Math.max(0, holdingPeriods - 1) }),
-        ...(nav
-          ? {
-              occurredAt: nav.navDate.toISOString(),
-              availableAt: nav.fetchedAt.toISOString(),
-            }
-          : {}),
-      },
     };
   }
 
@@ -225,23 +186,36 @@ export class StrategyRiskContextService {
     take?: number,
   ): Promise<RiskBar[]> {
     if (!this.bars) throw new BadRequestException('行情 Reader 不可用，策略风险拒绝读取行情');
-    const normalizedAssetType =
-      assetType.toLowerCase() === 'fund' ? 'MUTUAL_FUND' : assetType.toUpperCase();
-    const series = await this.bars.read({
-      identity: {
-        symbol,
-        assetType: normalizedAssetType as 'STOCK' | 'ETF' | 'MUTUAL_FUND',
-        timeframe,
+    if (timeframe === '1m') throw new MarketBarUnavailableError('分钟线尚无现行精确来源');
+    const normalizedAssetType = assetType.toUpperCase();
+    if (normalizedAssetType !== 'STOCK' && normalizedAssetType !== 'ETF')
+      throw new MarketBarUnavailableError('策略风险日线资产类型尚无现行精确来源');
+    let market: TradingMarket;
+    if (/\.(SH|SZ|BJ)$/.test(symbol)) market = 'CN';
+    else if (/\.HK$/.test(symbol)) market = 'HK';
+    else if (/\.US$/.test(symbol)) market = 'US';
+    else throw new MarketBarUnavailableError('策略风险标的市场无法识别');
+    const defaultStart = new Date(evaluatedAt);
+    defaultStart.setUTCDate(defaultStart.getUTCDate() - 366);
+    const selected = await this.bars.readV3({
+      market,
+      symbol,
+      routeKey: {
+        kind: 'bar',
+        market,
+        assetType: normalizedAssetType,
+        capability: 'DAILY_BAR',
+        timeframe: '1d',
         adjustment: 'none',
       },
       window: {
-        ...(start ? { start: start.toISOString() } : {}),
-        end: evaluatedAt.toISOString(),
-        ...(take ? { limit: take } : {}),
+        start: (start ?? defaultStart).toISOString().slice(0, 10),
+        end: evaluatedAt.toISOString().slice(0, 10),
       },
-      acceptance: 'complete',
     });
-    const rows = series.points
+    if (selected.status !== 'selected')
+      throw new MarketBarUnavailableError('策略风险日线窗口不可用');
+    const rows = selected.selection.response.bars
       .filter(
         (point) =>
           new Date(point.timestamp) <= evaluatedAt && new Date(point.availableAt) <= evaluatedAt,
@@ -251,9 +225,9 @@ export class StrategyRiskContextService {
         timestamp: new Date(point.timestamp),
         availableAt: new Date(point.availableAt),
         symbol,
-        provider: series.provenance.providerId,
+        provider: selected.selection.response.provenance.providerId,
       }));
-    return this.effectiveBars(rows);
+    return this.effectiveBars(take ? rows.slice(-take) : rows);
   }
 
   private minuteInputs(rows: RiskBar[], market: TradingMarket): BacktestMinuteBar[] {
@@ -458,7 +432,13 @@ export class StrategyRiskContextService {
     await this.assertTarget(accountId, symbol, target);
     const source = await this.loadPositionTrade(accountId, symbol);
     if (target.executionInstrument.assetType === 'fund')
-      return this.fundContext(symbol, source, evaluatedAt, target.requiresHoldingPeriods === true);
+      return currentFundRiskContext(
+        this.market,
+        symbol,
+        source,
+        evaluatedAt,
+        target.requiresHoldingPeriods === true,
+      );
     return this.exchangeContext(symbol, target, source, evaluatedAt);
   }
 }

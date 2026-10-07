@@ -9,11 +9,11 @@ import {
   quoteServedAgeMs,
   getVisibleMarketDetail,
 } from './market-detail.types.js';
-import type { BarSeriesV2, QuoteV1 } from '@thesis-ledger/schemas';
-import type { MarketDetailResponseV2 } from '@thesis-ledger/api-client';
+import type { BarSeries, Quote } from '@thesis-ledger/schemas';
+import type { MarketDetailResponse } from '@thesis-ledger/api-client';
 
-const detail = (symbol: string): MarketDetailResponseV2 => ({
-  contractVersion: 2,
+const detail = (symbol: string): MarketDetailResponse => ({
+  contractVersion: 3,
   symbol,
   assetType: 'STOCK',
   identity: { source: 'asset', status: 'confirmed' },
@@ -26,8 +26,8 @@ const detail = (symbol: string): MarketDetailResponseV2 => ({
   generatedAt: '2026-08-21T00:00:00.000Z',
 });
 
-const series = (timestamps: string[]): BarSeriesV2 => ({
-  contractVersion: 2 as const,
+const series = (timestamps: string[]): BarSeries => ({
+  contractVersion: 3 as const,
   identity: { symbol: '600519.SH', assetType: 'STOCK' as const, timeframe: '1d' as const, adjustment: 'qfq' as const },
   points: timestamps.map((timestamp) => ({ timestamp, open: 10, high: 12, low: 9, close: 11, volume: 100, amount: 1100, completionStatus: 'complete' as const, availableAt: timestamp })),
   coverage: { actualStart: timestamps[0] ?? null, actualEnd: timestamps.at(-1) ?? null, hasMoreBefore: false, latestCompleteTradingDate: timestamps.at(-1)?.slice(0, 10) ?? null },
@@ -48,8 +48,8 @@ describe('MarketDetail V2 类型辅助函数', () => {
   });
 
   it('合并 V2 bars 页面并保持严格时间顺序', () => {
-    const current: MarketDetailResponseV2 = { ...detail('600519.SH'), requested: ['bars'], barSeries: series(['2026-08-20T00:00:00.000Z']) };
-    const next: MarketDetailResponseV2 = { ...detail('600519.SH'), requested: ['bars'], barSeries: series(['2026-08-21T00:00:00.000Z']) };
+    const current: MarketDetailResponse = { ...detail('600519.SH'), requested: ['bars'], barSeries: series(['2026-08-20T00:00:00.000Z']) };
+    const next: MarketDetailResponse = { ...detail('600519.SH'), requested: ['bars'], barSeries: series(['2026-08-21T00:00:00.000Z']) };
     const merged = mergeMarketDetail(current, next);
     expect(merged.barSeries?.points.map((point) => point.timestamp)).toEqual([
       '2026-08-20T00:00:00.000Z',
@@ -59,7 +59,7 @@ describe('MarketDetail V2 类型辅助函数', () => {
   });
 
   it('按交易日替换同日修订，不因 ISO 时刻不同产生重复 bar', () => {
-    const current: MarketDetailResponseV2 = {
+    const current: MarketDetailResponse = {
       ...detail('600519.SH'),
       requested: ['bars'],
       barSeries: series(['2026-08-21T00:00:00.000Z']),
@@ -70,7 +70,7 @@ describe('MarketDetail V2 类型辅助函数', () => {
       close: 13,
       completionStatus: 'incomplete',
     };
-    const next: MarketDetailResponseV2 = {
+    const next: MarketDetailResponse = {
       ...detail('600519.SH'),
       requested: ['bars'],
       barSeries: revisedSeries,
@@ -93,8 +93,8 @@ describe('MarketDetail V2 类型辅助函数', () => {
 
   it('按取回时间判断行情是否仍在上游刷新间隔内', () => {
     const now = Date.parse('2026-08-21T00:10:00.000Z');
-    const quote = (fetchedAt: string): QuoteV1 => ({
-      version: 1,
+    const quote = (fetchedAt: string): Quote => ({
+      version: 3,
       symbol: '600519.SH',
       open: 100,
       high: 110,

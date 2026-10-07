@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   optimizationExperimentCloneSchema,
@@ -16,21 +17,71 @@ import {
   riskApplicationCreateSchema,
 } from '../src/strategy-optimization.js';
 
+const normalizedExecutionModel = () => {
+  const model = JSON.parse(
+    readFileSync(
+      new URL('../fixtures/backtest-execution-model.cn-2024q1.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  model.id = 'normalized-qfq-research-2024';
+  model.scope.range = { start: '2024-01-01', end: '2024-12-31' };
+  model.segments[0].range = { start: '2024-01-01', end: '2024-12-31' };
+  model.segments[0].assumptions.push('按 qfq 价格坐标及连续 Decimal 数量进行归一化研究');
+  model.segments[0].execution.price = {
+    kind: 'noDailyLimit',
+    reason: '归一化坐标不适用真实价格 tick 和涨跌幅限制',
+  };
+  model.segments[0].execution.normalizedExecution = {
+    priceCoordinate: 'continuous-decimal',
+    quantityUnits: 'continuous-normalized-decimal',
+    lotSizeConstraint: 'not-applied',
+    tickSizeConstraint: 'not-applied',
+    dailyPriceLimit: 'not-applied',
+    feeBasis: 'simulatedTurnover',
+  };
+  return model;
+};
+
 const runConfig = {
+  schemaVersion: '3',
   startDate: '2024-01-01',
   endDate: '2024-12-31',
   dataAsOf: '2025-01-01T00:00:00+00:00',
   baseCurrency: 'CNY',
   initialCash: { CNY: '100000' },
+  executionModel: normalizedExecutionModel(),
   valuationPolicy: {
     baseTimezone: 'Asia/Shanghai',
     dailyValuationTime: '15:00',
     pricePolicy: 'latestAvailable',
     fxPolicy: 'latestAvailable',
   },
+  executionPriceProtocol: {
+    protocolVersion: 'execution-price-v1',
+    priceBasis: {
+      adjustment: 'qfq',
+      method: 'provider-native',
+      methodVersion: 'provider-defined-v1',
+      basisScope: 'provider-defined',
+      anchor: null,
+      revision: { origin: 'local-observation', contentHash: 'a'.repeat(64) },
+      observedAt: '2025-01-01T00:00:00.000Z',
+      quantityBasis: 'normalized-units',
+      volumeBasis: 'unknown',
+      dividendMeaning: 'provider-defined',
+      dividendEvidenceRef: null,
+      conversionAvailable: false,
+      conversionEvidenceRef: null,
+      derivation: null,
+    },
+    accountingBasis: 'normalized-series',
+    history: { basis: 'fixed-provider-snapshot' },
+  },
 };
 
 const experiment = {
+  contractVersion: 3,
   strategyVersionId: '11111111-1111-4111-8111-111111111111',
   models: [
     { provider: 'provider-a', model: 'model-a' },
@@ -59,6 +110,27 @@ describe('strategy optimization contracts', () => {
     expect(parsed.split.test.start).toBe('2024-10-01');
     expect(parsed.models[0]?.reasoningEffort).toBe('high');
     expect(parsed.models[1]).not.toHaveProperty('reasoningEffort');
+  });
+
+  it('拒绝旧实验创建合同及缺少现行执行协议的配置', () => {
+    const legacyExperiment: Partial<typeof experiment> = { ...experiment };
+    const legacyRunConfig: Partial<typeof runConfig> = { ...runConfig };
+    delete legacyExperiment.contractVersion;
+    delete legacyRunConfig.schemaVersion;
+    delete legacyRunConfig.executionModel;
+    delete legacyRunConfig.executionPriceProtocol;
+    expect(
+      optimizationExperimentCreateSchema.safeParse({
+        ...legacyExperiment,
+        runConfig: legacyRunConfig,
+      }).success,
+    ).toBe(false);
+    expect(
+      optimizationExperimentCreateSchema.safeParse({
+        ...experiment,
+        runConfig: legacyRunConfig,
+      }).success,
+    ).toBe(false);
   });
 
   it('requires a currency for known frozen pricing and preserves explicit zero-price metadata', () => {
@@ -139,7 +211,7 @@ describe('strategy optimization contracts', () => {
     ).toThrow();
   });
 
-  it('requires discovery proposals to contain a complete StrategySchemaV2', () => {
+  it('requires discovery proposals to contain a complete BacktestStrategy', () => {
     expect(() =>
       optimizationDiscoveryProposalSchema.parse({ strategy: { type: 'code' } }),
     ).toThrow();

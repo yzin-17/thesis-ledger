@@ -4,6 +4,8 @@ import {
   decryptProviderCredential,
 } from '../../src/platform/credential-security.js';
 import { AiProviderService } from '../../src/ai/ai-provider.service.js';
+import { DEFAULT_SLOW_AFTER_MS } from '../../src/providers/provider-health.service.js';
+import { AI_GENERATION_SLOW_AFTER_MS } from '../../src/ai/ai-provider.service.js';
 import { AiSdkGenerationError } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { ProviderConfigService } from '../../src/providers/provider-config.service.js';
@@ -16,137 +18,14 @@ const successfulSdk = () => ({
     return { output: { ok: true } };
   }),
 });
-type TestRow = {
-  name: string;
-  type: string;
-  enabled: boolean;
-  priority: number;
-  capabilities: string[];
-  settings: Record<string, unknown>;
-  encryptedCredentials?: Uint8Array;
-  health: string;
-  updatedAt: Date;
-};
-type SaveInput = {
-  name: string;
-  enabled?: boolean;
-  priority: number;
-  capabilities: string[];
-  credentialsRef?: string;
-  settings: Record<string, unknown>;
-  clearCredentials?: boolean;
-};
-
-const validSettings = (baseUrl = 'https://db.example/v1', models = ['db-model']) => ({
-  baseUrl,
-  models,
-  upstreamFormat: 'chat-completions',
-  chatImplementation: 'compatible',
-});
-
-const createConfigStub = (initial: TestRow[] = []) => {
-  let rows = [...initial];
-  const service = {
-    listStored: vi.fn(async () => rows),
-    findStored: vi.fn(async (name: string) => rows.find((row) => row.name === name)),
-    readCredential: vi.fn(async (config: { encryptedCredentials?: Uint8Array }) =>
-      config.encryptedCredentials
-        ? decryptProviderCredential(config.encryptedCredentials).credential
-        : '',
-    ),
-    setEnabled: vi.fn(async (name: string, enabled: boolean) => {
-      const row = rows.find((item) => item.name === name);
-      if (!row) throw new Error('missing row');
-      row.enabled = enabled;
-      row.updatedAt = new Date();
-      return row;
-    }),
-    setHealth: vi.fn(async (name: string, health: string) => {
-      const row = rows.find((item) => item.name === name);
-      if (!row) throw new Error('missing row');
-      row.health = health;
-      return row;
-    }),
-    deleteStored: vi.fn(async (name: string) => {
-      rows = rows.filter((row) => row.name !== name);
-    }),
-    saveAi: vi.fn(async (input: SaveInput) => {
-      const existing = rows.find((row) => row.name === input.name);
-      const saved: TestRow = {
-        name: input.name,
-        type: 'ai',
-        enabled: input.enabled ?? existing?.enabled ?? true,
-        priority: input.priority,
-        capabilities: input.capabilities,
-        settings: input.settings,
-        ...(!input.clearCredentials && existing?.encryptedCredentials
-          ? { encryptedCredentials: existing.encryptedCredentials }
-          : {}),
-        health: existing?.health ?? 'unknown',
-        updatedAt: new Date(),
-      };
-      rows = [...rows.filter((row) => row.name !== input.name), saved];
-      return saved;
-    }),
-  };
-  return {
-    service,
-    replace(next: TestRow[]) {
-      rows = next;
-    },
-  };
-};
-
-const createHealthStub = () => ({
-  record: vi.fn(
-    async (
-      provider: string,
-      success: boolean,
-      latencyMs: number,
-      _error: string | undefined,
-      checkedAt: Date,
-    ) => ({
-      provider,
-      state: success ? 'healthy' : 'degraded',
-      latencyMs,
-      checkedAt,
-    }),
-  ),
-    recordHistory: vi.fn(
-      async (
-        provider: string,
-        state: string,
-        latencyMs: number,
-        errorCode: string | undefined,
-        checkedAt: Date,
-        source: string,
-        details: unknown,
-      ) => {
-        void provider;
-        void state;
-        void latencyMs;
-        void errorCode;
-        void checkedAt;
-        void source;
-        void details;
-        return null;
-      },
-    ),
-    get: vi.fn(async () => null),
-});
-
-const createDbRow = (name: string, overrides: Partial<TestRow> = {}): TestRow => ({
-  name,
-  type: 'ai',
-  enabled: true,
-  priority: 1,
-  capabilities: ['chat'],
-  settings: validSettings(),
-  encryptedCredentials: encryptProviderCredential(`db-key-${name}`),
-  health: 'unknown',
-  updatedAt: new Date('2026-09-14T00:00:00.000Z'),
-  ...overrides,
-});
+import {
+  createConfigStub,
+  createHealthStub,
+  createDbRow,
+  validSettings,
+  type TestRow,
+  type SaveInput,
+} from './ai-provider-management.fixtures.js';
 
 describe('AI Provider 持久化管理', () => {
   it('指定模型测试只请求目标模型，不回退到模型列表首项', async () => {
@@ -276,7 +155,7 @@ describe('AI Provider 持久化管理', () => {
     expect(generated?.messages).toEqual([
       { role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' },
     ]);
-    expect(generated).toMatchObject({ maxOutputTokens: 1_024 });
+    expect(generated).toMatchObject({ maxOutputTokens: 1_024, timeout: { totalMs: 30_000 } });
     expect(generated).not.toHaveProperty('reasoningEffort');
   });
 
@@ -531,6 +410,8 @@ describe('AI Provider 持久化管理', () => {
           source: 'configured_model_pricing',
         },
       }),
+      // AI 链路自带「慢」阈值：成功的慢生成不该被 3 秒的默认阈值判成 degraded。
+      AI_GENERATION_SLOW_AFTER_MS,
     );
   });
 
@@ -582,12 +463,14 @@ describe('AI Provider 持久化管理', () => {
     const configs = createConfigStub([createDbRow('cancelled-test')]);
     const health = createHealthStub();
     const sdk = {
-      generate: vi.fn((input: { signal: AbortSignal }) =>
-        new Promise((_resolve, reject) => {
-          input.signal.addEventListener('abort', () => reject(new Error('aborted')), {
-            once: true,
-          });
-        })),
+      generate: vi.fn(
+        (input: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            input.signal.addEventListener('abort', () => reject(new Error('aborted')), {
+              once: true,
+            });
+          }),
+      ),
     };
     const service = new AiProviderService(
       configs.service as never,
@@ -1322,6 +1205,35 @@ describe('AI Provider 持久化管理', () => {
       expect(health.record).toHaveBeenCalledTimes(1);
       expect(configs.service.setHealth).toHaveBeenCalledWith('saved', 'degraded');
       expect(registry.readiness('saved', true)).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('AI 链路按授权预算判慢，不沿用 3 秒的轻量连接测试阈值', async () => {
+    const configs = createConfigStub([createDbRow('saved')]);
+    const health = createHealthStub();
+    const service = new AiProviderService(
+      configs.service as never,
+      health as never,
+      new AiProviderRegistry(),
+      successfulSdk() as never,
+    );
+    try {
+      const result = await service.testSaved('saved');
+      expect(result.status).toBe('healthy');
+      expect(AI_GENERATION_SLOW_AFTER_MS).toBeGreaterThan(DEFAULT_SLOW_AFTER_MS);
+      expect(health.record).toHaveBeenCalledWith(
+        'saved',
+        true,
+        expect.any(Number),
+        undefined,
+        expect.any(Date),
+        'manual',
+        expect.anything(),
+        AI_GENERATION_SLOW_AFTER_MS,
+      );
+      expect(configs.service.setHealth).toHaveBeenCalledWith('saved', 'healthy');
     } finally {
       vi.unstubAllGlobals();
     }

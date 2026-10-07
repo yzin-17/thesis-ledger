@@ -1,4 +1,4 @@
-import type { LedgerAuditResponseV2, LedgerEventV2 } from '@thesis-ledger/api-client';
+import type { LedgerAuditResponse, LedgerEvent } from '@thesis-ledger/api-client';
 
 import type { Account } from '../portfolio/portfolio.types.js';
 import type { TransferEvent } from './account-data.cash.api.js';
@@ -7,12 +7,12 @@ export type AccountDataTab = 'positions' | 'transactions' | 'cash';
 export type ExecutionSide = 'BUY' | 'SELL';
 export type TimePrecision = 'INSTANT' | 'DATE';
 export type Currency = Account['currency'];
-export type LedgerAuditEvent = LedgerAuditResponseV2['events'][number];
-export type ExecutionEvent = Extract<LedgerEventV2, { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }>;
-export type VoidEvent = Extract<LedgerEventV2, { revisionAction: 'VOID' }>;
+export type LedgerAuditEvent = LedgerAuditResponse['events'][number];
+export type ExecutionEvent = Extract<LedgerEvent, { type: 'BUY_EXECUTION' | 'SELL_EXECUTION' }>;
+export type VoidEvent = Extract<LedgerEvent, { revisionAction: 'VOID' }>;
 export type CashTransferEvent = TransferEvent;
 
-export const isCashTransferEvent = (event: LedgerEventV2): event is CashTransferEvent =>
+export const isCashTransferEvent = (event: LedgerEvent): event is CashTransferEvent =>
   event.type === 'CASH_FLOW' &&
   event.revisionAction !== 'VOID' &&
   event.payload.category === 'TRANSFER' &&

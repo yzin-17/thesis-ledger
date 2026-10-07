@@ -1,6 +1,7 @@
 import { ArrowLeft, LoaderCircle, Play, RefreshCw, X } from 'lucide-react';
 import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,9 +79,12 @@ export function StrategyBacktestDetailPage({
     );
   }
   if (jobQuery.isError || !jobQuery.data) {
+    let message = '回测任务不存在或暂时无法读取。';
+    if (jobQuery.error instanceof ThesisLedgerApiError && jobQuery.error.status === 409)
+      message = '当前回测格式不受支持或冻结记录校验未通过，无法读取此任务。';
     return (
       <div className="space-y-4">
-        <NavigateBackMessage message="回测任务不存在或暂时无法读取。" />
+        <NavigateBackMessage message={message} />
         <Button variant="outline" onClick={() => void jobQuery.refetch()}>
           <RefreshCw />
           重试
@@ -156,8 +160,7 @@ export function StrategyBacktestDetailPage({
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{identity.subtitle}</p>
             <p className="mt-3 text-sm">
-              {symbol ?? '执行标的未记录'} · {timeframe ?? '周期未记录'} ·{' '}
-              {periodLabel}
+              {symbol ?? '执行标的未记录'} · {timeframe ?? '周期未记录'} · {periodLabel}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -215,7 +218,7 @@ export function StrategyBacktestDetailPage({
                 取消
               </Button>
             )}
-            {job.mode === 'V2' && job.status === 'failed' && (
+            {job.mode === 'V3' && job.status === 'failed' && (
               <Button size="sm" disabled={busyAction !== null} onClick={() => onRetry(job)}>
                 <Play />
                 重试执行

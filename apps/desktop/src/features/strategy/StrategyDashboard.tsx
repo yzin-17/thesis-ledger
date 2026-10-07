@@ -5,14 +5,11 @@ import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import type { LoadState } from '../shared/types.js';
 import {
   useCancelBacktestMutation,
-  useCancelBacktestV2Mutation,
   useCreateStrategyMutation,
   useCreateStrategyVersionMutation,
-  useFetchStrategyBarsMutation,
   useQueueBacktestMutation,
-  useRetryBacktestV2Mutation,
+  useRetryBacktestMutation,
   useRunBacktestMutation,
-  useRunBacktestV2Mutation,
 } from './strategy.mutations.js';
 import { createStrategyActionHandlers } from './strategy.actions.js';
 import { useStrategyQueries } from './strategy.queries.js';
@@ -32,6 +29,9 @@ import { StrategyRiskApplicationPage } from './StrategyRiskApplicationPage.js';
 import { BacktestSetupDialog } from './StrategySections.js';
 import { StrategyBacktestJobsPage } from './StrategyBacktestJobsPage.js';
 import { StrategyBacktestDetailPage } from './StrategyBacktestDetailPage.js';
+import { NavBacktestDetailPage } from './NavBacktestDetailPage.js';
+import { NavBacktestJobsPage } from './NavBacktestJobs.js';
+import { NavBacktestSetupPage } from './NavBacktestSetup.js';
 import { StrategyCenterErrorBoundary } from './StrategyCenterErrorBoundary.js';
 import {
   legacyStrategyDestination,
@@ -122,6 +122,23 @@ function StrategyEditorRoute({
   );
 }
 
+function NavBacktestSetupRoute({
+  strategies,
+  loading,
+}: {
+  strategies: StrategyRecord[];
+  loading: boolean;
+}) {
+  const { strategyId, versionId } = useParams();
+  return (
+    <NavBacktestSetupPage
+      key={`${strategyId ?? ''}:${versionId ?? ''}`}
+      strategies={strategies}
+      strategiesLoading={loading}
+    />
+  );
+}
+
 export function StrategyDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -143,12 +160,9 @@ export function StrategyDashboard() {
   const createMutation = useCreateStrategyMutation();
   const createVersionMutation = useCreateStrategyVersionMutation();
   const queueMutation = useQueueBacktestMutation();
-  const fetchBarsMutation = useFetchStrategyBarsMutation();
   const runMutation = useRunBacktestMutation();
   const cancelMutation = useCancelBacktestMutation();
-  const runV2Mutation = useRunBacktestV2Mutation();
-  const cancelV2Mutation = useCancelBacktestV2Mutation();
-  const retryV2Mutation = useRetryBacktestV2Mutation();
+  const retryMutation = useRetryBacktestMutation();
   const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
   const jobs: BacktestJobSummary[] = jobsQuery.data ?? [];
   let loadState: LoadState = 'loading';
@@ -166,13 +180,10 @@ export function StrategyDashboard() {
     toastManager,
     createMutation,
     createVersionMutation,
-    fetchBarsMutation,
     queueMutation,
     runMutation,
     cancelMutation,
-    runV2Mutation,
-    cancelV2Mutation,
-    retryV2Mutation,
+    retryMutation,
     onJobQueued: (job) => void navigate(strategyCenterPath.job(job.id)),
     load,
   });
@@ -257,6 +268,17 @@ export function StrategyDashboard() {
             }
           />
           <Route path="jobs" element={<StrategyBacktestJobsPage strategies={strategies} />} />
+          <Route path="jobs/nav" element={<NavBacktestJobsPage />} />
+          <Route
+            path="jobs/nav/setup/:strategyId/:versionId"
+            element={
+              <NavBacktestSetupRoute strategies={strategies} loading={strategiesQuery.isPending} />
+            }
+          />
+          <Route
+            path="jobs/nav/runs/:runId"
+            element={<NavBacktestDetailPage strategies={strategies} />}
+          />
           <Route
             path="jobs/:jobId"
             element={
@@ -264,8 +286,8 @@ export function StrategyDashboard() {
                 strategies={strategies}
                 strategiesLoading={strategiesQuery.isPending}
                 busyAction={busyAction}
-                onRun={(job) => void actions.run(job.id, job.mode)}
-                onCancel={(job) => void actions.cancel(job.id, job.mode)}
+                onRun={(job) => void actions.run(job.id)}
+                onCancel={(job) => void actions.cancel(job.id)}
                 onRetry={(job) => void actions.retry(job.id)}
                 onRerun={({ strategy, version, setup }) =>
                   setBacktestSelection({ strategy, version, initialSetup: setup, intent: 'rerun' })

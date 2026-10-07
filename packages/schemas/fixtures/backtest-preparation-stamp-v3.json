@@ -1,0 +1,36 @@
+{
+  "strategyVersionId": "11111111-1111-4111-8111-111111111111",
+  "strategyContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "runConfigChecksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "desiredRevision": 7,
+  "effectiveRevision": 1,
+  "catalogRevision": 12,
+  "targetSequences": [
+    {
+      "requirement": {
+        "symbol": "159516.SZ",
+        "capability": "DAILY_BAR",
+        "purpose": "execution",
+        "dateRange": {
+          "startDate": "2024-01-01",
+          "endDate": "2024-03-29"
+        },
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        }
+      },
+      "targets": [
+        {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0
+        }
+      ]
+    }
+  ]
+}

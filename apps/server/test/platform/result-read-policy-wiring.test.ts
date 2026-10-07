@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BacktestEventPublisher } from '../../src/backtest/backtest-event.publisher.js';
 import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
-import { BacktestV2RunService } from '../../src/backtest/backtest-v2-run.js';
+import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
 import { StrategyOptimizationReadService } from '../../src/strategy-optimization/strategy-optimization-read.service.js';
 
@@ -16,7 +16,7 @@ describe('读取门禁生产 wiring', () => {
     expect(dependencies).toEqual(
       expect.arrayContaining([
         { index: 1, param: BacktestQueueService },
-        { index: 2, param: BacktestV2RunService },
+        { index: 2, param: BacktestRunService },
       ]),
     );
   });

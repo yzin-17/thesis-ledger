@@ -6,6 +6,10 @@ export const strategyCenterPath = {
   library: '/strategy/library',
   jobs: '/strategy/jobs',
   job: (jobId: string) => `/strategy/jobs/${encodeURIComponent(jobId)}`,
+  navBacktestJobs: '/strategy/jobs/nav',
+  navBacktestSetup: (strategyId: string, versionId: string) =>
+    `/strategy/jobs/nav/setup/${encodeURIComponent(strategyId)}/${encodeURIComponent(versionId)}`,
+  navBacktestRun: (runId: string) => `/strategy/jobs/nav/runs/${encodeURIComponent(runId)}`,
   experiments: '/strategy/experiments',
   newStrategy: '/strategy/library/new',
   newExperiment: '/strategy/experiments/new',
@@ -55,6 +59,28 @@ export const findStrategyVersion = (
   const version = strategy.versions.find((candidate) => candidate.id === versionId);
   return version ? { strategy, version } : null;
 };
+
+export const navFundSymbolForStrategyVersion = (version: StrategyVersion) => {
+  const schema = record(version.schema);
+  const instrument = record(schema.executionInstrument);
+  const execution = record(schema.execution);
+  const symbol = instrument.symbol;
+  if (
+    instrument.assetType !== 'fund' ||
+    instrument.market !== 'CN' ||
+    execution.mode !== 'nav' ||
+    typeof symbol !== 'string' ||
+    !/^\d{6}\.OF$/.test(symbol)
+  ) {
+    return null;
+  }
+  return symbol;
+};
+
+function record(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
 
 export const legacyStrategyDestination = (search: string) => {
   const tab = new URLSearchParams(search).get('tab');

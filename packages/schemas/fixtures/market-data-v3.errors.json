@@ -1,0 +1,42 @@
+[
+  {
+    "contractVersion": 3,
+    "requestId": "market-data-v3-error-unsupported-version",
+    "error": {
+      "code": "unsupported_data_contract_version",
+      "message": "不支持请求的数据契约版本"
+    }
+  },
+  {
+    "contractVersion": 3,
+    "requestId": "market-data-v3-error-unsupported-basis",
+    "error": {
+      "code": "unsupported_price_basis",
+      "message": "来源不支持请求的价格口径"
+    }
+  },
+  {
+    "contractVersion": 3,
+    "requestId": "market-data-v3-error-insufficient-coverage",
+    "error": {
+      "code": "insufficient_coverage",
+      "message": "请求区间的数据覆盖不足"
+    }
+  },
+  {
+    "contractVersion": 3,
+    "requestId": "market-data-v3-error-upstream-failure",
+    "error": {
+      "code": "upstream_failure",
+      "message": "行情上游暂时不可用"
+    }
+  },
+  {
+    "contractVersion": 3,
+    "requestId": "market-data-v3-error-invalid-response",
+    "error": {
+      "code": "invalid_response",
+      "message": "行情上游响应格式无效"
+    }
+  }
+]

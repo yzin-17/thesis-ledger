@@ -1,0 +1,37 @@
+{
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "catalogRevision": 7,
+  "generatedAt": "2026-09-25T06:30:00.000Z",
+  "integrity": "complete",
+  "entries": [
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "DAILY_BAR",
+        "timeframe": "1d",
+        "adjustment": "qfq"
+      },
+      "target": {
+        "providerId": "hithink",
+        "upstreamSource": "hithink-financial-api"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "FUND_HOLDINGS"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "eastmoney"
+      },
+      "state": "quota_unavailable"
+    }
+  ]
+}

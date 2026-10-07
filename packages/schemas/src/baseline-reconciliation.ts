@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import {
   decimalStringSchema,
-  ledgerCommandSourceSchemaV2,
+  ledgerCommandSourceSchema,
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
-} from './ledger-v2.js';
+} from './ledger-contract.js';
 
-export const baselineReconciliationRuleVersionV2 = 1 as const;
+export const baselineReconciliationRuleVersion = 1 as const;
 
-export const baselineReconciliationConflictReasonsV2 = [
+export const baselineReconciliationConflictReasons = [
   'BASELINE_TIME_UNKNOWN',
   'MISSING_BASELINE_COST',
   'EXECUTION_TIME_UNKNOWN',
@@ -23,7 +23,7 @@ export const baselineReconciliationConflictReasonsV2 = [
   'NEGATIVE_REMAINING_COST',
 ] as const;
 
-export const baselineReconciliationMatchBasisV2 = [
+export const baselineReconciliationMatchBasis = [
   'ACCOUNT_MATCH',
   'SYMBOL_MATCH',
   'EXECUTION_BEFORE_BASELINE',
@@ -31,10 +31,10 @@ export const baselineReconciliationMatchBasisV2 = [
   'REPLAYED_CHECKPOINTS',
 ] as const;
 
-const baselineReconciliationStatusSchemaV2 = z.enum(['PARTIAL', 'MATCHED', 'CONFLICTED']);
-const candidateStatusSchemaV2 = z.enum(['AVAILABLE', 'CONFLICTED']);
+const baselineReconciliationStatusSchema = z.enum(['PARTIAL', 'MATCHED', 'CONFLICTED']);
+const candidateStatusSchema = z.enum(['AVAILABLE', 'CONFLICTED']);
 
-const baselineReconciliationCandidateSchemaV2 = z
+const baselineReconciliationCandidateSchema = z
   .object({
     candidateId: z.string().trim().min(1).max(200),
     baselineFactId: z.uuid(),
@@ -46,13 +46,13 @@ const baselineReconciliationCandidateSchemaV2 = z
     coveredCost: decimalStringSchema,
     remainingQuantity: decimalStringSchema,
     remainingCost: decimalStringSchema.optional(),
-    status: candidateStatusSchemaV2,
-    matchBasis: z.array(z.enum(baselineReconciliationMatchBasisV2)).min(1),
-    conflictReasons: z.array(z.enum(baselineReconciliationConflictReasonsV2)),
+    status: candidateStatusSchema,
+    matchBasis: z.array(z.enum(baselineReconciliationMatchBasis)).min(1),
+    conflictReasons: z.array(z.enum(baselineReconciliationConflictReasons)),
   })
   .strict();
 
-const baselineReconciliationCheckpointSchemaV2 = z
+const baselineReconciliationCheckpointSchema = z
   .object({
     baselineFactId: z.uuid(),
     symbol: z.string().trim().min(1),
@@ -64,17 +64,17 @@ const baselineReconciliationCheckpointSchemaV2 = z
     reconciledActualCost: decimalStringSchema,
     remainingQuantity: decimalStringSchema,
     remainingCost: decimalStringSchema.optional(),
-    status: baselineReconciliationStatusSchemaV2,
-    conflictReasons: z.array(z.enum(baselineReconciliationConflictReasonsV2)),
+    status: baselineReconciliationStatusSchema,
+    conflictReasons: z.array(z.enum(baselineReconciliationConflictReasons)),
   })
   .strict();
 
-export const baselineReconciliationCandidatesResponseSchemaV2 = z
+export const baselineReconciliationCandidatesResponseSchema = z
   .object({
     accountId: z.uuid(),
-    ruleVersion: z.literal(baselineReconciliationRuleVersionV2),
-    checkpoints: z.array(baselineReconciliationCheckpointSchemaV2),
-    candidates: z.array(baselineReconciliationCandidateSchemaV2),
+    ruleVersion: z.literal(baselineReconciliationRuleVersion),
+    checkpoints: z.array(baselineReconciliationCheckpointSchema),
+    candidates: z.array(baselineReconciliationCandidateSchema),
   })
   .strict();
 
@@ -90,7 +90,7 @@ const uniqueExecutionFactIds = (
     });
 };
 
-export const confirmBaselineReconciliationCommandSchemaV2 = z
+export const confirmBaselineReconciliationCommandSchema = z
   .object({
     command: z.literal('CONFIRM_BASELINE_RECONCILIATION'),
     accountId: z.uuid(),
@@ -98,64 +98,64 @@ export const confirmBaselineReconciliationCommandSchemaV2 = z
     executionFactIds: z.array(z.uuid()).min(1),
     coveredQuantity: positiveDecimalStringSchema,
     coveredCost: nonNegativeDecimalStringSchema,
-    ruleVersion: z.literal(baselineReconciliationRuleVersionV2),
+    ruleVersion: z.literal(baselineReconciliationRuleVersion),
     expectedLedgerRevision: z.string().regex(/^\d+$/),
-    source: ledgerCommandSourceSchemaV2,
+    source: ledgerCommandSourceSchema,
     actorId: z.string().trim().min(1).max(255),
     reason: z.string().trim().min(1).max(1000),
   })
   .strict()
   .superRefine(uniqueExecutionFactIds);
 
-const baselineReconciliationCorrectionShapeV2 = {
+const baselineReconciliationCorrectionShape = {
   accountId: z.uuid(),
   expectedLedgerRevision: z.string().regex(/^\d+$/),
   supersedesEventId: z.uuid(),
-  source: ledgerCommandSourceSchemaV2,
+  source: ledgerCommandSourceSchema,
   actorId: z.string().trim().min(1).max(255),
   reason: z.string().trim().min(1).max(1000),
 };
 
-export const voidBaselineReconciliationCommandSchemaV2 = z
+export const voidBaselineReconciliationCommandSchema = z
   .object({
     command: z.literal('VOID_BASELINE_RECONCILIATION'),
-    ...baselineReconciliationCorrectionShapeV2,
+    ...baselineReconciliationCorrectionShape,
   })
   .strict();
 
-export const restoreBaselineReconciliationCommandSchemaV2 = z
+export const restoreBaselineReconciliationCommandSchema = z
   .object({
     command: z.literal('RESTORE_BASELINE_RECONCILIATION'),
-    ...baselineReconciliationCorrectionShapeV2,
+    ...baselineReconciliationCorrectionShape,
   })
   .strict();
 
-export const baselineReconciliationCommandSchemaV2 = z.discriminatedUnion('command', [
-  confirmBaselineReconciliationCommandSchemaV2,
-  voidBaselineReconciliationCommandSchemaV2,
-  restoreBaselineReconciliationCommandSchemaV2,
+export const baselineReconciliationCommandSchema = z.discriminatedUnion('command', [
+  confirmBaselineReconciliationCommandSchema,
+  voidBaselineReconciliationCommandSchema,
+  restoreBaselineReconciliationCommandSchema,
 ]);
 
-export type BaselineReconciliationConflictReasonV2 =
-  (typeof baselineReconciliationConflictReasonsV2)[number];
-export type BaselineReconciliationMatchBasisV2 =
-  (typeof baselineReconciliationMatchBasisV2)[number];
-export type BaselineReconciliationCandidateV2 = z.infer<
-  typeof baselineReconciliationCandidateSchemaV2
+export type BaselineReconciliationConflictReason =
+  (typeof baselineReconciliationConflictReasons)[number];
+export type BaselineReconciliationMatchBasis =
+  (typeof baselineReconciliationMatchBasis)[number];
+export type BaselineReconciliationCandidate = z.infer<
+  typeof baselineReconciliationCandidateSchema
 >;
-export type BaselineReconciliationCheckpointV2 = z.infer<
-  typeof baselineReconciliationCheckpointSchemaV2
+export type BaselineReconciliationCheckpoint = z.infer<
+  typeof baselineReconciliationCheckpointSchema
 >;
-export type BaselineReconciliationCandidatesResponseV2 = z.infer<
-  typeof baselineReconciliationCandidatesResponseSchemaV2
+export type BaselineReconciliationCandidatesResponse = z.infer<
+  typeof baselineReconciliationCandidatesResponseSchema
 >;
-export type ConfirmBaselineReconciliationCommandV2 = z.infer<
-  typeof confirmBaselineReconciliationCommandSchemaV2
+export type ConfirmBaselineReconciliationCommand = z.infer<
+  typeof confirmBaselineReconciliationCommandSchema
 >;
-export type VoidBaselineReconciliationCommandV2 = z.infer<
-  typeof voidBaselineReconciliationCommandSchemaV2
+export type VoidBaselineReconciliationCommand = z.infer<
+  typeof voidBaselineReconciliationCommandSchema
 >;
-export type RestoreBaselineReconciliationCommandV2 = z.infer<
-  typeof restoreBaselineReconciliationCommandSchemaV2
+export type RestoreBaselineReconciliationCommand = z.infer<
+  typeof restoreBaselineReconciliationCommandSchema
 >;
-export type BaselineReconciliationCommandV2 = z.infer<typeof baselineReconciliationCommandSchemaV2>;
+export type BaselineReconciliationCommand = z.infer<typeof baselineReconciliationCommandSchema>;

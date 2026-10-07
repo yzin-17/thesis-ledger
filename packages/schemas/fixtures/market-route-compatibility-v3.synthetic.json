@@ -1,0 +1,159 @@
+{
+  "proof": {
+    "contractVersion": 3,
+    "proofId": "synthetic-proof-01",
+    "proofRevision": "rev-7",
+    "routeKey": {
+      "kind": "bar",
+      "market": "CN",
+      "assetType": "ETF",
+      "capability": "DAILY_BAR",
+      "timeframe": "1d",
+      "adjustment": "qfq"
+    },
+    "targets": {
+      "primary": { "providerId": "synthetic-provider-a", "upstreamSource": "synthetic-adapter-a" },
+      "backup": { "providerId": "synthetic-provider-b", "upstreamSource": "synthetic-adapter-b" }
+    },
+    "symbol": "SYNTHETIC.ETF",
+    "window": { "start": "2025-02-03", "end": "2025-02-07" },
+    "sourceFacts": {
+      "primary": {
+        "seriesFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "priceBasis": {
+          "adjustment": "qfq",
+          "method": "provider-native",
+          "methodVersion": "synthetic-qfq-method-7",
+          "basisScope": "request-window",
+          "anchor": "2025-02-07",
+          "revision": { "origin": "provider", "id": "synthetic-source-rev-a" },
+          "observedAt": "2025-02-10T09:00:00+08:00",
+          "volumeBasis": "split-adjusted",
+          "dividendMeaning": "embedded-verified",
+          "dividendEvidenceRef": "synthetic://dividends/source-a",
+          "conversionAvailable": false,
+          "conversionEvidenceRef": null,
+          "derivation": null
+        },
+        "fixedBasisRange": { "start": "2025-02-03", "end": "2025-02-07" },
+        "amountSemantics": {
+          "status": "verified",
+          "currency": "CNY",
+          "unitMultiplier": 1,
+          "definition": "reported-turnover",
+          "evidenceRef": "synthetic://amount/source-a"
+        }
+      },
+      "backup": {
+        "seriesFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "priceBasis": {
+          "adjustment": "qfq",
+          "method": "provider-native",
+          "methodVersion": "synthetic-qfq-method-7",
+          "basisScope": "request-window",
+          "anchor": "2025-02-07",
+          "revision": { "origin": "provider", "id": "synthetic-source-rev-b" },
+          "observedAt": "2025-02-10T09:00:00+08:00",
+          "volumeBasis": "split-adjusted",
+          "dividendMeaning": "embedded-verified",
+          "dividendEvidenceRef": "synthetic://dividends/source-b",
+          "conversionAvailable": false,
+          "conversionEvidenceRef": null,
+          "derivation": null
+        },
+        "fixedBasisRange": { "start": "2025-02-03", "end": "2025-02-07" },
+        "amountSemantics": {
+          "status": "verified",
+          "currency": "CNY",
+          "unitMultiplier": 1,
+          "definition": "reported-turnover",
+          "evidenceRef": "synthetic://amount/source-b"
+        }
+      }
+    },
+    "verification": {
+      "kind": "verified-equivalence",
+      "evidence": [
+        {
+          "reference": "synthetic://compatibility-test/01",
+          "revision": "test-rev-3",
+          "fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ]
+    },
+    "issuedAt": "2026-01-01T00:00:00Z",
+    "validFrom": "2026-01-01T00:00:00Z",
+    "validUntil": "2027-01-01T00:00:00Z"
+  },
+  "observation": {
+    "routeKey": {
+      "kind": "bar",
+      "market": "CN",
+      "assetType": "ETF",
+      "capability": "DAILY_BAR",
+      "timeframe": "1d",
+      "adjustment": "qfq"
+    },
+    "targets": {
+      "primary": { "providerId": "synthetic-provider-a", "upstreamSource": "synthetic-adapter-a" },
+      "backup": { "providerId": "synthetic-provider-b", "upstreamSource": "synthetic-adapter-b" }
+    },
+    "symbol": "SYNTHETIC.ETF",
+    "window": { "start": "2025-02-03", "end": "2025-02-07" },
+    "sourceFacts": {
+      "primary": {
+        "seriesFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "priceBasis": {
+          "adjustment": "qfq",
+          "method": "provider-native",
+          "methodVersion": "synthetic-qfq-method-7",
+          "basisScope": "request-window",
+          "anchor": "2025-02-07",
+          "revision": { "origin": "provider", "id": "synthetic-source-rev-a" },
+          "observedAt": "2025-02-10T09:00:00+08:00",
+          "volumeBasis": "split-adjusted",
+          "dividendMeaning": "embedded-verified",
+          "dividendEvidenceRef": "synthetic://dividends/source-a",
+          "conversionAvailable": false,
+          "conversionEvidenceRef": null,
+          "derivation": null
+        },
+        "fixedBasisRange": { "start": "2025-02-03", "end": "2025-02-07" },
+        "amountSemantics": {
+          "status": "verified",
+          "currency": "CNY",
+          "unitMultiplier": 1,
+          "definition": "reported-turnover",
+          "evidenceRef": "synthetic://amount/source-a"
+        }
+      },
+      "backup": {
+        "seriesFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "priceBasis": {
+          "adjustment": "qfq",
+          "method": "provider-native",
+          "methodVersion": "synthetic-qfq-method-7",
+          "basisScope": "request-window",
+          "anchor": "2025-02-07",
+          "revision": { "origin": "provider", "id": "synthetic-source-rev-b" },
+          "observedAt": "2025-02-10T09:00:00+08:00",
+          "volumeBasis": "split-adjusted",
+          "dividendMeaning": "embedded-verified",
+          "dividendEvidenceRef": "synthetic://dividends/source-b",
+          "conversionAvailable": false,
+          "conversionEvidenceRef": null,
+          "derivation": null
+        },
+        "fixedBasisRange": { "start": "2025-02-03", "end": "2025-02-07" },
+        "amountSemantics": {
+          "status": "verified",
+          "currency": "CNY",
+          "unitMultiplier": 1,
+          "definition": "reported-turnover",
+          "evidenceRef": "synthetic://amount/source-b"
+        }
+      }
+    }
+  },
+  "now": "2026-02-01T00:00:00Z"
+}

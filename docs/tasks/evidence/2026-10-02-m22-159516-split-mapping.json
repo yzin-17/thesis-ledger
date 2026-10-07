@@ -1,0 +1,26 @@
+{
+  "contractVersion": 1,
+  "kind": "split-date-mapping",
+  "mappings": [
+    {
+      "symbol": "159516.SZ",
+      "sourceConversionDate": "2026-03-27",
+      "sourceRatioPerUnit": "2",
+      "effectiveDate": "2026-03-30",
+      "recordDate": "2026-03-27",
+      "announcementDate": "2026-03-24",
+      "documentUrl": "https://static.cninfo.com.cn/finalpage/2026-03-24/1225024265.PDF",
+      "documentSha256": "8c79b77770e5bd9f853789a83c68981cb2a62735e2182540f3f3299a1bb02359"
+    },
+    {
+      "symbol": "159516.SZ",
+      "sourceConversionDate": "2026-07-09",
+      "sourceRatioPerUnit": "2",
+      "effectiveDate": "2026-07-10",
+      "recordDate": "2026-07-09",
+      "announcementDate": "2026-07-06",
+      "documentUrl": "https://disc.static.szse.cn/disc/disk03/finalpage/2026-07-06/f85c28ad-046c-4b29-96c3-142bf21dec58.PDF",
+      "documentSha256": "a758c693cd24aa4eeeac3d4de9492ac637e7d0206d7ac0b10469901db7a39fd6"
+    }
+  ]
+}

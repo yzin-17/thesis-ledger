@@ -3,7 +3,7 @@ import { PerformanceService } from '../../src/performance/performance.service.js
 import { cashBalanceEvent, cashFlowEvent, fixtureUuid } from '../ledger/ledger-event-fixtures.js';
 
 const fxResponse = (asOf: string, hkdRate = 0.92) => ({
-  version: 1 as const,
+  version: 3 as const,
   baseCurrency: 'CNY' as const,
   asOf,
   fetchedAt: `${asOf}T00:00:00.000Z`,
@@ -463,7 +463,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
     const market = {
       getQuote: vi.fn(async (symbol: string) => ({ price: symbol === '600519.SH' ? 12 : 6 })),
       getFxRates: vi.fn(async () => ({
-        version: 1,
+        version: 3,
         baseCurrency: 'CNY',
         asOf: '2026-08-24',
         fetchedAt: '2026-08-24T00:00:00.000Z',
@@ -523,7 +523,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
     };
     const market = {
       getFxRates: vi.fn(async () => ({
-        version: 1,
+        version: 3,
         baseCurrency: 'CNY',
         asOf: '2026-08-24',
         fetchedAt: '2026-08-24T00:00:00.000Z',
@@ -612,7 +612,7 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(merged.portfolio).toMatchObject({ currency: 'CNY', cashValue: 192 });
     expect(merged.fx).toMatchObject({
       status: 'ready',
-      evidenceVersion: expect.stringContaining('fx-v1'),
+      evidenceVersion: expect.stringContaining('fx-v3'),
     });
   });
 

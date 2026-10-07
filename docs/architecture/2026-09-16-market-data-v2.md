@@ -1,6 +1,8 @@
-# 市场数据 V2 当前架构
+# 市场数据 V2 与复权感知 V3 架构
 
-本文是 ThesisLedger 主仓市场数据读取、路由、事实存储和消费边界的当前 Architecture SSOT。产品行为以相关 Spec 为准，实施状态以对应 Task 为准，Provider 原始适配和 Effective Policy 运行细节仍由 `daily-stock-analysis` 仓库维护。
+> 历史 V2 架构基线。当前公开路由、DSA V3 合同及版本替换边界以[单一现行链路替换 Spec](../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)、[实施 Task](../tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)和[三仓版本矩阵](version-matrix.md)为准。下文的 V2 路径与缓存描述只说明当时设计，不代表当前生产入口。
+
+本文保留当时的市场数据读取、路由、事实存储和消费边界；Provider 原始适配和 Effective Policy 运行细节由 `daily-stock-analysis` 仓库维护。
 
 相关入口：
 
@@ -9,6 +11,14 @@
 - [消费者一致性 V2 Spec](../specs/2026-09-16-market-data-consumer-consistency-v2.md)
 - [Provider 路由与可靠性领域说明](../domain/2026-09-16-provider-routing-and-reliability.md)
 - [三仓版本与兼容矩阵](version-matrix.md)
+
+## V3 增量与当前实施边界
+
+[多源复权感知回测规格](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)扩展现有 Market 边界：`MarketBarReader.readV3` 按精确 RouteKey 读取，验证 Desired/Effective/Catalog 的修订与能力，整窗选择实际主源或兼容备用；`MarketBarWindowEvidenceV3` 保存来源证据、完整响应与摘要。冻结父窗口的子集由 `MarketFrozenWindowReaderV3` 校验后复用，每个正式 Run 仍拥有独立 Snapshot。
+
+V3 保留实际抓取时间、价格基准和修订身份，明确区分严格历史时点与固定供应商快照研究。归一化记账只使用模拟单位，事件按实际依赖获取，真实 Risk/Portfolio 不消费研究账本。交互图表由独立 `MarketChartReaderV3` 与 DSA `/api/v3/thesis-ledger/market/chart-bars` 入口处理，可携带未收盘条目但不提供回测 `coverageProof`；回测完整窗口 V3 wire 继续拒绝未收盘日线。
+
+2026-10-03 共同价格基线：HiThink ETF qfq 与腾讯 ETF none/qfq/hfq 按适配、必要凭据和精确路由启用，日级状态由公共层自动整理。图表与固定快照归一化价格研究的同口径整窗备用无需算法等价证明，仍校验有效价格、身份和实际来源。标的目录复用行情弹窗提供只读入口；三口径、备源、扩窗和运行配置隔离已通过目标 Web 验收，四条真实普通回测与冻结重放成功。Electron、新镜像发布和高级历史/事件能力另行验收。当前状态见[验收记录](../tasks/evidence/2026-10-03-common-price-baseline.md)和[实施任务](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 
 ## 三仓职责
 

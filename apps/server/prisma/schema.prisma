@@ -491,6 +491,7 @@ model LedgerEvent {
   economicOrderKey       String?
   recordedAt             DateTime                         @default(now())
   projectionGeneration   BigInt?
+  envelopeVersion        Int?
   payloadVersion         Int?
   payload                Json?
   sourceCategory         String?
@@ -591,50 +592,42 @@ model TargetAllocation {
   @@index([scope, accountId, active])
 }
 
-model MarketBarSeriesFact {
-  id                    BigInt   @id @default(autoincrement())
-  symbol                String
-  assetType             String
-  timeframe             String
-  timestamp             DateTime
-  adjustment            String
-  open                  Decimal  @db.Decimal(24, 8)
-  high                  Decimal  @db.Decimal(24, 8)
-  low                   Decimal  @db.Decimal(24, 8)
-  close                 Decimal  @db.Decimal(24, 8)
-  volume                Decimal  @db.Decimal(30, 8)
-  amount                Decimal  @db.Decimal(30, 8)
-  completionStatus      String
-  availableAt           DateTime
-  providerId            String
-  upstreamSource        String
-  providerRevision      String
-  fetchedAt             DateTime
+/// Immutable V3 evidence for one exact request window and source response.
+model MarketBarWindowEvidenceV3 {
+  /// SHA-256 of the canonical route, target, window, series, response and policy identity.
+  identityFingerprint     String   @id @db.Char(64)
+  routeKind               String   @default("bar") @db.VarChar(8)
+  market                  String   @db.VarChar(2)
+  assetType               String   @db.VarChar(32)
+  capability              String   @db.VarChar(32)
+  timeframe               String   @db.VarChar(8)
+  adjustment              String   @db.VarChar(8)
+  symbol                  String   @db.VarChar(128)
+  providerId              String   @db.VarChar(128)
+  upstreamSource          String   @db.VarChar(128)
+  routeIndex              Int      @db.SmallInt
+  requestedStart          DateTime @db.Date
+  requestedEnd            DateTime @db.Date
+  seriesVersion           String   @db.VarChar(128)
+  inputFingerprint         String   @db.Text
+  desiredRevision         Int
+  effectivePolicyRevision Int
+  catalogRevision         BigInt
+  sourcePriceBasis        Json
+  coverageProof           Json
+  completeResponse        Json?
+  completeResponseHash    String?  @db.Char(64)
+  fetchedAt               DateTime @default(now())
 
-  @@unique([symbol, timeframe, timestamp, adjustment, providerId, upstreamSource])
-  @@index([symbol, assetType, timeframe, adjustment, timestamp])
-  @@index([providerId, upstreamSource, fetchedAt])
+  @@index([market, assetType, capability, timeframe, adjustment, symbol, requestedStart, requestedEnd], map: "market_bar_window_evidence_v3_window_idx")
+  @@index([providerId, upstreamSource, seriesVersion], map: "market_bar_window_evidence_v3_source_idx")
 }
 
-model MarketBarSeriesCoverage {
-  id                       String   @id @default(uuid()) @db.Uuid
-  symbol                   String
-  assetType                String
-  timeframe                String
-  adjustment               String
-  providerId               String
-  upstreamSource           String
-  providerRevision         String
-  fetchedAt                DateTime
-  freshUntil               DateTime
-  actualStart              DateTime?
-  actualEnd                DateTime?
-  hasMoreBefore            Boolean
-  latestCompleteTradingDate DateTime?
-  updatedAt                DateTime   @updatedAt
-
-  @@unique([symbol, timeframe, adjustment, providerId, upstreamSource])
-  @@index([symbol, assetType, timeframe, adjustment, updatedAt])
+model MarketDerivedSeriesSnapshotV3 {
+  inputFingerprint  String   @id @db.Char(64)
+  algorithmRevision String   @db.VarChar(128)
+  snapshot          Json
+  createdAt         DateTime @default(now())
 }
 
 model DataQualityIssue {
@@ -981,7 +974,7 @@ model Strategy {
   name          String
   description   String?
   status        String            @default("draft")
-  schemaVersion Int               @default(1)
+  schemaVersion Int
   archived      Boolean           @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -989,15 +982,16 @@ model Strategy {
 }
 
 model StrategyVersion {
-  id             String         @id @default(uuid()) @db.Uuid
-  strategyId     String         @db.Uuid
-  version        Int
-  schemaVersion  Int            @default(1)
-  schema         Json
-  createdAt      DateTime       @default(now())
-  strategy       Strategy       @relation(fields: [strategyId], references: [id], onDelete: Restrict)
-  jobs           BacktestJob[]
-  journalEntries JournalEntry[]
+  id              String         @id @default(uuid()) @db.Uuid
+  strategyId      String         @db.Uuid
+  version         Int
+  schemaVersion   Int
+  schema          Json
+  createdAt       DateTime       @default(now())
+  strategy        Strategy       @relation(fields: [strategyId], references: [id], onDelete: Restrict)
+  jobs            BacktestJob[]
+  navPreparations NavBacktestPreparation[]
+  journalEntries  JournalEntry[]
 
   @@unique([strategyId, version])
 }
@@ -1005,7 +999,7 @@ model StrategyVersion {
 model BacktestJob {
   id                String          @id @default(uuid()) @db.Uuid
   strategyVersionId String          @db.Uuid
-  mode              String          @default("V1")
+  mode              String          @default("V3")
   idempotencyKey    String?
   status            String
   stage             String?
@@ -1032,9 +1026,26 @@ model BacktestJob {
   runConfig         Json?
   diagnostics       Json?
   strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  navPreparation    NavBacktestPreparation? @relation("BacktestJobNavPreparation")
 
   @@index([status, createdAt])
   @@unique([strategyVersionId, idempotencyKey])
+}
+
+model NavBacktestPreparation {
+  id                String          @id @default(uuid()) @db.Uuid
+  strategyVersionId String          @db.Uuid
+  preparationHash   String          @db.Char(64)
+  contentChecksum   String          @db.Char(64)
+  request           Json
+  evidence          Json
+  expiresAt         DateTime
+  createdAt         DateTime        @default(now())
+  consumedRunId     String?         @unique @db.Uuid
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  consumedRun       BacktestJob?    @relation("BacktestJobNavPreparation", fields: [consumedRunId], references: [id], onDelete: Restrict)
+
+  @@index([strategyVersionId, expiresAt])
 }
 
 model JournalEntry {

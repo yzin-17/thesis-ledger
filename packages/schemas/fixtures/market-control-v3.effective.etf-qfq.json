@@ -1,0 +1,31 @@
+{
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "requestId": "route-contract-fixture",
+  "revision": 1,
+  "sourceDesiredRevision": 1,
+  "enabled": true,
+  "routes": [
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "DAILY_BAR",
+        "timeframe": "1d",
+        "adjustment": "qfq"
+      },
+      "targets": [
+        {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    }
+  ],
+  "appliedAt": "2026-05-20T07:01:00.000Z"
+}

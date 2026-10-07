@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BarPointV2 } from '@thesis-ledger/schemas';
+import type { BarPoint } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -37,7 +37,7 @@ const rangeLabel = (range: number) => {
   return '1年';
 };
 
-const completionLabel = (status: BarPointV2['completionStatus'] | undefined) => {
+const completionLabel = (status: BarPoint['completionStatus'] | undefined) => {
   if (status === 'incomplete') return '未收盘（当日未完成）';
   if (status === 'unknown') return '收盘状态未知';
   if (status === 'complete') return '已收盘';

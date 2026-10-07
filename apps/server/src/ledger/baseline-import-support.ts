@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client';
 import {
-  type BaselineObservationInputV2,
-  type CreateBaselineObservationBatchCommandV2,
-  type ImportDraftRowV2,
+  type BaselineObservationInput,
+  type CreateBaselineObservationBatchCommand,
+  type ImportDraftRow,
 } from '@thesis-ledger/schemas';
 import {
   latestLedgerEventByFact,
@@ -33,15 +33,15 @@ export interface DraftRowAppendContext {
 
 export const completeObservations = async (
   context: AccountLedgerWriteContext,
-  command: CreateBaselineObservationBatchCommandV2,
-): Promise<BaselineObservationInputV2[]> => {
+  command: CreateBaselineObservationBatchCommand,
+): Promise<BaselineObservationInput[]> => {
   if (command.scope === 'PARTIAL') return command.observations;
   const missing = await findMissingBaselineAssets(
     context,
     command.observations.map((observation) => observation.symbol),
     command.observedAt,
   );
-  const zeroObservations: BaselineObservationInputV2[] = missing.symbols.map((symbol) => ({
+  const zeroObservations: BaselineObservationInput[] = missing.symbols.map((symbol) => ({
     symbol,
     quantity: '0',
     currency: missing.currencies.get(symbol) ?? 'CNY',
@@ -52,18 +52,18 @@ export const completeObservations = async (
 
 export const completeDraftBaselineRows = async (
   context: AccountLedgerWriteContext,
-  rows: ImportDraftRowV2[],
+  rows: ImportDraftRow[],
   observedAt: string,
-): Promise<ImportDraftRowV2[]> => {
+): Promise<ImportDraftRow[]> => {
   const includedSymbols = rows
     .filter(
-      (row): row is Extract<ImportDraftRowV2, { kind: 'POSITION_BASELINE' }> =>
+      (row): row is Extract<ImportDraftRow, { kind: 'POSITION_BASELINE' }> =>
         row.kind === 'POSITION_BASELINE',
     )
     .map((row) => row.symbol);
   const missing = await findMissingBaselineAssets(context, includedSymbols, observedAt);
   if (missing.symbols.length === 0) return rows;
-  const zeroRows: ImportDraftRowV2[] = missing.symbols.map((symbol) => ({
+  const zeroRows: ImportDraftRow[] = missing.symbols.map((symbol) => ({
     rowId: `baseline-zero:${symbol}`,
     kind: 'POSITION_BASELINE',
     symbol,
@@ -129,7 +129,7 @@ const readEffectiveEventTips = async (
 
 export const findOrphanSellRowIds = async (
   context: AccountLedgerWriteContext,
-  rows: ImportDraftRowV2[],
+  rows: ImportDraftRow[],
   defaultObservedAt?: string,
 ) => {
   const tips = await readEffectiveEventTips(context);
@@ -209,7 +209,7 @@ export const findOrphanSellRowIds = async (
 export const appendDraftRow = (
   repository: LedgerV2Repository,
   context: DraftRowAppendContext,
-  row: ImportDraftRowV2,
+  row: ImportDraftRow,
   index: number,
 ) => {
   if (row.kind === 'UNRESOLVED') throw new Error('未解决导入行不能进入账本');
@@ -227,7 +227,7 @@ export const appendDraftRow = (
   const sourceTimezone = row.sourceTimezone ?? context.sourceTimezone;
   if (!sourceTimezone) throw new Error('导入行缺少来源时区');
   const common = {
-    version: 2 as const,
+    version: 3 as const,
     eventId: crypto.randomUUID(),
     factId: crypto.randomUUID(),
     accountId: context.ledger.accountId,

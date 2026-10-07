@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { LedgerEventV2 } from '@thesis-ledger/api-client';
+import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { sumBy } from 'es-toolkit';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -53,8 +53,11 @@ export type SettledCashFlowRow = {
 
 type CashValuation = NonNullable<ReturnType<typeof useAccountValuationQuery>['data']>;
 type CashValuationQuery = ReturnType<typeof useAccountValuationQuery>;
+import { LedgerContractFailure, ledgerContractRejected } from './account-data.ledger-contract.js';
+
 type QueryLike = {
-  data: { events: LedgerEventV2[]; ledgerRevision: string } | undefined;
+  error?: unknown;
+  data: { events: LedgerEvent[]; ledgerRevision: string } | undefined;
   isPending: boolean;
   isError: boolean;
   isFetching: boolean;
@@ -69,7 +72,7 @@ const chargeTotal = (event: ExecutionEvent, currency: Currency) =>
     return Number(charge.amount);
   });
 
-const pendingCashTime = (event: LedgerEventV2) => {
+const pendingCashTime = (event: LedgerEvent) => {
   if (event.revisionAction === 'VOID') return null;
   if (
     event.type === 'BUY_EXECUTION' ||
@@ -94,7 +97,7 @@ const compareAscending = (left: { settledAt: string }, right: { settledAt: strin
 const compareDescending = (left: { settledAt: string }, right: { settledAt: string }) =>
   compareAscending(right, left);
 
-export const pendingCash = (events: LedgerEventV2[], now = new Date()): PendingCashRow[] => {
+export const pendingCash = (events: LedgerEvent[], now = new Date()): PendingCashRow[] => {
   const nowTime = now.getTime();
   const rows: PendingCashRow[] = [];
   for (const event of events) {
@@ -158,7 +161,7 @@ export const pendingCash = (events: LedgerEventV2[], now = new Date()): PendingC
 };
 
 export const settledCashFlows = (
-  events: LedgerEventV2[],
+  events: LedgerEvent[],
   now = new Date(),
 ): SettledCashFlowRow[] => {
   const nowTime = now.getTime();
@@ -508,7 +511,7 @@ export function CashSection({
   accounts: Account[];
   valuation: CashValuation | undefined;
   valuationQuery: CashValuationQuery;
-  events: LedgerEventV2[];
+  events: LedgerEvent[];
   eventsQuery: QueryLike;
   onCalibrate: () => void;
   resolveInstrumentName: (symbol: string) => string | undefined;
@@ -528,6 +531,9 @@ export function CashSection({
   const pendingRows = useMemo(() => pendingCash(events), [events]);
   const settledCashFlowRows = useMemo(() => settledCashFlows(events), [events]);
   const evidencePartial = Boolean(valuation?.dataQuality?.partial) || eventsQuery.isError;
+
+  if (eventsQuery.isError && ledgerContractRejected(eventsQuery.error))
+    return <LedgerContractFailure onRetry={eventsQuery.refetch} />;
 
   return (
     <section className="flex flex-col gap-8" aria-labelledby="account-data-cash-title">

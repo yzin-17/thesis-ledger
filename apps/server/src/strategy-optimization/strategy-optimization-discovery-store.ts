@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import type { OptimizationExperimentCreate, StrategySchemaV2 } from '@thesis-ledger/schemas';
+import type { OptimizationExperimentCreate, BacktestStrategy } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import {
   asJson,
@@ -16,7 +16,7 @@ const insert = async (
   prisma: Prisma.TransactionClient | PrismaService,
   parsed: OptimizationExperimentCreate,
   baseline: StrategyVersionRecord & { strategy: { id: string } },
-  baselineSchema: StrategySchemaV2,
+  baselineSchema: BacktestStrategy,
   modelConfig: OptimizationModelConfig[],
   idempotencyKey: string,
 ) => {
@@ -42,7 +42,7 @@ const insert = async (
 };
 
 export const computeDiscoveryDataFingerprint = (
-  schema: StrategySchemaV2,
+  schema: BacktestStrategy,
   parsed: { runConfig: unknown; split: unknown },
 ) =>
   optimizationSha256({

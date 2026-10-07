@@ -1,4 +1,4 @@
-import type { CurrencyV1 } from '@thesis-ledger/schemas';
+import type { Currency } from '@thesis-ledger/schemas';
 import { roundMoney } from '@thesis-ledger/shared';
 
 import { calculatePositionDailyChange, findPreviousFundNav } from './portfolio-daily-change.js';
@@ -32,7 +32,7 @@ type PortfolioMarketReader = {
 
 export const valuePortfolioPosition = async <T extends PositionInput>(
   position: T,
-  currency: CurrencyV1,
+  currency: Currency,
   market: PortfolioMarketReader,
 ) => {
   const quantity = Number(position.quantity);

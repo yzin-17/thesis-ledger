@@ -34,15 +34,20 @@ const summary = (
   continuationBlockedReason: null,
 });
 
+const researchContent = JSON.stringify({
+  conclusion: '本地研究结果',
+  evidence: [],
+  risks: [],
+  unknowns: [],
+  disclaimer: 'test',
+  signals: [],
+});
+
+/** 慢流每块的间隔；总时长必然超过用例给出的 Provider 级超时。 */
+const SLOW_STREAM_CHUNK_GAP_MS = 400;
+
 const writeSse = (response: ServerResponse) => {
-  const content = JSON.stringify({
-    conclusion: '本地研究结果',
-    evidence: [],
-    risks: [],
-    unknowns: [],
-    disclaimer: 'test',
-    signals: [],
-  });
+  const content = researchContent;
   const common = {
     id: 'research-fixture',
     object: 'chat.completion.chunk',
@@ -160,7 +165,8 @@ const stateStore = (initial: AiExecutionSummary) => {
 describe('Research SDK local HTTP vertical', () => {
   let baseURL = '';
   let requestCount = 0;
-  let mode: 'fallback' | 'disconnect' | 'hang' | 'retryAfterDeadline' | 'success' = 'success';
+  let mode: 'fallback' | 'disconnect' | 'hang' | 'retryAfterDeadline' | 'slowStream' | 'success' =
+    'success';
   const server = createServer((request, response) => {
     requestCount += 1;
     if (
@@ -181,6 +187,39 @@ describe('Research SDK local HTTP vertical', () => {
     if (request.url?.startsWith('/primary/') && mode === 'hang') {
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       response.write(': waiting\n\n');
+      return;
+    }
+    // 一直在出字、但总时长必然超过 Provider 级「超时（毫秒）」的慢流：
+    // 用来证明判活看的是“还在不在产出”，不是固定总时长。
+    if (request.url?.startsWith('/primary/') && mode === 'slowStream') {
+      response.on('error', () => undefined);
+      const common = {
+        id: 'slow-stream',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'fixture-model',
+      };
+      const pieces = researchContent.match(/.{1,24}/gu) ?? [];
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      pieces.forEach((piece, index) => {
+        setTimeout(() => {
+          response.write(
+            `data: ${JSON.stringify({
+              ...common,
+              choices: [{ index: 0, delta: { content: piece }, finish_reason: null }],
+            })}\n\n`,
+          );
+        }, index * SLOW_STREAM_CHUNK_GAP_MS);
+      });
+      setTimeout(() => {
+        response.write(
+          `data: ${JSON.stringify({
+            ...common,
+            choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+          })}\n\n`,
+        );
+        response.end('data: [DONE]\n\n');
+      }, pieces.length * SLOW_STREAM_CHUNK_GAP_MS);
       return;
     }
     writeSse(response);
@@ -204,10 +243,17 @@ describe('Research SDK local HTTP vertical', () => {
     await once(server, 'close');
   });
 
+  type RouteTimeouts = {
+    providerTimeoutMs?: number;
+    firstOutputTimeoutMs?: number;
+    outputIdleTimeoutMs?: number;
+  };
+
   const provider = (
     id: string,
     path: string,
     pricing = { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
+    timeouts: RouteTimeouts = {},
   ) => ({
     id,
     models: ['fixture-model'],
@@ -215,19 +261,30 @@ describe('Research SDK local HTTP vertical', () => {
       health: 'healthy' as const,
       ...pricing,
     },
-    sdkRuntime: () => ({ baseURL: `${baseURL}/${path}/v1`, apiKey: 'secret', timeoutMs: 2_000 }),
+    sdkRuntime: () => ({
+      baseURL: `${baseURL}/${path}/v1`,
+      apiKey: 'secret',
+      timeoutMs: timeouts.providerTimeoutMs ?? 2_000,
+    }),
   });
 
   const route = (
     id: string,
     path: string,
     pricing = { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
+    timeouts: RouteTimeouts = {},
   ) => ({
-    provider: provider(id, path, pricing),
+    provider: provider(id, path, pricing, timeouts),
     execution: {
       adapter: 'openai-compatible' as const,
       mode: 'json_validated' as const,
       readiness: { configurationFingerprint: `${id}-fingerprint` },
+      ...(timeouts.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstOutputTimeoutMs: timeouts.firstOutputTimeoutMs }),
+      ...(timeouts.outputIdleTimeoutMs === undefined
+        ? {}
+        : { outputIdleTimeoutMs: timeouts.outputIdleTimeoutMs }),
     },
   });
 
@@ -261,14 +318,15 @@ describe('Research SDK local HTTP vertical', () => {
     options: {
       currentPricing?: { costPer1kInput: number; costPer1kOutput: number; costCurrency: string };
       frozenPricing?: Record<string, number | string>;
+      timeouts?: RouteTimeouts;
     } = {},
   ) => {
     const state = stateStore(execution);
     const registry = {
       defaultModel: () => 'fixture-model',
       readyContractCandidates: () => [
-        route('primary', 'primary', options.currentPricing),
-        route('fallback', 'fallback', options.currentPricing),
+        route('primary', 'primary', options.currentPricing, options.timeouts),
+        route('fallback', 'fallback', options.currentPricing, options.timeouts),
       ],
     };
     const service = new AiResearchSdkExecution(
@@ -347,6 +405,23 @@ describe('Research SDK local HTTP vertical', () => {
       expect.anything(),
       expect.objectContaining({ continuationBlockedReason: 'cancelled' }),
     );
+  });
+
+  it('一直在出字的长流不会被 Provider 级「超时（毫秒）」掐断', async () => {
+    mode = 'slowStream';
+    const state = await execute(summary(), new AbortController().signal, {
+      // 现场复现：本地推理模型 research 探针实测 43～103 秒，而 Provider「超时（毫秒）」是 30 秒。
+      // 这里把两个量按比例缩小——Provider 超时 900 ms，慢流总时长约 1.6 s，块间隔 400 ms。
+      timeouts: {
+        providerTimeoutMs: 900,
+        firstOutputTimeoutMs: 900,
+        outputIdleTimeoutMs: 900,
+      },
+    });
+    expect(requestCount).toBe(1);
+    expect(state.markUnknown).not.toHaveBeenCalled();
+    expect(state.execution().requests[0]).toMatchObject({ state: 'completed' });
+    expect(state.execution().generationStatus).toBe('complete');
   });
 
   it('执行时 Provider 价格变化仍使用创建时冻结的模型价格', async () => {

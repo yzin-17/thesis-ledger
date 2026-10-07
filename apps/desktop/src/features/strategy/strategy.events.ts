@@ -54,6 +54,7 @@ export const applyBacktestJobSummaryEvent = (
   current: BacktestJobSummary[] | undefined,
   incoming: BacktestJobSummary,
 ) => {
+  if (incoming.mode !== 'V3') return current ?? [];
   if (!current) return [incoming];
   const index = current.findIndex((job) => job.id === incoming.id);
   if (index < 0) return [incoming, ...current];
@@ -69,6 +70,7 @@ export const useBacktestJobEvents = () => {
         void queryClient.invalidateQueries({ queryKey: strategyKeys.jobs() });
       },
       onUpdate: (incoming) => {
+        if (incoming.mode !== 'V3') return;
         queryClient.setQueryData<BacktestJobSummary[]>(strategyKeys.jobs(), (current) =>
           applyBacktestJobSummaryEvent(current, incoming),
         );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { runConfigSchemaV2, strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { runConfigSchemaV3, strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import type { ArtifactRef, ArtifactRow } from '../../src/backtest/backtest-artifact-store.js';
-import { runExchangeVertical } from '../../src/backtest/backtest-v2-execution.js';
+import { runExchangeVertical } from '../../src/backtest/backtest-v2-execution-exchange.js';
 
 const artifact = (key: string): ArtifactRef => ({
   artifactId: key,
@@ -57,7 +57,7 @@ const runScenario = (
       quality: 'complete',
     };
   });
-  const strategy = strategySchemaV2.parse({
+  const strategy = strategySchema.parse({
     schemaVersion: '2',
     name: '公司行动复权指标',
     signalSources: [
@@ -96,12 +96,13 @@ const runScenario = (
       timing: 'nextEligibleBarOpen',
     },
     cost: { commissionRate: '0', slippageRate: '0' },
-  }) as StrategySchemaV2;
+  }) as BacktestStrategy;
   const action: ArtifactRow = {
     symbol: '600519.SH',
     market: 'CN',
     instrumentType: 'STOCK',
     type: scenario.type,
+    effectiveDate: '2026-09-08',
     ...(scenario.type === 'CASH_DIVIDEND' ? { cashAmount: '10', currency: 'CNY' } : { ratio: '2' }),
     occurredAt: '2026-09-08T00:00:00Z',
     availableAt: actionAvailableAt,
@@ -156,7 +157,35 @@ const runScenario = (
     strategyVersionId: 'strategy-adjusted-indicator',
     snapshotId: 'snapshot-adjusted-indicator',
     strategy,
-    runConfig: runConfigSchemaV2.parse({
+    runConfig: runConfigSchemaV3.parse({
+      schemaVersion: '3',
+      executionPriceProtocol: {
+        protocolVersion: 'execution-price-v1',
+        priceBasis: {
+          adjustment: 'none',
+          method: 'provider-native',
+          methodVersion: 'provider-reported-v1',
+          basisScope: 'provider-defined',
+          anchor: null,
+          revision: {
+            origin: 'local-observation',
+            contentHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+          observedAt: '2024-01-01T00:00:00.000Z',
+          quantityBasis: 'actual-units',
+          volumeBasis: 'original',
+          dividendMeaning: 'explicit-cash',
+          dividendEvidenceRef: null,
+          conversionAvailable: false,
+          conversionEvidenceRef: null,
+          derivation: null,
+        },
+        accountingBasis: 'raw-events',
+        history: {
+          basis: 'point-in-time',
+          reconstructionEvidenceRef: 'original-bar-availability-v1',
+        },
+      },
       startDate: '2026-09-08',
       endDate: '2026-09-10',
       dataAsOf: '2026-09-11T00:00:00Z',
@@ -186,8 +215,8 @@ describe('V2 实际运行路径的 PIT 复权指标', () => {
     const knownAtEffectiveDate = runScenario(scenario, '2026-09-08T00:00:00Z');
     expect(knownAtEffectiveDate.fills).toEqual([]);
 
-    const learnedLater = runScenario(scenario, '2026-09-10T00:00:00Z');
-    expect(learnedLater.fills.map((fill) => fill.side)).toEqual(['buy']);
-    expect(learnedLater.fills[0]?.quantity).toBe('1');
+    expect(() => runScenario(scenario, '2026-09-10T00:00:00Z')).toThrow(
+      '公司行动缺少生效日冻结开盘或事实在生效记账时尚不可用。',
+    );
   });
 });

@@ -1,22 +1,25 @@
 import { DecimalValue } from './decimal.js';
+import {
+  isAvailableForDecisionAt,
+  type BacktestAvailability,
+} from './backtest-observation-clock.js';
 import type {
   BacktestAssetType,
   BacktestCurrency,
   PortfolioValuationPolicy,
-  V2BacktestMarket,
-} from './backtest-v2.js';
+  BacktestMarket,
+} from './backtest-contract.js';
 import type { SimulationLedgerState } from './simulation-ledger.js';
 
 export type SimulationValuationStatus = 'available' | 'partial' | 'unavailable';
 
-export interface SimulationValuationPrice {
+export interface SimulationValuationPrice extends BacktestAvailability {
   symbol: string;
-  market: V2BacktestMarket;
+  market: BacktestMarket;
   assetType: BacktestAssetType;
   currency: BacktestCurrency;
   price: string;
   occurredAt: string;
-  availableAt: string;
 }
 
 export interface SimulationFxRate {
@@ -119,7 +122,7 @@ const valuePosition = (
   if (invalidPrice) return { available: false, reason: 'PRICE_INVALID' };
   const candidates = matchingPrices.filter(
     (price) =>
-      isBeforeOrAt(price.occurredAt, valuationAt) && isBeforeOrAt(price.availableAt, valuationAt),
+      isBeforeOrAt(price.occurredAt, valuationAt) && isAvailableForDecisionAt(price, valuationAt),
   );
   const price = newest(candidates);
   if (!price) return { available: false, reason: 'PRICE_UNAVAILABLE' };

@@ -19,6 +19,7 @@ import {
   navRequestFromTargetIntent,
   createRiskEvaluationAdapter,
   valueSimulationLedger,
+  isAvailableForDecisionAt,
   type BacktestCorporateActionFact,
   type BacktestSeries,
   type ExecutionCalendarFact,
@@ -39,18 +40,20 @@ import {
 } from '@thesis-ledger/domain';
 import {
   executionRuleSnapshotSchema,
+  corporateActionStrategyVisibilitySchema,
   type ExecutionRuleSnapshot,
-  type RunConfig,
-  type StrategySchemaV2,
+  type RunConfigV3,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import { dailyBarSessionTimes } from './backtest-daily-bar-session.js';
+import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
 
 export type RowsByArtifact = ReadonlyMap<string, readonly ArtifactRow[]>;
 
 export const signalArtifactFor = (
   artifacts: readonly ArtifactRef[],
-  market: StrategySchemaV2['executionInstrument']['market'],
+  market: BacktestStrategy['executionInstrument']['market'],
   symbol: string,
 ) => {
   const segment = `signal/${market}-${symbol}-`;
@@ -63,8 +66,8 @@ export interface BacktestVerticalInput {
   runId: string;
   strategyVersionId: string;
   snapshotId: string;
-  strategy: StrategySchemaV2;
-  runConfig: RunConfig;
+  strategy: BacktestStrategy;
+  runConfig: RunConfigV3;
   rows: RowsByArtifact;
   artifacts: readonly ArtifactRef[];
   engineVersion: string;
@@ -99,7 +102,7 @@ const latestPointAt = (series: BacktestSeries | undefined, evaluationAt: string)
     .filter(
       (point) =>
         Date.parse(point.occurredAt) <= Date.parse(evaluationAt) &&
-        Date.parse(point.availableAt) <= Date.parse(evaluationAt),
+        isAvailableForDecisionAt(point, evaluationAt),
     )
     .sort(
       (left, right) =>
@@ -145,7 +148,7 @@ const stringField = (row: Readonly<Record<string, unknown>>, field: string) => {
 
 const rowsAtTimeframe = (
   rows: readonly ArtifactRow[],
-  timeframe: StrategySchemaV2['primaryTimeframe'],
+  timeframe: BacktestStrategy['primaryTimeframe'],
   calendar: TradingCalendar,
 ): readonly Record<string, unknown>[] => {
   if (timeframe === '1m' || timeframe === '1d') return rows;
@@ -176,13 +179,17 @@ const rowsAtTimeframe = (
   );
 };
 
-const instrumentType = (assetType: StrategySchemaV2['executionInstrument']['assetType']) => {
+const instrumentType = (assetType: BacktestStrategy['executionInstrument']['assetType']) => {
   if (assetType === 'stock') return 'STOCK' as const;
   if (assetType === 'etf') return 'ETF' as const;
   return 'NAV_FUND' as const;
 };
 
-const executionBars = (rows: readonly Record<string, unknown>[], calendar: TradingCalendar) => {
+const executionBars = (
+  rows: readonly Record<string, unknown>[],
+  calendar: TradingCalendar,
+  runConfig: RunConfigV3,
+) => {
   const ordered = rows
     .filter((row) => typeof row.occurredAt === 'string')
     .sort((left, right) =>
@@ -190,6 +197,11 @@ const executionBars = (rows: readonly Record<string, unknown>[], calendar: Tradi
     );
   return ordered.map((row, index) => {
     const sessionTimes = dailyBarSessionTimes(row, calendar);
+    const clocks = barResearchClocksV3(row, calendar, runConfig);
+    const previousClock =
+      index > 0
+        ? barResearchClocksV3(ordered[index - 1]!, calendar, runConfig).researchClock
+        : clocks.researchClock;
     let previousClose: string;
     if (typeof row.previousClose === 'string') {
       previousClose = row.previousClose;
@@ -210,8 +222,12 @@ const executionBars = (rows: readonly Record<string, unknown>[], calendar: Tradi
       occurredAt: stringField(row, 'occurredAt'),
       availableAt: stringField(row, 'availableAt'),
       openedAt: sessionTimes.openedAt ?? stringField(row, 'occurredAt'),
-      openAvailableAt: sessionTimes.openAvailableAt ?? stringField(row, 'availableAt'),
+      openAvailableAt: clocks.openResearchClock
+        ? stringField(row, 'availableAt')
+        : (sessionTimes.openAvailableAt ?? stringField(row, 'availableAt')),
       previousCloseAvailableAt,
+      ...clocks,
+      ...(previousClock ? { previousCloseResearchClock: previousClock } : {}),
       open: stringField(row, 'open'),
       close: stringField(row, 'close'),
       previousClose,
@@ -263,6 +279,12 @@ const toCorporateAction = (row: ArtifactRow): BacktestCorporateActionFact => {
   };
   if (typeof row.ratio === 'string') result.ratio = row.ratio;
   if (typeof row.cashAmount === 'string') result.cashAmount = row.cashAmount;
+  for (const field of ['effectiveDate', 'recordDate', 'paymentDate'] as const) {
+    if (typeof row[field] === 'string') result[field] = row[field];
+  }
+  if (typeof row.strategyVisibility === 'string') {
+    result.strategyVisibility = corporateActionStrategyVisibilitySchema.parse(JSON.parse(row.strategyVisibility));
+  }
   if (row.currency === 'CNY' || row.currency === 'HKD' || row.currency === 'USD') {
     return { ...result, currency: row.currency };
   }
@@ -270,8 +292,8 @@ const toCorporateAction = (row: ArtifactRow): BacktestCorporateActionFact => {
 };
 
 const initialLedgerConfig = (
-  strategy: StrategySchemaV2,
-  runConfig: RunConfig,
+  strategy: BacktestStrategy,
+  runConfig: RunConfigV3,
 ): SimulationLedgerConfig => {
   let currency: 'CNY' | 'HKD' | 'USD';
   if (strategy.executionInstrument.market === 'CN') {
@@ -343,9 +365,21 @@ const numericExpressionsIn = (expression: BooleanExpression): readonly NumericEx
 
 export interface ExchangeVerticalResult {
   fills: readonly SimulationFillRecord[];
-  rejects: readonly { orderId?: string; reason: string; code: string; occurredAt: string }[];
+  rejects: readonly ExchangeVerticalReject[];
   trades: ReturnType<typeof projectBacktestTrades>['trades'];
   analytics: ReturnType<typeof buildBacktestAnalytics>;
+}
+
+export interface ExchangeVerticalReject {
+  rejectionId?: string;
+  orderId?: string;
+  side?: 'buy' | 'sell';
+  code: string;
+  reason: string;
+  ruleVersion?: string;
+  occurredAt: string;
+  availableAt?: string;
+  inputFacts?: readonly string[];
 }
 
 export {

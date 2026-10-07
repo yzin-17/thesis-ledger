@@ -1,6 +1,6 @@
 import type {
   MarketDetailRequest as SharedMarketDetailRequest,
-  MarketDetailResponseV2,
+  MarketDetailResponse,
 } from '@thesis-ledger/api-client';
 
 export type MarketDetailRequest = SharedMarketDetailRequest;
@@ -8,11 +8,11 @@ export type MarketDetailRequest = SharedMarketDetailRequest;
 export type MarketDetailFetcher = (
   request: MarketDetailRequest,
   signal: AbortSignal,
-) => Promise<MarketDetailResponseV2>;
+) => Promise<MarketDetailResponse>;
 
 type Flight = {
   controller: AbortController;
-  promise: Promise<MarketDetailResponseV2>;
+  promise: Promise<MarketDetailResponse>;
   consumers: number;
   state: { settled: boolean };
 };
@@ -20,6 +20,8 @@ type Flight = {
 export const marketDetailRequestKey = (request: MarketDetailRequest) =>
   JSON.stringify({
     symbol: request.symbol,
+    adjustment: request.adjustment ?? null,
+    chartContractVersion: request.chartContractVersion ?? null,
     include: request.include ? [...request.include].sort() : null,
     barsLimit: request.barsLimit ?? 30,
     navLimit: request.navLimit ?? 30,
@@ -42,7 +44,7 @@ export class MarketDetailRequestCoordinator {
     request: MarketDetailRequest,
     fetcher: MarketDetailFetcher,
     signal?: AbortSignal,
-  ): Promise<MarketDetailResponseV2> {
+  ): Promise<MarketDetailResponse> {
     const key = marketDetailRequestKey(request);
     let flight = this.flights.get(key);
     if (flight?.controller.signal.aborted) {
@@ -83,7 +85,7 @@ export class MarketDetailRequestCoordinator {
       return Promise.reject(abortReason(consumerSignal));
     }
 
-    return new Promise<MarketDetailResponseV2>((resolve, reject) => {
+    return new Promise<MarketDetailResponse>((resolve, reject) => {
       const onAbort = () => {
         release();
         reject(abortReason(consumerSignal));

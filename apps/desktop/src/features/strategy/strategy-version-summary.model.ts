@@ -1,4 +1,4 @@
-import { strategySchemaV2, type StrategySchemaV2 } from '@thesis-ledger/schemas';
+import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 import {
   strategyAssetTypeLabel,
@@ -13,8 +13,7 @@ import {
 export type StrategyVersionSummary =
   | { kind: 'ready'; sections: ReadonlyArray<{ label: string; value: string }> }
   | { kind: 'missing'; missing: string[] }
-  | { kind: 'invalid'; reason: string }
-  | { kind: 'legacy' };
+  | { kind: 'invalid'; reason: string };
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -24,7 +23,7 @@ const record = (value: unknown): Record<string, unknown> | null =>
 const has = (value: Record<string, unknown>, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key) && value[key] !== undefined;
 
-const requiredV2Fields = (schema: StrategySchema) => {
+const requiredStrategyFields = (schema: StrategySchema) => {
   const missing: string[] = [];
   const labels: Record<string, string> = {
     signalSources: '信号来源',
@@ -49,7 +48,7 @@ const requiredV2Fields = (schema: StrategySchema) => {
   return [...new Set(missing)];
 };
 
-const sourceDisplayLabels = (sources: StrategySchemaV2['signalSources']) =>
+const sourceDisplayLabels = (sources: BacktestStrategy['signalSources']) =>
   new Map(
     sources.map((source) => [
       source.id,
@@ -111,14 +110,14 @@ const booleanExpression = (value: unknown, sourceLabels: ReadonlyMap<string, str
 
 const percentage = (value: string) => `${(Number(value) * 100).toLocaleString()}%`;
 
-const sizingSummary = (sizing: StrategySchemaV2['sizing']) => {
+const sizingSummary = (sizing: BacktestStrategy['sizing']) => {
   if (sizing.type === 'fixedAmount') return `每次固定投入 ${sizing.amount}`;
   if (sizing.type === 'percentOfEquity') return `每次使用权益的 ${percentage(sizing.percent)}`;
   if (sizing.type === 'fixedQuantity') return `每次固定买入 ${sizing.quantity}`;
   return `目标仓位 ${percentage(sizing.weight)}`;
 };
 
-const riskSummary = (risks: StrategySchemaV2['risk']) => {
+const riskSummary = (risks: BacktestStrategy['risk']) => {
   if (risks.length === 0) return '未设置独立风险退出规则';
   return risks
     .map((risk) => {
@@ -129,7 +128,7 @@ const riskSummary = (risks: StrategySchemaV2['risk']) => {
     .join('；');
 };
 
-const executionSummary = (schema: StrategySchemaV2) => {
+const executionSummary = (schema: BacktestStrategy) => {
   const cost = `佣金率 ${percentage(schema.cost.commissionRate)}，滑点率 ${percentage(schema.cost.slippageRate)}`;
   if (schema.execution.mode === 'nav') return `按下一可用净值申购或赎回；${cost}`;
   return `信号后在下一可执行 K 线开盘，以当日有效市价单执行；${cost}`;
@@ -146,16 +145,14 @@ export const strategyStatusLabel = (status: string | null | undefined) => {
 
 export const strategyVersionSummary = (version: StrategyVersion): StrategyVersionSummary => {
   const schema = version.schema;
-  const isV2 = version.schemaVersion === 2 || schema?.schemaVersion === '2';
-  if (!isV2) return { kind: 'legacy' };
   if (!schema) return { kind: 'missing', missing: ['策略定义'] };
-  const missing = requiredV2Fields(schema);
+  const missing = requiredStrategyFields(schema);
   if (missing.length > 0) return { kind: 'missing', missing };
-  const parsed = strategySchemaV2.safeParse(schema);
+  const parsed = strategySchema.safeParse(schema);
   if (!parsed.success) {
     return { kind: 'invalid', reason: parsed.error.issues[0]?.message ?? '策略定义无法解析' };
   }
-  const value = parsed.data as StrategySchemaV2;
+  const value = parsed.data as BacktestStrategy;
   const instrument = value.executionInstrument;
   const sourceLabels = sourceDisplayLabels(value.signalSources);
   return {

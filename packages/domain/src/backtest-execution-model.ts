@@ -1,7 +1,38 @@
 import { DecimalValue } from './decimal.js';
 
 export type ExecutionModelCurrency = 'CNY' | 'HKD' | 'USD';
+export type ExecutionModelPriceAdjustment = 'none' | 'qfq' | 'hfq';
+export type ExecutionModelQuantityBasis = 'actual-units' | 'normalized-units';
+export type ExecutionModelVolumeBasis = 'original' | 'split-adjusted' | 'unknown';
 export type ExecutionModelRange = { start: string; end: string };
+export interface ExecutionModelUnitConversion {
+  available: boolean;
+  evidenceRef: string | null;
+}
+
+/** Structural projection of market-price-protocol's price-basis contract. */
+export interface ExecutionModelPriceBasisFacts {
+  adjustment: ExecutionModelPriceAdjustment;
+  quantityBasis: ExecutionModelQuantityBasis;
+  volumeBasis: ExecutionModelVolumeBasis;
+  conversionAvailable: boolean;
+  conversionEvidenceRef: string | null;
+  dividendMeaning?: 'explicit-cash' | 'embedded-verified' | 'provider-defined';
+}
+
+/** Real instrument facts that a rule may depend on; these are not normalized units. */
+export interface ExecutionModelRuleUnitFacts {
+  realLotSize: string | null;
+  realTickSize: string | null;
+  actualQuantityConversion: ExecutionModelUnitConversion;
+}
+
+/** A true flag without a durable evidence reference is not a usable conversion. */
+export const hasVerifiedExecutionModelConversion = (conversion: ExecutionModelUnitConversion) =>
+  conversion.available &&
+  typeof conversion.evidenceRef === 'string' &&
+  conversion.evidenceRef.trim().length > 0;
+
 export type FrozenExecutionModelChargedFee = {
   treatment: 'charged';
   side: 'buy' | 'sell' | 'both';
@@ -43,6 +74,15 @@ export interface FrozenExecutionModelFees {
   handlingFee: FrozenExecutionModelFee;
 }
 
+export interface FrozenNormalizedExecutionAssumptions {
+  priceCoordinate: 'continuous-decimal';
+  quantityUnits: 'continuous-normalized-decimal';
+  lotSizeConstraint: 'not-applied';
+  tickSizeConstraint: 'not-applied';
+  dailyPriceLimit: 'not-applied';
+  feeBasis: 'simulatedTurnover';
+}
+
 export interface FrozenExecutionModelSegmentBase {
   id: string;
   range: ExecutionModelRange;
@@ -70,8 +110,16 @@ export interface FrozenExchangeExecutionModelSegment extends FrozenExecutionMode
           rounding: 'halfUpToTick';
           minimumDistanceTicks: number;
           minimumPriceTicks: number;
-        }
+      }
       | { kind: 'noDailyLimit'; reason: string };
+    normalizedExecution?: FrozenNormalizedExecutionAssumptions;
+  };
+}
+
+export interface FrozenNormalizedExecutionModelSegment extends FrozenExchangeExecutionModelSegment {
+  execution: FrozenExchangeExecutionModelSegment['execution'] & {
+    normalizedExecution: FrozenNormalizedExecutionAssumptions;
+    price: { kind: 'noDailyLimit'; reason: string };
   };
 }
 
@@ -178,6 +226,59 @@ export const resolveExecutionModelSegment = <T extends FrozenExecutionModelSegme
   }
   // Return an event-owned copy: a subsequent configuration edit cannot rewrite it.
   return structuredClone(selected) as T;
+};
+
+/**
+ * Resolves only the normalized-series contract. It intentionally accepts no
+ * instrument facts, so real lot/tick values cannot silently become fallbacks.
+ */
+export const resolveNormalizedExecutionModelSegment = (
+  model: FrozenExecutionModel,
+  input: {
+    expectedVersion: string;
+    symbol: string;
+    market: string;
+    instrumentType: string;
+    currency: ExecutionModelCurrency;
+    evaluatedAt: string;
+    dataAsOf: string;
+  },
+): FrozenNormalizedExecutionModelSegment => {
+  const segment = resolveExecutionModelSegment(model, input);
+  if (segment.execution.mode !== 'exchange') return fail('归一化序列只支持交易所日线执行');
+  const assumptions = segment.execution.normalizedExecution;
+  if (!assumptions) return fail(`执行分段未声明归一化研究假设: ${segment.id}`);
+  if (
+    assumptions.priceCoordinate !== 'continuous-decimal' ||
+    assumptions.quantityUnits !== 'continuous-normalized-decimal' ||
+    assumptions.lotSizeConstraint !== 'not-applied' ||
+    assumptions.tickSizeConstraint !== 'not-applied' ||
+    assumptions.dailyPriceLimit !== 'not-applied' ||
+    assumptions.feeBasis !== 'simulatedTurnover'
+  ) {
+    return fail(`归一化执行假设未知或不兼容: ${segment.id}`);
+  }
+  if (segment.execution.price.kind !== 'noDailyLimit') {
+    return fail(`归一化序列不能使用真实价格 tick 或涨跌停规则: ${segment.id}`);
+  }
+  if (!segment.fees) return fail(`归一化执行模型缺少费用表: ${segment.id}`);
+  const fees = segment.fees;
+  if (fees.collection !== 'perFillPerCharge') {
+    return fail(`归一化执行费用必须逐笔按模拟成交额计算: ${segment.id}`);
+  }
+  for (const key of [
+    'commission',
+    'stampDuty',
+    'transferFee',
+    'regulatoryFee',
+    'handlingFee',
+  ] as const) {
+    const fee = fees[key];
+    if (fee.treatment === 'charged' && fee.basis !== 'turnover') {
+      return fail(`归一化执行费用基数必须为模拟成交额: ${key}`);
+    }
+  }
+  return segment as FrozenNormalizedExecutionModelSegment;
 };
 
 const calculateChargedFee = (
