@@ -26,7 +26,7 @@ async function discover(directory) {
       if (!(await eslint.isPathIgnored(join(path, '__lint_directory_probe__.ts')))) {
         files.push(...(await discover(path)));
       }
-    } else if (/\.tsx?$/u.test(entry.name) && !(await eslint.isPathIgnored(path))) {
+    } else if (/\.(?:tsx?|mts)$/u.test(entry.name) && !(await eslint.isPathIgnored(path))) {
       files.push(relative(root, path));
     }
   }
