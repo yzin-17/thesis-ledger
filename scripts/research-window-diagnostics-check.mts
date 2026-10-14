@@ -7,7 +7,7 @@ import {
   type BacktestDiagnosticExport,
 } from '../apps/desktop/src/features/strategy/strategy-backtest-diagnostics.model.js';
 import type { BacktestJob } from '../apps/desktop/src/features/strategy/strategy.types.js';
-import { backtestUnknownListingWarningV3 } from '../packages/schemas/dist/index.js';
+import { backtestUnknownListingWarningV3 } from '@thesis-ledger/schemas';
 
 // ESM 入口；只读用户实际导出的文件与标准 API，不生成替代导出或修改结果。
 const samples = [

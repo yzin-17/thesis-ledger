@@ -10,10 +10,14 @@ import {
   backtestExecutionModelSchemaV3,
   marketEventResponseV3Schema,
   backtestRunPreparationRequestV3Schema,
+  backtestCalendarResponseSchema,
+  backtestInstrumentFactsResponseSchema,
+  tradingCalendarFactSchema,
+  marketNoticeDividendEvidenceV3Schema,
+  marketRouteCatalogV3Schema,
   type MarketEventRequestV3,
-  type BacktestCalendarRequest,
   type BacktestInstrumentFactsRequest,
-} from '../packages/schemas/src/index.js';
+} from '@thesis-ledger/schemas';
 import {
   LocalSnapshotStore,
   hashCanonicalManifest,
@@ -24,6 +28,7 @@ import { marketFrozenWindowHashV3 } from '../apps/server/src/market/market-froze
 import { prepareBacktestRunConfigV3 } from '../apps/server/src/backtest/backtest-run-preparation.js';
 import type { MarketBarWindowReadInputV3 } from '../apps/server/src/market/market-bar-reader-v3.js';
 import type { DsaClient } from '../apps/server/src/integration/dsa/dsa.client.js';
+import { parseEffectivePolicyEnvelopeV3 } from '../apps/server/src/integration/dsa/dsa-v3-protocol.js';
 
 // 本机受控验收：原始价格与公告是真实捕获输入；控制面为本地 wrapper，不能作为目标准入证明。
 const root = resolve(import.meta.dirname, '..');
@@ -35,7 +40,7 @@ const capturedPath = resolve(
 const output = resolve(root, '.recovery-artifacts/m31-2026-10-07/local-cash-snapshot');
 const clock = new Date().toISOString();
 const strategyVersionId = randomUUID();
-const source = (mode: string, start: string, end: string) =>
+const source = (mode: string, start: string, end: string): unknown =>
   JSON.parse(
     execFileSync(
       resolve(dsaRoot, '.venv/bin/python'),
@@ -50,8 +55,16 @@ const source = (mode: string, start: string, end: string) =>
       { cwd: dsaRoot, env: { ...process.env, PYTHONPATH: dsaRoot }, maxBuffer: 2_000_000 },
     ).toString(),
   );
-const fixture = async (name: string) =>
+const fixture = async (name: string): Promise<unknown> =>
   JSON.parse(await readFile(resolve(root, `packages/schemas/fixtures/${name}`), 'utf8'));
+const jsonObject = (value: unknown): Record<string, unknown> => {
+  assert(value !== null && typeof value === 'object' && !Array.isArray(value), '输入必须为 JSON 对象');
+  return value as Record<string, unknown>;
+};
+const jsonArray = (value: unknown): unknown[] => {
+  assert(Array.isArray(value), '输入必须为 JSON 数组');
+  return value as unknown[];
+};
 const key = {
   kind: 'data',
   market: 'CN',
@@ -68,13 +81,13 @@ for (const { analysisStart, end } of [
 ]) {
   const range = { start: analysisStart === '2023-01-05' ? '2023-01-03' : '2023-01-10', end };
   const sampleKey = analysisStart === '2023-01-05' ? end : `${analysisStart}--${end}`;
-  const rawStrategy = await fixture('backtest-v2.exchange.json');
+  const rawStrategy = strategySchema.parse(await fixture('backtest-v2.exchange.json'));
   rawStrategy.name = '510300 原始价格与现金分红持有验收';
   rawStrategy.executionInstrument = { symbol: '510300.SH', market: 'CN', assetType: 'etf' };
   rawStrategy.signalSources = [
     { id: 'execution', asset: rawStrategy.executionInstrument, timeframe: '1d', series: ['close'] },
   ];
-  const close = { type: 'series', sourceId: 'execution', field: 'close' };
+  const close = { type: 'series', sourceId: 'execution', field: 'close' } as const;
   rawStrategy.entry = {
     type: 'compare',
     operator: 'gt',
@@ -91,7 +104,9 @@ for (const { analysisStart, end } of [
   rawStrategy.sizing = { type: 'fixedAmount', amount: '50000' };
   rawStrategy.cost = { commissionRate: '0', slippageRate: '0' };
   const strategy = strategySchema.parse(rawStrategy);
-  const rawModel = await fixture('backtest-execution-model.cn-2024q1.json');
+  const rawModel = backtestExecutionModelSchemaV3.parse(
+    await fixture('backtest-execution-model.cn-2024q1.json'),
+  );
   rawModel.id = `510300-cash-research-${end}`;
   const analysisRange = { start: analysisStart, end };
   rawModel.scope = {
@@ -101,6 +116,8 @@ for (const { analysisStart, end } of [
     range: analysisRange,
   };
   const segment = rawModel.segments[0];
+  assert(segment?.fees && segment.execution.mode === 'exchange', '需使用交易所执行模型');
+  assert(segment.fees.commission.treatment === 'charged', '需使用显式佣金配置');
   segment.range = analysisRange;
   segment.source = {
     kind: 'userConfiguration',
@@ -115,33 +132,47 @@ for (const { analysisStart, end } of [
   ];
   segment.fees.commission.rate = '0';
   segment.fees.commission.minimum = { kind: 'none' };
-  for (const charge of ['stampDuty', 'transferFee', 'regulatoryFee', 'handlingFee'])
+  for (const charge of ['stampDuty', 'transferFee', 'regulatoryFee', 'handlingFee'] as const)
     segment.fees[charge] = {
       treatment: 'notApplicable',
       reason: '本现金入账验收显式假设不收取该项',
     };
   segment.execution.price = { kind: 'noDailyLimit', reason: '本现金入账研究不模拟日涨跌幅限制' };
   const executionModel = backtestExecutionModelSchemaV3.parse(rawModel);
-  const observed = source('bars', range.start, range.end);
-  const template = await fixture('market-data-v3.response.etf-qfq.json');
+  const observed = jsonObject(source('bars', range.start, range.end));
+  const metadata = jsonObject(observed.metadata);
+  const context = jsonObject(observed.context);
+  assert(typeof metadata.sha256 === 'string' && typeof metadata.fetchedAt === 'string');
+  const template = jsonObject(await fixture('market-data-v3.response.etf-qfq.json'));
+  const sourcePriceBasis = marketDataBarSeriesResponseV3Schema.shape.sourcePriceBasis.parse(
+    template.sourcePriceBasis,
+  );
   const basis = {
-    ...template.sourcePriceBasis,
+    ...sourcePriceBasis,
     adjustment: 'none',
     methodVersion: 'tencent-captured-raw-v1',
-    revision: { origin: 'local-observation', contentHash: observed.metadata.sha256 },
-    observedAt: observed.metadata.fetchedAt,
+    revision: { origin: 'local-observation', contentHash: metadata.sha256 },
+    observedAt: metadata.fetchedAt,
   };
-  const bars = observed.rows.map((row: string[]) => ({
-    timestamp: `${row[0]}T07:00:00.000Z`,
-    open: Number(row[1]),
-    close: Number(row[2]),
-    high: Number(row[3]),
-    low: Number(row[4]),
-    volume: Number(row[5]),
-    amount: Number(row[8]),
-    completionStatus: 'complete',
-    availableAt: observed.metadata.fetchedAt,
-  }));
+  const bars = jsonArray(observed.rows).map((rawRow) => {
+    const row = jsonArray(rawRow);
+    const date = row[0];
+    assert(typeof date === 'string', '捕获价格行必须包含交易日期');
+    return {
+      timestamp: `${date}T07:00:00.000Z`,
+      open: Number(row[1]),
+      close: Number(row[2]),
+      high: Number(row[3]),
+      low: Number(row[4]),
+      volume: Number(row[5]),
+      amount: Number(row[8]),
+      completionStatus: 'complete',
+      availableAt: metadata.fetchedAt,
+    };
+  });
+  const firstBar = bars[0];
+  const lastBar = bars.at(-1);
+  assert(firstBar && lastBar, '捕获价格窗口不能为空');
   const routeKey = {
     kind: 'bar',
     market: 'CN',
@@ -159,14 +190,14 @@ for (const { analysisStart, end } of [
     coverage: {
       requestedStart: range.start,
       requestedEnd: range.end,
-      actualStart: bars[0].timestamp,
-      actualEnd: bars.at(-1).timestamp,
+      actualStart: firstBar.timestamp,
+      actualEnd: lastBar.timestamp,
       hasMoreBefore: false,
-      latestCompleteTradingDate: observed.rows.at(-1)[0],
+      latestCompleteTradingDate: lastBar.timestamp.slice(0, 10),
     },
     coverageProof: {
-      calendar: observed.context.calendar,
-      listing: observed.context.listing,
+      calendar: context.calendar,
+      listing: context.listing,
       window: { status: 'complete', requestedStart: range.start, requestedEnd: range.end },
       pagination: { status: 'complete', pagesFetched: 1, continuationPending: false },
     },
@@ -177,7 +208,7 @@ for (const { analysisStart, end } of [
       routeIndex: 0,
       effectivePolicyRevision: 1,
     },
-    inputFingerprint: hashCanonicalManifest({ raw: observed.metadata.sha256, range }),
+    inputFingerprint: hashCanonicalManifest({ raw: metadata.sha256, range }),
     historicalTradabilityWindows: observed.historicalTradabilityWindows,
   });
   const responseHash = marketFrozenWindowHashV3(response);
@@ -214,22 +245,23 @@ for (const { analysisStart, end } of [
     },
     frozenWarmupBudgetSessions: 1,
   });
-  const dsa = {
-    backtestCalendar: async (request: BacktestCalendarRequest) => {
-      const fact = source('calendar', request.start, request.end);
-      return {
+  const dsa: NonNullable<Parameters<typeof buildBacktestSnapshotV3>[3]> = {
+    backtestCalendar: (request: Parameters<DsaClient['backtestCalendar']>[0]) => {
+      const fact = tradingCalendarFactSchema.parse(source('calendar', request.start, request.end));
+      return Promise.resolve(backtestCalendarResponseSchema.parse({
         version: 3,
         status: 'supported',
         provider: fact.provider,
         providerRevision: fact.providerRevision,
         coverage: { start: request.start, end: request.end, complete: true },
         facts: [fact],
-      };
+      }));
     },
-    backtestInstrumentFacts: async (request: BacktestInstrumentFactsRequest) => {
-      return source('instrument', request.start, request.end);
-    },
-    effectiveControlPolicyV3: async () => ({
+    backtestInstrumentFacts: (request: BacktestInstrumentFactsRequest) =>
+      Promise.resolve(backtestInstrumentFactsResponseSchema.parse(
+        source('instrument', request.start, request.end),
+      )),
+    effectiveControlPolicyV3: () => Promise.resolve(parseEffectivePolicyEnvelopeV3({
       contractVersion: 3,
       consumer: 'thesis-ledger',
       projection: {
@@ -250,22 +282,23 @@ for (const { analysisStart, end } of [
           ],
         },
       },
-    }),
-    marketRouteCatalogV3: async () => ({
+    })),
+    marketRouteCatalogV3: () => Promise.resolve(marketRouteCatalogV3Schema.parse({
       contractVersion: 3,
       consumer: 'thesis-ledger',
       catalogRevision: 1,
       generatedAt: clock,
       integrity: 'complete',
       entries: [{ key, target, state: 'ready' }],
-    }),
-    marketEventsV3: async (request: MarketEventRequestV3) => {
-      const notice = source('notice', request.start, request.end);
-      const evidence = notice.noticeDividendEvidence;
-      return marketEventResponseV3Schema.parse({
+    })),
+    marketEventsV3: (request: MarketEventRequestV3) => {
+      const notice = jsonObject(source('notice', request.start, request.end));
+      const provenance = jsonObject(notice.provenance);
+      const evidence = marketNoticeDividendEvidenceV3Schema.parse(notice.noticeDividendEvidence);
+      return Promise.resolve(marketEventResponseV3Schema.parse({
         ...request,
         fetchedAt: new Date().toISOString(),
-        providerRevision: notice.provenance.providerRevision,
+        providerRevision: provenance.providerRevision,
         facts: notice.facts,
         noticeDividendEvidence: evidence,
         coverage: { complete: true, admissionEvidenceRef: evidence.ref },
@@ -281,7 +314,7 @@ for (const { analysisStart, end } of [
           scopeDateFrom: '2023-01-03',
           scopeDateTo: '2023-02-01',
           adapterRevision: 'official-cash-notices-v1',
-          sourceRevision: notice.provenance.providerRevision,
+          sourceRevision: provenance.providerRevision,
           credentialRevision: 'not-required',
           validFrom: clock,
           validUntil: '2027-01-01T00:00:00Z',
@@ -290,13 +323,13 @@ for (const { analysisStart, end } of [
           invalidatedAt: null,
           invalidationReason: null,
         },
-      });
+      }));
     },
-  } as unknown as DsaClient;
+  };
   const reader = {
-    readV3: async (input: MarketBarWindowReadInputV3) => {
+    readV3: (input: MarketBarWindowReadInputV3) => {
       assert.deepEqual(input.window, range);
-      return {
+      return Promise.resolve({
         status: 'selected' as const,
         request: {
           contractVersion: 3 as const,
@@ -336,7 +369,7 @@ for (const { analysisStart, end } of [
           effectivePolicyRevision: 1,
           catalogRevision: 1,
         },
-      };
+      });
     },
   };
   const prepared = await prepareBacktestRunConfigV3({
@@ -344,7 +377,7 @@ for (const { analysisStart, end } of [
     reader,
     checkedAt: clock,
     control: {
-      getPolicy: async () => ({
+      getPolicy: () => Promise.resolve({
         contractVersion: 3,
         consumer: 'thesis-ledger',
         requestId: 'local-controlled-policy',
@@ -356,7 +389,7 @@ for (const { analysisStart, end } of [
           { key: routeKey, targets: [{ providerId: 'tencent', upstreamSource: 'tencent' }] },
         ],
       }),
-    } as never,
+    },
     request: backtestRunPreparationRequestV3Schema.parse({
       contractVersion: 3,
       requestId: `cash-prepare-${end}`,
@@ -413,7 +446,7 @@ for (const { analysisStart, end } of [
     JSON.stringify(
       {
         controlledSourceAdmission: true,
-        capturedPriceSha256: observed.metadata.sha256,
+        capturedPriceSha256: metadata.sha256,
         runConfig,
         manifest: built.manifest,
         result: first,
@@ -423,13 +456,14 @@ for (const { analysisStart, end } of [
     ),
   );
   assert.equal(first.cashDividendDisclosure?.records.length, 1);
-  const record = first.cashDividendDisclosure.records[0];
+  const record = first.cashDividendDisclosure?.records[0];
+  assert(record, '运行结果必须包含现金分红记录');
   assert.equal(record.status, end === '2023-01-18' ? 'receivable' : 'paid');
   assert.equal(first.metrics.totalReturn.status, 'available');
   assert.equal(first.benchmarkCompatibility.status, 'unverified');
   assert.equal(first.benchmark.totalReturn.status, 'unavailable');
   assert.equal(first.completeness, 'partial');
-  const independent = JSON.parse(
+  const independent: unknown = JSON.parse(
     execFileSync(
       resolve(dsaRoot, '.venv/bin/python'),
       [

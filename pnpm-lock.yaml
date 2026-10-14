@@ -24,6 +24,9 @@ importers:
       '@eslint/js':
         specifier: ^9.32.0
         version: 9.39.5
+      '@thesis-ledger/schemas':
+        specifier: workspace:*
+        version: link:packages/schemas
       eslint:
         specifier: ^9.32.0
         version: 9.39.5(jiti@2.7.0)
