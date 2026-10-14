@@ -3,7 +3,7 @@
 > 任务标识：`2026-09-09-portfolio-pnl-metrics`  
 > 日期：2026-09-09  
 > 状态：代码实现完成，待运行时验收  
-> 对应任务：[`组合概览收益指标语义统一实施任务`](../tasks/2026-09-09-portfolio-pnl-metrics.md)
+> 当前验收：[投资组合任务中的收益指标](../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-pnl-acceptance)；[原实施记录](../archive/tasks/2026-09-09-portfolio-pnl-metrics.md)保留。
 
 ## 背景与问题
 

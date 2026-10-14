@@ -5,7 +5,7 @@
 - [`统一回测系统 V2`](2026-08-28-unified-backtest-v2.md)
 - [`回测执行规则与研究假设`](2026-09-10-backtest-historical-execution-rule-facts.md)
 - [`本轮验收记录`](../reviews/2026-09-11-backtest-v2-closure.md)
-- 后续 [`回测真实历史市场规则数据源`](../../tasks/2026-09-16-backtest-real-historical-market-rules.md)
+- 后续 [`回测真实历史市场规则数据源`](2026-09-16-backtest-real-historical-market-rules.md)
 
 > 状态：已完成。本文件只收敛 2026-09-11 的责任边界；原任务历史证据保持不变。实时 Provider 可用性是运行环境状态，由 capability 动态报告，不再作为 V2 引擎交付永久完成条件。
 

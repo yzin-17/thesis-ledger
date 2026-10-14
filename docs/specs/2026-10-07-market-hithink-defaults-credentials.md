@@ -3,7 +3,7 @@
 > 任务标识：MARKET-HITHINK-DEFAULTS
 > 日期：2026-10-07
 > 状态：本地、目标 API 与真实 Web 客户端验收完成；选择与普通能力执行规则现由[市场数据精确接入与用户自主选择](2026-10-07-market-route-user-choice.md)定义。
-> 对应任务：[已归档实施任务](../archive/tasks/2026-10-07-market-hithink-defaults-credentials.md)；[客户端验收](../reviews/2026-10-08-market-provider-client-acceptance.md)。
+> 对应任务：[已归档实施任务](../archive/tasks/2026-10-07-market-hithink-defaults-credentials.md)；[客户端验收](../archive/reviews/2026-10-08-market-provider-client-acceptance.md)。
 
 ## 背景与目标
 

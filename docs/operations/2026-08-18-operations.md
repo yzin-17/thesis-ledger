@@ -21,7 +21,7 @@ docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-led
 
 数据库结构由主仓排序后的全部 SQL 输入定义，包含 Prisma model 与 raw-owned 表。空卷初始化只能解决首次安装，已有卷必须显式处理结构差异；PostgreSQL 进程健康不代表业务结构就绪。应用使用 app role，结构安装与权限初始化由独立 owner 执行。
 
-开发阶段可显式接受历史数据丢失并重建指定数据库的 `public` schema，保留 external volume；该流程使用全部 SQL 作为结构输入，不维护 Prisma 迁移历史。已验收设计见 [归档规格](../archive/specs/2026-09-14-dev-database-rebuild.md)，部署证据见 [验证记录](../reviews/2026-09-14-dev-database-rebuild.md)，操作入口以 infra 运维说明为准。未开启重建时应保留数据，并在结构不匹配时停止更新。
+开发阶段可显式接受历史数据丢失并重建指定数据库的 `public` schema，保留 external volume；该流程使用全部 SQL 作为结构输入，不维护 Prisma 迁移历史。已验收设计见 [归档规格](../archive/specs/2026-09-14-dev-database-rebuild.md)，部署证据见 [验证记录](../archive/reviews/2026-09-14-dev-database-rebuild.md)，操作入口以 infra 运维说明为准。未开启重建时应保留数据，并在结构不匹配时停止更新。
 
 正式发布需要独立的保留数据升级流程、备份与隔离演练，完成结构与权限校验后再发布匹配的版本标记。开发重建不能作为正式发布的升级入口；本主题未实现或验证正式环境的 Prisma Migrate 升级。禁止脚本或 entrypoint 自动删除卷。
 
@@ -35,7 +35,7 @@ docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-led
 
 固定快照归一化价格研究和图表可在 HiThink/腾讯已配置的同口径主备间整窗切换，无需算法等价证明。排查时检查返回的实际 `providerId/upstreamSource/routeIndex`、日期覆盖和请求口径，不能拼接两家价格。图表 `chart-bars` 可显示未收盘条目，其响应不作为回测输入。新规则的真实运行、恢复操作和重放见[共同价格能力验收](../tasks/evidence/2026-10-03-common-price-baseline.md)。
 
-任务执行以 PostgreSQL 业务状态为准，队列不可用或查询失败不代表任务不存在。排查时关联任务 ID、attempt、稳定错误码、Worker 状态和冻结快照；不要直接改终态或让晚到结果覆盖新 attempt。记录诊断摘要，不输出 Token、凭据或原始 Provider 响应。已冻结重放失败应核验输入摘要与版本，不通过在线补取改写比较数据。当前已验证和未通过条件见[目标运行态记录](../tasks/evidence/2026-09-27-target-runtime-gates.md)与[主任务](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
+任务执行以 PostgreSQL 业务状态为准，队列不可用或查询失败不代表任务不存在。排查时关联任务 ID、attempt、稳定错误码、Worker 状态和冻结快照；不要直接改终态或让晚到结果覆盖新 attempt。记录诊断摘要，不输出 Token、凭据或原始 Provider 响应。已冻结重放失败应核验输入摘要与版本，不通过在线补取改写比较数据。当前已验证和未通过条件见[目标运行态记录](../tasks/evidence/2026-09-27-target-runtime-gates.md)与[主任务](../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 
 ## Provider 故障
 

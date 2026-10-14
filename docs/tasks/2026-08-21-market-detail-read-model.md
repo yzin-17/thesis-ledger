@@ -1,6 +1,6 @@
 # 持仓行情详情共享读模型与按能力加载优化任务
 
-> 状态对账（2026-10-03）：部分实现/已实现待验收：T7a 的完整状态矩阵需核对现有组件用例，T8/T11 的股票、ETF、基金、StrictMode、partial/stale/empty/unsupported/unavailable 与局部重试的 Network/视觉验收仍开放。共同价格浏览器证据覆盖 ETF 三口径和来源切换，不覆盖全部断言。旧 API 兼容已被 Canonical 替代；旧本机 API 导航阻断不再作为全局浏览器阻塞。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：部分实现/已实现待验收：T7a 的完整状态矩阵需核对现有组件用例，T8/T11 的股票、ETF、基金、StrictMode、partial/stale/empty/unsupported/unavailable 与局部重试的 Network/视觉验收仍开放。共同价格浏览器证据覆盖 ETF 三口径和来源切换，不覆盖全部断言。旧 API 兼容已被 Canonical 替代；旧本机 API 导航阻断不再作为全局浏览器阻塞。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 关联规格：[持仓行情详情共享读模型与按能力加载优化规格](../specs/2026-08-21-market-detail-read-model.md)
 
@@ -87,4 +87,4 @@
 - [ ] 测试覆盖截图中的 ETF 422、ATR 422、指标 503、重复请求和长期 Pending 反例。
 - [ ] 浏览器 Network/视觉证据与实际代码、测试和文档一致。
 
-2026-08-22 复核记录：Standards 与 Spec 双轴复核均未发现当前 P0/P1/P2 问题。由于 In-app Browser 对本地 `/api` 请求返回 `net::ERR_BLOCKED_BY_CLIENT`，T7a、T8、T11 继续保持未勾选；这表示验收证据缺口，不代表代码复核通过等同于浏览器验收通过。完整审查报告见 [`docs/reviews/2026-08-22-market-detail-read-model-review.md`](../reviews/2026-08-22-market-detail-read-model-review.md)。
+2026-08-22 复核记录：Standards 与 Spec 双轴复核均未发现当前 P0/P1/P2 问题。由于 In-app Browser 对本地 `/api` 请求返回 `net::ERR_BLOCKED_BY_CLIENT`，T7a、T8、T11 继续保持未勾选；这表示验收证据缺口，不代表代码复核通过等同于浏览器验收通过。完整审查报告见 [`docs/archive/reviews/2026-08-22-market-detail-read-model-review.md`](../archive/reviews/2026-08-22-market-detail-read-model-review.md)。

@@ -3,13 +3,13 @@
 > 任务标识：MARKET-ROUTE-USER-CHOICE
 > 日期：2026-10-07
 > 状态：本地、正式运行态与真实 Web 客户端验收完成，现行合同保留。
-> 对应任务：[已归档实施任务](../archive/tasks/2026-10-07-market-route-user-choice.md)；[客户端验收](../reviews/2026-10-08-market-provider-client-acceptance.md)。
+> 对应任务：[已归档实施任务](../archive/tasks/2026-10-07-market-route-user-choice.md)；[客户端验收](../archive/reviews/2026-10-08-market-provider-client-acceptance.md)。
 
 ## 目标与当前问题
 
 用户要求补齐数据源的精确接入、配置和检查，并允许自主选择来源。当前前端仅列出 ready 条目，Server 同样按就绪状态拒绝保存；多个底层 Fetcher 尚未接入当前 V3，数据源卡片展示的宽能力与可选范围不一致。
 
-本规格将选择意图与执行就绪分开，覆盖当前应用合同的 CN/HK/US 市场、已声明的日线和非行情能力。第三方 SDK 未被本应用声明的功能及其他市场不在本次接入范围。原数据源检查见[核查报告](../reviews/2026-10-07-market-provider-capabilities-admissions.md)。
+本规格将选择意图与执行就绪分开，覆盖当前应用合同的 CN/HK/US 市场、已声明的日线和非行情能力。第三方 SDK 未被本应用声明的功能及其他市场不在本次接入范围。原数据源检查见[核查报告](../archive/reviews/2026-10-07-market-provider-capabilities-admissions.md)。
 
 ## 行为与接口
 

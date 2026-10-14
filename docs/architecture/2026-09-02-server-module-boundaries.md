@@ -6,7 +6,7 @@
 > 状态：现行
 >
 > 适用范围：`apps/server` 与 workspace 内部 runtime dependency  
-> 来源：[`2026-09-02-full-repo-architecture-hardening`](../specs/2026-09-02-full-repo-architecture-hardening.md)
+> 来源：[`2026-09-02-full-repo-architecture-hardening`](../archive/specs/2026-09-02-full-repo-architecture-hardening.md)
 
 ## 1. 文档定位
 
@@ -85,7 +85,7 @@ Automation、AI Optimization、Backtest 等模块可以拥有各自的业务状�
 
 ### 5.1 策略编写、可信身份与正式创建
 
-- `identity` 拥有工作区 principal、用户、密码摘要与会话校验，消费归属的业务模块单向依赖它。默认本地工作区提供稳定归属，无需注册或会话；显式账号模式保留会话验证。模式与兼容边界见[本地工作区规格](../specs/2026-10-06-strategy-local-workspace.md)。
+- `identity` 拥有工作区 principal、用户、密码摘要与会话校验，消费归属的业务模块单向依赖它。默认本地工作区提供稳定归属，无需注册或会话；显式账号模式保留会话验证。模式与兼容边界见[本地工作区规格](../archive/specs/2026-10-06-strategy-local-workspace.md)。
 - `strategy-authoring` 拥有草稿、不可变修订、编写操作、提案及创建来源快照；其 PostgreSQL 状态是业务事实源。专用队列与 Worker 适配器持有 BullMQ，Executor 管理领取/租约/终态，单次 Runner 管理指定模型调用。
 - `ai` 拥有独立的调用身份、不可变审计事实、模型/用途验证和计价依据。编写状态失败或租约丢失时仍保留调用事实；通用 AI 不依赖编写模块。
 - `market` 拥有目录标的解析；`backtest` 拥有 Canonical 正式策略、版本、通用来源和 `StrategyCreationService.createInTransaction()`。编写保存通过该能力在同一事务形成策略 v1、固定来源及草稿终态；保存后的回测由单独的显式动作发起。

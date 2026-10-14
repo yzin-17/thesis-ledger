@@ -3,7 +3,7 @@
 - 文档类型：Spec
 - 日期：2026-09-18
 - 任务标识：natural-language-strategy-authoring
-- 状态：设计文档已生成，待实施；尚未通过模型、运行态与浏览器验收
+- 状态：本主题实现与 G1～G3 已完成，完整 NL-AC 已按 2026-10-06 最终证据验收；本文保留现行产品契约，执行与证据见归档任务。
 - 对应任务：[实施任务](../archive/tasks/2026-09-18-natural-language-strategy-authoring.md)
 - 关联方案：[策略中心统一交互与回测结果体验](2026-09-17-strategy-center-ux-consolidation.md)
 - 领域词汇：[策略研究与应用](../../CONTEXT.md#策略研究与应用)

@@ -1,6 +1,6 @@
 # DSA Contract V1 兼容说明
 
-> 历史设计记录。ThesisLedger 专属接口和回测的现行合同以[单一现行链路替换 Spec](../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)及其 Task 为准。下述 `backtest-v2-t13-gate.mjs` 随旧 V2 能力汇总端点退役；历史性能记录只说明当时的输入和结果，不是当前部署门禁。
+> 历史设计记录。ThesisLedger 专属接口和回测的现行合同以[单一现行链路替换 Spec](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)及其 Task 为准。下述 `backtest-v2-t13-gate.mjs` 随旧 V2 能力汇总端点退役；历史性能记录只说明当时的输入和结果，不是当前部署门禁。
 
 本文记录 Data Contract V1 与 Control Contract V1 的能力级兼容边界和验证规则。三仓发布版本、镜像和数据库基线以 [三仓版本与兼容矩阵](version-matrix.md) 为准，避免在两份文档中重复维护版本号。
 
@@ -36,7 +36,7 @@ DSA 市场事实 → ThesisLedger DataSnapshot → Simulation Event Engine → S
 - DSA 不接收模拟现金、持仓、订单、成交或账户投影；Server 不把回测结果写入真实 Ledger、Portfolio、Journal 或 AI Review。
 - 当前 Data Contract V1 的 `Bars` 仍只有 `1d`；`1m`、HK/US Calendar、Instrument Facts、FX、公司行动和 CN NAV capability 必须按统一回测 V2 T2 验证后才能声明可用。
 
-完整行为与任务依赖见 [`统一回测系统 V2 Spec`](../specs/2026-08-28-unified-backtest-v2.md) 和 [`统一回测系统 V2 实施任务`](../tasks/2026-08-28-unified-backtest-v2.md)。
+完整行为与任务依赖见 [`统一回测系统 V2 Spec`](../specs/2026-08-28-unified-backtest-v2.md) 和 [`统一回测系统 V2 实施任务`](../archive/tasks/2026-08-28-unified-backtest-v2.md)。
 
 ### T13 第一阶段门禁
 

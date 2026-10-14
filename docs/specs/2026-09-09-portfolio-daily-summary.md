@@ -2,7 +2,7 @@
 
 - 状态：已批准，实施中（行情详情与窄屏视觉复核待完成）
 - 类型：现有能力增强
-- 对应任务：[`../tasks/2026-09-09-portfolio-daily-summary.md`](../tasks/2026-09-09-portfolio-daily-summary.md)
+- 当前验收：[投资组合任务中的每日摘要与窄屏](../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-summary-acceptance)；[原实施记录](../archive/tasks/2026-09-09-portfolio-daily-summary.md)保留。
 
 ## 背景与问题
 

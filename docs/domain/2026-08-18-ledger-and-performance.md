@@ -2,9 +2,9 @@
 
 ## 事实源与投影
 
-`LedgerEvent` 是交易、现金流、公司行动和受控修正的唯一事实源。`Position` 只是由 Ledger 重建的当前投影，`PortfolioSnapshot` 是带数据质量的历史缓存。清空 Position 后运行 `/api/v1/ledger/:accountId/rebuild`，应得到同一账户的最新投影。
+`LedgerEvent` 是交易、现金流、公司行动和受控修正的唯一事实源。`Position` 只是由 Ledger 重建的当前投影，`PortfolioSnapshot` 是带数据质量的历史缓存。现行 rebuild 从 Ledger 重建投影，不以清空投影作为用户操作流程。
 
-截图审核提交会通过专用 V2 命令写入 `POSITION_BASELINE_OBSERVATION`，由 `factId` 与追加式修正链表达事实版本，随后重建 Position；回滚追加带 `supersedesEventId` 的 `VOID`，不删除事实流水。手工持仓修改同样必须通过 V2 Baseline Observation，不得直接写入 Position。
+当前持久信封版本为 3。手工持仓修改通过 Baseline Observation 命令写入 `POSITION_BASELINE_OBSERVATION`，由 `factId` 与追加式修正链表达事实版本，随后重建 Position；回滚追加带 `supersedesEventId` 的 `VOID`，不删除事实流水，不得直接写入 Position。截图导入及审核页面当前已停用，相关历史实现不能作为当前可操作流程；当前入口见[项目 README](../../README.md)。
 
 ## 成本、现金与收益
 

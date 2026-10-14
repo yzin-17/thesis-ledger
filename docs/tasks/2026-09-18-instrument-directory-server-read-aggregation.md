@@ -1,6 +1,6 @@
 # 服务端标的目录聚合实施任务
 
-> 状态对账（2026-10-03）：已实现待验收：查询与 Docker 证据已完成；按原 Spec AC6，浏览器和安装态验收继续保留。共同价格目录打开行情并不证明清仓后的 Ledger/Journal 名称响应与无额外目录请求，不能以旧“无必要门禁”一句关闭此义务。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：已实现待验收：查询与 Docker 证据已完成；按原 Spec AC6，浏览器和安装态验收继续保留。共同价格目录打开行情并不证明清仓后的 Ledger/Journal 名称响应与无额外目录请求，不能以旧“无必要门禁”一句关闭此义务。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[服务端标的目录聚合 Spec](../specs/2026-09-18-instrument-directory-server-read-aggregation.md)
 

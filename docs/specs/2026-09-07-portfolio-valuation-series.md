@@ -2,7 +2,7 @@
 
 - 状态：已批准，实施中
 - 类型：新能力
-- 对应任务：[`../tasks/2026-09-07-portfolio-valuation-series.md`](../tasks/2026-09-07-portfolio-valuation-series.md)
+- 当前验收：[投资组合任务中的估值走势](../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-series-acceptance)；[原实施记录](../archive/tasks/2026-09-07-portfolio-valuation-series.md)保留。
 - 上游契约：[`2026-08-28-portfolio-snapshot-system.md`](2026-08-28-portfolio-snapshot-system.md)
 
 ## 背景与问题

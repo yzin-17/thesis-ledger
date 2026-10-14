@@ -4,7 +4,7 @@
 > 状态：已被复核版取代  
 > Review 对象：此前确认的统一回测 V2 12 项任务、当前交易与成交记录系统及已落地代码
 
-> 最新结论见 [`统一回测系统与交易系统任务衔接 Review（复核版）`](../../reviews/2026-08-28-unified-backtest-trade-integration-review-v2.md)。
+> 最新结论见 [`统一回测系统与交易系统任务衔接 Review（复核版）`](2026-08-28-unified-backtest-trade-integration-review-v2.md)。
 
 ## 1. 当前事实
 
@@ -23,7 +23,7 @@ Portfolio / Journal / AI Review
 相关权威文档和实现为：
 
 - [`交易与成交记录系统`](../../specs/2026-08-26-trade-execution-ledger-system.md)；
-- [`交易与成交记录系统实施任务`](../../tasks/2026-08-26-trade-execution-ledger-system.md)；
+- [`交易与成交记录系统实施任务`](../tasks/2026-08-26-trade-execution-ledger-system.md)；
 - [`交易系统返工任务`](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)；
 - `packages/domain/src/ledger-v2.ts`、`trade-projection.ts`、`trade-costs.ts`；
 - `docs/operations/2026-08-28-trade-projection-cutover.md`。

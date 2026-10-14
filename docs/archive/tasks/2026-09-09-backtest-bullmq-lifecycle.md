@@ -2,7 +2,7 @@
 
 > 最终状态（2026-10-06）：T4.1–T4.12、T4 父项及最终一致性 Review 全部完成。正式更新和保留数据升级成功，同一新镜像上的九组保护场景、真实浏览器/Electron 及独立生产启动通过。任务已归档，当前需求继续以 Spec 为准。见[最终验收与部署证据](../../tasks/evidence/2026-10-06-backtest-target-lifecycle.md)。
 
-> 历史状态对账（2026-10-03）：durable owner、CAS、分页恢复的当前实现与隔离 Worker 证据由 Canonical C02 承接，旧 jobs/V1/V2 执行入口已退役。当时 T4 的目标故障、429 与 Electron 证据未完整。只对当前 Run 执行剩余断言。下文历史环境与协议描述仅在其原范围有效；对账依据见[当时 Review](../../reviews/2026-10-03-task-state-reconciliation.md)。
+> 历史状态对账（2026-10-03）：durable owner、CAS、分页恢复的当前实现与隔离 Worker 证据由 Canonical C02 承接，旧 jobs/V1/V2 执行入口已退役。当时 T4 的目标故障、429 与 Electron 证据未完整。只对当前 Run 执行剩余断言。下文历史环境与协议描述仅在其原范围有效；对账依据见[当时 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 [当前 Spec](../../specs/2026-09-09-backtest-bullmq-lifecycle.md)。
 

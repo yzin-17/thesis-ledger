@@ -1,6 +1,6 @@
 # 自动化运行历史分页 Spec
 
-任务文档：[`../tasks/2026-09-09-automation-run-history-pagination.md`](../tasks/2026-09-09-automation-run-history-pagination.md)
+任务文档：[`../tasks/2026-09-09-automation-run-history-pagination.md`](../archive/tasks/2026-09-09-automation-run-history-pagination.md)
 
 ## 背景与问题
 

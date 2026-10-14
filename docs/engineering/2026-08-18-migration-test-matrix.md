@@ -28,4 +28,4 @@
 
 `20260926090000_market_window_frozen_response` 仅为Market逐窗证据增加可空完整响应及JSON形状约束。旧记录保留空值，不从元数据推导历史Bars。应用需验证请求/响应、来源、窗口、覆盖及seriesVersion关联；同一身份只能原子填充空载荷，已有载荷不可覆盖。
 
-该变更的本地、隔离PostgreSQL和目标运行态结果分别记录在[多来源复权回测Task](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。尚未执行的环境检查不得列为通过。正式发布的保留数据升级流程仍需独立完成。
+该变更的本地、隔离PostgreSQL和目标运行态结果分别记录在[多来源复权回测Task](../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。尚未执行的环境检查不得列为通过。正式发布的保留数据升级流程仍需独立完成。

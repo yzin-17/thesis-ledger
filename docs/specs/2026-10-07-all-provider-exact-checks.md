@@ -1,6 +1,6 @@
 # 全部数据源精确接入、配置与检查
 
-对应任务：[已归档实施任务](../archive/tasks/2026-10-07-all-provider-exact-checks.md)。状态：本地、目标 API 与真实 Web 客户端验收完成，现行合同保留；[客户端验收](../reviews/2026-10-08-market-provider-client-acceptance.md)独立记录真实账号边界。
+对应任务：[已归档实施任务](../archive/tasks/2026-10-07-all-provider-exact-checks.md)。状态：本地、目标 API 与真实 Web 客户端验收完成，现行合同保留；[客户端验收](../archive/reviews/2026-10-08-market-provider-client-acceptance.md)独立记录真实账号边界。
 
 ## 范围与问题
 

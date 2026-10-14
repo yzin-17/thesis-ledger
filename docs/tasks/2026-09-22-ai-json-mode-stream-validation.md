@@ -1,6 +1,6 @@
 # AI 输出模式与完整流验收实施任务
 
-> 状态对账（2026-10-03）：已实现待验收：最新已执行日志含输出解析 8 项、JSON Mode 27 项、SDK HTTP/SSE 20 项、就绪 16 项，旧无法安装/只能语法转译的前置已消除。下方历史验证表不是当前状态；本地测试/构建记录见新增证据链接。CI 当前 HEAD、枚举消费者、浏览器、真实 Chat/Responses、费用/超时仍分别核对。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：已实现待验收：最新已执行日志含输出解析 8 项、JSON Mode 27 项、SDK HTTP/SSE 20 项、就绪 16 项，旧无法安装/只能语法转译的前置已消除。下方历史验证表不是当前状态；本地测试/构建记录见新增证据链接。CI 当前 HEAD、枚举消费者、浏览器、真实 Chat/Responses、费用/超时仍分别核对。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 > 任务标识：`2026-09-22-ai-json-mode-stream-validation`
 > 对应 Spec：[AI 输出模式与完整流验收](../specs/2026-09-22-ai-json-mode-stream-validation.md)

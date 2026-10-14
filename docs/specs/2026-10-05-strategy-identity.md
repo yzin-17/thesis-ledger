@@ -1,6 +1,6 @@
 # 策略编写可信身份
 
-> 2026-10-06 用户明确目前无需登录验证。默认使用[策略中心本地工作区](2026-10-06-strategy-local-workspace.md)；本文的账号会话规则仅适用于明确启用 `STRATEGY_IDENTITY_MODE=account` 的部署。
+> 2026-10-06 用户明确目前无需登录验证。默认使用[策略中心本地工作区](../archive/specs/2026-10-06-strategy-local-workspace.md)；本文的账号会话规则仅适用于明确启用 `STRATEGY_IDENTITY_MODE=account` 的部署。
 
 ## 目标与范围
 

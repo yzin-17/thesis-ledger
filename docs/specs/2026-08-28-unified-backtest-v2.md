@@ -3,9 +3,9 @@
 > 任务标识：`2026-08-28-unified-backtest-v2`  
 > 日期：2026-08-28  
 > 状态：V2 产品/引擎与 T13 收敛验收已完成；实时 Provider 可用性由 capability 独立报告
-> 范围基线：[`统一回测系统与交易系统任务衔接 Review（复核版）`](../reviews/2026-08-28-unified-backtest-trade-integration-review-v2.md)  
-> 对应任务：[`统一回测系统 V2 实施任务`](../tasks/2026-08-28-unified-backtest-v2.md)
-> T13 当前阻塞解决增量：[`回测执行规则与研究假设 Spec`](2026-09-10-backtest-historical-execution-rule-facts.md)
+> 范围基线：[`统一回测系统与交易系统任务衔接 Review（复核版）`](../archive/reviews/2026-08-28-unified-backtest-trade-integration-review-v2.md)
+> 对应任务：[`统一回测系统 V2 实施任务`](../archive/tasks/2026-08-28-unified-backtest-v2.md)
+> T13 当前阻塞解决增量：[`回测执行规则与研究假设 Spec`](../archive/specs/2026-09-10-backtest-historical-execution-rule-facts.md)
 
 ## 背景与问题
 
@@ -505,7 +505,7 @@ CashSettlement
 
 具体规则不得只用客户端硬编码的 `tPlusOne` 或 A 股 10% 限制表达。规则至少覆盖：交易日历、时区、Session、停牌、可买卖、lotSize、tickSize、适用价格限制、持仓可卖时间、资金结算时间和标的个体约束。
 
-Snapshot 必须冻结本次运行实际使用的数据和规则模型，包括来源、版本、适用范围、简化假设、价格限制、持仓可卖、资金占用/再投资及费用。允许明确预设或用户配置，目标区间内重要变化按需有限分段；不冒充历史已验证事实。Runner 只消费冻结输入，版本不匹配、必要覆盖不足、关键价格/公司行为/交易约束缺失仍失败；与计算无关的原件档案缺失不阻塞。不得由缺 K 线推断停牌或前填撮合。三类缺失、F1–F6 与待实施门禁调整以[执行规则增量 Spec](2026-09-10-backtest-historical-execution-rule-facts.md)为准；现有代码仍按 unavailable 拒绝，文档不代表实现已放行。
+Snapshot 必须冻结本次运行实际使用的数据和规则模型，包括来源、版本、适用范围、简化假设、价格限制、持仓可卖、资金占用/再投资及费用。允许明确预设或用户配置，目标区间内重要变化按需有限分段；不冒充历史已验证事实。Runner 只消费冻结输入，版本不匹配、必要覆盖不足、关键价格/公司行为/交易约束缺失仍失败；与计算无关的原件档案缺失不阻塞。不得由缺 K 线推断停牌或前填撮合。三类缺失、F1–F6 与待实施门禁调整以[执行规则增量 Spec](../archive/specs/2026-09-10-backtest-historical-execution-rule-facts.md)为准；现有代码仍按 unavailable 拒绝，文档不代表实现已放行。
 
 ExchangeExecution 只支持：
 

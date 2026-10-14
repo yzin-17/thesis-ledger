@@ -6,7 +6,7 @@
 
 ## 实施前基线
 
-以下缺口为实施前核对结果，均已处理。当前实现、完整 AC 与本轮门禁结论见[最终对账](../reviews/2026-10-05-journal-review-completion.md)；本 Spec 继续定义当前契约。
+以下缺口为实施前核对结果，均已处理。当前实现、完整 AC 与本轮门禁结论见[最终对账](../archive/reviews/2026-10-05-journal-review-completion.md)；本 Spec 继续定义当前契约。
 
 2026-10-04 源码核对：现有候选继承 `completedTradeSchema` 的 number 字段，`reviewObjectId` 使用未加对象类型的 Trade/Slice ID；Journal 服务按账户整体 projectionFingerprint 判断旧快照，缺少对象级 evidenceFingerprint 和统一 statisticsEligibility；分析继续消费 CompletedTrade<number>；快照只有保存 POST，没有列表/详情 GET。这是实现缺口，不能用目标空列表、健康检查或新增 GET 单独结项。
 

@@ -2,7 +2,7 @@
 
 对应 [Spec](../specs/2026-09-10-backtest-historical-execution-rule-facts.md)；上游 [统一回测 V2 Task](2026-08-28-unified-backtest-v2.md)。
 
-> 状态：已完成。T0–T4 的研究回测增量均已收敛；当前完成边界是 DSA 关键事实与显式研究模型闭环。真实历史市场规则 Provider 由后续 [`回测真实历史市场规则数据源任务`](../../tasks/2026-09-16-backtest-real-historical-market-rules.md) 承担。
+> 状态：已完成。T0–T4 的研究回测增量均已收敛；当前完成边界是 DSA 关键事实与显式研究模型闭环。真实历史市场规则 Provider 由后续 [`回测真实历史市场规则数据源任务`](2026-09-16-backtest-real-historical-market-rules.md) 承担。
 
 ## 2026-09-16 完成条件收敛
 
@@ -162,7 +162,7 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
 
 ## 3. F1–F6 与验收责任
 
-范围拆解以 [Spec 第 4.3 节](../../specs/2026-09-10-backtest-historical-execution-rule-facts.md#43-f1f6-逐项收敛) 为准。F1/F2/F3/F5/F6 的研究模型配置与校验由 T1 负责，执行由 T3.2 负责；F4 现金/持仓生命周期由 T3.2 负责。T3.1 冻结全部实际使用配置，T3.3 披露，T4 验收首个真实场景。法定收费、制度版本与来源链的 Provider 历史事实证明转入后续专项，不计入这些任务完成条件。
+范围拆解以 [Spec 第 4.3 节](../specs/2026-09-10-backtest-historical-execution-rule-facts.md#43-f1f6-逐项收敛) 为准。F1/F2/F3/F5/F6 的研究模型配置与校验由 T1 负责，执行由 T3.2 负责；F4 现金/持仓生命周期由 T3.2 负责。T3.1 冻结全部实际使用配置，T3.3 披露，T4 验收首个真实场景。法定收费、制度版本与来源链的 Provider 历史事实证明转入后续专项，不计入这些任务完成条件。
 
 | AC             | 实现/局部验证            | 真实门禁         |
 | -------------- | ------------------------ | ---------------- |
@@ -177,7 +177,7 @@ T3 保留为原任务的责任组，不额外计为完成项；拆分依据是 S
 
 ## 4. 历史证据与当前门禁
 
-[来源矩阵](../../benchmarks/2026-09-10-backtest-historical-execution-rule-source-matrix.md)的 36 条来源、39 个链接、digest 和 null/unproven 均保留为旧审计记录；旧 T0 没有通过。本次范围调整使完整档案不再成为当前前置条件，也不把旧失败改成真实 Provider 成功。
+[来源矩阵](../reviews/2026-09-10-backtest-historical-execution-rule-source-matrix.md)的 36 条来源、39 个链接、digest 和 null/unproven 均保留为旧审计记录；旧 T0 没有通过。本次范围调整使完整档案不再成为当前前置条件，也不把旧失败改成真实 Provider 成功。
 
 2026-09-10 的历史基线中，无模型运行在规则 unavailable 时失败且研究模型真实闭环尚未完成；后续 T4 已完成显式研究模型的固定 CN 日频闭环。当前源码继续让无模型且 Provider 规则 unavailable 的运行失败，这是保留的安全边界。CN/HK/US 股票与 ETF、国内场外基金及原有周期仍是目标能力，不能由本文件一个 CN 日频用例替代；真实历史规则 Provider 的新增覆盖按后续专项独立验收。
 

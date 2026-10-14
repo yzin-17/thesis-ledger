@@ -3,7 +3,7 @@
 > 任务标识：`PORTFOLIO-VALUATION-DEMAND-GUARD-V1`
 > 日期：2026-09-14
 > 状态：功能、运行态与 T4 `AccountDataPage` 行为保持型拆分验收完成（最终一致性 Review 仍有非阻塞提交范围问题）
-> 对应任务：[`../tasks/2026-09-14-portfolio-valuation-demand-guard.md`](../tasks/2026-09-14-portfolio-valuation-demand-guard.md)
+> 对应任务：[`../tasks/2026-09-14-portfolio-valuation-demand-guard.md`](../archive/tasks/2026-09-14-portfolio-valuation-demand-guard.md)
 
 ## 背景与问题
 

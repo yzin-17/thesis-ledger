@@ -1,6 +1,6 @@
 # 组合估值按需查询与 ETF 行情上游保护实施任务
 
-对应 Spec：[`../specs/2026-09-14-portfolio-valuation-demand-guard.md`](../specs/2026-09-14-portfolio-valuation-demand-guard.md)
+对应 Spec：[`../specs/2026-09-14-portfolio-valuation-demand-guard.md`](../../specs/2026-09-14-portfolio-valuation-demand-guard.md)
 
 > 任务标识：`PORTFOLIO-VALUATION-DEMAND-GUARD-V1`
 > 状态：T1、T2、I1、T3、I2、T4 完成（最终一致性 Review 仍有非阻塞提交范围问题）

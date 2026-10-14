@@ -25,4 +25,4 @@
 - AC5：真实目标 API、调度执行、页面流程和新快照消费经过验证；原有数据源策略、凭证、数据库及冻结快照保留。
 - AC6：风险解析有真实公告与消费验证，未知信息不被补成正常状态。
 
-实施与证据：[已完成任务](../archive/tasks/2026-10-08-announcement-preparation.md) · [验收记录](../reviews/2026-10-08-announcement-preparation-acceptance.md)。
+实施与证据：[已完成任务](../archive/tasks/2026-10-08-announcement-preparation.md) · [验收记录](../archive/reviews/2026-10-08-announcement-preparation-acceptance.md)。

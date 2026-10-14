@@ -1,10 +1,11 @@
 # 定期现金入账计划 Spec
 
 - 日期：2026-08-30
-- 状态：T1–T4 已实现并验证
+- 状态：T1–T4 本地实现与确定性验证完成；真实 Scheduler、通知与客户端验收仍开放
 - 适用项目：`thesis-ledger`
 - 类型：增量设计
 - 依赖：[`2026-08-30-cash-account-funding-and-transfer.md`](2026-08-30-cash-account-funding-and-transfer.md)
+- 当前验收：[现金任务中的定期入账](../tasks/2026-08-30-cash-account-funding-and-transfer.md#recurring-cash-acceptance)；[原实施记录](../archive/tasks/2026-08-30-recurring-cash-deposit-plan.md)保留。
 
 ## 背景与问题
 

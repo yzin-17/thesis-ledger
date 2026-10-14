@@ -73,7 +73,7 @@ V2 原先列为非目标的以下内容，由本规格作为后续增量接手�
 
 仓库实现完成度与部署时外部能力分离：真实模型网络/鉴权、在线行情 Provider 以及人工浏览器 smoke 只有在目标部署环境提供对应凭证和运行条件时执行；未配置时保持 `unavailable`/待验证并限制相应入口，不能用 Fixture 冒充，也不把已经通过契约、V2 Run 与 CI 的仓库实现重新标为未完成。
 
-G1 与 G2 分别验收，规则生成不依赖先完成多模型优化。普通回测以[研究回测边界](2026-09-10-backtest-historical-execution-rule-facts.md)为准：G2/G3 接受已说明来源、版本、范围并冻结的研究模型，不要求客户历史协议/原件档案；关键价格、必要公司行为和执行约束缺失仍阻止对应实验。G1 不依赖回测成功或全市场 T13；G2 上线须有所选范围成功运行与隔离证据，不能把不可用结果用于候选正常排名。独立契约开发只依赖已验证接口，不等待完整市场矩阵。V2 的缺失项回到原任务补齐，本任务不重复认领整套回测引擎。
+G1 与 G2 分别验收，规则生成不依赖先完成多模型优化。普通回测以[研究回测边界](../archive/specs/2026-09-10-backtest-historical-execution-rule-facts.md)为准：G2/G3 接受已说明来源、版本、范围并冻结的研究模型，不要求客户历史协议/原件档案；关键价格、必要公司行为和执行约束缺失仍阻止对应实验。G1 不依赖回测成功或全市场 T13；G2 上线须有所选范围成功运行与隔离证据，不能把不可用结果用于候选正常排名。独立契约开发只依赖已验证接口，不等待完整市场矩阵。V2 的缺失项回到原任务补齐，本任务不重复认领整套回测引擎。
 
 ## 3. 首版范围与后续范围
 
@@ -637,7 +637,7 @@ DSA 继续负责数据能力和事实，不承担 AI 实验、风险应用或 Sn
 | 编号 | 来源 | 使用内容 |
 | --- | --- | --- |
 | R1 | [统一回测系统 V2 Spec](2026-08-28-unified-backtest-v2.md) | 策略与执行边界、时间语义、独占 Snapshot、风险类型和真实账本隔离 |
-| R2 | [统一回测系统 V2 Task](../tasks/2026-08-28-unified-backtest-v2.md) | 既有依赖与实施门禁，不重复认领 |
+| R2 | [统一回测系统 V2 Task](../archive/tasks/2026-08-28-unified-backtest-v2.md) | 既有依赖与实施门禁，不重复认领 |
 | R3 | [`packages/schemas/src/ai.ts`](../../packages/schemas/src/ai.ts) | 策略研究上下文与 AI 审计契约 |
 | R4 | [`apps/server/src/ai/ai-run.service.ts`](../../apps/server/src/ai/ai-run.service.ts) | 现有 AiRun 生命周期和上下文校验接缝 |
 | R5 | [`apps/server/src/ai/provider-registry.ts`](../../apps/server/src/ai/provider-registry.ts) | Provider 注册及 fallback 与严格对比模式的隔离需求 |

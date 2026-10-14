@@ -1,6 +1,6 @@
 # AI 接入自动选择与测试后保存实施任务
 
-> 状态对账（更新于 2026-10-04）：已实现待验收：verified-save、onboarding HTTP 和 Desktop 历史局部门禁保留，#45 已在本地提交历史合入。本轮 T6.P1 的真实 PostgreSQL 保存竞争 5 项通过，默认引用另由用途配置 T4.2.P1 验证；T6 仍缺完整当前 CI、真实 Provider、浏览器与修订后超时/取消及目标运行态。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+> 状态对账（更新于 2026-10-04）：已实现待验收：verified-save、onboarding HTTP 和 Desktop 历史局部门禁保留，#45 已在本地提交历史合入。本轮 T6.P1 的真实 PostgreSQL 保存竞争 5 项通过，默认引用另由用途配置 T4.2.P1 验证；T6 仍缺完整当前 CI、真实 Provider、浏览器与修订后超时/取消及目标运行态。初始对账见[Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 - Spec：[AI 接入自动选择与测试后保存](../specs/2026-09-23-ai-provider-auto-test-save.md)
 - 基线：main@f74a18e7dc8711aab7833461c2b4adeb4bb04fbe（#44 已合入）

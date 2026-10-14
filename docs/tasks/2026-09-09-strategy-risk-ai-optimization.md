@@ -1,13 +1,13 @@
 # 策略驱动风险规则与 AI 多模型优化实施任务
 
-> 状态对账（2026-10-03）：部分实现：T17/T18 本地及历史目标证据已有，隔离 PostgreSQL 的适用断言仍需匹配；T19 的真实模型/在线行情业务闭环未完成。Canonical U02 完成当前 Run 过滤与旧结果拒绝，不等于新增策略应用事务、预算或真实优化验收。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：部分实现：T17/T18 本地及历史目标证据已有，隔离 PostgreSQL 的适用断言仍需匹配；T19 的真实模型/在线行情业务闭环未完成。Canonical U02 完成当前 Run 过滤与旧结果拒绝，不等于新增策略应用事务、预算或真实优化验收。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 > 任务标识：`2026-09-09-strategy-risk-ai-optimization`  
 > 日期：2026-09-09  
 > 状态：**17/20 完成**；T17、T18 的仓库实现、本地门禁、目标开发数据库增量 SQL 与当前 Docker 更新已通过，T17 的隔离 PostgreSQL及 T19 的真实 Provider/在线行情闭环仍待执行，因此暂不勾选新增任务
 > 推荐位置：`docs/tasks/2026-09-09-strategy-risk-ai-optimization.md`  
 > 对应规格：[Spec](../specs/2026-09-09-strategy-risk-ai-optimization.md)  
-> 前置任务：[统一回测系统 V2](2026-08-28-unified-backtest-v2.md)  
+> 前置任务：[统一回测系统 V2](../archive/tasks/2026-08-28-unified-backtest-v2.md)
 > 本文已按 2026-09-12 的实现、迁移、PostgreSQL Service E2E 与 CI 证据收敛；历史基线继续保留用于解释设计起点。
 
 ## 1. 实施约束
@@ -150,7 +150,7 @@
 
 - 开始实施版本：`ad2a7e786c291822887b1d0550b72a1db835a908`（`feat: implement BullMQ lifecycle for V1 backtest tasks`）；开始时工作树无既有未提交修改，本任务新增本 Spec/Task 及导航修改。
 - 核对时间与环境：2026-09-09，主仓本地源码与 Prisma Schema；本阶段未连接数据库、DSA、Redis、真实模型或浏览器。
-- 原 V2 前置状态：[`统一回测系统 V2 Task`](2026-08-28-unified-backtest-v2.md) 仍为 `0/14`，`StrategySchemaV2`、Typed AST、Run-owned `DataSnapshot`、`ArtifactStore`、跨市场执行与 NAV Simulation 尚无实现证据。本增量不复制这些任务。
+- 原 V2 前置状态：[`统一回测系统 V2 Task`](../archive/tasks/2026-08-28-unified-backtest-v2.md) 仍为 `0/14`，`StrategySchemaV2`、Typed AST、Run-owned `DataSnapshot`、`ArtifactStore`、跨市场执行与 NAV Simulation 尚无实现证据。本增量不复制这些任务。
 
 | 门禁 | 当前结论 | 源码与迁移证据 | 依赖归属 |
 | --- | --- | --- | --- |
@@ -191,7 +191,7 @@
 
 **完成条件：**Desktop、Server 和实验编排使用同一契约；未知字段或非法策略在 Server 被拒绝；迁移不重写旧策略和手工规则。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
 
 ### T02：实现确定性规则编译与共享判断内核
 
@@ -215,7 +215,7 @@
 
 **完成条件：**同一策略和编译输入得到相同计划；风险/退出覆盖不混淆；无第二套含义不同的止损判断。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#36/#37 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#36/#37 CI。
 
 ### T03：接入实际持仓上下文、评价时钟和事件隔离
 
@@ -239,7 +239,7 @@
 
 **完成条件：**真实监控能按正确上下文输出四态结果，无法判断时有明确原因；未发生真实订单、Ledger 或投影写入。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#36/#37 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#36/#37 CI。
 
 **2026-09-19 增量证据：**风险上下文已在 MarketBar 边界区分临时 `unavailable/timeout` 与契约错误；前两者保留账户及持仓事实，由共享四态判断把价格相关规则标记为 `unavailable`，不再让风险应用预览整体返回 HTTP 503；`invalid-response` 等错误仍 fail-closed。Server 定向测试 2 个文件、10 个测试通过，Server 包级测试 114 个文件、717 个测试通过（另有 11 个文件、33 个 PostgreSQL 条件测试按环境跳过），typecheck、build 与 scoped ESLint 通过。真实 Docker 接口与浏览器回归尚未执行。
 
@@ -265,7 +265,7 @@
 
 **完成条件：**从正式策略到风险中心形成可审计闭环；升级无静默覆盖，错误不会产生半套启用规则。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#37/#38 PostgreSQL Service E2E。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#37/#38 PostgreSQL Service E2E。
 
 ### T05：实现规则预览与风险中心联动界面
 
@@ -289,7 +289,7 @@
 
 **完成条件：**阶段 A 的正常流程和失败流程都能由 UI 完成；只有已确认的账户应用被启用。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md)；仓库 UI 类型/构建已通过，人工视觉/键盘/focus 保留为部署门禁。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md)；仓库 UI 类型/构建已通过，人工视觉/键盘/focus 保留为部署门禁。
 
 **2026-09-19 风险应用管理增量证据：**风险中心已移除“复制为独立规则”和含义不清的“定位此应用”，改为明确的“编辑通知配置/收起通知配置”；通知严重级别与渠道复用统一中文标签映射和下拉选项，卡片头部及通知表单重新对齐。新增经确认的“删除应用”：`DELETE /strategy-optimization/risk-applications/:id` 使用 `expectedRevision`，同一事务停用并软删除应用、归档冻结规则、写入审计；Desktop 普通列表请求 `includeArchived=false`。Schema、Server、Desktop 定向测试共 35 个通过，三个包 typecheck、Server/Desktop build 与变更文件 ESLint 通过；`sync-code.sh thesis-ledger` 已同步当前容器，Server、Worker 健康，健康接口与未归档列表接口均返回 200。尚未执行本轮浏览器视觉、键盘与删除确认交互验收。
 
@@ -315,7 +315,7 @@
 
 **完成条件：**所有候选读取固定市场数据；不同策略身份不影响公平性判定；封存隔离不是仅前端隐藏。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T07：接入严格模型路由、提案契约与 AiRun 审计
 
@@ -339,7 +339,7 @@
 
 **完成条件：**每个提案可追溯到真实调用；没有模型输出能直接修改策略正式版本或实际账户。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
 
 ### T08：实现候选校验、不可变版本与实验内去重
 
@@ -363,7 +363,7 @@
 
 **完成条件：**只有经过完整校验的固定策略能进入运行队列；任何复用结果都能指向原始真实 Run。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T09：实现统一评价与最小回测诊断读模型
 
@@ -387,7 +387,7 @@
 
 **完成条件：**所有展示绩效来自真实 Run，排序可由保存的协议重算；结果不依赖 AI 的措辞或投票。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35 CI。
 
 ### T10：实现实验编排、预算、取消与故障恢复
 
@@ -411,7 +411,7 @@
 
 **完成条件：**实验不会永久 queued、无界调用或重复持久化结果；停止与恢复有清晰可读状态和费用记录；结果未知必须显式恢复而非自动重试。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 PostgreSQL Service E2E。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 PostgreSQL Service E2E。
 
 ### T11：实现最终候选锁定、封存验证与暴露审计
 
@@ -435,7 +435,7 @@
 
 **完成条件：**测试在迭代前真实隔离，揭示后不能重新包装成未见；最终选择过程可追溯。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #35/#38 CI。
 
 ### T12：实现候选对比、正式采纳与规则差异闭环
 
@@ -459,7 +459,7 @@
 
 **完成条件：**用户从实验选择到正式版本再到规则预览可以完成，但真实监控仍需独立显式启用。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 PostgreSQL Service E2E。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 PostgreSQL Service E2E。
 
 ### T13：实现 AI 实验工作区与多模型对比界面
 
@@ -483,7 +483,7 @@
 
 **完成条件：**一轮自动优化、对比、最终验证、采纳和风险预览无需手动复制 AI 文本或重新录入参数。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 CI。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md) 与 PR #38 CI。
 
 ### T14：完成跨模块集成、隔离、安全与真实小额验收
 
@@ -531,7 +531,7 @@
 
 **完成条件：**文档与实际开放能力一致；全部首版任务完成条件都有仓库证据，外部限制有清晰披露。
 
-**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../reviews/2026-09-11-strategy-risk-ai-optimization-verification.md)；PR #38 最终 CI #430 / workflow run `34645792807` 与合并后 `main` CI #431 / workflow run `34647495457` 均为 `completed / success`。
+**验证证据：**见 [`2026-09-11-strategy-risk-ai-optimization-verification.md`](../archive/reviews/2026-09-11-strategy-risk-ai-optimization-verification.md)；PR #38 最终 CI #430 / workflow run `34645792807` 与合并后 `main` CI #431 / workflow run `34647495457` 均为 `completed / success`。
 
 ## 4. 必须覆盖的测试矩阵
 

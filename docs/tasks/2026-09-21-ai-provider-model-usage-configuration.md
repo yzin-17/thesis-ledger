@@ -1,6 +1,6 @@
 # AI Provider 配置与模型用途配置实施任务
 
-> 状态对账（更新于 2026-10-04）：已实现待验收：原完整 AC-01～30 及 9/24 AC-09 仍是基线。历史隔离执行状态与 lmstudio 零价用途证据保留；本轮 T4.2.P1 的默认引用 PostgreSQL/HTTP 竞争 10 项通过，并修复检查与提交分离的竞态。认证、非零计费、研究提交/冻结竞态、超时/取消、目标运行态与 Electron 缺口分别保留。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+> 状态对账（更新于 2026-10-04）：已实现待验收：原完整 AC-01～30 及 9/24 AC-09 仍是基线。历史隔离执行状态与 lmstudio 零价用途证据保留；本轮 T4.2.P1 的默认引用 PostgreSQL/HTTP 竞争 10 项通过，并修复检查与提交分离的竞态。认证、非零计费、研究提交/冻结竞态、超时/取消、目标运行态与 Electron 缺口分别保留。初始对账见[Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 对应 Spec：[AI Provider 配置与模型用途配置优化](../specs/2026-09-21-ai-provider-model-usage-configuration.md)
 

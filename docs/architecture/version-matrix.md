@@ -18,13 +18,13 @@
 
 ### V3 源码增量与发布基线
 
-2026-10-03 的共同价格基线按[多源 Spec §1.1](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md#11-2026-10-03-共同能力基线)执行：HiThink ETF qfq 与腾讯 ETF none/qfq/hfq 不再以人工窗口准入为前置，日级状态自动整理；同口径整窗备用支持图表和固定快照归一化价格研究。协议仍为 V3，无依赖、数据库或镜像格式变化。目标使用官方 `sync-code.sh` 同步，真实 Server/Worker 与重放结果见[验收记录](../tasks/evidence/2026-10-03-common-price-baseline.md)；本轮未发布新镜像。
+2026-10-03 的共同价格基线按[多源 Spec §1.1](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md#11-2026-10-03-共同能力基线)执行：HiThink ETF qfq 与腾讯 ETF none/qfq/hfq 不再以人工窗口准入为前置，日级状态自动整理；同口径整窗备用支持图表和固定快照归一化价格研究。协议仍为 V3，无依赖、数据库或镜像格式变化。目标使用官方 `sync-code.sh` 同步，真实 Server/Worker 与重放结果见[验收记录](../tasks/evidence/2026-10-03-common-price-baseline.md)；该批次未发布新镜像。
 
-当前 DSA ThesisLedger 专属 Data/Control 只有 V3 可调用路由，主仓 Server 和客户端按同一合同消费。DSA 原生 `/api/v1` 仍服务其自身功能；它不构成 ThesisLedger 旧合同读取能力。`RunConfigV3`、V3 Snapshot 与结果格式需要按自己的不可变标识校验，旧 Run/产物不得在当前执行路径中被解码或回放。NAV 基金和 Ledger 当前经济能力的正向接线仍归[单一现行链路替换 Task](../tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)，不能因旧入口删除而当作验收完成。
+当前 DSA ThesisLedger 专属 Data/Control 只有 V3 可调用路由，主仓 Server 和客户端按同一合同消费。DSA 原生 `/api/v1` 仍服务其自身功能；它不构成 ThesisLedger 旧合同读取能力。`RunConfigV3`、V3 Snapshot 与结果格式需要按自己的不可变标识校验，旧 Run/产物不得在当前执行路径中被解码或回放。Canonical 的 NAV/Ledger 正向接线已有[归档任务](../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)中的有界验收；后续现金、NAV 确认和账户投影的独立业务条件仍由[当前任务索引](../tasks/README.md)承接，不能用协议删除或接线完成替代。
 
 2026-09-27 的保留数据升级和 2026-09-28 的 `BIGINT` 结构升级各有当时目标证据，见[数据库升级任务](../archive/tasks/2026-09-27-preserve-data-database-upgrade.md)与[目录修复证据](../tasks/evidence/2026-09-28-cont-159516-catalog-revision-bigint.md)。这些结果不声明 2026-09-29 的后续迁移已进入目标环境；当前结构 head 必须从实际 migration 输入重新派生。
 
-2026-09-29 的官方 `update.sh all` 在 DSA 镜像完成后，于主仓镜像构建时耗尽宿主磁盘，数据库准备和服务启动未发生；见[失败边界](../tasks/evidence/2026-09-29-canonical-update-all-disk-blocked.md)。因此当前源码的目标 G-Deploy、真实来源、Worker、UI 和 AI 业务验收保持开放。`sync-code.sh` 更新位于容器可写层，不能当作镜像发布证据。
+2026-09-29 的官方 `update.sh all` 在 DSA 镜像完成后，于主仓镜像构建时耗尽宿主磁盘，数据库准备和服务启动未发生；见[失败边界](../tasks/evidence/2026-09-29-canonical-update-all-disk-blocked.md)。这是当时的失败记录；后续 Canonical 目标验收及统一适配层运行证据已接续，不能据此宣称今天目标部署整体仍阻塞。各业务尚未覆盖条件以[当前任务](../tasks/README.md)为准。`sync-code.sh` 更新位于容器可写层，不能当作镜像发布证据。
 
 ### 通用规则
 
@@ -43,4 +43,4 @@ pnpm migration:matrix
 pnpm provider:failover
 ```
 
-运行三仓目标栈时，先在 infra 执行 `node scripts/check-compatibility.mjs`，再按变更选择官方 `sync-code.sh` 或 `update.sh`。`bash scripts/market-v3-contract-test.sh` 只验协议；`./scripts/contract-test.sh` 追加真实 Data 正向读取。两者之外还须核对数据库 head/权限、Server/Worker/DSA 实际版本、Run 生命周期和目标客户端，具体门禁见[多来源回测 Task](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
+运行三仓目标栈时，先在 infra 执行 `node scripts/check-compatibility.mjs`，再按变更选择官方 `sync-code.sh` 或 `update.sh`。`bash scripts/market-v3-contract-test.sh` 只验协议；`./scripts/contract-test.sh` 追加真实 Data 正向读取。两者之外还须核对数据库 head/权限、Server/Worker/DSA 实际版本、Run 生命周期和目标客户端，具体门禁见[当前任务索引](../tasks/README.md)及其按业务划分的正式任务。

@@ -1,6 +1,6 @@
 # 回测公告准备实施任务
 
-规格：[回测公告自动准备与增量更新](../../specs/2026-10-08-announcement-preparation.md)。已完成并归档；工作区其他改动保留，没有提交。运行与一致性核对见[验收记录](../../reviews/2026-10-08-announcement-preparation-acceptance.md)。
+规格：[回测公告自动准备与增量更新](../../specs/2026-10-08-announcement-preparation.md)。已完成并归档；工作区其他改动保留，没有提交。运行与一致性核对见[验收记录](../reviews/2026-10-08-announcement-preparation-acceptance.md)。
 
 ## 任务与依赖
 

@@ -2,7 +2,7 @@
 
 - Spec：[契约与读取链路收敛](../../specs/2026-10-04-journal-review-contracts.md)。
 - 原任务：[统一 Trade Projection 复盘](2026-08-28-journal-review-trade-projection.md)。
-- 当前状态：C1—C5 全部完成，本地、隔离数据库、目标 API／真实 Provider／恢复、完整 Web 浏览器及对应提交 CI 已通过；用户取消本轮设备验收。详见[最终 AC 对账](../../reviews/2026-10-05-journal-review-completion.md)。
+- 当前状态：C1—C5 全部完成，本地、隔离数据库、目标 API／真实 Provider／恢复、完整 Web 浏览器及对应提交 CI 已通过；用户取消本轮设备验收。详见[最终 AC 对账](../reviews/2026-10-05-journal-review-completion.md)。
 
 ## 实施顺序
 
@@ -60,4 +60,4 @@
 - [x] 不存在未解决的当前 Blocking 问题或本任务拥有的后续义务
 - [x] 实现、用户指南与最终 Review 同步，未关联 WIP 保留，现行 Spec 保留
 
-结论：通过并归档。逐条实现与验证见[最终 Review](../../reviews/2026-10-05-journal-review-completion.md)，文档及归档检查见[J8.5](../../tasks/evidence/2026-10-05-journal-final-j85.md)。原 C5 的拆分义务由收口 J4—J8 完成，不以核心目标流程代替完整消费验收。
+结论：通过并归档。逐条实现与验证见[最终 Review](../reviews/2026-10-05-journal-review-completion.md)，文档及归档检查见[J8.5](../../tasks/evidence/2026-10-05-journal-final-j85.md)。原 C5 的拆分义务由收口 J4—J8 完成，不以核心目标流程代替完整消费验收。

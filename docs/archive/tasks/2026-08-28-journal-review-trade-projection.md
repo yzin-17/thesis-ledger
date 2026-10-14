@@ -1,6 +1,6 @@
 # 投资复盘工作台（统一 Trade Projection）实施任务
 
-> 状态对账（2026-10-05）：T1—T7 全部完成。完整 AC1—AC16、本地／隔离数据库、目标模型内容与安全恢复、J8.1—J8.3 真实浏览器及 J8.4 对应提交 CI 已分层通过；J8.5 最终一致性 Review 通过。用户调整后的本轮范围及逐条证据见[最终对账](../../reviews/2026-10-05-journal-review-completion.md)。
+> 状态对账（2026-10-05）：T1—T7 全部完成。完整 AC1—AC16、本地／隔离数据库、目标模型内容与安全恢复、J8.1—J8.3 真实浏览器及 J8.4 对应提交 CI 已分层通过；J8.5 最终一致性 Review 通过。用户调整后的本轮范围及逐条证据见[最终对账](../reviews/2026-10-05-journal-review-completion.md)。
 
 对应 Spec：[`../specs/2026-08-28-journal-review-trade-projection.md`](../../specs/2026-08-28-journal-review-trade-projection.md)
 
@@ -176,7 +176,7 @@
 
 ## 最终一致性 Review
 
-本轮按[最终 AC1—AC16 对账](../../reviews/2026-10-05-journal-review-completion.md)检查，原 T4—T7 的剩余义务由 J4—J8 完成，没有用局部测试替代必要产品门禁。
+本轮按[最终 AC1—AC16 对账](../reviews/2026-10-05-journal-review-completion.md)检查，原 T4—T7 的剩余义务由 J4—J8 完成，没有用局部测试替代必要产品门禁。
 
 - [x] 全部验收标准与 T1—T7 完成条件有明确实现和适当验证
 - [x] 契约、候选、decimal 分析、资格、未知时间、对象 ID、半开窗口和跨层接口一致

@@ -1,6 +1,6 @@
 # 数据源即时启停与页面凭证配置实施任务
 
-> 状态对账（2026-10-03）：已实现待验收/范围性跳过：配置、OAuth/加密与当前合同有实现及目标证据。T5b 逐来源核对；Tushare 前端凭据已测试但免费 ETF 接口 40203，ETF 多源接入按用户跳过，不再将其 Token 缺失作为必须恢复的前置。TickFlow、Finnhub、Alpha Vantage、Longbridge 的原在线义务未被该跳过取消；各自凭证/授权与权限是相应真实前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：已实现待验收/范围性跳过：配置、OAuth/加密与当前合同有实现及目标证据。T5b 逐来源核对；Tushare 前端凭据已测试但免费 ETF 接口 40203，ETF 多源接入按用户跳过，不再将其 Token 缺失作为必须恢复的前置。TickFlow、Finnhub、Alpha Vantage、Longbridge 的原在线义务未被该跳过取消；各自凭证/授权与权限是相应真实前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[数据源即时启停与页面凭证配置](../specs/2026-09-14-market-provider-credentials.md)
 

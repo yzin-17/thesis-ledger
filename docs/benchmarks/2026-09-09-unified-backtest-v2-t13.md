@@ -2,7 +2,7 @@
 
 > 2026-09-11 当前结论：固定 CN 股票日频场景已完成真实买卖闭环、同 Snapshot 重放、账户隔离、Artifact 缺失/恢复复验及 Browser 三条展示链路；Provider `executionRules.unavailable` 已由显式研究模型边界有界收敛。该局部证据不覆盖完整目标市场、资产与周期，因此 V2 T13 保持未完成。下文按阶段保留原测试、失败与“可勾选”等当时判断，当前状态以末尾最新复验及本说明为准。
 >
-> 普通回测已改为可信、可复现的策略研究。客户级历史凭证、收费协议与提现档案不再是前置，但关键价格、公司行为、持仓/现金约束仍需齐备；固定 CN 股票日频场景的新模型与按需门禁已实现并取得真实运行及 Browser 局部证据，但完整目标市场、资产、周期及其浏览器展示仍待验收，不能把历史失败改写为通过。见[规则增量 Spec](../specs/2026-09-10-backtest-historical-execution-rule-facts.md)与[Task](../tasks/2026-09-10-backtest-historical-execution-rule-facts.md)。已有 CN 日频局部证据不代表完整目标市场/资产/周期。
+> 普通回测已改为可信、可复现的策略研究。客户级历史凭证、收费协议与提现档案不再是前置，但关键价格、公司行为、持仓/现金约束仍需齐备；固定 CN 股票日频场景的新模型与按需门禁已实现并取得真实运行及 Browser 局部证据，但完整目标市场、资产、周期及其浏览器展示仍待验收，不能把历史失败改写为通过。见[规则增量 Spec](../archive/specs/2026-09-10-backtest-historical-execution-rule-facts.md)与[Task](../archive/tasks/2026-09-10-backtest-historical-execution-rule-facts.md)。已有 CN 日频局部证据不代表完整目标市场/资产/周期。
 
 ## 范围
 

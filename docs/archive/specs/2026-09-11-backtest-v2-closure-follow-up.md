@@ -1,0 +1,58 @@
+# 统一回测 V2 收敛补充 Spec
+
+> 归档说明（2026-10-14）：原 V2 收敛任务已完成；现行产品合同见统一回测 V2，经济模型、复权及不可变冻结见多源复权感知回测规格。本文只保留原阶段责任边界和分层验收依据。 当前入口：[V2 产品合同](../../specs/2026-08-28-unified-backtest-v2.md)及[多源经济与复权合同](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)。
+
+
+日期：2026-09-11
+
+关联：[`统一回测系统 V2`](../../specs/2026-08-28-unified-backtest-v2.md)、[`回测执行规则与研究假设`](2026-09-10-backtest-historical-execution-rule-facts.md)、[`回测真实历史市场规则数据源`](2026-09-16-backtest-real-historical-market-rules.md)
+
+## 目标
+
+消除“局部能力未验收导致整个回测任务长期无法收敛”的状态混淆，同时不降低回测正确性门禁。
+
+本补充只明确三点：
+
+1. 历史上市/停牌属于不可由研究模型替代的 critical fact；必须由可证明 Provider 覆盖。
+2. executionRules 中费用、价格限制和结算等允许由完整、显式、已冻结的研究模型替代 Provider model assumption，但不得改写 Provider 原始状态。
+3. T13 必须分别记录离线契约矩阵和真实 Provider/Runtime 证据；fixture/Schema 成功不能冒充真实数据源支持。
+
+## 历史可交易性
+
+CN Stock 第一版事实源使用 DSA 已有 BaoStock 能力：
+
+- 证券基础信息证明上市/退市边界；
+- 交易日历确定请求区间应存在的交易会话；
+- `tradestatus` 明确证明每个交易会话是否停牌；
+- 只有预期交易会话全部存在合法状态时 coverage 才完整；
+- 缺行、解析失败或 Provider 异常均返回 unavailable，不从缺失行情推断停牌；
+- 明确停牌属于已知不可交易状态，当前阻止整个运行，后续若引入逐日 tradability 再另行放宽到事件级撮合拒绝。
+
+## Snapshot
+
+Snapshot Builder 继续遵守既有边界：
+
+- critical fact unavailable 必须失败；
+- 研究模型只能替代 executionRules model assumption；
+- 模型、来源、假设和实际数据都必须冻结并进入内容哈希；
+- replay 只读 finalized Artifact，不重新访问 Provider；
+- 旧 Snapshot 不自动补模型。
+
+## T13 分层验收
+
+### 契约层
+
+必须自动覆盖 CN/HK/US × Stock/ETF × `1d/60m/30m/15m/5m/1m`，以及 CN NAV `1d`；HK/US NAV 保持明确 unsupported。FX、公司行动和 NAV 依赖契约必须能表达目标事实。
+
+### Provider/Runtime 层
+
+只有实际 Provider 能在所需区间提供完整事实，且 Server/Worker 真实运行、重放、隔离和故障门禁通过时，才可标记真实能力完成。`unavailable` 是合法且安全的结果，但不能计作能力已实现。
+
+本补充所称真实 Provider 必要事实不包含 DSA 在当前阶段直接提供法定收费、完整制度版本和历史规则分段。当前产品/引擎完成以显式研究模型闭环为准；无模型历史规则成功路径作为独立数据能力增强，由后续专项负责。
+
+## 非目标
+
+- 不通过静态常量伪造 HK/US/ETF 历史事实；
+- 不为完成 T13 把 unavailable 改成 supported；
+- 不以单一 `600519.SH` 日频运行代表全部矩阵；
+- 不重建第二套 Snapshot/Runner。

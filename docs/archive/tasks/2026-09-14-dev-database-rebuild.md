@@ -27,14 +27,14 @@
   - 范围：infra Compose/update、主仓必要版本消费和迁移矩阵检查。
   - 完成条件：启动顺序、失败不启动和非重建结构拒绝的定向测试通过，维护运维说明。
   - 验证：Shell 语法、定向编排测试、相关仓库门禁与 diff 检查；不修改无关业务。
-  - 证据：infra Compose 契约与编排行为测试通过；动态迁移矩阵、独立 tarball 输入与执行器检查、模块边界检查、两仓 diff 检查通过。数据库编排提取至 `scripts/dev-database.sh`，既有 `update.sh` 未增加规模。详见[验证记录](../../reviews/2026-09-14-dev-database-rebuild.md)。
+  - 证据：infra Compose 契约与编排行为测试通过；动态迁移矩阵、独立 tarball 输入与执行器检查、模块边界检查、两仓 diff 检查通过。数据库编排提取至 `scripts/dev-database.sh`，既有 `update.sh` 未增加规模。详见[验证记录](../reviews/2026-09-14-dev-database-rebuild.md)。
 - [x] G1：隔离 PostgreSQL 验收。
   - 覆盖：AC2、AC3、AC6 的数据库场景。
   - 依赖：T1；执行器就绪后尽早验证，不等现有环境部署。
   - 范围：本任务新建容器及临时数据，不使用当前 external volume。
   - 完成条件：空库、旧 baseline、重复重建、raw-owned 覆盖、应用权限及 SQL 故障行为均有实际证据。
   - 验证：复用同一 PostgreSQL 镜像与隔离环境，完成后仅清理本任务资源。
-  - 证据：主代理独立执行 `python3 scripts/test-dev-database-rebuild.py`，7 个场景通过；故障注入后原测试记录仍在，错误目标 B 的记录保留，证明数据语义而非仅比较 marker/表数。见[验证记录](../../reviews/2026-09-14-dev-database-rebuild.md)。
+  - 证据：主代理独立执行 `python3 scripts/test-dev-database-rebuild.py`，7 个场景通过；故障注入后原测试记录仍在，错误目标 B 的记录保留，证明数据语义而非仅比较 marker/表数。见[验证记录](../reviews/2026-09-14-dev-database-rebuild.md)。
 - [x] G2：现有开发库与应用部署验收。
   - 覆盖：AC4、AC6 的目标运行态，AC7 的真实状态报告。
   - 依赖：T2、G1，以及精确目标和数据丢失开关确认。
@@ -82,6 +82,6 @@
 
 - 结论：本主题 T1/T2/G1/G2 全部通过；当前开发库与 Server/Worker 已恢复。
 - 目标绑定与 worker 生命周期缺陷均已修复，主代理审查最终代码并独立复核失败场景通过。授权、启动失败行为及结构输入证据已补齐。
-- 验证命令、输入范围、镜像身份及证据边界统一见[验证记录](../../reviews/2026-09-14-dev-database-rebuild.md)。
+- 验证命令、输入范围、镜像身份及证据边界统一见[验证记录](../reviews/2026-09-14-dev-database-rebuild.md)。
 - 尚未通过的必要门禁：无。正式发布的保留数据升级不在本主题验收范围内。
 - 保留既有工作区修改，未创建提交。

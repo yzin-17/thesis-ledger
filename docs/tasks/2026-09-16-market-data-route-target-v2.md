@@ -1,6 +1,6 @@
 # 市场数据 RouteTarget V2 实施任务
 
-> 状态对账（2026-10-03）：历史范围被替代/已实现待验收：当前精确路由、主备与 provenance 已由 Canonical E02/E04、共同价格四条 Run/三口径接续；V2 默认主备与 handshake 路径不再是现行执行目标。AKShare/EastMoney 已被用户跳过，不再强制恢复。旧 ≤5s/≤10s 冷主源/成功备用性能断言没有当前等价测量，G1 保留该证据缺口，不以两秒 Run 终态代替请求延迟。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：历史范围被替代/已实现待验收：当前精确路由、主备与 provenance 已由 Canonical E02/E04、共同价格四条 Run/三口径接续；V2 默认主备与 handshake 路径不再是现行执行目标。AKShare/EastMoney 已被用户跳过，不再强制恢复。旧 ≤5s/≤10s 冷主源/成功备用性能断言没有当前等价测量，G1 保留该证据缺口，不以两秒 Run 终态代替请求延迟。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[市场数据 RouteTarget V2 Spec](../specs/2026-09-16-market-data-route-target-v2.md)
 

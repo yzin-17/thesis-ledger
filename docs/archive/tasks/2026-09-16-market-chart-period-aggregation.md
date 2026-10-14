@@ -14,7 +14,7 @@
 
 > 2026-10-05 部署检查点：目标保数据升级与官方更新已完成，新详情/周期能力已部署，独立能力与 1d/1w 两点详情 Schema、非法参数 400 检查通过。完整真实来源窗口、显示/计算指纹矩阵与缓存故障仍归 T3.2b2.2/T3.3c/T3.2c3，保持未勾选。下方交付时点的“未部署”记录为历史边界，当前基线见[部署证据](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)。
 
-> 状态对账（2026-10-04）：T1.1～T1.3、T2 与 DSA 计算叶 T4 已完成；T1.2 拒绝路径及 T1.3/T4 受控计算通过目标验证。公开 Bar/RouteTarget 原始周期仍为 1m/1d；T3、T5～T6、G1/P1/R1 继续开放。收益走势 interval 与价格口径不是此任务周期。历史对账见[2026-10-03 Review](../../reviews/2026-10-03-task-state-reconciliation.md)，局部交付见[并行证据](../../tasks/evidence/2026-10-04-market-period-parallel.md)与[跨仓计算证据](../../tasks/evidence/2026-10-04-market-period-indicator-contract.md)。
+> 状态对账（2026-10-04）：T1.1～T1.3、T2 与 DSA 计算叶 T4 已完成；T1.2 拒绝路径及 T1.3/T4 受控计算通过目标验证。公开 Bar/RouteTarget 原始周期仍为 1m/1d；T3、T5～T6、G1/P1/R1 继续开放。收益走势 interval 与价格口径不是此任务周期。历史对账见[2026-10-03 Review](../reviews/2026-10-03-task-state-reconciliation.md)，局部交付见[并行证据](../../tasks/evidence/2026-10-04-market-period-parallel.md)与[跨仓计算证据](../../tasks/evidence/2026-10-04-market-period-indicator-contract.md)。
 
 对应 Spec：[当前 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)
 

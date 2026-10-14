@@ -13,7 +13,7 @@
 
 工作区为 ThesisLedger 及相邻 DSA、infra 三仓。本轮初始工作树分别有 987、303、19 条状态记录；保留全部既有修改，不提交、发布、清理或重建数据库。本轮串行执行。
 
-共同价格交付以[旧 Task §0、§13](../../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)和[最终证据](../../tasks/evidence/2026-10-03-common-price-baseline.md)为准；Canonical 以[归档任务](2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准。旧记录中 RQData 的“无账号／跳过”曾由本次注册验证单独承接，用户已取消该计划，不取消其他扩展的边界。
+共同价格交付以[旧 Task §0、§13](2026-09-25-multi-source-adjustment-aware-backtest.md)和[最终证据](../../tasks/evidence/2026-10-03-common-price-baseline.md)为准；Canonical 以[归档任务](2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准。旧记录中 RQData 的“无账号／跳过”曾由本次注册验证单独承接，用户已取消该计划，不取消其他扩展的边界。
 
 允许写入本 Spec/Task、相关导航和 TODO 的窄范围索引。注册仅操作官方页面；秘密通过既有安全配置入口，真实探针只读。生产适配、策略/准入修改、部署、付款及其他来源均不在本轮写集。
 

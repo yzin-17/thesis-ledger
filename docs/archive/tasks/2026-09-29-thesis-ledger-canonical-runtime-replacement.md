@@ -3,7 +3,7 @@
 > 任务标识：`thesis-ledger-canonical-runtime-replacement`
 > 对应 Spec：[单一现行链路替换](../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)
 > 状态：已完成并归档（2026-10-02）；全部 C/E/U/D 任务及最终 Review 完成，旧数据不保留读取兼容。
-> 交叉验收：[多来源回测 Task](../../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)继续拥有 M1/M2/M3、AC01–AC20 和真实 Provider/业务验收状态。本任务只拥有版本替换及旧兼容删除，不将这些未完成门禁勾选。
+> 交叉验收：[多来源回测 Task](2026-09-25-multi-source-adjustment-aware-backtest.md)继续拥有 M1/M2/M3、AC01–AC20 和真实 Provider/业务验收状态。本任务只拥有版本替换及旧兼容删除，不将这些未完成门禁勾选。
 
 ## 1. 基线与执行约束
 

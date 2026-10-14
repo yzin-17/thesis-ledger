@@ -1,6 +1,6 @@
 # 当前 Market、Backtest 与 Ledger 运行链
 
-本页记录现行模块与消费边界。替换要求以[Spec](../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准，运行验收以[Task](../tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)及其证据为准。
+本页记录现行模块与消费边界。替换要求以[Spec](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准，运行验收以[Task](../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)及其证据为准。
 
 ## 接口与合同所有权
 
@@ -67,19 +67,19 @@ DSA 日历与可交易性事实分别由 `thesis_ledger_dependency_facts`、`the
 
 东财现金已通过相同现金能力合同和来源绑定进入原事件入口，复用原有界页面及元/份Decimal转换，保留本次观察摘要、当前availableAt和覆盖未知。原准入sourceRevision表示接口合同，不能改为页面摘要；不由分页完成签发历史完整覆盖。事件工厂延迟到准入后，标准查询不构造无实际需要的SDK。当前事件保留原读取与身份/映射语义；用户主备由有效政策routeIndex决定，不取目录枚举顺序。
 
-RQData现金/拆分已由来源定义拥有manifest、凭据规则、工厂、精确修订和当前准入解析，公共事件/RQ Runtime透传分支退役。来源通过请求绑定回调复用原持久身份映射、不可变账号HMAC复核与30s隔离，现金/拆分各自强类型经济事实共享事件信封；身份/币种原文、观察摘要、覆盖未知和原V3 wire保持。manifest统一从全部19来源派生，保留原能力/开关；字段值归一化规则由来源声明。当前现金均已来源绑定，真实账号、目标成功消费、浏览器/新冻结按原Task独立验收。
+RQData现金/拆分已由来源定义拥有manifest、凭据规则、工厂、精确修订和当前准入解析，公共事件/RQ Runtime透传分支退役。来源通过请求绑定回调复用原持久身份映射、不可变账号HMAC复核与30s隔离，现金/拆分各自强类型经济事实共享事件信封；身份/币种原文、观察摘要、覆盖未知和原V3 wire保持。manifest统一从注册的全部来源派生，保留原能力/开关；字段值归一化规则由来源声明。当前现金均已来源绑定，真实账号、目标成功消费、浏览器/新冻结按原Task独立验收。
 
 东财拆分已来源绑定并共用Split合同，保留原正比例/标签、可选登记日、原文字节、日期映射及观察组合修订；SDK读取窗口仍扩至明确源折算日，消费生效日只从原映射获得。统一模型沿原公开正比例合同，来源特有方向规则归RQ适配器。公共generic事件尾段已退役，当前事件均已来源绑定；当前无拆分路线，不由代码同步推定真实消费通过。
 
 Tushare现金已标准绑定，来源固定guard/SDK/安全回调保持原执行顺序及30s预算，原provider凭据缓存继续使用。公共Tushare执行/当前准入特判退役，现金金额/可见日及身份原文投影回原V3字段；事件信封精确比较时钟，不经微秒或浮点截断。来源未提供可见性时保持未知，未配置来源不自动加入政策。现行事件均由来源binding执行，目标成功消费/浏览器/新冻结与后续控制缓存门禁仍独立。
 
-HiThink现金已绑定同一现金合同，来源固定原文/准入/SDK/安全回调复用原认证、HMAC、金额/日期、全部准入标的范围和精确时钟，原wire及未知覆盖保持。公共事件现金/拆分分派与供应商当前准入特判已退役，目录/修订/策略准入按binding派生。现行19来源140精确目标各有一个binding，未新增用户路由/准入或业务资格；不能以本地移植数量代替Provider配置代次、缓存、真实目标消费或新旧冻结验证。
+HiThink现金已绑定同一现金合同，来源固定原文/准入/SDK/安全回调复用原认证、HMAC、金额/日期、全部准入标的范围和精确时钟，原wire及未知覆盖保持。公共事件现金/拆分分派与供应商当前准入特判已退役，目录/修订/策略准入按binding派生。迁移阶段记录的19来源140精确目标各有一个binding；当前清单由来源注册和能力矩阵派生，未新增用户路由/准入或业务资格；不能以本地移植数量代替Provider配置代次、缓存、真实目标消费或新旧冻结验证。
 
 当前报价、场外基金净值/历史/持仓和筹码缓存先经原Data V3只读`market/cache-context`核对控制。有效政策、来源配置/凭据及绑定修订形成不透明代次，fresh/last-valid/flight/锁共用该代次；停用、未选、控制不可用或读取期间变化不消费旧缓存。基金读取由`MarketFundReader`承担，原DsaClient/URL/TTL与可选身份持久化保留。控制投影不执行SDK，原无assetType报价仍由DSA解析；本地回归和目标只读投影已验证，真实切代次/故障及新冻结继续由原Task独立验收。
 
 四基金/筹码缓存数据GET与控制cache-context POST在原消费trace内有有界传输观察，记录独立transportId/attempt/开始结束且只含pathname，不含query/body/headers或秘密。GET原2次尝试、控制原1次和错误/超时保持；无trace独立CLI保留原stdout。观察/计数缺完成记录不支持零调用证明，HTTP尝试不等同SDK页数或源执行。真实未选拒绝已核对，临时选择/切代次仍需具体授权；持仓原Reader进程与绩效HTTP证据分别记录。
 
-原路由界面已展示五项独立功能开关与业务分组，精确候选从同一目录派生并披露querySupport参数范围。关闭保留主备，编辑来源不重置关闭状态；新选择显式启用并由原保存API携带expectedRevision。当前目录客户端投影由共享Schema验证，Desktop不维护重复信封校验；参数范围不是实际窗口覆盖证明。真实浏览器草稿和原界面保存/关闭/恢复已通过：五独立功能真实消费成功，关闭状态保留主备且0数据/风险仍可消费，CAS恢复原16路线至实时120。H09新组合冻结/原Worker两次断网重放亦已通过；个别来源正向资格与coverage限制仍分别记录，见[最终分层对账](../reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h07-h12-final-obligation-reconcile)。
+原路由界面已展示五项独立功能开关与业务分组，精确候选从同一目录派生并披露querySupport参数范围。关闭保留主备，编辑来源不重置关闭状态；新选择显式启用并由原保存API携带expectedRevision。当前目录客户端投影由共享Schema验证，Desktop不维护重复信封校验；参数范围不是实际窗口覆盖证明。真实浏览器草稿和原界面保存/关闭/恢复已通过：五独立功能真实消费成功，关闭状态保留主备且0数据/风险仍可消费，CAS恢复原16路线至实时120。H09新组合冻结/原Worker两次断网重放亦已通过；个别来源正向资格与coverage限制仍分别记录，见[最终分层对账](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h07-h12-final-obligation-reconcile)。
 
 DSA来源声明已拥有凭据准入修订策略、认证载荷构造与有限报价守卫。公共摘要沿原用途隔离HMAC，HiThink/Tushare/RQData原载荷字节和权限保持；报价Runtime按声明在预算前准备、工厂复用同次快照、读取后复核。HiThink复用原Guard，来源不接收Runtime或任意SDK方法，其他未声明守卫的查询行为保持；真实政策代次与新冻结门禁仍由原Task分层记录。
 
@@ -113,9 +113,9 @@ Yahoo零量私有响应摘要/元信息由源内研究帧适配器解析，Daily
 
 原HiThink ETF五年窗口计划已由该精确qfq绑定的纯window_planner拥有，公共多窗口入口查绑定/复核强计划，不按来源名称选择算法。原子窗覆盖预检、同目标控制检查、8次请求/4.5s总期限与交集冲突即停保持；未声明或只有一窗仍走原单窗。不同会话段规划通过隔离HTTP合同，原已选单窗在正式同步后只读核对通过；不等同多年真实来源或新增覆盖资格。
 
-现有Daily/Quote/Query/Event绑定均只有查询生命周期，公共注册统一拒绝operation=subscribe，不因能力合同操作全集包含订阅而授予来源生命周期资格。非日线ExactKey不得携带会被RouteKey投影隐藏的adjustment成员；能力专有参数继续由各请求合同拥有。正式目标140查询登记保持，四类错误订阅与72非法非日线键在工厂/数据执行前拒绝；未新增生产订阅或改变用户路线/源修订。
+现有Daily/Quote/Query/Event绑定均只有查询生命周期，公共注册统一拒绝operation=subscribe，不因能力合同操作全集包含订阅而授予来源生命周期资格。非日线ExactKey不得携带会被RouteKey投影隐藏的adjustment成员；能力专有参数继续由各请求合同拥有。该批次正式目标140查询登记保持，四类错误订阅与72非法非日线键在工厂/数据执行前拒绝；未新增生产订阅或改变用户路线/源修订。
 
-注册期间从绑定派生capability/version标准合同视图，拒绝来源对同名同版本请求Schema、结果/关联校验或操作语义的分叉；临时视图不作为第二事实源。当前140绑定共17合同组一致，等价合同复用及合法版本共存已验证；目标同版本冲突零工厂/数据调用拒绝。新版本仍需相应产品Schema/消费支持，不自动改变现有协议、目录修订或冻结。
+注册期间从绑定派生capability/version标准合同视图，拒绝来源对同名同版本请求Schema、结果/关联校验或操作语义的分叉；临时视图不作为第二事实源。该批次140绑定共17合同组一致，等价合同复用及合法版本共存已验证；目标同版本冲突零工厂/数据调用拒绝。新版本仍需相应产品Schema/消费支持，不自动改变现有协议、目录修订或冻结。
 
 静态来源工厂的明确CapabilityContractError经有限工厂执行边界转换为公共ProviderCallError，三种原作用域保持code/retryable，固定安全消息并不携带源原文/诊断。调用一次、快照读取/缓存发布规则保持，非标准OAuth/Control/其他异常仍原路径；目标三入口及真实已配置报价已核对，未改变认证、SDK或用户路由。
 
@@ -123,10 +123,10 @@ Yahoo零量私有响应摘要/元信息由源内研究帧适配器解析，Daily
 
 独立状态能力 API 已与日线共用 API 所有权的 Data V3 安全错误信封投影：固定消息和本次requestId置于标准error对象，真实能力不支持单独使用unsupported_capability。Server共享Schema及Mapper保留强校验，标准可选来源失败可以冻结为组合failed项，平铺V3、错关联或供应商原文继续阻断。该修复不改变SDK、源修订、研究要求或旧冻结；目标部署和真实新业务冻结的完成状态仍以[原Task](../tasks/2026-10-09-unified-data-capability-adapter.md)为准。
 
-BaoStock独立状态/粗ST及基础日期经来源专属隔离进程复用原SDK标准化，45秒终止/wait边界避免服务进程内全局连接并发；状态/粗ST仍共享同代次获取，日期独立。原工厂、其他日线、全部公开来源/适配修订保持。Market组合及Snapshot外层复核共用同一政策事实比较，首份完整政策冻结，真实字段变化拒绝。目标H09-K2新Run已生成十产物、五事实/三真实可选失败，并通过原Worker两次断网一致/0网络；数据快照complete、固定两日指标partial保持，[分层证据](../reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h09-real-composition-freeze-passed)。H10原浏览器真实保存/关闭/恢复与最终分层Review已完成；K37部分来源正向资格仍独立受外部条件阻塞，不扩大为组合机制失败。
+BaoStock独立状态/粗ST及基础日期经来源专属隔离进程复用原SDK标准化，45秒终止/wait边界避免服务进程内全局连接并发；状态/粗ST仍共享同代次获取，日期独立。原工厂、其他日线、全部公开来源/适配修订保持。Market组合及Snapshot外层复核共用同一政策事实比较，首份完整政策冻结，真实字段变化拒绝。目标H09-K2新Run已生成十产物、五事实/三真实可选失败，并通过原Worker两次断网一致/0网络；数据快照complete、固定两日指标partial保持，[分层证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h09-real-composition-freeze-passed)。H10原浏览器真实保存/关闭/恢复与最终分层Review已完成；K37部分来源正向资格仍独立受外部条件阻塞，不扩大为组合机制失败。
 
 结构由全部排序 migration SQL 与 raw-owned 清单共同定义，运行时 head 自动派生。普通启动与更新只检查结构；显式开发重建和正式保数据升级遵守独立的精确目标、备份及恢复门禁。
 
 代码变化通过相邻 infra 官方 `sync-code.sh` 同步已有容器，依赖、结构或镜像变化使用 `update.sh`。快更替换完整目录以删除退役代码，但只写容器可写层；重建后必须重新同步或构建含当前源码的镜像。详见[三仓矩阵](version-matrix.md)与 infra Docker 更新说明。
 
-Canonical 完成表示单一现行链和其范围内验收闭合。严格历史 PIT、raw/hfq、独立备用、AI 和完整业务来源门禁继续由关联多来源 Task 独立验收。
+Canonical 完成表示单一现行链及其有界验收闭合。S05 严格 PIT、M32 和旧历史原件追补等已按[10-08 范围决定](../specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)取消；保留的合同不重新授权这些范围。统一适配层的正向真实现金验收、历史按需摘牌验收、富途分钟及 AI 等各自范围仍以[当前任务索引](../tasks/README.md)指向的正式任务为准。

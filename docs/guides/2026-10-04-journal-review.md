@@ -44,4 +44,4 @@
 
 “高级 JSON 兼容分析”用于开发调试和旧数据分析，其输入不会成为正式候选、周期统计样本或复盘快照。
 
-当前行为见[统一复盘规格](../specs/2026-08-28-journal-review-trade-projection.md)；实现与验收记录见[已完成任务](../archive/tasks/2026-08-28-journal-review-trade-projection.md)和[最终对账](../reviews/2026-10-05-journal-review-completion.md)。
+当前行为见[统一复盘规格](../specs/2026-08-28-journal-review-trade-projection.md)；实现与验收记录见[已完成任务](../archive/tasks/2026-08-28-journal-review-trade-projection.md)和[最终对账](../archive/reviews/2026-10-05-journal-review-completion.md)。

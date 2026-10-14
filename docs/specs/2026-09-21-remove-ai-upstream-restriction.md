@@ -2,8 +2,8 @@
 
 > 任务标识：2026-09-21-remove-ai-upstream-restriction  
 > 日期：2026-09-21  
-> 状态：已完成本地实现与验证；真实外部 Provider、Docker 目标运行态和 Electron 实机视觉验收未执行  
-> 对应任务：[实施任务](../tasks/2026-09-21-remove-ai-upstream-restriction.md)  
+> 状态：本主题移除实现、本地与目标 Docker / Server / Worker 契约验证已完成；真实外部 Provider 与 Electron 的更广验收继续由 AI 用途配置等原任务维护。
+> 对应任务：[实施任务](../archive/tasks/2026-09-21-remove-ai-upstream-restriction.md)
 > 修订：[AI 接入层迁移 Spec](2026-09-19-vercel-ai-sdk-integration.md)、[移除免费依据 Spec](2026-09-21-remove-ai-free-evidence.md)
 
 ## 背景与问题

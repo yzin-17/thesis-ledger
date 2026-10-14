@@ -251,7 +251,7 @@ C 队列最终一致性审查：C1、C2.1、C2.2 及 C3.1～C3.4 通过，PR-AC0
 
 收口结论：PR06/07及PR08a本地与目标消费验证、PR08真实页面验证均通过。此批扩展范围及消费接缝已同步原配对Spec；原五项高级能力不因基础Quote勾选，不把当前任务整体归档为全能力完成。
 
-原[共同价格任务](../../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)和[共同价格证据](../../tasks/evidence/2026-10-03-common-price-baseline.md)保留完成状态。原剩余编号及历史未通过条件见[交接清单](../../tasks/evidence/2026-10-03-multi-source-remaining-tasks.md)。RQData 注册验证已按用户决定终止；AKShare/EastMoney、Tushare、RQData、TdxAiData 不继续请求或购买。
+原[共同价格任务](2026-09-25-multi-source-adjustment-aware-backtest.md)和[共同价格证据](../../tasks/evidence/2026-10-03-common-price-baseline.md)保留完成状态。原剩余编号及历史未通过条件见[交接清单](../../tasks/evidence/2026-10-03-multi-source-remaining-tasks.md)。RQData 注册验证已按用户决定终止；AKShare/EastMoney、Tushare、RQData、TdxAiData 不继续请求或购买。
 
 保护三仓既有 WIP。更新前本地 Server 镜像为 `sha256:ed7f1174ba5e6d2bfe944cc4aa7166afe2c2c435feaffaf56e9651866c9896a3`（2026-10-01），DSA 为 `sha256:6a7252651a631bc15dfc6824468f8485cee181ad7827c87935b77ace2215d725`（2026-10-01）；最新源码通过可写层同步，不能视作已进入这些镜像。构建前宿主可用空间约 7.6 GiB，失败后约 0.18 GiB；Docker.raw 上限 32 GiB，实际分配约 26.18 GiB。以清理后实测空间作为再次构建前置。
 

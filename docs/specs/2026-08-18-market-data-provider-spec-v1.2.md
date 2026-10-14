@@ -6,7 +6,7 @@
 | 日期 | 2026-08-18 |
 | 状态 | 已确认实施基线 |
 | 任务标识 | `market-data-provider-v1-2` |
-| 关联任务 | [市场数据与标的中心 v1.2 实施任务](../tasks/2026-08-18-market-data-provider-v1-2.md) |
+| 关联任务 | [市场数据与标的中心 v1.2 实施任务](../tasks/2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#native-parent-review) |
 | 适用仓库 | `thesis-ledger`、`daily-stock-analysis`、`thesis-ledger-infra` |
 
 > 本文是需求与领域边界规格，不是实施指令。业务范围已确认；实现状态和验证证据分别以关联 Task、Architecture 和 Review 为准。

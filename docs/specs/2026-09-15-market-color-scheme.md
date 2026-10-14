@@ -3,7 +3,7 @@
 > 任务标识：market-color-scheme
 > 日期：2026-09-15
 > 状态：实现完成；Desktop 运行态已验收，Mobile 运行态待验收
-> 对应任务：[涨跌配色配置实施任务](../tasks/2026-09-15-market-color-scheme.md)
+> 当前验收：[Mobile 任务中的配色与持久化](../tasks/2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#mobile-color-acceptance)；[原实施记录](../archive/tasks/2026-09-15-market-color-scheme.md)保留。
 
 ## 背景与问题
 

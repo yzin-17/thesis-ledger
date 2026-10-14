@@ -3,7 +3,7 @@
 > 任务标识：2026-09-21-remove-ai-capability-declaration  
 > 日期：2026-09-21  
 > 状态：本地实现与验证完成；Electron 实机视觉验收和真实外部 Provider 验收未执行  
-> 对应任务：[实施任务](../tasks/2026-09-21-remove-ai-capability-declaration.md)  
+> 对应任务：[实施任务](../archive/tasks/2026-09-21-remove-ai-capability-declaration.md)
 > 修订：[AI 接入层迁移 Spec](2026-09-19-vercel-ai-sdk-integration.md)
 
 后续范围修订（2026-09-21）：上游服务限制和免费依据随后分别由[移除 AI 执行路由上游服务限制 Spec](2026-09-21-remove-ai-upstream-restriction.md)与[移除 AI 执行路由免费依据 Spec](2026-09-21-remove-ai-free-evidence.md)移除。本 Spec 中对这两项能力的“保留”仅描述本 Spec 完成时的历史边界，不代表当前配置契约。

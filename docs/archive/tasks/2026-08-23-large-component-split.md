@@ -2,7 +2,7 @@
 
 归档说明（2026-10-03）：原 Spec 的声明范围及本地最终 Review 已完成。本轮核对其验收与测试边界后归档，保留未执行浏览器、真实 Provider、通知或设备的原说明；不将这些证据限制新增为本主题强制门禁，也不宣称其已通过。当前产品 Spec 保留。
 
-对应规格：[`../specs/2026-08-23-large-component-split.md`](../../specs/2026-08-23-large-component-split.md)
+对应规格：[`../specs/2026-08-23-large-component-split.md`](../specs/2026-08-23-large-component-split.md)
 
 ## 执行约束
 

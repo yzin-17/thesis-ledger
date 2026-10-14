@@ -1,6 +1,6 @@
 # N3 净值结果与离线 Runner 合同
 
-关联主规格：[现行运行链替换](2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。本文件补充 N3 已冻结输入之后、N2 创建持久化之前可独立交付的结果与执行接口，不修改共享主规格。
+关联主规格：[现行运行链替换](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。本文件补充 N3 已冻结输入之后、N2 创建持久化之前可独立交付的结果与执行接口，不修改共享主规格。
 
 ## 范围与所有权
 

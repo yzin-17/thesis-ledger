@@ -5,7 +5,7 @@
 - [`交易与成交记录系统`](../specs/2026-08-26-trade-execution-ledger-system.md)
 - [`Trade Projection 与收益读取模型`](../specs/2026-08-26-trade-projection-read-model.md)
 - [`Trade 与 Journal 统一及迁移`](../specs/2026-08-26-trade-journal-migration.md)
-- [`交易与成交记录系统实施任务`](../tasks/2026-08-26-trade-execution-ledger-system.md)
+- [`交易与成交记录系统实施任务`](../archive/tasks/2026-08-26-trade-execution-ledger-system.md)
 
 ## 目的与边界
 

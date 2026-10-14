@@ -61,7 +61,7 @@ DSA → DataSnapshot → Simulation Event Engine → SimulationLedger → Backte
 
 HiThink/腾讯的固定快照归一化价格研究由系统自动整理实际 Bar、交易日状态、来源摘要和采集时间。缺日按显式“不交易”研究假设处理，不补造价格。已配置的同口径备用按整个窗口选取；信号、成交和基准继续使用本次冻结的同一序列。真实份额、严格历史 PIT、公司行动和量额规则只在计算实际依赖它们时检查，详见 Spec §1.1。
 
-AI 候选共享冻结比较数据和假设，封存测试内容不得进入模型提示词。归一化绝对价格和模拟数量不能直接生成真实账户风险规则；真实风险采纳需重新编译和验证其依据。详细行为见[多源复权感知回测规格](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)，实际完成与未通过门禁见[当前任务](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。真实来源、普通回测、图表/Electron 与 AI 验收仍分开记录。
+AI 候选共享冻结比较数据和假设，封存测试内容不得进入模型提示词。归一化绝对价格和模拟数量不能直接生成真实账户风险规则；真实风险采纳需重新编译和验证其依据。详细行为见[多源复权感知回测规格](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)，实际完成与未通过门禁见[当前任务](../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。真实来源、普通回测、图表/Electron 与 AI 验收仍分开记录。
 
 ## AI Research
 

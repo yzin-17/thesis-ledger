@@ -14,6 +14,14 @@
 
 近期归档包括：
 
+- 2026-10-15 当前 Task 承接：[实施与验证记录](tasks/2026-10-14-docs-large-document-cleanup.md#第四轮当前-task-承接)。7 份父任务或同域验收记录由现有 Mobile、投资组合、现金任务承接后归档，验收仍开放。各原 Spec、未通过条件及历史证据保留；没有增加新的当前 Task 文件。
+
+- 2026-10-14 第三轮入口清理：[实施与验证记录](tasks/2026-10-14-docs-large-document-cleanup.md#第三轮跳转与历史入口清理)。34 份历史 Review 和 8 份旧 Spec 退出当前正文；删除 47 个无实际引用跳转，两份反向跳转由真实归档正文替换。仍被原始证据、测试输入和邻仓引用的兼容入口保留，当前合同和未通过验收继续由原 Spec/Task 管理。
+
+- 2026-10-14 第二轮巨型文档与重复证据精简：[实施与验证记录](tasks/2026-10-14-docs-large-document-cleanup.md)。三份 Task 的详细执行历史及六份一次性报告按原主题保留；来源专属约束仍是现行合同，按需查阅附页。S05 原件迁出 Markdown 正文，解码字节与原摘要一致；相同 Android XML 只保留规范副本。未通过验收继续留在当前 Task。
+
+- 2026-10-14 当前入口治理：[实施与验证记录](tasks/2026-10-14-docs-current-entry-cleanup.md)。16 份历史 Task 退出当前执行入口：09-25 多源、Docker 更新、自动化历史分页、两份 AI 配置移除、ETF 内部备用、七份 09-27 修复、交易主任务、旧历史规则、缓存与路由。ETF 旧备用及旧历史规则 Spec 一并归档，其余 Spec 保留；取消、跳过与未验证记录不改为通过。原始证据保持原路径与字节。
+
 - 每手股数独立路由：[已完成任务](tasks/2026-10-08-security-lot-size-routing.md)，当前选择富途的真实股数、模型冻结及页面/下载通过；[现行Spec](../specs/2026-10-08-security-lot-size-routing.md)保留，[验收证据](../tasks/evidence/2026-10-08-security-lot-size-live-acceptance.md)区分长桥未配置与开发同步边界。
 
 - 多源扩展、历史规则与P6：[多源任务](tasks/2026-10-03-multi-source-remaining-acceptance.md) · [历史规则任务](tasks/2026-10-06-historical-rules-primary-backup.md) · [P6任务](tasks/2026-10-07-p6-market-state-expansion.md)。基础报价/普通研究、M31、用户选定状态/市场、港美实际股数与精简镜像/恢复范围完成；[现行P6 Spec](../specs/2026-10-07-p6-market-state-expansion.md)保留，最终证据见[港股与当前版本核验](../tasks/evidence/2026-10-08-p6-hk-share-window-acceptance.md)。取消项不记作通过，港股每手历史变更未核验。
@@ -22,13 +30,13 @@
 
 - 行情图表周期聚合：[已完成任务](tasks/2026-09-16-market-chart-period-aggregation.md)，完整 AC1–AC11 与 T1～T6/G1/P1/R1 已通过；[现行 Spec](../specs/2026-09-16-market-chart-period-aggregation.md)保留，分层证据见[R1 最终 Review](../tasks/evidence/2026-10-06-market-period-r1-final-review.md)。
 
-- 投资复盘：[原任务](tasks/2026-08-28-journal-review-trade-projection.md)、[契约子任务](tasks/2026-10-04-journal-review-contracts.md)、[收口任务](tasks/2026-10-05-journal-review-completion.md)；完整 AC1—AC16 与本轮 Web／真实模型／目标恢复／远端 CI 已通过，见[最终 Review](../reviews/2026-10-05-journal-review-completion.md)。现行产品与契约 Spec 保留。
+- 投资复盘：[原任务](tasks/2026-08-28-journal-review-trade-projection.md)、[契约子任务](tasks/2026-10-04-journal-review-contracts.md)、[收口任务](tasks/2026-10-05-journal-review-completion.md)；完整 AC1—AC16 与本轮 Web／真实模型／目标恢复／远端 CI 已通过，见[最终 Review](reviews/2026-10-05-journal-review-completion.md)。现行产品与契约 Spec 保留。
 
 - [基金定投计划](tasks/2026-09-08-recurring-fund-investment.md)与[日期精度成本策略修复](tasks/2026-10-04-ledger-date-cost-boundary.md)：全部实施及分层运行时验收完成，Spec 继续保留当前契约；
 - `2026-09-17-strategy-center-ux-consolidation`：T00—T16 与 G1—G3 已完成，最终一致性 Review 通过；Spec 继续保留为当前产品与交互契约；
-- `2026-08-28-unified-backtest-v2`、`2026-09-10-backtest-historical-execution-rule-facts`、`2026-09-11-backtest-v2-closure-follow-up`：V2 产品/引擎交付与收敛任务已经完成；真实历史市场规则由新的 active task 承接；
+- `2026-08-28-unified-backtest-v2`、`2026-09-10-backtest-historical-execution-rule-facts`、`2026-09-11-backtest-v2-closure-follow-up`：V2 产品/引擎交付与收敛任务已经完成；历史规则后继由已完成的[主备任务](tasks/2026-10-06-historical-rules-primary-backup.md)和[P6 任务](tasks/2026-10-07-p6-market-state-expansion.md)承接，未选定扩展不作为当前重做入口；
 - `2026-09-14-portfolio-valuation-demand-guard`：当前功能和运行态门禁已经完成；明确延期的 batch/catalog、FX、LedgerEvent 与 realized PnL 优化转入 `docs/TODO.md`；
-- `2026-09-16-market-bar-series-cache-v2`：BarSeries Fact/Coverage、Reader、缓存和当前 Docker 门禁已经完成；当前架构由 `architecture/2026-09-16-market-data-v2.md` 维护；
+- `2026-09-16-market-bar-series-cache-v2`：BarSeries Fact/Coverage、Reader、缓存和当前 Docker 门禁已经完成；原 V2 设计保留历史依据，当前架构由 [Canonical](../architecture/canonical-runtime.md)维护；
 - `2026-09-11-backtest-v2-closure.md`：一次性收敛验收记录从 `benchmarks/` 归档到 `archive/reviews/`；
 - `2026-08-18-market-data-provider-v1-2-implementation.md`：旧 Market Data v1.2 实施说明被 Market Data V2 Architecture 取代；
 - `2026-08-18-provider-selection.md` 与 `2026-08-18-provider-reliability.md`：旧 Provider 领域说明合并为 V2 `provider-routing-and-reliability`。
@@ -44,4 +52,4 @@
 - `2026-08-18-v1-release-checklist.md`：V1 一次性发布执行记录，当前 Operations 只保留可复用 checklist；
 - `2026-08-18-spec-traceability.md`：记录 V0.x/V1 历史追踪，不再作为当前 Spec 状态 SSOT。
 
-归档主题文档使用 `YYYY-MM-DD-<topic>.md` 命名。归档意味着退出当前实现入口，不意味着删除历史证据。为兼容历史链接，原目录可以暂时保留只含归档链接的短跳转文件；跳转文件不属于当前实现文档。
+归档主题文档使用 `YYYY-MM-DD-<topic>.md` 命名。归档意味着退出当前实现入口，不意味着删除历史证据。当前导航直接链接实际正文；只为原始证据、测试输入或邻仓仍需要的路径保留短跳转，已无实际引用的跳转删除。归档记录里的原执行路径仅说明当时输入，不自动产生长期维持旧路径的义务。

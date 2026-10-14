@@ -4,12 +4,14 @@
 > 日期：2026-09-25
 > 状态：§1.1 共同价格范围已完成；2026-10-08 已取消的高级扩展及精简后的 F01 以 §1.3 为准，未取消的既有来源跳过决定保持。真实验收和历史例外见对应 Task §0。
 > 范围：ThesisLedger、DSA Fork；infra 仅承担确有必要的 SDK 运行依赖、凭证与发布兼容。
-> 对应任务：[分阶段实施任务](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)
+> 对应任务：[分阶段实施任务](../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)
 > 规划基线：首次读取的远端 `main` 文档与关键代码。实施基线为 Task 记录的三仓未提交工作区；外部接口文档声明与账号下实测结果分别记录。
 
-> 2026-09-29 范围变更：用户确认[整个 ThesisLedger V1/V2 链路由现行实现直接取代](2026-09-29-thesis-ledger-canonical-runtime-replacement.md)，旧数据无需兼容读取。本 Spec 的来源、经济模型、PIT 和 AC01–AC20 验收仍有效；文中既有“旧字段继续解码”“先兼容消费者再升级生产者”等历史兼容要求由替换 Spec 取代，实施按其独立 Task 跟踪。
+> 2026-09-29 范围变更：用户确认[整个 ThesisLedger V1/V2 链路由现行实现直接取代](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)，旧数据无需兼容读取。本 Spec 的现行来源、经济模型及保留范围的 AC 验收仍有效，取消范围以 §1.3 为准；文中既有“旧字段继续解码”“先兼容消费者再升级生产者”等历史兼容要求由替换 Spec 取代，实施按其独立 Task 跟踪。
 
 > 2026-10-09 适配层设计增量见[统一数据能力适配层](2026-10-09-unified-data-capability-adapter.md)。新来源与新能力分别通过标准合同及实现绑定接入；本主题已完成范围、历史验收和最新取消决定不变，不恢复高级追补义务。
+
+本页继续拥有价格、数量、复权和冻结研究合同（§5、§8、§9、§11）。原执行任务归档，历史未勾选项不构成当前待办；取消与保留范围由[10-08 决定](2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)维护。来源适配和能力扩展由[统一适配层](2026-10-09-unified-data-capability-adapter.md)承接，不能据旧 PIT、发布或兼容计划重启取消义务。
 
 ## 1. 目标与已确认决策
 
@@ -716,9 +718,9 @@ LEAN 官方资料显示，原始和复权数据可以采用不同的拆分／分
 `文档已声明` 只证明接口说明；`fixture 通过` 只证明本地代码；`真实响应通过` 证明具体来源／范围；`目标运行与重放通过` 才证明该交付链路。不得互相替代。
 
 [I1]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/specs/2026-08-28-unified-backtest-v2.md
-[I2]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/specs/2026-09-10-backtest-historical-execution-rule-facts.md
+[I2]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/archive/specs/2026-09-10-backtest-historical-execution-rule-facts.md
 [I3]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/specs/2026-09-16-market-data-route-target-v2.md
-[I4]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/specs/2026-09-16-market-bar-series-cache-v2.md
+[I4]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/archive/specs/2026-09-16-market-bar-series-cache-v2.md
 [I5]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/specs/2026-09-16-market-data-consumer-consistency-v2.md
 [I6]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/specs/2026-09-09-strategy-risk-ai-optimization.md
 [I7]: https://github.com/yzin-17/thesis-ledger/blob/main/docs/architecture/2026-09-16-market-data-v2.md

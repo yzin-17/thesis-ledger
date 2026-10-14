@@ -1,8 +1,8 @@
 # 统一回测系统 V2 实施任务
 
-对应 Spec：[`../specs/2026-08-28-unified-backtest-v2.md`](../specs/2026-08-28-unified-backtest-v2.md)
+对应 Spec：[`../specs/2026-08-28-unified-backtest-v2.md`](../../specs/2026-08-28-unified-backtest-v2.md)
 
-后续增量：[`策略驱动风险规则与 AI 多模型优化实施任务`](2026-09-09-strategy-risk-ai-optimization.md)；该任务不重复认领本任务尚未完成的 V2 引擎能力。
+后续增量：[`策略驱动风险规则与 AI 多模型优化实施任务`](../../tasks/2026-09-09-strategy-risk-ai-optimization.md)；该任务不重复认领本任务尚未完成的 V2 引擎能力。
 
 T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-09-10-backtest-historical-execution-rule-facts.md)。已取消全部历史证据通过 T0 的总门禁；按运行需要确认输入/模型，契约、Provider、Snapshot、执行、披露分别验证，再做真实闭环。本文 T0–T12 的既有完成记录不代表新增模型已实现。
 

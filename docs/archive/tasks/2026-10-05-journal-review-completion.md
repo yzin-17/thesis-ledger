@@ -1,6 +1,6 @@
 # 投资复盘收口实施
 
-对应[收口规格](../../specs/2026-10-05-journal-review-completion.md)，承接原 T4—T7。
+对应[收口规格](../specs/2026-10-05-journal-review-completion.md)，承接原 T4—T7。
 
 - [x] J4 单笔交互：真实挂载测试补齐候选、读取、临时草稿、保存、局部状态、隔离与晚响应；发现缺陷先修复并定向复验。
 - [x] J5 周期与历史：窗口/分页/深链、独立统计、失败与旧结果保护、来源可读；不复制服务端资格规则。
@@ -13,7 +13,7 @@
   - [x] J8.4 远端 CI：复盘及必要依赖提交 `50196596a53a1160cf2edf9d9e0c1a09c4728d22` 在 [CI 37322596501](https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501) 通过，quality、contracts-and-guardrails、journal-postgres 和 mobile-android-native 全部成功。专用数据库 18 项及既有 PostgreSQL E2E 11 项实际执行；桌面打包按 PR 条件跳过。首轮失败、修复、SHA、job 链接和跳过说明见[本叶证据](../../tasks/evidence/2026-10-05-journal-ci-j84.md)。
   - [x] J8.5 最终闭合：按完整 AC1—AC16 逐条关联当前实现、测试、目标和浏览器/CI 证据；修复发现的问题后只复验受影响输入。指南、Review、证据和原 T4—T7 已同步，完整验收及最终一致性 Review 通过，三份 Task 已归档，见[最终证据](../../tasks/evidence/2026-10-05-journal-final-j85.md)。
 
-本地实现和交互证据见[本轮验证](../../tasks/evidence/2026-10-05-journal-review-completion.md)与[逐项对账](../../reviews/2026-10-05-journal-review-completion.md)。J4—J6 的勾选代表本地实现与真实 React 挂载测试，J7 代表独立目标 API、结构、数据保护及进程恢复；恢复缺陷的[叶任务](2026-10-05-journal-research-recovery-ownership.md)已完成归档。原 T4—T7 的真实 Web 浏览器及最终门禁由 J8 完成承担，已同步关闭原任务。
+本地实现和交互证据见[本轮验证](../../tasks/evidence/2026-10-05-journal-review-completion.md)与[逐项对账](../reviews/2026-10-05-journal-review-completion.md)。J4—J6 的勾选代表本地实现与真实 React 挂载测试，J7 代表独立目标 API、结构、数据保护及进程恢复；恢复缺陷的[叶任务](2026-10-05-journal-research-recovery-ownership.md)已完成归档。原 T4—T7 的真实 Web 浏览器及最终门禁由 J8 完成承担，已同步关闭原任务。
 
 ## J8.1 固定输入准备
 
@@ -87,4 +87,4 @@
 - [x] 三份完成 Task 归档，Spec 保留，兼容跳转只有归档链接
 - [x] 文档格式、链接、归档状态及差异卫生检查通过，索引与未关联 WIP 保留
 
-结论：通过。J4—J8、原 T1—T7 及 C1—C5 全部闭合；详细验收映射见[最终 Review](../../reviews/2026-10-05-journal-review-completion.md)，核对与归档见[J8.5 证据](../../tasks/evidence/2026-10-05-journal-final-j85.md)。此前各叶结论中的剩余项及未提交描述保留为当时记录；J8.4 已在独立工作树形成对应功能提交和成功 CI，J8.5 只修改本机文档，没有合并或发布 PR。
+结论：通过。J4—J8、原 T1—T7 及 C1—C5 全部闭合；详细验收映射见[最终 Review](../reviews/2026-10-05-journal-review-completion.md)，核对与归档见[J8.5 证据](../../tasks/evidence/2026-10-05-journal-final-j85.md)。此前各叶结论中的剩余项及未提交描述保留为当时记录；J8.4 已在独立工作树形成对应功能提交和成功 CI，J8.5 只修改本机文档，没有合并或发布 PR。

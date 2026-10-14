@@ -4,9 +4,9 @@
 >
 > 日期：2026-10-09
 >
-> 状态：S、L1/L2、L3 跨上市准备闭环及实际诊断下载已验收；摘牌真实消费仍开放；D/R 按各自证据边界维护。
+> 状态：S、L1/L2、L3 跨上市准备闭环与实际诊断下载及 D1～D5 有界现金研究已验收；摘牌真实消费仍开放，按用户决定停止扩搜。普通现金修订与登记资格 v2 已由统一适配层 Task 接续完成；R 保留已完成预研及其未验证能力边界。
 >
-> [实施任务与交接 Prompt](../tasks/2026-10-09-history-data-on-demand.md) · [真实可得性预研](../reviews/2026-10-09-historical-data-availability-research.md)
+> [实施任务与交接 Prompt](../tasks/2026-10-09-history-data-on-demand.md) · [真实可得性预研](../archive/reviews/2026-10-09-historical-data-availability-research.md)
 
 ## 2026-10-13 分红研究边界修订
 

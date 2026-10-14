@@ -1,6 +1,8 @@
-# 现金账户资金范围与内部划转实施任务
+# Cash 资金、划转与定期入账验收
 
-> 状态对账（2026-10-03）：已实现待验收：本地命令/投影已完成，真实浏览器键盘、跨账户划转及相关运行断言仍需验收。Canonical E03 的账本命令与隔离证明只覆盖其明确场景，不代表全部资金/划转产品交互已通过；旧运行版本推测不作为当前前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 2026-10-15 当前责任：本页维护资金/划转原验收及定期入账的真实 Scheduler、通知和客户端条件；本地实现完成不等于产品验收通过。原 T1–T4 的历史 Review 仅覆盖原资金/划转范围，未覆盖条件继续有效。
+
+> 状态对账（2026-10-03）：已实现待验收：本地命令/投影已完成，真实浏览器键盘、跨账户划转及相关运行断言仍需验收。Canonical E03 的账本命令与隔离证明只覆盖其明确场景，不代表全部资金/划转产品交互已通过；旧运行版本推测不作为当前前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[`../specs/2026-08-30-cash-account-funding-and-transfer.md`](../specs/2026-08-30-cash-account-funding-and-transfer.md)
 
@@ -85,3 +87,30 @@
 - 发现的问题：无确定性测试失败。
 - 遗留风险：本轮未执行浏览器、键盘、Compose/真实服务运行、真实迁移部署和外部通知投递；这些不影响已完成的确定性 API/UI、投影、typecheck、build、格式和 diff 检查结论。
 - 验证命令与结果：保留前序 T1-T3 证据；T4 Desktop 定向测试 2 个文件 18/18、Server 投影测试 6/6、Desktop typecheck、Desktop build、Prettier 和 `git diff --check` 均通过。
+
+<a id="recurring-cash-acceptance"></a>
+## 定期现金入账的剩余产品验收
+
+对应 [定期入账 Spec](../specs/2026-08-30-recurring-cash-deposit-plan.md)及 [T1–T4 原实施记录](../archive/tasks/2026-08-30-recurring-cash-deposit-plan.md)。原确定性状态、事务、日期及客户端回归已经完成；以下是原要求中未取得实际证据的执行面、通知与消费面，不重做原实现，也不重跑输入未变的通过证据。其他 Scheduler lease/进程恢复仍归其原 Task，不由本节证明。
+
+- [ ] 定期入账 T3 的真实 Scheduler、补期与通知验收；不得用日期/Service 测试或现金页面截图代替。
+  - 覆盖验收标准：AC2、AC5、AC6、AC7
+  - 依赖：T1、T2
+  - 涉及范围：Automation Job 类型、固定扫描任务、Handler、日期纯函数和运行历史。
+  - 完成条件：单例任务扫描所有到期计划；补齐全部启用期漏期；暂停月份跳过；并发运行不重复；补期通知按计划合并。
+  - 验证方式：日期纯函数、Automation service/runtime/scheduler、并发与重启恢复测试，真实 Scheduler 运行演练。
+  - 验证证据：
+    - 既有 Automation/Scheduler 证据保留；本轮只执行定期入账日期/Service 回归，未重新执行 Automation runtime、Scheduler 或真实运行演练。
+
+- [ ] 定期入账 T4 的真实客户端、宽窄屏与键盘验收；覆盖确认实际金额/日期、跳过/恢复、账户切换及错误状态。
+  - 覆盖验收标准：AC1、AC3、AC4、AC8
+  - 依赖：T1、T3
+  - 涉及范围：账户数据现金页、TanStack Query、计划/确认 Sheet、上下文菜单、通知/错误提示和 Desktop 测试。
+  - 完成条件：现金账户可创建和管理计划；待确认实例突出显示；确认可修改实际金额与日期；跳过/恢复与错误状态清楚；不新增页面级 CSS。
+  - 验证方式：Desktop API/UI 测试、typecheck、build、宽窄屏浏览器和键盘验收。
+  - 验证证据：
+    - Desktop 定向回归 5 个测试文件、34 个测试通过；覆盖定期入账 CONFIRMED 历史、PENDING 逾期、SKIPPED 恢复、账户/Tab 切换清理、持仓 Empty、Risk 和 Portfolio。
+    - `pnpm --filter @thesis-ledger/desktop typecheck`：通过。
+    - 本轮未执行 Desktop build、浏览器或键盘运行时验收，不将其作为本轮证据。
+
+原最终 Review 未执行真实迁移部署、Scheduler/Compose、外部通知、Desktop build 或浏览器的边界仍保留在原记录；现行 Spec 的原验收条件全部继续有效。本轮只转移文档责任，不把这些限制改为通过或增加新的账号/付费要求。

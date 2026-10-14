@@ -1,7 +1,7 @@
 # 组合范围估值快照（聚合快照）Spec
 
-日期：2026-09-07　状态：已定案（2026-09-07 用户确认候选 A），实施中
-任务文档：[`../tasks/2026-09-07-portfolio-aggregate-snapshot.md`](../archive/tasks/2026-09-07-portfolio-aggregate-snapshot.md)
+日期：2026-09-07　状态：候选 A 已实施，AC1～AC4 的 API 与浏览器验收完成；T3 按定案取消，本文保留当前聚合快照合同。
+任务文档：[已完成任务](../archive/tasks/2026-09-07-portfolio-aggregate-snapshot.md)
 来源：自动化配置台实施验收（[`2026-09-05-automation-console-design.md`](2026-09-05-automation-console-design.md) 未决问题第三条）中发现的缺口，按用户要求立项跟踪。
 
 ## 背景与问题

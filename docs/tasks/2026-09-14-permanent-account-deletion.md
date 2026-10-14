@@ -1,6 +1,6 @@
 # 账户永久删除实施任务
 
-> 状态对账（2026-10-03）：已实现待验收：G3/G4 的 Desktop 浏览器及 Android/iOS 编译/模拟器关键交互仍开放。当前迁移 head 与健康结果不能替代删除确认、失败/竞态、缓存刷新、跨端隔离和 Native compile。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：已实现待验收：G3/G4 的 Desktop 浏览器及 Android/iOS 编译/模拟器关键交互仍开放。当前迁移 head 与健康结果不能替代删除确认、失败/竞态、缓存刷新、跨端隔离和 Native compile。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[账户永久删除 Spec](../specs/2026-09-14-permanent-account-deletion.md)
 
