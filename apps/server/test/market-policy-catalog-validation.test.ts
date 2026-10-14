@@ -58,7 +58,7 @@ const effective = (policy = saved): EffectiveProviderPolicyV3 => ({
 });
 const navIssue = (reason: string) => [{ path: ['routes', 0, 'targets', 0], reason }];
 
-describe('已应用路由的配置保留资格', () => {
+describe('精确路由的用户选择', () => {
   it.each(['credential_missing', 'quota_unavailable', 'not_admitted'] as const)(
     '保留未改变且暂不可用的旧路由（%s），允许新增就绪 HFQ',
     (state) => {
@@ -74,28 +74,26 @@ describe('已应用路由的配置保留资格', () => {
     ).toEqual([]);
   });
 
-  it('新增的不可用目标仍然拒绝', () => {
+  it('新增的未就绪目标允许保存', () => {
     const currentCatalog = structuredClone(catalog);
     currentCatalog.entries[1]!.state = 'not_admitted';
-    expect(marketPolicyCatalogIssues(desired, currentCatalog, effective())).toEqual([
-      { path: ['routes', 1, 'targets', 0], reason: 'not_admitted' },
-    ]);
+    expect(marketPolicyCatalogIssues(desired, currentCatalog, effective())).toEqual([]);
   });
 
-  it.each([null, {}, saved])('缺失、无效或只有 Desired 时不继承保留资格：%j', (previous) => {
-    expect(marketPolicyCatalogIssues(desired, catalog, previous)).toEqual(navIssue('not_admitted'));
+  it.each([null, {}, saved])('选择不依赖历史生效投影：%j', (previous) => {
+    expect(marketPolicyCatalogIssues(desired, catalog, previous)).toEqual([]);
   });
 
   it('不从晚于当前 Desired 的投影继承保留资格', () => {
     expect(
       marketPolicyCatalogIssues(desired, catalog, effective({ ...saved, revision: 10 })),
-    ).toEqual(navIssue('not_admitted'));
+    ).toEqual([]);
   });
 
   it('全局重新启用时重新验证全部目标', () => {
     expect(
       marketPolicyCatalogIssues(desired, catalog, effective({ ...saved, enabled: false })),
-    ).toEqual(navIssue('not_admitted'));
+    ).toEqual([]);
   });
 
   it('部分目录不能授予配置保留资格', () => {
@@ -140,7 +138,7 @@ describe('已应用路由的配置保留资格', () => {
         },
         effective(),
       ),
-    ).toEqual(navIssue('not_admitted'));
+    ).toEqual([]);
   });
 
   it('主备顺序变化时必须重新验证整条路由', () => {
@@ -156,6 +154,6 @@ describe('已应用路由的配置保留资格', () => {
         },
         effective(previous),
       ),
-    ).toEqual([{ path: ['routes', 0, 'targets', 1], reason: 'not_admitted' }]);
+    ).toEqual([]);
   });
 });

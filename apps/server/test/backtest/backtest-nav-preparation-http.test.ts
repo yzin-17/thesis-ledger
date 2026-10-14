@@ -23,6 +23,7 @@ import {
   hashCanonicalManifest,
 } from '../../src/backtest/backtest-snapshot.js';
 import { navPreparationFixture } from './nav-preparation.fixtures.js';
+import { sharedStrategyHttpProviders } from './shared-strategy-http-providers.js';
 
 describe('NAV 准备服务与实际 HTTP', () => {
   let app: INestApplication;
@@ -43,6 +44,7 @@ describe('NAV 准备服务与实际 HTTP', () => {
     @Module({
       controllers: [BacktestNavPreparationController],
       providers: [
+        ...sharedStrategyHttpProviders,
         BacktestNavPreparationService,
         BacktestNavPreparationRepository,
         { provide: PrismaService, useValue: prisma },

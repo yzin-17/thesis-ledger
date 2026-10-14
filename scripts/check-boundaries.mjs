@@ -11,6 +11,110 @@ const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
   [
+    'apps/server/src/market/market-known-cash-selector-v3.ts',
+    'apps/server/src/backtest/',
+    '方案观察选择不得依赖回测记账或冻结编排',
+  ],
+  [
+    'packages/schemas/src/market-known-cash-record-v3.ts',
+    'packages/schemas/src/backtest-',
+    '通用现金方案观察不得反向依赖回测编排合同',
+  ],
+  [
+    'packages/schemas/src/market-cash-assessment-v3.ts',
+    'packages/schemas/src/backtest-',
+    '标准分红质量记录不得依赖回测编排',
+  ],
+  ...['market', 'integration', 'providers'].map((feature) => [
+    'apps/server/src/backtest/backtest-known-cash-selection-v3.ts',
+    `apps/server/src/${feature}/`,
+    '冻结现金选择只消费标准记录与研究参数，不得读取最新来源',
+  ]),
+  [
+    'apps/server/src/market/market-split-acquisition-v3.ts',
+    'apps/server/src/backtest/',
+    '拆分采集只使用市场事实与原selector，不依赖回测冻结编排',
+  ],
+  [
+    'packages/schemas/src/market-split-acquisition-v3.ts',
+    'packages/schemas/src/backtest-',
+    '拆分采集信封不得反向依赖现金研究或回测编排合同',
+  ],
+  ...['market', 'integration', 'providers'].map((feature) => [
+    'apps/server/src/backtest/backtest-known-cash-research-v3.ts',
+    `apps/server/src/${feature}/`,
+    '已知现金方案冻结投影只消费绑定输入，不得读取最新来源',
+  ]),
+  ...['market', 'integration', 'providers'].map((feature) => [
+    'apps/server/src/backtest/backtest-known-cash-preparation-v3.ts',
+    `apps/server/src/${feature}/`,
+    '现金准备接缝只消费注入的标准读取端口，不得解析或直接读取供应商',
+  ]),
+  [
+    'apps/server/src/market/market-lifecycle-reader-v3.ts',
+    'apps/server/src/backtest/',
+    '生命周期事实读取不得依赖回测预热或研究编排',
+  ],
+  [
+    'apps/server/src/market/market-status-composition-reader-v1.ts',
+    'apps/server/src/backtest/',
+    '标准功能组合不得反向依赖冻结或回测编排',
+  ],
+  [
+    'packages/schemas/src/market-status-composition-v1.ts',
+    'packages/schemas/src/backtest-',
+    '标准功能组合不得依赖研究冻结合同',
+  ],
+  ...['strategy-authoring', 'ai', 'backtest', 'market', 'journal', 'strategy-optimization'].map(
+    (feature) => [
+      'apps/server/src/identity/',
+      `apps/server/src/${feature}/`,
+      '可信身份不得反向依赖消费身份的业务编排',
+    ],
+  ),
+  ['apps/server/src/ai/', 'apps/server/src/strategy-authoring/', '通用 AI 不得反向依赖策略编写'],
+  [
+    'packages/schemas/src/strategy-provenance.ts',
+    'packages/schemas/src/strategy-authoring',
+    '正式版本通用来源不得反向依赖编写快照',
+  ],
+  [
+    'apps/server/src/backtest/',
+    'apps/server/src/strategy-authoring/',
+    '策略执行与正式版本不得反向依赖编写编排',
+  ],
+  [
+    'apps/server/src/market/',
+    'apps/server/src/strategy-authoring/',
+    '行情事实不得反向依赖编写编排',
+  ],
+  [
+    'packages/schemas/src/backtest-strategy.ts',
+    'packages/schemas/src/strategy-authoring',
+    '策略定义不得依赖编写合同',
+  ],
+  [
+    'apps/server/src/market/market-period-',
+    'apps/server/src/backtest/',
+    '周期展示应消费日历事实，不得依赖 Backtest 编排',
+  ],
+  ['apps/server/src/ai/', 'apps/server/src/journal/', 'AI 执行层不得反向依赖 Journal 业务编排'],
+  [
+    'apps/server/src/journal/journal-review',
+    'apps/server/src/journal/journal-legacy',
+    '正式复盘不得消费旧 number 兼容分析',
+  ],
+  [
+    'apps/server/src/journal/journal-period-review',
+    'apps/server/src/journal/journal-legacy',
+    '正式周期解读不得消费旧 number 兼容分析',
+  ],
+  [
+    'apps/desktop/src/features/journal/review/',
+    'apps/desktop/src/features/journal/journal.api',
+    '正式桌面复盘不得依赖旧 number API 编排',
+  ],
+  [
     'apps/desktop/src/features/market-detail/',
     'apps/desktop/src/features/market-data/InstrumentCatalogPanel',
     '行情详情不得反向依赖目录页面编排',
@@ -31,6 +135,41 @@ const forbiddenFeatureDependencies = [
     '场内 Runner 不得转发 NAV 编排，资产执行由各自 Runner 拥有',
   ],
   ['packages/domain/src/', 'packages/schemas/src/', '领域内核不得依赖 JSON 解析合同'],
+  [
+    'packages/domain/src/trade-projection.ts',
+    'packages/domain/src/journal-review',
+    '交易生命周期投影不得反向依赖复盘消费规则',
+  ],
+  [
+    'packages/domain/src/trade-costs.ts',
+    'packages/domain/src/journal-review',
+    '交易成本分配不得反向依赖复盘消费规则',
+  ],
+  [
+    'packages/schemas/src/trade-api.ts',
+    'packages/schemas/src/journal-review',
+    '交易事实契约不得反向依赖复盘契约',
+  ],
+  [
+    'packages/schemas/src/journal-review',
+    'packages/schemas/src/api',
+    '复盘事实契约不得依赖旧 number 分析及候选兼容入口',
+  ],
+  [
+    'packages/schemas/src/journal-period-review.ts',
+    'packages/schemas/src/api',
+    '周期复盘契约不得依赖旧 number 分析合同',
+  ],
+  [
+    'packages/domain/src/journal-analysis',
+    'packages/domain/src/behavior',
+    '正式复盘不得反向调用旧 number 分析',
+  ],
+  [
+    'packages/domain/src/journal-period-analysis',
+    'packages/domain/src/behavior',
+    '正式周期复盘不得调用旧 number 分析',
+  ],
   [
     'packages/schemas/src/backtest-strategy.ts',
     'packages/schemas/src/backtest-run',
@@ -61,15 +200,16 @@ const forbiddenFeatureDependencies = [
     serverBacktestPrefix,
     'DSA source adapters must not depend on backtest preparation or orchestration',
   ],
-  [
-    'apps/server/src/market/',
-    serverBacktestPrefix,
-    'market facts must not depend on backtest preparation or orchestration',
-  ],
+  ['apps/server/src/market/', serverBacktestPrefix, '市场事实与公告准备不得反向依赖回测编排'],
   [
     serverProvidersPrefix,
     'apps/server/src/ai/',
     'provider storage must not depend on AI orchestration',
+  ],
+  [
+    'apps/server/src/ai/ai-provider-configuration-transaction.ts',
+    'apps/server/src/ai/ai-provider.service',
+    'AI 配置事务边界不得反向依赖 Provider 应用编排',
   ],
   [
     'apps/server/src/ai/',
@@ -77,6 +217,7 @@ const forbiddenFeatureDependencies = [
     'AI adapters must not depend on strategy orchestration',
   ],
   [serverLedgerPrefix, serverImportsPrefix, 'ledger must not depend on imports adapter'],
+  [serverLedgerPrefix, 'apps/server/src/journal/', '交易事实投影不得反向依赖复盘消费与持久化'],
   [
     serverProvidersPrefix,
     'apps/server/src/notifications/',
@@ -99,6 +240,11 @@ const forbiddenFeatureDependencies = [
     'notification outbox must not depend on cash plan callers',
   ],
   [serverBacktestPrefix, serverLedgerPrefix, 'backtest must not depend on real ledger facts'],
+  [
+    serverBacktestPrefix,
+    'apps/server/src/strategy-optimization/',
+    '回测版本及所属用户契约不得反向依赖优化分组消费层',
+  ],
   [
     serverBacktestPrefix,
     'apps/server/src/portfolio/',
@@ -141,6 +287,18 @@ async function inspect(path) {
   const isServerSource = file.startsWith('apps/server/src/');
   const isMarketFeature = file.startsWith('apps/server/src/market/');
   const isDsaBoundary = file.startsWith('apps/server/src/integration/dsa/');
+  if (
+    (isServerSource || file.startsWith('packages/schemas/src/')) &&
+    imports.some((specifier) => /daily-stock-analysis|data_provider\//u.test(specifier))
+  ) {
+    violations.push(`${file} -> 数据源实现 (产品只消费标准能力合同)`);
+  }
+  if (
+    file === 'apps/server/src/market/market-basic-price-fallback.ts' &&
+    /\.providerId\s*(?:===|!==|==|!=)\s*['"][^'"]+['"]/u.test(source)
+  ) {
+    violations.push(`${file} -> 供应商名称备用判断 (应使用标准能力事实与消费者要求)`);
+  }
   if (
     file.includes('/src/') &&
     /\b(?:barSchemaV1|BarInputV1|BarV1|QuoteV1|QuantCapabilityContract|QuantCapabilityDeclaration)\b/u.test(
@@ -203,9 +361,13 @@ async function inspect(path) {
     if (
       specifier === 'bullmq' &&
       !file.startsWith(serverBacktestPrefix) &&
-      !file.startsWith(serverBacktestTestPrefix)
+      !file.startsWith(serverBacktestTestPrefix) &&
+      ![
+        'apps/server/src/strategy-authoring/authoring-queue.ts',
+        'apps/server/src/strategy-authoring/authoring.worker.ts',
+      ].includes(file)
     ) {
-      violations.push(`${file} -> ${specifier} (BullMQ adapter must remain in backtest boundary)`);
+      violations.push(`${file} -> ${specifier} (BullMQ 只能由回测或编写队列适配器消费)`);
     }
     if (!specifier.startsWith('.')) continue;
     const target = relative(root, resolve(dirname(path), specifier)).replaceAll('\\', '/');

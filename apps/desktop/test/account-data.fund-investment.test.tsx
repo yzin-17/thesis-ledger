@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { Toaster } from '../src/components/ui/toast.js';
 import { RecurringFundInvestments } from '../src/features/account-data/AccountDataRecurringFundInvestments.js';
 import { fundInvestmentKeys } from '../src/features/account-data/account-data.fund-investment.queries.js';
+import type { Account } from '../src/features/portfolio/portfolio.types.js';
 
 const fundAccount = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -14,7 +15,7 @@ const fundAccount = {
   active: true,
 };
 
-const renderFeature = (account = fundAccount) => {
+const renderFeature = (account: Account = fundAccount) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(fundInvestmentKeys.plans(account.id), []);
   queryClient.setQueryData(fundInvestmentKeys.occurrences(account.id), []);
@@ -36,8 +37,13 @@ describe('成交记录基金定投', () => {
     expect(markup).toContain('确认前不会改变持仓或现金');
   });
 
-  it('证券账户不显示基金定投', () => {
-    const markup = renderFeature({ ...fundAccount, type: 'securities' as const });
+  it.each([
+    { type: 'securities' as const },
+    { type: 'cash' as const },
+    { mode: 'shadow' as const },
+    { active: false },
+  ])('账户范围 %j 不显示基金定投', (scope) => {
+    const markup = renderFeature({ ...fundAccount, ...scope });
     expect(markup).not.toContain('基金定投');
   });
 });

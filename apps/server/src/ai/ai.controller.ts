@@ -21,6 +21,7 @@ const clientAuditMetadataFields = new Set([
   'toolCall',
   'toolCalls',
   'fallbackErrors',
+  'frozenResearch',
 ]);
 
 const clientModelMetadataSchema = z.unknown().superRefine((value, context) => {
@@ -99,10 +100,7 @@ export class AiController {
       'question' in input &&
       !('provider' in input)
     ) {
-      const created = this.runs.startResearch(aiResearchStartInputSchema.parse(input));
-      if (this.executor)
-        void Promise.resolve(created).then((run) => this.executor?.dispatch(run.id));
-      return created;
+      return this.createResearch(aiResearchStartInputSchema.parse(input));
     }
     const body = aiRunStartInputSchema.parse(input);
     const modelMetadata =
@@ -127,6 +125,12 @@ export class AiController {
       body.context,
       modelMetadata,
     );
+  }
+
+  private async createResearch(input: z.infer<typeof aiResearchStartInputSchema>) {
+    const created = await this.runs.startResearch(input);
+    this.executor?.dispatch(created.id);
+    return created;
   }
 
   @Patch(':id/checkpoint')

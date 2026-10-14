@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "用途": "本人本地研究",
+  "provider": "baostock",
+  "sdkVersion": "0.9.3",
+  "用途依据": {
+    "平台介绍": "https://www.baostock.com/mainContent?file=home.md",
+    "字段与本地导出示例": "https://www.baostock.com/mainContent?file=stockKData.md",
+    "核验日期": "2026-10-06",
+    "说明": "官网明确支持将数据保存本地分析；本包作为用户本人本地研究证据。"
+  },
+  "证据边界": [
+    "保存的是 SDK 返回字段与字符串行，不是网络原始字节。",
+    "查询取得时刻属于当前，不证明 2023 历史首次可见时刻或修订链。",
+    "当前基本信息不作为候选历史窗口逐日身份依据。",
+    "同源日历与日线不是独立来源交叉证明。",
+    "周末空响应不代表交易日缺行时可以成功。",
+    "这是研究候选样本，未取得完整特殊状态、历史收费或结算覆盖，不是来源准入或运行时 Snapshot。"
+  ],
+  "datasets": [
+    {
+      "名称": "候选执行与研究预热日线",
+      "query": {
+        "method": "query_history_k_data_plus",
+        "code": "sh.600000",
+        "fields": "date,code,preclose,close,tradestatus,isST",
+        "start_date": "2023-08-24",
+        "end_date": "2023-08-29",
+        "frequency": "d",
+        "adjustflag": "3"
+      },
+      "fetchedAtStart": "2026-10-06T04:08:59.903407+00:00",
+      "fetchedAtEnd": "2026-10-06T04:09:00.377581+00:00",
+      "canonicalSha256": "3aad9869279a8bc791cbfba8b5cb921a314ee16e4c7b5b67b40316073c051420",
+      "sdkResult": {
+        "fields": [
+          "date",
+          "code",
+          "preclose",
+          "close",
+          "tradestatus",
+          "isST"
+        ],
+        "rows": [
+          [
+            "2023-08-24",
+            "sh.600000",
+            "7.0200",
+            "6.9900",
+            "1",
+            "0"
+          ],
+          [
+            "2023-08-25",
+            "sh.600000",
+            "6.9900",
+            "7.0500",
+            "1",
+            "0"
+          ],
+          [
+            "2023-08-28",
+            "sh.600000",
+            "7.0500",
+            "7.1500",
+            "1",
+            "0"
+          ],
+          [
+            "2023-08-29",
+            "sh.600000",
+            "7.1500",
+            "7.0700",
+            "1",
+            "0"
+          ]
+        ],
+        "error_code": "0",
+        "error_msg": "success"
+      }
+    },
+    {
+      "名称": "当前证券基本信息",
+      "query": {
+        "method": "query_stock_basic",
+        "code": "sh.600000"
+      },
+      "fetchedAtStart": "2026-10-06T04:09:00.378009+00:00",
+      "fetchedAtEnd": "2026-10-06T04:09:00.421749+00:00",
+      "canonicalSha256": "4889568e20cf563d0f14ef4b65d90fe5b1f46eed70ea14041b7b9ef0eacace14",
+      "sdkResult": {
+        "fields": [
+          "code",
+          "code_name",
+          "ipoDate",
+          "outDate",
+          "type",
+          "status"
+        ],
+        "rows": [
+          [
+            "sh.600000",
+            "浦发银行",
+            "1999-11-10",
+            "",
+            "1",
+            "1"
+          ]
+        ],
+        "error_code": "0",
+        "error_msg": "success"
+      }
+    },
+    {
+      "名称": "六个自然日交易日历",
+      "query": {
+        "method": "query_trade_dates",
+        "start_date": "2023-08-24",
+        "end_date": "2023-08-29"
+      },
+      "fetchedAtStart": "2026-10-06T04:09:00.421780+00:00",
+      "fetchedAtEnd": "2026-10-06T04:09:00.461701+00:00",
+      "canonicalSha256": "e7a17c86de6e450c389fb1a39b343c00a2d6476c76d865e5adec72e381443cba",
+      "sdkResult": {
+        "fields": [
+          "calendar_date",
+          "is_trading_day"
+        ],
+        "rows": [
+          [
+            "2023-08-24",
+            "1"
+          ],
+          [
+            "2023-08-25",
+            "1"
+          ],
+          [
+            "2023-08-26",
+            "0"
+          ],
+          [
+            "2023-08-27",
+            "0"
+          ],
+          [
+            "2023-08-28",
+            "1"
+          ],
+          [
+            "2023-08-29",
+            "1"
+          ]
+        ],
+        "error_code": "0",
+        "error_msg": "success"
+      }
+    },
+    {
+      "名称": "周末成功空响应",
+      "query": {
+        "method": "query_history_k_data_plus",
+        "code": "sh.600000",
+        "fields": "date,code,preclose,close,tradestatus,isST",
+        "start_date": "2023-08-26",
+        "end_date": "2023-08-27",
+        "frequency": "d",
+        "adjustflag": "3"
+      },
+      "fetchedAtStart": "2026-10-06T04:09:00.461721+00:00",
+      "fetchedAtEnd": "2026-10-06T04:09:00.739035+00:00",
+      "canonicalSha256": "79c7579bf3dba1caad3fbaf1a38704278984513768b8d696c3394dfc9ee41d40",
+      "sdkResult": {
+        "fields": [
+          "date",
+          "code",
+          "preclose",
+          "close",
+          "tradestatus",
+          "isST"
+        ],
+        "rows": [],
+        "error_code": "0",
+        "error_msg": "success"
+      }
+    }
+  ]
+}

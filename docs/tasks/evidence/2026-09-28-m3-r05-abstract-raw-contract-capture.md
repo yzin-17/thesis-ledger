@@ -24,7 +24,7 @@
 
 ## 原样结构与元数据
 
-完整 98 个 `report_list` 键的插入顺序保存在 [合同摘要](/private/tmp/m3-r05-abstract-contract-0928/contract-summary.json) 的 `report_keys_in_order`；本地绝对路径为 `/private/tmp/m3-r05-abstract-contract-0928/contract-summary.json`。本样本从 `20260630` 到 `20001231` 按日期降序，键无重复；不能把样本顺序升级为接口保证。全部每期原样 `item_title/item_value` 及其他字段保存在 `/private/tmp/m3-r05-abstract-contract-0928/report-items.json`，与原文解析后的 `report_list` 完整相等。
+完整 98 个 `report_list` 键的插入顺序保存在 合同摘要（历史定位 `/private/tmp/m3-r05-abstract-contract-0928/contract-summary.json`，2026-10-03 已不可取回，不作为当前原文证据） 的 `report_keys_in_order`；本地绝对路径为 `/private/tmp/m3-r05-abstract-contract-0928/contract-summary.json`。本样本从 `20260630` 到 `20001231` 按日期降序，键无重复；不能把样本顺序升级为接口保证。全部每期原样 `item_title/item_value` 及其他字段保存在 `/private/tmp/m3-r05-abstract-contract-0928/report-items.json`，与原文解析后的 `report_list` 完整相等。
 
 顶层只有 `result`；其内为 `status` 和 `data`。`data` 内为 `report_count`、`report_date`、`report_list`。`report_date` 条目含 `date_value/date_description/date_type`，提供报告期标签（例如最新 `20260630/2026半年报/2`），没有公告时间解释。
 

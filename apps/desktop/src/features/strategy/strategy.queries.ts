@@ -5,6 +5,7 @@ export const strategyKeys = {
   root: ['desktop', 'strategy'] as const,
   strategies: () => [...strategyKeys.root, 'strategies'] as const,
   jobs: () => [...strategyKeys.root, 'jobs'] as const,
+  groups: () => [...strategyKeys.root, 'backtest-groups'] as const,
   job: (jobId: string) => [...strategyKeys.jobs(), jobId] as const,
 };
 
@@ -23,7 +24,7 @@ export const jobFallbackInterval = (jobs: unknown) => (shouldPollJobs(jobs) ? 30
 
 export const jobDetailFallbackInterval = (job: unknown) => {
   if (!job || typeof job !== 'object' || !('status' in job)) return false;
-  return terminalJobStatuses.has(String((job as { status?: unknown }).status)) ? false : 5_000;
+  return terminalJobStatuses.has(String((job as { status?: unknown }).status)) ? false : 30_000;
 };
 
 export const useStrategyQueries = () => {

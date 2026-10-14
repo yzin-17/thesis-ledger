@@ -3,7 +3,7 @@
 > 任务标识：market-quote-change-display
 > 日期：2026-09-18
 > 状态：实现完成；Desktop 定向验证通过
-> 对应任务：[实施任务](../tasks/2026-09-18-market-quote-change-display.md)
+> 对应任务：[已完成的实施任务](../archive/tasks/2026-09-18-market-quote-change-display.md)
 
 ## 背景与问题
 

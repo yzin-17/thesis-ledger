@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  CurrentStrategyOwner,
+  StrategyIdentityGuard,
+} from '../backtest/strategy-identity.guard.js';
 import { z } from 'zod';
 import { RiskService } from '../risk/risk.service.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
@@ -107,8 +121,9 @@ export class StrategyOptimizationController {
   }
 
   @Get('backtests/groups')
-  listBacktestGroups(@Query() query: unknown) {
-    return this.reads.listBacktestGroups(listBacktestGroupsQuery.parse(query));
+  @UseGuards(StrategyIdentityGuard)
+  listBacktestGroups(@Query() query: unknown, @CurrentStrategyOwner() ownerId: string | null) {
+    return this.reads.listBacktestGroups(listBacktestGroupsQuery.parse(query), ownerId);
   }
 
   @Get('experiments/:id')

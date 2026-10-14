@@ -193,9 +193,8 @@ describe('V3 同执行序列 Benchmark', () => {
     expect(inRange.length).toBeGreaterThanOrEqual(2);
     expect(projection.benchmarkCompatibility.status).toBe('compatible');
     expect(projection.benchmarkCompatibility.costAssumption).toMatchObject({
-      kind: 'proportional',
-      commissionRate: '0.00051',
-      slippageRate: '0.001',
+      kind: 'execution-model',
+      version: 'execution-model-cost-v1',
     });
     const cost = projection.benchmarkCompatibility.costAssumption;
     if (cost.kind === 'unavailable' || cost.kind === 'unsupported') {
@@ -283,21 +282,30 @@ describe('V3 同执行序列 Benchmark', () => {
     });
   });
 
-  it('报告显式冻结的零成本，不继承旧 V2 零成本版本', async () => {
+  it('新版本零费用仍使用完整执行模型身份，不继承旧 V2 零成本版本', async () => {
     const { input } = await setup('zero');
     const projection = buildBacktestV3Benchmark(input);
-    expect(projection.benchmarkCompatibility.costAssumption).toMatchObject({ kind: 'zero-cost' });
+    expect(projection.benchmarkCompatibility.costAssumption).toMatchObject({
+      kind: 'execution-model',
+    });
     expect(projection.benchmarkCompatibility.costAssumption).not.toMatchObject({
       version: 'legacy-v2-zero-cost',
     });
     expect(benchmarkMetric(projection, 'totalReturn').status).toBe('available');
   });
 
-  it('最低费用或方向费用不退化为零成本', async () => {
+  it('新版本最低费用和方向费用参与基准净收益，旧版本继续保持原限制', async () => {
     const { input } = await setup('default');
     const projection = buildBacktestV3Benchmark(input);
-    expect(projection.benchmarkCompatibility.costAssumption.kind).toBe('unsupported');
-    expect(benchmarkMetric(projection, 'totalReturn')).toEqual({
+    expect(projection.benchmarkCompatibility.costAssumption.kind).toBe('execution-model');
+    expect(benchmarkMetric(projection, 'totalReturn').status).toBe('available');
+    expect(benchmarkMetric(projection, 'excessReturn').status).toBe('available');
+    expect(projection.benchmarkCompatibility.status).toBe('compatible');
+    const manifest = { ...input.manifest };
+    delete manifest.benchmarkCostVersion;
+    const legacy = buildBacktestV3Benchmark({ ...input, manifest });
+    expect(legacy.benchmarkCompatibility.costAssumption.kind).toBe('unsupported');
+    expect(benchmarkMetric(legacy, 'totalReturn')).toEqual({
       status: 'unavailable',
       reason: 'BENCHMARK_COST_MODEL_UNSUPPORTED',
     });
@@ -472,7 +480,7 @@ describe('V3 同执行序列 Benchmark', () => {
         runConfigChecksum: hashCanonicalManifest(changedCapital),
       },
     });
-    expect(changedCapitalProjection.benchmarkCompatibility.benchmarkFingerprint).not.toBe(
+    expect(changedCapitalProjection.benchmarkCompatibility.benchmarkFingerprint).toBe(
       first.benchmarkCompatibility.benchmarkFingerprint,
     );
     expect(backtestBenchmarkCompatibilitySchemaV3.parse(first.benchmarkCompatibility)).toEqual(

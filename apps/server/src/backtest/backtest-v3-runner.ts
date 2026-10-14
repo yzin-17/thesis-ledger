@@ -12,9 +12,27 @@ import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
 import type { LocalSnapshotStore } from './backtest-snapshot.js';
 import type { ExchangeVerticalResult } from './backtest-v2-execution-shared.js';
+import { lifecycleExecutionWarningsV3 } from './backtest-lifecycle-execution-v3.js';
 import { runExchangeVertical } from './backtest-v2-execution-exchange.js';
-import { skippedBacktestTradingDatesV3 } from './backtest-v3-tradability.js';
+import {
+  skippedBacktestTradingDatesV3,
+  zeroVolumeObservationWarningsV3,
+} from './backtest-v3-tradability.js';
 import { buildBacktestV3Benchmark } from './backtest-v3-benchmark.js';
+import { backtestListingWarningsV3 } from './backtest-listing-disclosure-v3.js';
+import { cashDividendDisclosureV3 } from './backtest-cash-dividend-disclosure-v3.js';
+import { knownCashDisclosureV3 } from './backtest-known-cash-disclosure-v3.js';
+import { dependencyEvidenceKey } from './backtest-snapshot-v3-dependencies.js';
+import {
+  readSnapshotPublicFeesV3,
+  publicFeesWarningsV3,
+} from './backtest-public-fees-snapshot-v3.js';
+import { publicFeesArtifactKeyV3 } from '@thesis-ledger/schemas';
+import { statusPriceExecutionModelV3 } from './backtest-status-price-model-v3.js';
+import {
+  prepareTradingStatusExecutionV3,
+  tradingStatusWarningsV3,
+} from './backtest-trading-status-execution-v3.js';
 
 export interface BacktestV3RunnerInput {
   runId: string;
@@ -203,13 +221,30 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       rowsByArtifact,
       manifest.runId,
     );
+    const publicFees = readSnapshotPublicFeesV3(
+      manifest,
+      runConfig,
+      rowsByArtifact.get(`${manifest.runId}/${publicFeesArtifactKeyV3}`) ?? [],
+    );
+    let executionRunConfig = publicFees?.runConfig ?? runConfig;
+    const tradingStatus = prepareTradingStatusExecutionV3(manifest, runConfig, rowsByArtifact);
+    if (tradingStatus.status?.disclosure.status === 'source') {
+      executionRunConfig = {
+        ...executionRunConfig,
+        executionModel: statusPriceExecutionModelV3(
+          runConfig,
+          tradingStatus.status.disclosure.response,
+          executionRunConfig.executionModel,
+        ),
+      };
+    }
     const vertical = runExchangeVertical({
       runId: manifest.runId,
       strategyVersionId: manifest.strategyVersionId,
       snapshotId: manifest.contentHash,
       strategy,
-      runConfig,
-      rows: rowsByArtifact,
+      runConfig: executionRunConfig,
+      rows: tradingStatus.executionRows,
       artifacts: manifest.artifacts,
       engineVersion: this.id,
       marketRuleVersion: manifest.marketRuleVersion,
@@ -225,9 +260,11 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       runConfig,
       strategy,
       manifest,
-      rows: rowsByArtifact,
+      rows: tradingStatus.benchmarkRows,
       analytics: vertical.analytics,
-      skippedTradingDates,
+      skippedTradingDates: [
+        ...new Set([...skippedTradingDates, ...tradingStatus.benchmarkSkippedDates]),
+      ],
     });
     const hasUnavailableBenchmarkMetric = Object.values(benchmark.benchmark).some(
       (metric) => metric.status !== 'available',
@@ -250,6 +287,20 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       aggregationVersion: manifest.aggregationVersion,
       contentHash: manifest.contentHash,
       completeness,
+      ...(runConfig.knownCashPreparation
+        ? { knownCashDividendDisclosure: knownCashDisclosureV3(runConfig, vertical.cashEvents) }
+        : {}),
+      ...(runConfig.executionPriceProtocol.cashEventResearch && !runConfig.knownCashPreparation
+        ? {
+            cashDividendDisclosure: cashDividendDisclosureV3(
+              runConfig,
+              rowsByArtifact.get(`${manifest.runId}/${dependencyEvidenceKey}`) ?? [],
+              vertical.cashEvents,
+            ),
+          }
+        : {}),
+      ...(publicFees ? { publicFeesDisclosure: publicFees.disclosure } : {}),
+      ...(tradingStatus.status ? { tradingStatusDisclosure: tradingStatus.status.disclosure } : {}),
       ...(runConfig.executionModel && manifest.executionModel
         ? {
             executionModelDisclosure: {
@@ -262,6 +313,14 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       comparableDataFingerprint: manifest.comparableDataFingerprint,
       actualSources: manifest.actualSources,
       warnings: [
+        ...zeroVolumeObservationWarningsV3(strategy, runConfig, rowsByArtifact, manifest.runId),
+        ...backtestListingWarningsV3(
+          rowsByArtifact.get(`${manifest.runId}/metadata/market-window-evidence-v3.parquet`)?.[0],
+          tradingStatus.status?.disclosure,
+        ),
+        ...publicFeesWarningsV3(publicFees?.disclosure),
+        ...tradingStatusWarningsV3(tradingStatus.status?.disclosure), ...tradingStatus.compositionWarnings,
+        ...lifecycleExecutionWarningsV3(runConfig),
         ...(skippedTradingDates.length
           ? [`按冻结逐日状态跳过 ${skippedTradingDates.length} 个缺 Bar 交易日。`]
           : []),

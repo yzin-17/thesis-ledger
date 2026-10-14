@@ -25,12 +25,15 @@ export function marketControlClient(request: Request) {
         marketProviderConfigResponseSchema.refine((response) => response.providerId === id),
         { method: 'POST', body: JSON.stringify(input) },
       ),
-    testProvider: (id: string, input: unknown, signal?: AbortSignal) =>
-      request(
+    testProvider: (id: string, input: unknown, signal?: AbortSignal) => {
+      const purpose = typeof input === 'object' && input !== null && 'purpose' in input && input.purpose === 'account_access'
+        ? 'account_access' : 'capability_read';
+      return request(
         providerPath(id, 'test'),
-        marketProviderTestResponseSchema.refine((response) => response.providerId === id),
+        marketProviderTestResponseSchema.refine((response) => response.providerId === id && (response.purpose ?? 'capability_read') === purpose),
         { method: 'POST', body: JSON.stringify(input), signal: signal ?? null },
-      ),
+      );
+    },
     removeProvider: (id: string) =>
       request(
         providerPath(id, 'remove'),

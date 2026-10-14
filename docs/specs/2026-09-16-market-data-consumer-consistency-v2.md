@@ -1,5 +1,7 @@
 # 市场数据消费者一致性 V2 Spec
 
+2026-10-03 适用性对账：保留 acceptance、领域边界和受保护清理原则；旧 V2 创建与存储路径由[Canonical 架构](../architecture/canonical-runtime.md)替代，固定快照与严格历史 PIT 的分界按[现行多源规格](2026-09-25-multi-source-adjustment-aware-backtest.md)。原 G1 尚未覆盖断言见[原 Task](../tasks/2026-09-16-market-data-consumer-consistency-v2.md)；重建后的归零检查不要求每次 smoke 后再清理。
+
 > 任务标识：market-data-consumer-consistency-v2
 > 日期：2026-09-16
 > 状态：T1–T4 本地实现完成；已授权开发库重建与保留事实恢复，真实运行态门禁未完成

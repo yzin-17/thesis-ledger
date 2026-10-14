@@ -4,7 +4,7 @@ import {
   Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { normalizeSymbol } from '@thesis-ledger/domain';
+import { normalizeMarketSymbol } from './market-symbol-identity.js';
 import {
   marketDetailSectionSchema,
   type MarketDetailAssetType,
@@ -21,6 +21,7 @@ import { DsaError } from '../integration/dsa/dsa.client.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketService } from './market.service.js';
 import { parseMarketDetailDateRange } from './market-request-validation.js';
+import { detailPolicyMarket, readDetailPolicySnapshot, type DetailPolicySnapshot } from './market-detail-policy-v3.js';
 
 export const MARKET_DETAIL_CAPABILITIES = [
   'quote',
@@ -84,18 +85,16 @@ type DetailLimit = number | string | undefined;
 type NonBarDetailResult = {
   requested: MarketDetailCapability[];
   sections: Partial<Record<MarketDetailCapability, MarketDetailSection>>;
-  dependencies: Record<string, { status: MarketDetailSectionStatus; error?: MarketDetailDiagnostic }>;
+  dependencies: Record<
+    string,
+    { status: MarketDetailSectionStatus; error?: MarketDetailDiagnostic }
+  >;
 };
 export type ResolvedMarketDetailIdentity = {
   symbol: string;
   assetType: MarketDetailAssetType;
   source: 'asset' | 'catalog' | 'symbol' | 'unknown';
   status: 'confirmed' | 'provider' | 'unknown';
-};
-
-type PolicySnapshot = {
-  enabled: boolean;
-  routes: Record<string, Record<string, Array<{ providerId: string; upstreamSource: string }>>>;
 };
 
 const assetTypeFromValue = (value: unknown): MarketDetailAssetType | null => {
@@ -121,42 +120,6 @@ const isEmptyValue = (value: unknown) =>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const normalizedPolicyRoutes = (
-  value: unknown,
-): Record<string, Record<string, Array<{ providerId: string; upstreamSource: string }>>> | null => {
-  if (!isRecord(value)) return null;
-  const result: Record<
-    string,
-    Record<string, Array<{ providerId: string; upstreamSource: string }>>
-  > = {};
-  for (const [capability, rawTypes] of Object.entries(value)) {
-    if (!isRecord(rawTypes)) return null;
-    const typeRoutes: Record<
-      string,
-      Array<{ providerId: string; upstreamSource: string }>
-    > = {};
-    for (const [assetType, targets] of Object.entries(rawTypes)) {
-      if (!Array.isArray(targets)) return null;
-      const parsedTargets: Array<{ providerId: string; upstreamSource: string }> = [];
-      for (const target of targets) {
-        if (
-          !isRecord(target) ||
-          typeof target.providerId !== 'string' ||
-          typeof target.upstreamSource !== 'string'
-        )
-          return null;
-        parsedTargets.push({
-          providerId: target.providerId,
-          upstreamSource: target.upstreamSource,
-        });
-      }
-      typeRoutes[assetType] = parsedTargets;
-    }
-    result[capability] = typeRoutes;
-  }
-  return result;
-};
 
 @Injectable()
 export class MarketDetailService {
@@ -189,7 +152,7 @@ export class MarketDetailService {
     const policyEnabledCapabilities = policyUnavailable
       ? []
       : baseSupported.filter((capability) =>
-          this.policyAllows(policy, capability, identity.assetType),
+          this.policyAllows(policy, capability, identity),
         );
     const requestId = currentTraceId() ?? crypto.randomUUID();
     const refreshOptions = options.refresh === true ? { refresh: true } : {};
@@ -225,7 +188,7 @@ export class MarketDetailService {
     if (supportedRequested.includes('quote')) {
       tasks.push(
         this.loadSection('quote', requestId, () =>
-          this.market.getQuote(identity.symbol, { allowStale: true, ...refreshOptions }),
+          this.market.getQuote(identity.symbol, { allowStale: true, ...refreshOptions, assetType: identity.assetType === 'ETF' ? 'ETF' : 'STOCK' }),
         ).then((section) => {
           sections.quote = section;
         }),
@@ -268,34 +231,28 @@ export class MarketDetailService {
     return { requested, sections, dependencies };
   }
 
-  private async readPolicy(): Promise<PolicySnapshot | null> {
+  private async readPolicy(): Promise<DetailPolicySnapshot | null> {
     try {
-      const raw = await this.control.getPolicy();
-      const projection = isRecord(raw.effectiveProjection) ? raw.effectiveProjection : null;
-      const source = projection ?? raw;
-      const routes = normalizedPolicyRoutes(source.routes);
-      const applied = projection !== null || raw.syncState === 'applied';
-      if (!applied || typeof source.enabled !== 'boolean' || routes === null) return null;
-      return { enabled: source.enabled, routes };
+      return readDetailPolicySnapshot(await this.control.getPolicy());
     } catch {
       return null;
     }
   }
 
   private policyAllows(
-    policy: PolicySnapshot | null,
+    policy: DetailPolicySnapshot | null,
     capability: MarketDetailCapability,
-    assetType: MarketDetailAssetType,
+    identity: ResolvedMarketDetailIdentity,
   ) {
     if (!policy || !policy.enabled) return false;
-    const route = policy.routes[POLICY_CAPABILITY_BY_DETAIL[capability]]?.[assetType];
+    const route = policy.routes[`${detailPolicyMarket(identity.symbol)}:${POLICY_CAPABILITY_BY_DETAIL[capability]}`]?.[identity.assetType];
     return Array.isArray(route) && route.length > 0;
   }
 
   async resolveIdentity(input: string): Promise<ResolvedMarketDetailIdentity> {
-    let normalized: ReturnType<typeof normalizeSymbol>;
+    let normalized: ReturnType<typeof normalizeMarketSymbol>;
     try {
-      normalized = normalizeSymbol(input);
+      normalized = normalizeMarketSymbol(input);
     } catch {
       throw new BadRequestException('非法行情标的代码');
     }
@@ -399,8 +356,8 @@ export class MarketDetailService {
       .filter(Boolean);
     if (values.length === 0) throw new BadRequestException('include 至少需要一个合法能力');
     const unique = [...new Set(values)];
-    const invalid = unique.filter((value) =>
-      !NON_BAR_CAPABILITIES.has(value as MarketDetailCapability),
+    const invalid = unique.filter(
+      (value) => !NON_BAR_CAPABILITIES.has(value as MarketDetailCapability),
     );
     if (invalid.length > 0)
       throw new BadRequestException(`不支持的行情详情能力: ${invalid.join(', ')}`);

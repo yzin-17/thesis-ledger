@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MarketService } from '../../src/market/market.service.js';
 import { redisKey } from '../../src/platform/redis.service.js';
+import { quoteControlFixture, quoteControlCacheKey, quoteControlGeneration } from './quote-control-fixture.js';
 
 const equity = '600519.SH';
 const fund = '000001.OF';
@@ -9,7 +10,7 @@ const cases = [
   {
     kind: 'quote',
     symbol: equity,
-    key: `quote:3:${equity}`,
+    key: quoteControlCacheKey(equity),
     value: {
       version: 3,
       symbol: equity,
@@ -30,7 +31,7 @@ const cases = [
   {
     kind: 'nav',
     symbol: fund,
-    key: `fund-nav:3:${fund}`,
+    key: `fund-nav:4:${fund}:${quoteControlGeneration}`,
     value: {
       version: 3,
       symbol: fund,
@@ -44,7 +45,7 @@ const cases = [
   {
     kind: 'holdings',
     symbol: fund,
-    key: `fund-holdings:3:${fund}`,
+    key: `fund-holdings:4:${fund}:${quoteControlGeneration}`,
     value: {
       version: 3,
       fundSymbol: fund,
@@ -59,7 +60,7 @@ const cases = [
   {
     kind: 'chip',
     symbol: equity,
-    key: `chip:3:${equity}`,
+    key: `chip:4:${equity}:${quoteControlGeneration}`,
     value: {
       version: 3,
       symbol: equity,
@@ -77,6 +78,7 @@ const cases = [
 
 const harness = (values: Map<string, string>) => {
   const dsa = {
+    marketCacheContextV3: vi.fn(quoteControlFixture),
     get: vi.fn(async () => {
       throw new Error('upstream unavailable');
     }),

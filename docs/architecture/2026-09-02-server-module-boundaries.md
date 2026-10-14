@@ -1,8 +1,10 @@
 # Server 模块边界与依赖方向
 
 > 日期：2026-09-02  
-> 更新：2026-09-12  
-> 状态：Active  
+> 更新：2026-10-06
+>
+> 状态：现行
+>
 > 适用范围：`apps/server` 与 workspace 内部 runtime dependency  
 > 来源：[`2026-09-02-full-repo-architecture-hardening`](../specs/2026-09-02-full-repo-architecture-hardening.md)
 
@@ -81,6 +83,16 @@ Automation、AI Optimization、Backtest 等模块可以拥有各自的业务状�
 
 共享的是**生命周期原则**，不是业务表或通用 Job Framework；禁止为了复用而建立 Automation ↔ AI ↔ Backtest 的反向模块依赖。
 
+### 5.1 策略编写、可信身份与正式创建
+
+- `identity` 拥有工作区 principal、用户、密码摘要与会话校验，消费归属的业务模块单向依赖它。默认本地工作区提供稳定归属，无需注册或会话；显式账号模式保留会话验证。模式与兼容边界见[本地工作区规格](../specs/2026-10-06-strategy-local-workspace.md)。
+- `strategy-authoring` 拥有草稿、不可变修订、编写操作、提案及创建来源快照；其 PostgreSQL 状态是业务事实源。专用队列与 Worker 适配器持有 BullMQ，Executor 管理领取/租约/终态，单次 Runner 管理指定模型调用。
+- `ai` 拥有独立的调用身份、不可变审计事实、模型/用途验证和计价依据。编写状态失败或租约丢失时仍保留调用事实；通用 AI 不依赖编写模块。
+- `market` 拥有目录标的解析；`backtest` 拥有 Canonical 正式策略、版本、通用来源和 `StrategyCreationService.createInTransaction()`。编写保存通过该能力在同一事务形成策略 v1、固定来源及草稿终态；保存后的回测由单独的显式动作发起。
+- 正式版本通用来源只持有类型与引用；具体编写内容由编写来源 API 消费，旧公开策略的可空 owner 语义保持。正式版本、行情和通用 Schema 不反向导入编写编排或快照。
+
+上述源码方向、身份反向依赖和 BullMQ 使用范围由 `scripts/check-boundaries.mjs` 固化。详细合同与验收见[策略编写规格](../specs/2026-09-18-natural-language-strategy-authoring.md)及[执行规格](../specs/2026-10-05-authoring-execution.md)。
+
 ## 6. Workspace runtime dependency
 
 Workspace runtime graph 以各 package 的 `dependencies`、`optionalDependencies`、`peerDependencies` 为准，`devDependencies` 不参与 runtime cycle 判定。
@@ -124,6 +136,8 @@ Ledger V2 专用命令已经取代旧的通用 Position Adjustment / LedgerEvent
 禁止为了兼容新功能重新引入无类型的通用 LedgerEvent 写 API。
 
 ## 8. 变更规则
+
+回测所属用户过滤与 `StrategyIdentityGuard` 源码契约归 Backtest。优化模块导入 `IdentityModule` 并注册复用守卫，消费 `BacktestModule` 导出的 `StrategyAccessService` 与 `visibleStrategyOwners`，仅投影当前会话可读取的任务；查询参数不能授予身份。依赖保持优化模块单向消费回测与身份模块，边界脚本禁止回测核心反向依赖优化消费层。
 
 出现以下情况时必须同步更新本文：
 

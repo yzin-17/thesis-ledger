@@ -14,8 +14,9 @@ import { ErrorTrackingService } from './error-tracking.service.js';
 const normalizeHttpResponse = (payload: unknown) => {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return payload;
   const record = payload as Record<string, unknown>;
-  if (typeof record.error === 'string' || typeof record.errorCode !== 'string') return payload;
-  return { ...record, error: record.errorCode };
+  const errorCode = record.errorCode ?? record.code;
+  if (typeof record.error === 'string' || typeof errorCode !== 'string') return payload;
+  return { ...record, error: errorCode, errorCode };
 };
 
 @Catch()
@@ -26,6 +27,15 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
+    const parserType = (exception as { type?: unknown } | null)?.type;
+    if (parserType === 'entity.too.large' || parserType === 'entity.parse.failed') {
+      const tooLarge = parserType === 'entity.too.large';
+      response.status(tooLarge ? 413 : 400).json({
+        error: tooLarge ? 'request_body_too_large' : 'validation_error',
+        message: tooLarge ? '请求正文超过当前入口大小预算' : '请求正文不是有效JSON',
+      });
+      return;
+    }
     if (exception instanceof ZodError) {
       this.logger.warn({
         operation: 'http.validation_error',

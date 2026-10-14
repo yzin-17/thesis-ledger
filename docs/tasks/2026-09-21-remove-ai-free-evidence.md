@@ -1,5 +1,7 @@
 # 移除 AI 执行路由免费依据配置实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：本地、隔离 PostgreSQL 与目标结构/配置证据已有，尚未覆盖真实非零费用和 Electron。最新全包不关闭最后一项条件性门禁；旧全仓 lint 的错误数只是历史输入结果，不能一直作为当前确定阻塞。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[移除 AI 执行路由免费依据配置 Spec](../specs/2026-09-21-remove-ai-free-evidence.md)
 
 > 状态：已完成本地实现、隔离 PostgreSQL 与目标 Docker / Server 验证；真实外部 Provider 计费事实与 Electron 实机视觉验收未执行；保留工作区既有未提交修改，不创建提交。

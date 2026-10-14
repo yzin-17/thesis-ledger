@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import { barPointSchema } from '../src/market-bar-series.js';
 import {
   barSeriesSchema,
   canonicalBarSeriesEncoding,
@@ -21,6 +22,12 @@ const point = {
 };
 
 describe('日线序列现行合同', () => {
+  it('缺失量额保留为空，不等同于零或估算成交额', () => {
+    const parsed = barPointSchema.parse({ ...point, volume: null, amount: null });
+    expect(parsed.volume).toBeNull();
+    expect(parsed.amount).toBeNull();
+    expect(barPointSchema.safeParse({ ...point, amount: Number.POSITIVE_INFINITY }).success).toBe(false);
+  });
   it('校验 identity、coverage 和精确 provenance', () => {
     const result = barSeriesSchema.parse({
       contractVersion: 3,

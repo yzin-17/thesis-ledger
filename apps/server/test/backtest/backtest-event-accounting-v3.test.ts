@@ -23,6 +23,38 @@ const input = {
   dataAsOf: '2026-01-01T00:00:00Z',
 };
 describe('V3 事件经济调度', () => {
+  it('显式现金模型使用登记资格、发放日开盘及独立研究时钟', () => {
+    const source = {
+      ...fact,
+      recordDate: '2025-06-17',
+      paymentDate: '2025-06-20',
+      availableAt: '2025-07-01T00:00:00Z',
+    };
+    const [result] = prepareEventAccountingV3([source], {
+      ...input,
+      bars: [...input.bars, { openedAt: '2025-06-20T01:30:00Z' }],
+      cashEventResearch: 'ex-date-entitlement-payment-date-cash-v1',
+    });
+    expect(result).toMatchObject({
+      availableAt: source.availableAt,
+      accountingAt: input.bars[0]!.openedAt,
+      cashSettlementAt: '2025-06-20T01:30:00Z',
+      researchClock: { basis: 'fixed-provider-snapshot', dataAsOf: input.dataAsOf },
+    });
+    expect(source).not.toHaveProperty('researchClock');
+    expect(() =>
+      prepareEventAccountingV3([{ ...source, recordDate: '2025-06-16' }], {
+        ...input,
+        cashEventResearch: 'ex-date-entitlement-payment-date-cash-v1',
+      }),
+    ).toThrow('最后交易日');
+    const [pending] = prepareEventAccountingV3([source], {
+      ...input,
+      endDate: '2025-06-19',
+      cashEventResearch: 'ex-date-entitlement-payment-date-cash-v1',
+    });
+    expect(pending).not.toHaveProperty('cashSettlementAt');
+  });
   it('窗口前记录、窗口内生效使用冻结开盘，缺策略可见性允许记账', () => {
     const [result] = prepareEventAccountingV3([fact], input);
     expect(result).toEqual({ ...fact, accountingAt: '2025-06-18T01:30:00Z' });

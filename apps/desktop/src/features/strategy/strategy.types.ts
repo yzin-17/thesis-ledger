@@ -5,6 +5,7 @@ import type {
   BacktestRunPreparationResultV3,
   BacktestRunCreateV3,
   ResultReadEligibility,
+  StrategyVersionProvenance,
 } from '@thesis-ledger/schemas';
 
 export type StrategyStatus = 'draft' | 'active' | 'archived';
@@ -17,6 +18,7 @@ export interface StrategyVersion {
   version: number;
   schema?: StrategySchema;
   schemaVersion?: number;
+  source?: StrategyVersionProvenance | null;
   createdAt?: string;
   updatedAt?: string;
 }

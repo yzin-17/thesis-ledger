@@ -1,4 +1,4 @@
-import type { BarSeries } from '@thesis-ledger/schemas';
+import type { MarketDisplayBarSeries as BarSeries } from '@thesis-ledger/schemas';
 
 /** Different V3 acquisitions may have different adjustment anchors or revisions. */
 export const canCombineChartSeries = (left: BarSeries, right: BarSeries): boolean => {
@@ -9,6 +9,8 @@ export const canCombineChartSeries = (left: BarSeries, right: BarSeries): boolea
     left.identity.adjustment !== right.identity.adjustment
   )
     return false;
+  if ('derivation' in left || 'derivation' in right)
+    return 'derivation' in left && 'derivation' in right && left.inputFingerprint === right.inputFingerprint;
   if (!left.chartContextV3 && !right.chartContextV3) return true;
   return Boolean(
     left.chartContextV3 &&

@@ -1,4 +1,8 @@
 import { DecimalValue } from './decimal.js';
+import {
+  availabilityForDecision,
+  type BacktestResearchClock,
+} from './backtest-observation-clock.js';
 import type {
   SimulationLedger,
   SimulationExecutionInstrument,
@@ -16,9 +20,13 @@ export interface BacktestCorporateActionFact {
   effectiveDate?: string;
   /** 内部经济调度时刻；源 occurredAt/availableAt 不被改写。 */
   accountingAt?: string;
+  researchClock?: BacktestResearchClock;
+  /** 新现金研究模型的可用现金调度；发放日仍保留在源事实中。 */
+  cashSettlementAt?: string;
   recordDate?: string;
   paymentDate?: string;
-  strategyVisibility?: { kind: 'announcement'; announcedAt: string }
+  strategyVisibility?:
+    | { kind: 'announcement'; announcedAt: string }
     | { kind: 'conservative-day'; visibleDate: string };
   ratio?: string;
   cashAmount?: string;
@@ -86,7 +94,8 @@ const stableSerialize = (value: unknown): string => {
     .join(',')}}`;
 };
 
-export const corporateActionAccountingAt = (fact: BacktestCorporateActionFact) => fact.accountingAt ?? fact.occurredAt;
+export const corporateActionAccountingAt = (fact: BacktestCorporateActionFact) =>
+  fact.accountingAt ?? fact.occurredAt;
 
 /** The fact identity, not array position, is the retry/deduplication key. */
 export const corporateActionEventId = (fact: BacktestCorporateActionFact, runId: string) =>
@@ -99,7 +108,12 @@ export const corporateActionEventId = (fact: BacktestCorporateActionFact, runId:
     cashAmount: fact.cashAmount,
     currency: fact.currency,
     occurredAt: fact.occurredAt,
-    ...(fact.accountingAt ? { effectiveDate: fact.effectiveDate, accountingAt: fact.accountingAt } : {}),
+    ...(fact.accountingAt
+      ? { effectiveDate: fact.effectiveDate, accountingAt: fact.accountingAt }
+      : {}),
+    ...(fact.researchClock
+      ? { researchClock: fact.researchClock, cashSettlementAt: fact.cashSettlementAt }
+      : {}),
     availableAt: fact.availableAt,
     provider: fact.provider,
     providerRevision: fact.providerRevision,
@@ -127,7 +141,7 @@ const validateTimes = (
   runId: string,
 ): CorporateActionRejected | undefined => {
   const occurredAt = parseTime(corporateActionAccountingAt(fact));
-  const availableAt = parseTime(fact.availableAt);
+  const availableAt = parseTime(availabilityForDecision(fact) ?? '');
   const evaluation = parseTime(evaluationAt);
   const eventId = corporateActionEventId(fact, runId);
   if (![occurredAt, availableAt, evaluation].every(Number.isFinite)) {
@@ -178,6 +192,7 @@ const toLedgerEvent = (
             currency: fact.currency,
             occurredAt: corporateActionAccountingAt(fact),
             availableAt: fact.availableAt,
+            ...(fact.researchClock ? { researchClock: fact.researchClock } : {}),
           },
         },
       };
@@ -220,6 +235,7 @@ export const createCorporateActionPort = (
   ledger: SimulationLedger,
   executionInstrument: SimulationExecutionInstrument,
   runId: string,
+  cashEntitlement?: (fact: BacktestCorporateActionFact) => string,
 ): CorporateActionPort => {
   const applied = new Set<string>();
   return {
@@ -230,6 +246,9 @@ export const createCorporateActionPort = (
       if (timeIssue) return timeIssue;
       const mutation = toLedgerEvent(fact, executionInstrument, runId);
       if ('applied' in mutation) return mutation;
+      if (cashEntitlement && mutation.ledgerEvent.type === 'cashDividend') {
+        mutation.ledgerEvent.payload.eligibleQuantity = cashEntitlement(fact);
+      }
       const ledgerResult = ledger.applyEvent(mutation.ledgerEvent, evaluationAt);
       if (!ledgerResult.applied) {
         let code: CorporateActionRejectCode = 'RULE_REJECTED';
@@ -258,3 +277,18 @@ export const createCorporateActionPort = (
     },
   };
 };
+
+/** 事件编排只调用领域 port；缺 port 时不发布公司行动。 */
+export function applyCorporateActionAt(
+  port: CorporateActionPort | undefined,
+  fact: BacktestCorporateActionFact,
+  runId: string,
+  evaluationAt: string,
+): CorporateActionResult {
+  if (port) return port.apply(fact, evaluationAt);
+  return reject(
+    corporateActionEventId(fact, runId),
+    'RULE_REJECTED',
+    '公司行动需要显式 corporateActionPort 才能接入 SimulationLedger',
+  );
+}

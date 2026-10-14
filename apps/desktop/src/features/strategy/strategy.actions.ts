@@ -245,7 +245,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     setBusyAction(`cancel:${jobId}`);
     try {
       await cancelMutation.mutateAsync(jobId);
-      toastManager.add({ title: '回测已取消', type: 'success', timeout: 2800 });
+      toastManager.add({ title: '取消请求已提交', type: 'success', timeout: 2800 });
       await load();
     } catch {
       errorToast(toastManager, '回测取消失败', '请检查任务状态和服务连接。');

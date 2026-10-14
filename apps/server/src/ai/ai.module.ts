@@ -9,6 +9,7 @@ import { AiProviderService } from './ai-provider.service.js';
 import { AiRunService } from './ai-run.service.js';
 import { AiResearchExecutor } from './ai-research.executor.js';
 import { AiExecutionStateStore } from './ai-execution-state.store.js';
+import { AiInvocationStore } from './ai-invocation.store.js';
 import { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
 import { AiResearchSdkExecution } from './ai-research-sdk-execution.js';
 import { AiProviderRegistry } from './provider-registry.js';
@@ -23,6 +24,7 @@ import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
   providers: [
     AiRunService,
     AiExecutionStateStore,
+    AiInvocationStore,
     AiSdkGenerationAdapter,
     AiResearchSdkExecution,
     AiProviderService,
@@ -57,6 +59,7 @@ import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
   exports: [
     AiRunService,
     AiExecutionStateStore,
+    AiInvocationStore,
     AiSdkGenerationAdapter,
     AiResearchSdkExecution,
     AiProviderRegistry,

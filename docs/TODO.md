@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | `market-chart-minute-period` | 行情图表分钟线与盘中周期：Provider 分钟能力与 RouteTarget、CN/HK/US Session/午休边界、分钟级分页窗口、TTL/尾 bar 完成状态、指标预热、Desktop 盘中刷新与增量更新 | `specs/2026-09-16-market-chart-period-aggregation.md`；`tasks/2026-09-10-market-chart-indicator-integration.md` | 至少一个目标市场的分钟级数据能力、授权和运行预算明确；单独建立 `market-chart-minute-period` Spec/Task |
 | `market-chart-intraday-daily-bar` | 稳定交付股票与 ETF 的盘中日线快照（非分钟线）：在完整窗口和最新端正确选择真实当日 `incomplete` bar，验证跨源复权、价格、成交量单位与指标输入可比性，并处理上游临时故障、请求预算及收盘状态转换。当前图表路径的盘中日线尚未通过可用性验收；单次备用源成功不代表稳定支持 | `specs/2026-09-17-market-chart-refresh.md`；`tasks/2026-09-17-market-chart-refresh.md`（2026-09-28 盘中核查与降级分支） | 核实目标 Provider 的盘中覆盖、频率限制或配额、时间戳与字段语义后单独立项；至少以真实 ETF 和股票目标验证同日两次快照、`incomplete → complete`、故障退避及浏览器展示。本轮 T4 仍须完成无当日 bar 时的截止日期降级验收 |
-| `market-detail-pagination-anchor` | 修复 `/api/v2/market/:symbol/detail` 对 `calculationAnchor` 的显式支持，并收敛 `loadEarlier` 的分页锚点语义，避免把序列末尾日期误作向前分页锚点 | `specs/2026-09-16-market-chart-period-aggregation.md` | 在继续扩展历史分页/周期分页前，或现有分页出现可复现错误时，独立立项并补充回归证据 |
+| `market-detail-pagination-anchor` | 修复现行 `/api/market/:symbol/detail` 对 `calculationAnchor` 的显式支持，并收敛 `loadEarlier` 的分页锚点语义，避免把序列末尾日期误作向前分页锚点 | `specs/2026-09-16-market-chart-period-aggregation.md` | 在继续扩展历史分页/周期分页前，或现有分页出现可复现错误时，独立立项并补充回归证据 |
 | `market-chart-trading-overlays` | 行情图表交易标记、成本线、风险线与区间测量等交易叠加层 | `tasks/2026-09-10-market-chart-indicator-integration.md` | 产品交互与数据来源明确后单独立项；不得夹带进周期、指标或分页任务 |
 | `backtest-market-rules-expansion` | 在首个真实历史规则来源闭环之后扩展完整市场矩阵、客户级真实费用，以及公告/规则原文、首次公开时间和长期可复核来源链 | `tasks/2026-09-16-backtest-real-historical-market-rules.md` | 当前 bounded slice 完成，首个来源的许可、版本和历史覆盖稳定；再按市场/资产拆分新增 Spec/Task |
 | `market-batch-catalog` | 为真正需要批量行情的消费者建立显式 batch/catalog 边界，禁止从单标 Quote 路径恢复 universe/full-market fallback | `archive/tasks/2026-09-14-portfolio-valuation-demand-guard.md` | 出现独立批量消费场景并能定义请求预算、缓存和 Provider 责任边界 |
@@ -29,8 +29,8 @@
 
 以下类型即使受外部条件影响，也仍属于**当前任务完成条件**，不得迁入本文：
 
-- 尚未被用户明确取消、跳过或调整范围的真实备用源门禁；本轮已确认的多源扩展见上表；
-- 五个 Market Provider 的真实凭证/在线验收；
+- 尚未被用户明确取消、跳过或调整范围的真实备用源门禁；已立项的多源扩展由[当前 Task](archive/tasks/2026-10-03-multi-source-remaining-acceptance.md)承接，不在上表重复登记；
+- Market Provider 的当前凭证/在线验收以[来源配置 Task](tasks/2026-09-14-market-provider-credentials.md)为准，区分有效义务与 Tushare 等来源的范围性跳过；
 - Desktop / Mobile / Browser / Simulator 的当前产品运行态验收；
 - 已实现功能的 Docker、Worker、PostgreSQL、Redis 或真实 Provider smoke；
 - 当前 Task 明确列出的用户确认或受保护数据清理门禁。

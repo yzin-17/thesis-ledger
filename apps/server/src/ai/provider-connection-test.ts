@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 import { VALIDATION_DURATION_SECONDS } from './ai-provider-validation-policy.js';
+import { authoringConnectionProbe } from './authoring-connection-probe.js';
 
 const connectionProbeSchema = z.object({ ok: z.literal(true) }).strict();
 const CONNECTION_PROBE_MAX_OUTPUT_TOKENS = 1_024;
@@ -50,6 +51,10 @@ type ProbeInput = {
 };
 
 const contractForPurpose = (purpose: AiGenerationContractRef['id'] | undefined) => {
+  if (purpose === 'strategy_authoring_analysis') return aiGenerationContracts.authoringAnalysis;
+  if (purpose === 'strategy_authoring_generation') return aiGenerationContracts.authoringGeneration;
+  if (purpose === 'strategy_authoring_modification')
+    return aiGenerationContracts.authoringModification;
   if (purpose === 'parameter_optimization') return aiGenerationContracts.parameterOptimization;
   if (purpose === 'strategy_discovery') return aiGenerationContracts.strategyDiscovery;
   return aiGenerationContracts.research;
@@ -66,6 +71,16 @@ const contractForPurpose = (purpose: AiGenerationContractRef['id'] | undefined) 
 export const probeMessages = (purpose: AiGenerationContractRef['id'] | undefined) => {
   if (purpose === undefined)
     return [{ role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' }];
+  const example = authoringConnectionProbe(purpose);
+  if (example)
+    return [
+      {
+        role: 'system',
+        content:
+          '这是结构化输出格式验证。只输出用户给出的 JSON 实例，不增加、删减或修改字段，不输出解释或代码围栏。',
+      },
+      { role: 'user', content: `原样返回这个已满足本用途合同的实例：${JSON.stringify(example)}` },
+    ];
   const schema = z.toJSONSchema(contractForPurpose(purpose).schema, { io: 'output' });
   return [
     {
@@ -80,6 +95,9 @@ export const probeMessages = (purpose: AiGenerationContractRef['id'] | undefined
         '返回下面契约的最小可用实例：必须满足 Schema 的全部约束（required、minItems、minLength、枚举），' +
         '数组只保留满足最小长度所需的元素，字符串尽量短；带默认值的字段可以省略。' +
         '所有数值字段必须是大于 0 的有限数值，不要使用 0、空字符串、null 或占位符；' +
+        (purpose === 'strategy_authoring_analysis'
+          ? '编写分析的问题必须使用 answer=null 和 answerState=unanswered，不能代替用户移除要求。'
+          : '') +
         `枚举字段只能取 Schema 列出的取值。\n${JSON.stringify(schema)}`,
     },
   ];
@@ -124,7 +142,9 @@ export const runProviderConnectionTest = async ({
     timeout: {
       // 一次性返回的连接探针仍以 Provider 超时为总时长上限；流式用途探针不设总时长墙。
       ...(streamingProbe ? {} : { totalMs: timeoutMs }),
-      ...(streamingProbe ? { firstChunkMs: firstOutputTimeoutMs, chunkMs: outputIdleTimeoutMs } : {}),
+      ...(streamingProbe
+        ? { firstChunkMs: firstOutputTimeoutMs, chunkMs: outputIdleTimeoutMs }
+        : {}),
     },
     signal: signal ? AbortSignal.any([signal, ceilingSignal]) : ceilingSignal,
   });

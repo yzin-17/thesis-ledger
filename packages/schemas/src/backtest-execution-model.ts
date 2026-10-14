@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { nonNegativeDecimalStringSchema, positiveDecimalStringSchema } from './monetary-values.js';
+import { executionFeeMinimumSchema as minimum, executionModelFeesSchema, executionModelFeesV3Schema } from './backtest-execution-fees.js';
+import { backtestResearchLotSizeSchema, researchLotSizeClockIssuesV3, researchLotSizeModelIssuesV3, type BacktestResearchLotSize } from './backtest-research-lot-size.js';
+export { executionModelFeesSchema, executionModelFeesV3Schema } from './backtest-execution-fees.js';
+export { backtestResearchLotSizeSchema, type BacktestResearchLotSize } from './backtest-research-lot-size.js';
 
 const currency = z.enum(['CNY', 'HKD', 'USD']);
 const dateRange = z
@@ -11,27 +15,20 @@ const provenance = { description: text, references: z.array(text).min(1), revisi
 
 export const executionModelSourceSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('historicalFact'), ...provenance, knownAt: timestamp }),
-  z.strictObject({ kind: z.literal('researchPreset'), ...provenance, configuredAt: timestamp }),
-  z.strictObject({ kind: z.literal('userConfiguration'), ...provenance, configuredAt: timestamp }),
+  z.strictObject({
+    kind: z.literal('researchPreset'),
+    ...provenance,
+    configuredAt: timestamp,
+    historicalKnownAt: timestamp.optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('userConfiguration'),
+    ...provenance,
+    configuredAt: timestamp,
+    historicalKnownAt: timestamp.optional(),
+  }),
 ]);
 
-const minimum = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('none') }),
-  z.strictObject({ kind: z.literal('amount'), amount: positiveDecimalStringSchema }),
-]);
-const charged = z.strictObject({
-  treatment: z.literal('charged'),
-  side: z.enum(['buy', 'sell', 'both']),
-  basis: z.literal('turnover'),
-  currency,
-  rate: nonNegativeDecimalStringSchema,
-  minimum,
-});
-const fee = z.discriminatedUnion('treatment', [
-  charged,
-  z.strictObject({ treatment: z.literal('includedInCommission'), reason: text }),
-  z.strictObject({ treatment: z.literal('notApplicable'), reason: text }),
-]);
 const navFeeCollection = {
   currency: z.literal('CNY'),
   collection: z.literal('perApplication'),
@@ -62,39 +59,6 @@ const navFee = <S extends 'buy' | 'sell', B extends string>(side: S, basis: B) =
 const navSubscriptionFee = navFee('buy', 'subscriptionApplicationAmount');
 const navRedemptionFee = navFee('sell', 'redemptionGrossProceeds');
 
-export const executionModelFeesSchema = z
-  .strictObject({
-    currency,
-    rounding: z.strictObject({ mode: z.literal('halfUp'), decimalPlaces: z.literal(2) }),
-    collection: z.literal('perFillPerCharge'),
-    commission: charged,
-    stampDuty: fee,
-    transferFee: fee,
-    regulatoryFee: fee,
-    handlingFee: fee,
-  })
-  .superRefine((value, ctx) => {
-    for (const key of [
-      'commission',
-      'stampDuty',
-      'transferFee',
-      'regulatoryFee',
-      'handlingFee',
-    ] as const) {
-      const charge = value[key];
-      if (charge.treatment === 'charged' && charge.currency !== value.currency) {
-        ctx.addIssue({
-          code: 'custom',
-          path: [key, 'currency'],
-          message: '费用币种必须与模型一致',
-        });
-      }
-      if (charge.treatment === 'includedInCommission' && value.commission.side !== 'both') {
-        ctx.addIssue({ code: 'custom', path: [key], message: '包含规费的佣金必须覆盖买卖两侧' });
-      }
-    }
-  });
-
 const tradingDays = z.number().int().min(0).max(30);
 const exchange = z.strictObject({
   mode: z.literal('exchange'),
@@ -103,6 +67,10 @@ const exchange = z.strictObject({
   buyDebitAt: z.literal('fill'),
   sellableAfterTradingDays: tradingDays,
   saleReinvestableAfterTradingDays: tradingDays,
+  statusPolicy: z
+    .strictObject({ intradayHalt: z.literal('exclude-known-halt-date-v1'),
+      resultAvailability: z.literal('valid-metrics-with-status-rejections-v1').optional() })
+    .optional(),
   price: z.discriminatedUnion('kind', [
     z.strictObject({
       kind: z.literal('dailyLimit'),
@@ -223,18 +191,23 @@ export type BacktestExecutionModel = z.infer<typeof backtestExecutionModelSchema
 
 /** V3 decoder: accepts the optional normalized assumptions while V1/V2 stay strict. */
 export const backtestExecutionModelSchemaV3 = backtestExecutionModelSchema.safeExtend({
-  segments: z.array(
-    z.union([
-      z.strictObject({
-        ...segmentMetadata,
-        fees: executionModelFeesSchema,
-        execution: exchange.extend({
-          normalizedExecution: normalizedExecutionAssumptionsSchema.optional(),
+  researchLotSize: backtestResearchLotSizeSchema.optional(),
+  segments: z
+    .array(
+      z.union([
+        z.strictObject({
+          ...segmentMetadata,
+          fees: executionModelFeesV3Schema,
+          execution: exchange.extend({
+            normalizedExecution: normalizedExecutionAssumptionsSchema.optional(),
+          }),
         }),
-      }),
-      z.strictObject({ ...segmentMetadata, fees: z.null(), execution: nav }),
-    ]),
-  ).min(1),
+        z.strictObject({ ...segmentMetadata, fees: z.null(), execution: nav }),
+      ]),
+    )
+    .min(1),
+}).superRefine((model, context) => {
+  for (const issue of researchLotSizeModelIssuesV3(model)) context.addIssue({ code: 'custom', ...issue });
 });
 export type BacktestExecutionModelV3 = z.infer<typeof backtestExecutionModelSchemaV3>;
 
@@ -272,29 +245,48 @@ export const executionModelAccountingIssuesV3 = (
     return issues;
   }
   if (!model) return issues;
+  if (model.researchLotSize && accountingBasis !== 'raw-events')
+    add(['executionModel', 'researchLotSize'], '每手研究预设要求原价实际股数记账');
 
   const overlapping = model.segments
     .map((segment, index) => ({ segment, index }))
-    .filter(({ segment }) => segment.range.end >= run.startDate && segment.range.start <= run.endDate);
+    .filter(
+      ({ segment }) => segment.range.end >= run.startDate && segment.range.start <= run.endDate,
+    );
   if (accountingBasis === 'normalized-series' && model.scope.instrumentType === 'NAV_FUND') {
     add(['executionModel', 'scope', 'instrumentType'], '净值基金不能使用归一化日线执行模型');
   }
   for (const { segment, index } of overlapping) {
-    const assumptions = segment.execution.mode === 'exchange'
-      ? segment.execution.normalizedExecution
-      : undefined;
+    if (accountingBasis === 'normalized-series' && segment.fees?.tradingActivityFee)
+      add(['executionModel', 'segments', index, 'fees', 'tradingActivityFee'], '按股数收费要求实际股数，归一化数量不能作为TAF基数');
+    if (accountingBasis === 'normalized-series' && segment.fees?.brokerCommission?.basis.kind === 'actualShares')
+      add(['executionModel', 'segments', index, 'fees', 'brokerCommission', 'basis'], '归一化美股佣金必须显式选用参考股价换算，不能按真实股数计费');
+    const assumptions =
+      segment.execution.mode === 'exchange' ? segment.execution.normalizedExecution : undefined;
     if (accountingBasis === 'normalized-series') {
       if (!assumptions) {
-        add(['executionModel', 'segments', index, 'execution', 'normalizedExecution'], '运行区间内的每个执行分段都必须声明归一化研究假设');
+        add(
+          ['executionModel', 'segments', index, 'execution', 'normalizedExecution'],
+          '运行区间内的每个执行分段都必须声明归一化研究假设',
+        );
         continue;
       }
       if (segment.execution.mode !== 'exchange') {
-        add(['executionModel', 'segments', index, 'execution', 'mode'], '归一化序列只支持交易所日线执行');
+        add(
+          ['executionModel', 'segments', index, 'execution', 'mode'],
+          '归一化序列只支持交易所日线执行',
+        );
       } else if (segment.execution.price.kind !== 'noDailyLimit') {
-        add(['executionModel', 'segments', index, 'execution', 'price'], '归一化序列不能套用真实价格 tick 或涨跌停规则');
+        add(
+          ['executionModel', 'segments', index, 'execution', 'price'],
+          '归一化序列不能套用真实价格 tick 或涨跌停规则',
+        );
       }
     } else if (assumptions) {
-      add(['executionModel', 'segments', index, 'execution', 'normalizedExecution'], '原始份额记账不能携带归一化执行假设');
+      add(
+        ['executionModel', 'segments', index, 'execution', 'normalizedExecution'],
+        '原始份额记账不能携带归一化执行假设',
+      );
     }
   }
   return issues;
@@ -302,12 +294,13 @@ export const executionModelAccountingIssuesV3 = (
 
 /** Date-scoped historical rules must be known before their first applicable day. */
 export const executionModelRunIssues = (
-  model: BacktestExecutionModel,
+  model: BacktestExecutionModel & { researchLotSize?: BacktestResearchLotSize | undefined },
   run: { startDate: string; endDate: string; dataAsOf: string },
   instrument?: { symbol: string; market: string; assetType: string },
 ): { path: (string | number)[]; message: string }[] => {
   const issues: { path: (string | number)[]; message: string }[] = [];
   const add = (path: (string | number)[], message: string) => issues.push({ path, message });
+  issues.push(...researchLotSizeClockIssuesV3(model, run.dataAsOf));
   let formatter: Intl.DateTimeFormat;
   try {
     formatter = new Intl.DateTimeFormat('en', {

@@ -1,5 +1,7 @@
 # 定期现金入账计划实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：定期入账状态与确定性回归已完成，真实 Scheduler 到期、确认/跳过/恢复及通知仍须分别验收。现金页面 UI 的历史浏览器记录可复用布局/入口，不证明调度和投递；已安装工具查询的历史错误不是业务阻塞。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[`../specs/2026-08-30-recurring-cash-deposit-plan.md`](../specs/2026-08-30-recurring-cash-deposit-plan.md)
 
 状态：T1–T4 已完成并验证。

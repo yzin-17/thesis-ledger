@@ -88,6 +88,11 @@ const diagnosticGroups = (payload: BacktestDiagnosticExport) => [
     fields: [
       { label: '结果完整性', value: payload.outcome.completeness },
       { label: '指标与不可用原因', value: payload.outcome.metrics },
+      { label: '基准指标与不可用原因', value: payload.outcome.benchmark },
+      { label: '基准兼容与成本身份', value: payload.outcome.benchmarkCompatibility },
+      ...(payload.outcome.tradingStatus
+        ? [{ label: '停复牌来源与状态', value: payload.outcome.tradingStatus }]
+        : []),
       { label: '警告与缺口说明', value: payload.outcome.warnings },
       { label: '失败信息', value: payload.outcome.failure },
       { label: '引擎版本', value: payload.traceability.engineVersion },
@@ -200,7 +205,11 @@ export function StrategyBacktestDiagnostics({
         {copyMessage}
       </p>
       {groups.map((group) => (
-        <details key={group.title} className="rounded-lg border" open={group.title === '策略与任务'}>
+        <details
+          key={group.title}
+          className="rounded-lg border"
+          open={group.title === '策略与任务'}
+        >
           <summary className="cursor-pointer px-4 py-3 font-medium">{group.title}</summary>
           <div className="grid gap-2 border-t p-4 sm:grid-cols-2">
             {group.fields.map((field) => (

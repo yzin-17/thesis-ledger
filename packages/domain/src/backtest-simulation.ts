@@ -1,4 +1,9 @@
 import { type BacktestSeries } from './backtest-series.js';
+import { simulationObservationEvents } from './simulation-observation-ticks.js';
+import {
+  scheduledCorporateActions,
+  enqueueCorporateActionPayment,
+} from './backtest-corporate-scheduling.js';
 import { simulationExpressionContext } from './backtest-expression-context.js';
 import {
   availabilityForDecision,
@@ -17,8 +22,7 @@ import {
   numericExpressionKey,
 } from './backtest-simulation-evaluator.js';
 import {
-  corporateActionEventId,
-  corporateActionAccountingAt,
+  applyCorporateActionAt,
   type BacktestCorporateActionFact,
   type CorporateActionPort,
   type CorporateActionResult,
@@ -39,6 +43,7 @@ export const simulationPhases = [
   'OrderValidation',
   'FillOrReject',
   'NavConfirmationSettlement',
+  'PositionCheckpoint',
   'PortfolioValuation',
   'ResultEmission',
 ] as const;
@@ -57,6 +62,7 @@ export type SimulationEventType =
   | 'navConfirmation'
   | 'cashSettlement'
   | 'portfolioValuation'
+  | 'positionCheckpoint'
   | 'resultEmission';
 
 export interface SimulationEvent<TPayload = unknown> {
@@ -105,7 +111,11 @@ export interface SimulationPositionState {
 
 export interface SimulationExpressionContext {
   tick: SimulationTick;
-  corporateActionSignals?: { facts: readonly BacktestCorporateActionFact[]; symbol: string; market: string };
+  corporateActionSignals?: {
+    facts: readonly BacktestCorporateActionFact[];
+    symbol: string;
+    market: string;
+  };
   sourceSeries: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   indicatorSeries?: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   positionState?: SimulationPositionState;
@@ -223,6 +233,7 @@ export interface SimulationEngineInput {
   indicatorSeries?: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   positionState?: SimulationPositionState;
   positionStateAt?: (tick: SimulationTick) => SimulationPositionState | undefined;
+  positionCheckpoint?: { ticks: readonly SimulationTick[]; captureAt: (tick: SimulationTick) => void };
   corporateActions?: readonly BacktestCorporateActionFact[];
   corporateActionSignalFacts?: readonly BacktestCorporateActionFact[];
   corporateActionPort?: CorporateActionPort;
@@ -787,15 +798,12 @@ const processCorporateActionEvent = (
   event: SimulationEvent,
 ) => {
   const fact = event.payload as BacktestCorporateActionFact;
-  const result = state.input.corporateActionPort
-    ? state.input.corporateActionPort.apply(fact, eventAvailableAt(event))
-    : {
-        applied: false as const,
-        published: false as const,
-        eventId: corporateActionEventId(fact, state.input.runId),
-        code: 'RULE_REJECTED' as const,
-        reason: '公司行动需要显式 corporateActionPort 才能接入 SimulationLedger',
-      };
+  const result = applyCorporateActionAt(
+    state.input.corporateActionPort,
+    fact,
+    state.input.runId,
+    eventAvailableAt(event),
+  );
   state.corporateActionResults.push(result);
   if (!result.applied) {
     const code = simulationRejectCodeFor(result.code);
@@ -817,9 +825,11 @@ const processCorporateActionEvent = (
   };
   state.mutations.push(mutation);
   state.input.execution?.onMutation?.(mutation);
+  enqueueCorporateActionPayment(fact, result.eventId, state, createSimulationEvent);
 };
 
 const processSimulationEvent = (state: SimulationOrchestratorState, event: SimulationEvent) => {
+  if (event.type === 'positionCheckpoint') return state.input.positionCheckpoint?.captureAt(event.payload as SimulationTick);
   if (event.type === 'corporateAction') return processCorporateActionEvent(state, event);
   if (event.type === 'signalEvaluation') return processSignalEvent(state, event);
   if (event.type === 'targetIntent') return processTargetIntentEvent(state, event);
@@ -865,38 +875,20 @@ export class DeterministicSimulationEngine {
         }),
       );
     }
-    for (const tick of input.portfolioValuation?.ticks ?? []) {
-      state.queue.enqueue(
-        createSimulationEvent({
-          runId: input.runId,
-          sequence: state.sequence++,
-          type: 'portfolioValuation',
-          phase: 'PortfolioValuation',
-          occurredAt: tick.occurredAt,
-          availableAt: tick.availableAt ?? tick.occurredAt,
-          payload: tick,
-        }),
-      );
-    }
-    const corporateActions = [...(input.corporateActions ?? [])].sort((left, right) =>
-      corporateActionEventId(left, input.runId).localeCompare(
-        corporateActionEventId(right, input.runId),
-      ),
-    );
-    for (const fact of corporateActions) {
-      const occurredAt = corporateActionAccountingAt(fact);
-      const processingAt =
-        instant(occurredAt) >= instant(fact.availableAt) ? occurredAt : fact.availableAt;
+    const observations = simulationObservationEvents(input, state.sequence, createSimulationEvent);
+    state.sequence += observations.length;
+    for (const event of observations) state.queue.enqueue(event);
+    for (const item of scheduledCorporateActions(input.corporateActions ?? [], input.runId)) {
       const event = createSimulationEvent({
         runId: input.runId,
         sequence: state.sequence++,
         type: 'corporateAction',
         phase: 'CorporateAction',
-        occurredAt,
-        availableAt: processingAt,
-        payload: fact,
+        occurredAt: item.occurredAt,
+        availableAt: item.availableAt,
+        payload: item.fact,
       });
-      state.queue.enqueue({ ...event, eventId: corporateActionEventId(fact, input.runId) });
+      state.queue.enqueue({ ...event, eventId: item.eventId });
     }
     const processed: SimulationEvent[] = [];
     while (state.queue.size > 0) {

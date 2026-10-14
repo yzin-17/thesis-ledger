@@ -1,5 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { useBeforeUnload, useBlocker, useNavigate, useParams } from 'react-router';
+import { useBeforeUnload, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AuthoringWorkPage } from '../strategy-authoring/AuthoringWorkPage.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -76,6 +78,9 @@ export function StrategyEditorPage({
 }) {
   const params = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [creationMode, setCreationMode] = useState(searchParams.has('draft') || searchParams.get('authoring') === '1' ? 'authoring' : 'manual');
+  const [authoringDirty, setAuthoringDirty] = useState(false);
   const selection =
     mode === 'edit' ? findStrategyVersion(strategies, params.strategyId, params.versionId) : null;
   const [dirty, setDirty] = useState(false);
@@ -86,10 +91,14 @@ export function StrategyEditorPage({
   const busy = createStrategy.isPending || createVersion.isPending;
   const strategy = selection?.strategy ?? null;
   const version = selection?.version ?? null;
-  const blocker = useBlocker(() => dirty && !busy && !allowNavigationRef.current);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    const leavingPage = currentLocation.pathname !== nextLocation.pathname;
+    const changingDraft = new URLSearchParams(currentLocation.search).get('draft') !== new URLSearchParams(nextLocation.search).get('draft');
+    return ((dirty && leavingPage) || (authoringDirty && (leavingPage || changingDraft))) && !busy && !allowNavigationRef.current;
+  });
   useBeforeUnload(
     (event) => {
-      if (!dirty || busy || allowNavigationRef.current) return;
+      if ((!dirty && !authoringDirty) || busy || allowNavigationRef.current) return;
       event.preventDefault();
     },
     { capture: true },
@@ -230,7 +239,19 @@ export function StrategyEditorPage({
             : `基于 v${version?.version ?? '?'} 编辑，保存后创建新版本，原版本保持不变。`}
         </p>
       </div>
-      {editor}
+      {mode === 'create' ? <Tabs value={creationMode} onValueChange={(value: unknown) => {
+        if (typeof value !== 'string') return;
+        setCreationMode(value);
+        const next = new URLSearchParams(searchParams);
+        if (value === 'authoring') next.set('authoring', '1'); else next.delete('authoring');
+        setSearchParams(next, { replace: true });
+      }}><TabsList><TabsTrigger value="manual">手动编写</TabsTrigger><TabsTrigger value="authoring">自然语言创建</TabsTrigger></TabsList>
+        <TabsContent value="manual" keepMounted>{editor}</TabsContent>
+        <TabsContent value="authoring" keepMounted><AuthoringWorkPage onDirtyChange={setAuthoringDirty} onSaved={(strategyId, versionId) => {
+          allowNavigationRef.current = true;
+          void navigate(strategyCenterPath.strategyVersion(strategyId, versionId), { replace: true });
+        }} /></TabsContent>
+      </Tabs> : editor}
     </div>
   );
 }

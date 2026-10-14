@@ -50,6 +50,11 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
     unavailable('当前 V3 完整冻结仅支持股票/ETF 日线的显式同坐标输入');
   }
   const plan = planBacktestDependencies({ ...input, runConfig });
+  if (
+    runConfig.knownCashPreparation &&
+    plan.blockingIssues.some((issue) => issue.path[0] === 'knownCashPreparation')
+  )
+    unavailable('已知现金研究不能使用公司行动策略信号');
   const invalidWarmup = plan.blockingIssues.find((issue) => issue.code === 'INVALID_WARMUP_RANGE');
   if (invalidWarmup) unavailable(invalidWarmup.message);
   if (plan.requiredFx.length > 0) unavailable('V3 跨币种 FX 冻结尚未就绪');

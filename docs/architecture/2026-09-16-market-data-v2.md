@@ -22,6 +22,8 @@ V3 保留实际抓取时间、价格基准和修订身份，明确区分严格�
 
 ## 三仓职责
 
+公告准备由 Market 拥有：`MarketAnnouncementPreparationService` 读取生效路由并消费 DSA 的持久获取进度；Backtest 在配置准备与新快照创建前单向调用。DSA 拥有证券精确检索、公告库存、获取任务和每日更新。客户端通过现有 TanStack Query 轮询准备接口，计算 Worker 和冻结重放不获取公告。现行边界见[公告自动准备规格](../specs/2026-10-08-announcement-preparation.md)。
+
 | 仓库 | 当前职责 | 不承担的职责 |
 | --- | --- | --- |
 | `daily-stock-analysis` | Provider manifest、source-pinned runtime、Effective Policy、Provider 配置/凭证/健康/熔断、真实上游访问与 Data/Control Contract 实现 | 不读取 ThesisLedger PostgreSQL 的业务事实，不决定 Portfolio/Risk/Backtest 的产品 acceptance |

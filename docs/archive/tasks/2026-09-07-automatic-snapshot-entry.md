@@ -1,6 +1,6 @@
 # 自动估值快照入口实施任务
 
-对应 Spec：[`../specs/2026-09-07-automatic-snapshot-entry.md`](../specs/2026-09-07-automatic-snapshot-entry.md)
+对应 Spec：[`../specs/2026-09-07-automatic-snapshot-entry.md`](../../specs/2026-09-07-automatic-snapshot-entry.md)
 
 状态：已完成，待归档
 

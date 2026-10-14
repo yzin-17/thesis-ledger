@@ -7,7 +7,12 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import type { BacktestJob } from './strategy.types.js';
+import { BacktestLifecyclePreparationDisclosure } from './BacktestLifecyclePreparationDisclosure.js';
 import { BacktestPriceDisclosure } from './BacktestPriceDisclosure.js';
+import { BacktestPublicFeesDisclosure } from './BacktestPublicFeesDisclosure.js';
+import { BacktestTradingStatusDisclosure } from './BacktestTradingStatusDisclosure.js';
+import { BacktestBrokerCommissionDisclosure } from './BacktestBrokerCommissionDisclosure.js';
+import { BacktestResearchLotSizeDisclosure } from './BacktestResearchLotSizeDisclosure.js';
 
 export function BacktestModelDisclosure({
   disclosure,
@@ -55,6 +60,8 @@ export function BacktestModelDisclosure({
           </div>
         ))}
         <p>模型选择与事实支持状态分别校验；Provider 可用性及结果完整度以本次运行返回为准。</p>
+        <BacktestBrokerCommissionDisclosure model={model} />
+        <BacktestResearchLotSizeDisclosure model={model} />
         {contentHash && <p className="break-all">模型内容哈希：{contentHash}</p>}
       </AlertDescription>
     </Alert>
@@ -76,6 +83,7 @@ export function BacktestRunDisclosure({ job }: { job: BacktestJob }) {
   return (
     <div className="flex flex-col gap-3 pb-4">
       {isV3 && <BacktestPriceDisclosure result={result} />}
+      <BacktestLifecyclePreparationDisclosure config={job.input?.runConfig} />
       {job.status === 'failed' && (
         <Alert variant="destructive">
           <AlertTitle>回测失败 · {job.errorCode ?? '未提供错误码'}</AlertTitle>
@@ -95,6 +103,8 @@ export function BacktestRunDisclosure({ job }: { job: BacktestJob }) {
       {typeof result?.completeness === 'string' && (
         <p className="text-sm">结果完整度：{completenessLabel(result.completeness)}</p>
       )}
+      {isV3 && <BacktestPublicFeesDisclosure disclosure={result.publicFeesDisclosure} />}
+      {isV3 && <BacktestTradingStatusDisclosure disclosure={result.tradingStatusDisclosure} />}
     </div>
   );
 }

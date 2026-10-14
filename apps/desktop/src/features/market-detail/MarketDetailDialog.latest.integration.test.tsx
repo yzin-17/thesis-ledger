@@ -379,6 +379,7 @@ const mount = async (
   const opening = deferred<MarketDetailResponse>();
   requestMarketDetailMock.mockImplementationOnce(() => opening.promise);
   useQueryMock.mockImplementation((options: { queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => {
+    if (options.queryKey[1] === 'market-period-options') return { data: { options: [] }, isSuccess: true };
     const [state, setState] = useState({ data: cached, isPending: false, isError: false, isFetching: true });
     useEffect(() => {
       const controller = new AbortController();
@@ -471,7 +472,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
       expect.objectContaining({ adjustment }), expect.any(AbortSignal),
     );
     const openingOptions = useQueryMock.mock.calls.at(-1)?.[0] as { queryKey: readonly unknown[] };
-    expect(openingOptions.queryKey.at(-3)).toBe(adjustment);
+    expect(openingOptions.queryKey.at(-4)).toBe(adjustment);
     mounted.opening.resolve(current);
     await act(flushAsync);
     requestMarketDetailMock.mockResolvedValue(current);
@@ -484,7 +485,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
         expect.objectContaining({ adjustment }), expect.any(AbortSignal),
       );
       const retryOptions = queryClient.fetchQuery.mock.calls.at(-1)?.[0] as { queryKey: readonly unknown[] };
-      expect(retryOptions.queryKey.at(-3)).toBe(adjustment);
+      expect(retryOptions.queryKey.at(-4)).toBe(adjustment);
     }
     await act(async () => { mounted.root.unmount(); await flushAsync(); });
   });

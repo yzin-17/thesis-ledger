@@ -43,6 +43,23 @@ const evidence = {
 } as const;
 
 describe('backtest daily tradability evidence', () => {
+  it('精确港股原价窗口保留零量排除，其他none来源/标的/范围拒绝', () => {
+    const source = { provider: 'observed-source', revision: 'current', availableAt: '2026-10-08T09:00:00Z' };
+    const zero = { open: '0.265', high: '0.265', low: '0.265', close: '0.265', volume: '0', sourceResponseSha256: 'b'.repeat(64) };
+    const hk = { ...evidence, symbol: '00147.HK', market: 'HK', instrumentType: 'STOCK',
+      range: { start: '2025-08-06', end: '2025-08-11' }, listing: { status: 'unknown' },
+      calendar: { source, expectedSessions: ['2025-08-06', '2025-08-07', '2025-08-08', '2025-08-11'] },
+      barSource: { ...evidence.barSource, routeKey: { ...evidence.barSource.routeKey, market: 'HK', assetType: 'STOCK', adjustment: 'none' },
+        routeTarget: { providerId: 'yfinance', upstreamSource: 'yahoo-hk-share-window' } },
+      days: [{ date: '2025-08-06', state: 'observed-traded' },
+        { date: '2025-08-07', state: 'assumed-untradable-no-bar', excludedZeroVolumeObservation: zero },
+        { date: '2025-08-08', state: 'observed-traded' }, { date: '2025-08-11', state: 'observed-traded' }] };
+    expect(backtestDailyTradabilityEvidenceV3Schema.parse(hk).days[1]?.excludedZeroVolumeObservation).toEqual(zero);
+    expect(backtestDailyTradabilityEvidenceV3Schema.safeParse({ ...hk, symbol: '00700.HK' }).success).toBe(false);
+    expect(backtestDailyTradabilityEvidenceV3Schema.safeParse({ ...hk, range: { ...hk.range, start: '2025-08-05' } }).success).toBe(false);
+    expect(backtestDailyTradabilityEvidenceV3Schema.safeParse({ ...hk, barSource: { ...hk.barSource,
+      routeTarget: { providerId: 'yfinance', upstreamSource: 'yfinance' } } }).success).toBe(false);
+  });
   it('来源参数必须完整成组，接受备用来源索引', () => {
     const request = {
       symbol: '159515.SZ',

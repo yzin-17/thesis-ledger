@@ -1,3 +1,5 @@
+import { UseGuards } from '@nestjs/common';
+import { CurrentStrategyOwner, StrategyIdentityGuard } from './strategy-identity.guard.js';
 import {
   Body,
   Controller,
@@ -15,6 +17,7 @@ import { BacktestNavRunService } from './backtest-nav-run.service.js';
 import { BacktestRunService } from './backtest-run.service.js';
 
 @Controller('backtests/runs/nav')
+@UseGuards(StrategyIdentityGuard)
 export class BacktestNavRunController {
   constructor(
     @Inject(BacktestNavRunService) private readonly runs: BacktestNavRunService,
@@ -25,9 +28,9 @@ export class BacktestNavRunController {
   ) {}
 
   @Get()
-  list() {
+  list(@CurrentStrategyOwner() ownerId: string | null = null) {
     if (!this.runList) throw new ServiceUnavailableException('NAV Run 列表服务未配置');
-    return this.runList.list();
+    return this.runList.list(ownerId);
   }
 
   @Post()

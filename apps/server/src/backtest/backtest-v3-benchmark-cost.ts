@@ -11,8 +11,38 @@ import {
   type FrozenExecutionModelFees,
 } from '@thesis-ledger/domain';
 import type { RunConfigV3, BacktestStrategy } from '@thesis-ledger/schemas';
+import {
+  benchmarkExecutionModelCostVersionV3,
+  wholeShareWindowBenchmarkCostVersionV3,
+  researchLotShareWindowBenchmarkCostVersionV3,
+  publicFeesArtifactKeyV3,
+  type BacktestSnapshotManifestV3,
+} from '@thesis-ledger/schemas';
+import type { ArtifactRow } from './backtest-artifact-store.js';
+import { readSnapshotPublicFeesV3 } from './backtest-public-fees-snapshot-v3.js';
+import { resolveLegacyBenchmarkCostAssumptionV3 } from './backtest-v3-benchmark-cost-legacy.js';
+import { calculateWholeShareBenchmarkReturnV3 } from './backtest-whole-share-benchmark-cost-v3.js';
 
 type BenchmarkCostReport = BacktestBenchmarkCostAssumption | { kind: 'unavailable' };
+
+/** 基准身份仍校验原 RunConfig；收费计算消费同一份独立冻结规则。 */
+export const resolveFrozenBenchmarkCostV3 = (
+  input: Parameters<typeof resolveBacktestV3BenchmarkCost>[0] & {
+    manifest: BacktestSnapshotManifestV3;
+    rows: ReadonlyMap<string, readonly ArtifactRow[]>;
+  },
+) => {
+  const fees = readSnapshotPublicFeesV3(
+    input.manifest,
+    input.runConfig,
+    input.rows.get(`${input.manifest.runId}/${publicFeesArtifactKeyV3}`) ?? [],
+  );
+  return resolveBacktestV3BenchmarkCost({
+    ...input,
+    runConfig: fees?.runConfig ?? input.runConfig,
+    costVersion: input.manifest.benchmarkCostVersion,
+  });
+};
 
 export interface BenchmarkCostCalculation {
   status: 'available';
@@ -38,19 +68,6 @@ export interface BacktestV3BenchmarkCostResolution {
   result: BenchmarkCostReturn;
 }
 
-interface FeeRate {
-  status: 'supported';
-  rate: DecimalValue;
-}
-
-interface UnsupportedFeeRate {
-  status: 'unsupported';
-  reason: string;
-}
-
-const COST_MODEL_VERSION =
-  'v3-normalized-buy-first-close-liquidate-last-close-per-charge-half-up-2-v1';
-
 const instrumentCurrency = (market: BacktestStrategy['executionInstrument']['market']) => {
   if (market === 'CN') return 'CNY' as const;
   if (market === 'HK') return 'HKD' as const;
@@ -63,45 +80,6 @@ const instrumentRouteType = (assetType: BacktestStrategy['executionInstrument'][
   return 'NAV_FUND';
 };
 
-const chargedFeeRate = (
-  segment: FrozenExecutionModel['segments'][number],
-  currency: string,
-): FeeRate | UnsupportedFeeRate => {
-  if (segment.execution.mode !== 'exchange' || !segment.fees) {
-    return { status: 'unsupported', reason: 'non-exchange execution fees' };
-  }
-  if (
-    segment.fees.currency !== currency ||
-    segment.fees.collection !== 'perFillPerCharge' ||
-    segment.fees.rounding.mode !== 'halfUp' ||
-    segment.fees.rounding.decimalPlaces !== 2
-  ) {
-    return {
-      status: 'unsupported',
-      reason: 'fee currency, collection, or rounding is unsupported',
-    };
-  }
-  let total = DecimalValue.from('0');
-  for (const key of [
-    'commission',
-    'stampDuty',
-    'transferFee',
-    'regulatoryFee',
-    'handlingFee',
-  ] as const) {
-    const fee = segment.fees[key];
-    if (fee.treatment !== 'charged') continue;
-    if (fee.basis !== 'turnover' || fee.minimum.kind !== 'none') {
-      return { status: 'unsupported', reason: `${key} has a non-proportional basis or minimum` };
-    }
-    if (fee.side !== 'both' && DecimalValue.from(fee.rate).isPositive()) {
-      return { status: 'unsupported', reason: `${key} differs by transaction side` };
-    }
-    total = total.plus(fee.rate);
-  }
-  return { status: 'supported', rate: total };
-};
-
 const unavailable = (
   reason: string,
   assumption: BenchmarkCostReport = { kind: 'unavailable' },
@@ -112,35 +90,6 @@ const unavailable = (
   unavailableReason: reason,
   result: { status: 'unavailable', reason },
 });
-
-const costIdentity = (input: {
-  model: FrozenExecutionModel;
-  initialCash: string | undefined;
-  currency: string;
-  slippageRate: string;
-  buySegment: FrozenExecutionModel['segments'][number];
-  sellSegment: FrozenExecutionModel['segments'][number];
-}) => ({
-  version: COST_MODEL_VERSION,
-  model: { id: input.model.id, version: input.model.version },
-  capital: { currency: input.currency, initialCash: input.initialCash ?? null },
-  slippageRate: input.slippageRate,
-  buySegment: { id: input.buySegment.id, fees: input.buySegment.fees },
-  sellSegment: { id: input.sellSegment.id, fees: input.sellSegment.fees },
-});
-
-const unsupported = (
-  identity: ReturnType<typeof costIdentity>,
-  reason: string,
-): BacktestV3BenchmarkCostResolution => {
-  const version = `execution-model-v1:${identity.model.id}:${identity.model.version}:${deterministicResultChecksum(identity)}`;
-  const assumption: BacktestBenchmarkCostAssumption = {
-    kind: 'unsupported',
-    version,
-    fingerprint: deterministicResultChecksum({ identity, reason }),
-  };
-  return unavailable('BENCHMARK_COST_MODEL_UNSUPPORTED', assumption, assumption);
-};
 
 export const calculateBacktestV3BenchmarkReturn = (input: {
   initialCash: string;
@@ -226,7 +175,15 @@ export const resolveBacktestV3BenchmarkCost = (input: {
   firstOccurredAt: string;
   lastClose: string;
   lastOccurredAt: string;
+  costVersion?: BacktestSnapshotManifestV3['benchmarkCostVersion'];
 }): BacktestV3BenchmarkCostResolution => {
+  if (
+    input.costVersion !== undefined &&
+    input.costVersion !== benchmarkExecutionModelCostVersionV3 && input.costVersion !== wholeShareWindowBenchmarkCostVersionV3 &&
+    input.costVersion !== researchLotShareWindowBenchmarkCostVersionV3
+  ) {
+    return unavailable('BENCHMARK_COST_VERSION_UNSUPPORTED');
+  }
   const modelInput = input.runConfig.executionModel;
   if (!modelInput) return unavailable('BENCHMARK_COST_ASSUMPTION_UNAVAILABLE');
 
@@ -264,51 +221,64 @@ export const resolveBacktestV3BenchmarkCost = (input: {
     return unavailable('BENCHMARK_COST_ASSUMPTION_UNAVAILABLE');
   }
 
-  const identity = costIdentity({
-    model,
-    initialCash,
-    currency,
-    slippageRate: input.strategy.cost.slippageRate,
-    buySegment,
-    sellSegment,
-  });
+  let assumption: BenchmarkCostReport;
+  let identityAssumption: BacktestBenchmarkCostAssumption | undefined;
+  if (input.costVersion === benchmarkExecutionModelCostVersionV3 || input.costVersion === wholeShareWindowBenchmarkCostVersionV3 ||
+    input.costVersion === researchLotShareWindowBenchmarkCostVersionV3) {
+    assumption = {
+      kind: 'execution-model',
+      version: input.costVersion,
+      fingerprint: deterministicResultChecksum({
+        scope: model.scope,
+        accountingBasis: input.runConfig.executionPriceProtocol.accountingBasis,
+        slippageRate: input.strategy.cost.slippageRate,
+        ...(input.costVersion === researchLotShareWindowBenchmarkCostVersionV3 ? { researchLotSize: modelInput.researchLotSize } : {}),
+        segments: model.segments.map((segment) => ({
+          range: segment.range,
+          mode: segment.execution.mode,
+          fees: segment.fees,
+        })),
+      }),
+    };
+    identityAssumption = assumption;
+    const slippage = DecimalValue.from(input.strategy.cost.slippageRate);
+    if (slippage.isNegative() || slippage.compareTo('1') >= 0) {
+      return unavailable('INVALID_BENCHMARK_COST_ASSUMPTION', assumption, assumption);
+    }
+  } else {
+    const legacy = resolveLegacyBenchmarkCostAssumptionV3({
+      model,
+      initialCash,
+      currency,
+      slippageRate: input.strategy.cost.slippageRate,
+      buySegment,
+      sellSegment,
+    });
+    if (legacy.unavailableReason) {
+      return unavailable(legacy.unavailableReason, legacy.assumption, legacy.identityAssumption);
+    }
+    assumption = legacy.assumption;
+    identityAssumption = legacy.identityAssumption;
+  }
   if (!buySegment.fees || !sellSegment.fees) {
-    return unsupported(identity, 'non-exchange execution fees');
-  }
-  const slippage = DecimalValue.from(input.strategy.cost.slippageRate);
-  const buyFeeRate = chargedFeeRate(buySegment, currency);
-  const sellFeeRate = chargedFeeRate(sellSegment, currency);
-  if (buyFeeRate.status !== 'supported') return unsupported(identity, buyFeeRate.reason);
-  if (sellFeeRate.status !== 'supported') return unsupported(identity, sellFeeRate.reason);
-  if (buyFeeRate.rate.compareTo(sellFeeRate.rate) !== 0) {
-    return unsupported(identity, 'buy/sell fee rates differ');
-  }
-  if (
-    slippage.isNegative() ||
-    slippage.compareTo('1') >= 0 ||
-    buyFeeRate.rate.isNegative() ||
-    buyFeeRate.rate.compareTo('1') >= 0
-  ) {
-    return unsupported(identity, 'invalid proportional rate');
+    return unavailable('BENCHMARK_COST_ASSUMPTION_UNAVAILABLE', assumption, identityAssumption);
   }
   if (initialCash === undefined) {
-    return unavailable('BENCHMARK_INITIAL_CASH_UNAVAILABLE');
+    return unavailable('BENCHMARK_INITIAL_CASH_UNAVAILABLE', assumption, identityAssumption);
   }
   if (!DecimalValue.from(initialCash).isPositive()) {
-    return unavailable('ZERO_INITIAL_BENCHMARK');
+    return unavailable('ZERO_INITIAL_BENCHMARK', assumption, identityAssumption);
   }
 
-  const version = `execution-model-v2:${model.id}:${model.version}:${deterministicResultChecksum(identity)}`;
-  const assumption: BacktestBenchmarkCostAssumption =
-    buyFeeRate.rate.isZero() && slippage.isZero()
-      ? { kind: 'zero-cost', version: `v3-explicit-zero-cost:${version}` }
-      : {
-          kind: 'proportional',
-          version,
-          commissionRate: buyFeeRate.rate.toString(),
-          slippageRate: slippage.toString(),
-        };
-  const result = calculateBacktestV3BenchmarkReturn({
+  let calculate = calculateBacktestV3BenchmarkReturn;
+  if (input.costVersion === wholeShareWindowBenchmarkCostVersionV3) calculate = calculateWholeShareBenchmarkReturnV3;
+  if (input.costVersion === researchLotShareWindowBenchmarkCostVersionV3) {
+    const lot = modelInput.researchLotSize;
+    if (!lot || currency !== 'HKD') return unavailable('BENCHMARK_LOT_RESEARCH_PRESET_UNAVAILABLE', assumption, identityAssumption);
+    calculate = values => calculateWholeShareBenchmarkReturnV3(values,
+      { sharesPerLot: lot.sharesPerLot, currency: 'HKD', priceScale: '1000' });
+  }
+  const result = calculate({
     initialCash,
     firstClose: input.firstClose,
     lastClose: input.lastClose,
@@ -318,7 +288,11 @@ export const resolveBacktestV3BenchmarkCost = (input: {
     sellFees: sellSegment.fees,
   });
   if (result.status === 'unavailable') {
-    return unavailable(result.reason, assumption, assumption);
+    return unavailable(result.reason, assumption, identityAssumption);
   }
-  return { assumption, identityAssumption: assumption, result };
+  return {
+    assumption,
+    ...(identityAssumption === undefined ? {} : { identityAssumption }),
+    result,
+  };
 };

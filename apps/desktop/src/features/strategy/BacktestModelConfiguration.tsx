@@ -3,10 +3,13 @@ import {
   backtestExecutionModelSchemaV3,
   type BacktestExecutionModelV3,
 } from '@thesis-ledger/schemas';
+import { useEffect, useState } from 'react';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { BacktestModelDisclosure } from './BacktestModelDisclosure.js';
+import { BacktestBrokerCommissionEditor } from './BacktestBrokerCommissionEditor.js';
+import { BacktestResearchLotSizeEditor } from './BacktestResearchLotSizeEditor.js';
 
 export function parseBacktestModelConfiguration(text: string, version: 2 | 3 = 2) {
   if (!text.trim()) return { model: undefined, error: null };
@@ -31,15 +34,20 @@ export function BacktestModelConfiguration({
   confirmed,
   onChange,
   onConfirm,
+  onInvalidate,
   version = 2,
 }: {
   text: string;
   confirmed: boolean;
   onChange: (text: string) => void;
   onConfirm: (model: BacktestExecutionModelV3) => void;
+  onInvalidate?: () => void;
   version?: 2 | 3;
 }) {
   const { model, error } = parseBacktestModelConfiguration(text, version);
+  const [modelDraftPending, setModelDraftPending] = useState(false);
+  useEffect(() => setModelDraftPending(false), [text]);
+  const invalidateModelDraft = () => { setModelDraftPending(true); onInvalidate?.(); };
   return (
     <Field invalid={Boolean(error)}>
       <FieldLabel htmlFor="backtest-model">执行模型配置</FieldLabel>
@@ -58,11 +66,18 @@ export function BacktestModelConfiguration({
       {error && <FieldError>{error}</FieldError>}
       {model && (
         <>
+          {version === 3 && <BacktestBrokerCommissionEditor
+            key={JSON.stringify(model)} model={model} onChange={onChange}
+            onDraftChange={invalidateModelDraft}
+          />}
+          {version === 3 && <BacktestResearchLotSizeEditor
+            key={`lot-${JSON.stringify(model)}`} model={model} onChange={onChange} onDraftChange={invalidateModelDraft}
+          />}
           <BacktestModelDisclosure disclosure={{ model }} />
           <Button
             type="button"
             variant="outline"
-            disabled={confirmed}
+            disabled={confirmed || modelDraftPending}
             onClick={() => onConfirm(model)}
           >
             {confirmed ? '已确认执行模型' : '确认以上范围与假设'}

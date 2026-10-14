@@ -224,6 +224,27 @@ const ruleFacts = (runConfig: RunConfigV3) => ({
 });
 
 describe('backtest dependency plan', () => {
+  it('显式现金研究只依赖现金能力，不生成拆分覆盖；旧raw仍依赖三类事件', () => {
+    const strategy = strategyValue({
+      executionInstrument: { symbol: '510300.SH', market: 'CN', assetType: 'etf' },
+    });
+    const raw = runConfigValue('raw-events', true);
+    raw.executionModel!.scope.instrumentType = 'ETF';
+    raw.executionPriceProtocol.history = { basis: 'fixed-provider-snapshot' };
+    raw.executionPriceProtocol.cashEventResearch = 'ex-date-entitlement-payment-date-cash-v1';
+    const cash = planBacktestDependencies({ strategy, runConfig: raw });
+    expect(cash.corporateActions.dependencies[0]?.eventTypes).toEqual(['CASH_DIVIDEND']);
+    expect(cash.warmup.calendarBufferDays).toBe(0);
+    expect(cash.warmup.lookbackPeriods).toBeGreaterThan(0);
+    delete raw.executionPriceProtocol.cashEventResearch;
+    const legacy = planBacktestDependencies({ strategy, runConfig: raw });
+    expect(legacy.warmup.calendarBufferDays).toBe(14);
+    expect(legacy.corporateActions.dependencies[0]?.eventTypes).toEqual([
+      'CASH_DIVIDEND',
+      'REVERSE_SPLIT',
+      'SPLIT',
+    ]);
+  });
   it('closes strategy, execution, default benchmark, FX, identity, sessions, and warmup inputs', () => {
     const strategy = strategyValue({
       signalSources: [

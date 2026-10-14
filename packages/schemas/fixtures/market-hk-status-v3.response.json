@@ -1,0 +1,112 @@
+{
+  "request": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "p6-wire-contract",
+    "routeKey": {
+      "kind": "data",
+      "market": "HK",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "official-hk-rules",
+      "upstreamSource": "hkex-00147-halt",
+      "routeIndex": 0
+    },
+    "symbol": "00147.HK",
+    "range": {
+      "start": "2025-08-06",
+      "end": "2025-08-11"
+    }
+  },
+  "response": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "p6-wire-contract",
+    "routeKey": {
+      "kind": "data",
+      "market": "HK",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "official-hk-rules",
+      "upstreamSource": "hkex-00147-halt",
+      "routeIndex": 0
+    },
+    "symbol": "00147.HK",
+    "range": {
+      "start": "2025-08-06",
+      "end": "2025-08-11"
+    },
+    "status": "supported",
+    "days": [
+      {
+        "date": "2025-08-06",
+        "state": "unknown"
+      },
+      {
+        "date": "2025-08-07",
+        "state": "unknown",
+        "intradayHalts": [
+          {
+            "startedAt": "2025-08-07T11:14:00+08:00",
+            "endedAt": "2025-08-08T09:00:00+08:00",
+            "reason": "港交所暂停及恢复交易通知"
+          }
+        ],
+        "sourceDocumentIds": [
+          "hkex-00147-halt",
+          "hkex-00147-resume"
+        ]
+      },
+      {
+        "date": "2025-08-08",
+        "state": "unknown"
+      },
+      {
+        "date": "2025-08-09",
+        "state": "unknown"
+      },
+      {
+        "date": "2025-08-10",
+        "state": "unknown"
+      },
+      {
+        "date": "2025-08-11",
+        "state": "unknown"
+      }
+    ],
+    "sourceDocuments": [
+      {
+        "id": "hkex-00147-halt",
+        "title": "00147暂停交易：2025-08-07 11:14",
+        "url": "https://www.hkexnews.hk/listedco/listconews/sehk/2025/0807/2025080700179.htm",
+        "publishedDate": "2025-08-07",
+        "kind": "exchangePublication",
+        "sha256": "1fb20e55e00a07b9b1507ccdbe7adffe7465d2fc7c85957fca86208662c45316",
+        "observedAt": "2026-10-07T08:06:24.594772+00:00"
+      },
+      {
+        "id": "hkex-00147-resume",
+        "title": "00147恢复交易：2025-08-08 09:00",
+        "url": "https://www1.hkexnews.hk/listedco/listconews/sehk/2025/0808/2025080800075.htm",
+        "publishedDate": "2025-08-08",
+        "kind": "exchangePublication",
+        "sha256": "29a2264e7b74a5c17beedb73b684bed9412f9f4fba6a8290e2e2ca6d9437704b",
+        "observedAt": "2026-10-07T08:06:32.080963+00:00"
+      }
+    ],
+    "provenance": {
+      "providerId": "official-hk-rules",
+      "upstreamSource": "hkex-00147-halt",
+      "providerRevision": "bounded-market-rules-sha256:0e6488dca79e136cc4804d49fce2b7d80660d2883c2e38015bd0362d4f32d5c0",
+      "datasetId": "hk-00147-intraday-halt-2025-08-v1",
+      "fetchedAt": "2026-10-08T00:00:00+00:00",
+      "historicalAvailability": "notVerified",
+      "granularity": "intraday",
+      "timezone": "Asia/Hong_Kong"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { barQueryFixture } from './bar-query.fixture.js';
 import { createHash } from 'node:crypto';
 import { canonicalMarketMultiWindowEncodingV3 } from '@thesis-ledger/schemas';
 import { describe, expect, it, vi } from 'vitest';
@@ -164,6 +165,40 @@ const makeInput = (
   ...overrides,
 });
 
+describe('未知上市信息的行情窗口读取', () => {
+  it.each(['complete', 'missing', 'warmup', 'identity', 'price'])(
+    '未知上市信息读取保留 %s 校验',
+    async (mode) => {
+      const read = vi.fn(async (input: MarketWindowReadRequestV3) => {
+        const response = makeResponse(input.request, input.target, input.routeIndex);
+        response.coverageProof.listing = {
+          symbol: mode === 'identity' ? '600519.SH' : input.request.symbol,
+          status: 'unknown',
+        };
+        if (mode === 'missing') {
+          response.bars.pop();
+          response.coverage.actualEnd = response.bars.at(-1)?.timestamp ?? null;
+        }
+        if (mode === 'price') response.bars[0]!.close = -1;
+        return response;
+      });
+      const result = await selectMarketWindowV3(makeInput({
+        read,
+        ...(mode === 'warmup' ? { warmup: { analysisStart: '2026-05-20', minimumSessions: 3 } } : {}),
+      }));
+      if (mode === 'complete') {
+        expect(result.status).toBe('selected');
+      } else {
+        let failure = 'invalid_response';
+        if (mode === 'missing') failure = 'missing_window';
+        if (mode === 'warmup') failure = 'insufficient_warmup';
+        expect(result).toMatchObject({ status: 'unavailable', primaryFailure: failure });
+      }
+      expect(read).toHaveBeenCalledOnce();
+    },
+  );
+});
+
 describe('market window selector V3', () => {
   it.each([true, false])('共同价格来源免证明回退只对固定价格研究启用（%s）', async (priceResearch) => {
     const policies = makePolicies();
@@ -175,7 +210,7 @@ describe('market window selector V3', () => {
     policies.effective.routes[0]!.targets = targets.map((target, routeIndex) => ({
       ...target, routeIndex, eligible: true, reason: null,
     }));
-    policies.catalog.entries = targets.map((target) => ({ key: routeKey, target, state: 'ready' as const }));
+    policies.catalog.entries = targets.map((target) => ({ key: routeKey, target, state: 'ready' as const, barQuery: barQueryFixture(routeKey.adjustment) }));
     const read = vi.fn(async ({ request, target, routeIndex }: MarketWindowReadRequestV3) => {
       if (routeIndex === 0) throw new Error('主源故障');
       return makeResponse(request, target, routeIndex);
@@ -330,7 +365,7 @@ describe('market window selector V3', () => {
   it('distinguishes pre-listing, missing-window, and insufficient-warmup diagnostics', async () => {
     const preListingRead = vi.fn(async (input: MarketWindowReadRequestV3) => {
       const response = makeResponse(input.request, input.target, input.routeIndex);
-      response.coverageProof.listing.firstTradingDate = '2026-05-21';
+      response.coverageProof.listing = { ...response.coverageProof.listing, firstTradingDate: '2026-05-21' };
       return response;
     });
     const preListing = await selectMarketWindowV3(makeInput({ read: preListingRead }));

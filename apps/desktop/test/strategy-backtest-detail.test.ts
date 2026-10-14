@@ -184,7 +184,7 @@ describe('回测独立详情模型', () => {
   });
 
   it('独立详情在运行态主动读取完整结果，终态后停止兜底轮询', () => {
-    expect(jobDetailFallbackInterval({ status: 'running' })).toBe(5_000);
+    expect(jobDetailFallbackInterval({ status: 'running' })).toBe(30_000);
     expect(jobDetailFallbackInterval({ status: 'succeeded' })).toBe(false);
     expect(jobDetailFallbackInterval({ status: 'failed' })).toBe(false);
   });

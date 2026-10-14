@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { executionPriceProtocolSchema } from './market-price-protocol.js';
 import { decimalStringSchema, positiveDecimalStringSchema } from './monetary-values.js';
 import { executionModelDisclosureSchemaV3 } from './backtest-execution-model.js';
+import { backtestPublicFeesDisclosureV3Schema } from './backtest-public-fees-v3.js';
+import { backtestTradingStatusDisclosureV3Schema } from './backtest-trading-status-v3.js';
+import { backtestCashDividendDisclosureV3Schema } from './backtest-cash-dividends-v3.js';
+import { backtestKnownCashDisclosureV3Schema } from './backtest-known-cash-disclosure-v3.js';
 import { backtestSnapshotActualSourceV3Schema } from './backtest-data.js';
 import { backtestMoneySchema } from './backtest-values.js';
 const issue = (ctx: z.RefinementCtx, path: (string | number)[], message: string) =>
@@ -131,6 +135,11 @@ export const backtestBenchmarkCostAssumptionV3Schema = z.discriminatedUnion('kin
     slippageRate: decimalStringSchema,
   }),
   z.strictObject({
+    kind: z.literal('execution-model'),
+    version: z.string().trim().min(1),
+    fingerprint: benchmarkReportFingerprintSchema,
+  }),
+  z.strictObject({
     kind: z.literal('unsupported'),
     version: z.string().trim().min(1),
     fingerprint: z.string().min(1),
@@ -191,12 +200,24 @@ export const backtestResultSchemaV3 = z
     schemaVersion: z.literal('3'),
     snapshotVersion: z.literal('snapshot-manifest-v3'),
     executionModelDisclosure: executionModelDisclosureSchemaV3.optional(),
+    publicFeesDisclosure: backtestPublicFeesDisclosureV3Schema.optional(),
+    tradingStatusDisclosure: backtestTradingStatusDisclosureV3Schema.optional(),
+    cashDividendDisclosure: backtestCashDividendDisclosureV3Schema.optional(),
+    knownCashDividendDisclosure: backtestKnownCashDisclosureV3Schema.optional(),
     executionPriceProtocol: executionPriceProtocolSchema,
     comparableDataFingerprint: sha256FingerprintSchema,
     actualSources: z.array(backtestSnapshotActualSourceV3Schema).min(1),
     benchmarkCompatibility: backtestBenchmarkCompatibilitySchemaV3.optional(),
   })
   .superRefine((result, context) => {
+    if (
+      Boolean(result.executionPriceProtocol.cashEventResearch) !==
+      Boolean(result.cashDividendDisclosure || result.knownCashDividendDisclosure)
+    ) {
+      issue(context, ['cashDividendDisclosure'], '现金结果披露必须与冻结研究协议一致');
+    }
+    if (result.cashDividendDisclosure && result.knownCashDividendDisclosure)
+      issue(context, ['knownCashDividendDisclosure'], '现金结果不能同时声明两种覆盖协议');
     const executionSources = result.actualSources.filter(
       (source) => source.purpose === 'execution',
     );

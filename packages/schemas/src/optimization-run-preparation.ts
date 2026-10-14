@@ -4,6 +4,7 @@ import { optimizationDiscoveryScopeSchema } from './strategy-optimization.js';
 import { runConfigSchemaV3 } from './backtest-contract.js';
 import { backtestSnapshotActualSourceV3Schema } from './backtest-data.js';
 import { backtestPreflightDiagnosticV3Schema } from './backtest-preflight-v3.js';
+import { marketAnnouncementPreparationSchema } from './market-announcement-preparation.js';
 
 export const optimizationPreparationTargetSchema = z.discriminatedUnion('sourceMode', [
   z.strictObject({ sourceMode: z.literal('existing'), strategyVersionId: z.uuid() }),
@@ -45,6 +46,8 @@ const responseFields = {
   scope: z.literal('baseline-window'),
 };
 export const optimizationRunPreparationResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({ ...responseFields, status: z.literal('preparing'),
+    announcementPreparation: marketAnnouncementPreparationSchema }),
   z
     .strictObject({
       ...responseFields,
@@ -53,6 +56,7 @@ export const optimizationRunPreparationResultSchema = z.discriminatedUnion('stat
       strategyContentHash: z.string().regex(/^[a-f0-9]{64}$/),
       actualSource: backtestSnapshotActualSourceV3Schema,
       routeRevisions: optimizationPreparationRouteRevisionsSchema,
+      announcementPreparation: marketAnnouncementPreparationSchema.optional(),
     })
     .superRefine((value, context) => {
       if (

@@ -18,6 +18,10 @@ const sourceCodes: Record<DsaV3ErrorCode, BacktestNavPreparationDiagnosticV3['co
   'unsupported-capability': 'SOURCE_UNSUPPORTED',
   'insufficient-coverage': 'DATA_UNAVAILABLE',
   'control-rejected': 'SOURCE_NOT_ADMITTED',
+  'source-symbol-unrecognized': 'DATA_UNAVAILABLE',
+  'invalid-request': 'DATA_UNAVAILABLE',
+  'permission-denied': 'SOURCE_UNAUTHORIZED',
+  'source-authentication-failed': 'SOURCE_UNAUTHORIZED',
   'stale-revision': 'PREPARATION_STALE',
 };
 const messages: Record<BacktestNavPreparationDiagnosticV3['code'], string> = {

@@ -8,6 +8,7 @@ import {
   searchMarketInstruments,
 } from './market-data.api.js';
 import { catalogJobPollingInterval } from './catalog-job-response.js';
+import { nextAccountAccessRefresh } from './provider-account-access.js';
 
 export const marketDataKeys = {
   root: ['desktop', 'market-data'] as const,
@@ -30,6 +31,7 @@ export const useMarketDataQueries = () => {
     queryFn: fetchMarketRouteCapabilitiesV3,
     retry: false,
     staleTime: 0,
+    refetchInterval: (query) => nextAccountAccessRefresh(query.state.data?.entries.map((entry) => entry.accountAccess?.validUntil) ?? []),
   });
   const catalog = useQuery({ queryKey: marketDataKeys.catalog(), queryFn: fetchCatalogStatus });
   return { policy, providers, routeCapabilities, catalog };

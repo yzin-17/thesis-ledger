@@ -21,6 +21,7 @@ import { ApiExceptionFilter } from '../../src/platform/api-exception.filter.js';
 import type { MarketNavReaderV3 } from '../../src/market/market-nav-reader-v3.js';
 import { prepareNavRunConfigV3 } from '../../src/backtest/backtest-nav-preparation.js';
 import { navPreparationFixture } from './nav-preparation.fixtures.js';
+import { sharedStrategyHttpProviders } from './shared-strategy-http-providers.js';
 
 const preparationId = '22222222-2222-4222-8222-222222222222';
 const alternatePreparationId = '33333333-3333-4333-8333-333333333333';
@@ -292,6 +293,7 @@ async function createHttpHarness(input: {
   @Module({
     controllers: [BacktestNavRunController],
     providers: [
+      ...sharedStrategyHttpProviders,
       { provide: BacktestNavRunService, useValue: service },
       { provide: BacktestRunService, useValue: runExecution },
       { provide: BacktestQueueService, useValue: queueService },
@@ -327,6 +329,7 @@ async function createHttpHarness(input: {
     @Module({
       controllers: [BacktestNavRunController],
       providers: [
+        ...sharedStrategyHttpProviders,
         { provide: BacktestNavRunService, useValue: alternateService },
         { provide: BacktestRunService, useValue: runExecution },
         { provide: BacktestQueueService, useValue: queueService },

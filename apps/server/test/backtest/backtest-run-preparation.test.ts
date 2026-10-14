@@ -13,6 +13,7 @@ import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
 import { ApiExceptionFilter } from '../../src/platform/api-exception.filter.js';
 import { completeSnapshotFixture } from './v3-complete-snapshot-fixtures.js';
 import { makeReaderResult } from './v3-snapshot-fixtures.js';
+import { sharedStrategyHttpProviders } from './shared-strategy-http-providers.js';
 
 const fixture = async () => {
   const { input, reader } = await completeSnapshotFixture();
@@ -63,6 +64,24 @@ const fixture = async () => {
   );
   return { input, reader, request, prisma, policy, control, service };
 };
+
+describe('V3公告自动准备', () => {
+  it('公告准备期间不读取价格或创建回测，草稿准备不触发公告获取', async () => {
+    const f = await fixture();
+    const progress = { status: 'preparing', jobIds: ['a'.repeat(64)], total: 1, completed: 0,
+      failed: 0, matched: 0, downloaded: 0, parsed: 0, errors: [] };
+    const announcements = { prepare: vi.fn(async () => progress) };
+    const service = new BacktestRunPreparationService(f.prisma as never, f.reader as never,
+      f.control as never, announcements as never);
+    expect(backtestRunPreparationResultV3Schema.parse(await service.prepare(f.request)).status).toBe('preparing');
+    expect(f.reader.readV3).not.toHaveBeenCalled();
+    expect(f.prisma.backtestJob.create).not.toHaveBeenCalled();
+    const { strategyVersionId, ...intent } = f.request;
+    expect(strategyVersionId).toBe(f.request.strategyVersionId);
+    await service.prepareDraft(intent, f.input.strategy);
+    expect(announcements.prepare).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('V3运行配置准备', () => {
   it('固定来源缺日输入仍可准备，并保留稀疏窗口身份', async () => {
@@ -280,7 +299,7 @@ describe('V3运行配置准备', () => {
     const f = await fixture();
     @Module({
       controllers: [BacktestRunPreparationController],
-      providers: [{ provide: BacktestRunPreparationService, useValue: f.service }],
+      providers: [...sharedStrategyHttpProviders, { provide: BacktestRunPreparationService, useValue: f.service }],
     })
     class PreparationHttpModule {}
     const app = await NestFactory.create(PreparationHttpModule, { logger: false });

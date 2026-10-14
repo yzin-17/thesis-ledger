@@ -310,14 +310,15 @@ describe('市场数据 Provider 与主备路由', () => {
     );
 
     expect(html).toContain('11 个来源');
-    expect(html).toContain('5 个可用');
+    expect(html).toContain('5 个已启用');
     expect(html).toContain('DSA 默认');
     expect(html).toContain('手动配置');
     expect(html).not.toContain('可参与路由');
     expect(html).toContain('Yahoo Finance');
     expect(html).toContain('Tushare Pro');
     expect(html).toContain('Alpha Vantage');
-    expect(html).toContain('市场：中国内地、港股、美股、日股、韩股、台股');
+    expect(html).toContain('精确能力目录尚未加载');
+    expect(html).not.toContain('DAILY_BAR');
     expect(html).toContain('上游：');
     expect(html).toContain('腾讯财经');
     expect(html).toContain('尚未配置凭证');

@@ -141,3 +141,41 @@ export const createDbRow = (name: string, overrides: Partial<TestRow> = {}): Tes
   updatedAt: new Date('2026-09-14T00:00:00.000Z'),
   ...overrides,
 });
+
+export const createRoutingTransactionFixture = (
+  row: TestRow,
+  settings: {
+    id: string;
+    researchDefaultProvider: string | null;
+    researchDefaultModel: string | null;
+    revision: number;
+  },
+) => {
+  const transaction = {
+    $executeRaw: vi.fn(async () => 1),
+    providerConfig: {
+      findUnique: vi.fn(async () => row),
+      updateMany: vi.fn(async ({ data }: { data: { enabled: boolean } }) => {
+        row.enabled = data.enabled;
+        row.updatedAt = new Date('2026-09-14T00:00:02.000Z');
+        return { count: 1 };
+      }),
+      deleteMany: vi.fn(),
+    },
+    aiRoutingSettings: {
+      findUnique: vi.fn(async () => settings),
+      updateMany: vi.fn(async () => {
+        settings.researchDefaultProvider = null;
+        settings.researchDefaultModel = null;
+        settings.revision += 1;
+        return { count: 1 };
+      }),
+    },
+  };
+  const prisma = {
+    $transaction: vi.fn(async (callback: (value: typeof transaction) => unknown) =>
+      callback(transaction),
+    ),
+  };
+  return { transaction, prisma };
+};

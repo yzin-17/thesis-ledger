@@ -21,6 +21,7 @@ import { planMarketChartWindow } from './market-chart-window.js';
 import { sliceBarSeries } from './market-bar-window.js';
 import type { BarReadInput } from './market-bar-reader.js';
 import { resolveChartOptionsV3, unavailableChartOptions } from './market-chart-options-v3.js';
+import { marketRouteMarket } from './market-symbol-identity.js';
 
 /** Interactive observations never enter the frozen-window repository. */
 @Injectable()
@@ -37,7 +38,7 @@ export class MarketChartReaderV3 {
   ) {
     if (window) marketChartOptionsWindowV3Schema.parse(window);
     if (
-      !/\.(SH|SZ|BJ)$/.test(identity.symbol) ||
+      !/\.(SH|SZ|BJ|HK|US)$/.test(identity.symbol) ||
       (identity.assetType !== 'STOCK' && identity.assetType !== 'ETF')
     ) {
       return unavailableChartOptions(identity.symbol, 'legacy', 'not_adapted', window);
@@ -96,14 +97,14 @@ export class MarketChartReaderV3 {
       input.history ||
       input.asOf ||
       input.identity.timeframe !== '1d' ||
-      !/\.(SH|SZ|BJ)$/.test(input.identity.symbol)
+      !/\.(SH|SZ|BJ|HK|US)$/.test(input.identity.symbol)
     ) {
-      throw new Error('交互 V3 只支持中国市场日线图表，不提供回测或历史可见性验收');
+      throw new Error('交互 V3 只支持中港美日线图表，不提供回测或历史可见性验收');
     }
     const { start, end } = planMarketChartWindow(input.window);
     const routeKey: MarketDataBarRouteKeyV3 = {
       kind: 'bar',
-      market: 'CN',
+      market: marketRouteMarket(input.identity.symbol),
       assetType: input.identity.assetType,
       timeframe: '1d',
       capability: 'DAILY_BAR',

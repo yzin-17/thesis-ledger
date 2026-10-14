@@ -4,13 +4,23 @@
 
 本 README 不再手工枚举全部 Review 状态；每个主题的当前状态由对应 Task/Review 自身维护，避免目录索引在新增 Review 后长期漂移。
 
+当前文档状态对账见[2026-10-03 Review](2026-10-03-task-state-reconciliation.md)。旧发布、设备与 V1/V2 Review 保留原时点证据，当前执行义务及接口以[Task 索引](../tasks/README.md)链接的权威任务为准，不机械重复历史门禁。
+
 ## 分类原则
+
+当前投资复盘实现与未完成门禁见[2026-10-04 对账](2026-10-04-journal-review-consistency.md)。
+
+统一数据能力适配层的全来源检查与功能路由映射见[2026-10-10 矩阵](2026-10-10-provider-adaptation-and-route-matrix.md)，设计与进度由其引用的原 Spec/Task 维护。
+
+该主题的历史授权、实施过程和详细命令从[实施日志](2026-10-11-unified-data-capability-implementation-log.md)进入，按初始闭环、功能路由、来源迁移和缓存/公共接缝链接验证正文；当前任务状态仍只由原 Task 维护。
 
 - 发布/运行门禁：真实 Docker、Provider、Worker、浏览器、设备、数据库恢复等当前仍需复核的证据；
 - 跨仓审计：DSA Fork attribution、Contract 兼容和需要长期复核的跨仓边界；
 - 当前功能 Review：仍被 active Task 明确引用的最终一致性或运行态 Review；
 - 一次性 closure：任务已经关闭且只剩历史审计价值时，移动到 `archive/reviews/`；
 - 固定 benchmark：如果可以由固定脱敏输入重复执行，应进入 `docs/benchmarks/`，而不是把一次运行结果留在 Review 中。
+
+主仓与并行任务的集成范围见[2026-10-04 聚合对账](2026-10-04-parallel-task-integration.md)。
 
 ## Evidence
 

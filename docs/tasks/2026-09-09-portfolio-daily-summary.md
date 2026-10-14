@@ -1,5 +1,7 @@
 # 投资组合每日摘要实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：T3/T4 的剩余 AC6/AC9 窄屏视觉证据仍开放，当前 browser 可用不等于已完成该场景。保留既有宽屏/主题证据；“宿主无法调整视口”只是历史限制，下一次按可用浏览器先核实。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[`../specs/2026-09-09-portfolio-daily-summary.md`](../specs/2026-09-09-portfolio-daily-summary.md)
 
 ## 任务

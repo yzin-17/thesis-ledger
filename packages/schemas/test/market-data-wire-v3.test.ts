@@ -433,4 +433,25 @@ describe('Market Data Wire V3', () => {
       }).success,
     ).toBe(false);
   });
+  it('能力不支持有独立固定错误，保持严格文案与信封', () => {
+    const value = {
+      contractVersion: 3,
+      requestId: 'status-request',
+      error: { code: 'unsupported_capability', message: '来源不支持请求的数据能力' },
+    };
+    expect(marketDataErrorEnvelopeV3Schema.safeParse(value).success).toBe(true);
+    expect(
+      marketDataErrorEnvelopeV3Schema.safeParse({
+        ...value,
+        error: { ...value.error, message: 'raw vendor body' },
+      }).success,
+    ).toBe(false);
+    expect(
+      marketDataErrorEnvelopeV3Schema.safeParse({
+        ...value,
+        code: value.error.code,
+        diagnosticId: value.requestId,
+      }).success,
+    ).toBe(false);
+  });
 });

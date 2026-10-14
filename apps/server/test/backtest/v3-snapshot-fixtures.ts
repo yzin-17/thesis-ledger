@@ -44,6 +44,7 @@ export const makeReaderResult = async (
   input: MarketBarWindowReadInputV3,
   targetMismatch = false,
   missingDates: readonly string[] = [],
+  listingUnknown = false,
 ): Promise<MarketBarWindowReadResultV3> => {
   const request = marketDataBarSeriesRequestV3Schema.parse({
     contractVersion: 3,
@@ -97,7 +98,7 @@ export const makeReaderResult = async (
         ...response.coverageProof.calendar,
         expectedSessionDates: dates,
       },
-      listing: {
+      listing: listingUnknown ? { symbol: request.symbol, status: 'unknown' } : {
         ...response.coverageProof.listing,
         symbol: request.symbol,
       },

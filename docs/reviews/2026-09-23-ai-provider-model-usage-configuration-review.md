@@ -1,5 +1,7 @@
 # 任务验收评审：AI Provider 配置与模型用途配置（2026-09-21）
 
+历史评审适用性（2026-10-03）：下文以 272eaa27 为基线的 Desktop 失败/依赖限制属于历史发现；后继用途 Task 已记录 label 修复与复验，最新 Desktop 543 项及 AI 本地回归也有证据。当前缺口以[用途 Task](../tasks/2026-09-21-ai-provider-model-usage-configuration.md)及[本轮对账](2026-10-03-task-state-reconciliation.md)为准，不将旧 Blocking 当作当前仍复现，也不关闭真实 Provider/费用/超时/Electron 门禁。
+
 - 评审对象：`docs/tasks/2026-09-21-ai-provider-model-usage-configuration.md`
 - 评审基线：`thesis-ledger` HEAD=`272eaa27`（`feat(ai): 自动选择生成方式与测试后保存 (#45)`），工作区干净
 - 评审方式：源码/测试核对 + 本机门禁实跑（无 pnpm，用仓库根 `node_modules/.bin/`）

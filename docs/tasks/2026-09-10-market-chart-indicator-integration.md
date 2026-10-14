@@ -1,5 +1,7 @@
 # 日线行情与技术指标联动实施任务
 
+> 状态对账（2026-10-03）：部分实现/已实现待验收：T11/T12 的交互精炼按原清单核对，G2/R2 的全屏旁导航、指标设置与键盘等仍未通过完整浏览器验收。共同价格三口径图表与目录入口不覆盖这些专属交互，不能批量勾选。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[日线行情与技术指标联动 Spec](../specs/2026-09-10-market-chart-indicator-integration.md)
 
 > 任务标识：market-chart-indicator-integration

@@ -19,6 +19,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { BacktestSetupInput, StrategyRecord, StrategyVersion } from './strategy.types.js';
 import { StrategyV2Summary } from './StrategyV2Summary.js';
 import { BacktestPricePreparation, type PreparedBacktest } from './BacktestPricePreparation.js';
+import { AuthoringRunIntents } from '../strategy-authoring/AuthoringRunIntents.js';
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -85,6 +86,9 @@ export function BacktestSetupDialog({
   const currentStrategy = version?.schema
     ? strategySchema.safeParse(version.schema).success
     : false;
+  let submitLabel = '开始回测';
+  if (busy) submitLabel = '准备中…';
+  else if (intent === 'rerun') submitLabel = '创建新任务';
   const submit = async () => {
     const cash = Number(initialCash);
     if (!period.start || !period.end || period.start > period.end) {
@@ -134,6 +138,7 @@ export function BacktestSetupDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
+          <AuthoringRunIntents version={version} enabled={open} />
           {version?.schema && currentStrategy && (
             <StrategyV2Summary
               schema={version.schema}
@@ -258,7 +263,7 @@ export function BacktestSetupDialog({
                   aria-hidden="true"
                 />
               )}
-              {busy ? '准备中…' : intent === 'rerun' ? '创建新任务' : '开始回测'}
+              {submitLabel}
             </Button>
           </DialogFooter>
         </div>

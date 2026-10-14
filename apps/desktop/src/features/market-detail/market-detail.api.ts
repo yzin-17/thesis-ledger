@@ -1,5 +1,6 @@
-import type { MarketDetailResponse, MarketDetailCapability } from '@thesis-ledger/api-client';
+import type { MarketDisplayDetailResponse as MarketDetailResponse, MarketDetailCapability } from '@thesis-ledger/api-client';
 import { getDesktopApiClient } from '../../shared/api/client.js';
+import { requestMarketPeriodDetail } from './market-period-detail.api.js';
 import {
   MarketDetailRequestCoordinator,
   type MarketDetailFetcher,
@@ -9,6 +10,8 @@ import {
 export const marketDetailRequestCoordinator = new MarketDetailRequestCoordinator();
 
 const fetchMarketDetail: MarketDetailFetcher = async (request, signal) => {
+  if (request.timeframe && request.timeframe !== '1d' && request.timeframe !== '1m')
+    return requestMarketPeriodDetail(request, signal);
   const client = getDesktopApiClient();
   const chartCapabilities: MarketDetailCapability[] = [
     'bars',
@@ -68,7 +71,7 @@ const fetchMarketDetail: MarketDetailFetcher = async (request, signal) => {
   if (
     planned?.window &&
     result.barSeries &&
-    (result.barSeries.chartContextV3?.requestedStart !== planned.window.start ||
+    ('derivation' in result.barSeries || result.barSeries.chartContextV3?.requestedStart !== planned.window.start ||
       result.barSeries.chartContextV3?.requestedEnd !== planned.window.end)
   ) {
     throw new Error('图表获取窗口与已校验计划不一致');

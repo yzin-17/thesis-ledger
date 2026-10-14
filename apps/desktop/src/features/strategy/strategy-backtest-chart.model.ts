@@ -131,7 +131,8 @@ export const buildBacktestChartModel = (
   const completeness = resultCompleteness(result);
   let limitation: string | null = null;
   if (completeness === 'limited') {
-    limitation = '部分结果未核实；图表仅展示服务端返回的时点，覆盖范围请以冻结数据证据为准。';
+    limitation =
+      '结果部分可用；具体受限项目见指标与诊断说明。图表保留已返回时点，覆盖范围请以冻结数据证据为准。';
   } else if (completeness === 'unknown') {
     limitation = '结果未提供完整性证据；图中仅展示已返回时点。';
   }

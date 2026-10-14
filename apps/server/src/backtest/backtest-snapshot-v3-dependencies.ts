@@ -188,10 +188,11 @@ export const expectedSnapshotDependencyRequestsV3 = (
     }
     const instrument = instrumentIdentity(identity);
     const window = input.tradabilityWindow;
+    const boundWindow = window && (instrument.market === 'CN' || window.historicalTradabilityWindows);
     if (instrument.market === 'CN' && runConfig.priceInputBindings && !window) {
       fail('request_scope_invalid', '逐日可交易性请求缺少本次选中的行情来源');
     }
-    if (window && instrument.market === 'CN' && window.symbol !== instrument.symbol) {
+    if (boundWindow && (window.symbol !== instrument.symbol || window.routeKey.market !== instrument.market)) {
       fail('request_scope_invalid', '逐日可交易性请求不能复用其他标的来源');
     }
     const request = backtestInstrumentFactsRequestSchema.parse({
@@ -203,7 +204,7 @@ export const expectedSnapshotDependencyRequestsV3 = (
       executionStart: runConfig.startDate,
       executionEnd: runConfig.endDate,
       dataAsOf: runConfig.dataAsOf,
-      ...(window && instrument.market === 'CN' ? tradabilityRequestSourceV3(window) : {}),
+      ...(boundWindow ? tradabilityRequestSourceV3(window) : {}),
     });
     requests.push({
       purpose: 'instrumentFacts',

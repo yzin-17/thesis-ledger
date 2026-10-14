@@ -5,6 +5,8 @@ import { barPointSchema, barSeriesIdentitySchema } from './market-bar-series.js'
 import {
   marketCalendarTimezonesV3,
   marketCoverageProofV3Schema,
+  marketCoverageSessionDatesV3,
+  isBeforeKnownListingDateV3,
 } from './market-coverage-proof-v3.js';
 import { sourcePriceBasisSchema } from './market-price-protocol.js';
 import { marketRouteKeyIdV3, marketRouteKeyV3Schema } from './market-route-v3.js';
@@ -69,12 +71,12 @@ export const marketDataBarSeriesRequestV3Schema = z
     }
     if (
       request.tradabilityMode &&
-      (request.routeKey.market !== 'CN' || request.routeKey.timeframe !== '1d')
+      (!['CN', 'HK', 'US'].includes(request.routeKey.market) || request.routeKey.timeframe !== '1d')
     ) {
       context.addIssue({
         code: 'custom',
         path: ['tradabilityMode'],
-        message: '缺日假设仅支持 CN 日线',
+        message: '缺日假设仅支持已接入的 CN/HK/US 日线',
       });
     }
   });
@@ -209,7 +211,7 @@ export const marketDataBarSeriesResponseV3Schema = z
         message: '完整窗口证明必须与请求覆盖范围一致',
       });
     }
-    if (proof.listing.firstTradingDate > proof.window.requestedEnd) {
+    if (isBeforeKnownListingDateV3(proof.listing, proof.window.requestedEnd)) {
       context.addIssue({
         code: 'custom',
         path: ['coverageProof', 'listing', 'firstTradingDate'],
@@ -217,9 +219,7 @@ export const marketDataBarSeriesResponseV3Schema = z
       });
     }
 
-    let expectedPostListingDates = proof.calendar.expectedSessionDates.filter(
-      (date) => date >= proof.listing.firstTradingDate,
-    );
+    let expectedPostListingDates = marketCoverageSessionDatesV3(proof);
     if (response.historicalTradabilityWindows) {
       try {
         expectedPostListingDates = observedTradabilityDatesV3(
@@ -233,7 +233,10 @@ export const marketDataBarSeriesResponseV3Schema = z
         );
         if (
           response.bars.some(
-            (bar) => bar.volume <= 0 || Math.min(bar.open, bar.high, bar.low, bar.close) <= 0,
+            (bar) =>
+              bar.volume === null ||
+              bar.volume <= 0 ||
+              Math.min(bar.open, bar.high, bar.low, bar.close) <= 0,
           )
         ) {
           throw new Error('日级已交易 Bar 必须有正成交量及正 OHLC');
@@ -362,22 +365,52 @@ export type MarketDataBarSeriesRequestResponseV3 = z.infer<
 >;
 
 export const marketDataErrorCodeV3 = {
+  unsupportedCapability: 'unsupported_capability',
   unsupportedDataContractVersion: 'unsupported_data_contract_version',
   unsupportedPriceBasis: 'unsupported_price_basis',
   insufficientCoverage: 'insufficient_coverage',
   upstreamFailure: 'upstream_failure',
   invalidResponse: 'invalid_response',
+  sourceSymbolUnrecognized: 'source_symbol_unrecognized',
+  invalidRequest: 'invalid_request',
+  permissionDenied: 'permission_denied',
+  authenticationFailed: 'authentication_failed',
 } as const;
 
 export const marketDataErrorMessageV3 = {
+  unsupportedCapability: '来源不支持请求的数据能力',
   unsupportedDataContractVersion: '不支持请求的数据契约版本',
   unsupportedPriceBasis: '来源不支持请求的价格口径',
   insufficientCoverage: '请求区间的数据覆盖不足',
   upstreamFailure: '行情上游暂时不可用',
   invalidResponse: '行情上游响应格式无效',
+  sourceSymbolUnrecognized: '来源未识别请求的证券',
+  invalidRequest: '来源拒绝请求参数',
+  permissionDenied: '来源权限不足',
+  authenticationFailed: '来源凭据未通过认证',
 } as const;
 
 export const marketDataErrorDetailV3Schema = z.discriminatedUnion('code', [
+  z.strictObject({
+    code: z.literal(marketDataErrorCodeV3.unsupportedCapability),
+    message: z.literal(marketDataErrorMessageV3.unsupportedCapability),
+  }),
+  z.strictObject({
+    code: z.literal(marketDataErrorCodeV3.sourceSymbolUnrecognized),
+    message: z.literal(marketDataErrorMessageV3.sourceSymbolUnrecognized),
+  }),
+  z.strictObject({
+    code: z.literal(marketDataErrorCodeV3.invalidRequest),
+    message: z.literal(marketDataErrorMessageV3.invalidRequest),
+  }),
+  z.strictObject({
+    code: z.literal(marketDataErrorCodeV3.permissionDenied),
+    message: z.literal(marketDataErrorMessageV3.permissionDenied),
+  }),
+  z.strictObject({
+    code: z.literal(marketDataErrorCodeV3.authenticationFailed),
+    message: z.literal(marketDataErrorMessageV3.authenticationFailed),
+  }),
   z.strictObject({
     code: z.literal(marketDataErrorCodeV3.unsupportedDataContractVersion),
     message: z.literal(marketDataErrorMessageV3.unsupportedDataContractVersion),

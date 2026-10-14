@@ -60,7 +60,7 @@ T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-
   - 验证方式：文档交叉检查、契约名称搜索、边界单元测试设计评审、链接/格式检查。
   - 验证证据：
     - 代码版本：从 `ad2a7e786c291822887b1d0550b72a1db835a908` 开始实施，保持既有真实账户与 V1 回测行为不变；本 Step 未提交。
-    - 文档交叉检查：Spec 第 1 节、[`策略与回测领域边界`](../domain/2026-08-18-strategy-and-backtest.md) 与 [`DSA Contract V1 兼容说明`](../architecture/2026-08-18-thesis-ledger-dsa-compatibility.md) 已统一 `source=BACKTEST`、`Asset.symbol`、Decimal/Money、`SimulationEvent`、`SimulationLedger` 和 `BacktestTrade` 命名。
+    - 文档交叉检查：Spec 第 1 节、[`策略与回测领域边界`](../../domain/2026-08-18-strategy-and-backtest.md) 与 [`DSA Contract V1 兼容说明`](../../architecture/2026-08-18-thesis-ledger-dsa-compatibility.md) 已统一 `source=BACKTEST`、`Asset.symbol`、Decimal/Money、`SimulationEvent`、`SimulationLedger` 和 `BacktestTrade` 命名。
     - 隔离决策：明确禁止回测读写真实 Ledger、Portfolio、Journal、AI Review、`actual/shadow` 与 Projection Generation；未来需要展示关联时另建只读模型，不修改本默认决策。
     - 自动门禁：`scripts/check-boundaries.mjs` 已增加 Backtest 与 Ledger/Portfolio/Journal 的双向依赖禁令，以及普通 AI 研究直接消费 Backtest 的禁令。
     - 验证命令：`node scripts/check-boundaries.mjs`：通过；`pnpm exec prettier --check docs/architecture/2026-08-18-thesis-ledger-dsa-compatibility.md docs/specs/2026-08-28-unified-backtest-v2.md docs/tasks/2026-08-28-unified-backtest-v2.md`：通过；三份文档相对链接检查：通过；`git diff --check`：通过。
@@ -328,7 +328,7 @@ T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-
     - `pnpm --filter @thesis-ledger/schemas exec vitest run test/backtest-v2-t13-golden.test.ts`：2 tests passed；跨仓 Exchange/CN NAV fixture 可解析，HK/US NAV、Limit 和非目标 Risk 在 Schema 层拒绝。
     - `node scripts/backtest-v1-inventory.mjs`：通过静态盘点；确认 `BacktestJob` 仍保留 V1 mode 默认值和旧队列引用，但当前未提供 `DATABASE_URL`，V1 历史行数仍需数据库只读盘点。
     - `pnpm --filter @thesis-ledger/server exec vitest run test/backtest/artifact-store.test.ts test/backtest/snapshot.test.ts test/backtest/v2-run-lifecycle.test.ts test/backtest/v2-run.test.ts`：4 files / 19 tests passed，覆盖 Artifact 缺失/损坏/删除清理、Snapshot hash 与 retry、Runner 终态/取消/旧 attempt 防覆盖。
-    - 性能报告：[`统一回测 V2 T13 性能与功能基线`](../benchmarks/2026-09-09-unified-backtest-v2-t13.md)；`scripts/backtest-v2-performance-spike.ts` 两次复跑的 `functionalDigest` 一致。该 workload 的 RSS 包含 `parquet-wasm` 初始化，不替代真实 Worker/Docker 基线。
+    - 性能报告：[`统一回测 V2 T13 性能与功能基线`](../../benchmarks/2026-09-09-unified-backtest-v2-t13.md)；`scripts/backtest-v2-performance-spike.ts` 两次复跑的 `functionalDigest` 一致。该 workload 的 RSS 包含 `parquet-wasm` 初始化，不替代真实 Worker/Docker 基线。
     - 尚未完成：真实 DSA HTTP、PostgreSQL/Redis/Docker Worker、真实账户 Ledger/Revision/Projection/Portfolio/Journal 前后快照、磁盘空间不足注入及 Runner 生产 RSS；T13 保持未勾选。
     - 第二阶段运行态探测：Docker/Server/DSA/PostgreSQL/Redis 容器健康，但当前 Server `/api/v1/backtests/runs` 返回 404、DSA V2 capability 返回 404，且无运行中的 `backtest-worker`；数据库仍为 baseline SchemaVersion，2 个 V1 StrategyVersion 和 8 个 BacktestJob 需要先 Expand/Cutover。详细证据见性能与功能基线报告；未将只读探测误记为 V2 smoke。
     - 第三阶段构建/迁移阻塞（2026-09-10）：已确认 compose 的 `backtest-worker` 入口和 V2 Runner 架构；`scripts/update.sh` 因旧 Dockerfile 静态约定安全退出，直接 compose build 未产出新镜像。当前 PostgreSQL recovery 因 `No space left on device` 无法完成 checkpoint，健康检查持续拒绝连接，旧 Server 因 Prisma `P1017` 退出。未执行 prune、卷操作或 migration；2/8 V1 数据仅沿用第二阶段只读基线，真实 DSA/V2 Run、取消/重试/崩溃、账户隔离和 RSS 保持未验证。详见性能与功能基线报告；T13 保持未勾选。

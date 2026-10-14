@@ -18,6 +18,8 @@ import type { ComparableDataFingerprintRange } from './backtest-run.service.js';
 import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
 import { assertCurrentRunForRead, isCurrentRunForRead } from './backtest-current-run-read.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
+import { visibleStrategyOwners } from './strategy-access.service.js';
+import { StrategyCreationService } from './strategy-creation.service.js';
 
 export type { BacktestSnapshotBuilder } from './backtest-run.service.js';
 
@@ -39,28 +41,14 @@ export class BacktestService {
     @Inject(BacktestRunService)
     private readonly runs: BacktestRunService | undefined,
     private readonly resultReadPolicy: ResultReadPolicyService,
+    @Optional() private readonly creation?: StrategyCreationService,
   ) {
     if (!resultReadPolicy) throw new Error('ResultReadPolicyService is required');
   }
 
-  async createStrategy(name: string, schema: unknown, description?: string) {
-    const parsed = strategySchema.parse(schema);
-    return this.prisma.strategy.create({
-      data: {
-        name,
-        description: description ?? parsed.description ?? null,
-        status: 'draft',
-        schemaVersion: 2,
-        versions: {
-          create: {
-            version: 1,
-            schemaVersion: 2,
-            schema: parsed as Prisma.InputJsonValue,
-          },
-        },
-      },
-      include: { versions: true },
-    });
+  async createStrategy(name: string, schema: unknown, description?: string, ownerId?: string | null) {
+    return (this.creation ?? new StrategyCreationService()).createInTransaction(this.prisma,
+      { name, description, definition: schema, ownerId: ownerId ?? null, source: { kind: 'manual' } });
   }
 
   async createVersion(strategyId: string, schema: unknown) {
@@ -86,6 +74,7 @@ export class BacktestService {
         version: (latest._max.version ?? 0) + 1,
         schemaVersion: 2,
         schema: parsed as Prisma.InputJsonValue,
+        source: { kind: 'manual' },
       },
     });
   }
@@ -95,17 +84,17 @@ export class BacktestService {
     return this.runs.createRun(input);
   }
 
-  listStrategies() {
+  listStrategies(ownerId?: string | null) {
     return this.prisma.strategy.findMany({
-      where: { schemaVersion: 2, status: { not: 'experiment-only' } },
+      where: { schemaVersion: 2, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
       include: { versions: { where: { schemaVersion: 2 } } },
       orderBy: { updatedAt: 'desc' },
     });
   }
 
-  async listCurrentRunSummaries() {
+  async listCurrentRunSummaries(ownerId?: string | null) {
     const jobs = await this.prisma.backtestJob.findMany({
-      where: { mode: 'V3' },
+      where: { mode: 'V3', strategyVersion: { strategy: visibleStrategyOwners(ownerId) } },
       orderBy: { createdAt: 'desc' },
       take: 100,
       select: backtestJobSummarySelect,

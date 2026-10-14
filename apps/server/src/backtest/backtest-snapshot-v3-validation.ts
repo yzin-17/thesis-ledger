@@ -1,7 +1,8 @@
-import type { BacktestSnapshotManifestV3 } from '@thesis-ledger/schemas';
+import { runConfigSchemaV3, statusCompositionArtifactKeyV1, type BacktestSnapshotManifestV3 } from '@thesis-ledger/schemas';
 import type { ArtifactRef, ArtifactRow, LocalArtifactStore } from './backtest-artifact-store.js';
 import { validateSnapshotExecutionEvidenceV3 } from './backtest-snapshot-v3-execution-evidence.js';
 import { validateCompleteSnapshotInputsV3 } from './backtest-snapshot-v3-completeness.js';
+import { readSnapshotStatusCompositionV1 } from './backtest-status-composition-v1.js';
 
 interface SnapshotValidationDependenciesV3 {
   artifacts: LocalArtifactStore;
@@ -30,14 +31,19 @@ export const validateSnapshotInputsV3 = async (
     readRows: (ref) => readSnapshotArtifactRowsV3(dependencies.artifacts, ref),
   });
   try {
+    const inputs = await Promise.all(artifacts.map(async (artifact) => ({
+      key: artifact.key.slice(manifest.runId.length + 1),
+      rows: await readSnapshotArtifactRowsV3(dependencies.artifacts, artifact),
+    })));
+    const compositionRows = inputs.find((input) => input.key === statusCompositionArtifactKeyV1)?.rows ?? [];
+    if (manifest.statusComposition || compositionRows.length) {
+      const metadata = inputs.find((input) => input.key === 'metadata/snapshot-metadata-v3.parquet')?.rows;
+      if (metadata?.length !== 1 || typeof metadata[0]?.runConfig !== 'string') throw new Error('组合冻结缺少唯一运行配置');
+      readSnapshotStatusCompositionV1(manifest, runConfigSchemaV3.parse(JSON.parse(metadata[0].runConfig)), compositionRows);
+    }
     validateCompleteSnapshotInputsV3(
       manifest,
-      await Promise.all(
-        artifacts.map(async (artifact) => ({
-          key: artifact.key.slice(manifest.runId.length + 1),
-          rows: await readSnapshotArtifactRowsV3(dependencies.artifacts, artifact),
-        })),
-      ),
+      inputs,
     );
   } catch (error) {
     throw dependencies.integrityError(

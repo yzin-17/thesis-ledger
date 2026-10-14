@@ -9,7 +9,7 @@ import type { PortfolioMode } from '../features/portfolio/portfolio.types.js';
 import { AccountDataPage } from '../features/account-data/AccountDataPage.js';
 import { AiChat } from '../features/ai/AiChat.js';
 import { LegacyImportReviewRedirect } from '../features/import/LegacyImportReviewRedirect.js';
-import { JournalDashboard } from '../features/journal/JournalDashboard.js';
+import { JournalReviewWorkspace } from '../features/journal/review/JournalReviewWorkspace.js';
 import { PerformanceDashboard } from '../features/performance/PerformanceDashboard.js';
 import { PortfolioDashboard } from '../features/portfolio/PortfolioDashboard.js';
 import { ProviderSettings } from '../features/providers/ProviderSettings.js';
@@ -135,7 +135,7 @@ export function AppRoutes() {
       <Route
         path="/journal"
         element={
-          <JournalDashboard
+          <JournalReviewWorkspace
             accounts={accounts}
             accountsReady={accountsReady}
             accountsPending={accountsPending}

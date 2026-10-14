@@ -80,7 +80,8 @@ describe('冻结 raw 响应派生接缝', () => {
     (kind) => {
       const f = fixture();
       if (kind === 'binding') f.conversion.rawResponseHash = 'b'.repeat(64);
-      else if (kind === 'content') f.frozen.response.bars[0]!.amount += 1;
+      else if (kind === 'content')
+        f.frozen.response.bars[0]!.amount = f.frozen.response.bars[0]!.amount! + 1;
       else if (kind === 'adjusted') f.frozen.response.routeKey.adjustment = 'qfq';
       else if (kind === 'request') f.frozen.request.symbol = '510300.SH';
       else f.frozen.response.sourcePriceBasis.observedAt = '2099-01-01T00:00:00Z';

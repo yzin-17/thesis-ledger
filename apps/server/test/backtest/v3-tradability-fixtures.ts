@@ -11,7 +11,7 @@ export const tradabilityFixtureV3 = (
     market: 'CN',
     instrumentType: window.routeKey.assetType as 'ETF' | 'STOCK',
     range: { start: proof.window.requestedStart, end: proof.window.requestedEnd },
-    listing: {
+    listing: 'status' in proof.listing ? { status: 'unknown' } : {
       listedOn: proof.listing.firstTradingDate,
       source: {
         provider: proof.listing.source,

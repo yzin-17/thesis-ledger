@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarketDetailService } from '../../src/market/market-detail.service.js';
 
 const time = '2026-08-21T00:00:00.000Z';
-const route = [{ providerId: 'fixture', upstreamSource: 'fixture' }];
+const route = [
+  { providerId: 'fixture', upstreamSource: 'fixture', routeIndex: 0, eligible: true, reason: null },
+];
 const quote = {
   version: 3,
   symbol: '600519.SH',
@@ -42,11 +44,27 @@ const makeControl = () => ({
   getPolicy: vi.fn(async () => ({
     enabled: true,
     syncState: 'applied',
-    routes: {
-      REALTIME_QUOTE: { STOCK: route, ETF: route },
-      CHIP_SUMMARY: { STOCK: route },
-      FUND_NAV: { MUTUAL_FUND: route },
-      FUND_NAV_HISTORY: { MUTUAL_FUND: route },
+    revision: 1,
+    dsaRevision: 1,
+    effectiveProjection: {
+      contractVersion: 3,
+      consumer: 'thesis-ledger',
+      requestId: 'fixture',
+      revision: 1,
+      sourceDesiredRevision: 1,
+      enabled: true,
+      appliedAt: time,
+      routes: [
+        ['REALTIME_QUOTE', 'STOCK'],
+        ['REALTIME_QUOTE', 'ETF'],
+        ['CHIP_SUMMARY', 'STOCK'],
+        ['FUND_NAV', 'MUTUAL_FUND'],
+        ['FUND_NAV_HISTORY', 'MUTUAL_FUND'],
+      ].map(([capability, assetType]) => ({
+        key: { kind: 'data', market: 'CN', assetType, capability },
+        targets: route,
+        reason: null,
+      })),
     },
   })),
 });
@@ -73,6 +91,7 @@ describe('MarketDetailService（非 bars/indicator helper）', () => {
     expect(result.sections.bars).toBeUndefined();
     expect(market.getBars).not.toHaveBeenCalled();
     expect(market.getIndicator).not.toHaveBeenCalled();
+    expect(market.getQuote).toHaveBeenCalledWith('600519.SH', { allowStale: true, assetType: 'STOCK' });
   });
 
   it('拒绝由旧 helper 直接请求 bars 或 indicator', async () => {
@@ -105,13 +124,18 @@ describe('MarketDetailService（非 bars/indicator helper）', () => {
       error: { code: 'capability_unsupported' },
     });
     expect(market.getChip).not.toHaveBeenCalled();
+    expect(market.getQuote).toHaveBeenCalledWith('510300.SH', { allowStale: true, assetType: 'ETF' });
   });
 
   it('策略不可用时不调用非 bars Provider', async () => {
     const market = { getQuote: vi.fn(), getChip: vi.fn() };
     const service = new MarketDetailService(
       market as never,
-      { getPolicy: vi.fn(async () => { throw new Error('offline'); }) } as never,
+      {
+        getPolicy: vi.fn(async () => {
+          throw new Error('offline');
+        }),
+      } as never,
       makePrisma({ assetType: 'stock' }) as never,
     );
 

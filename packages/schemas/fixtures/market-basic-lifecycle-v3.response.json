@@ -1,0 +1,225 @@
+{
+  "response": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "controlled-lifecycle-fixture",
+    "symbol": "000995.SZ",
+    "range": {
+      "start": "2026-05-01",
+      "end": "2026-05-22"
+    },
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "baostock",
+      "upstreamSource": "baostock",
+      "routeIndex": 0
+    },
+    "status": "supported",
+    "days": [
+      {
+        "date": "2026-05-01",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-02",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-03",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-04",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-05",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-06",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-07",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-08",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-09",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-10",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-11",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-12",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-13",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-14",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-15",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-16",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-17",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-18",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-19",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-20",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-21",
+        "state": "unknown"
+      },
+      {
+        "date": "2026-05-22",
+        "state": "unknown"
+      }
+    ],
+    "sourceDocuments": [],
+    "basicLifecycle": {
+      "ipoDate": "2026-05-18",
+      "outDate": null,
+      "ipoDateStatus": "known",
+      "outDateStatus": "notProvided",
+      "sourceRecordId": "basic"
+    },
+    "sourceRecords": [
+      {
+        "id": "basic",
+        "kind": "normalizedQueryResponse",
+        "providerId": "baostock",
+        "upstreamSource": "baostock",
+        "symbol": "000995.SZ",
+        "range": {
+          "start": "2026-05-01",
+          "end": "2026-05-22"
+        },
+        "queryMethod": "query_stock_basic",
+        "queryFields": "code,ipoDate,outDate,type",
+        "normalizerRevision": "baostock-basic-dates-v1",
+        "responseSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observedAt": "2026-06-01T00:00:00Z"
+      }
+    ],
+    "structuredCoverage": {
+      "expectedSessions": [
+        "2026-05-01",
+        "2026-05-02",
+        "2026-05-03",
+        "2026-05-04",
+        "2026-05-05",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-09",
+        "2026-05-10",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-13",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-16",
+        "2026-05-17",
+        "2026-05-18",
+        "2026-05-19",
+        "2026-05-20",
+        "2026-05-21",
+        "2026-05-22"
+      ],
+      "statusUnknownDates": [
+        "2026-05-01",
+        "2026-05-02",
+        "2026-05-03",
+        "2026-05-04",
+        "2026-05-05",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-09",
+        "2026-05-10",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-13",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-16",
+        "2026-05-17",
+        "2026-05-18",
+        "2026-05-19",
+        "2026-05-20",
+        "2026-05-21",
+        "2026-05-22"
+      ],
+      "stUnknownDates": [
+        "2026-05-01",
+        "2026-05-02",
+        "2026-05-03",
+        "2026-05-04",
+        "2026-05-05",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-09",
+        "2026-05-10",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-13",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-16",
+        "2026-05-17",
+        "2026-05-18",
+        "2026-05-19",
+        "2026-05-20",
+        "2026-05-21",
+        "2026-05-22"
+      ],
+      "calendarUnknownDates": [],
+      "complete": false
+    },
+    "provenance": {
+      "providerId": "baostock",
+      "upstreamSource": "baostock",
+      "providerRevision": "controlled-fixture-v1",
+      "datasetId": "controlled-basic",
+      "fetchedAt": "2026-06-01T00:00:00Z",
+      "granularity": "1d",
+      "historicalAvailability": "notVerified"
+    }
+  }
+}

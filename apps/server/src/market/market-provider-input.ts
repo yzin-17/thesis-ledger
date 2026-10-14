@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { marketProviderProbeRouteSchema } from '@thesis-ledger/schemas';
 
 const envelope = {
   contractVersion: z.literal(3).optional(),
@@ -14,12 +15,18 @@ const save = z
   .strictObject({
     ...envelope,
     enabled: z.boolean().optional(),
+    expectedConfigVersion: z.number().int().nonnegative().optional(),
     credentials: credentials.optional(),
     clearCredentials: z.boolean().optional(),
     settings: z.record(z.string(), z.unknown()).optional(),
   })
   .refine((value) => !(value.clearCredentials && value.credentials));
-const test = z.strictObject({ ...envelope, credentials: credentials.optional() });
+const test = z.strictObject({
+  ...envelope,
+  credentials: credentials.optional(),
+  route: marketProviderProbeRouteSchema.optional(),
+  purpose: z.enum(['capability_read', 'account_access']).optional(),
+});
 const remove = z.strictObject(envelope);
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {

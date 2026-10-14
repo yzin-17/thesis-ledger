@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { money } from '../shared/display.js';
 import type {
@@ -37,6 +37,8 @@ export function PerformanceTrendChart({
   interval: PerformanceSeriesInterval;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [tooltipX, setTooltipX] = useState(0);
+  useEffect(() => setActiveIndex(null), [seriesPoints]);
   const values = seriesPoints.map((point) => point.value);
   const width = 640;
   const height = 220;
@@ -63,10 +65,25 @@ export function PerformanceTrendChart({
   const activeValue = activeIndex === null ? undefined : seriesPoints[activeIndex];
   const dense = interval === '1min' || interval === '1h';
 
-  const activateNearest = (clientX: number, target: SVGSVGElement) => {
-    const bounds = target.getBoundingClientRect();
-    if (bounds.width === 0) return;
-    const viewX = ((clientX - bounds.left) / bounds.width) * width;
+  const activatePoint = (index: number, target: SVGSVGElement) => {
+    const point = points[index];
+    const transform = target.getScreenCTM();
+    const bounds = target.parentElement?.getBoundingClientRect();
+    if (!point || !transform || !bounds) return;
+    const anchor = target.createSVGPoint();
+    anchor.x = point.x;
+    anchor.y = point.y;
+    setTooltipX(anchor.matrixTransform(transform).x - bounds.left);
+    setActiveIndex(index);
+  };
+
+  const activateNearest = (clientX: number, clientY: number, target: SVGSVGElement) => {
+    const transform = target.getScreenCTM();
+    if (!transform || points.length === 0) return;
+    const pointer = target.createSVGPoint();
+    pointer.x = clientX;
+    pointer.y = clientY;
+    const viewX = pointer.matrixTransform(transform.inverse()).x;
     let nearest = 0;
     let distance = Number.POSITIVE_INFINITY;
     points.forEach((point, index) => {
@@ -76,7 +93,7 @@ export function PerformanceTrendChart({
         distance = nextDistance;
       }
     });
-    setActiveIndex(nearest);
+    activatePoint(nearest, target);
   };
 
   return (
@@ -87,9 +104,15 @@ export function PerformanceTrendChart({
         role="application"
         tabIndex={0}
         aria-label="资产价值走势图，可使用左右方向键逐点查看"
-        onFocus={() => setActiveIndex((current) => current ?? seriesPoints.length - 1)}
-        onPointerMove={(event) => activateNearest(event.clientX, event.currentTarget)}
-        onPointerDown={(event) => activateNearest(event.clientX, event.currentTarget)}
+        onFocus={(event) =>
+          activatePoint(activeIndex ?? seriesPoints.length - 1, event.currentTarget)
+        }
+        onPointerMove={(event) =>
+          activateNearest(event.clientX, event.clientY, event.currentTarget)
+        }
+        onPointerDown={(event) =>
+          activateNearest(event.clientX, event.clientY, event.currentTarget)
+        }
         onPointerLeave={(event) => {
           if (event.pointerType === 'mouse') setActiveIndex(null);
         }}
@@ -102,7 +125,10 @@ export function PerformanceTrendChart({
           event.preventDefault();
           const current = activeIndex ?? seriesPoints.length - 1;
           const direction = event.key === 'ArrowLeft' ? -1 : 1;
-          setActiveIndex(Math.max(0, Math.min(seriesPoints.length - 1, current + direction)));
+          activatePoint(
+            Math.max(0, Math.min(seriesPoints.length - 1, current + direction)),
+            event.currentTarget,
+          );
         }}
       >
         <line
@@ -156,8 +182,10 @@ export function PerformanceTrendChart({
       </svg>
       {activePoint && activeValue ? (
         <div
-          className="pointer-events-none absolute top-3 z-10 min-w-52 -translate-x-1/2 rounded-lg border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
-          style={{ left: `${Math.max(18, Math.min(82, (activePoint.x / width) * 100))}%` }}
+          className="pointer-events-none absolute top-3 z-10 w-64 max-w-full rounded-lg border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+          style={{
+            left: `clamp(0px, calc(${tooltipX}px - 8rem), max(0px, calc(100% - 16rem)))`,
+          }}
           role="status"
           aria-live="polite"
         >

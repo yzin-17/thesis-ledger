@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { backtestResearchReadOptionsV3 } from './backtest-research-read-options-v3.js';
 import { hasExecutableBacktestWindowV3 } from './backtest-snapshot-v3-tradability.js';
 import { z } from 'zod';
 import {
@@ -544,9 +545,7 @@ export const preflightBacktestExecutionWindowV3 = async (
     symbol: context.requirement.symbol!,
     routeKey,
     window: { start: dataset.range.startDate, end: dataset.range.endDate },
-    ...(routeKey.market === 'CN' && context.runConfig.executionPriceProtocol.history.basis === 'fixed-provider-snapshot'
-      ? { tradabilityMode: 'assume-untradable-no-bar' as const,
-          priceResearch: context.runConfig.executionPriceProtocol.accountingBasis === 'normalized-series' } : {}),
+    ...backtestResearchReadOptionsV3(routeKey.market, context.runConfig.executionPriceProtocol),
     ...(context.runConfig.frozenExecutionWindow
       ? { frozenWindowRef: context.runConfig.frozenExecutionWindow }
       : {}),
@@ -554,7 +553,7 @@ export const preflightBacktestExecutionWindowV3 = async (
     context.runConfig.frozenExecutionWindow
       ? {
           warmup: {
-            analysisStart: context.runConfig.startDate,
+            analysisStart: context.runConfig.lifecyclePreparation?.signalStartDate ?? context.runConfig.startDate,
             minimumSessions: plan.warmup.lookbackPeriods,
           },
         }

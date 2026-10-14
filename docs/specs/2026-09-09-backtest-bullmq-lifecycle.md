@@ -1,5 +1,15 @@
 # V1 回测任务 BullMQ 生命周期 Spec
 
+2026-10-03 历史适用性对账：数据库事实源、durable owner、有限重试及 CAS 原则继续适用；旧 V1/V2 HTTP/执行路径已由[Canonical 架构](../architecture/canonical-runtime.md)替代。当时未覆盖的当前 Run 故障恢复、SSE/429 与 Electron 场景由原 T4 承接；该任务现已完成，见[归档任务](../archive/tasks/2026-09-09-backtest-bullmq-lifecycle.md)，不恢复退役接口。
+
+2026-10-06 当前验收合同：公开读取/创建/运行/取消使用 `/api/v1/backtests/runs`，事件保持 `/api/v1/backtests/events`；下文旧 jobs 路径只属于历史契约。自动执行周期最多三个 durable attempts，运输记录重建不能刷新预算；用户显式 `/retry` 按当前冻结重试合同建立新周期，owner 继续单调增加。列表、分组列表与详情均使用 30 秒非终态事实源兜底；SSE 更新直接更新对应 Query 缓存，终态按需刷新已打开详情。HTTP 与 SSE 重连共享按源站和 HTTP 方法的 429 冷却，兼容 `Retry-After` 秒数及 HTTP 日期；冷却和流式读取均可取消。已取消终态显示“已取消”，只有运行中的取消请求显示“正在取消”。
+
+T4 目标故障必须通过 infra 仓库维护的受保护入口执行：精确绑定 Compose 项目、数据库、容器、镜像、验收 Run 和快照，串行占用更新锁，拒绝其他在途任务，保存受保护业务摘要；逐场景恢复原服务及验收快照，不删除共享卷、不批量清空 Redis、不伪造数据库 running 状态。开发目标与基础生产 Compose 配置的验证证据分别记录，生产发布不能由本地开发镜像身份替代。
+
+基础生产配置另以专属 Compose 项目启动验收：复用已验证的镜像 ID，全部数据卷绑定本次专属名称，先在空库应用完整 migration 链并初始化 app role，再启动 Server/Worker；健康通过后只清理该项目及其专属卷。该验收证明生产启动配置，不执行外部镜像发布或真实生产数据库升级。
+
+Compose 的 Server 在容器内监听 `0.0.0.0`，宿主机发布端口默认绑定 `127.0.0.1`，保持本地 Desktop 使用范围。容器内健康和宿主机映射端口的 `/api/v1/health` 必须同时通过。
+
 > 2026-09-12 增量说明：本 Spec 最初针对 V1 BullMQ 生命周期。当前 V1/V2 共用同一 `BacktestJob`、BullMQ transport、processor 与 reconciler，因此本次 durable owner 与恢复语义同时约束 V1/V2 的共享运输层；不改变 V2 Snapshot、SimulationLedger、执行模型或结果语义。
 
 ## 背景与问题
@@ -207,13 +217,13 @@ API 与 Worker 不记录 bars、结果正文或敏感配置。
 
 ## 未决问题
 
-### Blocking
+### 阻塞问题
 
-无代码 Blocking 问题。
+无代码阻塞问题。
 
 ### 部署验证门禁
 
-仍需在目标 Compose 环境执行一次“任务已 claimed/running 后硬杀 Worker → transport 恢复/重建 → durable ownerAttempt 递增 → 唯一终态”的真实 smoke。该门禁验证部署与进程级恢复，不用于否定已经通过自动化回归的代码修复，也不能由单元测试伪报完成。
+目标 Compose 的“真实 claimed/running 后硬杀 Worker → 自动恢复 → durable ownerAttempt 递增 → 唯一终态”及客户端、基础生产配置门禁已完成，见[最终运行态证据](../tasks/evidence/2026-10-06-backtest-target-lifecycle.md)。后续修改仍须按实际输入复核部署及进程级恢复，不以单元测试替代真实运行态。
 
 ## 验收标准
 

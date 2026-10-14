@@ -18,6 +18,7 @@ import { verifySplitMappingV3 } from '../market/market-split-mapping-v3.js';
 import { verifyRqdataFundIdentityV3 } from '../market/market-rqdata-identity-v3.js';
 import { verifyTushareFundIdentityV3 } from '../market/market-tushare-identity-v3.js';
 import { verifyHithinkFundIdentityV3 } from '../market/market-hithink-identity-v3.js';
+import { verifyNoticeDividendsV3 } from '../market/market-notice-dividends-v3.js';
 
 export const snapshotEventRevisionsV3Schema = z.strictObject({
   desiredRevision: z.number().int().positive(),
@@ -82,6 +83,7 @@ export function validateSnapshotEventsV3(
       verifyRqdataFundIdentityV3(exchange.response);
       verifyTushareFundIdentityV3(exchange.response);
       verifyHithinkFundIdentityV3(exchange.response);
+      verifyNoticeDividendsV3(exchange.response);
     } catch {
       return fail('Snapshot V3 事件日期或身份映射证据无效。');
     }

@@ -16,6 +16,7 @@ import { ProviderModule } from './providers/provider.module.js';
 import { QualityModule } from './quality/quality.module.js';
 import { RiskModule } from './risk/risk.module.js';
 import { StrategyOptimizationModule } from './strategy-optimization/strategy-optimization.module.js';
+import { AuthoringExecutionModule } from './strategy-authoring/authoring-execution.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { StrategyOptimizationModule } from './strategy-optimization/strategy-opt
     AiModule,
     AutomationModule,
     StrategyOptimizationModule,
+    AuthoringExecutionModule,
   ],
 })
 export class AppModule {}

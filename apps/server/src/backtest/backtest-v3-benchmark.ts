@@ -25,8 +25,13 @@ import {
 } from './backtest-v2-execution-shared.js';
 import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
 import { alignBacktestBenchmarkClosesV3 } from './backtest-v3-benchmark-alignment.js';
-import { resolveBacktestV3BenchmarkCost } from './backtest-v3-benchmark-cost.js';
+import { resolveFrozenBenchmarkCostV3 } from './backtest-v3-benchmark-cost.js';
+import { researchBenchmarkLimitV3, supportsWholeShareWindowBenchmarkV3 } from './backtest-research-benchmark-limit-v3.js';
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
+import {
+  benchmarkSourceIdentityV3 as sourceIdentity,
+  benchmarkCompatibilityIdentityV3 as identityFor,
+} from './backtest-v3-benchmark-identity.js';
 
 const EVALUATION_VERSION =
   'v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2';
@@ -77,13 +82,6 @@ const instrumentRouteType = (assetType: BacktestStrategy['executionInstrument'][
   if (assetType === 'etf') return 'ETF';
   return 'NAV_FUND';
 };
-
-const sourceIdentity = (source: BacktestSnapshotManifestV3['actualSources'][number]) => ({
-  symbol: source.symbol,
-  routeKey: source.routeKey,
-  provenance: source.provenance,
-  inputFingerprint: source.inputFingerprint,
-});
 
 const same = (left: unknown, right: unknown) =>
   canonicalizeManifest(left) === canonicalizeManifest(right);
@@ -273,38 +271,6 @@ const valuationCloses = (
   return points.sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
 };
 
-const identityFor = (
-  runConfig: RunConfigV3,
-  source: BacktestSnapshotManifestV3['actualSources'][number],
-  costAssumption?: BacktestBenchmarkCostAssumption,
-  benchmarkConvention = EVALUATION_VERSION,
-): BacktestBenchmarkCompatibilityIdentity => ({
-  priceProtocol: {
-    priceBasis: JSON.parse(
-      JSON.stringify(runConfig.executionPriceProtocol.priceBasis),
-    ) as NonNullable<BacktestBenchmarkCompatibilityIdentity['priceProtocol']>,
-    accountingBasis: runConfig.executionPriceProtocol.accountingBasis,
-    // assertFrozenInputs only returns a validated daily execution source; callers only reuse
-    // another source after verifying its full source identity matches that execution source.
-    timeframe: '1d',
-  },
-  returnProtocol: {
-    version: 'v3-total-return-v1',
-    metric: 'net-total-return',
-    currency: runConfig.baseCurrency,
-    evaluationRange: { startDate: runConfig.startDate, endDate: runConfig.endDate },
-    benchmarkConvention,
-  },
-  historyProtocol: runConfig.executionPriceProtocol.history,
-  ...(costAssumption === undefined ? {} : { costAssumption }),
-  source: sourceIdentity(source),
-  dividendAssumption: {
-    accountingBasis: runConfig.executionPriceProtocol.accountingBasis,
-    meaning: runConfig.executionPriceProtocol.priceBasis.dividendMeaning,
-    evidenceRef: runConfig.executionPriceProtocol.priceBasis.dividendEvidenceRef,
-  },
-});
-
 const finish = (
   strategyIdentity: BacktestBenchmarkCompatibilityIdentity,
   benchmarkIdentity: BacktestBenchmarkCompatibilityIdentity | undefined,
@@ -373,6 +339,19 @@ export const buildBacktestV3Benchmark = (
     input.analytics.metrics.totalReturn ?? unavailable('STRATEGY_RETURN_UNAVAILABLE');
   const executionCurrency = instrumentCurrency(strategy.executionInstrument.market);
   const strategyIdentity = identity(executionSource);
+  const researchLimit = researchBenchmarkLimitV3(runConfig.executionPriceProtocol, manifest);
+  if (researchLimit) {
+    const { reason, cost } = researchLimit;
+    warnings.add(reason);
+    return finish(
+      strategyIdentity,
+      undefined,
+      cost,
+      unavailable(reason),
+      strategyTotalReturn,
+      warnings,
+    );
+  }
 
   const benchmarkBinding = runConfig.priceInputBindings?.benchmark;
   if (!benchmarkBinding || benchmarkBinding.binding !== 'execution-series') {
@@ -451,7 +430,7 @@ export const buildBacktestV3Benchmark = (
     );
   }
 
-  if (runConfig.executionPriceProtocol.accountingBasis !== 'normalized-series') {
+  if (runConfig.executionPriceProtocol.accountingBasis !== 'normalized-series' && !supportsWholeShareWindowBenchmarkV3(runConfig.executionPriceProtocol, manifest)) {
     warnings.add('BENCHMARK_RAW_ACTIONS_UNSUPPORTED');
     const benchmarkIdentity = identity(benchmarkSource);
     delete benchmarkIdentity.returnProtocol;
@@ -550,9 +529,8 @@ export const buildBacktestV3Benchmark = (
 
   const firstClose = aligned[0]!;
   const lastClose = aligned.at(-1)!;
-  const cost = resolveBacktestV3BenchmarkCost({
-    runConfig,
-    strategy,
+  const cost = resolveFrozenBenchmarkCostV3({
+    ...input,
     firstClose: firstClose.close,
     firstOccurredAt: firstClose.occurredAt,
     lastClose: lastClose.close,

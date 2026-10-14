@@ -1,7 +1,11 @@
 import { z } from 'zod';
+import { marketBarQuerySemanticsV3Schema } from './market-bar-query-semantics.js';
 import { barSeriesIdentitySchema } from './market-bar-series.js';
 import { priceAdjustmentSchema } from './market-price-protocol.js';
 import { marketRouteTargetSchema } from './market-route-target.js';
+import { isStatusCapabilityNameV1 } from './market-status-capability-id.js';
+import { statusQuerySupportV1Schema } from './market-status-query-support-v1.js';
+import { marketAccountAccessSchema } from './market-account-access.js';
 
 const text = z.string().trim().min(1);
 const market = z.enum(['CN', 'HK', 'US']);
@@ -51,7 +55,11 @@ const routeTargets = z.array(marketRouteTargetSchema).min(1).max(2).superRefine(
   });
 });
 
-const route = z.strictObject({ key: marketRouteKeyV3Schema, targets: routeTargets });
+const route = z.strictObject({ key: marketRouteKeyV3Schema, targets: routeTargets, enabled: z.boolean().optional() })
+  .superRefine((value, context) => {
+    if (isStatusCapabilityNameV1(value.key.capability) && value.enabled === undefined)
+      context.addIssue({ code: 'custom', path: ['enabled'], message: '新增独立功能须明确启停状态' });
+  });
 const routes = z.array(route).superRefine((entries, context) => {
   const seen = new Set<string>();
   entries.forEach((entry, index) => {
@@ -81,6 +89,7 @@ export const routeAvailabilityReasonV3Schema = z.enum([
   'not_adapted',
   'unsupported_adjustment',
   'credential_missing',
+  'dependency_missing',
   'not_admitted',
   'admission_invalid',
   'admission_not_yet_valid',
@@ -111,6 +120,7 @@ export const effectiveProviderPolicyV3Schema = z.strictObject({
   enabled: z.boolean(),
   routes: z.array(z.strictObject({
     key: marketRouteKeyV3Schema,
+    enabled: z.boolean().optional(),
     targets: z.array(targetStatus).max(2),
     reason: routeAvailabilityReasonV3Schema.nullable(),
   })),
@@ -133,10 +143,12 @@ export const effectiveProviderPolicyV3Schema = z.strictObject({
         context.addIssue({ code: 'custom', path: ['routes', routeIndex, 'targets', targetIndex], message: '生效目标不能重复' });
       }
       targets.add(id);
-      if (!policy.enabled && target.eligible) {
+      if ((!policy.enabled || route.enabled === false) && target.eligible) {
         context.addIssue({ code: 'custom', path: ['routes', routeIndex, 'targets', targetIndex, 'eligible'], message: '禁用的策略不能存在可用目标' });
       }
     });
+    if (route.enabled === false && (route.reason !== 'disabled' || route.targets.some((target) => target.reason !== 'disabled')))
+      context.addIssue({ code: 'custom', path: ['routes', routeIndex, 'reason'], message: '停用功能必须保留 disabled 原因' });
     if (route.targets.some((target) => target.eligible) && route.reason !== null) {
       context.addIssue({ code: 'custom', path: ['routes', routeIndex, 'reason'], message: '有可用目标的路由不能标记失败' });
     }
@@ -148,8 +160,13 @@ export type EffectiveProviderPolicyV3 = z.infer<typeof effectiveProviderPolicyV3
 export const marketRouteCapabilityV3Schema = z.strictObject({
   key: marketRouteKeyV3Schema,
   target: marketRouteTargetSchema,
-  state: z.enum(['ready', 'credential_missing', 'not_admitted', 'quota_unavailable']),
-});
+  state: z.enum(['ready', 'credential_missing', 'dependency_missing', 'not_admitted', 'quota_unavailable']),
+  barQuery: marketBarQuerySemanticsV3Schema.optional(),
+  querySupport: statusQuerySupportV1Schema.optional(),
+  accountAccess: marketAccountAccessSchema.optional(),
+}).refine((value) => value.querySupport === undefined ||
+  (value.key.kind === 'data' && value.querySupport.capability === value.key.capability),
+{ message: '来源参数资格必须属于当前能力' });
 export type MarketRouteCapabilityV3 = z.infer<typeof marketRouteCapabilityV3Schema>;
 
 export type MarketRoutePolicyIssueV3 = {
@@ -169,14 +186,12 @@ export const validateDesiredProviderPolicyV3 = (
         item.target.providerId === target.providerId && item.target.upstreamSource === target.upstreamSource);
       const exact = sameTarget.find((item) => marketRouteKeyIdV3(item.key) === marketRouteKeyIdV3(requestedKey));
       let reason: RouteAvailabilityReasonV3 | null = null;
-      if (exact) {
-        if (exact.state !== 'ready') reason = exact.state;
-      } else if (requestedKey.kind === 'bar' && sameTarget.some((item) =>
+      if (!exact && requestedKey.kind === 'bar' && sameTarget.some((item) =>
         item.key.kind === 'bar' && item.key.market === requestedKey.market &&
         item.key.assetType === requestedKey.assetType && item.key.capability === requestedKey.capability &&
         item.key.timeframe === requestedKey.timeframe)) {
         reason = 'unsupported_adjustment';
-      } else {
+      } else if (!exact) {
         reason = 'not_adapted';
       }
       if (reason) issues.push({ path: ['routes', routeIndex, 'targets', targetIndex], reason });

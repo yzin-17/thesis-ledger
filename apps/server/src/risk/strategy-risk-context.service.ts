@@ -231,21 +231,25 @@ export class StrategyRiskContextService {
   }
 
   private minuteInputs(rows: RiskBar[], market: TradingMarket): BacktestMinuteBar[] {
-    return rows.map((row) => ({
-      symbol: row.symbol,
-      market,
-      timeframe: '1m',
-      occurredAt: row.timestamp.toISOString(),
-      availableAt: row.availableAt.toISOString(),
-      open: row.open.toString(),
-      high: row.high.toString(),
-      low: row.low.toString(),
-      close: row.close.toString(),
-      volume: row.volume.toString(),
-      amount: row.amount.toString(),
-      provider: row.provider,
-      quality: 'complete',
-    }));
+    return rows.map((row) => {
+      if (row.volume === null || row.amount === null)
+        throw new Error('分钟聚合的成交量或成交额不可用');
+      return {
+        symbol: row.symbol,
+        market,
+        timeframe: '1m',
+        occurredAt: row.timestamp.toISOString(),
+        availableAt: row.availableAt.toISOString(),
+        open: row.open.toString(),
+        high: row.high.toString(),
+        low: row.low.toString(),
+        close: row.close.toString(),
+        volume: row.volume.toString(),
+        amount: row.amount.toString(),
+        provider: row.provider,
+        quality: 'complete',
+      };
+    });
   }
 
   private async derivedBars(

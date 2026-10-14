@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateBuyAndHoldReturn,
   compareBacktestBenchmarkCompatibility,
+  deterministicResultChecksum,
+  type BacktestBenchmarkCostAssumption,
   type BacktestBenchmarkCompatibilityIdentity,
 } from '../src/backtest-benchmark-compatibility.js';
 
@@ -68,6 +70,108 @@ describe('backtest benchmark compatibility', () => {
     expect(result.status).toBe('unverified');
     expect(result.missingFields).toEqual(['historyProtocol']);
     expect(result.strategyFingerprint).toBeUndefined();
+  });
+});
+
+describe('执行模型型基准成本身份', () => {
+  const rules = {
+    currency: 'CNY',
+    collection: 'perFillPerCharge',
+    rounding: { mode: 'halfUp', decimalPlaces: 2 },
+    slippageRate: '0',
+    segments: [
+      {
+        from: '2023-08-23',
+        toExclusive: '2023-08-28',
+        commission: { side: 'both', rate: '0.0003', minimum: '5' },
+        stampDuty: { side: 'sell', rate: '0.001' },
+        transferFee: { side: 'both', rate: '0.00001' },
+        regulatoryFee: { treatment: 'includedInCommission' },
+        handlingFee: { treatment: 'includedInCommission' },
+      },
+      {
+        from: '2023-08-28',
+        toExclusive: '2023-08-30',
+        commission: { side: 'both', rate: '0.0003', minimum: '5' },
+        stampDuty: { side: 'sell', rate: '0.0005' },
+        transferFee: { side: 'both', rate: '0.00001' },
+        regulatoryFee: { treatment: 'includedInCommission' },
+        handlingFee: { treatment: 'includedInCommission' },
+      },
+    ],
+  };
+  const assumption = (frozenRules = rules): BacktestBenchmarkCostAssumption => ({
+    kind: 'execution-model',
+    version: 'frozen-execution-cost-v1',
+    fingerprint: deterministicResultChecksum(frozenRules),
+  });
+
+  it('同费则允许策略与基准有不同成交和已付费用', () => {
+    const strategy = { cost: assumption(rules), fills: 4, paidFees: '35.25' };
+    const benchmark = { cost: assumption(structuredClone(rules)), fills: 2, paidFees: '110.00' };
+    const report = compareBacktestBenchmarkCompatibility(
+      identity({ costAssumption: strategy.cost }),
+      identity({ costAssumption: benchmark.cost }),
+    );
+    expect(strategy.paidFees).not.toBe(benchmark.paidFees);
+    expect(report).toMatchObject({ status: 'compatible', differentFields: [], missingFields: [] });
+    expect(report.strategyFingerprint).toBe(report.benchmarkFingerprint);
+  });
+
+  it.each(['minimum', 'side', 'effectiveDate', 'includedFee', 'slippage', 'rounding'] as const)(
+    '冻结费用设置变化必须产生不同成本身份：%s',
+    (field) => {
+      const changed = structuredClone(rules);
+      const first = changed.segments[0]!;
+      if (field === 'minimum') first.commission.minimum = '6';
+      else if (field === 'side') first.stampDuty.side = 'both';
+      else if (field === 'effectiveDate') first.toExclusive = '2023-08-27';
+      else if (field === 'includedFee') first.handlingFee.treatment = 'charged';
+      else if (field === 'slippage') changed.slippageRate = '0.001';
+      else changed.rounding.decimalPlaces = 3;
+      expect(
+        compareBacktestBenchmarkCompatibility(
+          identity({ costAssumption: assumption(rules) }),
+          identity({ costAssumption: assumption(changed) }),
+        ),
+      ).toMatchObject({ status: 'incompatible', differentFields: ['costAssumption'] });
+    },
+  );
+
+  it('同一指纹的不同计算版本不能声明兼容', () => {
+    const cost = assumption();
+    expect(
+      compareBacktestBenchmarkCompatibility(
+        identity({ costAssumption: cost }),
+        identity({ costAssumption: { ...cost, version: 'frozen-execution-cost-v2' } }),
+      ),
+    ).toMatchObject({ status: 'incompatible', differentFields: ['costAssumption'] });
+  });
+
+  it('执行模型身份不等同于旧比例或不支持摘要，即使版本相同', () => {
+    const cost = assumption();
+    for (const oldCost of [
+      {
+        kind: 'unsupported',
+        version: cost.version,
+        fingerprint: deterministicResultChecksum(rules),
+      },
+      { kind: 'proportional', version: cost.version, commissionRate: '0.0003', slippageRate: '0' },
+    ] satisfies BacktestBenchmarkCostAssumption[]) {
+      expect(
+        compareBacktestBenchmarkCompatibility(
+          identity({ costAssumption: cost }),
+          identity({ costAssumption: oldCost }),
+        ),
+      ).toMatchObject({ status: 'incompatible', differentFields: ['costAssumption'] });
+    }
+  });
+
+  it('两点价格快捷算法要求真实执行模型，不能猜算最低额或卖侧税', () => {
+    expect(calculateBuyAndHoldReturn('10', '12', assumption())).toEqual({
+      status: 'unavailable',
+      reason: 'BENCHMARK_EXECUTION_MODEL_REQUIRED',
+    });
   });
 });
 

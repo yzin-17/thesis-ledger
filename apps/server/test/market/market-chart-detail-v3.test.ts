@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   marketDataBarSeriesResponseV3Schema,
+  marketDetailResponseSchema,
   type BarSeries,
   type IndicatorCalculateRequest,
 } from '@thesis-ledger/schemas';
@@ -179,7 +180,7 @@ describe('行情详情显式图表 V3 接入', () => {
       expect.objectContaining({ refresh: true, acceptance: 'interactive' }),
     );
     expect(calculate).toHaveBeenCalledOnce();
-    expect(result.barSeries?.chartContextV3?.acquisitionFingerprint).toBe('acquisition');
+    expect(marketDetailResponseSchema.parse(result).barSeries?.chartContextV3?.acquisitionFingerprint).toBe('acquisition');
     expect(result.sections['indicator:MA']?.status).toBe('ready');
   });
   it('新入口失败不回退旧 Reader', async () => {

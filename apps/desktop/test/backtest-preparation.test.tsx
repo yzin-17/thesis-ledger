@@ -14,6 +14,7 @@ import {
 } from '../src/features/strategy/strategy.preparation.js';
 import { marketDataKeys } from '../src/features/market-data/market-data.queries.js';
 import { BacktestPriceDisclosure } from '../src/features/strategy/BacktestPriceDisclosure.js';
+import { AnnouncementPreparationStatus } from '../src/features/strategy/AnnouncementPreparationStatus.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 import { preparedBacktestSubmission } from '../src/features/strategy/backtest-prepared-submission.js';
 import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
@@ -102,6 +103,22 @@ const result = () => {
     metrics: {},
   });
 };
+
+describe('公告自动准备展示', () => {
+  it('公告获取中返回进度，不提前运行预检，中文状态展示不增加按钮', async () => {
+    const pending = { contractVersion: 3, requestId: 'prepare-1', checkedAt: '2026-09-11T00:00:00Z',
+      scope: 'execution-window', status: 'preparing', announcementPreparation: {
+        status: 'preparing', jobIds: ['a'.repeat(64)], total: 2, completed: 1, failed: 0,
+        matched: 3, downloaded: 2, parsed: 1, errors: [] } };
+    const client = vi.fn(async () => pending);
+    const prepared = await prepareBacktestRunConfig(request(), undefined, { request: client } as DesktopRequestClient);
+    expect(prepared.status).toBe('preparing');
+    expect(client).toHaveBeenCalledTimes(1);
+    const markup = renderToStaticMarkup(<AnnouncementPreparationStatus result={prepared} />);
+    expect(markup).toContain('正在自动准备公告资料');
+    expect(markup).not.toContain('<button');
+  });
+});
 
 describe('普通回测配置准备与披露', () => {
   it('忽略准备前的旧缓存，只因更新后的策略或目录事实失效', () => {

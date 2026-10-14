@@ -9,10 +9,7 @@ import {
 } from '../src/features/strategy/strategy-backtest-diagnostics.model.js';
 import { StrategyBacktestDiagnostics } from '../src/features/strategy/StrategyBacktestDiagnostics.js';
 import { StrategyBacktestResultTabs } from '../src/features/strategy/StrategyBacktestDetailSections.js';
-import type {
-  BacktestJob,
-  BacktestJobResult,
-} from '../src/features/strategy/strategy.types.js';
+import type { BacktestJob, BacktestJobResult } from '../src/features/strategy/strategy.types.js';
 
 const longHash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -83,7 +80,7 @@ describe('回测诊断白名单导出', () => {
     );
 
     expect(payload.format).toBe(BACKTEST_DIAGNOSTIC_FORMAT);
-    expect(payload.formatVersion).toBe(1);
+    expect(payload.formatVersion).toBe(2);
     expect(payload.exportedAt).toBe('2026-09-18T01:02:03.000Z');
     expect(Object.keys(payload)).toEqual([
       'format',

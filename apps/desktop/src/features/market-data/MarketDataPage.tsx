@@ -1,3 +1,4 @@
+import { useMarketProviderDialogs } from './useMarketProviderDialogs.js';
 import { PageHeader } from '../shared/PageHeader.js';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,9 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { useToastManager } from '@/components/ui/toast';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InstrumentCatalogPanel } from './InstrumentCatalogPanel.js';
+import { SecurityStaticInfoPanel } from './SecurityStaticInfoPanel.js';
 import { MarketPolicyPanel } from './MarketPolicyPanel.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
-import { ProviderCredentialsSheet } from './ProviderCredentialsSheet.js';
 import { MarketProviderPanel } from './MarketProviderPanel.js';
 import { MarketDataSectionTabs } from './MarketDataSectionTabs.js';
 import { useMarketProviderEnabled } from './useMarketProviderEnabled.js';
@@ -16,7 +17,6 @@ import {
   useCatalogSyncMutation,
   useConfirmInstrumentMutation,
   useRemoveMarketProviderMutation,
-  useTestMarketProviderMutation,
 } from './market-data.mutations.js';
 import {
   marketDataKeys,
@@ -27,7 +27,6 @@ import type { ProviderManifest } from './market-data.types.js';
 import { useCatalogJobProgress } from './useCatalogJobProgress.js';
 import { routePolicySummaryV3 } from './market-policy-status-v3.js';
 import { useMarketPolicyWorkflow } from './useMarketPolicyWorkflow.js';
-import { marketProviderProbeFeedback } from './market-provider-probe-feedback.js';
 
 export function MarketDataPage() {
   const queryClient = useQueryClient();
@@ -35,17 +34,13 @@ export function MarketDataPage() {
   const { policy, providers, routeCapabilities, catalog } = useMarketDataQueries();
   const marketDataRefreshing =
     policy.isFetching || providers.isFetching || routeCapabilities.isFetching || catalog.isFetching;
-  const testProvider = useTestMarketProviderMutation();
   const removeProvider = useRemoveMarketProviderMutation();
   const syncCatalog = useCatalogSyncMutation();
   const confirmInstrument = useConfirmInstrumentMutation();
 
   const providerEnabled = useMarketProviderEnabled(providers.data ?? []);
   const providerDrafts = providerEnabled.providers;
-  const [credentialProviderId, setCredentialProviderId] = useState<string | null>(null);
-  const credentialProvider = providers.data?.find(
-    (provider) => provider.providerId === credentialProviderId,
-  );
+  const providerDialogs = useMarketProviderDialogs(providers.data ?? [], routeCapabilities.data);
   const toastManager = useToastManager();
   const [message, setErrorMessage] = useState<string | null>(null);
   const setMessage = useCallback(
@@ -63,6 +58,8 @@ export function MarketDataPage() {
   const marketPolicy = useMarketPolicyWorkflow({
     policy: policy.data,
     catalogComplete: routeCapabilities.data?.status === 'complete',
+    catalog: routeCapabilities.data,
+    providers: providers.data,
     setBusyAction,
     setMessage,
   });
@@ -97,24 +94,6 @@ export function MarketDataPage() {
         type: 'error',
         text: error instanceof Error ? error.message : '启停保存失败。',
       });
-    }
-  };
-
-  const handleTestProvider = async (provider: ProviderManifest) => {
-    setBusyAction(`provider-test:${provider.providerId}`);
-    setMessage(null);
-    try {
-      const result = await testProvider.mutateAsync({
-        provider,
-      });
-      setMessage(marketProviderProbeFeedback(result, provider.displayName));
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Provider 测试失败。',
-      });
-    } finally {
-      setBusyAction(null);
     }
   };
 
@@ -238,24 +217,19 @@ export function MarketDataPage() {
         </Badge>
       </section>
 
-      {credentialProvider && (
-        <ProviderCredentialsSheet
-          key={credentialProvider.providerId}
-          provider={credentialProvider}
-          onClose={() => setCredentialProviderId(null)}
-        />
-      )}
+      {providerDialogs.dialogs}
 
       <MarketDataSectionTabs
         providerPanel={
           <MarketProviderPanel
             providers={providerDrafts}
+            catalog={routeCapabilities.data}
             disabled={controlsDisabled}
             busyAction={busyAction}
             pendingProviderIds={providerEnabled.pendingProviderIds}
             onProviderChange={(provider) => void replaceProvider(provider)}
-            onConfigure={(provider) => setCredentialProviderId(provider.providerId)}
-            onTest={(provider) => void handleTestProvider(provider)}
+            onConfigure={providerDialogs.configure}
+            onTest={providerDialogs.inspect}
             onRemove={(provider) => void handleRemoveProvider(provider)}
           />
         }
@@ -277,6 +251,8 @@ export function MarketDataPage() {
           />
         }
         catalogPanel={
+          <div className="flex flex-col gap-4">
+          <SecurityStaticInfoPanel />
           <InstrumentCatalogPanel
             catalog={catalogJob.data ?? catalog.data ?? null}
             disabled={controlsDisabled}
@@ -292,6 +268,7 @@ export function MarketDataPage() {
             onSearch={setSubmittedSearch}
             onConfirm={(instrument) => void handleConfirmInstrument(instrument)}
           />
+          </div>
         }
       />
     </section>

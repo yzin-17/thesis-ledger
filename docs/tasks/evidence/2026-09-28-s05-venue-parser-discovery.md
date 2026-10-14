@@ -12,8 +12,8 @@
 
 - [主 Spec §6](/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/docs/specs/2026-09-25-multi-source-adjustment-aware-backtest.md:226) 要求精确交易所、标的范围、独立证券交易所证据、连续日期范围及原发布记录解析；未知 parser 失败关闭。对应证据必须在决策时刻已可见；原字节、摘要、归一化与时间规则必须保留。§6 对现在重新获取的历史档案另要求不可变原始捕获证明，本次 HTTP 成功没有自动满足该义务。
 - [既有日历发现](/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/docs/tasks/evidence/2026-09-28-s05-calendar-parser-discovery.md) 和 [DSA 发布登记](/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/src/services/thesis_ledger_calendar_release.py:8) 固定 `exchange-calendars 4.13.2`、公开可用时刻 `2026-03-10T03:24:37.055242Z` 及 93 源文件树；仅投影 XSHG，不提供证券名录或 XSHE 日历。
-- [DSA 执行日历](/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/src/services/thesis_ledger_v2_dependencies.py:126) 实际调用 `get_calendar("XSHG")`。即使取得 159516 场所事件，仍不能以 XSHG 日历签发 XSHE 资格。
-- [DSA 静态标的事实](/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/src/services/thesis_ledger_v2_dependencies.py:179) 只包含标的、市场、类型、币种、lot/tick 等，不提供独立场所发布原文；源码明确不得作为全请求历史区间可交易证明。
+- DSA 执行日历（当时源码定位 `/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/src/services/thesis_ledger_v2_dependencies.py:126`；该旧路径已退役，现行合同见 Canonical） 实际调用 `get_calendar("XSHG")`。即使取得 159516 场所事件，仍不能以 XSHG 日历签发 XSHE 资格。
+- DSA 静态标的事实（当时源码定位 `/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/src/services/thesis_ledger_v2_dependencies.py:179`；该旧路径已退役，现行合同见 Canonical） 只包含标的、市场、类型、币种、lot/tick 等，不提供独立场所发布原文；源码明确不得作为全请求历史区间可交易证明。
 - [DSA 目录入口](/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/src/services/thesis_ledger_catalog.py:227) 消费 `stock_info_a_code_name`、`fund_etf_spot_em`、`fund_name_em`；[目录来源登记](/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis/docs/thesis-ledger-catalog-source-evidence.md:23) 列出官方股票 endpoint 与东方财富 ETF endpoint，但现有今日列表与名称消费均不建立历史场所有效范围。本轮没有调用这些 endpoint，也没有重试已耗尽的 BaoStock 批量身份路径。
 
 ## 已取得的独立材料

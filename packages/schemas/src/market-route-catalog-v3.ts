@@ -10,8 +10,12 @@ import { marketRouteTargetSchema } from './market-route-target.js';
 export const marketRouteCatalogGetEndpointV3 =
   '/api/v3/thesis-ledger/control/routes/capabilities?contractVersion=3';
 
-const catalogEntry = marketRouteCapabilityV3Schema.extend({
+const catalogEntry = marketRouteCapabilityV3Schema.safeExtend({
   target: marketRouteTargetSchema.strict(),
+}).superRefine((entry, context) => {
+  if (entry.barQuery && (entry.key.kind !== 'bar' || entry.key.capability !== 'DAILY_BAR' || entry.key.adjustment !== entry.barQuery.adjustment)) {
+    context.addIssue({ code: 'custom', path: ['barQuery'], message: '日线语义与精确路由不一致' });
+  }
 });
 
 const entries = z.array(catalogEntry).superRefine((capabilities, context) => {

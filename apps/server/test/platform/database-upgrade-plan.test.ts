@@ -43,6 +43,13 @@ describe('保留数据升级计划', () => {
       '20260930100000_rebase_legacy_market_policy',
       '20261001100000_nav_backtest_preparation',
       '20261001120000_require_explicit_strategy_contract',
+      '20261004130000_strategy_authoring_drafts',
+      '20261004140000_strategy_authoring_records',
+      '20261005130000_identity_sessions',
+      '20261005133000_ai_invocation_facts',
+      '20261005140000_authoring_execution_state',
+      '20261005143000_authoring_analysis_application',
+      '20261006030000_strategy_authoring_save',
     ]);
   });
   it('仅列出当前 head 后的迁移且保留完整链摘要', () => {

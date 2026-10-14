@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ConflictException } from '@nestjs/common';
+import type { PrismaService } from '../../src/platform/prisma.service.js';
 import {
   buildMarketPolicyPayload,
   decodeMarketPolicyRoutes,
   encodeMarketPolicyRoutes,
   marketPolicyResponse,
   removeProviderTargets,
+  persistMarketPolicyRevision,
 } from '../../src/market/market-policy-storage.js';
 
 const routes = [
@@ -25,6 +28,38 @@ const routes = [
 ];
 
 describe('market policy JSON storage', () => {
+  it('期望修订在原行锁事务内拒绝并行者的相同内容', async () => {
+    const policy = buildMarketPolicyPayload({ contractVersion: 3, enabled: true, routes }, 8);
+    const update = vi.fn();
+    const transaction = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      desiredProviderPolicy: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ revision: 8, enabled: true, routes: encodeMarketPolicyRoutes(routes) }),
+        update,
+      },
+    };
+    const prisma = { $transaction: (work: (value: typeof transaction) => unknown) => work(transaction) } as unknown as PrismaService;
+    await expect(persistMarketPolicyRevision(prisma, policy, 7)).rejects.toThrow(ConflictException);
+    expect(update).not.toHaveBeenCalled();
+    await expect(persistMarketPolicyRevision(prisma, policy)).resolves.toMatchObject({ revision: 8 });
+  });
+
+  it('匹配期望修订时仍沿现有持久化与历史写入', async () => {
+    const policy = buildMarketPolicyPayload({ contractVersion: 3, enabled: true, routes }, 8);
+    const update = vi.fn().mockResolvedValue({ revision: 8 });
+    const transaction = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      desiredProviderPolicy: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ revision: 7, enabled: true, routes: encodeMarketPolicyRoutes(routes) }),
+        update,
+      },
+    };
+    const prisma = { $transaction: (work: (value: typeof transaction) => unknown) => work(transaction) } as unknown as PrismaService;
+    await expect(persistMarketPolicyRevision(prisma, policy, 7)).resolves.toEqual({ revision: 8 });
+    expect(update).toHaveBeenCalledOnce();
+    expect(update.mock.calls[0]?.[0].data.history.create.revision).toBe(8);
+  });
+
   it('只存储当前精确路由，读取拒绝旧矩阵和旧包装', () => {
     const stored = encodeMarketPolicyRoutes(routes);
     expect(stored).toEqual({ storageVersion: 3, routes });

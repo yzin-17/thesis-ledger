@@ -97,7 +97,10 @@ describe('Server 逐日可交易性来源绑定与冻结', () => {
     if (mode === 'missing') delete f.response.historicalTradability;
     if (mode === 'source') evidence.barSource.routeTarget.providerId = 'other';
     if (mode === 'adjustment') evidence.barSource.routeKey.adjustment = 'none';
-    if (mode === 'listing') evidence.listing.source.revision = 'other';
+    if (mode === 'listing') {
+      if (!('source' in evidence.listing)) throw new Error('此回归夹具需要已知上市来源');
+      evidence.listing.source.revision = 'other';
+    }
     if (mode === 'calendar') evidence.calendar.source.revision = 'other';
     if (mode === 'dates') evidence.days[0]!.state = 'assumed-untradable-no-bar';
     if (mode === 'revision') evidence.barSource.providerRevision = 'unknown';

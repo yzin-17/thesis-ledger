@@ -8,5 +8,6 @@ third_party
 coverage
 .git
 .env
+.recovery-artifacts
 *.log
 .DS_Store

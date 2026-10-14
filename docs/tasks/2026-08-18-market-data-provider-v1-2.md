@@ -1,5 +1,7 @@
 # 市场数据与标的中心 v1.2 实施任务
 
+> 状态对账（2026-10-03）：部分实现/已实现待验收：T11 的剩余原生联网、实际/模拟隔离及视觉义务仍归 closure-09，closure-11 只汇总证据，不新增第二次设备验收。V1 数据与控制入口已被 Canonical 当前合同替代；不要复跑退役 API。历史 efinance 在线结果与新来源资格分开。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 关联规格：[市场数据与标的中心 Spec v1.2](../specs/2026-08-18-market-data-provider-spec-v1.2.md)
 
 任务标识：`market-data-provider-v1-2`

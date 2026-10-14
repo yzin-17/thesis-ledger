@@ -1,3 +1,4 @@
+import { quoteControlFixture } from './quote-control-fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import { MarketService } from '../../src/market/market.service.js';
 import { MarketDataController } from '../../src/market/market-data.controller.js';
@@ -23,7 +24,7 @@ describe('行情缓存', () => {
 
   it('重复请求命中新鲜缓存且不重复调用 Provider', async () => {
     const values = new Map<string, string>();
-    const dsa = { get: vi.fn(async () => quote) };
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture), get: vi.fn(async () => quote) };
     const redis = {
       client: {
         get: vi.fn(async (key: string) => values.get(key) ?? null),
@@ -52,7 +53,7 @@ describe('行情缓存', () => {
   it('普通请求与显式 refresh 在缓存未命中时共享同一底层 flight', async () => {
     const values = new Map<string, string>();
     let resolveProvider!: (value: typeof quote) => void;
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(
         () =>
           new Promise<typeof quote>((resolve) => {
@@ -92,7 +93,7 @@ describe('行情缓存', () => {
     await expect(Promise.all([regular, refresh])).resolves.toHaveLength(2);
   });
   it('基金净值拒绝上游旧版本，不补写为当前版本', async () => {
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => ({
         version: 1,
         symbol: '000001.OF',
@@ -120,7 +121,7 @@ describe('行情缓存', () => {
         freshness: 'delayed',
       },
     ];
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return points;
@@ -166,7 +167,7 @@ describe('行情缓存', () => {
       },
     ];
     const refreshedPoints = [{ ...points[0]!, unitNav: 1.2 }];
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi
         .fn()
         .mockResolvedValueOnce(points)
@@ -229,7 +230,7 @@ describe('行情缓存', () => {
       },
     ];
     const paths: string[] = [];
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async (path: string) => {
         paths.push(path);
         return points;
@@ -248,7 +249,7 @@ describe('行情缓存', () => {
   });
   it('把 DSA Chip 映射为统一契约', async () => {
     const timestamp = '2025-01-01T00:00:00Z';
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => ({
         version: 3,
         symbol: '600519.SH',
@@ -276,7 +277,7 @@ describe('行情缓存', () => {
     const values = new Map<string, string>();
     const ttls = new Map<string, number>();
     const timestamp = '2025-01-01T00:00:00Z';
-    const dsa = {
+    const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => ({
         version: 3,
         symbol: '600519.SH',

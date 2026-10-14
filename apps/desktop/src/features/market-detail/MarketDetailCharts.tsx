@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BarPoint } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -7,6 +6,7 @@ import { MarketChartAttribution } from './MarketChartAttribution.js';
 import { MarketChartNavigationControls } from './MarketChartNavigationControls.js';
 import { MarketChartReadout } from './MarketChartReadout.js';
 import { MarketChartToolbar } from './MarketChartToolbar.js';
+import { chartPeriodTitle, chartPeriodSourceLabel, chartCompletionLabel } from './market-chart-period-label.js';
 import { MarketIndicatorSettingsMenu } from './MarketIndicatorSettingsMenu.js';
 import {
   LightweightMarketChart,
@@ -35,13 +35,6 @@ const rangeLabel = (range: number) => {
   if (range === 90) return '3月';
   if (range === 180) return '6月';
   return '1年';
-};
-
-const completionLabel = (status: BarPoint['completionStatus'] | undefined) => {
-  if (status === 'incomplete') return '未收盘（当日未完成）';
-  if (status === 'unknown') return '收盘状态未知';
-  if (status === 'complete') return '已收盘';
-  return '收盘状态未声明';
 };
 
 const timestampOf = (timestamp: string) => timestamp.slice(0, 10);
@@ -196,7 +189,7 @@ export function MarketPriceChart({
       cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
       if (Date.parse(earliest.timestamp) > cutoff.getTime()) {
         if (canLoadEarlier) {
-          setRangeNotice('正在补充该范围所需的更早日线，请加载完成后再次选择。');
+          setRangeNotice('正在补充该范围所需的更早行情，请加载完成后再次选择。');
           onLoadEarlier?.();
         } else {
           setRangeNotice('当前数据源没有覆盖该范围，已保留当前可用范围。');
@@ -215,7 +208,7 @@ export function MarketPriceChart({
     <div className="grid gap-3 rounded-lg bg-muted/30 p-3">
       <div className="flex flex-col gap-3">
         <div>
-          <h4 className="m-0 text-sm font-medium">日线走势</h4>
+          <h4 className="m-0 text-sm font-medium">{chartPeriodTitle(latestBar)}</h4>
           <p className="m-0 text-xs text-muted-foreground">K线、均线、成交量与指标共用日期轴</p>
         </div>
         <MarketChartToolbar
@@ -235,7 +228,7 @@ export function MarketPriceChart({
             <ToggleGroup
               value={[String(preference.visibleRange)]}
               onValueChange={(value) => value[0] && chooseRange(Number(value[0]))}
-              aria-label="日线范围"
+              aria-label="行情区间"
             >
               {[0, 30, 90, 180, 365].map((range) => (
                 <ToggleGroupItem key={range} value={String(range)}>
@@ -391,7 +384,7 @@ export function MarketPriceChart({
           lockedTimestamp={lockedTimestamp}
         />
       ) : (
-        <p className="empty-inline">当前没有可用日线。</p>
+        <p className="empty-inline">当前没有可用行情。</p>
       )}
       {rangeNotice ? (
         <p className="m-0 text-xs text-muted-foreground" role="status">
@@ -451,8 +444,8 @@ export function MarketPriceChart({
           : ` · 可视区间 ${change >= 0 ? '+' : ''}${(change * 100).toFixed(2)}%`}
       </span>
       <span>
-        数据来源 {last?.provider ?? '未知'} · 复权 {last?.adjustment ?? '未声明'} ·{' '}
-        {completionLabel(last?.completionStatus)}
+        {chartPeriodSourceLabel(last)} ·{' '}
+        {chartCompletionLabel(last)}
       </span>
       <MarketChartAttribution />
     </figcaption>
@@ -467,7 +460,7 @@ export function MarketPriceChart({
             showCloseButton
           >
             <DialogHeader>
-              <DialogTitle>日线走势</DialogTitle>
+              <DialogTitle>{chartPeriodTitle(latestBar)}</DialogTitle>
             </DialogHeader>
             {panel}
           </DialogContent>

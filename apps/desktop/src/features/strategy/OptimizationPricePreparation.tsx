@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatDateTime } from '@/lib/date-display';
 import { useQuery } from '@tanstack/react-query';
+import { AnnouncementPreparationStatus } from './AnnouncementPreparationStatus.js';
 import {
   optimizationRunPreparationRequestSchema,
   type BacktestExecutionModelV3,
@@ -72,6 +73,7 @@ export function OptimizationPricePreparation({
       return prepareOptimizationConfiguration(submitted.request, signal);
     },
     retry: false,
+    refetchInterval: (query) => query.state.data?.status === 'preparing' ? 2000 : false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
@@ -221,7 +223,7 @@ export function OptimizationPricePreparation({
         type="button"
         variant="outline"
         onClick={prepare}
-        disabled={!model || query.isFetching}
+        disabled={!model || query.isFetching || result?.status === 'preparing'}
       >
         {query.isFetching ? '正在准备实验配置…' : '准备实验配置'}
       </Button>
@@ -232,6 +234,7 @@ export function OptimizationPricePreparation({
           {query.error instanceof Error ? query.error.message : '实验配置准备失败'}
         </FieldError>
       )}
+      <AnnouncementPreparationStatus result={result} />
       {result?.status === 'blocked' && (
         <Alert variant="destructive">
           <AlertTitle>实验配置暂不可用</AlertTitle>

@@ -26,11 +26,10 @@ import {
 import { LoaderCircle, RefreshCw, Search } from 'lucide-react';
 import {
   mergeModelOptions,
-  mergeSelectedModelReasoning,
   modelReasoningBadgeLabels,
   modelsFromText,
-  modelsToText,
 } from './ai-provider.actions.js';
+import { withAiProviderModels } from './ai-provider-model-selection.js';
 import { AiProviderExecutionFields } from './AiProviderExecutionFields.js';
 import { AiProviderModelPricingFields } from './AiProviderModelPricingFields.js';
 import { AiProviderUpstreamFields } from './AiProviderUpstreamFields.js';
@@ -107,17 +106,7 @@ export function AiProviderEditorFields({
     [modelDetails],
   );
   const updateModels = (models: string[]) => {
-    const modelsText = modelsToText(models, MAX_SELECTED_MODELS);
-    const selectedModels = modelsFromText(modelsText);
-    onUpdateDraft((current) => ({
-      ...current,
-      modelsText,
-      modelReasoning: mergeSelectedModelReasoning(
-        selectedModels,
-        current.modelReasoning,
-        modelDetails,
-      ),
-    }));
+    onUpdateDraft((current) => withAiProviderModels(current, models, modelDetails));
   };
 
   const addManualModel = () => {

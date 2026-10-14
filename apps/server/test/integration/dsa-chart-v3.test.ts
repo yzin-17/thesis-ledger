@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   marketDataBarSeriesResponseV3Schema,
+  marketDataErrorCodeV3,
+  marketDataErrorMessageV3,
   type MarketChartBarsRequestV3,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../../src/integration/dsa/dsa.client.js';
@@ -92,6 +94,22 @@ describe('DSA 图表 V3 传输', () => {
     await expect(client.marketChartBarsV3(request)).rejects.toMatchObject({
       code: 'unsupported-capability',
     });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['sourceSymbolUnrecognized', 'source-symbol-unrecognized', 404],
+    ['invalidRequest', 'invalid-request', 422],
+    ['permissionDenied', 'permission-denied', 403],
+    ['authenticationFailed', 'source-authentication-failed', 403],
+  ] as const)('保留 %s 的标准来源分类与请求身份', async (kind, code, status) => {
+    const { request, client } = setup();
+    const fetchMock = vi.fn(async () => ({ ok: false, status, json: async () => ({
+      contractVersion: 3, requestId: request.requestId,
+      error: { code: marketDataErrorCodeV3[kind], message: marketDataErrorMessageV3[kind] },
+    }) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(client.marketChartBarsV3(request)).rejects.toMatchObject({ code, status, sourceReason: marketDataErrorCodeV3[kind] });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

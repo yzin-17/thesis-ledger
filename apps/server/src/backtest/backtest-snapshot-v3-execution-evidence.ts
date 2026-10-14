@@ -10,6 +10,8 @@ import {
 } from './backtest-snapshot-v3-execution-window.js';
 import { validateExecutionWindowIdentityV3 } from './backtest-snapshot-v3-execution-identity.js';
 import { validateExecutionBarsEvidenceV3 } from './backtest-snapshot-v3-execution-bars.js';
+import { readSnapshotPublicFeesV3 } from './backtest-public-fees-snapshot-v3.js';
+import { publicFeesArtifactKeyV3 } from '@thesis-ledger/schemas';
 
 export interface SnapshotV3EvidenceContext {
   readRows: (ref: ArtifactRef) => Promise<ArtifactRow[]>;
@@ -57,6 +59,12 @@ export const validateSnapshotExecutionEvidenceV3 = async (
     context.readRows(barsRef),
   ]);
   const config = validateExecutionMetadataV3(manifest, metadataRows, context);
+  const publicFeesRef = refFor(`${manifest.runId}/${publicFeesArtifactKeyV3}`);
+  readSnapshotPublicFeesV3(
+    manifest,
+    config,
+    publicFeesRef ? await context.readRows(publicFeesRef) : [],
+  );
   if (manifest.executionModel) {
     await validateExecutionModelEvidenceV3(manifest, artifacts, config, context);
   } else if (config.executionModel) {

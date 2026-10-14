@@ -9,6 +9,22 @@ function FieldGroup({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
+  return (
+    <fieldset data-slot="field-set" className={cn('flex flex-col gap-4', className)} {...props} />
+  );
+}
+
+function FieldLegend({ className, ...props }: React.ComponentProps<'legend'>) {
+  return (
+    <legend
+      data-slot="field-legend"
+      className={cn('mb-3 text-sm font-medium', className)}
+      {...props}
+    />
+  );
+}
+
 function Field({ className, invalid, ...props }: FieldPrimitive.Root.Props) {
   return (
     <FieldPrimitive.Root
@@ -28,7 +44,10 @@ function isInteractiveLabelTarget(target: EventTarget | null) {
   const element = target as EventTarget & {
     closest?: (selectors: string) => Element | null;
   };
-  return typeof element.closest === 'function' && element.closest('button,input,select,textarea') !== null;
+  return (
+    typeof element.closest === 'function' &&
+    element.closest('button,input,select,textarea') !== null
+  );
 }
 
 function preventLabelActivation(event: LabelInteractionEvent) {
@@ -86,4 +105,4 @@ function FieldError({ className, children, ...props }: FieldPrimitive.Error.Prop
   );
 }
 
-export { Field, FieldDescription, FieldError, FieldGroup, FieldLabel };
+export { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet };

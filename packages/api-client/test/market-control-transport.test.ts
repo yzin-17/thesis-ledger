@@ -29,6 +29,11 @@ describe('Market 控制客户端当前传输', () => {
     }
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
+  it('账户检查不接受普通读取结果冒充权限结论', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(probe)));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    await expect(client.market.testProvider('tushare', { purpose: 'account_access' })).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
   it('探测只请求当前 URL，绑定 Provider 身份并保留明确未配置状态', async () => {
     const fetcher = vi
       .fn<typeof fetch>()

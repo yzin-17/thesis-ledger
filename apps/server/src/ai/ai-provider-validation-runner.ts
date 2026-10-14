@@ -13,6 +13,11 @@ import {
   type AiCompatibilityExtensionProfile,
 } from './ai-provider-upstream.js';
 import { runtimeAdapterForSelection } from './ai-provider-upstream.js';
+import {
+  assertValidationActive,
+  validationInterruption,
+  validationInterruptionMessage,
+} from './ai-provider-validation-interruption.js';
 import type { ProviderHealthService } from '../providers/provider-health.service.js';
 import {
   explicitlyUnsupportedFormat,
@@ -88,6 +93,30 @@ const costFacts = (
   };
 };
 
+const validationFailure = (
+  context: ValidationRunContext,
+  error: unknown,
+  firstOutputTimeoutMs: number,
+  outputIdleTimeoutMs: number,
+) => {
+  const interruption = validationInterruption(context.signal, context.deadline);
+  const unsupported = explicitlyUnsupportedFormat(error);
+  let code = 'validation_failed';
+  let message = sanitizeAiProviderError(error, context.credential);
+  if (interruption) {
+    code = interruption;
+    message = validationInterruptionMessage(interruption);
+  } else if (unsupported) {
+    code = 'format_unsupported';
+  } else if (error instanceof AiSdkGenerationError && error.fact.code === 'schema_invalid') {
+    code = 'schema_mismatch';
+  } else if (error instanceof AiSdkGenerationError && error.fact.code === 'cancelled') {
+    code = 'provider_timeout';
+    message = `Provider 在限时内没有继续产出（首块 ${firstOutputTimeoutMs} ms / 间隔 ${outputIdleTimeoutMs} ms），已按超时中断`;
+  }
+  return { code, message, retryFormat: unsupported && !interruption };
+};
+
 export const validateProviderRoute = async (
   context: ValidationRunContext,
   route: AiProviderExecutionRouteInput,
@@ -105,8 +134,7 @@ export const validateProviderRoute = async (
   for (const mode of validationModes(route, adapter, context.allowText)) {
     if (!adapterSupportsGenerationMode(adapter, mode))
       throw new BadRequestException('当前接口不支持所选生成方式，请修改手动设置');
-    if (context.signal.aborted || Date.now() >= context.deadline)
-      throw new BadRequestException('验证已取消或超过总期限，未保存配置');
+    assertValidationActive(context.signal, context.deadline);
     if (context.remainingCalls <= 0) throw new BadRequestException('已达到授权测试次数上限');
     context.remainingCalls -= 1;
     const requestId = randomUUID();
@@ -160,7 +188,7 @@ export const validateProviderRoute = async (
       );
       observedUsage = usage;
       observedCost = cost;
-      if (context.signal.aborted) throw new DOMException('验证已取消', 'AbortError');
+      assertValidationActive(context.signal, context.deadline);
       const checkedAt = new Date().toISOString();
       await health.recordHistory(
         input.name,
@@ -185,26 +213,12 @@ export const validateProviderRoute = async (
       };
     } catch (error) {
       const usage = error instanceof AiSdkGenerationError ? error.usage : observedUsage;
-      const unsupported = explicitlyUnsupportedFormat(error);
-      // 探针超时只会让合并后的 signal 变成 aborted，适配器看不到是谁掐的，会归为 “cancelled”。
-      // 调用方没有取消时（context.signal 未 abort）必须如实报超时，不能显示成“生成请求已取消”。
-      const timedOut =
-        error instanceof AiSdkGenerationError &&
-        error.fact.code === 'cancelled' &&
-        !context.signal.aborted;
-      const schemaMismatch =
-        error instanceof AiSdkGenerationError && error.fact.code === 'schema_invalid';
+      const failure = validationFailure(context, error, firstOutputTimeoutMs, outputIdleTimeoutMs);
       await health.recordHistory(
         input.name,
         'degraded',
         Date.now() - startedAt,
-        unsupported
-          ? 'format_unsupported'
-          : schemaMismatch
-            ? 'schema_mismatch'
-            : timedOut
-              ? 'provider_timeout'
-              : 'validation_failed',
+        failure.code,
         new Date(),
         'manual',
         {
@@ -214,13 +228,9 @@ export const validateProviderRoute = async (
           cost: observedCost ?? costFacts(input, route.model, usage),
         },
       );
-      if (route.outputPolicy === 'auto' && unsupported && !context.signal.aborted) continue;
+      if (route.outputPolicy === 'auto' && failure.retryFormat) continue;
       throw new BadRequestException(
-        `${route.model} / ${route.contract.id} 验证未通过：${
-          timedOut
-            ? `Provider 在限时内没有继续产出（首块 ${firstOutputTimeoutMs} ms / 间隔 ${outputIdleTimeoutMs} ms），已按超时中断`
-            : sanitizeAiProviderError(error, context.credential)
-        }。原配置未修改。`,
+        `${route.model} / ${route.contract.id} 验证未通过：${failure.message}。原配置未修改。`,
       );
     }
   }

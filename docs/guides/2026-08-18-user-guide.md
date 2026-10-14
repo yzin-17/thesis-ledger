@@ -22,6 +22,8 @@
 
 ## Portfolio、Trade 与投资复盘
 
+单笔草稿、独立周期统计、历史快照与 AI 操作见[投资复盘使用说明](2026-10-04-journal-review.md)。
+
 `LedgerEventV2` 是真实账户唯一经济事实源，Position、Trade 和 Cash 都是可重建读取模型。Portfolio 的交易视图读取统一 Trade Projection，不把 Position 或 Journal 当成第二套可编辑交易事实。
 
 投资复盘不再直接从 Ledger 拼装“已平仓交易”，而是消费两级复盘对象：

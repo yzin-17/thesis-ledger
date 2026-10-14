@@ -11,6 +11,7 @@ import { verifySplitMappingV3 } from './market-split-mapping-v3.js';
 import { verifyRqdataFundIdentityV3 } from './market-rqdata-identity-v3.js';
 import { verifyTushareFundIdentityV3 } from './market-tushare-identity-v3.js';
 import { verifyHithinkFundIdentityV3 } from './market-hithink-identity-v3.js';
+import { verifyNoticeDividendsV3 } from './market-notice-dividends-v3.js';
 
 export type MarketEventSelectionInputV3 = {
   scope: Omit<MarketEventRequestV3, 'routeTarget'>;
@@ -99,6 +100,7 @@ export async function selectMarketEventV3(
     verifyRqdataFundIdentityV3(exchange.data.response);
     verifyTushareFundIdentityV3(exchange.data.response);
     verifyHithinkFundIdentityV3(exchange.data.response);
+    verifyNoticeDividendsV3(exchange.data.response);
   } catch {
     return { status: 'unavailable', reason: 'invalid_response', request };
   }

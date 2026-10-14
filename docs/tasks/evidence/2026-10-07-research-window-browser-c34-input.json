@@ -1,0 +1,369 @@
+{
+  "samples": [
+    {
+      "symbol": "600519.SH",
+      "path": "/Users/yzin/Downloads/backtest-dbc39963-da96-4583-8746-01feac9c7ff2-diagnostics-v2.json",
+      "sha256": "f2d7eabf4301b56ac772a9b44af547c5bc85548e4f28800c48630a55e47fb379",
+      "fullExportMatchesPersistentClientMapping": true,
+      "diagnostic": {
+        "format": "thesis-ledger.backtest-diagnostics",
+        "formatVersion": 2,
+        "exportedAt": "2026-10-06T18:11:35.083Z",
+        "identity": {
+          "jobId": "dbc39963-da96-4583-8746-01feac9c7ff2",
+          "runId": "dbc39963-da96-4583-8746-01feac9c7ff2",
+          "strategyVersionId": "26176553-5529-441c-a998-403ddbbb0e44",
+          "mode": "V3",
+          "status": "succeeded",
+          "stage": "succeeded",
+          "createdAt": "2026-10-06T17:22:30.339Z",
+          "startedAt": "2026-10-06T17:22:30.352Z",
+          "finishedAt": "2026-10-06T17:22:30.848Z",
+          "period": {
+            "start": "2023-08-01T00:00:00.000Z",
+            "end": "2023-09-15T00:00:00.000Z"
+          }
+        },
+        "frozenConfiguration": {
+          "dataAsOf": "2026-10-06T17:22:29.812Z",
+          "baseCurrency": "CNY",
+          "initialCash": {
+            "recordedAmount": null,
+            "CNY": "100000",
+            "HKD": null,
+            "USD": null
+          },
+          "valuationPolicy": {
+            "missingPrice": null
+          },
+          "executionModel": {
+            "schemaVersion": "execution-model-v1",
+            "id": "cn-600519.SH-extended-window-research",
+            "version": "1",
+            "symbol": "600519.SH",
+            "market": "CN",
+            "instrumentType": "STOCK",
+            "currency": "CNY",
+            "timezone": "Asia/Shanghai",
+            "rangeStart": "2023-08-01",
+            "rangeEnd": "2023-09-15",
+            "segmentCount": 1,
+            "contentHash": "e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a"
+          }
+        },
+        "outcome": {
+          "completeness": "complete",
+          "warnings": [
+            "未获取上市日期，未验证回测窗口与上市日期的边界关系",
+            "公共收费源暂不可用，使用已选执行模型。",
+            "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。",
+            "BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2"
+          ],
+          "metrics": {
+            "cagr": {
+              "status": "available",
+              "value": "-0.00696672912834506164",
+              "reason": null,
+              "code": null
+            },
+            "sharpe": {
+              "status": "available",
+              "value": "-0.73175721393832227069",
+              "reason": null,
+              "code": null
+            },
+            "winRate": {
+              "status": "available",
+              "value": "0.75",
+              "reason": null,
+              "code": null
+            },
+            "turnover": {
+              "status": "available",
+              "value": "79974.682543304415228090373856654163598524662122",
+              "reason": null,
+              "code": null
+            },
+            "tradeCount": {
+              "status": "available",
+              "value": "4",
+              "reason": null,
+              "code": null
+            },
+            "volatility": {
+              "status": "available",
+              "value": "0.00949399492394615609",
+              "reason": null,
+              "code": null
+            },
+            "maxDrawdown": {
+              "status": "available",
+              "value": "-0.00287869041408916673",
+              "reason": null,
+              "code": null
+            },
+            "totalReturn": {
+              "status": "available",
+              "value": "-0.00086097456695584772",
+              "reason": null,
+              "code": null
+            },
+            "profitFactor": {
+              "status": "available",
+              "value": "0.65194191982420898317",
+              "reason": null,
+              "code": null
+            },
+            "basicPeriodReturn": {
+              "status": "available",
+              "value": "-0.00086097456695584772",
+              "reason": null,
+              "code": null
+            }
+          },
+          "benchmark": {
+            "totalReturn": {
+              "status": "available",
+              "value": "-0.06270828004724727032",
+              "reason": null,
+              "code": null
+            },
+            "excessReturn": {
+              "status": "available",
+              "value": "0.0618473054802914226",
+              "reason": null,
+              "code": null
+            }
+          },
+          "benchmarkCompatibility": {
+            "status": "compatible",
+            "strategyFingerprint": "bf370f48b05606bb",
+            "benchmarkFingerprint": "bf370f48b05606bb",
+            "missingFields": [],
+            "differentFields": [],
+            "costAssumption": {
+              "kind": "execution-model",
+              "version": "execution-model-cost-v1",
+              "fingerprint": "43ded329941a4f7c",
+              "commissionRate": null,
+              "slippageRate": null
+            }
+          },
+          "tradingStatus": {
+            "status": "notIncluded",
+            "reason": "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。"
+          },
+          "failure": {
+            "code": null,
+            "summary": null
+          }
+        },
+        "traceability": {
+          "engineVersion": "thesis-ledger-v3-local-runner-v2",
+          "snapshotId": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+          "contentHash": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+          "resultChecksum": "022494dccd271850",
+          "executionModelHash": "e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a",
+          "marketRuleVersion": "market-rules-v1",
+          "calendarVersion": "calendar-v1",
+          "aggregationVersion": "bar-aggregation-v1"
+        },
+        "reproduction": {
+          "artifactMode": "references-only",
+          "dependencyAccess": "unverified",
+          "requiredArtifacts": [
+            "策略版本定义",
+            "数据快照",
+            "执行模型",
+            "回测引擎版本"
+          ],
+          "note": "此文件只包含诊断字段和产物引用，不包含原始数据快照；依赖可访问性尚未验证，不能视为完整复现包。"
+        }
+      },
+      "summary": "回测诊断摘要（格式 v2）\n任务 ID：dbc39963-da96-4583-8746-01feac9c7ff2\n策略版本 ID：26176553-5529-441c-a998-403ddbbb0e44\n运行 ID：dbc39963-da96-4583-8746-01feac9c7ff2\n任务状态：succeeded\n请求区间：{\"start\":\"2023-08-01T00:00:00.000Z\",\"end\":\"2023-09-15T00:00:00.000Z\"}\n数据冻结时点：2026-10-06T17:22:29.812Z\n执行模型：{\"schemaVersion\":\"execution-model-v1\",\"id\":\"cn-600519.SH-extended-window-research\",\"version\":\"1\",\"symbol\":\"600519.SH\",\"market\":\"CN\",\"instrumentType\":\"STOCK\",\"currency\":\"CNY\",\"timezone\":\"Asia/Shanghai\",\"rangeStart\":\"2023-08-01\",\"rangeEnd\":\"2023-09-15\",\"segmentCount\":1,\"contentHash\":\"e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a\"}\n结果完整性：complete\n数据说明：未获取上市日期，未验证回测窗口与上市日期的边界关系\n基准指标：{\"totalReturn\":{\"status\":\"available\",\"value\":\"-0.06270828004724727032\",\"reason\":null,\"code\":null},\"excessReturn\":{\"status\":\"available\",\"value\":\"0.0618473054802914226\",\"reason\":null,\"code\":null}}\n基准兼容与成本身份：{\"status\":\"compatible\",\"strategyFingerprint\":\"bf370f48b05606bb\",\"benchmarkFingerprint\":\"bf370f48b05606bb\",\"missingFields\":[],\"differentFields\":[],\"costAssumption\":{\"kind\":\"execution-model\",\"version\":\"execution-model-cost-v1\",\"fingerprint\":\"43ded329941a4f7c\",\"commissionRate\":null,\"slippageRate\":null}}\n停复牌来源与状态：{\"status\":\"notIncluded\",\"reason\":\"已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。\"}\n引擎版本：thesis-ledger-v3-local-runner-v2\n数据快照 ID：96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0\n内容哈希：96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0\n结果校验和：022494dccd271850\n复现边界：此文件只包含诊断字段和产物引用，不包含原始数据快照；依赖可访问性尚未验证，不能视为完整复现包。",
+      "summaryScope": "由实际下载文件通过当前客户端函数生成；不作为系统剪贴板读取证据"
+    },
+    {
+      "symbol": "600000.SH",
+      "path": "/Users/yzin/Downloads/backtest-73ab7c23-9335-4771-a612-5f1a1547734f-diagnostics-v2.json",
+      "sha256": "644927df176d00ec2ef7b37d93c5e8098441b756e125121745411f449eda595b",
+      "fullExportMatchesPersistentClientMapping": true,
+      "diagnostic": {
+        "format": "thesis-ledger.backtest-diagnostics",
+        "formatVersion": 2,
+        "exportedAt": "2026-10-06T17:59:44.624Z",
+        "identity": {
+          "jobId": "73ab7c23-9335-4771-a612-5f1a1547734f",
+          "runId": "73ab7c23-9335-4771-a612-5f1a1547734f",
+          "strategyVersionId": "5178af06-77ef-42f6-9bbd-0a7e0fed7bfe",
+          "mode": "V3",
+          "status": "succeeded",
+          "stage": "succeeded",
+          "createdAt": "2026-10-06T17:22:16.663Z",
+          "startedAt": "2026-10-06T17:22:16.731Z",
+          "finishedAt": "2026-10-06T17:22:17.360Z",
+          "period": {
+            "start": "2023-08-01T00:00:00.000Z",
+            "end": "2023-09-15T00:00:00.000Z"
+          }
+        },
+        "frozenConfiguration": {
+          "dataAsOf": "2026-10-06T17:22:16.058Z",
+          "baseCurrency": "CNY",
+          "initialCash": {
+            "recordedAmount": null,
+            "CNY": "100000",
+            "HKD": null,
+            "USD": null
+          },
+          "valuationPolicy": {
+            "missingPrice": null
+          },
+          "executionModel": {
+            "schemaVersion": "execution-model-v1",
+            "id": "cn-600000.SH-extended-window-research",
+            "version": "1",
+            "symbol": "600000.SH",
+            "market": "CN",
+            "instrumentType": "STOCK",
+            "currency": "CNY",
+            "timezone": "Asia/Shanghai",
+            "rangeStart": "2023-08-01",
+            "rangeEnd": "2023-09-15",
+            "segmentCount": 1,
+            "contentHash": "25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078"
+          }
+        },
+        "outcome": {
+          "completeness": "complete",
+          "warnings": [
+            "公共收费源暂不可用，使用已选执行模型。",
+            "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。",
+            "BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2"
+          ],
+          "metrics": {
+            "cagr": {
+              "status": "available",
+              "value": "-0.06705147129504673842",
+              "reason": null,
+              "code": null
+            },
+            "sharpe": {
+              "status": "available",
+              "value": "-6.31520989651186415159",
+              "reason": null,
+              "code": null
+            },
+            "winRate": {
+              "status": "available",
+              "value": "0",
+              "reason": null,
+              "code": null
+            },
+            "turnover": {
+              "status": "available",
+              "value": "99178.717635233000207901118977172773488433737601",
+              "reason": null,
+              "code": null
+            },
+            "tradeCount": {
+              "status": "available",
+              "value": "5",
+              "reason": null,
+              "code": null
+            },
+            "volatility": {
+              "status": "available",
+              "value": "0.01097948680169968071",
+              "reason": null,
+              "code": null
+            },
+            "maxDrawdown": {
+              "status": "available",
+              "value": "-0.00969312432107067132",
+              "reason": null,
+              "code": null
+            },
+            "totalReturn": {
+              "status": "available",
+              "value": "-0.00851467314261949287",
+              "reason": null,
+              "code": null
+            },
+            "profitFactor": {
+              "status": "available",
+              "value": "0",
+              "reason": null,
+              "code": null
+            },
+            "basicPeriodReturn": {
+              "status": "available",
+              "value": "-0.00851467314261949287",
+              "reason": null,
+              "code": null
+            }
+          },
+          "benchmark": {
+            "totalReturn": {
+              "status": "available",
+              "value": "-0.07545494232558139535",
+              "reason": null,
+              "code": null
+            },
+            "excessReturn": {
+              "status": "available",
+              "value": "0.06694026918296190248",
+              "reason": null,
+              "code": null
+            }
+          },
+          "benchmarkCompatibility": {
+            "status": "compatible",
+            "strategyFingerprint": "913781a52b242744",
+            "benchmarkFingerprint": "913781a52b242744",
+            "missingFields": [],
+            "differentFields": [],
+            "costAssumption": {
+              "kind": "execution-model",
+              "version": "execution-model-cost-v1",
+              "fingerprint": "492c2c101f6e906f",
+              "commissionRate": null,
+              "slippageRate": null
+            }
+          },
+          "tradingStatus": {
+            "status": "notIncluded",
+            "reason": "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。"
+          },
+          "failure": {
+            "code": null,
+            "summary": null
+          }
+        },
+        "traceability": {
+          "engineVersion": "thesis-ledger-v3-local-runner-v2",
+          "snapshotId": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+          "contentHash": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+          "resultChecksum": "1e83d3eb24788bcf",
+          "executionModelHash": "25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078",
+          "marketRuleVersion": "market-rules-v1",
+          "calendarVersion": "calendar-v1",
+          "aggregationVersion": "bar-aggregation-v1"
+        },
+        "reproduction": {
+          "artifactMode": "references-only",
+          "dependencyAccess": "unverified",
+          "requiredArtifacts": [
+            "策略版本定义",
+            "数据快照",
+            "执行模型",
+            "回测引擎版本"
+          ],
+          "note": "此文件只包含诊断字段和产物引用，不包含原始数据快照；依赖可访问性尚未验证，不能视为完整复现包。"
+        }
+      },
+      "summary": "回测诊断摘要（格式 v2）\n任务 ID：73ab7c23-9335-4771-a612-5f1a1547734f\n策略版本 ID：5178af06-77ef-42f6-9bbd-0a7e0fed7bfe\n运行 ID：73ab7c23-9335-4771-a612-5f1a1547734f\n任务状态：succeeded\n请求区间：{\"start\":\"2023-08-01T00:00:00.000Z\",\"end\":\"2023-09-15T00:00:00.000Z\"}\n数据冻结时点：2026-10-06T17:22:16.058Z\n执行模型：{\"schemaVersion\":\"execution-model-v1\",\"id\":\"cn-600000.SH-extended-window-research\",\"version\":\"1\",\"symbol\":\"600000.SH\",\"market\":\"CN\",\"instrumentType\":\"STOCK\",\"currency\":\"CNY\",\"timezone\":\"Asia/Shanghai\",\"rangeStart\":\"2023-08-01\",\"rangeEnd\":\"2023-09-15\",\"segmentCount\":1,\"contentHash\":\"25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078\"}\n结果完整性：complete\n基准指标：{\"totalReturn\":{\"status\":\"available\",\"value\":\"-0.07545494232558139535\",\"reason\":null,\"code\":null},\"excessReturn\":{\"status\":\"available\",\"value\":\"0.06694026918296190248\",\"reason\":null,\"code\":null}}\n基准兼容与成本身份：{\"status\":\"compatible\",\"strategyFingerprint\":\"913781a52b242744\",\"benchmarkFingerprint\":\"913781a52b242744\",\"missingFields\":[],\"differentFields\":[],\"costAssumption\":{\"kind\":\"execution-model\",\"version\":\"execution-model-cost-v1\",\"fingerprint\":\"492c2c101f6e906f\",\"commissionRate\":null,\"slippageRate\":null}}\n停复牌来源与状态：{\"status\":\"notIncluded\",\"reason\":\"已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。\"}\n引擎版本：thesis-ledger-v3-local-runner-v2\n数据快照 ID：5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701\n内容哈希：5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701\n结果校验和：1e83d3eb24788bcf\n复现边界：此文件只包含诊断字段和产物引用，不包含原始数据快照；依赖可访问性尚未验证，不能视为完整复现包。",
+      "summaryScope": "由实际下载文件通过当前客户端函数生成；不作为系统剪贴板读取证据"
+    }
+  ]
+}

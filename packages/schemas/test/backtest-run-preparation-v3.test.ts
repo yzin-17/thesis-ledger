@@ -36,6 +36,17 @@ const request = () => ({
 });
 
 describe('V3配置准备合同', () => {
+  it('现金研究只接受境内ETF原始价格及固定快照意图', () => {
+    const input = request();
+    input.runConfig.executionModel.scope.instrumentType = 'ETF';
+    const cash = { ...input, history: { basis: 'fixed-provider-snapshot' },
+      cashEventResearch: 'ex-date-entitlement-payment-date-cash-v1' };
+    expect(backtestRunPreparationRequestV3Schema.safeParse(cash).success).toBe(true);
+    expect(backtestRunPreparationRequestV3Schema.safeParse({ ...cash, adjustment: 'qfq', accountingBasis: 'normalized-series' }).success).toBe(false);
+    expect(backtestRunPreparationRequestV3Schema.safeParse({ ...cash, history: input.history }).success).toBe(false);
+    input.runConfig.executionModel.scope.instrumentType = 'STOCK';
+    expect(backtestRunPreparationRequestV3Schema.safeParse(cash).success).toBe(false);
+  });
   it('取价完成时冻结仅允许固定快照，不能修改严格历史时点', () => {
     const input = {
       ...request(),

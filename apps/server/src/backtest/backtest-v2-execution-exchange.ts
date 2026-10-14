@@ -2,8 +2,11 @@ import {
   runExchangeSimulation,
   availabilityForDecision,
   type BacktestEquityPoint,
+  type BacktestCorporateActionFact,
 } from '@thesis-ledger/domain';
+import { lifecycleSignalDateV3, lifecycleWarmupRowV3 } from './backtest-lifecycle-execution-v3.js';
 import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
+import { expectedStatusRejectionV3 } from './backtest-status-rejection-availability-v3.js';
 import {
   buildBacktestAnalytics,
   projectBacktestTrades,
@@ -31,7 +34,10 @@ import {
   toCorporateAction,
 } from './backtest-v2-execution-shared.js';
 import { buildPointInTimeIndicatorSeries } from './backtest-adjusted-indicators.js';
-import { prepareEventAccountingV3 } from './backtest-event-accounting-v3.js';
+import { frozenAccountingActionsV3 } from './backtest-known-cash-accounting-v3.js';
+import { knownCashEntitlementV3 } from './backtest-known-cash-entitlement-v3.js';
+import { exchangeDecisionTicksV3 } from './backtest-exchange-clocks-v3.js';
+import { cashDividendExecutionEventsV3 } from './backtest-cash-event-accounting-v3.js';
 import {
   annualizationFactorFromValuations,
   buildDailyValuationTicks,
@@ -41,6 +47,7 @@ import { requireFrozenExecutionRules } from './backtest-market-rules.js';
 import { buildBacktestSizingEquity } from './backtest-sizing-equity.js';
 import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
 import { requireV3EventSignalVisibility } from './backtest-v3-event-signal-clock.js';
+import { hkResearchLotForFactV3 } from './backtest-hk-research-lot-v3.js';
 
 type ExchangeVerticalInput = BacktestVerticalInput;
 
@@ -65,7 +72,8 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     instrumentRows,
     (row) => row.symbol === instrument.symbol && row.market === instrument.market,
   );
-  const fact = instrumentFact(instrumentRow);
+  const fact = instrumentFact(instrumentRow, isNormalizedSeries,
+    hkResearchLotForFactV3(instrumentRow, v3Config));
   const executionModel = input.runConfig.executionModel as
     | NonNullable<Parameters<typeof runExchangeSimulation>[0]['exchange']['executionModel']>
     | undefined;
@@ -81,6 +89,14 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
   );
   const rules = new VersionedExecutionRules({
     version: input.marketRuleVersion,
+    ...(v3Config.executionPriceProtocol.cashEventResearch ||
+    v3Config.executionPriceProtocol.marketRuleResearch ||
+    (v3Config.executionPriceProtocol.accountingBasis === 'normalized-series' &&
+      v3Config.executionPriceProtocol.history.basis === 'fixed-provider-snapshot')
+      ? {
+          factResearch: { basis: 'fixed-provider-snapshot' as const, dataAsOf: v3Config.dataAsOf },
+        }
+      : {}),
     calendar,
     calendarProvider: fact.provider,
     calendarProviderRevision: fact.providerRevision,
@@ -146,7 +162,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
       const sourceCalendar = tradingCalendarFromFact(
         calendarFact(rowFor(calendarRows, (row) => row.market === source.asset.market)),
       );
-      const rows = rowsAtTimeframe(input.rows.get(ref.key) ?? [], source.timeframe, sourceCalendar);
+      const rows = rowsAtTimeframe(input.rows.get(ref.key) ?? [], source.timeframe, sourceCalendar).filter(row => lifecycleWarmupRowV3(v3Config, row));
       for (const field of source.series) {
         sourceSeries.set(sourceSeriesKey(source.id, field), {
           sourceId: source.id,
@@ -189,10 +205,8 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
   const corporateActions = actionRows
     .filter((row) => row.kind !== 'empty-dataset')
     .map(toCorporateAction);
-  const accountingActions = !isNormalizedSeries
-    ? prepareEventAccountingV3(corporateActions, { calendar, bars,
-        startDate: input.runConfig.startDate, endDate: input.runConfig.endDate, dataAsOf: input.runConfig.dataAsOf })
-    : corporateActions;
+  const accountingActions = frozenAccountingActionsV3(v3Config, corporateActions, input.rows, { calendar, bars });
+  const cashEntitlement = knownCashEntitlementV3(calendar, v3Config);
   const executionSeries: BacktestSeries = {
     sourceId: `execution:${instrument.market}:${instrument.symbol}`,
     symbol: instrument.symbol,
@@ -217,19 +231,14 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     const tradingDate = calendar.status(bar.occurredAt).date;
     return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
   });
-  const decisionBars = executionRangeBars;
-  const ticks = decisionBars.map((bar) => ({
-    occurredAt: availabilityForDecision(bar)!,
-    tradingDate: calendar.status(bar.occurredAt).date,
-    availableAt: availabilityForDecision(bar)!,
-    timeframe: input.strategy.primaryTimeframe,
-  }));
+  const decisionBars = executionRangeBars.filter(bar => lifecycleSignalDateV3(v3Config, calendar.status(bar.occurredAt).date));
+  const ticks = exchangeDecisionTicksV3(decisionBars, input.strategy.primaryTimeframe, (at) => calendar.status(at).date);
   requireV3EventSignalVisibility({
-      strategy: input.strategy,
-      facts: corporateActions,
-      ticks,
-      symbol: instrument.symbol,
-      market: instrument.market,
+    strategy: input.strategy,
+    facts: corporateActions,
+    ticks,
+    symbol: instrument.symbol,
+    market: instrument.market,
   });
   const indicatorSeries = buildPointInTimeIndicatorSeries({
     expressions: [input.strategy.entry, input.strategy.exit],
@@ -293,6 +302,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     Parameters<typeof runExchangeSimulation>[0]['simulation']['positionStateAt']
   > = (tick) => {
     const position = ledger.snapshot().position;
+    cashEntitlement?.captureLegacy(tick.occurredAt, position.settledQuantity);
     if (position.quantity === '0') {
       positionWasOpen = false;
       positionOpenedAt = undefined;
@@ -357,12 +367,14 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
       },
       risk: (context) => riskAdapter.asSimulationRisk(context),
       positionStateAt,
+      ...cashEntitlement?.checkpoint(accountingActions, () => ledger.snapshot().position.quantity),
       corporateActions: isNormalizedSeries ? [] : accountingActions,
       corporateActionSignalFacts: corporateActions,
     },
     ledger,
     accountingBasis: snapshotProtocol.accountingBasis,
     exchange: {
+      ...(cashEntitlement ? { cashEntitlementFor: (fact: BacktestCorporateActionFact) => cashEntitlement.quantityFor(fact) } : {}),
       rules,
       calendar,
       bars,
@@ -440,9 +452,9 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     mutation.applied ? [] : [`LEDGER_${mutation.code}:${mutation.reason}`],
   );
   const executionUnavailableReasons = rejects.flatMap((reject) => {
+    if (expectedStatusRejectionV3(input.runConfig, reject)) return [];
     const expiredAtRangeEnd =
-      reject.code === 'DAY_EXPIRED' &&
-      reject.occurredAt === ticks.at(-1)?.occurredAt;
+      reject.code === 'DAY_EXPIRED' && reject.occurredAt === ticks.at(-1)?.occurredAt;
     return expiredAtRangeEnd ? [] : [`${reject.code}:${reject.reason}`];
   });
   const unavailableReasons = [
@@ -455,7 +467,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
         : [`CORPORATE_ACTION_REJECTED:${result.code}`],
     ),
   ];
-  const analytics = buildBacktestAnalytics({
+  const computedAnalytics = buildBacktestAnalytics({
     runId: input.runId,
     strategyVersionId: input.strategyVersionId,
     snapshotId: input.snapshotId,
@@ -471,7 +483,18 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     trades: trades.trades,
     equityCurve,
   });
-  return { fills, rejects, trades: trades.trades, analytics };
+  const expected = rejects.filter((reject) => expectedStatusRejectionV3(input.runConfig, reject));
+  const analytics = expected.length ? { ...computedAnalytics,
+    completeness: computedAnalytics.completeness === 'complete' ? 'partial' as const : computedAnalytics.completeness,
+    warnings: [...computedAnalytics.warnings, `已按冻结状态模型拒绝${expected.length}笔订单；有效成交、现金账与指标保留，未知状态仍按研究假设披露。`],
+  } : computedAnalytics;
+  return {
+    fills,
+    rejects,
+    trades: trades.trades,
+    analytics,
+    ...cashDividendExecutionEventsV3(input.runConfig, simulation),
+  };
 };
 
 export type { ExchangeVerticalResult };

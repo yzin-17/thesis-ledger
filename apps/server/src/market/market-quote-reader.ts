@@ -1,16 +1,19 @@
 import { parseCurrentQuote } from './market-current-data.js';
-import { normalizeSymbol } from '@thesis-ledger/domain';
-import { type Quote } from '@thesis-ledger/schemas';
+import { normalizeMarketSymbol } from './market-symbol-identity.js';
+import { type Quote, type QuoteAssetType } from '@thesis-ledger/schemas';
 import { type DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 import { type RedisService, redisKey } from '../platform/redis.service.js';
 import { StructuredLogger, currentTraceId } from '../platform/structured-logger.js';
 import { MARKET_CACHE_POLICIES } from './market-result-cache.js';
+import { MarketCacheControl } from './market-cache-control.js';
 
 const DEFAULT_DSA_TIMEOUT_MS = 5_000;
 const QUOTE_LOCK_SAFETY_MARGIN_MS = 5_000;
+const QUOTE_LOCK_DSA_OPERATIONS = 3;
 const QUOTE_LOCK_POLL_INTERVAL_MS = 100;
 
-type QuoteReadOptions = { allowStale?: boolean; refresh?: boolean };
+export type { QuoteAssetType } from '@thesis-ledger/schemas';
+export type QuoteReadOptions = { allowStale?: boolean; refresh?: boolean; assetType?: QuoteAssetType };
 
 type QuoteRedisClient = {
   get?: (key: string) => Promise<string | null>;
@@ -51,7 +54,7 @@ export class MarketQuoteReader {
     const configured = Number((this.dsa as DsaClient & { timeoutMs?: number }).timeoutMs);
     const timeoutMs =
       Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_DSA_TIMEOUT_MS;
-    return timeoutMs + QUOTE_LOCK_SAFETY_MARGIN_MS;
+    return timeoutMs * QUOTE_LOCK_DSA_OPERATIONS + QUOTE_LOCK_SAFETY_MARGIN_MS;
   }
 
   private client(): QuoteRedisClient | undefined {
@@ -171,13 +174,21 @@ export class MarketQuoteReader {
   }
 
   async getQuote(input: string, options: QuoteReadOptions = {}): Promise<Quote> {
-    const { symbol } = normalizeSymbol(input);
-    const flightKey = `quote:3:${symbol}`;
-    const freshKey = redisKey('cache', `quote:3:${symbol}:fresh`);
-    const lastValidKey = redisKey('cache', `quote:3:${symbol}:last-valid`);
+    const { symbol } = normalizeMarketSymbol(input);
+    const control = new MarketCacheControl(this.dsa);
+    const scope = await control.read({ capability: 'REALTIME_QUOTE', symbol,
+      ...(options.assetType ? { assetType: options.assetType } : {}) });
+    const flightKey = `quote:4:${symbol}:${options.assetType ?? 'inferred'}:${scope.context.generation}`;
+    const freshKey = redisKey('cache', `${flightKey}:fresh`);
+    const lastValidKey = redisKey('cache', `${flightKey}:last-valid`);
     const startedAt = Date.now();
-    const readFallback = (status: string) =>
-      this.readFreshOrLastValid(freshKey, lastValidKey, symbol, startedAt, status);
+    const checked = async (quote: Quote) => {
+      await control.assertCurrent(scope);
+      if (options.allowStale === false && quote.stale) throw new Error('行情陈旧，当前操作要求新鲜行情');
+      return quote;
+    };
+    const readFallback = async (status: string) =>
+      checked(await this.readFreshOrLastValid(freshKey, lastValidKey, symbol, startedAt, status));
 
     if (!options.refresh) {
       try {
@@ -188,7 +199,7 @@ export class MarketQuoteReader {
             symbol,
           );
           this.logStage(symbol, 'fresh-hit', startedAt, 'cache');
-          return parsed;
+          return await checked(parsed);
         }
       } catch {
         return readFallback('cache-error');
@@ -199,6 +210,7 @@ export class MarketQuoteReader {
       this.withQuoteLock(
         flightKey,
         async () => {
+          await control.assertCurrent(scope);
           if (!options.refresh) {
             try {
               const cached = await this.client()?.get?.(freshKey);
@@ -223,7 +235,7 @@ export class MarketQuoteReader {
           let raw: Record<string, unknown>;
           try {
             raw = await this.dsa.get<Record<string, unknown>>(
-              `/api/v3/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}`,
+              `/api/v3/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}${options.assetType ? `&assetType=${options.assetType}` : ''}`,
               1,
             );
             this.logStage(symbol, 'dsa-call', dsaStartedAt, 'success');
@@ -246,6 +258,7 @@ export class MarketQuoteReader {
               symbol,
             );
             const serialized = JSON.stringify(quote);
+            await control.assertCurrent(scope);
             const multi = this.client()?.multi;
             if (typeof multi !== 'function') return readFallback('cache-unavailable');
             await multi
@@ -275,10 +288,6 @@ export class MarketQuoteReader {
         () => readFallback('unavailable'),
         () => this.logStage(symbol, 'lock-acquired', startedAt, 'owner'),
       ),
-    ).then((quote) => {
-      if (options.allowStale === false && quote.stale)
-        throw new Error('行情陈旧，当前操作要求新鲜行情');
-      return quote;
-    });
+    ).then(checked);
   }
 }

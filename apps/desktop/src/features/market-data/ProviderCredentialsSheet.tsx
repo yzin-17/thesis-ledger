@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetHeader,
   SheetTitle,
   SheetDescription,
@@ -16,21 +17,31 @@ import { ProviderCredentialFields } from './ProviderCredentialFields.js';
 import {
   clearMarketProviderCredential,
   saveMarketProviderCredentials,
-  testMarketProvider,
 } from './market-data.api.js';
 import { ProviderOAuthPanel } from './ProviderOAuthPanel.js';
-import { providerTestMessage } from './provider-credentials.js';
+import { useProviderCredentialProbe } from './useProviderCredentialProbe.js';
+import { ProviderAccountAccessPanel } from './ProviderAccountAccessPanel.js';
 import { marketDataKeys } from './market-data.queries.js';
 import { credentialSourceLabel, validateCredentialDraft } from './provider-credentials.js';
-import type { ProviderManifest, ProviderCredentialDraft } from './market-data.types.js';
+import type { ProviderManifest, ProviderCredentialDraft, MarketRouteCatalogReadV3 } from './market-data.types.js';
 
 export function ProviderCredentialsSheet({
-  provider,
+  provider: initialProvider,
+  catalog,
   onClose,
 }: {
   provider: ProviderManifest;
+  catalog?: MarketRouteCatalogReadV3;
   onClose: () => void;
 }) {
+  const [savedConfiguration, setSavedConfiguration] = useState<
+    Awaited<ReturnType<typeof saveMarketProviderCredentials>> | null
+  >(null);
+  const [fieldsRevision, setFieldsRevision] = useState(0);
+  const provider =
+    savedConfiguration && savedConfiguration.configVersion > (initialProvider.configVersion ?? -1)
+      ? { ...initialProvider, ...savedConfiguration }
+      : initialProvider;
   const [draft, setDraft] = useState<ProviderCredentialDraft>(() => ({
     method:
       provider.credentialSchema?.methods.find((item) => item.method !== 'oauth')?.method ?? '',
@@ -40,20 +51,25 @@ export function ProviderCredentialsSheet({
     provider.providerId === 'longbridge' && provider.credentialMethod !== 'legacy',
   );
   const draftRevision = useRef(0);
-  const testAbort = useRef<AbortController | null>(null);
   const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
   const client = useQueryClient();
   const { confirm } = useConfirmDialog();
   const dirty = Object.values(draft.values).some((value) => value.length > 0);
   const refresh = () => client.invalidateQueries({ queryKey: marketDataKeys.root });
+  const probe = useProviderCredentialProbe(provider, draft, draftRevision, setFeedback);
+  const test = probe.test;
   // 凭证通过组件闭包读取，不作为 mutation variables 留在全局缓存中。
   const save = useMutation({
     gcTime: 0,
     retry: false,
     mutationFn: () => saveMarketProviderCredentials(provider.providerId, draft),
-    onSuccess: () => {
+    onSuccess: (configuration) => {
+      setSavedConfiguration(configuration);
+      setFieldsRevision((revision) => revision + 1);
       setDraft((current) => ({ ...current, values: {} }));
-      setFeedback({ error: false, text: '凭证已保存。可通过测试连接检查权限与可达性。' });
+      setFeedback({ error: false, text: provider.accountAccessSupported
+        ? '凭证已保存，正在检查账户功能权限。' : '凭证已保存。可通过测试连接检查权限与可达性。' });
+      probe.checkSaved(configuration.configVersion);
     },
     onError: () => setFeedback({ error: true, text: '凭证保存失败，请检查字段后重试。' }),
     onSettled: refresh,
@@ -62,39 +78,21 @@ export function ProviderCredentialsSheet({
     gcTime: 0,
     retry: false,
     mutationFn: () => clearMarketProviderCredential(provider),
-    onSuccess: () => {
+    onSuccess: (configuration) => {
+      setSavedConfiguration(configuration);
+      setFieldsRevision((revision) => revision + 1);
       setDraft((current) => ({ ...current, values: {} }));
-      setFeedback({ error: false, text: '页面凭证已移除。有环境配置时将自动使用环境配置。' });
+      setFeedback({
+        error: false,
+        text: '页面凭证已移除。有环境配置时自动使用环境凭证；否则数据源已停用。',
+      });
     },
     onError: () => setFeedback({ error: true, text: '移除失败，请稍后重试。' }),
     onSettled: refresh,
   });
-  const test = useMutation({
-    gcTime: 0,
-    retry: false,
-    mutationFn: async () => {
-      const revision = draftRevision.current;
-      const controller = new AbortController();
-      testAbort.current = controller;
-      try {
-        const result = await testMarketProvider(provider, draft, controller.signal);
-        return { revision, ...providerTestMessage(result) };
-      } catch {
-        return { revision, error: true, text: '测试未完成，请检查凭证或稍后重试。' };
-      } finally {
-        testAbort.current = null;
-      }
-    },
-    onSuccess: (result) => {
-      if (result.revision === draftRevision.current)
-        setFeedback({ error: result.error, text: result.text });
-    },
-  });
-  useEffect(() => () => testAbort.current?.abort(), []);
   useEffect(() => {
     if (save.isSuccess || save.isError) save.reset();
     if (clear.isSuccess || clear.isError) clear.reset();
-    if (test.isSuccess || test.isError) test.reset();
   }, [
     save.isSuccess,
     save.isError,
@@ -102,11 +100,19 @@ export function ProviderCredentialsSheet({
     clear.isSuccess,
     clear.isError,
     clear.reset,
-    test.isSuccess,
-    test.isError,
-    test.reset,
   ]);
   const busy = save.isPending || clear.isPending;
+  let testLabel = '测试连接';
+  if (test.isPending) testLabel = '测试中…';
+  else if (dirty) testLabel = '测试当前输入';
+  if (provider.accountAccessSupported) {
+    if (test.isPending) testLabel = '检查权限中…';
+    else if (dirty) testLabel = '检查当前输入权限';
+    else testLabel = '检查功能权限';
+  }
+  let saveLabel = '保存凭证';
+  if (save.isPending) saveLabel = '保存中…';
+  else if (provider.accountAccessSupported) saveLabel = '保存并检查权限';
   const close = async () => {
     if (busy) return;
     if (
@@ -134,7 +140,7 @@ export function ProviderCredentialsSheet({
     )
       return;
     draftRevision.current++;
-    testAbort.current?.abort();
+    probe.clear();
     setDraft((value) => ({ ...value, values: {} }));
     setFeedback(null);
     setOauthMode(useOAuth);
@@ -143,7 +149,7 @@ export function ProviderCredentialsSheet({
     if (
       !(await confirm({
         title: '移除页面凭证？',
-        description: '移除后恢复 DSA 环境配置；没有环境配置时，此数据源将不可用。',
+        description: '移除后恢复 DSA 环境配置；没有环境配置时，此数据源将停用。',
         confirmLabel: '移除凭证',
         cancelLabel: '取消',
         variant: 'destructive',
@@ -151,7 +157,7 @@ export function ProviderCredentialsSheet({
     )
       return;
     draftRevision.current++;
-    testAbort.current?.abort();
+    probe.clear();
     clear.mutate();
   };
   return (
@@ -161,14 +167,16 @@ export function ProviderCredentialsSheet({
         if (!open) void close();
       }}
     >
-      <SheetContent size="compact">
+      <SheetContent size="compact" className="min-h-0 overflow-hidden">
         <SheetHeader>
-          <SheetTitle>{provider.displayName} 凭证配置</SheetTitle>
+          <SheetTitle>{provider.displayName} {provider.providerId === 'futu' ? '连接配置' : '凭证配置'}</SheetTitle>
           <SheetDescription>
-            用于 ThesisLedger 的行情请求。页面配置优先于 DSA 环境配置。
+            {provider.providerId === 'futu'
+              ? '连接已登录的 OpenD，只读取证券静态资料，不需要券商账号、交易密码或持仓权限。DSA 在本机 Docker 中时，可填写 host.docker.internal 和 OpenD 实际监听端口。'
+              : '用于 ThesisLedger 的行情和证券资料请求。页面配置优先于 DSA 环境配置。'}
           </SheetDescription>
         </SheetHeader>
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
+        <SheetBody className="flex flex-col gap-6">
           <div>
             <Badge variant="outline">{credentialSourceLabel(provider)}</Badge>
           </div>
@@ -193,21 +201,32 @@ export function ProviderCredentialsSheet({
             </div>
           )}
           {oauthMode ? (
-            <ProviderOAuthPanel />
+            <ProviderOAuthPanel
+              key={fieldsRevision}
+              credentialConfigured={
+                provider.configured &&
+                provider.credentialConfigured &&
+                provider.credentialSource === 'control' &&
+                provider.credentialMethod === 'oauth'
+              }
+              disabled={busy}
+            />
           ) : (
             <>
               <ProviderCredentialFields
+                key={`${draft.method}-${fieldsRevision}`}
                 provider={provider}
                 draft={draft}
                 disabled={busy}
                 onChange={(next) => {
                   draftRevision.current++;
+                  probe.clear();
                   setDraft(next);
                   setFeedback(null);
                 }}
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
-                凭证加密保存在服务端，保存后不回显。留空仅保留当前方式下已保存的页面字段。
+                凭证加密保存在服务端，保存后不回显。点击“更换”可更新已配置的字段。
               </p>
             </>
           )}
@@ -216,6 +235,7 @@ export function ProviderCredentialsSheet({
               <AlertDescription role="status">{feedback.text}</AlertDescription>
             </Alert>
           )}
+          <ProviderAccountAccessPanel provider={provider} catalog={catalog} report={probe.report} dirty={dirty} />
           {provider.credentialSource === 'control' && (
             <div>
               <Button variant="ghost" disabled={busy} onClick={() => void clearCredentials()}>
@@ -223,7 +243,7 @@ export function ProviderCredentialsSheet({
               </Button>
             </div>
           )}
-        </div>
+        </SheetBody>
         <SheetFooter>
           <Button variant="outline" disabled={busy} onClick={() => void close()}>
             关闭
@@ -233,19 +253,20 @@ export function ProviderCredentialsSheet({
               variant="outline"
               disabled={busy || test.isPending}
               onClick={() => {
-                const error = validateCredentialDraft(provider, draft);
+                const error = !dirty && provider.accountAccessSupported && provider.credentialConfigured
+                  ? null : validateCredentialDraft(provider, draft);
                 if (error) {
                   setFeedback({ error: true, text: error });
                   return;
                 }
                 setFeedback(null);
-                test.mutate();
+                test.mutate(undefined);
               }}
             >
-              {test.isPending ? '测试中…' : '测试当前输入'}
+              {testLabel}
             </Button>
           )}
-          {!oauthMode && (
+          {!oauthMode && dirty && (
             <Button
               disabled={busy || test.isPending || !dirty}
               onClick={() => {
@@ -258,7 +279,7 @@ export function ProviderCredentialsSheet({
                 save.mutate();
               }}
             >
-              {save.isPending ? '保存中…' : '保存凭证'}
+              {saveLabel}
             </Button>
           )}
         </SheetFooter>

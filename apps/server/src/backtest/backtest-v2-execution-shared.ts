@@ -21,6 +21,8 @@ import {
   valueSimulationLedger,
   isAvailableForDecisionAt,
   type BacktestCorporateActionFact,
+  type CorporateActionResult,
+  type LedgerMutationResult,
   type BacktestSeries,
   type ExecutionCalendarFact,
   type ExecutionInstrumentFact,
@@ -48,6 +50,7 @@ import {
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import { dailyBarSessionTimes } from './backtest-daily-bar-session.js';
 import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
+import { instrumentFact } from './backtest-instrument-fact-v3.js';
 
 export type RowsByArtifact = ReadonlyMap<string, readonly ArtifactRow[]>;
 
@@ -249,20 +252,6 @@ const calendarFact = (row: ArtifactRow): ExecutionCalendarFact => ({
   range: parseJson(row.range, 'Calendar range'),
 });
 
-const instrumentFact = (row: ArtifactRow): ExecutionInstrumentFact => ({
-  symbol: stringField(row, 'symbol'),
-  market: row.market as ExecutionInstrumentFact['market'],
-  instrumentType: row.instrumentType as ExecutionInstrumentFact['instrumentType'],
-  currency: row.currency as ExecutionInstrumentFact['currency'],
-  lotSize: stringField(row, 'lotSize'),
-  tickSize: stringField(row, 'tickSize'),
-  tradable: row.tradable === true,
-  provider: stringField(row, 'provider'),
-  providerRevision: stringField(row, 'providerRevision'),
-  occurredAt: stringField(row, 'occurredAt'),
-  availableAt: stringField(row, 'availableAt'),
-});
-
 const executionRuleSnapshot = (row: ArtifactRow): ExecutionRuleSnapshot =>
   executionRuleSnapshotSchema.parse(parseJson(row.executionRules, 'Execution rules'));
 
@@ -283,7 +272,9 @@ const toCorporateAction = (row: ArtifactRow): BacktestCorporateActionFact => {
     if (typeof row[field] === 'string') result[field] = row[field];
   }
   if (typeof row.strategyVisibility === 'string') {
-    result.strategyVisibility = corporateActionStrategyVisibilitySchema.parse(JSON.parse(row.strategyVisibility));
+    result.strategyVisibility = corporateActionStrategyVisibilitySchema.parse(
+      JSON.parse(row.strategyVisibility),
+    );
   }
   if (row.currency === 'CNY' || row.currency === 'HKD' || row.currency === 'USD') {
     return { ...result, currency: row.currency };
@@ -368,6 +359,10 @@ export interface ExchangeVerticalResult {
   rejects: readonly ExchangeVerticalReject[];
   trades: ReturnType<typeof projectBacktestTrades>['trades'];
   analytics: ReturnType<typeof buildBacktestAnalytics>;
+  cashEvents?: {
+    actions: readonly CorporateActionResult[];
+    ledger: readonly LedgerMutationResult[];
+  };
 }
 
 export interface ExchangeVerticalReject {

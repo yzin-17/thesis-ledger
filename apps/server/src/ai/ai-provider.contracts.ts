@@ -256,6 +256,9 @@ export { aiProviderTestKindSchema };
 export type { AiProviderTestKind } from '@thesis-ledger/schemas';
 
 export const aiProviderTestPurposeSchema = z.enum([
+  'strategy_authoring_analysis',
+  'strategy_authoring_generation',
+  'strategy_authoring_modification',
   'research',
   'parameter_optimization',
   'strategy_discovery',

@@ -1,4 +1,5 @@
 import { DecimalValue } from './decimal.js';
+import { executionRuleAvailability } from './execution-rule-availability.js';
 import type {
   TradingCalendar,
   TradingDayStatus,
@@ -54,6 +55,7 @@ export interface ExecutionCalendarFact {
 
 export interface ExecutionRuleFacts {
   version: string;
+  factResearch?: { basis: 'fixed-provider-snapshot'; dataAsOf: string };
   calendar: TradingCalendar;
   calendarProvider: string;
   calendarProviderRevision: string;
@@ -251,9 +253,7 @@ const roundedLimit = (
   minimumDistanceTicks?: number,
 ) => {
   const multiplier =
-    direction === 'up'
-      ? DecimalValue.from('1').plus(ratio)
-      : DecimalValue.from('1').minus(ratio);
+    direction === 'up' ? DecimalValue.from('1').plus(ratio) : DecimalValue.from('1').minus(ratio);
   let limit = reference.times(multiplier).dividedBy(tick, 0).times(tick);
   if (minimumDistanceTicks !== undefined) {
     const minimumDistance = tick.times(minimumDistanceTicks.toString());
@@ -427,21 +427,8 @@ export class VersionedExecutionRules {
     ) {
       return this.reject(input, 'INSTRUMENT_NOT_TRADABLE', '订单标的与规则事实不匹配');
     }
-    const evaluatedAt = new Date(input.evaluatedAt).getTime();
-    const instrumentAvailableAt = new Date(this.facts.instrument.availableAt).getTime();
-    const calendarAvailableAt = new Date(this.facts.calendarAvailableAt).getTime();
-    if (!Number.isFinite(evaluatedAt) || !Number.isFinite(instrumentAvailableAt)) {
-      return this.reject(input, 'INSTRUMENT_NOT_TRADABLE', '评估时间或 Instrument Fact 时间无效');
-    }
-    if (!Number.isFinite(calendarAvailableAt)) {
-      return this.reject(input, 'CALENDAR_UNAVAILABLE', 'Calendar Fact 时间无效');
-    }
-    if (calendarAvailableAt > evaluatedAt) {
-      return this.reject(input, 'CALENDAR_UNAVAILABLE', 'Calendar Fact 在评估时尚不可用');
-    }
-    if (instrumentAvailableAt > evaluatedAt) {
-      return this.reject(input, 'INSTRUMENT_NOT_TRADABLE', 'Instrument Fact 在评估时尚不可用');
-    }
+    const availability = executionRuleAvailability(this.facts, input.evaluatedAt);
+    if (availability) return this.reject(input, availability.code, availability.reason);
     const day = this.facts.calendar.status(input.evaluatedAt);
     if (!day.open) return this.reject(input, 'MARKET_CLOSED', `市场不开市：${day.reason}`);
     if (!this.facts.calendar.isTradingSession(input.evaluatedAt)) {
@@ -558,9 +545,7 @@ export class VersionedExecutionRules {
   normalizePrice(value: string | DecimalValue) {
     const price = DecimalValue.from(value);
     if (this.facts.price.rounding !== 'halfUpToTick') return price;
-    return price
-      .dividedBy(this.facts.instrument.tickSize, 0)
-      .times(this.facts.instrument.tickSize);
+    return price.dividedBy(this.facts.instrument.tickSize, 0).times(this.facts.instrument.tickSize);
   }
 
   settlementDates(side: ExecutionSide, tradingDate: string): SettlementDates {

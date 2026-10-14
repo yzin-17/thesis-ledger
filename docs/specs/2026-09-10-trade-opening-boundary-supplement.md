@@ -1,5 +1,7 @@
 # 历史建仓时间补录 Spec
 
+原本地实施与验证见[归档任务](../archive/tasks/2026-09-10-trade-opening-boundary-supplement.md)；本文保留建仓断言的当前产品边界。
+
 上位 Spec：[`2026-08-26-trade-execution-ledger-system.md`](2026-08-26-trade-execution-ledger-system.md)
 
 相关子 Spec：[`Trade Projection 与收益读取模型`](2026-08-26-trade-projection-read-model.md)、[`交易与成交记录产品界面`](2026-08-26-trade-product-experience.md)

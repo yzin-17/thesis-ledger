@@ -1,4 +1,5 @@
 import {
+  benchmarkExecutionModelCostVersionV3,
   marketDataBarRouteKeyV3Schema,
   runConfigSchemaV3,
   strategySchema,
@@ -15,12 +16,25 @@ import {
   hashCanonicalManifest,
 } from './backtest-snapshot.js';
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
+import { backtestResearchReadOptionsV3 } from './backtest-research-read-options-v3.js';
+import { executionBarRowsV3 } from './backtest-v3-execution-bar-rows.js';
+import { shareWindowBenchmarkCostVersionV3 } from './backtest-share-window-benchmark-profile-v3.js';
 import { createBacktestSnapshotV3Source } from './backtest-snapshot-v3-source.js';
 import type { LocalSnapshotV3Store } from './backtest-snapshot-v3-store.js';
 import type { MarketBarReader } from '../market/market-bar-reader.js';
 import { collectSnapshotDependenciesV3 } from './backtest-snapshot-v3-dependencies.js';
 import { planSnapshotInputsV3 } from './backtest-snapshot-v3-input-plan.js';
-import { assertActualWarmupBarsV3, tradabilityWindowFromResponseV3 } from './backtest-snapshot-v3-tradability.js';
+import type { MarketLifecycleReadPortV3 } from '../market/market-lifecycle-reader-v3.js';
+import type { MarketKnownCashControlResponseV3 } from '@thesis-ledger/schemas';
+import { knownCashSnapshotContextV3 } from './backtest-known-cash-snapshot-v3.js';
+import {
+  assertLifecyclePreparationV3,
+  lifecycleInputHashV3,
+} from './backtest-lifecycle-preparation-v3.js';
+import {
+  assertActualWarmupBarsV3,
+  tradabilityWindowFromResponseV3,
+} from './backtest-snapshot-v3-tradability.js';
 import { assertPreparedSelection } from './backtest-preparation-fence.js';
 import {
   BacktestHistoricalInputErrorV3,
@@ -28,6 +42,11 @@ import {
   type BacktestReconstructionPreflightPortV3,
 } from './backtest-reconstruction-preflight-v3.js';
 import { writeBacktestSnapshotV3Artifacts } from './backtest-snapshot-v3-artifact-writer.js';
+import { collectSnapshotPublicFeesV3 } from './backtest-public-fees-snapshot-v3.js';
+import { publicFeesArtifactKeyV3, publicFeesCompositionVersionV3 } from '@thesis-ledger/schemas';
+import { tradingStatusArtifactKeyV3 } from '@thesis-ledger/schemas';
+import { collectSnapshotStatusInputsV1 } from './backtest-status-composition-v1.js';
+import { statusCompositionArtifactKeyV1 } from '@thesis-ledger/schemas';
 
 export interface BacktestSnapshotV3BuildInput {
   runId: string;
@@ -106,6 +125,7 @@ const buildBuildingManifest = (input: BacktestSnapshotV3BuildInput): BacktestSna
 
   return {
     manifestVersion: 'snapshot-manifest-v3',
+    benchmarkCostVersion: benchmarkExecutionModelCostVersionV3,
     runId: input.runId,
     strategyVersionId: input.strategyVersionId,
     strategyVersionHash: input.strategyVersionHash,
@@ -168,38 +188,6 @@ const assertExistingSnapshotMatches = (
   }
 };
 
-const makeBarRows = (
-  readResult: Extract<Awaited<ReturnType<MarketBarReader['readV3']>>, { status: 'selected' }>,
-  symbol: string,
-): ArtifactRow[] => {
-  const { response } = readResult.selection;
-  const routeKey = response.routeKey;
-  return response.bars.map((point) => ({
-    kind: 'market-bar-v3',
-    purpose: 'execution',
-    symbol,
-    market: routeKey.market,
-    assetType: routeKey.assetType,
-    timeframe: routeKey.timeframe,
-    adjustment: routeKey.adjustment,
-    occurredAt: point.timestamp,
-    availableAt: point.availableAt,
-    open: String(point.open),
-    high: String(point.high),
-    low: String(point.low),
-    close: String(point.close),
-    volume: String(point.volume),
-    amount: String(point.amount),
-    providerId: response.provenance.providerId,
-    upstreamSource: response.provenance.upstreamSource,
-    routeIndex: response.provenance.routeIndex,
-    effectivePolicyRevision: response.provenance.effectivePolicyRevision,
-    inputFingerprint: response.inputFingerprint,
-    completionStatus: point.completionStatus,
-    quality: 'complete',
-  }));
-};
-
 const replayResult = (manifest: BacktestSnapshotManifestV3): BacktestSnapshotV3BuildResult => {
   if (!manifest.contentHash) throw new Error('Snapshot V3 contentHash 缺失');
   return {
@@ -210,7 +198,7 @@ const replayResult = (manifest: BacktestSnapshotManifestV3): BacktestSnapshotV3B
 };
 
 const assertExecutionWindowMatchesProtocol = (
-  readResult: Parameters<typeof makeBarRows>[0],
+  readResult: Extract<Awaited<ReturnType<MarketBarReader['readV3']>>, { status: 'selected' }>,
   initialManifest: BacktestSnapshotManifestV3,
 ): void => {
   if (
@@ -235,6 +223,8 @@ export const buildBacktestSnapshotV3 = async (
   bars: Pick<MarketBarReader, 'readV3'>,
   dsa?: Parameters<typeof collectSnapshotDependenciesV3>[1],
   reconstruction?: BacktestReconstructionPreflightPortV3,
+  lifecycle?: MarketLifecycleReadPortV3,
+  knownCashCheck?: () => Promise<MarketKnownCashControlResponseV3>,
 ): Promise<BacktestSnapshotV3BuildResult> => {
   const initialManifest = buildBuildingManifest(input);
   const strategy = input.strategy;
@@ -246,24 +236,41 @@ export const buildBacktestSnapshotV3 = async (
     return replayResult(await snapshots.replay(input.runId));
   }
   if (typeof bars.readV3 !== 'function') throw new Error('MarketBarReader V3 未注入');
+  const cashContext = knownCashSnapshotContextV3(
+    input.runConfig.knownCashPreparation,
+    knownCashCheck,
+  );
+  await cashContext.read();
 
   const window = {
     start: initialManifest.dateRange.warmupStartDate,
     end: initialManifest.dateRange.endDate,
   };
+  if (input.runConfig.lifecyclePreparation) {
+    if (!lifecycle) throw new Error('生命周期准备冻结缺少当前来源复核端口');
+    const prepared = input.runConfig.lifecyclePreparation;
+    const current = await lifecycle.read({
+      market: 'CN',
+      symbol,
+      start: prepared.response.range.start,
+      end: prepared.response.range.end,
+    });
+    if (prepared.inputHash !== lifecycleInputHashV3(current))
+      throw new Error('生命周期准备输入变化，请重新准备');
+  }
   const readResult = await bars.readV3({
     market: routeKey.market,
     symbol,
     routeKey,
     window,
-    ...(routeKey.market === 'CN' && initialManifest.executionPriceProtocol.history.basis === 'fixed-provider-snapshot'
-      ? { tradabilityMode: 'assume-untradable-no-bar' as const,
-          priceResearch: initialManifest.executionPriceProtocol.accountingBasis === 'normalized-series' } : {}),
+    ...backtestResearchReadOptionsV3(routeKey.market, initialManifest.executionPriceProtocol),
     ...(initialManifest.frozenExecutionWindow
       ? {
           frozenWindowRef: initialManifest.frozenExecutionWindow,
           warmup: {
-            analysisStart: initialManifest.dateRange.startDate,
+            analysisStart:
+              input.runConfig.lifecyclePreparation?.signalStartDate ??
+              initialManifest.dateRange.startDate,
             minimumSessions: initialManifest.warmup.lookbackPeriods,
           },
         }
@@ -276,11 +283,20 @@ export const buildBacktestSnapshotV3 = async (
   if (input.preparationStamp) assertPreparedSelection(input.preparationStamp, readResult);
   if (readResult.status !== 'selected') throw new Error('V3 execution 行情窗口未 selected');
   assertExecutionWindowMatchesProtocol(readResult, initialManifest);
-  assertActualWarmupBarsV3(readResult.selection.response, initialManifest.dateRange.startDate, initialManifest.warmup.lookbackPeriods);
+  assertActualWarmupBarsV3(
+    readResult.selection.response,
+    input.runConfig.lifecyclePreparation?.signalStartDate ?? initialManifest.dateRange.startDate,
+    initialManifest.warmup.lookbackPeriods,
+  );
 
-  const rows = makeBarRows(readResult, symbol);
+  const rows = executionBarRowsV3(
+    readResult.selection.response,
+    symbol,
+    initialManifest.executionPriceProtocol,
+  );
   if (rows.length === 0) throw new Error('V3 execution Snapshot 未返回完整 Bar 数据');
   const runConfig = runConfigSchemaV3.parse(input.runConfig);
+  cashContext.assertPriceRevisions(readResult.evidence);
   const historyFailure = await backtestHistoricalExecutionPreflightFailureV3(
     {
       request: readResult.request,
@@ -293,6 +309,13 @@ export const buildBacktestSnapshotV3 = async (
     reconstruction,
   );
   if (historyFailure) throw new BacktestHistoricalInputErrorV3(historyFailure);
+  assertLifecyclePreparationV3(
+    runConfig,
+    readResult.selection.response.bars,
+    initialManifest.warmup.lookbackPeriods,
+  );
+  const publicFees = await collectSnapshotPublicFeesV3(runConfig, dsa);
+  const { statusComposition, tradingStatus } = await collectSnapshotStatusInputsV1(runConfig, dsa);
   const inputPlan = runConfig.priceInputBindings
     ? planSnapshotInputsV3({ strategy, runConfig })
     : undefined;
@@ -322,15 +345,41 @@ export const buildBacktestSnapshotV3 = async (
       ? { frozenWindowRef: JSON.stringify(readResult.frozenWindowRef) }
       : {}),
   };
+  const knownCash = await cashContext.read();
   const manifest = {
     ...initialManifest,
+    benchmarkCostVersion: shareWindowBenchmarkCostVersionV3(
+      initialManifest.executionPriceProtocol,
+      sourceOutput.actualSource,
+    ),
+    ...(statusComposition ? { statusComposition: { artifactKey: `${input.runId}/${statusCompositionArtifactKeyV1}`, freezeVersion: statusComposition.freezeVersion } } : {}),
+    ...(tradingStatus
+      ? {
+          tradingStatus: {
+            artifactKey: `${input.runId}/${tradingStatusArtifactKeyV3}`,
+            freezeVersion: tradingStatus.freezeVersion,
+          },
+        }
+      : {}),
+    ...(publicFees
+      ? {
+          publicFees: {
+            artifactKey: `${input.runId}/${publicFeesArtifactKeyV3}`,
+            compositionVersion: publicFeesCompositionVersionV3,
+          },
+        }
+      : {}),
     actualSources: inputPlan
       ? [...new Set(inputPlan.priceInputs.map((alias) => alias.purpose))].map((purpose) => ({
           ...sourceOutput.actualSource,
           purpose,
         }))
       : [sourceOutput.actualSource],
-    providerRevisions: dependencies ? { ...dependencies.providerRevisions } : {},
+    ...cashContext.manifest,
+    providerRevisions: {
+      ...(dependencies?.providerRevisions ?? {}),
+      ...cashContext.providerRevisions,
+    },
   } satisfies BacktestSnapshotManifestV3;
 
   const building = await snapshots.startBuild(manifest);
@@ -345,8 +394,28 @@ export const buildBacktestSnapshotV3 = async (
       strategy,
       runConfig,
       dependencies,
+      publicFees,
+      tradingStatus,
+      knownCash,
+      statusComposition,
     );
     await input.beforeFinalize?.();
+    await cashContext.read();
+    if (runConfig.lifecyclePreparation && lifecycle) {
+      const prepared = runConfig.lifecyclePreparation;
+      const current = await lifecycle.read({
+        market: 'CN',
+        symbol,
+        start: prepared.response.range.start,
+        end: prepared.response.range.end,
+      });
+      assertLifecyclePreparationV3(
+        runConfig,
+        readResult.selection.response.bars,
+        initialManifest.warmup.lookbackPeriods,
+        current,
+      );
+    }
     const finalized = await snapshots.finalize(input.runId, building, artifactRefs);
     return replayResult(finalized);
   } catch (error) {

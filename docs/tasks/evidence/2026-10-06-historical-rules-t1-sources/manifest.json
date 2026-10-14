@@ -1,0 +1,43 @@
+{
+  "用途": "本地非商业来源核验；不证明产品分发或商业冻结许可",
+  "编码": "Base64；解码得到未经重写的官方响应原字节",
+  "时钟": "fetchedAt 为本轮取得时刻；不作为历史 availableAt",
+  "条目": [
+    {
+      "name": "2023-trading-rules.docx.b64",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10824490/files/dcbe58edb194451d93f19b1f7dd8fb4c.docx",
+      "finalUrl": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10824490/files/dcbe58edb194451d93f19b1f7dd8fb4c.docx",
+      "status": 200,
+      "bytes": 51948,
+      "sha256": "7aa2319f6dcf597be1e86b3b69d7c2ad0e6acb2a5d0cc6be48a01af602fded40",
+      "fetchedAt": "2026-10-05T18:36:43.787728+00:00"
+    },
+    {
+      "name": "2023-deferred-clauses.docx.b64",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10824490/files/3f0cc77bae0543c795a42731398bc8e0.docx",
+      "finalUrl": "https://www.sse.com.cn/lawandrules/sselawsrules2025/repeal/rules/c/10824490/files/3f0cc77bae0543c795a42731398bc8e0.docx",
+      "status": 200,
+      "bytes": 17995,
+      "sha256": "13cd6f14fdc5b8ecb5fad1876c6ecb05bf6c163d5217a2f2d687029ffa5bf4e2",
+      "fetchedAt": "2026-10-05T18:36:44.010347+00:00"
+    },
+    {
+      "name": "2023-08-fee-guide.docx.b64",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/charge/c/10781461/files/6ead9e7d60e14272a19cd75b622dd2ef.docx",
+      "finalUrl": "https://www.sse.com.cn/lawandrules/sselawsrules2025/charge/c/10781461/files/6ead9e7d60e14272a19cd75b622dd2ef.docx",
+      "status": 200,
+      "bytes": 31017,
+      "sha256": "b42cb6ad16be71f59618e2150ec31af57e8cf8874bc83973934ca8237fd56e84",
+      "fetchedAt": "2026-10-05T18:36:45.253081+00:00"
+    },
+    {
+      "name": "sse-legal.html.b64",
+      "url": "https://www.sse.com.cn/home/legal/",
+      "finalUrl": "https://www.sse.com.cn/home/legal/",
+      "status": 200,
+      "bytes": 30155,
+      "sha256": "26733c0c6cd93428d1ec5d62401b6ad269a26990a9181c5f5d63237c35431f69",
+      "fetchedAt": "2026-10-05T18:36:45.740218+00:00"
+    }
+  ]
+}

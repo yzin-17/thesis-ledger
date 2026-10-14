@@ -1,0 +1,13 @@
+{
+  "request": {"symbol": "00700.HK", "market": "HK", "depth": 2, "allowDepthDegradation": false},
+  "response": {
+    "contractVersion": 1, "capability": "ORDER_BOOK", "symbol": "00700.HK", "market": "HK",
+    "venue": "XHKG", "coverage": "venue", "priceCurrency": "HKD", "quantityUnit": "share",
+    "requestedDepth": 2, "sourceDepthLimit": 5, "depthDegraded": false,
+    "bids": [{"price": "302.20", "quantity": "1000", "orderCount": null}, {"price": "302.10", "quantity": "2000", "orderCount": null}],
+    "asks": [{"price": "302.30", "quantity": "3000", "orderCount": null}],
+    "sourceEventTime": "2026-10-09T08:00:00+00:00", "receivedAt": "2026-10-09T08:00:01+00:00",
+    "sequence": 1, "target": {"providerId": "fixture-a", "upstreamSource": "venue-a"},
+    "adapterRevision": "fixture-book-v1", "dataNature": "realtime", "state": "valid", "continuity": "unknown"
+  }
+}

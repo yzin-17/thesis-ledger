@@ -1,6 +1,6 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { MarketDetailCapability, MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDetailCapability, MarketDisplayDetailResponse as MarketDetailResponse } from '@thesis-ledger/api-client';
 import type { MarketIndicatorResult } from '@thesis-ledger/schemas';
 import { requestMarketDetail } from './market-detail.api.js';
 import {
@@ -109,6 +109,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
             : {}),
           ...(adjustment ? { adjustment } : {}),
           barsLimit: chartWindowV3.barsLimit,
+          ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
           chartContractVersion: 3,
           navLimit: 90,
           indicatorParams,
@@ -141,7 +142,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
       capability,
       paramsKey,
       adjustment ?? null,
-      'chart-v3', chartWindowV3.barsLimit,
+      'chart-v3', chartWindowV3.barsLimit, chartWindowV3.timeframe ?? '1d',
     ] as const;
     const requestToken = lifecycle.beginRequest();
     retryQueryKeysRef.current.push(queryKey);
@@ -159,6 +160,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
               include: capability === 'bars' || capability.startsWith('indicator:')
                 ? ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] : [capability],
               barsLimit: chartWindowV3.barsLimit,
+              ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
               chartContractVersion: 3,
               navLimit: 90,
               indicatorParams,

@@ -1,4 +1,6 @@
 import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { backtestNavPreparationRequestV3Schema } from '@thesis-ledger/schemas';
 import { prepareNavRunConfigV3 } from '../../src/backtest/backtest-nav-preparation.js';
@@ -37,7 +39,7 @@ describe('NAV 准备合同与完整输入核验', () => {
     expect(preparationHash).toBe(hashCanonicalManifest(binding));
     expect(f.read).toHaveBeenCalledTimes(1);
     expect(f.read.mock.calls[0]![0]).toMatchObject({ warmupPeriods: 1, tailTradingDays: 1 });
-    const directory = await mkdtemp('/private/tmp/nav-preparation-test-');
+    const directory = await mkdtemp(join(tmpdir(), 'nav-preparation-test-'));
     try {
       const store = new LocalNavSnapshotStore(directory);
       const response = result.selection.response;

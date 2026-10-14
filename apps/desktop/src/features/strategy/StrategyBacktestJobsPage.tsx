@@ -81,7 +81,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
       return items.some((group) =>
         group.jobs.some((job) => !['succeeded', 'failed', 'cancelled'].includes(job.status)),
       )
-        ? 10_000
+        ? 30_000
         : false;
     },
   });

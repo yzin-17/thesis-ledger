@@ -247,6 +247,7 @@ export async function formalizeOptimizationCandidate(
         version: expectedVersion + 1,
         schemaVersion: 2,
         schema: candidateStrategy.data as Prisma.InputJsonValue,
+        source: { kind: 'experiment', referenceId: experimentId },
       },
     });
     const adoptionRows = await transaction.$queryRaw<OptimizationAdoptionRow[]>(Prisma.sql`

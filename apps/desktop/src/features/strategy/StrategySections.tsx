@@ -34,25 +34,8 @@ import type {
   StrategyVersion,
 } from './strategy.types.js';
 
-export const jobStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    queued: '排队中',
-    running: '运行中',
-    succeeded: '已完成',
-    failed: '失败',
-    cancelled: '已取消',
-  };
-  return labels[status] ?? `未知状态（${status}）`;
-};
-
-export const jobStatusVariant = (
-  status: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' => {
-  if (status === 'succeeded') return 'secondary';
-  if (status === 'failed') return 'destructive';
-  if (status === 'running') return 'secondary';
-  return 'outline';
-};
+import { jobStatusLabel, jobStatusVariant } from './backtest-status.js';
+export { jobStatusLabel, jobStatusVariant } from './backtest-status.js';
 
 export const backtestStageLabel = (stage: unknown) => {
   const labels: Record<string, string> = {
@@ -404,7 +387,7 @@ export function StrategyJobs({
                     </td>
                     <td>
                       <Badge variant={jobStatusVariant(job.status)}>
-                        {job.cancelRequestedAt ? '正在取消' : jobStatusLabel(job.status)}
+                        {jobStatusLabel(job.status, job.cancelRequestedAt)}
                       </Badge>
                       {errorSummary && <span>{errorSummary}</span>}
                       {job.errorCode && <span>{job.errorCode}</span>}

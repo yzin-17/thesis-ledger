@@ -401,7 +401,7 @@ export function LightweightMarketChart({
     setData(
       volume,
       chartPoints.map((point) =>
-        point.bar
+        point.bar && point.bar.volume !== null
           ? {
               time: point.date,
               value: point.bar.volume,
@@ -692,12 +692,12 @@ export function LightweightMarketChart({
       />
       {isLeftHistoryBlank && historyLoading ? (
         <span className="pointer-events-none absolute top-3 left-3 text-xs text-muted-foreground">
-          正在加载更早日线…
+          正在加载更早行情…
         </span>
       ) : null}
       {isLatestBoundaryReached && latestLoading ? (
         <span className="pointer-events-none absolute top-3 right-3 text-xs text-muted-foreground">
-          正在检查更新日线…
+          正在检查更新行情…
         </span>
       ) : null}
     </div>

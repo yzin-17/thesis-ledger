@@ -71,6 +71,11 @@ import {
 } from './ai-provider-readiness.persistence.js';
 import { createStoredAiProvider } from './ai-provider-runtime.js';
 import { generationPricingError, testPricingForModel } from './ai-provider-test-pricing.js';
+import {
+  withAiProviderConfigurationTransaction,
+  mutateAiProviderLifecycle,
+  type StoredProviderLifecycleAction,
+} from './ai-provider-configuration-transaction.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
 import { planAiProviderMigrations } from './ai-provider-migration.js';
 import type {
@@ -128,7 +133,6 @@ export interface AiTestRuntimeInput {
   executionRoutes?: AiProviderExecutionRouteInput[];
 }
 
-type StoredProviderLifecycleAction = { kind: 'set-enabled'; enabled: boolean } | { kind: 'delete' };
 
 type AiTestModelPricing = {
   costPer1kInput?: number | undefined;
@@ -193,8 +197,8 @@ export class AiProviderService implements OnModuleInit {
     await this.refreshRegistry();
   }
 
-  async list(): Promise<AiProviderSummary[]> {
-    const rows = await this.configs.listStored();
+  async list(transaction?: Prisma.TransactionClient): Promise<AiProviderSummary[]> {
+    const rows = await this.configs.listStored(transaction);
     const environment = this.environmentProviders();
     const databaseIds = new Set(rows.map((row) => row.name));
     const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
@@ -248,21 +252,22 @@ export class AiProviderService implements OnModuleInit {
 
   async updateRoutingSettings(input: AiRoutingSettingsUpdate) {
     if (!this.routingSettings) throw new InternalServerErrorException('AI 默认模型设置不可用');
-    if (input.researchDefault) {
-      const candidate = (await this.getRoutingSettings()).candidates.find(
-        (item) =>
-          item.providerId === input.researchDefault?.providerId &&
-          item.model === input.researchDefault?.model,
-      );
-      if (!candidate) throw new BadRequestException('研究默认模型必须配置研究报告用途');
-      if (!candidate.enabled) throw new BadRequestException('研究默认模型所属 Provider 已停用');
-      if (candidate.health === 'down')
-        throw new BadRequestException('研究默认模型所属 Provider 当前不可用');
-    }
-    const saved = await this.routingSettings.update({
-      researchDefault: input.researchDefault,
-      expectedRevision: input.expectedRevision,
-    });
+    const persist = async (transaction?: Prisma.TransactionClient) => {
+      if (input.researchDefault) {
+        const candidate = (await this.list(transaction))
+          .flatMap((provider) => this.researchCandidatesFromSummary(provider))
+          .find((item) => item.providerId === input.researchDefault?.providerId &&
+            item.model === input.researchDefault?.model);
+        if (!candidate) throw new BadRequestException('研究默认模型必须配置研究报告用途');
+        if (!candidate.enabled) throw new BadRequestException('研究默认模型所属 Provider 已停用');
+        if (candidate.health === 'down')
+          throw new BadRequestException('研究默认模型所属 Provider 当前不可用');
+      }
+      return this.routingSettings!.update(input, transaction);
+    };
+    const saved = this.prisma
+      ? await withAiProviderConfigurationTransaction(this.prisma, persist)
+      : await persist();
     return {
       ...saved,
       candidates: (await this.list()).flatMap((provider) =>
@@ -283,7 +288,6 @@ export class AiProviderService implements OnModuleInit {
       if (existingSettings?.modelPricing && input.modelPricing === undefined)
         throw new ConflictException('当前 Provider 含模型级价格，请使用新版完整配置后再保存');
     }
-    await this.assertResearchDefaultPreserved(input);
     const environment = this.environmentProviders();
     const hasInputCredential = Boolean(input.apiKey?.trim() || input.credentialsRef?.trim());
     if (
@@ -301,19 +305,28 @@ export class AiProviderService implements OnModuleInit {
       input.apiKey?.trim() || input.credentialsRef?.trim(),
     );
     const credential = input.apiKey?.trim() || input.credentialsRef?.trim() || draft?.credential;
-    const saved = await this.configs.saveAi({
-      name: input.name,
-      enabled: input.enabled ?? existing?.enabled ?? true,
-      priority: input.priority,
-      capabilities: input.capabilities ?? ['chat'],
-      ...(credential ? { credentialsRef: credential } : {}),
-      ...(input.authMode === 'none' ? { clearCredentials: true } : {}),
-      settings: {
-        ...settingsFromAiProviderInput(input, existing?.settings),
-        ...(verifiedRoutes === undefined ? {} : { generationValidation: verifiedRoutes }),
-      },
-      ...(input.expectedRevision === undefined ? {} : { expectedRevision: input.expectedRevision }),
-    });
+    const persist = async (transaction?: Prisma.TransactionClient) => {
+      await this.assertResearchDefaultPreserved(input, transaction);
+      return this.configs.saveAi(
+        {
+          name: input.name,
+          enabled: input.enabled ?? existing?.enabled ?? true,
+          priority: input.priority,
+          capabilities: input.capabilities ?? ['chat'],
+          ...(credential ? { credentialsRef: credential } : {}),
+          ...(input.authMode === 'none' ? { clearCredentials: true } : {}),
+          settings: {
+            ...settingsFromAiProviderInput(input, existing?.settings),
+            ...(verifiedRoutes === undefined ? {} : { generationValidation: verifiedRoutes }),
+          },
+          ...(input.expectedRevision === undefined ? {} : { expectedRevision: input.expectedRevision }),
+        },
+        transaction,
+      );
+    };
+    const saved = this.prisma
+      ? await withAiProviderConfigurationTransaction(this.prisma, persist)
+      : await persist();
     if (draft) await this.recordSavedHealth(input.name, true, draft.latencyMs, draft.checkedAt);
     const observed = verifiedRoutes?.find(
       (record) =>
@@ -528,7 +541,7 @@ export class AiProviderService implements OnModuleInit {
   private researchCandidatesFromSummary(provider: AiProviderSummary): AiResearchDefaultCandidate[] {
     const models = new Set(provider.models);
     const researchModels = (provider.executionRouteConfigs ?? [])
-      .filter((route) => route.contract.id === 'research')
+      .filter((route) => route.enabled !== false && route.contract.id === 'research')
       .map((route) => route.model)
       .filter((model) => models.has(model));
     return [...new Set(researchModels)].map((model) => {
@@ -580,58 +593,20 @@ export class AiProviderService implements OnModuleInit {
     if (Number.isNaN(expectedDate.getTime()))
       throw new ConflictException('Provider 配置版本无效，请刷新后重试');
 
-    return this.prisma.$transaction(async (transaction) => {
-      const current = await transaction.providerConfig.findUnique({ where: { name } });
-      if (!current || current.type !== 'ai') throw new NotFoundException('AI Provider 配置不存在');
-      if (current.updatedAt.toISOString() !== expectedRevision)
-        throw new ConflictException('Provider 配置已变化，请刷新后重试');
-
-      const settings = await transaction.aiRoutingSettings.findUnique({
-        where: { id: 'global' },
-      });
-      const isResearchDefault = settings?.researchDefaultProvider === name;
-      if (isResearchDefault) {
-        if (!options.clearResearchDefault)
-          throw new ConflictException('该 Provider 是研究默认模型，请先更换或清除研究默认模型');
-        if (
-          !options.expectedSettingsRevision ||
-          options.expectedSettingsRevision !== String(settings.revision)
-        )
-          throw new ConflictException('AI 默认模型设置已变化，请刷新后重试');
-        const cleared = await transaction.aiRoutingSettings.updateMany({
-          where: { id: 'global', revision: settings.revision },
-          data: {
-            researchDefaultProvider: null,
-            researchDefaultModel: null,
-            revision: settings.revision + 1,
-          },
-        });
-        if (cleared.count !== 1) throw new ConflictException('AI 默认模型设置已变化，请刷新后重试');
-      } else if (options.clearResearchDefault) {
-        throw new ConflictException('当前 Provider 不是研究默认模型，不能清除默认路由');
-      }
-
-      if (action.kind === 'set-enabled') {
-        const updated = await transaction.providerConfig.updateMany({
-          where: { name, updatedAt: expectedDate },
-          data: { enabled: action.enabled },
-        });
-        if (updated.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
-        return transaction.providerConfig.findUnique({ where: { name } });
-      }
-
-      const deleted = await transaction.providerConfig.deleteMany({
-        where: { name, updatedAt: expectedDate },
-      });
-      if (deleted.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
-      return null;
-    });
+    return withAiProviderConfigurationTransaction(this.prisma, (transaction) =>
+      mutateAiProviderLifecycle(transaction, name, action, options),
+    );
   }
 
-  private async assertResearchDefaultPreserved(input: AiProviderInput) {
-    const settings = await this.routingSettings?.read();
+  private async assertResearchDefaultPreserved(
+    input: AiProviderInput,
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const settings = await this.routingSettings?.read(transaction);
     const researchDefault = settings?.researchDefault;
     if (!researchDefault || researchDefault.providerId !== input.name) return;
+    if (input.enabled === false)
+      throw new ConflictException('保存会停用研究默认 Provider，请先更换或清除研究默认模型');
     if (!input.models.includes(researchDefault.model))
       throw new ConflictException('保存会移除研究默认模型，请先更换或清除研究默认模型');
     if (

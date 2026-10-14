@@ -1,5 +1,7 @@
 # 现金账户资金范围与内部划转实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：本地命令/投影已完成，真实浏览器键盘、跨账户划转及相关运行断言仍需验收。Canonical E03 的账本命令与隔离证明只覆盖其明确场景，不代表全部资金/划转产品交互已通过；旧运行版本推测不作为当前前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[`../specs/2026-08-30-cash-account-funding-and-transfer.md`](../specs/2026-08-30-cash-account-funding-and-transfer.md)
 
 状态：T1-T4 已完成并验证。

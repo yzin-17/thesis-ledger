@@ -1,8 +1,10 @@
 import type {
   DesiredProviderPolicyV3,
   EffectiveProviderPolicyV3,
-  MarketRouteCapabilityV3,
+  MarketRouteCatalogReadClientV3,
+  LocalHistorySource,
 } from '@thesis-ledger/schemas';
+import { isLocalHistoryProvider, localHistoryRouteLabel } from './market-local-history.js';
 
 export interface RouteTarget {
   providerId: string;
@@ -38,23 +40,8 @@ export type MarketPolicyError = {
   issues?: Array<{ path: Array<string | number>; reason: string }>;
 };
 
-export type RouteCatalogReadReasonV3 =
-  | 'catalog_partial'
-  | 'control_timeout'
-  | 'control_unauthorized'
-  | 'unsupported_capability'
-  | 'invalid_response'
-  | 'control_unavailable';
-
-export interface MarketRouteCatalogReadV3 {
-  contractVersion: 3;
-  consumer: 'thesis-ledger';
-  status: 'complete' | 'partial' | 'unavailable';
-  catalogRevision: number | null;
-  generatedAt: string | null;
-  entries: MarketRouteCapabilityV3[];
-  reason: RouteCatalogReadReasonV3 | null;
-}
+export type RouteCatalogReadReasonV3 = NonNullable<MarketRouteCatalogReadClientV3['reason']>;
+export type MarketRouteCatalogReadV3 = MarketRouteCatalogReadClientV3;
 
 export interface ProviderManifest {
   providerId: string;
@@ -65,9 +52,11 @@ export interface ProviderManifest {
   enabled: boolean;
   credentialConfigured: boolean;
   requiresCredential?: boolean;
+  accountAccessSupported?: boolean;
   origin?: 'dsa';
   markets?: string[];
   configurationMode?: 'control' | 'built_in' | 'dsa_environment';
+  sourceKind?: 'online' | 'local_history';
   credentialSource?: 'control' | 'environment' | 'none' | 'built_in';
   credentialMethod?: string | null;
   credentialFieldsConfigured?: Record<string, boolean>;
@@ -77,6 +66,8 @@ export interface ProviderManifest {
     sourceId: string;
     displayName: string;
     capabilities: Record<string, string[]>;
+    localHistory?: LocalHistorySource;
+    documentCatalog?: 'announcements';
   }>;
   updatedAt?: string | null;
   health?: { scopes?: Array<{ state?: string; circuit?: string; errorCode?: string | null }> };
@@ -170,6 +161,9 @@ export const dataSourceDisplay = (
   providers: readonly ProviderManifest[] = [],
 ) => {
   const provider = providers.find((item) => item.providerId === providerId);
+  if (provider && isLocalHistoryProvider(provider)) {
+    return localHistoryRouteLabel(provider, upstreamSource);
+  }
   let providerName = provider?.displayName ?? providerId;
   if (!provider && providerId === 'akshare') providerName = 'AKShare';
   else if (!provider && providerId === 'tencent') providerName = '腾讯财经';

@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  readyRouteTargetsV3,
+  selectableRouteTargetsV3,
   routeAvailabilityLabelV3,
   routeKeyIdV3,
   routeTargetMatchesV3,
@@ -20,6 +20,7 @@ import {
   type RouteTarget,
 } from './market-data.types.js';
 import { targetLabelV3 } from './market-policy-status-v3.js';
+import { Field, FieldLabel } from '@/components/ui/field';
 
 const NONE = '__none__';
 
@@ -55,7 +56,11 @@ const choicesForRole = (
       : candidates;
   const choices: TargetChoice[] = [
     { label: role === 'primary' ? '未配置' : '不设备用', value: NONE },
-    ...available.map((option) => ({ label: option.label, value: option.key })),
+    ...available.map((option) => ({
+      label: option.label,
+      value: option.key,
+      disabled: option.disabled ?? false,
+    })),
   ];
   if (selected && !available.some((option) => routeTargetMatchesV3(option.target, selected))) {
     const reason = unreadyTargetReason(catalog, row, selected);
@@ -87,15 +92,15 @@ export function MarketPolicyTargetSelect({
   disabled: boolean;
   onChange: (target: RouteTarget | null) => void;
 }) {
-  const candidates = readyRouteTargetsV3(catalog, row.key, providers);
+  const candidates = selectableRouteTargetsV3(catalog, row.key, providers);
   const choices = choicesForRole(role, selected, other, candidates, catalog, row, providers);
   const value = selected ? targetOptionKey(selected) : NONE;
   const fieldLabel = role === 'primary' ? '主数据源' : '备用数据源';
   const selectable = !disabled && catalog?.status === 'complete';
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="block text-xs font-medium text-muted-foreground">{fieldLabel}</span>
+    <Field className="min-w-0">
+      <FieldLabel><span className="sr-only">{row.label} </span>{fieldLabel}</FieldLabel>
       <Select
         items={choices}
         value={value}
@@ -106,6 +111,7 @@ export function MarketPolicyTargetSelect({
             return;
           }
           const choice = candidates.find((option) => option.key === nextValue);
+          if (choice?.disabled) return;
           onChange(choice?.target ?? null);
         }}
       >
@@ -122,6 +128,6 @@ export function MarketPolicyTargetSelect({
           </SelectGroup>
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   );
 }

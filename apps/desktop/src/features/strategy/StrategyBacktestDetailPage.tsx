@@ -155,7 +155,7 @@ export function StrategyBacktestDetailPage({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-semibold tracking-tight">{identity.title}</h2>
               <Badge variant={jobStatusVariant(job.status)}>
-                {job.cancelRequestedAt ? '正在取消' : jobStatusLabel(job.status)}
+                {jobStatusLabel(job.status, job.cancelRequestedAt)}
               </Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{identity.subtitle}</p>

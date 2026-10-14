@@ -1,13 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { mapEventV3HttpError, parseEventResponseV3 } from './dsa-events-v3.js';
+import { DsaDataCapabilityReaderV3 } from './dsa-data-capability-reader-v3.js';
 import type {
   DesiredProviderPolicyV3,
+  MarketProviderProbeRoute,
   MarketRouteCatalogV3,
   MarketControlHandshakeResponseV3,
   MarketControlPolicyApplyResponseV3,
   MarketDataBarSeriesRequestV3,
   MarketEventRequestV3,
   MarketEventResponseV3,
+  MarketCacheContextRequestV3,
+  MarketCacheContextResponseV3,
+  MarketPublicFeesRequestV3,
+  MarketPublicFeesResponseV3,
+  MarketTradingStatusRequestV3,
+  MarketTradingStatusResponseV3,
   MarketChartBarsRequestV3,
   MarketChartBarsResponseV3,
   MarketDataBarSeriesResponseV3,
@@ -30,16 +37,17 @@ import {
   marketControlHandshakeRequestV3Schema,
   marketControlPolicyApplyRequestV3Schema,
   marketRouteCatalogGetEndpointV3,
-  marketEventRequestV3Schema,
-  marketChartBarsRequestV3Schema,
   indicatorCalculateRequestSchema,
+  marketPeriodIndicatorRequestSchema,
+  marketPeriodIndicatorCapabilitiesSchema,
+  type MarketPeriodIndicatorRequest,
+  type MarketPeriodIndicatorCapabilities,
   indicatorCalculateResponseSchema,
 } from '@thesis-ledger/schemas';
 import {
   DsaV3ProtocolError,
   mapControlV3HttpError,
   mapDataV3HttpError,
-  parseChartBarsResponseV3,
   parseControlHandshakeResponseV3,
   parseControlPolicyApplyResponseV3,
   parseDataCapabilitiesV3,
@@ -49,7 +57,6 @@ import {
   type EffectivePolicyEnvelopeV3,
 } from './dsa-v3-protocol.js';
 import { loadConfig } from '../../platform/config.js';
-import { readBarSeriesV3 } from './dsa-market-bars-v3.js';
 import {
   parseProviderRegistry,
   parseProviderMutation,
@@ -64,6 +71,7 @@ import {
   parseCatalogDelta,
 } from './dsa-catalog-v3.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
+import { fetchObservedCacheRequest } from './dsa-cache-request-observation.js';
 
 function controlErrorCode(detailCode: string | undefined, status: number): DsaV3ErrorCode {
   if (detailCode === 'unauthorized') return 'unauthorized';
@@ -75,20 +83,12 @@ function controlErrorCode(detailCode: string | undefined, status: number): DsaV3
 
 export type { CatalogJob } from './dsa-catalog-v3.js';
 
-export class DsaError extends Error {
-  constructor(
-    message: string,
-    readonly code: DsaV3ErrorCode,
-    readonly status?: number,
-  ) {
-    super(message);
-  }
-}
+export class DsaError extends DsaV3ProtocolError {}
 
 type HttpErrorMapper = (status: number, payload: unknown) => DsaV3ProtocolError;
 
 const toDsaError = (error: DsaV3ProtocolError) =>
-  new DsaError(error.message, error.code, error.status);
+  new DsaError(error.message, error.code, error.status, error.sourceReason);
 
 const parseV3Response = <T>(parse: () => T): T => {
   try {
@@ -102,7 +102,14 @@ const parseV3Response = <T>(parse: () => T): T => {
 @Injectable()
 export class DsaClient {
   private readonly config = loadConfig();
-
+  get dataCapabilities() {
+    return new DsaDataCapabilityReaderV3(
+      (path, request, mapper) => this.post<unknown>(path, request, 1, mapper),
+      parseV3Response,
+      () => this.marketDataCapabilitiesV3(),
+      () => this.effectiveControlPolicyV3().then(result => result.projection?.effective ?? null),
+    );
+  }
   /** Read-only budget used by callers to derive bounded distributed leases. */
   get timeoutMs() {
     return this.config.dsaTimeoutMs;
@@ -113,14 +120,14 @@ export class DsaClient {
     const traceId = currentTraceId() ?? crypto.randomUUID();
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const response = await fetch(new URL(path, this.config.dsaBaseUrl), {
+        const response = await fetchObservedCacheRequest(new URL(path, this.config.dsaBaseUrl), {
           signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
           headers: {
             authorization: `Bearer ${this.config.dsaToken}`,
             'x-trace-id': traceId,
             'x-request-id': traceId,
           },
-        });
+        }, traceId, attempt + 1);
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
             detail?: { code?: string; message?: string };
@@ -167,7 +174,7 @@ export class DsaClient {
     const traceId = currentTraceId() ?? crypto.randomUUID();
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const response = await fetch(new URL(path, this.config.dsaBaseUrl), {
+        const response = await fetchObservedCacheRequest(new URL(path, this.config.dsaBaseUrl), {
           method: 'POST',
           signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
           headers: {
@@ -177,7 +184,7 @@ export class DsaClient {
             'x-request-id': traceId,
           },
           body: JSON.stringify(body),
-        });
+        }, traceId, attempt + 1);
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
             detail?: { code?: string; message?: string };
@@ -212,6 +219,7 @@ export class DsaClient {
     init?: RequestInit,
     attempts = 1,
     mapHttpError?: HttpErrorMapper,
+    timeoutMs = this.config.dsaTimeoutMs,
   ): Promise<T> {
     if (!this.config.controlToken) throw new DsaError('Control Token 未配置', 'unavailable');
     let lastError: unknown;
@@ -219,7 +227,7 @@ export class DsaClient {
       try {
         const response = await fetch(new URL(path, this.config.dsaBaseUrl), {
           ...init,
-          signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
           headers: {
             'content-type': 'application/json',
             authorization: `Bearer ${this.config.controlToken}`,
@@ -274,6 +282,18 @@ export class DsaClient {
     ).then((raw) => backtestCalendarResponseSchema.parse(raw));
   }
 
+  marketCalendar(input: {
+    market: BacktestMarket;
+    start: string;
+    end: string;
+    dataAsOf: string;
+  }): Promise<BacktestCalendarResponse> {
+    const params = new URLSearchParams(input);
+    return this.get<unknown>(`/api/v3/thesis-ledger/market/calendar?${params.toString()}`, 1).then(
+      (raw) => backtestCalendarResponseSchema.parse(raw),
+    );
+  }
+
   backtestInstrumentFacts(
     input: BacktestInstrumentFactsRequest,
   ): Promise<BacktestInstrumentFactsResponse> {
@@ -304,34 +324,29 @@ export class DsaClient {
 
   /** 选择器读取时将选中的 target 与 routeIndex 放入 request.routeTarget，以固定并核对来源。 */
   marketBarsV3(input: MarketDataBarSeriesRequestV3): Promise<MarketDataBarSeriesResponseV3> {
-    return readBarSeriesV3(
-      input,
-      (request) =>
-        this.post<unknown>('/api/v3/thesis-ledger/market/bars', request, 1, (status, payload) =>
-          mapDataV3HttpError(status, payload, request.requestId),
-        ),
-      () => this.marketDataCapabilitiesV3(),
-    ).then(parseV3Response);
+    return this.dataCapabilities.bars(input);
   }
 
   marketChartBarsV3(input: MarketChartBarsRequestV3): Promise<MarketChartBarsResponseV3> {
-    const request = marketChartBarsRequestV3Schema.parse(input);
-    return this.post<unknown>(
-      '/api/v3/thesis-ledger/market/chart-bars',
-      request,
-      1,
-      (status, payload) => mapDataV3HttpError(status, payload, request.requestId),
-    ).then((raw) => parseV3Response(() => parseChartBarsResponseV3(raw, request)));
+    return this.dataCapabilities.chartBars(input);
   }
 
   marketEventsV3(input: MarketEventRequestV3): Promise<MarketEventResponseV3> {
-    const request = marketEventRequestV3Schema.parse(input);
-    return this.post<unknown>(
-      '/api/v3/thesis-ledger/market/events',
-      request,
-      1,
-      (status, payload) => mapEventV3HttpError(status, payload, request.requestId),
-    ).then((raw) => parseV3Response(() => parseEventResponseV3(raw, request)));
+    return this.dataCapabilities.events(input);
+  }
+
+  marketCacheContextV3(input: MarketCacheContextRequestV3): Promise<MarketCacheContextResponseV3> {
+    return this.dataCapabilities.cacheContext(input);
+  }
+
+  marketPublicFeesV3(input: MarketPublicFeesRequestV3): Promise<MarketPublicFeesResponseV3> {
+    return this.dataCapabilities.publicFees(input);
+  }
+
+  marketTradingStatusV3(
+    input: MarketTradingStatusRequestV3,
+  ): Promise<MarketTradingStatusResponseV3> {
+    return this.dataCapabilities.tradingStatus(input);
   }
 
   calculateIndicators(input: {
@@ -343,6 +358,29 @@ export class DsaClient {
     const request = indicatorCalculateRequestSchema.parse({ contractVersion: 3, ...input });
     return this.post<unknown>('/api/v3/thesis-ledger/market/indicators/calculate', request, 1).then(
       (raw) => indicatorCalculateResponseSchema.parse(raw),
+    );
+  }
+
+  marketPeriodIndicatorCapabilities(): Promise<MarketPeriodIndicatorCapabilities> {
+    return this.get<unknown>('/api/v3/thesis-ledger/market/indicators/capabilities', 1).then(
+      (raw) => marketPeriodIndicatorCapabilitiesSchema.parse(raw),
+    );
+  }
+
+  calculatePeriodIndicators(
+    input: Omit<MarketPeriodIndicatorRequest, 'contractVersion'>,
+  ): Promise<IndicatorCalculateResponse> {
+    const request = marketPeriodIndicatorRequestSchema.parse({ ...input, contractVersion: 3 });
+    return this.post<unknown>('/api/v3/thesis-ledger/market/indicators/calculate', request, 1).then(
+      (raw) =>
+        indicatorCalculateResponseSchema
+          .refine(
+            (value) =>
+              value.engineVersion === DSA_MARKET_INDICATOR_ENGINE_VERSION &&
+              value.inputFingerprint === request.inputFingerprint &&
+              value.results.every((result) => result.inputFingerprint === request.inputFingerprint),
+          )
+          .parse(raw),
     );
   }
 
@@ -426,6 +464,7 @@ export class DsaClient {
     input: {
       requestId?: string;
       enabled?: boolean;
+      expectedConfigVersion?: number;
       credentials?: { method: string; values: Record<string, unknown> };
       clearCredentials?: boolean;
       settings?: Record<string, unknown>;
@@ -451,9 +490,12 @@ export class DsaClient {
     input: {
       requestId?: string;
       credentials?: { method: string; values: Record<string, unknown> };
+      route?: MarketProviderProbeRoute;
+      purpose?: 'capability_read' | 'account_access';
     } = {},
   ) {
     const requestId = input.requestId ?? crypto.randomUUID();
+    const budget: [] | [number, undefined, number] = input.purpose === 'account_access' ? [1, undefined, 22_000] : [];
     return this.control<unknown>(
       `/api/v3/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/test`,
       {
@@ -465,7 +507,8 @@ export class DsaClient {
           requestId,
         }),
       },
-    ).then((raw) => parseProviderMutation('test', raw, providerId, requestId));
+      ...budget,
+    ).then((raw) => parseProviderMutation('test', raw, providerId, requestId, input.purpose));
   }
 
   removeControlProvider(providerId: string, input: { requestId?: string; reason?: string } = {}) {

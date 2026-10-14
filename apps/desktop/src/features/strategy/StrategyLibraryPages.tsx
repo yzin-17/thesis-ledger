@@ -1,4 +1,6 @@
 import { useEffect, useMemo } from 'react';
+import { AuthoringVersionSource } from '../strategy-authoring/AuthoringVersionSource.js';
+import { AuthoringIdentity } from '../strategy-authoring/AuthoringIdentity.js';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { AlertCircle, ArrowLeft, Search } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -137,6 +139,7 @@ export function StrategyLibraryPage({
   return (
     <div className="flex flex-col gap-4">
       <StrategyLibraryToolbar search={search} onSearchChange={updateSearch} />
+      <AuthoringIdentity />
       {!loading && visible.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
@@ -471,6 +474,7 @@ export function StrategyVersionPage({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="definition" className="mt-4">
+          <AuthoringVersionSource version={version} />
           <div className="grid gap-3 md:grid-cols-2">
             {definitionSections.map((section) => (
               <Card key={section.label}>

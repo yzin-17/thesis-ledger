@@ -69,8 +69,8 @@ const instantOf = (value: string) => Date.parse(value);
 /** DSA 完整输入已经过指纹校验；投影保留该证据，不把显示指纹冒充计算指纹。 */
 export const projectIndicatorResponse = (
   response: IndicatorCalculateResponse,
-  calculation: BarSeries,
-  visible: BarSeries,
+  calculation: Pick<BarSeries, 'points' | 'coverage' | 'inputFingerprint'>,
+  visible: Pick<BarSeries, 'points' | 'coverage' | 'inputFingerprint'>,
 ): IndicatorCalculateResponse => {
   if (response.inputFingerprint !== calculation.inputFingerprint)
     throw new Error('指标计算输入 fingerprint 不一致');

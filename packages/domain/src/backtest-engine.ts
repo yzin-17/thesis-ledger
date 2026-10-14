@@ -1,6 +1,7 @@
 import {
   createCorporateActionPort,
   type CorporateActionMutation,
+  type BacktestCorporateActionFact,
 } from './backtest-corporate-actions.js';
 import { DecimalValue } from './decimal.js';
 import {
@@ -34,6 +35,7 @@ export interface ExchangeSimulationRunInput {
   ledger: SimulationLedger;
   accountingBasis: SimulationAccountingBasis;
   exchange: {
+    cashEntitlementFor?: (fact: BacktestCorporateActionFact) => string;
     rules: VersionedExecutionRules;
     calendar: TradingCalendar;
     /** Frozen execution prices and their session/availability times. */
@@ -326,6 +328,7 @@ export const runExchangeSimulation = (
         currency,
       },
       input.simulation.runId,
+      input.exchange.cashEntitlementFor,
     ),
     execution,
   });

@@ -1,5 +1,7 @@
 # 研究助手任务工作台实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：真实研究任务、claimed 后重启/租约恢复、外部来源长任务及工作台键盘/焦点 smoke 仍按下方运行门禁保留。AI SDK 的历史受控执行、未知费用与再次生成浏览器证据可以复用匹配断言，但不能据此补勾全部四项。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应规格：[`../specs/2026-08-25-ai-research-workbench.md`](../specs/2026-08-25-ai-research-workbench.md)
 
 ## 当前状态
@@ -231,6 +233,13 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
   - 实际验证：逐条复核验收标准 1-23、所有 `succeeded` 写入路径、详情与 Tool 分页边界、历史兼容和只读范围；上述本轮确定性验证全部通过。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 受环境条件限制，保留为未完成的运行时验收门禁。
 
 ## 运行时验收门禁（未完成）
+
+### R1：隔离数据库中的独立服务进程恢复（2026-10-04）
+
+- [x] 独立进程领取 queued 研究并持久化 prepared 或 dispatched 请求；强制结束后由新进程恢复，验证未发送请求的新代次领取、已发送未知结果终态及旧代次提交拒绝。
+- 输入：当前 AiRunService、AiExecutionStateStore、全部 migration 与现有恢复状态机；使用专用临时数据库，不操作目标任务，不请求真实 Provider。
+- 验证阶段：数据库准备/领取与持久化 → 服务进程终止及新进程恢复 → 终态与代次屏障检查。该证据不能替代下方目标服务与真实 Provider 的重启 smoke，目标仍受默认选择及 Provider 连接阻塞。
+- 证据：[生命周期与提交](evidence/2026-10-04-ai-lifecycle-and-submission.md)，三个独立进程场景通过，目标门禁不勾选。
 
 - [ ] 真实 OpenAI-compatible Provider smoke：使用部署环境 `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` 完成至少一次真实研究任务并核对 Provider/Model/Token/来源链事实。
 - [ ] 服务进程重启 smoke：在任务处于 `queued/running` 时重启服务，确认租约恢复和终态收敛符合设计。

@@ -7,6 +7,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { marketRouteContextV3 } from './market-window-selector-v3.js';
 import { resolveChartOptionsV3 } from './market-chart-options-v3.js';
+import { marketRouteMarket } from './market-symbol-identity.js';
 import type { MarketChartProofRepository } from './market-chart-proof.repository.js';
 
 /** Availability remains advisory; the reader revalidates before and after acquisition. */
@@ -29,7 +30,7 @@ export async function resolveChartWindowOptions(input: {
     if (option.available) continue;
     const routeKey: MarketDataBarRouteKeyV3 = {
       kind: 'bar',
-      market: 'CN',
+      market: marketRouteMarket(input.identity.symbol),
       assetType: input.identity.assetType,
       capability: 'DAILY_BAR',
       timeframe: '1d',

@@ -12,6 +12,7 @@ import { PrismaService } from '../platform/prisma.service.js';
 import { investmentAccountWhere } from '../portfolio/investment-account-scope.js';
 import { PerformanceLayerService } from './performance-layer.service.js';
 import { PerformanceSnapshotService } from './performance-snapshot.service.js';
+import { aggregatePerformanceSeriesQuality } from './performance-series-quality.js';
 import type { Currency, PortfolioMode } from './performance-types.js';
 
 const intervalMatrix: Record<PerformanceSeriesRange, readonly PerformanceSeriesInterval[]> = {
@@ -286,11 +287,9 @@ export class PerformanceValuationSeriesService {
       ? await this.intradayPoints(input, start)
       : await this.dailyPoints(input, start);
     const sampled = resample(points, input.interval);
-    const qualities = new Set(sampled.map((point) => point.dataQuality));
-    let dataQuality: SeriesPoint['dataQuality'] = 'COMPLETE';
-    if (qualities.has('UNAVAILABLE')) dataQuality = 'UNAVAILABLE';
-    else if (qualities.has('LOW_COVERAGE')) dataQuality = 'LOW_COVERAGE';
-    else if (qualities.has('PARTIAL')) dataQuality = 'PARTIAL';
+    const dataQuality = aggregatePerformanceSeriesQuality(
+      sampled.map((point) => point.dataQuality),
+    );
     return {
       range: input.range,
       interval: input.interval,
@@ -349,7 +348,7 @@ export class PerformanceValuationSeriesService {
       valuationBasis: 'ESTIMATED',
       disclosureCoverage: Math.min(...values.map((row) => Number(row.disclosureCoverage))),
       pricedCoverage: Math.min(...values.map((row) => Number(row.pricedCoverage))),
-      dataQuality: values.every((row) => row.dataQuality === 'COMPLETE') ? 'COMPLETE' : 'PARTIAL',
+      dataQuality: aggregatePerformanceSeriesQuality(values.map((row) => row.dataQuality)),
       sourceSnapshotId: null,
     }));
   }
@@ -377,6 +376,9 @@ export class PerformanceValuationSeriesService {
         row.payload.partial === true;
       let pricedCoverage = partial ? 0 : 1;
       if ('pricedCoverage' in row) pricedCoverage = Number(row.pricedCoverage ?? pricedCoverage);
+      let dataQuality: SeriesPoint['dataQuality'] = partial ? 'PARTIAL' : 'COMPLETE';
+      if ('valuationStatus' in row && row.valuationStatus === 'UNAVAILABLE')
+        dataQuality = 'UNAVAILABLE';
       return {
         at: row.capturedAt.toISOString(),
         value: Number(row.marketValue) + Number(row.cashValue),
@@ -384,7 +386,7 @@ export class PerformanceValuationSeriesService {
         valuationBasis: 'valuationBasis' in row ? (row.valuationBasis ?? 'ESTIMATED') : 'ESTIMATED',
         disclosureCoverage: 'disclosureCoverage' in row ? Number(row.disclosureCoverage ?? 1) : 1,
         pricedCoverage,
-        dataQuality: partial ? 'PARTIAL' : 'COMPLETE',
+        dataQuality,
         sourceSnapshotId: row.id ?? null,
       };
     });
@@ -413,7 +415,8 @@ export class PerformanceValuationSeriesService {
             this.market.getFundNav(position.symbol, { allowStale: true }),
             this.market.getFundHoldings(position.symbol),
           ]);
-          if (!holdings.disclosureDate || new Date(holdings.disclosureDate) > at) throw new Error('披露时间未知或晚于估值时点');
+          if (!holdings.disclosureDate || new Date(holdings.disclosureDate) > at)
+            throw new Error('披露时间未知或晚于估值时点');
           const anchorStart = new Date(nav.navDate);
           anchorStart.setUTCDate(anchorStart.getUTCDate() - 7);
           const returns = new Map<string, number>();

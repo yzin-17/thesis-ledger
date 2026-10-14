@@ -1,0 +1,429 @@
+[
+  {
+    "phase": "初始读取",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "初始读取",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "初始读取",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "导入准备",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "导入准备",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/34abe590-02d6-4bb9-8018-17ec2909bd5a?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "导入准备",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "导入准备",
+    "method": "GET",
+    "path": "/api/v1/journal/review-objects/TRADE_CYCLE%3Atrade%3Atrade-projection-v1%3A95bd7e1a-72df-4cd7-aae8-121d8545e5ea%3A600519.SH%3A5c670de7-ead6-41f7-9c9a-8dec7fa9de71?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "导入准备",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&start=2026-01-01T00%3A00%3A00Z&end=2026-02-01T00%3A00%3A00Z&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "导入准备",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新单笔近期任务",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新单笔近期任务",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新单笔近期任务",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新单笔近期任务",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "单笔同输入分析",
+    "method": "GET",
+    "path": "/api/v1/journal/review-objects/TRADE_CYCLE%3Atrade%3Atrade-projection-v1%3A95bd7e1a-72df-4cd7-aae8-121d8545e5ea%3A600519.SH%3A5c670de7-ead6-41f7-9c9a-8dec7fa9de71?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "单笔同输入分析",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/object",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "单笔同输入分析",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "周期同输入分析",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/period",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "周期同输入分析",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "既有失败任务消费",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/34abe590-02d6-4bb9-8018-17ec2909bd5a?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "单笔复验",
+    "method": "GET",
+    "path": "/api/v1/journal/review-objects/TRADE_CYCLE%3Atrade%3Atrade-projection-v1%3A95bd7e1a-72df-4cd7-aae8-121d8545e5ea%3A600519.SH%3A5c670de7-ead6-41f7-9c9a-8dec7fa9de71?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "单笔复验",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/object",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "单笔复验",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "单笔一次读取失败",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/object",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "单笔一次读取失败",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 503,
+    "source": "injected"
+  },
+  {
+    "phase": "单笔局部重读",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "移除失败近期引用",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "清除单笔后刷新",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "清除单笔后刷新",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "清除单笔后刷新",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "清除单笔后刷新",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "清除单笔后刷新",
+    "method": "GET",
+    "path": "/api/v1/journal/review-objects/TRADE_CYCLE%3Atrade%3Atrade-projection-v1%3A95bd7e1a-72df-4cd7-aae8-121d8545e5ea%3A600519.SH%3A5c670de7-ead6-41f7-9c9a-8dec7fa9de71?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "清除单笔后刷新",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/object",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "周期同输入恢复复验",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/period",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "周期同输入恢复复验",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "近期任务切换周期复验",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "移除单笔近期引用",
+    "method": "GET",
+    "path": "/api/v1/journal/explanations/e2c829d1-6ad6-4325-81bb-26e931047669?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "移除单笔近期引用",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新周期近期任务",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新周期近期任务",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新周期近期任务",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "刷新周期近期任务",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "周期刷新后同输入分析",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/period",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "周期刷新后同输入分析",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "周期一次读取失败",
+    "method": "POST",
+    "path": "/api/v1/journal/analysis/period",
+    "status": 201,
+    "source": "target"
+  },
+  {
+    "phase": "周期一次读取失败",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 503,
+    "source": "injected"
+  },
+  {
+    "phase": "周期局部重读",
+    "method": "GET",
+    "path": "/api/v1/journal/period-explanations/67e14795-2113-4174-b366-9c95db6ddb14?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "读取既有历史快照",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots/82310e15-66c2-486c-80be-ff6bc72991c3?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "读取既有STALE快照",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots/4e670373-64b1-468b-9dee-c0645cc44c75?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "所有本机引用清除后刷新",
+    "method": "GET",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "所有本机引用清除后刷新",
+    "method": "GET",
+    "path": "/api/v1/journal/review-snapshots?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=20",
+    "status": 200,
+    "source": "target"
+  },
+  {
+    "phase": "所有本机引用清除后刷新",
+    "method": "GET",
+    "path": "/api/v1/journal/review-candidates?accountId=95bd7e1a-72df-4cd7-aae8-121d8545e5ea&mode=actual&limit=30",
+    "status": 200,
+    "source": "target"
+  }
+]

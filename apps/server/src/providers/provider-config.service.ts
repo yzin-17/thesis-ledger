@@ -136,12 +136,12 @@ export class ProviderConfigService {
   }
 
   /** Internal stable persistence boundary consumed by the AI feature module. */
-  async saveAi(input: Omit<ProviderConfigInput, 'type'>) {
-    return this.saveInternal({ ...input, type: 'ai' });
+  async saveAi(input: Omit<ProviderConfigInput, 'type'>, transaction?: Prisma.TransactionClient) {
+    return this.saveInternal({ ...input, type: 'ai' }, transaction);
   }
 
-  async listStored() {
-    return this.prisma.providerConfig.findMany({
+  async listStored(transaction?: Prisma.TransactionClient) {
+    return (transaction ?? this.prisma).providerConfig.findMany({
       where: { type: 'ai' },
       orderBy: [{ priority: 'asc' }, { name: 'asc' }],
     });
@@ -181,9 +181,12 @@ export class ProviderConfigService {
     return this.readStoredCredential(config);
   }
 
-  private async saveInternal(input: ProviderConfigInput) {
+  private async saveInternal(input: ProviderConfigInput, transaction?: Prisma.TransactionClient) {
+    const persistence = transaction ?? this.prisma;
     const value = validate(input);
-    const existing = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
+    const existing = await persistence.providerConfig.findUnique({ where: { name: value.name } });
+    if (!existing && value.type === 'ai' && value.expectedRevision)
+      throw new ConflictException('Provider 配置已删除，请刷新后重试');
     const tested = this.consumeDraftTest(value);
     let credentialPayload = value.clearCredentials ? undefined : tested?.encryptedCredential;
     const rawCredential = value.credentialsRef?.trim();
@@ -227,23 +230,23 @@ export class ProviderConfigService {
     if (existing && value.type === 'ai') {
       if (!value.expectedRevision)
         throw new ConflictException('Provider 配置已存在，请基于当前版本保存');
-      const result = await this.prisma.providerConfig.updateMany({
+      const result = await persistence.providerConfig.updateMany({
         where: { name: value.name, updatedAt: new Date(value.expectedRevision) },
         data: updateData,
       });
       if (result.count !== 1) throw new ConflictException('Provider 配置已变化，请刷新后重试');
-      saved = await this.prisma.providerConfig.findUnique({ where: { name: value.name } });
+      saved = await persistence.providerConfig.findUnique({ where: { name: value.name } });
       if (!saved) throw new NotFoundException('Provider 配置保存后不存在');
     } else if (value.type === 'ai') {
       try {
-        saved = await this.prisma.providerConfig.create({ data: createData });
+        saved = await persistence.providerConfig.create({ data: createData });
       } catch (error) {
         if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002')
           throw new ConflictException('同名接入配置已创建，请刷新后重试');
         throw error;
       }
     } else {
-      saved = await this.prisma.providerConfig.upsert({
+      saved = await persistence.providerConfig.upsert({
         where: { name: value.name },
         update: updateData,
         create: createData,

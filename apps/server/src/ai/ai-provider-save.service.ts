@@ -1,5 +1,6 @@
 import { DEFAULT_AI_TIMEOUT_MS, loadConfig } from '../platform/config.js';
 import { AiProviderValidationJournal } from './ai-provider-validation-journal.js';
+import { assertValidationActive } from './ai-provider-validation-interruption.js';
 import {
   BadRequestException,
   ConflictException,
@@ -221,7 +222,7 @@ export class AiProviderSaveService {
     let costUnknown = false;
     try {
       for (const item of context.routes) {
-        if (signal.aborted) throw new BadRequestException('验证已取消，原配置未修改');
+        assertValidationActive(signal, run.deadline);
         if (item.record) {
           records.push(item.record);
           continue;
@@ -241,7 +242,7 @@ export class AiProviderSaveService {
           this.successful.delete(this.successful.keys().next().value!);
         costUnknown = result.costUnknown;
       }
-      if (signal.aborted) throw new BadRequestException('验证已取消，原配置未修改');
+      assertValidationActive(signal, run.deadline);
       // save() re-reads the revision, then persistence applies its existing CAS fence.
       return await this.persist(context, records);
     } finally {

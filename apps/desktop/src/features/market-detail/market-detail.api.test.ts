@@ -21,6 +21,12 @@ describe('图表请求到共享客户端的实际适配', () => {
         })),
       });
   });
+  it('派生周期直接传完整窗口，避免先获取日线或客户端聚合', async () => {
+    getDetail.mockResolvedValue({ requestId: 'derived' });
+    await requestMarketDetail({ symbol: '159516.SZ', timeframe: '1mo', barsLimit: 30, adjustment: 'qfq' });
+    expect(getDetail).toHaveBeenCalledWith('159516.SZ', expect.objectContaining({ timeframe: '1mo', barsLimit: 30 }));
+    expect(getPlannedChartOptions).not.toHaveBeenCalled();
+  });
   it.each(['none', 'qfq', 'hfq'] as const)(
     '传递 %s、V3 版本及整窗参数，不在适配层丢弃',
     async (adjustment) => {

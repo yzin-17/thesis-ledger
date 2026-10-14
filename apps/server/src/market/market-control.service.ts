@@ -92,18 +92,22 @@ export class MarketControlService {
 
   async applyPolicy(input: unknown) {
     const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+    const { expectedRevision, ...policyInput } = raw;
+    if (expectedRevision !== undefined && (typeof expectedRevision !== 'number' ||
+      !Number.isSafeInteger(expectedRevision) || expectedRevision < 0))
+      throw new BadRequestException('expectedRevision 必须是非负安全整数');
     if (raw.contractVersion !== 3) throw new BadRequestException('Policy contractVersion 必须是 3');
     if (typeof raw.revision !== 'number' || !Number.isInteger(raw.revision) || raw.revision <= 0)
       throw new BadRequestException('Policy revision 必须是正整数');
     let policy;
     try {
-      policy = buildMarketPolicyPayload(input, raw.revision);
+      policy = buildMarketPolicyPayload(policyInput, raw.revision);
     } catch (error) {
       if (error instanceof ZodError) throw new BadRequestException('Policy V3 结构无效');
       throw error;
     }
     await this.ensureSeededPolicy();
-    const current = await persistMarketPolicyRevision(this.prisma, policy);
+    const current = await persistMarketPolicyRevision(this.prisma, policy, expectedRevision);
     return marketPolicyCatalogResponse(
       await applyDesiredProviderPolicyV3(this.prisma, this.dsa, policy, current),
     );
@@ -215,6 +219,7 @@ export class MarketControlService {
     return this.dsa.saveControlProvider(providerId, {
       requestId: raw.requestId ?? randomUUID(),
       ...(raw.enabled !== undefined ? { enabled: raw.enabled } : {}),
+      ...(raw.expectedConfigVersion !== undefined ? { expectedConfigVersion: raw.expectedConfigVersion } : {}),
       ...(raw.credentials !== undefined ? { credentials: raw.credentials } : {}),
       ...(raw.clearCredentials !== undefined ? { clearCredentials: raw.clearCredentials } : {}),
       ...(raw.settings !== undefined ? { settings: raw.settings } : {}),
@@ -226,6 +231,8 @@ export class MarketControlService {
     return this.dsa.testControlProvider(providerId, {
       requestId: raw.requestId ?? randomUUID(),
       ...(raw.credentials !== undefined ? { credentials: raw.credentials } : {}),
+      ...(raw.route !== undefined ? { route: raw.route } : {}),
+      ...(raw.purpose !== undefined ? { purpose: raw.purpose } : {}),
     });
   }
 }

@@ -21,6 +21,7 @@ const successfulSdk = () => ({
 import {
   createConfigStub,
   createHealthStub,
+  createRoutingTransactionFixture,
   createDbRow,
   validSettings,
   type TestRow,
@@ -549,31 +550,7 @@ describe('AI Provider 持久化管理', () => {
       researchDefaultModel: 'db-model',
       revision: 7,
     };
-    const transaction = {
-      providerConfig: {
-        findUnique: vi.fn(async () => row),
-        updateMany: vi.fn(async ({ data }: { data: { enabled: boolean } }) => {
-          row.enabled = data.enabled;
-          row.updatedAt = new Date('2026-09-14T00:00:02.000Z');
-          return { count: 1 };
-        }),
-        deleteMany: vi.fn(),
-      },
-      aiRoutingSettings: {
-        findUnique: vi.fn(async () => settings),
-        updateMany: vi.fn(async () => {
-          settings.researchDefaultProvider = null;
-          settings.researchDefaultModel = null;
-          settings.revision += 1;
-          return { count: 1 };
-        }),
-      },
-    };
-    const prisma = {
-      $transaction: vi.fn(async (callback: (value: typeof transaction) => unknown) =>
-        callback(transaction),
-      ),
-    };
+    const { transaction, prisma } = createRoutingTransactionFixture(row, settings);
     const service = new AiProviderService(
       configs.service as never,
       createHealthStub() as never,
@@ -865,6 +842,7 @@ describe('AI Provider 持久化管理', () => {
     });
     expect(configs.service.saveAi).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'shared', credentialsRef: 'new-key' }),
+      undefined,
     );
   });
 
@@ -1259,6 +1237,7 @@ describe('AI Provider 持久化管理', () => {
     expect(result).toMatchObject({ authMode: 'none', credentialConfigured: false });
     expect(configs.service.saveAi).toHaveBeenCalledWith(
       expect.objectContaining({ clearCredentials: true }),
+      undefined,
     );
     expect(configs.service.readCredential).not.toHaveBeenCalled();
   });

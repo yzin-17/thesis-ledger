@@ -1,6 +1,6 @@
 import type {
   MarketDetailRequest as SharedMarketDetailRequest,
-  MarketDetailResponse,
+  MarketDisplayDetailResponse as MarketDetailResponse,
 } from '@thesis-ledger/api-client';
 
 export type MarketDetailRequest = SharedMarketDetailRequest;
@@ -20,6 +20,7 @@ type Flight = {
 export const marketDetailRequestKey = (request: MarketDetailRequest) =>
   JSON.stringify({
     symbol: request.symbol,
+    timeframe: request.timeframe ?? '1d',
     adjustment: request.adjustment ?? null,
     chartContractVersion: request.chartContractVersion ?? null,
     include: request.include ? [...request.include].sort() : null,

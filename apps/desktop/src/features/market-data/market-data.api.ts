@@ -1,6 +1,7 @@
 import {
   marketPolicyClientResponseSchema,
-  marketRouteCapabilityV3Schema,
+  marketRouteCatalogReadClientV3Schema,
+  type MarketProviderProbeRoute,
 } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { parseCatalogJobResponse } from './catalog-job-response.js';
@@ -14,18 +15,6 @@ import type {
 
 const api = () => getDesktopApiClient();
 
-const catalogReadReasons = new Set([
-  'catalog_partial',
-  'control_timeout',
-  'control_unauthorized',
-  'unsupported_capability',
-  'invalid_response',
-  'control_unavailable',
-]);
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
 export const parseMarketPolicyResponse = (value: unknown): MarketPolicyResponse => {
   const parsed = marketPolicyClientResponseSchema.safeParse(value);
   if (!parsed.success) throw new Error('路由策略响应无效：需要 V3 策略。');
@@ -34,55 +23,12 @@ export const parseMarketPolicyResponse = (value: unknown): MarketPolicyResponse 
 
 export const fetchMarketPolicy = () => api().market.getPolicy();
 
-const parseRouteCatalogReadV3 = (value: unknown): MarketRouteCatalogReadV3 | null => {
-  if (!isRecord(value) || value.contractVersion !== 3 || value.consumer !== 'thesis-ledger') {
-    return null;
-  }
-  if (value.status !== 'complete' && value.status !== 'partial' && value.status !== 'unavailable') {
-    return null;
-  }
-  const catalogRevision = value.catalogRevision;
-  if (
-    catalogRevision !== null &&
-    (!Number.isInteger(catalogRevision) || (catalogRevision as number) <= 0)
-  ) {
-    return null;
-  }
-  const generatedAt = value.generatedAt;
-  if (generatedAt !== null && typeof generatedAt !== 'string') return null;
-  const reason = value.reason;
-  if (reason !== null && (typeof reason !== 'string' || !catalogReadReasons.has(reason))) {
-    return null;
-  }
-  if (!Array.isArray(value.entries)) return null;
-  const entries: MarketRouteCatalogReadV3['entries'] = [];
-  for (const entry of value.entries) {
-    const parsed = marketRouteCapabilityV3Schema.safeParse(entry);
-    if (!parsed.success) return null;
-    entries.push(parsed.data);
-  }
-  if (value.status === 'complete' && reason !== null) return null;
-  if (value.status !== 'complete' && entries.length > 0) return null;
-  if (value.status === 'partial' && reason !== 'catalog_partial') return null;
-  if (value.status === 'unavailable' && reason === null) return null;
-
-  return {
-    contractVersion: 3,
-    consumer: 'thesis-ledger',
-    status: value.status,
-    catalogRevision: catalogRevision as number | null,
-    generatedAt,
-    entries,
-    reason: reason as MarketRouteCatalogReadV3['reason'],
-  };
-};
-
 export const fetchMarketRouteCapabilitiesV3 = async (): Promise<MarketRouteCatalogReadV3> => {
   const response = await api().request<unknown>(
     '/api/market-data/routes/capabilities?contractVersion=3',
   );
-  const parsed = parseRouteCatalogReadV3(response);
-  if (parsed) return parsed;
+  const parsed = marketRouteCatalogReadClientV3Schema.safeParse(response);
+  if (parsed.success) return parsed.data;
   return {
     contractVersion: 3,
     consumer: 'thesis-ledger',
@@ -112,6 +58,7 @@ export const saveMarketPolicy = async (policy: MarketPolicyDraftV3) =>
         consumer: 'thesis-ledger',
         requestId: crypto.randomUUID(),
         revision: policy.revision + 1,
+        expectedRevision: policy.revision,
         enabled: policy.enabled,
         routes: policy.routes,
       }),
@@ -138,7 +85,18 @@ export const testMarketProvider = (
   provider: ProviderManifest,
   credentials?: ProviderCredentialDraft,
   signal?: AbortSignal,
-) => api().market.testProvider(provider.providerId, credentials ? { credentials } : {}, signal);
+  route?: MarketProviderProbeRoute,
+  purpose?: 'capability_read' | 'account_access',
+) =>
+  api().market.testProvider(
+    provider.providerId,
+    {
+      ...(credentials ? { credentials } : {}),
+      ...(route ? { route } : {}),
+      ...(purpose ? { purpose } : {}),
+    },
+    signal,
+  );
 
 export const removeMarketProvider = (providerId: string) => api().market.removeProvider(providerId);
 

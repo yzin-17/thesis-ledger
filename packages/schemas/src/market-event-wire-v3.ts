@@ -4,6 +4,10 @@ import { marketDataRouteTargetPinV3Schema } from './market-data-wire-v3.js';
 import { marketEventAdmissionV3Schema } from './market-event-admission-v3.js';
 import { marketRouteKeyIdV3 } from './market-route-v3.js';
 import {
+  isMarketNoticeDividendRouteV3,
+  marketNoticeDividendEvidenceV3Schema,
+} from './market-notice-dividends-v3.js';
+import {
   marketRqdataIdentityEvidenceV3Schema,
   validateMarketRqdataIdentityResponseV3,
 } from './market-rqdata-identity-v3.js';
@@ -119,6 +123,7 @@ export const marketEventResponseV3Schema = z
     identityEvidence: marketRqdataIdentityEvidenceV3Schema.optional(),
     tushareIdentityEvidence: marketTushareIdentityEvidenceV3Schema.optional(),
     hithinkIdentityEvidence: marketHithinkIdentityEvidenceV3Schema.optional(),
+    noticeDividendEvidence: marketNoticeDividendEvidenceV3Schema.optional(),
     dateMappingEvidence: z
       .strictObject({
         ref: z.string().regex(/^sha256:[a-f0-9]{64}$/),
@@ -166,6 +171,13 @@ export const marketEventResponseV3Schema = z
       });
     }
     const admission = value.admission;
+    if (isMarketNoticeDividendRouteV3(value) !== !!value.noticeDividendEvidence) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['noticeDividendEvidence'],
+        message: '公告原文与精确来源不匹配',
+      });
+    }
     const mapping = value.dateMappingEvidence;
     if (
       mapping &&

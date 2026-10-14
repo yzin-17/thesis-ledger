@@ -97,7 +97,12 @@ try {
   const calendar=await client.backtestCalendar({market:'CN',start:'2026-09-01',end:'2026-09-08',dataAsOf:'2026-10-01T00:00:00Z'});
   assert.equal(calendar.version,3);
   const fault=new Error('controlled-upstream-unavailable');
-  const compiledService=new MarketService({get:async()=>{throw fault;}},{client:{get:async()=>null}},prisma);
+  // 隔离的编译产物错误路径；合成控制上下文不充当目标政策验收。
+  const compiledService=new MarketService({
+    marketCacheContextV3:async request=>({...request,routeKey:{kind:'data',market:'CN',assetType:'MUTUAL_FUND',capability:request.capability},
+      policyRevision:1,generation:'a'.repeat(64),ready:true,reason:null}),
+    get:async()=>{throw fault;}
+  },{client:{get:async()=>null}},prisma);
   navProbeActive=true;
   try {await assert.rejects(compiledService.getFundNavHistory('000001.OF'),error=>error===fault);}
   finally {navProbeActive=false;}

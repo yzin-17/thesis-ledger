@@ -1,6 +1,7 @@
 import type { PrismaService } from '../platform/prisma.service.js';
 import { backtestJobSummarySelect } from '../backtest/backtest-summary.js';
 import { isCurrentRunForRead } from '../backtest/backtest-current-run-read.js';
+import { visibleStrategyOwners } from '../backtest/strategy-access.service.js';
 
 /** 优化分组只消费当前完整读取合同；旧或损坏事实不投影成策略指标。 */
 export async function currentBacktestGroupRecords(
@@ -10,10 +11,12 @@ export async function currentBacktestGroupRecords(
     status?: string | undefined;
     strategyVersionId?: string | undefined;
   },
+  ownerId: string | null = null,
 ) {
   const records = await prisma.backtestJob.findMany({
     where: {
       mode: 'V3',
+      strategyVersion: { strategy: visibleStrategyOwners(ownerId) },
       ...(input.jobId ? { id: input.jobId } : {}),
       ...(input.status ? { status: input.status } : {}),
       ...(input.strategyVersionId ? { strategyVersionId: input.strategyVersionId } : {}),

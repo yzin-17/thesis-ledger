@@ -20,6 +20,9 @@ import { BACKTEST_SNAPSHOT_BUILDER, BacktestRunService } from './backtest-run.se
 import { BACKTEST_V3_RUNNER, LocalSnapshotV3Runner } from './backtest-v3-runner.js';
 import { BacktestRunPreparationService } from './backtest-run-preparation.service.js';
 import { BacktestCreationGuardService } from './backtest-creation-guard.service.js';
+import { BacktestKnownCashGuardV3 } from './backtest-known-cash-guard-v3.service.js';
+import { BacktestKnownCashAcquisitionV3 } from './backtest-known-cash-acquisition-v3.service.js';
+import { BacktestKnownCashPreparationRepository } from './backtest-known-cash-preparation.repository.js';
 import { BacktestConfiguredRunService } from './backtest-configured-run.service.js';
 import { BacktestRunPreparationController } from './backtest-run-preparation.controller.js';
 import { BacktestRunPreflightController } from './backtest-run-preflight.controller.js';
@@ -36,9 +39,13 @@ import {
   NAV_PREPARATION_TIMEOUT_MS,
 } from './backtest-nav-preparation.service.js';
 import { loadConfig } from '../platform/config.js';
+import { StrategyCreationService } from './strategy-creation.service.js';
+import { IdentityModule } from '../identity/identity.module.js';
+import { StrategyIdentityGuard } from './strategy-identity.guard.js';
+import { StrategyAccessService } from './strategy-access.service.js';
 
 @Module({
-  imports: [DsaModule, MarketModule, PlatformModule],
+  imports: [DsaModule, MarketModule, PlatformModule, IdentityModule],
   controllers: [
     BacktestNavRunController,
     BacktestNavPreparationController,
@@ -47,6 +54,9 @@ import { loadConfig } from '../platform/config.js';
     BacktestRunPreflightController,
   ],
   providers: [
+    StrategyCreationService,
+    StrategyIdentityGuard,
+    StrategyAccessService,
     BacktestNavPreparationRepository,
     BacktestNavRunListService,
     BacktestNavRunService,
@@ -56,6 +66,15 @@ import { loadConfig } from '../platform/config.js';
     BacktestRunPreparationService,
     BacktestRunPreflightService,
     BacktestCreationGuardService,
+    BacktestKnownCashGuardV3,
+    BacktestKnownCashAcquisitionV3,
+    {
+      provide: BacktestKnownCashPreparationRepository,
+      useFactory: () =>
+        new BacktestKnownCashPreparationRepository(
+          process.env.BACKTEST_SNAPSHOT_ROOT ?? resolve(process.cwd(), 'var/backtest'),
+        ),
+    },
     BacktestConfiguredRunService,
     BacktestBullQueue,
     BacktestEventService,
@@ -89,6 +108,8 @@ import { loadConfig } from '../platform/config.js';
     { provide: BACKTEST_JOB_EVENTS, useExisting: BacktestEventPublisher },
   ],
   exports: [
+    StrategyAccessService,
+    StrategyCreationService,
     BacktestService,
     BacktestConfiguredRunService,
     BacktestRunPreparationService,

@@ -8,6 +8,8 @@ import { runWithTrace, StructuredLogger } from './platform/structured-logger.js'
 import type { NextFunction, Request, Response } from 'express';
 import { createApiRateLimitMiddleware } from './platform/api-rate-limit.js';
 import { ErrorTrackingService } from './platform/error-tracking.service.js';
+import { backtestResearchBodyParserOptions } from './backtest/backtest-research-body-parser.js';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import {
   createLanAuthMiddleware,
   resolveServerNetworkSecurity,
@@ -16,7 +18,9 @@ import {
 const bootstrap = async () => {
   const config = loadConfig();
   const network = resolveServerNetworkSecurity();
-  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
   app.enableShutdownHooks();
   app.enableCors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false });
   app.use(createApiRateLimitMiddleware());
@@ -40,6 +44,8 @@ const bootstrap = async () => {
       next();
     });
   });
+  app.useBodyParser('json', backtestResearchBodyParserOptions());
+  app.useBodyParser('json', { limit: '100kb' });
   app.useGlobalFilters(new ApiExceptionFilter(app.get(ErrorTrackingService)));
   app.setGlobalPrefix('api/v1', {
     exclude: [

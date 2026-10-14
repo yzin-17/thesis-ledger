@@ -1,5 +1,7 @@
 # 涨跌配色配置实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：Desktop 已有运行证据，I1 尚缺 Mobile 实际配色/持久化/状态边界产品验收；多源 ETF 浏览器与 Desktop 全包成功不覆盖 Mobile。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[涨跌配色配置 Spec](../specs/2026-09-15-market-color-scheme.md)
 
 > 状态：实现完成；Desktop 运行态已验收，Mobile 运行态待验收

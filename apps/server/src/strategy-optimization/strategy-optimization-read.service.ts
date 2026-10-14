@@ -354,11 +354,14 @@ export class StrategyOptimizationReadService {
     } satisfies ExperimentPage;
   }
 
-  async listBacktestGroups(input: ExperimentListInput = {}): Promise<BacktestGroupPage> {
+  async listBacktestGroups(
+    input: ExperimentListInput = {},
+    ownerId?: string | null,
+  ): Promise<BacktestGroupPage> {
     const bounded = Math.max(1, Math.min(input.limit ?? 50, 100));
     const cursor = decodeCursor(input.cursor);
     if (input.cursor && !cursor) throw new BadRequestException('回测分组游标无效');
-    const jobs = await currentBacktestGroupRecords(this.prisma, input);
+    const jobs = await currentBacktestGroupRecords(this.prisma, input, ownerId);
     const [associations, strategyVersions] = await Promise.all([
       this.prisma.$queryRaw<BacktestAssociationRow[]>(Prisma.sql`
       SELECT refs."value" AS "runId", e."id" AS "experimentId", e."name" AS "experimentName",

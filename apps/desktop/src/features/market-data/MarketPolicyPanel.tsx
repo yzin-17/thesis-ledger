@@ -4,33 +4,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
-import { MarketPolicyTargetSelect } from './MarketPolicyTargetSelect.js';
-import { MarketPolicyPreset } from './MarketPolicyPreset.js';
-import {
-  marketPolicyRouteRowsV3,
-  policyRouteTargetsV3,
-  readyRouteTargetsV3,
-  routeAvailabilityLabelV3,
-  routeAvailabilityMessageV3,
-  routeCatalogMessageV3,
-  routeKeyLabelV3,
-  updatePolicyRouteTargetV3,
-  type MarketPolicyRouteRowV3,
-} from './market-data-routes-v3.js';
-import {
-  effectivePolicyV3,
-  effectiveRouteLabelV3,
-  policySyncLabelV3,
-} from './market-policy-status-v3.js';
+import { MarketPolicyRoutes } from './MarketPolicyRoutes.js';
+import { routeAvailabilityLabelV3, routeCatalogMessageV3 } from './market-data-routes-v3.js';
+import { effectivePolicyV3, policySyncLabelV3 } from './market-policy-status-v3.js';
 import {
   type MarketPolicyDraftV3,
   type MarketPolicyResponse,
   type MarketRouteCatalogReadV3,
   type ProviderManifest,
 } from './market-data.types.js';
-
-const savedTargets = (policy: MarketPolicyDraftV3, row: MarketPolicyRouteRowV3) =>
-  policyRouteTargetsV3(policy, row.key);
 
 export function MarketPolicyPanel({
   policy,
@@ -61,14 +43,15 @@ export function MarketPolicyPanel({
   onSave: () => void;
   onRetry: () => void;
 }) {
-  const rows = marketPolicyRouteRowsV3(catalog, policy);
   const catalogMessage = catalogPending
     ? '正在读取 DSA 精确路由能力目录。'
     : routeCatalogMessageV3(catalog, catalogQueryFailed);
   const effective = effectivePolicyV3(serverPolicy);
   const effectiveRevision = effective?.revision ?? null;
   const effectiveSourceRevision = effective?.sourceDesiredRevision ?? null;
-  const canRetry = Boolean(serverPolicy && (serverPolicy.syncState !== 'applied' || serverPolicy.effectiveStale));
+  const canRetry = Boolean(
+    serverPolicy && (serverPolicy.syncState !== 'applied' || serverPolicy.effectiveStale),
+  );
   let statusBadgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
   if (serverPolicy?.syncState === 'rejected') statusBadgeVariant = 'destructive';
   else if (dirty) statusBadgeVariant = 'default';
@@ -136,77 +119,15 @@ export function MarketPolicyPanel({
           </Alert>
         )}
 
-        {policy && (
-          <MarketPolicyPreset
-            policy={policy}
-            catalog={catalog}
-            providers={providers}
-            disabled={disabled || saving || retrying || catalogPending || catalogQueryFailed}
-            onChange={onChange}
-          />
-        )}
-
-        {policy ? (
-          rows.length > 0 ? (
-            <div className="divide-y rounded-lg border border-border">
-              {rows.map((row) => {
-                const [primary, fallback] = savedTargets(policy, row);
-                const candidates = readyRouteTargetsV3(catalog, row.key, providers);
-                const routeMessage = routeAvailabilityMessageV3(catalog, row.key);
-                return (
-                  <div
-                    key={row.id}
-                    className="grid gap-4 p-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
-                  >
-                    <div className="flex flex-col gap-1 self-center">
-                      <strong className="block text-sm font-medium">
-                        {routeKeyLabelV3(row.key)}
-                      </strong>
-                      <span className="text-xs text-muted-foreground">
-                        {effectiveRouteLabelV3(serverPolicy, row, dirty)}
-                      </span>
-                      {candidates.length === 0 && routeMessage && (
-                        <span className="text-xs text-muted-foreground">{routeMessage}</span>
-                      )}
-                    </div>
-                    <MarketPolicyTargetSelect
-                      row={row}
-                      role="primary"
-                      selected={primary}
-                      other={fallback}
-                      catalog={catalog}
-                      providers={providers}
-                      disabled={disabled}
-                      onChange={(target) =>
-                        onChange(updatePolicyRouteTargetV3(policy, row.key, 'primary', target))
-                      }
-                    />
-                    <MarketPolicyTargetSelect
-                      row={row}
-                      role="fallback"
-                      selected={fallback}
-                      other={primary}
-                      catalog={catalog}
-                      providers={providers}
-                      disabled={disabled}
-                      onChange={(target) =>
-                        onChange(updatePolicyRouteTargetV3(policy, row.key, 'fallback', target))
-                      }
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {catalog?.status === 'complete'
-                ? '当前目录没有可配置的数据能力。'
-                : '正在读取路由策略与精确能力目录…'}
-            </p>
-          )
-        ) : (
-          <p className="text-sm text-muted-foreground">正在读取路由策略…</p>
-        )}
+        <MarketPolicyRoutes
+          policy={policy}
+          serverPolicy={serverPolicy}
+          catalog={catalog}
+          providers={providers}
+          disabled={disabled}
+          dirty={dirty}
+          onChange={onChange}
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           <Button

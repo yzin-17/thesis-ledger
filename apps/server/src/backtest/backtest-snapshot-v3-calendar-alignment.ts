@@ -1,8 +1,9 @@
 import {
-  compareMarketPitEvidenceInstantStringsV1,
   marketCoverageProofV3Schema,
+  isBeforeKnownListingDateV3,
   type RunConfigV3,
 } from '@thesis-ledger/schemas';
+import { assertLifecyclePreparationV3 } from './backtest-lifecycle-preparation-v3.js';
 import { tradingCalendarFromFact } from '@thesis-ledger/domain';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import type { SnapshotInputPlanV3 } from './backtest-snapshot-v3-input-plan.js';
@@ -11,6 +12,7 @@ import { calendarFact } from './backtest-v2-execution-shared.js';
 import { dailyBarSessionTimes } from './backtest-daily-bar-session.js';
 import { canonicalizeManifest } from './backtest-snapshot.js';
 import { tradabilityExpectedBarDatesV3 } from './backtest-snapshot-v3-tradability.js';
+import { applicableInstrumentObservationV3 } from './backtest-identity-observation-clock-v3.js';
 import {
   assertSettlementCalendarCoverage,
   settlementCalendarRequirement,
@@ -37,7 +39,7 @@ export const validateSnapshotCalendarAlignmentV3 = (
   const last = new Date(`${input.plan.runWindow.endDate}T12:00:00.000Z`);
   for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
     const status = calendar.status(cursor);
-    if (status.open && status.date >= proof.listing.firstTradingDate)
+    if (status.open && !isBeforeKnownListingDateV3(proof.listing, status.date))
       expectedDates.push(status.date);
   }
   const bars = artifacts.get('execution/bars.parquet');
@@ -51,7 +53,9 @@ export const validateSnapshotCalendarAlignmentV3 = (
   if (canonicalizeManifest(dates) !== canonicalizeManifest(tradabilityExpectedBarDatesV3(instrumentFacts, expectedDates))) {
     fail('V3 冻结日历与行情覆盖证明的交易日不一致');
   }
-  const preceding = dates.filter((date) => date < input.plan.runWindow.startDate);
+  const analysisStart = settlementConfig?.lifecyclePreparation?.signalStartDate ?? input.plan.runWindow.startDate;
+  if (settlementConfig?.lifecyclePreparation) assertLifecyclePreparationV3(settlementConfig, bars.map(bar => ({ timestamp: String(bar.occurredAt) })), input.plan.warmup.lookbackPeriods);
+  const preceding = dates.filter((date) => date < analysisStart);
   if (preceding.length < input.plan.warmup.lookbackPeriods) {
     fail('V3 冻结行情不足以满足策略预热周期');
   }
@@ -71,11 +75,9 @@ export const validateSnapshotCalendarAlignmentV3 = (
     .flatMap(([, value]) => value);
   if (
     !openedAt ||
-    !facts.some((fact) => {
-      if (typeof fact.occurredAt !== 'string') return false;
-      const order = compareMarketPitEvidenceInstantStringsV1(fact.occurredAt, openedAt);
-      return order === -1 || order === 0;
-    })
+    !facts.some((fact) => applicableInstrumentObservationV3(fact, openedAt, settlementConfig,
+      proof.listing.symbol, input.executionRouteKey.market,
+      artifacts.get('metadata/dependency-evidence-v3.parquet') ?? []))
   ) {
     fail('V3 完整快照缺少期初适用的标的历史事实');
   }

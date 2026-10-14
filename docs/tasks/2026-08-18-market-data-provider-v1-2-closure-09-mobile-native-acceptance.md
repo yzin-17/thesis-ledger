@@ -1,5 +1,7 @@
 # 09 — 完成 Mobile 原生联网与只读边界验收
 
+> 状态对账（2026-10-03）：已实现待验收：两项未勾选的原生联网与状态视觉仍有效。旧“无 Android/CoreSimulator 拒绝”是当时环境事实，本轮未检查设备，不能认定为今天仍存在的阻塞；下一次先核实设备，再验证当前合同。多源任务对 Electron 的跳过不豁免 Mobile。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 **要构建的能力：** Mobile 在实际原生运行环境中能够读取 ThesisLedger API 的投资组合和风险信息，同时保持纯只读客户端，不暴露市场数据控制面写操作或 Control Token。
 
 **阻塞于：** 当前机器没有可用的 Android 原生目标，CoreSimulatorService 也拒绝连接；需要外部设备或恢复的 iOS Simulator 服务。

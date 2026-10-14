@@ -11,6 +11,12 @@ import {
   SnapshotV3InputPlanError,
 } from './backtest-snapshot-v3-input-plan.js';
 import type { validateSnapshotDependencyArtifactsV3 } from './backtest-snapshot-v3-dependency-validation.js';
+import { publicFeesArtifactKeyV3, tradingStatusArtifactKeyV3, statusCompositionArtifactKeyV1 } from '@thesis-ledger/schemas';
+import { hkResearchLotForFactV3 } from './backtest-hk-research-lot-v3.js';
+import {
+  knownCashMetadataKeyV3,
+  knownCashRecordsKeyV3,
+} from './backtest-known-cash-snapshot-v3.js';
 
 export const priceInputBindingsArtifactKeyV3 = 'metadata/price-input-bindings-v3.parquet';
 
@@ -70,6 +76,9 @@ export const validateCompleteSnapshotExecutionFactsV3 = (
   runConfig: RunConfigV3,
   inputPlan: ReturnType<typeof planSnapshotInputsV3>,
   validated: ReturnType<typeof validateSnapshotDependencyArtifactsV3>,
+  publicFees?: BacktestSnapshotManifestV3['publicFees'],
+  tradingStatus?: BacktestSnapshotManifestV3['tradingStatus'],
+  statusComposition?: BacktestSnapshotManifestV3['statusComposition'],
 ): void => {
   const expectedKeys = new Set([
     'metadata/snapshot-metadata-v3.parquet',
@@ -78,6 +87,10 @@ export const validateCompleteSnapshotExecutionFactsV3 = (
     'execution/bars.parquet',
     ...validated.artifacts.map(({ key }) => key),
     ...(runConfig.executionModel ? ['metadata/execution-model-v3.parquet'] : []),
+    ...(publicFees ? [publicFeesArtifactKeyV3] : []),
+    ...(tradingStatus ? [tradingStatusArtifactKeyV3] : []),
+    ...(statusComposition ? [statusCompositionArtifactKeyV1] : []),
+    ...(runConfig.knownCashPreparation ? [knownCashMetadataKeyV3, knownCashRecordsKeyV3] : []),
   ]);
   if (byKey.size !== expectedKeys.size || [...byKey.keys()].some((key) => !expectedKeys.has(key))) {
     fail('V3 完整快照包含未规划或缺失的 Artifact');
@@ -93,6 +106,7 @@ export const validateCompleteSnapshotExecutionFactsV3 = (
     priceBasis: runConfig.executionPriceProtocol.priceBasis,
   };
   for (const fact of executionFacts) {
+    hkResearchLotForFactV3(fact, runConfig);
     const plan = planBacktestDependencies({
       strategy,
       runConfig,

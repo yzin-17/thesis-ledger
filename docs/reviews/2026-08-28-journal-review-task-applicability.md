@@ -22,20 +22,20 @@
 
 ## 原任务逐项适用性
 
-| 原任务 | 结论 | 重新适用时的处理 |
-| --- | --- | --- |
-| T1 候选和查询契约 | 保留目标，契约已被替代 | 以当前 `mode`、`reviewObjectType`、`tradeId`、`closeSliceId`、投影指纹和 legacy 字段为准。 |
-| T2 服务端交易生命周期重建 | 不再适用为 Journal 任务 | 由 Trade Projection 的 T8–T10 承担；不得恢复旧的 Journal→Ledger 计算路径。 |
-| T3 候选聚合 endpoint | 保留目标，依赖已变化 | 候选服务只编排 `TradeQueryService` 结果、计划、Journal 和快照状态。 |
-| T4 Desktop 数据访问 | 保留 | Query key、API 类型和模式隔离必须同步 Trade Projection 契约。 |
-| T5 页面信息架构 | 保留 | 账户数据和投资组合已有独立 Trade 入口，Journal 只负责复盘编排。 |
-| T6 单笔选择与证据核对 | 保留，粒度需扩展 | 同时支持完整 Trade 与 Close Slice，并展示 Baseline、证据不足、legacy 和过期状态。 |
-| T7 确定性结果 | 保留，数据边界需扩展 | 结果需尊重十进制字符串、成本估算、原币/本位币和统计资格。 |
-| T8 周期复盘 | 保留，统计口径需改写 | 完整周期统计只使用符合资格的 `TRADE_CYCLE`，Close Slice 单独统计。 |
-| T9 AI 解读 | 保留 | AI 输入需携带确定性 Trade 事实、来源和投影边界；失败不影响快照。 |
-| T10 回归测试 | 保留，旧证据已过期 | 以当前 Trade/Journal 测试数量、指纹、legacy 和模式隔离用例为准。 |
-| T11 文档与质量检查 | 保留 | 用户文档应说明成交、交易周期、持仓和基线观察的区别。 |
-| T12 最终一致性 Review | 原结论不再适用 | 由 Trade 任务 T17 和本 Review 共同承担当前一致性判断。 |
+| 原任务                    | 结论                    | 重新适用时的处理                                                                           |
+| ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| T1 候选和查询契约         | 保留目标，契约已被替代  | 以当前 `mode`、`reviewObjectType`、`tradeId`、`closeSliceId`、投影指纹和 legacy 字段为准。 |
+| T2 服务端交易生命周期重建 | 不再适用为 Journal 任务 | 由 Trade Projection 的 T8–T10 承担；不得恢复旧的 Journal→Ledger 计算路径。                 |
+| T3 候选聚合 endpoint      | 保留目标，依赖已变化    | 候选服务只编排 `TradeQueryService` 结果、计划、Journal 和快照状态。                        |
+| T4 Desktop 数据访问       | 保留                    | Query key、API 类型和模式隔离必须同步 Trade Projection 契约。                              |
+| T5 页面信息架构           | 保留                    | 账户数据和投资组合已有独立 Trade 入口，Journal 只负责复盘编排。                            |
+| T6 单笔选择与证据核对     | 保留，粒度需扩展        | 同时支持完整 Trade 与 Close Slice，并展示 Baseline、证据不足、legacy 和过期状态。          |
+| T7 确定性结果             | 保留，数据边界需扩展    | 结果需尊重十进制字符串、成本估算、原币/本位币和统计资格。                                  |
+| T8 周期复盘               | 保留，统计口径需改写    | 完整周期统计只使用符合资格的 `TRADE_CYCLE`，Close Slice 单独统计。                         |
+| T9 AI 解读                | 保留                    | AI 输入需携带确定性 Trade 事实、来源和投影边界；失败不影响快照。                           |
+| T10 回归测试              | 保留，旧证据已过期      | 以当前 Trade/Journal 测试数量、指纹、legacy 和模式隔离用例为准。                           |
+| T11 文档与质量检查        | 保留                    | 用户文档应说明成交、交易周期、持仓和基线观察的区别。                                       |
+| T12 最终一致性 Review     | 原结论不再适用          | 由 Trade 任务 T17 和本 Review 共同承担当前一致性判断。                                     |
 
 ## 必须修正的旧表述
 
@@ -78,7 +78,7 @@ Trade Projection 允许 `openedAt = null`。不得使用 `earliestEvidenceAt`、
 
 ## 后续建议
 
-1. 原 8/25 Spec 和任务文档已归档为历史基线；当前入口使用新的 [`统一 Trade Projection Spec`](../specs/2026-08-28-journal-review-trade-projection.md) 和 [`实施任务`](../tasks/2026-08-28-journal-review-trade-projection.md)。
+1. 原 8/25 Spec 和任务文档已归档为历史基线；当前入口使用新的 [`统一 Trade Projection Spec`](../specs/2026-08-28-journal-review-trade-projection.md) 和 [`实施任务`](../archive/tasks/2026-08-28-journal-review-trade-projection.md)。
 2. 后续 Journal 迭代不得重新实现 Trade Projection，新增行为应建立在当前统一投影契约上。
 3. 后续 Review 使用当前测试和运行态证据，不再引用原任务中的旧测试计数作为现状。
 

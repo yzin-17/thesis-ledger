@@ -1,0 +1,120 @@
+import type { JournalReviewEvidenceInput } from '@thesis-ledger/schemas';
+
+export const journalEvidenceFixture = (): JournalReviewEvidenceInput => {
+  const accountId = '00000000-0000-4000-8000-000000000001';
+  const buyEvent = '00000000-0000-4000-8000-000000000002';
+  const buyFact = '00000000-0000-4000-8000-000000000003';
+  const sellEvent = '00000000-0000-4000-8000-000000000004';
+  const sellFact = '00000000-0000-4000-8000-000000000005';
+  return {
+    reference: {
+      reviewObjectType: 'TRADE_CYCLE',
+      reviewObjectId: 'TRADE_CYCLE:trade-1',
+      tradeId: 'trade-1',
+    },
+    trade: {
+      id: 'trade-1',
+      accountId,
+      accountMode: 'actual',
+      symbol: 'AAPL.US',
+      lifecycle: 'ENDED',
+      exitProgress: 'FULL',
+      endEvidence: 'SELL_EXECUTION',
+      openedAt: '2026-01-01T09:00:00Z',
+      closedAt: '2026-01-03T09:00:00Z',
+      earliestEvidenceAt: '2026-01-01T09:00:00Z',
+      sourceQuantity: '2',
+      closedQuantity: '2',
+      remainingQuantity: '0',
+      grossRealizedPnl: '4',
+      netRealizedPnl: '4',
+      realizedNetReturnRate: '0.2',
+      costEstimated: false,
+      completeness: 'COMPLETE',
+      issues: [],
+      costIssues: [],
+      algorithmVersion: 'fixture',
+      projectionFingerprint: 'projection-1',
+      projectionGeneration: '7',
+      excludedReasons: [],
+      entryLegs: [
+        {
+          id: 'storage-entry-1',
+          eventId: buyEvent,
+          factId: buyFact,
+          occurredAt: '2026-01-01T09:00:00Z',
+          currency: 'USD',
+          price: '10',
+          originalQuantity: '2',
+          quantity: '2',
+          remainingQuantity: '0',
+          rawCost: '20',
+          remainingCost: '0',
+          rawCostEstimated: false,
+          charges: [],
+        },
+      ],
+      baselineComponents: [],
+      corporateActions: [],
+      closeSlices: [
+        {
+          id: 'slice-1',
+          eventId: sellEvent,
+          factId: sellFact,
+          occurredAt: '2026-01-02T09:00:00Z',
+          currency: 'USD',
+          price: '12',
+          quantity: '1',
+          remainingQuantityAfter: '1',
+          charges: [],
+          grossRealizedPnl: '2',
+          netRealizedPnl: '2',
+          realizedNetReturnRate: '0.2',
+          costEstimated: false,
+          allocations: [
+            {
+              id: 'storage-allocation-1',
+              source: 'ENTRY_LEG',
+              sourceEventId: buyEvent,
+              sourceFactId: buyFact,
+              quantity: '1',
+              originalCost: '10',
+              allocatedBuyCharges: [],
+            },
+          ],
+        },
+      ],
+      dividendAttributions: [],
+      evidenceSources: [
+        {
+          id: 'storage-evidence-buy',
+          kind: 'EXECUTION',
+          eventId: buyEvent,
+          factId: buyFact,
+          source: { category: 'MANUAL', channel: 'fixture' },
+        },
+        {
+          id: 'storage-evidence-sell',
+          kind: 'EXECUTION',
+          eventId: sellEvent,
+          factId: sellFact,
+          source: { category: 'MANUAL', channel: 'fixture' },
+        },
+      ],
+    },
+    plan: null,
+    journalEntries: [],
+    analysisDraft: null,
+    fxEvidence: [],
+    projection: {
+      ledgerRevision: '12',
+      projectionGeneration: '7',
+      projectionFingerprint: 'projection-1',
+      evidenceFingerprint: 'pending',
+      factIds: [buyFact, sellFact],
+      eventIds: [buyEvent, sellEvent],
+      fxEvidenceVersion: null,
+      conversionFingerprint: null,
+    },
+  };
+};

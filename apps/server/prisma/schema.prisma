@@ -971,6 +971,7 @@ model RecurringFundInvestmentOccurrence {
 
 model Strategy {
   id            String            @id @default(uuid()) @db.Uuid
+  ownerId       String?           @db.Uuid
   name          String
   description   String?
   status        String            @default("draft")
@@ -979,6 +980,8 @@ model Strategy {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   versions      StrategyVersion[]
+
+  @@index([ownerId])
 }
 
 model StrategyVersion {
@@ -987,6 +990,7 @@ model StrategyVersion {
   version         Int
   schemaVersion   Int
   schema          Json
+  source          Json?
   createdAt       DateTime       @default(now())
   strategy        Strategy       @relation(fields: [strategyId], references: [id], onDelete: Restrict)
   jobs            BacktestJob[]
@@ -1271,4 +1275,54 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([resource, resourceId, createdAt])
+}
+
+model IdentityUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  sessions     IdentitySession[]
+}
+
+model IdentitySession {
+  tokenDigest String   @id
+  userId      String   @db.Uuid
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  user        IdentityUser @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, expiresAt])
+}
+
+model AiInvocation {
+  requestId        String   @id @db.Uuid
+  consumer         String
+  referenceId      String   @db.Uuid
+  ownerId          String   @db.Uuid
+  executionAttempt Int
+  providerId       String
+  requestedModel   String
+  inputFingerprint String
+  preparedAt       DateTime @default(now())
+  facts            AiInvocationFact[]
+
+  @@unique([consumer, referenceId, executionAttempt])
+  @@index([ownerId, preparedAt])
+}
+
+model AiInvocationFact {
+  requestId String   @db.Uuid
+  eventKey  String   @db.Uuid
+  sequence  Int
+  kind      String
+  details   Json
+  createdAt DateTime @default(now())
+  invocation AiInvocation @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+
+  @@id([requestId, eventKey])
+  @@unique([requestId, sequence])
 }

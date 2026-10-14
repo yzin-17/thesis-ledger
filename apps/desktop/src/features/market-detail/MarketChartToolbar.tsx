@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useMarketPeriodControls } from './MarketPeriodSelection.js';
 
 function ToolbarGroup({
   label,
@@ -31,9 +32,11 @@ export function MarketChartToolbar({
   indicatorControls: ReactNode;
   viewControls: ReactNode;
 }) {
+  const periodControls = useMarketPeriodControls();
   return (
     <div className="flex flex-wrap items-start gap-x-4 gap-y-3" data-market-chart-toolbar>
       <ToolbarGroup label="图形">{chartControls}</ToolbarGroup>
+      {periodControls ? <ToolbarGroup label="周期">{periodControls}</ToolbarGroup> : null}
       <ToolbarGroup label="区间">{rangeControls}</ToolbarGroup>
       <ToolbarGroup label="指标">{indicatorControls}</ToolbarGroup>
       <ToolbarGroup label="视图">{viewControls}</ToolbarGroup>

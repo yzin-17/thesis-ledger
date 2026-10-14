@@ -76,6 +76,30 @@ const order = (
   ...overrides,
 });
 
+describe('固定快照规则事实研究截点', () => {
+  it('只改变来源读取截点，保留来源时间并按真实交易时刻判定交易日', () => {
+    const source = facts('CN', { calendarAvailableAt: '2026-10-06T00:00:00Z' });
+    expect(new VersionedExecutionRules(source).evaluate(order('CN')).accepted).toBe(false);
+    const research = new VersionedExecutionRules({
+      ...source,
+      factResearch: { basis: 'fixed-provider-snapshot', dataAsOf: '2026-10-07T00:00:00Z' },
+    });
+    const decision = research.evaluate(order('CN'));
+    expect(decision.accepted).toBe(true);
+    expect(decision.trace.calendarAvailableAt).toBe(source.calendarAvailableAt);
+    expect(decision.trace.evaluatedAt).toBe(sessionOpen.CN);
+    expect(research.evaluate(order('CN', { evaluatedAt: '2026-09-06T01:30:00Z' })).accepted).toBe(
+      false,
+    );
+    expect(
+      new VersionedExecutionRules({
+        ...source,
+        factResearch: { basis: 'fixed-provider-snapshot', dataAsOf: '2026-09-08T00:00:00Z' },
+      }).evaluate(order('CN')).accepted,
+    ).toBe(false);
+  });
+});
+
 describe('VersionedExecutionRules 三市场 Golden', () => {
   it('CN 按 lot 向下规范化并使用交易日表达持仓 T+1', () => {
     const rules = new VersionedExecutionRules(facts('CN'));
@@ -222,12 +246,12 @@ describe('VersionedExecutionRules 拒绝与追踪', () => {
     expect(
       rules.evaluate(order('CN', { rawPrice: '11.07', previousClose: '10.05' })),
     ).toMatchObject({ accepted: false, reasonCode: 'PRICE_LIMIT' });
-    expect(
-      rules.evaluate(order('CN', { rawPrice: '9.05', previousClose: '10.05' })),
-    ).toMatchObject({ accepted: true });
-    expect(
-      rules.evaluate(order('CN', { rawPrice: '9.04', previousClose: '10.05' })),
-    ).toMatchObject({ accepted: false, reasonCode: 'PRICE_LIMIT' });
+    expect(rules.evaluate(order('CN', { rawPrice: '9.05', previousClose: '10.05' }))).toMatchObject(
+      { accepted: true },
+    );
+    expect(rules.evaluate(order('CN', { rawPrice: '9.04', previousClose: '10.05' }))).toMatchObject(
+      { accepted: false, reasonCode: 'PRICE_LIMIT' },
+    );
   });
 
   it('法定费用与最低费用使用 Decimal 计算且保留币种', () => {

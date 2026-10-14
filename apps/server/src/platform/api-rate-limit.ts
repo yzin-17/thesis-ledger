@@ -42,7 +42,7 @@ export class ApiRateLimiter {
   }
 }
 
-const heavyPath = /\/(imports|ai|backtests|automations\/workflows)(?:\/|$)/u;
+const heavyPath = /\/(imports|ai|identity|strategy-authoring|backtests|automations\/workflows)(?:\/|$)/u;
 
 export const createApiRateLimitMiddleware =
   (limiter = new ApiRateLimiter()) =>

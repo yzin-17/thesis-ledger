@@ -54,7 +54,7 @@ describe('Market Route Contract V3', () => {
     }).success).toBe(false);
   });
 
-  it('按精确目标区分未适配、伪支持口径、未鉴权与额度', () => {
+  it('按精确目标校验适配与口径，允许保存缺凭证或额度不足的选择', () => {
     const policy = desiredProviderPolicyV3Schema.parse(fixture());
     const key = policy.routes[0]!.key;
     const target = policy.routes[0]!.targets[0]!;
@@ -62,8 +62,9 @@ describe('Market Route Contract V3', () => {
     expect(validateDesiredProviderPolicyV3(policy, [capability])).toEqual([]);
     expect(validateDesiredProviderPolicyV3(policy, [])).toMatchObject([{ reason: 'not_adapted' }]);
     expect(validateDesiredProviderPolicyV3(policy, [{ ...capability, key: { ...key, adjustment: 'none' } }])).toMatchObject([{ reason: 'unsupported_adjustment' }]);
-    expect(validateDesiredProviderPolicyV3(policy, [{ ...capability, state: 'credential_missing' }])).toMatchObject([{ reason: 'credential_missing' }]);
-    expect(validateDesiredProviderPolicyV3(policy, [{ ...capability, state: 'quota_unavailable' }])).toMatchObject([{ reason: 'quota_unavailable' }]);
+    expect(validateDesiredProviderPolicyV3(policy, [{ ...capability, state: 'credential_missing' }])).toEqual([]);
+    expect(validateDesiredProviderPolicyV3(policy, [{ ...capability, state: 'quota_unavailable' }])).toEqual([]);
+    expect(validateDesiredProviderPolicyV3(policy, [{ ...capability, state: 'not_admitted' }])).toEqual([]);
   });
 
   it('当前报价目录允许股票与 ETF 分别选用精确来源', () => {

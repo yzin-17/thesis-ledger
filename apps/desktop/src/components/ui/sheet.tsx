@@ -88,6 +88,19 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+function SheetBody({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="sheet-body"
+      className={cn(
+        '-mx-1 -my-1 min-h-0 min-w-0 flex-1 overflow-y-auto px-1 py-1',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -130,6 +143,7 @@ export {
   SheetClose,
   SheetContent,
   SheetHeader,
+  SheetBody,
   SheetFooter,
   SheetTitle,
   SheetDescription,

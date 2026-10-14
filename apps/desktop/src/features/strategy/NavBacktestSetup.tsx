@@ -18,6 +18,7 @@ import {
 } from './strategy-center.navigation.js';
 import { strategyVersionSummary } from './strategy-version-summary.model.js';
 import type { StrategyRecord } from './strategy.types.js';
+import { AuthoringRunIntents } from '../strategy-authoring/AuthoringRunIntents.js';
 import {
   errorText,
   ExecutionModelCard,
@@ -73,6 +74,7 @@ export function NavBacktestSetupPage({
   return (
     <div className="flex flex-col gap-4">
       <NavSetupHeader selection={selection} symbol={symbol} />
+      <AuthoringRunIntents version={version} />
       <ResearchVisibilityNotice />
       <RunScopeCard
         fundType={setup.fundType}

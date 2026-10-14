@@ -134,7 +134,9 @@ describe('现行 Run 入口', () => {
       { id: 'current-run' },
       { id: 'succeeded-run' },
     ]);
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { mode: 'V3' } }));
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { mode: 'V3', strategyVersion: { strategy: { OR: [{ ownerId: null }] } } },
+    }));
   });
 
   it.each([

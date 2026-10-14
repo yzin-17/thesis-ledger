@@ -1,3 +1,5 @@
+import { providerUpstreamSourceSchema } from './market-provider-source.js';
+export { localHistorySourceSchema, type LocalHistorySource } from './market-provider-source.js';
 import { z } from 'zod';
 import {
   barSeriesSchema,
@@ -5,7 +7,9 @@ import {
   type BarSeries,
   type MarketIndicatorResult,
 } from './market-bar-series.js';
+import { marketTimeframeSchema, type MarketTimeframe } from './market-period.js';
 import { priceAdjustmentSchema } from './market-price-protocol.js';
+import { marketQuoteSymbolSchema } from './market-quote-identity.js';
 
 const isoDate = z.iso.datetime({ offset: true });
 const isoCalendarDate = z.iso.date();
@@ -50,14 +54,14 @@ export type FxRatesResponse = z.infer<typeof fxRatesResponseSchema>;
 export const quoteSchema = z
   .object({
     version: z.literal(3),
-    symbol: z.string().regex(/^\d{6}\.(SH|SZ|BJ)$/),
+    symbol: marketQuoteSymbolSchema,
     open: finite.nonnegative(),
     high: finite.nonnegative(),
     low: finite.nonnegative(),
     price: finite.nonnegative(),
     previousClose: finite.nonnegative(),
-    volume: finite.nonnegative(),
-    amount: finite.nonnegative(),
+    volume: finite.nonnegative().nullable(),
+    amount: finite.nonnegative().nullable(),
     stale: z.boolean(),
     fallbackUsed: z.boolean().optional(),
     servedFromCache: z.boolean().optional(),
@@ -181,9 +185,11 @@ export const providerManifestSchema = z.object({
   enabled: z.boolean(),
   credentialConfigured: z.boolean(),
   requiresCredential: z.boolean().optional(),
+  accountAccessSupported: z.boolean().optional(),
   origin: z.enum(['dsa']).optional(),
   markets: z.array(z.string().min(1)).optional(),
   configurationMode: z.enum(['control', 'built_in', 'dsa_environment']).optional(),
+  sourceKind: z.enum(['online', 'local_history']).optional(),
   credentialSchema: z
     .object({
       methods: z.array(
@@ -204,15 +210,7 @@ export const providerManifestSchema = z.object({
   credentialFieldsConfigured: z.record(z.string(), z.boolean()).optional(),
   credentialMethod: z.string().min(1).nullable().optional(),
   configVersion: z.number().int().nonnegative().optional(),
-  upstreamSources: z
-    .array(
-      z.object({
-        sourceId: z.string().min(1),
-        displayName: z.string().min(1),
-        capabilities: z.record(z.string(), z.array(z.string().min(1))),
-      }),
-    )
-    .optional(),
+  upstreamSources: z.array(providerUpstreamSourceSchema).optional(),
   updatedAt: isoDate.nullable().optional(),
 });
 
@@ -256,6 +254,7 @@ export const marketDetailRequestSchema = z
     barsLimit: z.number().int().min(1).max(3000).optional(),
     navLimit: z.number().int().min(1).max(90).optional(),
     adjustment: priceAdjustmentSchema.optional(),
+    timeframe: marketTimeframeSchema.optional(),
     chartContractVersion: z.literal(3).optional(),
     start: isoCalendarDate.optional(),
     end: isoCalendarDate.optional(),
@@ -379,85 +378,95 @@ const marketDetailSectionEnvelopeSchema = z.object({
   error: marketDetailDiagnosticSchema.optional(),
 });
 
-const marketDetailResponseSchemaImplementation = z
-  .object({
-    contractVersion: z.literal(3),
-    symbol: z.string().min(1),
-    assetType: marketDetailAssetTypeSchema,
-    identity: z.object({
-      source: z.enum(['asset', 'catalog', 'symbol', 'unknown']),
-      status: z.enum(['confirmed', 'provider', 'unknown']),
-    }),
-    requested: z.array(marketDetailCapabilitySchema),
-    capabilities: z.object({
-      supported: z.array(marketDetailCapabilitySchema),
-      unsupported: z.array(marketDetailCapabilitySchema),
-    }),
-    limits: z.object({
-      bars: z.number().int().positive(),
-      nav: z.number().int().positive(),
-      barsHasMoreBefore: z.boolean().optional(),
-    }),
-    barSeries: barSeriesSchema.optional(),
-    sections: z.record(z.string(), marketDetailSectionEnvelopeSchema),
-    dependencies: z.record(z.string(), marketDetailDependencySchema),
-    requestId: z.string().min(1),
-    generatedAt: isoDate,
-  })
-  .superRefine((response, context) => {
-    for (const capability of response.requested) {
-      const section = response.sections[capability];
-      if (!section) {
-        context.addIssue({
-          code: 'custom',
-          path: ['sections', capability],
-          message: '响应必须为每个 requested 能力提供分段状态。',
-        });
-        continue;
-      }
-      if (section.capability !== capability) {
-        context.addIssue({
-          code: 'custom',
-          path: ['sections', capability, 'capability'],
-          message: '分段键必须与 capability 一致。',
-        });
-      }
-      if (section.status === 'ready' || section.status === 'stale') {
-        let parsed: { success: boolean } = { success: true };
-        if (capability === 'bars') {
-          parsed = barSeriesSchema.safeParse(section.data);
-        } else if (capability.startsWith('indicator:')) {
-          const indicator = marketIndicatorResultSchema.safeParse(section.data);
-          parsed = indicator;
-          if (
-            indicator.success &&
-            response.barSeries &&
-            indicator.data.inputFingerprint !== response.barSeries.inputFingerprint
-          ) {
-            context.addIssue({
-              code: 'custom',
-              path: ['sections', capability, 'data', 'inputFingerprint'],
-              message: '详情指标必须与日线序列共享 inputFingerprint。',
-            });
-          }
-        }
-        if (!parsed.success) {
+export const marketDetailResponseEnvelopeSchema = z.object({
+  contractVersion: z.literal(3),
+  symbol: z.string().min(1),
+  assetType: marketDetailAssetTypeSchema,
+  identity: z.object({
+    source: z.enum(['asset', 'catalog', 'symbol', 'unknown']),
+    status: z.enum(['confirmed', 'provider', 'unknown']),
+  }),
+  requested: z.array(marketDetailCapabilitySchema),
+  capabilities: z.object({
+    supported: z.array(marketDetailCapabilitySchema),
+    unsupported: z.array(marketDetailCapabilitySchema),
+  }),
+  limits: z.object({
+    bars: z.number().int().positive(),
+    nav: z.number().int().positive(),
+    barsHasMoreBefore: z.boolean().optional(),
+  }),
+  barSeries: barSeriesSchema.optional(),
+  sections: z.record(z.string(), marketDetailSectionEnvelopeSchema),
+  dependencies: z.record(z.string(), marketDetailDependencySchema),
+  requestId: z.string().min(1),
+  generatedAt: isoDate,
+});
+
+export function refineMarketDetailResponse(
+  response: Omit<z.infer<typeof marketDetailResponseEnvelopeSchema>, 'barSeries'> & {
+    barSeries?: { inputFingerprint: string } | undefined;
+  },
+  context: z.RefinementCtx,
+  barsSchema: z.ZodType = barSeriesSchema,
+) {
+  for (const capability of response.requested) {
+    const section = response.sections[capability];
+    if (!section) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sections', capability],
+        message: '响应必须为每个 requested 能力提供分段状态。',
+      });
+      continue;
+    }
+    if (section.capability !== capability) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sections', capability, 'capability'],
+        message: '分段键必须与 capability 一致。',
+      });
+    }
+    if (section.status === 'ready' || section.status === 'stale') {
+      let parsed: { success: boolean } = { success: true };
+      if (capability === 'bars') {
+        parsed = barsSchema.safeParse(section.data);
+      } else if (capability.startsWith('indicator:')) {
+        const indicator = marketIndicatorResultSchema.safeParse(section.data);
+        parsed = indicator;
+        if (
+          indicator.success &&
+          response.barSeries &&
+          indicator.data.inputFingerprint !== response.barSeries.inputFingerprint
+        ) {
           context.addIssue({
             code: 'custom',
-            path: ['sections', capability, 'data'],
-            message: '详情分段数据契约不匹配。',
+            path: ['sections', capability, 'data', 'inputFingerprint'],
+            message: '详情指标必须与显示序列共享 inputFingerprint。',
           });
         }
-        if (capability.startsWith('indicator:') && !response.barSeries) {
-          context.addIssue({
-            code: 'custom',
-            path: ['barSeries'],
-            message: '指标分段必须携带对应的日线序列。',
-          });
-        }
+      }
+      if (!parsed.success) {
+        context.addIssue({
+          code: 'custom',
+          path: ['sections', capability, 'data'],
+          message: '详情分段数据契约不匹配。',
+        });
+      }
+      if (capability.startsWith('indicator:') && !response.barSeries) {
+        context.addIssue({
+          code: 'custom',
+          path: ['barSeries'],
+          message: '指标分段必须携带对应的显示序列。',
+        });
       }
     }
-  });
+  }
+}
+
+const marketDetailResponseSchemaImplementation = marketDetailResponseEnvelopeSchema.superRefine(
+  (response, context) => refineMarketDetailResponse(response, context),
+);
 
 export const marketDetailResponseSchema =
   marketDetailResponseSchemaImplementation as z.ZodType<MarketDetailResponse>;
@@ -486,6 +495,7 @@ export type MarketDetailRequest = {
   barsLimit?: number;
   navLimit?: number;
   adjustment?: z.infer<typeof priceAdjustmentSchema>;
+  timeframe?: MarketTimeframe;
   chartContractVersion?: 3;
   start?: string;
   end?: string;

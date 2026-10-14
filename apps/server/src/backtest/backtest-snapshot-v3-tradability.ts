@@ -112,7 +112,7 @@ export const validateSnapshotTradabilityV3 = (
     throw new SnapshotDependencyV3Error('response_contract_invalid', '缺少有效的逐日可交易性证据');
   }
   if (
-    window.routeKey.market !== 'CN' ||
+    !['CN', 'HK', 'US'].includes(window.routeKey.market) ||
     window.routeKey.adjustment !== config.executionPriceProtocol.priceBasis.adjustment ||
     !same(range, {
       start: window.coverageProof.window.requestedStart,
@@ -123,11 +123,12 @@ export const validateSnapshotTradabilityV3 = (
     fail('逐日可交易性身份、范围或来源与冻结行情不一致');
   }
   for (const evidence of windows) {
-    for (const timestamp of [
+    const timestamps = [
       evidence.barSource.observedAt,
       evidence.calendar.source.availableAt,
-      evidence.listing.source.availableAt,
-    ]) {
+    ];
+    if ('source' in evidence.listing) timestamps.push(evidence.listing.source.availableAt);
+    for (const timestamp of timestamps) {
       if (isBacktestEvidenceAfterDataAsOfV3(timestamp, config.dataAsOf)) {
         throw new SnapshotDependencyV3Error('future_fact', '逐日可交易性证据晚于 dataAsOf');
       }

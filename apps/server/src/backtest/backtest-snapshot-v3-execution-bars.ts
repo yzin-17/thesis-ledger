@@ -1,5 +1,6 @@
 import {
   marketCalendarTimezonesV3,
+  marketCoverageSessionDatesV3,
   backtestDailyTradabilityEvidenceV3Schema,
   observedTradabilityDatesV3,
   type marketCoverageProofV3Schema,
@@ -65,9 +66,7 @@ export const validateExecutionBarsEvidenceV3 = (
     const part = (type: string) => parts.find((item) => item.type === type)?.value;
     return `${part('year')}-${part('month')}-${part('day')}`;
   });
-  let expectedDates = coverageProof.calendar.expectedSessionDates.filter(
-    (date) => date >= coverageProof.listing.firstTradingDate,
-  );
+  let expectedDates = marketCoverageSessionDatesV3(coverageProof);
   if (typeof evidence.historicalTradabilityWindows === 'string') {
     expectedDates = observedTradabilityDatesV3(
       backtestDailyTradabilityEvidenceV3Schema.array().min(1).parse(JSON.parse(evidence.historicalTradabilityWindows)),

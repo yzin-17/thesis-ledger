@@ -1,5 +1,7 @@
 # 市场数据 RouteTarget V2 Spec
 
+2026-10-03 适用性对账：本文的 V2 envelope、默认主备及旧握手是历史合同，现行接口与配置以[Canonical 架构](../architecture/canonical-runtime.md)及[共同能力修订](2026-09-25-multi-source-adjustment-aware-backtest.md)为准。原延迟测量等未覆盖断言仍由[原 Task](../tasks/2026-09-16-market-data-route-target-v2.md)持有；替代不等于原 AC 全部通过。
+
 > 任务标识：market-data-route-target-v2
 > 日期：2026-09-16
 > 状态：Phase 1 实现中

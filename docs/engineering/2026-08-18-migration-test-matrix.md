@@ -1,5 +1,9 @@
 # 数据库结构测试矩阵
 
+## 自然语言编写持久化（2026-10-04）
+
+新增 `20261004130000_strategy_authoring_drafts` 与 `20261004140000_strategy_authoring_records` 采用保数据扩展，新增编写草稿/修订及操作/提案/来源，均登记 raw-owned inventory；Prisma Schema 不变。运行时打包与结构门禁动态读取全部 migration/模型/inventory，无需维护第二份静态清单。隔离 PostgreSQL 需验证存量 Strategy/StrategyVersion 原样保留、受限 app role 权限、owner 隔离、同修订竞态、终态不可写、单活动操作和晚到结果；实际证据见[本批任务证据](../tasks/evidence/2026-10-04-natural-language-strategy-parallel.md)。目标数据库、正式保数据升级演练及 G2 未在本批执行。
+
 当前结构由主仓活动 migration 目录内按名称排序的全部 SQL 共同定义，包括初始基线和后续增量；不能只执行初始基线或以 `prisma db push` 替代。结构 head 从实际输入派生，预期表包含 Prisma model 和 `raw-owned-tables.json` 登记项。
 
 | 起点 | 执行路径 | 目标与检查 | 验收边界 |

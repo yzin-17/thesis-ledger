@@ -1,5 +1,5 @@
-import type { BacktestDailyTradabilityEvidenceV3 } from './backtest-daily-tradability.js';
-import type { MarketCoverageProofV3 } from './market-coverage-proof-v3.js';
+import type { BacktestDailyTradabilityEvidenceV3, BacktestListingInformationV3 } from './backtest-daily-tradability.js';
+import { marketCoverageSessionDatesV3, type MarketCoverageProofV3, type MarketListingInformationV3 } from './market-coverage-proof-v3.js';
 import type { MarketDataBarRouteKeyV3 } from './market-data-wire-v3.js';
 
 const assertTradabilitySourceV3 = (
@@ -24,6 +24,18 @@ const assertTradabilitySourceV3 = (
   }
 };
 
+const listingInformationMatchesV3 = (
+  listing: BacktestListingInformationV3,
+  proof: MarketListingInformationV3,
+): boolean => {
+  if ('status' in proof) return 'status' in listing;
+  if ('status' in listing) return false;
+  return listing.listedOn === proof.firstTradingDate &&
+    listing.source.provider === proof.source &&
+    listing.source.revision === proof.revision &&
+    listing.source.availableAt === proof.knownAt;
+};
+
 /** 校验来源窗口的日级分区并集；每个来源原始摘要保持独立。 */
 export const observedTradabilityDatesV3 = (
   windows: readonly BacktestDailyTradabilityEvidenceV3[],
@@ -35,19 +47,15 @@ export const observedTradabilityDatesV3 = (
   },
 ): string[] => {
   const proof = scope.coverageProof;
-  const expected = proof.calendar.expectedSessionDates.filter(
-    (date) => date >= proof.listing.firstTradingDate,
-  );
+  if (proof.listing.symbol !== scope.symbol) throw new Error('日级证据标的与上市信息身份不一致');
+  const expected = marketCoverageSessionDatesV3(proof);
   const states = new Map<string, BacktestDailyTradabilityEvidenceV3['days'][number]['state']>();
   for (const evidence of windows) {
     assertTradabilitySourceV3(evidence, scope, windows[0]!.barSource.providerRevision);
     if (
       evidence.range.start < proof.window.requestedStart ||
       evidence.range.end > proof.window.requestedEnd ||
-      evidence.listing.listedOn !== proof.listing.firstTradingDate ||
-      evidence.listing.source.provider !== proof.listing.source ||
-      evidence.listing.source.revision !== proof.listing.revision ||
-      evidence.listing.source.availableAt !== proof.listing.knownAt ||
+      !listingInformationMatchesV3(evidence.listing, proof.listing) ||
       evidence.calendar.source.provider !== proof.calendar.source ||
       evidence.calendar.source.revision !== proof.calendar.revision
     ) {

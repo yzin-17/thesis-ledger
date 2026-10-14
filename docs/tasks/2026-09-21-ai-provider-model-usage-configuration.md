@@ -1,5 +1,7 @@
 # AI Provider 配置与模型用途配置实施任务
 
+> 状态对账（更新于 2026-10-04）：已实现待验收：原完整 AC-01～30 及 9/24 AC-09 仍是基线。历史隔离执行状态与 lmstudio 零价用途证据保留；本轮 T4.2.P1 的默认引用 PostgreSQL/HTTP 竞争 10 项通过，并修复检查与提交分离的竞态。认证、非零计费、研究提交/冻结竞态、超时/取消、目标运行态与 Electron 缺口分别保留。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+
 对应 Spec：[AI Provider 配置与模型用途配置优化](../specs/2026-09-21-ai-provider-model-usage-configuration.md)
 
 > 状态：既有本地实现、自动门禁、隔离 PostgreSQL、目标 Docker / Server / Worker 与内建浏览器本地 Web 预览有历史证据；2026-09-24 修订的完整 AC-09 超时语义仍需对当前源码做定向及目标运行态验证，真实 Provider 与 Electron 实机门禁也未通过。本文记录统一 G0→G5 基线、已验证证据和未授权外部门禁，不把 Provider 配置或自动化结果宣称为真实计费调用通过。
@@ -109,15 +111,25 @@
   - 完成条件：默认不按列表顺序推断；研究创建读取显式默认并冻结 Provider、Model 和设置修订；无有效默认时明确阻断。
   - 已有证据：`AiRoutingSettings` 定向测试、Server services 测试、Prisma validate、migration matrix、Server / Desktop typecheck；内建浏览器已验证无研究默认模型时创建研究按钮保持禁用并给出配置提示。真实 PostgreSQL 并发 HTTP 和 Electron 研究界面实机未验证。
 
-- [x] **T4.2：默认引用原子变更与并发保护**（本地实现里程碑已完成；真实 PostgreSQL 并发待验证）
+- [x] **T4.2：默认引用原子变更与并发保护**（本地里程碑及隔离配置竞争已完成；研究提交竞态与目标运行态待验证）
   - 覆盖：完整 AC-17～21、AC-28。
   - 依赖：T4.1；默认设置的 `expectedRevision` 契约、Provider 条件更新和默认清除事务已固化。
   - 完成条件：`expectedRevision` 或等价版本保护不能被省略；删除、停用或移除默认用途时，确认、默认清除和 Provider 变更原子提交；并发冲突不得后写覆盖或产生悬空默认；不自动寻找下一个默认。
   - 验证方式：PostgreSQL 持久化集成、并发 HTTP、Provider 生命周期和研究创建测试。
   - 当前进度：Provider 保存、启停、删除均携带并校验 `expectedRevision`；默认 Provider 的停用 / 删除要求显式确认、设置修订号和同一 Prisma transaction 内清除引用；不自动寻找下一个默认，旧客户端缺少版本号会拒绝。
   - 定向验证：通过；Server routing / service / Provider management 生命周期测试、Desktop 生命周期请求测试、migration matrix、Prisma validate 和两端 typecheck 通过。
-  - 证据边界：已证明服务层条件更新和事务调用的局部语义；尚未证明真实 PostgreSQL 锁竞争、并发 HTTP、研究创建竞态和部署后悬空引用回归。
-  - 剩余条件：运行隔离 PostgreSQL 并发集成与目标 Server 验收后，才能把完整 AC-17～21、AC-28 标记为运行态通过。
+  - 证据边界：2026-10-04 真实 PostgreSQL 锁竞争及两个独立 Nest HTTP 实例已验证配置默认、生命周期和回滚；研究创建竞态和部署后悬空引用回归仍未验证。
+  - 剩余条件：补研究提交/冻结并发与目标 Server 验收，不能把完整 AC-17～21、AC-28 标记为目标运行态通过。
+
+### T4.2.P1：真实 PostgreSQL 默认引用竞争（2026-10-03）
+
+- [x] 验证同修订默认更新、默认设置与 Provider 停用/删除/移除用途并发、清除默认后 Provider CAS 零更新或数据库写入失败的事务回滚；最终无悬空默认，冲突不自动改选。
+- 对应完整 AC-18、AC-21、AC-28 的持久化断言；研究创建提交竞态 AC-19、冻结执行 AC-20 和目标 Server 验收仍分别开放。
+- 输入：当前 `AiRoutingSettingsService`、Provider 保存与生命周期事务；执行面仅 Server 配置持久化与本机 HTTP，真实数据库使用 T6.P1 的隔离运行入口。T6.P1 完成后独立推进，无真实模型依赖。
+- 写入范围：AI 配置持久化、通用 Provider 存储的事务参数、定向/集成测试和必要门禁；不修改 Schema/migration、Desktop、正式研究执行或目标配置。若发现检查与提交分离的确切竞态，沿现有概念所有权修复，再维护依赖门禁。
+- 验证：先稳定复现竞争，再修复及定向回归，最后隔离 PostgreSQL / HTTP；本叶不代替完整 G2/G5。
+- 规划预检：仓库契约已固化，输入就绪；外部原稿不可取回的限制保留，不借本叶关闭其他断言。
+- 完成检查：10 项真实 PostgreSQL/HTTP 用例通过，含双向锁竞争、默认清除回滚与确认/版本保护；隔离故障通过真实数据库触发器注入，未操作业务库。CI 增加独立隔离入口，但远端 Checks 未运行。详细验证及剩余边界见[证据](evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 ### T5：迁移、兼容性、回归与真实运行态
 
@@ -142,6 +154,14 @@
 
 ## 3. 完整设计稿 AC-01～30 基线矩阵
 
+### T4.2.P2：研究提交与冻结竞争（2026-10-04）
+
+- [x] 使用专用隔离 PostgreSQL 和真实服务验证 AC-17～20：缺默认阻断、过期设置版本冲突、配置/默认变更与创建竞争、创建后 Provider/Model/价格/修订冻结。
+- 依赖：T4.2.P1 的配置事务；固定 SDK 输入仅用于配置验证，不访问真实模型或修改目标默认。
+- 写集：AI 研究创建的持久化边界、对应领域 helper、专用数据库集成测试和本任务；先建立可重复竞争，再修复已证实的缺陷。
+- 当前证据：[生命周期与提交](evidence/2026-10-04-ai-lifecycle-and-submission.md)。三项研究提交数据库竞争通过；保存、默认引用及独立进程共 21 项通过。目标空默认错误另发现控制器未处理拒绝并已修复，完整更新及服务存活复验继续。
+- 目标研究额外阻塞：当前 researchDefault=null；用户显式选择仍待回复。2026-10-04 实际 lmstudio 用途调用 requestId `af19a83d-4805-4471-939f-489d9a0880f6` 于 10.73 秒返回 provider_timeout（连接 192.168.5.20:6789 超时），usage/cost 为 unknown；未再次请求。
+
 下表是当前基线快照。`局部实现`不等于完整 AC 通过；完整 AC 只有在“完成”条件满足后才能勾选。
 
 | 完整 AC | 核心断言 | 实现责任 | 验证责任 / 门禁 | 当前判定 |
@@ -162,18 +182,18 @@
 | AC-14 | 非零模型未获本次预算授权时阻断调用 | T1.2 | 预算门禁、生成测试 | 任务创建、策略基础门禁、指定模型生成测试和隔离费用闭环已补；真实服务待验证 |
 | AC-15 | 无认证连接不发 Key，不读取环境 Key 兜底 | T3.1、T5.2 | adapter 定向测试、真实服务 | 2026-09-23 用 lmstudio（`authMode: none`）真实成功：`credentialConfigured=false` 且返回 `healthy` 与 reported usage；有认证路径仍待验证 |
 | AC-16 | 留空保留 Key；切换认证方式有确认和重新输入边界 | T3.1、T3.2 | Server、Desktop、Electron | 内建浏览器已确认 Key 输入不回显与留空说明；实机切换确认和保存后行为待验证 |
-| AC-17 | 默认失效或预算不足时明确阻断，不按顺序换模型 | T4.1、T4.2 | Server、研究创建、真实服务 | 内建浏览器已确认无研究默认时创建按钮禁用且给出明确提示；并发与真实运行态待验证 |
-| AC-18 | 调整排序不改变显式默认 | T4.2 | settings / 研究创建测试 | 实施中 |
+| AC-17 | 默认失效或预算不足时明确阻断，不按顺序换模型 | T4.1、T4.2 | Server、研究创建、真实服务 | 内建浏览器已确认无研究默认时创建按钮禁用且给出明确提示；配置竞争已验证，研究提交/冻结与目标运行态待验证 |
+| AC-18 | 调整排序不改变显式默认 | T4.2 | settings / 研究创建测试 | 隔离配置排序验证通过；研究创建消费与目标验收仍开放 |
 | AC-19 | 默认在研究提交前变更时返回版本冲突 | T4.2 | 并发 HTTP、PostgreSQL | 服务层版本保护已实现；并发 HTTP / PostgreSQL 待验证 |
 | AC-20 | 研究和策略只使用允许且冻结的模型，不自动换模型 | T4.2 | Server 执行集成 | 待补验证 |
-| AC-21 | 删除、停用或移除默认引用时确认并原子提交 | T4.2 | Provider 生命周期、PostgreSQL | 本地 transaction 与确认已实现；PostgreSQL 待验证 |
+| AC-21 | 删除、停用或移除默认引用时确认并原子提交 | T4.2 | Provider 生命周期、PostgreSQL | 隔离 PostgreSQL 已验证停用/删除确认与原子清除、回滚及用途变更竞争；默认用途保存保持先改默认的保护，完整交互/目标门禁保留 |
 | AC-22 | 保存、切页、详情打开不产生生成请求，未测试为中性状态 | T3.2 | Desktop 请求断言 | 内建浏览器切页、打开编辑器和撤销均未触发生成；完整请求断言仍以自动化测试为准 |
 | AC-23 | 指定模型测试只调用目标模型，付费先授权，重复点击不重复调用 | T1.2、T3.2 | 生成生命周期、费用、取消 | 目标模型、付费授权、单飞、取消和事实留存已本地验证；2026-09-23 已用 lmstudio 完成三个用途的真实生成（零价，未触发计费授权）；非零费率的真实授权路径待验证 |
 | AC-24 | 配置变化和测试失败按正确粒度过期、归因 | T3.2 | 请求竞态、状态测试 | 待补验证 |
 | AC-25 | 价格迁移保留值、缺失不补零、重复执行幂等 | T5.1 | 隔离 PostgreSQL、迁移 dry-run | dry-run 规划、冲突保护和隔离结构输入已验证；目标数据库 apply 待验证 |
 | AC-26 | 旧路由冲突保留原值并可定位，不静默合并 | T5.1 | 迁移报告、冲突 fixture | 冲突 fixture 和隔离结构验证已通过；目标数据库 apply 待验证 |
 | AC-27 | 历史任务和部署配置不被改写，旧客户端有损写入被拒绝 | T5.1 | 兼容 Schema、历史任务、部署检查 | 旧客户端有损写入已拒绝；历史任务 / 部署回归待验证 |
-| AC-28 | Provider / 默认设置并发编辑返回冲突且无悬空引用 | T4.2 | PostgreSQL、并发 HTTP | 条件更新与事务已实现；PostgreSQL / 并发 HTTP 待验证 |
+| AC-28 | Provider / 默认设置并发编辑返回冲突且无悬空引用 | T4.2 | PostgreSQL、并发 HTTP | 隔离 PostgreSQL/HTTP 配置竞争通过；部署后回归待验证 |
 | AC-29 | 不恢复已移除能力声明、免费依据、上游限制或供应商专用依赖 | T5.2 | 源码扫描、边界 / 回归门禁 | 待验证 |
 | AC-30 | 真实 Desktop / Server 闭环可操作并能修复失败 | T5.2 | Docker、Server / Worker、Electron、Provider | 未开始 |
 
@@ -183,7 +203,7 @@
 | --- | --- | --- | --- |
 | G0 基线一致性 | 本 Task、Spec、完整设计稿可访问 | 编号、任务责任、证据类型和状态无冲突 | 已完成；继续保留完整 AC 与局部里程碑边界 |
 | G1 契约与纯函数 | T1.1、T2.1、T3.1、T4.1 的共享契约稳定 | 价格状态、用途唯一性、认证组合、超时、取消和默认引用的本地语义一致 | 已通过；Schema、Server / Desktop 定向测试和 typecheck/build 通过 |
-| G2 Server / PostgreSQL 集成 | T1.2、T3.2、T4.2 的实现可运行 | 冻结、预算、测试状态、默认事务、版本冲突和历史事实正确；按 AC-09 区分非流式总超时、流式停顿超时与绝对期限，并正确归因取消 | 既有 Server 自动化、隔离 PostgreSQL 16 项和目标结构 / HTTP smoke 已通过；2026-09-24 超时契约的受影响执行路径及真实 Provider 费用事实待验证 |
+| G2 Server / PostgreSQL 集成 | T1.2、T3.2、T4.2 的实现可运行 | 冻结、预算、测试状态、默认事务、版本冲突和历史事实正确；按 AC-09 区分非流式总超时、流式停顿超时与绝对期限，并正确归因取消 | 既有隔离执行状态证据保留；2026-10-04 保存/默认配置竞争 15 项通过；研究提交/冻结竞争、修订后完整超时及真实费用仍待验证 |
 | G3 Desktop / Electron | G1 和相关 API 契约就绪 | 双页签、目录竞态、错误定位、用途编辑、取消、默认展示和长 ID 可操作 | Desktop 自动化与内建浏览器本地 Web 预览已通过；Electron 实机未执行 |
 | G4 迁移与兼容 | G2 完成，迁移输入和旧数据样本明确 | 迁移可重复、冲突可定位、旧任务不改写、旧客户端有损写入被拒绝 | dry-run、保护逻辑、隔离 PostgreSQL 重建和目标库 apply 已通过；真实 Provider 兼容输入未执行 |
 | G5 真实运行态 | G2、G3、G4 完成；目标服务、凭证和预算可用 | 无认证、有认证、指定模型、显式默认和业务用途输出通过实际 Server / Worker / Desktop；长时间持续输出不被 Provider `timeoutMs` 截断，停顿或绝对期限到达时正确终止 | 目标服务健康、AI 配置只读接口、无认证 fail-closed 探测和内建浏览器本地 Web 预览已通过；2026-09-24 超时契约的目标运行态、真实 Provider 成功计费与 Electron 实机仍未执行 |
@@ -221,12 +241,33 @@
 
 - 结论：**既有局部里程碑有本地证据；修订后的 AC-09 与外部运行态门禁未通过**。T1～T4 与 T5.1 的历史本地交付物不能据此宣称完整 AC-01～30 全部通过。
 - 已确认的默认决策：完整设计稿 AC-01～30 为主编号；客户端不得提交 `pricingVersion`；影响默认引用的变更必须有版本保护和原子提交；取消不等于零消耗；真实环境缺失不豁免运行态门禁。
-- 当前剩余门禁：修订后 AC-09 的非流式 / 流式超时与取消归因、Electron / 浏览器人工验收、有认证请求、真实计费（非零费率）请求、真实 PostgreSQL 并发；无认证成功连接与指定用途的真实生成已于 2026-09-23 用 lmstudio Provider 执行（见 T3.2）。
+- 当前剩余门禁：修订后 AC-09 的非流式 / 流式超时与取消归因、Electron / 浏览器人工验收、有认证请求、真实计费（非零费率）请求、研究提交/冻结的真实 PostgreSQL 并发与目标配置回归；保存与默认引用的隔离配置竞争已于 2026-10-04 完成。无认证成功连接与指定用途的真实生成已于 2026-09-23 用 lmstudio Provider 执行（见 T3.2）。
 - 规划风险：完整设计稿位于 Downloads，后续若源文件发生变化，必须重新检查 AC-01～30 映射和受影响证据。
 - 本次验证（2026-09-22 快照，已被下一行取代）：Server 完整测试 813 通过 / 49 个 PostgreSQL 集成用例按环境跳过，Desktop 455 通过，Schemas 209 通过；另有隔离 PostgreSQL 任务执行集成 16 项、重建 7 项、结构测试 9 项通过，目标库重建到当前 head、目标 Compose 全部 healthy、目标 HTTP/Redis/完整性 smoke 和无认证 fail-closed 探测通过；migration matrix、Prisma validate / generate、两端 build / typecheck、受影响文件 ESLint 和 `git diff --check` 通过。`pnpm lint` 的 build、边界和工作区依赖门禁通过，但全仓 ESLint 仍被既有 mobile React Native Flow 解析错误及未修改的 Desktop / Server 文件 22 项错误阻断（“22 项”本次未实测，旁证文档 `2026-09-21-remove-ai-free-evidence.md`、`2026-09-21-remove-ai-upstream-restriction.md` 各只记录 3 个未改动文件的既有错误，数量口径需后续统一）；未执行真实 Provider 成功生成/计费请求或 Electron 验收。
 - 2026-09-23 复核验证（基线 `main@272eaa27`）：Schemas 209 通过；Server 876 通过 / 49 个 PostgreSQL 集成用例按环境跳过；Desktop 464 通过（修复 `272eaa27` 引入的原生 `<label>` 违例后 0 失败）；两端 `tsc --noEmit`、`check-boundaries.mjs`、`check-migration-matrix.mjs`（15 migrations / 66 tables）、受影响文件 ESLint、`git diff --check` 通过。目标 Compose（thesis-ledger / backtest-worker / dsa / postgres / redis）全部 healthy。真实 Provider 复验见 T3.2“2026-09-23 真实 Provider 复验”一行。Electron 实机、有认证请求、真实计费与 PostgreSQL 并发仍未执行。
 
 ## 7. 2026-09-22 模型用途交互收敛增量
+
+### 2026-10-05 删除模型草稿同步修复
+
+- [x] **T2.6：主动移除模型时同步清理关联草稿**（本地修复与隔离浏览器交互验收完成）
+  - 覆盖：仓库 AC-05a；完整设计稿的模型编辑与配置变化相关断言。
+  - 原因：模型选择更新只清理推理信息，隐藏的旧用途路由继续进入保存校验，触发“执行路由必须选择已配置的模型”。
+  - 写入范围：Desktop 模型选择 Draft 转换、`AiProviderEditorFields.tsx` 调用接入及独立回归测试；不修改 Server 契约、持久化或研究默认引用保护。
+  - 实施：使用同一纯函数处理多选和手动添加，同步模型列表、全部用途路由和模型配置；保持现有父级测试结果失效流程。
+  - 本地验收：多用途及停用路由随模型删除、保留模型原值、删除最后一个模型校验、重新添加无旧配置、序列化与草稿校验；Provider 定向回归、Desktop typecheck/build、受影响 lint/格式与仓库门禁。
+  - 浏览器门禁：独立检查实际模型删除交互和保存输入；不写入用户真实 Provider 配置。
+  - 规划复核：Ready；现有 Draft / API 契约已就绪，实施与浏览器验收分开记录。此修复不关闭既有完整 AI Provider 门禁。
+  - 实现：新增 `ai-provider-model-selection.ts`，模型多选与手动添加共用 Draft 转换；原组件减少 11 行，未修改保存校验和 Server 默认引用保护。
+  - 定向回归：`pnpm exec vitest run test/ai-provider-model-selection.test.ts test/ai-provider-ui.test.tsx test/ai-provider-auto-save.test.tsx`，42 项通过；模型选择 5 项涵盖原错误复现、删除后校验、停用用途清理、剩余配置保持、清空及重新添加。测试数据修正为有效输出模式后，新增 5 项再次通过。
+  - 包级验证：Desktop `pnpm exec vitest run`，83 文件 / 557 项通过；`pnpm build`（含 TypeScript 检查）与 `pnpm typecheck` 通过。构建保留既有大 chunk 警告。
+  - 静态验证：受影响源码及测试 ESLint、Prettier、`git diff --check` 与 `node scripts/check-boundaries.mjs` 通过；`check-file-size-guardrails.mjs` 返回通过并记录 9 项既有警告，无有效 baseline，不能据此声明全仓 ratchet 比较已完成。
+  - 复杂度门禁：`node scripts/lint-workspace.mjs --guardrails` 完成，8 组 / 1578 文件通过，既有复杂度警告保留。
+  - 浏览器验证：通过 `test/browser-ai-provider-model-removal.html` 的实际编辑组件点击第二个模型的移除按钮；选择从 2 变 1，剩余模型用途保持，保存输入不含已删除模型且校验通过。继续删除最后模型得到“请至少填写一个模型”；手动重新添加后用途与价格为空。截图保存在 `/private/tmp/ai-provider-model-removal.png`；临时预览服务和页签已关闭。
+  - 目标更新（2026-10-05，用户已授权）：在 `/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra` 执行 `./scripts/sync-code.sh thesis-ledger`，无额外环境参数，兼容性预检通过、退出码 0；当前 Server / backtest-worker 已同步当前工作区产物并重启。镜像保持 `sha256:471213bfc1796d80526618f4ee037a54f39c9d0e2f8c233e1db2e8bf79c2a8f1`，未执行数据库或外部卷变更。快更仅更新容器可写层，容器重建后恢复镜像代码。执行日志：`/private/tmp/thesis-ledger-model-removal-deploy.log`。
+  - 独立运行态检查：Server / Worker 均 healthy；`GET /api/v1/health` 与 `GET /api/v1/ai/providers` 返回 200；启动后日志未发现模块缺失或数据库缺表。首次检查遗漏 API 前缀产生的 404 已定位并改用正确路径。当前前端由本地 Vite `localhost:5173` 提供，其实际转换响应已包含 `withAiProviderModels` 调用及路由、默认方式和价格清理逻辑；Docker 脚本只更新 Server / Worker，不打包 Desktop。
+  - 证据边界：上述检查针对当前未提交工作区；浏览器只验证真实组件交互、序列化和本地保存校验，不发送真实 Provider 测试或写入请求。目标代码同步与只读运行态验证已完成；Electron 与真实服务端保存未执行，继续由既有 G3 / G5 管理。
+  - 局部最终一致性 Review：AC-05a 的 Draft 转换与交互断言通过；主动删除模型与停用用途保留的行为边界清楚，目录刷新未接入删除转换，研究默认引用保护未更改。部署授权、实际入口及运行态证据已记录，改动未提交。
 
 - [x] **T2.3：用途选择、单详情面板与默认输出覆盖保存**（局部里程碑已完成）
   - 覆盖：仓库局部 AC-07～09；完整设计稿中用途编辑、详情切换与输出配置相关断言的本地实现部分。
@@ -235,7 +276,7 @@
   - 定向验证（2026-09-22 快照）：Desktop typecheck、Desktop 全量 457 项通过；Server typecheck、Server 全量 814 项通过（49 项 PostgreSQL 集成按环境跳过）。2026-09-23 复核：Desktop 全量 464 项通过，Server 全量 876 项通过（49 项跳过）。
   - 证据边界：自动化证明本地状态、序列化、Server Schema 与静态组件结构；未执行 Electron 实机交互、保存后浏览器回读或真实 Provider 调用。
 
-- [ ] **T2.4：模型用途紧凑布局与降权操作**（已被 T2.5 的复选框 / 父表单保存交互替代；浏览器视觉门禁未验证）
+- **T2.4：模型用途紧凑布局与降权操作（历史方案，已替代）**：后继 T2.5 的复选框 / 父表单保存交互承接当前视觉义务，不再作为第二项待执行任务。
   - 覆盖：仓库局部 AC-10～11。
   - 实现：移除用途详情内层 Card，使用 `Separator` 分隔默认配置和单一详情区段；默认方式、用途方式和超时输入改为最大宽度布局，超时使用 `InputGroup` 的“秒”后缀。用途操作已由 T2.5 的复选框和父表单统一保存替代。
   - 定向验证：Desktop typecheck、Provider UI 测试、受影响文件 ESLint 与 `git diff --check`；通过。

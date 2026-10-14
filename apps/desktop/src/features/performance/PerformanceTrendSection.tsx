@@ -64,6 +64,16 @@ const defaultIntervals: Record<PerformanceSeriesRange, PerformanceSeriesInterval
   '5Y': '1mo',
   ALL: '1mo',
 };
+const intervalsByRange: Record<PerformanceSeriesRange, readonly PerformanceSeriesInterval[]> = {
+  '1D': ['1min', '1h'],
+  '5D': ['1min', '1h', '1d'],
+  '1M': ['1h', '1d', '1w'],
+  '3M': ['1h', '1d', '1w', '1mo'],
+  YTD: ['1d', '1w', '1mo'],
+  '1Y': ['1d', '1w', '1mo'],
+  '5Y': ['1w', '1mo', '1y'],
+  ALL: ['1mo', '1y'],
+};
 
 const snapshotsForRange = (snapshots: SnapshotRecord[], range: PerformanceSeriesRange) => {
   if (range === 'ALL' || snapshots.length === 0) return snapshots;
@@ -112,7 +122,13 @@ function TrendControls({
     <div className="flex flex-wrap items-center gap-2">
       <Select
         value={range}
-        onValueChange={(value) => value && onRangeChange(value, defaultIntervals[value])}
+        onValueChange={(value) => {
+          if (!value) return;
+          const nextInterval = intervalsByRange[value].includes(interval)
+            ? interval
+            : defaultIntervals[value];
+          onRangeChange(value, nextInterval);
+        }}
       >
         <SelectTrigger className="w-32" aria-label="走势区间">
           <SelectValue>

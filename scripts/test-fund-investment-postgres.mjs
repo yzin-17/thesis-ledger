@@ -1,0 +1,128 @@
+import { randomUUID } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const container = `ledger-fund-investment-test-${randomUUID().slice(0, 8)}`;
+const database = 'fund_investment_fixture';
+const owner = 'fixture_owner';
+const run = (command, args, options = {}) => {
+  const result = spawnSync(command, args, {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 60_000,
+    maxBuffer: 8 * 1024 * 1024,
+    ...options,
+  });
+  if (result.error || result.status !== 0)
+    throw new Error(
+      `${command} failed: ${result.error?.message ?? result.stderr ?? result.stdout}`,
+    );
+  return result.stdout.trim();
+};
+let started = false;
+try {
+  run('docker', [
+    'run',
+    '--pull',
+    'never',
+    '-d',
+    '--name',
+    container,
+    '--tmpfs',
+    '/var/lib/postgresql/data',
+    '-p',
+    '127.0.0.1::5432',
+    '-e',
+    `POSTGRES_USER=${owner}`,
+    '-e',
+    'POSTGRES_PASSWORD=isolated_fixture',
+    '-e',
+    `POSTGRES_DB=${database}`,
+    'postgres:17-alpine',
+  ]);
+  started = true;
+  for (let attempt = 0; ; attempt++) {
+    const ready = spawnSync('docker', [
+      'exec',
+      container,
+      'pg_isready',
+      '-h',
+      '127.0.0.1',
+      '-U',
+      owner,
+      '-d',
+      database,
+    ]);
+    if (ready.status === 0) break;
+    if (attempt >= 40) throw new Error('隔离 PostgreSQL 未就绪');
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const sql = (input) =>
+    run(
+      'docker',
+      [
+        'exec',
+        '-i',
+        container,
+        'psql',
+        '-XqAt',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-U',
+        owner,
+        '-d',
+        database,
+        '-f',
+        '-',
+      ],
+      { input },
+    );
+  if (sql('SELECT current_database(), current_user;') !== `${database}|${owner}`)
+    throw new Error('隔离数据库身份不符');
+  const migrationRoot = `${root}apps/server/prisma/migrations`;
+  const migrations = readdirSync(migrationRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  for (const migration of migrations)
+    sql(readFileSync(`${migrationRoot}/${migration}/migration.sql`, 'utf8'));
+  const port = run('docker', ['port', container, '5432/tcp']).split(':').at(-1);
+  const url = `postgresql://${owner}:isolated_fixture@127.0.0.1:${port}/${database}`;
+  console.log(
+    JSON.stringify({
+      database,
+      owner,
+      migrations: migrations.length,
+      head: migrations.at(-1),
+      isolated: true,
+    }),
+  );
+  const result = spawnSync(
+    'pnpm',
+    [
+      '--filter',
+      '@thesis-ledger/server',
+      'exec',
+      'vitest',
+      'run',
+      '--no-file-parallelism',
+      'test/fund-plans/recurring-fund-postgres.integration.test.ts',
+      'test/fund-plans/recurring-fund-lifecycle-postgres.integration.test.ts',
+    ],
+    {
+      cwd: root,
+      stdio: 'inherit',
+      timeout: 120_000,
+      env: { ...process.env, DATABASE_URL: url, FUND_INVESTMENT_DATABASE_URL: url },
+    },
+  );
+  if (result.error) throw result.error;
+  process.exitCode = result.status ?? 1;
+} finally {
+  if (started) {
+    run('docker', ['rm', '-f', container]);
+    console.log('已清理本次基金定投隔离容器');
+  }
+}

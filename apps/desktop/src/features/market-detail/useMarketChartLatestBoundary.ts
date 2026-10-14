@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDisplayDetailResponse as MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketTimeframe } from '@thesis-ledger/schemas';
 import { requestMarketDetail } from './market-detail.api.js';
 import { barDatesAfter, hasLatestPointChanges } from './market-chart-latest-window.js';
 import { buildChartPoints, type ChartPoint } from './market-chart-model.js';
@@ -20,7 +21,7 @@ export type LatestPage = {
   response: MarketDetailResponse;
 };
 
-export type ChartWindowV3 = { barsLimit: number };
+export type ChartWindowV3 = { barsLimit: number; timeframe?: MarketTimeframe };
 
 export const latestDetailQueryKey = (
   symbol: string,
@@ -38,6 +39,7 @@ export const latestDetailQueryKey = (
     adjustment ?? null,
     'chart-v3',
     chartWindowV3.barsLimit,
+    chartWindowV3.timeframe ?? '1d',
   ] as const;
 
 export type LatestBoundaryOptions = {
@@ -156,7 +158,7 @@ export function useMarketChartLatestBoundary({
         if (queryKey) void queryClient.cancelQueries({ queryKey });
       });
     };
-  }, [queryClient, symbol, adjustment, chartWindowV3.barsLimit]);
+  }, [queryClient, symbol, adjustment, chartWindowV3.barsLimit, chartWindowV3.timeframe]);
 
   const loadLater = (options: { force?: boolean } = {}) => {
     if (latestQueryKeyRef.current) return;
@@ -167,7 +169,7 @@ export function useMarketChartLatestBoundary({
       return;
     const generation = requestGeneration;
     const queryKey = ['desktop', 'market-detail', symbol, 'latest', paramsKey, baseline, adjustment ?? null,
-      'chart-v3', chartWindowV3.barsLimit] as const;
+      'chart-v3', chartWindowV3.barsLimit, chartWindowV3.timeframe ?? '1d'] as const;
     const requestToken = lifecycle.beginRequest();
     latestRequestTokenRef.current = requestToken;
     latestQueryKeyRef.current = queryKey;
@@ -185,6 +187,7 @@ export function useMarketChartLatestBoundary({
               ...(adjustment ? { adjustment } : {}),
               include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'],
               barsLimit: chartWindowV3.barsLimit,
+              ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
               navLimit: 90,
               indicatorParams,
               chartContractVersion: 3,
@@ -207,15 +210,15 @@ export function useMarketChartLatestBoundary({
         const notice = latestDate ? `，截止 ${latestDate}。` : '。';
         onLatestDetail(next);
         setLaterPages([{ key: `later:${baseline}`, paramsKey, start: baseline, response: next }]);
-        if (added.length > 0) setLatestNotice(`已补充 ${added.length} 根更新日线${notice}`);
-        else if (changed) setLatestNotice(`已更新最新日线${notice}`);
+        if (added.length > 0) setLatestNotice(`已补充 ${added.length} 根更新${chartWindowV3.timeframe && chartWindowV3.timeframe !== '1d' ? '行情' : '日线'}${notice}`);
+        else if (changed) setLatestNotice(`已更新最新${chartWindowV3.timeframe && chartWindowV3.timeframe !== '1d' ? '行情' : '日线'}${notice}`);
         else setLatestNotice(`本次未发现更新数据${notice}`);
       })
       .catch((error: unknown) => {
         if (!lifecycle.requestIsCurrent(requestToken, generation, symbol)) return;
         if (error instanceof DOMException && error.name === 'AbortError') return;
         if (latestQueryKeyRef.current !== queryKey) return;
-        setLatestError('检查更新日线失败，当前图表已保留。');
+        setLatestError(`检查更新${chartWindowV3.timeframe && chartWindowV3.timeframe !== '1d' ? '行情' : '日线'}失败，当前图表已保留。`);
       })
       .finally(() => {
         const active = lifecycle.requestIsCurrent(requestToken, generation, symbol);

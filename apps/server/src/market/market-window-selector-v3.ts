@@ -3,6 +3,8 @@ import {
   effectiveProviderPolicyV3Schema,
   marketCalendarTimezonesV3,
   marketCoverageProofV3Schema,
+  marketCoverageSessionDatesV3,
+  isBeforeKnownListingDateV3,
   marketDataBarSeriesRequestV3Schema,
   marketRouteCatalogV3Schema,
   marketRouteCompatibilityObservationV3Schema,
@@ -243,7 +245,7 @@ const classifyInvalidResponse = (
   if (proof.window.requestedStart !== request.start || proof.window.requestedEnd !== request.end) {
     return 'window_mismatch';
   }
-  if (proof.listing.firstTradingDate > request.end) return 'pre_listing';
+  if (isBeforeKnownListingDateV3(proof.listing, request.end)) return 'pre_listing';
 
   if (!Array.isArray(raw.bars)) return 'invalid_response';
   const actualDates: string[] = [];
@@ -253,9 +255,7 @@ const classifyInvalidResponse = (
     if (!date) return 'invalid_response';
     if (actualDates.at(-1) !== date) actualDates.push(date);
   }
-  const expectedDates = proof.calendar.expectedSessionDates.filter(
-    (date) => date >= proof.listing.firstTradingDate,
-  );
+  const expectedDates = marketCoverageSessionDatesV3(proof);
   if (
     actualDates.length !== expectedDates.length ||
     actualDates.some((date, index) => date !== expectedDates[index])
@@ -463,7 +463,7 @@ export const selectMarketWindowV3 = async (
   if (!backup) return unavailable('primary_unavailable', { primaryFailure: primaryResult.reason });
 
   const basicFallback = input.priceResearch &&
-    supportsBasicPriceFallback(input.routeKey, [primary.target, backup.target]);
+    supportsBasicPriceFallback(input.routeKey, [primary.target, backup.target], context.catalog);
   const compatibility = basicFallback ? null : parseCompatibility(input.compatibility);
   if (!basicFallback && (!compatibility || !hasExpectedCompatibilityIdentity(input, context, compatibility))) {
     return unavailable('incompatible_backup', {

@@ -24,6 +24,11 @@ import { parseSettlementCalendarPolicy } from './backtest-settlement-calendar.js
 import { tradabilityWindowFromArtifactsV3 } from './backtest-snapshot-v3-tradability.js';
 import { snapshotEventRevisionsV3Schema } from './backtest-snapshot-v3-events.js';
 import {
+  validateKnownCashSnapshotV3,
+  knownCashMetadataKeyV3,
+  knownCashRecordsKeyV3,
+} from './backtest-known-cash-snapshot-v3.js';
+import {
   planSnapshotInputsV3,
   SnapshotV3InputPlanError,
 } from './backtest-snapshot-v3-input-plan.js';
@@ -61,6 +66,12 @@ export const validateCompleteSnapshotInputsV3 = (
   strategySchema.parse(strategyValue);
   const strategy = strategyValue as BacktestStrategy;
   const runConfig = runConfigSchemaV3.parse(json(metadata[0], 'runConfig'));
+  const knownCash = validateKnownCashSnapshotV3(
+    runConfig.knownCashPreparation,
+    manifest.knownCash,
+    byKey.get(knownCashMetadataKeyV3) ?? [],
+    byKey.get(knownCashRecordsKeyV3) ?? [],
+  );
   const inputPlan = planSnapshotInputsV3({ strategy, runConfig });
   const marketEvidence = byKey.get('metadata/market-window-evidence-v3.parquet');
   if (marketEvidence?.length !== 1) fail('V3 完整快照缺少唯一行情证据。');
@@ -77,7 +88,9 @@ export const validateCompleteSnapshotInputsV3 = (
     eventRevisions,
     settlementCalendarPolicy,
     tradabilityWindow: tradabilityWindowFromArtifactsV3(
-      strategy.executionInstrument.symbol, marketEvidence[0]!, byKey.get('execution/bars.parquet') ?? [],
+      strategy.executionInstrument.symbol,
+      marketEvidence[0]!,
+      byKey.get('execution/bars.parquet') ?? [],
     ),
   };
   validateCompleteSnapshotSourceBindingsV3(manifest, byKey, strategy, runConfig, inputPlan);
@@ -94,8 +107,23 @@ export const validateCompleteSnapshotInputsV3 = (
     byKey,
     settlementCalendarPolicy ? runConfig : undefined,
   );
-  if (!same(manifest.providerRevisions, validated.providerRevisions)) {
+  const revisions = {
+    ...validated.providerRevisions,
+    ...(knownCash
+      ? { [knownCashRecordsKeyV3]: knownCash.prepared.input.source.providerRevision }
+      : {}),
+  };
+  if (!same(manifest.providerRevisions, revisions)) {
     fail('V3 完整快照非价格事实版本与证据不一致');
   }
-  validateCompleteSnapshotExecutionFactsV3(byKey, strategy, runConfig, inputPlan, validated);
+  validateCompleteSnapshotExecutionFactsV3(
+    byKey,
+    strategy,
+    runConfig,
+    inputPlan,
+    validated,
+    manifest.publicFees,
+    manifest.tradingStatus,
+    manifest.statusComposition,
+  );
 };

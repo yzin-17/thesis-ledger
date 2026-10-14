@@ -223,7 +223,7 @@ const validateInstrumentResponseFacts = (
   if ((typedResponse.historicalTradability || typedResponse.historicalTradabilityWindows) && !input.tradabilityWindow) {
     fail('request_scope_invalid', '逐日可交易性响应缺少可核对的冻结行情');
   }
-  if (input.tradabilityWindow && instrument.market === 'CN') {
+  if (input.tradabilityWindow && (instrument.market === 'CN' || input.tradabilityWindow.historicalTradabilityWindows)) {
     validateSnapshotTradabilityV3(input.tradabilityWindow, input.runConfig, request.range, typedResponse);
   }
   if (typedResponse.facts.length === 0) {

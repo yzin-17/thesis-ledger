@@ -1,0 +1,2002 @@
+{
+  "networkCalls": 0,
+  "sameProjectionTwice": true,
+  "samples": [
+    {
+      "request": {
+        "contractVersion": 3,
+        "requestId": "c22b2a-captured-600000.SH",
+        "symbol": "600000.SH",
+        "start": "2023-07-08",
+        "end": "2023-09-15",
+        "tradabilityMode": "assume-untradable-no-bar",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "routeTarget": {
+          "providerId": "tencent",
+          "upstreamSource": "tencent",
+          "routeIndex": 0
+        }
+      },
+      "response": {
+        "contractVersion": 3,
+        "requestId": "c22b2a-captured-600000.SH",
+        "symbol": "600000.SH",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "bars": [
+          {
+            "timestamp": "2023-07-10T00:00:00+00:00",
+            "open": 5.75,
+            "high": 5.78,
+            "low": 5.73,
+            "close": 5.75,
+            "volume": 11410700,
+            "amount": 82406300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-11T00:00:00+00:00",
+            "open": 5.79,
+            "high": 5.82,
+            "low": 5.76,
+            "close": 5.81,
+            "volume": 14074200,
+            "amount": 102272400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-12T00:00:00+00:00",
+            "open": 5.81,
+            "high": 5.85,
+            "low": 5.78,
+            "close": 5.78,
+            "volume": 14414500,
+            "amount": 105021900,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-13T00:00:00+00:00",
+            "open": 5.83,
+            "high": 5.93,
+            "low": 5.8,
+            "close": 5.93,
+            "volume": 26925400,
+            "amount": 198390800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-14T00:00:00+00:00",
+            "open": 5.95,
+            "high": 5.98,
+            "low": 5.91,
+            "close": 5.97,
+            "volume": 19569700,
+            "amount": 145348700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-17T00:00:00+00:00",
+            "open": 5.97,
+            "high": 5.98,
+            "low": 5.88,
+            "close": 5.95,
+            "volume": 13992100,
+            "amount": 103339600,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-18T00:00:00+00:00",
+            "open": 5.95,
+            "high": 5.95,
+            "low": 5.9,
+            "close": 5.92,
+            "volume": 12026600,
+            "amount": 88895200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-19T00:00:00+00:00",
+            "open": 5.89,
+            "high": 5.96,
+            "low": 5.89,
+            "close": 5.94,
+            "volume": 18189600,
+            "amount": 134677000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-20T00:00:00+00:00",
+            "open": 5.96,
+            "high": 6.01,
+            "low": 5.93,
+            "close": 5.95,
+            "volume": 26686800,
+            "amount": 198503300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-21T00:00:00+00:00",
+            "open": 5.95,
+            "high": 6,
+            "low": 5.92,
+            "close": 5.97,
+            "volume": 27661400,
+            "amount": 196814000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-24T00:00:00+00:00",
+            "open": 5.93,
+            "high": 6.01,
+            "low": 5.92,
+            "close": 5.98,
+            "volume": 25840200,
+            "amount": 184072400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-25T00:00:00+00:00",
+            "open": 6.03,
+            "high": 6.14,
+            "low": 6.02,
+            "close": 6.12,
+            "volume": 31444800,
+            "amount": 227784700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-26T00:00:00+00:00",
+            "open": 6.13,
+            "high": 6.19,
+            "low": 6.11,
+            "close": 6.14,
+            "volume": 22818000,
+            "amount": 166416300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-27T00:00:00+00:00",
+            "open": 6.18,
+            "high": 6.25,
+            "low": 6.14,
+            "close": 6.22,
+            "volume": 26198800,
+            "amount": 193006500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-28T00:00:00+00:00",
+            "open": 6.18,
+            "high": 6.37,
+            "low": 6.18,
+            "close": 6.35,
+            "volume": 46528800,
+            "amount": 347454800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-31T00:00:00+00:00",
+            "open": 6.4,
+            "high": 6.49,
+            "low": 6.37,
+            "close": 6.45,
+            "volume": 52804200,
+            "amount": 400087100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-01T00:00:00+00:00",
+            "open": 6.43,
+            "high": 6.48,
+            "low": 6.39,
+            "close": 6.45,
+            "volume": 30934300,
+            "amount": 234625800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-02T00:00:00+00:00",
+            "open": 6.41,
+            "high": 6.44,
+            "low": 6.28,
+            "close": 6.33,
+            "volume": 42654500,
+            "amount": 319717200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-03T00:00:00+00:00",
+            "open": 6.37,
+            "high": 6.43,
+            "low": 6.29,
+            "close": 6.41,
+            "volume": 29329500,
+            "amount": 220449800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-04T00:00:00+00:00",
+            "open": 6.44,
+            "high": 6.5,
+            "low": 6.39,
+            "close": 6.43,
+            "volume": 34256800,
+            "amount": 260297700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-07T00:00:00+00:00",
+            "open": 6.42,
+            "high": 6.42,
+            "low": 6.34,
+            "close": 6.37,
+            "volume": 26012900,
+            "amount": 195449500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-08T00:00:00+00:00",
+            "open": 6.32,
+            "high": 6.4,
+            "low": 6.28,
+            "close": 6.37,
+            "volume": 27001200,
+            "amount": 202344900,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-09T00:00:00+00:00",
+            "open": 6.35,
+            "high": 6.4,
+            "low": 6.32,
+            "close": 6.4,
+            "volume": 17792600,
+            "amount": 133937300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-10T00:00:00+00:00",
+            "open": 6.3,
+            "high": 6.31,
+            "low": 6.2,
+            "close": 6.27,
+            "volume": 52865300,
+            "amount": 391107900,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-11T00:00:00+00:00",
+            "open": 6.29,
+            "high": 6.29,
+            "low": 6.08,
+            "close": 6.08,
+            "volume": 37051100,
+            "amount": 270665800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-14T00:00:00+00:00",
+            "open": 6.03,
+            "high": 6.05,
+            "low": 5.9,
+            "close": 5.95,
+            "volume": 44245500,
+            "amount": 315007700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-15T00:00:00+00:00",
+            "open": 5.97,
+            "high": 6.04,
+            "low": 5.94,
+            "close": 6.02,
+            "volume": 31218700,
+            "amount": 222582900,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-16T00:00:00+00:00",
+            "open": 6,
+            "high": 6.04,
+            "low": 5.97,
+            "close": 5.99,
+            "volume": 22954000,
+            "amount": 163923300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-17T00:00:00+00:00",
+            "open": 5.98,
+            "high": 5.99,
+            "low": 5.9,
+            "close": 5.95,
+            "volume": 37202500,
+            "amount": 263599000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-18T00:00:00+00:00",
+            "open": 5.95,
+            "high": 6.02,
+            "low": 5.92,
+            "close": 5.92,
+            "volume": 28150600,
+            "amount": 200372000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-21T00:00:00+00:00",
+            "open": 5.91,
+            "high": 5.96,
+            "low": 5.81,
+            "close": 5.81,
+            "volume": 42517700,
+            "amount": 298419500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-22T00:00:00+00:00",
+            "open": 5.83,
+            "high": 5.89,
+            "low": 5.82,
+            "close": 5.86,
+            "volume": 32940000,
+            "amount": 230491400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-23T00:00:00+00:00",
+            "open": 5.86,
+            "high": 5.94,
+            "low": 5.83,
+            "close": 5.87,
+            "volume": 30151400,
+            "amount": 212210300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-24T00:00:00+00:00",
+            "open": 5.88,
+            "high": 5.91,
+            "low": 5.83,
+            "close": 5.84,
+            "volume": 24605000,
+            "amount": 172413200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-25T00:00:00+00:00",
+            "open": 5.84,
+            "high": 5.94,
+            "low": 5.82,
+            "close": 5.9,
+            "volume": 24703800,
+            "amount": 174021400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-28T00:00:00+00:00",
+            "open": 6.15,
+            "high": 6.17,
+            "low": 5.97,
+            "close": 6,
+            "volume": 66648100,
+            "amount": 480922500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-29T00:00:00+00:00",
+            "open": 6.05,
+            "high": 6.05,
+            "low": 5.88,
+            "close": 5.92,
+            "volume": 50437500,
+            "amount": 357554800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-30T00:00:00+00:00",
+            "open": 5.95,
+            "high": 5.95,
+            "low": 5.86,
+            "close": 5.88,
+            "volume": 28718300,
+            "amount": 202072800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-31T00:00:00+00:00",
+            "open": 5.88,
+            "high": 5.94,
+            "low": 5.83,
+            "close": 5.83,
+            "volume": 32933200,
+            "amount": 231268200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-01T00:00:00+00:00",
+            "open": 5.84,
+            "high": 5.89,
+            "low": 5.84,
+            "close": 5.86,
+            "volume": 21793000,
+            "amount": 152752400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-04T00:00:00+00:00",
+            "open": 5.91,
+            "high": 5.99,
+            "low": 5.88,
+            "close": 5.96,
+            "volume": 36814300,
+            "amount": 261369400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-05T00:00:00+00:00",
+            "open": 5.95,
+            "high": 5.97,
+            "low": 5.88,
+            "close": 5.89,
+            "volume": 22326800,
+            "amount": 157581000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-06T00:00:00+00:00",
+            "open": 5.87,
+            "high": 5.94,
+            "low": 5.87,
+            "close": 5.94,
+            "volume": 16736500,
+            "amount": 118026800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-07T00:00:00+00:00",
+            "open": 5.94,
+            "high": 5.95,
+            "low": 5.87,
+            "close": 5.89,
+            "volume": 20271900,
+            "amount": 143062800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-08T00:00:00+00:00",
+            "open": 5.88,
+            "high": 5.9,
+            "low": 5.85,
+            "close": 5.85,
+            "volume": 18416600,
+            "amount": 129109500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-11T00:00:00+00:00",
+            "open": 5.87,
+            "high": 5.94,
+            "low": 5.85,
+            "close": 5.89,
+            "volume": 24885000,
+            "amount": 175285100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-12T00:00:00+00:00",
+            "open": 5.88,
+            "high": 5.92,
+            "low": 5.88,
+            "close": 5.91,
+            "volume": 20976200,
+            "amount": 147913300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-13T00:00:00+00:00",
+            "open": 5.94,
+            "high": 5.95,
+            "low": 5.89,
+            "close": 5.9,
+            "volume": 20049800,
+            "amount": 141654400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-14T00:00:00+00:00",
+            "open": 5.93,
+            "high": 5.97,
+            "low": 5.91,
+            "close": 5.96,
+            "volume": 35579900,
+            "amount": 252575900,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-15T00:00:00+00:00",
+            "open": 5.97,
+            "high": 6.01,
+            "low": 5.92,
+            "close": 5.97,
+            "volume": 34081900,
+            "amount": 242512700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          }
+        ],
+        "coverageProof": {
+          "calendar": {
+            "market": "CN",
+            "timezone": "Asia/Shanghai",
+            "source": "exchange-calendars/XSHG",
+            "revision": "exchange-calendars-4.13.2-release-evidence-v1:availableAt=2026-03-10T03:24:37.055242+00:00",
+            "supportedRange": {
+              "start": "2023-07-08",
+              "end": "2023-09-15"
+            },
+            "expectedSessionDates": [
+              "2023-07-10",
+              "2023-07-11",
+              "2023-07-12",
+              "2023-07-13",
+              "2023-07-14",
+              "2023-07-17",
+              "2023-07-18",
+              "2023-07-19",
+              "2023-07-20",
+              "2023-07-21",
+              "2023-07-24",
+              "2023-07-25",
+              "2023-07-26",
+              "2023-07-27",
+              "2023-07-28",
+              "2023-07-31",
+              "2023-08-01",
+              "2023-08-02",
+              "2023-08-03",
+              "2023-08-04",
+              "2023-08-07",
+              "2023-08-08",
+              "2023-08-09",
+              "2023-08-10",
+              "2023-08-11",
+              "2023-08-14",
+              "2023-08-15",
+              "2023-08-16",
+              "2023-08-17",
+              "2023-08-18",
+              "2023-08-21",
+              "2023-08-22",
+              "2023-08-23",
+              "2023-08-24",
+              "2023-08-25",
+              "2023-08-28",
+              "2023-08-29",
+              "2023-08-30",
+              "2023-08-31",
+              "2023-09-01",
+              "2023-09-04",
+              "2023-09-05",
+              "2023-09-06",
+              "2023-09-07",
+              "2023-09-08",
+              "2023-09-11",
+              "2023-09-12",
+              "2023-09-13",
+              "2023-09-14",
+              "2023-09-15"
+            ]
+          },
+          "listing": {
+            "symbol": "600000.SH",
+            "firstTradingDate": "1999-11-10",
+            "source": "https://news.spdb.com.cn/about_spd/xwdt_1632/202302/t20230201_1115740.shtml",
+            "revision": "spdb-listing-t20230201_1115740",
+            "knownAt": "2023-02-01T00:00:00+08:00"
+          },
+          "window": {
+            "status": "complete",
+            "requestedStart": "2023-07-08",
+            "requestedEnd": "2023-09-15"
+          },
+          "pagination": {
+            "status": "complete",
+            "pagesFetched": 1,
+            "continuationPending": false
+          }
+        },
+        "coverage": {
+          "requestedStart": "2023-07-08",
+          "requestedEnd": "2023-09-15",
+          "actualStart": "2023-07-10T00:00:00+00:00",
+          "actualEnd": "2023-09-15T00:00:00+00:00",
+          "hasMoreBefore": false,
+          "latestCompleteTradingDate": "2023-09-15"
+        },
+        "sourcePriceBasis": {
+          "adjustment": "qfq",
+          "method": "provider-native",
+          "methodVersion": "dsa-market-bars-v3-native-source-v1",
+          "basisScope": "provider-defined",
+          "anchor": null,
+          "revision": {
+            "origin": "local-observation",
+            "contentHash": "3a8111433781d0e31745bb65106a070647e9b895449021708c75fe71a3f85236"
+          },
+          "observedAt": "2026-10-06T13:41:06.212759+00:00",
+          "volumeBasis": "unknown",
+          "dividendMeaning": "provider-defined",
+          "dividendEvidenceRef": null,
+          "conversionAvailable": false,
+          "conversionEvidenceRef": null,
+          "derivation": null
+        },
+        "provenance": {
+          "providerId": "tencent",
+          "upstreamSource": "tencent",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 39
+        },
+        "inputFingerprint": "3a8111433781d0e31745bb65106a070647e9b895449021708c75fe71a3f85236",
+        "historicalTradabilityWindows": [
+          {
+            "contractVersion": 1,
+            "symbol": "600000.SH",
+            "market": "CN",
+            "instrumentType": "STOCK",
+            "range": {
+              "start": "2023-07-08",
+              "end": "2023-09-15"
+            },
+            "listing": {
+              "listedOn": "1999-11-10",
+              "source": {
+                "provider": "https://news.spdb.com.cn/about_spd/xwdt_1632/202302/t20230201_1115740.shtml",
+                "revision": "spdb-listing-t20230201_1115740",
+                "availableAt": "2023-02-01T00:00:00+08:00"
+              }
+            },
+            "calendar": {
+              "expectedSessions": [
+                "2023-07-10",
+                "2023-07-11",
+                "2023-07-12",
+                "2023-07-13",
+                "2023-07-14",
+                "2023-07-17",
+                "2023-07-18",
+                "2023-07-19",
+                "2023-07-20",
+                "2023-07-21",
+                "2023-07-24",
+                "2023-07-25",
+                "2023-07-26",
+                "2023-07-27",
+                "2023-07-28",
+                "2023-07-31",
+                "2023-08-01",
+                "2023-08-02",
+                "2023-08-03",
+                "2023-08-04",
+                "2023-08-07",
+                "2023-08-08",
+                "2023-08-09",
+                "2023-08-10",
+                "2023-08-11",
+                "2023-08-14",
+                "2023-08-15",
+                "2023-08-16",
+                "2023-08-17",
+                "2023-08-18",
+                "2023-08-21",
+                "2023-08-22",
+                "2023-08-23",
+                "2023-08-24",
+                "2023-08-25",
+                "2023-08-28",
+                "2023-08-29",
+                "2023-08-30",
+                "2023-08-31",
+                "2023-09-01",
+                "2023-09-04",
+                "2023-09-05",
+                "2023-09-06",
+                "2023-09-07",
+                "2023-09-08",
+                "2023-09-11",
+                "2023-09-12",
+                "2023-09-13",
+                "2023-09-14",
+                "2023-09-15"
+              ],
+              "source": {
+                "provider": "exchange-calendars/XSHG",
+                "revision": "exchange-calendars-4.13.2-release-evidence-v1:availableAt=2026-03-10T03:24:37.055242+00:00",
+                "availableAt": "2026-10-06T13:41:06.212759+00:00"
+              }
+            },
+            "barSource": {
+              "routeKey": {
+                "kind": "bar",
+                "market": "CN",
+                "assetType": "STOCK",
+                "capability": "DAILY_BAR",
+                "timeframe": "1d",
+                "adjustment": "qfq"
+              },
+              "routeTarget": {
+                "providerId": "tencent",
+                "upstreamSource": "tencent"
+              },
+              "providerRevision": "f626cfdff93bffeb2f5071cd7b2825304879544a4a5220e1c95d7fbb240490e9",
+              "responseSha256": "9b654bff97acd31fe3a6977e98bcd1df8b95e3eb4ab7a4cd564a2954796a44e0",
+              "observedAt": "2026-10-06T13:41:06.212759+00:00",
+              "requestComplete": true,
+              "paginationComplete": true
+            },
+            "days": [
+              {
+                "date": "2023-07-10",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-11",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-12",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-13",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-14",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-17",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-18",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-19",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-20",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-21",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-24",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-25",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-26",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-27",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-28",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-31",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-01",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-02",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-03",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-04",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-07",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-08",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-09",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-10",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-11",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-14",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-15",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-16",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-17",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-18",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-21",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-22",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-23",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-24",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-25",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-28",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-29",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-30",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-31",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-01",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-04",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-05",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-06",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-07",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-08",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-11",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-12",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-13",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-14",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-15",
+                "state": "observed-traded"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "contractVersion": 3,
+        "requestId": "c22b2a-captured-600519.SH",
+        "symbol": "600519.SH",
+        "start": "2023-07-08",
+        "end": "2023-09-15",
+        "tradabilityMode": "assume-untradable-no-bar",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "routeTarget": {
+          "providerId": "tencent",
+          "upstreamSource": "tencent",
+          "routeIndex": 0
+        }
+      },
+      "response": {
+        "contractVersion": 3,
+        "requestId": "c22b2a-captured-600519.SH",
+        "symbol": "600519.SH",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "bars": [
+          {
+            "timestamp": "2023-07-10T00:00:00+00:00",
+            "open": 1551.55,
+            "high": 1561.51,
+            "low": 1546.55,
+            "close": 1547.45,
+            "volume": 1347700,
+            "amount": 2298241700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-11T00:00:00+00:00",
+            "open": 1556.55,
+            "high": 1561.72,
+            "low": 1548.65,
+            "close": 1556.55,
+            "volume": 1258300,
+            "amount": 2151079300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-12T00:00:00+00:00",
+            "open": 1559.59,
+            "high": 1569.55,
+            "low": 1557.88,
+            "close": 1560.35,
+            "volume": 1328500,
+            "amount": 2280785400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-13T00:00:00+00:00",
+            "open": 1568.54,
+            "high": 1591.96,
+            "low": 1565.56,
+            "close": 1584.95,
+            "volume": 2580700,
+            "amount": 4479772500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-14T00:00:00+00:00",
+            "open": 1602.55,
+            "high": 1605.05,
+            "low": 1587.75,
+            "close": 1599.55,
+            "volume": 1855000,
+            "amount": 3245530300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-17T00:00:00+00:00",
+            "open": 1597.55,
+            "high": 1597.55,
+            "low": 1573.15,
+            "close": 1576.52,
+            "volume": 1433600,
+            "amount": 2482069800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-18T00:00:00+00:00",
+            "open": 1580.13,
+            "high": 1581.06,
+            "low": 1567.55,
+            "close": 1569.35,
+            "volume": 1473800,
+            "amount": 2544005100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-19T00:00:00+00:00",
+            "open": 1561.56,
+            "high": 1574.55,
+            "low": 1560.35,
+            "close": 1569.55,
+            "volume": 1248300,
+            "amount": 2147704400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-20T00:00:00+00:00",
+            "open": 1574.54,
+            "high": 1595.53,
+            "low": 1568.55,
+            "close": 1570.55,
+            "volume": 1669300,
+            "amount": 2897176500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-21T00:00:00+00:00",
+            "open": 1578.43,
+            "high": 1619.05,
+            "low": 1572.55,
+            "close": 1617.85,
+            "volume": 3937700,
+            "amount": 6931535700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-24T00:00:00+00:00",
+            "open": 1597.07,
+            "high": 1617.7,
+            "low": 1597.07,
+            "close": 1617.7,
+            "volume": 1971300,
+            "amount": 3476648200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-25T00:00:00+00:00",
+            "open": 1646.55,
+            "high": 1675.43,
+            "low": 1646.54,
+            "close": 1675.1,
+            "volume": 4308600,
+            "amount": 7837450000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-26T00:00:00+00:00",
+            "open": 1675.1,
+            "high": 1682.54,
+            "low": 1661.63,
+            "close": 1675.1,
+            "volume": 1961100,
+            "amount": 3580171500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-27T00:00:00+00:00",
+            "open": 1682.55,
+            "high": 1701.34,
+            "low": 1675.25,
+            "close": 1684.58,
+            "volume": 2034000,
+            "amount": 3749635300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-28T00:00:00+00:00",
+            "open": 1678.55,
+            "high": 1746.55,
+            "low": 1674.56,
+            "close": 1743.55,
+            "volume": 3901800,
+            "amount": 7330314100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-07-31T00:00:00+00:00",
+            "open": 1754.55,
+            "high": 1781.55,
+            "low": 1720.55,
+            "close": 1727.13,
+            "volume": 4537900,
+            "amount": 8615279800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-01T00:00:00+00:00",
+            "open": 1724.56,
+            "high": 1753.5,
+            "low": 1724.44,
+            "close": 1735.55,
+            "volume": 1923100,
+            "amount": 3635857300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-02T00:00:00+00:00",
+            "open": 1729.95,
+            "high": 1736.55,
+            "low": 1713.35,
+            "close": 1726.55,
+            "volume": 1850900,
+            "amount": 3478674200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-03T00:00:00+00:00",
+            "open": 1716.55,
+            "high": 1736.55,
+            "low": 1697.05,
+            "close": 1725.02,
+            "volume": 2154300,
+            "amount": 4031087700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-04T00:00:00+00:00",
+            "open": 1734.37,
+            "high": 1753.07,
+            "low": 1728.55,
+            "close": 1740.02,
+            "volume": 2457400,
+            "amount": 4655813800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-07T00:00:00+00:00",
+            "open": 1727.5,
+            "high": 1744.55,
+            "low": 1717.58,
+            "close": 1734.48,
+            "volume": 2389200,
+            "amount": 4491893100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-08T00:00:00+00:00",
+            "open": 1726.58,
+            "high": 1740.26,
+            "low": 1710.63,
+            "close": 1736.55,
+            "volume": 1773600,
+            "amount": 3333559500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-09T00:00:00+00:00",
+            "open": 1736.55,
+            "high": 1751.55,
+            "low": 1729.51,
+            "close": 1736.83,
+            "volume": 1852300,
+            "amount": 3506306400,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-10T00:00:00+00:00",
+            "open": 1728.55,
+            "high": 1735.55,
+            "low": 1708.85,
+            "close": 1721.55,
+            "volume": 1843600,
+            "amount": 3454219100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-11T00:00:00+00:00",
+            "open": 1731.55,
+            "high": 1731.95,
+            "low": 1680.43,
+            "close": 1680.55,
+            "volume": 2678600,
+            "amount": 4959166800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-14T00:00:00+00:00",
+            "open": 1656.55,
+            "high": 1671.53,
+            "low": 1642.55,
+            "close": 1649.55,
+            "volume": 2373100,
+            "amount": 4285362100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-15T00:00:00+00:00",
+            "open": 1655.55,
+            "high": 1664.55,
+            "low": 1647.56,
+            "close": 1659.53,
+            "volume": 1481800,
+            "amount": 2682125100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-16T00:00:00+00:00",
+            "open": 1654.13,
+            "high": 1669.9,
+            "low": 1652.55,
+            "close": 1666.55,
+            "volume": 1318400,
+            "amount": 2396261800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-17T00:00:00+00:00",
+            "open": 1652.63,
+            "high": 1680.55,
+            "low": 1648.1,
+            "close": 1674.6,
+            "volume": 1729000,
+            "amount": 3141408000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-18T00:00:00+00:00",
+            "open": 1678.54,
+            "high": 1681.54,
+            "low": 1649.14,
+            "close": 1649.14,
+            "volume": 1702300,
+            "amount": 3084761600,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-21T00:00:00+00:00",
+            "open": 1639.55,
+            "high": 1660.54,
+            "low": 1636.62,
+            "close": 1637.55,
+            "volume": 1891200,
+            "amount": 3405415600,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-22T00:00:00+00:00",
+            "open": 1647.54,
+            "high": 1649.11,
+            "low": 1617.57,
+            "close": 1634.55,
+            "volume": 2665000,
+            "amount": 4763131200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-23T00:00:00+00:00",
+            "open": 1643.55,
+            "high": 1646.55,
+            "low": 1616.63,
+            "close": 1620.55,
+            "volume": 1991200,
+            "amount": 3556178600,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-24T00:00:00+00:00",
+            "open": 1626.17,
+            "high": 1674.55,
+            "low": 1621.55,
+            "close": 1662.85,
+            "volume": 2605500,
+            "amount": 4703417600,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-25T00:00:00+00:00",
+            "open": 1655.34,
+            "high": 1684.32,
+            "low": 1652.56,
+            "close": 1671.53,
+            "volume": 1883100,
+            "amount": 3433296800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-28T00:00:00+00:00",
+            "open": 1745.13,
+            "high": 1745.13,
+            "low": 1678.43,
+            "close": 1681.52,
+            "volume": 4105200,
+            "amount": 7633221000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-29T00:00:00+00:00",
+            "open": 1674.55,
+            "high": 1715.63,
+            "low": 1674.55,
+            "close": 1697.88,
+            "volume": 2895000,
+            "amount": 5371260200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-30T00:00:00+00:00",
+            "open": 1714.45,
+            "high": 1714.55,
+            "low": 1690.21,
+            "close": 1702.55,
+            "volume": 1981200,
+            "amount": 3672570300,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-08-31T00:00:00+00:00",
+            "open": 1706.55,
+            "high": 1706.55,
+            "low": 1687.56,
+            "close": 1693.55,
+            "volume": 1482000,
+            "amount": 2738445500,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-01T00:00:00+00:00",
+            "open": 1699.38,
+            "high": 1712.02,
+            "low": 1692.58,
+            "close": 1697.6,
+            "volume": 1314500,
+            "amount": 2438622700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-04T00:00:00+00:00",
+            "open": 1709.15,
+            "high": 1726.49,
+            "low": 1700.08,
+            "close": 1712.55,
+            "volume": 2387100,
+            "amount": 4453823200,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-05T00:00:00+00:00",
+            "open": 1714.55,
+            "high": 1714.55,
+            "low": 1703.35,
+            "close": 1705.25,
+            "volume": 1565900,
+            "amount": 2915626000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-06T00:00:00+00:00",
+            "open": 1704.55,
+            "high": 1713.21,
+            "low": 1695.56,
+            "close": 1707.55,
+            "volume": 1112100,
+            "amount": 2067606000,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-07T00:00:00+00:00",
+            "open": 1699.15,
+            "high": 1703.44,
+            "low": 1677.74,
+            "close": 1684.55,
+            "volume": 1698200,
+            "amount": 3128587100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-08T00:00:00+00:00",
+            "open": 1681.49,
+            "high": 1681.49,
+            "low": 1661.5,
+            "close": 1665.05,
+            "volume": 1221200,
+            "amount": 2224338100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-11T00:00:00+00:00",
+            "open": 1654.55,
+            "high": 1686.55,
+            "low": 1654.55,
+            "close": 1668.72,
+            "volume": 1592600,
+            "amount": 2902617700,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-12T00:00:00+00:00",
+            "open": 1673.15,
+            "high": 1673.53,
+            "low": 1662.57,
+            "close": 1666.51,
+            "volume": 1216800,
+            "amount": 2214514100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-13T00:00:00+00:00",
+            "open": 1676.47,
+            "high": 1676.47,
+            "low": 1646.6,
+            "close": 1666.46,
+            "volume": 1950100,
+            "amount": 3540583600,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-14T00:00:00+00:00",
+            "open": 1669.08,
+            "high": 1673.53,
+            "low": 1652.55,
+            "close": 1665.24,
+            "volume": 1750500,
+            "amount": 3180447800,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          },
+          {
+            "timestamp": "2023-09-15T00:00:00+00:00",
+            "open": 1665.55,
+            "high": 1666.33,
+            "low": 1627.85,
+            "close": 1628.54,
+            "volume": 2843100,
+            "amount": 5105749100,
+            "completionStatus": "complete",
+            "availableAt": "2026-10-06T13:41:06.212759+00:00"
+          }
+        ],
+        "coverageProof": {
+          "calendar": {
+            "market": "CN",
+            "timezone": "Asia/Shanghai",
+            "source": "exchange-calendars/XSHG",
+            "revision": "exchange-calendars-4.13.2-release-evidence-v1:availableAt=2026-03-10T03:24:37.055242+00:00",
+            "supportedRange": {
+              "start": "2023-07-08",
+              "end": "2023-09-15"
+            },
+            "expectedSessionDates": [
+              "2023-07-10",
+              "2023-07-11",
+              "2023-07-12",
+              "2023-07-13",
+              "2023-07-14",
+              "2023-07-17",
+              "2023-07-18",
+              "2023-07-19",
+              "2023-07-20",
+              "2023-07-21",
+              "2023-07-24",
+              "2023-07-25",
+              "2023-07-26",
+              "2023-07-27",
+              "2023-07-28",
+              "2023-07-31",
+              "2023-08-01",
+              "2023-08-02",
+              "2023-08-03",
+              "2023-08-04",
+              "2023-08-07",
+              "2023-08-08",
+              "2023-08-09",
+              "2023-08-10",
+              "2023-08-11",
+              "2023-08-14",
+              "2023-08-15",
+              "2023-08-16",
+              "2023-08-17",
+              "2023-08-18",
+              "2023-08-21",
+              "2023-08-22",
+              "2023-08-23",
+              "2023-08-24",
+              "2023-08-25",
+              "2023-08-28",
+              "2023-08-29",
+              "2023-08-30",
+              "2023-08-31",
+              "2023-09-01",
+              "2023-09-04",
+              "2023-09-05",
+              "2023-09-06",
+              "2023-09-07",
+              "2023-09-08",
+              "2023-09-11",
+              "2023-09-12",
+              "2023-09-13",
+              "2023-09-14",
+              "2023-09-15"
+            ]
+          },
+          "listing": {
+            "symbol": "600519.SH",
+            "status": "unknown"
+          },
+          "window": {
+            "status": "complete",
+            "requestedStart": "2023-07-08",
+            "requestedEnd": "2023-09-15"
+          },
+          "pagination": {
+            "status": "complete",
+            "pagesFetched": 1,
+            "continuationPending": false
+          }
+        },
+        "coverage": {
+          "requestedStart": "2023-07-08",
+          "requestedEnd": "2023-09-15",
+          "actualStart": "2023-07-10T00:00:00+00:00",
+          "actualEnd": "2023-09-15T00:00:00+00:00",
+          "hasMoreBefore": false,
+          "latestCompleteTradingDate": "2023-09-15"
+        },
+        "sourcePriceBasis": {
+          "adjustment": "qfq",
+          "method": "provider-native",
+          "methodVersion": "dsa-market-bars-v3-native-source-v1",
+          "basisScope": "provider-defined",
+          "anchor": null,
+          "revision": {
+            "origin": "local-observation",
+            "contentHash": "ecbff05d64602c47b03dcf4f3ab17305c48737a47cfb7d00e04f39d635097157"
+          },
+          "observedAt": "2026-10-06T13:41:06.212759+00:00",
+          "volumeBasis": "unknown",
+          "dividendMeaning": "provider-defined",
+          "dividendEvidenceRef": null,
+          "conversionAvailable": false,
+          "conversionEvidenceRef": null,
+          "derivation": null
+        },
+        "provenance": {
+          "providerId": "tencent",
+          "upstreamSource": "tencent",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 39
+        },
+        "inputFingerprint": "ecbff05d64602c47b03dcf4f3ab17305c48737a47cfb7d00e04f39d635097157",
+        "historicalTradabilityWindows": [
+          {
+            "contractVersion": 1,
+            "symbol": "600519.SH",
+            "market": "CN",
+            "instrumentType": "STOCK",
+            "range": {
+              "start": "2023-07-08",
+              "end": "2023-09-15"
+            },
+            "listing": {
+              "status": "unknown"
+            },
+            "calendar": {
+              "expectedSessions": [
+                "2023-07-10",
+                "2023-07-11",
+                "2023-07-12",
+                "2023-07-13",
+                "2023-07-14",
+                "2023-07-17",
+                "2023-07-18",
+                "2023-07-19",
+                "2023-07-20",
+                "2023-07-21",
+                "2023-07-24",
+                "2023-07-25",
+                "2023-07-26",
+                "2023-07-27",
+                "2023-07-28",
+                "2023-07-31",
+                "2023-08-01",
+                "2023-08-02",
+                "2023-08-03",
+                "2023-08-04",
+                "2023-08-07",
+                "2023-08-08",
+                "2023-08-09",
+                "2023-08-10",
+                "2023-08-11",
+                "2023-08-14",
+                "2023-08-15",
+                "2023-08-16",
+                "2023-08-17",
+                "2023-08-18",
+                "2023-08-21",
+                "2023-08-22",
+                "2023-08-23",
+                "2023-08-24",
+                "2023-08-25",
+                "2023-08-28",
+                "2023-08-29",
+                "2023-08-30",
+                "2023-08-31",
+                "2023-09-01",
+                "2023-09-04",
+                "2023-09-05",
+                "2023-09-06",
+                "2023-09-07",
+                "2023-09-08",
+                "2023-09-11",
+                "2023-09-12",
+                "2023-09-13",
+                "2023-09-14",
+                "2023-09-15"
+              ],
+              "source": {
+                "provider": "exchange-calendars/XSHG",
+                "revision": "exchange-calendars-4.13.2-release-evidence-v1:availableAt=2026-03-10T03:24:37.055242+00:00",
+                "availableAt": "2026-10-06T13:41:06.212759+00:00"
+              }
+            },
+            "barSource": {
+              "routeKey": {
+                "kind": "bar",
+                "market": "CN",
+                "assetType": "STOCK",
+                "capability": "DAILY_BAR",
+                "timeframe": "1d",
+                "adjustment": "qfq"
+              },
+              "routeTarget": {
+                "providerId": "tencent",
+                "upstreamSource": "tencent"
+              },
+              "providerRevision": "6ebd46ab1ab465281252e99edbb58dce78e9f41e1c0ca549554c06470bf0d7d7",
+              "responseSha256": "f05790a360a9e9b748e6d5efa2c62715ad6f55295b59b139b9a0f3a27afc6440",
+              "observedAt": "2026-10-06T13:41:06.212759+00:00",
+              "requestComplete": true,
+              "paginationComplete": true
+            },
+            "days": [
+              {
+                "date": "2023-07-10",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-11",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-12",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-13",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-14",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-17",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-18",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-19",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-20",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-21",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-24",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-25",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-26",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-27",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-28",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-07-31",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-01",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-02",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-03",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-04",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-07",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-08",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-09",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-10",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-11",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-14",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-15",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-16",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-17",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-18",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-21",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-22",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-23",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-24",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-25",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-28",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-29",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-30",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-08-31",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-01",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-04",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-05",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-06",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-07",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-08",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-11",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-12",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-13",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-14",
+                "state": "observed-traded"
+              },
+              {
+                "date": "2023-09-15",
+                "state": "observed-traded"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

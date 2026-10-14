@@ -1,5 +1,7 @@
 # 巨型组件拆分与请求层统一规格
 
+原本地实施与验证见[归档任务](../archive/tasks/2026-08-23-large-component-split.md)。本文保留当前模块拆分原则，历史路径与接口以 Canonical 当前合同为准。
+
 ## 背景与问题
 
 Desktop 的 `apps/desktop/src/features/legacy-pages.tsx` 约 6210 行，集中承载组合、账户与持仓录入、导入、Provider、风险、绩效、策略、AI、Journal 和首次运行引导等多个领域。文件内部包含多个超过函数行数与复杂度阈值的页面，导致请求状态、表单状态、领域类型和展示结构相互耦合。
@@ -103,4 +105,3 @@ Desktop 的 `apps/desktop/src/features/legacy-pages.tsx` 约 6210 行，集中�
 5. Strategy、AI、Journal 的加载、错误、轮询/取消或分析结果行为有对应测试覆盖。
 6. Mobile `MobileApp` 拆分后现有 store、主题、模式、导航和刷新竞态测试通过。
 7. Desktop/mobile typecheck、测试、构建、格式检查、目标 ESLint 复杂度/函数长度检查和文件大小 guardrail 通过。
-

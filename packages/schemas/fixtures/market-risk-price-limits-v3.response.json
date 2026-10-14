@@ -1,0 +1,163 @@
+{
+  "request": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "trading-status-source-sample",
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "official-states",
+      "upstreamSource": "cn-stock-risk-price-limits",
+      "routeIndex": 0
+    },
+    "symbol": "000995.SZ",
+    "range": {
+      "start": "2023-08-16",
+      "end": "2023-08-21"
+    }
+  },
+  "response": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "trading-status-source-sample",
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "official-states",
+      "upstreamSource": "cn-stock-risk-price-limits",
+      "routeIndex": 0
+    },
+    "symbol": "000995.SZ",
+    "range": {
+      "start": "2023-08-16",
+      "end": "2023-08-21"
+    },
+    "status": "supported",
+    "days": [
+      {
+        "date": "2023-08-16",
+        "state": "unknown",
+        "sourceDocumentIds": [
+          "huangtai-2023-029-risk"
+        ],
+        "riskWarning": {
+          "delisting": "active",
+          "other": "unknown"
+        },
+        "dailyPriceLimit": {
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.05",
+          "maxDownRatio": "0.05"
+        }
+      },
+      {
+        "date": "2023-08-17",
+        "state": "suspended",
+        "sourceDocumentIds": [
+          "huangtai-2023-029-risk"
+        ],
+        "riskWarning": {
+          "delisting": "active",
+          "other": "none"
+        },
+        "dailyPriceLimit": {
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.05",
+          "maxDownRatio": "0.05"
+        }
+      },
+      {
+        "date": "2023-08-18",
+        "state": "trading",
+        "sourceDocumentIds": [
+          "huangtai-2023-029-risk"
+        ],
+        "riskWarning": {
+          "delisting": "none",
+          "other": "none"
+        },
+        "dailyPriceLimit": {
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.1",
+          "maxDownRatio": "0.1"
+        }
+      },
+      {
+        "date": "2023-08-19",
+        "state": "unknown",
+        "sourceDocumentIds": [
+          "huangtai-2023-029-risk"
+        ],
+        "riskWarning": {
+          "delisting": "none",
+          "other": "none"
+        },
+        "dailyPriceLimit": {
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.1",
+          "maxDownRatio": "0.1"
+        }
+      },
+      {
+        "date": "2023-08-20",
+        "state": "unknown",
+        "sourceDocumentIds": [
+          "huangtai-2023-029-risk"
+        ],
+        "riskWarning": {
+          "delisting": "none",
+          "other": "none"
+        },
+        "dailyPriceLimit": {
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.1",
+          "maxDownRatio": "0.1"
+        }
+      },
+      {
+        "date": "2023-08-21",
+        "state": "unknown",
+        "sourceDocumentIds": [
+          "huangtai-2023-029-risk"
+        ],
+        "riskWarning": {
+          "delisting": "none",
+          "other": "none"
+        },
+        "dailyPriceLimit": {
+          "reference": "previousRawClose",
+          "maxUpRatio": "0.1",
+          "maxDownRatio": "0.1"
+        }
+      }
+    ],
+    "sourceDocuments": [
+      {
+        "id": "huangtai-2023-029-risk",
+        "title": "皇台酒业：撤销退市风险警示暨停牌公告（2023-029），第1至3页",
+        "url": "https://static.cninfo.com.cn/finalpage/2023-08-17/1217557800.PDF",
+        "publishedDate": "2023-08-17",
+        "kind": "issuerDisclosure",
+        "sha256": "d98685515a9022db66f689cfbe782991575f3de03b0fc7d70c340170ba9b73a2",
+        "observedAt": "2026-10-07T06:18:28.685988+00:00"
+      }
+    ],
+    "provenance": {
+      "providerId": "official-states",
+      "upstreamSource": "cn-stock-risk-price-limits",
+      "providerRevision": "official-trading-status-bc06aba7fb3f6620f330f86d07f7951ebf03596967f8837a3f29707b58fd5b82",
+      "datasetId": "cn-000995-risk-limits-2023-08",
+      "fetchedAt": "2026-10-07T06:23:46.023241+00:00",
+      "granularity": "1d",
+      "historicalAvailability": "notVerified"
+    }
+  }
+}

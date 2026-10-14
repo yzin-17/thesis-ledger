@@ -356,12 +356,15 @@ const buildChargeBreakdown = (
   input: ExchangeMarketSimulationInput,
   costs: ReturnType<typeof strategyCharges>,
   modelSegment: FrozenExchangeExecutionModelSegment | undefined,
+  quantity: string,
 ): ExchangeChargeBreakdown[] => {
   if (modelSegment) {
     const modelCharges = calculateExecutionModelFees(modelSegment.fees, {
       side: input.order.side,
       turnover: costs.turnover.toString(),
       currency: input.currency,
+      quantity, price: costs.price.toString(),
+      quantityBasis: modelSegment.execution.normalizedExecution ? 'normalized-units' : 'actual-units',
     });
     return modelCharges.charges.map((charge) => ({ ...charge, source: 'executionModel' }));
   }
@@ -664,7 +667,7 @@ const buildFilledPlan = (
   quantity: string,
   ruleTrace: ExecutionRuleTrace | NormalizedExecutionTrace,
 ): ExchangePlan => {
-  const chargeBreakdown = buildChargeBreakdown(input, costs, modelSegment);
+  const chargeBreakdown = buildChargeBreakdown(input, costs, modelSegment, quantity);
   const charges = [...chargeBreakdown.map(({ amount, currency }) => ({ amount, currency }))];
   const totalCharges = chargeBreakdown.reduce(
     (total, charge) => total.plus(charge.amount),

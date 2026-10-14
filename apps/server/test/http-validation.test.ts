@@ -125,6 +125,25 @@ describe('HTTP runtime validation', () => {
     expect(queries.effectiveEvents).not.toHaveBeenCalled();
   });
 
+  it('全局异常过滤器保留领域 code 和条件明细并补齐 API 错误合同', () => {
+    const response = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const host = { switchToHttp: () => ({ getResponse: () => response }) };
+    new ApiExceptionFilter().catch(
+      new ConflictException({
+        code: 'AUTHORING_CONDITIONS_INCOMPLETE',
+        message: '请审核',
+        issues: ['遗漏原文'],
+      }),
+      host as never,
+    );
+    expect(response.json).toHaveBeenCalledWith({
+      code: 'AUTHORING_CONDITIONS_INCOMPLETE',
+      error: 'AUTHORING_CONDITIONS_INCOMPLETE',
+      errorCode: 'AUTHORING_CONDITIONS_INCOMPLETE',
+      message: '请审核',
+      issues: ['遗漏原文'],
+    });
+  });
   it('全局异常过滤器保留稳定 errorCode 并补齐通用 error 字段', () => {
     const response = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     const host = { switchToHttp: () => ({ getResponse: () => response }) };

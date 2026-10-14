@@ -8,6 +8,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { marketRouteContextV3 } from './market-window-selector-v3.js';
 import { supportsBasicPriceFallback } from './market-basic-price-fallback.js';
+import { marketRouteMarket } from './market-symbol-identity.js';
 
 export const unavailableChartOptions = (
   symbol: string,
@@ -39,7 +40,7 @@ export const resolveChartOptionsV3 = (
   const options = (['none', 'qfq', 'hfq'] as const).map((adjustment) => {
     const routeKey: MarketDataBarRouteKeyV3 = {
       kind: 'bar',
-      market: 'CN',
+      market: marketRouteMarket(identity.symbol),
       assetType: identity.assetType,
       capability: 'DAILY_BAR',
       timeframe: '1d',
@@ -69,7 +70,7 @@ export const resolveChartOptionsV3 = (
           entry?.state === 'ready' ? 'not_admitted' : (entry?.state ?? 'catalog_unavailable');
       }
       if (reason && primary && backup?.eligible && backup.catalogReady &&
-        supportsBasicPriceFallback(routeKey, [primary.target, backup.target])) {
+        supportsBasicPriceFallback(routeKey, [primary.target, backup.target], context.context.catalog)) {
         reason = null;
         availableVia = 'backup';
       }

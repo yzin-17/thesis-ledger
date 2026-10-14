@@ -1,3 +1,4 @@
+import { MarketLifecycleReaderV3 } from './market-lifecycle-reader-v3.js';
 import { Module } from '@nestjs/common';
 import { DsaModule } from '../integration/dsa/dsa.module.js';
 import { QualityModule } from '../quality/quality.module.js';
@@ -10,6 +11,10 @@ import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { MarketControlService } from './market-control.service.js';
 import { MarketRouteRevisionService } from './market-route-revision.service.js';
 import { MarketDataController } from './market-data.controller.js';
+import { MarketSecurityLotSizeController } from './market-security-lot-size.controller.js';
+import { MarketSecurityStaticInfoController } from './market-security-static-info.controller.js';
+import { MarketAnnouncementsController } from './market-announcements.controller.js';
+import { MarketAnnouncementPreparationService } from './market-announcement-preparation.service.js';
 import { MarketDetailService } from './market-detail.service.js';
 import { MarketService } from './market.service.js';
 import { MarketBarWindowReaderV3 } from './market-bar-reader-v3.js';
@@ -22,11 +27,27 @@ import { MarketPitReconstructionRepository } from './market-pit-reconstruction.r
 import { MarketBarReader } from './market-bar-reader.js';
 import { MarketController } from './market.controller.js';
 import { MarketNavReaderV3 } from './market-nav-reader-v3.js';
+import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
+import { MarketPeriodReader } from './market-period-reader.js';
+import { MarketPeriodViewCache } from './market-period-view-cache.js';
+import { MarketPeriodIndicatorReader } from './market-period-indicator-reader.js';
+import { MarketPeriodDisplayService } from './market-period-display.service.js';
+import { MarketPeriodDetailService } from './market-period-detail.service.js';
+import { MarketPeriodOptionsService } from './market-period-options.service.js';
 
 @Module({
   imports: [QualityModule, DsaModule],
-  controllers: [MarketDataController, MarketController],
+  controllers: [MarketDataController, MarketController, MarketAnnouncementsController, MarketSecurityLotSizeController, MarketSecurityStaticInfoController],
   providers: [
+    MarketLifecycleReaderV3,
+    MarketAnnouncementPreparationService,
+    MarketPeriodCalendarReader,
+    MarketPeriodReader,
+    MarketPeriodViewCache,
+    MarketPeriodIndicatorReader,
+    MarketPeriodDisplayService,
+    MarketPeriodDetailService,
+    MarketPeriodOptionsService,
     MarketNavReaderV3,
     MarketService,
     MarketDetailService,
@@ -48,6 +69,8 @@ import { MarketNavReaderV3 } from './market-nav-reader-v3.js';
     MarketBarReader,
   ],
   exports: [
+    MarketLifecycleReaderV3,
+    MarketAnnouncementPreparationService,
     MarketNavReaderV3,
     MarketPitReconstructionRepository,
     MarketRouteRevisionService,

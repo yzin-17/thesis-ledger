@@ -1,0 +1,18 @@
+{
+  "HK": {
+    "broker": "futu-hk", "plan": "standard-fixed-platform",
+    "sourceUrl": "https://www.futuhk.com/hans/support/topic2_335", "checkedDate": "2026-10-07",
+    "applicability": "current-schedule-research", "userModified": false, "collection": "single-fill-order-v1",
+    "basis": { "kind": "turnover" },
+    "commission": { "rate": "0.0003", "minimumAmount": "3", "maximumTurnoverRatio": null },
+    "platformFee": { "kind": "fixed", "amount": "15" }
+  },
+  "US": {
+    "broker": "futu-hk", "plan": "standard-fixed-platform",
+    "sourceUrl": "https://www.futuhk.com/hans/support/topic2_283", "checkedDate": "2026-10-07",
+    "applicability": "current-schedule-research", "userModified": false, "collection": "single-fill-order-v1",
+    "basis": { "kind": "referencePrice", "price": "20" },
+    "commission": { "rate": "0.0049", "minimumAmount": "0.99", "maximumTurnoverRatio": "0.005" },
+    "platformFee": { "kind": "perShare", "rate": "0.005", "minimumAmount": "1", "maximumTurnoverRatio": "0.005" }
+  }
+}

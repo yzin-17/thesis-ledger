@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  backtestRunPreparationResultV3Schema,
+  backtestRunPreparationTerminalResultV3Schema as backtestRunPreparationResultV3Schema,
   desiredProviderPolicyV3Schema,
   marketRouteKeyIdV3,
   type BacktestPreflightDiagnosticV3,

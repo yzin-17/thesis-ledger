@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { IdentityModule } from '../identity/identity.module.js';
+import { StrategyIdentityGuard } from '../backtest/strategy-identity.guard.js';
 import { AiModule } from '../ai/ai.module.js';
 import { BacktestModule } from '../backtest/backtest.module.js';
 import { RiskModule } from '../risk/risk.module.js';
@@ -16,9 +18,10 @@ import { StrategyRiskApplicationStoreService } from './strategy-risk-application
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
 
 @Module({
-  imports: [AiModule, BacktestModule, RiskModule, PlatformModule],
+  imports: [AiModule, BacktestModule, IdentityModule, RiskModule, PlatformModule],
   controllers: [StrategyOptimizationController, StrategyOptimizationPreparationController],
   providers: [
+    StrategyIdentityGuard,
     StrategyOptimizationReadService,
     StrategyOptimizationRunService,
     StrategyOptimizationSdkExecutor,

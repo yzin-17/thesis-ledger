@@ -8,6 +8,7 @@ export type BacktestBenchmarkCostAssumption =
       commissionRate: string;
       slippageRate: string;
     }
+  | { kind: 'execution-model'; version: string; fingerprint: string }
   | { kind: 'unsupported'; version: string; fingerprint: string };
 
 export type BacktestBenchmarkCompatibilityFact =
@@ -122,6 +123,9 @@ export const calculateBuyAndHoldReturn = (
     const last = DecimalValue.from(lastValue);
     if (!first.isPositive()) return { status: 'unavailable', reason: 'ZERO_INITIAL_BENCHMARK' };
 
+    if (costAssumption.kind === 'execution-model') {
+      return { status: 'unavailable', reason: 'BENCHMARK_EXECUTION_MODEL_REQUIRED' };
+    }
     if (costAssumption.kind === 'unsupported') {
       return { status: 'unavailable', reason: 'BENCHMARK_COST_MODEL_UNSUPPORTED' };
     }

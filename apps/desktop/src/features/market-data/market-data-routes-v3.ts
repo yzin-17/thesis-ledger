@@ -1,5 +1,6 @@
 import {
   marketRouteKeyIdV3,
+  statusCapabilityNamesV1,
   type MarketRouteCapabilityV3,
   type MarketRouteKeyV3,
 } from '@thesis-ledger/schemas';
@@ -10,6 +11,7 @@ import type {
   RouteTarget,
 } from './market-data.types.js';
 import { dataSourceDisplay, routeTargetKey, sameRouteTarget } from './market-data.types.js';
+import { statusQuerySupportLabelV1 } from './market-status-query-support-display.js';
 
 export type MarketPolicyRouteRowV3 = {
   id: string;
@@ -21,9 +23,9 @@ export type MarketPolicyTargetOptionV3 = {
   key: string;
   target: RouteTarget;
   label: string;
+  disabled?: boolean;
 };
 
-const adjustments = ['none', 'qfq', 'hfq'] as const;
 const adjustmentOrder = { none: 0, qfq: 1, hfq: 2 } as const;
 const marketOrder = { CN: 0, HK: 1, US: 2 } as const;
 const assetTypeOrder = {
@@ -57,6 +59,8 @@ const capabilityLabel: Record<string, string> = {
   DAILY_BAR: '日线行情',
   MINUTE_BAR: '分钟行情',
   REALTIME_QUOTE: '实时行情',
+  SECURITY_LOT_SIZE: '每手股数',
+  SECURITY_STATIC_INFO: '证券静态资料',
   FUND_NAV: '基金净值',
   FUND_NAV_HISTORY: '基金净值历史',
   FUND_HOLDINGS: '基金持仓',
@@ -65,6 +69,13 @@ const capabilityLabel: Record<string, string> = {
   CASH_DISTRIBUTION: '现金分红',
   SPLIT: '份额拆分',
   SPLIT_EVENT: '份额拆分',
+  HISTORICAL_PUBLIC_FEES: '历史公共收费',
+  HISTORICAL_TRADING_STATUS: '历史停复牌',
+  DAILY_TRADING_STATUS: '日级交易状态',
+  RISK_WARNING: '风险警示',
+  DAILY_PRICE_RULE: '日级价格规则',
+  SECURITY_BASIC_DATES: '上市与摘牌日期',
+  LISTING_PHASE: '上市阶段',
 };
 
 const adjustmentLabel = {
@@ -79,6 +90,9 @@ export const marketCapabilityLabel = (capability: string) =>
 const targetId = (target: RouteTarget) => routeTargetKey(target);
 
 export const routeKeyIdV3 = (key: MarketRouteKeyV3) => marketRouteKeyIdV3(key);
+
+export const isIndependentMarketFunctionV3 = (key: MarketRouteKeyV3) =>
+  key.kind === 'data' && statusCapabilityNamesV1.some((name) => name === key.capability);
 
 export const routeKeyLabelV3 = (key: MarketRouteKeyV3) => {
   const scope = `${marketLabel[key.market] ?? key.market}${assetTypeLabel[key.assetType] ?? key.assetType}`;
@@ -114,24 +128,7 @@ export const marketPolicyRouteRowsV3 = (
   const add = (key: MarketRouteKeyV3) => keys.set(routeKeyIdV3(key), key);
 
   if (catalog?.status === 'complete') {
-    const dataKeys = new Map<string, Extract<MarketRouteKeyV3, { kind: 'data' }>>();
-    const barFamilies = new Map<
-      string,
-      Omit<Extract<MarketRouteKeyV3, { kind: 'bar' }>, 'adjustment'>
-    >();
-    for (const entry of catalog.entries) {
-      if (entry.key.kind === 'data') {
-        dataKeys.set(routeKeyIdV3(entry.key), entry.key);
-      } else {
-        const { market, assetType, capability, timeframe } = entry.key;
-        const familyId = JSON.stringify([market, assetType, capability, timeframe]);
-        barFamilies.set(familyId, { kind: 'bar', market, assetType, capability, timeframe });
-      }
-    }
-    for (const key of dataKeys.values()) add(key);
-    for (const family of barFamilies.values()) {
-      for (const adjustment of adjustments) add({ ...family, adjustment });
-    }
+    for (const entry of catalog.entries) add(entry.key);
   }
 
   for (const route of policy?.routes ?? []) add(route.key);
@@ -152,12 +149,40 @@ export const readyRouteTargetsV3 = (
 ): MarketPolicyTargetOptionV3[] => {
   if (catalog?.status !== 'complete') return [];
   return catalog.entries
-    .filter((entry) => entryKeyMatches(entry, key) && entry.state === 'ready')
+    .filter((entry) => entryKeyMatches(entry, key) && entry.state === 'ready' &&
+      accountAccessSelectable(entry.accountAccess, Date.now(), providers.find((provider) => provider.providerId === entry.target.providerId)?.configVersion))
     .map(({ target }) => ({
       key: targetId(target),
       target,
       label: dataSourceDisplay(target.providerId, target.upstreamSource, providers),
     }));
+};
+
+/** 精确来源保留在选项中；缺少必要凭证时禁选，其余执行状态作说明。 */
+export const selectableRouteTargetsV3 = (
+  catalog: MarketRouteCatalogReadV3 | undefined,
+  key: MarketRouteKeyV3,
+  providers: readonly ProviderManifest[],
+): MarketPolicyTargetOptionV3[] => {
+  if (catalog?.status !== 'complete') return [];
+  return catalog.entries
+    .filter((entry) => entryKeyMatches(entry, key))
+    .map((entry) => {
+      const { target, state } = entry;
+      let label = dataSourceDisplay(target.providerId, target.upstreamSource, providers);
+      const support = statusQuerySupportLabelV1(entry.querySupport);
+      if (support) label += ` · ${support}`;
+      const provider = providers.find((item) => item.providerId === target.providerId);
+      const accessReady = accountAccessSelectable(entry.accountAccess, Date.now(), provider?.configVersion);
+      const credentialMissing =
+        state === 'credential_missing' ||
+        (provider?.requiresCredential === true && !provider.credentialConfigured);
+      if (credentialMissing) label += ` · ${routeAvailabilityLabelV3('credential_missing')}`;
+      else if (entry.accountAccess && !accessReady) label += ` · ${accountAccessLabel(entry.accountAccess, Date.now(), provider?.configVersion)}`;
+      else if (provider?.enabled === false) label += ' · 已停用';
+      else if (state !== 'ready') label += ` · ${routeAvailabilityLabelV3(state)}`;
+      return { key: targetId(target), target, label, disabled: credentialMissing || !accessReady };
+    });
 };
 
 export const policyRouteTargetsV3 = (
@@ -183,8 +208,24 @@ export const updatePolicyRouteTargetV3 = (
   }
 
   const routes = policy.routes.filter((route) => routeKeyIdV3(route.key) !== routeKeyIdV3(key));
-  if (next.length > 0) routes.push({ key, targets: next });
+  if (next.length > 0) {
+    const existing = policy.routes.find((route) => routeKeyIdV3(route.key) === routeKeyIdV3(key));
+    const updated = { ...existing, key, targets: next };
+    if (isIndependentMarketFunctionV3(key) && updated.enabled === undefined) updated.enabled = true;
+    routes.push(updated);
+  }
   return { ...policy, routes };
+};
+
+export const policyRouteEnabledV3 = (policy: MarketPolicyDraftV3, key: MarketRouteKeyV3) => {
+  const route = policy.routes.find((item) => routeKeyIdV3(item.key) === routeKeyIdV3(key));
+  return Boolean(route && route.enabled !== false);
+};
+
+export const updatePolicyRouteEnabledV3 = (policy: MarketPolicyDraftV3, key: MarketRouteKeyV3, enabled: boolean) => {
+  if (!isIndependentMarketFunctionV3(key)) return policy;
+  return { ...policy, routes: policy.routes.map((route) =>
+    routeKeyIdV3(route.key) === routeKeyIdV3(key) ? { ...route, enabled } : route) };
 };
 
 export const routeCatalogMessageV3 = (
@@ -209,6 +250,7 @@ export const routeAvailabilityLabelV3 = (reason: string | null | undefined) => {
     not_adapted: '该来源尚未接入此能力',
     unsupported_adjustment: '该来源不支持此复权口径',
     credential_missing: '凭据缺失',
+    dependency_missing: '运行环境缺少来源依赖',
     not_admitted: '来源尚未准入',
     admission_invalid: '来源准入已失效',
     admission_not_yet_valid: '来源准入尚未生效',
@@ -260,3 +302,4 @@ export const routeAvailabilityMessageV3 = (
 };
 
 export const routeTargetMatchesV3 = sameRouteTarget;
+import { accountAccessLabel, accountAccessSelectable } from './provider-account-access.js';

@@ -72,6 +72,7 @@ const setup = async (options?: {
   cost?: 'default' | 'proportional';
   signalOnlyAtRangeEnd?: boolean;
   tailSide?: 'sell';
+  legacyCostVersion?: boolean;
 }) => {
   const root = await mkdtemp(join(tmpdir(), 'v3-runner-'));
   directories.push(root);
@@ -123,6 +124,14 @@ const setup = async (options?: {
   if (options?.complete === false) delete fixture.input.runConfig.priceInputBindings;
 
   const snapshots = new LocalSnapshotStore(root);
+  if (options?.legacyCostVersion) {
+    const startBuild = snapshots.v3.startBuild.bind(snapshots.v3);
+    vi.spyOn(snapshots.v3, 'startBuild').mockImplementation((manifest) => {
+      const legacy = { ...manifest };
+      delete legacy.benchmarkCostVersion;
+      return startBuild(legacy);
+    });
+  }
   const built = await new DsaSnapshotBuilder(
     fixture.dsa as unknown as DsaClient,
     snapshots,
@@ -145,6 +154,25 @@ const setup = async (options?: {
 const signal = () => new AbortController().signal;
 
 describe('LocalSnapshotV3Runner', () => {
+  it('旧快照复用和重放保持原比例摘要限制、内容身份与结果校验和', async () => {
+    const { fixture, snapshots, built, runner, input } = await setup({ legacyCostVersion: true });
+    expect(built.manifest).not.toHaveProperty('benchmarkCostVersion');
+    const result = await runner.run(input, signal());
+    expect(result.benchmarkCompatibility?.costAssumption.kind).toBe('unsupported');
+    expect(result.completeness).not.toBe('complete');
+    expect(result.benchmark?.totalReturn).toEqual({
+      status: 'unavailable',
+      reason: 'BENCHMARK_COST_MODEL_UNSUPPORTED',
+    });
+    const reused = await new DsaSnapshotBuilder(
+      fixture.dsa as unknown as DsaClient,
+      snapshots,
+      fixture.reader,
+    ).buildV3(fixture.input);
+    expect(reused).toEqual(built);
+    expect(await runner.run(input, signal())).toEqual(result);
+    expect(fixture.reader.readV3).not.toHaveBeenCalled();
+  });
   it('replays a complete frozen Snapshot offline with strict deterministic benchmark disclosure', async () => {
     const { fixture, built, runner, input } = await setup();
 
@@ -167,14 +195,14 @@ describe('LocalSnapshotV3Runner', () => {
         contentHash: built.manifest.executionModel?.contentHash,
       },
       benchmarkCompatibility: {
-        costAssumption: { kind: 'unsupported' },
+        costAssumption: { kind: 'execution-model' },
       },
       benchmark: {
-        totalReturn: { status: 'unavailable', reason: 'BENCHMARK_COST_MODEL_UNSUPPORTED' },
-        excessReturn: { status: 'unavailable' },
+        totalReturn: { status: 'available' },
+        excessReturn: { status: 'available' },
       },
     });
-    expect(result.completeness).not.toBe('complete');
+    expect(result.completeness).toBe('complete');
     expect(result.warnings).toContain(
       'BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2',
     );
@@ -202,9 +230,8 @@ describe('LocalSnapshotV3Runner', () => {
     expect(result.benchmarkCompatibility).toMatchObject({
       status: 'compatible',
       costAssumption: {
-        kind: 'proportional',
-        commissionRate: '0.00051',
-        slippageRate: '0.001',
+        kind: 'execution-model',
+        version: 'execution-model-cost-v1',
       },
     });
     const benchmark = result.benchmark;

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { barQueryFixture } from './bar-query.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   marketDataBarSeriesResponseV3Schema,
@@ -95,6 +96,7 @@ describe('图表 V3 兼容备用整窗选择', () => {
     input.context.targets = targets.map((target, routeIndex) => ({
       target, routeIndex, eligible: true, catalogReady: true,
     }));
+    input.context.catalog.entries = targets.map((target) => ({ key: input.request.routeKey, target, state: 'ready' as const, barQuery: barQueryFixture(input.request.routeKey.adjustment) }));
     const resolveCompatibility = vi.fn().mockRejectedValue(new Error('不应读取人工证明'));
     const read = vi.fn(async (request: MarketChartBarsRequestV3) => {
       if (request.routeTarget.routeIndex === 0) throw new Error('主源故障');

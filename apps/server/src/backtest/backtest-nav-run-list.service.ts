@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
 import { canonicalizeManifest } from './backtest-snapshot.js';
+import { visibleStrategyOwners } from './strategy-access.service.js';
 
 const navRunListSelect = {
   id: true,
@@ -92,10 +93,11 @@ const summaryFor = (row: NavRunListRecord): BacktestNavRunSummaryV3 | undefined 
 export class BacktestNavRunListService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async list(): Promise<BacktestNavRunSummaryV3[]> {
+  async list(ownerId?: string | null): Promise<BacktestNavRunSummaryV3[]> {
     const rows = await this.prisma.backtestJob.findMany({
       where: {
         mode: 'V3',
+        strategyVersion: { strategy: visibleStrategyOwners(ownerId) },
         AND: [
           { input: { path: ['contractVersion'], equals: 3 } },
           { input: { path: ['schemaVersion'], equals: '3' } },

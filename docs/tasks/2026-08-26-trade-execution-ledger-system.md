@@ -1,5 +1,7 @@
 # 交易与成交记录系统实施任务
 
+> 状态对账（2026-10-03）：主实现已完成；剩余义务由[follow-up](2026-08-26-trade-execution-ledger-system-follow-up.md)拥有，主表不重复执行 T18。Canonical E03 已完成当前信封、经济命令与目标拒绝/读取；截图导入、导入草稿和对账入口当前暂未开放，历史 Sheet 验收不表示现行入口已开放。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[`../specs/2026-08-26-trade-execution-ledger-system.md`](../specs/2026-08-26-trade-execution-ledger-system.md)
 
 ## 执行约束

@@ -16,7 +16,17 @@ import {
 import { collectSnapshotEventsV3 } from './backtest-snapshot-v3-events.js';
 
 export type DependencyDsa = Pick<DsaClient, 'backtestCalendar' | 'backtestInstrumentFacts'> &
-  Partial<Pick<DsaClient, 'effectiveControlPolicyV3' | 'marketRouteCatalogV3' | 'marketEventsV3'>>;
+  Partial<
+    Pick<
+      DsaClient,
+      | 'effectiveControlPolicyV3'
+      | 'marketRouteCatalogV3'
+      | 'marketEventsV3'
+      | 'marketPublicFeesV3'
+      | 'marketTradingStatusV3'
+      | 'dataCapabilities'
+    >
+  >;
 
 /** 预检与冻结共用单项读取和验证，不写入任何快照产物。 */
 export async function readSnapshotDependencyV3(

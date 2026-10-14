@@ -17,7 +17,9 @@ const instrumentTypes = { stock: 'STOCK', etf: 'ETF', fund: 'NAV_FUND' } as cons
 const instrumentKey = (instrument: AssetSymbolRef) =>
   `${instrument.market}:${instrument.symbol}:${instrument.assetType}`;
 
-export const collectEventTypes = (strategy: Pick<BacktestStrategy, 'entry' | 'exit'>): CorporateActionFact['type'][] => {
+export const collectEventTypes = (
+  strategy: Pick<BacktestStrategy, 'entry' | 'exit'>,
+): CorporateActionFact['type'][] => {
   const types = new Set<CorporateActionFact['type']>();
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) {
@@ -72,12 +74,18 @@ export const deriveEventDependencyPlan = (
   const instrumentId = instrumentKey(instrument);
   const signalTypes = collectEventTypes(strategy);
   const dependencies: BacktestEventDependency[] = [];
-  if (runConfig.executionPriceProtocol.accountingBasis === 'raw-events') {
+  if (
+    runConfig.executionPriceProtocol.accountingBasis === 'raw-events' &&
+    !runConfig.executionPriceProtocol.marketRuleResearch &&
+    !runConfig.knownCashPreparation
+  ) {
     dependencies.push({
       instrument: instrumentId,
       purpose: 'raw-accounting',
       effectiveDateWindow: { startDate: runConfig.startDate, endDate: runConfig.endDate },
-      eventTypes: ['CASH_DIVIDEND', 'REVERSE_SPLIT', 'SPLIT'],
+      eventTypes: runConfig.executionPriceProtocol.cashEventResearch
+        ? ['CASH_DIVIDEND']
+        : ['CASH_DIVIDEND', 'REVERSE_SPLIT', 'SPLIT'],
       requiredFields: [
         'symbol',
         'market',
@@ -111,6 +119,18 @@ export const deriveEventDependencyPlan = (
   }
 
   const issues: BacktestDependencyPlanIssue[] = [];
+  if (runConfig.knownCashPreparation && signalTypes.length) {
+    issues.push(issue('RULE_INCOMPATIBLE', ['knownCashPreparation'], '已知现金方案研究不能使用公司行动策略信号'));
+  }
+  if (runConfig.executionPriceProtocol.marketRuleResearch && signalTypes.length) {
+    issues.push(
+      issue(
+        'RULE_INCOMPATIBLE',
+        ['executionPriceProtocol', 'marketRuleResearch'],
+        '不纳入公司行动的规则研究不能使用公司行动事件信号',
+      ),
+    );
+  }
   const response = responses?.[instrumentId];
   let validation: 'not-required' | 'pending' | 'complete' | 'blocked' = 'not-required';
   if (dependencies.length > 0 && !responses) {

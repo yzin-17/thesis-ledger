@@ -1,5 +1,7 @@
 # 组合概览收益指标语义统一实施任务
 
+> 状态对账（2026-10-03）：已实现待验收。原 Spec 顶部明确保留运行时验收，虽然 AC 的本地测试与 Task T1–T3 已完成，也不能仅凭本地完成把该义务取消。旧 Server/FX 环境推测已过期，当前真实收益字段、无卖出/部分卖出及缺成本/FX 的可见状态尚缺本任务目标证据；保持 active，不归档。
+
 对应 Spec：[`../specs/2026-09-09-portfolio-pnl-metrics.md`](../specs/2026-09-09-portfolio-pnl-metrics.md)
 
 > 任务标识：`2026-09-09-portfolio-pnl-metrics`  
@@ -59,6 +61,12 @@
     - 完成下方最终一致性 Review，不把未实现字段重命名为累计字段。
   - 验证方式：记录实际命令与结果，并检查 `git diff --check`。
   - 验证证据：按定向测试、包级测试与 build、门禁顺序完成验证。Schema 12 个文件/129 个测试、API client 10 个测试、Mobile 7 个测试通过；`check-boundaries.mjs`、`check-workspace-dependencies.mjs`、`git diff --check` 和相关 Prettier 检查通过。根级 `rtk pnpm eslint . --max-warnings=0` 未通过，但 16 个错误均位于本次未修改的 `RiskRuleWorkbench` 或 backtest 文件；本次改动文件的定向 ESLint 已通过。边界 Review 覆盖无卖出、部分卖出、全部卖出/多次 Close Slice、未知成本、费用币种不匹配及多币种 FX。
+
+## 当前运行时门禁
+
+- [ ] G1：按原 Spec 的运行时状态核对当前 API 与浏览器收益字段、真实 Trade Close Slice 和缺失降级；复用现有合法数据，真实 FX 来源及账户/模式证据不足时保留准确原因。T1–T3 的既有确定性证据不重跑，不能用健康或空结果替代。
+  - 2026-10-04 目标 HTTP 与浏览器：实际组合无卖出，`realizedPnl=0`；两持仓缺行情导致 `unrealizedPnl=null`、`cumulativePnl=null`；`dailyChange.basis=PREVIOUS_CLOSE_CURRENT_HOLDINGS`，金额/收益率均为 null，并列出 600519.SH、161725.OF。四宫格与“未实现盈亏”列可见，已实现显示真实 ¥0.00，累计保持不可用。
+  - 真实 Trade 查询确认证券验收账户为 ACTIVE、closedQuantity=0、remainingQuantity=3、净实现为 0，projectionGeneration=16。未新增或改写旧交易事实。部分/全部/多次卖出的目标样本和外部 FX 仍不足，G1 保持开放。
 
 ## 最终一致性 Review
 

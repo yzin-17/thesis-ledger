@@ -59,6 +59,15 @@ export const dailyBarSessionWindow = (
   };
 };
 
+export const dailyBarSessionIntervals = (date: string, calendar: TradingCalendar) => {
+  const probe = utcForLocalMinute(date, 720, calendar.timezone);
+  if (!calendar.isTradingDay(probe)) return [];
+  return calendar.sessionsForDate(probe).map((session) => ({
+    openedAt: utcForLocalMinute(date, session.start, calendar.timezone).getTime(),
+    closedAt: utcForLocalMinute(date, session.end, calendar.timezone).getTime(),
+  }));
+};
+
 export const dailyBarSessionTimes = (
   row: Readonly<Record<string, unknown>>,
   calendar: TradingCalendar,

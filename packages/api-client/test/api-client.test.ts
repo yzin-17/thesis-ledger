@@ -111,7 +111,7 @@ describe('ThesisLedgerApiClient', () => {
     await expect(client.portfolio.getValuation()).rejects.toBeInstanceOf(ThesisLedgerContractError);
   });
 
-  it('typed journal endpoint validates and serializes review candidate queries', async () => {
+  it('正式复盘入口拒绝旧 number 候选响应并序列化显式范围', async () => {
     const candidate = {
       id: `review:${accountId}:600519.SH:buy-1:sell-1`,
       accountId,
@@ -184,15 +184,15 @@ describe('ThesisLedgerApiClient', () => {
     const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
 
     await expect(
-      client.journal.getReviewCandidates({
+      client.journalReviews.candidates({
         accountId,
         start: '2026-08-01T00:00:00.000Z',
         end: '2026-08-31T00:00:00.000Z',
         limit: 10,
       }),
-    ).resolves.toMatchObject({ total: 1, items: [{ symbol: '600519.SH' }] });
+    ).rejects.toBeInstanceOf(ThesisLedgerContractError);
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(
-      '/journal/review-candidates?accountId=00000000-0000-4000-8000-000000000001&start=2026-08-01T00%3A00%3A00.000Z&end=2026-08-31T00%3A00%3A00.000Z&limit=10',
+      '/journal/review-candidates?accountId=00000000-0000-4000-8000-000000000001&mode=actual&start=2026-08-01T00%3A00%3A00.000Z&end=2026-08-31T00%3A00%3A00.000Z&limit=10',
     );
   });
 
@@ -423,8 +423,21 @@ describe('ThesisLedgerApiClient', () => {
     );
     expect(fetcher.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ signal }));
 
+    const adjusted = { ...barSeries, identity: { ...barSeries.identity, adjustment: 'hfq' } };
+    fetcher.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...detail,
+          barSeries: adjusted,
+          sections: { ...detail.sections, bars: { ...detail.sections.bars, data: adjusted } },
+        }),
+        { status: 200 },
+      ),
+    );
     await client.market.getDetail('600519.SH', { chartContractVersion: 3, adjustment: 'hfq' });
-    expect(String(fetcher.mock.calls.at(-1)?.[0])).toContain('chartContractVersion=3&adjustment=hfq');
+    expect(String(fetcher.mock.calls.at(-1)?.[0])).toContain(
+      'chartContractVersion=3&adjustment=hfq',
+    );
 
     await client.market.getDetail('600519.SH', { include: ['quote', 'bars'], barsLimit: 30 });
     expect(String(fetcher.mock.calls.at(-1)?.[0])).toContain(

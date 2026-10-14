@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  backtestLifecyclePreparationV3Schema,
+  lifecycleRunIssuesV3,
+} from './backtest-lifecycle-preparation-v3.js';
 import { nonNegativeDecimalStringSchema } from './monetary-values.js';
 import { backtestCurrencySchema, currencyForMarket } from './backtest-values.js';
 import { type BacktestStrategy } from './backtest-strategy.js';
@@ -14,6 +18,8 @@ import { executionPriceProtocolSchema } from './market-price-protocol.js';
 import { backtestPriceInputBindingsSchemaV3 } from './backtest-price-input-bindings.js';
 import { marketFrozenWindowRefV3Schema } from './market-frozen-window.js';
 import { backtestSnapshotManifestV3Schema } from './backtest-data.js';
+import { backtestKnownCashPreparationV3Schema } from './backtest-known-cash-preparation-v3.js';
+import { knownCashRunBindingIssuesV3 } from './backtest-known-cash-binding-v3.js';
 const issue = (ctx: z.RefinementCtx, path: (string | number)[], message: string) =>
   ctx.addIssue({ code: 'custom', path, message });
 const decimalIsNonNegative = (value: string) => !value.startsWith('-');
@@ -83,10 +89,40 @@ export const runConfigSchemaV3 = z
     executionPriceProtocol: executionPriceProtocolSchema,
     priceInputBindings: backtestPriceInputBindingsSchemaV3.optional(),
     frozenExecutionWindow: marketFrozenWindowRefV3Schema.optional(),
+    lifecyclePreparation: backtestLifecyclePreparationV3Schema.optional(),
+    knownCashPreparation: backtestKnownCashPreparationV3Schema.optional(),
     frozenWarmupBudgetSessions: z.number().int().min(0).max(504).optional(),
+    frozenPriceWarmupPolicy: z.literal('cash-reference-calendar-buffer-v1').optional(),
   })
   .superRefine((value, context) => {
     validateRunConfig(value, context);
+    for (const message of knownCashRunBindingIssuesV3(value))
+      issue(context, ['knownCashPreparation'], message);
+    if (value.frozenPriceWarmupPolicy && !value.knownCashPreparation)
+      issue(context, ['frozenPriceWarmupPolicy'], '现金参考缓冲版本必须绑定已知现金准备包');
+    for (const message of lifecycleRunIssuesV3(value))
+      issue(context, ['lifecyclePreparation'], message);
+    if (
+      value.executionPriceProtocol.marketRuleResearch &&
+      value.executionModel?.scope.instrumentType !== 'STOCK'
+    ) {
+      issue(
+        context,
+        ['executionPriceProtocol', 'marketRuleResearch'],
+        '规则研究只支持具有显式模型的股票',
+      );
+    }
+    if (
+      value.executionPriceProtocol.cashEventResearch &&
+      (value.executionModel?.scope.market !== 'CN' ||
+        value.executionModel.scope.instrumentType !== 'ETF')
+    ) {
+      issue(
+        context,
+        ['executionPriceProtocol', 'cashEventResearch'],
+        '现金分红研究只支持具有显式模型的境内ETF',
+      );
+    }
     if (value.frozenWarmupBudgetSessions !== undefined && !value.frozenExecutionWindow) {
       issue(context, ['frozenWarmupBudgetSessions'], '预热预算必须与冻结行情窗口一起保存');
     }

@@ -423,6 +423,47 @@ export class TradeQueryService {
     };
   }
 
+  async readAccountProjection(
+    input: {
+      accountId: string;
+      mode: 'actual' | 'shadow';
+      symbol?: string;
+    },
+    transaction?: Prisma.TransactionClient,
+  ): Promise<{
+    version: { ledgerRevision: string; projectionGeneration: string };
+    details: TradeDetailResponse[];
+  }> {
+    const client = transaction ?? this.prisma;
+    const stateRequest = client.accountLedgerState.findUnique({
+      where: { accountId: input.accountId },
+      select: { ledgerRevision: true, projectionGeneration: true },
+    });
+    const tradesRequest = client.trade.findMany({
+      where: {
+        accountId: input.accountId,
+        accountMode: input.mode,
+        account: { mode: input.mode },
+        ...(input.symbol === undefined ? {} : { symbol: input.symbol }),
+      },
+      include: tradeDetailInclude,
+    });
+    // 调用方提供事务时，须使用 RepeatableRead 或 Serializable 保持一致读取。
+    const [state, trades] =
+      transaction === undefined
+        ? await this.prisma.$transaction([stateRequest, tradesRequest], {
+            isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+          })
+        : await Promise.all([stateRequest, tradesRequest]);
+    return {
+      version: {
+        ledgerRevision: state?.ledgerRevision.toString() ?? '0',
+        projectionGeneration: state?.projectionGeneration.toString() ?? '0',
+      },
+      details: trades.sort(compareTrades).map(mapDetail),
+    };
+  }
+
   async closeSlice(
     accountId: string,
     tradeId: string,

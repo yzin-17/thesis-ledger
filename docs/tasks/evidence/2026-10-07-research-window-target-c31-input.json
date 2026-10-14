@@ -1,0 +1,366 @@
+{
+  "policy": {
+    "revision": 40,
+    "dsaRevision": 40,
+    "syncState": "applied",
+    "routes": [
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "hithink",
+            "upstreamSource": "fund-market-historical"
+          },
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "MUTUAL_FUND",
+          "capability": "FUND_NAV_HISTORY"
+        },
+        "targets": [
+          {
+            "providerId": "efinance",
+            "upstreamSource": "eastmoney"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "hfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "none"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "REALTIME_QUOTE"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_PUBLIC_FEES"
+        },
+        "targets": [
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees"
+          },
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees-archive"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_TRADING_STATUS"
+        },
+        "targets": [
+          {
+            "providerId": "official-states",
+            "upstreamSource": "cn-stock-daily-suspension"
+          }
+        ]
+      }
+    ]
+  },
+  "schemaVersion": "20261006030000_strategy_authoring_save",
+  "identities": [
+    {
+      "service": "thesis-ledger",
+      "path": "/app/apps/server/dist/src/backtest/backtest-listing-disclosure-v3.js",
+      "sha256": "f0b1cd9f9f6be11572fecca428d84911a7670cba3f8b704bb410cde7aabd4d58"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/apps/server/dist/src/backtest/backtest-v3-runner.js",
+      "sha256": "f2e8989b3fe8fe01c11dd6177c5e3900eebc2fb3e2f6ccc8cc0984fd62cece4b"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/apps/server/dist/src/backtest/backtest-snapshot-v3-builder.js",
+      "sha256": "9dbda8b296aa0fa2760fb3933f1c8d702afaacd37dc5e1536e0282530ba2e766"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/apps/server/dist/src/backtest/backtest-snapshot-v3-calendar-alignment.js",
+      "sha256": "f32a8f7390335adc1b6f75afe35824e8251deeff779412e6cc310482b244f406"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/apps/server/dist/src/backtest/backtest-v3-benchmark-cost.js",
+      "sha256": "39fc26ac72765aacd517e0eb353aa6b67184d4e9a002ce6e172a5b28b30c63b5"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/apps/server/dist/src/market/market-window-selector-v3.js",
+      "sha256": "e6a44999f0f957087ba6cafeb8caccd91e6be4d4375f797b6f1d6ce11d77e73c"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/backtest-daily-tradability.js",
+      "sha256": "eb7bb844985be9af8fd95400d56e70a1ba72ccce4b3eab8fce9ddde04fea38a7"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/market-data-wire-v3.js",
+      "sha256": "60b18ba1a99c32af7161db21d91d8f7a453acf296a26584a90003f5f26bcdf95"
+    },
+    {
+      "service": "thesis-ledger",
+      "path": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/market-coverage-proof-v3.js",
+      "sha256": "cef63eb1b9f21663495e850a563b19e79e2a77a81e2d49da0f47cda0e766597f"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/apps/server/dist/src/backtest/backtest-listing-disclosure-v3.js",
+      "sha256": "f0b1cd9f9f6be11572fecca428d84911a7670cba3f8b704bb410cde7aabd4d58"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/apps/server/dist/src/backtest/backtest-v3-runner.js",
+      "sha256": "f2e8989b3fe8fe01c11dd6177c5e3900eebc2fb3e2f6ccc8cc0984fd62cece4b"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/apps/server/dist/src/backtest/backtest-snapshot-v3-builder.js",
+      "sha256": "9dbda8b296aa0fa2760fb3933f1c8d702afaacd37dc5e1536e0282530ba2e766"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/apps/server/dist/src/backtest/backtest-snapshot-v3-calendar-alignment.js",
+      "sha256": "f32a8f7390335adc1b6f75afe35824e8251deeff779412e6cc310482b244f406"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/apps/server/dist/src/backtest/backtest-v3-benchmark-cost.js",
+      "sha256": "39fc26ac72765aacd517e0eb353aa6b67184d4e9a002ce6e172a5b28b30c63b5"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/apps/server/dist/src/market/market-window-selector-v3.js",
+      "sha256": "e6a44999f0f957087ba6cafeb8caccd91e6be4d4375f797b6f1d6ce11d77e73c"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/backtest-daily-tradability.js",
+      "sha256": "eb7bb844985be9af8fd95400d56e70a1ba72ccce4b3eab8fce9ddde04fea38a7"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/market-data-wire-v3.js",
+      "sha256": "60b18ba1a99c32af7161db21d91d8f7a453acf296a26584a90003f5f26bcdf95"
+    },
+    {
+      "service": "backtest-worker",
+      "path": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/market-coverage-proof-v3.js",
+      "sha256": "cef63eb1b9f21663495e850a563b19e79e2a77a81e2d49da0f47cda0e766597f"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/api/thesis_ledger.py",
+      "sha256": "430d5b5101fb5f0d09672094bc140dde1a8965802a1b1cee8a68afd394899340"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/src/services/thesis_ledger_listing_information.py",
+      "sha256": "c75edf56fb0f8720177ce25c20f5a555b562b81c6059bae5e70baefbbbfb56be"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/src/services/thesis_ledger_market_v3_facts.py",
+      "sha256": "435d97c3a06cd19204d68f074775affc009c21e3b826ef8424b7e2f9f2af30bd"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/src/services/thesis_ledger_research_calendar.py",
+      "sha256": "ccfc768d107acc77df22e3663f4f745a4413a7857e90fba10f5d14f8c8ae9b7b"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/src/services/thesis_ledger_market_tradability_input.py",
+      "sha256": "0e77327dc46db13590a212e90f06ad4c07f320bafef9cd86155da6d0b87d4342"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/src/services/thesis_ledger_daily_tradability.py",
+      "sha256": "5a4482ee7ef661ed8db9190a15afad0fa938c9992d7213b7b521d48b66547b0c"
+    },
+    {
+      "service": "dsa",
+      "path": "/app/src/services/thesis_ledger_market_daily_tradability.py",
+      "sha256": "1a32d620ab6965e4e9d88e2051affc7fa46d876edb481984ef9a0a2ceba4e75f"
+    }
+  ],
+  "samples": [
+    {
+      "symbol": "600000.SH",
+      "count": 50,
+      "coverage": {
+        "requestedStart": "2023-07-08",
+        "requestedEnd": "2023-09-15",
+        "actualStart": "2023-07-10T00:00:00+00:00",
+        "actualEnd": "2023-09-15T00:00:00+00:00",
+        "hasMoreBefore": false,
+        "latestCompleteTradingDate": "2023-09-15"
+      },
+      "listing": {
+        "symbol": "600000.SH",
+        "firstTradingDate": "1999-11-10",
+        "source": "https://news.spdb.com.cn/about_spd/xwdt_1632/202302/t20230201_1115740.shtml",
+        "revision": "spdb-listing-t20230201_1115740",
+        "knownAt": "2023-02-01T00:00:00+08:00"
+      },
+      "provenance": {
+        "providerId": "tencent",
+        "upstreamSource": "tencent",
+        "routeIndex": 0,
+        "effectivePolicyRevision": 40
+      },
+      "inputFingerprint": "76a353d5d4f8b32f840c308a8b46eb049f415ebe59afdc1228ba1f1a1de63dc6",
+      "consumerParses": 2
+    },
+    {
+      "symbol": "600519.SH",
+      "count": 50,
+      "coverage": {
+        "requestedStart": "2023-07-08",
+        "requestedEnd": "2023-09-15",
+        "actualStart": "2023-07-10T00:00:00+00:00",
+        "actualEnd": "2023-09-15T00:00:00+00:00",
+        "hasMoreBefore": false,
+        "latestCompleteTradingDate": "2023-09-15"
+      },
+      "listing": {
+        "symbol": "600519.SH",
+        "status": "unknown"
+      },
+      "provenance": {
+        "providerId": "tencent",
+        "upstreamSource": "tencent",
+        "routeIndex": 0,
+        "effectivePolicyRevision": 40
+      },
+      "inputFingerprint": "c2071a9a56925692189dc35fbf5d16b17c47af692545b4a1194b77dc514df77b",
+      "consumerParses": 2
+    }
+  ],
+  "jobs": {
+    "873ba8dd-40c3-4f9e-b1d5-b16192f697b0": {
+      "status": "succeeded",
+      "snapshotId": "0046b0759593d8a66a2a1cb9f78979a3540942801f28e359c46484005a0a39a5",
+      "resultChecksum": "a07303d0e7c0f3ce",
+      "completeness": "complete"
+    },
+    "652ba051-a4c5-493d-81e6-2cdbe3c090f0": {
+      "status": "succeeded",
+      "snapshotId": "dbcb682568ebac75acfd5a23c9e968ba0808b097118a45f50453e78c425c558d",
+      "resultChecksum": "8c66f3f721f5e4d8",
+      "completeness": "partial"
+    }
+  },
+  "images": {
+    "thesis-ledger": {
+      "id": "c9211abe2a0d8f4cb8d96acdd506580b14de1e5e9dcfcb1cc0831f5c5f14efe9",
+      "image": "sha256:95d8e518ffee019a8a29a13979b4fd9736f914153c4b78c636d6e0866c87a0b0",
+      "health": "healthy",
+      "command": [
+        "node",
+        "apps/server/dist/src/main.js"
+      ]
+    },
+    "backtest-worker": {
+      "id": "be45b6c51387760346c32c5af339953934f276ef408520f9a04a45503134cb6a",
+      "image": "sha256:95d8e518ffee019a8a29a13979b4fd9736f914153c4b78c636d6e0866c87a0b0",
+      "health": "healthy",
+      "command": [
+        "node",
+        "apps/server/dist/src/backtest/backtest-worker.main.js"
+      ]
+    },
+    "dsa": {
+      "id": "77f0e256b8a74b2042dc50924502604ddf16c5d5d82da546c279b705aa179b51",
+      "image": "sha256:08bfe1b5a0d59d6b27c54e961a5850f603885b4686d459818897c68d3bcd250e",
+      "health": "healthy",
+      "command": [
+        "python",
+        "main.py",
+        "--serve-only",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ]
+    }
+  }
+}

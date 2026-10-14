@@ -18,6 +18,8 @@ import type {
   BacktestRuleCompatibilityFacts,
 } from './backtest-dependency-plan.js';
 
+import { shareWindowWarmupPolicyV3 } from './backtest-share-window-warmup-policy-v3.js';
+
 const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
 const timeframeRank: Record<Timeframe, number> = {
   '1m': 1,
@@ -27,8 +29,6 @@ const timeframeRank: Record<Timeframe, number> = {
   '60m': 60,
   '1d': 1440,
 };
-const warmupRangePolicyVersion = 'calendar-aware-conservative-v1';
-const warmupCalendarBufferDays = 14;
 
 const instrumentKey = (instrument: AssetSymbolRef) =>
   `${instrument.market}:${instrument.symbol}:${instrument.assetType}`;
@@ -207,9 +207,19 @@ export const planBacktestPriceInputs = (
   strategy: BacktestStrategy,
   runConfig: Pick<
     RunConfigV3,
-    'startDate' | 'endDate' | 'baseCurrency' | 'frozenWarmupBudgetSessions'
-  >,
-  options: { minimumWarmupSessions?: number } = {},
+    | 'startDate'
+    | 'endDate'
+    | 'baseCurrency'
+    | 'frozenWarmupBudgetSessions'
+    | 'frozenPriceWarmupPolicy'
+  > &
+    Partial<Pick<RunConfigV3, 'executionPriceProtocol'>>,
+  options: {
+    minimumWarmupSessions?: number;
+    cashEventResearch?: RunConfigV3['executionPriceProtocol']['cashEventResearch'];
+    marketRuleResearch?: RunConfigV3['executionPriceProtocol']['marketRuleResearch'];
+    priceWarmupPolicy?: RunConfigV3['frozenPriceWarmupPolicy'];
+  } = {},
 ) => {
   const signalSources = collectUsedSignalSources(strategy);
   const benchmark = strategy.benchmark ?? strategy.executionInstrument;
@@ -225,9 +235,16 @@ export const planBacktestPriceInputs = (
     exit: withoutEventPredicates(strategy.exit),
   } as Parameters<typeof strategyRequiredLookback>[0]);
   const requiredSessions = Math.max(lookback.required, options.minimumWarmupSessions ?? 0);
+  const warmupPolicy = shareWindowWarmupPolicyV3(
+    strategy,
+    options.marketRuleResearch ?? runConfig.executionPriceProtocol?.marketRuleResearch,
+  );
+  const priceWarmupPolicy = options.priceWarmupPolicy ?? runConfig.frozenPriceWarmupPolicy;
+  let calendarBufferDays = options.cashEventResearch ? 0 : warmupPolicy.calendarBufferDays;
+  if (priceWarmupPolicy === 'cash-reference-calendar-buffer-v1') calendarBufferDays = 7;
   const warmupStartDate = subtractUtcDays(
     runConfig.startDate,
-    requiredSessions * 2 + warmupCalendarBufferDays,
+    requiredSessions * 2 + calendarBufferDays,
   );
   const blockingIssues: BacktestDependencyPlanIssue[] = [];
   if (
@@ -366,8 +383,8 @@ export const planBacktestPriceInputs = (
       lookbackPeriods: requiredSessions,
       lookbackTimeframe,
       startDate: warmupStart,
-      rangePolicyVersion: warmupRangePolicyVersion,
-      calendarBufferDays: warmupCalendarBufferDays,
+      rangePolicyVersion: priceWarmupPolicy ?? warmupPolicy.rangePolicyVersion,
+      calendarBufferDays,
       requiresVerifiedSessionCalendar: true,
     },
     blockingIssues,
@@ -380,7 +397,11 @@ export const derivePriceDependencyPlan = (
   runConfig: RunConfigV3,
   ruleFacts: BacktestRuleCompatibilityFacts | undefined,
 ) => {
-  const plan = planBacktestPriceInputs(strategy, runConfig);
+  const plan = planBacktestPriceInputs(strategy, runConfig, {
+    ...(runConfig.executionPriceProtocol.cashEventResearch
+      ? { cashEventResearch: runConfig.executionPriceProtocol.cashEventResearch }
+      : {}),
+  });
   const rulePlan = planRuleCompatibility(
     strategy,
     runConfig,

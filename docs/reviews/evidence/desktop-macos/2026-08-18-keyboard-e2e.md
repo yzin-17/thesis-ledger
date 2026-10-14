@@ -16,7 +16,7 @@
 4. D5：在截图草稿候选行中用键盘修改代码为 `000001.SZ`、数量为 `10`、成本价为 `100`，提交后页面显示“导入已提交，组合已重新估值”；提交结果见 [import-keyboard-submit.jpeg](import-keyboard-submit.jpeg)。
 5. D6：Tab 到风险阈值，输入 `120`，跳过默认严重级别，输入证券代码 `000001.SZ`，Tab 到“创建规则”并用 Space 提交；页面显示“规则已创建并记录审计”。
 6. D7：Tab 到研究问题，追加“键盘验收”，Tab 到“创建研究任务”并用 Space 提交；页面显示研究任务 ID 和“已记录研究问题”。
-7. D8/D9：进入“数据与自动化”页，确认 Provider 凭证只显示“已配置/未配置”、自动化任务和健康历史可见；切换 fixture 的 error/stale/ready 后用“刷新 Provider 与自动化”观察失败/陈旧提示再恢复正常，最新 release 回归确认恢复成功后清除错误提示，截图见 [provider-onboarding-configured.jpeg](provider-onboarding-configured.jpeg)、[provider-automation-release.jpeg](provider-automation-release.jpeg)、[provider-automation-stale.jpeg](provider-automation-stale.jpeg)。
+7. D8/D9：进入“数据与自动化”页，确认 Provider 凭证只显示“已配置/未配置”、自动化任务和健康历史可见；切换 fixture 的 error/stale/ready 后用“刷新 Provider 与自动化”观察失败/陈旧提示再恢复正常，最新 release 回归确认恢复成功后清除错误提示，截图见 [provider-onboarding-configured.jpeg](provider-onboarding-configured.jpeg)、[provider-automation-release.jpeg](provider-automation-release.jpeg)、provider-automation-stale.jpeg（历史定位 `provider-automation-stale.jpeg`，2026-10-03 文件未保留）。
 8. D10：本报告汇总 D2、D4、D6、D7 的键盘-only 验收；所有输入、选择器、提交和重试控件均通过 Tab/Shift+Tab/Space/Return 到达，焦点轮廓保持可见。
 
 以上路径使用真实 release 包的实际按钮、表单和页面状态，不依赖开发服务 DOM 查询。`release-800px-compose-focus.jpeg` 与 `release-520px-compose.jpeg` 继续作为窗口尺寸和 focus-visible 证据。

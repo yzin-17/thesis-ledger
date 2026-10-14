@@ -52,6 +52,7 @@ export function parseProviderMutation(
   raw: unknown,
   providerId: string,
   requestId: string,
+  expectedPurpose?: 'account_access' | 'capability_read',
 ) {
   let result: z.infer<typeof config> | z.infer<typeof probe> | z.infer<typeof removal>;
   if (kind === 'config') result = parse(config, raw);
@@ -64,6 +65,8 @@ export function parseProviderMutation(
   ) {
     throw new DsaV3ProtocolError('DSA Provider 响应身份不匹配', 'invalid-response');
   }
+  if (kind === 'test' && (('purpose' in result ? result.purpose : undefined) ?? 'capability_read') !== (expectedPurpose ?? 'capability_read'))
+    throw new DsaV3ProtocolError('DSA Provider 检查用途不匹配', 'invalid-response');
   return result;
 }
 

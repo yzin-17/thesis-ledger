@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  MarketDetailResponse,
+  MarketDisplayDetailResponse as MarketDetailResponse,
 } from '@thesis-ledger/api-client';
 import type { Quote } from '@thesis-ledger/schemas';
 import { MarketDetailDialogContent } from './MarketDetailDialogContent.js';
 import { MarketChartAdjustment } from './MarketChartAdjustment.js';
+import { MarketPeriodSelection, useMarketPeriodNotice, type ChartPeriod } from './MarketPeriodSelection.js';
+import { clearIndicatorSections } from './market-detail-generation.js';
+export { commitIfCurrentGeneration } from './market-detail-generation.js';
 import { useMarketChartSelection } from './useMarketChartSelection.js';
 import {
   MarketDetailNotice,
@@ -34,42 +37,34 @@ export { responseMatchesIndicatorParams } from './useMarketChartLatestRefresh.js
 
 const indicatorParamsKey = (params: MarketIndicatorParams) => JSON.stringify(params);
 
-const clearIndicatorSections = (response: MarketDetailResponse | null) => {
-  if (!response) return response;
-  const sections = { ...response.sections };
-  delete sections['indicator:MA'];
-  delete sections['indicator:MACD'];
-  delete sections['indicator:RSI'];
-  return { ...response, sections };
-};
+type DetailDialogProps = { position: MarketDetailPosition; onClose: () => void; adjustment?: 'none' | 'qfq' | 'hfq' };
+export function MarketDetailDialog(props: DetailDialogProps) {
+  const { adjustment, select } = useMarketChartSelection(props.position.symbol, props.adjustment);
+  return <MarketPeriodSelection symbol={props.position.symbol} {...(adjustment ? { adjustment } : {})}
+    enabled={props.position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ)$/.test(props.position.symbol)}>
+    {(timeframe) => <MarketDetailDialogView position={props.position} onClose={props.onClose}
+      {...(adjustment ? { adjustment } : {})} select={select} timeframe={timeframe} key={`${props.position.symbol}:${timeframe}`} />}
+  </MarketPeriodSelection>;
+}
 
-/** Resolve delayed work before committing it to the current request generation. */
-export const commitIfCurrentGeneration = async <T,>(
-  generation: number,
-  currentGeneration: () => number,
-  request: () => Promise<T>,
-  commit: (value: T) => void,
-) => {
-  const value = await request();
-  if (generation !== currentGeneration()) return false;
-  commit(value);
-  return true;
-};
-
-export function MarketDetailDialog({
+function MarketDetailDialogView({
   position,
   onClose,
-  adjustment: initialAdjustment,
+  adjustment,
+  select,
+  timeframe,
 }: {
   position: MarketDetailPosition;
   onClose: () => void;
   adjustment?: 'none' | 'qfq' | 'hfq';
+  select: (adjustment: 'none' | 'qfq' | 'hfq') => void;
+  timeframe: ChartPeriod;
 }) {
-  const { adjustment, select } = useMarketChartSelection(position.symbol, initialAdjustment);
+  const periodNotice = useMarketPeriodNotice();
   const queryClient = useQueryClient();
   const [refreshSequence, setRefreshSequence] = useState(0);
-  const [chartBarsLimit, setChartBarsLimit] = useState(90);
-  const chartWindowV3 = { barsLimit: chartBarsLimit };
+  const [chartBarsLimit, setChartBarsLimit] = useState(timeframe === '1y' ? 2 : 90);
+  const chartWindowV3 = { barsLimit: chartBarsLimit, timeframe };
   const [detail, setDetail] = useState<MarketDetailResponse | null>(null);
   const [indicatorParams, setIndicatorParams] = useState<MarketIndicatorParams>({
     fast: 12,
@@ -133,9 +128,9 @@ export function MarketDetailDialog({
   }, [position.symbol, adjustment]);
 
   useEffect(() => {
-    setChartBarsLimit(90);
+    setChartBarsLimit(timeframe === '1y' ? 2 : 90);
     setIndicatorParams({ fast: 12, slow: 26, signal: 9, short: 6, mid: 12, long: 24 });
-  }, [position.symbol]);
+  }, [position.symbol, timeframe]);
 
   useEffect(() => {
     if (
@@ -320,7 +315,7 @@ export function MarketDetailDialog({
           plan={{ barsLimit: chartBarsLimit, indicatorParams }} refreshSequence={refreshSequence} /> : undefined}
       position={position}
       unit={unit}
-      queryNotice={queryNotice()}
+      queryNotice={<>{periodNotice}{queryNotice()}</>}
       loading={loading}
       stale={stale}
       staleNotice={staleNotice}

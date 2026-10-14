@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "2",
+  "name": "均线示例",
+  "signalSources": [
+    {
+      "id": "primary",
+      "asset": { "symbol": "510300.SH", "market": "CN", "assetType": "etf" },
+      "timeframe": "1d",
+      "series": ["open", "high", "low", "close", "volume"]
+    }
+  ],
+  "executionInstrument": { "symbol": "510300.SH", "market": "CN", "assetType": "etf" },
+  "primaryTimeframe": "1d",
+  "entry": {
+    "type": "cross",
+    "direction": "above",
+    "left": { "type": "series", "sourceId": "primary", "field": "close" },
+    "right": {
+      "type": "indicator",
+      "name": "MA",
+      "input": { "type": "series", "sourceId": "primary", "field": "close" },
+      "params": { "period": 20 }
+    }
+  },
+  "exit": {
+    "type": "cross",
+    "direction": "below",
+    "left": { "type": "series", "sourceId": "primary", "field": "close" },
+    "right": {
+      "type": "indicator",
+      "name": "MA",
+      "input": { "type": "series", "sourceId": "primary", "field": "close" },
+      "params": { "period": 20 }
+    }
+  },
+  "sizing": { "type": "percentOfEquity", "percent": "0.5" },
+  "risk": [{ "type": "fixedStop", "percent": "0.05" }],
+  "execution": {
+    "mode": "exchange",
+    "orderType": "market",
+    "timeInForce": "DAY",
+    "timing": "nextEligibleBarOpen"
+  },
+  "cost": { "commissionRate": "0.0003", "slippageRate": "0.001" }
+}

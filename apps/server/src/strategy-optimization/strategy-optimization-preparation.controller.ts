@@ -32,6 +32,9 @@ export class StrategyOptimizationPreparationController {
         status: 'blocked',
         diagnostics: result.diagnostics,
       });
+    if (result.status === 'preparing') return optimizationRunPreparationResultSchema.parse({
+      ...base, status: 'preparing', announcementPreparation: result.announcementPreparation,
+    });
     const strategyContentHash =
       'strategyContentHash' in result
         ? result.strategyContentHash
@@ -43,6 +46,7 @@ export class StrategyOptimizationPreparationController {
       status: 'prepared',
       runConfig: result.runConfig,
       actualSource: result.actualSource,
+      ...('announcementPreparation' in result ? { announcementPreparation: result.announcementPreparation } : {}),
       strategyContentHash,
       routeRevisions: revisions && {
         desiredRevision: revisions.desiredRevision,

@@ -146,12 +146,18 @@ describe('market-policy-catalog', () => {
     expect(dsa.applyControlPolicyV3).not.toHaveBeenCalled();
   });
 
-  it('新增的精确 target 非 ready 时按目录 reason 拒绝，且不调用 Apply', async () => {
+  it('新增缺凭证目标可保存，Effective 独立保留不可执行原因', async () => {
     const store = policyStore();
     store.current.effectiveProjection = null;
     const dsa = {
       marketRouteCatalogV3: vi.fn(async () => catalog('credential_missing')),
-      applyControlPolicyV3: vi.fn(),
+      applyControlPolicyV3: vi.fn(async (desired: DesiredProviderPolicyV3) => {
+        const response = applyResponse(desired);
+        return { ...response, effective: { ...response.effective, routes: [{ key,
+          reason: 'credential_missing', targets: [{ ...target, routeIndex: 0,
+            eligible: false, reason: 'credential_missing' }],
+        }] } };
+      }),
     };
 
     const result = marketPolicyCatalogResponse(
@@ -164,13 +170,10 @@ describe('market-policy-catalog', () => {
     );
 
     expect(result).toMatchObject({
-      syncState: 'rejected',
-      lastError: {
-        code: 'route_not_ready',
-        issues: [{ path: ['routes', 0, 'targets', 0], reason: 'credential_missing' }],
-      },
+      syncState: 'applied',
+      effectiveProjection: { routes: [{ targets: [{ eligible: false, reason: 'credential_missing' }] }] },
     });
-    expect(dsa.applyControlPolicyV3).not.toHaveBeenCalled();
+    expect(dsa.applyControlPolicyV3).toHaveBeenCalledWith(policy);
   });
 
   it('保留旧不可用路由并新增就绪路由，按 DSA 实际状态保存 Effective', async () => {

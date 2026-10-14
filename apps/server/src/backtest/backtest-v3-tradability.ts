@@ -7,12 +7,11 @@ import {
 import type { ArtifactRow } from './backtest-artifact-store.js';
 
 /** Runner 从冻结标的状态建立可执行日期分区；缺日不插入 Bar。 */
-export const skippedBacktestTradingDatesV3 = (
+const frozenTradabilityWindows = (
   strategy: BacktestStrategy,
-  config: RunConfigV3,
   rows: ReadonlyMap<string, readonly ArtifactRow[]>,
   runId: string,
-): string[] => {
+) => {
   const instrument = strategy.executionInstrument;
   const facts =
     rows.get(`${runId}/instrumentFacts/${instrument.market}-${instrument.symbol}.parquet`) ?? [];
@@ -21,9 +20,41 @@ export const skippedBacktestTradingDatesV3 = (
   if (encoded === undefined) return [];
   if (typeof encoded !== 'string') throw new Error('Runner 缺少冻结日级状态');
   const decoded: unknown = JSON.parse(encoded);
-  const windows = (Array.isArray(decoded) ? decoded : [decoded]).map((value) =>
+  return (Array.isArray(decoded) ? decoded : [decoded]).map((value) =>
     backtestDailyTradabilityEvidenceV3Schema.parse(value),
   );
+};
+
+export const zeroVolumeObservationWarningsV3 = (
+  strategy: BacktestStrategy,
+  config: RunConfigV3,
+  rows: ReadonlyMap<string, readonly ArtifactRow[]>,
+  runId: string,
+): string[] => {
+  const dates = frozenTradabilityWindows(strategy, rows, runId)
+    .flatMap((window) => window.days)
+    .filter(
+      (day) =>
+        day.excludedZeroVolumeObservation &&
+        day.date >= config.startDate &&
+        day.date <= config.endDate,
+    )
+    .map((day) => day.date);
+  return dates.length
+    ? [
+        `来源零成交量占位观察已保留原价字段与摘要；${dates.join('、')}不进入成交、信号或估值，真实全天交易状态仍未知。`,
+      ]
+    : [];
+};
+
+export const skippedBacktestTradingDatesV3 = (
+  strategy: BacktestStrategy,
+  config: RunConfigV3,
+  rows: ReadonlyMap<string, readonly ArtifactRow[]>,
+  runId: string,
+): string[] => {
+  const windows = frozenTradabilityWindows(strategy, rows, runId);
+  if (!windows.length) return [];
   const bars = rows.get(`${runId}/execution/bars.parquet`) ?? [];
   return assertBacktestTradabilityBars({
     days: windows.flatMap((window) => window.days),

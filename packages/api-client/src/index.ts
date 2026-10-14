@@ -1,7 +1,9 @@
+import { marketDisplayClient } from './market-display-client.js';
 import { backtestRunClient } from './backtest-run-client.js';
 import { marketControlClient } from './market-control-client.js';
 import { backtestRunConfigClient } from './backtest-run-config-client.js';
 import { backtestNavRunClient } from './backtest-nav-run-client.js';
+import { journalReviewClient } from './journal-review-client.js';
 import {
   apiErrorResponseSchema,
   accountsResponseSchema,
@@ -9,13 +11,10 @@ import {
   instrumentSearchResponseSchema,
   importDraftCommandResponseSchema,
   importDraftRevisionResponseSchema,
-  journalReviewCandidatesResponseSchema,
-  journalReviewSnapshotResponseSchema,
   ledgerCommandResponseSchema,
   ledgerAuditResponseSchema,
   ledgerEventsResponseSchema,
   ledgerReplayResponseSchema,
-  marketDetailResponseSchema,
   marketChartOptionsV3Schema,
   marketChartOptionsWindowV3Schema,
   type MarketChartOptionsWindowV3,
@@ -57,12 +56,6 @@ import {
   type VoidExecutionCommand,
   type VoidCashFlowCommand,
   type VoidCashTransferCommand,
-  type MarketDetailRequest,
-  type MarketDetailResponse,
-  type JournalReviewCandidatesQuery,
-  type JournalReviewCandidatesResponse,
-  type JournalReviewSnapshotInput,
-  type JournalReviewSnapshotResponse,
   type BaselineReconciliationCandidatesResponse,
   type ConfirmBaselineReconciliationCommand,
   type RestoreBaselineReconciliationCommand,
@@ -93,6 +86,16 @@ import {
 } from '@thesis-ledger/schemas';
 
 export type {
+  JournalReviewCandidateContract,
+  JournalReviewListContract,
+  JournalReviewAnalysisResponse,
+  JournalReviewSnapshotRequest,
+  JournalDeterministicReview,
+  JournalSnapshotHistoryQuery,
+  JournalSnapshotHistoryResponse,
+  JournalStoredSnapshotView,
+  JournalPeriodReviewRequest,
+  JournalPeriodReviewResponse,
   ApiErrorResponse,
   InstrumentSearchResult,
   PerformanceSummaryResponse,
@@ -101,6 +104,9 @@ export type {
   MarketDetailCapability,
   MarketDetailRequest,
   MarketDetailResponse,
+  MarketDisplayDetailResponse,
+  MarketDisplayDetailSection,
+  MarketPeriodOptions,
   MarketDetailSection,
   MarketDetailSectionStatus,
   JournalReviewCandidate,
@@ -201,9 +207,7 @@ export type {
   JournalLegacyReviewCandidate,
 } from '@thesis-ledger/schemas';
 
-export type MarketDetailQuery = Omit<MarketDetailRequest, 'symbol'> & {
-  signal?: AbortSignal;
-};
+export type { MarketDetailQuery, MarketChartQuery, MarketPeriodOptionsQuery } from './market-display-client.js';
 
 type QueryValue = string | number | boolean | readonly string[] | undefined;
 
@@ -217,14 +221,8 @@ const queryString = (params: Record<string, QueryValue>) => {
   return encoded ? `?${encoded}` : '';
 };
 
-export class ThesisLedgerApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly payload: ApiErrorResponse | null,
-  ) {
-    super(`ThesisLedger API ${status}${payload?.message ? `: ${payload.message}` : ''}`);
-  }
-}
+import { ThesisLedgerApiError, retryAfterMilliseconds } from './api-error.js';
+export { ThesisLedgerApiError, retryAfterMilliseconds } from './api-error.js';
 
 export class ThesisLedgerContractError extends Error {
   constructor(public readonly path: string) {
@@ -478,6 +476,7 @@ export class ThesisLedgerApiClient {
 
   readonly market = {
     ...marketControlClient(this.requestParsed.bind(this)),
+    ...marketDisplayClient(this.requestParsed.bind(this), queryString),
     getPlannedChartOptions: async (
       symbol: string,
       input: MarketChartPlanV3,
@@ -538,36 +537,13 @@ export class ThesisLedgerApiClient {
         `/api/market-data/instruments/search${queryString(params)}`,
         instrumentSearchResponseSchema,
       ),
-    getDetail: (symbol: string, params: MarketDetailQuery = {}) => {
-      const { signal, refresh, include, indicatorParams, adjustment, ...query } = params;
-      return this.requestParsed<MarketDetailResponse>(
-        `/api/market/${encodeURIComponent(symbol)}/detail${queryString({
-          ...query,
-          chartContractVersion: 3,
-          ...(adjustment === undefined ? {} : { adjustment }),
-          ...(indicatorParams ? { indicatorParams: JSON.stringify(indicatorParams) } : {}),
-          ...(refresh ? { refresh: 1 } : {}),
-          ...(include ? { include } : {}),
-        })}`,
-        marketDetailResponseSchema,
-        signal ? { signal } : undefined,
-      );
-    },
   };
 
-  readonly journal = {
-    getReviewCandidates: (
-      params: Omit<JournalReviewCandidatesQuery, 'limit'> & { limit?: number },
-    ): Promise<JournalReviewCandidatesResponse> =>
-      this.requestParsed(
-        `/journal/review-candidates${queryString(params)}`,
-        journalReviewCandidatesResponseSchema,
-      ),
-    saveReviewSnapshot: (
-      input: JournalReviewSnapshotInput,
-    ): Promise<JournalReviewSnapshotResponse> =>
-      this.postParsed('/journal/review-snapshots', input, journalReviewSnapshotResponseSchema),
-  };
+  readonly journalReviews = journalReviewClient(
+    this.requestParsed.bind(this),
+    this.postParsed.bind(this),
+    queryString,
+  );
 
   readonly ledger = {
     createCashFlow: (command: CreateCashFlowCommand): Promise<LedgerCommandResponse> =>
@@ -715,7 +691,7 @@ export class ThesisLedgerApiClient {
     return parsed.data;
   }
 
-  private async fetchResponse(path: string, init?: RequestInit) {
+  async fetchResponse(path: string, init?: RequestInit) {
     const requestInit: RequestInit = { ...init };
     const isMultipart = typeof FormData !== 'undefined' && init?.body instanceof FormData;
     if (!isMultipart) {
@@ -734,6 +710,8 @@ export class ThesisLedgerApiClient {
     } catch {
       payload = null;
     }
-    throw new ThesisLedgerApiError(response.status, payload);
+    throw new ThesisLedgerApiError(
+      response.status, payload, retryAfterMilliseconds(response.headers.get('retry-after')),
+    );
   }
 }

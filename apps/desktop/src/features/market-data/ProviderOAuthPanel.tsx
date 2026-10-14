@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { marketDataKeys } from './market-data.queries.js';
@@ -16,8 +17,15 @@ import {
 
 const oauthKey = ['market-provider-oauth'] as const;
 
-export function ProviderOAuthPanel() {
+export function ProviderOAuthPanel({
+  credentialConfigured,
+  disabled = false,
+}: {
+  credentialConfigured: boolean;
+  disabled?: boolean;
+}) {
   const [clientId, setClientId] = useState('');
+  const [reauthorizing, setReauthorizing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const client = useQueryClient();
@@ -30,8 +38,9 @@ export function ProviderOAuthPanel() {
     retry: false,
   });
   useEffect(() => {
-    if (!sessionId && current.data?.session) setSessionId(current.data.session.sessionId);
-  }, [current.data, sessionId]);
+    if (!sessionId && !current.isFetching && current.data?.session)
+      setSessionId(current.data.session.sessionId);
+  }, [current.data, current.isFetching, sessionId]);
   const session = useQuery({
     queryKey: [...oauthKey, sessionId],
     queryFn: ({ signal }) => getProviderOAuth(sessionId!, signal),
@@ -50,6 +59,8 @@ export function ProviderOAuthPanel() {
     }
     if (result?.status === 'succeeded' && refreshed.current !== result.sessionId) {
       refreshed.current = result.sessionId;
+      setReauthorizing(false);
+      setClientId('');
       void client.invalidateQueries({ queryKey: marketDataKeys.root });
     }
   }, [url, result, client]);
@@ -76,8 +87,11 @@ export function ProviderOAuthPanel() {
     onError: () => setActionError('取消结果暂未确认，请刷新授权状态。'),
   });
   const pending = create.isPending || oauthPending(result);
+  const authorized = credentialConfigured || result?.status === 'succeeded';
+  const showInput = !pending && (!authorized || reauthorizing);
   let statusText = '输入 Longbridge 应用的 Client ID，在浏览器完成授权后会自动保存。';
-  if (result?.status === 'starting') statusText = '正在准备浏览器授权…';
+  if (authorized) statusText = '已授权，凭证已加密保存。';
+  if (create.isPending || result?.status === 'starting') statusText = '正在准备浏览器授权…';
   else if (result?.status === 'authorizing')
     statusText = '等待你在浏览器完成授权。关闭侧栏后授权仍会继续，可重新打开查看。';
   else if (result?.status === 'succeeded') statusText = '授权已完成，凭证已加密保存并生效。';
@@ -86,19 +100,22 @@ export function ProviderOAuthPanel() {
     statusText = oauthErrorLabels[result.errorCode ?? ''] ?? '授权未完成，原凭证保持不变。请重试。';
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <span id="longbridge-client-id" className="font-medium">
-          Client ID
-        </span>
-        <Input
-          aria-labelledby="longbridge-client-id"
-          value={clientId}
-          disabled={pending}
-          autoComplete="off"
-          onChange={(event) => setClientId(event.target.value)}
-          placeholder="请输入应用 Client ID"
-        />
-      </div>
+      {showInput && (
+        <div className="flex flex-col gap-2">
+          <span id="longbridge-client-id" className="font-medium">
+            Client ID
+          </span>
+          <Input
+            aria-labelledby="longbridge-client-id"
+            value={clientId}
+            disabled={disabled}
+            autoComplete="off"
+            onChange={(event) => setClientId(event.target.value)}
+            placeholder="请输入应用 Client ID"
+          />
+        </div>
+      )}
+      {authorized && !showInput && !pending && <Badge variant="secondary">已授权</Badge>}
       <div className="rounded-md border p-3 text-xs leading-relaxed text-muted-foreground">
         在 Longbridge 应用中登记回调地址：
         <code className="break-all">http://localhost:60355/callback</code>。支持本机和本机 Docker。
@@ -114,15 +131,42 @@ export function ProviderOAuthPanel() {
         </Alert>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button
-          disabled={pending || !clientId.trim()}
-          onClick={() => {
-            setActionError(null);
-            create.mutate();
-          }}
-        >
-          {create.isPending ? '发起中…' : '授权并保存'}
-        </Button>
+        {showInput && (
+          <Button
+            disabled={disabled || !clientId.trim()}
+            onClick={() => {
+              setActionError(null);
+              create.mutate();
+            }}
+          >
+            授权并保存
+          </Button>
+        )}
+        {authorized && !showInput && !pending && (
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => {
+              setActionError(null);
+              setReauthorizing(true);
+            }}
+          >
+            重新授权
+          </Button>
+        )}
+        {authorized && showInput && (
+          <Button
+            variant="ghost"
+            disabled={disabled}
+            onClick={() => {
+              setClientId('');
+              setActionError(null);
+              setReauthorizing(false);
+            }}
+          >
+            取消重新授权
+          </Button>
+        )}
         {url && (
           <Button
             variant="outline"
@@ -134,7 +178,7 @@ export function ProviderOAuthPanel() {
         {oauthPending(result) && (
           <Button
             variant="ghost"
-            disabled={cancel.isPending}
+            disabled={disabled || cancel.isPending}
             onClick={() => {
               setActionError(null);
               cancel.mutate();
@@ -144,7 +188,7 @@ export function ProviderOAuthPanel() {
           </Button>
         )}
       </div>
-      {result && (
+      {result && oauthPending(result) && (
         <p className="text-xs text-muted-foreground">
           授权截止：{new Date(result.expiresAt).toLocaleTimeString('zh-CN')}
         </p>

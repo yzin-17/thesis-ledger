@@ -1,8 +1,11 @@
+import { UseGuards } from '@nestjs/common';
+import { StrategyIdentityGuard } from './strategy-identity.guard.js';
 import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { backtestNavPreparationRequestV3Schema } from '@thesis-ledger/schemas';
 import { BacktestNavPreparationService } from './backtest-nav-preparation.service.js';
 
 @Controller('backtests/run-config/nav')
+@UseGuards(StrategyIdentityGuard)
 export class BacktestNavPreparationController {
   constructor(
     @Inject(BacktestNavPreparationService)

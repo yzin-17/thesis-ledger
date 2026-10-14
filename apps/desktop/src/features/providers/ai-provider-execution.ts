@@ -2,6 +2,7 @@ import {
   AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION,
   AI_RESEARCH_GENERATION_CONTRACT_VERSION,
   AI_STRATEGY_DISCOVERY_CONTRACT_VERSION,
+  aiGenerationContracts,
   type AiGenerationContractRef,
   type AiProviderModelExecution,
 } from '@thesis-ledger/schemas';
@@ -14,12 +15,18 @@ export const aiContractOptions: Array<{
   value: AiGenerationContractRef['id'];
   label: string;
 }> = [
+  { value: 'strategy_authoring_analysis', label: '策略需求分析' },
+  { value: 'strategy_authoring_generation', label: '策略定义生成' },
+  { value: 'strategy_authoring_modification', label: '策略局部修改' },
   { value: 'research', label: '研究报告' },
   { value: 'parameter_optimization', label: '参数优化' },
   { value: 'strategy_discovery', label: '策略发现' },
 ];
 
 const contractRefs: Record<AiGenerationContractRef['id'], AiGenerationContractRef> = {
+  strategy_authoring_analysis: aiGenerationContracts.authoringAnalysis.ref,
+  strategy_authoring_generation: aiGenerationContracts.authoringGeneration.ref,
+  strategy_authoring_modification: aiGenerationContracts.authoringModification.ref,
   research: { id: 'research', version: AI_RESEARCH_GENERATION_CONTRACT_VERSION },
   parameter_optimization: {
     id: 'parameter_optimization',

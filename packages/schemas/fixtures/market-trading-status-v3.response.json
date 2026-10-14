@@ -1,0 +1,91 @@
+{
+  "request": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "trading-status-source-sample",
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "official-states",
+      "upstreamSource": "cn-stock-daily-suspension",
+      "routeIndex": 0
+    },
+    "symbol": "000995.SZ",
+    "range": {
+      "start": "2023-08-16",
+      "end": "2023-08-21"
+    }
+  },
+  "response": {
+    "contractVersion": 3,
+    "consumer": "thesis-ledger",
+    "requestId": "trading-status-source-sample",
+    "routeKey": {
+      "kind": "data",
+      "market": "CN",
+      "assetType": "STOCK",
+      "capability": "HISTORICAL_TRADING_STATUS"
+    },
+    "routeTarget": {
+      "providerId": "official-states",
+      "upstreamSource": "cn-stock-daily-suspension",
+      "routeIndex": 0
+    },
+    "symbol": "000995.SZ",
+    "range": {
+      "start": "2023-08-16",
+      "end": "2023-08-21"
+    },
+    "status": "supported",
+    "days": [
+      {
+        "date": "2023-08-16",
+        "state": "unknown"
+      },
+      {
+        "date": "2023-08-17",
+        "state": "suspended",
+        "sourceDocumentIds": ["huangtai-2023-029"]
+      },
+      {
+        "date": "2023-08-18",
+        "state": "trading",
+        "sourceDocumentIds": ["huangtai-2023-029"]
+      },
+      {
+        "date": "2023-08-19",
+        "state": "unknown"
+      },
+      {
+        "date": "2023-08-20",
+        "state": "unknown"
+      },
+      {
+        "date": "2023-08-21",
+        "state": "unknown"
+      }
+    ],
+    "sourceDocuments": [
+      {
+        "id": "huangtai-2023-029",
+        "title": "皇台酒业：关于公司股票交易撤销退市风险警示暨停牌的公告（2023-029）",
+        "url": "https://static.cninfo.com.cn/finalpage/2023-08-17/1217557800.PDF",
+        "publishedDate": "2023-08-17",
+        "kind": "issuerDisclosure"
+      }
+    ],
+    "provenance": {
+      "providerId": "official-states",
+      "upstreamSource": "cn-stock-daily-suspension",
+      "providerRevision": "official-trading-status-da53da5f33af4372be9e15300a05ad4fe821d6694249bfaf4d457f335f98abe8",
+      "datasetId": "cn-000995-daily-suspension-2023-08",
+      "fetchedAt": "2026-10-06T00:00:00+00:00",
+      "granularity": "1d",
+      "historicalAvailability": "notVerified"
+    }
+  }
+}

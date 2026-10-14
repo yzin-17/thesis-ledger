@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { strategyKeys } from './strategy.queries.js';
 import type { BacktestJobSummary } from './strategy.types.js';
+import { createBacktestStreamSource } from './strategy-event-source.js';
+import { applyBacktestGroupEvent } from './strategy-group-events.js';
 
 type BacktestEventHandlers = {
   onOpen: () => void;
@@ -9,12 +11,13 @@ type BacktestEventHandlers = {
   onInvalid: () => void;
 };
 
-type BacktestEventSource = Pick<EventSource, 'addEventListener' | 'close'> & {
+type BacktestEventSource = Pick<EventTarget, 'addEventListener'> & {
+  close: () => void;
   onopen: ((event: Event) => void) | null;
 };
 
 export const createBacktestEventConnection = (
-  createSource: () => BacktestEventSource = () => new EventSource('/api/v1/backtests/events'),
+  createSource: () => BacktestEventSource = createBacktestStreamSource,
 ) => {
   const subscribers = new Set<BacktestEventHandlers>();
   let source: BacktestEventSource | null = null;
@@ -68,22 +71,31 @@ export const useBacktestJobEvents = () => {
     return backtestEventConnection.subscribe({
       onOpen: () => {
         void queryClient.invalidateQueries({ queryKey: strategyKeys.jobs() });
+        void queryClient.invalidateQueries({ queryKey: strategyKeys.groups() });
       },
       onUpdate: (incoming) => {
         if (incoming.mode !== 'V3') return;
         queryClient.setQueryData<BacktestJobSummary[]>(strategyKeys.jobs(), (current) =>
           applyBacktestJobSummaryEvent(current, incoming),
         );
+        queryClient.setQueriesData({ queryKey: strategyKeys.groups() }, (current: unknown) =>
+          applyBacktestGroupEvent(current, incoming),
+        );
+        if (incoming.status === 'queued' && incoming.executionAttempt === 0) {
+          void queryClient.invalidateQueries({ queryKey: strategyKeys.groups() });
+        }
         queryClient.setQueryData(strategyKeys.job(incoming.id), (current: unknown) => {
           if (!current || typeof current !== 'object') return current;
           return { ...current, ...incoming };
         });
         if (['succeeded', 'failed', 'cancelled'].includes(incoming.status)) {
           void queryClient.invalidateQueries({ queryKey: strategyKeys.job(incoming.id) });
+          void queryClient.invalidateQueries({ queryKey: strategyKeys.groups() });
         }
       },
       onInvalid: () => {
         void queryClient.invalidateQueries({ queryKey: strategyKeys.jobs() });
+        void queryClient.invalidateQueries({ queryKey: strategyKeys.groups() });
       },
     });
   }, [queryClient]);

@@ -1,0 +1,1394 @@
+{
+  "jobs": {
+    "73ab7c23-9335-4771-a612-5f1a1547734f": {
+      "sha256": "f386226b138e2c571d5387edafd91a56152bee223ad06d3d498544ba74c535e6",
+      "resultChecksum": "1e83d3eb24788bcf",
+      "snapshotId": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+      "status": "succeeded",
+      "completeness": "complete"
+    },
+    "dbc39963-da96-4583-8746-01feac9c7ff2": {
+      "sha256": "ba2dfe6938411beb8e63523afbefb16d06cad72edd569d8939ce3b1ad1292979",
+      "resultChecksum": "022494dccd271850",
+      "snapshotId": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+      "status": "succeeded",
+      "completeness": "complete"
+    },
+    "873ba8dd-40c3-4f9e-b1d5-b16192f697b0": {
+      "sha256": "397c4d3eebaaca9528af8ad902946904ab7e6e20c960b861538375e530bfdf28",
+      "resultChecksum": "a07303d0e7c0f3ce",
+      "snapshotId": "0046b0759593d8a66a2a1cb9f78979a3540942801f28e359c46484005a0a39a5",
+      "status": "succeeded",
+      "completeness": "complete"
+    },
+    "652ba051-a4c5-493d-81e6-2cdbe3c090f0": {
+      "sha256": "0ae85a8c0c77e4e00ba40877db996f20a92b8b54ce0bd7a16b71780cad0acb1a",
+      "resultChecksum": "8c66f3f721f5e4d8",
+      "snapshotId": "dbcb682568ebac75acfd5a23c9e968ba0808b097118a45f50453e78c425c558d",
+      "status": "succeeded",
+      "completeness": "partial"
+    }
+  },
+  "replays": [
+    {
+      "name": "600000",
+      "runId": "73ab7c23-9335-4771-a612-5f1a1547734f",
+      "snapshotId": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+      "resultChecksum": "1e83d3eb24788bcf",
+      "identicalReplay": true,
+      "fullPersistentResultEqual": true,
+      "replayCount": 2,
+      "networkCalls": 0,
+      "networkTransportsBlocked": [
+        "fetch",
+        "http",
+        "https",
+        "net",
+        "tls"
+      ],
+      "benchmarkCostVersion": "execution-model-cost-v1",
+      "benchmarkCostAssumption": {
+        "kind": "execution-model",
+        "version": "execution-model-cost-v1",
+        "fingerprint": "492c2c101f6e906f"
+      },
+      "artifactIdentities": [
+        {
+          "artifactId": "30a167604676e5186da3e66184097e1bf6c43f61ece7a89fd30861cddffbcc6a",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/calendar/CN.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "3f91b96ed4054292ae3b7bb06de06c603f6a938c68442f188c2dda906b72159b",
+          "sizeBytes": 4274,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "5854a57e2a44e722a8e41c86d0ef3e4e9349e931e4ca9d1a4fd5c3182b1a1510",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/execution/bars.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "67cb8eda8d3f0f1e47585bf51ba4e14b5cc569044f1696b8d75f3b1feb72a499",
+          "sizeBytes": 9553,
+          "verifiedRows": 50
+        },
+        {
+          "artifactId": "6259a494753eaac1a985eb27f5dba28e67c0f9733f8aa6a1bbbbeadd1fb37781",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/instrumentFacts/CN-600000.SH.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "5c51a2131140bb84a60926c3711ed7fa1554aa6a4384803040733cab32f3e0e0",
+          "sizeBytes": 6386,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "06c926f4c0f4e8e8bfba4cebb11436f2ec28eeb42e28fc157c52fc1dc0750f5f",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/dependency-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "ec2f4437ec62a18137d4f4e907a3ab93d201f2d6e8842d59b8c6fe7b84dd6e33",
+          "sizeBytes": 8015,
+          "verifiedRows": 2
+        },
+        {
+          "artifactId": "269bb72dcbb6b23ea76ef3c76d5bb9a68b1ca308359c4e1865de49340d83b2db",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/execution-model-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "4412f37af10b6e1d35ff91b056bbfa86b773656bdec50ecd48534d234cb7d7e9",
+          "sizeBytes": 2581,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "d018cd94c687d162c0b16f91c13464a4d2d0367e0cae07c0ca0760ac853f4780",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/market-window-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "99ae6159595f8c16f63cfd2b449d01e60d10567ab57c6e89be8ac55ac7c045a1",
+          "sizeBytes": 13866,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "d70ba1021aae50a8a796f7b18a81d8f4d8389aa1c0b895f334083c803c4c4b3b",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/price-input-bindings-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "9027ae1245cf99d15ae7fb3a7b7bb3e06865917c89b34ffb4f316414c6930392",
+          "sizeBytes": 1351,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "47e0a964af2f754083839410a2cf5e454fa9166f007165f8d61bda3de9c8dae8",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/public-fees-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "2a44f4769946d6f3ed62fe82dcf1d34f50d1870e8969c5b6365b86268bbac1df",
+          "sizeBytes": 1369,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "42d5da84ccf9ceff4fbaf4b693b579909328652033c0be82960e34eac65fcca3",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/snapshot-metadata-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "95b29692eb28b2b68c0cf702cf24f50e1e734fa11433d9ce1926f631480e3a62",
+          "sizeBytes": 4827,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "cedea1f034b23b2dc731608a9560309d8e11ebc7af916d6b5a418cb068e4d110",
+          "key": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/trading-status-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "02e68a6b547b632724a53a67e727a240b7f9d44eb08b19c031dbcdf56615d231",
+          "sizeBytes": 1436,
+          "verifiedRows": 1
+        }
+      ],
+      "resultSHA256": "d655ce09fcf451bc14c0d539ee44bb24c758b0451c30fc5a4fdbe8399ee892c1",
+      "runtimeReport": {
+        "path": "/private/tmp/thesis-c33-replay-600000.json",
+        "sha256": "bd847e9a7c5ded600df30470e3aa478fb4bb7110fcedade83f3c61edc66bea52"
+      }
+    },
+    {
+      "name": "600519",
+      "runId": "dbc39963-da96-4583-8746-01feac9c7ff2",
+      "snapshotId": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+      "resultChecksum": "022494dccd271850",
+      "identicalReplay": true,
+      "fullPersistentResultEqual": true,
+      "replayCount": 2,
+      "networkCalls": 0,
+      "networkTransportsBlocked": [
+        "fetch",
+        "http",
+        "https",
+        "net",
+        "tls"
+      ],
+      "benchmarkCostVersion": "execution-model-cost-v1",
+      "benchmarkCostAssumption": {
+        "kind": "execution-model",
+        "version": "execution-model-cost-v1",
+        "fingerprint": "43ded329941a4f7c"
+      },
+      "artifactIdentities": [
+        {
+          "artifactId": "ad267270a156b8e1dde7f9b5401ccea3eb4917151c9f5cf75ab8af693228d8aa",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/calendar/CN.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "3f91b96ed4054292ae3b7bb06de06c603f6a938c68442f188c2dda906b72159b",
+          "sizeBytes": 4274,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "3b334bd4e639512eb98a097334412ed3ee0d0282f73a86f0f7bdc062fd44518a",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/execution/bars.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "27e5a4a1aec600efeaba71aa430f6225ff794919528a343a86ef4c482d66450a",
+          "sizeBytes": 9943,
+          "verifiedRows": 50
+        },
+        {
+          "artifactId": "5431645cfc9942fefa880e94fd7af89076b529dd7020951edc7e25447b8101e2",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/instrumentFacts/CN-600519.SH.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "dcd112c261c5f96ce60038143b3c6d09c18cd6700accc429312adac01792855e",
+          "sizeBytes": 6272,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "348072c95412e8efdce3877312b75d72eee1b216092b6063baa19ee16801d6df",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/dependency-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "762aac72263ae33a9c67c320756ddcd0a9427e15ffe0defc57060db7c7f05489",
+          "sizeBytes": 7916,
+          "verifiedRows": 2
+        },
+        {
+          "artifactId": "e9b9da3b5fa30d19ff37da19654fcaef67ade342685bf42447286a274dd2a9af",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/execution-model-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "1c315ea54e12fddd75ef46d2b78c095652141c73fa3587bf8bd86b384091c7e4",
+          "sizeBytes": 2583,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "75713ea5492ac81c7eba07e205e12173c7d3680fea23cca91b9834680508ea69",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/market-window-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "d76e27bad30126eb76b53127125a5879ed2d036b70e65ba611a9da8a6ec8cee1",
+          "sizeBytes": 13651,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "8dc17cbb27fd617eaee63c1294e7ea64bbabc3069a9854b8cae44eb01a6c9997",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/price-input-bindings-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "3537772debd05ac623de3478d38b1964a77b23e148842c7f2173870df12a92bd",
+          "sizeBytes": 1353,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "4ca5d4d7bfbb05a1c12783949846a927b95ce159e56b95bd9dfb64eff0c69ddc",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/public-fees-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "7b5eb0336f17551b872f36bedcfed77d27c870666010f7721ed4ac46b9156646",
+          "sizeBytes": 1369,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "199fb34cfda529b865e6a1640c0c10b88d6d660f11fef4a75d05aeed1a4ec2b6",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/snapshot-metadata-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "4bfd178ecf77a314e3fd4a23c1de6b41e9de2aaddcab643ba56af4700278f02e",
+          "sizeBytes": 4823,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "7bfab6adba8d7819c2f4897600a3efafdae32fa42f6cd11fabb1f2427d39c933",
+          "key": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/trading-status-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "9b3d7472ef6a3ba0231fb0c01dbc91b5a59793f4410e46d706ab526bcc584a05",
+          "sizeBytes": 1436,
+          "verifiedRows": 1
+        }
+      ],
+      "resultSHA256": "f61bdb073b8ea90ed083056b1fe5f557865dc7024aed8b9b9a2ffea3fc21cd9d",
+      "runtimeReport": {
+        "path": "/private/tmp/thesis-c33-replay-600519.json",
+        "sha256": "43b1e575afadec216d092f2e6867b4b2cf761126ea9cfa19df3b93e366755646"
+      }
+    },
+    {
+      "name": "legacy-complete",
+      "runId": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0",
+      "snapshotId": "0046b0759593d8a66a2a1cb9f78979a3540942801f28e359c46484005a0a39a5",
+      "resultChecksum": "a07303d0e7c0f3ce",
+      "identicalReplay": true,
+      "fullPersistentResultEqual": true,
+      "replayCount": 2,
+      "networkCalls": 0,
+      "networkTransportsBlocked": [
+        "fetch",
+        "http",
+        "https",
+        "net",
+        "tls"
+      ],
+      "benchmarkCostVersion": "execution-model-cost-v1",
+      "benchmarkCostAssumption": {
+        "kind": "execution-model",
+        "version": "execution-model-cost-v1",
+        "fingerprint": "4311d8b1cb67fd6c"
+      },
+      "artifactIdentities": [
+        {
+          "artifactId": "c1a8504aa59df587ad3e3e581d3b062df8c61ccbc974ca2d6d94e624f237f421",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/calendar/CN.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "d774254703a994722d0dafc9046d07aaaeceaff0e170b88d7f0fbc537442eeda",
+          "sizeBytes": 4146,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "d559982c96e1a649102cdc4077726b4becc5b96ac95041609f3c6e129f1850c4",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/execution/bars.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "1f312527260210c1355c41b85cc3c49b3ae2a48144e8144c1acba7954217806e",
+          "sizeBytes": 8859,
+          "verifiedRows": 17
+        },
+        {
+          "artifactId": "59c7239bd0e55a3f9072f54c8506d7e35b859d4b37d4279fa97500146a4fd61b",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/instrumentFacts/CN-600000.SH.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "4fbec120aea166fa947eaa931413d77e9fd17479bab2ea4fe4f35efd2a9d4359",
+          "sizeBytes": 6256,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "66cadd91ed2df5db90ca44ec94d01f78f9c84a8582e0f664b0c2dde215e5fcdb",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/metadata/dependency-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "cc844bb1ec4682e65b531a5a94b5699d245c3f553c6721e2c4d6274722934bf2",
+          "sizeBytes": 7906,
+          "verifiedRows": 2
+        },
+        {
+          "artifactId": "aff3be636b0b64559d4772a1e602ff8ad95e193891862066dd539a1c12cf614a",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/metadata/execution-model-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "e64b0274ecf8643db01ef0a6b5b7998aa97aad4b7e24e5ccb16940f4ae42a211",
+          "sizeBytes": 2448,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "44f2b8ad0c1ad12abcf258f872536e44ee54c3c0694bfc3e0795c8fe09cc5420",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/metadata/market-window-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "1198aea3ff79e28007d3eecd1030dd1f9e643c361c353768c7a11f794db35da7",
+          "sizeBytes": 13647,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "9d7ab7e402ab0f37a22d5afa4c19e486ab8e9e8f70cc4c81c5510176a6ce7029",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/metadata/price-input-bindings-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "9b3f742686e4416cd1c06052885f02f8e25b5bcb5c7db15d0e1c7a5d8994cd60",
+          "sizeBytes": 1339,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "7e21a4a6f9bba09936b638e3e2dd15d98e3c32de15c05e560e3ce66e1fa15bc9",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/metadata/public-fees-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "5a579617c357b070bda4ac7fef827de8641a2fb66c6b4e55b65d849ba744be84",
+          "sizeBytes": 2722,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "7a99c6655d8f7157c277b3b5d1564b0b59e1515a4301e480fca0647162b46c66",
+          "key": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0/metadata/snapshot-metadata-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "d0f98c2ec51cce3f1f5281cf81251b4aa12c22dd02f5a78d6db1f2cc497aa8d3",
+          "sizeBytes": 4625,
+          "verifiedRows": 1
+        }
+      ],
+      "resultSHA256": "4dc771b5da8ad4e6c796198a62685ae829618bcff5607265d58e5eb0fac1c524",
+      "runtimeReport": {
+        "path": "/private/tmp/thesis-c33-replay-legacy-complete.json",
+        "sha256": "679f7dd243a3158d5b78e2fa596baa3f8f56f06e5cbcbf7882ef32a9cd19deac"
+      }
+    },
+    {
+      "name": "legacy-partial",
+      "runId": "652ba051-a4c5-493d-81e6-2cdbe3c090f0",
+      "snapshotId": "dbcb682568ebac75acfd5a23c9e968ba0808b097118a45f50453e78c425c558d",
+      "resultChecksum": "8c66f3f721f5e4d8",
+      "identicalReplay": true,
+      "fullPersistentResultEqual": true,
+      "replayCount": 2,
+      "networkCalls": 0,
+      "networkTransportsBlocked": [
+        "fetch",
+        "http",
+        "https",
+        "net",
+        "tls"
+      ],
+      "benchmarkCostVersion": null,
+      "benchmarkCostAssumption": {
+        "kind": "unsupported",
+        "version": "execution-model-v1:cn-600000-public-fees-local-research:1:public-fees-model-v1:official-public-fees-88ca26355bad0e1016cf46eb6beff6018bab45918eb562aeb51ed50adf64c3e7:7ae6e6c8bc2626c9",
+        "fingerprint": "8c05138e87cc3fe5"
+      },
+      "artifactIdentities": [
+        {
+          "artifactId": "daf34aefaa09462a705ce6a0a6fe9867da65362bcad1293fdefa41337004f1f4",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/calendar/CN.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "d774254703a994722d0dafc9046d07aaaeceaff0e170b88d7f0fbc537442eeda",
+          "sizeBytes": 4146,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "0779447dae831e09045d99cd85cd8f559f07486473385028c304574250b0e2be",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/execution/bars.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "31582d3c655f77f71d9dcfc3145a9e28263b0fd6652275351be76377b29fe6cd",
+          "sizeBytes": 8863,
+          "verifiedRows": 17
+        },
+        {
+          "artifactId": "3cee57972a23dfbd37a842ab1b903a251a81c895e001879a2249fbd5d497e737",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/instrumentFacts/CN-600000.SH.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "56f1037425e137d7c3ba6d735e1650ff3e05af873f759d7fb95c063ee2ae9e80",
+          "sizeBytes": 6256,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "e18e156d9c3b3055fb4ebad9c3a8a8442308a41acfa4dbca5fcc82492962233c",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/metadata/dependency-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "b75d9de0f9ebd60f1fe074986c92d02c0dcb9815139dc461df98c5fee37691f6",
+          "sizeBytes": 7908,
+          "verifiedRows": 2
+        },
+        {
+          "artifactId": "29a542bbd29b7ecb1cff1382684ff28c47a5b07d6f9d584d17ad87da0d62397b",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/metadata/execution-model-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "6262e4f04b102b7b96dc720c2a8b68fd37ae9010a9c0cc2f6f93859ee141e5d6",
+          "sizeBytes": 2448,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "121620f0a0fc8fd4a0c22d69b51233384d5cd1a099e15328a231df7bd91abda2",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/metadata/market-window-evidence-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "1dcdb673d7b0ed18acfe9a471789b6230a046183f24b2972c3b63462339832e6",
+          "sizeBytes": 13648,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "53f32cae632789f3a6a854e3b746ae8010c890f617eabe9709d7b1e357bb5d7b",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/metadata/price-input-bindings-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "9b3f742686e4416cd1c06052885f02f8e25b5bcb5c7db15d0e1c7a5d8994cd60",
+          "sizeBytes": 1339,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "4bb99971a378d2c61395ea221472fe52e5150c5e8832505f64dd614f2d33391b",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/metadata/public-fees-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "67c315304324bf0e27c82b729a9314ef171debda9943449a0109d7e4f00e64c0",
+          "sizeBytes": 2720,
+          "verifiedRows": 1
+        },
+        {
+          "artifactId": "8ba9c980e5062bf2115957a73afa0a15783d924b5edc257c98c468d1e4aef9ed",
+          "key": "652ba051-a4c5-493d-81e6-2cdbe3c090f0/metadata/snapshot-metadata-v3.parquet",
+          "format": "parquet",
+          "compression": "zstd",
+          "contentHash": "f959c929c0a6e209cf6757b39e248a70575d7f5bb7f9c20967db6c1c1bb64b19",
+          "sizeBytes": 4619,
+          "verifiedRows": 1
+        }
+      ],
+      "resultSHA256": "50f22c600089b16905a16ff0d9e861471f42fbb148b06bea49bd8b09fbd18cad",
+      "runtimeReport": {
+        "path": "/private/tmp/thesis-c33-replay-legacy-partial.json",
+        "sha256": "a768dad7022c401149a77fee40be887da66c536ea6c9c37da78c3286551e5d19"
+      }
+    }
+  ],
+  "independent": [
+    {
+      "runId": "73ab7c23-9335-4771-a612-5f1a1547734f",
+      "snapshotId": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+      "resultChecksum": "1e83d3eb24788bcf",
+      "independentDecimalCheck": true,
+      "allFillChargesExact": true,
+      "allDailyEquitiesExact": true,
+      "equityDatesChecked": 34,
+      "strategy": {
+        "initialCash": "100000",
+        "fillCount": 11,
+        "totalFees": "80.69",
+        "finalCash": "89098.027635233000207901118977172773488433737481",
+        "finalQuantity": "1683.5016835016835016835016835016835016835017",
+        "finalMarkPrice": "5.97",
+        "finalEquity": "99148.532685738050712951624027677823993484242630",
+        "netReturn": "-0.00851467314261949287",
+        "cashLedger": [
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:0:order:fill",
+            "date": "2023-08-02",
+            "side": "buy",
+            "quantity": "1560.062402496099843993759750390015600624025",
+            "price": "6.41",
+            "gross": "10000.00000000000000000000000000000000000000025",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89994.89999999999999999999999999999999999999975",
+            "heldQuantity": "1560.062402496099843993759750390015600624025"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:1:order:fill",
+            "date": "2023-08-03",
+            "side": "sell",
+            "quantity": "1560.062402496099843993759750390015600624025",
+            "price": "6.37",
+            "gross": "9937.59750390015600624024960998439937597503925",
+            "charges": [
+              "5.00",
+              "4.97",
+              "0.10"
+            ],
+            "cash": "99922.42750390015600624024960998439937597503900",
+            "heldQuantity": "0E-39"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:2:order:fill",
+            "date": "2023-08-04",
+            "side": "buy",
+            "quantity": "1552.7950310559006211180124223602484472049689",
+            "price": "6.44",
+            "gross": "9999.999999999999999999999999999999999999999716",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89917.327503900156006240249609984399375975039284",
+            "heldQuantity": "1552.7950310559006211180124223602484472049689"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:4:order:fill",
+            "date": "2023-08-08",
+            "side": "sell",
+            "quantity": "1552.7950310559006211180124223602484472049689",
+            "price": "6.32",
+            "gross": "9813.664596273291925465838509316770186335403448",
+            "charges": [
+              "5.00",
+              "4.91",
+              "0.10"
+            ],
+            "cash": "99720.982100173447931706088119301169562310442732",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:6:order:fill",
+            "date": "2023-08-10",
+            "side": "buy",
+            "quantity": "1587.3015873015873015873015873015873015873016",
+            "price": "6.3",
+            "gross": "10000.00000000000000000000000000000000000000008",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89715.882100173447931706088119301169562310442652",
+            "heldQuantity": "1587.3015873015873015873015873015873015873016"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:7:order:fill",
+            "date": "2023-08-11",
+            "side": "sell",
+            "quantity": "1587.3015873015873015873015873015873015873016",
+            "price": "6.29",
+            "gross": "9984.126984126984126984126984126984126984127064",
+            "charges": [
+              "5.00",
+              "4.99",
+              "0.10"
+            ],
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:18:order:fill",
+            "date": "2023-08-28",
+            "side": "buy",
+            "quantity": "1626.0162601626016260162601626016260162601626",
+            "price": "6.15",
+            "gross": "9999.999999999999999999999999999999999999999990",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89684.819084300432058690215103428153689294569726",
+            "heldQuantity": "1626.0162601626016260162601626016260162601626"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:21:order:fill",
+            "date": "2023-08-31",
+            "side": "sell",
+            "quantity": "1626.0162601626016260162601626016260162601626",
+            "price": "5.88",
+            "gross": "9560.975609756097560975609756097560975609756088",
+            "charges": [
+              "5.00",
+              "4.78",
+              "0.10"
+            ],
+            "cash": "99235.914694056529619665824859525714664904325814",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:24:order:fill",
+            "date": "2023-09-05",
+            "side": "buy",
+            "quantity": "1680.6722689075630252100840336134453781512605",
+            "price": "5.95",
+            "gross": "9999.999999999999999999999999999999999999999975",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89230.814694056529619665824859525714664904325839",
+            "heldQuantity": "1680.6722689075630252100840336134453781512605"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:27:order:fill",
+            "date": "2023-09-08",
+            "side": "sell",
+            "quantity": "1680.6722689075630252100840336134453781512605",
+            "price": "5.88",
+            "gross": "9882.352941176470588235294117647058823529411740",
+            "charges": [
+              "5.00",
+              "4.94",
+              "0.10"
+            ],
+            "cash": "99103.127635233000207901118977172773488433737579",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "73ab7c23-9335-4771-a612-5f1a1547734f:intent:30:order:fill",
+            "date": "2023-09-13",
+            "side": "buy",
+            "quantity": "1683.5016835016835016835016835016835016835017",
+            "price": "5.94",
+            "gross": "10000.000000000000000000000000000000000000000098",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89098.027635233000207901118977172773488433737481",
+            "heldQuantity": "1683.5016835016835016835016835016835016835017"
+          }
+        ],
+        "equityChecks": [
+          {
+            "date": "2023-08-01",
+            "cash": "100000",
+            "heldQuantity": "0",
+            "equity": "100000.00"
+          },
+          {
+            "date": "2023-08-02",
+            "cash": "89994.89999999999999999999999999999999999999975",
+            "heldQuantity": "1560.062402496099843993759750390015600624025",
+            "equity": "99870.09500780031201248049921996879875195007800"
+          },
+          {
+            "date": "2023-08-03",
+            "cash": "99922.42750390015600624024960998439937597503900",
+            "heldQuantity": "0E-39",
+            "equity": "99922.42750390015600624024960998439937597503900"
+          },
+          {
+            "date": "2023-08-04",
+            "cash": "89917.327503900156006240249609984399375975039284",
+            "heldQuantity": "1552.7950310559006211180124223602484472049689",
+            "equity": "99901.799553589597000029069485760796891502989311"
+          },
+          {
+            "date": "2023-08-07",
+            "cash": "89917.327503900156006240249609984399375975039284",
+            "heldQuantity": "1552.7950310559006211180124223602484472049689",
+            "equity": "99808.631851726242962761988740419181984670691177"
+          },
+          {
+            "date": "2023-08-08",
+            "cash": "99720.982100173447931706088119301169562310442732",
+            "heldQuantity": "0E-40",
+            "equity": "99720.982100173447931706088119301169562310442732"
+          },
+          {
+            "date": "2023-08-09",
+            "cash": "99720.982100173447931706088119301169562310442732",
+            "heldQuantity": "0E-40",
+            "equity": "99720.982100173447931706088119301169562310442732"
+          },
+          {
+            "date": "2023-08-10",
+            "cash": "89715.882100173447931706088119301169562310442652",
+            "heldQuantity": "1587.3015873015873015873015873015873015873016",
+            "equity": "99668.263052554400312658469071682121943262823684"
+          },
+          {
+            "date": "2023-08-11",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-14",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-15",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-16",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-17",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-18",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-21",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-22",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-23",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-24",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-25",
+            "cash": "99689.919084300432058690215103428153689294569716",
+            "heldQuantity": "0E-40",
+            "equity": "99689.919084300432058690215103428153689294569716"
+          },
+          {
+            "date": "2023-08-28",
+            "cash": "89684.819084300432058690215103428153689294569726",
+            "heldQuantity": "1626.0162601626016260162601626016260162601626",
+            "equity": "99440.916645276041814787776079037909786855545326"
+          },
+          {
+            "date": "2023-08-29",
+            "cash": "89684.819084300432058690215103428153689294569726",
+            "heldQuantity": "1626.0162601626016260162601626016260162601626",
+            "equity": "99310.835344463033684706475266029779705554732318"
+          },
+          {
+            "date": "2023-08-30",
+            "cash": "89684.819084300432058690215103428153689294569726",
+            "heldQuantity": "1626.0162601626016260162601626016260162601626",
+            "equity": "99245.794694056529619665824859525714664904325814"
+          },
+          {
+            "date": "2023-08-31",
+            "cash": "99235.914694056529619665824859525714664904325814",
+            "heldQuantity": "0E-40",
+            "equity": "99235.914694056529619665824859525714664904325814"
+          },
+          {
+            "date": "2023-09-01",
+            "cash": "99235.914694056529619665824859525714664904325814",
+            "heldQuantity": "0E-40",
+            "equity": "99235.914694056529619665824859525714664904325814"
+          },
+          {
+            "date": "2023-09-04",
+            "cash": "99235.914694056529619665824859525714664904325814",
+            "heldQuantity": "0E-40",
+            "equity": "99235.914694056529619665824859525714664904325814"
+          },
+          {
+            "date": "2023-09-05",
+            "cash": "89230.814694056529619665824859525714664904325839",
+            "heldQuantity": "1680.6722689075630252100840336134453781512605",
+            "equity": "99129.974357922075838153219817508907942215250184"
+          },
+          {
+            "date": "2023-09-06",
+            "cash": "89230.814694056529619665824859525714664904325839",
+            "heldQuantity": "1680.6722689075630252100840336134453781512605",
+            "equity": "99214.007971367453989413724019189580211122813209"
+          },
+          {
+            "date": "2023-09-07",
+            "cash": "89230.814694056529619665824859525714664904325839",
+            "heldQuantity": "1680.6722689075630252100840336134453781512605",
+            "equity": "99129.974357922075838153219817508907942215250184"
+          },
+          {
+            "date": "2023-09-08",
+            "cash": "99103.127635233000207901118977172773488433737579",
+            "heldQuantity": "0E-40",
+            "equity": "99103.127635233000207901118977172773488433737579"
+          },
+          {
+            "date": "2023-09-11",
+            "cash": "99103.127635233000207901118977172773488433737579",
+            "heldQuantity": "0E-40",
+            "equity": "99103.127635233000207901118977172773488433737579"
+          },
+          {
+            "date": "2023-09-12",
+            "cash": "99103.127635233000207901118977172773488433737579",
+            "heldQuantity": "0E-40",
+            "equity": "99103.127635233000207901118977172773488433737579"
+          },
+          {
+            "date": "2023-09-13",
+            "cash": "89098.027635233000207901118977172773488433737481",
+            "heldQuantity": "1683.5016835016835016835016835016835016835017",
+            "equity": "99030.687567892932867833778909832706148366397511"
+          },
+          {
+            "date": "2023-09-14",
+            "cash": "89098.027635233000207901118977172773488433737481",
+            "heldQuantity": "1683.5016835016835016835016835016835016835017",
+            "equity": "99131.697668903033877934789010842807158467407613"
+          },
+          {
+            "date": "2023-09-15",
+            "cash": "89098.027635233000207901118977172773488433737481",
+            "heldQuantity": "1683.5016835016835016835016835016835016835017",
+            "equity": "99148.532685738050712951624027677823993484242630"
+          }
+        ]
+      },
+      "benchmark": {
+        "firstDate": "2023-08-01",
+        "lastDate": "2023-09-15",
+        "buyPrice": "6.45",
+        "sellPrice": "5.97",
+        "quantity": "15499.0713178294573643410852713178294573643410",
+        "buyGross": "99969.009999999999999999999999999999999999999450",
+        "buyFees": "30.99",
+        "residualCash": "5.50E-40",
+        "sellGross": "92529.455767441860465116279069767441860465115770",
+        "sellFees": "74.95",
+        "finalCash": "92454.505767441860465116279069767441860465116320",
+        "netReturn": "-0.07545494232558139535",
+        "netReturnDifference": "0.06694026918296190248",
+        "nextQuantityUnaffordable": true
+      }
+    },
+    {
+      "runId": "dbc39963-da96-4583-8746-01feac9c7ff2",
+      "snapshotId": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+      "resultChecksum": "022494dccd271850",
+      "independentDecimalCheck": true,
+      "allFillChargesExact": true,
+      "allDailyEquitiesExact": true,
+      "equityDatesChecked": 34,
+      "strategy": {
+        "initialCash": "100000",
+        "fillCount": 8,
+        "totalFees": "60.78",
+        "finalCash": "99913.902543304415228090373856654163598524684442",
+        "finalQuantity": "0E-40",
+        "finalMarkPrice": "1628.54",
+        "finalEquity": "99913.902543304415228090373856654163598524684442",
+        "netReturn": "-0.00086097456695584772",
+        "cashLedger": [
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:0:order:fill",
+            "date": "2023-08-02",
+            "side": "buy",
+            "quantity": "5.7805138876846151622879273967455706812336",
+            "price": "1729.95",
+            "gross": "10000.000000000000000000000000000000000000066320",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89994.899999999999999999999999999999999999933680",
+            "heldQuantity": "5.7805138876846151622879273967455706812336"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:2:order:fill",
+            "date": "2023-08-04",
+            "side": "sell",
+            "quantity": "5.7805138876846151622879273967455706812336",
+            "price": "1734.37",
+            "gross": "10025.549871383565999017312639093615422411118832",
+            "charges": [
+              "5.00",
+              "5.01",
+              "0.10"
+            ],
+            "cash": "100010.339871383565999017312639093615422411052512",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:3:order:fill",
+            "date": "2023-08-07",
+            "side": "buy",
+            "quantity": "5.7887120115774240231548480463096960926194",
+            "price": "1727.5",
+            "gross": "10000.00000000000000000000000000000000000001350",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "90005.239871383565999017312639093615422411039012",
+            "heldQuantity": "5.7887120115774240231548480463096960926194"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:7:order:fill",
+            "date": "2023-08-11",
+            "side": "sell",
+            "quantity": "5.7887120115774240231548480463096960926194",
+            "price": "1731.55",
+            "gross": "10023.444283646888567293777134587554269175122070",
+            "charges": [
+              "5.00",
+              "5.01",
+              "0.10"
+            ],
+            "cash": "100018.574155030454566311089773681169691586161082",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:12:order:fill",
+            "date": "2023-08-18",
+            "side": "buy",
+            "quantity": "5.9575583542840802125656820808559819843435",
+            "price": "1678.54",
+            "gross": "9999.999999999999999999999999999999999999938490",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "90013.474155030454566311089773681169691586222592",
+            "heldQuantity": "5.9575583542840802125656820808559819843435"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:13:order:fill",
+            "date": "2023-08-21",
+            "side": "sell",
+            "quantity": "5.9575583542840802125656820808559819843435",
+            "price": "1639.55",
+            "gross": "9767.714799766463712512064055667425262430385425",
+            "charges": [
+              "5.00",
+              "4.88",
+              "0.10"
+            ],
+            "cash": "99771.208954796918278823153829348594954016608017",
+            "heldQuantity": "0E-40"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:17:order:fill",
+            "date": "2023-08-25",
+            "side": "buy",
+            "quantity": "6.0410550098469196660504790556622808607295",
+            "price": "1655.34",
+            "gross": "9999.999999999999999999999999999999999999970530",
+            "charges": [
+              "5.00",
+              "0.10"
+            ],
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295"
+          },
+          {
+            "fillId": "dbc39963-da96-4583-8746-01feac9c7ff2:intent:27:order:fill",
+            "date": "2023-09-08",
+            "side": "sell",
+            "quantity": "6.0410550098469196660504790556622808607295",
+            "price": "1681.49",
+            "gross": "10157.973588507496949267220027305568644508046955",
+            "charges": [
+              "5.00",
+              "5.08",
+              "0.10"
+            ],
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40"
+          }
+        ],
+        "equityChecks": [
+          {
+            "date": "2023-08-01",
+            "cash": "100000",
+            "heldQuantity": "0",
+            "equity": "100000.00"
+          },
+          {
+            "date": "2023-08-02",
+            "cash": "89994.899999999999999999999999999999999999933680",
+            "heldQuantity": "5.7805138876846151622879273967455706812336",
+            "equity": "99975.246252781872308448221046851065059683805760"
+          },
+          {
+            "date": "2023-08-03",
+            "cash": "89994.899999999999999999999999999999999999933680",
+            "heldQuantity": "5.7805138876846151622879273967455706812336",
+            "equity": "99966.402066533714847249920517934044336541518352"
+          },
+          {
+            "date": "2023-08-04",
+            "cash": "100010.339871383565999017312639093615422411052512",
+            "heldQuantity": "0E-40",
+            "equity": "100010.339871383565999017312639093615422411052512"
+          },
+          {
+            "date": "2023-08-07",
+            "cash": "90005.239871383565999017312639093615422411039012",
+            "heldQuantity": "5.7887120115774240231548480463096960926194",
+            "equity": "100045.645081224376418698933478456857101137535924"
+          },
+          {
+            "date": "2023-08-08",
+            "cash": "90005.239871383565999017312639093615422411039012",
+            "heldQuantity": "5.7887120115774240231548480463096960926194",
+            "equity": "100057.627715088341686426864013912718172049258082"
+          },
+          {
+            "date": "2023-08-09",
+            "cash": "90005.239871383565999017312639093615422411039012",
+            "heldQuantity": "5.7887120115774240231548480463096960926194",
+            "equity": "100059.248554451583365153347371365684886955191514"
+          },
+          {
+            "date": "2023-08-10",
+            "cash": "90005.239871383565999017312639093615422411039012",
+            "heldQuantity": "5.7887120115774240231548480463096960926194",
+            "equity": "99970.797034914680326079541293218072730659967082"
+          },
+          {
+            "date": "2023-08-11",
+            "cash": "100018.574155030454566311089773681169691586161082",
+            "heldQuantity": "0E-40",
+            "equity": "100018.574155030454566311089773681169691586161082"
+          },
+          {
+            "date": "2023-08-14",
+            "cash": "100018.574155030454566311089773681169691586161082",
+            "heldQuantity": "0E-40",
+            "equity": "100018.574155030454566311089773681169691586161082"
+          },
+          {
+            "date": "2023-08-15",
+            "cash": "100018.574155030454566311089773681169691586161082",
+            "heldQuantity": "0E-40",
+            "equity": "100018.574155030454566311089773681169691586161082"
+          },
+          {
+            "date": "2023-08-16",
+            "cash": "100018.574155030454566311089773681169691586161082",
+            "heldQuantity": "0E-40",
+            "equity": "100018.574155030454566311089773681169691586161082"
+          },
+          {
+            "date": "2023-08-17",
+            "cash": "100018.574155030454566311089773681169691586161082",
+            "heldQuantity": "0E-40",
+            "equity": "100018.574155030454566311089773681169691586161082"
+          },
+          {
+            "date": "2023-08-18",
+            "cash": "90013.474155030454566311089773681169691586222592",
+            "heldQuantity": "5.9575583542840802125656820808559819843435",
+            "equity": "99838.321939414502608061658720504003821246462182"
+          },
+          {
+            "date": "2023-08-21",
+            "cash": "99771.208954796918278823153829348594954016608017",
+            "heldQuantity": "0E-40",
+            "equity": "99771.208954796918278823153829348594954016608017"
+          },
+          {
+            "date": "2023-08-22",
+            "cash": "99771.208954796918278823153829348594954016608017",
+            "heldQuantity": "0E-40",
+            "equity": "99771.208954796918278823153829348594954016608017"
+          },
+          {
+            "date": "2023-08-23",
+            "cash": "99771.208954796918278823153829348594954016608017",
+            "heldQuantity": "0E-40",
+            "equity": "99771.208954796918278823153829348594954016608017"
+          },
+          {
+            "date": "2023-08-24",
+            "cash": "99771.208954796918278823153829348594954016608017",
+            "heldQuantity": "0E-40",
+            "equity": "99771.208954796918278823153829348594954016608017"
+          },
+          {
+            "date": "2023-08-25",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "99863.913635406339908216511085259767281151818622"
+          },
+          {
+            "date": "2023-08-28",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "99924.263774954710635680355371025833466950506327"
+          },
+          {
+            "date": "2023-08-29",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "100023.095434915806241416941208376468381832040947"
+          },
+          {
+            "date": "2023-08-30",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "100051.307161811791356257396945566411233451647712"
+          },
+          {
+            "date": "2023-08-31",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "99996.937666723169079262942634065450705705082212"
+          },
+          {
+            "date": "2023-09-01",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "100021.403939513049103910447074240882943191036687"
+          },
+          {
+            "date": "2023-09-04",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "100111.717711910260552917901736123034042058942712"
+          },
+          {
+            "date": "2023-09-05",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "100067.618010338378039355733239016699391775617362"
+          },
+          {
+            "date": "2023-09-06",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "100081.512436861025954587649340844722637755295212"
+          },
+          {
+            "date": "2023-09-07",
+            "cash": "89766.108954796918278823153829348594954016637487",
+            "heldQuantity": "6.0410550098469196660504790556622808607295",
+            "equity": "99942.568171634546802268488322564490177958516712"
+          },
+          {
+            "date": "2023-09-08",
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40",
+            "equity": "99913.902543304415228090373856654163598524684442"
+          },
+          {
+            "date": "2023-09-11",
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40",
+            "equity": "99913.902543304415228090373856654163598524684442"
+          },
+          {
+            "date": "2023-09-12",
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40",
+            "equity": "99913.902543304415228090373856654163598524684442"
+          },
+          {
+            "date": "2023-09-13",
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40",
+            "equity": "99913.902543304415228090373856654163598524684442"
+          },
+          {
+            "date": "2023-09-14",
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40",
+            "equity": "99913.902543304415228090373856654163598524684442"
+          },
+          {
+            "date": "2023-09-15",
+            "cash": "99913.902543304415228090373856654163598524684442",
+            "heldQuantity": "0E-40",
+            "equity": "99913.902543304415228090373856654163598524684442"
+          }
+        ]
+      },
+      "benchmark": {
+        "firstDate": "2023-08-01",
+        "lastDate": "2023-09-15",
+        "buyPrice": "1735.55",
+        "sellPrice": "1628.54",
+        "quantity": "57.6007663276771052404137017083921523436374",
+        "buyGross": "99969.009999999999999999999999999999999999889570",
+        "buyFees": "30.99",
+        "residualCash": "1.10430E-37",
+        "sellGross": "93805.151995275272968223329780184955777707251396",
+        "sellFees": "75.98",
+        "finalCash": "93729.171995275272968223329780184955777707361826",
+        "netReturn": "-0.06270828004724727032",
+        "netReturnDifference": "0.06184730548029142260",
+        "nextQuantityUnaffordable": true
+      }
+    }
+  ],
+  "policy": {
+    "revision": 40,
+    "dsaRevision": 40,
+    "syncState": "applied",
+    "routes": [
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "hithink",
+            "upstreamSource": "fund-market-historical"
+          },
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "MUTUAL_FUND",
+          "capability": "FUND_NAV_HISTORY"
+        },
+        "targets": [
+          {
+            "providerId": "efinance",
+            "upstreamSource": "eastmoney"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "hfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "none"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "REALTIME_QUOTE"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_PUBLIC_FEES"
+        },
+        "targets": [
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees"
+          },
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees-archive"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_TRADING_STATUS"
+        },
+        "targets": [
+          {
+            "providerId": "official-states",
+            "upstreamSource": "cn-stock-daily-suspension"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -114,6 +114,7 @@ export const removeProviderTargets = (routes: MarketPolicyRoutes, providerId: st
 export const persistMarketPolicyRevision = async (
   prisma: PrismaService,
   policy: MarketPolicyPayload,
+  expectedRevision?: number,
 ) =>
   prisma.$transaction(async (transaction) => {
     await transaction.$queryRaw(Prisma.sql`
@@ -126,6 +127,8 @@ export const persistMarketPolicyRevision = async (
       include: { history: { orderBy: { revision: 'desc' }, take: 20 } },
     });
     const currentRoutes = decodeMarketPolicyRoutes(current.routes);
+    if (expectedRevision !== undefined && current.revision !== expectedRevision)
+      throw new ConflictException('Policy 已改变，请重新读取后再操作');
     if (policy.revision < current.revision) throw new ConflictException('Policy revision 不能回退');
     if (policy.revision === current.revision) {
       if (

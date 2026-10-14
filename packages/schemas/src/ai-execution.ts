@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { nonNegativeDecimalStringSchema } from './monetary-values.js';
+import {
+  authoringAnalysisOutputSchema,
+  authoringGenerationOutputSchema,
+  authoringModificationOutputSchema,
+} from './strategy-authoring-generation.js';
 import { aiResearchContextSchema, aiResearchTemplateIdSchema } from './ai.js';
 import {
   optimizationDiscoveryGenerationOutputSchema,
@@ -48,6 +53,24 @@ export const aiRoutingSettingsSchema = z
 export type AiRoutingSettings = z.infer<typeof aiRoutingSettingsSchema>;
 
 export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
+  z
+    .object({
+      id: z.literal('strategy_authoring_analysis'),
+      version: z.literal('authoring-analysis-v1'),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.literal('strategy_authoring_generation'),
+      version: z.enum(['authoring-generation-v1', 'authoring-generation-v2']),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.literal('strategy_authoring_modification'),
+      version: z.enum(['authoring-modification-v1', 'authoring-modification-v2']),
+    })
+    .strict(),
   z
     .object({
       id: z.literal('parameter_optimization'),
@@ -108,6 +131,27 @@ export const aiResearchGenerationSchema = z
 export type AiResearchGeneration = z.infer<typeof aiResearchGenerationSchema>;
 
 export const aiGenerationContracts = {
+  authoringAnalysis: {
+    ref: {
+      id: 'strategy_authoring_analysis',
+      version: 'authoring-analysis-v1',
+    } satisfies AiGenerationContractRef,
+    schema: authoringAnalysisOutputSchema,
+  },
+  authoringGeneration: {
+    ref: {
+      id: 'strategy_authoring_generation',
+      version: 'authoring-generation-v2',
+    } satisfies AiGenerationContractRef,
+    schema: authoringGenerationOutputSchema,
+  },
+  authoringModification: {
+    ref: {
+      id: 'strategy_authoring_modification',
+      version: 'authoring-modification-v2',
+    } satisfies AiGenerationContractRef,
+    schema: authoringModificationOutputSchema,
+  },
   parameterOptimization: {
     ref: {
       id: 'parameter_optimization',

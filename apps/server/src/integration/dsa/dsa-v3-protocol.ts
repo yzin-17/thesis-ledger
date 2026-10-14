@@ -29,13 +29,19 @@ export type DsaV3ErrorCode =
   | 'unsupported-capability'
   | 'insufficient-coverage'
   | 'control-rejected'
+  | 'source-symbol-unrecognized'
+  | 'invalid-request'
+  | 'permission-denied'
+  | 'source-authentication-failed'
   | 'stale-revision';
+// 来源错误与 Data Token 鉴权、证券的全局存在性分开。
 
 export class DsaV3ProtocolError extends Error {
   constructor(
     message: string,
     readonly code: DsaV3ErrorCode,
     readonly status?: number,
+    readonly sourceReason?: string,
   ) {
     super(message);
   }
@@ -248,6 +254,7 @@ export const mapDataV3HttpError = (
     }
     const { error } = parsed.data;
     switch (error.code) {
+      case marketDataErrorCodeV3.unsupportedCapability:
       case marketDataErrorCodeV3.unsupportedDataContractVersion:
       case marketDataErrorCodeV3.unsupportedPriceBasis:
         return new DsaV3ProtocolError(error.message, 'unsupported-capability', status);
@@ -257,6 +264,14 @@ export const mapDataV3HttpError = (
         return new DsaV3ProtocolError(error.message, 'unavailable', status);
       case marketDataErrorCodeV3.invalidResponse:
         return new DsaV3ProtocolError(error.message, 'invalid-response', status);
+      case marketDataErrorCodeV3.sourceSymbolUnrecognized:
+        return new DsaV3ProtocolError(error.message, 'source-symbol-unrecognized', status, error.code);
+      case marketDataErrorCodeV3.invalidRequest:
+        return new DsaV3ProtocolError(error.message, 'invalid-request', status, error.code);
+      case marketDataErrorCodeV3.permissionDenied:
+        return new DsaV3ProtocolError(error.message, 'permission-denied', status, error.code);
+      case marketDataErrorCodeV3.authenticationFailed:
+        return new DsaV3ProtocolError(error.message, 'source-authentication-failed', status, error.code);
     }
   }
 

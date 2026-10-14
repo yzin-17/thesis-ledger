@@ -1,5 +1,6 @@
 import type { BacktestCorporateActionFact, TradingCalendar } from '@thesis-ledger/domain';
 import { compareMarketPitEvidenceInstantStringsV1 } from '@thesis-ledger/schemas';
+import { cashEventAccountingProjectionV3 } from './backtest-cash-event-accounting-v3.js';
 
 export class BacktestEventAccountingError extends Error {
   readonly code = 'DATA_UNAVAILABLE';
@@ -14,6 +15,7 @@ export function prepareEventAccountingV3(
     startDate: string;
     endDate: string;
     dataAsOf: string;
+    cashEventResearch?: 'ex-date-entitlement-payment-date-cash-v1';
   },
 ): BacktestCorporateActionFact[] {
   const openings = new Map<string, string>();
@@ -42,12 +44,14 @@ export function prepareEventAccountingV3(
       asOfOrder === undefined ||
       asOfOrder > 0 ||
       accountingOrder === undefined ||
-      accountingOrder > 0
+      (accountingOrder > 0 && !input.cashEventResearch)
     ) {
       throw new BacktestEventAccountingError(
         '公司行动缺少生效日冻结开盘或事实在生效记账时尚不可用。',
       );
     }
+    if (input.cashEventResearch)
+      return [cashEventAccountingProjectionV3(fact, { ...input, accountingAt, openings })];
     return [{ ...fact, accountingAt }];
   });
 }

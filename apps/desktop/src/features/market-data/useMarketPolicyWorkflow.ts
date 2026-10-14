@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
   useRetryMarketPolicyMutation,
   useSaveMarketPolicyMutation,
 } from './market-data.mutations.js';
 import { routeAvailabilityLabelV3 } from './market-data-routes-v3.js';
-import type { MarketPolicyDraftV3, MarketPolicyResponse } from './market-data.types.js';
+import { withDefaultHithinkRoutes } from './market-policy-defaults-v3.js';
+import type {
+  MarketPolicyDraftV3,
+  MarketPolicyResponse,
+  MarketRouteCatalogReadV3,
+  ProviderManifest,
+} from './market-data.types.js';
 
 const toPolicyDraftV3 = (policy: MarketPolicyResponse): MarketPolicyDraftV3 => {
   return {
@@ -25,24 +31,46 @@ const retryMessage = (policy: MarketPolicyResponse) => {
 export function useMarketPolicyWorkflow({
   policy,
   catalogComplete,
+  catalog,
+  providers,
   setBusyAction,
   setMessage,
 }: {
   policy: MarketPolicyResponse | undefined;
   catalogComplete: boolean;
+  catalog: MarketRouteCatalogReadV3 | undefined;
+  providers: readonly ProviderManifest[] | undefined;
   setBusyAction: Dispatch<SetStateAction<string | null>>;
   setMessage: (next: { type: 'success' | 'error'; text: string } | null) => void;
 }) {
   const [draft, setDraft] = useState<MarketPolicyDraftV3 | null>(null);
   const [dirty, setDirty] = useState(false);
+  const defaultsInitialized = useRef(false);
+  const hydratedPolicy = useRef<MarketPolicyResponse | undefined>(undefined);
   const saveMutation = useSaveMarketPolicyMutation();
   const retryMutation = useRetryMarketPolicyMutation();
 
   useEffect(() => {
-    if (!policy) return;
+    if (!policy || hydratedPolicy.current === policy) return;
+    hydratedPolicy.current = policy;
+    if (dirty) return;
     setDraft(toPolicyDraftV3(policy));
-    setDirty(false);
-  }, [policy]);
+  }, [policy, dirty]);
+
+  useEffect(() => {
+    if (!policy || !providers || catalog?.status !== 'complete' || defaultsInitialized.current)
+      return;
+    if (dirty) {
+      defaultsInitialized.current = true;
+      return;
+    }
+    const initial = toPolicyDraftV3(policy);
+    const next = withDefaultHithinkRoutes(initial, catalog, providers);
+    if (next === initial) return;
+    defaultsInitialized.current = true;
+    setDraft(next);
+    setDirty(true);
+  }, [policy, catalog, providers, dirty]);
 
   const changeDraft = useCallback((next: MarketPolicyDraftV3) => {
     setDraft(next);

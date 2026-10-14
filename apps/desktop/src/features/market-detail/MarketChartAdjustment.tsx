@@ -20,6 +20,7 @@ export const chartAdjustmentReason: Record<
   not_adapted: '暂未接入',
   unsupported_adjustment: '来源不支持此口径',
   credential_missing: '尚未配置凭据',
+  dependency_missing: '依赖数据尚未就绪',
   not_admitted: '尚未完成来源准入',
   admission_invalid: '来源准入已失效',
   admission_not_yet_valid: '来源准入尚未生效',

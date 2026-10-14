@@ -1,7 +1,14 @@
+import { lifecyclePreparationDiagnosticExport } from './backtest-lifecycle-preparation-diagnostics.js';
 import type { BacktestJob, BacktestJobResult } from './strategy.types.js';
+import { backtestUnknownListingWarningV3 } from '@thesis-ledger/schemas';
+import { tradingStatusDiagnosticExport } from './backtest-trading-status-disclosure.model.js';
+import { publicFeesDiagnosticExport } from './backtest-public-fees-diagnostic.js';
+import { cashDividendDiagnosticExport } from './backtest-cash-dividend-disclosure.model.js';
+import { knownCashDiagnosticExport } from './backtest-known-cash-disclosure.model.js';
+import { executionResearchDiagnostics } from './backtest-execution-research-diagnostics.model.js';
 
 export const BACKTEST_DIAGNOSTIC_FORMAT = 'thesis-ledger.backtest-diagnostics';
-export const BACKTEST_DIAGNOSTIC_FORMAT_VERSION = 1;
+export const BACKTEST_DIAGNOSTIC_FORMAT_VERSION = 2;
 
 type DiagnosticScalar = string | number | boolean | null;
 type DiagnosticRecord = Record<string, DiagnosticScalar>;
@@ -28,12 +35,29 @@ export type BacktestDiagnosticExport = {
     initialCash: DiagnosticRecord;
     valuationPolicy: DiagnosticRecord;
     executionModel: DiagnosticRecord;
+    brokerCosts?: ReturnType<typeof executionResearchDiagnostics>['brokerCosts'];
+    researchLotSize?: ReturnType<typeof executionResearchDiagnostics>['researchLotSize'];
+    marketRuleResearch?: 'raw-prices-no-corporate-actions-v1';
+    lifecyclePreparation?: ReturnType<typeof lifecyclePreparationDiagnosticExport>;
   };
   outcome: {
     completeness: DiagnosticScalar;
     warnings: string[];
     metrics: Record<string, DiagnosticRecord>;
+    benchmark: Record<string, DiagnosticRecord>;
+    benchmarkCompatibility: {
+      status: DiagnosticScalar;
+      strategyFingerprint: DiagnosticScalar;
+      benchmarkFingerprint: DiagnosticScalar;
+      missingFields: string[];
+      differentFields: string[];
+      costAssumption: DiagnosticRecord;
+    };
     failure: DiagnosticRecord;
+    tradingStatus?: ReturnType<typeof tradingStatusDiagnosticExport>;
+    publicFees?: ReturnType<typeof publicFeesDiagnosticExport>;
+    cashDividends?: ReturnType<typeof cashDividendDiagnosticExport>;
+    knownCashDividends?: ReturnType<typeof knownCashDiagnosticExport>;
   };
   traceability: DiagnosticRecord;
   reproduction: {
@@ -120,7 +144,13 @@ const currencyAmounts = (value: unknown): DiagnosticRecord => {
 
 const metricExport = (value: unknown): DiagnosticRecord => {
   const source = record(value);
-  if (!source) return { status: value === null || value === undefined ? null : 'available', value: safeScalar(value), reason: null, code: null };
+  if (!source)
+    return {
+      status: value === null || value === undefined ? null : 'available',
+      value: safeScalar(value),
+      reason: null,
+      code: null,
+    };
   return {
     status: safeScalar(source.status),
     value: safeScalar(source.value),
@@ -156,7 +186,9 @@ const executionModelExport = (
 ): DiagnosticRecord => {
   const disclosure =
     record(result.executionModelDisclosure) ?? record(job.executionModelDisclosure);
-  const model = record(firstPresent(field(disclosure, 'model'), field(runConfig, 'executionModel')));
+  const model = record(
+    firstPresent(field(disclosure, 'model'), field(runConfig, 'executionModel')),
+  );
   const scope = record(field(model, 'scope'));
   const range = record(field(scope, 'range'));
   const segments = field(model, 'segments');
@@ -204,9 +236,7 @@ const configurationExport = (
   const valuationPolicy = record(field(runConfig, 'valuationPolicy'));
   const metadata = record(result.metadata);
   return {
-    dataAsOf: safeString(
-      firstPresent(field(runConfig, 'dataAsOf'), result.dataAsOf, job.dataAsOf),
-    ),
+    dataAsOf: safeString(firstPresent(field(runConfig, 'dataAsOf'), result.dataAsOf, job.dataAsOf)),
     baseCurrency: safeString(
       firstPresent(
         field(runConfig, 'baseCurrency'),
@@ -219,6 +249,44 @@ const configurationExport = (
     ),
     valuationPolicy: { missingPrice: safeScalar(field(valuationPolicy, 'missingPrice')) },
     executionModel: executionModelExport(job, result, runConfig),
+    ...executionResearchDiagnostics(
+      firstPresent(
+        field(record(result.executionModelDisclosure ?? job.executionModelDisclosure), 'model'),
+        field(runConfig, 'executionModel'),
+      ),
+      sanitizeBacktestDiagnosticText,
+    ),
+    ...(lifecyclePreparationDiagnosticExport(runConfig, sanitizeBacktestDiagnosticText)
+      ? {
+          lifecyclePreparation: lifecyclePreparationDiagnosticExport(
+            runConfig,
+            sanitizeBacktestDiagnosticText,
+          ),
+        }
+      : {}),
+    ...(field(record(field(runConfig, 'executionPriceProtocol')), 'marketRuleResearch') ===
+    'raw-prices-no-corporate-actions-v1'
+      ? { marketRuleResearch: 'raw-prices-no-corporate-actions-v1' as const }
+      : {}),
+  };
+};
+
+const benchmarkCompatibilityExport = (result: BacktestJobResult) => {
+  const compatibility = record(result.benchmarkCompatibility);
+  const cost = record(compatibility?.costAssumption);
+  return {
+    status: safeScalar(compatibility?.status),
+    strategyFingerprint: safeScalar(compatibility?.strategyFingerprint),
+    benchmarkFingerprint: safeScalar(compatibility?.benchmarkFingerprint),
+    missingFields: warningExport(compatibility?.missingFields),
+    differentFields: warningExport(compatibility?.differentFields),
+    costAssumption: {
+      kind: safeScalar(cost?.kind),
+      version: safeScalar(cost?.version),
+      fingerprint: safeScalar(cost?.fingerprint),
+      commissionRate: safeScalar(cost?.commissionRate),
+      slippageRate: safeScalar(cost?.slippageRate),
+    },
   };
 };
 
@@ -229,6 +297,40 @@ const outcomeExport = (
   completeness: safeScalar(result.completeness),
   warnings: warningExport(firstPresent(result.warnings, job.warnings)),
   metrics: metricsExport(result.metrics),
+  benchmark: metricsExport(result.benchmark),
+  benchmarkCompatibility: benchmarkCompatibilityExport(result),
+  ...(result.schemaVersion === '3' && result.knownCashDividendDisclosure !== undefined
+    ? {
+        knownCashDividends: knownCashDiagnosticExport(
+          result.knownCashDividendDisclosure,
+          sanitizeBacktestDiagnosticText,
+        ),
+      }
+    : {}),
+  ...(result.schemaVersion === '3' && result.publicFeesDisclosure !== undefined
+    ? {
+        publicFees: publicFeesDiagnosticExport(
+          result.publicFeesDisclosure,
+          sanitizeBacktestDiagnosticText,
+        ),
+      }
+    : {}),
+  ...(result.schemaVersion === '3' && result.cashDividendDisclosure !== undefined
+    ? {
+        cashDividends: cashDividendDiagnosticExport(
+          result.cashDividendDisclosure,
+          sanitizeBacktestDiagnosticText,
+        ),
+      }
+    : {}),
+  ...(result.schemaVersion === '3' && result.tradingStatusDisclosure !== undefined
+    ? {
+        tradingStatus: tradingStatusDiagnosticExport(
+          result.tradingStatusDisclosure,
+          sanitizeBacktestDiagnosticText,
+        ),
+      }
+    : {}),
   failure: {
     code: safeScalar(job.errorCode),
     summary: safeScalar(job.errorSummary),
@@ -299,6 +401,17 @@ export const buildBacktestDiagnosticSummary = (payload: BacktestDiagnosticExport
     summaryLine('数据冻结时点', payload.frozenConfiguration.dataAsOf),
     summaryLine('执行模型', payload.frozenConfiguration.executionModel),
     summaryLine('结果完整性', payload.outcome.completeness),
+    ...(payload.outcome.warnings.includes(backtestUnknownListingWarningV3)
+      ? [summaryLine('数据说明', backtestUnknownListingWarningV3)]
+      : []),
+    summaryLine('基准指标', payload.outcome.benchmark),
+    ...(payload.outcome.knownCashDividends
+      ? [summaryLine('已知现金方案研究', payload.outcome.knownCashDividends)]
+      : []),
+    summaryLine('基准兼容与成本身份', payload.outcome.benchmarkCompatibility),
+    ...(payload.outcome.tradingStatus
+      ? [summaryLine('停复牌来源与状态', payload.outcome.tradingStatus)]
+      : []),
     summaryLine('引擎版本', payload.traceability.engineVersion),
     summaryLine('数据快照 ID', payload.traceability.snapshotId),
     summaryLine('内容哈希', payload.traceability.contentHash),

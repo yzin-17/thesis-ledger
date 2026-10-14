@@ -7,6 +7,7 @@ import { Switch, SwitchThumb } from '@/components/ui/switch';
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetFooter,
   SheetHeader,
@@ -103,7 +104,7 @@ export const AutomationEditorSheet = ({
             className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={onSubmit}
           >
-            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+            <SheetBody>
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="automation-job-type">任务类型</FieldLabel>
@@ -206,7 +207,7 @@ export const AutomationEditorSheet = ({
                   </Switch>
                 </div>
               </FieldGroup>
-            </div>
+            </SheetBody>
             <SheetFooter>
               <Button
                 type="button"

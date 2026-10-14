@@ -1,4 +1,6 @@
 import { DecimalValue } from './decimal.js';
+import { calculateBrokerCommission, type FrozenBrokerCommission } from './backtest-broker-commission.js';
+import { calculateActualSharesFee, roundExecutionFeeAmount, type ExecutionFeeAmountRounding, type FrozenActualSharesFee } from './backtest-public-fee-calculation.js';
 
 export type ExecutionModelCurrency = 'CNY' | 'HKD' | 'USD';
 export type ExecutionModelPriceAdjustment = 'none' | 'qfq' | 'hfq';
@@ -40,6 +42,7 @@ export type FrozenExecutionModelChargedFee = {
   currency: ExecutionModelCurrency;
   rate: string;
   minimum: { kind: 'none' } | { kind: 'amount'; amount: string };
+  amountRounding?: ExecutionFeeAmountRounding | undefined;
 };
 export type FrozenExecutionModelFee =
   | FrozenExecutionModelChargedFee
@@ -64,6 +67,7 @@ export type FrozenNavExecutionModelFee =
 
 /** The transport schema validates structure before this domain boundary. */
 export interface FrozenExecutionModelFees {
+  brokerCommission?: FrozenBrokerCommission | undefined;
   currency: ExecutionModelCurrency;
   rounding: { mode: 'halfUp'; decimalPlaces: 2 };
   collection: 'perFillPerCharge';
@@ -72,6 +76,8 @@ export interface FrozenExecutionModelFees {
   transferFee: FrozenExecutionModelFee;
   regulatoryFee: FrozenExecutionModelFee;
   handlingFee: FrozenExecutionModelFee;
+  afrcLevy?: FrozenExecutionModelChargedFee | undefined;
+  tradingActivityFee?: FrozenActualSharesFee | undefined;
 }
 
 export interface FrozenNormalizedExecutionAssumptions {
@@ -88,7 +94,11 @@ export interface FrozenExecutionModelSegmentBase {
   range: ExecutionModelRange;
   source:
     | { kind: 'historicalFact'; knownAt: string }
-    | { kind: 'researchPreset' | 'userConfiguration'; configuredAt: string };
+    | {
+        kind: 'researchPreset' | 'userConfiguration';
+        configuredAt: string;
+        historicalKnownAt?: string | undefined;
+      };
   assumptions: readonly string[];
 }
 
@@ -101,6 +111,8 @@ export interface FrozenExchangeExecutionModelSegment extends FrozenExecutionMode
     buyDebitAt: 'fill';
     sellableAfterTradingDays: number;
     saleReinvestableAfterTradingDays: number;
+    statusPolicy?: { intradayHalt: 'exclude-known-halt-date-v1';
+      resultAvailability?: 'valid-metrics-with-status-rejections-v1' };
     price:
       | {
           kind: 'dailyLimit';
@@ -110,7 +122,7 @@ export interface FrozenExchangeExecutionModelSegment extends FrozenExecutionMode
           rounding: 'halfUpToTick';
           minimumDistanceTicks: number;
           minimumPriceTicks: number;
-      }
+        }
       | { kind: 'noDailyLimit'; reason: string };
     normalizedExecution?: FrozenNormalizedExecutionAssumptions;
   };
@@ -220,8 +232,12 @@ export const resolveExecutionModelSegment = <T extends FrozenExecutionModelSegme
   );
   if (matches.length !== 1) return fail(`规则分段缺口或重叠: ${date}`);
   const selected = matches[0]!;
-  if (selected.source.kind === 'historicalFact') {
-    const knownAt = instant(selected.source.knownAt);
+  const factClock =
+    selected.source.kind === 'historicalFact'
+      ? selected.source.knownAt
+      : selected.source.historicalKnownAt;
+  if (factClock) {
+    const knownAt = instant(factClock);
     if (knownAt > at || knownAt > asOf) return fail(`规则事实在事件时尚不可知: ${selected.id}`);
   }
   // Return an event-owned copy: a subsequent configuration edit cannot rewrite it.
@@ -263,6 +279,8 @@ export const resolveNormalizedExecutionModelSegment = (
   }
   if (!segment.fees) return fail(`归一化执行模型缺少费用表: ${segment.id}`);
   const fees = segment.fees;
+  if (fees.tradingActivityFee) return fail('按股数收费不能消费归一化数量');
+  if (fees.brokerCommission?.basis.kind === 'actualShares') return fail('券商按股佣金不能消费归一化数量');
   if (fees.collection !== 'perFillPerCharge') {
     return fail(`归一化执行费用必须逐笔按模拟成交额计算: ${segment.id}`);
   }
@@ -297,6 +315,8 @@ const calculateChargedFee = (
   }
   if (fee.currency !== input.currency) return fail(`费用币种不一致: ${input.code}`);
   if (fee.basis !== input.basis) return fail(`费用基数不一致: ${input.code}`);
+  if (fee.amountRounding?.mode === 'ceil' && (input.code !== 'stampDuty' || input.currency !== 'HKD'))
+    return fail('整港元进位仅用于HKD印花税');
   if (fee.side !== 'both' && fee.side !== input.side) {
     return { code: input.code, amount: '0', currency: input.currency };
   }
@@ -312,7 +332,7 @@ const calculateChargedFee = (
   }
   return {
     code: input.code,
-    amount: amount.dividedBy('1', input.decimalPlaces).toString(),
+    amount: roundExecutionFeeAmount(amount, input.decimalPlaces, fee.amountRounding),
     currency: input.currency,
   };
 };
@@ -346,7 +366,8 @@ export const calculateNavExecutionModelFee = (
 
 export const calculateExecutionModelFees = (
   fees: FrozenExecutionModelFees,
-  input: { side: 'buy' | 'sell'; turnover: string; currency: ExecutionModelCurrency },
+  input: { side: 'buy' | 'sell'; turnover: string; currency: ExecutionModelCurrency;
+    quantity?: string; price?: string; quantityBasis?: ExecutionModelQuantityBasis },
 ) => {
   if (fees.currency !== input.currency) return fail('费用币种与成交币种不一致');
   if (
@@ -358,16 +379,25 @@ export const calculateExecutionModelFees = (
   }
   const turnover = DecimalValue.from(input.turnover);
   if (turnover.isNegative()) return fail('成交金额不能为负数');
+  if (fees.afrcLevy && (fees.currency !== 'HKD' || fees.afrcLevy.side !== 'both'))
+    return fail('AFRC费项须为港元双侧收费');
   const charges: { code: string; amount: string; currency: ExecutionModelCurrency }[] = [];
+  if (fees.brokerCommission) {
+    if (fees.commission.rate !== '0' || fees.commission.minimum.kind !== 'none' || fees.commission.side !== 'both')
+      return fail('券商成本与旧佣金重复或口径冲突');
+    charges.push(...calculateBrokerCommission(fees.brokerCommission, input));
+  }
   for (const key of [
     'commission',
     'stampDuty',
     'transferFee',
     'regulatoryFee',
     'handlingFee',
+    'afrcLevy',
   ] as const) {
     const fee = fees[key];
-    if (fee.treatment !== 'charged') continue;
+    if (key === 'commission' && fees.brokerCommission) continue;
+    if (!fee || fee.treatment !== 'charged') continue;
     const charge = calculateChargedFee(fee, {
       code: key,
       side: input.side,
@@ -380,6 +410,8 @@ export const calculateExecutionModelFees = (
       charges.push(charge);
     }
   }
+  if (fees.tradingActivityFee)
+    charges.push(calculateActualSharesFee(fees.tradingActivityFee, { ...input, decimalPlaces: fees.rounding.decimalPlaces }));
   return {
     charges,
     total: charges

@@ -9,4 +9,4 @@
 
 两候选均不取得当前状态回退资格；不得以健康或旧版本结果读取成功标记原 F01 完成。源业务摘要、目录与策略身份前后不变，隔离资源残留为 0。
 
-执行日志：`/private/tmp/thesis-ledger-component-restore-20261003.log`、`/private/tmp/thesis-ledger-component-server-diagnostic-20261003.log`。完整入口与本地恢复制品续验见[剩余验收 Task](../2026-10-03-multi-source-remaining-acceptance.md)。
+执行日志：`/private/tmp/thesis-ledger-component-restore-20261003.log`、`/private/tmp/thesis-ledger-component-server-diagnostic-20261003.log`。完整入口与本地恢复制品续验见[剩余验收 Task](../../archive/tasks/2026-10-03-multi-source-remaining-acceptance.md)。

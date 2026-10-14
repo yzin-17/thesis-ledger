@@ -58,6 +58,7 @@ describe('回测模型响应与摘要', () => {
         currentRunForRead: vi.fn(async () => record),
       } as never,
       {} as never,
+      {} as never,
     );
     for (const response of [
       await controller.createRun({}),

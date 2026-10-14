@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BacktestNavRunController } from '../../src/backtest/backtest-nav-run.controller.js';
 import { BacktestNavRunListService } from '../../src/backtest/backtest-nav-run-list.service.js';
 import { BacktestNavRunService } from '../../src/backtest/backtest-nav-run.service.js';
@@ -9,9 +9,12 @@ import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.
 import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
 import { prepareNavRunConfigV3 } from '../../src/backtest/backtest-nav-preparation.js';
 import { navPreparationFixture } from './nav-preparation.fixtures.js';
+import { sharedStrategyHttpProviders } from './shared-strategy-http-providers.js';
 
 describe('NAV Run 历史列表', () => {
+  afterEach(() => vi.unstubAllEnvs());
   it('HTTP 返回严格的当前合同摘要，跳过旧合同和损坏记录', async () => {
+    vi.stubEnv('STRATEGY_IDENTITY_MODE', 'local');
     const source = navPreparationFixture();
     const prepared = await prepareNavRunConfigV3(source.options);
     const config = prepared.runConfig;
@@ -42,6 +45,7 @@ describe('NAV Run 历史列表', () => {
     @Module({
       controllers: [BacktestNavRunController],
       providers: [
+        ...sharedStrategyHttpProviders,
         { provide: BacktestNavRunService, useValue: {} },
         { provide: BacktestRunService, useValue: {} },
         { provide: BacktestQueueService, useValue: {} },
@@ -81,6 +85,11 @@ describe('NAV Run 历史列表', () => {
         expect.objectContaining({
           where: {
             mode: 'V3',
+            strategyVersion: {
+              strategy: {
+                OR: [{ ownerId: null }, { ownerId: '4cb546a5-b04f-4c0a-9d3b-6a53fdb74f57' }],
+              },
+            },
             AND: [
               { input: { path: ['contractVersion'], equals: 3 } },
               { input: { path: ['schemaVersion'], equals: '3' } },

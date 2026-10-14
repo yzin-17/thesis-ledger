@@ -5,6 +5,7 @@ import {
   desiredProviderPolicyV3Schema,
   effectiveProviderPolicyV3Schema,
   marketRouteKeyIdV3,
+  marketRouteCapabilityV3Schema,
 } from './market-route-v3.js';
 
 export const marketProviderRegistrySchema = z
@@ -20,6 +21,28 @@ export const marketProviderRegistrySchema = z
     'Provider 身份不得重复',
   )
   .transform(omitUndefinedDeep);
+
+/** 原Server目录读取投影；参数资格条目仍复用同一精确能力合同。 */
+export const marketRouteCatalogReadClientV3Schema = z.object({
+  contractVersion: z.literal(3),
+  consumer: z.literal('thesis-ledger'),
+  status: z.enum(['complete', 'partial', 'unavailable']),
+  catalogRevision: z.number().refine((value) => Number.isInteger(value) && value > 0).nullable(),
+  generatedAt: z.string().nullable(),
+  entries: z.array(marketRouteCapabilityV3Schema),
+  reason: z.enum(['catalog_partial', 'control_timeout', 'control_unauthorized',
+    'unsupported_capability', 'invalid_response', 'control_unavailable']).nullable(),
+}).superRefine((value, context) => {
+  if (value.status === 'complete' && value.reason !== null)
+    context.addIssue({ code: 'custom', path: ['reason'], message: '完整目录不应带不可用原因' });
+  if (value.status !== 'complete' && value.entries.length > 0)
+    context.addIssue({ code: 'custom', path: ['entries'], message: '不完整目录不能发布候选' });
+  if (value.status === 'partial' && value.reason !== 'catalog_partial')
+    context.addIssue({ code: 'custom', path: ['reason'], message: '部分目录原因不匹配' });
+  if (value.status === 'unavailable' && value.reason === null)
+    context.addIssue({ code: 'custom', path: ['reason'], message: '不可用目录须有明确原因' });
+});
+export type MarketRouteCatalogReadClientV3 = z.infer<typeof marketRouteCatalogReadClientV3Schema>;
 
 export const marketPolicyClientResponseSchema = z
   .object({

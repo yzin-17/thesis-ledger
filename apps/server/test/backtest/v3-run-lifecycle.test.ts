@@ -1,5 +1,6 @@
 import { BacktestCreationGuardService } from '../../src/backtest/backtest-creation-guard.service.js';
 import { preparationStampFor, preparedRevisionReader } from './v3-preparation-fixtures.js';
+import { exchangeExecutionModel } from './v2-execution.fixtures.js';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -46,6 +47,16 @@ const strategy = strategySchema.parse({
   cost: { commissionRate: '0', slippageRate: '0' },
 }) as BacktestStrategy;
 
+const modelTemplate = exchangeExecutionModel();
+const modelRange = { start: '2026-05-18', end: '2026-05-20' };
+const lifecycleModel = {
+  ...modelTemplate,
+  scope: { ...modelTemplate.scope, symbol: '159516.SZ', instrumentType: 'ETF' as const, range: modelRange },
+  segments: modelTemplate.segments.map(segment => ({
+    ...segment, range: modelRange,
+    source: { ...segment.source, configuredAt: '2026-05-17T00:00:00.000Z' },
+  })),
+};
 const runConfig = runConfigSchemaV3.parse({
   schemaVersion: '3',
   startDate: '2026-05-18',
@@ -53,6 +64,7 @@ const runConfig = runConfigSchemaV3.parse({
   dataAsOf: '2026-08-10T00:00:00.000Z',
   baseCurrency: 'CNY',
   initialCash: { CNY: '1000000' },
+  executionModel: lifecycleModel,
   valuationPolicy: {
     baseTimezone: 'Asia/Shanghai',
     dailyValuationTime: '15:00',
@@ -170,6 +182,18 @@ const prismaHarness = (existing: unknown = null) => {
 };
 
 describe('V3 Run lifecycle boundary', () => {
+  it('缺少当前创建合同要求的执行模型时仍在冻结前拒绝', async () => {
+    const state = prismaHarness();
+    const builder = { buildV3: vi.fn() };
+    const service = createTestRunService(state.prisma as never, undefined, undefined, builder);
+    const input = request();
+    const withoutModel = { ...input.runConfig }; delete withoutModel.executionModel;
+    const stamp = preparationStampFor(strategy, withoutModel, strategyVersionId);
+    await expect(service.createRun({ ...input, runConfig: withoutModel, preparationStamp: stamp }))
+      .rejects.toMatchObject({ response: { code: 'PREPARATION_STALE' } });
+    expect(builder.buildV3).not.toHaveBeenCalled();
+    expect(state.create).not.toHaveBeenCalled();
+  });
   it('在冻结或写库前拒绝执行币种现金不足的现行配置', async () => {
     const state = prismaHarness();
     const builder = { buildV3: vi.fn() };
@@ -374,7 +398,7 @@ describe('V3 Run lifecycle boundary', () => {
     await expect(service.createRun(request())).resolves.toBe(existing);
     expect(builder.buildV3).not.toHaveBeenCalled();
 
-    const changedConfig = runConfigSchemaV3.parse({ ...runConfig, endDate: '2026-05-21' });
+    const changedConfig = runConfigSchemaV3.parse({ ...runConfig, endDate: '2026-05-19' });
     await expect(
       service.createRun({ ...request(), runConfig: changedConfig }),
     ).rejects.toMatchObject({
@@ -406,7 +430,7 @@ describe('V3 Run lifecycle boundary', () => {
       ...existing,
       input: {
         ...existing.input,
-        runConfig: runConfigSchemaV3.parse({ ...runConfig, endDate: '2026-05-21' }),
+        runConfig: runConfigSchemaV3.parse({ ...runConfig, endDate: '2026-05-19' }),
       },
     });
     const alteredInputService = createTestRunService(

@@ -1,5 +1,7 @@
 # 移动端运行时 Review
 
+历史证据适用性（2026-10-03）：本报告只证明原记录的版本、输入与环境，不是当前全仓运行态声明。现行接口及任务承接关系见[状态对账 Review](2026-10-03-task-state-reconciliation.md)；原发布/设备/恢复未覆盖义务保留，不因本轮文档对账视为通过。
+
 ## 已完成
 
 - `apps/mobile` 已切换为 Expo/React Native 目标，包含 `app.json`、Metro/Babel 配置、Android/iOS native 目录和 EAS production profile。

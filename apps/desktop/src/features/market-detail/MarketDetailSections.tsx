@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type {
-  BarSeries,
+  MarketDisplayBarSeries as BarSeries,
   ChipDistribution,
   FundNavHistory,
   FundNav,
@@ -8,8 +8,8 @@ import type {
 } from '@thesis-ledger/schemas';
 import type {
   MarketDetailCapability,
-  MarketDetailResponse,
-  MarketDetailSection,
+  MarketDisplayDetailResponse as MarketDetailResponse,
+  MarketDisplayDetailSection as MarketDetailSection,
 } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,7 @@ import {
   formatQuoteChangePercent,
   quoteChangeTone,
 } from './market-quote-display.js';
+import { derivedSectionLabel } from './market-period-section-label.js';
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
@@ -224,19 +225,24 @@ const SectionHeading = ({
   section: MarketDetailSection;
   onRetry?: () => void;
   retrying: boolean;
-}) => (
-  <div className="flex flex-wrap items-start justify-between gap-3">
-    <div>
-      <h3 className="m-0 text-sm font-medium">{marketDetailSectionTitle(capability)}</h3>
-      {sectionIsDataReady(section) ? (
-        <p className="mb-0 mt-1 text-xs text-muted-foreground">
-          数据来自 {providerOf(section.data)}
-        </p>
-      ) : null}
+}) => {
+  const title = capability === 'bars' && !sectionIsDataReady(section)
+    ? '行情数据'
+    : derivedSectionLabel(section.data)?.title ?? marketDetailSectionTitle(capability);
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h3 className="m-0 text-sm font-medium">{title}</h3>
+        {sectionIsDataReady(section) ? (
+          <p className="mb-0 mt-1 text-xs text-muted-foreground">
+            数据来自 {derivedSectionLabel(section.data)?.source ?? providerOf(section.data)}
+          </p>
+        ) : null}
+      </div>
+      <SectionStatus section={section} {...(onRetry ? { onRetry } : {})} retrying={retrying} />
     </div>
-    <SectionStatus section={section} {...(onRetry ? { onRetry } : {})} retrying={retrying} />
-  </div>
-);
+  );
+};
 
 export const QuoteSection = ({
   section,
@@ -331,7 +337,7 @@ export const BarsSection = ({
   retrying: boolean;
 }) => {
   const series = section.data as BarSeries | undefined;
-  const bars = series ? chartBarsFromSeries(series) : [];
+  const bars = sectionIsDataReady(section) && series ? chartBarsFromSeries(series) : [];
   return (
     <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="bars">
       <SectionHeading
@@ -361,7 +367,7 @@ export const BarsSection = ({
             {...(latestError !== undefined ? { latestError } : {})}
           />
         ) : null,
-        <p className="empty-inline">当前没有可用日线。</p>,
+        <p className="empty-inline">当前没有可用行情。</p>,
       )}
     </section>
   );

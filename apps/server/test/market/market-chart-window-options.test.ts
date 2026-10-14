@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { barQueryFixture } from './bar-query.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   desiredProviderPolicyV3Schema,
@@ -55,7 +56,7 @@ describe('图表备用可用性绑定获取窗口', () => {
       reason: routeIndex === 0 ? 'credential_missing' : null,
     }));
     input.catalog.entries.push(...targets.map((target) => ({
-      key: input.desired.routes[0]!.key, target, state: 'ready' as const,
+      key: input.desired.routes[0]!.key, target, state: 'ready' as const, barQuery: barQueryFixture('qfq'),
     })));
     input.proofs.findExact.mockRejectedValue(new Error('不应读取人工证明'));
     expect((await resolveChartWindowOptions(input)).options[1]).toMatchObject({

@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { assetTypeForInstrument, symbolForInstrument } from './instruments/instrument-search.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { InstrumentAssociationService } from './instruments/instrument-association.service.js';
 import { InstrumentSearchService } from './instruments/instrument-search.service.js';
@@ -45,6 +46,16 @@ export class InstrumentService {
 
   requireConfirmed(instrumentId: string) {
     return this.associationsService().requireConfirmed(instrumentId);
+  }
+
+  async resolveTradableInstrument(instrumentId: string) {
+    const instrument = await this.prisma.instrument.findUnique({ where: { id: instrumentId } });
+    if (!instrument) throw new NotFoundException('目录标的不存在');
+    if (!instrument.active) throw new BadRequestException('目录标的已失效，请重新选择');
+    if (!['SH', 'SZ', 'BJ', 'OF', 'HK', 'US'].includes(instrument.market) || !['STOCK', 'ETF', 'MUTUAL_FUND'].includes(instrument.instrumentType))
+      throw new BadRequestException('目录标的类型或市场不在当前支持范围');
+    const market = ['SH', 'SZ', 'BJ', 'OF'].includes(instrument.market) ? 'CN' : instrument.market;
+    return { market, symbol: symbolForInstrument(instrument), assetType: assetTypeForInstrument(instrument.instrumentType) };
   }
 
   latestGeneration() {

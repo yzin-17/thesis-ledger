@@ -38,6 +38,39 @@ const removal = {
 };
 
 describe('Provider 当前消费合同', () => {
+  it('控制传输实际使用指定超时，其他请求继续使用配置值', async () => {
+    const client = Object.create(DsaClient.prototype) as DsaClient;
+    Object.defineProperty(client, 'config', { value: { controlToken: 'synthetic', dsaBaseUrl: 'http://synthetic.internal', dsaTimeoutMs: 5000 } });
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')));
+    try {
+      await client.control('/readonly', {}, 1, undefined, 22_000);
+      expect(timeout).toHaveBeenLastCalledWith(22_000);
+      await client.control('/readonly');
+      expect(timeout).toHaveBeenLastCalledWith(5000);
+    } finally {
+      timeout.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+  it('账户六接口检查使用有界外层预算，普通检查沿用默认超时', async () => {
+    const client = Object.create(DsaClient.prototype) as DsaClient;
+    const time = { configVersion: 1, checkedAt: '2026-10-14T06:00:00Z', validUntil: '2026-10-14T06:05:00Z' };
+    const report = { ...identity, status: 'degraded', credentialConfigured: true, capabilityResults: {}, purpose: 'account_access',
+      accountAccess: { ...time, scope: 'account_interfaces', credentialContext: 'current', routes: [{
+        key: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },
+        target: { providerId: 'tushare', upstreamSource: 'tushare' },
+        access: { ...time, state: 'permission_missing', attempted: true, errorCode: 'permission_denied' },
+      }] } };
+    const control = vi.spyOn(client, 'control').mockResolvedValue(report);
+    expect(await client.testControlProvider('tushare', { requestId: identity.requestId, purpose: 'account_access' })).toEqual(report);
+    expect(control.mock.calls[0]![4]).toBe(22_000);
+    control.mockResolvedValue(probe);
+    await client.testControlProvider('tushare', { requestId: identity.requestId });
+    expect(control.mock.calls[1]).toHaveLength(2);
+    await expect(client.testControlProvider('tushare', { requestId: identity.requestId, purpose: 'account_access' }))
+      .rejects.toMatchObject({ code: 'invalid-response' });
+  });
   for (const [kind, response] of [
     ['config', config],
     ['test', probe],

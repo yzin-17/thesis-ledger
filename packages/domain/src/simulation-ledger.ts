@@ -1,4 +1,7 @@
+import { simulationCashDividendAmount } from './simulation-cash-dividend-entitlement.js';
 import { DecimalValue } from './decimal.js';
+import { simulationEventAvailabilityIssue } from './simulation-event-availability.js';
+import type { BacktestResearchClock } from './backtest-observation-clock.js';
 import {
   shouldApplySimulationCorporateAction,
   type SimulationAccountingBasis,
@@ -91,12 +94,14 @@ export interface SimulationSettlement {
 }
 
 export interface SimulationCashDividend {
+  eligibleQuantity?: string;
   eventId: string;
   executionSymbol: string;
   amountPerShare: string;
   currency: BacktestCurrency;
   occurredAt: string;
   availableAt: string;
+  researchClock?: BacktestResearchClock;
 }
 
 export interface SimulationSplit {
@@ -423,13 +428,12 @@ export class SimulationLedger {
         dividend.availableAt,
         evaluationAt,
         true,
+        dividend.researchClock,
       );
       if (availability) return availability;
       this.assertFillIdentity(dividend);
-      const amountPerShare = parseAmount(dividend.amountPerShare, '每股分红');
-      if (amountPerShare.isNegative()) {
-        return this.rejection(dividend.eventId, 'INVALID_AMOUNT', '每股分红不能为负数');
-      }
+      const cash = simulationCashDividendAmount(dividend, this.position.settledQuantity);
+      if (!cash.valid) return this.rejection(dividend.eventId, 'INVALID_AMOUNT', cash.reason);
       if (dividend.currency !== this.position.currency) {
         return this.rejection(
           dividend.eventId,
@@ -444,7 +448,7 @@ export class SimulationLedger {
           'normalized-series 已在价格序列中表达公司行动，不重复记入现金',
         );
       }
-      const amount = amountPerShare.times(this.position.settledQuantity);
+      const amount = cash.amount;
       this.pendingCredits[dividend.currency] = this.pendingCredits[dividend.currency].plus(amount);
       this.pendingCashEffects.set(dividend.eventId, {
         currency: dividend.currency,
@@ -612,23 +616,16 @@ export class SimulationLedger {
     availableAt: string,
     evaluationAt: string,
     allowKnowledgeBeforeOccurrence = false,
+    researchClock?: BacktestResearchClock,
   ): RejectedLedgerMutation | undefined {
-    const occurred = Date.parse(occurredAt);
-    const available = Date.parse(availableAt);
-    const evaluation = Date.parse(evaluationAt);
-    if (![occurred, available, evaluation].every(Number.isFinite)) {
-      return this.rejection(eventId, 'INVALID_TIME', 'Simulation Event 时间无效');
-    }
-    if (!allowKnowledgeBeforeOccurrence && available < occurred) {
-      return this.rejection(eventId, 'INVALID_TIME', 'availableAt 不能早于 occurredAt');
-    }
-    if (occurred > evaluation) {
-      return this.rejection(eventId, 'FUTURE_DATA', 'Simulation Event 尚未发生');
-    }
-    if (available > evaluation) {
-      return this.rejection(eventId, 'FUTURE_DATA', 'Simulation Event 在评估时尚不可用');
-    }
-    return undefined;
+    const issue = simulationEventAvailabilityIssue(
+      occurredAt,
+      availableAt,
+      evaluationAt,
+      allowKnowledgeBeforeOccurrence,
+      researchClock,
+    );
+    return issue ? this.rejection(eventId, issue.code, issue.reason) : undefined;
   }
 
   private refreshUnsettled(currency: BacktestCurrency) {

@@ -1,115 +1,38 @@
 import { BadRequestException, Controller, Get, Optional, Param, Query } from '@nestjs/common';
 import {
-  barSeriesIdentitySchema,
   marketChartOptionsWindowV3Schema,
+  quoteAssetTypeSchema,
   marketChartPlanV3Schema,
   indicatorCalculateResponseSchema,
   marketDetailResponseSchema,
-  type BarSeriesIdentity,
   type BarSeries,
   type MarketDetailCapability,
   type MarketDetailDiagnostic,
   type MarketDetailSection,
 } from '@thesis-ledger/schemas';
 import { DSA_MARKET_INDICATOR_ENGINE_VERSION, DsaClient } from '../integration/dsa/dsa.client.js';
-import { inferAssetType } from '../ledger/asset-type.js';
-import { RedisService, redisKey } from '../platform/redis.service.js';
-import { MarketBarReader, type BarReadAcceptance } from './market-bar-reader.js';
+import { RedisService } from '../platform/redis.service.js';
+import { MarketIndicatorCache, indicatorRequestKey } from './market-indicator-cache.js';
+export { MarketIndicatorCache } from './market-indicator-cache.js';
+import { MarketBarReader } from './market-bar-reader.js';
 import {
   MARKET_DETAIL_CAPABILITIES,
   MARKET_DETAIL_CAPABILITY_MATRIX,
   MarketDetailService,
 } from './market-detail.service.js';
-import { assertCalendarDateRange, assertIndicatorParameters } from './market-request-validation.js';
+import { normalizeIndicatorName, selectIndicatorParameters } from './market-indicator-request.js';
+import { marketChartRequest, parseAcceptance } from './market-chart-request.js';
+import { parseMarketTimeframe, requireNativeMarketTimeframe } from './market-period-request.js';
+import { MarketPeriodDisplayService } from './market-period-display.service.js';
+import { MarketPeriodDetailService } from './market-period-detail.service.js';
+import { MarketPeriodOptionsService } from './market-period-options.service.js';
 import { MarketService } from './market.service.js';
+import { type QuoteAssetType } from './market-quote-reader.js';
 import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
 import { planMarketChartWindow } from './market-chart-window.js';
 import { indicatorReadInput, indicatorWindows, projectIndicatorResponse, MAX_CHART_V3_INDICATOR_INPUT_POINTS } from './market-indicator-window.js';
 
 type IndicatorName = 'MA' | 'MACD' | 'RSI';
-const indicatorKeys: Record<IndicatorName, readonly string[]> = {
-  MA: ['period'],
-  MACD: ['fast', 'slow', 'signal', 'macdFast', 'macdSlow', 'macdSignal'],
-  RSI: ['short', 'mid', 'long', 'rsiShort', 'rsiMid', 'rsiLong'],
-};
-
-type IndicatorResponse = ReturnType<typeof indicatorCalculateResponseSchema.parse>;
-type CachedIndicator = { expiresAt: number; response: IndicatorResponse };
-
-const indicatorRequestKey = (request: { name: string; parameters: Record<string, number> }) =>
-  `${request.name}:${JSON.stringify(Object.entries(request.parameters).sort(([left], [right]) => left.localeCompare(right)))}`;
-
-export class MarketIndicatorCache {
-  private readonly memory = new Map<string, CachedIndicator>();
-  constructor(private readonly redis?: RedisService) {}
-
-  async get(key: string): Promise<IndicatorResponse | null> {
-    const local = this.memory.get(key);
-    if (local) {
-      if (local.expiresAt > Date.now()) return local.response;
-      this.memory.delete(key);
-    }
-    const client = this.redis?.client;
-    if (!client?.get) return null;
-    try {
-      const raw = await client.get(redisKey('cache', `market-indicators-v3:${key}`));
-      return raw ? indicatorCalculateResponseSchema.parse(JSON.parse(raw)) : null;
-    } catch { return null; }
-  }
-
-  async set(key: string, response: IndicatorResponse, expiresAt: number) {
-    if (expiresAt <= Date.now()) return;
-    this.memory.set(key, { response, expiresAt });
-    const client = this.redis?.client;
-    if (!client?.set) return;
-    try {
-      const ttl = Math.max(1, Math.ceil((expiresAt - Date.now()) / 1000));
-      await client.set(redisKey('cache', `market-indicators-v3:${key}`), JSON.stringify(response), 'EX', ttl);
-    } catch { /* Redis 写失败不影响已完成的纯计算结果。 */ }
-  }
-}
-
-const parseAcceptance = (value: string | undefined): BarReadAcceptance => {
-  if (!value) return 'interactive';
-  if (value === 'interactive' || value === 'complete' || value === 'point-in-time') return value;
-  throw new BadRequestException('acceptance 必须是 interactive、complete 或 point-in-time');
-};
-
-const parseParameters = (value: string | undefined): Record<string, number> => {
-  if (!value) return {};
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object');
-    if (!Object.values(parsed).every((item) => typeof item === 'number' && Number.isFinite(item)))
-      throw new Error('number');
-    return parsed as Record<string, number>;
-  } catch { throw new BadRequestException('parameters 必须是 JSON 数字对象'); }
-};
-
-const normalizeIndicatorName = (value: string): IndicatorName => {
-  const normalized = value.toUpperCase();
-  if (normalized !== 'MA' && normalized !== 'MACD' && normalized !== 'RSI')
-    throw new BadRequestException('指标名称不支持');
-  return normalized;
-};
-
-const selectIndicatorParameters = (name: IndicatorName, value: string | undefined) => {
-  const parsed = parseParameters(value);
-  const selected = Object.fromEntries(Object.entries(parsed).filter(([key]) => indicatorKeys[name].includes(key)));
-  try { assertIndicatorParameters(name, selected); }
-  catch (error) { throw new BadRequestException(error instanceof Error ? error.message : '指标参数无效'); }
-  if (name === 'MA') return { period: selected.period ?? 5 };
-  if (name === 'MACD') return {
-    fast: selected.fast ?? selected.macdFast ?? 12,
-    slow: selected.slow ?? selected.macdSlow ?? 26,
-    signal: selected.signal ?? selected.macdSignal ?? 9,
-  };
-  return {
-    short: selected.short ?? selected.rsiShort ?? 6,
-    mid: selected.mid ?? selected.rsiMid ?? 12,
-    long: selected.long ?? selected.rsiLong ?? 24,
-  };
-};
 
 @Controller('api/market')
 export class MarketController {
@@ -121,38 +44,10 @@ export class MarketController {
     @Optional() private readonly detailService?: MarketDetailService,
     @Optional() private readonly market?: MarketService,
     @Optional() private readonly chartReader?: MarketChartReaderV3,
+    @Optional() private readonly periods?: MarketPeriodDisplayService,
+    @Optional() private readonly periodDetail?: MarketPeriodDetailService,
+    @Optional() private readonly periodOptions?: MarketPeriodOptionsService,
   ) { this.indicatorCache = new MarketIndicatorCache(redis); }
-
-  private input(symbol: string, query: Record<string, string | undefined>) {
-    let identity: BarSeriesIdentity;
-    try {
-      const normalizedSymbol = symbol.trim().toUpperCase();
-      const requestedAssetType = query.assetType?.trim().toLowerCase();
-      const resolvedAssetType = requestedAssetType ?? inferAssetType(normalizedSymbol);
-      const assetType = resolvedAssetType === 'fund' ? 'MUTUAL_FUND' : resolvedAssetType?.toUpperCase();
-      identity = barSeriesIdentitySchema.parse({
-        symbol: normalizedSymbol, assetType,
-        timeframe: query.timeframe ?? '1d', adjustment: query.adjustment ?? 'qfq',
-      });
-    } catch { throw new BadRequestException('assetType、timeframe 或 adjustment 不支持'); }
-    const limit = query.limit === undefined ? undefined : Number(query.limit);
-    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 3650))
-      throw new BadRequestException('limit 必须是 1 到 3650 之间的整数');
-    try { assertCalendarDateRange(query.start, query.end); }
-    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : '日期范围无效'); }
-    if (query.asOf && Number.isNaN(new Date(query.asOf).getTime())) throw new BadRequestException('asOf 必须是有效时间');
-    return {
-      identity,
-      window: {
-        ...(query.start ? { start: query.start } : {}),
-        ...(query.end ? { end: query.end } : {}),
-        ...(limit !== undefined ? { limit } : {}),
-      },
-      acceptance: parseAcceptance(query.acceptance),
-      refresh: query.refresh === '1',
-      ...(query.asOf ? { asOf: query.asOf } : {}),
-    } as const;
-  }
 
   private async calculate(series: BarSeries, requests: Array<{ name: IndicatorName; parameters: Record<string, number> }>) {
     const normalizedRequests = requests.map((request) => ({
@@ -189,7 +84,11 @@ export class MarketController {
     @Query('refresh') refresh?: string,
     @Query('asOf') asOf?: string,
   ) {
-    const input = this.input(symbol, { assetType, timeframe, adjustment, start, end, limit, acceptance, refresh, asOf });
+    const displayTimeframe = parseMarketTimeframe(timeframe);
+    if (this.periods && displayTimeframe !== '1m' && displayTimeframe !== '1d')
+      return this.periods.bars(symbol, displayTimeframe,
+        { assetType, adjustment, start, end, limit, acceptance, refresh, asOf });
+    const input = marketChartRequest(symbol, { assetType, timeframe, adjustment, start, end, limit, acceptance, refresh, asOf });
     if (input.acceptance !== 'interactive' || input.asOf) {
       throw new BadRequestException('图表只支持 interactive 验收，不接受 asOf');
     }
@@ -207,11 +106,17 @@ export class MarketController {
     @Query('limit') limit?: string,
     @Query('acceptance') acceptance?: string,
     @Query('parameters') parameters?: string,
+    @Query('refresh') refresh?: string,
+    @Query('asOf') asOf?: string,
   ) {
     const normalizedName = normalizeIndicatorName(name);
     const requests = [{ name: normalizedName, parameters: selectIndicatorParameters(normalizedName, parameters) }];
-    const input = this.input(symbol, { assetType, timeframe, adjustment, start, end, limit, acceptance });
-    if (input.acceptance !== 'interactive') throw new BadRequestException('图表只支持 interactive 验收');
+    const displayTimeframe = parseMarketTimeframe(timeframe);
+    if (this.periods && displayTimeframe !== '1m' && displayTimeframe !== '1d')
+      return this.periods.indicator(symbol, displayTimeframe,
+        { assetType, adjustment, start, end, limit, acceptance, refresh, asOf }, requests);
+    const input = marketChartRequest(symbol, { assetType, timeframe, adjustment, start, end, limit, acceptance, refresh, asOf });
+    if (input.acceptance !== 'interactive' || input.asOf) throw new BadRequestException('图表只支持 interactive 验收，不接受 asOf');
     const acquired = await this.reader.readChartV3(indicatorReadInput(input, requests, MAX_CHART_V3_INDICATOR_INPUT_POINTS));
     const { visible, calculation } = indicatorWindows(acquired, input, requests);
     return projectIndicatorResponse(await this.calculate(calculation, requests), calculation, visible);
@@ -229,16 +134,26 @@ export class MarketController {
     @Query('indicatorParams') indicatorParams?: string,
     @Query('refresh') refresh?: string,
     @Query('chartContractVersion') chartContractVersion?: string,
+    @Query('timeframe') timeframe?: string,
   ) {
     if (chartContractVersion !== undefined && chartContractVersion !== '3') {
       throw new BadRequestException('chartContractVersion 仅支持 3');
     }
     if (!this.detailService) throw new Error('MarketDetailService 未注入');
     const identity = await this.detailService.resolveIdentity(symbol);
+    const displayTimeframe = parseMarketTimeframe(timeframe);
+    if (!this.periodDetail) requireNativeMarketTimeframe(timeframe, identity.assetType);
     const supported = MARKET_DETAIL_CAPABILITY_MATRIX[identity.assetType];
     const requested = this.parseDetailInclude(include) ?? [...supported];
-    const parsedBarsLimit = this.parseDetailLimit(barsLimit, 'barsLimit', 3000);
+    const parsedBarsLimit = this.parseDetailLimit(barsLimit ?? (displayTimeframe === '1y' ? '10' : undefined), 'barsLimit', 3000);
     const parsedNavLimit = this.parseDetailLimit(navLimit, 'navLimit');
+    if (this.periodDetail && displayTimeframe !== '1m' && displayTimeframe !== '1d') {
+      return this.periodDetail.get(identity, displayTimeframe, {
+        requested, barsLimit: parsedBarsLimit, navLimit: parsedNavLimit,
+        adjustment, start, end, acceptance, indicatorParams, refresh,
+      });
+    }
+    const nativeTimeframe = requireNativeMarketTimeframe(timeframe, identity.assetType);
     const requestId = crypto.randomUUID();
     const sections: Partial<Record<MarketDetailCapability, MarketDetailSection>> = {};
     const dependencies: Record<string, { status: 'ready' | 'stale' | 'empty' | 'unsupported' | 'unavailable'; error?: MarketDetailDiagnostic }> = {};
@@ -268,8 +183,8 @@ export class MarketController {
         const name = normalizeIndicatorName(capability.slice('indicator:'.length));
         return { name, parameters: selectIndicatorParameters(name, indicatorParams) };
       });
-      const input = this.input(identity.symbol, {
-        assetType: identity.assetType, timeframe: '1d', adjustment: adjustment ?? 'qfq',
+      const input = marketChartRequest(identity.symbol, {
+        assetType: identity.assetType, timeframe: nativeTimeframe, adjustment: adjustment ?? 'qfq',
         start, end, limit: String(parsedBarsLimit), acceptance, refresh,
       });
       const readInput = requests.length ? indicatorReadInput(input, requests,
@@ -320,6 +235,16 @@ export class MarketController {
     });
   }
 
+  @Get(':symbol/period-options') async derivedOptions(@Param('symbol') symbol: string,
+    @Query('adjustment') adjustment?: string, @Query('start') start?: string,
+    @Query('end') end?: string, @Query('barsLimit') barsLimit?: string,
+    @Query('indicatorParams') indicatorParams?: string) {
+    if (!this.detailService || !this.periodOptions) throw new Error('周期能力服务未注入');
+    const limit = barsLimit === undefined ? undefined : String(this.parseDetailLimit(barsLimit, 'barsLimit', 3000));
+    return this.periodOptions.get(await this.detailService.resolveIdentity(symbol),
+      { adjustment, start, end, limit }, indicatorParams);
+  }
+
   @Get(':symbol/chart-options') async chartOptions(@Param('symbol') symbol: string,
     @Query('start') start?: string, @Query('end') end?: string,
     @Query('barsLimit') barsLimit?: string, @Query('indicatorParams') indicatorParams?: string,
@@ -333,7 +258,7 @@ export class MarketController {
         ...(planEnd !== undefined ? { end: planEnd } : {}) }); }
       catch { throw new BadRequestException('图表窗口规划参数无效'); }
       const identity = await this.detailService.resolveIdentity(symbol);
-      const input = this.input(identity.symbol, { assetType: identity.assetType, timeframe: '1d',
+      const input = marketChartRequest(identity.symbol, { assetType: identity.assetType, timeframe: '1d',
         adjustment: 'qfq', limit: String(plan.barsLimit), acceptance: 'interactive',
         ...(plan.end ? { end: planMarketChartWindow({ end: plan.end }).end } : {}) });
       const requests = (['MA', 'MACD', 'RSI'] as const).map((name) => ({ name,
@@ -347,9 +272,11 @@ export class MarketController {
     return this.chartReader.options(await this.detailService.resolveIdentity(symbol), window?.data);
   }
 
-  @Get(':symbol/quote') quote(@Param('symbol') symbol: string) {
+  @Get(':symbol/quote') quote(@Param('symbol') symbol: string, @Query('assetType') assetType?: QuoteAssetType) {
     if (!this.market) throw new Error('MarketService 未注入');
-    return this.market.getQuote(symbol);
+    if (assetType !== undefined && !quoteAssetTypeSchema.safeParse(assetType).success)
+      throw new BadRequestException('报价 assetType 必须为 STOCK、ETF 或 INDEX');
+    return this.market.getQuote(symbol, assetType ? { assetType } : {});
   }
 
   @Get(':symbol/fund-nav') fundNav(@Param('symbol') symbol: string) {

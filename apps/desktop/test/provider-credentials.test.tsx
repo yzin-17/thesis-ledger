@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialFields } from '../src/features/market-data/ProviderCredentialFields.js';
+import { MarketProviderPanel } from '../src/features/market-data/MarketProviderPanel.js';
 import {
   canRetainCredentialField,
   validateCredentialDraft,
@@ -60,6 +61,52 @@ const provider: ProviderManifest = {
 };
 
 describe('页面凭证配置', () => {
+  it('HiThink API Key 配置入口、密码字段与独立保存请求保持一致', async () => {
+    const hithink: ProviderManifest = {
+      ...provider,
+      providerId: 'hithink',
+      displayName: 'HiThink',
+      credentialMethod: 'api_key',
+      credentialSource: 'environment',
+      credentialFieldsConfigured: { apiKey: false },
+      credentialSchema: {
+        methods: [
+          { method: 'api_key', fields: [{ name: 'apiKey', required: true, secret: true }] },
+        ],
+      },
+    };
+    const html = renderToStaticMarkup(
+      <MarketProviderPanel
+        providers={[hithink]}
+        disabled={false}
+        busyAction={null}
+        onProviderChange={vi.fn()}
+        onConfigure={vi.fn()}
+        onTest={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+    expect(html).toContain('配置凭证');
+    const fields = renderToStaticMarkup(
+      <ProviderCredentialFields
+        provider={hithink}
+        draft={{ method: 'api_key', values: {} }}
+        disabled={false}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(fields).toContain('type="password"');
+    expect(fields).toContain('API Key');
+    expect(validateCredentialDraft(hithink, { method: 'api_key', values: {} })).toContain(
+      'API Key',
+    );
+    const credentials = { method: 'api_key', values: { apiKey: 'synthetic-page-key' } };
+    await saveMarketProviderCredentials('hithink', credentials);
+    expect(request).toHaveBeenLastCalledWith('/api/market-data/providers/hithink/config', {
+      method: 'POST',
+      body: JSON.stringify({ credentials }),
+    });
+  });
   it('只打开官方授权地址，模拟或未执行测试不显示成功', () => {
     expect(
       safeOAuthUrl('https://openapi.longbridge.com/oauth2/authorize?state=fixture'),
@@ -140,7 +187,7 @@ describe('页面凭证配置', () => {
     expect(validateCredentialDraft(provider, { method: 'unknown', values: {} })).not.toBeNull();
   });
 
-  it('密钥字段使用密码输入与独立可访问标签，不生成默认标签激活', () => {
+  it('已保存的密钥显示配置状态与更换入口，不留空输入框', () => {
     const html = renderToStaticMarkup(
       <ProviderCredentialFields
         provider={provider}
@@ -149,9 +196,9 @@ describe('页面凭证配置', () => {
         onChange={vi.fn()}
       />,
     );
-    expect(html.match(/type="password"/g)).toHaveLength(3);
-    expect(html.match(/已保存，留空保留/g)).toHaveLength(3);
-    expect(html).toContain('aria-labelledby="credential-longbridge-appSecret"');
+    expect(html.match(/已配置/g)).toHaveLength(3);
+    expect(html).toContain('aria-label="更换 App Secret"');
+    expect(html).not.toContain('<input');
     expect(html).not.toContain('<label');
   });
 

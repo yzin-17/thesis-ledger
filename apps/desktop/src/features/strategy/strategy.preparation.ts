@@ -67,6 +67,7 @@ export const backtestPreparationOptions = (
       return prepareBacktestRunConfig(submitted.request, signal, client);
     },
     retry: false,
+    refetchInterval: (query) => query.state.data?.status === 'preparing' ? 2000 : false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

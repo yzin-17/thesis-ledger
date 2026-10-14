@@ -1,5 +1,7 @@
 # AI 接入层迁移至 Vercel AI SDK 实施任务
 
+> 状态对账（2026-10-03）：已实现待验收：T0–T13 本地实现与历史 G0/G0.1/G2 保留；G1 仍缺三类业务合同的当前真实合法结果。旧免费模型连续限流是历史失败，不推断今天所有 Provider 都不可用；9/23 lmstudio 用途测试可支持用途输入，但不能代替完整业务提示词、预算/费用及新版超时断言。T13 后的浏览器流程仍需复验。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 > 任务标识：`2026-09-19-vercel-ai-sdk-integration`
 > 创建日期：2026-09-19
 > 对应 Spec：[AI 接入层迁移至 Vercel AI SDK](../specs/2026-09-19-vercel-ai-sdk-integration.md)

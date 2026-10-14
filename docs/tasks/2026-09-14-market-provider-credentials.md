@@ -1,5 +1,7 @@
 # 数据源即时启停与页面凭证配置实施任务
 
+> 状态对账（2026-10-03）：已实现待验收/范围性跳过：配置、OAuth/加密与当前合同有实现及目标证据。T5b 逐来源核对；Tushare 前端凭据已测试但免费 ETF 接口 40203，ETF 多源接入按用户跳过，不再将其 Token 缺失作为必须恢复的前置。TickFlow、Finnhub、Alpha Vantage、Longbridge 的原在线义务未被该跳过取消；各自凭证/授权与权限是相应真实前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[数据源即时启停与页面凭证配置](../specs/2026-09-14-market-provider-credentials.md)
 
 > 状态：T1—T5a 完成；本机 Docker 与浏览器验收通过，T5b 等待真实凭证在线验收。
@@ -105,7 +107,7 @@ T3b 启动契约核对：SDK Python 存储回调、禁止隐式授权和异步�
 
 | 来源 | 当前结论 | 尚需证据 |
 | --- | --- | --- |
-| Tushare | 未通过在线验收 | 可用 Token、实际连接与行情结果 |
+| Tushare | 页面凭据与测试链路已有证据；ETF 免费接口权限不足，当前跳过 | [目标凭据记录](evidence/2026-10-02-tushare-page-credentials-target.md)及主多源 Task 的 40203 记录；其他能力不由此授予资格，当前不要求恢复 ETF 来源 |
 | TickFlow | 未通过在线验收 | 可用 API Key、实际连接与行情结果 |
 | Finnhub | 未通过在线验收 | 可用 API Key、实际连接与行情权限 |
 | Alpha Vantage | 未通过在线验收 | 可用 API Key、实际连接与配额结果 |

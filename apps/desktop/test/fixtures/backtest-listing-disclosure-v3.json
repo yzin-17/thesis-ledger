@@ -1,0 +1,895 @@
+{
+  "known": {
+    "source": "BACKTEST",
+    "runId": "run-v3-snapshot-test",
+    "strategyVersionId": "strategy-version-v3",
+    "snapshotId": "ae6c2633a8c4615719d09bbd03e5fb99b5c3f6a7ce04ac450860574ae7d50344",
+    "engineVersion": "thesis-ledger-v3-local-runner-v2",
+    "marketRuleVersion": "market-rules-v1",
+    "calendarVersion": "calendar-v1",
+    "aggregationVersion": "bar-aggregation-v1",
+    "contentHash": "ae6c2633a8c4615719d09bbd03e5fb99b5c3f6a7ce04ac450860574ae7d50344",
+    "resultChecksum": "7aa84c45e97d07ff",
+    "completeness": "complete",
+    "warnings": [
+      "BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2"
+    ],
+    "rejectedOrders": [],
+    "simulationFills": [
+      {
+        "fillId": "run-v3-snapshot-test:intent:0:order:fill",
+        "orderId": "run-v3-snapshot-test:intent:0:order",
+        "executionSymbol": "159516.SZ",
+        "side": "buy",
+        "quantity": "9842.5196850393700787401574803149606299212598",
+        "price": "1.017016",
+        "charges": [
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          }
+        ],
+        "occurredAt": "2026-05-19T01:30:00.000Z",
+        "availableAt": "2026-05-19T01:30:00.000Z",
+        "reason": "signal"
+      },
+      {
+        "fillId": "run-v3-snapshot-test:intent:1:order:fill",
+        "orderId": "run-v3-snapshot-test:intent:1:order",
+        "executionSymbol": "159516.SZ",
+        "side": "sell",
+        "quantity": "9842.5196850393700787401574803149606299212598",
+        "price": "1.0159830000000000999",
+        "charges": [
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          }
+        ],
+        "occurredAt": "2026-05-20T01:30:00.000Z",
+        "availableAt": "2026-05-20T01:30:00.000Z",
+        "reason": "signal"
+      }
+    ],
+    "trades": [
+      {
+        "source": "BACKTEST",
+        "executionSymbol": "159516.SZ",
+        "openedAt": "2026-05-19T01:30:00.000Z",
+        "closedAt": "2026-05-20T01:30:00.000Z",
+        "entryQuantity": "9842.5196850393700787401574803149606299212598",
+        "exitQuantity": "9842.5196850393700787401574803149606299212598",
+        "entryValue": {
+          "amount": "10009.9999999999999999999999999999999999999999567568",
+          "currency": "CNY"
+        },
+        "exitValue": {
+          "amount": "9999.83267716535531397637795275590551181102357884796692913385402",
+          "currency": "CNY"
+        },
+        "realizedPnl": {
+          "amount": "-25.36732283464468602362204724409448818897637790883307086614598",
+          "currency": "CNY"
+        },
+        "charges": [
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          },
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          }
+        ],
+        "returnRate": "-0.00253419808537908951",
+        "closeReason": "signal",
+        "fillIds": [
+          "run-v3-snapshot-test:intent:0:order:fill",
+          "run-v3-snapshot-test:intent:1:order:fill"
+        ]
+      }
+    ],
+    "equityCurve": [
+      {
+        "occurredAt": "2026-05-18T07:00:00.000Z",
+        "value": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "availableAt": "2026-05-18T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-19T07:00:00.000Z",
+        "value": {
+          "amount": "999994.7425196850393700787401574803149606299212598432",
+          "currency": "CNY"
+        },
+        "availableAt": "2026-05-19T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-20T07:00:00.000Z",
+        "value": {
+          "amount": "999974.63267716535531397637795275590551181102362209116692913385402",
+          "currency": "CNY"
+        },
+        "availableAt": "2026-05-20T07:00:00.000Z"
+      }
+    ],
+    "drawdownCurve": [
+      {
+        "occurredAt": "2026-05-18T07:00:00.000Z",
+        "equity": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "peak": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "drawdown": "0",
+        "availableAt": "2026-05-18T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-19T07:00:00.000Z",
+        "equity": {
+          "amount": "999994.7425196850393700787401574803149606299212598432",
+          "currency": "CNY"
+        },
+        "peak": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "drawdown": "-0.00000525748031496063",
+        "availableAt": "2026-05-19T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-20T07:00:00.000Z",
+        "equity": {
+          "amount": "999974.63267716535531397637795275590551181102362209116692913385402",
+          "currency": "CNY"
+        },
+        "peak": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "drawdown": "-0.00002536732283464469",
+        "availableAt": "2026-05-20T07:00:00.000Z"
+      }
+    ],
+    "metrics": {
+      "totalReturn": {
+        "status": "available",
+        "value": "-0.00002536732283464469"
+      },
+      "cagr": {
+        "status": "available",
+        "value": "-0.00462195669617382343"
+      },
+      "maxDrawdown": {
+        "status": "available",
+        "value": "-0.00002536732283464469"
+      },
+      "volatility": {
+        "status": "available",
+        "value": "0.00020071243462534328"
+      },
+      "sharpe": {
+        "status": "available",
+        "value": "-23.08093926507678972371"
+      },
+      "basicPeriodReturn": {
+        "status": "available",
+        "value": "-0.00002536732283464469"
+      },
+      "tradeCount": {
+        "status": "available",
+        "value": "1"
+      },
+      "winRate": {
+        "status": "available",
+        "value": "0"
+      },
+      "profitFactor": {
+        "status": "available",
+        "value": "0"
+      },
+      "turnover": {
+        "status": "available",
+        "value": "20009.83267716535531397637795275590551181102353560476692913385402"
+      }
+    },
+    "benchmark": {
+      "totalReturn": {
+        "status": "available",
+        "value": "-0.0011530607751500468"
+      },
+      "excessReturn": {
+        "status": "available",
+        "value": "0.00112769345231540211"
+      }
+    },
+    "schemaVersion": "3",
+    "snapshotVersion": "snapshot-manifest-v3",
+    "executionModelDisclosure": {
+      "model": {
+        "schemaVersion": "execution-model-v1",
+        "id": "cn-600519-research-2024q1",
+        "version": "1",
+        "scope": {
+          "symbol": "159516.SZ",
+          "market": "CN",
+          "instrumentType": "ETF",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "range": {
+            "start": "2026-05-18",
+            "end": "2026-05-20"
+          }
+        },
+        "segments": [
+          {
+            "id": "2024q1",
+            "range": {
+              "start": "2026-05-18",
+              "end": "2026-05-20"
+            },
+            "source": {
+              "kind": "researchPreset",
+              "description": "首个场景的显式研究模型；契约用例，不是 Provider 事实或已启用生产预设",
+              "references": [
+                "docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md",
+                "docs/benchmarks/2026-09-10-backtest-historical-execution-rule-source-matrix.md"
+              ],
+              "revision": "1",
+              "configuredAt": "2026-05-17T07:00:00.000Z"
+            },
+            "assumptions": [
+              "佣金双向成交额0.0003，每笔最低CNY 5，包含监管费与经手费",
+              "印花税卖出0.0005，过户费双向0.00001；本模型不设最低额",
+              "每笔每项应用最低额后以CNY两位小数halfUp舍入，再求和",
+              "持仓成交后第一个交易日可卖，成交扣款，卖出成交款当日可再投资",
+              "仅在事实确认适用普通A股价格限制时使用10%模型；历史身份及可交易性未知必须阻止运行"
+            ],
+            "fees": {
+              "currency": "CNY",
+              "rounding": {
+                "mode": "halfUp",
+                "decimalPlaces": 2
+              },
+              "collection": "perFillPerCharge",
+              "commission": {
+                "treatment": "charged",
+                "side": "both",
+                "basis": "turnover",
+                "currency": "CNY",
+                "rate": "0.0003",
+                "minimum": {
+                  "kind": "amount",
+                  "amount": "5"
+                }
+              },
+              "stampDuty": {
+                "treatment": "charged",
+                "side": "sell",
+                "basis": "turnover",
+                "currency": "CNY",
+                "rate": "0.0005",
+                "minimum": {
+                  "kind": "none"
+                }
+              },
+              "transferFee": {
+                "treatment": "charged",
+                "side": "both",
+                "basis": "turnover",
+                "currency": "CNY",
+                "rate": "0.00001",
+                "minimum": {
+                  "kind": "none"
+                }
+              },
+              "regulatoryFee": {
+                "treatment": "includedInCommission",
+                "reason": "研究佣金采用含规费口径"
+              },
+              "handlingFee": {
+                "treatment": "includedInCommission",
+                "reason": "研究佣金采用含规费口径"
+              }
+            },
+            "execution": {
+              "mode": "exchange",
+              "calendarMarket": "CN",
+              "reserveCashAt": "orderAccepted",
+              "buyDebitAt": "fill",
+              "sellableAfterTradingDays": 1,
+              "saleReinvestableAfterTradingDays": 0,
+              "price": {
+                "kind": "noDailyLimit",
+                "reason": "合成 V3 归一化执行测试假设"
+              },
+              "normalizedExecution": {
+                "priceCoordinate": "continuous-decimal",
+                "quantityUnits": "continuous-normalized-decimal",
+                "lotSizeConstraint": "not-applied",
+                "tickSizeConstraint": "not-applied",
+                "dailyPriceLimit": "not-applied",
+                "feeBasis": "simulatedTurnover"
+              }
+            }
+          }
+        ]
+      },
+      "contentHash": "8e806ff0cf162e7fe72b6300b0eb5940f9dd92bcaf2daf17353f5e42b328d0d3"
+    },
+    "executionPriceProtocol": {
+      "protocolVersion": "execution-price-v1",
+      "priceBasis": {
+        "adjustment": "qfq",
+        "method": "provider-native",
+        "methodVersion": "hithink-financial-api-qfq-fixture-v1",
+        "basisScope": "provider-defined",
+        "anchor": null,
+        "revision": {
+          "origin": "provider",
+          "id": "hithink-financial-api-fixture-revision-1"
+        },
+        "observedAt": "2026-05-20T07:01:00.000Z",
+        "volumeBasis": "unknown",
+        "dividendMeaning": "provider-defined",
+        "dividendEvidenceRef": null,
+        "conversionAvailable": false,
+        "conversionEvidenceRef": null,
+        "derivation": null,
+        "quantityBasis": "normalized-units"
+      },
+      "accountingBasis": "normalized-series",
+      "history": {
+        "basis": "fixed-provider-snapshot"
+      }
+    },
+    "comparableDataFingerprint": "b4da7854e6c73efa30478889592323730404064990add006a3bbd8fc66dd36bd",
+    "actualSources": [
+      {
+        "purpose": "execution",
+        "symbol": "159516.SZ",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "provenance": {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 1
+        },
+        "inputFingerprint": "synthetic-complete-v3-execution-bars"
+      },
+      {
+        "purpose": "signal",
+        "symbol": "159516.SZ",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "provenance": {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 1
+        },
+        "inputFingerprint": "synthetic-complete-v3-execution-bars"
+      },
+      {
+        "purpose": "benchmark",
+        "symbol": "159516.SZ",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "provenance": {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 1
+        },
+        "inputFingerprint": "synthetic-complete-v3-execution-bars"
+      }
+    ],
+    "benchmarkCompatibility": {
+      "status": "compatible",
+      "strategyFingerprint": "184e136ea21f4a82",
+      "benchmarkFingerprint": "184e136ea21f4a82",
+      "missingFields": [],
+      "differentFields": [],
+      "costAssumption": {
+        "kind": "execution-model",
+        "version": "execution-model-cost-v1",
+        "fingerprint": "b67635c409477dc2"
+      }
+    }
+  },
+  "unknown": {
+    "source": "BACKTEST",
+    "runId": "run-v3-snapshot-test",
+    "strategyVersionId": "strategy-version-v3",
+    "snapshotId": "6f42214277072c17ce035a268a97c2c3c485a847deeed15916e83aaf5d74e278",
+    "engineVersion": "thesis-ledger-v3-local-runner-v2",
+    "marketRuleVersion": "market-rules-v1",
+    "calendarVersion": "calendar-v1",
+    "aggregationVersion": "bar-aggregation-v1",
+    "contentHash": "6f42214277072c17ce035a268a97c2c3c485a847deeed15916e83aaf5d74e278",
+    "resultChecksum": "9217f859a01fab0e",
+    "completeness": "complete",
+    "warnings": [
+      "未获取上市日期，未验证回测窗口与上市日期的边界关系",
+      "BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2"
+    ],
+    "rejectedOrders": [],
+    "simulationFills": [
+      {
+        "fillId": "run-v3-snapshot-test:intent:0:order:fill",
+        "orderId": "run-v3-snapshot-test:intent:0:order",
+        "executionSymbol": "159516.SZ",
+        "side": "buy",
+        "quantity": "9842.5196850393700787401574803149606299212598",
+        "price": "1.017016",
+        "charges": [
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          }
+        ],
+        "occurredAt": "2026-05-19T01:30:00.000Z",
+        "availableAt": "2026-05-19T01:30:00.000Z",
+        "reason": "signal"
+      },
+      {
+        "fillId": "run-v3-snapshot-test:intent:1:order:fill",
+        "orderId": "run-v3-snapshot-test:intent:1:order",
+        "executionSymbol": "159516.SZ",
+        "side": "sell",
+        "quantity": "9842.5196850393700787401574803149606299212598",
+        "price": "1.0159830000000000999",
+        "charges": [
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          }
+        ],
+        "occurredAt": "2026-05-20T01:30:00.000Z",
+        "availableAt": "2026-05-20T01:30:00.000Z",
+        "reason": "signal"
+      }
+    ],
+    "trades": [
+      {
+        "source": "BACKTEST",
+        "executionSymbol": "159516.SZ",
+        "openedAt": "2026-05-19T01:30:00.000Z",
+        "closedAt": "2026-05-20T01:30:00.000Z",
+        "entryQuantity": "9842.5196850393700787401574803149606299212598",
+        "exitQuantity": "9842.5196850393700787401574803149606299212598",
+        "entryValue": {
+          "amount": "10009.9999999999999999999999999999999999999999567568",
+          "currency": "CNY"
+        },
+        "exitValue": {
+          "amount": "9999.83267716535531397637795275590551181102357884796692913385402",
+          "currency": "CNY"
+        },
+        "realizedPnl": {
+          "amount": "-25.36732283464468602362204724409448818897637790883307086614598",
+          "currency": "CNY"
+        },
+        "charges": [
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          },
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "5",
+            "currency": "CNY"
+          },
+          {
+            "amount": "0.1",
+            "currency": "CNY"
+          }
+        ],
+        "returnRate": "-0.00253419808537908951",
+        "closeReason": "signal",
+        "fillIds": [
+          "run-v3-snapshot-test:intent:0:order:fill",
+          "run-v3-snapshot-test:intent:1:order:fill"
+        ]
+      }
+    ],
+    "equityCurve": [
+      {
+        "occurredAt": "2026-05-18T07:00:00.000Z",
+        "value": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "availableAt": "2026-05-18T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-19T07:00:00.000Z",
+        "value": {
+          "amount": "999994.7425196850393700787401574803149606299212598432",
+          "currency": "CNY"
+        },
+        "availableAt": "2026-05-19T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-20T07:00:00.000Z",
+        "value": {
+          "amount": "999974.63267716535531397637795275590551181102362209116692913385402",
+          "currency": "CNY"
+        },
+        "availableAt": "2026-05-20T07:00:00.000Z"
+      }
+    ],
+    "drawdownCurve": [
+      {
+        "occurredAt": "2026-05-18T07:00:00.000Z",
+        "equity": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "peak": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "drawdown": "0",
+        "availableAt": "2026-05-18T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-19T07:00:00.000Z",
+        "equity": {
+          "amount": "999994.7425196850393700787401574803149606299212598432",
+          "currency": "CNY"
+        },
+        "peak": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "drawdown": "-0.00000525748031496063",
+        "availableAt": "2026-05-19T07:00:00.000Z"
+      },
+      {
+        "occurredAt": "2026-05-20T07:00:00.000Z",
+        "equity": {
+          "amount": "999974.63267716535531397637795275590551181102362209116692913385402",
+          "currency": "CNY"
+        },
+        "peak": {
+          "amount": "1000000",
+          "currency": "CNY"
+        },
+        "drawdown": "-0.00002536732283464469",
+        "availableAt": "2026-05-20T07:00:00.000Z"
+      }
+    ],
+    "metrics": {
+      "totalReturn": {
+        "status": "available",
+        "value": "-0.00002536732283464469"
+      },
+      "cagr": {
+        "status": "available",
+        "value": "-0.00462195669617382343"
+      },
+      "maxDrawdown": {
+        "status": "available",
+        "value": "-0.00002536732283464469"
+      },
+      "volatility": {
+        "status": "available",
+        "value": "0.00020071243462534328"
+      },
+      "sharpe": {
+        "status": "available",
+        "value": "-23.08093926507678972371"
+      },
+      "basicPeriodReturn": {
+        "status": "available",
+        "value": "-0.00002536732283464469"
+      },
+      "tradeCount": {
+        "status": "available",
+        "value": "1"
+      },
+      "winRate": {
+        "status": "available",
+        "value": "0"
+      },
+      "profitFactor": {
+        "status": "available",
+        "value": "0"
+      },
+      "turnover": {
+        "status": "available",
+        "value": "20009.83267716535531397637795275590551181102353560476692913385402"
+      }
+    },
+    "benchmark": {
+      "totalReturn": {
+        "status": "available",
+        "value": "-0.0011530607751500468"
+      },
+      "excessReturn": {
+        "status": "available",
+        "value": "0.00112769345231540211"
+      }
+    },
+    "schemaVersion": "3",
+    "snapshotVersion": "snapshot-manifest-v3",
+    "executionModelDisclosure": {
+      "model": {
+        "schemaVersion": "execution-model-v1",
+        "id": "cn-600519-research-2024q1",
+        "version": "1",
+        "scope": {
+          "symbol": "159516.SZ",
+          "market": "CN",
+          "instrumentType": "ETF",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "range": {
+            "start": "2026-05-18",
+            "end": "2026-05-20"
+          }
+        },
+        "segments": [
+          {
+            "id": "2024q1",
+            "range": {
+              "start": "2026-05-18",
+              "end": "2026-05-20"
+            },
+            "source": {
+              "kind": "researchPreset",
+              "description": "首个场景的显式研究模型；契约用例，不是 Provider 事实或已启用生产预设",
+              "references": [
+                "docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md",
+                "docs/benchmarks/2026-09-10-backtest-historical-execution-rule-source-matrix.md"
+              ],
+              "revision": "1",
+              "configuredAt": "2026-05-17T07:00:00.000Z"
+            },
+            "assumptions": [
+              "佣金双向成交额0.0003，每笔最低CNY 5，包含监管费与经手费",
+              "印花税卖出0.0005，过户费双向0.00001；本模型不设最低额",
+              "每笔每项应用最低额后以CNY两位小数halfUp舍入，再求和",
+              "持仓成交后第一个交易日可卖，成交扣款，卖出成交款当日可再投资",
+              "仅在事实确认适用普通A股价格限制时使用10%模型；历史身份及可交易性未知必须阻止运行"
+            ],
+            "fees": {
+              "currency": "CNY",
+              "rounding": {
+                "mode": "halfUp",
+                "decimalPlaces": 2
+              },
+              "collection": "perFillPerCharge",
+              "commission": {
+                "treatment": "charged",
+                "side": "both",
+                "basis": "turnover",
+                "currency": "CNY",
+                "rate": "0.0003",
+                "minimum": {
+                  "kind": "amount",
+                  "amount": "5"
+                }
+              },
+              "stampDuty": {
+                "treatment": "charged",
+                "side": "sell",
+                "basis": "turnover",
+                "currency": "CNY",
+                "rate": "0.0005",
+                "minimum": {
+                  "kind": "none"
+                }
+              },
+              "transferFee": {
+                "treatment": "charged",
+                "side": "both",
+                "basis": "turnover",
+                "currency": "CNY",
+                "rate": "0.00001",
+                "minimum": {
+                  "kind": "none"
+                }
+              },
+              "regulatoryFee": {
+                "treatment": "includedInCommission",
+                "reason": "研究佣金采用含规费口径"
+              },
+              "handlingFee": {
+                "treatment": "includedInCommission",
+                "reason": "研究佣金采用含规费口径"
+              }
+            },
+            "execution": {
+              "mode": "exchange",
+              "calendarMarket": "CN",
+              "reserveCashAt": "orderAccepted",
+              "buyDebitAt": "fill",
+              "sellableAfterTradingDays": 1,
+              "saleReinvestableAfterTradingDays": 0,
+              "price": {
+                "kind": "noDailyLimit",
+                "reason": "合成 V3 归一化执行测试假设"
+              },
+              "normalizedExecution": {
+                "priceCoordinate": "continuous-decimal",
+                "quantityUnits": "continuous-normalized-decimal",
+                "lotSizeConstraint": "not-applied",
+                "tickSizeConstraint": "not-applied",
+                "dailyPriceLimit": "not-applied",
+                "feeBasis": "simulatedTurnover"
+              }
+            }
+          }
+        ]
+      },
+      "contentHash": "8e806ff0cf162e7fe72b6300b0eb5940f9dd92bcaf2daf17353f5e42b328d0d3"
+    },
+    "executionPriceProtocol": {
+      "protocolVersion": "execution-price-v1",
+      "priceBasis": {
+        "adjustment": "qfq",
+        "method": "provider-native",
+        "methodVersion": "hithink-financial-api-qfq-fixture-v1",
+        "basisScope": "provider-defined",
+        "anchor": null,
+        "revision": {
+          "origin": "provider",
+          "id": "hithink-financial-api-fixture-revision-1"
+        },
+        "observedAt": "2026-05-20T07:01:00.000Z",
+        "volumeBasis": "unknown",
+        "dividendMeaning": "provider-defined",
+        "dividendEvidenceRef": null,
+        "conversionAvailable": false,
+        "conversionEvidenceRef": null,
+        "derivation": null,
+        "quantityBasis": "normalized-units"
+      },
+      "accountingBasis": "normalized-series",
+      "history": {
+        "basis": "fixed-provider-snapshot"
+      }
+    },
+    "comparableDataFingerprint": "cab7ae7ced281ed8c9a0f887528c0551d12b77bb486af287d863dc2c17f460fe",
+    "actualSources": [
+      {
+        "purpose": "execution",
+        "symbol": "159516.SZ",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "provenance": {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 1
+        },
+        "inputFingerprint": "synthetic-complete-v3-execution-bars"
+      },
+      {
+        "purpose": "signal",
+        "symbol": "159516.SZ",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "provenance": {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 1
+        },
+        "inputFingerprint": "synthetic-complete-v3-execution-bars"
+      },
+      {
+        "purpose": "benchmark",
+        "symbol": "159516.SZ",
+        "routeKey": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "provenance": {
+          "providerId": "hithink",
+          "upstreamSource": "hithink-financial-api",
+          "routeIndex": 0,
+          "effectivePolicyRevision": 1
+        },
+        "inputFingerprint": "synthetic-complete-v3-execution-bars"
+      }
+    ],
+    "benchmarkCompatibility": {
+      "status": "compatible",
+      "strategyFingerprint": "184e136ea21f4a82",
+      "benchmarkFingerprint": "184e136ea21f4a82",
+      "missingFields": [],
+      "differentFields": [],
+      "costAssumption": {
+        "kind": "execution-model",
+        "version": "execution-model-cost-v1",
+        "fingerprint": "b67635c409477dc2"
+      }
+    }
+  }
+}

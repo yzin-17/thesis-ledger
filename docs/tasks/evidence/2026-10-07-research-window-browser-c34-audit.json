@@ -1,0 +1,191 @@
+{
+  "protectedJobs": {
+    "73ab7c23-9335-4771-a612-5f1a1547734f": {
+      "sha256": "f386226b138e2c571d5387edafd91a56152bee223ad06d3d498544ba74c535e6",
+      "resultChecksum": "1e83d3eb24788bcf",
+      "snapshotId": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+      "status": "succeeded",
+      "completeness": "complete",
+      "fullAPIUnchanged": true
+    },
+    "dbc39963-da96-4583-8746-01feac9c7ff2": {
+      "sha256": "ba2dfe6938411beb8e63523afbefb16d06cad72edd569d8939ce3b1ad1292979",
+      "resultChecksum": "022494dccd271850",
+      "snapshotId": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+      "status": "succeeded",
+      "completeness": "complete",
+      "fullAPIUnchanged": true
+    },
+    "873ba8dd-40c3-4f9e-b1d5-b16192f697b0": {
+      "sha256": "397c4d3eebaaca9528af8ad902946904ab7e6e20c960b861538375e530bfdf28",
+      "resultChecksum": "a07303d0e7c0f3ce",
+      "snapshotId": "0046b0759593d8a66a2a1cb9f78979a3540942801f28e359c46484005a0a39a5",
+      "status": "succeeded",
+      "completeness": "complete",
+      "fullAPIUnchanged": true
+    },
+    "652ba051-a4c5-493d-81e6-2cdbe3c090f0": {
+      "sha256": "0ae85a8c0c77e4e00ba40877db996f20a92b8b54ce0bd7a16b71780cad0acb1a",
+      "resultChecksum": "8c66f3f721f5e4d8",
+      "snapshotId": "dbcb682568ebac75acfd5a23c9e968ba0808b097118a45f50453e78c425c558d",
+      "status": "succeeded",
+      "completeness": "partial",
+      "fullAPIUnchanged": true
+    }
+  },
+  "downloads": [
+    {
+      "path": "/Users/yzin/Downloads/backtest-dbc39963-da96-4583-8746-01feac9c7ff2-diagnostics-v2.json",
+      "sha256": "f2d7eabf4301b56ac772a9b44af547c5bc85548e4f28800c48630a55e47fb379",
+      "identity": "dbc39963-da96-4583-8746-01feac9c7ff2",
+      "complete": true
+    },
+    {
+      "path": "/Users/yzin/Downloads/backtest-73ab7c23-9335-4771-a612-5f1a1547734f-diagnostics-v2.json",
+      "sha256": "644927df176d00ec2ef7b37d93c5e8098441b756e125121745411f449eda595b",
+      "identity": "73ab7c23-9335-4771-a612-5f1a1547734f",
+      "complete": true
+    }
+  ],
+  "policy": {
+    "revision": 40,
+    "dsaRevision": 40,
+    "syncState": "applied",
+    "routes": [
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "hithink",
+            "upstreamSource": "fund-market-historical"
+          },
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "MUTUAL_FUND",
+          "capability": "FUND_NAV_HISTORY"
+        },
+        "targets": [
+          {
+            "providerId": "efinance",
+            "upstreamSource": "eastmoney"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "hfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "none"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "REALTIME_QUOTE"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_PUBLIC_FEES"
+        },
+        "targets": [
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees"
+          },
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees-archive"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_TRADING_STATUS"
+        },
+        "targets": [
+          {
+            "providerId": "official-states",
+            "upstreamSource": "cn-stock-daily-suspension"
+          }
+        ]
+      }
+    ]
+  },
+  "review": {
+    "PR-AC07": "有界通过",
+    "parentMultiSourceTask": "继续活跃",
+    "systemClipboardTransfer": "未验收",
+    "sourceProductionChanged": false
+  }
+}

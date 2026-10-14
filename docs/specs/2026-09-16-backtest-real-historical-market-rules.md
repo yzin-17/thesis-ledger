@@ -2,7 +2,7 @@
 
 > 任务标识：BACKTEST-HISTORICAL-MARKET-RULES-V1
 > 日期：2026-09-16
-> 状态：规划完成；T1 可启动，后续实现等待首个真实来源及授权条件确认
+> 状态：历史方案；2026-10-06 起实施以[主备数据源方案](2026-10-06-historical-rules-primary-backup.md)及其 Task 为准，下文保存原范围与调查背景。
 > 对应任务：[`回测真实历史市场规则数据源实施任务`](../tasks/2026-09-16-backtest-real-historical-market-rules.md)
 
 ## 背景与问题

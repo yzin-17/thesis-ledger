@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { MarketDetailCapability, MarketDetailResponse, MarketDetailSection } from '@thesis-ledger/api-client';
+import type { MarketDetailCapability, MarketDisplayDetailResponse as MarketDetailResponse, MarketDisplayDetailSection as MarketDetailSection } from '@thesis-ledger/api-client';
 import {
   Dialog,
   DialogContent,

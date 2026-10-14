@@ -1,3 +1,4 @@
+import type { MarketTimeframe } from './market-period.js';
 import { z } from 'zod';
 import { sourcePriceBasisSchema } from './market-price-protocol.js';
 
@@ -17,8 +18,8 @@ export const barPointSchema = z.object({
   high: z.number().finite().nonnegative(),
   low: z.number().finite().nonnegative(),
   close: z.number().finite().nonnegative(),
-  volume: z.number().finite().nonnegative(),
-  amount: z.number().finite().nonnegative(),
+  volume: z.number().finite().nonnegative().nullable(),
+  amount: z.number().finite().nonnegative().nullable(),
   completionStatus: z.enum(['complete', 'incomplete', 'unknown']),
   availableAt: isoDateTime,
 });
@@ -54,7 +55,7 @@ const normalizeCanonicalNumber = (value: number | null) => {
 };
 
 export const canonicalBarSeriesEncoding = (
-  identity: BarSeriesIdentity,
+  identity: Omit<BarSeriesIdentity, 'timeframe'> & { timeframe: MarketTimeframe },
   points: readonly BarPoint[],
 ) =>
   JSON.stringify([
@@ -116,20 +117,22 @@ export const indicatorRequestSchema = z.object({
   parameters: z.record(z.string(), z.number().int().positive()),
 });
 
-export const indicatorCalculateRequestSchema = z.object({
-  contractVersion: z.literal(3),
-  identity: barSeriesIdentitySchema,
-  inputFingerprint: z.string().min(1),
-  points: barPointsSchema,
-  requests: z.array(indicatorRequestSchema).min(1),
-}).superRefine((request, context) => {
+export const refineUniqueIndicatorRequests = (request: { requests: readonly z.infer<typeof indicatorRequestSchema>[] }, context: z.RefinementCtx) => {
   const seen = new Set<string>();
   for (const [index, item] of request.requests.entries()) {
     const key = `${item.name}:${JSON.stringify(Object.entries(item.parameters).sort())}`;
     if (seen.has(key)) context.addIssue({ code: 'custom', path: ['requests', index], message: '指标请求不得重复' });
     seen.add(key);
   }
-});
+};
+
+export const indicatorCalculateRequestSchema = z.object({
+  contractVersion: z.literal(3),
+  identity: barSeriesIdentitySchema,
+  inputFingerprint: z.string().min(1),
+  points: barPointsSchema,
+  requests: z.array(indicatorRequestSchema).min(1),
+}).superRefine(refineUniqueIndicatorRequests);
 export type IndicatorCalculateRequest = z.infer<typeof indicatorCalculateRequestSchema>;
 
 const marketIndicatorPointsSchema = z.array(z.object({

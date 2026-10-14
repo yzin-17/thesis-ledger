@@ -56,6 +56,34 @@ const listingFactV3Schema = z.strictObject({
   knownAt: isoDateTime,
 });
 
+/** 上市信息缺失时只记录标的与未知状态；已知信息沿用现有结构。 */
+export const marketListingInformationV3Schema = z.union([
+  listingFactV3Schema,
+  z.strictObject({ symbol: text, status: z.literal('unknown') }),
+]);
+export type MarketListingInformationV3 = z.infer<typeof marketListingInformationV3Schema>;
+
+/** 仅已有上市日期能够证明某日位于上市之前。 */
+export const isBeforeKnownListingDateV3 = (
+  listing: MarketListingInformationV3,
+  date: string,
+): boolean => 'firstTradingDate' in listing && date < listing.firstTradingDate;
+
+const marketListingInformationValuesV3 = (value: MarketListingInformationV3): string[] => {
+  if ('status' in value) {
+    return [value.symbol, value.status];
+  }
+  return [value.symbol, value.firstTradingDate, value.source, value.revision, value.knownAt];
+};
+
+/** 独立上市信息的稳定编码；已知分支与原覆盖证明中的数组编码一致。 */
+export const canonicalMarketListingInformationEncodingV3 = (
+  information: MarketListingInformationV3,
+) =>
+  JSON.stringify(
+    marketListingInformationValuesV3(marketListingInformationV3Schema.parse(information)),
+  );
+
 const completedWindowV3Schema = z.strictObject({
   status: z.literal('complete'),
   requestedStart: isoDate,
@@ -75,7 +103,7 @@ const completedPaginationV3Schema = z.strictObject({
 export const marketCoverageProofV3Schema = z
   .strictObject({
     calendar: calendarV3Schema,
-    listing: listingFactV3Schema,
+    listing: marketListingInformationV3Schema,
     window: completedWindowV3Schema,
     pagination: completedPaginationV3Schema,
   })
@@ -116,6 +144,13 @@ export const marketCoverageProofV3Schema = z
   });
 export type MarketCoverageProofV3 = z.infer<typeof marketCoverageProofV3Schema>;
 
+/** 已知上市日约束预期交易日；未知上市日保留整个请求日历。 */
+export const marketCoverageSessionDatesV3 = (proof: MarketCoverageProofV3): string[] => {
+  return proof.calendar.expectedSessionDates.filter(
+    (date) => !isBeforeKnownListingDateV3(proof.listing, date),
+  );
+};
+
 /**
  * Stable ordered encoding for cache/fingerprint composition. Call with parsed proof data;
  * ordered date arrays are enforced by the schema, so locale and object-key order do not vary.
@@ -132,13 +167,7 @@ export const canonicalMarketCoverageProofEncodingV3 = (proof: MarketCoverageProo
       [value.calendar.supportedRange.start, value.calendar.supportedRange.end],
       value.calendar.expectedSessionDates,
     ],
-    [
-      value.listing.symbol,
-      value.listing.firstTradingDate,
-      value.listing.source,
-      value.listing.revision,
-      value.listing.knownAt,
-    ],
+    marketListingInformationValuesV3(value.listing),
     [value.window.status, value.window.requestedStart, value.window.requestedEnd],
     [value.pagination.status, value.pagination.pagesFetched, value.pagination.continuationPending],
   ]);

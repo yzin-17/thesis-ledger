@@ -1,14 +1,11 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
-  aiExecutionSummarySchema,
-  aiGenerationContracts,
   aiContextSchema,
   aiResearchStartInputSchema,
   researchResultSchema,
@@ -25,9 +22,10 @@ import { recoverStaleAiRuns } from './ai-run-recovery.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
-import { freezeAiResearchRoutes, loadAiResearchPolicy } from './ai-research-policy.js';
 import { AiResearchRetry } from './ai-research-retry.js';
 import type { AiRunPage, ResearchFinishRoute } from './ai-run.types.js';
+import { AiResearchSubmission } from './ai-research-submission.js';
+import { readFrozenResearch, type AiFrozenResearch } from './ai-frozen-research.js';
 
 type AiResearchStartInput = z.infer<typeof aiResearchStartInputSchema>;
 
@@ -59,14 +57,16 @@ type ModelWithFindUnique = {
 export class AiRunService {
   private readonly researchQuery: AiResearchQuery;
   private readonly researchRetry: AiResearchRetry;
+  private readonly researchSubmission: AiResearchSubmission;
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly providers?: AiProviderRegistry,
-    @Optional() private readonly routingSettings?: AiRoutingSettingsService,
+    @Optional() providers?: AiProviderRegistry,
+    @Optional() routingSettings?: AiRoutingSettingsService,
   ) {
     this.researchQuery = new AiResearchQuery(prisma);
     this.researchRetry = new AiResearchRetry(prisma);
+    this.researchSubmission = new AiResearchSubmission(prisma, providers, routingSettings);
   }
 
   start(
@@ -177,61 +177,18 @@ export class AiRunService {
     }
   }
 
-  async startResearch(input: AiResearchStartInput) {
+  async startResearch(input: AiResearchStartInput, frozen?: AiFrozenResearch) {
     const parsed = aiResearchStartInputSchema.parse(input);
     await this.assertResearchContext(parsed);
     await this.researchRetry.assertRetry(parsed);
-    const policy = loadAiResearchPolicy();
-    const createdAt = new Date();
-    const deadlineAt = new Date(
-      createdAt.getTime() + policy.maxDurationSeconds * 1_000,
-    ).toISOString();
-    const sdkExecution = aiExecutionSummarySchema.parse({
-      version: 'sdk-execution-v1',
-      contract: aiGenerationContracts.research.ref,
-      frozenPolicy: policy,
-      deadlineAt,
-      generationStatus: 'pending',
-      usageCompleteness: 'unknown',
-      requests: [],
-      continuationBlockedReason: null,
-    });
-    const routing = this.routingSettings ? await this.routingSettings.read() : null;
-    if (this.routingSettings && !routing?.researchDefault)
-      throw new BadRequestException('请先选择研究默认模型');
-    if (
-      this.routingSettings &&
-      parsed.researchSettingsRevision !== undefined &&
-      parsed.researchSettingsRevision !== routing?.revision
-    )
-      throw new ConflictException('研究默认模型已变化，请刷新选择后重新提交');
-    const routeSnapshot = freezeAiResearchRoutes(this.providers, policy, routing?.researchDefault);
-    if (this.routingSettings && routeSnapshot.provider === 'pending')
-      throw new BadRequestException(
-        '研究默认模型当前不可执行，请检查 Provider、模型和研究用途配置',
-      );
-    return this.prisma.aiRun.create({
-      data: {
-        provider: routeSnapshot.provider,
-        model: routeSnapshot.model,
-        promptVersion: 'research-v1',
-        status: 'queued',
-        question: parsed.question,
-        context: parsed.context,
-        createdAt,
-        modelMetadata: {
-          ...(parsed.templateId === undefined ? {} : { templateId: parsed.templateId }),
-          researchPolicy: policy,
-          researchRoutes: routeSnapshot.routes,
-          ...(routing?.researchDefault === undefined
-            ? {}
-            : { researchDefault: routing.researchDefault }),
-          ...(routing ? { researchSettingsRevision: routing.revision } : {}),
-          sdkExecution,
-        },
-        ...(parsed.retryOfRunId === undefined ? {} : { retryOfRunId: parsed.retryOfRunId }),
-      },
-    });
+    return this.researchSubmission.start(parsed, frozen);
+  }
+
+  async frozenEvidence(id: string) {
+    const run = await this.prisma.aiRun.findUnique({ where: { id }, select: { modelMetadata: true, context: true } });
+    if (!run) return null;
+    await this.assertStoredRunAccess(run.context);
+    return readFrozenResearch(run.modelMetadata);
   }
 
   checkpoint(id: string, checkpoint: object) {

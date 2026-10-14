@@ -22,17 +22,19 @@ describe('database structure input', () => {
   it('自动发现全部 migration、Prisma 表和 raw-owned 表', async () => {
     const input = await discoverDatabaseStructure();
 
-    expect(input.currentHead).toBe('20261001120000_require_explicit_strategy_contract');
-    expect(input.migrations).toHaveLength(26);
-    expect(input.prismaTables).toHaveLength(60);
-    expect(input.rawOwnedTables).toHaveLength(11);
-    expect(input.expectedTables).toHaveLength(71);
+    expect(input.currentHead).toBe('20261006030000_strategy_authoring_save');
+    expect(input.migrations).toHaveLength(33);
+    expect(input.prismaTables).toHaveLength(64);
+    expect(input.rawOwnedTables).toHaveLength(16);
+    expect(input.expectedTables).toHaveLength(80);
     expect(input.expectedTables).toEqual(
       expect.arrayContaining([
         'StrategyRiskApplication',
         'AutomationRunLease',
         'LedgerEvent',
         'NavBacktestPreparation',
+        'StrategyAuthoringOperation',
+        'IdentitySession',
       ]),
     );
   });

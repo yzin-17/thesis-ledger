@@ -7,7 +7,6 @@ import { Metric } from '../shared/DesktopPrimitives.js';
 import {
   backtestBaseCurrency,
   backtestMetricNumber,
-  backtestMetricReason,
   backtestNumber,
   backtestResultCollections,
   readableBacktestResult,
@@ -17,7 +16,12 @@ import { buildBacktestChartModel } from './strategy-backtest-chart.model.js';
 import { StrategyBacktestEquityChart } from './StrategyBacktestEquityChart.js';
 import { StrategyBacktestEquityDetails } from './StrategyBacktestEquityDetails.js';
 import { StrategyBacktestDiagnostics } from './StrategyBacktestDiagnostics.js';
-import { BacktestRunDisclosure } from './BacktestModelDisclosure.js';
+import { BacktestRunDisclosure, completenessLabel } from './BacktestModelDisclosure.js';
+import {
+  backtestBenchmarkDisplayMetrics,
+  backtestMetricReasonLabel,
+  backtestPartialResultSummary,
+} from './strategy-backtest-result-availability.model.js';
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -48,7 +52,7 @@ const metricText = (
   const raw = metrics?.[key];
   const value = backtestMetricNumber(raw);
   if (value === null) {
-    const reason = backtestMetricReason(raw);
+    const reason = backtestMetricReasonLabel(raw);
     return reason ? `不可用：${reason}` : '不可用';
   }
   const displayed = magnitude ? Math.abs(value) : value;
@@ -114,6 +118,7 @@ function ResultOverview({ job, result }: { job: BacktestJob; result: BacktestJob
   const [visibleRange, setVisibleRange] = useState<{ from: number; to: number } | null>(null);
   useEffect(() => setVisibleRange(null), [job.id]);
   const metrics = record(result.metrics);
+  const benchmark = backtestBenchmarkDisplayMetrics(result);
   const collections = backtestResultCollections(result);
   const currency = backtestBaseCurrency(job, result);
   const lastEquity = collections.equityCurve.at(-1);
@@ -140,10 +145,19 @@ function ResultOverview({ job, result }: { job: BacktestJob; result: BacktestJob
     ['胜率', metricText(metrics, ['tradeWinRate', 'winRate'])],
     ['利润因子', metricText(metrics, ['profitFactor'], 'ratio')],
   ].filter(([, value]) => value !== '不可用');
+  if (benchmark) {
+    secondary.push(
+      ['基准净收益', metricText(benchmark, ['totalReturn'])],
+      ['净收益差', metricText(benchmark, ['excessReturn'])],
+    );
+  }
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="累计收益" value={metricText(metrics, ['cumulativeReturn', 'totalReturn'])} />
+        <Metric
+          label={result.schemaVersion === '3' ? '策略净收益' : '累计收益'}
+          value={metricText(metrics, ['cumulativeReturn', 'totalReturn'])}
+        />
         <Metric
           label="最大回撤"
           value={metricText(metrics, ['maxDrawdown'], 'percent', true)}
@@ -286,7 +300,7 @@ function DataAndAssumptions({ job, result }: { job: BacktestJob; result: Backtes
     ['初始资金', display(runConfig?.initialCash ?? input?.initialCash)],
     ['估值策略', display(runConfig?.valuationPolicy)],
     ['执行模型', display(runConfig?.executionModel ?? job.executionModelDisclosure)],
-    ['数据完整性', display(result.completeness)],
+    ['结果完整性', completenessLabel(result.completeness)],
     ['任务完成时间', job.finishedAt ? displayDateTime(job.finishedAt) : '未完成'],
   ];
   return (
@@ -334,7 +348,7 @@ export function StrategyBacktestResultTabs({ job }: { job: BacktestJob }) {
           <AlertDescription>
             {unsuccessful
               ? '任务未成功完成，当前产物仅用于诊断。'
-              : '任务已完成，但部分指标或比较项尚未核实；请查看数据与假设中的完整度与来源说明。'}
+              : backtestPartialResultSummary(result)}
           </AlertDescription>
         </Alert>
       )}

@@ -78,6 +78,7 @@ const toolCallIds = new Map([
   ['getRisk', '41111111-1111-4111-8111-111111111111'],
   ['getJournal', '51111111-1111-4111-8111-111111111111'],
   ['getStrategyVersion', '71111111-1111-4111-8111-111111111111'],
+  ['getJournalReview', '81111111-1111-4111-8111-111111111111'],
 ]);
 
 const runRecorder = (context: object = { scope: 'portfolio' }) => {
@@ -135,6 +136,47 @@ const sdkFixture = () => {
 };
 
 describe('AI 研究执行器', () => {
+  it('冻结来源只执行一笔审计读取，不回读当前组合，Prompt 使用提交版本', async () => {
+    const { runs, executions } = runRecorder({ scope: 'account', accountId: 'account-1' });
+    const original = await runs.claim();
+    const run = { ...original, promptVersion: 'frozen-prompt-v1', modelMetadata: { ...executionMetadata,
+      frozenResearch: { version: 'frozen-research-v1', prompt: { version: 'frozen-prompt-v1', template: '只解读冻结证据。' },
+        source: { tool: 'getJournalReview', permission: 'journal:read', evidence: { sourceId: 'journal:object-1', provider: 'thesis-ledger', fetchedAt: '2026-10-04T09:00:00Z', data: { quantity: '2.000000000000000001', pnl: '4.6' } } },
+      },
+    } };
+    runs.claim.mockResolvedValueOnce(run);
+    const prisma = prismaFixture();
+    const sdk = sdkFixture();
+    const executor = new AiResearchExecutor(runs as never, prisma as never, new AiProviderRegistry(), promptRegistry(), executions as never, sdk as never);
+    executor.dispatch(runId);
+    await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledOnce());
+    expect(sdk.execute.mock.calls[0]![0].messages[0]!.content).toBe('只解读冻结证据。');
+    expect(JSON.stringify(sdk.execute.mock.calls[0]![0].messages)).toContain('2.000000000000000001');
+    const schemaMessage = sdk.execute.mock.calls[0]![0].messages.find((message) =>
+      message.role === 'system' && message.content.includes('RESEARCH_OUTPUT_JSON_SCHEMA:'))!.content;
+    const outputSchema = JSON.parse(schemaMessage.split('RESEARCH_OUTPUT_JSON_SCHEMA:')[1]!);
+    expect(outputSchema.required).toEqual(expect.arrayContaining(['conclusion', 'evidence', 'risks', 'unknowns', 'disclaimer']));
+    expect(outputSchema.properties.evidence.items.type).toBe('object');
+    expect(runs.recordToolCall).toHaveBeenCalledTimes(1);
+    expect(runs.recordToolCall).toHaveBeenCalledWith(expect.objectContaining({ tool: 'getJournalReview', permission: 'journal:read' }));
+    expect(prisma.account.findMany).not.toHaveBeenCalled();
+    expect(prisma.position.findMany).not.toHaveBeenCalled();
+    expect(prisma.journalEntry.findMany).not.toHaveBeenCalled();
+    expect(executions.failOwned).not.toHaveBeenCalled();
+  });
+  it('冻结标记无效时以稳定错误码失败，不能退回实时来源', async () => {
+    const { runs, executions } = runRecorder();
+    const original = await runs.claim();
+    const run = { ...original, modelMetadata: { ...executionMetadata, frozenResearch: { version: 'unsupported' } } };
+    runs.claim.mockResolvedValueOnce(run);
+    const sdk = sdkFixture();
+    const prisma = prismaFixture();
+    const executor = new AiResearchExecutor(runs as never, prisma as never, new AiProviderRegistry(), promptRegistry(), executions as never, sdk as never);
+    executor.dispatch(runId);
+    await vi.waitFor(() => expect(executions.failOwned).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ errorCode: 'research_frozen_evidence_invalid' })));
+    expect(sdk.execute).not.toHaveBeenCalled();
+    expect(prisma.account.findMany).not.toHaveBeenCalled();
+  });
   it('发布停用开关关闭时不领取或恢复研究任务', async () => {
     vi.stubEnv('AI_RESEARCH_EXECUTION_ENABLED', 'false');
     const { runs, executions } = runRecorder();

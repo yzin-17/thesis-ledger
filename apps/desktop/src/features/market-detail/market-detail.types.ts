@@ -1,11 +1,12 @@
 import type {
   MarketDetailCapability,
-  MarketDetailResponse,
-  MarketDetailSection,
+  MarketDisplayDetailResponse as MarketDetailResponse,
+  MarketDisplayDetailSection as MarketDetailSection,
   MarketDetailSectionStatus,
 } from '@thesis-ledger/api-client';
-import type { BarSeries, Quote } from '@thesis-ledger/schemas';
+import type { MarketDisplayBarSeries as BarSeries, Quote } from '@thesis-ledger/schemas';
 import { canCombineChartSeries } from './market-chart-acquisition.js';
+import type { MarketDetailResponse as NativeDetailResponse } from '@thesis-ledger/api-client';
 
 export interface MarketDetailPosition {
   symbol: string;
@@ -15,10 +16,12 @@ export interface MarketDetailPosition {
   asset: { name: string; assetType?: 'stock' | 'etf' | 'fund' };
 }
 
-export const mergeMarketDetail = (
+export function mergeMarketDetail(current: NativeDetailResponse | null, next: NativeDetailResponse): NativeDetailResponse;
+export function mergeMarketDetail(current: MarketDetailResponse | null, next: MarketDetailResponse): MarketDetailResponse;
+export function mergeMarketDetail(
   current: MarketDetailResponse | null,
   next: MarketDetailResponse,
-): MarketDetailResponse => {
+): MarketDetailResponse {
   if (!current) return next;
   if (current.symbol !== next.symbol) return current;
   const currentSeries = current.barSeries;
@@ -48,7 +51,7 @@ export const mergeMarketDetail = (
       sections[capability as MarketDetailCapability] = nextSection;
   });
   let mergedBarSeries = nextSeries ?? currentSeries;
-  if (currentSeries && nextSeries && canCombine) {
+  if (currentSeries && nextSeries && canCombine && !('derivation' in currentSeries) && !('derivation' in nextSeries)) {
     // BarSeries 的 timestamp 可能在不同适配器间使用不同 ISO 表达，但图表语义按交易日
     // 合并；同日重叠项必须由本次有效响应替换，不能因时刻字符串不同而重复一根 bar。
     const byDate = new Map(currentSeries.points.map((bar) => [bar.timestamp.slice(0, 10), bar]));
@@ -77,7 +80,7 @@ export const mergeMarketDetail = (
     sections,
     dependencies: { ...current.dependencies, ...next.dependencies },
   };
-};
+}
 
 export const getVisibleMarketDetail = (
   detail: MarketDetailResponse | null,

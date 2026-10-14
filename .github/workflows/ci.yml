@@ -79,6 +79,16 @@ jobs:
         env:
           RUN_STRATEGY_OPTIMIZATION_POSTGRES_E2E: '1'
           RUN_AUTOMATION_POSTGRES_E2E: '1'
+      - name: AI 配置隔离 PostgreSQL
+        run: |
+          docker pull postgres:17-alpine
+          node scripts/test-ai-provider-postgres.mjs
+      - name: 基金定投隔离 PostgreSQL
+        run: node scripts/test-fund-investment-postgres.mjs
+      - name: 组合估值隔离 PostgreSQL
+        run: node scripts/test-portfolio-valuation-postgres.mjs
+      - name: 复盘投影隔离 PostgreSQL
+        run: node scripts/test-journal-review-postgres.mjs
       - name: Market reader review regressions
         run: |
           pnpm --filter @thesis-ledger/server exec vitest run \

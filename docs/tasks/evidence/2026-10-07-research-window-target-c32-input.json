@@ -1,0 +1,1938 @@
+{
+  "samples": [
+    {
+      "symbol": "600000.SH",
+      "strategyId": "d25142de-a46a-4086-9b9b-eda58c2d4e72",
+      "strategyVersionId": "5178af06-77ef-42f6-9bbd-0a7e0fed7bfe",
+      "request": {
+        "contractVersion": 3,
+        "requestId": "75c65fcb-2034-4e79-bcf0-a029eb75309e",
+        "runConfig": {
+          "startDate": "2023-08-01",
+          "endDate": "2023-09-15",
+          "dataAsOf": "2026-10-06T17:22:15.528Z",
+          "baseCurrency": "CNY",
+          "initialCash": {
+            "CNY": "100000"
+          },
+          "valuationPolicy": {
+            "baseTimezone": "Asia/Shanghai",
+            "dailyValuationTime": "15:00",
+            "pricePolicy": "latestAvailable",
+            "fxPolicy": "latestAvailable"
+          },
+          "executionModel": {
+            "schemaVersion": "execution-model-v1",
+            "id": "cn-600000.SH-extended-window-research",
+            "version": "1",
+            "scope": {
+              "symbol": "600000.SH",
+              "market": "CN",
+              "instrumentType": "STOCK",
+              "currency": "CNY",
+              "timezone": "Asia/Shanghai",
+              "range": {
+                "start": "2023-08-01",
+                "end": "2023-09-15"
+              }
+            },
+            "segments": [
+              {
+                "id": "selected-whole-window-model",
+                "range": {
+                  "start": "2023-08-01",
+                  "end": "2023-09-15"
+                },
+                "source": {
+                  "kind": "userConfiguration",
+                  "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+                  "references": [
+                    "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+                  ],
+                  "revision": "1",
+                  "configuredAt": "2026-10-06T17:22:15.528Z"
+                },
+                "assumptions": [
+                  "腾讯前复权归一化连续价格及连续单位；单次模拟金额 CNY 10000，零滑点。",
+                  "佣金双向成交额 0.0003，每笔最低 CNY 5，包含规费及经手费。",
+                  "整窗卖出印花税 0.0005、双向过户费 0.00001 均为研究假设，未按历史变化拼接。",
+                  "每笔每项应用最低额后按 CNY 两位小数 halfUp 舍入。",
+                  "成交后首个交易日可卖、卖出资金当日可再投资；无日涨跌幅、整手及价位限制。"
+                ],
+                "fees": {
+                  "currency": "CNY",
+                  "rounding": {
+                    "mode": "halfUp",
+                    "decimalPlaces": 2
+                  },
+                  "collection": "perFillPerCharge",
+                  "commission": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0003",
+                    "minimum": {
+                      "kind": "amount",
+                      "amount": "5"
+                    }
+                  },
+                  "stampDuty": {
+                    "treatment": "charged",
+                    "side": "sell",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0005",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "transferFee": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.00001",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "regulatoryFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  },
+                  "handlingFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  }
+                },
+                "execution": {
+                  "mode": "exchange",
+                  "calendarMarket": "CN",
+                  "reserveCashAt": "orderAccepted",
+                  "buyDebitAt": "fill",
+                  "sellableAfterTradingDays": 1,
+                  "saleReinvestableAfterTradingDays": 0,
+                  "price": {
+                    "kind": "noDailyLimit",
+                    "reason": "归一化研究按连续价格计算"
+                  },
+                  "normalizedExecution": {
+                    "priceCoordinate": "continuous-decimal",
+                    "quantityUnits": "continuous-normalized-decimal",
+                    "lotSizeConstraint": "not-applied",
+                    "tickSizeConstraint": "not-applied",
+                    "dailyPriceLimit": "not-applied",
+                    "feeBasis": "simulatedTurnover"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "adjustment": "qfq",
+        "accountingBasis": "normalized-series",
+        "history": {
+          "basis": "fixed-provider-snapshot"
+        },
+        "warmupBudgetSessions": 5,
+        "freezeTimePolicy": "after-acquisition",
+        "strategyVersionId": "5178af06-77ef-42f6-9bbd-0a7e0fed7bfe"
+      },
+      "prepared": {
+        "contractVersion": 3,
+        "requestId": "75c65fcb-2034-4e79-bcf0-a029eb75309e",
+        "checkedAt": "2026-10-06T17:22:15.673Z",
+        "scope": "execution-window",
+        "status": "prepared",
+        "runConfig": {
+          "schemaVersion": "3",
+          "startDate": "2023-08-01",
+          "endDate": "2023-09-15",
+          "dataAsOf": "2026-10-06T17:22:16.058Z",
+          "baseCurrency": "CNY",
+          "initialCash": {
+            "CNY": "100000"
+          },
+          "valuationPolicy": {
+            "baseTimezone": "Asia/Shanghai",
+            "dailyValuationTime": "15:00",
+            "pricePolicy": "latestAvailable",
+            "fxPolicy": "latestAvailable"
+          },
+          "executionModel": {
+            "schemaVersion": "execution-model-v1",
+            "id": "cn-600000.SH-extended-window-research",
+            "version": "1",
+            "scope": {
+              "symbol": "600000.SH",
+              "market": "CN",
+              "instrumentType": "STOCK",
+              "currency": "CNY",
+              "timezone": "Asia/Shanghai",
+              "range": {
+                "start": "2023-08-01",
+                "end": "2023-09-15"
+              }
+            },
+            "segments": [
+              {
+                "id": "selected-whole-window-model",
+                "range": {
+                  "start": "2023-08-01",
+                  "end": "2023-09-15"
+                },
+                "source": {
+                  "kind": "userConfiguration",
+                  "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+                  "references": [
+                    "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+                  ],
+                  "revision": "1",
+                  "configuredAt": "2026-10-06T17:22:15.528Z"
+                },
+                "assumptions": [
+                  "腾讯前复权归一化连续价格及连续单位；单次模拟金额 CNY 10000，零滑点。",
+                  "佣金双向成交额 0.0003，每笔最低 CNY 5，包含规费及经手费。",
+                  "整窗卖出印花税 0.0005、双向过户费 0.00001 均为研究假设，未按历史变化拼接。",
+                  "每笔每项应用最低额后按 CNY 两位小数 halfUp 舍入。",
+                  "成交后首个交易日可卖、卖出资金当日可再投资；无日涨跌幅、整手及价位限制。"
+                ],
+                "fees": {
+                  "currency": "CNY",
+                  "rounding": {
+                    "mode": "halfUp",
+                    "decimalPlaces": 2
+                  },
+                  "collection": "perFillPerCharge",
+                  "commission": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0003",
+                    "minimum": {
+                      "kind": "amount",
+                      "amount": "5"
+                    }
+                  },
+                  "stampDuty": {
+                    "treatment": "charged",
+                    "side": "sell",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0005",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "transferFee": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.00001",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "regulatoryFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  },
+                  "handlingFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  }
+                },
+                "execution": {
+                  "mode": "exchange",
+                  "calendarMarket": "CN",
+                  "reserveCashAt": "orderAccepted",
+                  "buyDebitAt": "fill",
+                  "sellableAfterTradingDays": 1,
+                  "saleReinvestableAfterTradingDays": 0,
+                  "price": {
+                    "kind": "noDailyLimit",
+                    "reason": "归一化研究按连续价格计算"
+                  },
+                  "normalizedExecution": {
+                    "priceCoordinate": "continuous-decimal",
+                    "quantityUnits": "continuous-normalized-decimal",
+                    "lotSizeConstraint": "not-applied",
+                    "tickSizeConstraint": "not-applied",
+                    "dailyPriceLimit": "not-applied",
+                    "feeBasis": "simulatedTurnover"
+                  }
+                }
+              }
+            ]
+          },
+          "executionPriceProtocol": {
+            "protocolVersion": "execution-price-v1",
+            "priceBasis": {
+              "adjustment": "qfq",
+              "method": "provider-native",
+              "methodVersion": "dsa-market-bars-v3-native-source-v1",
+              "basisScope": "provider-defined",
+              "anchor": null,
+              "revision": {
+                "origin": "local-observation",
+                "contentHash": "04c14f120da31b1b314ea622706c9625d0337f40a4f7320a281e067bbaea324e"
+              },
+              "observedAt": "2026-10-06T17:22:16.032099+00:00",
+              "volumeBasis": "unknown",
+              "dividendMeaning": "provider-defined",
+              "dividendEvidenceRef": null,
+              "conversionAvailable": false,
+              "conversionEvidenceRef": null,
+              "derivation": null,
+              "quantityBasis": "normalized-units"
+            },
+            "accountingBasis": "normalized-series",
+            "history": {
+              "basis": "fixed-provider-snapshot"
+            }
+          },
+          "priceInputBindings": {
+            "signals": [
+              {
+                "sourceId": "execution",
+                "binding": "execution-series"
+              }
+            ],
+            "benchmark": {
+              "binding": "execution-series"
+            }
+          },
+          "frozenExecutionWindow": {
+            "version": "market-frozen-window-v1",
+            "identityFingerprint": "f0dcbeb775f4c68d77395a6100851b5516867da42ac1a569d664d11814bd9dc8",
+            "responseHash": "3ad06883967877f78de78a36bb92deecb795ad90c89b2a133f5ef12108167d0c"
+          },
+          "frozenWarmupBudgetSessions": 5
+        },
+        "actualSource": {
+          "purpose": "execution",
+          "symbol": "600000.SH",
+          "routeKey": {
+            "kind": "bar",
+            "market": "CN",
+            "assetType": "STOCK",
+            "capability": "DAILY_BAR",
+            "timeframe": "1d",
+            "adjustment": "qfq"
+          },
+          "provenance": {
+            "providerId": "tencent",
+            "upstreamSource": "tencent",
+            "routeIndex": 0,
+            "effectivePolicyRevision": 40
+          },
+          "inputFingerprint": "04c14f120da31b1b314ea622706c9625d0337f40a4f7320a281e067bbaea324e"
+        },
+        "executionPreflight": {
+          "contractVersion": 3,
+          "requestId": "75c65fcb-2034-4e79-bcf0-a029eb75309e",
+          "checkedAt": "2026-10-06T17:22:15.673Z",
+          "status": "ready",
+          "revisionStamp": {
+            "strategyVersionId": "5178af06-77ef-42f6-9bbd-0a7e0fed7bfe",
+            "strategyContentHash": "c4501858a71f867d5a96dcc762578744e43a879472c9e0a27c2cf15f0856b2ed",
+            "runConfigChecksum": "2833616ee3d2d4d0f1bf5a9bb47594aecb14104088ea908e3265ad57db424889",
+            "desiredRevision": 40,
+            "effectiveRevision": 40,
+            "catalogRevision": 2025625790475339,
+            "targetSequences": [
+              {
+                "requirement": {
+                  "symbol": "600000.SH",
+                  "capability": "DAILY_BAR",
+                  "purpose": "execution",
+                  "dateRange": {
+                    "startDate": "2023-07-08",
+                    "endDate": "2023-09-15"
+                  },
+                  "routeKey": {
+                    "kind": "bar",
+                    "market": "CN",
+                    "assetType": "STOCK",
+                    "capability": "DAILY_BAR",
+                    "timeframe": "1d",
+                    "adjustment": "qfq"
+                  }
+                },
+                "targets": [
+                  {
+                    "providerId": "tencent",
+                    "upstreamSource": "tencent",
+                    "routeIndex": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "diagnostics": []
+        }
+      },
+      "job": {
+        "id": "73ab7c23-9335-4771-a612-5f1a1547734f",
+        "status": "succeeded",
+        "executionAttempt": 1,
+        "snapshotId": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+        "resultChecksum": "1e83d3eb24788bcf",
+        "strategyVersionId": "5178af06-77ef-42f6-9bbd-0a7e0fed7bfe"
+      },
+      "manifest": {
+        "status": "finalized",
+        "contentHash": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+        "dataAsOf": "2026-10-06T17:22:16.058Z",
+        "dateRange": {
+          "endDate": "2023-09-15",
+          "startDate": "2023-08-01",
+          "warmupStartDate": "2023-07-08"
+        },
+        "warmup": {
+          "startDate": "2023-07-08",
+          "lookbackPeriods": 5,
+          "lookbackTimeframe": "1d",
+          "calendarBufferDays": 14,
+          "rangePolicyVersion": "calendar-aware-conservative-v1"
+        },
+        "frozenExecutionWindow": {
+          "version": "market-frozen-window-v1",
+          "responseHash": "3ad06883967877f78de78a36bb92deecb795ad90c89b2a133f5ef12108167d0c",
+          "identityFingerprint": "f0dcbeb775f4c68d77395a6100851b5516867da42ac1a569d664d11814bd9dc8"
+        },
+        "executionModel": {
+          "id": "cn-600000.SH-extended-window-research",
+          "version": "1",
+          "artifactKey": "73ab7c23-9335-4771-a612-5f1a1547734f/metadata/execution-model-v3.parquet",
+          "contentHash": "25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078",
+          "schemaVersion": "execution-model-v1"
+        },
+        "benchmarkCostVersion": "execution-model-cost-v1",
+        "quality": {
+          "warnings": [],
+          "completeness": "complete"
+        }
+      },
+      "result": {
+        "resultChecksum": "1e83d3eb24788bcf",
+        "completeness": "complete",
+        "metrics": {
+          "cagr": {
+            "value": "-0.06705147129504673842",
+            "status": "available"
+          },
+          "sharpe": {
+            "value": "-6.31520989651186415159",
+            "status": "available"
+          },
+          "winRate": {
+            "value": "0",
+            "status": "available"
+          },
+          "turnover": {
+            "value": "99178.717635233000207901118977172773488433737601",
+            "status": "available"
+          },
+          "tradeCount": {
+            "value": "5",
+            "status": "available"
+          },
+          "volatility": {
+            "value": "0.01097948680169968071",
+            "status": "available"
+          },
+          "maxDrawdown": {
+            "value": "-0.00969312432107067132",
+            "status": "available"
+          },
+          "totalReturn": {
+            "value": "-0.00851467314261949287",
+            "status": "available"
+          },
+          "profitFactor": {
+            "value": "0",
+            "status": "available"
+          },
+          "basicPeriodReturn": {
+            "value": "-0.00851467314261949287",
+            "status": "available"
+          }
+        },
+        "benchmark": {
+          "totalReturn": {
+            "value": "-0.07545494232558139535",
+            "status": "available"
+          },
+          "excessReturn": {
+            "value": "0.06694026918296190248",
+            "status": "available"
+          }
+        },
+        "benchmarkCompatibility": {
+          "status": "compatible",
+          "missingFields": [],
+          "costAssumption": {
+            "kind": "execution-model",
+            "version": "execution-model-cost-v1",
+            "fingerprint": "492c2c101f6e906f"
+          },
+          "differentFields": [],
+          "strategyFingerprint": "913781a52b242744",
+          "benchmarkFingerprint": "913781a52b242744"
+        },
+        "warnings": [
+          "公共收费源暂不可用，使用已选执行模型。",
+          "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。",
+          "BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2"
+        ],
+        "publicFeesDisclosure": {
+          "reason": "公共收费源暂不可用，使用已选执行模型。",
+          "status": "executionModel"
+        },
+        "executionModelDisclosure": {
+          "model": {
+            "id": "cn-600000.SH-extended-window-research",
+            "scope": {
+              "range": {
+                "end": "2023-09-15",
+                "start": "2023-08-01"
+              },
+              "market": "CN",
+              "symbol": "600000.SH",
+              "currency": "CNY",
+              "timezone": "Asia/Shanghai",
+              "instrumentType": "STOCK"
+            },
+            "version": "1",
+            "segments": [
+              {
+                "id": "selected-whole-window-model",
+                "fees": {
+                  "currency": "CNY",
+                  "rounding": {
+                    "mode": "halfUp",
+                    "decimalPlaces": 2
+                  },
+                  "stampDuty": {
+                    "rate": "0.0005",
+                    "side": "sell",
+                    "basis": "turnover",
+                    "minimum": {
+                      "kind": "none"
+                    },
+                    "currency": "CNY",
+                    "treatment": "charged"
+                  },
+                  "collection": "perFillPerCharge",
+                  "commission": {
+                    "rate": "0.0003",
+                    "side": "both",
+                    "basis": "turnover",
+                    "minimum": {
+                      "kind": "amount",
+                      "amount": "5"
+                    },
+                    "currency": "CNY",
+                    "treatment": "charged"
+                  },
+                  "handlingFee": {
+                    "reason": "研究佣金采用含规费口径",
+                    "treatment": "includedInCommission"
+                  },
+                  "transferFee": {
+                    "rate": "0.00001",
+                    "side": "both",
+                    "basis": "turnover",
+                    "minimum": {
+                      "kind": "none"
+                    },
+                    "currency": "CNY",
+                    "treatment": "charged"
+                  },
+                  "regulatoryFee": {
+                    "reason": "研究佣金采用含规费口径",
+                    "treatment": "includedInCommission"
+                  }
+                },
+                "range": {
+                  "end": "2023-09-15",
+                  "start": "2023-08-01"
+                },
+                "source": {
+                  "kind": "userConfiguration",
+                  "revision": "1",
+                  "references": [
+                    "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+                  ],
+                  "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+                  "configuredAt": "2026-10-06T17:22:15.528Z"
+                },
+                "execution": {
+                  "mode": "exchange",
+                  "price": {
+                    "kind": "noDailyLimit",
+                    "reason": "归一化研究按连续价格计算"
+                  },
+                  "buyDebitAt": "fill",
+                  "reserveCashAt": "orderAccepted",
+                  "calendarMarket": "CN",
+                  "normalizedExecution": {
+                    "feeBasis": "simulatedTurnover",
+                    "quantityUnits": "continuous-normalized-decimal",
+                    "dailyPriceLimit": "not-applied",
+                    "priceCoordinate": "continuous-decimal",
+                    "lotSizeConstraint": "not-applied",
+                    "tickSizeConstraint": "not-applied"
+                  },
+                  "sellableAfterTradingDays": 1,
+                  "saleReinvestableAfterTradingDays": 0
+                },
+                "assumptions": [
+                  "腾讯前复权归一化连续价格及连续单位；单次模拟金额 CNY 10000，零滑点。",
+                  "佣金双向成交额 0.0003，每笔最低 CNY 5，包含规费及经手费。",
+                  "整窗卖出印花税 0.0005、双向过户费 0.00001 均为研究假设，未按历史变化拼接。",
+                  "每笔每项应用最低额后按 CNY 两位小数 halfUp 舍入。",
+                  "成交后首个交易日可卖、卖出资金当日可再投资；无日涨跌幅、整手及价位限制。"
+                ]
+              }
+            ],
+            "schemaVersion": "execution-model-v1"
+          },
+          "contentHash": "25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078"
+        },
+        "actualSources": [
+          {
+            "symbol": "600000.SH",
+            "purpose": "execution",
+            "routeKey": {
+              "kind": "bar",
+              "market": "CN",
+              "assetType": "STOCK",
+              "timeframe": "1d",
+              "adjustment": "qfq",
+              "capability": "DAILY_BAR"
+            },
+            "provenance": {
+              "providerId": "tencent",
+              "routeIndex": 0,
+              "upstreamSource": "tencent",
+              "effectivePolicyRevision": 40
+            },
+            "inputFingerprint": "04c14f120da31b1b314ea622706c9625d0337f40a4f7320a281e067bbaea324e"
+          },
+          {
+            "symbol": "600000.SH",
+            "purpose": "signal",
+            "routeKey": {
+              "kind": "bar",
+              "market": "CN",
+              "assetType": "STOCK",
+              "timeframe": "1d",
+              "adjustment": "qfq",
+              "capability": "DAILY_BAR"
+            },
+            "provenance": {
+              "providerId": "tencent",
+              "routeIndex": 0,
+              "upstreamSource": "tencent",
+              "effectivePolicyRevision": 40
+            },
+            "inputFingerprint": "04c14f120da31b1b314ea622706c9625d0337f40a4f7320a281e067bbaea324e"
+          },
+          {
+            "symbol": "600000.SH",
+            "purpose": "benchmark",
+            "routeKey": {
+              "kind": "bar",
+              "market": "CN",
+              "assetType": "STOCK",
+              "timeframe": "1d",
+              "adjustment": "qfq",
+              "capability": "DAILY_BAR"
+            },
+            "provenance": {
+              "providerId": "tencent",
+              "routeIndex": 0,
+              "upstreamSource": "tencent",
+              "effectivePolicyRevision": 40
+            },
+            "inputFingerprint": "04c14f120da31b1b314ea622706c9625d0337f40a4f7320a281e067bbaea324e"
+          }
+        ]
+      },
+      "frozenArtifacts": {
+        "runId": "73ab7c23-9335-4771-a612-5f1a1547734f",
+        "symbol": "600000.SH",
+        "contentHash": "5f29b4e001bb08fd2ab4cac3463efab5522d093269f343f613926c5ec1f3b701",
+        "status": "finalized",
+        "artifactCount": 10,
+        "networkCalls": 0,
+        "request": {
+          "contractVersion": 3,
+          "end": "2023-09-15",
+          "requestId": "bf1c2fb3-d9e0-48a5-b790-f83016527d11",
+          "routeKey": {
+            "adjustment": "qfq",
+            "assetType": "STOCK",
+            "capability": "DAILY_BAR",
+            "kind": "bar",
+            "market": "CN",
+            "timeframe": "1d"
+          },
+          "routeTarget": {
+            "providerId": "tencent",
+            "routeIndex": 0,
+            "upstreamSource": "tencent"
+          },
+          "start": "2023-07-08",
+          "symbol": "600000.SH",
+          "tradabilityMode": "assume-untradable-no-bar"
+        },
+        "frozenExecutionWindow": {
+          "identityFingerprint": "f0dcbeb775f4c68d77395a6100851b5516867da42ac1a569d664d11814bd9dc8",
+          "responseHash": "3ad06883967877f78de78a36bb92deecb795ad90c89b2a133f5ef12108167d0c",
+          "version": "market-frozen-window-v1"
+        },
+        "priceCount": 50,
+        "warmupDates": [
+          "2023-07-10",
+          "2023-07-11",
+          "2023-07-12",
+          "2023-07-13",
+          "2023-07-14",
+          "2023-07-17",
+          "2023-07-18",
+          "2023-07-19",
+          "2023-07-20",
+          "2023-07-21",
+          "2023-07-24",
+          "2023-07-25",
+          "2023-07-26",
+          "2023-07-27",
+          "2023-07-28",
+          "2023-07-31"
+        ],
+        "runDates": [
+          "2023-08-01",
+          "2023-08-02",
+          "2023-08-03",
+          "2023-08-04",
+          "2023-08-07",
+          "2023-08-08",
+          "2023-08-09",
+          "2023-08-10",
+          "2023-08-11",
+          "2023-08-14",
+          "2023-08-15",
+          "2023-08-16",
+          "2023-08-17",
+          "2023-08-18",
+          "2023-08-21",
+          "2023-08-22",
+          "2023-08-23",
+          "2023-08-24",
+          "2023-08-25",
+          "2023-08-28",
+          "2023-08-29",
+          "2023-08-30",
+          "2023-08-31",
+          "2023-09-01",
+          "2023-09-04",
+          "2023-09-05",
+          "2023-09-06",
+          "2023-09-07",
+          "2023-09-08",
+          "2023-09-11",
+          "2023-09-12",
+          "2023-09-13",
+          "2023-09-14",
+          "2023-09-15"
+        ],
+        "missingSessionDates": [],
+        "listing": {
+          "symbol": "600000.SH",
+          "firstTradingDate": "1999-11-10",
+          "source": "https://news.spdb.com.cn/about_spd/xwdt_1632/202302/t20230201_1115740.shtml",
+          "revision": "spdb-listing-t20230201_1115740",
+          "knownAt": "2023-02-01T00:00:00+08:00"
+        },
+        "pagination": {
+          "status": "complete",
+          "pagesFetched": 1,
+          "continuationPending": false
+        },
+        "provenance": {
+          "effectivePolicyRevision": 40,
+          "providerId": "tencent",
+          "routeIndex": 0,
+          "upstreamSource": "tencent"
+        },
+        "calendar": {
+          "provider": "exchange-calendars",
+          "providerRevision": "exchange-calendars-4.13.2-release-evidence-v1",
+          "availableAt": "2026-03-10T03:24:37.055242+00:00",
+          "range": {
+            "end": "2023-10-02",
+            "start": "2023-07-08"
+          },
+          "settlementDate": "2023-09-18"
+        },
+        "modelHash": "25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078",
+        "modelSource": {
+          "configuredAt": "2026-10-06T17:22:15.528Z",
+          "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+          "kind": "userConfiguration",
+          "references": [
+            "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+          ],
+          "revision": "1"
+        },
+        "fees": {
+          "compositionVersion": "public-fees-model-v1",
+          "modelContentHash": "25267d9ee73e3ddae110837ccfce170f76cb70876182c4d2d31f4ccc86aef078",
+          "disclosure": {
+            "status": "executionModel",
+            "reason": "公共收费源暂不可用，使用已选执行模型。"
+          }
+        },
+        "tradingStatus": {
+          "disclosure": {
+            "reason": "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。",
+            "status": "notIncluded"
+          },
+          "freezeVersion": "frozen-trading-status-v1",
+          "runConfigChecksum": "2833616ee3d2d4d0f1bf5a9bb47594aecb14104088ea908e3265ad57db424889"
+        },
+        "barsDigest": "6e9452ecfcd94545cd6696a1d7e61d2dec87a925dd4ef6206144d5407722ea3a"
+      },
+      "protectedJobs": [
+        {
+          "id": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0",
+          "status": "succeeded",
+          "snapshotId": "0046b0759593d8a66a2a1cb9f78979a3540942801f28e359c46484005a0a39a5",
+          "resultChecksum": "a07303d0e7c0f3ce"
+        },
+        {
+          "id": "652ba051-a4c5-493d-81e6-2cdbe3c090f0",
+          "status": "succeeded",
+          "snapshotId": "dbcb682568ebac75acfd5a23c9e968ba0808b097118a45f50453e78c425c558d",
+          "resultChecksum": "8c66f3f721f5e4d8"
+        }
+      ],
+      "fullRuntimeReport": {
+        "path": "/private/tmp/thesis-c32-run-600000.json",
+        "sha256": "69e33358ad262ff396ad7be6bc80b39fec42d6ec951badaa139d120cf9665eb8"
+      }
+    },
+    {
+      "symbol": "600519.SH",
+      "strategyId": "e840276a-a18f-4792-8b5a-c3953f4cc269",
+      "strategyVersionId": "26176553-5529-441c-a998-403ddbbb0e44",
+      "request": {
+        "contractVersion": 3,
+        "requestId": "6f35a860-c86b-4f99-89fd-102841ef403b",
+        "runConfig": {
+          "startDate": "2023-08-01",
+          "endDate": "2023-09-15",
+          "dataAsOf": "2026-10-06T17:22:29.360Z",
+          "baseCurrency": "CNY",
+          "initialCash": {
+            "CNY": "100000"
+          },
+          "valuationPolicy": {
+            "baseTimezone": "Asia/Shanghai",
+            "dailyValuationTime": "15:00",
+            "pricePolicy": "latestAvailable",
+            "fxPolicy": "latestAvailable"
+          },
+          "executionModel": {
+            "schemaVersion": "execution-model-v1",
+            "id": "cn-600519.SH-extended-window-research",
+            "version": "1",
+            "scope": {
+              "symbol": "600519.SH",
+              "market": "CN",
+              "instrumentType": "STOCK",
+              "currency": "CNY",
+              "timezone": "Asia/Shanghai",
+              "range": {
+                "start": "2023-08-01",
+                "end": "2023-09-15"
+              }
+            },
+            "segments": [
+              {
+                "id": "selected-whole-window-model",
+                "range": {
+                  "start": "2023-08-01",
+                  "end": "2023-09-15"
+                },
+                "source": {
+                  "kind": "userConfiguration",
+                  "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+                  "references": [
+                    "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+                  ],
+                  "revision": "1",
+                  "configuredAt": "2026-10-06T17:22:29.360Z"
+                },
+                "assumptions": [
+                  "腾讯前复权归一化连续价格及连续单位；单次模拟金额 CNY 10000，零滑点。",
+                  "佣金双向成交额 0.0003，每笔最低 CNY 5，包含规费及经手费。",
+                  "整窗卖出印花税 0.0005、双向过户费 0.00001 均为研究假设，未按历史变化拼接。",
+                  "每笔每项应用最低额后按 CNY 两位小数 halfUp 舍入。",
+                  "成交后首个交易日可卖、卖出资金当日可再投资；无日涨跌幅、整手及价位限制。"
+                ],
+                "fees": {
+                  "currency": "CNY",
+                  "rounding": {
+                    "mode": "halfUp",
+                    "decimalPlaces": 2
+                  },
+                  "collection": "perFillPerCharge",
+                  "commission": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0003",
+                    "minimum": {
+                      "kind": "amount",
+                      "amount": "5"
+                    }
+                  },
+                  "stampDuty": {
+                    "treatment": "charged",
+                    "side": "sell",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0005",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "transferFee": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.00001",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "regulatoryFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  },
+                  "handlingFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  }
+                },
+                "execution": {
+                  "mode": "exchange",
+                  "calendarMarket": "CN",
+                  "reserveCashAt": "orderAccepted",
+                  "buyDebitAt": "fill",
+                  "sellableAfterTradingDays": 1,
+                  "saleReinvestableAfterTradingDays": 0,
+                  "price": {
+                    "kind": "noDailyLimit",
+                    "reason": "归一化研究按连续价格计算"
+                  },
+                  "normalizedExecution": {
+                    "priceCoordinate": "continuous-decimal",
+                    "quantityUnits": "continuous-normalized-decimal",
+                    "lotSizeConstraint": "not-applied",
+                    "tickSizeConstraint": "not-applied",
+                    "dailyPriceLimit": "not-applied",
+                    "feeBasis": "simulatedTurnover"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "adjustment": "qfq",
+        "accountingBasis": "normalized-series",
+        "history": {
+          "basis": "fixed-provider-snapshot"
+        },
+        "warmupBudgetSessions": 5,
+        "freezeTimePolicy": "after-acquisition",
+        "strategyVersionId": "26176553-5529-441c-a998-403ddbbb0e44"
+      },
+      "prepared": {
+        "contractVersion": 3,
+        "requestId": "6f35a860-c86b-4f99-89fd-102841ef403b",
+        "checkedAt": "2026-10-06T17:22:29.467Z",
+        "scope": "execution-window",
+        "status": "prepared",
+        "runConfig": {
+          "schemaVersion": "3",
+          "startDate": "2023-08-01",
+          "endDate": "2023-09-15",
+          "dataAsOf": "2026-10-06T17:22:29.812Z",
+          "baseCurrency": "CNY",
+          "initialCash": {
+            "CNY": "100000"
+          },
+          "valuationPolicy": {
+            "baseTimezone": "Asia/Shanghai",
+            "dailyValuationTime": "15:00",
+            "pricePolicy": "latestAvailable",
+            "fxPolicy": "latestAvailable"
+          },
+          "executionModel": {
+            "schemaVersion": "execution-model-v1",
+            "id": "cn-600519.SH-extended-window-research",
+            "version": "1",
+            "scope": {
+              "symbol": "600519.SH",
+              "market": "CN",
+              "instrumentType": "STOCK",
+              "currency": "CNY",
+              "timezone": "Asia/Shanghai",
+              "range": {
+                "start": "2023-08-01",
+                "end": "2023-09-15"
+              }
+            },
+            "segments": [
+              {
+                "id": "selected-whole-window-model",
+                "range": {
+                  "start": "2023-08-01",
+                  "end": "2023-09-15"
+                },
+                "source": {
+                  "kind": "userConfiguration",
+                  "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+                  "references": [
+                    "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+                  ],
+                  "revision": "1",
+                  "configuredAt": "2026-10-06T17:22:29.360Z"
+                },
+                "assumptions": [
+                  "腾讯前复权归一化连续价格及连续单位；单次模拟金额 CNY 10000，零滑点。",
+                  "佣金双向成交额 0.0003，每笔最低 CNY 5，包含规费及经手费。",
+                  "整窗卖出印花税 0.0005、双向过户费 0.00001 均为研究假设，未按历史变化拼接。",
+                  "每笔每项应用最低额后按 CNY 两位小数 halfUp 舍入。",
+                  "成交后首个交易日可卖、卖出资金当日可再投资；无日涨跌幅、整手及价位限制。"
+                ],
+                "fees": {
+                  "currency": "CNY",
+                  "rounding": {
+                    "mode": "halfUp",
+                    "decimalPlaces": 2
+                  },
+                  "collection": "perFillPerCharge",
+                  "commission": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0003",
+                    "minimum": {
+                      "kind": "amount",
+                      "amount": "5"
+                    }
+                  },
+                  "stampDuty": {
+                    "treatment": "charged",
+                    "side": "sell",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.0005",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "transferFee": {
+                    "treatment": "charged",
+                    "side": "both",
+                    "basis": "turnover",
+                    "currency": "CNY",
+                    "rate": "0.00001",
+                    "minimum": {
+                      "kind": "none"
+                    }
+                  },
+                  "regulatoryFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  },
+                  "handlingFee": {
+                    "treatment": "includedInCommission",
+                    "reason": "研究佣金采用含规费口径"
+                  }
+                },
+                "execution": {
+                  "mode": "exchange",
+                  "calendarMarket": "CN",
+                  "reserveCashAt": "orderAccepted",
+                  "buyDebitAt": "fill",
+                  "sellableAfterTradingDays": 1,
+                  "saleReinvestableAfterTradingDays": 0,
+                  "price": {
+                    "kind": "noDailyLimit",
+                    "reason": "归一化研究按连续价格计算"
+                  },
+                  "normalizedExecution": {
+                    "priceCoordinate": "continuous-decimal",
+                    "quantityUnits": "continuous-normalized-decimal",
+                    "lotSizeConstraint": "not-applied",
+                    "tickSizeConstraint": "not-applied",
+                    "dailyPriceLimit": "not-applied",
+                    "feeBasis": "simulatedTurnover"
+                  }
+                }
+              }
+            ]
+          },
+          "executionPriceProtocol": {
+            "protocolVersion": "execution-price-v1",
+            "priceBasis": {
+              "adjustment": "qfq",
+              "method": "provider-native",
+              "methodVersion": "dsa-market-bars-v3-native-source-v1",
+              "basisScope": "provider-defined",
+              "anchor": null,
+              "revision": {
+                "origin": "local-observation",
+                "contentHash": "83cedc983cd83e2b0a6333da791929e1baedcc9a6e5aa28c643c00204b9806bd"
+              },
+              "observedAt": "2026-10-06T17:22:29.781906+00:00",
+              "volumeBasis": "unknown",
+              "dividendMeaning": "provider-defined",
+              "dividendEvidenceRef": null,
+              "conversionAvailable": false,
+              "conversionEvidenceRef": null,
+              "derivation": null,
+              "quantityBasis": "normalized-units"
+            },
+            "accountingBasis": "normalized-series",
+            "history": {
+              "basis": "fixed-provider-snapshot"
+            }
+          },
+          "priceInputBindings": {
+            "signals": [
+              {
+                "sourceId": "execution",
+                "binding": "execution-series"
+              }
+            ],
+            "benchmark": {
+              "binding": "execution-series"
+            }
+          },
+          "frozenExecutionWindow": {
+            "version": "market-frozen-window-v1",
+            "identityFingerprint": "96a92a3251563ee9f8b017e10c2cc1bcfcbf0c989881b1d87e423d6dda3988e5",
+            "responseHash": "1c49f73659e43d352126d7e04906824bf46ecc83b03dc9fcca619fab741c6151"
+          },
+          "frozenWarmupBudgetSessions": 5
+        },
+        "actualSource": {
+          "purpose": "execution",
+          "symbol": "600519.SH",
+          "routeKey": {
+            "kind": "bar",
+            "market": "CN",
+            "assetType": "STOCK",
+            "capability": "DAILY_BAR",
+            "timeframe": "1d",
+            "adjustment": "qfq"
+          },
+          "provenance": {
+            "providerId": "tencent",
+            "upstreamSource": "tencent",
+            "routeIndex": 0,
+            "effectivePolicyRevision": 40
+          },
+          "inputFingerprint": "83cedc983cd83e2b0a6333da791929e1baedcc9a6e5aa28c643c00204b9806bd"
+        },
+        "executionPreflight": {
+          "contractVersion": 3,
+          "requestId": "6f35a860-c86b-4f99-89fd-102841ef403b",
+          "checkedAt": "2026-10-06T17:22:29.467Z",
+          "status": "ready",
+          "revisionStamp": {
+            "strategyVersionId": "26176553-5529-441c-a998-403ddbbb0e44",
+            "strategyContentHash": "9aeaf7461f8800701ec99116eca0d085a39dca1c323e4ffd012cf41bb68b4582",
+            "runConfigChecksum": "29f71a9349f184512d87f5d0006dd378ac45d3690924554eb2f8863eee8b5c3a",
+            "desiredRevision": 40,
+            "effectiveRevision": 40,
+            "catalogRevision": 2025625790475339,
+            "targetSequences": [
+              {
+                "requirement": {
+                  "symbol": "600519.SH",
+                  "capability": "DAILY_BAR",
+                  "purpose": "execution",
+                  "dateRange": {
+                    "startDate": "2023-07-08",
+                    "endDate": "2023-09-15"
+                  },
+                  "routeKey": {
+                    "kind": "bar",
+                    "market": "CN",
+                    "assetType": "STOCK",
+                    "capability": "DAILY_BAR",
+                    "timeframe": "1d",
+                    "adjustment": "qfq"
+                  }
+                },
+                "targets": [
+                  {
+                    "providerId": "tencent",
+                    "upstreamSource": "tencent",
+                    "routeIndex": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "diagnostics": []
+        }
+      },
+      "job": {
+        "id": "dbc39963-da96-4583-8746-01feac9c7ff2",
+        "status": "succeeded",
+        "executionAttempt": 1,
+        "snapshotId": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+        "resultChecksum": "022494dccd271850",
+        "strategyVersionId": "26176553-5529-441c-a998-403ddbbb0e44"
+      },
+      "manifest": {
+        "status": "finalized",
+        "contentHash": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+        "dataAsOf": "2026-10-06T17:22:29.812Z",
+        "dateRange": {
+          "endDate": "2023-09-15",
+          "startDate": "2023-08-01",
+          "warmupStartDate": "2023-07-08"
+        },
+        "warmup": {
+          "startDate": "2023-07-08",
+          "lookbackPeriods": 5,
+          "lookbackTimeframe": "1d",
+          "calendarBufferDays": 14,
+          "rangePolicyVersion": "calendar-aware-conservative-v1"
+        },
+        "frozenExecutionWindow": {
+          "version": "market-frozen-window-v1",
+          "responseHash": "1c49f73659e43d352126d7e04906824bf46ecc83b03dc9fcca619fab741c6151",
+          "identityFingerprint": "96a92a3251563ee9f8b017e10c2cc1bcfcbf0c989881b1d87e423d6dda3988e5"
+        },
+        "executionModel": {
+          "id": "cn-600519.SH-extended-window-research",
+          "version": "1",
+          "artifactKey": "dbc39963-da96-4583-8746-01feac9c7ff2/metadata/execution-model-v3.parquet",
+          "contentHash": "e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a",
+          "schemaVersion": "execution-model-v1"
+        },
+        "benchmarkCostVersion": "execution-model-cost-v1",
+        "quality": {
+          "warnings": [],
+          "completeness": "complete"
+        }
+      },
+      "result": {
+        "resultChecksum": "022494dccd271850",
+        "completeness": "complete",
+        "metrics": {
+          "cagr": {
+            "value": "-0.00696672912834506164",
+            "status": "available"
+          },
+          "sharpe": {
+            "value": "-0.73175721393832227069",
+            "status": "available"
+          },
+          "winRate": {
+            "value": "0.75",
+            "status": "available"
+          },
+          "turnover": {
+            "value": "79974.682543304415228090373856654163598524662122",
+            "status": "available"
+          },
+          "tradeCount": {
+            "value": "4",
+            "status": "available"
+          },
+          "volatility": {
+            "value": "0.00949399492394615609",
+            "status": "available"
+          },
+          "maxDrawdown": {
+            "value": "-0.00287869041408916673",
+            "status": "available"
+          },
+          "totalReturn": {
+            "value": "-0.00086097456695584772",
+            "status": "available"
+          },
+          "profitFactor": {
+            "value": "0.65194191982420898317",
+            "status": "available"
+          },
+          "basicPeriodReturn": {
+            "value": "-0.00086097456695584772",
+            "status": "available"
+          }
+        },
+        "benchmark": {
+          "totalReturn": {
+            "value": "-0.06270828004724727032",
+            "status": "available"
+          },
+          "excessReturn": {
+            "value": "0.0618473054802914226",
+            "status": "available"
+          }
+        },
+        "benchmarkCompatibility": {
+          "status": "compatible",
+          "missingFields": [],
+          "costAssumption": {
+            "kind": "execution-model",
+            "version": "execution-model-cost-v1",
+            "fingerprint": "43ded329941a4f7c"
+          },
+          "differentFields": [],
+          "strategyFingerprint": "bf370f48b05606bb",
+          "benchmarkFingerprint": "bf370f48b05606bb"
+        },
+        "warnings": [
+          "未获取上市日期，未验证回测窗口与上市日期的边界关系",
+          "公共收费源暂不可用，使用已选执行模型。",
+          "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。",
+          "BENCHMARK_EVALUATION:v3-buy-first-in-range-close-liquidate-last-in-range-close-by-trading-date-v2"
+        ],
+        "publicFeesDisclosure": {
+          "reason": "公共收费源暂不可用，使用已选执行模型。",
+          "status": "executionModel"
+        },
+        "executionModelDisclosure": {
+          "model": {
+            "id": "cn-600519.SH-extended-window-research",
+            "scope": {
+              "range": {
+                "end": "2023-09-15",
+                "start": "2023-08-01"
+              },
+              "market": "CN",
+              "symbol": "600519.SH",
+              "currency": "CNY",
+              "timezone": "Asia/Shanghai",
+              "instrumentType": "STOCK"
+            },
+            "version": "1",
+            "segments": [
+              {
+                "id": "selected-whole-window-model",
+                "fees": {
+                  "currency": "CNY",
+                  "rounding": {
+                    "mode": "halfUp",
+                    "decimalPlaces": 2
+                  },
+                  "stampDuty": {
+                    "rate": "0.0005",
+                    "side": "sell",
+                    "basis": "turnover",
+                    "minimum": {
+                      "kind": "none"
+                    },
+                    "currency": "CNY",
+                    "treatment": "charged"
+                  },
+                  "collection": "perFillPerCharge",
+                  "commission": {
+                    "rate": "0.0003",
+                    "side": "both",
+                    "basis": "turnover",
+                    "minimum": {
+                      "kind": "amount",
+                      "amount": "5"
+                    },
+                    "currency": "CNY",
+                    "treatment": "charged"
+                  },
+                  "handlingFee": {
+                    "reason": "研究佣金采用含规费口径",
+                    "treatment": "includedInCommission"
+                  },
+                  "transferFee": {
+                    "rate": "0.00001",
+                    "side": "both",
+                    "basis": "turnover",
+                    "minimum": {
+                      "kind": "none"
+                    },
+                    "currency": "CNY",
+                    "treatment": "charged"
+                  },
+                  "regulatoryFee": {
+                    "reason": "研究佣金采用含规费口径",
+                    "treatment": "includedInCommission"
+                  }
+                },
+                "range": {
+                  "end": "2023-09-15",
+                  "start": "2023-08-01"
+                },
+                "source": {
+                  "kind": "userConfiguration",
+                  "revision": "1",
+                  "references": [
+                    "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+                  ],
+                  "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+                  "configuredAt": "2026-10-06T17:22:29.360Z"
+                },
+                "execution": {
+                  "mode": "exchange",
+                  "price": {
+                    "kind": "noDailyLimit",
+                    "reason": "归一化研究按连续价格计算"
+                  },
+                  "buyDebitAt": "fill",
+                  "reserveCashAt": "orderAccepted",
+                  "calendarMarket": "CN",
+                  "normalizedExecution": {
+                    "feeBasis": "simulatedTurnover",
+                    "quantityUnits": "continuous-normalized-decimal",
+                    "dailyPriceLimit": "not-applied",
+                    "priceCoordinate": "continuous-decimal",
+                    "lotSizeConstraint": "not-applied",
+                    "tickSizeConstraint": "not-applied"
+                  },
+                  "sellableAfterTradingDays": 1,
+                  "saleReinvestableAfterTradingDays": 0
+                },
+                "assumptions": [
+                  "腾讯前复权归一化连续价格及连续单位；单次模拟金额 CNY 10000，零滑点。",
+                  "佣金双向成交额 0.0003，每笔最低 CNY 5，包含规费及经手费。",
+                  "整窗卖出印花税 0.0005、双向过户费 0.00001 均为研究假设，未按历史变化拼接。",
+                  "每笔每项应用最低额后按 CNY 两位小数 halfUp 舍入。",
+                  "成交后首个交易日可卖、卖出资金当日可再投资；无日涨跌幅、整手及价位限制。"
+                ]
+              }
+            ],
+            "schemaVersion": "execution-model-v1"
+          },
+          "contentHash": "e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a"
+        },
+        "actualSources": [
+          {
+            "symbol": "600519.SH",
+            "purpose": "execution",
+            "routeKey": {
+              "kind": "bar",
+              "market": "CN",
+              "assetType": "STOCK",
+              "timeframe": "1d",
+              "adjustment": "qfq",
+              "capability": "DAILY_BAR"
+            },
+            "provenance": {
+              "providerId": "tencent",
+              "routeIndex": 0,
+              "upstreamSource": "tencent",
+              "effectivePolicyRevision": 40
+            },
+            "inputFingerprint": "83cedc983cd83e2b0a6333da791929e1baedcc9a6e5aa28c643c00204b9806bd"
+          },
+          {
+            "symbol": "600519.SH",
+            "purpose": "signal",
+            "routeKey": {
+              "kind": "bar",
+              "market": "CN",
+              "assetType": "STOCK",
+              "timeframe": "1d",
+              "adjustment": "qfq",
+              "capability": "DAILY_BAR"
+            },
+            "provenance": {
+              "providerId": "tencent",
+              "routeIndex": 0,
+              "upstreamSource": "tencent",
+              "effectivePolicyRevision": 40
+            },
+            "inputFingerprint": "83cedc983cd83e2b0a6333da791929e1baedcc9a6e5aa28c643c00204b9806bd"
+          },
+          {
+            "symbol": "600519.SH",
+            "purpose": "benchmark",
+            "routeKey": {
+              "kind": "bar",
+              "market": "CN",
+              "assetType": "STOCK",
+              "timeframe": "1d",
+              "adjustment": "qfq",
+              "capability": "DAILY_BAR"
+            },
+            "provenance": {
+              "providerId": "tencent",
+              "routeIndex": 0,
+              "upstreamSource": "tencent",
+              "effectivePolicyRevision": 40
+            },
+            "inputFingerprint": "83cedc983cd83e2b0a6333da791929e1baedcc9a6e5aa28c643c00204b9806bd"
+          }
+        ]
+      },
+      "frozenArtifacts": {
+        "runId": "dbc39963-da96-4583-8746-01feac9c7ff2",
+        "symbol": "600519.SH",
+        "contentHash": "96e96f97bc6a3582590018b870431d22e4d94e2c9f4d0c93f6359186a19966e0",
+        "status": "finalized",
+        "artifactCount": 10,
+        "networkCalls": 0,
+        "request": {
+          "contractVersion": 3,
+          "end": "2023-09-15",
+          "requestId": "0dc687ba-3050-4030-b547-7ed67b1ca11b",
+          "routeKey": {
+            "adjustment": "qfq",
+            "assetType": "STOCK",
+            "capability": "DAILY_BAR",
+            "kind": "bar",
+            "market": "CN",
+            "timeframe": "1d"
+          },
+          "routeTarget": {
+            "providerId": "tencent",
+            "routeIndex": 0,
+            "upstreamSource": "tencent"
+          },
+          "start": "2023-07-08",
+          "symbol": "600519.SH",
+          "tradabilityMode": "assume-untradable-no-bar"
+        },
+        "frozenExecutionWindow": {
+          "identityFingerprint": "96a92a3251563ee9f8b017e10c2cc1bcfcbf0c989881b1d87e423d6dda3988e5",
+          "responseHash": "1c49f73659e43d352126d7e04906824bf46ecc83b03dc9fcca619fab741c6151",
+          "version": "market-frozen-window-v1"
+        },
+        "priceCount": 50,
+        "warmupDates": [
+          "2023-07-10",
+          "2023-07-11",
+          "2023-07-12",
+          "2023-07-13",
+          "2023-07-14",
+          "2023-07-17",
+          "2023-07-18",
+          "2023-07-19",
+          "2023-07-20",
+          "2023-07-21",
+          "2023-07-24",
+          "2023-07-25",
+          "2023-07-26",
+          "2023-07-27",
+          "2023-07-28",
+          "2023-07-31"
+        ],
+        "runDates": [
+          "2023-08-01",
+          "2023-08-02",
+          "2023-08-03",
+          "2023-08-04",
+          "2023-08-07",
+          "2023-08-08",
+          "2023-08-09",
+          "2023-08-10",
+          "2023-08-11",
+          "2023-08-14",
+          "2023-08-15",
+          "2023-08-16",
+          "2023-08-17",
+          "2023-08-18",
+          "2023-08-21",
+          "2023-08-22",
+          "2023-08-23",
+          "2023-08-24",
+          "2023-08-25",
+          "2023-08-28",
+          "2023-08-29",
+          "2023-08-30",
+          "2023-08-31",
+          "2023-09-01",
+          "2023-09-04",
+          "2023-09-05",
+          "2023-09-06",
+          "2023-09-07",
+          "2023-09-08",
+          "2023-09-11",
+          "2023-09-12",
+          "2023-09-13",
+          "2023-09-14",
+          "2023-09-15"
+        ],
+        "missingSessionDates": [],
+        "listing": {
+          "symbol": "600519.SH",
+          "status": "unknown"
+        },
+        "pagination": {
+          "status": "complete",
+          "pagesFetched": 1,
+          "continuationPending": false
+        },
+        "provenance": {
+          "effectivePolicyRevision": 40,
+          "providerId": "tencent",
+          "routeIndex": 0,
+          "upstreamSource": "tencent"
+        },
+        "calendar": {
+          "provider": "exchange-calendars",
+          "providerRevision": "exchange-calendars-4.13.2-release-evidence-v1",
+          "availableAt": "2026-03-10T03:24:37.055242+00:00",
+          "range": {
+            "end": "2023-10-02",
+            "start": "2023-07-08"
+          },
+          "settlementDate": "2023-09-18"
+        },
+        "modelHash": "e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a",
+        "modelSource": {
+          "configuredAt": "2026-10-06T17:22:29.360Z",
+          "description": "扩展窗口验收的显式研究设置；公共主备包不覆盖整窗时使用本模型。",
+          "kind": "userConfiguration",
+          "references": [
+            "docs/tasks/2026-10-03-multi-source-remaining-acceptance.md"
+          ],
+          "revision": "1"
+        },
+        "fees": {
+          "compositionVersion": "public-fees-model-v1",
+          "modelContentHash": "e8fe3802bf5594d81aa08e0b67bb66e88dc93dd4fb18cc03b969a45b1eff8a9a",
+          "disclosure": {
+            "status": "executionModel",
+            "reason": "公共收费源暂不可用，使用已选执行模型。"
+          }
+        },
+        "tradingStatus": {
+          "disclosure": {
+            "reason": "已配置停复牌源暂不可用，未纳入真实状态约束，沿用已选普通研究假设。",
+            "status": "notIncluded"
+          },
+          "freezeVersion": "frozen-trading-status-v1",
+          "runConfigChecksum": "29f71a9349f184512d87f5d0006dd378ac45d3690924554eb2f8863eee8b5c3a"
+        },
+        "barsDigest": "ae40b5f4d09c398b5630f4373b17d2c6fe35b2f809a05f8aaca1687b1e72f765"
+      },
+      "protectedJobs": [
+        {
+          "id": "873ba8dd-40c3-4f9e-b1d5-b16192f697b0",
+          "status": "succeeded",
+          "snapshotId": "0046b0759593d8a66a2a1cb9f78979a3540942801f28e359c46484005a0a39a5",
+          "resultChecksum": "a07303d0e7c0f3ce"
+        },
+        {
+          "id": "652ba051-a4c5-493d-81e6-2cdbe3c090f0",
+          "status": "succeeded",
+          "snapshotId": "dbcb682568ebac75acfd5a23c9e968ba0808b097118a45f50453e78c425c558d",
+          "resultChecksum": "8c66f3f721f5e4d8"
+        }
+      ],
+      "fullRuntimeReport": {
+        "path": "/private/tmp/thesis-c32-run-600519.json",
+        "sha256": "5adec95b253b07622aaf82c5d1d1134acd2bf5f168184938ca3802407ded97ff"
+      }
+    }
+  ],
+  "feeCoverage": {
+    "observedAt": "2026-10-06T17:25:17.299583+00:00",
+    "attempts": [
+      {
+        "request": {
+          "contractVersion": 3,
+          "consumer": "thesis-ledger",
+          "requestId": "c32-fee-coverage-600000.SH-0",
+          "symbol": "600000.SH",
+          "range": {
+            "start": "2023-08-01",
+            "end": "2023-09-15"
+          },
+          "routeKey": {
+            "kind": "data",
+            "market": "CN",
+            "assetType": "STOCK",
+            "capability": "HISTORICAL_PUBLIC_FEES"
+          },
+          "routeTarget": {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees",
+            "routeIndex": 0
+          }
+        },
+        "httpStatus": 503,
+        "response": {
+          "error": "http_error",
+          "message": "公共收费包未覆盖请求日期",
+          "detail": {
+            "contractVersion": 3,
+            "code": "insufficient_coverage",
+            "message": "公共收费包未覆盖请求日期",
+            "requestId": "c32-fee-coverage-600000.SH-0",
+            "diagnosticId": "c32-fee-coverage-600000.SH-0"
+          }
+        }
+      },
+      {
+        "request": {
+          "contractVersion": 3,
+          "consumer": "thesis-ledger",
+          "requestId": "c32-fee-coverage-600000.SH-1",
+          "symbol": "600000.SH",
+          "range": {
+            "start": "2023-08-01",
+            "end": "2023-09-15"
+          },
+          "routeKey": {
+            "kind": "data",
+            "market": "CN",
+            "assetType": "STOCK",
+            "capability": "HISTORICAL_PUBLIC_FEES"
+          },
+          "routeTarget": {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees-archive",
+            "routeIndex": 1
+          }
+        },
+        "httpStatus": 503,
+        "response": {
+          "error": "http_error",
+          "message": "公共收费包未覆盖请求日期",
+          "detail": {
+            "contractVersion": 3,
+            "code": "insufficient_coverage",
+            "message": "公共收费包未覆盖请求日期",
+            "requestId": "c32-fee-coverage-600000.SH-1",
+            "diagnosticId": "c32-fee-coverage-600000.SH-1"
+          }
+        }
+      },
+      {
+        "request": {
+          "contractVersion": 3,
+          "consumer": "thesis-ledger",
+          "requestId": "c32-fee-coverage-600519.SH-0",
+          "symbol": "600519.SH",
+          "range": {
+            "start": "2023-08-01",
+            "end": "2023-09-15"
+          },
+          "routeKey": {
+            "kind": "data",
+            "market": "CN",
+            "assetType": "STOCK",
+            "capability": "HISTORICAL_PUBLIC_FEES"
+          },
+          "routeTarget": {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees",
+            "routeIndex": 0
+          }
+        },
+        "httpStatus": 503,
+        "response": {
+          "error": "http_error",
+          "message": "公共收费包未覆盖请求日期",
+          "detail": {
+            "contractVersion": 3,
+            "code": "insufficient_coverage",
+            "message": "公共收费包未覆盖请求日期",
+            "requestId": "c32-fee-coverage-600519.SH-0",
+            "diagnosticId": "c32-fee-coverage-600519.SH-0"
+          }
+        }
+      },
+      {
+        "request": {
+          "contractVersion": 3,
+          "consumer": "thesis-ledger",
+          "requestId": "c32-fee-coverage-600519.SH-1",
+          "symbol": "600519.SH",
+          "range": {
+            "start": "2023-08-01",
+            "end": "2023-09-15"
+          },
+          "routeKey": {
+            "kind": "data",
+            "market": "CN",
+            "assetType": "STOCK",
+            "capability": "HISTORICAL_PUBLIC_FEES"
+          },
+          "routeTarget": {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees-archive",
+            "routeIndex": 1
+          }
+        },
+        "httpStatus": 503,
+        "response": {
+          "error": "http_error",
+          "message": "公共收费包未覆盖请求日期",
+          "detail": {
+            "contractVersion": 3,
+            "code": "insufficient_coverage",
+            "message": "公共收费包未覆盖请求日期",
+            "requestId": "c32-fee-coverage-600519.SH-1",
+            "diagnosticId": "c32-fee-coverage-600519.SH-1"
+          }
+        }
+      }
+    ]
+  },
+  "policy": {
+    "revision": 40,
+    "dsaRevision": 40,
+    "syncState": "applied",
+    "routes": [
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "hithink",
+            "upstreamSource": "fund-market-historical"
+          },
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "MUTUAL_FUND",
+          "capability": "FUND_NAV_HISTORY"
+        },
+        "targets": [
+          {
+            "providerId": "efinance",
+            "upstreamSource": "eastmoney"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "hfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "none"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "ETF",
+          "capability": "REALTIME_QUOTE"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "bar",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "DAILY_BAR",
+          "timeframe": "1d",
+          "adjustment": "qfq"
+        },
+        "targets": [
+          {
+            "providerId": "tencent",
+            "upstreamSource": "tencent"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_PUBLIC_FEES"
+        },
+        "targets": [
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees"
+          },
+          {
+            "providerId": "official-rules",
+            "upstreamSource": "cn-stock-auction-fees-archive"
+          }
+        ]
+      },
+      {
+        "key": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "STOCK",
+          "capability": "HISTORICAL_TRADING_STATUS"
+        },
+        "targets": [
+          {
+            "providerId": "official-states",
+            "upstreamSource": "cn-stock-daily-suspension"
+          }
+        ]
+      }
+    ]
+  }
+}

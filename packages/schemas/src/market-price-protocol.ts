@@ -107,9 +107,33 @@ export const executionPriceProtocolSchema = z
     priceBasis: resolvedPriceBasisSchema,
     accountingBasis: accountingBasisSchema,
     history: historyInputSchema,
+    cashEventResearch: z.literal('ex-date-entitlement-payment-date-cash-v1').optional(),
+    marketRuleResearch: z.literal('raw-prices-no-corporate-actions-v1').optional(),
   })
   .superRefine((value, context) => {
     const { priceBasis, accountingBasis } = value;
+    if (
+      value.marketRuleResearch &&
+      (value.cashEventResearch ||
+        accountingBasis !== 'raw-events' ||
+        value.history.basis !== 'fixed-provider-snapshot')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['marketRuleResearch'],
+        message: '规则研究需要独立的原价固定快照协议，不得与现金研究混用',
+      });
+    }
+    if (
+      value.cashEventResearch &&
+      (accountingBasis !== 'raw-events' || value.history.basis !== 'fixed-provider-snapshot')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['cashEventResearch'],
+        message: '现金研究需要原始价格和固定快照',
+      });
+    }
     if (accountingBasis === 'raw-events') {
       if (priceBasis.adjustment !== 'none') {
         context.addIssue({

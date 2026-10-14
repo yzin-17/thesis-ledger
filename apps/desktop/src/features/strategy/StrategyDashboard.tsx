@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
@@ -12,7 +13,7 @@ import {
   useRunBacktestMutation,
 } from './strategy.mutations.js';
 import { createStrategyActionHandlers } from './strategy.actions.js';
-import { useStrategyQueries } from './strategy.queries.js';
+import { strategyKeys, useStrategyQueries } from './strategy.queries.js';
 import { useBacktestJobEvents } from './strategy.events.js';
 import { useToastManager } from '@/components/ui/toast';
 import { StrategyCenterLayout } from './StrategyCenterLayout.js';
@@ -140,6 +141,7 @@ function NavBacktestSetupRoute({
 }
 
 export function StrategyDashboard() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const toastManager = useToastManager();
@@ -170,7 +172,11 @@ export function StrategyDashboard() {
     loadState = strategies.length || jobs.length ? 'stale' : 'error';
   else if (strategiesQuery.isSuccess && jobsQuery.isSuccess) loadState = 'ready';
   const load = async () => {
-    await Promise.all([strategiesQuery.refetch(), jobsQuery.refetch()]);
+    await Promise.all([
+      strategiesQuery.refetch(),
+      jobsQuery.refetch(),
+      queryClient.refetchQueries({ queryKey: strategyKeys.groups(), type: 'active' }),
+    ]);
   };
   const actions = createStrategyActionHandlers({
     name: '',

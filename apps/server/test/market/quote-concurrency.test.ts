@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 import { MarketService } from '../../src/market/market.service.js';
 import { StructuredLogger } from '../../src/platform/structured-logger.js';
+import { quoteControlFixture, quoteControlCacheKey } from './quote-control-fixture.js';
 
 const quote = {
   version: 3,
@@ -74,6 +75,7 @@ const createSharedRedis = (): SharedRedis => {
 
 const createDsa = (implementation: () => Promise<unknown>) => ({
   timeoutMs: 7_000,
+  marketCacheContextV3: vi.fn(quoteControlFixture),
   get: vi.fn(implementation),
 });
 
@@ -116,7 +118,7 @@ describe('Quote 分布式锁并发保护', () => {
       marketTime: null, freshness: 'unknown', servedFromCache: true,
       units: { volume: symbol === '600519.SH' ? 'share' : 'unknown' },
     });
-    redis.values.delete(`thesis-ledger:cache:v1:quote:3:${symbol}:fresh`);
+    redis.values.delete(`thesis-ledger:cache:v1:${quoteControlCacheKey(symbol)}:fresh`);
     dsa.get.mockRejectedValueOnce(new DsaError('报价暂不可用', 'unavailable'));
     const stale = await service.getQuote(symbol, { refresh: true });
     expect(stale).toMatchObject({
@@ -142,7 +144,8 @@ describe('Quote 分布式锁并发保护', () => {
 
     expect(dsa.get).toHaveBeenCalledTimes(1);
     expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/quote?symbol=600519.SH', 1);
-    expect(redis.ttl).toBe(12_000);
+    // 锁内两次控制围栏与一次数据读取分别沿用原 DSA deadline。
+    expect(redis.ttl).toBe(26_000);
     expect(ownerResult.servedFromCache).toBe(false);
     expect(waiterResult).toMatchObject({ servedFromCache: true, stale: false, freshness: 'live' });
   });
@@ -180,7 +183,7 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('owner 失败时 waiter 只读 last-valid，且不会再次调用 DSA', async () => {
     const redis = createSharedRedis();
-    const lastValidKey = 'thesis-ledger:cache:v1:quote:3:600519.SH:last-valid';
+    const lastValidKey = `thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:last-valid`;
     redis.values.set(lastValidKey, JSON.stringify(quote));
     const dsa = createDsa(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -255,7 +258,7 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('锁设施异常时只返回 last-valid，不以异常扩大为 DSA 请求', async () => {
     const values = new Map([
-      ['thesis-ledger:cache:v1:quote:3:600519.SH:last-valid', JSON.stringify(quote)],
+      [`thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:last-valid`, JSON.stringify(quote)],
     ]);
     const dsa = createDsa(async () => quote);
     const redis = {
@@ -278,7 +281,7 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('Redis client 缺少 set 时 fail-closed，只返回 last-valid 且不调用 DSA', async () => {
     const values = new Map([
-      ['thesis-ledger:cache:v1:quote:3:600519.SH:last-valid', JSON.stringify(quote)],
+      [`thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:last-valid`, JSON.stringify(quote)],
     ]);
     const dsa = createDsa(async () => quote);
     const redis = {
@@ -298,8 +301,8 @@ describe('Quote 分布式锁并发保护', () => {
 
   it('fresh 缓存损坏时继续尝试 last-valid，且不触发 DSA', async () => {
     const redis = createSharedRedis();
-    redis.values.set('thesis-ledger:cache:v1:quote:3:600519.SH:fresh', '{broken-json');
-    redis.values.set('thesis-ledger:cache:v1:quote:3:600519.SH:last-valid', JSON.stringify(quote));
+    redis.values.set(`thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:fresh`, '{broken-json');
+    redis.values.set(`thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:last-valid`, JSON.stringify(quote));
     const dsa = createDsa(async () => quote);
     const logs: Array<Record<string, unknown>> = [];
     const logger = vi

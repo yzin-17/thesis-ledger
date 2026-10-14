@@ -1,7 +1,8 @@
-import type { MarketDetailResponse } from '@thesis-ledger/api-client';
+import type { MarketDisplayDetailResponse as MarketDetailResponse } from '@thesis-ledger/api-client';
+import { chartSourceMetadata } from './market-chart-source.js';
 import type {
   BarPoint,
-  BarSeries,
+  MarketDisplayBarSeries as BarSeries,
   MarketIndicatorResult,
 } from '@thesis-ledger/schemas';
 
@@ -13,6 +14,7 @@ export type MarketChartBar = Omit<BarPoint, 'completionStatus' | 'availableAt'> 
   availableAt?: string;
   symbol?: string;
   timeframe?: BarSeries['identity']['timeframe'];
+  timeframeKind?: 'base' | 'derived';
   provider?: string;
   upstreamSource?: string;
   providerRevision?: string;
@@ -53,18 +55,14 @@ export type MarketChartIndicator = Omit<MarketIndicatorResult, 'points' | 'input
 };
 
 export const chartBarsFromSeries = (series: BarSeries): MarketChartBar[] => {
-  const freshness = series.provenance.cacheStatus === 'stale' ? 'stale' : 'delayed';
+  const source = chartSourceMetadata(series);
   return series.points.map((point: BarPoint) => ({
     ...point,
     symbol: series.identity.symbol,
     timeframe: series.identity.timeframe,
-    provider: series.provenance.providerId,
-    upstreamSource: series.provenance.upstreamSource,
-    providerRevision: series.provenance.providerRevision,
+    ...source,
     adjustment: series.identity.adjustment,
     inputFingerprint: series.inputFingerprint,
-    freshness,
-    servedFromCache: series.provenance.servedFromCache,
   }));
 };
 
@@ -75,6 +73,7 @@ export const chartIndicatorFromResult = (
 ): MarketChartIndicator => {
   const start = series.coverage.actualStart ?? series.points[0]?.timestamp ?? generatedAt;
   const end = series.coverage.actualEnd ?? series.points.at(-1)?.timestamp ?? generatedAt;
+  const source = chartSourceMetadata(series);
   return {
     ...result,
     symbol: series.identity.symbol,
@@ -82,13 +81,13 @@ export const chartIndicatorFromResult = (
     marketTime: end,
     calculatedAt: generatedAt,
     values: result.points.at(-1)?.values ?? {},
-    provider: series.provenance.providerId,
+    provider: source.provider,
     points: result.points.map((point) => ({ ...point, inputFingerprint: result.inputFingerprint })),
     inputProvenance: {
       timeframe: series.identity.timeframe,
-      provider: series.provenance.providerId,
-      upstreamSource: series.provenance.upstreamSource,
-      providerRevision: series.provenance.providerRevision,
+      provider: source.provider,
+      upstreamSource: source.upstreamSource,
+      providerRevision: source.providerRevision,
       adjustment: series.identity.adjustment,
       inputDateRange: { start, end },
       inputFingerprint: result.inputFingerprint,
@@ -100,7 +99,7 @@ export const chartIndicatorFromResult = (
       complete: series.points.every((point) => point.completionStatus === 'complete'),
       hasMoreBefore: series.coverage.hasMoreBefore,
     },
-    servedFromCache: series.provenance.servedFromCache,
+    servedFromCache: source.servedFromCache,
     engineVersion: 'dsa-indicator-v3',
   };
 };

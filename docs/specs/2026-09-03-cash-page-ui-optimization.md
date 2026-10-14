@@ -5,6 +5,7 @@
 - 范围：现金页面前端信息架构、视觉层级与响应式呈现
 - 来源：`/Users/yzin/Downloads/2026-09-03-cash-page-ui-optimization.md`
 - 状态：已实现并验证
+- 对应任务：[已完成的实施任务](../archive/tasks/2026-09-03-cash-page-ui-optimization.md)
 
 ## 目标
 

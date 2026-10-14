@@ -1,5 +1,7 @@
 # 市场数据消费者一致性 V2 实施任务
 
+> 状态对账（2026-10-03）：已实现待验收/历史范围被替代：当前 Reader、隔离账本及消费者拒绝/读取由 Canonical E01/U02/D02 和共同价格证据接续；严格历史 PIT 仍归多源 S05。G1 不再要求已跳过的 AKShare 成功，也不要求再次把 smoke 新产物清零；若另有清理请求，仍须精确目标确认。Risk/Performance/Portfolio/Automation 各自未覆盖场景保留，整体不补勾。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[市场数据消费者一致性 V2 Spec](../specs/2026-09-16-market-data-consumer-consistency-v2.md)
 
 > 状态：T1–T5 已完成；当前 Docker 已切换到新结构与新代码，G1 等待真实行情与性能门禁收尾

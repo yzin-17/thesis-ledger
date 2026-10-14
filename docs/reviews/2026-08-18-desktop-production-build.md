@@ -1,5 +1,7 @@
 # Desktop 生产构建 Review
 
+历史证据适用性（2026-10-03）：本报告只证明原记录的版本、输入与环境，不是当前全仓运行态声明。现行接口及任务承接关系见[状态对账 Review](2026-10-03-task-state-reconciliation.md)；原发布/设备/恢复未覆盖义务保留，不因本轮文档对账视为通过。
+
 ## 已完成
 
 - `apps/desktop/electron/main.cjs` 提供 Electron BrowserWindow、生产静态资源服务和 `/api` 代理；`INVESTMENT_OS_API_URL` 用于环境切换，默认值仅用于本机开发。

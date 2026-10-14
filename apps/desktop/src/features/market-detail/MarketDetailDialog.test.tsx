@@ -11,7 +11,12 @@ const { useQueryMock, useQueryClientMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: useQueryMock,
+  useQuery: (options: { queryKey: unknown[] }): unknown => {
+    if (options.queryKey[1] === 'market-period-options') {
+      return { isSuccess: true, data: { options: [] } };
+    }
+    return useQueryMock(options);
+  },
   useQueryClient: useQueryClientMock,
 }));
 
@@ -398,6 +403,7 @@ describe('MarketDetailDialog UI contract', () => {
       isFetching: false,
     });
     renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
-    expect(useQueryMock.mock.calls[0]?.[0]).toMatchObject({ refetchOnMount: 'always' });
+    expect(useQueryMock.mock.calls.find(([options]) => (options as { queryKey: unknown[] }).queryKey[1] === 'market-detail')?.[0])
+      .toMatchObject({ refetchOnMount: 'always' });
   });
 });

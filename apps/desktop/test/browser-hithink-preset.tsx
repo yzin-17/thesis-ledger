@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MarketPolicyPanel } from '../src/features/market-data/MarketPolicyPanel.js';
 import { Button } from '../src/components/ui/button.js';
+import { withDefaultHithinkRoutes } from '../src/features/market-data/market-policy-defaults-v3.js';
 import type {
   MarketPolicyDraftV3,
   MarketRouteCatalogReadV3,
@@ -27,7 +28,7 @@ const catalog: MarketRouteCatalogReadV3 = {
   entries: [
     {
       key,
-      target: { providerId: 'hithink', upstreamSource: 'hithink-financial-api' },
+      target: { providerId: 'hithink', upstreamSource: 'fund-market-historical' },
       state: 'ready',
     },
   ],
@@ -43,19 +44,25 @@ const provider: ProviderManifest = {
 };
 
 function Fixture() {
-  const [policy, setPolicy] = useState<MarketPolicyDraftV3>({
-    contractVersion: 3,
-    revision: 4,
-    enabled: false,
-    routes: [],
-  });
+  const [policy, setPolicy] = useState<MarketPolicyDraftV3>(() =>
+    withDefaultHithinkRoutes(
+      {
+        contractVersion: 3,
+        revision: 4,
+        enabled: false,
+        routes: [],
+      },
+      catalog,
+      [provider],
+    ),
+  );
   const [revision, setRevision] = useState(9);
   const [enabled, setEnabled] = useState(true);
   const [changes, setChanges] = useState(0);
   const [saves, setSaves] = useState(0);
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">HiThink 预设交互验收</h1>
+    <main className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+      <h1 className="text-xl font-semibold">HiThink 默认主源交互验收</h1>
       <p>合成能力与内存草稿；本页不访问服务端、不保存真实设置。</p>
       <div className="flex gap-2">
         <Button onClick={() => setRevision((value) => value + 1)}>更新目录修订</Button>
@@ -74,7 +81,7 @@ function Fixture() {
         disabled={false}
         saving={false}
         retrying={false}
-        dirty={changes > 0}
+        dirty={policy.routes.length > 0 || changes > 0}
         onChange={(next) => {
           setPolicy(next);
           setChanges((value) => value + 1);

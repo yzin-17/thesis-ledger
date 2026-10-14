@@ -1,0 +1,120 @@
+{
+  "id": 37322596501,
+  "name": "CI",
+  "event": "pull_request",
+  "head_branch": "codex/journal-review-ci-20261005",
+  "head_sha": "50196596a53a1160cf2edf9d9e0c1a09c4728d22",
+  "status": "completed",
+  "conclusion": "success",
+  "html_url": "https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501",
+  "run_started_at": "2026-10-05T14:10:40Z",
+  "updated_at": "2026-10-05T14:20:05Z",
+  "jobs": [
+    {
+      "id": 111805170174,
+      "name": "journal-postgres",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501/job/111805170174",
+      "started_at": "2026-10-05T14:10:43Z",
+      "completed_at": "2026-10-05T14:12:07Z",
+      "steps": [
+        {
+          "name": "构建复盘依赖",
+          "conclusion": "success"
+        },
+        {
+          "name": "初始化专用隔离数据库",
+          "conclusion": "success"
+        },
+        {
+          "name": "复盘投影、快照、AI 关联与失租恢复",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111805170373,
+      "name": "contracts-and-guardrails",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501/job/111805170373",
+      "started_at": "2026-10-05T14:10:43Z",
+      "completed_at": "2026-10-05T14:14:18Z",
+      "steps": [
+        {
+          "name": "Secret scan",
+          "conclusion": "success"
+        },
+        {
+          "name": "Migration matrix",
+          "conclusion": "success"
+        },
+        {
+          "name": "PostgreSQL service E2E",
+          "conclusion": "success"
+        },
+        {
+          "name": "Contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complexity guardrails",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111805170453,
+      "name": "quality",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501/job/111805170453",
+      "started_at": "2026-10-05T14:10:43Z",
+      "completed_at": "2026-10-05T14:20:04Z",
+      "steps": [
+        {
+          "name": "Run pnpm lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm typecheck",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm test",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run pnpm build",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111805170661,
+      "name": "mobile-android-native",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501/job/111805170661",
+      "started_at": "2026-10-05T14:10:44Z",
+      "completed_at": "2026-10-05T14:17:44Z",
+      "steps": [
+        {
+          "name": "Build Android debug app",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111809445742,
+      "name": "desktop-packages",
+      "status": "completed",
+      "conclusion": "skipped",
+      "html_url": "https://github.com/yzin-17/thesis-ledger/actions/runs/37322596501/job/111809445742",
+      "started_at": "2026-10-05T14:20:05Z",
+      "completed_at": "2026-10-05T14:20:04Z",
+      "steps": []
+    }
+  ]
+}

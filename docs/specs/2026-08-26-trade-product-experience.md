@@ -1,5 +1,7 @@
 # 交易与成交记录产品界面子 Spec
 
+2026-10-03 适用性对账：当前截图导入、导入草稿及对账入口显示暂未开放，原接口与底层实现保留；产品入口未开放与命令已实现须分开。交易规则能力元数据及其他剩余义务见[follow-up](../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)。
+
 上位 Spec：[`2026-08-26-trade-execution-ledger-system.md`](2026-08-26-trade-execution-ledger-system.md)
 
 依赖：[`交易账本写入与修正协议`](2026-08-26-trade-ledger-write-correction.md)、[`历史基线、导入与对账`](2026-08-26-trade-baseline-import-reconciliation.md)、[`Trade Projection 与收益读取模型`](2026-08-26-trade-projection-read-model.md)

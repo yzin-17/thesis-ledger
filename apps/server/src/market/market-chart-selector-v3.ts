@@ -47,7 +47,7 @@ export async function selectChartWindowV3(input: {
   } catch (primaryError) {
     if (primaryError instanceof ChartPolicyChangedError) throw primaryError;
     if (!backup || !backup.eligible || !backup.catalogReady) throw primaryError;
-    if (supportsBasicPriceFallback(input.request.routeKey, [primary.target, backup.target])) {
+    if (supportsBasicPriceFallback(input.request.routeKey, [primary.target, backup.target], input.context.catalog)) {
       return acquire(backup);
     }
     const compatibility = input.resolveCompatibility

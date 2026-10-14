@@ -1,5 +1,7 @@
 # 移除 AI 执行路由上游服务限制实施任务
 
+> 状态对账（2026-10-03）：本地及目标契约已完成：原 Spec 的移除范围与更广 AI 业务验收分开，后者由 AI 用途配置 Task 跟踪。旧全仓 lint 23 项错误只保留历史时点；后继 Canonical/共同价格已通过受影响文件 lint 与构建，完整当前 pnpm lint 未由本轮重跑，不能声称全仓仍报同样错误或已全绿。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+
 对应 Spec：[移除 AI 执行路由上游服务限制 Spec](../specs/2026-09-21-remove-ai-upstream-restriction.md)
 
 > 状态：已完成本地实现、目标 Docker / Server / Worker 验证；未执行 Electron 实机视觉验收和真实外部 Provider 验收；保留工作区既有未提交修改，不创建提交。
