@@ -15,6 +15,7 @@ export function PortfolioModeSwitch({
   className,
   disabled = false,
   compact = false,
+  size = 'default',
 }: {
   mode: PortfolioModeValue;
   onModeChange: (mode: PortfolioModeValue) => void;
@@ -24,13 +25,18 @@ export function PortfolioModeSwitch({
   className?: string;
   disabled?: boolean;
   compact?: boolean;
+  size?: 'default' | 'sm';
 }) {
   const isActual = mode === 'actual';
   const currentLabel = isActual ? actualLabel : shadowLabel;
   const nextLabel = isActual ? shadowLabel : actualLabel;
+  const itemClassName = cn(
+    'border-transparent bg-transparent whitespace-nowrap data-pressed:bg-background data-pressed:text-foreground',
+    size === 'sm' && 'min-h-6 px-2 text-xs',
+  );
   return (
     <div className={cn('flex flex-col items-start gap-1.5', compact && 'items-center', className)}>
-      <span className="text-xs text-muted-foreground">{compact ? currentLabel : '账户范围'}</span>
+      <span className={cn('text-xs text-muted-foreground', compact && 'hidden')}>账户范围</span>
       <ToggleGroup
         value={[mode]}
         disabled={disabled}
@@ -45,15 +51,19 @@ export function PortfolioModeSwitch({
       >
         <ToggleGroupItem
           value="actual"
-          className="border-transparent bg-transparent data-pressed:bg-background data-pressed:text-foreground"
+          className={itemClassName}
+          aria-label={actualLabel}
+          title={actualLabel}
         >
-          {actualLabel}
+          {compact ? actualLabel.slice(0, 1) : actualLabel}
         </ToggleGroupItem>
         <ToggleGroupItem
           value="shadow"
-          className="border-transparent bg-transparent data-pressed:bg-background data-pressed:text-foreground"
+          className={itemClassName}
+          aria-label={shadowLabel}
+          title={shadowLabel}
         >
-          {shadowLabel}
+          {compact ? shadowLabel.slice(0, 1) : shadowLabel}
         </ToggleGroupItem>
       </ToggleGroup>
     </div>

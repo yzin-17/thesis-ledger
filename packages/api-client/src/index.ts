@@ -1,3 +1,15 @@
+import { cashManagementClient } from './cash-management-client.js';
+import { performanceClient } from './performance-client.js';
+import { riskManagementClient } from './risk-management-client.js';
+import { marketInformationClient } from './market-information-client.js';
+export { marketInformationClient } from './market-information-client.js';
+export {
+  requestPlannedMarketDetail,
+  readPlannedMarketDetail,
+  MarketChartUnavailableError,
+} from './planned-market-detail.js';
+export { riskManagementClient } from './risk-management-client.js';
+export { performanceClient } from './performance-client.js';
 import { marketChartOptionsClient } from './market-chart-options-client.js';
 import { ThesisLedgerContractError } from './api-error.js';
 import { marketDisplayClient } from './market-display-client.js';
@@ -16,17 +28,7 @@ import {
   ledgerAuditResponseSchema,
   ledgerEventsResponseSchema,
   ledgerReplayResponseSchema,
-  performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
-  riskEventsResponseSchema,
-  recurringCashDepositOccurrenceSchema,
-  recurringCashDepositOccurrencesResponseSchema,
-  recurringCashDepositPlanSchema,
-  recurringCashDepositPlansResponseSchema,
-  recurringFundInvestmentOccurrenceSchema,
-  recurringFundInvestmentOccurrencesResponseSchema,
-  recurringFundInvestmentPlanSchema,
-  recurringFundInvestmentPlansResponseSchema,
   tradeCloseSliceQueryResponseSchema,
   tradeDetailResponseSchema,
   tradeListResponseSchema,
@@ -67,16 +69,6 @@ import {
   type TradeReferenceResolveRequest,
   type TradeReferenceResolveResponse,
   type Currency,
-  type ConfirmRecurringCashDepositOccurrence,
-  type CreateRecurringCashDepositPlan,
-  type RecurringCashDepositOccurrence,
-  type RecurringCashDepositPlan,
-  type UpdateRecurringCashDepositPlan,
-  type ConfirmRecurringFundInvestmentOccurrence,
-  type CreateRecurringFundInvestmentPlan,
-  type RecurringFundInvestmentOccurrence,
-  type RecurringFundInvestmentPlan,
-  type UpdateRecurringFundInvestmentPlan,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -201,7 +193,11 @@ export type {
   JournalLegacyReviewCandidate,
 } from '@thesis-ledger/schemas';
 
-export type { MarketDetailQuery, MarketChartQuery, MarketPeriodOptionsQuery } from './market-display-client.js';
+export type {
+  MarketDetailQuery,
+  MarketChartQuery,
+  MarketPeriodOptionsQuery,
+} from './market-display-client.js';
 
 type QueryValue = string | number | boolean | readonly string[] | undefined;
 
@@ -231,7 +227,8 @@ export class ThesisLedgerApiClient {
   private readonly fetcher: typeof fetch;
 
   readonly accounts = accountManagementClient(
-    this.requestParsed.bind(this), this.fetchResponse.bind(this),
+    this.requestParsed.bind(this),
+    this.fetchResponse.bind(this),
   );
   readonly imports = ledgerImportClient(this.requestParsed.bind(this));
   readonly positionManagement = positionManagementClient(this.fetchResponse.bind(this));
@@ -292,188 +289,20 @@ export class ThesisLedgerApiClient {
       ),
   };
 
-  readonly cashDeposits = {
-    getPlans: (
-      params: { accountId?: string; status?: 'ACTIVE' | 'PAUSED' | 'ENDED' } = {},
-    ): Promise<RecurringCashDepositPlan[]> =>
-      this.requestParsed(
-        `/cash-deposit-plans${queryString(params)}`,
-        recurringCashDepositPlansResponseSchema,
-      ),
-    createPlan: (input: CreateRecurringCashDepositPlan): Promise<RecurringCashDepositPlan> =>
-      this.postParsed('/cash-deposit-plans', input, recurringCashDepositPlanSchema),
-    updatePlan: (
-      id: string,
-      input: UpdateRecurringCashDepositPlan,
-    ): Promise<RecurringCashDepositPlan> =>
-      this.patchParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}`,
-        input,
-        recurringCashDepositPlanSchema,
-      ),
-    pausePlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
-      this.postParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}/pause`,
-        { expectedVersion },
-        recurringCashDepositPlanSchema,
-      ),
-    resumePlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
-      this.postParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}/resume`,
-        { expectedVersion },
-        recurringCashDepositPlanSchema,
-      ),
-    endPlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
-      this.postParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}/end`,
-        { expectedVersion },
-        recurringCashDepositPlanSchema,
-      ),
-    getOccurrences: (
-      params: {
-        accountId?: string;
-        planId?: string;
-        status?: 'PENDING' | 'CONFIRMED' | 'SKIPPED';
-      } = {},
-    ): Promise<RecurringCashDepositOccurrence[]> =>
-      this.requestParsed(
-        `/cash-deposit-occurrences${queryString(params)}`,
-        recurringCashDepositOccurrencesResponseSchema,
-      ),
-    confirmOccurrence: (
-      id: string,
-      input: ConfirmRecurringCashDepositOccurrence,
-    ): Promise<RecurringCashDepositOccurrence> =>
-      this.postParsed(
-        `/cash-deposit-occurrences/${encodeURIComponent(id)}/confirm`,
-        input,
-        recurringCashDepositOccurrenceSchema,
-      ),
-    skipOccurrence: (
-      id: string,
-      input: { expectedVersion: number; reason: string },
-    ): Promise<RecurringCashDepositOccurrence> =>
-      this.postParsed(
-        `/cash-deposit-occurrences/${encodeURIComponent(id)}/skip`,
-        input,
-        recurringCashDepositOccurrenceSchema,
-      ),
-    reopenOccurrence: (
-      id: string,
-      expectedVersion: number,
-    ): Promise<RecurringCashDepositOccurrence> =>
-      this.postParsed(
-        `/cash-deposit-occurrences/${encodeURIComponent(id)}/reopen`,
-        { expectedVersion },
-        recurringCashDepositOccurrenceSchema,
-      ),
-  };
+  private readonly cashManagement = cashManagementClient(this.requestParsed.bind(this));
+  readonly cash = this.cashManagement.cash;
+  readonly cashDeposits = this.cashManagement.cashDeposits;
+  readonly fundInvestments = this.cashManagement.fundInvestments;
 
-  readonly fundInvestments = {
-    getPlans: (
-      params: { accountId?: string; status?: 'ACTIVE' | 'PAUSED' | 'ENDED' } = {},
-    ): Promise<RecurringFundInvestmentPlan[]> =>
-      this.requestParsed(
-        `/fund-investment-plans${queryString(params)}`,
-        recurringFundInvestmentPlansResponseSchema,
-      ),
-    createPlan: (input: CreateRecurringFundInvestmentPlan): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed('/fund-investment-plans', input, recurringFundInvestmentPlanSchema),
-    updatePlan: (
-      id: string,
-      input: UpdateRecurringFundInvestmentPlan,
-    ): Promise<RecurringFundInvestmentPlan> =>
-      this.patchParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}`,
-        input,
-        recurringFundInvestmentPlanSchema,
-      ),
-    pausePlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}/pause`,
-        { expectedVersion },
-        recurringFundInvestmentPlanSchema,
-      ),
-    resumePlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}/resume`,
-        { expectedVersion },
-        recurringFundInvestmentPlanSchema,
-      ),
-    endPlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}/end`,
-        { expectedVersion },
-        recurringFundInvestmentPlanSchema,
-      ),
-    getOccurrences: (
-      params: {
-        accountId?: string;
-        planId?: string;
-        status?: 'PENDING' | 'CONFIRMED' | 'SKIPPED';
-      } = {},
-    ): Promise<RecurringFundInvestmentOccurrence[]> =>
-      this.requestParsed(
-        `/fund-investment-occurrences${queryString(params)}`,
-        recurringFundInvestmentOccurrencesResponseSchema,
-      ),
-    confirmOccurrence: (
-      id: string,
-      input: ConfirmRecurringFundInvestmentOccurrence,
-    ): Promise<RecurringFundInvestmentOccurrence> =>
-      this.postParsed(
-        `/fund-investment-occurrences/${encodeURIComponent(id)}/confirm`,
-        input,
-        recurringFundInvestmentOccurrenceSchema,
-      ),
-    skipOccurrence: (
-      id: string,
-      input: { expectedVersion: number; reason: string },
-    ): Promise<RecurringFundInvestmentOccurrence> =>
-      this.postParsed(
-        `/fund-investment-occurrences/${encodeURIComponent(id)}/skip`,
-        input,
-        recurringFundInvestmentOccurrenceSchema,
-      ),
-    reopenOccurrence: (
-      id: string,
-      expectedVersion: number,
-    ): Promise<RecurringFundInvestmentOccurrence> =>
-      this.postParsed(
-        `/fund-investment-occurrences/${encodeURIComponent(id)}/reopen`,
-        { expectedVersion },
-        recurringFundInvestmentOccurrenceSchema,
-      ),
-  };
+  readonly risk = riskManagementClient(this.requestParsed.bind(this));
 
-  readonly risk = {
-    getEvents: (
-      params: { mode?: 'actual' | 'shadow'; cursor?: string; limit?: number; t?: number } = {},
-      signal?: AbortSignal,
-    ) => this.requestParsed(`/risk/events${queryString(params)}`, riskEventsResponseSchema, signal ? { signal } : undefined),
-  };
-
-  readonly performance = {
-    getSummary: (
-      params: {
-        accountId?: string;
-        start?: string;
-        end?: string;
-        mode?: 'actual' | 'shadow';
-        fxMerge?: boolean;
-        baseCurrency?: Currency;
-      } = {},
-    ) =>
-      this.requestParsed(
-        `/performance/summary${queryString(params)}`,
-        performanceSummaryResponseSchema,
-      ),
-  };
+  readonly performance = performanceClient(this.requestParsed.bind(this));
 
   readonly market = {
     ...marketControlClient(this.requestParsed.bind(this)),
     ...marketDisplayClient(this.requestParsed.bind(this), queryString),
     ...marketChartOptionsClient(this.requestParsed.bind(this), queryString),
+    ...marketInformationClient(this.requestParsed.bind(this)),
     ...instrumentClient(this.requestParsed.bind(this), this.fetchResponse.bind(this)),
   };
 
@@ -646,7 +475,9 @@ export class ThesisLedgerApiClient {
       payload = null;
     }
     throw new ThesisLedgerApiError(
-      response.status, payload, retryAfterMilliseconds(response.headers.get('retry-after')),
+      response.status,
+      payload,
+      retryAfterMilliseconds(response.headers.get('retry-after')),
     );
   }
 }

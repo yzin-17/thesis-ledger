@@ -1,23 +1,20 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { marketAnnouncementsSchema } from '@thesis-ledger/schemas';
+import { marketInformationClient } from '@thesis-ledger/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getDesktopApiClient } from '../../shared/api/client.js';
+import { parsedDesktopRequest } from '../shared/request.js';
 
 export function OfficialAnnouncements() {
   const [q, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ['desktop', 'market-data', 'announcements', q, page],
-    queryFn: async ({ signal }) => {
-      const params = new URLSearchParams({ q, page: String(page), pageSize: '50' });
-      return marketAnnouncementsSchema.parse(
-        await getDesktopApiClient().request<unknown>(`/api/market-data/announcements?${params}`, {
-          signal,
-        }),
-      );
-    },
+    queryFn: ({ signal }) =>
+      marketInformationClient(parsedDesktopRequest()).getAnnouncements(
+        { q, page, pageSize: 50 },
+        signal,
+      ),
     retry: false,
   });
   const data = query.data;

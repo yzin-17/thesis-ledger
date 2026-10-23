@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiGenerationRuntimeDiagnosticSchema } from './ai-generation-runtime-diagnostic.js';
 
 export const aiGenerationErrorCodeSchema = z.enum([
   'configuration_invalid',
@@ -57,6 +58,7 @@ export const aiGenerationFailureDiagnosticSchema = z.strictObject({
   jsonRootType: z.enum(['object', 'array', 'string', 'number', 'boolean', 'null']).nullable(),
   structuralPreview: z.string().max(2048).nullable(),
   truncated: z.boolean(),
+  runtime: aiGenerationRuntimeDiagnosticSchema.optional(),
 });
 export type AiGenerationFailureDiagnostic = z.infer<typeof aiGenerationFailureDiagnosticSchema>;
 

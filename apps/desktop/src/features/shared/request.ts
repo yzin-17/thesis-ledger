@@ -1,5 +1,6 @@
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
+import { ThesisLedgerContractError } from '@thesis-ledger/api-client';
 
 export type DesktopRequestClient = Pick<ThesisLedgerApiClient, 'request'>;
 
@@ -11,3 +12,16 @@ export const requestDesktopJson = <T>(
   const request = client.request.bind(client);
   return request<T>(path, init);
 };
+
+export const parsedDesktopRequest =
+  (client?: DesktopRequestClient) =>
+  async <T>(
+    path: string,
+    schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
+    init?: RequestInit,
+  ): Promise<T> => {
+    const raw = await requestDesktopJson<unknown>(path, init, client);
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) throw new ThesisLedgerContractError(path);
+    return parsed.data;
+  };

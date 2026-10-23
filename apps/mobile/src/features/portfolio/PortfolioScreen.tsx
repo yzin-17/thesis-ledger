@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAccounts, useValuation } from '../../app/query/mobile-queries';
 import { useMobileRuntime } from '../../app/MobileRuntime';
@@ -8,10 +9,13 @@ import { MobilePortfolioScreen } from '../../components/MobilePortfolioScreen';
 import { Action, Choices, Copy, Page, QueryStatus } from '../../components/MobilePrimitives';
 import { valuationLoadState } from '../../app/query/query-state';
 import type { PortfolioStackParams } from '../../app/navigation-types';
+import type { RootTabParams } from '../../app/navigation-types';
+import { mobileInstrument } from '../market-detail/market-model';
 
 export function PortfolioScreen() {
   const runtime = useMobileRuntime();
   const navigation = useNavigation<NativeStackNavigationProp<PortfolioStackParams>>();
+  const rootNavigation = useNavigation<NavigationProp<RootTabParams>>();
   const accounts = useAccounts();
   const [selection, setSelection] = useState('all');
   const query = useValuation(selection === 'all' ? null : selection);
@@ -47,6 +51,25 @@ export function PortfolioScreen() {
         state={state}
         theme={runtime.theme}
         styles={createStyles(runtime.theme)}
+        renderPositionAction={(position) => (
+          <Action
+            label={`查看行情 ${position.symbol}`}
+            onPress={() =>
+              rootNavigation.navigate('Market', {
+                screen: 'MarketDetail',
+                params: {
+                  instrument: mobileInstrument({
+                    symbol: position.symbol,
+                    displayName: position.asset?.name ?? position.symbol,
+                    instrumentType: position.asset?.assetType ?? '',
+                  }),
+                  accountId: position.accountId,
+                  mode: runtime.mode,
+                },
+              })
+            }
+          />
+        )}
       />
       <Action
         label="查看交易"
@@ -55,6 +78,12 @@ export function PortfolioScreen() {
         }
       />
       <Action label="风险事件" onPress={() => navigation.navigate('Risk')} />
+      <Action
+        label="收益分析"
+        onPress={() =>
+          navigation.navigate('Performance', { accountId: selection === 'all' ? null : selection })
+        }
+      />
     </Page>
   );
 }

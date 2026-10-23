@@ -1,7 +1,11 @@
-export function safeExternalUrl(value: string, allowedHosts?: readonly string[]): string {
+export function safeExternalUrl(
+  value: string,
+  allowedHosts?: readonly string[],
+  options: { allowHttp?: boolean } = {},
+): string {
   const url = new URL(value);
   if (
-    url.protocol !== 'https:' ||
+    (url.protocol !== 'https:' && !(options.allowHttp && url.protocol === 'http:')) ||
     url.username ||
     url.password ||
     (allowedHosts && !allowedHosts.includes(url.hostname))

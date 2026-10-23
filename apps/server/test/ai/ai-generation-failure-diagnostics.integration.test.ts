@@ -18,23 +18,23 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
       calls += 1;
       request.resume();
       await once(request, 'end');
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(
-        JSON.stringify({
-          id: 'completion-fixture',
-          object: 'chat.completion',
-          created: 1,
-          model: 'fixture/model:free',
-          choices: [
-            {
-              index: 0,
-              message: { role: 'assistant', content: privateText },
-              finish_reason: 'stop',
-            },
-          ],
-          usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 },
-        }),
-      );
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      const frame = (choices: unknown[], usage?: unknown) =>
+        response.write(
+          `data: ${JSON.stringify({
+            id: 'completion-fixture',
+            object: 'chat.completion.chunk',
+            created: 1,
+            model: 'fixture/model:free',
+            choices,
+            ...(usage ? { usage } : {}),
+          })}\n\n`,
+        );
+      frame([{ index: 0, delta: { reasoning: 'PRIVATE_REASONING' }, finish_reason: null }]);
+      frame([{ index: 0, delta: { content: privateText }, finish_reason: null }]);
+      frame([{ index: 0, delta: {}, finish_reason: 'stop' }]);
+      frame([], { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 });
+      response.end('data: [DONE]\n\n');
     });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
@@ -55,7 +55,7 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
           contract: researchGenerationV2Contract.ref,
           schema: z.strictObject({ answer: z.string() }),
           mode: 'native_schema',
-          transport: 'single',
+          transport: 'stream',
           timeout: { totalMs: 1000, firstChunkMs: 500, chunkMs: 500 },
           signal: new AbortController().signal,
         });
@@ -83,6 +83,14 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
         },
       });
       expect(failure.usage).toEqual({ status: 'reported', inputTokens: 7, outputTokens: 3 });
+      const runtime = failure.fact.diagnostic?.runtime;
+      expect(runtime?.packages.ai).toMatch(/^\d+\.\d+\.\d+/u);
+      expect(runtime?.packages.providerVersion).toMatch(/^\d+\.\d+\.\d+/u);
+      expect(runtime?.stream?.provider?.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
+      expect(runtime?.stream?.sdk.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
+      expect(runtime?.stream?.provider?.reasoning.sha256).toBe(
+        runtime?.stream?.sdk.reasoning.sha256,
+      );
 
       const now = new Date();
       const ownership = { runId: randomUUID(), executionAttempt: 1 };
@@ -160,7 +168,7 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
       expect(run.modelMetadata).toHaveProperty('legacyKey', 'preserve-me');
       const persisted = JSON.stringify(run.modelMetadata);
       expect(persisted).not.toMatch(
-        /PRIVATE_RESPONSE|private-holding|private-token|PRIVATE_PROMPT|sk-request-secret/u,
+        /PRIVATE_RESPONSE|private-holding|private-token|PRIVATE_PROMPT|sk-request-secret|PRIVATE_REASONING/u,
       );
       expect(persisted).not.toMatch(/"(?:cause|responseBody|headers|messages|prompt)":/u);
     } finally {

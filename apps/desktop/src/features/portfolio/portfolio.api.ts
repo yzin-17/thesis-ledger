@@ -1,12 +1,7 @@
 import type { PortfolioValuationResponse, ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
-import type {
-  Account,
-  HeldAssetType,
-  Portfolio,
-  PortfolioMode,
-} from './portfolio.types.js';
+import type { Account, HeldAssetType, Portfolio, PortfolioMode } from './portfolio.types.js';
 
 const heldAssetType = (value: string | undefined): HeldAssetType | undefined =>
   value === 'stock' || value === 'etf' || value === 'fund' ? value : undefined;
@@ -139,17 +134,19 @@ export const fetchAccounts = async (
   return raw.map(parseAccount);
 };
 
-export const fetchManagedAccounts = (client?: Pick<ThesisLedgerApiClient, 'accounts'>) => fetchAccounts(true, client);
+export const fetchManagedAccounts = (client?: Pick<ThesisLedgerApiClient, 'accounts'>) =>
+  fetchAccounts(true, client);
 
 export const searchPortfolioInstruments = (
   query: string,
   client: Pick<ThesisLedgerApiClient, 'market'> = getDesktopApiClient(),
   signal?: AbortSignal,
-) =>
-  client.market.searchInstruments({ q: query }, signal);
+) => client.market.searchInstruments({ q: query }, signal);
 
-export const confirmPortfolioInstrument = (instrumentId: string, client: Pick<ThesisLedgerApiClient, 'market'> = getDesktopApiClient()) =>
-  client.market.confirmInstrument(instrumentId);
+export const confirmPortfolioInstrument = (
+  instrumentId: string,
+  client: Pick<ThesisLedgerApiClient, 'market'> = getDesktopApiClient(),
+) => client.market.confirmInstrument(instrumentId);
 
 export interface SaveAccountInput {
   name: string;
@@ -163,11 +160,13 @@ export const saveAccount = (
   input: SaveAccountInput,
   accountId?: string,
   client: Pick<ThesisLedgerApiClient, 'accounts'> = getDesktopApiClient(),
-) =>
-  client.accounts.save(input, accountId);
+) => client.accounts.save(input, accountId);
 
-export const toggleAccount = (accountId: string, active: boolean, client: Pick<ThesisLedgerApiClient, 'accounts'> = getDesktopApiClient()) =>
-  client.accounts.setActive(accountId, !active);
+export const toggleAccount = (
+  accountId: string,
+  active: boolean,
+  client: Pick<ThesisLedgerApiClient, 'accounts'> = getDesktopApiClient(),
+) => client.accounts.setActive(accountId, !active);
 
 export type PortfolioAccountClient = Pick<ThesisLedgerApiClient['accounts'], 'permanentDelete'>;
 
@@ -209,27 +208,22 @@ export const saveCashBalance = (
   amount: string,
   currency?: Account['currency'],
   capturedAt?: string,
-  client?: DesktopRequestClient,
+  client: Pick<ThesisLedgerApiClient, 'cash'> = getDesktopApiClient(),
 ) =>
-  requestDesktopJson<unknown>(
-    '/portfolio/cash',
-    {
-      ...noStore,
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        accountId,
-        amount,
-        source: 'manual',
-        ...(currency ? { currency } : {}),
-        ...(capturedAt === undefined ? {} : { capturedAt }),
-      }),
-    },
-    client,
-  );
+  client.cash.recordBalance({
+    accountId,
+    amount,
+    source: 'manual',
+    capturedAt: capturedAt ?? new Date().toISOString(),
+    ...(currency ? { currency } : {}),
+  });
 
-export const clearPortfolioPositions = (accountId: string, client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient()) =>
-  client.positionManagement.clear(accountId);
+export const clearPortfolioPositions = (
+  accountId: string,
+  client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient(),
+) => client.positionManagement.clear(accountId);
 
-export const removePortfolioPosition = (positionId: string, client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient()) =>
-  client.positionManagement.remove(positionId);
+export const removePortfolioPosition = (
+  positionId: string,
+  client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient(),
+) => client.positionManagement.remove(positionId);

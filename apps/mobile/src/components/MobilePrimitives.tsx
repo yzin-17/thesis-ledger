@@ -11,10 +11,11 @@ import {
   type KeyboardTypeOptions,
 } from 'react-native';
 import type { ReactNode } from 'react';
-import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+import { ThesisLedgerApiError, ThesisLedgerContractError } from '@thesis-ledger/api-client';
 import { useMobileRuntime } from '../app/MobileRuntime';
 
 export function failureMessage(error: unknown) {
+  if (error instanceof ThesisLedgerContractError) return '读取数据与当前请求不一致，请重新读取。';
   if (error instanceof Error && error.name === 'AbortError')
     return '连接超时，请检查服务地址和网络后重试。';
   if (error instanceof TypeError && /fetch|network/i.test(error.message))
@@ -60,10 +61,21 @@ export function Copy({ children, muted = false }: { children: ReactNode; muted?:
     </Text>
   );
 }
-export function Section({ title, children }: { title?: string; children: ReactNode }) {
+export function Section({
+  title,
+  children,
+  testID,
+}: {
+  title?: string;
+  children: ReactNode;
+  testID?: string;
+}) {
   const { theme } = useMobileRuntime();
   return (
-    <View style={[ui.section, { backgroundColor: theme.surface1, borderColor: theme.border }]}>
+    <View
+      testID={testID}
+      style={[ui.section, { backgroundColor: theme.surface1, borderColor: theme.border }]}
+    >
       {title ? (
         <Text accessibilityRole="header" style={[ui.sectionTitle, { color: theme.textPrimary }]}>
           {title}
@@ -79,12 +91,14 @@ export function Action({
   disabled = false,
   primary = false,
   destructive = false,
+  testID,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   primary?: boolean;
   destructive?: boolean;
+  testID?: string;
 }) {
   const { theme } = useMobileRuntime();
   let color = theme.textPrimary;
@@ -92,6 +106,7 @@ export function Action({
   if (destructive) color = theme.error;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
@@ -162,7 +177,7 @@ export function Choices<T extends string>({
 }: {
   label: string;
   value: T;
-  options: ReadonlyArray<{ value: T; label: string }>;
+  options: ReadonlyArray<{ value: T; label: string; disabled?: boolean }>;
   onChange: (value: T) => void;
   disabled?: boolean;
   inline?: boolean;
@@ -177,11 +192,15 @@ export function Choices<T extends string>({
             key={option.value}
             accessibilityRole="radio"
             accessibilityLabel={option.label}
-            accessibilityState={{ checked: value === option.value, disabled }}
-            disabled={disabled}
+            accessibilityState={{
+              checked: value === option.value,
+              disabled: disabled || option.disabled === true,
+            }}
+            disabled={disabled || option.disabled === true}
             onPress={() => onChange(option.value)}
             style={[
               ui.choice,
+              (disabled || option.disabled) && ui.disabled,
               {
                 borderColor: value === option.value ? theme.textPrimary : theme.border,
                 backgroundColor: value === option.value ? theme.surfaceHover : theme.surface1,

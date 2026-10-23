@@ -57,9 +57,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <SidebarSimpleIcon size={18} aria-hidden="true" />
           </button>
         </div>
-        <div className="mb-4 flex px-2 [@media(max-width:800px)]:hidden">
-          <PortfolioModeSwitch mode={mode} onModeChange={(next) => void changeMode(next)} disabled={busy} compact={sidebarCollapsed} ariaLabel="全局账户模式" />
-        </div>
         <nav id="primary-navigation" aria-label="主导航">
           {desktopRoutes.map(({ view, path, label }) => {
             const Icon = navIcons[view];
@@ -81,16 +78,21 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="sidebar-foot">
-          <span className="connection-status">
-            <span className="status-dot" />
-            系统已连接
-          </span>
-          <div
-            className={cn('flex items-center gap-1.5', sidebarCollapsed ? 'flex-col' : 'ml-auto')}
-          >
-            <ThemeToggle />
-            <MarketColorMenu />
+        <div className="mt-auto">
+          <div className={cn('mb-3 flex px-2.5 [@media(max-width:800px)]:hidden', sidebarCollapsed && 'justify-center')}>
+            <PortfolioModeSwitch mode={mode} onModeChange={(next) => void changeMode(next)} disabled={busy} compact={sidebarCollapsed} size="sm" className={cn(!sidebarCollapsed && 'flex-row items-center gap-3')} ariaLabel="全局账户模式" />
+          </div>
+          <div className="sidebar-foot">
+            <span className="connection-status">
+              <span className="status-dot" />
+              系统已连接
+            </span>
+            <div
+              className={cn('flex items-center gap-1.5', sidebarCollapsed ? 'flex-col' : 'ml-auto')}
+            >
+              <ThemeToggle />
+              <MarketColorMenu />
+            </div>
           </div>
         </div>
       </aside>

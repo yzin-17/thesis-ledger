@@ -21,8 +21,13 @@ const renderToStaticMarkup = (node: ReactNode) =>
 
 describe('收益分析交互契约', () => {
   it('时间加权边界缺失时显示独立原因，资金加权数值继续可读', () => {
-    const markup = renderToStaticMarkup(<PerformanceMetrics latest={undefined} snapshotCount={2}
-      summary={{ ttwror: null, ttwrorReason: '缺少现金流估值边界', xirr: 0.1, xirrReason: null }} />);
+    const markup = renderToStaticMarkup(
+      <PerformanceMetrics
+        latest={undefined}
+        snapshotCount={2}
+        summary={{ ttwror: null, ttwrorReason: '缺少现金流估值边界', xirr: 0.1, xirrReason: null }}
+      />,
+    );
     expect(markup).toContain('缺少现金流估值边界');
     expect(markup).toContain('10.00%');
     expect(markup).toContain('基于账本现金流');
@@ -288,6 +293,8 @@ describe('自动估值快照入口契约', () => {
     const request = vi.fn(
       async <T,>() =>
         ({
+          range: '1Y',
+          interval: '1d',
           currency: 'CNY',
           availableIntervals: ['1d', '1w', '1mo'],
           defaultInterval: '1d',

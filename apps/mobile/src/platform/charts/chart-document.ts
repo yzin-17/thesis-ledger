@@ -1,6 +1,19 @@
-export type ChartCandle = { time: string; open: number; high: number; low: number; close: number };
-export type ChartLine = { name: string; values: { time: string; value: number }[] };
-export type ChartData = { candles: ChartCandle[]; lines: ChartLine[] };
+export type ChartTime = string | number;
+export type ChartCandle = {
+  time: ChartTime;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+export type ChartLine = {
+  name: string;
+  values: { time: ChartTime; value: number }[];
+  pane?: number;
+  kind?: 'line' | 'histogram';
+  style?: 0 | 1 | 2;
+};
+export type ChartData = { candles: ChartCandle[]; lines: ChartLine[]; main?: 'candles' | 'line' };
 export type ChartColors = {
   background: string;
   text: string;
@@ -15,14 +28,24 @@ export type ChartMessage = {
   kind: 'ready' | 'older' | ChartDiagnostic;
 };
 
-function orderedChartDays(points: ReadonlyArray<{ time: string }>) {
-  let previous = '';
+function orderedChartTimes(points: ReadonlyArray<{ time: ChartTime }>) {
+  let previous = -Infinity;
+  const timeType = typeof points[0]?.time;
   for (const point of points) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(point.time) || point.time <= previous) return false;
+    if (typeof point.time !== timeType) return false;
+    if (typeof point.time === 'number') {
+      if (!Number.isSafeInteger(point.time) || point.time < 0 || point.time <= previous)
+        return false;
+      previous = point.time;
+      continue;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(point.time)) return false;
     const date = new Date(`${point.time}T00:00:00Z`);
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== point.time)
       return false;
-    previous = point.time;
+    const epoch = date.getTime() / 1000;
+    if (epoch <= previous) return false;
+    previous = epoch;
   }
   return true;
 }
@@ -45,10 +68,10 @@ export function parseChartMessage(raw: string, instanceId: string): ChartMessage
     return null;
   }
 }
-function assertChartData(data: ChartData) {
+export function assertChartData(data: ChartData) {
   if (data.candles.length > 3000 || data.lines.length > 8)
     throw new Error('图表数据超过当前窗口上限。');
-  if (!orderedChartDays(data.candles)) throw new Error('图表窗口必须是有序且有效的日线数据。');
+  if (!orderedChartTimes(data.candles)) throw new Error('图表窗口必须是有序且有效的时间数据。');
   for (const candle of data.candles) {
     if (
       ![candle.open, candle.high, candle.low, candle.close].every(Number.isFinite) ||
@@ -60,7 +83,9 @@ function assertChartData(data: ChartData) {
   for (const line of data.lines) {
     if (
       line.values.length > 3000 ||
-      !orderedChartDays(line.values) ||
+      (line.pane !== undefined &&
+        (!Number.isInteger(line.pane) || line.pane < 0 || line.pane > 3)) ||
+      !orderedChartTimes(line.values) ||
       line.values.some((point) => !Number.isFinite(point.value))
     )
       throw new Error('图表指标必须是有序、有效且未超限的日线数据。');
@@ -94,16 +119,17 @@ export function chartDocument(
   const post=kind=>window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({version:1,instanceId:p.id,kind}));
   const palette=colors=>({layout:{background:{color:colors.background},textColor:colors.text},grid:{vertLines:{visible:false},horzLines:{color:colors.text+'18'}}});
   const chart=LightweightCharts.createChart(root,{autoSize:true,...palette(p.colors),timeScale:{timeVisible:false},rightPriceScale:{borderVisible:false},handleScroll:{vertTouchDrag:false,horzTouchDrag:true}});
-  const candles=chart.addSeries(LightweightCharts.CandlestickSeries,{borderVisible:false});
+  const mainLine=p.data.main==='line';
+  const candles=chart.addSeries(mainLine?LightweightCharts.LineSeries:LightweightCharts.CandlestickSeries,{borderVisible:false});
   const lines=[];
   const applySeries=()=>{
     chart.applyOptions(palette(p.colors));
-    candles.applyOptions({upColor:p.colors.up,downColor:p.colors.down,wickUpColor:p.colors.up,wickDownColor:p.colors.down});
-    candles.setData(p.data.candles);
+    candles.applyOptions(mainLine?{color:p.colors.line,lineWidth:2,priceLineVisible:false}:{upColor:p.colors.up,downColor:p.colors.down,wickUpColor:p.colors.up,wickDownColor:p.colors.down});
+    candles.setData(mainLine?p.data.candles.map(point=>({time:point.time,value:point.close})):p.data.candles);
     while(lines.length>p.data.lines.length)chart.removeSeries(lines.pop());
     p.data.lines.forEach((line,index)=>{
-      if(!lines[index])lines[index]=chart.addSeries(LightweightCharts.LineSeries,{lineWidth:1,priceLineVisible:false,lastValueVisible:false});
-      lines[index].applyOptions({color:p.colors.line});lines[index].setData(line.values);
+      if(!lines[index])lines[index]=chart.addSeries(line.kind==='histogram'?LightweightCharts.HistogramSeries:LightweightCharts.LineSeries,{lineWidth:1,priceLineVisible:false,lastValueVisible:false},line.pane||0);
+      lines[index].applyOptions({color:p.colors.line,...(line.kind==='histogram'?{}:{lineStyle:line.style||0})});lines[index].setData(line.kind==='histogram'?line.values.map(point=>({...point,color:point.value>=0?p.colors.up:p.colors.down})):line.values);
     });
   };
   applySeries();

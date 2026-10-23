@@ -6,8 +6,10 @@ import {
   type AiGenerationContractRef,
   type AiGenerationMode,
   type AiGenerationFailureDiagnostic,
+  type AiGenerationRuntimeDiagnostic,
   type AiUsageFacts,
 } from '@thesis-ledger/schemas';
+import { generationStructuralPreview as structuralPreview } from './ai-generation-structural-preview.js';
 import { AiSdkGenerationError, sanitize } from './ai-sdk-generation-facts.js';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -20,39 +22,6 @@ const outputError = (error: unknown) => {
     current = asRecord(current)?.cause;
   }
   return null;
-};
-
-/** 只保留结构，任何字符串内容及未加引号的文本／数字都被遮蔽。 */
-const structuralPreview = (text: string) => {
-  const structure = new Set('{}[]:,`\\ \n\r\t');
-  let result = '',
-    inString = false,
-    escaped = false,
-    masked = false;
-  for (const character of text.slice(0, 4096)) {
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (character === '\\') escaped = true;
-      else if (character === '"') {
-        result += '"';
-        inString = false;
-      }
-    } else if (character === '"') {
-      result += '"[text]';
-      inString = true;
-      masked = false;
-    } else if (structure.has(character)) {
-      result += character;
-      masked = false;
-    } else if (!masked) {
-      result += '[value]';
-      masked = true;
-    }
-  }
-  return {
-    structuralPreview: result.slice(0, 2048),
-    truncated: text.length > 4096 || result.length > 2048,
-  };
 };
 
 const jsonShape = (
@@ -78,6 +47,7 @@ const jsonShape = (
 export const generationFailureDiagnostic = (
   error: unknown,
   mode: AiGenerationMode,
+  runtime?: AiGenerationRuntimeDiagnostic,
 ): AiGenerationFailureDiagnostic => {
   const source = outputError(error);
   const text = source?.text;
@@ -95,6 +65,7 @@ export const generationFailureDiagnostic = (
   else if (error instanceof Error && error.name === 'ZodError') errorClass = 'schema';
   return aiGenerationFailureDiagnosticSchema.parse({
     version: 'ai-failure-diagnostic-v1',
+    ...(runtime ? { runtime } : {}),
     errorClass,
     generationMode: mode,
     finishReason: source?.finishReason ?? null,
@@ -111,6 +82,7 @@ export const schemaGenerationFailure = (
   error: unknown,
   input: { requestId: string; contract: AiGenerationContractRef; mode: AiGenerationMode },
   usage: AiUsageFacts,
+  runtime?: AiGenerationRuntimeDiagnostic,
 ) => {
   const researchV2 =
     input.contract.id === 'research' && input.contract.version === 'research-generation-v2';
@@ -121,9 +93,31 @@ export const schemaGenerationFailure = (
       externalResult: 'complete',
       requestId: input.requestId,
       summary: researchV2 ? '结构化响应未通过解析或契约校验' : sanitize(error),
-      ...(researchV2 ? { diagnostic: generationFailureDiagnostic(error, input.mode) } : {}),
+      ...(researchV2
+        ? { diagnostic: generationFailureDiagnostic(error, input.mode, runtime) }
+        : {}),
     }),
     usage,
+    { cause: error },
+  );
+};
+
+/** 结构化失败以外的终止也保留同一请求的安全运行诊断，不改变错误码与用量。 */
+export const withGenerationRuntimeDiagnostic = (
+  error: AiSdkGenerationError,
+  mode: AiGenerationMode,
+  runtime?: AiGenerationRuntimeDiagnostic,
+) => {
+  if (!runtime) return error;
+  return new AiSdkGenerationError(
+    aiGenerationErrorSchema.parse({
+      ...error.fact,
+      diagnostic: {
+        ...(error.fact.diagnostic ?? generationFailureDiagnostic(error, mode)),
+        runtime,
+      },
+    }),
+    error.usage,
     { cause: error },
   );
 };

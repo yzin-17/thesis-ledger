@@ -2,12 +2,14 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import type { MobileDashboardState } from '../index';
 import type { MobileThemeColors } from '../theme';
 import type { MobileStyles } from '../styles/mobileStyles';
+import type { ReactNode } from 'react';
 
 const formatNumber = (value: number | null | undefined, currency?: unknown) => {
   if (value === null || value === undefined) return '不可用';
   const options: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
   if (typeof currency === 'string' && /^[A-Z]{3}$/.test(currency)) {
-    options.style = 'currency'; options.currency = currency;
+    options.style = 'currency';
+    options.currency = currency;
   }
   return new Intl.NumberFormat('zh-CN', options).format(value);
 };
@@ -46,10 +48,14 @@ export function MobilePortfolioScreen({
   state,
   theme,
   styles,
+  renderPositionAction,
 }: {
   state: MobileDashboardState;
   theme: MobileThemeColors;
   styles: MobileStyles;
+  renderPositionAction?: (
+    position: NonNullable<MobileDashboardState['portfolio']>['positions'][number],
+  ) => ReactNode;
 }) {
   if (state.status === 'loading' && state.portfolio === null) {
     return (
@@ -72,14 +78,22 @@ export function MobilePortfolioScreen({
           value={formatNumber(state.portfolio.totalMarketValue, state.portfolio.baseCurrency)}
           styles={styles}
         />
-        <Metric label="总成本" value={formatNumber(state.portfolio.totalCost, state.portfolio.baseCurrency)} styles={styles} />
+        <Metric
+          label="总成本"
+          value={formatNumber(state.portfolio.totalCost, state.portfolio.baseCurrency)}
+          styles={styles}
+        />
         <Metric
           label="累计盈亏"
           value={formatNumber(state.portfolio.totalPnl, state.portfolio.baseCurrency)}
           {...(totalPnlTone ? { tone: totalPnlTone } : {})}
           styles={styles}
         />
-        <Metric label="现金" value={formatNumber(state.portfolio.cashValue, state.portfolio.baseCurrency)} styles={styles} />
+        <Metric
+          label="现金"
+          value={formatNumber(state.portfolio.cashValue, state.portfolio.baseCurrency)}
+          styles={styles}
+        />
       </View>
       <Text style={styles.sectionTitle}>持仓</Text>
       {state.portfolio.positions.length === 0 ? (
@@ -102,6 +116,7 @@ export function MobilePortfolioScreen({
               {formatNumber(position.pnl, position.currency)}
             </Text>
           </Text>
+          {renderPositionAction?.(position)}
         </View>
       ))}
     </View>

@@ -17,7 +17,12 @@ export function marketControlClient(request: Request) {
     `/api/market-data/providers/${encodeURIComponent(id)}/${action}`;
   return {
     getPolicy: () => request('/api/market-data/policy', marketPolicyClientResponseSchema),
-    getProviderRegistry: () => request('/api/market-data/providers', marketProviderRegistrySchema),
+    getProviderRegistry: (signal?: AbortSignal) =>
+      request(
+        '/api/market-data/providers',
+        marketProviderRegistrySchema,
+        signal ? { signal } : undefined,
+      ),
     getCatalogStatus: () => request('/api/market-data/catalog/status', marketCatalogStatusSchema),
     configureProvider: (id: string, input: unknown) =>
       request(
@@ -26,11 +31,19 @@ export function marketControlClient(request: Request) {
         { method: 'POST', body: JSON.stringify(input) },
       ),
     testProvider: (id: string, input: unknown, signal?: AbortSignal) => {
-      const purpose = typeof input === 'object' && input !== null && 'purpose' in input && input.purpose === 'account_access'
-        ? 'account_access' : 'capability_read';
+      const purpose =
+        typeof input === 'object' &&
+        input !== null &&
+        'purpose' in input &&
+        input.purpose === 'account_access'
+          ? 'account_access'
+          : 'capability_read';
       return request(
         providerPath(id, 'test'),
-        marketProviderTestResponseSchema.refine((response) => response.providerId === id && (response.purpose ?? 'capability_read') === purpose),
+        marketProviderTestResponseSchema.refine(
+          (response) =>
+            response.providerId === id && (response.purpose ?? 'capability_read') === purpose,
+        ),
         { method: 'POST', body: JSON.stringify(input), signal: signal ?? null },
       );
     },

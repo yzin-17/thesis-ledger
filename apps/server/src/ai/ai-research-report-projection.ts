@@ -8,7 +8,10 @@ import {
   type ResearchReportDetail,
 } from '@thesis-ledger/schemas';
 import { verifyAiFrozenResearchV2 } from './ai-research-frozen-integrity-v2.js';
-import { assertResearchRunBindingV2 } from './ai-research-run-binding-v2.js';
+import {
+  assertResearchResultModelBindingV2,
+  assertResearchRunBindingV2,
+} from './ai-research-run-binding-v2.js';
 import { verifyResearchNumericEvidenceV2 } from './ai-research-numeric-evidence-v2.js';
 import { safeDiagnosticSummary } from './ai-execution-read-model.js';
 
@@ -106,8 +109,7 @@ async function v2Projection(
       calls.map((call) => call.id),
     );
     verifyResearchNumericEvidenceV2(frozen, result.inference);
-    if (result.model.providerId !== row.provider || result.model.modelId !== row.model)
-      throw new Error('结果模型与结算任务不一致');
+    assertResearchResultModelBindingV2(row, result.model);
     const byId = new Map(calls.map((call) => [call.id, call]));
     for (const binding of result.evidenceBindings) {
       const call = byId.get(binding.toolCallId);

@@ -10,8 +10,10 @@ import {
   chartUpdateScript,
   type ChartData,
   type ChartDiagnostic,
+  assertChartData,
 } from './chart-document';
 import { createChartBridge } from './chart-bridge';
+import { chartViewportHeight } from './chart-layout';
 declare function __MOBILE_CHART_LIBRARY__(): string;
 
 type MobileChartProps = {
@@ -24,7 +26,17 @@ type MobileChartProps = {
 export function MobileChart(props: MobileChartProps) {
   const focused = useIsFocused();
   const { height } = useWindowDimensions();
-  const chartHeight = Math.min(220, Math.max(120, Math.round(height * 0.35)));
+  const panes = Math.max(0, ...props.data.lines.map((line) => line.pane ?? 0));
+  const chartHeight = chartViewportHeight(height, panes);
+  const invalid = useMemo(() => {
+    try {
+      assertChartData(props.data);
+      return false;
+    } catch {
+      return true;
+    }
+  }, [props.data]);
+  if (invalid) return <Copy muted>图表时间或数据不完整，请重新读取。</Copy>;
   if (!focused) return <View style={{ height: chartHeight }} />;
   return <ChartInstance {...props} height={chartHeight} />;
 }

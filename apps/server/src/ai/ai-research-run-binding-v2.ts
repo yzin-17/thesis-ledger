@@ -1,5 +1,10 @@
 import type { AiRun } from '@prisma/client';
-import { researchScopeSnapshotV2Schema, type AiFrozenResearchV2 } from '@thesis-ledger/schemas';
+import {
+  aiExecutionSummarySchema,
+  researchScopeSnapshotV2Schema,
+  type AiFrozenResearchV2,
+  type ResearchResultV2,
+} from '@thesis-ledger/schemas';
 import { AiFrozenResearchError } from './ai-frozen-research.js';
 import { researchSubmissionDigestV2 } from './ai-research-submission-identity-v2.js';
 
@@ -25,4 +30,41 @@ export function assertResearchRunBindingV2(run: Binding, frozen: AiFrozenResearc
     run.question !== frozen.request.question
   )
     throw new AiFrozenResearchError('V2 冻结范围、提交身份或问题与持久任务不一致');
+}
+
+/** 请求路由与 SDK 解析的实际模型可不同，差异必须由同次执行的成功派发审计支撑。 */
+export function assertResearchResultModelBindingV2(
+  run: Pick<AiRun, 'provider' | 'model' | 'modelMetadata' | 'executionAttempt'>,
+  model: ResearchResultV2['model'],
+) {
+  if (model.providerId !== run.provider)
+    throw new AiFrozenResearchError('V2 结果 Provider 与持久任务不一致');
+  if (model.modelId === run.model) return;
+  const metadata = run.modelMetadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+    throw new AiFrozenResearchError('V2 实际模型缺少成功请求审计');
+  const parsed = aiExecutionSummarySchema.safeParse(metadata.sdkExecution);
+  if (
+    !parsed.success ||
+    parsed.data.generationStatus !== 'complete' ||
+    parsed.data.contract.id !== 'research' ||
+    parsed.data.contract.version !== 'research-generation-v2'
+  )
+    throw new AiFrozenResearchError('V2 实际模型缺少完整研究执行审计');
+  const matches = parsed.data.requests.some(
+    (request) =>
+      request.state === 'completed' &&
+      request.dispatchingAt !== null &&
+      request.completedAt !== null &&
+      request.dispatchExecutionAttempt === run.executionAttempt &&
+      request.reservation.provider === run.provider &&
+      request.reservation.model === run.model &&
+      Boolean(request.reservation.configurationFingerprint) &&
+      request.error === null &&
+      request.outcome?.status === 'complete' &&
+      request.outcome.schemaAccepted &&
+      request.outcome.contract.id === 'research' &&
+      request.outcome.contract.version === 'research-generation-v2',
+  );
+  if (!matches) throw new AiFrozenResearchError('V2 实际模型缺少匹配的成功请求审计');
 }

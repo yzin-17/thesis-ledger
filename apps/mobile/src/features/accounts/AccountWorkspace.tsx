@@ -38,6 +38,19 @@ export function AccountWorkspace() {
             />
           </Section>
           <Section title="成交与审计">
+            <Action label="现金与结算" onPress={() => navigation.navigate('Cash', params)} />
+            {account.type === 'cash' ? (
+              <Action
+                label="定期入账"
+                onPress={() => navigation.navigate('Plans', { ...params, kind: 'cash' })}
+              />
+            ) : null}
+            {account.type === 'fund' ? (
+              <Action
+                label="基金定投"
+                onPress={() => navigation.navigate('Plans', { ...params, kind: 'fund' })}
+              />
+            ) : null}
             <Action label="成交记录" onPress={() => navigation.navigate('Executions', params)} />
             <Action
               label="新增成交"

@@ -144,14 +144,21 @@ describe('拆分后的领域请求契约', () => {
 
   it('Performance 查询 key 包含 mode 和 account，Import key 包含 account', async () => {
     const performance = makeClient([]);
-    await fetchPerformanceHistory('shadow', 'account-2', performance.client);
+    const performanceAccountId = '00000000-0000-4000-8000-000000000002';
+    await fetchPerformanceHistory('shadow', performanceAccountId, performance.client);
     expect(performance.request).toHaveBeenCalledWith(
-      '/performance/history?mode=shadow&accountId=account-2',
+      `/performance/history?mode=shadow&accountId=${performanceAccountId}`,
       expect.anything(),
     );
     expect(performanceKeys.history('actual', 'account-2')).not.toEqual(
       performanceKeys.history('shadow', 'account-2'),
     );
+    performance.request.mockResolvedValueOnce({
+      scope: 'portfolio',
+      accountId: null,
+      targets: {},
+      source: 'none',
+    });
     await fetchPerformanceTargets(
       'shadow',
       undefined,
@@ -181,7 +188,9 @@ describe('拆分后的领域请求契约', () => {
 
   it('Portfolio 标的搜索保留 TanStack Query 的 AbortSignal', async () => {
     const searchInstruments = vi.fn().mockResolvedValue([]);
-    const client = { market: { searchInstruments } } as unknown as Parameters<typeof searchPortfolioInstruments>[1];
+    const client = { market: { searchInstruments } } as unknown as Parameters<
+      typeof searchPortfolioInstruments
+    >[1];
     const controller = new AbortController();
     await searchPortfolioInstruments('600519', client, controller.signal);
 
@@ -211,12 +220,11 @@ describe('拆分后的领域请求契约', () => {
   });
 
   it('现金快照请求携带用户选择的快照时间', async () => {
-    const portfolio = makeClient({});
-    await saveCashBalance('account-1', '2000', 'CNY', '2026-08-20T01:00:00.000Z', portfolio.client);
-
-    const init = portfolio.request.mock.calls[0]?.[1];
-    expect(init?.method).toBe('POST');
-    expect(JSON.parse(String(init?.body))).toMatchObject({
+    const recordBalance = vi.fn().mockResolvedValue({});
+    await saveCashBalance('account-1', '2000', 'CNY', '2026-08-20T01:00:00.000Z', {
+      cash: { recordBalance },
+    });
+    expect(recordBalance).toHaveBeenCalledWith({
       accountId: 'account-1',
       amount: '2000',
       source: 'manual',
@@ -254,7 +262,9 @@ describe('拆分后的领域请求契约', () => {
 
   it('截图上传通过领域 Mutation API 保留 multipart body', async () => {
     const uploadScreenshot = vi.fn().mockResolvedValue({});
-    const client = { imports: { uploadScreenshot } } as unknown as Parameters<typeof uploadScreenshotImport>[1];
+    const client = { imports: { uploadScreenshot } } as unknown as Parameters<
+      typeof uploadScreenshotImport
+    >[1];
     const file = new File(['fixture'], 'fixture.png', { type: 'image/png' });
     await uploadScreenshotImport({ file, accountId: 'account-1', source: 'unknown' }, client);
 
@@ -290,7 +300,6 @@ describe('AI 与 Journal 行为契约', () => {
       '/ai/runs',
       expect.objectContaining({ method: 'POST', body: expect.stringContaining('portfolio') }),
     );
-
   });
 
   it('AI 历史请求失败会向 Query 层传播错误', async () => {
@@ -569,6 +578,4 @@ describe('Strategy 任务行为契约', () => {
     unsubscribeSecond();
     expect(source.close).toHaveBeenCalledOnce();
   });
-
-
 });

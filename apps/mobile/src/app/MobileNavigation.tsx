@@ -22,10 +22,18 @@ import { useMobileRuntime } from './MobileRuntime';
 import { mobileDestinations } from './navigation-state';
 import type { PortfolioStackParams, RootTabParams, SettingsStackParams } from './navigation-types';
 import { PortfolioScreen } from '../features/portfolio/PortfolioScreen';
-import { RiskEventsScreen } from '../features/portfolio/RiskEventsScreen';
+import { RiskEventsScreen } from '../features/risk-events/RiskEventsScreen';
+import { RiskRulesScreen } from '../features/risk-rules/RiskRulesScreen';
+import { RiskRuleEditor } from '../features/risk-rules/RiskRuleEditor';
+import { RiskEvaluateScreen } from '../features/risk-rules/RiskEvaluateScreen';
+import { RiskAuditScreen } from '../features/risk-events/RiskAuditScreen';
+import { RiskEventDetail } from '../features/risk-events/RiskEventDetail';
+import { RiskNotifications } from '../features/risk-events/RiskNotifications';
+import { PerformanceScreen } from '../features/performance-read/PerformanceScreen';
+import { TargetsScreen } from '../features/performance-targets/TargetsScreen';
 import { TradesScreen } from '../features/portfolio/TradesScreen';
 import { TradeDetailScreen } from '../features/portfolio/TradeDetailScreen';
-import { MarketScreen } from '../features/market/MarketScreen';
+import { MarketNavigator } from './MarketNavigator';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { ChartPreview } from '../features/settings/ChartPreview';
 import { Choices, Copy, Page, Section, ui } from '../components/MobilePrimitives';
@@ -41,6 +49,14 @@ function PortfolioNavigator() {
         options={{ headerShown: false }}
       />
       <Portfolio.Screen name="Risk" component={RiskEventsScreen} />
+      <Portfolio.Screen name="RiskRules" component={RiskRulesScreen} />
+      <Portfolio.Screen name="RiskRuleEditor" component={RiskRuleEditor} />
+      <Portfolio.Screen name="RiskEvaluate" component={RiskEvaluateScreen} />
+      <Portfolio.Screen name="RiskAudit" component={RiskAuditScreen} />
+      <Portfolio.Screen name="RiskEventDetail" component={RiskEventDetail} />
+      <Portfolio.Screen name="RiskNotifications" component={RiskNotifications} />
+      <Portfolio.Screen name="Performance" component={PerformanceScreen} />
+      <Portfolio.Screen name="PerformanceTargets" component={TargetsScreen} />
       <Portfolio.Screen name="Trades" component={TradesScreen} />
       <Portfolio.Screen name="TradeDetail" component={TradeDetailScreen} />
     </Portfolio.Navigator>
@@ -185,7 +201,7 @@ function NavigationFrame() {
         >
           <Tabs.Screen name="Portfolio" component={PortfolioNavigator} />
           <Tabs.Screen name="Accounts" component={AccountNavigator} />
-          <Tabs.Screen name="Market" component={MarketScreen} />
+          <Tabs.Screen name="Market" component={MarketNavigator} />
           <Tabs.Screen name="Research" component={ResearchDestination} />
           <Tabs.Screen name="Settings" component={SettingsNavigator} />
         </Tabs.Navigator>

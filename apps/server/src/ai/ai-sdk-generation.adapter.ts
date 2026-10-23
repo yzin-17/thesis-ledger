@@ -1,12 +1,8 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible, type MetadataExtractor } from '@ai-sdk/openai-compatible';
 import {
   generateText,
   modelMessageSchema,
   streamText,
   type FinishReason,
-  type LanguageModel,
   type LanguageModelUsage,
   type TextStreamPart,
 } from 'ai';
@@ -19,16 +15,18 @@ import {
   type AiAuthMode,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
-import {
-  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
-  type AiCompatibilityExtensionProfile,
-} from './ai-provider-upstream.js';
+import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
+import { createGenerationModel } from './ai-sdk-generation-model.js';
+import { AiGenerationStreamDiagnostics } from './ai-generation-stream-diagnostics.js';
 import {
   generationOutput,
   parseGenerationOutput,
   validateGenerationRequest,
 } from './ai-generation-output.js';
-import { schemaGenerationFailure } from './ai-generation-failure-diagnostics.js';
+import {
+  schemaGenerationFailure,
+  withGenerationRuntimeDiagnostic,
+} from './ai-generation-failure-diagnostics.js';
 import {
   AiSdkGenerationError,
   assertFinishReason,
@@ -92,120 +90,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-const openRouterCostMetadata = (value: unknown) => {
-  const usage = asRecord(asRecord(value)?.usage);
-  const cost = usage?.cost;
-  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost < 0) return undefined;
-  return { openrouter: { usage: { cost } } };
-};
-
-const openRouterMetadataExtractor: MetadataExtractor = {
-  extractMetadata: ({ parsedBody }) => Promise.resolve(openRouterCostMetadata(parsedBody)),
-  createStreamExtractor: () => {
-    let metadata: ReturnType<typeof openRouterCostMetadata>;
-    return {
-      processChunk: (parsedChunk) => {
-        metadata = openRouterCostMetadata(parsedChunk) ?? metadata;
-      },
-      buildMetadata: () => metadata,
-    };
-  },
-};
-
-const convertCompatibleUsage = (
-  usage:
-    | {
-        prompt_tokens?: number | null | undefined;
-        completion_tokens?: number | null | undefined;
-        prompt_tokens_details?: { cached_tokens?: number | null | undefined } | null | undefined;
-        completion_tokens_details?:
-          { reasoning_tokens?: number | null | undefined } | null | undefined;
-      }
-    | null
-    | undefined,
-) => ({
-  inputTokens: {
-    total: usage?.prompt_tokens ?? undefined,
-    noCache: undefined,
-    cacheRead: usage?.prompt_tokens_details?.cached_tokens ?? undefined,
-    cacheWrite: undefined,
-  },
-  outputTokens: {
-    total: usage?.completion_tokens ?? undefined,
-    text: undefined,
-    reasoning: usage?.completion_tokens_details?.reasoning_tokens ?? undefined,
-  },
-});
-
-const compatibilityProfile = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) =>
-  input.compatibilityExtensionProfile ??
-  (input.adapter === 'openrouter' ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 : undefined);
-
-const openRouterTransform = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
-  if (compatibilityProfile(input) !== AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1)
-    return undefined;
-  return (body: Record<string, unknown>) => {
-    if (input.mode !== 'native_schema') return body;
-    return { ...body, provider: { require_parameters: true } };
-  };
-};
-
-const noAuthFetch = async (
-  input: Parameters<typeof fetch>[0],
-  init?: Parameters<typeof fetch>[1],
-) => {
-  const headers = new Headers(init?.headers);
-  for (const header of ['authorization', 'x-api-key', 'api-key']) headers.delete(header);
-  return globalThis.fetch(input, { ...init, headers });
-};
-
-const modelFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>): LanguageModel => {
-  if (
-    compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 &&
-    input.reasoningEffort === 'max'
-  )
-    throw new AiSdkGenerationError(
-      aiGenerationErrorSchema.parse({
-        code: 'capability_unsupported',
-        phase: 'preflight',
-        summary: 'OpenRouter 兼容扩展不支持 max reasoning effort',
-        externalResult: 'not_sent',
-        requestId: input.requestId,
-      }),
-      { status: 'unknown', inputTokens: null, outputTokens: null },
-    );
-  const noAuth = input.authMode === 'none' ? { fetch: noAuthFetch } : {};
-  if (input.adapter === 'openai-chat') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).chat(
-      input.model,
-    );
-  }
-  if (input.adapter === 'openai-responses') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).responses(
-      input.model,
-    );
-  }
-  if (input.adapter === 'anthropic-messages') {
-    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).messages(
-      input.model,
-    );
-  }
-  const transformRequestBody = openRouterTransform(input);
-  return createOpenAICompatible({
-    name: 'compatible',
-    baseURL: input.baseURL,
-    apiKey: input.apiKey,
-    ...noAuth,
-    includeUsage: true,
-    supportsStructuredOutputs: input.mode === 'native_schema',
-    convertUsage: convertCompatibleUsage,
-    ...(transformRequestBody === undefined ? {} : { transformRequestBody }),
-    ...(compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-      ? { metadataExtractor: openRouterMetadataExtractor }
-      : {}),
-  }).chatModel(input.model);
-};
-
 const providerOptionsFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
   if (input.reasoningEffort === undefined) return {};
   if (input.adapter === 'anthropic-messages') {
@@ -256,8 +140,9 @@ const sdkPrompt = (messages: unknown[]) => {
 const commonOptions = <OUTPUT>(
   input: AiSdkGenerationRequest<OUTPUT>,
   onUsage: (usage: LanguageModelUsage) => void,
+  diagnostics?: AiGenerationStreamDiagnostics,
 ) => ({
-  model: modelFor(input),
+  model: createGenerationModel(input, diagnostics),
   ...sdkPrompt(input.messages),
   maxRetries: 0,
   abortSignal: input.signal,
@@ -282,15 +167,20 @@ export class AiSdkGenerationAdapter {
         { cause: error },
       );
     }
+    const diagnostics =
+      input.contract.id === 'research' && input.contract.version === 'research-generation-v2'
+        ? new AiGenerationStreamDiagnostics(input.adapter, input.transport)
+        : undefined;
     const startedAt = Date.now();
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
     const captureUsage = (usage: LanguageModelUsage) => {
       observedUsage = usageFacts(usage);
     };
     try {
-      if (input.transport === 'stream') return await this.stream(input, startedAt, captureUsage);
+      if (input.transport === 'stream')
+        return await this.stream(input, startedAt, captureUsage, diagnostics);
       const result = await generateText({
-        ...commonOptions(input, captureUsage),
+        ...commonOptions(input, captureUsage, diagnostics),
         output: generationOutput(input.mode, input.schema),
       });
       captureUsage(result.usage);
@@ -308,19 +198,24 @@ export class AiSdkGenerationAdapter {
       };
     } catch (error) {
       if (input.signal.aborted) {
-        throw new AiSdkGenerationError(
-          aiGenerationErrorSchema.parse({
-            code: 'cancelled',
-            phase: 'cancellation',
-            summary: '生成请求已取消',
-            externalResult: 'unknown',
-            requestId: input.requestId,
-          }),
-          error instanceof AiSdkGenerationError ? error.usage : observedUsage,
-          { cause: error },
+        throw withGenerationRuntimeDiagnostic(
+          new AiSdkGenerationError(
+            aiGenerationErrorSchema.parse({
+              code: 'cancelled',
+              phase: 'cancellation',
+              summary: '生成请求已取消',
+              externalResult: 'unknown',
+              requestId: input.requestId,
+            }),
+            error instanceof AiSdkGenerationError ? error.usage : observedUsage,
+            { cause: error },
+          ),
+          input.mode,
+          diagnostics?.snapshot(),
         );
       }
-      if (error instanceof AiSdkGenerationError) throw error;
+      if (error instanceof AiSdkGenerationError)
+        throw withGenerationRuntimeDiagnostic(error, input.mode, diagnostics?.snapshot());
       const name = error instanceof Error ? error.name : asRecord(error)?.name;
       const summary = sanitize(error);
       if (
@@ -329,12 +224,16 @@ export class AiSdkGenerationAdapter {
         (typeof name === 'string' && name.includes('NoOutputGeneratedError')) ||
         summary.startsWith('No object generated')
       ) {
-        throw schemaGenerationFailure(error, input, observedUsage);
+        throw schemaGenerationFailure(error, input, observedUsage, diagnostics?.snapshot());
       }
-      throw new AiSdkGenerationError(
-        errorFact(error, input.requestId, 'request', true),
-        observedUsage,
-        { cause: error },
+      throw withGenerationRuntimeDiagnostic(
+        new AiSdkGenerationError(
+          errorFact(error, input.requestId, 'request', true),
+          observedUsage,
+          { cause: error },
+        ),
+        input.mode,
+        diagnostics?.snapshot(),
       );
     }
   }
@@ -343,6 +242,7 @@ export class AiSdkGenerationAdapter {
     input: AiSdkGenerationRequest<OUTPUT>,
     startedAt: number,
     onUsage: (usage: LanguageModelUsage) => void,
+    diagnostics?: AiGenerationStreamDiagnostics,
   ): Promise<AiSdkGenerationResult<OUTPUT>> {
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
     const captureUsage = (usage: LanguageModelUsage) => {
@@ -353,7 +253,7 @@ export class AiSdkGenerationAdapter {
     let firstEvent: number | null = null;
     let firstText: number | null = null;
     const result = streamText({
-      ...commonOptions(input, captureUsage),
+      ...commonOptions(input, captureUsage, diagnostics),
       output: generationOutput(input.mode, input.schema),
       onError: ({ error }) => {
         streamError = error;
@@ -367,6 +267,7 @@ export class AiSdkGenerationAdapter {
     for await (const part of result.stream as AsyncIterable<
       TextStreamPart<Record<string, never>>
     >) {
+      diagnostics?.observeSdkPart(part);
       if (part.type === 'error') streamError = part.error;
       if (part.type === 'abort')
         throw new DOMException(part.reason ?? 'Provider stream aborted', 'AbortError');
