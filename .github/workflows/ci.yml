@@ -181,7 +181,14 @@ jobs:
       - name: Build Desktop workspace dependencies
         run: pnpm --filter '@thesis-ledger/desktop^...' build
       - name: Build Desktop installer
-        run: pnpm --filter @thesis-ledger/desktop ${{ matrix.package_script }}
+        shell: bash
+        run: |
+          for optional in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!optional}" ]]; then
+              unset "$optional"
+            fi
+          done
+          pnpm --filter @thesis-ledger/desktop ${{ matrix.package_script }}
         env:
           CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
