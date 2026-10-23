@@ -28,6 +28,7 @@ import {
   parseGenerationOutput,
   validateGenerationRequest,
 } from './ai-generation-output.js';
+import { schemaGenerationFailure } from './ai-generation-failure-diagnostics.js';
 import {
   AiSdkGenerationError,
   assertFinishReason,
@@ -328,17 +329,7 @@ export class AiSdkGenerationAdapter {
         (typeof name === 'string' && name.includes('NoOutputGeneratedError')) ||
         summary.startsWith('No object generated')
       ) {
-        throw new AiSdkGenerationError(
-          aiGenerationErrorSchema.parse({
-            code: 'schema_invalid',
-            phase: 'validation',
-            summary,
-            externalResult: 'complete',
-            requestId: input.requestId,
-          }),
-          observedUsage,
-          { cause: error },
-        );
+        throw schemaGenerationFailure(error, input, observedUsage);
       }
       throw new AiSdkGenerationError(
         errorFact(error, input.requestId, 'request', true),

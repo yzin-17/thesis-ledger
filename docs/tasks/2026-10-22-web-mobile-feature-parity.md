@@ -3,7 +3,7 @@
 对应 Spec：[Web 功能完整迁移至 Android / iOS](../specs/2026-10-22-web-mobile-feature-parity.md)。
 
 > 状态核对：2026-10-23；用户已授权第 0、1 批实施，Android/iOS 原生编译与运行验收分别记录，未通过不勾选。第 2～6 批保持规划状态。
-> 共享执行约束：保留当前大量未提交修改；基线为 `da002744` 加工作树，不重置、暂存或提交无关内容。不启用来源、通知、模型或发布操作；运行验证使用受控对象并保留原数据。
+> 共享执行约束：保留当前大量未提交修改；原工作树基线为 `da002744`，不重置、暂存或提交原工作树内容。用户本轮另行授权将 4059 文件的当前源码快照仅在隔离副本提交、推送至 `codex/mobile-parity-ci-20261023` 并运行 CI；不合并分支。不启用来源、通知、模型或产品发布操作；运行验证使用受控对象并保留原数据。
 > 当前事实来源：[差异盘点](../reviews/2026-10-22-web-mobile-feature-parity-inventory.md)。已通过的旧证据只在输入及断言仍一致时复用。
 > 实施记录与证据：[第 0、1 批记录](evidence/web-mobile-parity/2026-10-22-batch-0-1.md)。
 
@@ -15,7 +15,9 @@ F06 当前代码的原生补验已通过：Android 拖动 30→50 根，旋转�
 
 目标 API 当前镜像为 `2e5041ae00ef…`，与历史写入验收镜像不同；已通过现有共享 client/Schema 对两账户执行 9 个 GET 核对，账本均为 9，原事件、审计、对账候选与草稿响应可读。历史成功写入与双 URI 上传保留原镜像证据，不改写为当前镜像新执行结果；恢复后的 Web 已对两个账户重新读取，均为 201 份、成本 4.20，当前有效成交仍为买入 100×4.25 与卖出 10×4.5。
 
-F06 现勾选。F07 没有本工作树对应的 CI runner 结果，G0A/G0I、G1A/G1I 依赖门禁继续未勾选，第 0、1 批整体未完成；真机与签名分发另验。边界、依赖、边界正反例和文件尺寸检查通过；全仓 guardrails 本次完整命令 95 秒退出 1：`apps/server/test/report-metadata.test.ts:50` 的 `_attempts`、`_mapper`、`_budget` 三个既有未使用参数错误，保持原修改；不宣称全仓通过。第 2～6 批保持规划状态，既有未提交修改保留。
+本轮已修复服务端测试桩的 3 处未使用参数 lint 错误，全仓 guardrails 完整执行通过。全量检查继续暴露并修复了 migration 旧断言、已有引擎 v3 升级后的金样版本适配，以及共享 client 迁移后的 Web 测试桩和数据样例；复盘数据库样例按现行准入使用 `UNVERIFIED`。这些修复限于 9 个测试文件，未改写生产实现或原有业务规则。修复范围 lint、12 项原定向测试、45 项服务端回归和 33 项 Web 回归通过；干净副本构建、各包类型、完整 lint 通过，服务端 3305 项、手机 75 项及修复后的 Web 全量 1118 项通过；5 组隔离 PostgreSQL 共 150 项通过。历史失败命令保留，验证输入与复用边界见证据。
+
+当前源码快照为 `6b79b8b8`，已触发[CI 39947177417](https://github.com/yzin-17/thesis-ledger/actions/runs/39947177417)。iOS 在 `pod install --deployment` 失败：Hermes podspec 的 `HERMES_CLI_PATH` 含机器绝对路径；仅替换本机与 runner 的 checkout 前缀即可精确复现两端 checksum 差异。F07 正在通过 pnpm 维护的 React Native podspec 补丁修复路径可复现性，保留锁定安装门禁；补丁后的 iOS 原生编译和双端 CI 尚待验证。F06 现勾选；F07、G0A/G0I、G1A/G1I 继续未勾选，第 0、1 批整体未完成；真机与签名分发另验。第 2～6 批保持规划状态，既有未提交修改保留。
 
 本 Task 是完整迁移的唯一执行与状态入口，矩阵中的当前范围不迁入 TODO。原领域的外部条件由原 Task 持有，本 Task 只关联它们及手机消费证据，不复制或改写其状态。默认排在现有 P0/P1 主线之后；用户后续指定优先级时仅调整执行顺序。
 
@@ -66,7 +68,7 @@ F06 现勾选。F07 没有本工作树对应的 CI runner 结果，G0A/G0I、G1A
 | [x] F05a   | CSV 文件输出适配；AC13                          | F02；现有权益 CSV                                    | 手机 `src/platform/output/`、必要原生输入与 `f05a` 测试                     | 导出内容/编码保真；系统保存/分享取消、失败可恢复；VF、VP                                                                                                                 |
 | [x] F05b   | 系统链接/浏览器适配；AC13                       | F02；现有 OAuth URL 校验                             | 手机 `src/platform/links/`、必要原生输入与 `f05b` 测试                      | 白名单链接、打开失败和浏览器返回可观察；不在 WebView 收集凭证；VF、VP                                                                                                    |
 | [x] F06    | 本地 WebView 图表最小适配；AC07/13              | F03；`MarketPriceLightweightChart` 及图表合同        | 手机 `src/platform/charts/`、本地打包资产、桥 Schema、原生依赖与 `f06` 测试 | 本地定向 9 项及双端当前代码原生补验通过；增量窗口/配色/指标、视口保持、离页过滤成立；Android 扩窗/旋转，iOS 手势与完整横屏/生命周期有独立证据；不通过桥访问 API 或传凭证 |
-| [ ] F07    | iOS 原生 CI 与双端依赖/构建输入维护；AC14       | F01/F04/F05/F06 的依赖变更稳定；现有 Android CI      | `.github/workflows/ci.yml` 的手机 job、手机原生构建输入                     | 保留 Android job，增加 iOS job，复用现有原生工程；VA、VI；不可用 runner 记录阻塞，不跳过后声称通过                                                                       |
+| [ ] F07    | iOS 原生 CI 与双端依赖/构建输入维护；AC14       | F01/F04/F05/F06 的依赖变更稳定；现有 Android CI      | `.github/workflows/ci.yml` 的手机 job、手机原生构建输入、pnpm 补丁与锁文件 | 保留 Android job，增加 iOS job，复用现有原生工程；Hermes 编译器路径不绑定机器 checkout，保留 `pod install --deployment`；VA、VI；不可用 runner 记录阻塞，不跳过后声称通过 |
 
 ## 跨端合同：按消费批次补齐
 

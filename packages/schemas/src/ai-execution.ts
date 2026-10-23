@@ -1,4 +1,20 @@
 import { z } from 'zod';
+import {
+  aiGenerationErrorSchema,
+  aiGenerationErrorCodeSchema,
+  aiGenerationPhaseSchema,
+  aiExternalResultCertaintySchema,
+} from './ai-generation-error.js';
+export {
+  aiGenerationErrorCodeSchema,
+  aiGenerationPhaseSchema,
+  aiExternalResultCertaintySchema,
+  aiGenerationErrorSchema,
+  aiGenerationFailureDiagnosticSchema,
+  type AiGenerationErrorCode,
+  type AiGenerationError,
+  type AiGenerationFailureDiagnostic,
+} from './ai-generation-error.js';
 import { nonNegativeDecimalStringSchema } from './monetary-values.js';
 import {
   authoringAnalysisOutputSchema,
@@ -174,56 +190,6 @@ export const aiGenerationContracts = {
     schema: aiResearchGenerationSchema,
   },
 } as const;
-
-export const aiGenerationErrorCodeSchema = z.enum([
-  'configuration_invalid',
-  'capability_unsupported',
-  'authentication_failed',
-  'permission_denied',
-  'payment_required',
-  'provider_rejected',
-  'transport_unknown',
-  'provider_stream_error',
-  'output_truncated',
-  'empty_output',
-  'refused',
-  'schema_invalid',
-  'business_invalid',
-  'cancelled',
-  'persistence_failed',
-]);
-export type AiGenerationErrorCode = z.infer<typeof aiGenerationErrorCodeSchema>;
-
-export const aiGenerationPhaseSchema = z.enum([
-  'configuration',
-  'preflight',
-  'request',
-  'response_headers',
-  'stream',
-  'validation',
-  'persistence',
-  'settlement',
-  'cancellation',
-]);
-
-export const aiExternalResultCertaintySchema = z.enum([
-  'not_sent',
-  'rejected_before_generation',
-  'unknown',
-  'complete',
-]);
-
-export const aiGenerationErrorSchema = z
-  .object({
-    code: aiGenerationErrorCodeSchema,
-    phase: aiGenerationPhaseSchema,
-    summary: z.string().trim().min(1).max(500),
-    externalResult: aiExternalResultCertaintySchema,
-    requestId: z.uuid().nullable().default(null),
-    retryAfterMs: z.number().int().nonnegative().max(86_400_000).optional(),
-  })
-  .strict();
-export type AiGenerationError = z.infer<typeof aiGenerationErrorSchema>;
 
 export const aiUsageStatusSchema = z.enum(['reported', 'partial', 'unknown']);
 export const aiUsageCompletenessSchema = z.enum([

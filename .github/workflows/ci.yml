@@ -143,7 +143,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install iOS pods from the committed lockfile
         working-directory: apps/mobile/ios
-        run: pod install --deployment
+        run: |
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          pod install --deployment
       - name: Build iOS Simulator app
         run: >-
           xcodebuild -workspace apps/mobile/ios/ThesisLedger.xcworkspace
