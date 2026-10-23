@@ -27,13 +27,34 @@ const dataWindow = (first: number, last: number): ChartData => ({
   lines: [],
 });
 
-function runtime(initial: ChartData) {
+function runtime(initial: ChartData, autoLayout = true) {
   type Range = { from: number; to: number };
   let range: Range | null = null;
   let rangeChanged: ((value: Range | null) => void) | undefined;
   const events = new Map<string, (event?: { buttons: number }) => void>();
   const lifecycle = new Map<string, () => void>();
   const messages: ChartMessage[] = [];
+  const frames = new Map<number, () => void>();
+  let frameId = 0;
+  let resized:
+    ((entries: Array<{ contentRect: { width: number; height: number } }>) => void) | undefined;
+  const disconnect = vi.fn();
+  const root = {
+    clientWidth: 0,
+    clientHeight: 0,
+    addEventListener: (name: string, callback: (event?: { buttons: number }) => void) =>
+      events.set(name, callback),
+  };
+  const resize = (width: number, height: number) => {
+    root.clientWidth = width;
+    root.clientHeight = height;
+    resized?.([{ contentRect: { width, height } }]);
+  };
+  const renderFrame = () => {
+    const pending = [...frames.values()];
+    frames.clear();
+    pending.forEach((callback) => callback());
+  };
   const series: Array<{
     data: Array<{ time: string }>;
     setData: ReturnType<typeof vi.fn>;
@@ -80,17 +101,28 @@ function runtime(initial: ChartData) {
   };
   const context = createContext({
     window: web,
-    document: {
-      getElementById: () => ({
-        addEventListener: (name: string, callback: (event?: { buttons: number }) => void) =>
-          events.set(name, callback),
-      }),
+    document: { getElementById: () => root },
+    ResizeObserver: class {
+      constructor(callback: typeof resized) {
+        resized = callback;
+      }
+      observe() {}
+      disconnect = disconnect;
     },
+    requestAnimationFrame: (callback: () => void) => {
+      frames.set(++frameId, callback);
+      return frameId;
+    },
+    cancelAnimationFrame: (id: number) => frames.delete(id),
     LightweightCharts: { createChart, CandlestickSeries: 'candles', LineSeries: 'line' },
   });
   const html = chartDocument('', 'chart-test', initial, colors, true);
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)![1];
   runInContext(script, context);
+  if (autoLayout) {
+    resize(390, 320);
+    renderFrame();
+  }
   return {
     chart,
     scale,
@@ -98,6 +130,9 @@ function runtime(initial: ChartData) {
     messages,
     createChart,
     web,
+    resize,
+    renderFrame,
+    disconnect,
     range: () => range,
     visible: (next: Range) => scale.setVisibleLogicalRange(next),
     fire: (name: string) => events.get(name)?.({ buttons: 1 }),
@@ -108,6 +143,38 @@ function runtime(initial: ChartData) {
 }
 
 describe('本地图表窗口增量更新', () => {
+  it('零尺寸时不拟合或报告就绪，首次有效布局拟合最新数据，后续布局保留用户视口', () => {
+    const view = runtime(dataWindow(1, 3), false);
+    expect(view.scale.fitContent).not.toHaveBeenCalled();
+    expect(view.messages).toHaveLength(0);
+    view.resize(0, 320);
+    view.renderFrame();
+    expect(view.scale.fitContent).not.toHaveBeenCalled();
+    view.update(dataWindow(1, 7));
+    expect(view.scale.fitContent).not.toHaveBeenCalled();
+    view.resize(390, 320);
+    expect(view.scale.fitContent).not.toHaveBeenCalled();
+    view.renderFrame();
+    expect(view.range()).toEqual({ from: 0, to: 6 });
+    expect(view.messages.filter((message) => message.kind === 'ready')).toHaveLength(1);
+    view.visible({ from: 2, to: 4 });
+    view.resize(780, 200);
+    view.renderFrame();
+    expect(view.range()).toEqual({ from: 2, to: 4 });
+    expect(view.scale.fitContent).toHaveBeenCalledOnce();
+  });
+
+  it('首帧拟合前离页会停止观察和待执行帧，不再发送就绪或访问已释放图表', () => {
+    const view = runtime(dataWindow(1, 3), false);
+    view.resize(390, 320);
+    view.leave();
+    view.renderFrame();
+    expect(view.disconnect).toHaveBeenCalledOnce();
+    expect(view.scale.fitContent).not.toHaveBeenCalled();
+    expect(view.messages).toHaveLength(0);
+    expect(view.chart.remove).toHaveBeenCalledOnce();
+  });
+
   it('示例扩窗只增加更早日期，重叠蜡烛和指标数值保持不变', () => {
     const previous = exampleChartWindow(30);
     const next = exampleChartWindow(40);

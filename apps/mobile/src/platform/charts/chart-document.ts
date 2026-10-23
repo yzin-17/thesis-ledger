@@ -134,16 +134,16 @@ export function chartDocument(
   };
   applySeries();
   const timeline=data=>[...new Set([...data.candles.map(point=>point.time),...data.lines.flatMap(line=>line.values.map(point=>point.time))])].sort();
-  let interacting=false,writing=false;
+  let interacting=false,writing=false,initialized=false,disposed=false,initialFrame=0;
   window.__THESIS_LEDGER_CHART_UPDATE__=next=>{
     if(next.version!==1||next.id!==p.id||!next.data||!next.colors)return;
-    const previous=timeline(p.data),range=chart.timeScale().getVisibleLogicalRange();
+    const previous=timeline(p.data),range=initialized?chart.timeScale().getVisibleLogicalRange():null;
     const anchorIndex=range?Math.max(0,Math.min(previous.length-1,Math.floor(range.from))):0;
     const anchor=previous[anchorIndex];
     writing=true;p.data=next.data;p.colors=next.colors;p.diagnostics=next.diagnostics;applySeries();
     const nextIndex=timeline(p.data).indexOf(anchor);
     if(range&&anchor!==undefined&&nextIndex>=0){const shift=nextIndex-anchorIndex;chart.timeScale().setVisibleLogicalRange({from:range.from+shift,to:range.to+shift});}
-    else chart.timeScale().fitContent();
+    else if(initialized)chart.timeScale().fitContent();
     writing=false;
   };
   const begin=()=>{if(!interacting){interacting=true;if(p.diagnostics)post('touch');}};
@@ -157,7 +157,14 @@ export function chartDocument(
   root.addEventListener('touchend',()=>finish('end'),{passive:true,capture:true});
   root.addEventListener('pointerup',()=>finish('end'),{passive:true,capture:true});
   chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(interacting&&!writing&&range){if(p.diagnostics)post('range');if(range.from<3)post('older');}});
-  chart.timeScale().fitContent();
-  window.addEventListener('pagehide',()=>{delete window.__THESIS_LEDGER_CHART_UPDATE__;chart.remove();},{once:true}); post('ready');})();
+  const viewport=new ResizeObserver(entries=>{
+    if(initialized||disposed||initialFrame||!entries.some(entry=>entry.contentRect.width>0&&entry.contentRect.height>0))return;
+    initialFrame=requestAnimationFrame(()=>{
+      initialFrame=0;if(disposed||root.clientWidth<=0||root.clientHeight<=0)return;
+      writing=true;chart.timeScale().fitContent();writing=false;initialized=true;post('ready');
+    });
+  });
+  viewport.observe(root);
+  window.addEventListener('pagehide',()=>{disposed=true;viewport.disconnect();if(initialFrame)cancelAnimationFrame(initialFrame);delete window.__THESIS_LEDGER_CHART_UPDATE__;chart.remove();},{once:true});})();
   </script></body></html>`;
 }
