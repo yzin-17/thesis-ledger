@@ -178,6 +178,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build Desktop workspace dependencies
+        run: pnpm --filter '@thesis-ledger/desktop^...' build
       - name: Build Desktop installer
         run: pnpm --filter @thesis-ledger/desktop ${{ matrix.package_script }}
         env:
