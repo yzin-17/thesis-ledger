@@ -27,7 +27,7 @@ const dataWindow = (first: number, last: number): ChartData => ({
   lines: [],
 });
 
-function runtime(initial: ChartData, autoLayout = true) {
+function runtime(initial: ChartData, autoLayout = true, deferPaint = false) {
   type Range = { from: number; to: number };
   let range: Range | null = null;
   let rangeChanged: ((value: Range | null) => void) | undefined;
@@ -63,16 +63,24 @@ function runtime(initial: ChartData, autoLayout = true) {
   const scale = {
     getVisibleLogicalRange: () => range && { ...range },
     setVisibleLogicalRange: vi.fn((next: Range) => {
-      range = { ...next };
-      rangeChanged?.(range);
+      const apply = () => {
+        range = { ...next };
+        rangeChanged?.(range);
+      };
+      if (deferPaint) frames.set(++frameId, apply);
+      else apply();
     }),
     subscribeVisibleLogicalRangeChange: (callback: typeof rangeChanged) => {
       rangeChanged = callback;
     },
     fitContent: vi.fn(() => {
-      const count = series[0]?.data.length ?? 0;
-      range = count ? { from: 0, to: count - 1 } : null;
-      rangeChanged?.(range);
+      const apply = () => {
+        const count = series[0]?.data.length ?? 0;
+        range = count ? { from: 0, to: count - 1 } : null;
+        rangeChanged?.(range);
+      };
+      if (deferPaint) frames.set(++frameId, apply);
+      else apply();
     }),
   };
   const chart = {
@@ -83,6 +91,7 @@ function runtime(initial: ChartData, autoLayout = true) {
       const item = { data: [] as Array<{ time: string }>, setData: vi.fn(), applyOptions: vi.fn() };
       item.setData.mockImplementation((points: Array<{ time: string }>) => {
         item.data = points.map((point) => ({ ...point }));
+        if (deferPaint && range === null) range = { from: -40, to: points.length - 1 };
         if (range) rangeChanged?.(range);
       });
       series.push(item);
@@ -122,6 +131,7 @@ function runtime(initial: ChartData, autoLayout = true) {
   if (autoLayout) {
     resize(390, 320);
     renderFrame();
+    renderFrame();
   }
   return {
     chart,
@@ -143,6 +153,20 @@ function runtime(initial: ChartData, autoLayout = true) {
 }
 
 describe('本地图表窗口增量更新', () => {
+  it('拟合操作异步绘制时，先完成绘制再报告就绪，原生首次回传保留完整三点视口', () => {
+    const data: ChartData = { ...dataWindow(1, 3), main: 'line' };
+    const view = runtime(data, false, true);
+    view.resize(390, 320);
+    view.renderFrame();
+    expect(view.messages.filter((message) => message.kind === 'ready')).toHaveLength(0);
+    view.renderFrame();
+    expect(view.range()).toEqual({ from: 0, to: 2 });
+    expect(view.messages.filter((message) => message.kind === 'ready')).toHaveLength(1);
+    view.update(structuredClone(data));
+    view.renderFrame();
+    expect(view.range()).toEqual({ from: 0, to: 2 });
+  });
+
   it('零尺寸时不拟合或报告就绪，首次有效布局拟合最新数据，后续布局保留用户视口', () => {
     const view = runtime(dataWindow(1, 3), false);
     expect(view.scale.fitContent).not.toHaveBeenCalled();
@@ -156,6 +180,8 @@ describe('本地图表窗口增量更新', () => {
     expect(view.scale.fitContent).not.toHaveBeenCalled();
     view.renderFrame();
     expect(view.range()).toEqual({ from: 0, to: 6 });
+    expect(view.messages.filter((message) => message.kind === 'ready')).toHaveLength(0);
+    view.renderFrame();
     expect(view.messages.filter((message) => message.kind === 'ready')).toHaveLength(1);
     view.visible({ from: 2, to: 4 });
     view.resize(780, 200);

@@ -161,7 +161,8 @@ export function chartDocument(
     if(initialized||disposed||initialFrame||!entries.some(entry=>entry.contentRect.width>0&&entry.contentRect.height>0))return;
     initialFrame=requestAnimationFrame(()=>{
       initialFrame=0;if(disposed||root.clientWidth<=0||root.clientHeight<=0)return;
-      writing=true;chart.timeScale().fitContent();writing=false;initialized=true;post('ready');
+      writing=true;chart.timeScale().fitContent();writing=false;
+      initialFrame=requestAnimationFrame(()=>{initialFrame=0;if(!disposed){initialized=true;post('ready');}});
     });
   });
   viewport.observe(root);
