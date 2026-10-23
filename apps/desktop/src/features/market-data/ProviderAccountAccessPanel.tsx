@@ -19,6 +19,7 @@ export function ProviderAccountAccessPanel({ provider, catalog, report, dirty }:
     .map((entry) => ({ key: entry.key, target: entry.target,
       access: !dirty && entry.accountAccess ? entry.accountAccess : pending }));
   const expires = rows?.map((row) => row.access.validUntil).filter(Boolean).sort()[0];
+  const checkedAt = usableReport?.checkedAt ?? rows?.map((row) => row.access.checkedAt).filter(Boolean).sort().at(-1);
   useEffect(() => {
     const delay = nextAccountAccessRefresh([expires]);
     if (delay === false || expires && Date.parse(expires) <= Date.now()) return;
@@ -26,12 +27,15 @@ export function ProviderAccountAccessPanel({ provider, catalog, report, dirty }:
     return () => clearTimeout(timer);
   }, [expires]);
   if (!provider.accountAccessSupported) return null;
+  const visible = rows?.filter((row) => accountAccessState(row.access, Date.now(), provider.configVersion) === 'allowed');
+  const excluded = rows?.filter((row) => row.access.state === 'not_included').length ?? 0;
   return (
     <section className="flex flex-col gap-3" aria-label="账户功能权限">
-      <h3 className="text-sm font-medium">账户功能权限{usableReport?.credentialContext === 'draft' ? ' · 当前输入' : ''}</h3>
+      <h3 className="text-sm font-medium">可用功能{usableReport?.credentialContext === 'draft' ? ' · 当前输入' : ''}</h3>
       {!rows?.length && <p className="text-sm text-muted-foreground">功能目录加载中，可点击检查获取当前输入的结果。</p>}
+      {!!rows?.length && !visible?.length && <p className="text-sm text-muted-foreground">尚无已确认可用的功能，可更新账号积分后检查。</p>}
       <ul className="flex flex-col gap-3">
-        {rows?.map((row) => {
+        {visible?.map((row) => {
           const state = accountAccessState(row.access, Date.now(), provider.configVersion);
           let variant: 'secondary' | 'destructive' | 'outline' = 'outline';
           if (state === 'allowed') variant = 'secondary';
@@ -42,7 +46,11 @@ export function ProviderAccountAccessPanel({ provider, catalog, report, dirty }:
           </li>;
         })}
       </ul>
-      <p className="text-xs leading-relaxed text-muted-foreground">检查只确认本次接口访问情况，有效5分钟。数据覆盖和研究资格另行判断。</p>
+      {!!excluded && <p className="text-xs text-muted-foreground">当前等级未包含 {excluded} 项功能，已跳过检查。</p>}
+      {checkedAt && <p className="text-xs text-muted-foreground">最近检查：<time dateTime={checkedAt}>{new Date(checkedAt).toLocaleString('zh-CN')}</time></p>}
+      <p className="text-xs leading-relaxed text-muted-foreground">{rows?.some((row) => row.access.persisted)
+        ? '权限记录已保存在本地。账号变更或权限升级后可重新检查。'
+        : '当前输入的检查结果暂存5分钟，保存账号后记录在本地。'}</p>
     </section>
   );
 }

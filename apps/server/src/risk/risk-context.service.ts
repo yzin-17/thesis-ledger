@@ -2,12 +2,11 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { CompleteRiskContext, RiskRule } from '@thesis-ledger/domain';
 import {
   requiresRiskRuleAccount,
-  riskAccountContextSchema,
-  riskPortfolioContextSchema,
   riskScanContextSchema,
   riskScanEnvelopeSchema,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { concentrationGroups, deriveAccountContexts, derivePortfolioContext } from './risk-context-aggregation.js';
 import type {
   AccountContext,
   EvaluationCandidate,
@@ -77,28 +76,6 @@ const marketDataRuleKinds: ReadonlySet<string> = new Set([
   'chip-migration',
 ]);
 
-const latestByMarketTime = <T extends { marketTime: string }>(values: readonly T[]) =>
-  [...values].sort((left, right) => right.marketTime.localeCompare(left.marketTime))[0];
-
-const aggregateDataQuality = (contexts: readonly SecurityContext[]): Record<string, string> =>
-  contexts.reduce<Record<string, string>>(
-    (combined, context) => ({ ...combined, ...context.dataQuality }),
-    {},
-  );
-
-const aggregatePositions = (contexts: readonly SecurityContext[]) => {
-  const explicit = latestByMarketTime(
-    contexts.filter((context) => context.positions !== undefined),
-  );
-  if (explicit?.positions) return explicit.positions;
-  const bySymbol = new Map<string, PositionContext>();
-  for (const context of contexts) {
-    if (context.weight === undefined) continue;
-    bySymbol.set(context.symbol, { symbol: context.symbol, weight: context.weight });
-  }
-  return bySymbol.size > 0 ? [...bySymbol.values()] : undefined;
-};
-
 const toDomainPositions = (
   positions: readonly PositionContext[] | undefined,
 ): CompleteRiskContext['positions'] =>
@@ -109,71 +86,6 @@ const toDomainPositions = (
     ...(position.assetType === undefined ? {} : { assetType: position.assetType }),
     ...(position.volatility === undefined ? {} : { volatility: position.volatility }),
   }));
-
-const deriveAccountContexts = (security: readonly SecurityContext[]): AccountContext[] => {
-  const grouped = new Map<string, SecurityContext[]>();
-  for (const context of security) {
-    if (!context.accountId) continue;
-    const group = grouped.get(context.accountId) ?? [];
-    group.push(context);
-    grouped.set(context.accountId, group);
-  }
-  return [...grouped.entries()].map(([accountId, contexts]) => {
-    const latest = latestByMarketTime(contexts)!;
-    const aggregateSource = latestByMarketTime(
-      contexts.filter(
-        (context) =>
-          context.portfolioValues !== undefined ||
-          context.performance !== undefined ||
-          context.returns !== undefined,
-      ),
-    );
-    const positions = aggregatePositions(contexts);
-    return riskAccountContextSchema.parse({
-      accountId,
-      mode: latest.mode,
-      marketTime: latest.marketTime,
-      dataQuality: aggregateDataQuality(contexts),
-      ...(positions === undefined ? {} : { positions }),
-      ...(aggregateSource?.portfolioValues === undefined
-        ? {}
-        : { portfolioValues: aggregateSource.portfolioValues }),
-      ...(aggregateSource?.performance === undefined
-        ? {}
-        : { performance: aggregateSource.performance }),
-      ...(aggregateSource?.returns === undefined ? {} : { returns: aggregateSource.returns }),
-    });
-  });
-};
-
-const derivePortfolioContext = (
-  security: readonly SecurityContext[],
-): PortfolioContext | undefined => {
-  if (security.length === 0) return undefined;
-  const latest = latestByMarketTime(security)!;
-  const aggregateSource = latestByMarketTime(
-    security.filter(
-      (context) =>
-        context.portfolioValues !== undefined ||
-        context.performance !== undefined ||
-        context.returns !== undefined,
-    ),
-  );
-  const positions = aggregatePositions(security);
-  return riskPortfolioContextSchema.parse({
-    mode: latest.mode,
-    marketTime: latest.marketTime,
-    dataQuality: aggregateDataQuality(security),
-    ...(positions === undefined ? {} : { positions }),
-    ...(aggregateSource?.portfolioValues === undefined
-      ? {}
-      : { portfolioValues: aggregateSource.portfolioValues }),
-    ...(aggregateSource?.performance === undefined
-      ? {}
-      : { performance: aggregateSource.performance }),
-    ...(aggregateSource?.returns === undefined ? {} : { returns: aggregateSource.returns }),
-  });
-};
 
 @Injectable()
 export class RiskContextService {
@@ -201,21 +113,7 @@ export class RiskContextService {
     );
     const accountSpecific = Boolean(rule.accountId) || requiresRiskRuleAccount(rule.kind, rule.scope);
     if (rule.kind === 'position-concentration' && !accountSpecific) {
-      const grouped = new Map<string, { context: SecurityContext; weight: number }>();
-      for (const context of this.latestSecurityContexts(matching)) {
-        const current = grouped.get(context.symbol);
-        const weight = context.weight ?? 0;
-        if (!current) grouped.set(context.symbol, { context, weight });
-        else current.weight += weight;
-      }
-      return [...grouped.values()].map(({ context, weight }) => {
-        const affectedAccountIds = [
-          ...new Set(
-            matching
-              .filter((candidate) => candidate.symbol === context.symbol && candidate.accountId)
-              .map((candidate) => candidate.accountId!),
-          ),
-        ].sort();
+      return concentrationGroups(this.latestSecurityContexts(matching)).map(({ context, weight, affectedAccountIds }) => {
         return this.securityCandidate(
           this.globalSecurityContext(context),
           weight,

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   aiGenerationContracts,
+  researchGenerationV2Contract,
   aiProviderModelExecutionSchema,
   type AiAdapter,
   type AiChatImplementation,
@@ -110,7 +111,7 @@ const normalizedBaseUrl = (baseUrl: string) => {
 };
 
 const knownContract = (route: AiProviderExecutionRouteInput) =>
-  Object.values(aiGenerationContracts).some(
+  [...Object.values(aiGenerationContracts), researchGenerationV2Contract].some(
     ({ ref }) => ref.id === route.contract.id && ref.version === route.contract.version,
   );
 

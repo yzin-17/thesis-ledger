@@ -1,4 +1,5 @@
 import type { JournalDeterministicReview } from '@thesis-ledger/schemas';
+import { requestFailureMessage } from '../../../shared/api/request-error.js';
 export type JournalDecimalMetric = JournalDeterministicReview['metrics'][string];
 
 export const reviewObjectLabels = { TRADE_CYCLE: '完整交易周期', CLOSE_SLICE: '单次减仓' };
@@ -76,8 +77,7 @@ const evidenceLabels: Record<string, string> = {
 };
 export const evidenceLabel = (reason: string) =>
   evidenceLabels[reason] ?? `相关证据不足（${reason}）`;
-export const reviewError = (error: unknown) =>
-  error instanceof Error ? error.message : '请求未完成，请重试';
+export const reviewError = requestFailureMessage;
 export function metricText(metric: JournalDecimalMetric) {
   if (metric.status === 'NOT_APPLICABLE') return '不适用';
   if (metric.status === 'INSUFFICIENT_EVIDENCE') return '证据不足';

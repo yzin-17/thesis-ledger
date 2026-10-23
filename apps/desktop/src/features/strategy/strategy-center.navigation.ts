@@ -45,6 +45,12 @@ export const strategyCenterFocusTarget = (state: unknown) => {
   return typeof value === 'string' ? value : null;
 };
 
+export const backtestJobsReturnPath = (state: unknown) => {
+  const search = record(state).backtestJobsSearch;
+  if (typeof search !== 'string' || !search) return strategyCenterPath.jobs;
+  return `${strategyCenterPath.jobs}?${new URLSearchParams(search)}`;
+};
+
 export const latestStrategyVersion = (versions: StrategyVersion[]) =>
   [...versions].sort((left, right) => right.version - left.version)[0] ?? null;
 

@@ -9,6 +9,7 @@ import { historicalSeriesFreshSeconds, MARKET_CACHE_POLICIES, MarketResultCache 
 
 const fundSymbolPattern = /^\d{6}\.OF$/;
 type WorkGate = <T>(key: string, work: () => Promise<T>) => Promise<T>;
+type CancellableWorkGate = <T>(key: string, work: () => Promise<T>, signal?: AbortSignal) => Promise<T>;
 
 /** 场外基金当前消费与缓存，由原 DsaClient 承接来源执行和控制事实。 */
 export class MarketFundReader {
@@ -16,13 +17,13 @@ export class MarketFundReader {
   private readonly control: MarketCacheControl;
   private readonly resultCache: MarketResultCache;
   constructor(private readonly dsa: DsaClient, private readonly redis: RedisService,
-    private readonly singleFlight: WorkGate, private readonly withDistributedLock: WorkGate,
+    private readonly singleFlight: WorkGate, private readonly withDistributedLock: CancellableWorkGate,
     private readonly prisma?: PrismaService) {
     this.control = new MarketCacheControl(dsa);
     this.resultCache = new MarketResultCache(redis);
   }
-  private async checked<T>(scope: MarketCacheScope, value: T, allowStale?: boolean): Promise<T> {
-    await this.control.assertCurrent(scope);
+  private async checked<T>(scope: MarketCacheScope, value: T, allowStale?: boolean, signal?: AbortSignal): Promise<T> {
+    await this.control.assertCurrent(scope, signal);
     if (allowStale === false && (value as FundNav).freshness === 'stale')
       throw new Error('基金净值陈旧，当前操作要求新鲜净值');
     return value;
@@ -30,65 +31,54 @@ export class MarketFundReader {
 
   async getFundNav(
     input: string,
-    options: { allowStale?: boolean; refresh?: boolean } = {},
+    options: { allowStale?: boolean; refresh?: boolean; signal?: AbortSignal } = {},
   ): Promise<FundNav> {
+    options.signal?.throwIfAborted();
     const symbol = input.trim().toUpperCase();
     if (!fundSymbolPattern.test(symbol)) throw new Error(`非法场外基金代码: ${input}`);
-    const scope = await this.control.read({ capability: 'FUND_NAV', symbol });
+    const scope = await this.control.read({ capability: 'FUND_NAV', symbol }, options.signal);
     const flightKey = `fund-nav:4:${symbol}:${scope.context.generation}`;
     const freshKey = redisKey('cache', `${flightKey}:fresh`);
     const lastValidKey = redisKey('cache', `${flightKey}:last-valid`);
     if (!options.refresh) {
       const cached = await this.redis.client.get(freshKey);
-      if (cached)
-        return this.checked(scope, parseCurrentFundNav({ ...JSON.parse(cached), servedFromCache: true }, symbol), options.allowStale);
+      if (cached) return this.checked(scope, parseCurrentFundNav({ ...JSON.parse(cached), servedFromCache: true }, symbol), options.allowStale, options.signal);
     }
-    const nav = await this.singleFlight(flightKey, () =>
-      this.withDistributedLock(flightKey, async () => {
-        await this.control.assertCurrent(scope);
-        if (!options.refresh) {
-          const cached = await this.redis.client.get(freshKey);
-          if (cached)
-            return this.checked(scope, parseCurrentFundNav({ ...JSON.parse(cached), servedFromCache: true }, symbol), options.allowStale);
-        }
-        try {
-          const raw = await this.dsa.get<Record<string, unknown>>(
-            `/api/v3/thesis-ledger/market/fund-nav?symbol=${encodeURIComponent(symbol)}`,
-          );
-          const nav = parseCurrentFundNav(
-            {
-              ...raw,
-              servedFromCache: false,
-            },
-            symbol,
-          );
-          if (nav.freshness === 'unavailable') throw new Error('基金净值不可用');
-          await this.control.assertCurrent(scope);
-          const serialized = JSON.stringify(nav);
-          await this.redis.client
-            .multi()
-            .set(freshKey, serialized, 'EX', 300)
-            .set(lastValidKey, serialized, 'EX', 7 * 86_400)
-            .exec();
-          return nav;
-        } catch (error) {
-          const lastValid = await this.redis.client.get(lastValidKey);
-          if (lastValid)
-            return parseCurrentFundNav(
-              {
-                ...JSON.parse(lastValid),
-                freshness: 'stale',
-                servedFromCache: true,
-              },
-              symbol,
-            );
-          throw error;
-        }
-      }),
-    );
-    if (options.allowStale === false && nav.freshness === 'stale')
-      throw new Error('基金净值陈旧，当前操作要求新鲜净值');
-    return this.checked(scope, nav, options.allowStale);
+    const load = () => {
+      const work = () => this.loadCurrentNav(symbol, scope, freshKey, lastValidKey, options);
+      if (options.signal) return this.withDistributedLock(flightKey, work, options.signal);
+      return this.withDistributedLock(flightKey, work);
+    };
+    const nav = await (options.signal ? load() : this.singleFlight(flightKey, load));
+    return this.checked(scope, nav, options.allowStale, options.signal);
+  }
+
+  private async loadCurrentNav(
+    symbol: string, scope: MarketCacheScope, freshKey: string, lastValidKey: string,
+    options: { allowStale?: boolean; refresh?: boolean; signal?: AbortSignal },
+  ) {
+    await this.control.assertCurrent(scope, options.signal);
+    if (!options.refresh) {
+      const cached = await this.redis.client.get(freshKey);
+      if (cached) return this.checked(scope, parseCurrentFundNav({ ...JSON.parse(cached), servedFromCache: true }, symbol), options.allowStale, options.signal);
+    }
+    try {
+      const path = `/api/v3/thesis-ledger/market/fund-nav?symbol=${encodeURIComponent(symbol)}`;
+      const raw = options.signal
+        ? await this.dsa.get<Record<string, unknown>>(path, 1, undefined, options.signal)
+        : await this.dsa.get<Record<string, unknown>>(path);
+      const nav = parseCurrentFundNav({ ...raw, servedFromCache: false }, symbol);
+      if (nav.freshness === 'unavailable') throw new Error('基金净值不可用');
+      await this.control.assertCurrent(scope, options.signal);
+      const serialized = JSON.stringify(nav);
+      await this.redis.client.multi().set(freshKey, serialized, 'EX', 300).set(lastValidKey, serialized, 'EX', 7 * 86_400).exec();
+      return nav;
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      const lastValid = await this.redis.client.get(lastValidKey);
+      if (lastValid) return parseCurrentFundNav({ ...JSON.parse(lastValid), freshness: 'stale', servedFromCache: true }, symbol);
+      throw error;
+    }
   }
 
   async getFundNavHistory(

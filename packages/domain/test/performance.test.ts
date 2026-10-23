@@ -15,7 +15,7 @@ describe('收益与配置', () => {
       ttwror([
         { date: '2025-01-01', value: 100 },
         { date: '2025-01-02', value: 110 },
-        { date: '2025-01-03', value: 130, externalFlow: 20 },
+        { date: '2025-01-03', value: 130, externalFlow: 20, flowBoundary: { before: 110, after: 130 } },
       ]),
     ).toBeCloseTo(0.1));
   it('计算 XIRR', () =>
@@ -45,8 +45,8 @@ describe('收益与配置', () => {
         { 股票: 0.6, 现金: 0.4 },
       ),
     ).toMatchObject([
-      { category: '股票', amountGap: -10, direction: 'decrease' },
-      { category: '现金', amountGap: 10, direction: 'increase' },
+      { category: 'stock', amountGap: -10, direction: 'decrease' },
+      { category: 'cash', amountGap: 10, direction: 'increase' },
     ]);
     expect(() => rebalanceGap([], { 股票: 0.8 })).toThrow('100%');
   });

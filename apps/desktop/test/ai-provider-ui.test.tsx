@@ -489,7 +489,6 @@ describe('AI Provider 页面操作', () => {
       <AiProviderEditorFields
         draft={aiDraft}
         credentialInputOpen
-        takingOverEnvironmentName={null}
         onUpdateDraft={() => undefined}
         onResetTest={() => undefined}
         onSetCredentialInputOpen={() => undefined}
@@ -603,7 +602,6 @@ describe('AI Provider 页面操作', () => {
       <AiProviderEditorFields
         draft={draft}
         credentialInputOpen={false}
-        takingOverEnvironmentName={null}
         onUpdateDraft={() => undefined}
         onResetTest={() => undefined}
         onSetCredentialInputOpen={() => undefined}
@@ -645,7 +643,6 @@ describe('AI Provider 页面操作', () => {
         <AiProviderEditorFields
           draft={{ ...newAiProviderDraft(), upstreamFormat, chatImplementation: undefined }}
           credentialInputOpen
-          takingOverEnvironmentName={null}
           onUpdateDraft={() => undefined}
           onResetTest={() => undefined}
           onSetCredentialInputOpen={() => undefined}
@@ -724,11 +721,11 @@ describe('AI Provider 页面操作', () => {
     expect(markup).toContain('data-slot="badge"');
   });
 
-  it('部署来源显示只读接管入口，不显示启停或删除操作', () => {
+  it('数据库 AI 服务统一提供编辑、启停和删除操作', () => {
     const markup = renderToStaticMarkup(
       <ProviderTable
         loadState="ready"
-        providers={[aiProvider({ source: 'environment' })]}
+        providers={[aiProvider()]}
         priorityDrafts={{}}
         testingProviderName={null}
         savingProviderName={null}
@@ -743,10 +740,10 @@ describe('AI Provider 页面操作', () => {
       />,
     );
 
-    expect(markup).toContain('部署配置（只读）');
-    expect(markup).toContain('接管配置');
-    expect(markup).not.toContain('>删除<');
-    expect(markup).not.toContain('>停用<');
+    expect(markup).not.toContain('部署配置（只读）');
+    expect(markup).not.toContain('接管配置');
+    expect(markup).toContain('>删除<');
+    expect(markup).toContain('>停用<');
   });
 
   it('Provider 列表将长模型列表收敛为首项和剩余数量', () => {
@@ -847,18 +844,19 @@ describe('AI Provider 页面操作', () => {
     expect(markup.indexOf(models[1])).toBeLessThan(markup.indexOf(models[2]));
   });
 
-  it('删除数据库 AI Provider 必须经过确认，部署来源不会发出删除请求', async () => {
+  it('删除 AI Provider 必须经过确认，取消时不发请求', async () => {
     const confirm = vi.fn(async () => true);
     const remove = vi.fn(async () => undefined);
     await expect(requestAiProviderDeletion(aiProvider(), confirm, remove)).resolves.toBe(true);
     expect(confirm).toHaveBeenCalledOnce();
     expect(remove).toHaveBeenCalledWith('openrouter');
 
-    const environmentConfirm = vi.fn(async () => true);
+    const cancel = vi.fn(async () => false);
     await expect(
-      requestAiProviderDeletion(aiProvider({ source: 'environment' }), environmentConfirm, remove),
+      requestAiProviderDeletion(aiProvider(), cancel, remove),
     ).resolves.toBe(false);
-    expect(environmentConfirm).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledOnce();
   });
 
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { TradeSummaryResponse } from '@thesis-ledger/api-client';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ export function PortfolioTradeDetailDialog({
   );
   const title = trade?.assetName ?? trade?.symbol ?? '交易周期';
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && openingBoundaryOpen) return;
     if (!nextOpen) setOpeningBoundaryOpen(false);
     onOpenChange(nextOpen);
   };
@@ -71,8 +73,9 @@ export function PortfolioTradeDetailDialog({
             </div>
           ) : null}
           {detailQuery.isError ? (
-            <div className="rounded-md border border-destructive/40 p-3 text-sm" role="alert">
-              <p className="m-0">交易详情读取失败，请刷新后重试。</p>
+            <Alert variant="destructive">
+              <AlertTitle>交易详情读取失败</AlertTitle>
+              <AlertDescription>请重试读取；确认当前详情前不能补录。</AlertDescription>
               <Button
                 type="button"
                 size="sm"
@@ -82,7 +85,7 @@ export function PortfolioTradeDetailDialog({
               >
                 重试读取
               </Button>
-            </div>
+            </Alert>
           ) : null}
           {detailQuery.data ? (
             <>
@@ -90,12 +93,15 @@ export function PortfolioTradeDetailDialog({
                 detail={detailQuery.data}
                 accountLabel={accountName(accounts, detailQuery.data.accountId)}
                 onReview={onReview}
-                onSupplementOpening={() => setOpeningBoundaryOpen(true)}
+                {...(detailQuery.isError || detailQuery.isFetching
+                  ? {}
+                  : { onSupplementOpening: () => setOpeningBoundaryOpen(true) })}
               />
               <PortfolioTradeOpeningBoundarySheet
                 detail={detailQuery.data}
                 open={openingBoundaryOpen}
                 onOpenChange={setOpeningBoundaryOpen}
+                readOnly={detailQuery.isError || detailQuery.isFetching}
               />
             </>
           ) : null}

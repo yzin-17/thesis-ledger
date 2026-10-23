@@ -1,35 +1,20 @@
-import { z } from 'zod';
-import { createHash } from 'node:crypto';
-import { DEFAULT_AI_TIMEOUT_MS, type AppConfig } from '../platform/config.js';
+import { DEFAULT_AI_TIMEOUT_MS } from '../platform/config.js';
 import type {
   AiProvider,
   AiProviderHealth,
   AiProviderModelReasoningMetadata,
 } from './contracts.js';
-import {
-  aiProviderExecutionRouteInputSchema,
-  aiProviderModelReasoningSchema,
-  aiProviderModelPricingViewSchema,
-  type AiProviderExecutionRouteInput,
-  type AiProviderModelPricingView,
+import type {
+  AiProviderExecutionRouteInput,
+  AiProviderModelPricingView,
 } from './ai-provider.contracts.js';
-import {
-  aiLegacyAdapterSchema,
-  aiAuthModeSchema as sharedAiAuthModeSchema,
-  aiChatImplementationSchema,
-  aiUpstreamFormatSchema,
-  aiUpstreamSelectionSchema,
-  type AiAdapter,
-  type AiAuthMode,
-  type AiChatImplementation,
-  type AiUpstreamFormat,
+import type {
+  AiAdapter,
+  AiAuthMode,
+  AiChatImplementation,
+  AiUpstreamFormat,
 } from '@thesis-ledger/schemas';
-import {
-  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
-  runtimeAdapterForSelection,
-  selectionFromLegacyAdapter,
-  type AiCompatibilityExtensionProfile,
-} from './ai-provider-upstream.js';
+import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 
 type CompletionInput = {
   model: string;
@@ -38,89 +23,6 @@ type CompletionInput = {
   maxOutputTokens?: number;
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 };
-
-const providerConfigSchema = z
-  .array(
-    z
-      .object({
-        id: z.string().trim().min(1).max(120),
-        baseUrl: z.url(),
-        authMode: sharedAiAuthModeSchema.default('api_key'),
-        apiKey: z.string().trim().min(1).optional(),
-        models: z.array(z.string().trim().min(1).max(200)).min(1),
-        upstreamFormat: aiUpstreamFormatSchema.optional(),
-        chatImplementation: aiChatImplementationSchema.optional(),
-        adapter: aiLegacyAdapterSchema.optional(),
-        executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
-        timeoutMs: z.number().int().positive().optional(),
-        firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
-        outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
-        costPer1kInput: z.number().nonnegative().optional(),
-        costPer1kOutput: z.number().nonnegative().optional(),
-        costCurrency: z.string().trim().min(1).max(16).optional(),
-        pricingVersion: z.string().trim().min(1).max(120).optional(),
-        modelPricing: z
-          .record(z.string().trim().min(1).max(200), aiProviderModelPricingViewSchema)
-          .optional(),
-        modelReasoning: z
-          .record(z.string().trim().min(1).max(200), aiProviderModelReasoningSchema)
-          .optional(),
-      })
-      .strict(),
-  )
-  .max(12)
-  .superRefine((providers, context) => {
-    const ids = providers.map((provider) => provider.id);
-    if (new Set(ids).size !== ids.length)
-      context.addIssue({ code: 'custom', message: 'AI Provider id 必须唯一' });
-    providers.forEach((provider, index) => {
-      const selection = aiUpstreamSelectionSchema.safeParse({
-        upstreamFormat: provider.upstreamFormat ?? 'chat-completions',
-        ...(provider.chatImplementation === undefined
-          ? {}
-          : { chatImplementation: provider.chatImplementation }),
-      });
-      if (!selection.success)
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'chatImplementation'],
-          message: '只有 Chat Completions 可以选择 Chat 实现',
-        });
-      if (new Set(provider.models).size !== provider.models.length)
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'models'],
-          message: '同一 Provider 的模型不得重复',
-        });
-      if (provider.executionRoutes?.some((route) => route.outputPolicy === 'auto'))
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'executionRoutes'],
-          message: '部署配置只能指定具体方式；自动选择请通过页面测试并保存',
-        });
-      const selectedModels = new Set(provider.models);
-      if (provider.executionRoutes?.some((route) => !selectedModels.has(route.model)))
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'executionRoutes'],
-          message: '执行路由只能配置同一 Provider 已选择的模型',
-        });
-      if (provider.authMode === 'api_key' && !provider.apiKey)
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'apiKey'],
-          message: 'API Key 模式必须配置 API Key',
-        });
-      if (provider.authMode === 'none' && provider.apiKey)
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'authMode'],
-          message: '无需认证模式不能配置 API Key',
-        });
-    });
-  });
-
-export type ConfiguredAiProviderInput = z.infer<typeof providerConfigSchema>[number];
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -146,7 +48,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
       priority?: number;
       capabilities?: readonly string[];
       health?: AiProviderHealth;
-      source?: 'database' | 'environment';
+      source?: 'database';
       modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
       upstreamFormat?: AiUpstreamFormat;
       chatImplementation?: AiChatImplementation;
@@ -344,101 +246,3 @@ export class FixtureAiProvider implements AiProvider {
     });
   }
 }
-
-export const parseConfiguredAiProviderInputs = (raw: string | undefined) => {
-  if (!raw) return [];
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(raw) as unknown;
-  } catch {
-    throw new Error('AI_PROVIDER_CONFIGS_JSON 不是合法 JSON');
-  }
-  const parsed = providerConfigSchema.safeParse(decoded);
-  if (!parsed.success) throw new Error('AI_PROVIDER_CONFIGS_JSON 配置无效');
-  return parsed.data;
-};
-
-const providerFromInput = (input: ConfiguredAiProviderInput, defaultTimeoutMs: number) => {
-  const selection =
-    input.adapter && input.upstreamFormat === undefined && input.chatImplementation === undefined
-      ? selectionFromLegacyAdapter(input.adapter)
-      : aiUpstreamSelectionSchema.parse({
-          upstreamFormat: input.upstreamFormat ?? 'chat-completions',
-          ...(input.chatImplementation === undefined
-            ? {}
-            : { chatImplementation: input.chatImplementation }),
-        });
-  const compatibilityExtensionProfile =
-    input.adapter === 'openrouter' && Boolean(input.executionRoutes?.length)
-      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-      : undefined;
-  const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
-  return new OpenAiCompatibleProvider(
-    input.id,
-    input.models,
-    input.baseUrl,
-    input.authMode === 'none' ? '' : (input.apiKey ?? ''),
-    input.timeoutMs ?? defaultTimeoutMs,
-    {
-      ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-      ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
-      ...(input.costCurrency ? { costCurrency: input.costCurrency } : {}),
-      ...(input.pricingVersion ? { pricingVersion: input.pricingVersion } : {}),
-    },
-    {
-      authMode: input.authMode,
-      ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
-      upstreamFormat: selection.upstreamFormat,
-      ...(selection.upstreamFormat === 'chat-completions'
-        ? { chatImplementation: selection.chatImplementation }
-        : {}),
-      ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
-      ...(adapter ? { adapter } : {}),
-      ...(input.executionRoutes ? { executionRoutes: input.executionRoutes } : {}),
-      ...(input.firstOutputTimeoutMs === undefined
-        ? {}
-        : { firstOutputTimeoutMs: input.firstOutputTimeoutMs }),
-      ...(input.outputIdleTimeoutMs === undefined
-        ? {}
-        : { outputIdleTimeoutMs: input.outputIdleTimeoutMs }),
-      ...(input.modelPricing ? { modelPricing: input.modelPricing } : {}),
-      ...(input.apiKey
-        ? { credentialFingerprint: createHash('sha256').update(input.apiKey, 'utf8').digest('hex') }
-        : {}),
-    },
-  );
-};
-
-export const createConfiguredAiProviders = (config: AppConfig): AiProvider[] => {
-  const providers: AiProvider[] = parseConfiguredAiProviderInputs(config.aiProviderConfigsJson).map(
-    (input) => providerFromInput(input, config.aiTimeoutMs),
-  );
-  const configuredIds = new Set(providers.map((provider) => provider.id));
-  if (config.aiBaseUrl && config.aiApiKey && config.aiModel) {
-    const id = config.aiProviderId ?? 'openai-compatible';
-    if (!configuredIds.has(id)) {
-      providers.push(
-        new OpenAiCompatibleProvider(
-          id,
-          [config.aiModel],
-          config.aiBaseUrl,
-          config.aiApiKey,
-          config.aiTimeoutMs,
-          undefined,
-          {
-            upstreamFormat: 'chat-completions',
-            chatImplementation: 'compatible',
-            adapter: 'openai-compatible-chat',
-            authMode: 'api_key',
-          },
-        ),
-      );
-    }
-  }
-  if (config.aiFixtureEnabled || config.environment === 'test') {
-    const fixture = new FixtureAiProvider();
-    if (!configuredIds.has(fixture.id) && !providers.some((provider) => provider.id === fixture.id))
-      providers.push(fixture);
-  }
-  return providers;
-};

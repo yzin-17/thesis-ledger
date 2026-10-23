@@ -6,10 +6,16 @@ import type { SavePerformanceTargetsInput } from './performance.types.js';
 export const useSavePerformanceTargetsMutation = () => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: SavePerformanceTargetsInput) => savePerformanceTargets(input),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: performanceKeys.targetsRoot });
-      void client.invalidateQueries({ queryKey: performanceKeys.allocationRoot });
+    mutationFn: async (input: SavePerformanceTargetsInput) => {
+      await savePerformanceTargets(input);
+      const reads = await Promise.allSettled([
+        client.invalidateQueries({ queryKey: performanceKeys.targetsRoot }, { throwOnError: true }),
+        client.invalidateQueries(
+          { queryKey: performanceKeys.allocationRoot },
+          { throwOnError: true },
+        ),
+      ]);
+      return { refreshed: reads.every((read) => read.status === 'fulfilled') };
     },
   });
 };

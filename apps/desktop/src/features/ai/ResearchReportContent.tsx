@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, Check, CircleDot, Copy, ExternalLink, RotateCcw } from 'lucide-react';
 import type { AiRunRecord, AiToolCall } from './ai.types.js';
 import { AiExecutionFacts } from './AiExecutionFacts.js';
+import { ResearchToolAudit } from './ResearchToolAudit.js';
 import { checkpointLabel, errorLabel, formatFullDateTime, questionSummary } from './ai.display.js';
 
 const listOrEmpty = (items: string[] | undefined, empty: string) =>
@@ -37,10 +38,9 @@ const copyText = (value: string) => {
   void navigator.clipboard.writeText(value);
 };
 
-const toolAuditLabel = (toolCallId: string | undefined, audit: AiToolCall | undefined) => {
+const missingToolAuditLabel = (toolCallId: string | undefined) => {
   if (!toolCallId) return '历史兼容记录未提供 Tool 调用关联 ID';
-  if (!audit) return 'Tool 审计暂未加载或关联不可用';
-  return `Tool 审计：${audit.tool} · ${audit.status}`;
+  return 'Tool 审计暂未加载或关联不可用';
 };
 
 function PrimaryStatus({ run, onRetry }: { run: AiRunRecord; onRetry?: () => void }) {
@@ -83,6 +83,10 @@ function PrimaryStatus({ run, onRetry }: { run: AiRunRecord; onRetry?: () => voi
 function EvidenceSection({ run, toolCalls }: { run: AiRunRecord; toolCalls: AiToolCall[] }) {
   const evidence = run.result?.evidence ?? [];
   const toolCallById = new Map(toolCalls.flatMap((call) => (call.id ? [[call.id, call]] : [])));
+  const citedIds = new Set(
+    evidence.flatMap((item) => item.citations.map((citation) => citation.toolCallId)),
+  );
+  const uncitedCalls = toolCalls.filter((call) => !call.id || !citedIds.has(call.id));
   return (
     <section aria-labelledby="research-evidence-title" className="flex flex-col gap-3">
       <div>
@@ -109,12 +113,24 @@ function EvidenceSection({ run, toolCalls }: { run: AiRunRecord; toolCalls: AiTo
                         {citation.provider} · {citation.sourceId} ·{' '}
                         {formatFullDateTime(citation.observedAt)}
                       </span>
-                      <span>{toolAuditLabel(citation.toolCallId, audit)}</span>
+                      {audit ? (
+                        <ResearchToolAudit call={audit} />
+                      ) : (
+                        <span>{missingToolAuditLabel(citation.toolCallId)}</span>
+                      )}
                     </li>
                   );
                 })}
               </ul>
             </div>
+          ))}
+        </div>
+      )}
+      {uncitedCalls.length > 0 && (
+        <div className="flex min-w-0 flex-col gap-3">
+          <h4 className="text-sm font-medium">未被结论引用的 Tool 审计</h4>
+          {uncitedCalls.map((call, index) => (
+            <ResearchToolAudit key={call.id ?? `${call.tool}-${index}`} call={call} />
           ))}
         </div>
       )}

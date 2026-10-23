@@ -20,6 +20,14 @@ const renderToStaticMarkup = (node: ReactNode) =>
   renderMarkup(<ConfirmDialogProvider>{node}</ConfirmDialogProvider>);
 
 describe('收益分析交互契约', () => {
+  it('时间加权边界缺失时显示独立原因，资金加权数值继续可读', () => {
+    const markup = renderToStaticMarkup(<PerformanceMetrics latest={undefined} snapshotCount={2}
+      summary={{ ttwror: null, ttwrorReason: '缺少现金流估值边界', xirr: 0.1, xirrReason: null }} />);
+    expect(markup).toContain('缺少现金流估值边界');
+    expect(markup).toContain('10.00%');
+    expect(markup).toContain('基于账本现金流');
+    expect(markup).toContain('>—<');
+  });
   it('混合币种时提示选择单账户并保留模式账户列表', () => {
     const markup = renderToStaticMarkup(
       <PerformanceAccountSelector
@@ -41,25 +49,18 @@ describe('收益分析交互契约', () => {
     expect(markup).not.toContain('影子账户');
   });
 
-  it('组合模式使用实际/模拟 Switch', () => {
+  it('账户范围同时显示实际和模拟选项', () => {
     const markup = renderToStaticMarkup(
       <PortfolioModeSwitch mode="actual" onModeChange={vi.fn()} ariaLabel="收益范围" />,
     );
     expect(markup).toContain('收益范围');
-    expect(markup).toContain('data-slot="switch"');
+    expect(markup).toContain('data-slot="toggle-group"');
     expect(markup).toContain('data-mode="actual"');
-    expect(markup).toContain('h-7');
-    expect(markup).toContain('w-[70px]');
-    expect(markup).toContain('bg-[color:var(--color-mode-switch-track)]');
-    expect(markup).toContain('text-[color:var(--color-mode-switch-text)]');
-    expect(markup).toContain('border-[color:var(--color-mode-switch-border)]');
-    expect(markup).toContain('border-[color:var(--color-mode-switch-thumb-border)]');
-    expect(markup).not.toContain('shadow-[var(--color-mode-switch-thumb-shadow)]');
-    expect(markup).toContain('data-checked:translate-x-[40px]');
-    expect(markup).not.toContain('data-checked:bg-');
+    expect(markup).toContain('账户范围');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('aria-pressed="false"');
     expect(markup).toContain('实际');
     expect(markup).toContain('模拟');
-    expect(markup).not.toContain('data-slot="toggle-group"');
   });
 
   it('混合币种默认关闭汇率合并并显示分币种提示', () => {

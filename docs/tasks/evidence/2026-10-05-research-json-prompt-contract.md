@@ -1,6 +1,6 @@
 # 研究 JSON 输出字段合同验证
 
-规格与任务：[Spec](../../specs/2026-10-05-research-json-prompt-contract.md) · [Task](../2026-10-05-research-json-prompt-contract.md)。
+规格与任务：[Spec](../../specs/2026-10-05-research-json-prompt-contract.md) · [Task](../../archive/tasks/2026-10-05-research-json-prompt-contract.md)。
 
 ## 改动与验证输入
 

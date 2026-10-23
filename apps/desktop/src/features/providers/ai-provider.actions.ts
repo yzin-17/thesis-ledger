@@ -1,4 +1,5 @@
 import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
+import { newProviderDraft } from './providers.types.js';
 
 import type {
   AiProviderExecutionRouteConfig,
@@ -361,6 +362,19 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
   updatedAt: provider.updatedAt ?? '',
 });
 
+export const providerDraftFromRecord = (provider: ProviderRecord): ProviderDraft => {
+  if (provider.type === 'ai') return aiProviderDraftFromRecord(provider);
+  return {
+    ...newProviderDraft(),
+    name: provider.name,
+    type: provider.type,
+    capabilities: [...provider.capabilities],
+    priority: provider.priority,
+    enabled: provider.enabled,
+    updatedAt: provider.updatedAt ?? '',
+  };
+};
+
 export const aiProviderDraftError = (input: AiProviderInput) => {
   if (!input.name) return '请填写 Provider 名称。';
   if (!input.baseUrl) return '请填写 API Base URL。';
@@ -425,13 +439,12 @@ export const requestAiProviderDeletion = async (
   ) => Promise<unknown>,
   lifecycle?: { clearResearchDefault?: boolean; expectedSettingsRevision?: string },
 ) => {
-  if (provider.source === 'environment') return false;
   const confirmed = await confirm({
     title: `删除 ${provider.name}？`,
     description:
       lifecycle?.clearResearchDefault === true
         ? '该 Provider 是研究默认模型；确认后会在同一事务清除默认引用并删除 Provider。'
-        : '删除后该 Provider 不再参与后续 AI 请求；同名部署配置可能重新出现。',
+        : '删除后该 Provider 不再参与后续 AI 请求。',
     confirmLabel: '删除 Provider',
     cancelLabel: '取消',
     variant: 'destructive',

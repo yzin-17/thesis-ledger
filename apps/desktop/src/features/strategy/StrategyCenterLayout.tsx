@@ -14,25 +14,15 @@ export function StrategyCenterLayout({
   children,
   actions,
   value,
-  onValueChange,
 }: {
   children: ReactNode;
   actions?: ReactNode;
   value: StrategyCenterTab;
-  onValueChange: (value: StrategyCenterTab) => void;
 }) {
   return (
     <section className="module-page">
-      <PageHeader
-        eyebrow="STRATEGY CENTER"
-        title="策略中心"
-        description="管理策略版本、回测任务与 AI 优化实验。"
-        actions={actions}
-      />
-      <Tabs
-        value={value}
-        onValueChange={(nextValue) => onValueChange(nextValue as StrategyCenterTab)}
-      >
+      <PageHeader title="策略中心" actions={actions} />
+      <Tabs value={value}>
         <TabsList
           variant="line"
           className="w-full justify-start overflow-x-auto"
@@ -43,7 +33,7 @@ export function StrategyCenterLayout({
               key={value}
               value={value}
               nativeButton={false}
-              render={<NavLink to={to} onClick={() => onValueChange(value)} />}
+              render={<NavLink to={to} />}
             >
               {label}
             </TabsTrigger>

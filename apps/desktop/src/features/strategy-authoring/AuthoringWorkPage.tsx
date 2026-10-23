@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -18,6 +18,7 @@ import {
   AuthoringSavePanel,
 } from './AuthoringEditorForms.js';
 import { AuthoringEditorStatus, AuthoringEditorHistory } from './AuthoringEditorState.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 
 export function AuthoringWorkPage({
   onDirtyChange,
@@ -30,6 +31,7 @@ export function AuthoringWorkPage({
   const [params, setParams] = useSearchParams();
   const id = params.get('draft');
   const [editingDirty, setEditingDirty] = useState(false);
+  const savedNavigation = useRef(false);
   const reportDirty = useCallback(
     (dirty: boolean) => {
       setEditingDirty(dirty);
@@ -47,12 +49,21 @@ export function AuthoringWorkPage({
   });
   const create = useMutation({
     mutationFn: () => authoringApi.create(emptyAuthoringContent),
+    onMutate: () => {
+      savedNavigation.current = false;
+    },
     onSuccess: (draft) => {
+      savedNavigation.current = true;
       const next = new URLSearchParams(params);
       next.set('draft', draft.id);
       setParams(next, { replace: true });
       void drafts.refetch();
     },
+  });
+  useNavigationGuard({
+    dirty: false,
+    busy: create.isPending,
+    bypass: () => savedNavigation.current,
   });
   return (
     <div className="flex flex-col gap-5">

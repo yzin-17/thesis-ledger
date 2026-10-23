@@ -10,11 +10,20 @@ import {
 import { riskKeys } from './risk.queries.js';
 import type { CreateRiskRuleInput, RiskContext, RiskRuleRecord } from './risk.types.js';
 
-// 单条响应不带 assetName，直接写缓存会让标的名丢失；统一失效重取列表
-const invalidateRulesOnSuccess =
-  (client: QueryClient) => async () => {
-    await client.invalidateQueries({ queryKey: riskKeys.rules() });
-  };
+// 先保留已确认的版本，再重取完整列表；单条响应未带标的名时保留原名称。
+const invalidateRulesOnSuccess = (client: QueryClient) => async (saved: RiskRuleRecord) => {
+  client.setQueryData<RiskRuleRecord[]>(riskKeys.rules(), (current) => {
+    if (!current) return current;
+    const previous = current.find((rule) => rule.id === saved.id);
+    const merged = { ...previous, ...saved };
+    if (saved.assetName === undefined && previous?.assetName !== undefined) {
+      merged.assetName = previous.assetName;
+    }
+    if (!previous) return [merged, ...current];
+    return current.map((rule) => (rule.id === saved.id ? merged : rule));
+  });
+  await client.invalidateQueries({ queryKey: riskKeys.rules() });
+};
 
 export const useCreateRiskRuleMutation = () => {
   const client = useQueryClient();

@@ -151,7 +151,9 @@ class InMemoryCashRepository {
       findMany: vi.fn(async () => this.events.map(storedFromEvent)),
     };
     const account = {
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => this.accounts.get(where.id)),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
+        this.accounts.get(where.id),
+      ),
     };
     const revision = this.revisions.get(accountId) ?? 0n;
     const generation = this.generations.get(accountId) ?? 0n;
@@ -223,6 +225,68 @@ const errorCode = async (operation: Promise<unknown>) => {
 };
 
 describe('现金 Ledger 命令', () => {
+  it.each(['occurredAt', 'expectedAt', 'settledAt'] as const)(
+    '未来 %s 入账可降低金额并作废，不扣减当前已结算余额',
+    async (timeField) => {
+      const repository = new InMemoryCashRepository();
+      const commands = new CashLedgerCommandService(repository as never);
+      const future = '2099-10-18T04:00:00.000Z';
+      const original = cashFlowCommand(`future-${timeField}`);
+      const input = {
+        ...original,
+        occurredAt: timeField === 'occurredAt' ? future : original.occurredAt,
+        payload: {
+          ...original.payload,
+          ...(timeField === 'occurredAt' ? {} : { [timeField]: future }),
+        },
+      };
+      const created = await commands.createCashFlow(input);
+      expect(repository.balances().get(cashAccount)?.get('CNY')?.toString() ?? '0').toBe('0');
+      const replaced = await commands.replaceCashFlow({
+        ...input,
+        command: 'REPLACE_CASH_FLOW',
+        expectedLedgerRevision: created.ledgerRevisions[cashAccount],
+        supersedesEventId: created.eventIds[0],
+        payload: { ...input.payload, amount: '500' },
+        source: source(`future-${timeField}-replace`),
+        reason: '尚未到账，修正预计金额',
+      });
+      await commands.voidCashFlow({
+        command: 'VOID_CASH_FLOW',
+        accountId: cashAccount,
+        expectedLedgerRevision: replaced.ledgerRevisions[cashAccount],
+        supersedesEventId: replaced.eventIds[0],
+        source: source(`future-${timeField}-void`),
+        actorId: 'user-1',
+        reason: '取消尚未到账资金',
+      });
+      expect(repository.balances().get(cashAccount)?.get('CNY')?.toString() ?? '0').toBe('0');
+      expect(repository.events.map((event) => event.revisionAction)).toEqual([
+        'CREATE',
+        'REPLACE',
+        'VOID',
+      ]);
+    },
+  );
+
+  it('已消费入账不能改到未来以制造可用余额', async () => {
+    const repository = new InMemoryCashRepository();
+    const commands = new CashLedgerCommandService(repository as never);
+    const created = await commands.createCashFlow(cashFlowCommand());
+    await commands.createCashTransfer(transferCommand());
+    const result = commands.replaceCashFlow({
+      ...cashFlowCommand('deposit-move-future'),
+      command: 'REPLACE_CASH_FLOW',
+      occurredAt: '2099-10-18T04:00:00.000Z',
+      expectedLedgerRevision: '2',
+      supersedesEventId: created.eventIds[0],
+      reason: '核对资金时间边界',
+    });
+    await expect(errorCode(result)).resolves.toBe('LEDGER_INSUFFICIENT_CASH');
+    expect(repository.events).toHaveLength(3);
+    expect(repository.balances().get(cashAccount)?.get('CNY')?.toString()).toBe('600');
+  });
+
   it('外部入金幂等重放且只写入一次', async () => {
     const repository = new InMemoryCashRepository();
     const commands = new CashLedgerCommandService(repository as never);

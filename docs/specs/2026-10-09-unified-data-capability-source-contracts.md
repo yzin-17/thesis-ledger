@@ -3,6 +3,8 @@
 > 本页是[主 Spec](2026-10-09-unified-data-capability-adapter.md)的现行合同附页，继承同一 Task、AC 和范围决定，不是独立任务。
 > 按来源/接缝需要读取；详细实施及运行记录由原 Task 的证据索引维护。下面条款保持原语义，来源权限、覆盖未知与未通过验收不因整理而放行。
 
+> Alpha Vantage 日线增量（2026-10-22）：免费近期窗口的 compact、响应边界与修订合同由[专属 Spec](2026-10-22-alphavantage-free-recent-daily.md)维护；[已完成任务](../archive/tasks/2026-10-22-alphavantage-free-recent-daily.md)保留本地与目标验收证据，更早历史继续受限。原报价与其他来源合同不变。
+
 ### 13.8 H09 首批组合消费与独立冻结边界
 
 组合使用五种强类型 query 合同，逐项声明必需/可选，不新增通用任意 execute。同一组合的证券、市场、窗口和政策修订必须一致；基础日期没有价格窗口覆盖。每项结果分别保存真实请求、精确目标、观察时钟、上游/适配修订、覆盖与错误。缺失必需能力只阻止依赖它的计算；可选能力失败保留其他有效事实。交易状态与已知上市阶段/基础日期产生的交易资格矛盾单独记录，不按返回顺序覆盖来源；未知不当作冲突或完整。
@@ -72,6 +74,8 @@ Longbridge 四项 HK/US STOCK/ETF 和 Yahoo 七项 CN/HK/US STOCK/ETF、US INDEX
 ### 13.19 其余单标股票报价与缺失字段
 
 TickFlow/Tushare/Finnhub 三个既有股票报价复用 QuoteBinding，来源拥有原精确 SDK 参数、投影与稳定错误；Tushare rt_k 保留 4.5s 请求预算、一次限流核对与唯一 ts_code，TickFlow 保留单元素 symbols/身份校验，Finnhub strict=true/去 US 后缀与原 5s HTTP。来源不新增重试/切源，工厂和未迁移能力保持。
+
+Finnhub 免费账号范围于 2026-10-22 按用户决定核对：[官方维护者答复](https://github.com/finnhubio/Finnhub-API/issues/546)明确免费方案不开放 `/stock/candle`。现有报价真实通过的证据复用，现有股票日线绑定在该账号下明确受限；[免费范围验收](../tasks/evidence/2026-10-22-finnhub-free-scope-acceptance.md)通过不表示日线可用，也不改变绑定、准入、路由或来源启停。
 
 Alpha Vantage GLOBAL_QUOTE 旧 SDK 对缺字段默认零、未核对 01.symbol，不能把它直接当标准事实。产品适配器使用同一原 URL/凭据、random_sleep、5s HTTP 和 strict 错误分类，单次取得原响应后核对证券，缺 volume/价格字段为 None、实际零保留零，不将日级 latest trading day 伪造为精确时间。价格缺字段由标准校验拒绝。此实际规范化变更的本地 adapterRevision 升为 v2；原 endpoint sourceRevision 不变，原 SDK 原生分析行为不改，不改写旧冻结。
 
@@ -400,3 +404,13 @@ RQ账号修订及身份映射读取器明确识别的准入拒绝，以来源拥
 最终消费从显式信封派生与completedAt匹配的请求/响应，原deadline交换独立保留；不得把派生结果冒充原固定时间请求的响应。coverage必须保持false/historical_coverage_unverified，原普通完整冻结继续拒绝。本轮只实现信封、有限Server采集接缝与原验收驱动消费并做离线合同/局部验证；不同步目标、不实源请求、不续签、不改主备、不保存凭据、不重做H09，也不把本地通过代收K37d-live或完整冻结。
 
 精确准入围栏不能仅依赖ready行：现行目录修订只绑定就绪视图，记录被替换而仍ready时可不变。本轮在既有正式Control读取入口提供显式`eventAdmissions=v1`的`event-admission-catalog-v1`只读视图，携带已有事件准入脱敏快照；默认V3响应形状保持，目录不透明修订加入准入记录身份输入。采集保存并比较前/后快照与真实响应中的同一准入；缺失、不匹配或不能核实则零数据前置拒绝或拒绝后置消费。该视图不含凭据/原文，不签发准入、不改政策，不增加数据请求或来源适配范围。
+
+### 13.73 研报最小元数据的独立单页合同
+
+2026-10-23 用户确认仅本地个人研究、最小元数据和原文链接。独立 [Spec](2026-10-23-research-report-metadata.md) 与[已完成 Task](../archive/tasks/2026-10-23-research-report-metadata.md) 将 `RESEARCH_REPORT_METADATA` 登记为 `data/CN/STOCK` 下的标准 QueryBinding，当前唯一来源为 `akshare/eastmoney`，不借用 `NEWS_SEARCH`。源协议 DTO、字段投影、报告标识格式和原文 URL 模板由来源适配器拥有；核心合同只验证规范元数据、来源引用与请求关联。
+
+当前 [长期按需规格](2026-10-23-research-report-on-demand.md)与[已完成 Task](../archive/tasks/2026-10-23-research-report-on-demand.md)采用 `research-report-metadata-v2`：当前全部已支持的沪深股票可按需查询，日期为可选筛选，不依赖固定股票、固定窗口或首次 24 小时验收记录。规范请求未给日期时为 null；来源适配器将协议必需的 `beginTime/endTime` 传空字符串，不补隐藏日期。就绪要求来源已启用、显式单目标路由及当前合同/适配/来源版本与配置代次一致，停用或移除路由可撤销后续读取。
+
+一次请求只读一页，页大小最多 20、响应体最多 256 KiB，无重试、重定向、翻页、换源或附件请求。来源分页、标的、唯一标识、日期和必要字段必须完整匹配；零点来源值只保留 `date` 精度，历史完整性始终为 false。规范结果冻结元数据版本、适配/来源修订、政策与实际目标；单目标、请求预算及控制代次围栏保留。错误使用标准 Data V3 信封并关联原请求，诊断只记录安全状态，不输出来源 URL、原文响应或凭据。
+
+Server 以已有目录身份保存独立快照与内容摘要，历史 API 只读本地数据库，旧 v1 内容与摘要兼容保留。首次验收曾限定 `600519.SH`、`2026-08-01`～`2026-10-23`、24 小时；其升级、备份/副本演练、单条路由和同一 Server 重启留存证据继续保留，仅代表当时范围。长期版本的 DSA 423 项、Server 13 项及正式完整更新已通过；目标同一标的无日期、第 1 页/2 条/3000 ms 采集 201，返回 2 条、来源总数 772，新旧历史 200，旧摘要不变。目录 30/196，政策 173 的原 20 条路由、来源启停、11 张受保护业务表完整摘要及挂载保持；用户确认的预期并发修改保留。过程见[长期验收证据](../tasks/evidence/2026-10-23-research-report-on-demand.md)，不代收全历史、研究生成、历史比较或其他父项。

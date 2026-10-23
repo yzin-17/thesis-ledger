@@ -1,0 +1,711 @@
+{
+  "version": "research-trace-input-v1",
+  "datasetVersion": "controlled-research-audit-2026-10-19-v1",
+  "records": [
+    {
+      "kind": "ai-run",
+      "record": {
+        "id": "10000000-0000-4000-8000-000000000001",
+        "status": "succeeded",
+        "executionAttempt": 1,
+        "durationMs": 1200,
+        "modelMetadata": {
+          "sdkExecution": {
+            "version": "sdk-execution-v1",
+            "contract": {
+              "id": "research",
+              "version": "research-generation-v2"
+            },
+            "frozenPolicy": {
+              "version": "research-policy-v1",
+              "maxAiCalls": 2,
+              "maxInputTokens": 100000,
+              "maxOutputTokens": 20000,
+              "maxDurationSeconds": 300,
+              "maxCost": "1",
+              "costCurrency": "USD",
+              "paidRoutes": [
+                {
+                  "provider": "controlled-provider",
+                  "models": [
+                    "controlled-model"
+                  ]
+                }
+              ]
+            },
+            "deadlineAt": "2026-10-18T08:05:00Z",
+            "generationStatus": "complete",
+            "usageCompleteness": "reported",
+            "requests": [
+              {
+                "requestId": "10000000-0000-4000-8000-000000000101",
+                "sequence": 1,
+                "state": "completed",
+                "reservation": {
+                  "aiCalls": 1,
+                  "inputTokens": 100,
+                  "outputTokens": 20,
+                  "cost": {
+                    "status": "estimated",
+                    "amount": "0.4",
+                    "currency": "USD",
+                    "source": "frozen-price",
+                    "pricingVersion": "controlled-price-1"
+                  },
+                  "provider": "controlled-provider",
+                  "model": "controlled-model",
+                  "configurationFingerprint": "synthetic-configuration-marker"
+                },
+                "dispatchExecutionAttempt": 1,
+                "preparedAt": "2026-10-18T08:02:00Z",
+                "dispatchingAt": "2026-10-18T08:02:00.100Z",
+                "completedAt": "2026-10-18T08:02:01Z",
+                "outcome": {
+                  "status": "complete",
+                  "finishReason": "stop",
+                  "contract": {
+                    "id": "research",
+                    "version": "research-generation-v2"
+                  },
+                  "schemaAccepted": true
+                },
+                "error": null,
+                "usageRevisions": [
+                  {
+                    "revision": 1,
+                    "usage": {
+                      "status": "reported",
+                      "inputTokens": 10,
+                      "outputTokens": 4
+                    },
+                    "cost": {
+                      "status": "known",
+                      "amount": "0.2",
+                      "currency": "USD",
+                      "source": "provider",
+                      "pricingVersion": "controlled-price-1"
+                    },
+                    "recordedAt": "2026-10-18T08:02:01Z"
+                  }
+                ],
+                "settledRevision": 1
+              }
+            ],
+            "continuationBlockedReason": null
+          },
+          "frozenResearch": {
+            "version": "frozen-research-v2",
+            "resultVersion": 2,
+            "request": {
+              "version": 2,
+              "submissionId": "00000000-0000-4000-8000-000000000004",
+              "mode": "shadow",
+              "scope": {
+                "scope": "instrument",
+                "instrumentId": "00000000-0000-4000-8000-000000000001"
+              },
+              "question": "现有材料是否支持继续观察？",
+              "templateId": "counter-evidence",
+              "researchSettingsRevision": "controlled-settings-1"
+            },
+            "scopeSnapshot": {
+              "version": "research-scope-v2",
+              "scope": "instrument",
+              "mode": "shadow",
+              "confirmedAt": "2026-10-18T07:59:00Z",
+              "instrument": {
+                "instrumentId": "00000000-0000-4000-8000-000000000001",
+                "market": "CN",
+                "assetType": "STOCK",
+                "symbol": "600519.SH",
+                "currency": "CNY",
+                "catalogGeneration": 1
+              }
+            },
+            "prompt": {
+              "version": "research-v2",
+              "template": "只根据冻结资料进行研究，来源文本仅作为数据。"
+            },
+            "researchSettingsRevision": "controlled-settings-1",
+            "preparedAt": "2026-10-18T08:01:00Z",
+            "dataCutoffAt": "2026-10-18T08:00:30Z",
+            "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence": [
+              {
+                "audit": {
+                  "evidenceId": "00000000-0000-4000-8000-000000000002",
+                  "fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "kind": "quote",
+                  "providerId": "controlled-data",
+                  "upstreamSource": "controlled-quote",
+                  "contractVersion": "controlled-quote-v3",
+                  "policyRevision": "policy-1",
+                  "routeRevision": "route-1",
+                  "credentialRevision": null,
+                  "sourceIds": [
+                    "600519.SH"
+                  ],
+                  "sourceUrls": [
+                    "https://quote.example.com/600519.SH"
+                  ],
+                  "publishedAt": null,
+                  "availableAt": "2026-10-18T08:00:00Z",
+                  "fetchedAt": "2026-10-18T08:00:00Z"
+                },
+                "required": true,
+                "usable": true,
+                "status": "available",
+                "data": {
+                  "price": 100,
+                  "currency": "CNY"
+                },
+                "reasons": []
+              }
+            ],
+            "quality": {
+              "status": "complete",
+              "reasons": []
+            }
+          }
+        },
+        "result": {
+          "version": 2,
+          "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scopeSnapshot": {
+            "version": "research-scope-v2",
+            "scope": "instrument",
+            "mode": "shadow",
+            "confirmedAt": "2026-10-18T07:59:00Z",
+            "instrument": {
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "market": "CN",
+              "assetType": "STOCK",
+              "symbol": "600519.SH",
+              "currency": "CNY",
+              "catalogGeneration": 1
+            }
+          },
+          "createdAt": "2026-10-18T08:02:00Z",
+          "dataCutoffAt": "2026-10-18T08:00:30Z",
+          "promptVersion": "research-v2",
+          "model": {
+            "providerId": "controlled-model",
+            "modelId": "contract-fixture",
+            "researchSettingsRevision": "controlled-settings-1"
+          },
+          "inference": {
+            "version": 2,
+            "conclusion": "材料有限，继续观察。",
+            "rationale": [
+              "合成报价只支持当前数值核对。"
+            ],
+            "claims": [
+              {
+                "id": "price-view",
+                "description": "观察价格方向",
+                "evidenceIds": [
+                  "00000000-0000-4000-8000-000000000002"
+                ],
+                "kind": "price-direction",
+                "instrumentId": "00000000-0000-4000-8000-000000000001",
+                "direction": "up",
+                "tradingDays": 5,
+                "rationale": "这是待验证推断。"
+              }
+            ],
+            "numericClaims": [
+              {
+                "id": "current-price",
+                "description": "受控报价",
+                "kind": "field",
+                "source": {
+                  "evidenceId": "00000000-0000-4000-8000-000000000002",
+                  "fieldPath": "/price",
+                  "value": 100,
+                  "unit": "price",
+                  "currency": "CNY"
+                }
+              },
+              {
+                "id": "same-price-change",
+                "description": "相同操作数对照",
+                "kind": "derived",
+                "operation": "percentage_change",
+                "operands": [
+                  {
+                    "evidenceId": "00000000-0000-4000-8000-000000000002",
+                    "fieldPath": "/price",
+                    "value": 100,
+                    "unit": "price",
+                    "currency": "CNY"
+                  },
+                  {
+                    "evidenceId": "00000000-0000-4000-8000-000000000002",
+                    "fieldPath": "/price",
+                    "value": 100,
+                    "unit": "price",
+                    "currency": "CNY"
+                  }
+                ],
+                "value": 0,
+                "unit": "ratio",
+                "currency": null,
+                "assumptions": []
+              }
+            ],
+            "invalidationConditions": [
+              {
+                "id": "price-condition",
+                "description": "跌破合成阈值则复核",
+                "evidenceIds": [
+                  "00000000-0000-4000-8000-000000000002"
+                ],
+                "kind": "price-threshold",
+                "instrumentId": "00000000-0000-4000-8000-000000000001",
+                "operator": "lt",
+                "value": 90,
+                "unit": "price",
+                "currency": "CNY",
+                "tradingDays": 5
+              }
+            ],
+            "nextSteps": [
+              {
+                "action": "view_evidence",
+                "description": "查看资料",
+                "evidenceIds": [
+                  "00000000-0000-4000-8000-000000000002"
+                ],
+                "claimId": null
+              },
+              {
+                "action": "review_due",
+                "description": "到期复核",
+                "evidenceIds": [],
+                "claimId": "price-view"
+              }
+            ],
+            "risks": [
+              "样例不能代表真实走势。"
+            ],
+            "unknowns": [
+              "未来价格未知。"
+            ],
+            "disclaimer": "本样例仅用于合同测试。",
+            "confidence": {
+              "level": "unassessed",
+              "basis": [
+                "没有真实来源和模型执行。"
+              ]
+            }
+          },
+          "evidenceBindings": [
+            {
+              "audit": {
+                "evidenceId": "00000000-0000-4000-8000-000000000002",
+                "fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "kind": "quote",
+                "providerId": "controlled-data",
+                "upstreamSource": "controlled-quote",
+                "contractVersion": "controlled-quote-v3",
+                "policyRevision": "policy-1",
+                "routeRevision": "route-1",
+                "credentialRevision": null,
+                "sourceIds": [
+                  "600519.SH"
+                ],
+                "sourceUrls": [
+                  "https://quote.example.com/600519.SH"
+                ],
+                "publishedAt": null,
+                "availableAt": "2026-10-18T08:00:00Z",
+                "fetchedAt": "2026-10-18T08:00:00Z"
+              },
+              "toolCallId": "00000000-0000-4000-8000-000000000003"
+            }
+          ],
+          "quality": {
+            "status": "complete",
+            "reasons": []
+          }
+        },
+        "researchScopeSnapshot": {
+          "version": "research-scope-v2",
+          "scope": "instrument",
+          "mode": "shadow",
+          "confirmedAt": "2026-10-18T07:59:00Z",
+          "instrument": {
+            "instrumentId": "00000000-0000-4000-8000-000000000001",
+            "market": "CN",
+            "assetType": "STOCK",
+            "symbol": "600519.SH",
+            "currency": "CNY",
+            "catalogGeneration": 1
+          }
+        },
+        "promptVersion": "research-v2",
+        "context": {
+          "version": "research-scope-v2",
+          "scope": "instrument",
+          "mode": "shadow",
+          "confirmedAt": "2026-10-18T07:59:00Z",
+          "instrument": {
+            "instrumentId": "00000000-0000-4000-8000-000000000001",
+            "market": "CN",
+            "assetType": "STOCK",
+            "symbol": "600519.SH",
+            "currency": "CNY",
+            "catalogGeneration": 1
+          }
+        }
+      },
+      "toolCalls": [
+        {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "aiRunId": "10000000-0000-4000-8000-000000000001",
+          "tool": "getQuote",
+          "status": "ok",
+          "inputSummary": "{\"symbol\":\"600519.SH\",\"private\":\"synthetic-private-input-marker\"}",
+          "outputSummary": "synthetic-private-output-marker",
+          "durationMs": 10
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000010",
+          "aiRunId": "10000000-0000-4000-8000-000000000001",
+          "tool": "getQuote",
+          "status": "ok",
+          "inputSummary": "{\"symbol\":\"600519.SH\",\"private\":\"synthetic-private-input-marker\"}",
+          "outputSummary": "synthetic-private-output-marker",
+          "durationMs": 10
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000011",
+          "aiRunId": "10000000-0000-4000-8000-000000000001",
+          "tool": "getNews",
+          "status": "unavailable",
+          "inputSummary": "{\"symbol\":\"600519.SH\"}",
+          "outputSummary": "synthetic-private-output-marker",
+          "durationMs": 10
+        }
+      ]
+    },
+    {
+      "kind": "ai-run",
+      "record": {
+        "id": "10000000-0000-4000-8000-000000000002",
+        "status": "failed",
+        "executionAttempt": 1,
+        "durationMs": null,
+        "errorCode": "research_deadline_expired",
+        "modelMetadata": {
+          "sdkExecution": {
+            "version": "sdk-execution-v1",
+            "contract": {
+              "id": "research",
+              "version": "research-generation-v1"
+            },
+            "frozenPolicy": {
+              "version": "research-policy-v1",
+              "maxAiCalls": 2,
+              "maxInputTokens": 100000,
+              "maxOutputTokens": 20000,
+              "maxDurationSeconds": 300,
+              "maxCost": "1",
+              "costCurrency": "USD",
+              "paidRoutes": [
+                {
+                  "provider": "controlled-provider",
+                  "models": [
+                    "controlled-model"
+                  ]
+                }
+              ]
+            },
+            "deadlineAt": "2026-10-18T08:05:00Z",
+            "generationStatus": "unknown",
+            "usageCompleteness": "partial",
+            "requests": [
+              {
+                "requestId": "10000000-0000-4000-8000-000000000102",
+                "sequence": 1,
+                "state": "completed",
+                "reservation": {
+                  "aiCalls": 1,
+                  "inputTokens": 100,
+                  "outputTokens": 20,
+                  "cost": {
+                    "status": "estimated",
+                    "amount": "0.4",
+                    "currency": "USD",
+                    "source": "frozen-price",
+                    "pricingVersion": "controlled-price-1"
+                  },
+                  "provider": "controlled-provider",
+                  "model": "controlled-model",
+                  "configurationFingerprint": "synthetic-configuration-marker"
+                },
+                "dispatchExecutionAttempt": 1,
+                "preparedAt": "2026-10-18T08:02:00Z",
+                "dispatchingAt": "2026-10-18T08:02:00.100Z",
+                "completedAt": "2026-10-18T08:02:01Z",
+                "outcome": {
+                  "status": "incomplete",
+                  "finishReason": "stop",
+                  "contract": {
+                    "id": "research",
+                    "version": "research-generation-v1"
+                  },
+                  "schemaAccepted": false
+                },
+                "error": {
+                  "code": "schema_invalid",
+                  "phase": "validation",
+                  "summary": "synthetic-error-marker",
+                  "externalResult": "complete",
+                  "requestId": "10000000-0000-4000-8000-000000000102"
+                },
+                "usageRevisions": [
+                  {
+                    "revision": 1,
+                    "usage": {
+                      "status": "reported",
+                      "inputTokens": 10,
+                      "outputTokens": 4
+                    },
+                    "cost": {
+                      "status": "known",
+                      "amount": "0.3",
+                      "currency": "USD",
+                      "source": "provider",
+                      "pricingVersion": "controlled-price-1"
+                    },
+                    "recordedAt": "2026-10-18T08:02:01Z"
+                  }
+                ],
+                "settledRevision": 1
+              },
+              {
+                "requestId": "10000000-0000-4000-8000-000000000103",
+                "sequence": 2,
+                "state": "unknown",
+                "reservation": {
+                  "aiCalls": 1,
+                  "inputTokens": 100,
+                  "outputTokens": 20,
+                  "cost": {
+                    "status": "estimated",
+                    "amount": "0.4",
+                    "currency": "USD",
+                    "source": "frozen-price",
+                    "pricingVersion": "controlled-price-1"
+                  },
+                  "provider": "controlled-provider",
+                  "model": "controlled-model",
+                  "configurationFingerprint": "synthetic-configuration-marker"
+                },
+                "dispatchExecutionAttempt": 1,
+                "preparedAt": "2026-10-18T08:02:00Z",
+                "dispatchingAt": "2026-10-18T08:02:00.100Z",
+                "completedAt": null,
+                "outcome": null,
+                "error": {
+                  "code": "transport_unknown",
+                  "phase": "validation",
+                  "summary": "synthetic-error-marker",
+                  "externalResult": "unknown",
+                  "requestId": "10000000-0000-4000-8000-000000000103"
+                },
+                "usageRevisions": [],
+                "settledRevision": 0
+              }
+            ],
+            "continuationBlockedReason": "expired"
+          }
+        },
+        "result": null,
+        "promptVersion": "research-v1",
+        "context": {
+          "scope": "portfolio"
+        }
+      },
+      "toolCalls": [
+        {
+          "id": "10000000-0000-4000-8000-000000000012",
+          "aiRunId": "10000000-0000-4000-8000-000000000002",
+          "tool": "getNews",
+          "status": "ok",
+          "inputSummary": "{\"symbol\":\"600519.SH\"}",
+          "outputSummary": "synthetic-private-output-marker",
+          "durationMs": 10
+        }
+      ]
+    },
+    {
+      "kind": "ai-run",
+      "record": {
+        "id": "10000000-0000-4000-8000-000000000003",
+        "status": "cancelled",
+        "executionAttempt": 1,
+        "durationMs": 200,
+        "modelMetadata": {
+          "sdkExecution": {
+            "version": "sdk-execution-v1",
+            "contract": {
+              "id": "research",
+              "version": "research-generation-v1"
+            },
+            "frozenPolicy": {
+              "version": "research-policy-v1",
+              "maxAiCalls": 2,
+              "maxInputTokens": 100000,
+              "maxOutputTokens": 20000,
+              "maxDurationSeconds": 300,
+              "maxCost": "1",
+              "costCurrency": "USD",
+              "paidRoutes": [
+                {
+                  "provider": "controlled-provider",
+                  "models": [
+                    "controlled-model"
+                  ]
+                }
+              ]
+            },
+            "deadlineAt": "2026-10-18T08:05:00Z",
+            "generationStatus": "incomplete",
+            "usageCompleteness": "reported",
+            "requests": [
+              {
+                "requestId": "10000000-0000-4000-8000-000000000104",
+                "sequence": 1,
+                "state": "completed",
+                "reservation": {
+                  "aiCalls": 1,
+                  "inputTokens": 100,
+                  "outputTokens": 20,
+                  "cost": {
+                    "status": "estimated",
+                    "amount": "0.4",
+                    "currency": "USD",
+                    "source": "frozen-price",
+                    "pricingVersion": "controlled-price-1"
+                  },
+                  "provider": "controlled-provider",
+                  "model": "controlled-model",
+                  "configurationFingerprint": "synthetic-configuration-marker"
+                },
+                "dispatchExecutionAttempt": 1,
+                "preparedAt": "2026-10-18T08:02:00Z",
+                "dispatchingAt": "2026-10-18T08:02:00.100Z",
+                "completedAt": "2026-10-18T08:02:01Z",
+                "outcome": {
+                  "status": "incomplete",
+                  "finishReason": "stop",
+                  "contract": {
+                    "id": "research",
+                    "version": "research-generation-v1"
+                  },
+                  "schemaAccepted": false
+                },
+                "error": {
+                  "code": "cancelled",
+                  "phase": "cancellation",
+                  "summary": "synthetic-error-marker",
+                  "externalResult": "complete",
+                  "requestId": "10000000-0000-4000-8000-000000000104"
+                },
+                "usageRevisions": [
+                  {
+                    "revision": 1,
+                    "usage": {
+                      "status": "reported",
+                      "inputTokens": 10,
+                      "outputTokens": 4
+                    },
+                    "cost": {
+                      "status": "known",
+                      "amount": "0.1",
+                      "currency": "USD",
+                      "source": "provider",
+                      "pricingVersion": "controlled-price-1"
+                    },
+                    "recordedAt": "2026-10-18T08:02:01Z"
+                  }
+                ],
+                "settledRevision": 1
+              }
+            ],
+            "continuationBlockedReason": "cancelled"
+          }
+        },
+        "result": null,
+        "promptVersion": "research-v1",
+        "context": {
+          "scope": "portfolio"
+        }
+      },
+      "toolCalls": []
+    },
+    {
+      "kind": "ai-invocation",
+      "record": {
+        "requestId": "10000000-0000-4000-8000-000000000200",
+        "consumer": "strategy_authoring",
+        "referenceId": "10000000-0000-4000-8000-000000000210",
+        "ownerId": "10000000-0000-4000-8000-000000000211",
+        "executionAttempt": 1,
+        "providerId": "controlled-provider",
+        "requestedModel": "controlled-model",
+        "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "facts": [
+        {
+          "requestId": "10000000-0000-4000-8000-000000000200",
+          "eventKey": "10000000-0000-4000-8000-000000000201",
+          "sequence": 1,
+          "kind": "dispatching",
+          "details": {
+            "eventKey": "10000000-0000-4000-8000-000000000201",
+            "kind": "dispatching",
+            "actualModel": null,
+            "usage": null,
+            "cost": {
+              "status": "unknown",
+              "amount": null,
+              "currency": null,
+              "source": null,
+              "pricingVersion": null
+            },
+            "errorCode": null,
+            "outputFingerprint": null
+          }
+        },
+        {
+          "requestId": "10000000-0000-4000-8000-000000000200",
+          "eventKey": "10000000-0000-4000-8000-000000000202",
+          "sequence": 2,
+          "kind": "received",
+          "details": {
+            "eventKey": "10000000-0000-4000-8000-000000000202",
+            "kind": "received",
+            "actualModel": "controlled-model",
+            "usage": {
+              "status": "reported",
+              "inputTokens": 10,
+              "outputTokens": 4
+            },
+            "cost": {
+              "status": "known",
+              "amount": "1.2",
+              "currency": "CNY",
+              "source": "provider",
+              "pricingVersion": "controlled-price-1"
+            },
+            "errorCode": "schema_invalid",
+            "outputFingerprint": null
+          }
+        }
+      ]
+    }
+  ]
+}

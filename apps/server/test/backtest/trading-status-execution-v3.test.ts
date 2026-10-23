@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { tradingStatusArtifactKeyV3 } from '@thesis-ledger/schemas';
+import { deterministicResultChecksum } from '@thesis-ledger/domain';
 import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 import { DsaSnapshotBuilder } from '../../src/backtest/backtest-snapshot-builder.js';
 import { LocalSnapshotV3Runner } from '../../src/backtest/backtest-v3-runner.js';
@@ -199,22 +200,32 @@ describe('停复牌快照创建与现有执行约束', () => {
     {
       legacyCost: false,
       snapshot: '5282cf476dfa0fb636e81cd563c6b030c3d551150bf5609a3302d9ea6b57aa03',
-      result: 'f8467595af22acbf',
+      result: 'ed3ae2cf83259e36',
+      legacyEngineResult: 'f8467595af22acbf',
       benchmarkStatus: 'available',
     },
     {
       legacyCost: true,
       snapshot: '09f5fbd0bc6c8cb56f03435313f94e040cb64d3b63891d31c516a6af479b451c',
-      result: 'f762c1239b7d6bf0',
+      result: '89b4c0ab91c11acf',
+      legacyEngineResult: 'f762c1239b7d6bf0',
       benchmarkStatus: 'unavailable',
     },
-  ])('无状态引用的旧快照保持改动前完整身份：成本旧版 $legacyCost', async (expected) => {
+  ])('无状态引用的旧快照在当前引擎保持输入与计算内容：成本旧版 $legacyCost', async (expected) => {
     const state = await setup({ legacy: true, legacyCost: expected.legacyCost });
     expect(state.built.manifest.tradingStatus).toBeUndefined();
     expect(state.built.manifest.contentHash).toBe(expected.snapshot);
     const result = await state.execute();
     expect(result.tradingStatusDisclosure).toBeUndefined();
-    expect(result.resultChecksum).toBe(expected.result);
+    const { resultChecksum, ...payload } = result;
+    expect(payload.engineVersion).toBe('thesis-ledger-v3-local-runner-v3');
+    expect(resultChecksum).toBe(expected.result);
+    expect(
+      deterministicResultChecksum({
+        ...payload,
+        engineVersion: 'thesis-ledger-v3-local-runner-v2',
+      }),
+    ).toBe(expected.legacyEngineResult);
     expect(result.benchmark?.totalReturn?.status).toBe(expected.benchmarkStatus);
     expect(result.simulationFills[0]?.occurredAt.startsWith('2023-08-17')).toBe(true);
     const withNewSource = new DsaSnapshotBuilder(

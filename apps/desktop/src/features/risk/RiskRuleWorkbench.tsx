@@ -64,6 +64,7 @@ export function RiskRuleWorkbench({
   positions,
   loadState,
   busyAction,
+  readOnly = false,
   onCreate,
   onUpdate,
   onToggle,
@@ -79,6 +80,7 @@ export function RiskRuleWorkbench({
   positions: Position[];
   loadState: LoadState;
   busyAction: string | null;
+  readOnly?: boolean;
   onCreate: (input: CreateRiskRuleInput) => Promise<boolean>;
   onUpdate: (ruleId: string, input: CreateRiskRuleInput) => Promise<boolean>;
   onToggle: (rule: RiskRuleRecord) => Promise<boolean>;
@@ -107,7 +109,7 @@ export function RiskRuleWorkbench({
 
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? null;
   const selectedTestRecord = selectedRule ? riskTestRecordForRule(testRecords, selectedRule) : null;
-  const canCreate = busyAction === null;
+  const canCreate = busyAction === null && !readOnly;
   const empty = isDataLoaded(loadState) && rules.length === 0;
   const accountNameForRule = (rule: RiskRuleRecord) =>
     rule.accountId ? accounts.find((account) => account.id === rule.accountId)?.name : undefined;
@@ -125,6 +127,7 @@ export function RiskRuleWorkbench({
   };
 
   const submitEditor = async (input: CreateRiskRuleInput) => {
+    if (readOnly) return false;
     if (editingRule) return onUpdate(editingRule.id, input);
     return onCreate(input);
   };
@@ -196,7 +199,7 @@ export function RiskRuleWorkbench({
           <Empty className="min-h-40 rounded-lg border border-dashed p-8">
             <EmptyTitle>还没有风险规则</EmptyTitle>
             <EmptyDescription>创建第一条规则后，它会在这里集中管理。</EmptyDescription>
-            <Button type="button" onClick={openCreate}>
+            <Button type="button" disabled={!canCreate} onClick={openCreate}>
               创建第一条规则
             </Button>
           </Empty>
@@ -241,6 +244,7 @@ export function RiskRuleWorkbench({
                   testResults={selectedTestRecord?.results ?? []}
                   testTime={selectedTestRecord?.testedAt ?? null}
                   busyAction={busyAction}
+                  readOnly={readOnly}
                   onEdit={openEdit}
                   onToggle={() => void onToggle(selectedRule)}
                   onArchive={() => setArchiveRule(selectedRule)}
@@ -264,13 +268,16 @@ export function RiskRuleWorkbench({
         accounts={accounts}
         positions={positions}
         pending={busyAction === 'create-rule' || busyAction === `patch:${editingRule?.id ?? ''}`}
+        readOnly={readOnly}
         onOpenChange={setEditorOpen}
         onSubmit={submitEditor}
       />
 
       <AlertDialog
         open={Boolean(archiveRule)}
-        onOpenChange={(open) => !open && setArchiveRule(null)}
+        onOpenChange={(open) => {
+          if (!open && busyAction === null) setArchiveRule(null);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -282,6 +289,7 @@ export function RiskRuleWorkbench({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose
+              disabled={busyAction !== null}
               render={<Button type="button" variant="outline" className="secondary" />}
             >
               取消
@@ -289,7 +297,7 @@ export function RiskRuleWorkbench({
             <Button
               type="button"
               variant="destructive"
-              disabled={busyAction === `archive:${archiveRule?.id ?? ''}`}
+              disabled={busyAction !== null || readOnly}
               aria-busy={busyAction === `archive:${archiveRule?.id ?? ''}`}
               onClick={() => void confirmArchive()}
             >
@@ -315,6 +323,7 @@ function RuleDetail({
   testResults,
   testTime,
   busyAction,
+  readOnly,
   onEdit,
   onToggle,
   onArchive,
@@ -327,6 +336,7 @@ function RuleDetail({
   testResults: RiskTestResult[];
   testTime: string | null;
   busyAction: string | null;
+  readOnly: boolean;
   onEdit: () => void;
   onToggle: () => void;
   onArchive: () => void;
@@ -392,12 +402,16 @@ function RuleDetail({
               type="button"
               variant="outline"
               className="secondary"
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || readOnly}
               onClick={onRestore}
               aria-busy={restoring}
             >
               {restoring && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               {restoring ? '恢复中…' : '恢复规则'}
             </Button>
@@ -417,12 +431,16 @@ function RuleDetail({
               type="button"
               variant="outline"
               className="secondary"
-              disabled={busyAction !== null || rule.needsRepair}
+              disabled={busyAction !== null || readOnly || rule.needsRepair}
               onClick={onTest}
               aria-busy={testing}
             >
               {testing && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               {testing ? '测试中…' : '人工测试'}
             </Button>
@@ -430,7 +448,7 @@ function RuleDetail({
               type="button"
               variant="outline"
               className="secondary"
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || readOnly}
               onClick={onEdit}
             >
               编辑规则
@@ -439,12 +457,16 @@ function RuleDetail({
               type="button"
               variant="outline"
               className="secondary"
-              disabled={busyAction !== null || rule.needsRepair}
+              disabled={busyAction !== null || readOnly || rule.needsRepair}
               onClick={onToggle}
               aria-busy={toggling}
             >
               {toggling && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               {toggleRuleLabel(toggling, rule.enabled, rule.needsRepair)}
             </Button>
@@ -452,12 +474,16 @@ function RuleDetail({
               type="button"
               variant="outline"
               className="secondary"
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || readOnly}
               onClick={onArchive}
               aria-busy={archiving}
             >
               {archiving && (
-                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
               )}
               归档规则
             </Button>

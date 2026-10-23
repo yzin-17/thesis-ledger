@@ -1,6 +1,6 @@
 # Market 公开路由与客户端切换证据
 
-> 2026-09-29；对应[单一现行链路替换任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)的 E02、U01。只记录源码和本地验证，目标 Server/Desktop 尚未部署。
+> 2026-09-29；对应[单一现行链路替换任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)的 E02、U01。只记录源码和本地验证，目标 Server/Desktop 尚未部署。
 
 ## 改动
 

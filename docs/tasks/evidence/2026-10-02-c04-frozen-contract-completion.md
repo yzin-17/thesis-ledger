@@ -2,7 +2,7 @@
 
 ## 执行包与验收矩阵
 
-所属[规格](../../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)与[任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。用户授权完成整个 C04；沿用 C04-a.1 的本地文件证据，补齐结果、证据语义和真实运行态。
+所属[规格](../../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)与[任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。用户授权完成整个 C04；沿用 C04-a.1 的本地文件证据，补齐结果、证据语义和真实运行态。
 
 | 阶段 | 完成断言 | 当前状态 |
 | --- | --- | --- |

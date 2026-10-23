@@ -1,6 +1,6 @@
 # 行情周期真实读取编排证据
 
-对应 [Task](../2026-09-16-market-chart-period-aggregation.md) 的 T3.2b2。实现与真实来源成功验收拆开记账，父任务继续开放。
+对应 [Task](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md) 的 T3.2b2。实现与真实来源成功验收拆开记账，父任务继续开放。
 
 ## 编排实现
 

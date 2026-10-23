@@ -34,11 +34,29 @@ import { MarketPeriodIndicatorReader } from './market-period-indicator-reader.js
 import { MarketPeriodDisplayService } from './market-period-display.service.js';
 import { MarketPeriodDetailService } from './market-period-detail.service.js';
 import { MarketPeriodOptionsService } from './market-period-options.service.js';
+import { MarketNewsReader } from './market-news-reader.js';
+import { MarketNewsFeedReader } from './market-news-feed-reader.js';
+import { MarketNewsController } from './market-news.controller.js';
+import { MarketReportMetadataController } from './market-report-metadata.controller.js';
+import { MarketReportMetadataService } from './market-report-metadata.service.js';
+import { MarketReportMetadataRepository } from './market-report-metadata.repository.js';
 
 @Module({
   imports: [QualityModule, DsaModule],
-  controllers: [MarketDataController, MarketController, MarketAnnouncementsController, MarketSecurityLotSizeController, MarketSecurityStaticInfoController],
+  controllers: [
+    MarketDataController,
+    MarketController,
+    MarketAnnouncementsController,
+    MarketSecurityLotSizeController,
+    MarketSecurityStaticInfoController,
+    MarketNewsController,
+    MarketReportMetadataController,
+  ],
   providers: [
+    MarketReportMetadataService,
+    MarketReportMetadataRepository,
+    MarketNewsReader,
+    MarketNewsFeedReader,
     MarketLifecycleReaderV3,
     MarketAnnouncementPreparationService,
     MarketPeriodCalendarReader,
@@ -69,6 +87,8 @@ import { MarketPeriodOptionsService } from './market-period-options.service.js';
     MarketBarReader,
   ],
   exports: [
+    MarketPeriodCalendarReader,
+    MarketNewsReader,
     MarketLifecycleReaderV3,
     MarketAnnouncementPreparationService,
     MarketNavReaderV3,

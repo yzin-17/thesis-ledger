@@ -1,4 +1,5 @@
 import { PageHeader } from '../shared/PageHeader.js';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useToastManager } from '@/components/ui/toast';
 
@@ -6,7 +7,7 @@ import type { DesktopNavigationView } from '../../views.js';
 import type { Account } from '../portfolio/portfolio.types.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
-import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import { PortfolioModeNote } from '../shared/PortfolioModeSwitch.js';
 import { useSavePerformanceTargetsMutation } from './performance.mutations.js';
 import { usePerformanceQueries } from './performance.queries.js';
 import type {
@@ -26,12 +27,10 @@ import {
 export function PerformanceDashboard({
   accounts,
   mode,
-  onModeChange,
   onNavigate,
 }: {
   accounts: Account[];
   mode: PortfolioMode;
-  onModeChange: (mode: PortfolioMode) => void;
   onNavigate: (view: DesktopNavigationView) => void;
 }) {
   const [accountId, setAccountId] = useState('');
@@ -45,16 +44,19 @@ export function PerformanceDashboard({
     () => accounts.filter((account) => account.mode === mode && account.active !== false),
     [accounts, mode],
   );
+  const effectiveAccountId = modeAccounts.some((account) => account.id === accountId)
+    ? accountId
+    : '';
   const mixedCurrencies = useMemo(
     () => new Set(modeAccounts.map((account) => account.currency)).size > 1,
     [modeAccounts],
   );
-  const canMergeFx = mixedCurrencies && !accountId;
+  const canMergeFx = mixedCurrencies && !effectiveAccountId;
   const effectiveFxMerge = canMergeFx && fxMerge;
   const queryOptions = { fxMerge: effectiveFxMerge, baseCurrency };
   const performanceQueries = usePerformanceQueries(
     mode,
-    accountId,
+    effectiveAccountId,
     true,
     queryOptions,
     seriesRange,
@@ -94,11 +96,13 @@ export function PerformanceDashboard({
   const targets = targetsResponse?.targets ?? {};
   const latestSnapshot = snapshots.at(-1);
   const latest = [...snapshots].reverse().find((snapshot) => !snapshot.partial);
-  const scopedTotal = accountId
-    ? layers?.account.find((record) => record.accountId === accountId)
+  const scopedTotal = effectiveAccountId
+    ? layers?.account.find((record) => record.accountId === effectiveAccountId)
     : layers?.portfolio;
   const scopedSecurity =
-    layers?.security.filter((position) => !accountId || position.accountId === accountId) ?? [];
+    layers?.security.filter(
+      (position) => !effectiveAccountId || position.accountId === effectiveAccountId,
+    ) ?? [];
   const currentValue = scopedTotal ? scopedTotal.marketValue + scopedTotal.cashValue : undefined;
   const currentValuePartial = scopedTotal?.partial ?? layers?.dataQuality.partial ?? false;
   const currentCost = scopedSecurity.reduce((sum, position) => sum + position.costValue, 0);
@@ -157,6 +161,11 @@ export function PerformanceDashboard({
     performanceQueries.allocation,
   ].some((query) => query.isFetching);
   const saveTargetsMutation = useSavePerformanceTargetsMutation();
+  const savedTargetsRefreshFailed =
+    saveTargetsMutation.isSuccess &&
+    !saveTargetsMutation.data.refreshed &&
+    saveTargetsMutation.variables.accountId === (effectiveAccountId || undefined) &&
+    (performanceQueries.targets.isError || performanceQueries.allocation.isError);
 
   const retry = () => {
     void Promise.all([
@@ -178,20 +187,22 @@ export function PerformanceDashboard({
   const saveTargets = async (nextTargets: Record<AllocationCategory, number>) => {
     setTargetSaveError(null);
     try {
-      await saveTargetsMutation.mutateAsync({
-        scope: accountId ? 'account' : 'portfolio',
-        ...(accountId ? { accountId } : {}),
+      const saved = await saveTargetsMutation.mutateAsync({
+        scope: effectiveAccountId ? 'account' : 'portfolio',
+        ...(effectiveAccountId ? { accountId: effectiveAccountId } : {}),
         targets: nextTargets,
       });
       toastManager.add({
-        title: '目标配置已保存',
-        description: '已生成新版本，配置比较会自动更新。',
-        type: 'success',
-        timeout: 2800,
+        title: saved.refreshed ? '目标配置已保存' : '目标已保存，比较数据刷新失败',
+        description: saved.refreshed
+          ? '已生成新版本，配置比较已更新。'
+          : '请重新加载目标配置；本次保存已完成，无需再次提交。',
+        type: saved.refreshed ? 'success' : 'warning',
+        timeout: saved.refreshed ? 2800 : 6000,
       });
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '目标保存失败，请稍后重试。';
+      const message = requestFailureMessage(error, '目标保存失败，请稍后重试。');
       setTargetSaveError(message);
       return false;
     }
@@ -203,9 +214,6 @@ export function PerformanceDashboard({
         eyebrow="PERFORMANCE"
         title="收益分析"
         description="查看资产走势、历史收益与配置目标。"
-        actions={
-          <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="收益范围" />
-        }
       />
       {mode === 'shadow' ? (
         <PortfolioModeNote>当前收益只计算模拟账户，结果仅用于研究。</PortfolioModeNote>
@@ -215,7 +223,7 @@ export function PerformanceDashboard({
           <PerformanceAccountSelector
             accounts={accounts}
             mode={mode}
-            accountId={accountId}
+            accountId={effectiveAccountId}
             mixedCurrencies={mixedCurrencies}
             latestSnapshotAt={latest?.capturedAt}
             valuedAt={layers?.valuedAt}
@@ -239,7 +247,7 @@ export function PerformanceDashboard({
             currentPnlRate={currentPnlRate}
             currentCurrency={scopedTotal?.currency}
             currencyTotals={
-              !accountId && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
+              !effectiveAccountId && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
                 ? (layers?.byCurrency ?? [])
                 : []
             }
@@ -253,7 +261,7 @@ export function PerformanceDashboard({
         </div>
         <PerformanceSnapshotTable
           loadState={
-            !accountId && mixedCurrencies && !effectiveFxMerge ? historyState : seriesState
+            !effectiveAccountId && mixedCurrencies && !effectiveFxMerge ? historyState : seriesState
           }
           snapshots={snapshots}
           series={performanceQueries.series.data}
@@ -265,7 +273,9 @@ export function PerformanceDashboard({
           }}
           onIntervalChange={setSeriesInterval}
           groupedByCurrency={
-            !accountId && mixedCurrencies && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
+            !effectiveAccountId &&
+            mixedCurrencies &&
+            (!effectiveFxMerge || layers?.fx?.status === 'blocked')
           }
           refreshing={refreshing}
           onRetry={() =>
@@ -276,6 +286,12 @@ export function PerformanceDashboard({
           }
           onCompleteDataSetup={() => onNavigate('providers')}
         />
+        {savedTargetsRefreshFailed && (
+          <DataStateBanner
+            state="error"
+            description="目标配置已保存，但比较数据刷新失败。本次保存已完成，请重新加载目标配置，无需再次提交。"
+          />
+        )}
         <PerformanceAllocationSection
           loadState={allocationState}
           allocationRows={allocationResponse?.allocation ?? []}
@@ -290,7 +306,7 @@ export function PerformanceDashboard({
               : performanceQueries.quality
           }
           targetsUnavailable={targetsUnavailable}
-          portfolioScope={!accountId}
+          portfolioScope={!effectiveAccountId}
           valuedAt={layers?.valuedAt}
           fx={layers?.fx ?? summary?.fx}
           currencyTotals={layers?.byCurrency ?? []}
@@ -302,7 +318,7 @@ export function PerformanceDashboard({
           editDisabled={
             performanceQueries.targets.isPending ||
             performanceQueries.allocationUnavailable ||
-            (targetsUnavailable && Boolean(accountId))
+            (targetsUnavailable && Boolean(effectiveAccountId))
           }
           onRetry={retryAllocation}
           onSaveTargets={saveTargets}

@@ -20,7 +20,7 @@ import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 
 import { money } from '../shared/display.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
-import { assetQuantityUnit, type Position } from './portfolio.types.js';
+import { assetQuantityUnit, positionSourceLabel, type Position } from './portfolio.types.js';
 
 const positionPnlClass = (value: number | null) => {
   return marketToneClass(marketToneForValue(value)) ?? 'text-foreground';
@@ -68,13 +68,13 @@ export function PositionOverviewMenu({
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
           {onOpenImport && (
-            <DropdownMenuItem disabled onClick={onOpenImport}>
-              导入持仓快照（暂未开放）
+            <DropdownMenuItem onClick={onOpenImport}>
+              导入持仓草稿
             </DropdownMenuItem>
           )}
           {onOpenReconciliation && (
-            <DropdownMenuItem disabled onClick={onOpenReconciliation}>
-              对账候选（暂未开放）
+            <DropdownMenuItem onClick={onOpenReconciliation}>
+              对账候选
             </DropdownMenuItem>
           )}
           {positions.length > 0 && (
@@ -179,7 +179,7 @@ export function PositionObservationContent({
                 <Badge variant="outline">持仓快照</Badge>
               </td>
               <td className="truncate px-3 py-3 text-sm text-muted-foreground">
-                {position.source ?? '未知'}
+                {positionSourceLabel(position.source)}
               </td>
               <td className="whitespace-nowrap px-3 py-3">
                 <Badge variant="secondary">已记录快照</Badge>
@@ -266,7 +266,9 @@ export function StandardPositionContent({
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">当前记录</Badge>
-            <span className="text-xs text-muted-foreground">来源：{position.source ?? '未知'}</span>
+            <span className="text-xs text-muted-foreground">
+              来源：{positionSourceLabel(position.source)}
+            </span>
           </div>
           <div className="form-actions justify-end">
             <Button

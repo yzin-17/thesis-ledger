@@ -55,6 +55,9 @@ export async function recoverStaleAiRuns(prisma: PrismaService, now: Date, maxAt
             {
               modelMetadata: { path: ['frozenResearch', 'version'], equals: 'frozen-research-v1' },
             },
+            {
+              modelMetadata: { path: ['frozenResearch', 'version'], equals: 'frozen-research-v2' },
+            },
           ],
           leaseUntil: { lt: now },
         },

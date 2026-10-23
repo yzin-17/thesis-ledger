@@ -13,6 +13,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { z } from 'zod';
 import { ImportService, type ImportDraftOptions, type ScreenshotSource } from './import.service.js';
 import { visionPositionSchema, type VisionPosition } from './vision-validation.js';
+import { importDraftResponse } from './import-draft-response.js';
 
 const allowedMime = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
@@ -55,7 +56,7 @@ export class ImportController {
 
   @Post('screenshot')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
-  upload(
+  async upload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() body: Record<string, string>,
   ) {
@@ -68,7 +69,7 @@ export class ImportController {
       throw new BadRequestException('extracted 必须是包含十进制字符串的合法 JSON');
     }
     const temporal = readImportDraftOptions(body);
-    return this.imports.createDraft(
+    const draft = await this.imports.createDraft(
       body.accountId ?? '',
       file.buffer,
       (body.source ?? 'unknown') as ScreenshotSource,
@@ -76,6 +77,7 @@ export class ImportController {
       Number(body.sourceConfidence ?? (body.source === 'unknown' ? 0 : 1)),
       temporal,
     );
+    return importDraftResponse(draft);
   }
 
   @Post(':id/commit')
@@ -100,5 +102,10 @@ export class ImportController {
   @Get()
   history(@Query('accountId') accountId: string) {
     return this.imports.history(accountId);
+  }
+
+  @Get('review')
+  reviewHistory(@Query('accountId') accountId: string) {
+    return this.imports.reviewHistory(z.uuid().parse(accountId));
   }
 }

@@ -172,6 +172,7 @@ describe('研究工作台 UI 契约', () => {
 
   it('页面复用共享刷新入口，并在 Provider 不可执行时提供配置入口', () => {
     const source = readFileSync(new URL('../src/features/ai/AiChat.tsx', import.meta.url), 'utf8');
+    const controllerSource = readFileSync(new URL('../src/features/ai/use-research-workbench.ts', import.meta.url), 'utf8');
     const listSource = readFileSync(
       new URL('../src/features/ai/AiRunList.tsx', import.meta.url),
       'utf8',
@@ -185,11 +186,11 @@ describe('研究工作台 UI 契约', () => {
     expect(source).toContain("navigate('/providers')");
     expect(source).toContain('provider.action');
     expect(source).toContain('data-ai-provider-status');
-    expect(source).toContain("label: '服务已就绪'");
+    expect(controllerSource).toContain("label: '服务已就绪'");
     expect(newResearchSource).toContain('Provider、Tool 和执行 Worker 已就绪。');
-    expect(source).not.toContain("label: 'Provider 已就绪'");
+    expect(controllerSource).not.toContain("label: 'Provider 已就绪'");
     expect(source).toContain('<Button type="button" size="sm"');
-    expect(source).toContain('trigger ?? listFallbackRef.current');
+    expect(controllerSource).toContain('trigger ?? listFallbackRef.current');
     expect(source).toContain('tabIndex={-1}');
     expect(source).not.toContain('<Settings2');
     expect(listSource).toContain("?? '全部状态'");
@@ -218,6 +219,63 @@ describe('研究工作台 UI 契约', () => {
     expect(markup).toContain('历史费用未核对');
     expect(markup).toContain('历史记录没有冻结研究策略');
     expect(markup).not.toContain('modelMetadata');
+  });
+
+  it('关联证据可以展开实际 Tool 输入输出、权限和来源时间', () => {
+    const cited = structuredClone(run);
+    cited.result!.evidence[0]!.citations[0]!.toolCallId = 'tool-owned';
+    const markup = renderToStaticMarkup(
+      <ResearchReportContent
+        run={cited}
+        toolCalls={[
+          {
+            id: 'tool-owned',
+            tool: 'getPortfolio',
+            permission: 'portfolio:read',
+            status: 'ok',
+            inputSummary: '读取指定组合的输入摘要',
+            outputSummary: '实际返回组合摘要',
+            provider: 'thesis-ledger',
+            durationMs: 25,
+            marketTime: '2026-08-25T04:00:00.000Z',
+            availableAt: '2026-08-25T05:00:00.000Z',
+            fetchedAt: '2026-08-25T06:00:00.000Z',
+          },
+        ]}
+      />,
+    );
+    expect(markup).toContain('Tool 审计：getPortfolio · 已完成');
+    expect(markup).toContain('读取指定组合的输入摘要');
+    expect(markup).toContain('实际返回组合摘要');
+    expect(markup).toContain('portfolio:read');
+    expect(markup).toContain('市场时间');
+    expect(markup).toContain('可用时间');
+    expect(markup).toContain('抓取时间');
+    expect(markup).toContain('25 毫秒');
+  });
+
+  it('未被结论引用的失败调用仍可查看，缺失时间和耗时不补零', () => {
+    const markup = renderToStaticMarkup(
+      <ResearchReportContent
+        run={run}
+        toolCalls={[
+          {
+            id: 'tool-uncited',
+            tool: 'getRisk',
+            permission: 'risk:read',
+            status: 'unavailable',
+            inputSummary: '风险历史输入',
+            outputSummary: '风险来源暂不可用',
+          },
+        ]}
+      />,
+    );
+    expect(markup).toContain('未被结论引用的 Tool 审计');
+    expect(markup).toContain('Tool 审计：getRisk · 不可用');
+    expect(markup).toContain('风险来源暂不可用');
+    expect(markup).toContain('未记录');
+    expect(markup).not.toContain('0 毫秒');
+    expect(markup).toContain('历史兼容记录未提供 Tool 调用关联 ID');
   });
 
   it('无效结果只保留邻接标记的未验证文本，不渲染可信报告章节', () => {

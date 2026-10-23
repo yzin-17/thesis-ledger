@@ -151,7 +151,6 @@ ADJUSTMENT
 - A 股股票/ETF/场外基金资产语义
 - T+1、涨跌停、停复牌、除权除息
 - A 股 Provider（AKShare/easy-tdx/AData）
-- 截图持仓导入
 - 实时 Risk Engine
 - Chip Engine
 - Feishu Notification Provider
@@ -190,28 +189,6 @@ Ghostfolio 是 **AGPL-3.0**。AGPL 的设计目标之一，就是让通过网络
 这是目前功能表与我们最接近的成熟项目。
 
 ### 4.1 MVP 可直接借鉴
-
-#### 图片持仓导入
-
-值得复用的设计：
-
-```text
-图片
-→ Vision/OCR
-→ 代码/名称/持仓字段
-→ 置信度
-→ 标的补全
-→ 用户确认
-→ 导入
-```
-
-增强点：
-
-- 多 Vision Provider fallback
-- 股票代码/名称/拼音/别名补全
-- 图片、CSV/Excel、剪贴板统一 Import Pipeline
-
-我们的截图导入应沿用“识别与提交分离”的思想，严禁识别后直接修改 Ledger。
 
 #### 多行情源
 
@@ -262,7 +239,7 @@ Ghostfolio 是 **AGPL-3.0**。AGPL 的设计目标之一，就是让通过网络
 
 ### 4.3 Fork 判断
 
-优点：MIT、A股、截图导入、飞书、多源行情、AI 都已经有。
+优点：MIT、A股、飞书、多源行情、AI 都已经有。
 
 缺点：Python/FastAPI 为主，Portfolio/Ledger 不是核心，客户端和数据库架构不匹配。
 
@@ -696,7 +673,6 @@ Star 低不代表不值得使用，尤其是新项目和单一能力库。
 
 新增：
 
-- Screenshot Import Review（置信度 + 人工确认）
 - Notification cooldown / dedup
 - Provider health state
 - AI 输出 provenance
@@ -882,7 +858,6 @@ Ghostfolio
 
 验收：
 
-- 截图识别 Pipeline
 - 飞书通知 Pipeline
 - Provider fallback
 - Risk/Alert 机制

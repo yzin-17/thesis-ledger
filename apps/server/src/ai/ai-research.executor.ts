@@ -4,6 +4,7 @@ import {
   aiResearchContextSchema,
   researchResultSchema,
   type AiResearchGeneration,
+  type AiResearchStartInput,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AiRunService } from './ai-run.service.js';
@@ -21,6 +22,7 @@ import {
 } from './ai-frozen-research.js';
 import type { AiTool } from './contracts.js';
 import { researchOutputInstructions } from './ai-research-output-prompt.js';
+import { executeFrozenResearchV2 } from './ai-research-execution-v2.js';
 
 const allowedPermissions = new Set([
   'market:read',
@@ -37,8 +39,10 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-const asContext = (value: unknown) => {
+const asContext = (value: unknown): AiResearchStartInput['context'] => {
   const parsed = aiResearchContextSchema.safeParse(value);
+  if (!parsed.success && asRecord(value)?.mode !== undefined)
+    throw new Error('研究账户模式无效，拒绝扩大读取范围');
   return parsed.success ? parsed.data : { scope: 'portfolio' as const };
 };
 
@@ -54,6 +58,7 @@ const decimalValue = (value: unknown) => {
 @Injectable()
 export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
   private readonly active = new Set<string>();
+  private readonly cancellations = new Map<string, () => void>();
   private timer: ReturnType<typeof setInterval> | undefined;
 
   constructor(
@@ -83,6 +88,11 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     void this.execute(id)
       .catch(() => undefined)
       .finally(() => this.active.delete(id));
+  }
+
+  /** 调用方先完成身份校验和持久化取消，再尽快中止本进程的传输。 */
+  cancelActive(id: string) {
+    this.cancellations.get(id)?.();
   }
 
   async tick() {
@@ -124,7 +134,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
             state: 'unconfigured' as const,
             models: [],
             tools,
-            missing: ['AI_BASE_URL、AI_API_KEY、AI_MODEL'],
+            missing: ['请在 Provider 设置页配置 AI 服务、模型与执行路由'],
             impact: ['研究任务会进入失败状态，并明确提示 Provider 未配置。'],
           },
         ];
@@ -137,7 +147,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private toolAdapters() {
+  private toolAdapters(mode?: 'actual' | 'shadow') {
     const source = () => new Date().toISOString();
     const contextScope = (input: unknown) => asRecord(input) ?? {};
     const accountWhere = (input: unknown) => {
@@ -148,7 +158,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     const getPortfolio = async (input: unknown, signal: AbortSignal) => {
       if (signal.aborted) throw new Error('Tool 调用已取消');
       const accounts = await this.prisma.account.findMany({
-        where: { ...accountWhere(input), active: true },
+        where: { ...(typeof contextScope(input).accountId === 'string' ? { id: contextScope(input).accountId as string } : {}), active: true, ...(mode ? { mode } : {}) },
         select: { id: true, name: true, mode: true, currency: true },
         orderBy: { createdAt: 'asc' },
       });
@@ -165,6 +175,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       const value = contextScope(input);
       const positions = await this.prisma.position.findMany({
         where: {
+          ...(mode ? { account: { mode } } : {}),
           ...accountWhere(input),
           ...(typeof value.symbol === 'string' ? { symbol: value.symbol } : {}),
         },
@@ -196,6 +207,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       const value = contextScope(input);
       const events = await this.prisma.riskEvent.findMany({
         where: {
+          ...(mode ? { mode } : {}),
           ...accountWhere(input),
           ...(typeof value.symbol === 'string' ? { symbol: value.symbol } : {}),
         },
@@ -231,6 +243,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       const value = contextScope(input);
       const entries = await this.prisma.journalEntry.findMany({
         where: {
+          ...(mode ? { account: { mode } } : {}),
           ...accountWhere(input),
           ...(typeof value.symbol === 'string' ? { symbol: value.symbol } : {}),
         },
@@ -284,8 +297,8 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     return { getPortfolio, getPositions, getRisk, getJournal, getStrategyVersion };
   }
 
-  private tools(scope: string = 'portfolio') {
-    const adapters = this.toolAdapters();
+  private tools(scope: string = 'portfolio', mode?: 'actual' | 'shadow') {
+    const adapters = this.toolAdapters(mode);
     if (scope === 'strategy') {
       return [
         {
@@ -325,6 +338,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     deadline.unref?.();
     return {
       signal: controller.signal,
+      cancel: () => controller.abort('cancelled'),
       close: () => {
         clearInterval(heartbeat);
         clearTimeout(deadline);
@@ -341,7 +355,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
       throw new AiFrozenResearchError('冻结 Prompt 版本与任务不一致');
     const prompt = frozen?.prompt ?? this.prompts.latest('research');
     if (!prompt) throw new Error('缺少 research prompt 注册');
-    return { prompt, tools: frozen === null ? this.tools(scope) : [frozenResearchTool(frozen)] };
+    return { prompt, tools: frozen === null ? this.tools(scope, asContext(run.context).mode) : [frozenResearchTool(frozen)] };
   }
 
   private async collectEvidence(
@@ -392,8 +406,14 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     }
     const deadlineAt = new Date(execution.data.deadlineAt).getTime();
     const lifecycle = this.startLeaseHeartbeat(ownership, deadlineAt);
+    this.cancellations.set(id, lifecycle.cancel);
     try {
       if (Date.now() >= deadlineAt) throw new Error('研究任务已超过创建时冻结的绝对期限');
+      const frozen = asRecord(run.modelMetadata)?.frozenResearch;
+      if (asRecord(frozen)?.version === 'frozen-research-v2') {
+        await executeFrozenResearchV2({ run, raw: frozen, ownership, runs: this.runs, sdk: this.sdkExecution, signal: lifecycle.signal, deadlineAt, startedAt });
+        return;
+      }
       const context = asContext(run.context);
       const { prompt, tools } = this.sourcesForRun(run, context.scope);
       const input = { context, question: run.question ?? '请基于当前上下文完成研究。' };
@@ -480,6 +500,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
         ...(continuationBlockedReason ? { continuationBlockedReason } : {}),
       });
     } finally {
+      this.cancellations.delete(id);
       lifecycle.close();
     }
   }

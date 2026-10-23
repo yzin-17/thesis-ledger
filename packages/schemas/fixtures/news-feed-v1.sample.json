@@ -1,0 +1,66 @@
+{
+  "request": {
+    "version": 3,
+    "requestId": "controlled-feed-contract",
+    "publishedStart": null,
+    "publishedEnd": null,
+    "limit": 5,
+    "cursor": null,
+    "requestBudgetMs": 30000,
+    "contractVersion": "news-feed-v1",
+    "capability": "NEWS_FEED",
+    "market": "CN",
+    "providerId": "cls"
+  },
+  "response": {
+    "requestId": "controlled-feed-contract",
+    "status": "partial",
+    "items": [
+      {
+        "id": "news-item-v1:0d4956ba5fdb1fbdabc4b74888b2e183404baf53e278f0ed708c371d76ea38da",
+        "title": "公开快讯",
+        "url": "https://api3.cls.cn/share/article/123?os=web",
+        "originalUrl": null,
+        "publisher": "财联社",
+        "providerId": "cls",
+        "sourceItemId": "123",
+        "contentFingerprint": "dfa44d0108e44d0c161ba47ed9271e1fa31e31d6a4c0609683601ce5f1a46b6e",
+        "evidenceGroupId": "news-evidence-v1:9352c147021440fa590b5194d57be7af9fce4e94f9b5ffb1801deecaf9a797b1",
+        "excerpt": null,
+        "summaryKind": "provider-excerpt",
+        "publishedAt": null,
+        "sourceAvailableAt": null,
+        "fetchedAt": "2026-10-22T12:00:00+00:00",
+        "relatedInstruments": [],
+        "sourceUrls": ["https://api3.cls.cn/share/article/123?os=web"]
+      }
+    ],
+    "fetchedAt": "2026-10-22T12:00:00+00:00",
+    "route": {
+      "providerId": "cls",
+      "upstreamSource": "cls-roll",
+      "policyRevision": "effective:1",
+      "routeRevision": "controlled-v1",
+      "credentialRevision": "not-required"
+    },
+    "upstreamAttempts": 1,
+    "nextCursor": null,
+    "coverage": {
+      "basis": "current-feed",
+      "publishedStart": null,
+      "publishedEnd": null,
+      "complete": false,
+      "truncated": false,
+      "unknownPublishedTimeCount": 1,
+      "examinedCount": 1,
+      "returnedCount": 1,
+      "uniqueEvidenceCount": 1,
+      "missingReasons": ["market_feed_first_page_not_exhaustive", "published_time_unknown"]
+    },
+    "errors": [],
+    "version": 3,
+    "contractVersion": "news-feed-v1",
+    "capability": "NEWS_FEED",
+    "market": "CN"
+  }
+}

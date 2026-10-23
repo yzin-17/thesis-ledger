@@ -34,12 +34,37 @@ describe('表格操作列统一契约', () => {
         if (ts.isJsxElement(node)) {
           const tag = node.openingElement.tagName.getText(source);
           const attributes = node.openingElement.attributes.getText(source);
+          const row = node.parent;
+          const lastInRow =
+            ts.isJsxElement(row) &&
+            /^(tr|TableRow)$/.test(row.openingElement.tagName.getText(source)) &&
+            row.children.filter(ts.isJsxElement).at(-1) === node;
           if (
-            tag === 'th' &&
-            /操作|调整/.test(node.getText(source)) &&
+            (tag === 'th' || tag === 'TableHead') &&
+            lastInRow &&
+            /操作|调整|选择/.test(node.getText(source)) &&
             !attributes.includes('data-table-action-static')
           ) {
             violations.push(path);
+          }
+          if ((tag === 'td' || tag === 'TableCell') && !attributes.includes('colSpan')) {
+            if (lastInRow) {
+              let table: ts.Node | undefined = row.parent;
+              while (
+                table &&
+                !(
+                  ts.isJsxElement(table) &&
+                  /^(table|Table)$/.test(table.openingElement.tagName.getText(source))
+                )
+              )
+                table = table.parent;
+              const staticActions = table?.getText(source).includes('data-table-action-static');
+              if (
+                /onClick=|<Link\b|<DropdownMenuTrigger\b/.test(node.getText(source)) &&
+                !staticActions
+              )
+                violations.push(path);
+            }
           }
         }
         ts.forEachChild(node, visit);

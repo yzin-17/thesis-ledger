@@ -587,10 +587,15 @@ export function CashSection({
         evidencePartial={evidencePartial}
         resolveInstrumentName={resolveInstrumentName}
       />
-      {eventsQuery.isError && eventsQuery.data && (
+      {(eventsQuery.isError || (valuationQuery.isError && valuationQuery.data)) && (
         <Alert>
-          <AlertTitle>现金流水可能陈旧</AlertTitle>
-          <AlertDescription>余额仍保留上次成功结果；请刷新账本后再操作。</AlertDescription>
+          <AlertTitle>现金数据暂未更新</AlertTitle>
+          <AlertDescription>保留上次成功结果。已成功记录的入账、快照或划转无需再次提交，请重新读取余额与流水。</AlertDescription>
+          <Button type="button" variant="outline" size="sm"
+            disabled={eventsQuery.isFetching || valuationQuery.isFetching}
+            onClick={() => void Promise.all([eventsQuery.refetch(), valuationQuery.refetch()])}>
+            重新读取现金数据
+          </Button>
         </Alert>
       )}
       <RecurringCashDeposits account={account} />

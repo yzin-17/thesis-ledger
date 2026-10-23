@@ -14,7 +14,7 @@ import { StatePanel, DataStateBanner, DashboardSkeleton } from '../shared/Deskto
 
 import { FirstRunOnboarding } from '../onboarding/FirstRunOnboarding.js';
 import { useOnboardingStatusQuery } from '../onboarding/onboarding.queries.js';
-import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import { PortfolioModeNote } from '../shared/PortfolioModeSwitch.js';
 import { PortfolioTradeView } from './PortfolioTradeView.js';
 import type { PortfolioTradeReviewTarget } from './portfolio-trade.types.js';
 import { PortfolioPositionTable, PortfolioSummary } from './PortfolioOverview.js';
@@ -24,7 +24,6 @@ export function PortfolioDashboard({
   portfolio,
   accounts,
   mode,
-  onModeChange,
   onRetry,
   refreshing = false,
   onNavigate,
@@ -34,7 +33,6 @@ export function PortfolioDashboard({
   portfolio: Portfolio | null;
   accounts: Account[];
   mode: PortfolioMode;
-  onModeChange: (mode: PortfolioMode) => void;
   onRetry: () => void;
   refreshing?: boolean;
   onNavigate: (view: DesktopNavigationView, options?: OnboardingNavigationOptions) => void;
@@ -64,7 +62,6 @@ export function PortfolioDashboard({
       }
       actions={
         <>
-          <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="估值范围" />
           <RefreshIconButton label="刷新组合数据" refreshing={refreshing} onClick={onRetry} />
         </>
       }

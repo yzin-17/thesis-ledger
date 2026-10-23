@@ -1,4 +1,6 @@
 import { roundMoney } from '@thesis-ledger/shared';
+export { ttwror, type ValuationPoint } from './performance-time-weighted.js';
+export { xirr, type CashFlow } from './performance-money-weighted.js';
 
 export const allocationCategories = ['stock', 'etf', 'fund', 'index', 'cash'] as const;
 export type AllocationCategory = (typeof allocationCategories)[number];
@@ -57,53 +59,6 @@ export const normalizeAllocationTargets = (
   };
 };
 
-export interface CashFlow {
-  date: string;
-  amount: number;
-}
-export interface ValuationPoint {
-  date: string;
-  value: number;
-  externalFlow?: number;
-}
-
-export const ttwror = (points: readonly ValuationPoint[]): number => {
-  if (points.length < 2) return 0;
-  let factor = 1;
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1]!;
-    const current = points[index]!;
-    if (previous.value === 0) continue;
-    factor *= (current.value - (current.externalFlow ?? 0)) / previous.value;
-  }
-  return factor - 1;
-};
-
-export const xirr = (flows: readonly CashFlow[], guess = 0.1): number => {
-  if (
-    flows.length < 2 ||
-    !flows.some((flow) => flow.amount < 0) ||
-    !flows.some((flow) => flow.amount > 0)
-  ) {
-    throw new Error('资金加权收益率至少需要一笔流入和一笔流出');
-  }
-  const start = new Date(flows[0]!.date).getTime();
-  let rate = guess;
-  for (let iteration = 0; iteration < 100; iteration += 1) {
-    let value = 0;
-    let derivative = 0;
-    for (const flow of flows) {
-      const years = (new Date(flow.date).getTime() - start) / 31_557_600_000;
-      value += flow.amount / (1 + rate) ** years;
-      derivative -= (years * flow.amount) / (1 + rate) ** (years + 1);
-    }
-    const next = rate - value / derivative;
-    if (Math.abs(next - rate) < 1e-8) return next;
-    rate = next;
-  }
-  throw new Error('资金加权收益率未收敛');
-};
-
 export const allocation = (positions: readonly { category: string; marketValue: number }[]) => {
   const total = positions.reduce((sum, item) => sum + item.marketValue, 0);
   return Object.entries(
@@ -120,6 +75,7 @@ export interface RebalanceGap {
   targetWeight: number;
   weightGap: number;
   amountGap: number;
+  roundingAdjustment?: number;
   direction: 'increase' | 'decrease' | 'balanced';
 }
 
@@ -127,14 +83,25 @@ export const rebalanceGap = (
   current: readonly { category: string; marketValue: number }[],
   targets: Readonly<Record<string, number>>,
 ): RebalanceGap[] => {
-  const targetTotal = Object.values(targets).reduce((sum, value) => sum + value, 0);
+  const normalized = normalizeAllocationTargets(targets);
+  if (normalized.unknown.length > 0) throw new Error('无法识别配置类别');
+  if (Object.values(normalized.targets).some((value) => !Number.isFinite(value) || value < 0))
+    throw new Error('目标权重必须是非负有限数字');
+  const targetTotal = Object.values(normalized.targets).reduce((sum, value) => sum + value, 0);
   if (Math.abs(targetTotal - 1) > 1e-8) throw new Error('目标权重之和必须为 100%');
+  if (current.some((item) => !Number.isFinite(item.marketValue) || item.marketValue < 0))
+    throw new Error('资产市值必须是非负有限数字');
   const totalValue = current.reduce((sum, item) => sum + item.marketValue, 0);
+  if (!Number.isFinite(totalValue) || totalValue <= 0) throw new Error('配置市值分母不为正数');
   const currentValues = current.reduce<Record<string, number>>((result, item) => {
-    result[item.category] = (result[item.category] ?? 0) + item.marketValue;
+    const category = normalizeAllocationCategory(item.category);
+    if (!category) throw new Error('无法识别配置类别');
+    result[category] = (result[category] ?? 0) + item.marketValue;
     return result;
   }, {});
-  return Object.entries(targets).map(([category, targetWeight]) => {
+  const categories = allocationCategories.filter((category) => category in currentValues || category in normalized.targets);
+  const rows: RebalanceGap[] = categories.map((category) => {
+    const targetWeight = (normalized.targets[category] ?? 0) / targetTotal;
     const currentWeight = totalValue === 0 ? 0 : (currentValues[category] ?? 0) / totalValue;
     const weightGap = targetWeight - currentWeight;
     return {
@@ -143,7 +110,19 @@ export const rebalanceGap = (
       targetWeight,
       weightGap,
       amountGap: roundMoney(weightGap * totalValue),
-      direction: Math.abs(weightGap) < 1e-8 ? 'balanced' : weightGap > 0 ? 'increase' : 'decrease',
+      direction: 'balanced',
     };
   });
+  if (rows.some((row) => !Number.isFinite(row.amountGap))) throw new Error('再平衡金额超出有限数值范围');
+  const remainder = roundMoney(-rows.reduce((total, row) => total + row.amountGap, 0));
+  const largest = [...rows].sort((left, right) => Math.abs(right.amountGap) - Math.abs(left.amountGap))[0];
+  if (remainder !== 0 && largest) {
+    largest.amountGap = roundMoney(largest.amountGap + remainder);
+    largest.roundingAdjustment = remainder;
+  }
+  for (const row of rows) {
+    if (row.amountGap > 0) row.direction = 'increase';
+    else if (row.amountGap < 0) row.direction = 'decrease';
+  }
+  return rows;
 };

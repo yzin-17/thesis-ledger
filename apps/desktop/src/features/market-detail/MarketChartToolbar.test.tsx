@@ -19,6 +19,6 @@ describe('MarketChartToolbar', () => {
     expect(html).toContain('data-market-chart-toolbar-group="视图"');
     expect(html).toMatch(/data-market-chart-toolbar-group="指标"[\s\S]*指标设置[\s\S]*MACD[\s\S]*RSI/);
     expect(html).toContain('flex flex-wrap items-start');
-    expect(html).toContain('min-w-max flex-none flex-col');
+    expect(html.match(/role="group"/g)).toHaveLength(4);
   });
 });

@@ -2,9 +2,13 @@
 
 - 状态：已批准，实施中
 - 类型：增量设计
-- 对应任务：[`../tasks/2026-08-28-portfolio-snapshot-system.md`](../tasks/2026-08-28-portfolio-snapshot-system.md)
+- 对应任务：[`../tasks/2026-08-28-portfolio-snapshot-system.md`](../archive/tasks/2026-08-28-portfolio-snapshot-system.md)
 - 关联现状：[`2026-09-07-automatic-snapshot-entry.md`](2026-09-07-automatic-snapshot-entry.md)、[`2026-09-07-portfolio-aggregate-snapshot.md`](2026-09-07-portfolio-aggregate-snapshot.md)
 - 下游读模型：[`2026-09-07-portfolio-valuation-series.md`](2026-09-07-portfolio-valuation-series.md)
+
+> 2026-10-20 基金实源接续：目录就绪不代表现行路由已选择来源。基金 NAV 的正向消费先独立核对当前 V3 输入；临时路由验收按[精确预案](../tasks/evidence/2026-10-20-fund-nav-route-plan.md)限定来源、证券、窗口及恢复范围，在获得路由变更授权前仅执行只读预案。当前 NAV 合同没有完整披露资格，不能由净值接口成功关闭基金披露、正式校准或研究经济价格门禁。
+
+> 历史点按[来源合同 §13.46](2026-10-09-unified-data-capability-source-contracts.md#1346-四缓存实读验收的分层与恢复)保留日期年龄产生的 `stale`，与 `servedFromCache` 和末次有效缓存回退分别核对。当前净值正向仍拒绝陈旧；历史实源读取核对原日期年龄状态、精确窗口、来源和未回退事实，不把历史陈旧点提升为当前新鲜估值或合格经济价格。
 
 ## 背景与问题
 
@@ -91,6 +95,12 @@ Snapshot V2 至少保存：
 
 估算基金净值必须标明 `ESTIMATED`，正式 NAV 必须标明 `OFFICIAL`。正式版本通过替代链追加，不修改估算版 payload。
 
+正式校准只替换同一估值槽位的定价证据，必须复用估算版冻结的持仓数量、成本、原币现金、币种和账户范围；估值日后的买卖、停用或账户范围变化不得混入旧日修订。旧 payload 缺少必要经济输入时保留待补齐，不回退到当前持仓。零数量不构成待定价持仓。正式价格保存估值日、实际来源和价格/NAV 证据；汇率沿用原估值时点的历史口径。
+
+基金定价必须同时满足单位净值为有限正数及 `freshness=delayed`。V3 数据合同允许零值与 `unavailable` 表示不可用事实，但这不构成可定价证据：估算保持缺价及覆盖率，正式校准保留原估算待补齐，不得产生 `OFFICIAL/COMPLETE` 修订。此消费侧保护不改变历史接口保留日期年龄 stale 的读取合同，也不补造披露资格。
+
+基金实源正向校准需要独立自有验收账户和槽位。默认维护入口只读输出精确预案；没有对应授权时不创建账户、Ledger、快照或临时路由。现有 `161725.OF` 为 provider 身份时，普通成交需要先确认资产；不得绕过 Ledger 写入准入或直接伪造 Position。若本次批准确认该资产，应单独列明该现有资产身份及关联元数据的持久变化，其他原业务事实保持，不能宣称整个数据库完全未变。清理只结清并停用本次账户，保留全部审计和估算/正式修订，未知所有权或并行更改停止覆盖；任何失败仍尝试恢复本次精确路由，未完成条件原地保留。
+
 ### 4. 幂等与并发
 
 ```text
@@ -102,6 +112,8 @@ SYSTEM:               system:{operation}:{stableBusinessKey}
 ```
 
 同一幂等键并发请求只保留一条。创建 revision 时在事务内读取逻辑槽位并计算下一个 revision，唯一约束作为最终竞争保护。相同正式证据重复校准返回已存在记录；Provider 更正导致证据版本变化时可追加新的 OFFICIAL revision。
+
+`evidenceVersion` 由冻结经济输入、正式价格/NAV 和历史 FX 证据形成稳定摘要。请求 ID、抓取时刻及响应顺序不构成新证据；同值重复抓取不得新增修订。原始估算及其旧幂等键保留，不重写历史数据。
 
 ### 5. 自动化任务
 
@@ -157,6 +169,8 @@ SYSTEM:               system:{operation}:{stableBusinessKey}
 无。
 
 ## 验收标准
+
+维护采样可显式限定单一账户，仍保留实际/模拟模式、活跃投资账户及适用的市场时段过滤；不新增公开写接口或默认批量范围。验收点位只使用执行时实际经济输入和当前观测时间，不为补覆盖而回填旧分钟。
 
 - AC1：系统不存在公开手动快照入口、创建 API 或 `MANUAL` 来源。
 - AC2：Snapshot 能表达 account/portfolio、actual/shadow、逻辑估值槽位、不可变 revision 和替代链。

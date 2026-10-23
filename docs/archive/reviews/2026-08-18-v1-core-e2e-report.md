@@ -13,13 +13,12 @@
 
 ## 验证链路
 
-账户创建 → PNG 截图上传与人工确认 → Ledger Adjustment → Portfolio 重建 → DSA Quote → Snapshot 幂等 → RiskRule/ RiskEvent → Feishu 通知 → AI Run/Tool Call → Trade Plan → Journal Entry 与行为复盘 → Strategy/Backtest → 日报 → Integrity。
+账户创建 → 持仓草稿审核与提交 → Ledger Adjustment → Portfolio 重建 → DSA Quote → Snapshot 幂等 → RiskRule/ RiskEvent → Feishu 通知 → AI Run/Tool Call → Trade Plan → Journal Entry 与行为复盘 → Strategy/Backtest → 日报 → Integrity。
 
 ## 结果
 
 | 检查项              | 结果                                                   |
 | ------------------- | ------------------------------------------------------ |
-| 截图导入与提交      | 通过                                                   |
 | Ledger/Portfolio    | 通过，`600519.SH` 数量 10                              |
 | DSA 行情            | 通过，Provider `dsa`                                   |
 | Snapshot 幂等       | 通过                                                   |
@@ -34,4 +33,4 @@
 
 ## 发现并修复
 
-空数据库首次截图导入时，提交逻辑直接写入 Ledger，因 Asset Master 不存在返回 500。现已在同一事务中先 `asset.upsert`，并补充 Server 回归测试。
+空数据库首次提交持仓草稿时，提交逻辑直接写入 Ledger，因 Asset Master 不存在返回 500。现已在同一事务中先 `asset.upsert`，并补充 Server 回归测试。

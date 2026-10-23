@@ -1,6 +1,7 @@
 import type { JournalReviewCandidateContract } from '@thesis-ledger/schemas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { formatDateTime } from '@/lib/date-display';
 import { evidenceLabel, reviewObjectLabels, reviewStatusLabels } from './journal-review-display.js';
 import { JournalSourceFacts } from './JournalSourceFacts.js';
 
@@ -37,11 +38,11 @@ export function JournalFactSummary({ candidate }: { candidate: JournalReviewCand
         <dl className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <dt className="text-muted-foreground">真实开仓时间</dt>
-            <dd>{trade.openedAt ?? '未知'}</dd>
+            <dd>{formatDateTime(trade.openedAt, '未知')}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">退出 / 结束时间</dt>
-            <dd>{exitAt ?? '尚未结束或未知'}</dd>
+            <dd>{formatDateTime(exitAt, '尚未结束或未知')}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">原始数量 / 当前减仓数量</dt>

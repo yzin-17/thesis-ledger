@@ -36,6 +36,7 @@ import {
 } from './market-chart-types.js';
 import {
   formatQuoteChangePercent,
+  formatQuotePrice,
   quoteChangeTone,
 } from './market-quote-display.js';
 import { derivedSectionLabel } from './market-period-section-label.js';
@@ -277,7 +278,7 @@ export const QuoteSection = ({
           <div className="grid rounded-lg border border-border bg-border sm:grid-cols-4 sm:gap-px">
             <DetailMetric
               label="实时价"
-              value={money.format(quote.price)}
+              value={formatQuotePrice(quote.price, quote.units?.priceCurrency)}
               {...(quoteTone ? { tone: quoteTone } : {})}
             />
             <DetailMetric
@@ -285,7 +286,7 @@ export const QuoteSection = ({
               value={formatQuoteChangePercent(quote)}
               {...(quoteTone ? { tone: quoteTone } : {})}
             />
-            <DetailMetric label="涨跌前收" value={money.format(quote.previousClose)} />
+            <DetailMetric label="涨跌前收" value={formatQuotePrice(quote.previousClose, quote.units?.priceCurrency)} />
             <DetailMetric
               label="行情时点"
               value={quote.marketTime ? new Date(quote.marketTime).toLocaleString('zh-CN') : '未知'}
@@ -339,7 +340,7 @@ export const BarsSection = ({
   const series = section.data as BarSeries | undefined;
   const bars = sectionIsDataReady(section) && series ? chartBarsFromSeries(series) : [];
   return (
-    <section className="grid gap-3 border-t border-border pt-4" data-market-detail-section="bars">
+    <section className="grid min-w-0 grid-cols-1 gap-3 border-t border-border pt-4" data-market-detail-section="bars">
       <SectionHeading
         capability="bars"
         section={section}

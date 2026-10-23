@@ -1,6 +1,6 @@
 # T5.2 周期偏好、能力与工具栏本地收尾证据
 
-日期：2026-10-05。对应[原 Task 的 T5.2](../2026-09-16-market-chart-period-aggregation.md)及[完整 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)。用户本轮授权执行 T5.2；完成本叶后停止，不自动推进 T6/G1/P1/R1。
+日期：2026-10-05。对应[原 Task 的 T5.2](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md)及[完整 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)。用户本轮授权执行 T5.2；完成本叶后停止，不自动推进 T6/G1/P1/R1。
 
 ## 本地收尾结果
 

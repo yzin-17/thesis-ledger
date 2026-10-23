@@ -27,6 +27,13 @@ describe('图表请求到共享客户端的实际适配', () => {
     expect(getDetail).toHaveBeenCalledWith('159516.SZ', expect.objectContaining({ timeframe: '1mo', barsLimit: 30 }));
     expect(getPlannedChartOptions).not.toHaveBeenCalled();
   });
+  it('分钟周期和不复权传到规划及实际详情，不退成日线', async () => {
+    getDetail.mockResolvedValue({ requestId: 'minute' });
+    await requestMarketDetail({ symbol: 'SPY.US', timeframe: '1m', barsLimit: 90, adjustment: 'none' });
+    expect(getPlannedChartOptions).toHaveBeenCalledWith('SPY.US',
+      { barsLimit: 90, indicatorParams: {}, timeframe: '1m' }, expect.any(AbortSignal));
+    expect(getDetail).toHaveBeenCalledWith('SPY.US', expect.objectContaining({ timeframe: '1m', adjustment: 'none' }));
+  });
   it.each(['none', 'qfq', 'hfq'] as const)(
     '传递 %s、V3 版本及整窗参数，不在适配层丢弃',
     async (adjustment) => {

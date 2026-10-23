@@ -4,7 +4,6 @@ import { requestDesktopJson, type DesktopRequestClient } from '../shared/request
 import type {
   Account,
   HeldAssetType,
-  InstrumentLookup,
   Portfolio,
   PortfolioMode,
 } from './portfolio.types.js';
@@ -68,6 +67,7 @@ const normalizePortfolio = (value: PortfolioValuationWithDailyChange): Portfolio
       marketValue: position.marketValue,
       pnl: position.pnl,
       stale: position.stale,
+      ...(typeof position.source === 'string' ? { source: position.source } : {}),
       ...(marketPrice === undefined ? {} : { marketPrice }),
       ...(previousClose === undefined ? {} : { previousClose }),
       ...(pnlRatio === undefined ? {} : { pnlRatio }),
@@ -132,36 +132,24 @@ export const fetchPortfolioValuation = async (
 
 export const fetchAccounts = async (
   includeInactive = false,
-  client?: DesktopRequestClient,
+  client: Pick<ThesisLedgerApiClient, 'accounts'> = getDesktopApiClient(),
+  signal?: AbortSignal,
 ): Promise<Account[]> => {
-  const raw = await requestDesktopJson<unknown>(
-    `/accounts${includeInactive ? '?includeInactive=true' : ''}`,
-    { cache: 'no-store' },
-    client,
-  );
-  if (!Array.isArray(raw)) throw new Error('账户响应契约不匹配');
+  const raw = await client.accounts.list(includeInactive ? { includeInactive: true } : {}, signal);
   return raw.map(parseAccount);
 };
 
-export const fetchManagedAccounts = (client?: DesktopRequestClient) => fetchAccounts(true, client);
+export const fetchManagedAccounts = (client?: Pick<ThesisLedgerApiClient, 'accounts'>) => fetchAccounts(true, client);
 
 export const searchPortfolioInstruments = (
   query: string,
-  client?: DesktopRequestClient,
+  client: Pick<ThesisLedgerApiClient, 'market'> = getDesktopApiClient(),
   signal?: AbortSignal,
 ) =>
-  requestDesktopJson<InstrumentLookup[]>(
-    `/api/market-data/instruments/search?q=${encodeURIComponent(query)}`,
-    { ...noStore, ...(signal ? { signal } : {}) },
-    client,
-  );
+  client.market.searchInstruments({ q: query }, signal);
 
-export const confirmPortfolioInstrument = (instrumentId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<unknown>(
-    `/api/market-data/instruments/${encodeURIComponent(instrumentId)}/confirm`,
-    { ...noStore, method: 'POST' },
-    client,
-  );
+export const confirmPortfolioInstrument = (instrumentId: string, client: Pick<ThesisLedgerApiClient, 'market'> = getDesktopApiClient()) =>
+  client.market.confirmInstrument(instrumentId);
 
 export interface SaveAccountInput {
   name: string;
@@ -174,27 +162,12 @@ export interface SaveAccountInput {
 export const saveAccount = (
   input: SaveAccountInput,
   accountId?: string,
-  client?: DesktopRequestClient,
+  client: Pick<ThesisLedgerApiClient, 'accounts'> = getDesktopApiClient(),
 ) =>
-  requestDesktopJson<Account>(
-    accountId ? `/accounts/${encodeURIComponent(accountId)}` : '/accounts',
-    {
-      ...noStore,
-      method: accountId ? 'PATCH' : 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
+  client.accounts.save(input, accountId);
 
-export const toggleAccount = (accountId: string, active: boolean, client?: DesktopRequestClient) =>
-  requestDesktopJson<unknown>(
-    active
-      ? `/accounts/${encodeURIComponent(accountId)}`
-      : `/accounts/${encodeURIComponent(accountId)}/reactivate`,
-    { ...noStore, method: active ? 'DELETE' : 'POST' },
-    client,
-  );
+export const toggleAccount = (accountId: string, active: boolean, client: Pick<ThesisLedgerApiClient, 'accounts'> = getDesktopApiClient()) =>
+  client.accounts.setActive(accountId, !active);
 
 export type PortfolioAccountClient = Pick<ThesisLedgerApiClient['accounts'], 'permanentDelete'>;
 
@@ -255,24 +228,8 @@ export const saveCashBalance = (
     client,
   );
 
-export const clearPortfolioPositions = (accountId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<unknown>(
-    '/portfolio/positions/clear',
-    {
-      ...noStore,
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accountId }),
-    },
-    client,
-  );
+export const clearPortfolioPositions = (accountId: string, client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient()) =>
+  client.positionManagement.clear(accountId);
 
-export const removePortfolioPosition = (positionId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<unknown>(
-    `/portfolio/positions/${encodeURIComponent(positionId)}`,
-    {
-      ...noStore,
-      method: 'DELETE',
-    },
-    client,
-  );
+export const removePortfolioPosition = (positionId: string, client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient()) =>
+  client.positionManagement.remove(positionId);

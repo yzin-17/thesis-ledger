@@ -49,14 +49,14 @@ rtk git diff --check
 以下是建议优先级与选择入口，不是新的功能状态表。每次只选一个主题或叶子，仍按原 Spec/Task 执行；依赖就绪的主题可独立选择，不要求全部串行。真实输入不足时先做该能力的有界前置核验，不自动请求被跳过来源。
 
 1. **AI 新版超时与取消语义**：从[用途配置 AC-09/G2](../../tasks/2026-09-21-ai-provider-model-usage-configuration.md)开始，先核对各执行面与现有定向用例，确认非流式总超时、首输出/间隔、绝对期限及取消归因；完整 CI 与目标运行态另验，不重复已匹配的全包检查。
-2. **AI 保存与默认引用的真实 PostgreSQL 竞争**：按[自动测试后保存 T6](../../tasks/2026-09-23-ai-provider-auto-test-save.md)及用途配置的默认事务断言验收；状态机的历史 PostgreSQL 结果不能代替保存 CAS。完成后再选[AI SDK G1](../../tasks/2026-09-19-vercel-ai-sdk-integration.md)的三类真实业务、认证/非零费用与客户端门禁；真实模型前置是相应凭证、模型及预算。
+2. **AI 保存与默认引用的真实 PostgreSQL 竞争**：按[自动测试后保存 T6](2026-09-23-ai-provider-auto-test-save.md)及用途配置的默认事务断言验收；状态机的历史 PostgreSQL 结果不能代替保存 CAS。完成后再选[AI SDK G1](../../tasks/2026-09-19-vercel-ai-sdk-integration.md)的三类真实业务、认证/非零费用与客户端门禁；真实模型前置是相应凭证、模型及预算。
 3. **基金定投最小运行闭环**：按[定投 T2](2026-09-08-recurring-fund-investment.md)验证创建→到期物化→确认成交，再补跳过/恢复及账户隔离。前置是当前合同的基金账户和可用标的；旧 404 不再阻塞。
 4. **估值快照与走势真实点位**：先补[快照受管任务 AC6](../../tasks/2026-08-28-portfolio-snapshot-system.md)及有效点位，再做[估值走势 T4/T5](2026-09-07-portfolio-valuation-series.md)的鼠标/键盘/触屏和[组合收益指标 G1](2026-09-09-portfolio-pnl-metrics.md)。有数据及对应价格/NAV/FX 是验收前置，空响应不是通过；现金资金/定期入账按各自资金与调度断言独立验收。
-5. **回测与自动化进程恢复**：分别选[BullMQ 当前 Run T4](2026-09-09-backtest-bullmq-lifecycle.md)或[Automation 目标 smoke](../../tasks/2026-09-05-automation-execution-lease-hardening.md)，先确认当前镜像/隔离环境再做 claimed 后中断、租约与唯一终态。不把二者合成一个故障叶，也不把恢复演练视为已执行硬杀。
+5. **回测与自动化进程恢复**：分别选[BullMQ 当前 Run T4](2026-09-09-backtest-bullmq-lifecycle.md)或[Automation 目标 smoke](2026-09-05-automation-execution-lease-hardening.md)，先确认当前镜像/隔离环境再做 claimed 后中断、租约与唯一终态。不把二者合成一个故障叶，也不把恢复演练视为已执行硬杀。
 6. **新版投资复盘实现**：从[Journal T1–T3](2026-08-28-journal-review-trade-projection.md)的对象/decimal/指纹与 Snapshot 保存、列表、详情开始，再做单笔/周期/AI 解耦。依赖当前 Trade Projection 合同，不依赖所有专业来源或交易规则 T18 全部完成。
-7. **行情实现与浏览器缺口**：选[周期聚合 T1](2026-09-16-market-chart-period-aggregation.md)，按契约→聚合→指标→客户端推进；也可先补[刷新 T4/G1](../../tasks/2026-09-17-market-chart-refresh.md)截止日期降级、[指标交互](../../tasks/2026-09-10-market-chart-indicator-integration.md)及[详情状态矩阵](../../tasks/2026-08-21-market-detail-read-model.md)。分钟线/稳定盘中快照继续属于已明确延期的 TODO。
+7. **行情实现与浏览器缺口**（原检查时点）：选[周期聚合 T1](2026-09-16-market-chart-period-aggregation.md)，按契约→聚合→指标→客户端推进；也可先补[刷新 T4/G1](2026-09-17-market-chart-refresh.md)截止日期降级、[指标交互](2026-09-10-market-chart-indicator-integration.md)及[详情状态矩阵](2026-08-21-market-detail-read-model.md)。详情矩阵已于 10-16 完成；分钟与更新的当前责任以现行 Task 为准，本段不作为待办入口。
 8. **真实交易规则来源与策略应用闭环**：先做[历史规则 T1](2026-09-16-backtest-real-historical-market-rules.md)的许可/版本/覆盖核实，合格输入就绪后补[交易 T18](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)；[策略风险 T17–T19](../../tasks/2026-09-09-strategy-risk-ai-optimization.md)分别按数据库/当前 Run/模型前置验收，不以参考规则或离线模型冒充真实来源。
-9. **其他产品与原生验收**：按[任务分类入口](../../tasks/README.md)逐页选择全站 UI、窄屏摘要/Trade 名称、目录消费、账户删除、配色、录入模式和 Mobile；浏览器/Electron/Android/iOS 分别保留证据。截图导入、草稿与对账暂未开放，不自动开启。
+9. **其他产品与原生验收**：按[任务分类入口](../../tasks/README.md)逐页选择全站 UI、窄屏摘要/Trade 名称、目录消费、账户删除、配色、录入模式和 Mobile；浏览器/Electron/Android/iOS 分别保留证据。草稿与对账暂未开放，不自动开启。
 10. **自然语言策略编写**：现行策略契约和 AI 模型用途就绪后，从[T00/T01](2026-09-18-natural-language-strategy-authoring.md)冻结所有权与草稿持久化，先建立最小纵向闭环，再扩展局部修改和恢复；不因既有 AI 生成就跳过实现。
 11. **来源扩展与发布回退**：按[多源后继](2026-10-03-multi-source-remaining-acceptance.md)五个未完成项分别核实历史 PIT、事件、可靠因子、Quote 与异地制品/完整旧状态/合格候选。这些与前述独立功能没有统一串行依赖；合格输入和发布目的确定后再选叶子，本地恢复包与旧候选失败不重复执行。
 

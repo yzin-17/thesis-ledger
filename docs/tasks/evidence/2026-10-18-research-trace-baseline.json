@@ -1,0 +1,443 @@
+{
+  "version": "research-trace-evaluation-v1",
+  "datasetVersion": "controlled-research-audit-2026-10-19-v1",
+  "inputFingerprint": "70d806d607415fd6500341b1f783d46f208a1356f7d4260706b346d2e77d2abc",
+  "passed": true,
+  "violations": [],
+  "metrics": {
+    "traces": 4,
+    "researchRuns": 3,
+    "experimentTraces": 0,
+    "unclassifiedTraces": 0,
+    "runStates": {
+      "succeeded": 1,
+      "failed": 1,
+      "cancelled": 1,
+      "deadlineExpired": 1,
+      "other": 0
+    },
+    "modeUnknownRuns": 2,
+    "requests": {
+      "total": 5,
+      "unknownTraces": 0,
+      "states": {
+        "success": 1,
+        "failed": 3,
+        "unknown": 1,
+        "not_sent": 0,
+        "prepared": 0
+      },
+      "successRate": {
+        "numerator": 1,
+        "denominator": 5,
+        "value": 0.2,
+        "observedValue": 0.2,
+        "denominatorCompleteness": "complete"
+      },
+      "failureRate": {
+        "numerator": 3,
+        "denominator": 5,
+        "value": 0.6,
+        "observedValue": 0.6,
+        "denominatorCompleteness": "complete"
+      },
+      "retries": 1,
+      "additionalAfterSuccess": 0,
+      "cancelled": 1,
+      "timedOut": null
+    },
+    "tools": {
+      "total": 4,
+      "appearanceRate": {
+        "numerator": 2,
+        "denominator": 3,
+        "value": 0.6666666666666666
+      },
+      "successRate": {
+        "numerator": 3,
+        "denominator": 4,
+        "value": 0.75
+      },
+      "unavailable": 1,
+      "denied": 0,
+      "repeatedSummaries": 1
+    },
+    "evidence": {
+      "required": 1,
+      "usableRequired": 1,
+      "coverageRate": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": null,
+        "observedValue": 1,
+        "denominatorCompleteness": "partial"
+      },
+      "usable": 1,
+      "empty": 0,
+      "unavailable": 0,
+      "unknown": 0,
+      "unknownTraces": 2
+    },
+    "tokens": {
+      "reportedInput": 40,
+      "reportedOutput": 16,
+      "unknownInputRequests": 1,
+      "unknownOutputRequests": 1
+    },
+    "costs": {
+      "unknownRequests": 1,
+      "currencies": [
+        {
+          "currency": "CNY",
+          "known": "1.2",
+          "estimated": "0",
+          "unconfirmedReserved": "0"
+        },
+        {
+          "currency": "USD",
+          "known": "0.6",
+          "estimated": "0",
+          "unconfirmedReserved": "0.4"
+        }
+      ]
+    },
+    "settlement": {
+      "markedRequests": 3,
+      "history": "unknown"
+    },
+    "timing": {
+      "runs": {
+        "known": 2,
+        "unknown": 1,
+        "totalMs": 1400,
+        "maxMs": 1200
+      },
+      "tools": {
+        "known": 4,
+        "unknown": 0,
+        "totalMs": 40,
+        "maxMs": 10
+      },
+      "dispatch": {
+        "known": 4,
+        "unknown": 1,
+        "totalMs": 400,
+        "maxMs": 100
+      },
+      "response": {
+        "known": 3,
+        "unknown": 2,
+        "totalMs": 2700,
+        "maxMs": 900
+      }
+    }
+  },
+  "budgets": [
+    {
+      "traceId": "10000000-0000-4000-8000-000000000001",
+      "limits": {
+        "maxAiCalls": 2,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxCost": "1",
+        "costCurrency": "USD"
+      },
+      "observedCalls": 1,
+      "costs": {
+        "unknownRequests": 0,
+        "currencies": [
+          {
+            "currency": "USD",
+            "known": "0.2",
+            "estimated": "0",
+            "unconfirmedReserved": "0"
+          }
+        ]
+      }
+    },
+    {
+      "traceId": "10000000-0000-4000-8000-000000000002",
+      "limits": {
+        "maxAiCalls": 2,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxCost": "1",
+        "costCurrency": "USD"
+      },
+      "observedCalls": 2,
+      "costs": {
+        "unknownRequests": 1,
+        "currencies": [
+          {
+            "currency": "USD",
+            "known": "0.3",
+            "estimated": "0",
+            "unconfirmedReserved": "0.4"
+          }
+        ]
+      }
+    },
+    {
+      "traceId": "10000000-0000-4000-8000-000000000003",
+      "limits": {
+        "maxAiCalls": 2,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxCost": "1",
+        "costCurrency": "USD"
+      },
+      "observedCalls": 1,
+      "costs": {
+        "unknownRequests": 0,
+        "currencies": [
+          {
+            "currency": "USD",
+            "known": "0.1",
+            "estimated": "0",
+            "unconfirmedReserved": "0"
+          }
+        ]
+      }
+    }
+  ],
+  "traces": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "lineageId": "10000000-0000-4000-8000-000000000001",
+      "executionAttempt": 1,
+      "consumer": "research",
+      "status": "succeeded",
+      "mode": "shadow",
+      "durationMs": 1200,
+      "requests": [
+        {
+          "requestId": "10000000-0000-4000-8000-000000000101",
+          "state": "success",
+          "errorCode": null,
+          "usage": {
+            "status": "reported",
+            "inputTokens": 10,
+            "outputTokens": 4
+          },
+          "cost": {
+            "status": "known",
+            "amount": "0.2",
+            "currency": "USD",
+            "source": "provider",
+            "pricingVersion": "controlled-price-1"
+          },
+          "reservation": {
+            "status": "estimated",
+            "amount": "0.4",
+            "currency": "USD",
+            "source": "frozen-price",
+            "pricingVersion": "controlled-price-1"
+          },
+          "settledRevision": 1,
+          "dispatchMs": 100,
+          "responseMs": 900
+        }
+      ],
+      "budget": {
+        "maxAiCalls": 2,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxCost": "1",
+        "costCurrency": "USD"
+      },
+      "terminationReason": null,
+      "tools": [
+        {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "name": "getQuote",
+          "status": "ok",
+          "inputSummaryFingerprint": "b41385a23a2fad700cabc345b382131516836fc570fe9564c268b66f7131ff38",
+          "durationMs": 10
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000010",
+          "name": "getQuote",
+          "status": "ok",
+          "inputSummaryFingerprint": "b41385a23a2fad700cabc345b382131516836fc570fe9564c268b66f7131ff38",
+          "durationMs": 10
+        },
+        {
+          "id": "10000000-0000-4000-8000-000000000011",
+          "name": "getNews",
+          "status": "unavailable",
+          "inputSummaryFingerprint": "5d89fa19e697718c72dcf348a8730703c129ae34da46b7e4231dbad234d22bac",
+          "durationMs": 10
+        }
+      ],
+      "evidence": [
+        {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "required": true,
+          "availability": "usable",
+          "bound": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "lineageId": "10000000-0000-4000-8000-000000000002",
+      "executionAttempt": 1,
+      "consumer": "research",
+      "status": "failed",
+      "mode": null,
+      "durationMs": null,
+      "requests": [
+        {
+          "requestId": "10000000-0000-4000-8000-000000000102",
+          "state": "failed",
+          "errorCode": "schema_invalid",
+          "usage": {
+            "status": "reported",
+            "inputTokens": 10,
+            "outputTokens": 4
+          },
+          "cost": {
+            "status": "known",
+            "amount": "0.3",
+            "currency": "USD",
+            "source": "provider",
+            "pricingVersion": "controlled-price-1"
+          },
+          "reservation": {
+            "status": "estimated",
+            "amount": "0.4",
+            "currency": "USD",
+            "source": "frozen-price",
+            "pricingVersion": "controlled-price-1"
+          },
+          "settledRevision": 1,
+          "dispatchMs": 100,
+          "responseMs": 900
+        },
+        {
+          "requestId": "10000000-0000-4000-8000-000000000103",
+          "state": "unknown",
+          "errorCode": "transport_unknown",
+          "usage": null,
+          "cost": null,
+          "reservation": {
+            "status": "estimated",
+            "amount": "0.4",
+            "currency": "USD",
+            "source": "frozen-price",
+            "pricingVersion": "controlled-price-1"
+          },
+          "settledRevision": 0,
+          "dispatchMs": 100,
+          "responseMs": null
+        }
+      ],
+      "budget": {
+        "maxAiCalls": 2,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxCost": "1",
+        "costCurrency": "USD"
+      },
+      "terminationReason": "expired",
+      "tools": [
+        {
+          "id": "10000000-0000-4000-8000-000000000012",
+          "name": "getNews",
+          "status": "ok",
+          "inputSummaryFingerprint": "5d89fa19e697718c72dcf348a8730703c129ae34da46b7e4231dbad234d22bac",
+          "durationMs": 10
+        }
+      ],
+      "evidence": null,
+      "issues": []
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000003",
+      "lineageId": "10000000-0000-4000-8000-000000000003",
+      "executionAttempt": 1,
+      "consumer": "research",
+      "status": "cancelled",
+      "mode": null,
+      "durationMs": 200,
+      "requests": [
+        {
+          "requestId": "10000000-0000-4000-8000-000000000104",
+          "state": "failed",
+          "errorCode": "cancelled",
+          "usage": {
+            "status": "reported",
+            "inputTokens": 10,
+            "outputTokens": 4
+          },
+          "cost": {
+            "status": "known",
+            "amount": "0.1",
+            "currency": "USD",
+            "source": "provider",
+            "pricingVersion": "controlled-price-1"
+          },
+          "reservation": {
+            "status": "estimated",
+            "amount": "0.4",
+            "currency": "USD",
+            "source": "frozen-price",
+            "pricingVersion": "controlled-price-1"
+          },
+          "settledRevision": 1,
+          "dispatchMs": 100,
+          "responseMs": 900
+        }
+      ],
+      "budget": {
+        "maxAiCalls": 2,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxCost": "1",
+        "costCurrency": "USD"
+      },
+      "terminationReason": "cancelled",
+      "tools": [],
+      "evidence": null,
+      "issues": []
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000200",
+      "lineageId": "07dd4ae4d44ab56d17d849d1a49fe11fb1e19ab884ba6640c2838beb1d066987",
+      "executionAttempt": 1,
+      "consumer": "strategy_authoring",
+      "status": null,
+      "mode": null,
+      "durationMs": null,
+      "terminationReason": null,
+      "budget": null,
+      "requests": [
+        {
+          "requestId": "10000000-0000-4000-8000-000000000200",
+          "state": "failed",
+          "errorCode": "schema_invalid",
+          "usage": {
+            "status": "reported",
+            "inputTokens": 10,
+            "outputTokens": 4
+          },
+          "cost": {
+            "status": "known",
+            "amount": "1.2",
+            "currency": "CNY",
+            "source": "provider",
+            "pricingVersion": "controlled-price-1"
+          },
+          "reservation": null,
+          "settledRevision": null,
+          "dispatchMs": null,
+          "responseMs": null
+        }
+      ],
+      "tools": [],
+      "evidence": null,
+      "issues": []
+    }
+  ]
+}

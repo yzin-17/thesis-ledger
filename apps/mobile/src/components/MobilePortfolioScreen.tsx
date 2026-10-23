@@ -3,14 +3,14 @@ import type { MobileDashboardState } from '../index';
 import type { MobileThemeColors } from '../theme';
 import type { MobileStyles } from '../styles/mobileStyles';
 
-const money = new Intl.NumberFormat('zh-CN', {
-  style: 'currency',
-  currency: 'CNY',
-  maximumFractionDigits: 2,
-});
-
-const formatNumber = (value: number | null | undefined) =>
-  value === null || value === undefined ? '不可用' : money.format(value);
+const formatNumber = (value: number | null | undefined, currency?: unknown) => {
+  if (value === null || value === undefined) return '不可用';
+  const options: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
+  if (typeof currency === 'string' && /^[A-Z]{3}$/.test(currency)) {
+    options.style = 'currency'; options.currency = currency;
+  }
+  return new Intl.NumberFormat('zh-CN', options).format(value);
+};
 
 const marketTone = (value: number | null | undefined): 'up' | 'down' | undefined => {
   if (value === null || value === undefined || value === 0) return undefined;
@@ -56,8 +56,12 @@ export function MobilePortfolioScreen({
       <ActivityIndicator accessibilityLabel="正在加载投资组合" size="large" color={theme.brand} />
     );
   }
-  if (state.status === 'empty' || state.portfolio === null) {
-    return <Text style={styles.emptyText}>暂无持仓，请先在 Desktop 创建账户或导入持仓。</Text>;
+  if (state.portfolio === null) {
+    const message =
+      state.status === 'error'
+        ? '暂时无法读取持仓，请刷新重试。'
+        : '暂无持仓，可在「账户」创建账户并录入持仓。';
+    return <Text style={styles.emptyText}>{message}</Text>;
   }
   const totalPnlTone = marketTone(state.portfolio.totalPnl);
   return (
@@ -65,19 +69,22 @@ export function MobilePortfolioScreen({
       <View style={styles.metricsRow}>
         <Metric
           label="总市值"
-          value={formatNumber(state.portfolio.totalMarketValue)}
+          value={formatNumber(state.portfolio.totalMarketValue, state.portfolio.baseCurrency)}
           styles={styles}
         />
-        <Metric label="总成本" value={formatNumber(state.portfolio.totalCost)} styles={styles} />
+        <Metric label="总成本" value={formatNumber(state.portfolio.totalCost, state.portfolio.baseCurrency)} styles={styles} />
         <Metric
           label="累计盈亏"
-          value={formatNumber(state.portfolio.totalPnl)}
+          value={formatNumber(state.portfolio.totalPnl, state.portfolio.baseCurrency)}
           {...(totalPnlTone ? { tone: totalPnlTone } : {})}
           styles={styles}
         />
-        <Metric label="现金" value={formatNumber(state.portfolio.cashValue)} styles={styles} />
+        <Metric label="现金" value={formatNumber(state.portfolio.cashValue, state.portfolio.baseCurrency)} styles={styles} />
       </View>
       <Text style={styles.sectionTitle}>持仓</Text>
+      {state.portfolio.positions.length === 0 ? (
+        <Text style={styles.emptyText}>暂无持仓，可在「账户」录入持仓。</Text>
+      ) : null}
       {state.portfolio.positions.map((position) => (
         <View key={position.id} style={styles.card}>
           <View style={styles.cardHeader}>
@@ -87,12 +94,12 @@ export function MobilePortfolioScreen({
             </Text>
           </View>
           <Text style={styles.cardText}>
-            数量 {position.quantity} · 成本 {formatNumber(position.costPrice)}
+            数量 {position.quantity} · 成本 {formatNumber(position.costPrice, position.currency)}
           </Text>
           <Text style={styles.cardText}>
-            市值 {formatNumber(position.marketValue)} · 盈亏{' '}
+            市值 {formatNumber(position.marketValue, position.currency)} · 盈亏{' '}
             <Text style={marketToneStyle(marketTone(position.pnl), styles)}>
-              {formatNumber(position.pnl)}
+              {formatNumber(position.pnl, position.currency)}
             </Text>
           </Text>
         </View>

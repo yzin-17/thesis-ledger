@@ -2,6 +2,7 @@ import {
   marketPolicyClientResponseSchema,
   marketRouteCatalogReadClientV3Schema,
   type MarketProviderProbeRoute,
+  type MarketProviderAccountLevel,
 } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { parseCatalogJobResponse } from './catalog-job-response.js';
@@ -72,8 +73,11 @@ export const retryMarketPolicy = async () =>
 
 export const saveMarketProviderCredentials = (
   providerId: string,
-  credentials: ProviderCredentialDraft,
-) => api().market.configureProvider(providerId, { credentials });
+  credentials: ProviderCredentialDraft | undefined,
+  settings?: Record<string, unknown>,
+  expectedConfigVersion?: number,
+) => api().market.configureProvider(providerId, { ...(credentials ? { credentials } : {}),
+  ...(settings ? { settings } : {}), ...(expectedConfigVersion !== undefined ? { expectedConfigVersion } : {}) });
 
 export const setMarketProviderEnabled = (providerId: string, enabled: boolean) =>
   api().market.configureProvider(providerId, { enabled });
@@ -87,6 +91,7 @@ export const testMarketProvider = (
   signal?: AbortSignal,
   route?: MarketProviderProbeRoute,
   purpose?: 'capability_read' | 'account_access',
+  accountLevel?: MarketProviderAccountLevel,
 ) =>
   api().market.testProvider(
     provider.providerId,
@@ -94,6 +99,7 @@ export const testMarketProvider = (
       ...(credentials ? { credentials } : {}),
       ...(route ? { route } : {}),
       ...(purpose ? { purpose } : {}),
+      ...(accountLevel ? { accountLevel } : {}),
     },
     signal,
   );

@@ -2,7 +2,7 @@
 
 - 状态：已批准，实施中
 - 类型：新能力
-- 当前验收：[投资组合任务中的估值走势](../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-series-acceptance)；[原实施记录](../archive/tasks/2026-09-07-portfolio-valuation-series.md)保留。
+- 当前验收：[投资组合任务中的估值走势](../archive/tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-series-acceptance)；[原实施记录](../archive/tasks/2026-09-07-portfolio-valuation-series.md)保留。
 - 上游契约：[`2026-08-28-portfolio-snapshot-system.md`](2026-08-28-portfolio-snapshot-system.md)
 
 ## 背景与问题
@@ -67,6 +67,7 @@ estimatedNav(t) = anchorNav × [1 + Σ(weightᵢ × adjustedReturnᵢ(anchor, t)
 - 未披露仓位、现金、停牌和缺价持仓按零变动处理；
 - `disclosureCoverage` 为披露权重之和；
 - `pricedCoverage` 为本次成功定价持仓权重之和；
+- 底层证券价格和锚点收盘价必须为有限正数。合法数据响应中的零价按缺价持平处理，不计入 `pricedCoverage`，不能视为证券跌至零；基金 NAV 锚点为零、非有限数或 `unavailable` 时不计算盘中调整，并保留低覆盖与错误证据。原有允许陈旧锚点及报价的读取边界保持，不能借此把不可用价格计为成功。
 - 没有持仓证据时沿用锚点 NAV，并返回 `LOW_COVERAGE`；
 - 披露日期晚于估值时间的证据不得用于回放；
 - 正式 NAV 到达后由 Snapshot 校准链替代日终估算点。
@@ -106,6 +107,7 @@ shadow 在缺少分钟投影数据时不开放 `1min/1h`，以 `availableInterva
 - Tooltip 显示完整时间、资产总值、币种、估算/正式、披露覆盖率、可定价覆盖率和质量说明。
 - 图表可聚焦；左右键逐点移动，Escape 关闭；触屏点击选择最近点。
 - 加载、空数据、部分估值、数据延迟使用直接且可操作的中文说明。
+- 序列没有点位时，`historyStart=null`、`dataQuality=UNAVAILABLE`；空集合不能标为完整覆盖，也不能补一个零值点代替缺少历史。
 
 ## 数据、状态与兼容性影响
 

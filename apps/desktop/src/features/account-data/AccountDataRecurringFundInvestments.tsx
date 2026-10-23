@@ -20,8 +20,10 @@ import {
 } from '@/components/ui/sheet';
 import { useToastManager } from '@/components/ui/toast';
 import type { Account } from '../portfolio/portfolio.types.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import {
   formatCurrencyAmount,
+  errorMessage,
   formatDate,
   isPositiveDecimal,
   supportedCurrency,
@@ -71,7 +73,7 @@ export function RecurringFundInvestments({ account }: { account: Account }) {
     } catch (error) {
       toast.add({
         title: '计划操作失败',
-        description: error instanceof Error ? error.message : '请刷新后重试。',
+        description: errorMessage(error, '请刷新后重试。'),
         type: 'error',
       });
     }
@@ -103,7 +105,12 @@ export function RecurringFundInvestments({ account }: { account: Account }) {
       {(queries.plans.isError || queries.occurrences.isError) && (
         <Alert variant="destructive">
           <AlertTitle>基金定投读取失败</AlertTitle>
-          <AlertDescription>计划或待确认记录未更新，请重试。</AlertDescription>
+          <AlertDescription>计划或待确认记录未更新。已成功保存或确认的操作无需再次提交，请重新读取。</AlertDescription>
+          <Button type="button" variant="outline" size="sm"
+            disabled={queries.plans.isFetching || queries.occurrences.isFetching}
+            onClick={() => void Promise.all([queries.plans.refetch(), queries.occurrences.refetch()])}>
+            重新读取基金定投
+          </Button>
         </Alert>
       )}
       <div className="divide-y border-y border-border">
@@ -112,9 +119,9 @@ export function RecurringFundInvestments({ account }: { account: Account }) {
             <h4 className="m-0 text-sm font-semibold">待确认成交</h4>
             <p className="m-0 mt-1 text-xs text-muted-foreground">确认前不会改变持仓或现金。</p>
           </div>
-          <Badge variant={pending.length > 0 ? 'default' : 'secondary'}>{pending.length} 条</Badge>
+          <Badge variant={pending.length > 0 ? 'default' : 'secondary'}>{queries.occurrences.data === undefined ? '—' : pending.length} 条</Badge>
         </div>
-        {pending.length === 0 ? (
+        {pending.length === 0 && queries.occurrences.data !== undefined ? (
           <p className="m-0 py-3 text-sm text-muted-foreground">暂无待确认定投</p>
         ) : (
           pending.map((item) => (
@@ -153,9 +160,9 @@ export function RecurringFundInvestments({ account }: { account: Account }) {
         )}
         <div className="flex items-center justify-between gap-3 py-3">
           <h4 className="m-0 text-sm font-semibold">定投计划</h4>
-          <span className="text-sm text-muted-foreground">{plans.length} 个</span>
+          <span className="text-sm text-muted-foreground">{queries.plans.data === undefined ? '—' : plans.length} 个</span>
         </div>
-        {plans.length === 0 ? (
+        {plans.length === 0 && queries.plans.data !== undefined ? (
           <p className="m-0 py-3 text-sm text-muted-foreground">暂无基金定投计划</p>
         ) : (
           plans.map((plan) => (
@@ -276,6 +283,7 @@ function FundInvestmentPlanSheet({
   onClose: () => void;
   mutations: FundMutations;
 }) {
+  const toast = useToastManager();
   const plan = editor.plan;
   const [name, setName] = useState(plan?.name ?? '每月基金定投');
   const [symbol, setSymbol] = useState(plan?.symbol ?? '');
@@ -284,8 +292,13 @@ function FundInvestmentPlanSheet({
   const [startPeriod, setStartPeriod] = useState(plan?.startPeriod ?? currentPeriod());
   const [error, setError] = useState<string | null>(null);
   const busy = mutations.createPlan.isPending || mutations.updatePlan.isPending;
+  const requestClose = useDraftCloseGuard({ open: true, draft: { name, symbol, amount, day, startPeriod }, busy,
+    onOpenChange: (nextOpen) => { if (!nextOpen) onClose(); },
+  });
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy) return;
+    setError(null);
     const normalizedSymbol = symbol.trim().toUpperCase();
     const dayOfMonth = Number(day);
     if (!name.trim() || !/^\d{6}\.OF$/.test(normalizedSymbol) || !isPositiveDecimal(amount)) {
@@ -317,25 +330,24 @@ function FundInvestmentPlanSheet({
           startPeriod,
           timezone: 'Asia/Shanghai',
         });
+      toast.add({ title: '基金定投计划已保存', type: 'success' });
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '计划保存失败，请重试。');
+      setError(errorMessage(caught, '计划保存失败，输入已保留，请重试。'));
     }
   };
   return (
     <Sheet
       open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
+      onOpenChange={(open) => void requestClose(open)}
     >
-      <SheetContent side="right" size="form">
+      <SheetContent side="right" size="form" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{plan ? '编辑基金定投' : '新建基金定投'}</SheetTitle>
           <SheetDescription>到期只生成待确认记录，不会自动下单或写入成交。</SheetDescription>
         </SheetHeader>
-        <form className="flex flex-1 flex-col gap-5" onSubmit={(event) => void submit(event)}>
-          <FieldGroup>
+        <form className="flex min-h-0 flex-1 flex-col gap-5" onSubmit={(event) => void submit(event)}>
+          <FieldGroup className="min-h-0 flex-1 overflow-y-auto">
             <Field>
               <FieldLabel htmlFor="fund-plan-name">计划名称</FieldLabel>
               <Input
@@ -392,7 +404,7 @@ function FundInvestmentPlanSheet({
             )}
           </FieldGroup>
           <SheetFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => void requestClose(false)}>
               取消
             </Button>
             <Button type="submit" disabled={busy}>
@@ -415,6 +427,7 @@ function FundInvestmentOccurrenceSheet({
   onClose: () => void;
   mutations: FundMutations;
 }) {
+  const toast = useToastManager();
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
   const [commission, setCommission] = useState('');
@@ -422,8 +435,13 @@ function FundInvestmentOccurrenceSheet({
   const [reason, setReason] = useState('本期未执行');
   const [error, setError] = useState<string | null>(null);
   const busy = mutations.confirmOccurrence.isPending || mutations.skipOccurrence.isPending;
+  const requestClose = useDraftCloseGuard({ open: true, draft: { quantity, unitPrice, commission, occurredAt, reason }, busy,
+    onOpenChange: (nextOpen) => { if (!nextOpen) onClose(); },
+  });
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy) return;
+    setError(null);
     try {
       if (action.type === 'skip') {
         if (!reason.trim()) {
@@ -455,27 +473,26 @@ function FundInvestmentOccurrenceSheet({
           },
         });
       }
+      toast.add({ title: action.type === 'skip' ? '本期定投已跳过' : '定投成交已记录', type: 'success' });
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '操作失败，请重试。');
+      setError(errorMessage(caught, '操作失败，输入已保留，请重试。'));
     }
   };
   return (
     <Sheet
       open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
+      onOpenChange={(open) => void requestClose(open)}
     >
-      <SheetContent side="right" size="form">
+      <SheetContent side="right" size="form" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{action.type === 'skip' ? '跳过本期定投' : '确认定投成交'}</SheetTitle>
           <SheetDescription>
             {action.occurrence.fundName} · {action.occurrence.periodKey}
           </SheetDescription>
         </SheetHeader>
-        <form className="flex flex-1 flex-col gap-5" onSubmit={(event) => void submit(event)}>
-          <FieldGroup>
+        <form className="flex min-h-0 flex-1 flex-col gap-5" onSubmit={(event) => void submit(event)}>
+          <FieldGroup className="min-h-0 flex-1 overflow-y-auto">
             {action.type === 'skip' ? (
               <Field>
                 <FieldLabel htmlFor="fund-skip-reason">跳过原因</FieldLabel>
@@ -532,7 +549,7 @@ function FundInvestmentOccurrenceSheet({
             )}
           </FieldGroup>
           <SheetFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => void requestClose(false)}>
               取消
             </Button>
             <Button type="submit" disabled={busy}>

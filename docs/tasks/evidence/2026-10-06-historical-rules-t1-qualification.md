@@ -1,7 +1,7 @@
 # T1 真实历史市场规则四项缺口核验
 
 > 核验日期：2026-10-06（Asia/Shanghai）。首次实际取得时段为北京时间 02:30～02:40；后续调查与用途确认见 §10、§11，下文机器时间保留 UTC。
-> 权威依据：[完整 Spec](../../specs/2026-09-16-backtest-real-historical-market-rules.md) 的 AC1、[原 Task](../2026-09-16-backtest-real-historical-market-rules.md) 的 T1 完成条件。
+> 权威依据：[完整 Spec](../../archive/specs/2026-09-16-backtest-real-historical-market-rules.md) 的 AC1、[原 Task](../../archive/tasks/2026-09-16-backtest-real-historical-market-rules.md) 的 T1 完成条件。
 > 继承证据：[2026-10-04 独立核验](2026-10-04-real-source-prerequisites-parallel.md) §2；其其他主题不属于本轮写入范围。
 > 结论：四项缺口均取得增量证据，但完整来源资格仍阻塞；T1 保持未勾选，T2～T5 未启动。
 

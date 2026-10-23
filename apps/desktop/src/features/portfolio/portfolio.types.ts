@@ -71,6 +71,12 @@ export const accountTypeLabel = (type: Account['type']) => {
   return '证券';
 };
 
+export const accountCurrencyLabel = (currency: Account['currency']) => {
+  if (currency === 'CNY') return 'CNY · 人民币';
+  if (currency === 'HKD') return 'HKD · 港币';
+  return 'USD · 美元';
+};
+
 export const accountDisplayLabel = (account: Account) =>
   `${account.name} · ${accountTypeLabel(account.type)} · ${account.currency} · ${
     account.mode === 'shadow' ? '模拟' : '实际'
@@ -99,6 +105,15 @@ export interface Position {
   basePnl?: number | null;
   asset: { name: string; assetType?: HeldAssetType };
 }
+
+export const positionSourceLabel = (source?: string) => {
+  if (source === 'ledger') return '账本';
+  if (source === 'ledger-estimated') return '账本（成本估算）';
+  if (source === 'manual') return '手动录入';
+  if (source === 'screenshot') return '截图导入';
+  if (source === 'migration') return '迁移';
+  return '未知';
+};
 
 export interface Portfolio {
   totalMarketValue: number;

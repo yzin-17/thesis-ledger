@@ -124,7 +124,6 @@ describe('Portfolio table contract', () => {
         <PortfolioDashboard
           state="ready"
           mode="actual"
-          onModeChange={vi.fn()}
           onRetry={vi.fn()}
           onNavigate={vi.fn()}
           accounts={[
@@ -242,6 +241,7 @@ describe('Portfolio table contract', () => {
               dailyPnl: 80,
               dailyReturn: 0.005405,
               baseDailyPnl: 80,
+              source: 'ledger',
               stale: false,
               asset: { name: '贵州茅台', assetType: 'stock' },
             },
@@ -282,6 +282,7 @@ describe('Portfolio table contract', () => {
       dailyPnl: 80,
       dailyReturn: 0.005405,
       pnlRatio: 0.0262069,
+      source: 'ledger',
     });
   });
 

@@ -357,7 +357,7 @@ function TradeEvidence({ detail }: { detail: TradeDetailResponse }) {
           ))}
         </EvidenceList>
       </section>
-      <details open className="rounded-md border border-border bg-muted/20 p-3 text-xs">
+      <details className="rounded-md border border-border bg-muted/20 p-3 text-xs">
         <summary className="cursor-pointer font-medium">技术信息</summary>
         <dl className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
           <div>

@@ -3,13 +3,17 @@
     "name": "ThesisLedger",
     "slug": "thesis-ledger",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "scheme": "thesis-ledger",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios", "android", "web"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "io.github.yzin17.thesisledger.mobile"
+      "bundleIdentifier": "io.github.yzin17.thesisledger.mobile",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "选择投资账户截图，并在确认后上传为待审核草稿。",
+        "NSLocalNetworkUsageDescription": "连接你配置的本地 ThesisLedger 服务。"
+      }
     },
     "android": {
       "package": "io.github.yzin17.thesisledger.mobile"
@@ -17,6 +21,7 @@
     "web": {
       "bundler": "metro",
       "output": "single"
-    }
+    },
+    "plugins": ["expo-sharing"]
   }
 }

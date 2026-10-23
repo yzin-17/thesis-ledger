@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { useState } from 'react';
 import { modelsFromText } from './ai-provider.actions.js';
@@ -70,13 +70,13 @@ export function AiProviderExecutionFields({
             </CardHeader>
             <CardContent>
               <FieldGroup>
-                <Field>
-                  <FieldLabel>用于哪些任务</FieldLabel>
+                <FieldSet className="gap-2">
+                  <FieldLegend className="mb-0">用于哪些任务</FieldLegend>
                   <div className="flex flex-wrap gap-4">
                     {aiContractOptions.map((option) => {
                       const route = routes.find((item) => item.contractId === option.value);
                       return (
-                        <FieldLabel
+                        <div
                           key={option.value}
                           className="flex w-fit items-center gap-2 text-sm font-normal"
                         >
@@ -103,12 +103,12 @@ export function AiProviderExecutionFields({
                               }))
                             }
                           />
-                          {option.label}
-                        </FieldLabel>
+                          <span>{option.label}</span>
+                        </div>
                       );
                     })}
                   </div>
-                </Field>
+                </FieldSet>
                 <AiGenerationSettings
                   value={defaults}
                   protocol={draft.upstreamFormat}

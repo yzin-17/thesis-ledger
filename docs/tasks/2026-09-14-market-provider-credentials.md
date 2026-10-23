@@ -1,10 +1,20 @@
 # 数据源即时启停与页面凭证配置实施任务
 
-> 状态对账（2026-10-03）：已实现待验收/范围性跳过：配置、OAuth/加密与当前合同有实现及目标证据。T5b 逐来源核对；Tushare 前端凭据已测试但免费 ETF 接口 40203，ETF 多源接入按用户跳过，不再将其 Token 缺失作为必须恢复的前置。TickFlow、Finnhub、Alpha Vantage、Longbridge 的原在线义务未被该跳过取消；各自凭证/授权与权限是相应真实前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
+<a id="priority"></a>
+> 排期（2026-10-22）：**P1｜当前获准范围已验收，Longbridge 暂缓**。T5b 按来源保留精确范围；已保存/已验证配置不重做。Tushare 当前积分、ETF 跳过及 Finnhub 免费报价范围按用户决定保持；不开户、采购、自动启用或反复探针。
+> [全局优先级与接续规则](README.md#priority-policy)。本次仅调整文档，不改变下列原任务编号、checkbox、验收条件或执行授权。
+
+> 历史对账（2026-10-03）：当时配置、OAuth/加密与合同已有实现及目标证据。Tushare 前端凭据已测试但免费 ETF 接口 40203，ETF 多源接入按用户跳过，不再将其 Token 缺失作为必须恢复的前置；该决定当时未取消其余来源原在线义务。此后 Alpha Vantage 免费近期、首次保存修复及 Finnhub 免费范围已按下方最新确认收口；历史环境与协议描述只在原范围有效。原对账依据见[历史 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[数据源即时启停与页面凭证配置](../specs/2026-09-14-market-provider-credentials.md)
 
-> 状态：T1—T5a 完成；本机 Docker 与浏览器验收通过，T5b 等待真实凭证在线验收。
+> 状态：T1—T5a 保留原已过范围；TickFlow 日线/报价、Alpha Vantage 免费近期日线/报价及首次保存修复继续复用。用户确认免费范围后，Finnhub 已按现有报价能力完成验收，股票日线明确为免费范围外受限，不再列为待修复阻塞。Tushare 当前积分与 ETF 跳过范围保持。T5b 父项保留 Longbridge 暂缓的真实授权、行情与刷新恢复，整体不记全部通过。
+
+> 最新范围确认（2026-10-22）：Finnhub 官方维护者明确免费方案不开放 `/stock/candle`；复用本账号报价 `healthy`、1818ms 及日线 `permission_denied` 的原实测，完成[免费范围验收](evidence/2026-10-22-finnhub-free-scope-acceptance.md)。只更新合同与验收状态，凭据、启停及路由保持；Longbridge 仍暂缓。
+
+> 当前接续检查（2026-10-22）：[首次保存状态修复已完成归档](../archive/tasks/2026-10-22-provider-first-credential-state.md)，202 项定向/关联测试和门禁通过；用户授权的正式 `update.sh dsa` 保留数据完整更新成功，目标同版代码与原数据卷均核对。TickFlow 凭据补丁省略启停，返回 201，仍停用且凭据内容/内部版本保持，仅配置版本 2→3；其他 29 家来源和 195 个目录目标状态保持。详细结果见[证据](evidence/2026-10-22-provider-first-credential-state.md)。
+
+> 前一切片结果（2026-10-22）：用户已授权 Alpha Vantage 免费近期适配，现已[完成并归档](../archive/tasks/2026-10-22-alphavantage-free-recent-daily.md)。来源改为单次 compact，470 项定向/关联测试及门禁通过；正式 `sync-code.sh dsa` 后，目标 AAPL 近期日线读取 `healthy`、2521ms，2024 年旧窗同版处理器实际返回 `not_covered`、零行且无 full 回退。该切片结束时三家仍停用，配置版本为 2/1/1，30 家来源配置与 195 个目录目标的准入状态保持。当前合同见[免费近期 Spec](../specs/2026-10-22-alphavantage-free-recent-daily.md)，详细结果见[验收证据](evidence/2026-10-22-alphavantage-free-recent-daily.md)。Finnhub 日线 `permission_denied` 与 Longbridge 暂缓仍由本 Task 持有；首存修复现已通过上方独立验收。
 
 ## 任务与依赖
 
@@ -44,8 +54,10 @@
   - 验证：infra 契约检查、目标 Docker、浏览器网络与操作证据。不得以容器健康替代行为验收。
 - [ ] T5b：五个来源在线验收。
   - 依赖：T5a。覆盖 AC7 的在线数据、AC6 的真实授权。
-  - 完成条件：逐来源记录凭证与权限前提、真实连接/数据读取结果；Longbridge 完成真实授权与刷新恢复。
-  - 验证：实际 Provider 请求；无凭证或权限时逐项记为阻塞，不能用 fixture 勾选。
+  - 完成条件：逐来源记录凭证与账号范围、真实连接/数据读取结果；按现行 Spec 区分范围内未通过与范围外受限。Longbridge 恢复接续后仍需真实授权与刷新恢复。
+  - 验证：实际 Provider 证据按未变输入复用；范围内无凭据或权限时逐项阻塞，不能用 fixture 勾选。范围外受限不记读取成功。
+  - [x] T5b-FIN：Finnhub 当前已接入免费范围验收完成；报价真实通过，股票日线由官方说明与原实测确认受限，按用户决定不作为本轮待修复项。
+  - [ ] T5b-LB：Longbridge 真实授权、行情权限与刷新恢复；用户仍暂缓，保留未完成，不因其他来源收口勾选。
 
 ## 验证证据
 
@@ -101,16 +113,16 @@ T3b 启动契约核对：SDK Python 存储回调、禁止隐式授权和异步�
 - [x] 凭证来源、加密与失败语义符合 Spec，没有扩大数据消费范围。
 - [x] 文档与实际实现同步，既有修改保留。
 
-结论：代码一致性、实际 Docker 与浏览器配置闭环 Review 通过；T5b 还需真实凭证、账号权限及用户授权操作，整体在线验收仍未通过。未提交代码或删除既有业务数据。
+结论：原代码一致性、实际 Docker 与浏览器配置闭环证据保留其已覆盖场景；首存启停偏差已修复并通过独立目标验收。TickFlow、Alpha Vantage 与 Tushare 原已过范围继续复用；Finnhub 按用户确认的现有免费报价范围验收通过，股票日线受限，不记读取成功。T5b 父项仅保留 Longbridge 暂缓的未完成义务，不归档整个任务。未提交代码或删除既有业务数据。
 
 ## 在线验收前提
 
 | 来源 | 当前结论 | 尚需证据 |
 | --- | --- | --- |
 | Tushare | 页面凭据与测试链路已有证据；ETF 免费接口权限不足，当前跳过 | [目标凭据记录](evidence/2026-10-02-tushare-page-credentials-target.md)及主多源 Task 的 40203 记录；其他能力不由此授予资格，当前不要求恢复 ETF 来源 |
-| TickFlow | 未通过在线验收 | 可用 API Key、实际连接与行情结果 |
-| Finnhub | 未通过在线验收 | 可用 API Key、实际连接与行情权限 |
-| Alpha Vantage | 未通过在线验收 | 可用 API Key、实际连接与配额结果 |
-| Longbridge | 未通过在线验收 | 真实浏览器授权、行情权限及令牌刷新恢复 |
+| TickFlow | Key 已配置，版本 3，保持停用；股票日线 none 与实时报价实际读取通过，首存状态修复已完成目标验收 | 证据仅覆盖 `600519.SH` 指定窗口/能力，不推广其他精确目标；[状态修复验收](evidence/2026-10-22-provider-first-credential-state.md)不扩大行情权限 |
+| Finnhub | 当前已接入免费报价范围验收通过；Key 已配置、版本 1、保持停用，`AAPL.US` 报价实测通过；股票日线为免费范围外受限 | [官方依据与范围验收](evidence/2026-10-22-finnhub-free-scope-acceptance.md)；日线原 `permission_denied` 保留，不再作为本轮待修复，不扩大其他接口资格 |
+| Alpha Vantage | Key 已配置，版本 1，保持停用；目标报价及免费近期日线通过，旧窗实际返回 `not_covered` | [免费近期切片已完成](../archive/tasks/2026-10-22-alphavantage-free-recent-daily.md)；更早历史继续受限。默认报价为历史口径，不据内部 `REALTIME_QUOTE` 名称承诺实时 |
+| Longbridge | 用户于 2026-10-22 明确暂缓申请，本轮不接续；原状态未改 | 真实浏览器授权、行情权限及令牌刷新恢复未通过，暂缓不计为通过 |
 
-凭证在配置页面输入，不写入文档或聊天记录。Docker/浏览器持久化验收已通过；真实凭证在线验收仍保留未勾选。
+凭证在配置页面输入，不写入文档或聊天记录。Docker/浏览器持久化及现行获准范围证据继续复用；父项未勾选仅保留 Longbridge 暂缓的真实在线义务。

@@ -146,11 +146,13 @@ const rsi = (points: readonly BacktestSeriesPoint[], period: number): IndicatorP
   const output: IndicatorPoint[] = points.map((point) => unavailable(point, `warmup：需要 ${period + 1} 个值`));
   let averageGain: DecimalValue | undefined;
   let averageLoss: DecimalValue | undefined;
+  let previous: IndicatorPoint | undefined;
   for (let index = 0; index < points.length; index += 1) {
     const window = points.slice(index - period, index + 1);
     if (window.length !== period + 1 || window.some((point) => numeric(point) === undefined)) {
       averageGain = undefined;
       averageLoss = undefined;
+      previous = undefined;
       output[index] = unavailable(points[index]!, `warmup 或输入缺失：需要连续 ${period + 1} 个值`);
       continue;
     }
@@ -169,31 +171,42 @@ const rsi = (points: readonly BacktestSeriesPoint[], period: number): IndicatorP
             DIVISION_SCALE,
           ),
         );
-    output[index] = available(points[index]!, value, window);
+    output[index] = available(points[index]!, value,
+      previous && period > 1 ? [previous, points[index - 1]!, points[index]!] : window);
+    previous = output[index];
   }
   return output;
 };
 
 const trueRange = (points: readonly BacktestSeriesPoint[], index: number) => {
   const point = points[index]!;
+  if (point.status === 'unavailable') return undefined;
+  try {
   const high = point.high ? DecimalValue.from(point.high) : numeric(point);
   const low = point.low ? DecimalValue.from(point.low) : numeric(point);
   const close = point.close ? DecimalValue.from(point.close) : numeric(point);
   if (!high || !low || !close) return undefined;
+  if (high.isNegative() || low.isNegative() || close.isNegative() || high.compareTo(low) < 0) return undefined;
   if (index === 0) return high.minus(low);
   const previous = points[index - 1]!;
+  if (previous.status === 'unavailable') return undefined;
   const previousClose = previous.close ? DecimalValue.from(previous.close) : numeric(previous);
-  if (!previousClose) return undefined;
+  if (!previousClose || previousClose.isNegative()) return undefined;
   const highLow = high.minus(low);
   const highPrevious = absolute(high.minus(previousClose));
   const lowPrevious = absolute(low.minus(previousClose));
   return [highLow, highPrevious, lowPrevious].sort((left, right) => right.compareTo(left))[0]!;
+  } catch {
+    return undefined;
+  }
 };
 
 const atr = (points: readonly BacktestSeriesPoint[], period: number): IndicatorPoint[] => {
   const ranges = points.map((point, index) => {
     const value = trueRange(points, index);
-    return value ? { ...point, value: value.toString(), status: 'available' as const } : unavailable(point, 'OHLC 输入 unavailable');
+    return value ? { ...point, value: value.toString(), status: 'available' as const,
+      ...mergeBacktestAvailability(index === 0 ? [point] : [points[index - 1]!, point]),
+    } : unavailable(point, 'OHLC 输入 unavailable');
   });
   return rolling(ranges, period, average);
 };

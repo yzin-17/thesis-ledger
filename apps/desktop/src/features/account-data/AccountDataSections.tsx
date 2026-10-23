@@ -120,11 +120,11 @@ export function TransactionSection({
             />
             <DropdownMenuContent align="end">
               <DropdownMenuGroup>
-                <DropdownMenuItem disabled onClick={onOpenImport}>
-                  导入草稿（暂未开放）
+                <DropdownMenuItem disabled={account.type === 'cash'} onClick={onOpenImport}>
+                  导入草稿
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled onClick={onOpenReconciliation}>
-                  打开对账（暂未开放）
+                <DropdownMenuItem disabled={account.type === 'cash'} onClick={onOpenReconciliation}>
+                  打开对账
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -167,8 +167,11 @@ export function TransactionSection({
         <Alert>
           <AlertTitle>显示的是上次成功读取的结果</AlertTitle>
           <AlertDescription>
-            本次刷新失败。你可以继续查看，但提交修正前应重新加载最新账本版本。
+            本次刷新失败。已成功提交的操作无需再次提交；提交修正前请重新读取最新账本版本。
           </AlertDescription>
+          <Button type="button" variant="outline" size="sm" disabled={query.isFetching} onClick={() => void query.refetch()}>
+            重新读取账本
+          </Button>
         </Alert>
       )}
       <RecurringFundInvestments account={account} />
@@ -243,7 +246,7 @@ function TransactionResults({
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
       <table className="w-full min-w-[900px] table-fixed text-left text-sm">
-        <caption className="sr-only">{emptyTitle}</caption>
+        <caption className="sr-only">账本事件</caption>
         <colgroup>
           <col className="w-[30%]" />
           <col className="w-[20%]" />
@@ -417,6 +420,7 @@ export function PositionCalibrationSection({
   cashValue,
   valuationQuery,
   onDirtyChange,
+  onBusyChange,
   onSaved,
   onOpenImport,
   onOpenReconciliation,
@@ -432,7 +436,8 @@ export function PositionCalibrationSection({
   cashValue: number;
   valuationQuery: ReturnType<typeof useAccountValuationQuery>;
   onDirtyChange: (dirty: boolean) => void;
-  onSaved: () => void;
+  onBusyChange: (busy: boolean) => void;
+  onSaved: () => void | Promise<unknown>;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
   resolveInstrumentName: (symbol: string) => string | undefined;
@@ -466,6 +471,16 @@ export function PositionCalibrationSection({
     );
   }
   return (
+    <>
+      {valuationQuery.isError && valuationQuery.data && (
+        <Alert>
+          <AlertTitle>持仓快照暂未更新</AlertTitle>
+          <AlertDescription>显示的是上次成功读取的结果；已成功保存的快照无需再次提交。</AlertDescription>
+          <Button type="button" variant="outline" size="sm" disabled={valuationQuery.isFetching} onClick={() => void valuationQuery.refetch()}>
+            重新读取持仓快照
+          </Button>
+        </Alert>
+      )}
     <PortfolioManagement
       key={account.id}
       accounts={accounts}
@@ -485,7 +500,9 @@ export function PositionCalibrationSection({
       onOpenImport={onOpenImport}
       onOpenReconciliation={onOpenReconciliation}
       onDirtyChange={onDirtyChange}
+      onBusyChange={onBusyChange}
       onSaved={onSaved}
     />
+    </>
   );
 }

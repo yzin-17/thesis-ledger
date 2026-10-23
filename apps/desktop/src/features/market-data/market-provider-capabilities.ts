@@ -15,6 +15,8 @@ export const providerExactCapabilities = (
   if (catalog?.status !== 'complete') return null;
   return catalog.entries
     .filter((entry) => entry.target.providerId === provider.providerId)
+    .filter((entry) => !provider.accountAccessSupported || !!entry.accountAccess &&
+      accountAccessSelectable(entry.accountAccess, Date.now(), provider.configVersion))
     .map((entry) => {
       const local = isLocalHistoryProvider(provider);
       let state = local ? '读取入口就绪' : '配置就绪';

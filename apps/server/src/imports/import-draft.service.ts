@@ -4,6 +4,7 @@ import { currencySchema, importDraftSchema, type ImportDraft } from '@thesis-led
 import type { ImportDraftOptions } from '../ledger/import-draft.types.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AssetMatcherService } from './asset-matcher.service.js';
+import { readImportDraftReviews } from './import-draft-review.query.js';
 import { readAccount, readLedgerEvents, stableBaselineHash } from './import-state.js';
 import type { ScreenshotSource } from './screenshot-source.js';
 import { inferAssetType } from '../ledger/asset-type.js';
@@ -218,5 +219,9 @@ export class ImportDraftService {
       where: { accountId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  reviewHistory(accountId: string) {
+    return readImportDraftReviews(this.prisma, accountId);
   }
 }

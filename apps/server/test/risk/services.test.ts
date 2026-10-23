@@ -45,6 +45,55 @@ describe('风险事件与通知解耦', () => {
       }),
     });
   });
+  it.each([
+    [false, false, 'update'],
+    [true, true, 'update'],
+    [false, true, 'enable'],
+    [true, false, 'disable'],
+  ] as const)('编辑规则从启用 %s 到 %s 时记录 %s', async (enabled, nextEnabled, action) => {
+    const stored = {
+      id: 'rule-audit',
+      version: 1,
+      kind: 'drawdown',
+      scope: 'portfolio',
+      severity: 'warning',
+      threshold: 0.317,
+      enabled,
+      symbol: null,
+      accountId: null,
+      condition: null,
+      parameters: null,
+      config: null,
+      effectiveAt: new Date('2026-10-17T00:00:00Z'),
+    };
+    const transaction = {
+      riskRule: {
+        findUniqueOrThrow: vi.fn(async () => stored),
+        update: vi.fn(async () => ({
+          ...stored,
+          version: 2,
+          enabled: nextEnabled,
+          threshold: 0.318,
+        })),
+      },
+      riskRuleAudit: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
+    };
+    await new RiskService(prisma as never, {} as never).updateRule(stored.id, {
+      enabled: nextEnabled,
+      threshold: 0.318,
+    });
+    expect(transaction.riskRuleAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action,
+        ruleVersion: 2,
+        before: expect.objectContaining({ enabled, threshold: 0.317 }),
+        after: expect.objectContaining({ enabled: nextEnabled, threshold: 0.318 }),
+      }),
+    });
+  });
   it('通知排队失败时仍保留已写入的 RiskEvent 和 ruleVersion', async () => {
     const event = { id: 'event-1' };
     const prisma = {
@@ -382,7 +431,9 @@ describe('风险事件与通知解耦', () => {
       asset: { findMany: vi.fn(async () => [{ symbol: '600519.SH', name: '贵州茅台' }]) },
     };
     const rules = await new RiskService(prisma as never, {} as never).listRules();
-    expect(rules).toEqual([expect.objectContaining({ symbol: '600519.SH', assetName: '贵州茅台' })]);
+    expect(rules).toEqual([
+      expect.objectContaining({ symbol: '600519.SH', assetName: '贵州茅台' }),
+    ]);
     expect(prisma.asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { symbol: { in: ['600519.SH'] } } }),
     );

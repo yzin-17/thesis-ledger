@@ -34,7 +34,7 @@
 保持现有 HTTP Contract 和业务行为不变，统一依赖方向为：
 
 ```text
-imports（截图上传/识别适配）
+imports（外部输入适配）
   -> ledger（Import Draft / Baseline Ledger 契约与状态）
   -> packages/domain + packages/schemas
 ```
@@ -43,9 +43,9 @@ Ledger 不再直接 import `apps/server/src/imports/*`。
 
 本轮按概念所有权拆分依赖：
 
-- Ledger-owned：Import Draft 状态读取、`ImportDraftOptions`、与截图来源无关的导入持仓数值一致性校验；
-- Imports-owned：`ScreenshotSource`、`VisionPosition`、Provider 接口和 Vision Schema 等截图/识别适配概念；
-- `imports` 可以单向消费 Ledger-owned 原语，Ledger 不知道截图 Provider 或具体截图来源枚举；
+- Ledger-owned：Import Draft 状态读取、`ImportDraftOptions`、导入持仓数值一致性校验；
+- Imports-owned：外部 Provider 接口和协议 Schema；
+- `imports` 可以单向消费 Ledger-owned 原语，Ledger 不知道外部 Provider 或具体来源枚举；
 - 旧的 `imports/import-state.ts` 仅保留兼容 re-export，不保留第二份实现。
 
 ### G3. 将文件尺寸告警改为增量 ratchet
@@ -138,7 +138,7 @@ base > threshold && current <= base      -> pass + warning
 
 - [ ] `AGENTS.md` 包含 Server 边界、复杂度 ratchet、Native 验证、生成物治理规则。
 - [ ] `apps/server/src/ledger/**` 不再 import `../imports/*`。
-- [ ] `ScreenshotSource` / `VisionPosition` 等适配器专属概念仍归 `imports` 所有。
+- [ ] 外部 Provider 与协议 Schema 等适配器专属概念仍归 `imports` 所有。
 - [ ] boundary guardrail 能阻止新的 `ledger -> imports` 依赖。
 - [ ] 文件尺寸 guardrail 在 CI 中对新增超标和存量增长返回失败。
 - [ ] 存量超标但未增长的文件仍允许通过。

@@ -116,7 +116,7 @@ Review已证明旧“已结算”研究约定不能用于新场内ETF权益模�
 
 原[共同价格Task](2026-09-25-multi-source-adjustment-aware-backtest.md)保留历史；取消/保留范围以[2026-10-08决定](../../specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)为准。S05、旧HiThink M31全历史/高级准入、M32、专业Quote高级资格、指定旧资产追补和复杂回退不恢复。
 
-[按需历史数据](../../tasks/2026-10-09-history-data-on-demand.md)和[富途接入](../../tasks/2026-10-08-futu-openapi-full-integration.md)独立维护业务验收；本框架不成为其已完成切片的新前置，不覆盖其WIP/状态。盘口只交付契约与隔离扩展测试，真实二级行情/订阅/盘口UI/逐笔仓库不属于本轮。
+[按需历史数据](../../tasks/2026-10-09-history-data-on-demand.md)和[富途接入](2026-10-08-futu-openapi-full-integration.md)独立维护业务验收；本框架不成为其已完成切片的新前置，不覆盖其WIP/状态。盘口只交付契约与隔离扩展测试，真实二级行情/订阅/盘口UI/逐笔仓库不属于本轮。
 
 ### 0.1 本地文档阶段
 

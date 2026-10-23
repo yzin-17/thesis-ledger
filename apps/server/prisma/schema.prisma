@@ -149,6 +149,7 @@ model Instrument {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
   associations   InstrumentAssetAssociation[]
+  reportMetadataSnapshots MarketReportMetadataSnapshot[]
 
   @@unique([canonicalCode, instrumentType, market])
   @@index([canonicalCode])
@@ -621,6 +622,18 @@ model MarketBarWindowEvidenceV3 {
 
   @@index([market, assetType, capability, timeframe, adjustment, symbol, requestedStart, requestedEnd], map: "market_bar_window_evidence_v3_window_idx")
   @@index([providerId, upstreamSource, seriesVersion], map: "market_bar_window_evidence_v3_source_idx")
+}
+
+model MarketReportMetadataSnapshot {
+  id           String   @id @default(uuid()) @db.Uuid
+  instrumentId String   @db.Uuid
+  symbol       String   @db.VarChar(32)
+  contentHash  String   @db.Char(64)
+  payload      Json
+  collectedAt  DateTime @default(now())
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+
+  @@index([instrumentId, collectedAt, id])
 }
 
 model MarketDerivedSeriesSnapshotV3 {
@@ -1194,6 +1207,63 @@ model AutomationRun {
   @@index([status])
 }
 
+model ResearchObservation {
+  id                  String   @id @default(uuid()) @db.Uuid
+  ownerId             String   @db.Uuid
+  runId               String   @db.Uuid
+  lineageId           String   @db.Uuid
+  logicalKey          String   @unique @db.VarChar(64)
+  artifactFingerprint String   @db.VarChar(64)
+  claimId             String   @db.VarChar(80)
+  windowTradingDays   Int?
+  methodVersion       String   @db.VarChar(80)
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+
+  run         AiRun                           @relation(fields: [runId], references: [id], onDelete: Restrict)
+  versions    ResearchObservationVersion[]
+  submissions ResearchObservationSubmission[]
+
+  @@index([ownerId, runId])
+  @@index([ownerId, lineageId, methodVersion])
+}
+
+model ResearchObservationVersion {
+  id               String   @id @default(uuid()) @db.Uuid
+  observationId    String   @db.Uuid
+  inputFingerprint String   @db.VarChar(64)
+  visibleAt        DateTime @db.Timestamptz(6)
+  payload          Json
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  observation ResearchObservation             @relation(fields: [observationId], references: [id], onDelete: Restrict)
+  submissions ResearchObservationSubmission[]
+
+  @@unique([observationId, inputFingerprint])
+  @@unique([observationId, id])
+  @@index([observationId, visibleAt, createdAt, id], map: "ResearchObservationVersion_projection_idx")
+}
+
+model ResearchObservationSubmission {
+  id            String    @id @default(uuid()) @db.Uuid
+  ownerId       String    @db.Uuid
+  submissionId  String    @db.Uuid
+  observationId String    @db.Uuid
+  requestDigest String    @db.VarChar(64)
+  visibleAt     DateTime  @db.Timestamptz(6)
+  state         String
+  versionId     String?   @db.Uuid
+  errorCode     String?   @db.VarChar(80)
+  expiresAt     DateTime  @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  completedAt   DateTime? @db.Timestamptz(6)
+
+  observation ResearchObservation         @relation(fields: [observationId], references: [id], onDelete: Restrict)
+  version     ResearchObservationVersion? @relation(fields: [observationId, versionId], references: [observationId, id], onDelete: Restrict)
+
+  @@unique([ownerId, submissionId])
+  @@index([observationId, createdAt])
+}
+
 model AiRun {
   id               String    @id @default(uuid()) @db.Uuid
   provider         String
@@ -1217,6 +1287,10 @@ model AiRun {
   executionAttempt Int       @default(0)
   claimedAt        DateTime?
   leaseUntil       DateTime?
+  researchOwnerId       String? @db.Uuid
+  researchSubmissionId  String? @db.Uuid
+  researchInputDigest   String? @db.VarChar(64)
+  researchScopeSnapshot Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -1226,6 +1300,10 @@ model AiRun {
   @@index([status, createdAt, id])
   @@index([retryOfRunId])
   @@index([leaseUntil])
+  @@unique([researchOwnerId, researchSubmissionId])
+  @@index([researchOwnerId, createdAt, id])
+  researchObservations ResearchObservation[]
+
 }
 
 model AiToolCall {

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { isEqual } from 'es-toolkit';
 import {
   journalAnalysisDraftSchema,
+  positiveDecimalStringSchema,
   type JournalAnalysisDraft,
   type JournalReviewCandidateContract,
 } from '@thesis-ledger/schemas';
@@ -12,17 +14,29 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { JournalRequestError } from './JournalReviewFeedback.js';
+import { useDraftCloseGuard } from '../../shared/useDraftCloseGuard.js';
 
 const prices = {
   plannedEntry: '计划入场价',
   plannedExit: '计划退出价',
   stopLoss: '计划止损价',
 } as const;
+type PriceField = keyof typeof prices;
+export function journalDraftPriceErrors(draft: JournalAnalysisDraft) {
+  const errors: Partial<Record<PriceField, string>> = {};
+  for (const key of Object.keys(prices) as PriceField[]) {
+    const value = draft[key];
+    if (value == null) continue;
+    if (!positiveDecimalStringSchema.safeParse(value).success)
+      errors[key] = `${prices[key]}必须是大于零的有效十进制价格`;
+  }
+  return errors;
+}
 export function JournalDraftSheet({
   candidate,
   value,
@@ -38,7 +52,19 @@ export function JournalDraftSheet({
 }) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<unknown>(null);
+  const [priceErrors, setPriceErrors] = useState<Partial<Record<PriceField, string>>>({});
+  const errorId = useId();
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: null,
+    dirty: !isEqual(draft, value),
+    busy: false,
+    onOpenChange,
+  });
   const apply = () => {
+    const errors = journalDraftPriceErrors(draft);
+    setPriceErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     const parsed = journalAnalysisDraftSchema.safeParse(draft);
     if (!parsed.success) {
       setError(new Error('请填写有效的十进制价格和非负整数天数'));
@@ -48,7 +74,7 @@ export function JournalDraftSheet({
     onOpenChange(false);
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>本次分析草稿</SheetTitle>
@@ -60,21 +86,27 @@ export function JournalDraftSheet({
           {Object.entries(prices).map(([rawKey, label]) => {
             const key = rawKey as keyof typeof prices;
             return (
-              <Field key={key}>
+              <Field key={key} invalid={Boolean(priceErrors[key])}>
                 <FieldLabel>{label}</FieldLabel>
                 <Input
                   aria-label={label}
+                  aria-invalid={Boolean(priceErrors[key])}
+                  aria-describedby={priceErrors[key] ? `${errorId}-${key}` : undefined}
                   inputMode="decimal"
                   value={draft[key] ?? ''}
                   placeholder={candidate.input.plan?.[key] ?? '未提供'}
                   onChange={(event) => {
                     setError(null);
+                    setPriceErrors((previous) => ({ ...previous, [key]: '' }));
                     setDraft({ ...draft, [key]: event.target.value || null });
                   }}
                 />
                 <FieldDescription>
                   原计划：{candidate.input.plan?.[key] ?? '未提供'}
                 </FieldDescription>
+                {priceErrors[key] && (
+                  <FieldError id={`${errorId}-${key}`}>{priceErrors[key]}</FieldError>
+                )}
               </Field>
             );
           })}
@@ -109,10 +141,17 @@ export function JournalDraftSheet({
         </FieldGroup>
         {error !== null && <JournalRequestError title="草稿尚未应用" error={error} />}
         <SheetFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => void requestClose(false)}>
             取消
           </Button>
-          <Button variant="outline" onClick={() => setDraft({})}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDraft({});
+              setPriceErrors({});
+              setError(null);
+            }}
+          >
             使用原计划
           </Button>
           <Button onClick={apply}>应用草稿</Button>

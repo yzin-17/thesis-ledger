@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { desktopPathForView, type DesktopNavigationView } from '../views.js';
 import {
   isPortfolioSummaryConsumerRoute,
   usePortfolioShellQueries,
 } from '../features/portfolio/portfolio.queries.js';
-import type { PortfolioMode } from '../features/portfolio/portfolio.types.js';
+import { usePortfolioMode } from '../features/portfolio/portfolio-mode-context.js';
+import { AccountModeLinkNotice } from '../features/portfolio/AccountModeLinkNotice.js';
 import { AccountDataPage } from '../features/account-data/AccountDataPage.js';
 import { AiChat } from '../features/ai/AiChat.js';
 import { LegacyImportReviewRedirect } from '../features/import/LegacyImportReviewRedirect.js';
@@ -24,7 +24,7 @@ type NavigationOptions = { step?: ImportStep };
 export function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [portfolioMode, setPortfolioMode] = useState<PortfolioMode>('actual');
+  const { mode: portfolioMode } = usePortfolioMode();
   const {
     state,
     portfolio,
@@ -66,6 +66,8 @@ export function AppRoutes() {
   };
 
   return (
+    <>
+    <AccountModeLinkNotice accounts={accounts} mode={portfolioMode} />
     <Routes>
       <Route path="/" element={<Navigate to="/portfolio" replace />} />
       <Route
@@ -76,7 +78,6 @@ export function AppRoutes() {
             portfolio={portfolio}
             accounts={accounts}
             mode={portfolioMode}
-            onModeChange={setPortfolioMode}
             onRetry={() => void refresh()}
             refreshing={refreshing}
             onNavigate={navigateTo}
@@ -116,7 +117,6 @@ export function AppRoutes() {
             portfolio={portfolio}
             portfolioState={state}
             mode={portfolioMode}
-            onModeChange={setPortfolioMode}
           />
         }
       />
@@ -126,7 +126,6 @@ export function AppRoutes() {
           <PerformanceDashboard
             accounts={accounts}
             mode={portfolioMode}
-            onModeChange={setPortfolioMode}
             onNavigate={navigateTo}
           />
         }
@@ -136,6 +135,8 @@ export function AppRoutes() {
         path="/journal"
         element={
           <JournalReviewWorkspace
+            key={portfolioMode}
+            mode={portfolioMode}
             accounts={accounts}
             accountsReady={accountsReady}
             accountsPending={accountsPending}
@@ -143,6 +144,12 @@ export function AppRoutes() {
             onRetry={() => void refresh()}
             onNavigateAccounts={() => void navigate('/accounts')}
             onNavigatePosition={() => void navigate('/position-entry')}
+            onAccountChange={(accountId) => {
+              const params = new URLSearchParams(location.search);
+              for (const key of ['mode', 'tradeId', 'reviewObjectId', 'reviewObjectType', 'closeSliceId']) params.delete(key);
+              params.set('accountId', accountId);
+              void navigate({ pathname: '/journal', search: `?${params.toString()}` });
+            }}
             search={location.search}
           />
         }
@@ -152,5 +159,6 @@ export function AppRoutes() {
       <Route path="/market-data" element={<MarketDataPage />} />
       <Route path="*" element={<Navigate to="/portfolio" replace />} />
     </Routes>
+    </>
   );
 }

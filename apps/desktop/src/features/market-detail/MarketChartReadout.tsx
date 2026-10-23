@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import type { MarketChartBar } from './market-chart-types.js';
+import { formatChartBarTime } from './market-chart-time.js';
 import { Separator } from '@/components/ui/separator';
 import { indicatorComparable, indicatorValue, type ChartPoint } from './market-chart-model.js';
 import type { ChartPreference } from './market-chart-preferences.js';
@@ -110,8 +111,8 @@ export function MarketChartReadout({
   activePane: ChartPreference['activePane'];
   showBothPanes: boolean;
 }) {
-  const date = selectedBar?.timestamp.slice(0, 10);
-  let interaction = '最新日';
+  const date = selectedBar ? formatChartBarTime(selectedBar) : undefined;
+  let interaction = selectedBar?.timeframe === '1m' ? '最新分钟' : '最新日';
   if (lockedTimestamp) {
     interaction = '已锁定';
   } else if (selectedTimestamp) {
@@ -135,7 +136,7 @@ export function MarketChartReadout({
   return (
     <div className="flex flex-col gap-2" data-market-chart-readout>
       <p className="m-0 text-xs text-muted-foreground" role="status" aria-live="polite">
-        {date ? `${interaction} ${new Date(date).toLocaleDateString('zh-CN')}` : '悬停查看，点击锁定，Esc 恢复最新'}
+        {date ? `${interaction} ${date}${selectedBar?.session === 'regular' ? ' · 正常时段' : ''}` : '悬停查看，点击锁定，Esc 恢复最新'}
       </p>
       <div className="overflow-x-auto">
         <div className="flex min-w-max items-stretch gap-3">

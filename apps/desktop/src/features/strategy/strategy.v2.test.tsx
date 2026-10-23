@@ -71,6 +71,39 @@ describe('策略工作台当前合同', () => {
     expect(html).not.toContain('下一可执行 K 线开盘');
   });
 
+  it.each([
+    { type: 'percentOfEquity', percent: '0.25' },
+    { type: 'targetWeight', weight: '0.25' },
+  ])('比例仓位明确 0–1 单位并保留原始比例值：$type', async (sizing) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        root.render(
+          <StrategyV2Summary schema={{ ...schema, sizing }} editable onChange={vi.fn()} />,
+        );
+        await Promise.resolve();
+      });
+      const input = document.getElementById('strategy-v2-sizing') as HTMLInputElement | null;
+      expect(input?.value).toBe('0.25');
+      expect(input?.getAttribute('aria-describedby')?.split(' ')).toContain(
+        'strategy-v2-sizing-help',
+      );
+      const description = document.getElementById('strategy-v2-sizing-help')?.textContent;
+      expect(description).toContain('0–1');
+      expect(description).toContain('0.25 表示 25%');
+    } finally {
+      await act(async () => {
+        root.unmount();
+        await Promise.resolve();
+      });
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('取消与重试使用独立的现行 Run 入口', async () => {
     const cancel = makeClient({});
     await cancelBacktest('run/1', cancel.client);
@@ -82,3 +115,6 @@ describe('策略工作台当前合同', () => {
     expect(retry.request).toHaveBeenCalledWith('/backtests/runs/run%2F1/retry', { method: 'POST' });
   });
 });
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';

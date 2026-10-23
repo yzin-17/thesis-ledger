@@ -284,7 +284,7 @@ export type AiProviderTestInput = z.infer<typeof aiProviderTestInputSchema>;
 
 export const aiProviderTestCancelInputSchema = z.object({ requestId: z.uuid() }).strict();
 
-export type AiProviderSource = 'database' | 'environment';
+export type AiProviderSource = 'database';
 
 export const aiProviderModelCatalogInputSchema = z
   .object({

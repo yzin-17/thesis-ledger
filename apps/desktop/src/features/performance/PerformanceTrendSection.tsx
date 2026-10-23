@@ -300,7 +300,7 @@ export function PerformanceSnapshotTable({
     }
   }
   let content: ReactNode;
-  if (loadState === 'loading' && seriesPoints.length === 0 && !groupedByCurrency) {
+  if (loadState === 'loading' && seriesPoints.length === 0 && groups.size === 0) {
     content = <Skeleton className="h-52 w-full rounded-lg" aria-label="资产走势加载中" />;
   } else if (groups.size > 0) {
     content = (
@@ -323,22 +323,25 @@ export function PerformanceSnapshotTable({
         <TrendPointDetails points={seriesPoints} />
       </>
     );
-  } else {
+  } else if (loadState === 'empty' || loadState === 'ready') {
     content = (
       <EmptyTrend
         hasHistory={snapshots.length > 0 || series !== undefined}
         onCompleteDataSetup={onCompleteDataSetup}
       />
     );
+  } else {
+    content = null;
   }
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="m-0 text-xl font-semibold tracking-tight">资产走势</h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            周、月、年线取周期内最后一个有效估值；盘中历史从启用后逐步积累。
-          </p>
+          <details className="mt-1 text-xs text-muted-foreground">
+            <summary className="cursor-pointer">走势计算说明</summary>
+            <p className="mt-2">周、月、年线取周期内最后一个有效估值；盘中历史从启用后逐步积累。</p>
+          </details>
         </div>
         <TrendControls
           range={range}
@@ -350,7 +353,7 @@ export function PerformanceSnapshotTable({
         />
       </div>
       {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
-        <DataStateBanner state={loadState} onRetry={onRetry} />
+        <DataStateBanner state={loadState} description={loadState === 'stale' ? '刷新失败，当前保留上次读取的估值数据。' : undefined} onRetry={onRetry} />
       ) : null}
       {content}
     </section>

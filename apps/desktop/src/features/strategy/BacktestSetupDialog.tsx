@@ -20,6 +20,7 @@ import type { BacktestSetupInput, StrategyRecord, StrategyVersion } from './stra
 import { StrategyV2Summary } from './StrategyV2Summary.js';
 import { BacktestPricePreparation, type PreparedBacktest } from './BacktestPricePreparation.js';
 import { AuthoringRunIntents } from '../strategy-authoring/AuthoringRunIntents.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -69,6 +70,14 @@ export function BacktestSetupDialog({
   const [error, setError] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState<'none' | 'qfq' | 'hfq'>('none');
   const [prepared, setPrepared] = useState<PreparedBacktest | null>(null);
+  const [preparationDirty, setPreparationDirty] = useState(false);
+  const requestOpenChange = useDraftCloseGuard({
+    open,
+    busy,
+    draft: { period, initialCash, baseCurrency, adjustment },
+    dirty: preparationDirty,
+    onOpenChange,
+  });
   useEffect(() => {
     if (open) {
       setPeriod(initialSetup?.period ?? defaultBacktestPeriod());
@@ -77,6 +86,7 @@ export function BacktestSetupDialog({
       setError(null);
       setAdjustment(initialSetup?.adjustment ?? 'none');
       setPrepared(null);
+      setPreparationDirty(false);
     }
   }, [initialSetup, open, version?.id]);
   const presets = backtestPeriodPresets();
@@ -90,6 +100,7 @@ export function BacktestSetupDialog({
   if (busy) submitLabel = '准备中…';
   else if (intent === 'rerun') submitLabel = '创建新任务';
   const submit = async () => {
+    if (busy) return;
     const cash = Number(initialCash);
     if (!period.start || !period.end || period.start > period.end) {
       setError('请选择有效的回测日期区间。');
@@ -127,7 +138,7 @@ export function BacktestSetupDialog({
     onOpenChange(false);
   };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => void requestOpenChange(nextOpen)}>
       <DialogContent className="max-h-[calc(100dvh-32px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6 pr-14 pb-4">
           <DialogTitle>{intent === 'rerun' ? '基于本次配置再次运行' : '开始回测'}</DialogTitle>
@@ -137,7 +148,7 @@ export function BacktestSetupDialog({
               : '提交后将在后台准备行情并启动任务，进度可在回测任务中查看。'}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6">
+        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6" onChange={() => setPreparationDirty(true)}>
           <AuthoringRunIntents version={version} enabled={open} />
           {version?.schema && currentStrategy && (
             <StrategyV2Summary
@@ -199,6 +210,7 @@ export function BacktestSetupDialog({
             onValueChange={(values) => {
               const preset = presets.find((item) => item.label === values[0]);
               if (preset) setPeriod(preset.period);
+              if (preset) setPreparationDirty(true);
             }}
             aria-label="常用回测区间"
             className="w-fit"
@@ -220,6 +232,7 @@ export function BacktestSetupDialog({
                   if (value === 'none' || value === 'qfq' || value === 'hfq') {
                     setAdjustment(value);
                     setPrepared(null);
+                    setPreparationDirty(true);
                   }
                 }}
               >
@@ -241,14 +254,15 @@ export function BacktestSetupDialog({
                 ? { initialModel: initialSetup.executionModel }
                 : {})}
               onPrepared={setPrepared}
+              onDirtyChange={setPreparationDirty}
             />
           )}
-          {error && <FieldError>{error}</FieldError>}
+          {error && <Field invalid><FieldError>{error}</FieldError></Field>}
         </div>
         <div>
           <Separator />
           <DialogFooter className="px-6 py-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => void requestOpenChange(false)}>
               取消
             </Button>
             <Button

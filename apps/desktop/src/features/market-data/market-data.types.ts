@@ -53,6 +53,7 @@ export interface ProviderManifest {
   credentialConfigured: boolean;
   requiresCredential?: boolean;
   accountAccessSupported?: boolean;
+  settings?: Record<string, unknown>;
   origin?: 'dsa';
   markets?: string[];
   configurationMode?: 'control' | 'built_in' | 'dsa_environment';

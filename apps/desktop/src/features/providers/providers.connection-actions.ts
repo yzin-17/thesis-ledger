@@ -1,5 +1,5 @@
 import type { ProviderActionDependencies } from './providers.actions.js';
-
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 export const createProviderConnectionHandlers = (dependencies: ProviderActionDependencies) => {
   const {
     providerDraft,
@@ -31,7 +31,7 @@ export const createProviderConnectionHandlers = (dependencies: ProviderActionDep
     } catch (error) {
       toastManager.add({
         title: `${name} 连通性测试失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接。',
+        description: requestFailureMessage(error, '请检查服务连接。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -105,7 +105,7 @@ export const createProviderConnectionHandlers = (dependencies: ProviderActionDep
       setProviderTestState('error');
       toastManager.add({
         title: `${name} 连通性测试失败`,
-        description: error instanceof Error ? error.message : '连接测试失败。',
+        description: requestFailureMessage(error, '连接测试失败。'),
         type: 'error',
         timeout: 0,
         priority: 'high',

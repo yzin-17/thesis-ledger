@@ -1,8 +1,8 @@
 # ETF 日线独立备用源实施任务
 
-> 归档说明（2026-10-14）：旧 Adapter 内部备用方案已被[显式 RouteTarget Spec](../../specs/2026-09-16-market-data-route-target-v2.md)取代，对应旧 Spec 一并归档；原验证仅证明当时实现，不恢复隐藏切源语义。当前 RouteTarget 尚未完成的独立验收仍在[正式任务](../../tasks/2026-09-16-market-data-route-target-v2.md)。
+> 归档说明（2026-10-14）：旧 Adapter 内部备用方案已被[显式 RouteTarget Spec](../../specs/2026-09-16-market-data-route-target-v2.md)取代，对应旧 Spec 一并归档；原验证仅证明当时实现，不恢复隐藏切源语义。当前 RouteTarget 尚未完成的独立验收仍在[正式任务](2026-09-16-market-data-route-target-v2.md)。
 
-> 状态：历史任务，已由 [`2026-09-16-market-data-route-target-v2.md`](../../tasks/2026-09-16-market-data-route-target-v2.md) 的显式数据源路由改造取代。下列勾选项只表示旧方案当时完成，不表示其内部回退语义仍然有效。
+> 状态：历史任务，已由 [`2026-09-16-market-data-route-target-v2.md`](2026-09-16-market-data-route-target-v2.md) 的显式数据源路由改造取代。下列勾选项只表示旧方案当时完成，不表示其内部回退语义仍然有效。
 
 对应 Spec：[`../specs/2026-09-08-etf-daily-independent-fallback.md`](../specs/2026-09-08-etf-daily-independent-fallback.md)
 

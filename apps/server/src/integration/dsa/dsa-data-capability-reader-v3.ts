@@ -1,6 +1,9 @@
 import {
   marketChartBarsRequestV3Schema,
   marketEventRequestV3Schema,
+  marketNewsRequestV3Schema,
+  marketNewsEndpointV3,
+  type MarketNewsRequestV3,
   marketKnownCashRequestV3Schema,
   marketKnownCashEndpointV3,
   type MarketKnownCashRequestV3,
@@ -22,6 +25,7 @@ import {
   marketCacheContextRequestV3Schema, correlateMarketCacheContextV3, type MarketCacheContextRequestV3,
 } from '@thesis-ledger/schemas';
 import { mapEventV3HttpError, parseEventResponseV3 } from './dsa-events-v3.js';
+import { mapNewsV3HttpError, parseNewsResponseV3 } from './dsa-news-v3.js';
 import { mapKnownCashV3HttpError, parseKnownCashResponseV3 } from './dsa-known-cash-v3.js';
 import {
   mapKnownCashControlV3HttpError,
@@ -37,7 +41,7 @@ import { parseTradingStatusResponseV3 } from './dsa-trading-status-v3.js';
 import { readStatusRouteV1, type RoutedStatusRequestV1, type StatusPolicyReadV1 } from './dsa-status-route-reader-v1.js';
 
 type Mapper = (status: number, payload: unknown) => DsaV3ProtocolError;
-type Post = (path: string, request: unknown, mapper: Mapper) => Promise<unknown>;
+type Post = (path: string, request: unknown, mapper: Mapper, budgetMs?: number, signal?: AbortSignal) => Promise<unknown>;
 
 /** 单次能力请求的绑定与响应解析；认证、期限与传输仍由 DsaClient 承接。 */
 export class DsaDataCapabilityReaderV3 {
@@ -74,10 +78,17 @@ export class DsaDataCapabilityReaderV3 {
     ).then((raw) => this.parse(() => parseEventResponseV3(raw, request)));
   }
 
-  cacheContext(input: MarketCacheContextRequestV3) {
+  news(input: MarketNewsRequestV3, signal?: AbortSignal) {
+    const request = marketNewsRequestV3Schema.parse(input);
+    return this.post(marketNewsEndpointV3, request,
+      (status, payload) => mapNewsV3HttpError(status, payload, request), request.requestBudgetMs, signal,
+    ).then(raw => this.parse(() => parseNewsResponseV3(raw, request)));
+  }
+
+  cacheContext(input: MarketCacheContextRequestV3, signal?: AbortSignal) {
     const request = marketCacheContextRequestV3Schema.parse(input);
     return this.post('/api/v3/thesis-ledger/market/cache-context', request, (status, payload) =>
-      mapDataV3HttpError(status, payload, request.requestId),
+      mapDataV3HttpError(status, payload, request.requestId), undefined, signal,
     ).then((raw) => this.parse(() => {
       try { return correlateMarketCacheContextV3(request, raw); }
       catch { throw new DsaV3ProtocolError('DSA 缓存控制响应未通过关联合同', 'invalid-response'); }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { MarketProviderAccountAccessReport } from '@thesis-ledger/schemas';
+import { marketProviderAccountLevelSchema, type MarketProviderAccountAccessReport, type MarketProviderAccountLevel } from '@thesis-ledger/schemas';
 import { testMarketProvider } from './market-data.api.js';
 import { marketDataKeys } from './market-data.queries.js';
 import { providerTestMessage } from './provider-credentials.js';
@@ -11,7 +11,7 @@ type Feedback = { error: boolean; text: string };
 
 /** 草稿凭证仅通过闭包传入请求；不进入 Query key、mutation variables 或缓存。 */
 export function useProviderCredentialProbe(provider: ProviderManifest, draft: ProviderCredentialDraft,
-  revision: MutableRefObject<number>, publishFeedback: (feedback: Feedback) => void) {
+  revision: MutableRefObject<number>, publishFeedback: (feedback: Feedback) => void, level?: MarketProviderAccountLevel) {
   const [report, setReport] = useState<MarketProviderAccountAccessReport | null>(null);
   const abort = useRef<AbortController | null>(null);
   const active = useRef(true);
@@ -23,10 +23,18 @@ export function useProviderCredentialProbe(provider: ProviderManifest, draft: Pr
       const controller = new AbortController();
       abort.current = controller;
       const dirty = Object.values(draft.values).some((value) => value.length > 0);
+      const configured = marketProviderAccountLevelSchema.safeParse(provider.settings?.accountLevel);
+      let levelChanged = configured.success;
+      if (level) {
+        levelChanged = !configured.success || level.points !== configured.data.points ||
+          level.independentApis.length !== configured.data.independentApis.length ||
+          level.independentApis.some((api) => !configured.data.independentApis.includes(api));
+      }
       try {
         const result = await testMarketProvider(provider,
           savedVersion === undefined && dirty ? draft : undefined, controller.signal, undefined,
-          provider.accountAccessSupported ? 'account_access' : undefined);
+          provider.accountAccessSupported ? 'account_access' : undefined,
+          dirty || levelChanged ? level : undefined);
         if (provider.accountAccessSupported && (result.purpose !== 'account_access' || !result.accountAccess))
           throw new Error('服务未返回逐功能账户权限结果');
         if (savedVersion !== undefined && result.accountAccess?.configVersion !== savedVersion)

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   projectCashBalances,
   projectCashMaterialization,
@@ -6,6 +6,7 @@ import {
 } from '../../src/ledger/cash-projection.js';
 import { rebuildCoreProjections } from '../../src/ledger/core-projection.js';
 import { storedV2Event } from './ledger-event-fixtures.js';
+import { fakeCoreClient } from './core-projection.fixture.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 const strategyId = '22222222-2222-4222-8222-222222222222';
@@ -89,60 +90,6 @@ const cashSnapshot = (input: { id: string; amount: string; capturedAt: string })
     payload: { currency: 'CNY', amount: input.amount, capturedAt: input.capturedAt },
   }) as StoredCashEvent;
 
-const fakeCoreClient = (events: StoredCashEvent[]) => ({
-  account: {
-    findUnique: vi.fn(async () => ({
-      id: accountId,
-      mode: 'actual',
-      createdAt: new Date('2025-01-01T00:00:00.000Z'),
-    })),
-  },
-  accountCostStrategyVersion: {
-    findMany: vi.fn(async () => [
-      {
-        id: strategyId,
-        accountId,
-        revision: 1,
-        method: 'AVG',
-        effectiveAt: new Date('2025-01-01T00:00:00.000Z'),
-        reason: 'test',
-        actorId: 'test',
-      },
-    ]),
-    create: vi.fn(),
-  },
-  accountLedgerState: {
-    findUnique: vi.fn(),
-  },
-  ledgerEvent: {
-    findMany: vi.fn(async () => events),
-  },
-  position: {
-    findMany: vi.fn(async () => []),
-    update: vi.fn(),
-    delete: vi.fn(),
-    create: vi.fn(),
-  },
-  trade: {
-    deleteMany: vi.fn(),
-    create: vi.fn(),
-  },
-  tradeEntryLeg: { create: vi.fn() },
-  tradeBaselineComponent: { create: vi.fn() },
-  tradeCorporateActionAdjustment: { create: vi.fn() },
-  tradeCloseSlice: { create: vi.fn() },
-  tradeCloseAllocation: { create: vi.fn() },
-  tradeDividendAttribution: { create: vi.fn() },
-  tradeEvidenceSource: { create: vi.fn() },
-  cashBalance: {
-    deleteMany: vi.fn(),
-    create: vi.fn(),
-  },
-  cashSettlement: {
-    deleteMany: vi.fn(),
-    create: vi.fn(),
-  },
-});
 
 describe('core ledger projection', () => {
   it('拒绝旧迁移产生的无 transfer 元数据现金划转', () => {

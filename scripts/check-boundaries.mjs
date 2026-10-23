@@ -1,5 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
+import { mobileBoundaryViolation } from './mobile-boundaries.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const violations = [];
@@ -10,6 +11,16 @@ const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
+  [
+    'apps/desktop/src/features/portfolio/portfolio-mode-context.tsx',
+    'apps/desktop/src/app/',
+    '账户模式上下文不得反向依赖应用路由或页面编排',
+  ],
+  [
+    'apps/desktop/src/features/shared/navigation-guard.tsx',
+    'apps/desktop/src/features/portfolio/',
+    'UI 转换保护不得拥有账户模式或组合领域状态',
+  ],
   [
     'apps/server/src/market/market-known-cash-selector-v3.ts',
     'apps/server/src/backtest/',
@@ -201,6 +212,48 @@ const forbiddenFeatureDependencies = [
     'DSA source adapters must not depend on backtest preparation or orchestration',
   ],
   ['apps/server/src/market/', serverBacktestPrefix, '市场事实与公告准备不得反向依赖回测编排'],
+  ['apps/server/src/market/', 'apps/server/src/research/', '市场事实不得反向依赖研究产品编排'],
+  ['apps/server/src/ai/', 'apps/server/src/research/', 'AI 执行适配不得反向依赖研究产品编排'],
+  ...['market', 'integration', 'providers', 'notifications'].map((feature) => [
+    'apps/server/src/research/research-report-comparison.ts',
+    `apps/server/src/${feature}/`,
+    '冻结报告比较只消费已授权产物，不得请求最新数据或发送通知',
+  ]),
+  ...[
+    'research-observation.store.ts',
+    'research-observation-method.ts',
+    'research-observation-statistics.ts',
+  ].flatMap((file) =>
+    ['market', 'ai', 'integration', 'providers', 'notifications'].map((feature) => [
+      `apps/server/src/research/${file}`,
+      `apps/server/src/${feature}/`,
+      '观察存储和确定性计算不得发起模型、来源或账本调用',
+    ]),
+  ),
+  ...['market', 'integration', 'providers', 'ledger', 'notifications', 'platform'].map(
+    (feature) => [
+      'apps/server/src/ai/research-experiment-driver.ts',
+      `apps/server/src/${feature}/`,
+      '离线实验驱动只消费固定输入和显式受控适配器，不得读取生产业务或配置',
+    ],
+  ),
+  ...[
+    'apps/server/src/ai/ai.module.ts',
+    'apps/server/src/ai/ai.controller.ts',
+    'apps/server/src/ai/ai-research.executor.ts',
+    'apps/server/src/research/',
+  ].map((source) => [
+    source,
+    'apps/server/src/ai/research-experiment-',
+    '受控离线实验不得注册到生产研究路径',
+  ]),
+  [
+    'apps/server/src/research/',
+    'apps/server/src/integration/',
+    '研究产品必须通过 Market 消费数据事实',
+  ],
+  ['apps/server/src/research/', 'apps/server/src/providers/', '研究准备不得直接配置或测试数据来源'],
+  ['apps/server/src/research/', 'apps/server/src/notifications/', '研究准备不得隐式发送通知'],
   [
     serverProvidersPrefix,
     'apps/server/src/ai/',
@@ -217,6 +270,18 @@ const forbiddenFeatureDependencies = [
     'AI adapters must not depend on strategy orchestration',
   ],
   [serverLedgerPrefix, serverImportsPrefix, 'ledger must not depend on imports adapter'],
+  [
+    'apps/server/src/ledger/execution-write-admission.ts',
+    'apps/server/src/integration/',
+    '成交写入准入只接稳定事实，不直接消费来源适配器',
+  ],
+  [
+    'apps/server/src/ledger/execution-write-admission.ts',
+    'apps/server/src/providers/',
+    '成交写入准入不得自行读取 Provider 或凭证',
+  ],
+  ['apps/server/src/risk/', 'apps/server/src/automation/', '风险上下文不得反向依赖扫描编排'],
+  ['apps/server/src/risk/', 'apps/server/src/performance/', '风险估值不得依赖收益页面或快照编排'],
   [serverLedgerPrefix, 'apps/server/src/journal/', '交易事实投影不得反向依赖复盘消费与持久化'],
   [
     serverProvidersPrefix,
@@ -280,12 +345,20 @@ async function walk(directory) {
 
 async function inspect(path) {
   const source = await readFile(path, 'utf8');
-  const imports = [...source.matchAll(/(?:from\s+|import\s*\()['"]([^'"]+)['"]/g)].map(
+  const imports = [...source.matchAll(/(?:from\s+|(?:import|require)\s*\(|import\s*)['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );
   const file = relative(root, path).replaceAll('\\', '/');
   const isServerSource = file.startsWith('apps/server/src/');
   const isMarketFeature = file.startsWith('apps/server/src/market/');
+  if (
+    isServerSource &&
+    /\b(?:AI_PROVIDER_CONFIGS_JSON|AI_PROVIDER_ID|AI_BASE_URL|AI_API_KEY|AI_MODEL|AI_FIXTURE_ENABLED|aiProviderConfigsJson|aiProviderId|aiBaseUrl|aiApiKey|aiModel|aiFixtureEnabled|createConfiguredAiProviders|parseConfiguredAiProviderInputs)\b/u.test(
+      source,
+    )
+  ) {
+    violations.push(`${file} -> 退役的 AI 部署配置入口 (AI Provider 只能消费数据库配置)`);
+  }
   const isDsaBoundary = file.startsWith('apps/server/src/integration/dsa/');
   if (
     (isServerSource || file.startsWith('packages/schemas/src/')) &&
@@ -345,12 +418,26 @@ async function inspect(path) {
   }
   if (
     isServerSource &&
+    !isMarketFeature &&
+    !isDsaBoundary &&
+    /\.\s*marketNewsV3\s*\(|\breadDsaNewsFeedV3\s*\(|\.dataCapabilities\s*\.\s*news\s*\(/u.test(
+      source,
+    )
+  ) {
+    violations.push(
+      `${file} -> DsaClient news (必须通过 MarketNewsReader 或 MarketNewsFeedReader)`,
+    );
+  }
+  if (
+    isServerSource &&
     (/\/api\/v2\/thesis-ledger\/market\/bars/u.test(source) ||
       /\b(?:prisma|client)\.marketBarSeries(?:Fact|Coverage)\b/u.test(source))
   ) {
     violations.push(`${file} -> 旧 BarSeries 事实链路 (必须使用现行精确窗口)`);
   }
   for (const specifier of imports) {
+    const mobileViolation = mobileBoundaryViolation(file, specifier);
+    if (mobileViolation) violations.push(`${file} -> ${specifier} (${mobileViolation})`);
     if (
       /(?:^|\/)(?:ledger-v2|backtest-v2|backtest-analytics-v2|backtest-v2-execution)\.js$/u.test(
         specifier,

@@ -37,6 +37,8 @@ describe('AI Provider 兼容迁移 dry-run', () => {
               costPer1kOutput: 0.2,
               costCurrency: 'USD',
               pricingVersion: 'user-v1',
+              updatedAt: '2026-10-01T00:00:00.000Z',
+              source: 'user',
             },
           },
           costPer1kInput: 0.3,
@@ -87,5 +89,89 @@ describe('AI Provider 兼容迁移 dry-run', () => {
       expect.arrayContaining(['模型 model-a 的用途 research 存在重复路由']),
     );
     expect(item.proposedModelPricing['model-a']).toEqual({ costPer1kInput: 0.1 });
+  });
+
+  it('已有全部模型价格时仍明确迁移旧全局键，新增模型不依赖旧回退', () => {
+    const report = planAiProviderMigrations([
+      {
+        name: 'cleanup-only',
+        settings: {
+          models: ['model'],
+          costPer1kInput: 0,
+          costPer1kOutput: 0,
+          costCurrency: 'USD',
+          modelPricing: {
+            model: {
+              costPer1kInput: 0.2,
+              pricingVersion: 'user-v1',
+              updatedAt: '2026-10-01T00:00:00.000Z',
+              source: 'user',
+            },
+          },
+        },
+      },
+    ]);
+    expect(report.items[0]).toMatchObject({
+      status: 'ready',
+      preservedModels: ['model'],
+      proposedModelPricing: {},
+    });
+  });
+
+  it.each([
+    { costCurrency: 'not-a-currency' },
+    { modelPricing: { model: null } },
+    { modelPricing: { model: { costPer1kInput: -1 } } },
+    { modelPricing: { model: { costPer1kInput: 0 } } },
+  ])('无法安全转换的价格报告冲突 %j', (change) => {
+    const report = planAiProviderMigrations([
+      {
+        name: 'invalid',
+        settings: {
+          models: ['model'],
+          costPer1kInput: 0,
+          costPer1kOutput: 0,
+          costCurrency: 'USD',
+          ...change,
+        },
+      },
+    ]);
+    expect(report.items[0]?.status).toBe('conflict');
+  });
+
+  it('特殊模型名保持自身键值，不改变迁移建议对象原型', () => {
+    const report = planAiProviderMigrations([
+      {
+        name: 'special',
+        settings: {
+          models: ['__proto__'],
+          costPer1kInput: 0,
+          costPer1kOutput: 0,
+          costCurrency: 'USD',
+        },
+      },
+    ]);
+    expect(Object.hasOwn(report.items[0]!.proposedModelPricing, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(report.items[0]!.proposedModelPricing)).toBeNull();
+  });
+
+  it.each([
+    { models: [' model '] },
+    { models: ['model', 'model'] },
+    { models: ['m'.repeat(201)] },
+    { models: Array.from({ length: 33 }, (_, index) => `model-${index}`) },
+  ])('模型键必须能被现行价格读取合同完整消费 %j', (change) => {
+    const report = planAiProviderMigrations([
+      {
+        name: 'invalid-models',
+        settings: {
+          costPer1kInput: 0,
+          costPer1kOutput: 0,
+          costCurrency: 'USD',
+          ...change,
+        },
+      },
+    ]);
+    expect(report.items[0]?.status).toBe('conflict');
   });
 });

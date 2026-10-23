@@ -107,10 +107,12 @@ describe('AI 运行审计', () => {
     );
     await service.list(20, 'failed');
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { status: 'failed' }, take: 20 }),
+      expect.objectContaining({ where: { status: 'failed', researchOwnerId: null }, take: 20 }),
     );
     await service.resume('run-2');
-    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'run-2' } }));
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'run-2', researchOwnerId: null } }),
+    );
   });
 
   it('再次生成预填保留来源模板，unknown 来源必须由服务端确认风险', async () => {

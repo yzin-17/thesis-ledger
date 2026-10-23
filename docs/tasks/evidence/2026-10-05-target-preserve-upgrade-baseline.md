@@ -1,6 +1,6 @@
 # 目标保数据升级与部署基线证据
 
-历史权威状态见[归档任务](../../archive/tasks/2026-10-05-target-preserve-upgrade-baseline.md)，验收标准见[规格](../../specs/2026-10-05-target-preserve-upgrade-baseline.md)。本记录对应未提交工作区，不把 HEAD 当成完整部署输入。
+历史权威状态见[归档任务](../../archive/tasks/2026-10-05-target-preserve-upgrade-baseline.md)，验收标准见[规格](../../archive/specs/2026-10-05-target-preserve-upgrade-baseline.md)。本记录对应未提交工作区，不把 HEAD 当成完整部署输入。
 
 ## 输入与准备
 

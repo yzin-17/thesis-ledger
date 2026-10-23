@@ -29,7 +29,7 @@
 - 不为派生周期新增 PostgreSQL 事实表或 migration：派生序列是可重算的视图，不是来源事实。
 - 不在 Desktop、不在 API Client 做聚合或指标计算，不引入第二套公式。
 - 不改变交易标记、成本线、风险线、区间测量等既有非目标。
-- 不修复分页锚点既有缺陷（`/detail` 未接收 `calculationAnchor`、`loadEarlier` 传序列末尾日期）；该独立后续项已迁入 [`../TODO.md`](../TODO.md) 的 `market-detail-pagination-anchor`。
+- 不扩展真正游标及显式 `calculationAnchor` 接收/消费；当前 `loadEarlier` 已采用增加 `barsLimit` 的有界扩窗，旧末尾日期参数路径已退役。后续范围由 [`../TODO.md`](../TODO.md) 的 `market-detail-pagination-anchor` 维护，不按旧描述重复修复。
 
 ## 现状与约束
 
@@ -43,7 +43,7 @@
 - 服务端详情能力矩阵把 bars 与指标绑定在 `DAILY_BAR`：`apps/server/src/market/market-detail.service.ts:64-67`。
 - 指标端点已是「给定 points 的纯计算」：`packages/schemas/src/market-bar-series-v2.ts:111-137` 的 `indicatorCalculateRequestV2Schema` 只要求 `identity + inputFingerprint + points + requests`，`market-v2.controller.ts:172-198` 的 `calculate()` 直接消费 Reader 返回的序列。因此聚合后的周期序列可以直接交给 DSA 计算。
 - 指标缓存键已含输入口径：`market-v2.controller.ts:177` 为 `${series.inputFingerprint}:${engineVersion}:${requests}`，而 fingerprint 由 `identity + points` 决定，周期不同即天然隔离。
-- 事实身份含 timeframe：`docs/specs/2026-09-16-market-bar-series-cache-v2.md:15` 规定事实唯一身份为 `symbol + timeframe + timestamp + adjustment + providerId + upstreamSource`，且该 Spec 明确 PostgreSQL 只保存来源事实、Redis 保存可丢弃视图。
+- 事实身份含 timeframe：[历史缓存合同](../archive/specs/2026-09-16-market-bar-series-cache-v2.md#目标) 规定事实唯一身份为 `symbol + timeframe + timestamp + adjustment + providerId + upstreamSource`，且该 Spec 明确 PostgreSQL 只保存来源事实、Redis 保存可丢弃视图。
 - 主仓已有派生周期先例与命名法：`apps/server/src/market/backtest-bar-aggregation.service.ts:20-46` 用 `kind: 'derived'`、`provider: 'thesis-ledger-server'`、`providerRevision: 'server-aggregation-v2'`、reason「由 Server 从冻结 1m Bar 按市场 Session 确定性派生」，且「calendar fact 不可用时派生能力降级为 unavailable」；schema 侧 `packages/schemas/src/backtest-data.ts:10` 有 `dataTimeframeKindSchema = z.enum(['base','derived'])`。
 - 窗口与预热约束：本节保留立项基线记录，现行参数以 T1.3/T3 冻结合同和下文「对外行为或接口变化」为准。`limits.bars` 表示本次请求条数，90 是 Desktop 常用窗口，不是现行详情硬上限；派生基础事实与指标计算各自使用 3650 点预算，不能把两层预算合并。
 - 图表侧的指纹与分页语义已冻结：`2026-09-10` Spec AC4 要求按「共同日期的逐日 inputFingerprint」判断可比；Desktop 已按「页 = 一次详情响应」的粒度构建 ChartPoint 并按日期合并（`market-chart-model.ts` 的 `mergeChartPoints`、`market-chart-types.ts` 的 `chartPageFromResponse`）。周期切换必须沿用这套页内可比语义。

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { formatDateTime } from '@/lib/date-display';
 import { EmptyListState } from '../shared/EmptyStates.js';
+import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { fetchStrategyBacktestGroups } from './strategy-optimization.api.js';
 import { backtestIdentity, resolveBacktestVersion } from './strategy-backtest-detail.model.js';
 import { strategyCenterPath } from './strategy-center.navigation.js';
@@ -50,6 +51,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
   const trail = (searchParams.get('trail') ?? '').split(',').filter(Boolean);
   const [draftSearch, setDraftSearch] = useState(search);
   const expanded = new Set((searchParams.get('expanded') ?? '').split(',').filter(Boolean));
+  const detailState = { backtestJobsSearch: searchParams.toString() };
 
   useEffect(() => setDraftSearch(search), [search]);
   useEffect(() => {
@@ -187,6 +189,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
         </Field>
       </div>
 
+      {groups.isPending && <DataStateBanner state="loading" description="正在读取回测任务列表。" />}
       {groups.isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
           <p className="font-medium text-destructive">回测任务加载失败</p>
@@ -238,6 +241,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                         <Link
                           className="block truncate font-medium text-foreground hover:underline"
                           to={strategyCenterPath.job(latest.id)}
+                          state={detailState}
                           title={title}
                         >
                           {title}
@@ -262,7 +266,11 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                           size="xs"
                           variant="ghost"
                           nativeButton={false}
-                          render={<Link to={strategyCenterPath.job(latest.id)}>详情</Link>}
+                          render={
+                            <Link to={strategyCenterPath.job(latest.id)} state={detailState}>
+                              详情
+                            </Link>
+                          }
                         />
                       </td>
                     </tr>
@@ -322,6 +330,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                               <Link
                                 className="block truncate font-medium text-foreground hover:underline"
                                 to={strategyCenterPath.job(job.id)}
+                                state={detailState}
                                 title={identity.title}
                               >
                                 {identity.title}
@@ -346,7 +355,11 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                                 size="xs"
                                 variant="ghost"
                                 nativeButton={false}
-                                render={<Link to={strategyCenterPath.job(job.id)}>详情</Link>}
+                                render={
+                                  <Link to={strategyCenterPath.job(job.id)} state={detailState}>
+                                    详情
+                                  </Link>
+                                }
                               />
                             </td>
                           </tr>
@@ -361,9 +374,13 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
       )}
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
-          共 {groups.data?.totalCount ?? 0} 项，本页包含{' '}
-          {groups.data?.items.reduce((total, group) => total + group.jobs.length, 0) ?? 0} 个任务
-          {trail.length > 0 ? `，第 ${trail.length + 1} 页` : ''}
+          {groups.data ? (
+            <>
+              共 {groups.data.totalCount} 项，本页包含{' '}
+              {groups.data.items.reduce((total, group) => total + group.jobs.length, 0)} 个任务
+              {trail.length > 0 ? `，第 ${trail.length + 1} 页` : ''}
+            </>
+          ) : '任务数量尚未确定'}
         </span>
         <div className="flex gap-2">
           <Button

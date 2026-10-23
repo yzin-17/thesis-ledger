@@ -1,5 +1,5 @@
 import { ArrowLeft, LoaderCircle, Play, RefreshCw, X } from 'lucide-react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -20,8 +20,7 @@ import {
   deriveBacktestRerun,
   resolveBacktestVersion,
 } from './strategy-backtest-detail.model.js';
-import { strategyCenterPath } from './strategy-center.navigation.js';
-import type { StrategyCenterTab } from './strategy-center.navigation.js';
+import { backtestJobsReturnPath, strategyCenterPath } from './strategy-center.navigation.js';
 import { useBacktestJobQuery } from './strategy.queries.js';
 import { StrategyBacktestResultTabs } from './StrategyBacktestDetailSections.js';
 import { backtestStageLabel, jobStatusLabel, jobStatusVariant } from './StrategySections.js';
@@ -49,7 +48,6 @@ export function StrategyBacktestDetailPage({
   onCancel,
   onRetry,
   onRerun,
-  onSourceTabChange,
 }: {
   strategies: StrategyRecord[];
   strategiesLoading: boolean;
@@ -58,9 +56,9 @@ export function StrategyBacktestDetailPage({
   onCancel: (job: BacktestJob) => void;
   onRetry: (job: BacktestJob) => void;
   onRerun: (request: RerunRequest) => void;
-  onSourceTabChange: (tab: StrategyCenterTab) => void;
 }) {
   const { jobId } = useParams();
+  const returnPath = backtestJobsReturnPath(useLocation().state);
   const jobQuery = useBacktestJobQuery(jobId ?? null);
   const groupQuery = useQuery({
     queryKey: ['desktop', 'strategy', 'backtest-group', jobId],
@@ -69,7 +67,7 @@ export function StrategyBacktestDetailPage({
     staleTime: 10_000,
   });
 
-  if (!jobId) return <NavigateBackMessage message="回测任务 ID 缺失。" />;
+  if (!jobId) return <NavigateBackMessage message="回测任务 ID 缺失。" returnPath={returnPath} />;
   if (jobQuery.isPending) {
     return (
       <div className="flex min-h-60 items-center justify-center text-sm text-muted-foreground">
@@ -84,7 +82,7 @@ export function StrategyBacktestDetailPage({
       message = '当前回测格式不受支持或冻结记录校验未通过，无法读取此任务。';
     return (
       <div className="space-y-4">
-        <NavigateBackMessage message={message} />
+        <NavigateBackMessage message={message} returnPath={returnPath} />
         <Button variant="outline" onClick={() => void jobQuery.refetch()}>
           <RefreshCw />
           重试
@@ -143,7 +141,7 @@ export function StrategyBacktestDetailPage({
         variant="ghost"
         size="sm"
         render={
-          <Link to={strategyCenterPath.jobs}>
+          <Link to={returnPath}>
             <ArrowLeft />
             返回回测任务
           </Link>
@@ -170,14 +168,7 @@ export function StrategyBacktestDetailPage({
                 size="sm"
                 variant="outline"
                 render={
-                  <Link
-                    to={sourcePath}
-                    onClick={() =>
-                      onSourceTabChange(
-                        identity.sourceKind === 'experiment' ? 'experiments' : 'library',
-                      )
-                    }
-                  >
+                  <Link to={sourcePath}>
                     查看来源
                   </Link>
                 }
@@ -282,14 +273,15 @@ export function StrategyBacktestDetailPage({
   );
 }
 
-function NavigateBackMessage({ message }: { message: string }) {
+function NavigateBackMessage({ message, returnPath }: { message: string; returnPath: string }) {
   return (
     <div className="rounded-lg border border-dashed p-8 text-center">
       <p className="text-sm text-muted-foreground">{message}</p>
       <Button
+        nativeButton={false}
         className="mt-4"
         variant="outline"
-        render={<Link to={strategyCenterPath.jobs}>返回回测任务</Link>}
+        render={<Link to={returnPath}>返回回测任务</Link>}
       />
     </div>
   );

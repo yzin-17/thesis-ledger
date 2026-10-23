@@ -1,6 +1,7 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import { assertLegacyAiContextAccess } from './ai-legacy-read-access.js';
 import {
   aiContextSchema,
   aiResearchListQuerySchema,
@@ -46,10 +47,6 @@ interface ResearchQueryRow {
 
 type ResearchContext = z.infer<typeof aiContextSchema>;
 
-type ModelWithFindUnique = {
-  findUnique?: (args: unknown) => Promise<unknown>;
-};
-
 const encodeCursor = (updatedAt: Date | string, id: string) => {
   const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
   return Buffer.from(JSON.stringify({ version: 1, updatedAt: date.toISOString(), id })).toString(
@@ -92,7 +89,7 @@ export class AiResearchQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   private where(query: AiResearchListQuery, cursor: ReturnType<typeof decodeCursor>) {
-    const conditions: Prisma.Sql[] = [];
+    const conditions: Prisma.Sql[] = [Prisma.sql`r."researchOwnerId" IS NULL`];
     if (query.status) conditions.push(Prisma.sql`r."status"=${query.status}`);
     if (query.search) conditions.push(Prisma.sql`r."question" ILIKE ${`%${query.search}%`}`);
     if (cursor) {
@@ -244,17 +241,17 @@ export class AiResearchQuery {
         label: '研究对象',
       };
       if (context?.scope === 'portfolio') {
-        object = { type: 'portfolio', label: '当前投资组合' };
+        object = { type: 'portfolio', label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}投资组合` : '当前投资组合' };
       } else if (context?.scope === 'account') {
         object = {
           type: 'account',
-          label: '账户',
+          label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}账户` : '账户',
           ...(account?.name ? { name: account.name } : {}),
         };
       } else if (context?.scope === 'position') {
         object = {
           type: 'position',
-          label: '持仓',
+          label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}持仓` : '持仓',
           ...(asset?.name ? { name: asset.name } : {}),
           ...(context.symbol ? { code: context.symbol } : {}),
         };
@@ -332,43 +329,6 @@ export class AiResearchQuery {
     });
   }
 
-  private async assertAccess(contextValue: unknown) {
-    const parsed = aiContextSchema.safeParse(contextValue);
-    if (!parsed.success) return;
-    const models = this.prisma as unknown as {
-      account?: ModelWithFindUnique;
-      position?: ModelWithFindUnique;
-      strategyVersion?: ModelWithFindUnique;
-    };
-    const context = parsed.data;
-    if (context.accountId && models.account?.findUnique) {
-      const account = (await models.account.findUnique({
-        where: { id: context.accountId },
-        select: { id: true, active: true },
-      })) as { id?: string; active?: boolean } | null;
-      if (!account || account.active === false) throw new NotFoundException('研究上下文已不可访问');
-    }
-    if (
-      context.scope === 'position' &&
-      context.accountId &&
-      context.symbol &&
-      models.position?.findUnique
-    ) {
-      const position = await models.position.findUnique({
-        where: { accountId_symbol: { accountId: context.accountId, symbol: context.symbol } },
-        select: { id: true },
-      });
-      if (!position) throw new NotFoundException('研究上下文已不可访问');
-    }
-    if (context.strategyVersionId && models.strategyVersion?.findUnique) {
-      const version = await models.strategyVersion.findUnique({
-        where: { id: context.strategyVersionId },
-        select: { id: true },
-      });
-      if (!version) throw new NotFoundException('研究上下文已不可访问');
-    }
-  }
-
   async listPage(input: unknown) {
     const query = aiResearchListQuerySchema.parse(input);
     const rows = await this.rows(query);
@@ -422,12 +382,12 @@ export class AiResearchQuery {
         ORDER BY attempt."createdAt" DESC, attempt."id" DESC
         LIMIT 1
       ) AS relation ON TRUE
-      WHERE r."id"=${id}::uuid
+      WHERE r."id"=${id}::uuid AND r."researchOwnerId" IS NULL
       LIMIT 1
     `);
     const row = rows[0];
     if (!row) return null;
-    await this.assertAccess(row.context);
+    await assertLegacyAiContextAccess(this.prisma, row.context);
     const display = (await this.projections([row]))[0];
     const execution = aiExecutionReadModel(row.modelMetadata);
     return {

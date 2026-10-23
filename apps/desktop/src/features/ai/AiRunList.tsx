@@ -1,3 +1,4 @@
+import { researchStateMeta } from './research-state-display.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,7 @@ import {
 import { ExternalLink, Search } from 'lucide-react';
 import type { LoadState } from '../shared/types.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import type { AiRunFilterStatus, AiRunRecord, AiRunSourceFilter } from './ai.types.js';
 import { formatDateTime, formatFullDateTime, questionSummary, statusLabel } from './ai.display.js';
 
@@ -43,6 +45,7 @@ const statusFilters: Array<{ value: AiRunFilterStatus; label: string }> = [
 
 const sourceFilters: Array<{ value: AiRunSourceFilter; label: string }> = [
   { value: 'all', label: '全部来源' },
+  { value: 'instrument', label: '标的研究' },
   { value: 'portfolio', label: '组合研究' },
   { value: 'account', label: '账户研究' },
   { value: 'position', label: '持仓研究' },
@@ -174,6 +177,7 @@ function ResearchMobileRow({
 }
 
 interface AiRunListProps {
+  readView?: 'legacy' | 'scoped';
   runs: AiRunRecord[];
   selectedId: string | null;
   status: AiRunFilterStatus;
@@ -208,10 +212,11 @@ function ResearchListToolbar(
     | 'onIncludeInternalChange'
     | 'onSearchChange'
     | 'onRefresh'
+    | 'readView'
   >,
 ) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border bg-card p-3">
+    <div className="flex flex-wrap items-center gap-2 py-1">
       <div className="relative min-w-52 flex-1 basis-72">
         <Search
           aria-hidden="true"
@@ -244,36 +249,46 @@ function ResearchListToolbar(
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Select
-        value={props.source}
-        onValueChange={(value) => props.onSourceChange(value as AiRunSourceFilter)}
-      >
-        <SelectTrigger size="sm" aria-label="研究来源">
-          <SelectValue>
-            {sourceFilters.find((item) => item.value === props.source)?.label ?? '全部来源'}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false}>
-          <SelectGroup>
-            {sourceFilters.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <div className="flex items-center gap-2 text-sm">
-        <Switch
-          checked={props.includeInternal}
-          onCheckedChange={props.onIncludeInternalChange}
-          variant="risk"
-          aria-label="包含实验内部任务"
+      {props.readView !== 'legacy' && (
+        <Select
+          value={props.source}
+          onValueChange={(value) => props.onSourceChange(value as AiRunSourceFilter)}
         >
-          <SwitchThumb variant="risk" />
-        </Switch>
-        <span>包含实验内部任务</span>
-      </div>
+          <SelectTrigger size="sm" aria-label="研究来源">
+            <SelectValue>
+              {sourceFilters.find((item) => item.value === props.source)?.label ?? '全部来源'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            <SelectGroup>
+              {sourceFilters
+                .filter(
+                  (item) =>
+                    props.readView !== 'scoped' ||
+                    !['unknown', 'strategy_experiment'].includes(item.value),
+                )
+                .map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      )}
+      {props.readView === undefined && (
+        <div className="flex items-center gap-2 text-sm">
+          <Switch
+            checked={props.includeInternal}
+            onCheckedChange={props.onIncludeInternalChange}
+            variant="risk"
+            aria-label="包含实验内部任务"
+          >
+            <SwitchThumb variant="risk" />
+          </Switch>
+          <span>包含实验内部任务</span>
+        </div>
+      )}
       <RefreshIconButton
         label="刷新研究列表"
         refreshing={props.refreshing}
@@ -299,7 +314,9 @@ function ResearchDesktopTable({
             <TableHead className="hidden w-44 @min-[1080px]:table-cell">来源</TableHead>
             <TableHead className="w-32">状态</TableHead>
             <TableHead className="w-28">更新时间</TableHead>
-            <TableHead className="w-20 text-right">操作</TableHead>
+            <StickyTableActionHeader className="h-10 w-20 px-2 align-middle font-medium whitespace-nowrap">
+              操作
+            </StickyTableActionHeader>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -351,7 +368,7 @@ function ResearchDesktopTable({
                   {formatDateTime(run.display?.updatedAt ?? run.updatedAt ?? run.createdAt)}
                 </time>
               </TableCell>
-              <TableCell className="text-right">
+              <StickyTableActionCell className="p-2 text-right align-middle whitespace-nowrap">
                 <Button
                   type="button"
                   variant="ghost"
@@ -364,7 +381,7 @@ function ResearchDesktopTable({
                 >
                   查看
                 </Button>
-              </TableCell>
+              </StickyTableActionCell>
             </TableRow>
           ))}
         </TableBody>
@@ -443,11 +460,11 @@ function ResearchListResults(
       {showEmpty && (
         <Empty className="min-h-72 border-0 p-6">
           <EmptyHeader>
-            <EmptyTitle>{hasConditions ? '没有匹配的研究' : '暂无研究'}</EmptyTitle>
+            <EmptyTitle>{hasConditions ? '没有匹配的研究' : researchStateMeta.empty.label}</EmptyTitle>
             <EmptyDescription>
               {hasConditions
                 ? '当前查询条件没有返回研究任务。'
-                : '新建研究后，可在这里比较结果与来源。'}
+                : researchStateMeta.empty.description}
             </EmptyDescription>
           </EmptyHeader>
           {hasConditions && (
@@ -472,6 +489,7 @@ function ResearchListResults(
 }
 
 export function AiRunList({
+  readView,
   runs,
   selectedId,
   status,
@@ -495,6 +513,7 @@ export function AiRunList({
   return (
     <section className="@container flex min-h-0 flex-col gap-3" aria-label="研究任务列表">
       <ResearchListToolbar
+        {...(readView ? { readView } : {})}
         status={status}
         source={source}
         includeInternal={includeInternal}
@@ -520,7 +539,7 @@ export function AiRunList({
         onRefresh={onRefresh}
         onClearFilters={onClearFilters}
       />
-      {runs.length > 0 && hasMore && (
+      {hasMore && (
         <Button
           type="button"
           variant="outline"

@@ -1,18 +1,19 @@
 import type { MarketAccountAccess, MarketProviderAccountAccessReport } from '@thesis-ledger/schemas';
 
 export const accountAccessState = (access: MarketAccountAccess, now = Date.now(), configVersion?: number) => {
-  if (access.state === 'allowed' && (!access.checkedAt || !access.validUntil || access.configVersion === undefined)) return 'unknown';
+  if (access.state === 'allowed' && (!access.checkedAt || (!access.validUntil && !access.persisted) || access.configVersion === undefined)) return 'unknown';
   if (configVersion !== undefined && access.configVersion !== undefined && access.configVersion !== configVersion) return 'unknown';
   if (access.validUntil && Date.parse(access.validUntil) <= now) return 'unknown';
   return access.state;
 };
 
-export const accountAccessSelectable = (access: MarketAccountAccess | undefined, now = Date.now(), configVersion?: number) =>
-  access === undefined || accountAccessState(access, now, configVersion) === 'allowed';
+export const accountAccessSelectable = (access: MarketAccountAccess | undefined, now = Date.now(), configVersion?: number, requiresCheck = false) =>
+  access === undefined ? !requiresCheck : accountAccessState(access, now, configVersion) === 'allowed';
 
 export function accountAccessLabel(access: MarketAccountAccess, now = Date.now(), configVersion?: number): string {
   const state = accountAccessState(access, now, configVersion);
   if (state === 'allowed') return '当前账户可访问';
+  if (state === 'not_included') return '当前等级未包含';
   if (state === 'permission_missing') return '当前账户缺少权限';
   if (state === 'credential_missing') return '尚未配置凭证';
   if (state === 'credential_invalid') return '凭证无效，请重新配置';
@@ -31,6 +32,8 @@ export function accountAccessLabel(access: MarketAccountAccess, now = Date.now()
 
 export const accountAccessReportMessage = (report: MarketProviderAccountAccessReport) => {
   const count = (state: MarketAccountAccess['state']) => report.routes.filter((route) => route.access.state === state).length;
+  if (count('not_included')) return { error: count('credential_invalid') > 0,
+    text: `已确认${count('allowed')}项可用功能，${count('not_included')}项当前等级未包含，${count('unknown')}项待确认。` };
   return { error: count('credential_invalid') > 0,
     text: `已检查${report.routes.length}项功能：${count('allowed')}项可访问，${count('permission_missing')}项缺少权限，${count('unknown')}项待验证。` };
 };

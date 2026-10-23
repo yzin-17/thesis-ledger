@@ -1,6 +1,6 @@
 import { Prisma, type BacktestJob } from '@prisma/client';
 import type { PrismaService } from '../platform/prisma.service.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { prepareBacktestAttempt } from './backtest-run-attempt-preflight.js';
 
 export interface BacktestRunAttemptExecution {
   attempt: number;
@@ -35,9 +35,8 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
 ): Promise<TJob | null> {
   const { job, execution, prisma, activeControllers } = input;
   const runId = job.id;
-  if (persistedContractVersion(job) !== 3) throw new Error('旧 Run 持久化合同拒绝执行');
-  if (finishedStatuses.has(job.status)) return job;
-  if (!execution && job.status !== 'queued') return job;
+  const eligibility = await prepareBacktestAttempt(prisma, job, input.runnerId, execution !== undefined);
+  if (!eligibility.allowed) return eligibility.job;
 
   const attempt = execution?.attempt ?? job.executionAttempt + 1;
   if (job.cancelRequestedAt) {

@@ -78,8 +78,7 @@ export class RiskRuleService {
       (input as Record<string, unknown>).enabled === true;
     return this.prisma.$transaction(async (transaction) => {
       const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
-      if (stored.archivedAt)
-        throw new BadRequestException('规则已归档，请先恢复后再编辑或启停');
+      if (stored.archivedAt) throw new BadRequestException('规则已归档，请先恢复后再编辑或启停');
       const mergedInput = {
         kind: stored.kind,
         scope: stored.scope,
@@ -121,7 +120,8 @@ export class RiskRuleService {
           version: { increment: 1 },
         },
       });
-      const action = patch.enabled === undefined ? 'update' : patch.enabled ? 'enable' : 'disable';
+      let action = 'update';
+      if (updated.enabled !== stored.enabled) action = updated.enabled ? 'enable' : 'disable';
       await transaction.riskRuleAudit.create({
         data: {
           ruleId: id,

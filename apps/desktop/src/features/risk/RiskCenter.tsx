@@ -1,5 +1,7 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToastManager } from '@/components/ui/toast';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -8,8 +10,9 @@ import type { Account, Portfolio, PortfolioMode } from '../portfolio/portfolio.t
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import type { LoadState } from '../shared/types.js';
-import { PortfolioModeNote, PortfolioModeSwitch } from '../shared/PortfolioModeSwitch.js';
+import { PortfolioModeNote } from '../shared/PortfolioModeSwitch.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { createRiskActionHandlers } from './risk.actions.js';
 import {
   useCreateRiskRuleMutation,
@@ -43,13 +46,11 @@ export function RiskCenter({
   portfolio,
   portfolioState,
   mode,
-  onModeChange,
 }: {
   accounts: Account[];
   portfolio: Portfolio | null;
   portfolioState: LoadState;
   mode: PortfolioMode;
-  onModeChange: (mode: PortfolioMode) => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
@@ -64,6 +65,11 @@ export function RiskCenter({
   const [eventSeverityFilter, setEventSeverityFilter] = useState<string | null>(null);
   const [notificationStatusFilter, setNotificationStatusFilter] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const failureToastRef = useRef<string | null>(null);
+  useNavigationGuard({
+    dirty: false,
+    busy: busyAction !== null && !busyAction.startsWith('audit:'),
+  });
   const [auditRule, setAuditRule] = useState<RiskRuleRecord | null>(null);
   const [auditVisible, setAuditVisible] = useState(false);
   const [testRecords, setTestRecords] = useState<Record<string, RiskTestRecord>>({});
@@ -79,8 +85,33 @@ export function RiskCenter({
   const testRuleMutation = useTestRiskRuleMutation();
   const scanRiskMutation = useScanRiskMutation();
   const rules = riskQueries.rules.data ?? [];
+  const rulesReadOnly = riskQueries.rules.isError || riskQueries.rules.isPending;
+  const rulesReadState = resolveLoadState(
+    [riskQueries.rules],
+    riskQueries.rules.data !== undefined,
+    rules.length === 0,
+  );
+  const confirmedRuleWrite = [
+    createRuleMutation,
+    patchRuleMutation,
+    deleteRuleMutation,
+    restoreRuleMutation,
+  ].some((mutation) => mutation.data !== undefined);
+  const scanReadUnconfirmed =
+    scanRiskMutation.data !== undefined &&
+    (riskQueries.rules.isError || riskQueries.events.isError || riskQueries.notifications.isError);
   const events = riskQueries.events.data ?? [];
   const deliveries = riskQueries.notifications.data ?? [];
+  const eventReadState = resolveLoadState(
+    [riskQueries.events],
+    riskQueries.events.data !== undefined,
+    events.length === 0,
+  );
+  const notificationReadState = resolveLoadState(
+    [riskQueries.notifications],
+    riskQueries.notifications.data !== undefined,
+    deliveries.length === 0,
+  );
   let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
   if (notificationRoutingQuery.isError) notificationRoutingState = 'error';
   else if (notificationRoutingQuery.isPending) notificationRoutingState = 'loading';
@@ -114,6 +145,7 @@ export function RiskCenter({
     busyAction,
     setBusyAction,
     toastManager,
+    failureToastRef,
     createRuleMutation,
     patchRuleMutation,
     deleteRuleMutation,
@@ -137,20 +169,6 @@ export function RiskCenter({
     if (!auditRule || busyAction !== `audit:${auditRule.id}`) return;
     if (!auditQuery.isPending && !auditQuery.isFetching) setBusyAction(null);
   }, [auditQuery.isFetching, auditQuery.isPending, auditRule, auditVisible, busyAction]);
-
-  useEffect(() => {
-    if (!auditQuery.isError || !auditRule) return;
-    setAuditVisible(false);
-    setAuditRule(null);
-    setBusyAction(null);
-    toastManager.add({
-      title: '审计记录读取失败',
-      description: '请稍后重试。',
-      type: 'error',
-      timeout: 0,
-      priority: 'high',
-    });
-  }, [auditQuery.isError, auditRule, toastManager]);
 
   const selectTab = (nextTab: RiskTab, filter?: string) => {
     setTab(nextTab);
@@ -238,7 +256,6 @@ export function RiskCenter({
         description="设置监控规则，查看风险事件与通知记录。"
         actions={
           <>
-            <PortfolioModeSwitch mode={mode} onModeChange={onModeChange} ariaLabel="风险范围" />
             <RefreshIconButton
               label="刷新风险数据"
               refreshing={riskRefreshing}
@@ -266,6 +283,38 @@ export function RiskCenter({
       {loadState === 'empty' ? null : (
         <DataStateBanner state={loadState} onRetry={() => void refreshRisk()} />
       )}
+      {confirmedRuleWrite && riskQueries.rules.isError && (
+        <Alert>
+          <AlertTitle>规则更改已保存</AlertTitle>
+          <AlertDescription>
+            完整规则列表读取失败；无需再次提交，重新读取后再继续操作。
+          </AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={riskQueries.rules.isFetching}
+            onClick={() => void riskQueries.rules.refetch()}
+          >
+            重新读取规则
+          </Button>
+        </Alert>
+      )}
+      {scanReadUnconfirmed && (
+        <Alert>
+          <AlertTitle>风险扫描已完成</AlertTitle>
+          <AlertDescription>
+            风险历史读取失败，无需再次执行；重新读取后再继续扫描。
+          </AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={riskRefreshing}
+            onClick={() => void actions.loadRisk()}
+          >
+            重新读取风险历史
+          </Button>
+        </Alert>
+      )}
 
       <Tabs value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
         <TabsList variant="line" className="mb-4 w-full">
@@ -280,14 +329,18 @@ export function RiskCenter({
             mode={mode}
             portfolioValueAt={portfolio?.valuedAt ?? null}
             portfolioState={portfolioState}
-            loadState={loadState}
+            loadState={eventReadState}
+            rulesState={rulesReadState}
+            notificationsState={notificationReadState}
             rules={rules}
             events={events}
             deliveries={deliveries}
             lastUpdatedAt={riskUpdatedAt}
             scanning={busyAction === 'scan-risk'}
+            scanDisabled={rulesReadOnly || busyAction !== null || scanReadUnconfirmed}
             onScan={() => void actions.scanRisk()}
             onSelectTab={selectTab}
+            onRetryEvents={() => void riskQueries.events.refetch()}
           />
         </TabsContent>
         <TabsContent value="rules">
@@ -297,6 +350,7 @@ export function RiskCenter({
             positions={portfolio?.positions ?? []}
             loadState={loadState}
             busyAction={busyAction}
+            readOnly={rulesReadOnly}
             testRecords={testRecords}
             onCreate={createRule}
             onUpdate={updateRule}
@@ -313,18 +367,20 @@ export function RiskCenter({
         </TabsContent>
         <TabsContent value="events">
           <RiskEventTable
-            loadState={loadState}
+            loadState={eventReadState}
             events={events}
             severityFilter={eventSeverityFilter}
+            onRetry={() => void riskQueries.events.refetch()}
           />
         </TabsContent>
         <TabsContent value="notifications">
           <RiskNotificationTable
-            loadState={loadState}
+            loadState={notificationReadState}
             deliveries={deliveries}
             statusFilter={notificationStatusFilter}
             routes={notificationRoutingQuery.data?.routes ?? []}
             routingState={notificationRoutingState}
+            onRetry={() => void riskQueries.notifications.refetch()}
           />
         </TabsContent>
       </Tabs>
@@ -336,6 +392,7 @@ export function RiskCenter({
         audit={auditQuery.data ?? []}
         pending={auditQuery.isPending || auditQuery.isFetching}
         error={auditQuery.isError}
+        onRetry={() => void auditQuery.refetch()}
         onOpenChange={closeAudit}
       />
     </section>

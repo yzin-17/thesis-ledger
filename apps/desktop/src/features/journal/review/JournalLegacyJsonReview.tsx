@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { completedTradeSchema } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
@@ -25,22 +25,37 @@ function legacyInput(text: string) {
 export function JournalLegacyJsonReview() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const submissionLock = useRef(false);
   const analysis = useMutation({
-    mutationFn: () => {
-      const input = legacyInput(text);
+    mutationFn: (submittedText: string) => {
+      const input = legacyInput(submittedText);
       return requestDesktopJson<unknown>('/journal/analysis/planned-vs-actual', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(input),
       });
     },
+    onSettled: () => {
+      submissionLock.current = false;
+    },
   });
+  const handleAnalyze = () => {
+    if (submissionLock.current) return;
+    submissionLock.current = true;
+    analysis.mutate(text);
+  };
   return (
     <>
       <Button variant="ghost" onClick={() => setOpen(true)}>
         高级 JSON 兼容分析
       </Button>
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && submissionLock.current) return;
+          setOpen(nextOpen);
+        }}
+      >
         <SheetContent className="overflow-y-auto">
           <SheetHeader>
             <SheetTitle>高级 JSON 兼容分析</SheetTitle>
@@ -55,14 +70,16 @@ export function JournalLegacyJsonReview() {
                 aria-label="旧交易 JSON"
                 rows={14}
                 value={text}
+                disabled={analysis.isPending || submissionLock.current}
                 onChange={(event) => {
+                  if (submissionLock.current) return;
                   setText(event.target.value);
                   analysis.reset();
                 }}
               />
             </Field>
           </FieldGroup>
-          <Button disabled={analysis.isPending} onClick={() => analysis.mutate()}>
+          <Button disabled={analysis.isPending || submissionLock.current} onClick={handleAnalyze}>
             分析兼容输入
           </Button>
           {analysis.isError && (

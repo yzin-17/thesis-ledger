@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
+import { requestFailureMessage } from '@/shared/api/request-error';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,8 +107,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
       setFeedback('风险应用已更新。');
       await invalidate();
     },
-    onError: (error) =>
-      setFeedback(error instanceof Error ? error.message : '更新策略风险应用失败'),
+    onError: (error) => setFeedback(requestFailureMessage(error, '更新策略风险应用失败')),
   });
   const remove = useMutation({
     mutationFn: (application: StrategyRiskApplication) =>
@@ -121,7 +121,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
       setFeedback('风险应用已删除，相关实际监控已停止。');
       await invalidate();
     },
-    onError: (error) => setFeedback(error instanceof Error ? error.message : '删除风险应用失败'),
+    onError: (error) => setFeedback(requestFailureMessage(error, '删除风险应用失败')),
   });
   const previewUpgrade = useMutation({
     mutationFn: (input: { applicationId: string; targetVersion: StrategyVersion }) =>
@@ -134,8 +134,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
         idempotencyKey: crypto.randomUUID(),
       });
     },
-    onError: (error) =>
-      setFeedback(error instanceof Error ? error.message : '风险应用升级预览失败'),
+    onError: (error) => setFeedback(requestFailureMessage(error, '风险应用升级预览失败')),
   });
   const confirmUpgrade = useMutation({
     mutationFn: () => {
@@ -152,8 +151,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
       setFeedback(`风险应用已升级，当前修订 r${application.revision}。`);
       await invalidate();
     },
-    onError: (error) =>
-      setFeedback(error instanceof Error ? error.message : '升级失败，请刷新后重新预览'),
+    onError: (error) => setFeedback(requestFailureMessage(error, '升级失败，请刷新后重新预览')),
   });
   const openApplication = (applicationId: string) => {
     const next = new URLSearchParams(searchParams);

@@ -40,7 +40,7 @@ export function OfficialAnnouncements() {
       {query.isError && (
         <div className="flex flex-col gap-2">
           <p role="alert" className="text-sm text-muted-foreground">
-            公告列表加载失败。
+            {data ? '公告刷新失败，当前保留上次成功读取的结果。' : '公告列表加载失败。'}
           </p>
           <Button variant="outline" onClick={() => void query.refetch()}>
             重试

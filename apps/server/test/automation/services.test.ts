@@ -106,7 +106,7 @@ describe('风险后台评估', () => {
     quantity: 100,
     costPrice: 10,
     updatedAt: new Date('2026-09-05T00:00:00Z'),
-    asset: { assetType: 'stock' },
+    asset: { assetType: 'stock', currency: 'CNY' },
   });
 
   const makeRuntime = (
@@ -124,7 +124,8 @@ describe('风险后台评估', () => {
         riskEvent: { findMany: vi.fn(async () => []) },
       } as never,
       { riskScan } as never,
-      { getQuote: vi.fn(async () => ({ price: 9 })) } as never,
+      { getQuote: vi.fn(async (symbol: string) => ({ symbol, price: 9, stale: false,
+        freshness: 'live', provider: 'controlled', marketTime: '2026-09-05T02:00:00Z' })) } as never,
       {} as never,
       {} as never,
       {} as never,

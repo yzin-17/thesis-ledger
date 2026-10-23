@@ -1,0 +1,1629 @@
+{
+  "description": "受控合成观察；不表示任何真实来源或模型已验收。",
+  "report": {
+    "id": "00000000-0000-4000-8000-000000000099",
+    "status": "succeeded",
+    "question": "现有材料是否支持继续观察？",
+    "createdAt": "2026-10-18T08:02:00.000Z",
+    "updatedAt": "2026-10-18T08:03:00.000Z",
+    "historicalScope": {
+      "status": "known",
+      "snapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      }
+    },
+    "resultVersion": 2,
+    "availability": "available",
+    "summary": "材料有限，继续观察。",
+    "quality": {
+      "status": "complete",
+      "reasons": []
+    },
+    "errorCode": null,
+    "errorSummary": null,
+    "result": {
+      "version": 2,
+      "inputFingerprint": "8aaa37492eb270ff22a9aa291e0c703512681ed39a0742372640c836ce35b240",
+      "scopeSnapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      },
+      "createdAt": "2026-10-18T08:02:00Z",
+      "dataCutoffAt": "2026-10-18T08:00:30Z",
+      "promptVersion": "research-v2",
+      "model": {
+        "providerId": "controlled-model",
+        "modelId": "contract-fixture",
+        "researchSettingsRevision": "controlled-settings-1"
+      },
+      "inference": {
+        "version": 2,
+        "conclusion": "材料有限，继续观察。",
+        "rationale": [
+          "合成报价只支持当前数值核对。"
+        ],
+        "claims": [
+          {
+            "id": "direction-1",
+            "description": "受控方向断言",
+            "evidenceIds": [
+              "5ae8d674-40f4-489e-b055-76c675ac643e"
+            ],
+            "kind": "price-direction",
+            "instrumentId": "00000000-0000-4000-8000-000000000001",
+            "direction": "up",
+            "tradingDays": 5,
+            "rationale": "受控依据"
+          }
+        ],
+        "numericClaims": [
+          {
+            "id": "current-price",
+            "description": "受控报价",
+            "kind": "field",
+            "source": {
+              "evidenceId": "5ae8d674-40f4-489e-b055-76c675ac643e",
+              "fieldPath": "/price",
+              "unit": "price",
+              "currency": "CNY",
+              "value": 100
+            }
+          },
+          {
+            "id": "same-price-change",
+            "description": "相同操作数对照",
+            "kind": "derived",
+            "operation": "percentage_change",
+            "operands": [
+              {
+                "evidenceId": "5ae8d674-40f4-489e-b055-76c675ac643e",
+                "fieldPath": "/price",
+                "unit": "price",
+                "currency": "CNY",
+                "value": 100
+              },
+              {
+                "evidenceId": "5ae8d674-40f4-489e-b055-76c675ac643e",
+                "fieldPath": "/price",
+                "unit": "price",
+                "currency": "CNY",
+                "value": 100
+              }
+            ],
+            "value": 0,
+            "unit": "ratio",
+            "currency": null,
+            "assumptions": []
+          }
+        ],
+        "invalidationConditions": [
+          {
+            "id": "price-condition",
+            "description": "跌破合成阈值则复核",
+            "evidenceIds": [
+              "5ae8d674-40f4-489e-b055-76c675ac643e"
+            ],
+            "kind": "price-threshold",
+            "instrumentId": "00000000-0000-4000-8000-000000000001",
+            "operator": "lt",
+            "value": 90,
+            "unit": "price",
+            "currency": "CNY",
+            "tradingDays": 5
+          }
+        ],
+        "nextSteps": [
+          {
+            "action": "view_evidence",
+            "description": "查看资料",
+            "evidenceIds": [
+              "5ae8d674-40f4-489e-b055-76c675ac643e"
+            ],
+            "claimId": null
+          },
+          {
+            "action": "review_due",
+            "description": "到期复核",
+            "evidenceIds": [],
+            "claimId": "direction-1"
+          }
+        ],
+        "risks": [
+          "样例不能代表真实走势。"
+        ],
+        "unknowns": [
+          "未来价格未知。"
+        ],
+        "disclaimer": "本样例仅用于合同测试。",
+        "confidence": {
+          "level": "unassessed",
+          "basis": [
+            "没有真实来源和模型执行。"
+          ]
+        }
+      },
+      "evidenceBindings": [
+        {
+          "audit": {
+            "evidenceId": "5ae8d674-40f4-489e-b055-76c675ac643e",
+            "fingerprint": "059f5a27684642ec9438e86b99facaff22cbb3b5be7feb7e39ecebc74e2c669b",
+            "kind": "quote",
+            "providerId": "controlled-data",
+            "upstreamSource": "controlled-quote",
+            "contractVersion": "controlled-quote-v3",
+            "policyRevision": "policy-1",
+            "routeRevision": "route-1",
+            "credentialRevision": null,
+            "sourceIds": [
+              "600519.SH"
+            ],
+            "sourceUrls": [
+              "https://quote.example.com/600519.SH"
+            ],
+            "publishedAt": null,
+            "availableAt": "2026-10-18T08:00:00Z",
+            "fetchedAt": "2026-10-18T08:00:00Z"
+          },
+          "toolCallId": "8994cdcd-9ab1-4242-9e49-732d8aa15db7"
+        }
+      ],
+      "quality": {
+        "status": "complete",
+        "reasons": []
+      }
+    },
+    "submission": {
+      "version": 2,
+      "submissionId": "98fd6289-7c36-4d6b-b5cb-7e395d41bc9c",
+      "mode": "shadow",
+      "scope": {
+        "scope": "instrument",
+        "instrumentId": "00000000-0000-4000-8000-000000000001"
+      },
+      "question": "现有材料是否支持继续观察？",
+      "templateId": "counter-evidence",
+      "researchSettingsRevision": "controlled-settings-1"
+    }
+  },
+  "observations": {
+    "version": "research-observations-v1",
+    "reportId": "00000000-0000-4000-8000-000000000099",
+    "historicalScope": {
+      "status": "known",
+      "snapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      }
+    },
+    "asOf": "2026-11-30T08:00:00Z",
+    "availability": "available",
+    "issues": [],
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000301",
+        "claimId": "direction-1",
+        "instrumentId": "00000000-0000-4000-8000-000000000001",
+        "direction": "up",
+        "tradingDays": 5,
+        "current": {
+          "id": "00000000-0000-4000-8000-000000000303",
+          "observationId": "00000000-0000-4000-8000-000000000301",
+          "inputFingerprint": "90e0b269cffc96dca27c66959aa4ec9128e1f2baf3e58f3bbe51a6be67f0d246",
+          "recordedAt": "2026-11-30T08:00:01Z",
+          "inputs": {
+            "visibleAt": "2026-11-30T08:00:00Z",
+            "calendar": {
+              "status": "ready",
+              "calendar": {
+                "market": "CN",
+                "timezone": "Asia/Shanghai",
+                "revision": "controlled-calendar-1",
+                "availableAt": "2026-10-01T00:00:00Z",
+                "coverageStart": "2026-10-01",
+                "coverageEnd": "2026-12-01",
+                "sessions": [
+                  {
+                    "tradingDate": "2026-10-09",
+                    "startAt": "2026-10-09T01:30:00Z",
+                    "endAt": "2026-10-09T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-09",
+                    "startAt": "2026-10-09T05:00:00Z",
+                    "endAt": "2026-10-09T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-12",
+                    "startAt": "2026-10-12T01:30:00Z",
+                    "endAt": "2026-10-12T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-12",
+                    "startAt": "2026-10-12T05:00:00Z",
+                    "endAt": "2026-10-12T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-13",
+                    "startAt": "2026-10-13T01:30:00Z",
+                    "endAt": "2026-10-13T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-13",
+                    "startAt": "2026-10-13T05:00:00Z",
+                    "endAt": "2026-10-13T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-14",
+                    "startAt": "2026-10-14T01:30:00Z",
+                    "endAt": "2026-10-14T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-14",
+                    "startAt": "2026-10-14T05:00:00Z",
+                    "endAt": "2026-10-14T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-15",
+                    "startAt": "2026-10-15T01:30:00Z",
+                    "endAt": "2026-10-15T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-15",
+                    "startAt": "2026-10-15T05:00:00Z",
+                    "endAt": "2026-10-15T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-16",
+                    "startAt": "2026-10-16T01:30:00Z",
+                    "endAt": "2026-10-16T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-16",
+                    "startAt": "2026-10-16T05:00:00Z",
+                    "endAt": "2026-10-16T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-19",
+                    "startAt": "2026-10-19T01:30:00Z",
+                    "endAt": "2026-10-19T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-19",
+                    "startAt": "2026-10-19T05:00:00Z",
+                    "endAt": "2026-10-19T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-20",
+                    "startAt": "2026-10-20T01:30:00Z",
+                    "endAt": "2026-10-20T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-20",
+                    "startAt": "2026-10-20T05:00:00Z",
+                    "endAt": "2026-10-20T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-21",
+                    "startAt": "2026-10-21T01:30:00Z",
+                    "endAt": "2026-10-21T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-21",
+                    "startAt": "2026-10-21T05:00:00Z",
+                    "endAt": "2026-10-21T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-22",
+                    "startAt": "2026-10-22T01:30:00Z",
+                    "endAt": "2026-10-22T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-22",
+                    "startAt": "2026-10-22T05:00:00Z",
+                    "endAt": "2026-10-22T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-23",
+                    "startAt": "2026-10-23T01:30:00Z",
+                    "endAt": "2026-10-23T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-23",
+                    "startAt": "2026-10-23T05:00:00Z",
+                    "endAt": "2026-10-23T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-26",
+                    "startAt": "2026-10-26T01:30:00Z",
+                    "endAt": "2026-10-26T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-26",
+                    "startAt": "2026-10-26T05:00:00Z",
+                    "endAt": "2026-10-26T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-27",
+                    "startAt": "2026-10-27T01:30:00Z",
+                    "endAt": "2026-10-27T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-27",
+                    "startAt": "2026-10-27T05:00:00Z",
+                    "endAt": "2026-10-27T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-28",
+                    "startAt": "2026-10-28T01:30:00Z",
+                    "endAt": "2026-10-28T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-28",
+                    "startAt": "2026-10-28T05:00:00Z",
+                    "endAt": "2026-10-28T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-29",
+                    "startAt": "2026-10-29T01:30:00Z",
+                    "endAt": "2026-10-29T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-29",
+                    "startAt": "2026-10-29T05:00:00Z",
+                    "endAt": "2026-10-29T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-30",
+                    "startAt": "2026-10-30T01:30:00Z",
+                    "endAt": "2026-10-30T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-10-30",
+                    "startAt": "2026-10-30T05:00:00Z",
+                    "endAt": "2026-10-30T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-02",
+                    "startAt": "2026-11-02T01:30:00Z",
+                    "endAt": "2026-11-02T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-02",
+                    "startAt": "2026-11-02T05:00:00Z",
+                    "endAt": "2026-11-02T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-03",
+                    "startAt": "2026-11-03T01:30:00Z",
+                    "endAt": "2026-11-03T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-03",
+                    "startAt": "2026-11-03T05:00:00Z",
+                    "endAt": "2026-11-03T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-04",
+                    "startAt": "2026-11-04T01:30:00Z",
+                    "endAt": "2026-11-04T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-04",
+                    "startAt": "2026-11-04T05:00:00Z",
+                    "endAt": "2026-11-04T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-05",
+                    "startAt": "2026-11-05T01:30:00Z",
+                    "endAt": "2026-11-05T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-05",
+                    "startAt": "2026-11-05T05:00:00Z",
+                    "endAt": "2026-11-05T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-06",
+                    "startAt": "2026-11-06T01:30:00Z",
+                    "endAt": "2026-11-06T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-06",
+                    "startAt": "2026-11-06T05:00:00Z",
+                    "endAt": "2026-11-06T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-09",
+                    "startAt": "2026-11-09T01:30:00Z",
+                    "endAt": "2026-11-09T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-09",
+                    "startAt": "2026-11-09T05:00:00Z",
+                    "endAt": "2026-11-09T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-10",
+                    "startAt": "2026-11-10T01:30:00Z",
+                    "endAt": "2026-11-10T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-10",
+                    "startAt": "2026-11-10T05:00:00Z",
+                    "endAt": "2026-11-10T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-11",
+                    "startAt": "2026-11-11T01:30:00Z",
+                    "endAt": "2026-11-11T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-11",
+                    "startAt": "2026-11-11T05:00:00Z",
+                    "endAt": "2026-11-11T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-12",
+                    "startAt": "2026-11-12T01:30:00Z",
+                    "endAt": "2026-11-12T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-12",
+                    "startAt": "2026-11-12T05:00:00Z",
+                    "endAt": "2026-11-12T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-13",
+                    "startAt": "2026-11-13T01:30:00Z",
+                    "endAt": "2026-11-13T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-13",
+                    "startAt": "2026-11-13T05:00:00Z",
+                    "endAt": "2026-11-13T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-16",
+                    "startAt": "2026-11-16T01:30:00Z",
+                    "endAt": "2026-11-16T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-16",
+                    "startAt": "2026-11-16T05:00:00Z",
+                    "endAt": "2026-11-16T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-17",
+                    "startAt": "2026-11-17T01:30:00Z",
+                    "endAt": "2026-11-17T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-17",
+                    "startAt": "2026-11-17T05:00:00Z",
+                    "endAt": "2026-11-17T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-18",
+                    "startAt": "2026-11-18T01:30:00Z",
+                    "endAt": "2026-11-18T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-18",
+                    "startAt": "2026-11-18T05:00:00Z",
+                    "endAt": "2026-11-18T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-19",
+                    "startAt": "2026-11-19T01:30:00Z",
+                    "endAt": "2026-11-19T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-19",
+                    "startAt": "2026-11-19T05:00:00Z",
+                    "endAt": "2026-11-19T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-20",
+                    "startAt": "2026-11-20T01:30:00Z",
+                    "endAt": "2026-11-20T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-20",
+                    "startAt": "2026-11-20T05:00:00Z",
+                    "endAt": "2026-11-20T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-23",
+                    "startAt": "2026-11-23T01:30:00Z",
+                    "endAt": "2026-11-23T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-23",
+                    "startAt": "2026-11-23T05:00:00Z",
+                    "endAt": "2026-11-23T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-24",
+                    "startAt": "2026-11-24T01:30:00Z",
+                    "endAt": "2026-11-24T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-24",
+                    "startAt": "2026-11-24T05:00:00Z",
+                    "endAt": "2026-11-24T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-25",
+                    "startAt": "2026-11-25T01:30:00Z",
+                    "endAt": "2026-11-25T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-25",
+                    "startAt": "2026-11-25T05:00:00Z",
+                    "endAt": "2026-11-25T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-26",
+                    "startAt": "2026-11-26T01:30:00Z",
+                    "endAt": "2026-11-26T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-26",
+                    "startAt": "2026-11-26T05:00:00Z",
+                    "endAt": "2026-11-26T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-27",
+                    "startAt": "2026-11-27T01:30:00Z",
+                    "endAt": "2026-11-27T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-27",
+                    "startAt": "2026-11-27T05:00:00Z",
+                    "endAt": "2026-11-27T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-30",
+                    "startAt": "2026-11-30T01:30:00Z",
+                    "endAt": "2026-11-30T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-11-30",
+                    "startAt": "2026-11-30T05:00:00Z",
+                    "endAt": "2026-11-30T07:00:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-12-01",
+                    "startAt": "2026-12-01T01:30:00Z",
+                    "endAt": "2026-12-01T03:30:00Z"
+                  },
+                  {
+                    "tradingDate": "2026-12-01",
+                    "startAt": "2026-12-01T05:00:00Z",
+                    "endAt": "2026-12-01T07:00:00Z"
+                  }
+                ]
+              }
+            },
+            "prices": {
+              "status": "ready",
+              "currency": "CNY",
+              "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "points": [
+                {
+                  "date": "2026-10-19",
+                  "close": "100",
+                  "state": "traded",
+                  "availableAt": "2026-10-19T07:01:00Z"
+                },
+                {
+                  "date": "2026-10-26",
+                  "close": "110",
+                  "state": "traded",
+                  "availableAt": "2026-10-26T07:01:00Z"
+                }
+              ]
+            }
+          },
+          "evaluation": {
+            "status": "completed",
+            "reasons": [],
+            "window": {
+              "tradingDays": 5,
+              "startSession": "2026-10-19",
+              "endSession": "2026-10-26",
+              "startCloseAt": "2026-10-19T07:00:00Z",
+              "endCloseAt": "2026-10-26T07:00:00Z"
+            },
+            "economic": {
+              "basis": "economic-close",
+              "currency": "CNY",
+              "startPrice": "100",
+              "endPrice": "110",
+              "returnRate": "0.1",
+              "directionMatched": true
+            }
+          }
+        }
+      }
+    ],
+    "statistics": {
+      "methodVersion": "research-price-direction-v1",
+      "coverage": "complete",
+      "samples": 1,
+      "dueSamples": 1,
+      "dueUnknownSamples": 0,
+      "calculatedSamples": 1,
+      "notDueSamples": 0,
+      "notApplicableSamples": 0,
+      "matchedSamples": 1,
+      "exclusions": [],
+      "sampleStatus": "insufficient",
+      "directionMatchRate": null,
+      "returnBasis": "economic-close"
+    }
+  },
+  "submission": {
+    "reportId": "00000000-0000-4000-8000-000000000099",
+    "historicalScope": {
+      "status": "known",
+      "snapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      }
+    },
+    "claimId": "direction-1",
+    "attempt": {
+      "submissionId": "00000000-0000-4000-8000-000000000302",
+      "observationId": "00000000-0000-4000-8000-000000000301",
+      "state": "succeeded",
+      "expiresAt": "2026-11-30T08:00:30Z",
+      "errorCode": null,
+      "version": {
+        "id": "00000000-0000-4000-8000-000000000303",
+        "observationId": "00000000-0000-4000-8000-000000000301",
+        "inputFingerprint": "90e0b269cffc96dca27c66959aa4ec9128e1f2baf3e58f3bbe51a6be67f0d246",
+        "recordedAt": "2026-11-30T08:00:01Z",
+        "inputs": {
+          "visibleAt": "2026-11-30T08:00:00Z",
+          "calendar": {
+            "status": "ready",
+            "calendar": {
+              "market": "CN",
+              "timezone": "Asia/Shanghai",
+              "revision": "controlled-calendar-1",
+              "availableAt": "2026-10-01T00:00:00Z",
+              "coverageStart": "2026-10-01",
+              "coverageEnd": "2026-12-01",
+              "sessions": [
+                {
+                  "tradingDate": "2026-10-09",
+                  "startAt": "2026-10-09T01:30:00Z",
+                  "endAt": "2026-10-09T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-09",
+                  "startAt": "2026-10-09T05:00:00Z",
+                  "endAt": "2026-10-09T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-12",
+                  "startAt": "2026-10-12T01:30:00Z",
+                  "endAt": "2026-10-12T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-12",
+                  "startAt": "2026-10-12T05:00:00Z",
+                  "endAt": "2026-10-12T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-13",
+                  "startAt": "2026-10-13T01:30:00Z",
+                  "endAt": "2026-10-13T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-13",
+                  "startAt": "2026-10-13T05:00:00Z",
+                  "endAt": "2026-10-13T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-14",
+                  "startAt": "2026-10-14T01:30:00Z",
+                  "endAt": "2026-10-14T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-14",
+                  "startAt": "2026-10-14T05:00:00Z",
+                  "endAt": "2026-10-14T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-15",
+                  "startAt": "2026-10-15T01:30:00Z",
+                  "endAt": "2026-10-15T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-15",
+                  "startAt": "2026-10-15T05:00:00Z",
+                  "endAt": "2026-10-15T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-16",
+                  "startAt": "2026-10-16T01:30:00Z",
+                  "endAt": "2026-10-16T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-16",
+                  "startAt": "2026-10-16T05:00:00Z",
+                  "endAt": "2026-10-16T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-19",
+                  "startAt": "2026-10-19T01:30:00Z",
+                  "endAt": "2026-10-19T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-19",
+                  "startAt": "2026-10-19T05:00:00Z",
+                  "endAt": "2026-10-19T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-20",
+                  "startAt": "2026-10-20T01:30:00Z",
+                  "endAt": "2026-10-20T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-20",
+                  "startAt": "2026-10-20T05:00:00Z",
+                  "endAt": "2026-10-20T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-21",
+                  "startAt": "2026-10-21T01:30:00Z",
+                  "endAt": "2026-10-21T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-21",
+                  "startAt": "2026-10-21T05:00:00Z",
+                  "endAt": "2026-10-21T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-22",
+                  "startAt": "2026-10-22T01:30:00Z",
+                  "endAt": "2026-10-22T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-22",
+                  "startAt": "2026-10-22T05:00:00Z",
+                  "endAt": "2026-10-22T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-23",
+                  "startAt": "2026-10-23T01:30:00Z",
+                  "endAt": "2026-10-23T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-23",
+                  "startAt": "2026-10-23T05:00:00Z",
+                  "endAt": "2026-10-23T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-26",
+                  "startAt": "2026-10-26T01:30:00Z",
+                  "endAt": "2026-10-26T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-26",
+                  "startAt": "2026-10-26T05:00:00Z",
+                  "endAt": "2026-10-26T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-27",
+                  "startAt": "2026-10-27T01:30:00Z",
+                  "endAt": "2026-10-27T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-27",
+                  "startAt": "2026-10-27T05:00:00Z",
+                  "endAt": "2026-10-27T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-28",
+                  "startAt": "2026-10-28T01:30:00Z",
+                  "endAt": "2026-10-28T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-28",
+                  "startAt": "2026-10-28T05:00:00Z",
+                  "endAt": "2026-10-28T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-29",
+                  "startAt": "2026-10-29T01:30:00Z",
+                  "endAt": "2026-10-29T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-29",
+                  "startAt": "2026-10-29T05:00:00Z",
+                  "endAt": "2026-10-29T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-30",
+                  "startAt": "2026-10-30T01:30:00Z",
+                  "endAt": "2026-10-30T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-30",
+                  "startAt": "2026-10-30T05:00:00Z",
+                  "endAt": "2026-10-30T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-02",
+                  "startAt": "2026-11-02T01:30:00Z",
+                  "endAt": "2026-11-02T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-02",
+                  "startAt": "2026-11-02T05:00:00Z",
+                  "endAt": "2026-11-02T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-03",
+                  "startAt": "2026-11-03T01:30:00Z",
+                  "endAt": "2026-11-03T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-03",
+                  "startAt": "2026-11-03T05:00:00Z",
+                  "endAt": "2026-11-03T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-04",
+                  "startAt": "2026-11-04T01:30:00Z",
+                  "endAt": "2026-11-04T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-04",
+                  "startAt": "2026-11-04T05:00:00Z",
+                  "endAt": "2026-11-04T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-05",
+                  "startAt": "2026-11-05T01:30:00Z",
+                  "endAt": "2026-11-05T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-05",
+                  "startAt": "2026-11-05T05:00:00Z",
+                  "endAt": "2026-11-05T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-06",
+                  "startAt": "2026-11-06T01:30:00Z",
+                  "endAt": "2026-11-06T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-06",
+                  "startAt": "2026-11-06T05:00:00Z",
+                  "endAt": "2026-11-06T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-09",
+                  "startAt": "2026-11-09T01:30:00Z",
+                  "endAt": "2026-11-09T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-09",
+                  "startAt": "2026-11-09T05:00:00Z",
+                  "endAt": "2026-11-09T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-10",
+                  "startAt": "2026-11-10T01:30:00Z",
+                  "endAt": "2026-11-10T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-10",
+                  "startAt": "2026-11-10T05:00:00Z",
+                  "endAt": "2026-11-10T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-11",
+                  "startAt": "2026-11-11T01:30:00Z",
+                  "endAt": "2026-11-11T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-11",
+                  "startAt": "2026-11-11T05:00:00Z",
+                  "endAt": "2026-11-11T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-12",
+                  "startAt": "2026-11-12T01:30:00Z",
+                  "endAt": "2026-11-12T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-12",
+                  "startAt": "2026-11-12T05:00:00Z",
+                  "endAt": "2026-11-12T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-13",
+                  "startAt": "2026-11-13T01:30:00Z",
+                  "endAt": "2026-11-13T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-13",
+                  "startAt": "2026-11-13T05:00:00Z",
+                  "endAt": "2026-11-13T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-16",
+                  "startAt": "2026-11-16T01:30:00Z",
+                  "endAt": "2026-11-16T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-16",
+                  "startAt": "2026-11-16T05:00:00Z",
+                  "endAt": "2026-11-16T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-17",
+                  "startAt": "2026-11-17T01:30:00Z",
+                  "endAt": "2026-11-17T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-17",
+                  "startAt": "2026-11-17T05:00:00Z",
+                  "endAt": "2026-11-17T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-18",
+                  "startAt": "2026-11-18T01:30:00Z",
+                  "endAt": "2026-11-18T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-18",
+                  "startAt": "2026-11-18T05:00:00Z",
+                  "endAt": "2026-11-18T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-19",
+                  "startAt": "2026-11-19T01:30:00Z",
+                  "endAt": "2026-11-19T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-19",
+                  "startAt": "2026-11-19T05:00:00Z",
+                  "endAt": "2026-11-19T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-20",
+                  "startAt": "2026-11-20T01:30:00Z",
+                  "endAt": "2026-11-20T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-20",
+                  "startAt": "2026-11-20T05:00:00Z",
+                  "endAt": "2026-11-20T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-23",
+                  "startAt": "2026-11-23T01:30:00Z",
+                  "endAt": "2026-11-23T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-23",
+                  "startAt": "2026-11-23T05:00:00Z",
+                  "endAt": "2026-11-23T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-24",
+                  "startAt": "2026-11-24T01:30:00Z",
+                  "endAt": "2026-11-24T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-24",
+                  "startAt": "2026-11-24T05:00:00Z",
+                  "endAt": "2026-11-24T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-25",
+                  "startAt": "2026-11-25T01:30:00Z",
+                  "endAt": "2026-11-25T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-25",
+                  "startAt": "2026-11-25T05:00:00Z",
+                  "endAt": "2026-11-25T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-26",
+                  "startAt": "2026-11-26T01:30:00Z",
+                  "endAt": "2026-11-26T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-26",
+                  "startAt": "2026-11-26T05:00:00Z",
+                  "endAt": "2026-11-26T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-27",
+                  "startAt": "2026-11-27T01:30:00Z",
+                  "endAt": "2026-11-27T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-27",
+                  "startAt": "2026-11-27T05:00:00Z",
+                  "endAt": "2026-11-27T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-30",
+                  "startAt": "2026-11-30T01:30:00Z",
+                  "endAt": "2026-11-30T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-30",
+                  "startAt": "2026-11-30T05:00:00Z",
+                  "endAt": "2026-11-30T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-12-01",
+                  "startAt": "2026-12-01T01:30:00Z",
+                  "endAt": "2026-12-01T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-12-01",
+                  "startAt": "2026-12-01T05:00:00Z",
+                  "endAt": "2026-12-01T07:00:00Z"
+                }
+              ]
+            }
+          },
+          "prices": {
+            "status": "ready",
+            "currency": "CNY",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "points": [
+              {
+                "date": "2026-10-19",
+                "close": "100",
+                "state": "traded",
+                "availableAt": "2026-10-19T07:01:00Z"
+              },
+              {
+                "date": "2026-10-26",
+                "close": "110",
+                "state": "traded",
+                "availableAt": "2026-10-26T07:01:00Z"
+              }
+            ]
+          }
+        },
+        "evaluation": {
+          "status": "completed",
+          "reasons": [],
+          "window": {
+            "tradingDays": 5,
+            "startSession": "2026-10-19",
+            "endSession": "2026-10-26",
+            "startCloseAt": "2026-10-19T07:00:00Z",
+            "endCloseAt": "2026-10-26T07:00:00Z"
+          },
+          "economic": {
+            "basis": "economic-close",
+            "currency": "CNY",
+            "startPrice": "100",
+            "endPrice": "110",
+            "returnRate": "0.1",
+            "directionMatched": true
+          }
+        }
+      }
+    }
+  },
+  "history": {
+    "reportId": "00000000-0000-4000-8000-000000000099",
+    "historicalScope": {
+      "status": "known",
+      "snapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      }
+    },
+    "observationId": "00000000-0000-4000-8000-000000000301",
+    "versions": [
+      {
+        "id": "00000000-0000-4000-8000-000000000303",
+        "observationId": "00000000-0000-4000-8000-000000000301",
+        "inputFingerprint": "90e0b269cffc96dca27c66959aa4ec9128e1f2baf3e58f3bbe51a6be67f0d246",
+        "recordedAt": "2026-11-30T08:00:01Z",
+        "inputs": {
+          "visibleAt": "2026-11-30T08:00:00Z",
+          "calendar": {
+            "status": "ready",
+            "calendar": {
+              "market": "CN",
+              "timezone": "Asia/Shanghai",
+              "revision": "controlled-calendar-1",
+              "availableAt": "2026-10-01T00:00:00Z",
+              "coverageStart": "2026-10-01",
+              "coverageEnd": "2026-12-01",
+              "sessions": [
+                {
+                  "tradingDate": "2026-10-09",
+                  "startAt": "2026-10-09T01:30:00Z",
+                  "endAt": "2026-10-09T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-09",
+                  "startAt": "2026-10-09T05:00:00Z",
+                  "endAt": "2026-10-09T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-12",
+                  "startAt": "2026-10-12T01:30:00Z",
+                  "endAt": "2026-10-12T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-12",
+                  "startAt": "2026-10-12T05:00:00Z",
+                  "endAt": "2026-10-12T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-13",
+                  "startAt": "2026-10-13T01:30:00Z",
+                  "endAt": "2026-10-13T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-13",
+                  "startAt": "2026-10-13T05:00:00Z",
+                  "endAt": "2026-10-13T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-14",
+                  "startAt": "2026-10-14T01:30:00Z",
+                  "endAt": "2026-10-14T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-14",
+                  "startAt": "2026-10-14T05:00:00Z",
+                  "endAt": "2026-10-14T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-15",
+                  "startAt": "2026-10-15T01:30:00Z",
+                  "endAt": "2026-10-15T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-15",
+                  "startAt": "2026-10-15T05:00:00Z",
+                  "endAt": "2026-10-15T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-16",
+                  "startAt": "2026-10-16T01:30:00Z",
+                  "endAt": "2026-10-16T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-16",
+                  "startAt": "2026-10-16T05:00:00Z",
+                  "endAt": "2026-10-16T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-19",
+                  "startAt": "2026-10-19T01:30:00Z",
+                  "endAt": "2026-10-19T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-19",
+                  "startAt": "2026-10-19T05:00:00Z",
+                  "endAt": "2026-10-19T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-20",
+                  "startAt": "2026-10-20T01:30:00Z",
+                  "endAt": "2026-10-20T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-20",
+                  "startAt": "2026-10-20T05:00:00Z",
+                  "endAt": "2026-10-20T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-21",
+                  "startAt": "2026-10-21T01:30:00Z",
+                  "endAt": "2026-10-21T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-21",
+                  "startAt": "2026-10-21T05:00:00Z",
+                  "endAt": "2026-10-21T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-22",
+                  "startAt": "2026-10-22T01:30:00Z",
+                  "endAt": "2026-10-22T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-22",
+                  "startAt": "2026-10-22T05:00:00Z",
+                  "endAt": "2026-10-22T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-23",
+                  "startAt": "2026-10-23T01:30:00Z",
+                  "endAt": "2026-10-23T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-23",
+                  "startAt": "2026-10-23T05:00:00Z",
+                  "endAt": "2026-10-23T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-26",
+                  "startAt": "2026-10-26T01:30:00Z",
+                  "endAt": "2026-10-26T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-26",
+                  "startAt": "2026-10-26T05:00:00Z",
+                  "endAt": "2026-10-26T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-27",
+                  "startAt": "2026-10-27T01:30:00Z",
+                  "endAt": "2026-10-27T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-27",
+                  "startAt": "2026-10-27T05:00:00Z",
+                  "endAt": "2026-10-27T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-28",
+                  "startAt": "2026-10-28T01:30:00Z",
+                  "endAt": "2026-10-28T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-28",
+                  "startAt": "2026-10-28T05:00:00Z",
+                  "endAt": "2026-10-28T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-29",
+                  "startAt": "2026-10-29T01:30:00Z",
+                  "endAt": "2026-10-29T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-29",
+                  "startAt": "2026-10-29T05:00:00Z",
+                  "endAt": "2026-10-29T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-30",
+                  "startAt": "2026-10-30T01:30:00Z",
+                  "endAt": "2026-10-30T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-10-30",
+                  "startAt": "2026-10-30T05:00:00Z",
+                  "endAt": "2026-10-30T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-02",
+                  "startAt": "2026-11-02T01:30:00Z",
+                  "endAt": "2026-11-02T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-02",
+                  "startAt": "2026-11-02T05:00:00Z",
+                  "endAt": "2026-11-02T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-03",
+                  "startAt": "2026-11-03T01:30:00Z",
+                  "endAt": "2026-11-03T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-03",
+                  "startAt": "2026-11-03T05:00:00Z",
+                  "endAt": "2026-11-03T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-04",
+                  "startAt": "2026-11-04T01:30:00Z",
+                  "endAt": "2026-11-04T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-04",
+                  "startAt": "2026-11-04T05:00:00Z",
+                  "endAt": "2026-11-04T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-05",
+                  "startAt": "2026-11-05T01:30:00Z",
+                  "endAt": "2026-11-05T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-05",
+                  "startAt": "2026-11-05T05:00:00Z",
+                  "endAt": "2026-11-05T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-06",
+                  "startAt": "2026-11-06T01:30:00Z",
+                  "endAt": "2026-11-06T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-06",
+                  "startAt": "2026-11-06T05:00:00Z",
+                  "endAt": "2026-11-06T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-09",
+                  "startAt": "2026-11-09T01:30:00Z",
+                  "endAt": "2026-11-09T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-09",
+                  "startAt": "2026-11-09T05:00:00Z",
+                  "endAt": "2026-11-09T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-10",
+                  "startAt": "2026-11-10T01:30:00Z",
+                  "endAt": "2026-11-10T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-10",
+                  "startAt": "2026-11-10T05:00:00Z",
+                  "endAt": "2026-11-10T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-11",
+                  "startAt": "2026-11-11T01:30:00Z",
+                  "endAt": "2026-11-11T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-11",
+                  "startAt": "2026-11-11T05:00:00Z",
+                  "endAt": "2026-11-11T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-12",
+                  "startAt": "2026-11-12T01:30:00Z",
+                  "endAt": "2026-11-12T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-12",
+                  "startAt": "2026-11-12T05:00:00Z",
+                  "endAt": "2026-11-12T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-13",
+                  "startAt": "2026-11-13T01:30:00Z",
+                  "endAt": "2026-11-13T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-13",
+                  "startAt": "2026-11-13T05:00:00Z",
+                  "endAt": "2026-11-13T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-16",
+                  "startAt": "2026-11-16T01:30:00Z",
+                  "endAt": "2026-11-16T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-16",
+                  "startAt": "2026-11-16T05:00:00Z",
+                  "endAt": "2026-11-16T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-17",
+                  "startAt": "2026-11-17T01:30:00Z",
+                  "endAt": "2026-11-17T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-17",
+                  "startAt": "2026-11-17T05:00:00Z",
+                  "endAt": "2026-11-17T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-18",
+                  "startAt": "2026-11-18T01:30:00Z",
+                  "endAt": "2026-11-18T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-18",
+                  "startAt": "2026-11-18T05:00:00Z",
+                  "endAt": "2026-11-18T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-19",
+                  "startAt": "2026-11-19T01:30:00Z",
+                  "endAt": "2026-11-19T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-19",
+                  "startAt": "2026-11-19T05:00:00Z",
+                  "endAt": "2026-11-19T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-20",
+                  "startAt": "2026-11-20T01:30:00Z",
+                  "endAt": "2026-11-20T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-20",
+                  "startAt": "2026-11-20T05:00:00Z",
+                  "endAt": "2026-11-20T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-23",
+                  "startAt": "2026-11-23T01:30:00Z",
+                  "endAt": "2026-11-23T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-23",
+                  "startAt": "2026-11-23T05:00:00Z",
+                  "endAt": "2026-11-23T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-24",
+                  "startAt": "2026-11-24T01:30:00Z",
+                  "endAt": "2026-11-24T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-24",
+                  "startAt": "2026-11-24T05:00:00Z",
+                  "endAt": "2026-11-24T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-25",
+                  "startAt": "2026-11-25T01:30:00Z",
+                  "endAt": "2026-11-25T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-25",
+                  "startAt": "2026-11-25T05:00:00Z",
+                  "endAt": "2026-11-25T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-26",
+                  "startAt": "2026-11-26T01:30:00Z",
+                  "endAt": "2026-11-26T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-26",
+                  "startAt": "2026-11-26T05:00:00Z",
+                  "endAt": "2026-11-26T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-27",
+                  "startAt": "2026-11-27T01:30:00Z",
+                  "endAt": "2026-11-27T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-27",
+                  "startAt": "2026-11-27T05:00:00Z",
+                  "endAt": "2026-11-27T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-30",
+                  "startAt": "2026-11-30T01:30:00Z",
+                  "endAt": "2026-11-30T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-11-30",
+                  "startAt": "2026-11-30T05:00:00Z",
+                  "endAt": "2026-11-30T07:00:00Z"
+                },
+                {
+                  "tradingDate": "2026-12-01",
+                  "startAt": "2026-12-01T01:30:00Z",
+                  "endAt": "2026-12-01T03:30:00Z"
+                },
+                {
+                  "tradingDate": "2026-12-01",
+                  "startAt": "2026-12-01T05:00:00Z",
+                  "endAt": "2026-12-01T07:00:00Z"
+                }
+              ]
+            }
+          },
+          "prices": {
+            "status": "ready",
+            "currency": "CNY",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "points": [
+              {
+                "date": "2026-10-19",
+                "close": "100",
+                "state": "traded",
+                "availableAt": "2026-10-19T07:01:00Z"
+              },
+              {
+                "date": "2026-10-26",
+                "close": "110",
+                "state": "traded",
+                "availableAt": "2026-10-26T07:01:00Z"
+              }
+            ]
+          }
+        },
+        "evaluation": {
+          "status": "completed",
+          "reasons": [],
+          "window": {
+            "tradingDays": 5,
+            "startSession": "2026-10-19",
+            "endSession": "2026-10-26",
+            "startCloseAt": "2026-10-19T07:00:00Z",
+            "endCloseAt": "2026-10-26T07:00:00Z"
+          },
+          "economic": {
+            "basis": "economic-close",
+            "currency": "CNY",
+            "startPrice": "100",
+            "endPrice": "110",
+            "returnRate": "0.1",
+            "directionMatched": true
+          }
+        }
+      }
+    ],
+    "truncated": false
+  }
+}

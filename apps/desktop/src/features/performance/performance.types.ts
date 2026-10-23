@@ -139,6 +139,7 @@ export interface PerformancePortfolioTotal {
 
 export interface PerformanceSummary {
   ttwror: number | null;
+  ttwrorReason?: string | null;
   xirr: number | null;
   xirrReason?: string | null;
   currency?: Currency;

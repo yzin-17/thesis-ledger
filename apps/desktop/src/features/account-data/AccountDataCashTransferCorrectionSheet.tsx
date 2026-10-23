@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -15,8 +16,9 @@ import {
 import { useToastManager } from '@/components/ui/toast';
 
 import type { CashTransferEvent } from './account-data.types.js';
-import { currentLocalDateTime, localDateTimeValue } from './account-data.helpers.js';
+import { currentLocalDateTime, errorMessage, localDateTimeValue } from './account-data.helpers.js';
 import { useCashOperationsMutations } from './account-data.cash.queries.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 
 const correctionLabels = {
   replace: {
@@ -66,8 +68,12 @@ export function CashTransferCorrectionSheet({
     mutations.replaceTransfer.isPending ||
     mutations.voidTransfer.isPending ||
     mutations.restoreTransfer.isPending;
+  const requestClose = useDraftCloseGuard({
+    open, draft: { amount, occurredAt, note, reason }, busy: pending, onOpenChange,
+  });
   const submit = async (formEvent: React.FormEvent) => {
     formEvent.preventDefault();
+    if (pending) return;
     setError('');
     if (!reason.trim()) {
       setError('请填写更正或作废原因。');
@@ -95,12 +101,12 @@ export function CashTransferCorrectionSheet({
       onSaved?.();
       onOpenChange(false);
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : '现金划转操作失败。');
+      setError(errorMessage(submissionError, '现金划转操作失败，输入已保留，请重试。'));
     }
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{labels.title}</SheetTitle>
@@ -153,14 +159,19 @@ export function CashTransferCorrectionSheet({
                   aria-invalid={Boolean(error) && !reason.trim()}
                 />
               </Field>
-              {error && <FieldError>{error}</FieldError>}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>划转操作失败</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </FieldGroup>
           </div>
           <SheetFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => void requestClose(false)}
               disabled={pending}
             >
               取消

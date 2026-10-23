@@ -1,6 +1,6 @@
 # 回测执行服务单链路收敛证据
 
-> 2026-09-29；对应[单一现行链路替换任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。本记录只证明当前源码和本地测试，不代表目标容器或真实来源验收。
+> 2026-09-29；对应[单一现行链路替换任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。本记录只证明当前源码和本地测试，不代表目标容器或真实来源验收。
 
 ## 修改与边界
 

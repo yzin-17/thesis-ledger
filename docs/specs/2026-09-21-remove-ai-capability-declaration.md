@@ -33,7 +33,7 @@
 
 - `capabilityDeclaration` 当前同时出现在共享 Schema、Server 输入与 readiness 结果、Desktop 编辑器和相关测试中。
 - `adapterEvidence` 是受控发布输入，仍是接入就绪所需的本地契约证据。
-- 历史数据库设置和 `AI_PROVIDER_CONFIGS_JSON` 可能已经包含 `capabilityDeclaration`，读取兼容不能把整条路由丢弃。
+- 历史数据库设置 可能已经包含 `capabilityDeclaration`，读取兼容不能把整条路由丢弃。
 - 新旧 Provider 的配置来源、凭证保护和现有路由指纹规则继续有效；移除声明字段后，指纹不再包含该字段。
 
 ## 设计方案

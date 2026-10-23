@@ -13,6 +13,7 @@ export const aiCitationSchema = z.object({
 
 export const aiContextSchema = z.object({
   scope: z.enum(['portfolio', 'account', 'position', 'strategy']),
+  mode: z.enum(['actual', 'shadow']).optional(),
   portfolioId: z.string().optional(),
   accountId: z.string().optional(),
   symbol: z.string().optional(),
@@ -20,7 +21,7 @@ export const aiContextSchema = z.object({
 });
 
 export const aiResearchContextSchema = aiContextSchema.superRefine((value, context) => {
-  const reject = (field: 'portfolioId' | 'accountId' | 'symbol' | 'strategyVersionId') => {
+  const reject = (field: 'portfolioId' | 'accountId' | 'symbol' | 'strategyVersionId' | 'mode') => {
     if (value[field] !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -65,6 +66,7 @@ export const aiResearchContextSchema = aiContextSchema.superRefine((value, conte
     reject('strategyVersionId');
   }
   if (value.scope === 'strategy') {
+    reject('mode');
     reject('portfolioId');
     reject('accountId');
     reject('symbol');

@@ -1,7 +1,10 @@
 import { type FormEvent, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { LoaderCircle } from 'lucide-react';
 import { MarketDetailDialog } from '../market-detail/MarketDetailDialog.js';
 import type { MarketDetailPosition } from '../market-detail/market-detail.types.js';
@@ -18,24 +21,31 @@ export function InstrumentCatalogPanel({
   disabled,
   syncing,
   searchBusy,
+  searchRequested = false,
+  searchError = null,
   searchResults,
   confirmingId,
   onSync,
   onSearch,
+  onRetrySearch,
   onConfirm,
 }: {
   catalog: CatalogStatus | null;
   disabled: boolean;
   syncing: boolean;
   searchBusy: boolean;
+  searchRequested?: boolean;
+  searchError?: string | null;
   searchResults: InstrumentResult[];
   confirmingId: string | null;
   onSync: () => void;
   onSearch: (query: string) => void;
+  onRetrySearch?: () => void;
   onConfirm: (instrument: InstrumentResult) => void;
 }) {
   const [searchText, setSearchText] = useState('');
   const [marketSubject, setMarketSubject] = useState<MarketDetailPosition | null>(null);
+  const hasSearchRequest = searchRequested || searchBusy || searchResults.length > 0;
   const openMarketDetails = (instrument: InstrumentResult) => {
     const assetType = marketAssetTypes[instrument.instrumentType];
     if (!assetType) return;
@@ -90,6 +100,44 @@ export function InstrumentCatalogPanel({
               </Button>
             </div>
           </form>
+          {searchBusy && (
+            <div className="flex flex-col gap-3" role="status" aria-live="polite" aria-busy="true">
+              <span className="text-sm text-muted-foreground">正在搜索本地标的…</span>
+              {searchResults.length === 0 && <Skeleton className="h-14 w-full" aria-hidden="true" />}
+            </div>
+          )}
+          {!searchBusy && searchError && (
+            <Alert
+              variant="destructive"
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex flex-col gap-1">
+                <AlertTitle>标的目录搜索失败</AlertTitle>
+                <AlertDescription>{searchError}</AlertDescription>
+              </div>
+              <Button type="button" variant="outline" onClick={onRetrySearch}>
+                重试
+              </Button>
+            </Alert>
+          )}
+          {!searchBusy && !searchError && !hasSearchRequest && (
+            <Empty className="gap-2 border-0 p-4">
+              <EmptyHeader>
+                <EmptyTitle className="text-sm">尚未搜索标的</EmptyTitle>
+                <EmptyDescription>
+                  输入代码、名称或拼音首字母后，搜索已同步的本地目录。
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+          {!searchBusy && !searchError && hasSearchRequest && searchResults.length === 0 && (
+            <Empty className="gap-2 border-0 p-4">
+              <EmptyHeader>
+                <EmptyTitle className="text-sm">没有找到匹配的本地标的</EmptyTitle>
+                <EmptyDescription>请调整代码、名称或拼音首字母后重新搜索。</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
           {searchResults.length > 0 && (
             <div className="divide-y border-y border-border">
               {searchResults.map((instrument) => (

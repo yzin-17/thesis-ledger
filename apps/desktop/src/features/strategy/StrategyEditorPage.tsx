@@ -1,17 +1,11 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { useBeforeUnload, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
+import { requestFailureMessage } from '@/shared/api/request-error';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthoringWorkPage } from '../strategy-authoring/AuthoringWorkPage.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+import { useToastManager } from '@/components/ui/toast';
 import {
   Sheet,
   SheetContent,
@@ -88,21 +82,17 @@ export function StrategyEditorPage({
   const allowNavigationRef = useRef(false);
   const createStrategy = useCreateStrategyMutation();
   const createVersion = useCreateStrategyVersionMutation();
+  const toastManager = useToastManager();
   const busy = createStrategy.isPending || createVersion.isPending;
   const strategy = selection?.strategy ?? null;
   const version = selection?.version ?? null;
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+  useNavigationGuard({ dirty: dirty || authoringDirty, busy,
+    bypass: () => allowNavigationRef.current,
+    blocksLocation: (currentLocation, nextLocation) => {
     const leavingPage = currentLocation.pathname !== nextLocation.pathname;
     const changingDraft = new URLSearchParams(currentLocation.search).get('draft') !== new URLSearchParams(nextLocation.search).get('draft');
-    return ((dirty && leavingPage) || (authoringDirty && (leavingPage || changingDraft))) && !busy && !allowNavigationRef.current;
-  });
-  useBeforeUnload(
-    (event) => {
-      if ((!dirty && !authoringDirty) || busy || allowNavigationRef.current) return;
-      event.preventDefault();
-    },
-    { capture: true },
-  );
+    return leavingPage || (authoringDirty && changingDraft);
+  } });
 
   const closePage = () => {
     allowNavigationRef.current = true;
@@ -162,6 +152,7 @@ export function StrategyEditorPage({
         const created = await createStrategy.mutateAsync({ name, schema });
         const createdVersion = latestStrategyVersion(created.versions);
         if (!createdVersion) throw new Error('策略已创建，但响应中没有可定位的版本');
+        toastManager.add({ title: '策略已创建', description: '首个版本已保存，无需重复创建。', type: 'success' });
         allowNavigationRef.current = true;
         void navigate(strategyCenterPath.strategyVersion(created.id, createdVersion.id), {
           replace: true,
@@ -171,13 +162,14 @@ export function StrategyEditorPage({
       }
       if (!strategy) return;
       const createdVersion = await createVersion.mutateAsync({ strategyId: strategy.id, schema });
+      toastManager.add({ title: '新版本已保存', description: '原版本保持不变，无需重复保存。', type: 'success' });
       allowNavigationRef.current = true;
       void navigate(strategyCenterPath.strategyVersion(strategy.id, createdVersion.id), {
         replace: true,
         state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '保存失败，请保留当前输入后重试。');
+      setError(requestFailureMessage(cause, '保存失败，请保留当前输入后重试。'));
     }
   };
 
@@ -198,24 +190,6 @@ export function StrategyEditorPage({
         }}
         onSave={(schema) => void save(schema)}
       />
-      <AlertDialog open={blocker.state === 'blocked'}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
-            <AlertDialogDescription>
-              当前输入尚未保存。继续离开会丢失这些修改。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button variant="outline" onClick={() => blocker.reset?.()}>
-              继续编辑
-            </Button>
-            <Button variant="destructive" onClick={() => blocker.proceed?.()}>
-              放弃并离开
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 

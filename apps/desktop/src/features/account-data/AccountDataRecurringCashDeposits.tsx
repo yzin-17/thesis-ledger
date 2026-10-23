@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -30,11 +30,13 @@ import { useToastManager } from '@/components/ui/toast';
 import type { Account } from '../portfolio/portfolio.types.js';
 import {
   currentLocalDateTime,
+  errorMessage,
   formatCurrencyAmount,
   formatDate,
   supportedCurrency,
 } from './account-data.helpers.js';
 import { useCashDepositQueries, useCashOperationsMutations } from './account-data.cash.queries.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 
 type PlanEditor = { mode: 'create'; plan: null } | { mode: 'edit'; plan: RecurringCashDepositPlan };
 type OccurrenceAction = { type: 'confirm' | 'skip'; occurrence: RecurringCashDepositOccurrence };
@@ -90,7 +92,7 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
     } catch (error) {
       toastManager.add({
         title: '计划操作失败',
-        description: error instanceof Error ? error.message : '请刷新后重试。',
+        description: errorMessage(error, '请刷新后重试。'),
         type: 'error',
       });
     }
@@ -110,7 +112,7 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
     } catch (error) {
       toastManager.add({
         title: '恢复失败',
-        description: error instanceof Error ? error.message : '请刷新后重试。',
+        description: errorMessage(error, '请刷新后重试。'),
         type: 'error',
       });
     }
@@ -139,7 +141,12 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
       {(queries.plans.isError || queries.occurrences.isError) && (
         <Alert variant="destructive">
           <AlertTitle>定期入账读取失败</AlertTitle>
-          <AlertDescription>计划或待确认记录未更新，请重试。</AlertDescription>
+          <AlertDescription>计划或待确认记录未更新。已成功保存或确认的操作无需再次提交，请重新读取。</AlertDescription>
+          <Button type="button" variant="outline" size="sm"
+            disabled={queries.plans.isFetching || queries.occurrences.isFetching}
+            onClick={() => void Promise.all([queries.plans.refetch(), queries.occurrences.refetch()])}>
+            重新读取定期入账
+          </Button>
         </Alert>
       )}
       {overdue.length > 0 && (
@@ -158,9 +165,9 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
               核对实际金额和到账时间后再写入 Ledger。
             </p>
           </div>
-          <span className="text-sm font-medium text-muted-foreground">{pending.length} 条</span>
+          <span className="text-sm font-medium text-muted-foreground">{queries.occurrences.data === undefined ? '—' : pending.length} 条</span>
         </div>
-        {pending.length === 0 ? (
+        {pending.length === 0 && queries.occurrences.data !== undefined ? (
           <div className="py-3 text-sm text-muted-foreground">暂无待确认入账</div>
         ) : (
           <div className="divide-y">
@@ -213,9 +220,9 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
               每月到期后生成待确认记录，不会自动改变现金余额。
             </p>
           </div>
-          <span className="text-sm font-medium text-muted-foreground">{plans.length} 个</span>
+          <span className="text-sm font-medium text-muted-foreground">{queries.plans.data === undefined ? '—' : plans.length} 个</span>
         </div>
-        {plans.length === 0 ? (
+        {plans.length === 0 && queries.plans.data !== undefined ? (
           <div className="py-3 text-sm text-muted-foreground">
             暂无定期入账计划。创建计划后，到期会生成待确认记录。
           </div>
@@ -379,6 +386,7 @@ function PlanEditorSheet({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const toastManager = useToastManager();
   const mutations = useCashOperationsMutations(account.id, account.mode);
   const [name, setName] = useState(editor.plan?.name ?? '工资入账');
   const [amount, setAmount] = useState(editor.plan?.expectedAmount ?? '');
@@ -386,8 +394,12 @@ function PlanEditorSheet({
   const [startPeriod, setStartPeriod] = useState(currentPeriod);
   const [error, setError] = useState('');
   const pending = mutations.createPlan.isPending || mutations.updatePlan.isPending;
+  const requestClose = useDraftCloseGuard({
+    open, draft: { name, amount, dayOfMonth, startPeriod }, busy: pending, onOpenChange,
+  });
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (pending) return;
     setError('');
     try {
       if (editor.mode === 'create')
@@ -409,13 +421,14 @@ function PlanEditorSheet({
             dayOfMonth: Number(dayOfMonth),
           },
         });
+      toastManager.add({ title: '定期入账计划已保存', type: 'success' });
       onSaved();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : '计划保存失败。');
+      setError(errorMessage(submissionError, '计划保存失败，输入已保留，请重试。'));
     }
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>
@@ -468,14 +481,19 @@ function PlanEditorSheet({
                   />
                 </Field>
               )}
-              {error && <FieldError>{error}</FieldError>}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>计划保存失败</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </FieldGroup>
           </div>
           <SheetFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => void requestClose(false)}
               disabled={pending}
             >
               取消
@@ -501,6 +519,7 @@ function OccurrenceActionSheet({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const toastManager = useToastManager();
   const occurrence = action.occurrence;
   const mutations = useCashOperationsMutations(occurrence.accountId, 'actual');
   const [actualAmount, setActualAmount] = useState(occurrence.expectedAmount);
@@ -508,8 +527,12 @@ function OccurrenceActionSheet({
   const [reason, setReason] = useState('本期未到账');
   const [error, setError] = useState('');
   const pending = mutations.confirmOccurrence.isPending || mutations.skipOccurrence.isPending;
+  const requestClose = useDraftCloseGuard({
+    open, draft: { actualAmount, occurredAt, reason }, busy: pending, onOpenChange,
+  });
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (pending) return;
     setError('');
     try {
       if (action.type === 'confirm')
@@ -527,15 +550,16 @@ function OccurrenceActionSheet({
           expectedVersion: occurrence.version,
           reason,
         });
+      toastManager.add({ title: action.type === 'confirm' ? '实际入账已确认' : '本期入账已跳过', type: 'success' });
       onSaved();
     } catch (submissionError) {
       setError(
-        submissionError instanceof Error ? submissionError.message : '操作失败，请刷新后重试。',
+        errorMessage(submissionError, '操作失败，输入已保留，请重试。'),
       );
     }
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{action.type === 'confirm' ? '确认实际入账' : '跳过本期入账'}</SheetTitle>
@@ -586,14 +610,19 @@ function OccurrenceActionSheet({
                   />
                 </Field>
               )}
-              {error && <FieldError>{error}</FieldError>}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>入账操作失败</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </FieldGroup>
           </div>
           <SheetFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => void requestClose(false)}
               disabled={pending}
             >
               取消

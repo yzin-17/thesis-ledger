@@ -15,8 +15,7 @@ import { loadConfig } from '../platform/config.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { ProviderConfigService } from '../providers/provider-config.service.js';
 import { ProviderHealthService, type ProviderState } from '../providers/provider-health.service.js';
-import { AiProviderRegistry, routeSnapshotsFromProvider } from './provider-registry.js';
-import { createConfiguredAiProviders } from './provider-adapters.js';
+import { AiProviderRegistry } from './provider-registry.js';
 import { runProviderConnectionTest } from './provider-connection-test.js';
 import {
   AiSdkGenerationAdapter,
@@ -44,7 +43,6 @@ import {
 import { fetchAiProviderModelCatalog } from './ai-provider-model-catalog.js';
 import {
   aiProviderCapabilities,
-  aiProviderSummaryFromProvider,
   aiProviderSummaryFromRow,
   parseAiProviderSettings,
 } from './ai-provider-summary.js';
@@ -199,18 +197,6 @@ export class AiProviderService implements OnModuleInit {
 
   async list(transaction?: Prisma.TransactionClient): Promise<AiProviderSummary[]> {
     const rows = await this.configs.listStored(transaction);
-    const environment = this.environmentProviders();
-    const databaseIds = new Set(rows.map((row) => row.name));
-    const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
-    const environmentSummaries = environment
-      .filter((provider) => !databaseIds.has(provider.id) && !disabled.has(provider.id))
-      .map((provider) => {
-        const summary = aiProviderSummaryFromProvider(provider);
-        const executionRoutes = routeSnapshotsFromProvider(provider).map((snapshot) =>
-          evaluateAiProviderReadiness(snapshot, { budgetAuthorized: false }),
-        );
-        return executionRoutes.length > 0 ? { ...summary, executionRoutes } : summary;
-      });
     const databaseSummaries = await Promise.all(
       rows.map(async (row) => {
         const settings = parseAiProviderSettings(row.settings);
@@ -227,7 +213,7 @@ export class AiProviderService implements OnModuleInit {
         return executionRoutes.length > 0 ? { ...summary, executionRoutes } : summary;
       }),
     );
-    return [...databaseSummaries, ...environmentSummaries].sort(
+    return databaseSummaries.sort(
       (left, right) => left.priority - right.priority || left.name.localeCompare(right.name),
     );
   }
@@ -288,15 +274,6 @@ export class AiProviderService implements OnModuleInit {
       if (existingSettings?.modelPricing && input.modelPricing === undefined)
         throw new ConflictException('当前 Provider 含模型级价格，请使用新版完整配置后再保存');
     }
-    const environment = this.environmentProviders();
-    const hasInputCredential = Boolean(input.apiKey?.trim() || input.credentialsRef?.trim());
-    if (
-      !existing &&
-      environment.some((provider) => provider.id === input.name) &&
-      input.authMode === 'api_key' &&
-      !hasInputCredential
-    )
-      throw new BadRequestException('接管部署配置时必须重新输入 API Key');
     const runtimeInput = this.runtimeInput(input, existing, '');
     const draft = this.consumeDraft(
       input.connectionTestToken,
@@ -305,6 +282,8 @@ export class AiProviderService implements OnModuleInit {
       input.apiKey?.trim() || input.credentialsRef?.trim(),
     );
     const credential = input.apiKey?.trim() || input.credentialsRef?.trim() || draft?.credential;
+    if (!existing && input.authMode === 'api_key' && !credential && input.enabled !== false)
+      throw new BadRequestException('请填写 API Key');
     const persist = async (transaction?: Prisma.TransactionClient) => {
       await this.assertResearchDefaultPreserved(input, transaction);
       return this.configs.saveAi(
@@ -449,11 +428,7 @@ export class AiProviderService implements OnModuleInit {
 
   async setEnabled(name: string, enabled: boolean, options: AiProviderLifecycleOptions = {}) {
     const config = await this.configs.findStored(name);
-    if (!config || config.type !== 'ai') {
-      if (this.environmentProviders().some((provider) => provider.id === name))
-        throw new ConflictException('部署配置不可启停，请先创建数据库配置接管');
-      throw new NotFoundException('AI Provider 配置不存在');
-    }
+    if (!config || config.type !== 'ai') throw new NotFoundException('AI Provider 配置不存在');
     if (options.expectedRevision && options.expectedRevision !== config.updatedAt.toISOString())
       throw new ConflictException('Provider 配置已变化，请刷新后重试');
     await this.mutateStoredProvider(name, { kind: 'set-enabled', enabled }, options);
@@ -463,11 +438,7 @@ export class AiProviderService implements OnModuleInit {
 
   async remove(name: string, options: AiProviderLifecycleOptions = {}) {
     const config = await this.configs.findStored(name);
-    if (!config || config.type !== 'ai') {
-      if (this.environmentProviders().some((provider) => provider.id === name))
-        throw new ConflictException('部署配置不可删除');
-      throw new NotFoundException('AI Provider 配置不存在');
-    }
+    if (!config || config.type !== 'ai') throw new NotFoundException('AI Provider 配置不存在');
     if (options.expectedRevision && options.expectedRevision !== config.updatedAt.toISOString())
       throw new ConflictException('Provider 配置已变化，请刷新后重试');
     await this.mutateStoredProvider(name, { kind: 'delete' }, options);
@@ -477,25 +448,14 @@ export class AiProviderService implements OnModuleInit {
 
   async refreshRegistry() {
     const rows = await this.configs.listStored();
-    const environment = this.environmentProviders();
-    const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
-    const databaseIds = new Set(rows.map((row) => row.name));
     const databaseProviders = await Promise.all(
       rows.map(async (row) => createStoredAiProvider(row, this.configs, configuredTimeout())),
     );
-    const next = [
-      ...databaseProviders.filter((provider): provider is AiProvider => provider !== null),
-      ...environment.filter(
-        (provider) => !databaseIds.has(provider.id) && !disabled.has(provider.id),
-      ),
-    ];
+    const next = databaseProviders.filter((provider): provider is AiProvider => provider !== null);
     const databaseRoutes = rows.flatMap((row) =>
       routeSnapshotsFromProviderRow(row, parseAiProviderSettings(row.settings), row.health),
     );
-    const environmentRoutes = next
-      .filter((provider) => provider.metadata?.source !== 'database')
-      .flatMap((provider) => routeSnapshotsFromProvider(provider));
-    this.registry.replace(next, [...databaseRoutes, ...environmentRoutes]);
+    this.registry.replace(next, databaseRoutes);
     return next;
   }
 
@@ -506,17 +466,6 @@ export class AiProviderService implements OnModuleInit {
       throw new InternalServerErrorException(
         `AI Provider Registry 刷新失败：${sanitizeAiProviderError(error)}`,
       );
-    }
-  }
-
-  private environmentProviders() {
-    try {
-      return createConfiguredAiProviders(loadConfig()).map((provider) => {
-        if (provider.metadata) provider.metadata.source = 'environment';
-        return provider;
-      });
-    } catch {
-      return [];
     }
   }
 

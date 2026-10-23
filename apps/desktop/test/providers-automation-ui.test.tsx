@@ -58,7 +58,7 @@ describe('自动化任务标签映射', () => {
     expect(automationJobTypeLabel('snapshot-close-estimate')).toBe('盘后估值预估');
     expect(automationJobTypeLabel('snapshot-official-reconcile')).toBe('正式净值校准');
     expect(automationJobTypeLabel('backup')).toBe('数据备份');
-    expect(automationJobTypeLabel('provider-health')).toBe('Provider 健康检查');
+    expect(automationJobTypeLabel('provider-health')).toBe('提供方健康检查');
     expect(automationJobTypeLabel('cash-deposit-materialization')).toBe('定期入账生成');
     expect(automationJobTypeLabel('unknown-type')).toBe('其他（unknown-type）');
 
@@ -338,6 +338,41 @@ describe('运行历史与状态表渲染', () => {
     expect(lastPage).toMatch(/<button[^>]*disabled=""[^>]*>下一页<\/button>/);
     expect(loadingPage).toMatch(/<button[^>]*disabled=""[^>]*>上一页<\/button>/);
     expect(loadingPage).toMatch(/<button[^>]*disabled=""[^>]*>下一页<\/button>/);
+  });
+
+  it('运行历史区分 pending、读取失败、成功空页，并在 stale 时保留已有行', () => {
+    const renderHistory = (
+      loadState: 'loading' | 'error' | 'empty' | 'stale',
+      items: AutomationHistoryRecord[] = [],
+    ) =>
+      renderToStaticMarkup(
+        <AutomationRunHistoryTable
+          loadState={loadState}
+          jobs={[historyJob]}
+          history={{
+            items,
+            page: 1,
+            pageSize: 20,
+            total: items.length,
+            totalPages: items.length > 0 ? 1 : 0,
+          }}
+          loading={loadState === 'loading'}
+          onPage={() => {}}
+        />,
+      );
+
+    const pending = renderHistory('loading');
+    const failed = renderHistory('error');
+    const successfulEmpty = renderHistory('empty');
+    const stale = renderHistory('stale', jobHistory);
+
+    expect(pending).toContain('正在读取自动化运行历史');
+    expect(pending).not.toContain('暂无记录');
+    expect(failed).toContain('自动化运行历史读取失败，请重新加载');
+    expect(failed).not.toContain('暂无记录');
+    expect(successfulEmpty).toContain('暂无记录');
+    expect(stale).toContain('市场数据同步');
+    expect(stale).not.toContain('暂无记录');
   });
 
   it('通知失败与数据质量级别展示中文状态', () => {

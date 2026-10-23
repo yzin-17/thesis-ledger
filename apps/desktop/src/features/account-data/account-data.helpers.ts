@@ -4,8 +4,9 @@ import type {
   LedgerEvent,
 } from '@thesis-ledger/api-client';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 
-import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
+import { accountCurrencyLabel, type InstrumentLookup } from '../portfolio/portfolio.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
 import type {
   ChargeCategory,
@@ -75,11 +76,7 @@ export const formatCurrencyAmount = (amount: number, currency: Currency) =>
     maximumFractionDigits: 8,
   }).format(amount);
 
-export const currencyLabel = (currency: Currency) => {
-  if (currency === 'CNY') return 'CNY · 人民币';
-  if (currency === 'HKD') return 'HKD · 港币';
-  return 'USD · 美元';
-};
+export const currencyLabel = accountCurrencyLabel;
 
 const sourceChannelLabels: Record<string, string> = {
   manual: '桌面端 · 资产录入',
@@ -233,6 +230,10 @@ export const transactionAmount = (event: LedgerEvent, execution: ExecutionEvent 
   }
   if (event.revisionAction !== 'VOID' && event.type === 'CASH_BALANCE_OBSERVATION')
     return formatDecimal(event.payload.amount);
+  if (event.revisionAction !== 'VOID' && event.type === 'CASH_FLOW') {
+    const sign = event.payload.direction === 'INFLOW' ? '+' : '-';
+    return `${sign}${event.payload.amount} ${event.payload.currency}`;
+  }
   return '—';
 };
 
@@ -282,11 +283,7 @@ export const toCommandTime = (value: string, precision: TimePrecision) => {
   return new Date(value).toISOString();
 };
 
-export const errorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof ThesisLedgerApiError) return error.payload?.message ?? fallback;
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-};
+export const errorMessage = requestFailureMessage;
 
 export const errorCode = (error: unknown) =>
   error instanceof ThesisLedgerApiError ? error.payload?.errorCode : undefined;
@@ -357,7 +354,7 @@ export const executionDraft = (
     currentLocalDateTime(),
   timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
   settledAt: localDateTimeValue(event?.payload.settledAt ?? event?.payload.expectedAt, 'INSTANT'),
-  capabilityVerification: event?.payload.capabilityVerification ?? 'UNVERIFIED',
+  capabilityVerification: 'UNVERIFIED',
   note: event?.payload.note ?? '',
   reason: '',
 });

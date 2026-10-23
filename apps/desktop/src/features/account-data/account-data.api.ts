@@ -12,6 +12,7 @@ import type {
 } from '@thesis-ledger/api-client';
 
 import { getDesktopApiClient } from '../../shared/api/client.js';
+import { ThesisLedgerContractError } from '@thesis-ledger/api-client';
 
 export type AccountDataLedgerClient = Pick<
   ThesisLedgerApiClient['ledger'],
@@ -37,11 +38,15 @@ export const fetchAccountLedgerAudit = (
   client: Pick<AccountDataLedgerClient, 'getEventAudit'> = defaultLedgerClient(),
 ): Promise<LedgerAuditResponse> => client.getEventAudit(accountId);
 
-export const fetchReconciliationCandidates = (
+export const fetchReconciliationCandidates = async (
   accountId: string,
   client: Pick<AccountDataLedgerClient, 'getReconciliationCandidates'> = defaultLedgerClient(),
-): Promise<BaselineReconciliationCandidatesResponse> =>
-  client.getReconciliationCandidates(accountId);
+): Promise<BaselineReconciliationCandidatesResponse> => {
+  const result = await client.getReconciliationCandidates(accountId);
+  if (result.accountId !== accountId)
+    throw new ThesisLedgerContractError('/ledger/reconciliation-candidates');
+  return result;
+};
 
 export const createExecution = (
   command: CreateExecutionCommand,

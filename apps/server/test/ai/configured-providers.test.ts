@@ -1,9 +1,11 @@
+import 'reflect-metadata';
 import { describe, expect, it } from 'vitest';
-import { createConfiguredAiProviders } from '../../src/ai/provider-adapters.js';
+import { MODULE_METADATA } from '@nestjs/common/constants.js';
+import { AiModule } from '../../src/ai/ai.module.js';
+import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { parseConfig } from '../../src/platform/config.js';
 
 const baseEnvironment = {
-  NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
   REDIS_URL: 'redis://localhost:6379',
   DSA_BASE_URL: 'http://localhost:8000',
@@ -11,129 +13,51 @@ const baseEnvironment = {
   CREDENTIAL_ENCRYPTION_KEY: '0123456789abcdef',
 };
 
-describe('configured AI providers', () => {
-  it('registers multiple explicit provider/model identities', () => {
-    const config = parseConfig({
-      ...baseEnvironment,
-      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-        {
-          id: 'alpha',
-          baseUrl: 'https://alpha.example/v1',
-          apiKey: 'a',
-          models: ['a1', 'a2'],
-          costPer1kInput: 0.1,
-          costPer1kOutput: 0.2,
-          costCurrency: 'USD',
-          pricingVersion: '2026-09',
-        },
-        {
-          id: 'beta',
-          baseUrl: 'https://beta.example/v1',
-          apiKey: 'b',
-          models: ['b1'],
-          timeoutMs: 1234,
-        },
-      ]),
-    });
-    const providers = createConfiguredAiProviders(config);
-    expect(providers.map(({ id, models }) => ({ id, models: [...models] }))).toEqual([
-      { id: 'alpha', models: ['a1', 'a2'] },
-      { id: 'beta', models: ['b1'] },
-    ]);
-    expect(providers[0]?.metadata).toMatchObject({
-      costPer1kInput: 0.1,
-      costPer1kOutput: 0.2,
-      costCurrency: 'USD',
-      pricingVersion: '2026-09',
-    });
-  });
+describe('AI 服务的部署配置边界', () => {
+  it.each(['development', 'test', 'production'])(
+    '%s 环境忽略遗留 Provider 配置和自动演示开关',
+    (NODE_ENV) => {
+      const config = parseConfig({
+        ...baseEnvironment,
+        NODE_ENV,
+        AI_PROVIDER_ID: '',
+        AI_BASE_URL: 'invalid-url',
+        AI_API_KEY: '',
+        AI_MODEL: '',
+        AI_PROVIDER_CONFIGS_JSON: '{invalid-json',
+        AI_FIXTURE_ENABLED: 'invalid-flag',
+      });
+      expect(config).not.toHaveProperty('aiProviderId');
+      expect(config).not.toHaveProperty('aiBaseUrl');
+      expect(config).not.toHaveProperty('aiApiKey');
+      expect(config).not.toHaveProperty('aiModel');
+      expect(config).not.toHaveProperty('aiProviderConfigsJson');
+      expect(config).not.toHaveProperty('aiFixtureEnabled');
+      expect(config).toMatchObject({ environment: NODE_ENV, aiTimeoutMs: 120_000 });
+    },
+  );
 
-  it('rejects duplicate provider identities', () => {
-    const config = parseConfig({
-      ...baseEnvironment,
-      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-        { id: 'alpha', baseUrl: 'https://one.example/v1', apiKey: 'a', models: ['a1'] },
-        { id: 'alpha', baseUrl: 'https://two.example/v1', apiKey: 'b', models: ['a2'] },
-      ]),
-    });
-    expect(() => createConfiguredAiProviders(config)).toThrow(/AI_PROVIDER_CONFIGS_JSON 配置无效/);
-  });
-
-  it('keeps the legacy single-provider configuration compatible', () => {
-    const config = parseConfig({
-      ...baseEnvironment,
-      AI_PROVIDER_ID: 'legacy',
-      AI_BASE_URL: 'https://legacy.example/v1',
-      AI_API_KEY: 'legacy-key',
-      AI_MODEL: 'legacy-model',
-    });
+  it('模块直接提供空 Registry，启动数据由数据库服务加载', () => {
+    const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AiModule) as unknown[];
+    expect(providers).toContain(AiProviderRegistry);
     expect(
-      createConfiguredAiProviders(config).map(({ id, models, metadata }) => ({
-        id,
-        models: [...models],
-        upstreamFormat: metadata?.upstreamFormat,
-        chatImplementation: metadata?.chatImplementation,
-        adapter: metadata?.adapter,
-      })),
-    ).toEqual([
-      {
-        id: 'legacy',
-        models: ['legacy-model'],
-        upstreamFormat: 'chat-completions',
-        chatImplementation: 'compatible',
-        adapter: 'openai-compatible-chat',
-      },
-    ]);
+      providers.some(
+        (provider) =>
+          typeof provider === 'object' &&
+          provider !== null &&
+          'provide' in provider &&
+          provider.provide === AiProviderRegistry,
+      ),
+    ).toBe(false);
+    expect(new AiProviderRegistry().list()).toEqual([]);
   });
 
-  it('maps legacy environment adapters only at the read boundary', () => {
-    const config = parseConfig({
-      ...baseEnvironment,
-      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-        {
-          id: 'legacy-openrouter',
-          baseUrl: 'https://gateway.example/v1',
-          apiKey: 'secret',
-          models: ['model-a'],
-          adapter: 'openrouter',
-          executionRoutes: [
-            {
-              model: 'model-a',
-              mode: 'json_validated',
-              contract: { id: 'research', version: 'research-generation-v1' },
-              freeEvidence: null,
-            },
-          ],
-        },
-      ]),
-    });
-    const provider = createConfiguredAiProviders(config)[0];
-    expect(provider?.metadata).toMatchObject({
-      upstreamFormat: 'chat-completions',
-      chatImplementation: 'compatible',
-      adapter: 'openai-compatible-chat',
-      compatibilityExtensionProfile: 'openrouter-v1',
-    });
-  });
-
-  it('selects the official provider for explicit non-compatible formats', () => {
-    const config = parseConfig({
-      ...baseEnvironment,
-      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-        {
-          id: 'responses',
-          baseUrl: 'https://same.example/v1',
-          apiKey: 'secret',
-          models: ['model-a'],
-          upstreamFormat: 'responses',
-        },
-      ]),
-    });
-    expect(createConfiguredAiProviders(config)[0]?.metadata).toMatchObject({
-      upstreamFormat: 'responses',
-    });
-    expect(createConfiguredAiProviders(config)[0]?.metadata).toMatchObject({
-      adapter: 'openai-responses',
-    });
+  it('继续校验基础设施配置', () => {
+    expect(() => parseConfig({ ...baseEnvironment, AI_TIMEOUT_MS: 'invalid' })).toThrow(
+      'AI_TIMEOUT_MS',
+    );
+    expect(() => parseConfig({ ...baseEnvironment, CREDENTIAL_ENCRYPTION_KEY: '' })).toThrow(
+      'CREDENTIAL_ENCRYPTION_KEY',
+    );
   });
 });

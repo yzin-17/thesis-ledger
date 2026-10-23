@@ -1,10 +1,20 @@
 # Cash 资金、划转与定期入账验收
 
+<a id="priority"></a>
+> 排期（2026-10-18）：**P2｜仅外部补期汇总通知，待渠道与发送授权**。资金、划转、客户端和 Scheduler 恢复的已过项不重做；路由为空时不重复执行或自行配置。资金正确性缺陷另按 P0 修复，不被本页通知排期拖后。
+> [全局优先级与接续规则](README.md#priority-policy)。本次仅调整文档，不改变下列原任务编号、checkbox、验收条件或执行授权。
+
 > 2026-10-15 当前责任：本页维护资金/划转原验收及定期入账的真实 Scheduler、通知和客户端条件；本地实现完成不等于产品验收通过。原 T1–T4 的历史 Review 仅覆盖原资金/划转范围，未覆盖条件继续有效。
 
-> 状态对账（2026-10-03）：已实现待验收：本地命令/投影已完成，真实浏览器键盘、跨账户划转及相关运行断言仍需验收。Canonical E03 的账本命令与隔离证明只覆盖其明确场景，不代表全部资金/划转产品交互已通过；旧运行版本推测不作为当前前置。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../archive/reviews/2026-10-03-task-state-reconciliation.md)。
+> 2026-10-17 当前结果：资金双向划转/修正链、未来入账、客户端、scheduled 正向及进程停机/并发恢复已通过；后者在当前 Compose 镜像内用专用执行进程和隔离 PostgreSQL 验证真实现金 handler，生成 1＋3 条后重放零新增。正常账户、扫描 cron 与通知配置保持。现在只剩外部补期汇总通知，路由为空时不重复执行、不自行配置渠道。详见[当前证据](evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)。
+
+> 原[10-03 状态对账](../archive/reviews/2026-10-03-task-state-reconciliation.md)指出的客户端缺口已补齐；Scheduler 独立进程条件由 10-17 新证据接续。Canonical E03 与旧运行记录只证明原范围，不替代仍开放的外部通知。
 
 对应 Spec：[`../specs/2026-08-30-cash-account-funding-and-transfer.md`](../specs/2026-08-30-cash-account-funding-and-transfer.md)
+
+- [x] 2026-10-16 失败路径修复：定期确认、计划保存和划转修正改用现有表单级 Alert；实际挂载回归、受控 409、真实余额不足、保留输入和重试通过。
+- [x] 2026-10-16 账本消费修复：现金流显示方向、原始金额和币种，非空表格不再使用空态名称；定向回归通过。
+- [x] 2026-10-16 未来入账修正：未来修改/作废及已消费入账移到未来四条回归先失败后通过；正式 `sync-code.sh thesis-ledger` 更新后，原被拒绝的 10 CNY 入账成功作废。
 
 状态：T1-T4 已完成并验证。
 
@@ -93,24 +103,24 @@
 
 对应 [定期入账 Spec](../specs/2026-08-30-recurring-cash-deposit-plan.md)及 [T1–T4 原实施记录](../archive/tasks/2026-08-30-recurring-cash-deposit-plan.md)。原确定性状态、事务、日期及客户端回归已经完成；以下是原要求中未取得实际证据的执行面、通知与消费面，不重做原实现，也不重跑输入未变的通过证据。其他 Scheduler lease/进程恢复仍归其原 Task，不由本节证明。
 
-- [ ] 定期入账 T3 的真实 Scheduler、补期与通知验收；不得用日期/Service 测试或现金页面截图代替。
+- [ ] 定期入账 T3 的外部补期汇总通知；Scheduler、补期和恢复条件已补，不以参数捕获替代送达。
   - 覆盖验收标准：AC2、AC5、AC6、AC7
   - 依赖：T1、T2
   - 涉及范围：Automation Job 类型、固定扫描任务、Handler、日期纯函数和运行历史。
   - 完成条件：单例任务扫描所有到期计划；补齐全部启用期漏期；暂停月份跳过；并发运行不重复；补期通知按计划合并。
   - 验证方式：日期纯函数、Automation service/runtime/scheduler、并发与重启恢复测试，真实 Scheduler 运行演练。
   - 验证证据：
-    - 既有 Automation/Scheduler 证据保留；本轮只执行定期入账日期/Service 回归，未重新执行 Automation runtime、Scheduler 或真实运行演练。
+    - [x] 10-16 日期/Service/Automation runtime 回归及目标手动 1＋3 条、重跑零新增；10-17 同一目标镜像内真实 Scheduler/现金 handler 的独立进程、隔离 PostgreSQL、补期/暂停/双实例竞争和 SIGKILL 恢复通过。见[逐项证据](evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)。
+    - [ ] 外部通知：当前路由为空，尚无真实投递/失败恢复结果；不启用新渠道或发送消息来关闭此项。
 
-- [ ] 定期入账 T4 的真实客户端、宽窄屏与键盘验收；覆盖确认实际金额/日期、跳过/恢复、账户切换及错误状态。
+- [x] 定期入账 T4 的真实客户端、宽窄屏与键盘验收；覆盖确认实际金额/日期、跳过/恢复、账户切换及错误状态。
   - 覆盖验收标准：AC1、AC3、AC4、AC8
-  - 依赖：T1、T3
+  - 依赖：T1、T3 的 Handler 执行面；真实 scheduled 与外部通知继续由上项独立验收。
   - 涉及范围：账户数据现金页、TanStack Query、计划/确认 Sheet、上下文菜单、通知/错误提示和 Desktop 测试。
   - 完成条件：现金账户可创建和管理计划；待确认实例突出显示；确认可修改实际金额与日期；跳过/恢复与错误状态清楚；不新增页面级 CSS。
   - 验证方式：Desktop API/UI 测试、typecheck、build、宽窄屏浏览器和键盘验收。
   - 验证证据：
-    - Desktop 定向回归 5 个测试文件、34 个测试通过；覆盖定期入账 CONFIRMED 历史、PENDING 逾期、SKIPPED 恢复、账户/Tab 切换清理、持仓 Empty、Risk 和 Portfolio。
-    - `pnpm --filter @thesis-ledger/desktop typecheck`：通过。
-    - 本轮未执行 Desktop build、浏览器或键盘运行时验收，不将其作为本轮证据。
+    - 10-16 真实确认金额/日期、防重复、跳过/恢复、计划修改/启停、错误与重试、账户恢复及宽窄屏/键盘通过；专用对象已回收为停用/结束和保留审计状态。
+    - 当前 Desktop 定向 35 项、全量 841 项、typecheck/build 及静态门禁通过；原通过的账户/Tab 清理与 Risk/Portfolio 证据继续复用。
 
-原最终 Review 未执行真实迁移部署、Scheduler/Compose、外部通知、Desktop build 或浏览器的边界仍保留在原记录；现行 Spec 的原验收条件全部继续有效。本轮只转移文档责任，不把这些限制改为通过或增加新的账号/付费要求。
+原最终 Review 的历史验证边界保留在原记录；新增通过条件只按 10-16 证据更新，未通过的 Scheduler、进程恢复和通知要求继续有效，不增加账号或付费要求。

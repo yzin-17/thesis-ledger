@@ -81,7 +81,7 @@ export class MobileReadOnlyStore {
   setMode(mode: MobilePortfolioMode) {
     if (mode === this.mode) return;
     this.mode = mode;
-    this.setState({ ...this.state, mode, status: 'loading', error: null });
+    this.setState({ ...initialState, mode });
     void this.refresh();
   }
 

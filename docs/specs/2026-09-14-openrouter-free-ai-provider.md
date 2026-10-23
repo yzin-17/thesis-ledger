@@ -3,13 +3,14 @@
 > 任务标识：`openrouter-free-ai-provider`
 > 日期：2026-09-14
 > 状态：已完成；前端配置、动态 Registry、真实 OpenRouter 连接与目标 Compose/浏览器验收均已通过。2026-09-15 已补充 OpenRouter reasoning/响应变体兼容与 Provider 页面查询刷新范围修复。
+> 配置来源合同已于 2026-10-19 更新为[统一页面配置](2026-10-19-ai-provider-database-only.md)，本规格的既有完成结论仅代表当时范围。
 > 对应任务：[2026-09-14-openrouter-free-ai-provider](../archive/tasks/2026-09-14-openrouter-free-ai-provider.md)
 
 ## 背景与问题
 
 ThesisLedger Server 已有 OpenAI-compatible AI Provider 适配器，策略优化和 AI 研究通过运行中的 `AiProviderRegistry` 选择 Provider/Model。此前实现只把 `thesis-ledger-infra/.env` 中的 `AI_*` 配置透传给 Server，并在 Server 启动时注册 Provider；Desktop `/providers` 页面虽然允许选择 `ai` 类型，但它保存的 `ProviderConfig` 不会进入 `AiProviderRegistry`，连接测试也只支持通知 Webhook。
 
-因此部署级 OpenRouter 可以工作，但“用户从前端新增、修改、测试、启停和切换 AI Provider”的原始产品要求没有完成。本 Spec 保留 `.env` 作为兼容的部署引导路径，并补齐数据库、Server 运行时与 Desktop 页面之间的产品闭环。
+因此部署级 OpenRouter 可以工作，但“用户从前端新增、修改、测试、启停和切换 AI Provider”的原始产品要求没有完成。本 Spec 建立数据库、Server 运行时与 Desktop 页面之间的产品闭环；当前仅使用页面保存到数据库的服务配置。
 
 ## 2026-09-15 回归修复
 
@@ -62,29 +63,26 @@ type AiProviderSettings = {
 
 `name` 是 Registry 中稳定的 Provider ID；API Key 写入 `encryptedCredentials`。查询只返回 `credentialConfigured`，不得返回密文或明文。模型去空白、去重且至少一个；URL、超时、费用和能力在 Server 使用共享 Schema 校验，不能只依赖前端校验。
 
-### 配置来源与优先级
+### 配置来源
 
-- 数据库记录是产品级配置，`source = "database"`，可由页面管理。
-- `AI_PROVIDER_CONFIGS_JSON` 与单 Provider `AI_*` 继续作为部署级兼容来源，`source = "environment"`；环境来源不得向客户端暴露密钥。
-- 相同 Provider ID 存在数据库记录时，由数据库记录覆盖环境来源；数据库记录被停用时同名环境 Provider 也被屏蔽，确保页面“停用”立即生效。
-- 删除数据库记录后，同名环境来源可以重新出现；API/UI 必须显示其部署来源和只读性质，避免把它误认成未删除的数据库记录。
+数据库记录是唯一产品级配置，摘要兼容保留 `source = "database"`。启动、列表和动态刷新只消费数据库；不加载部署环境服务配置，不存在来源覆盖或接管。删除后不会重新出现，详细空态、故障和升级行为见[现行来源规格](2026-10-19-ai-provider-database-only.md)。
 
 ### Server 接口
 
 AI 模块提供独立接口，避免通用 Provider 端点继续产生“已保存但未接入 Registry”的假成功：
 
-- `GET /ai/providers`：返回数据库与部署来源的脱敏摘要、模型、能力、状态和审计摘要。
+- `GET /ai/providers`：返回数据库配置的脱敏摘要、模型、能力、状态和审计摘要。
 - `POST /ai/providers`：创建或更新数据库 AI Provider；保留未重新输入的已有密钥。
 - `POST /ai/providers/test`：使用草稿配置执行受控、低 token 的结构化连接测试，不持久化草稿。
 - `POST /ai/providers/:name/test`：使用已保存配置测试并记录健康历史。
 - `PATCH /ai/providers/:name/enabled`：启停数据库配置并刷新 Registry。
-- `DELETE /ai/providers/:name`：删除数据库配置并刷新 Registry；删除部署来源时拒绝并给出明确错误。
+- `DELETE /ai/providers/:name`：删除数据库配置并刷新 Registry；不存在的配置返回明确错误。
 
 通用 `/providers/config` 查询可继续承载通知 Provider；Desktop 对 `ai` 类型必须使用上述专用接口。Server 对通过通用保存端点提交的 `type = "ai"` 请求应拒绝并指向专用接口，防止形成第二条不刷新 Registry 的写入路径。
 
 ### 动态 Registry
 
-Server 启动时从环境来源和数据库来源构建完整快照。每次成功创建、更新、启停或删除后，先从持久化事实重新构建下一份 Provider Map，验证通过后一次性替换当前快照；构建失败时保留旧 Registry 并返回失败，不得留下部分刷新状态。
+Server 启动时从数据库构建完整快照。每次成功创建、更新、启停或删除后，先从持久化事实重新构建下一份 Provider Map，验证通过后一次性替换当前快照；构建失败时保留旧 Registry 并返回失败，不得留下部分刷新状态。
 
 策略优化和 AI 研究继续注入同一个 `AiProviderRegistry` 实例。普通回测 Worker 不加载 `AiModule`，本功能不向其扩散 API Key 或 LLM 依赖。
 
@@ -99,7 +97,7 @@ Server 启动时从环境来源和数据库来源构建完整快照。每次成�
 
 当类型为 `ai` 时显示专用字段：API Base URL、模型列表、API Key、超时和可选费用元数据；默认能力为 `chat`。编辑已保存配置时不回显 API Key，留空保存继续使用已有密钥。连接测试、启停、删除和保存均使用 TanStack Query mutation，并在成功后刷新 Provider 列表及策略优化能力查询。
 
-部署来源记录显示“部署配置”，不提供删除/启停假操作；用户可通过新建同名数据库配置接管，但必须重新输入 API Key。
+所有 AI 服务统一提供新增、编辑、启停和删除；空态提供新增入口。
 
 ## 对外行为或接口变化
 
@@ -111,7 +109,7 @@ Server 启动时从环境来源和数据库来源构建完整快照。每次成�
 ## 数据、状态或兼容性影响
 
 - 不新增 migration；复用现有 `ProviderConfig`、`ProviderHealth` 和 `ProviderHealthCheck`。
-- `.env` 配置保留为部署兼容路径，但不再作为唯一产品入口。
+- 仅环境中的服务升级前需通过页面重新录入；数据库已有配置和凭证保留，不自动导入。
 - 已存在但缺少合法 AI `settings` 的 `type = "ai"` 记录不进入 Registry，并在管理查询中返回配置失败状态；Server 不因单条坏记录整体无法启动。
 - Registry 只包含启用且配置完整的 Provider；停用和删除不会中断已经发出的第三方请求，但影响后续路由。
 
@@ -120,13 +118,13 @@ Server 启动时从环境来源和数据库来源构建完整快照。每次成�
 ### 关键可观察行为
 
 - 页面创建 OpenRouter 后，查询结果不含 Key，Registry/策略优化能力立即包含配置的 Provider/Model。
-- 修改模型、停用、重新启用和删除均无需重启，并按配置来源优先级生效。
+- 修改模型、停用、重新启用和删除均无需重启，并以数据库为唯一事实源生效。
 - 草稿和已保存连接测试能区分成功、鉴权失败、超时和配置错误，且错误中没有 API Key。
 - 通知 Provider 原有保存/测试行为和普通回测 Worker 依赖边界不变。
 
 ### 测试层级与证据边界
 
-1. Server 单元/集成：Schema、加密保留、CRUD、来源合并、Registry 原子替换、健康审计和错误脱敏。
+1. Server 单元/集成：Schema、加密保留、CRUD、唯一数据库来源、Registry 原子替换、健康审计和错误脱敏。
 2. Desktop 组件/交互：AI 专用字段、编辑不回显 Key、请求契约、启停/删除确认和错误状态。
 3. 包级与仓库门禁：Server/Desktop 定向测试、TypeScript、边界检查；不以全量成功日志替代定向断言。
 4. 目标运行时：当前 Server 镜像与数据库中，通过页面保存并脱敏回读 OpenRouter 配置，完成一次真实结构化连接测试，确认动态能力列表与健康审计同步；实际组合、账户或策略研究请求因会向第三方传输用户业务数据，不作为配置功能的默认验收动作。
@@ -154,7 +152,7 @@ Server 启动时从环境来源和数据库来源构建完整快照。每次成�
 - AC2：Server 提供 AI Provider 查询、创建/更新、草稿测试、已保存测试、启停和删除接口；非法配置在 Server 端被拒绝且错误脱敏。
 - AC3：AI Provider API Key 使用现有 AES-256-GCM 凭证机制加密持久化，响应、日志、测试证据和健康历史均不包含明文或密文。
 - AC4：创建、修改、启停和删除数据库 AI Provider 后，运行中的 `AiProviderRegistry` 与策略优化能力查询无需重启即反映结果；刷新失败不留下部分 Registry。
-- AC5：数据库与环境来源优先级、停用屏蔽和删除后环境来源重新出现的行为可观察且有自动化覆盖；部署来源在页面明确标识且不可被假删除。
+- AC5：启动、列表、刷新与生命周期只消费数据库；停用或删除后不会从环境恢复。本来源收敛范围已由[统一页面配置实施记录](../archive/tasks/2026-10-19-ai-provider-database-only.md)完成，现行行为继续以[来源规格](2026-10-19-ai-provider-database-only.md)为准。
 - AC6：已保存连接测试写入最近状态及历史检查，管理查询能返回更新时间、来源、状态、检查时间、延迟和脱敏错误码。
 - AC7：通知 Provider 和普通回测 Worker 的既有行为与依赖边界不变。
 - AC8：目标 Compose/数据库/浏览器使用真实 OpenRouter Key 完成“页面保存 → 脱敏回读 → 动态能力刷新 → 结构化连接测试 → 健康审计”闭环；未执行前不得宣称产品功能达到真实运行时验收。实际组合、账户或策略研究请求仅在用户明确授权向第三方发送相应业务数据后执行。

@@ -1,5 +1,11 @@
 # 数据库结构测试矩阵
 
+## 研究幂等提交（2026-10-19）
+
+`20261019010000_research_submission_v2` 仅扩展 AiRun，追加可空身份、提交标识、输入摘要与范围快照，不修改旧报告、来源、费用或状态。新写入要求四项完整、摘要为 SHA-256 形式、快照标明 V2/模式/范围；按身份和提交标识建立唯一约束。未新增表，raw-owned 清单不变；动态 migration matrix、运行时打包输入和结构 head 自动包含本项。
+
+隔离 PostgreSQL 门禁需覆盖迁移前 V1 记录逐字段保留、同身份并发提交唯一、异身份隔离、异摘要冲突、权限检查先于找回、事务回滚及数据库直接拒绝不完整/重复输入；应用角色的列写入权限沿用 AiRun 权限初始化。当前仅进入本地实现，隔离数据库和目标保留升级结果由[研究 Task](../tasks/2026-10-18-research-evidence-evolution.md)分别记录，不以静态矩阵代替。
+
 ## 自然语言编写持久化（2026-10-04）
 
 新增 `20261004130000_strategy_authoring_drafts` 与 `20261004140000_strategy_authoring_records` 采用保数据扩展，新增编写草稿/修订及操作/提案/来源，均登记 raw-owned inventory；Prisma Schema 不变。运行时打包与结构门禁动态读取全部 migration/模型/inventory，无需维护第二份静态清单。隔离 PostgreSQL 需验证存量 Strategy/StrategyVersion 原样保留、受限 app role 权限、owner 隔离、同修订竞态、终态不可写、单活动操作和晚到结果；实际证据见[本批任务证据](../tasks/evidence/2026-10-04-natural-language-strategy-parallel.md)。目标数据库、正式保数据升级演练及 G2 未在本批执行。

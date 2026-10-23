@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { journalReviewQuerySchema } from '@thesis-ledger/schemas';
 import { journalReviewWindow } from '@thesis-ledger/domain';
@@ -14,8 +14,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import { getDesktopApiClient } from '@/shared/api/client';
+import { StickyTableActionCell, StickyTableActionHeader } from '../../shared/StickyTableActions.js';
 import { JournalEmpty, JournalRequestError } from './JournalReviewFeedback.js';
 import { evidenceLabel, reviewObjectLabels, reviewStatusLabels } from './journal-review-display.js';
 
@@ -25,12 +26,14 @@ export function JournalCandidateBrowser({
   symbol,
   onSelect,
   onWindowApplied,
+  selectionPrompt,
 }: {
   accountId: string;
   mode: 'actual' | 'shadow';
   symbol: string;
   onSelect: (id: string) => void;
   onWindowApplied: () => void;
+  selectionPrompt?: ReactNode;
 }) {
   const api = getDesktopApiClient().journalReviews;
   const client = useQueryClient();
@@ -59,25 +62,34 @@ export function JournalCandidateBrowser({
   });
   const rows = query.data?.pages.flatMap((page) => page.items) ?? [];
   const legacy = query.data?.pages[0]?.legacyItems ?? [];
+  const instrumentNames = new Map(
+    query.data?.pages.flatMap((page) =>
+      (page.instrumentDirectory?.items ?? []).map(
+        (item) => [item.symbol.toUpperCase(), item.displayName] as const,
+      ),
+    ),
+  );
+  const instrumentLabel = (symbol: string) => {
+    const name = instrumentNames.get(symbol.toUpperCase());
+    return name ? `${name} · ${symbol}` : symbol;
+  };
   return (
     <div className="flex flex-col gap-3">
       <FieldGroup className="sm:flex-row sm:items-end">
         <Field>
-          <FieldLabel>候选开始时间（含，可选）</FieldLabel>
-          <Input
+          <FieldLabel>候选开始时间（可选）</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="候选开始时间"
-            placeholder="带时区的 ISO 8601 时间"
             value={draftWindow.start}
-            onChange={(event) => setDraftWindow({ ...draftWindow, start: event.target.value })}
+            onValueChange={(start) => setDraftWindow({ ...draftWindow, start })}
           />
         </Field>
         <Field>
-          <FieldLabel>候选结束时间（不含，可选）</FieldLabel>
-          <Input
+          <FieldLabel>候选结束时间（可选）</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="候选结束时间"
-            placeholder="带时区的 ISO 8601 时间"
             value={draftWindow.end}
-            onChange={(event) => setDraftWindow({ ...draftWindow, end: event.target.value })}
+            onValueChange={(end) => setDraftWindow({ ...draftWindow, end })}
           />
         </Field>
         <Button
@@ -98,13 +110,14 @@ export function JournalCandidateBrowser({
               setWindowError(null);
               onWindowApplied();
             } catch {
-              setWindowError(new Error('请输入带时区的有效时间，结束时间不能早于开始时间'));
+              setWindowError(new Error('请选择有效时间，结束时间不能早于开始时间'));
             }
           }}
         >
           应用候选窗口
         </Button>
       </FieldGroup>
+      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">时间范围说明</summary><p className="mt-2">按本机时区输入；开始时刻计入范围，结束时刻不计入。</p></details>
       {windowError && <JournalRequestError title="候选窗口无效" error={windowError} />}
       {query.isPending && <Skeleton className="h-40 w-full" />}
       {query.isError && (
@@ -129,14 +142,16 @@ export function JournalCandidateBrowser({
               <TableHead>标的与粒度</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>统计资格</TableHead>
-              <TableHead>选择</TableHead>
+              <StickyTableActionHeader className="h-10 px-2 align-middle font-medium whitespace-nowrap">
+                选择
+              </StickyTableActionHeader>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.input.reference.reviewObjectId}>
                 <TableCell>
-                  <p>{row.input.trade.symbol}</p>
+                  <p>{instrumentLabel(row.input.trade.symbol)}</p>
                   <p className="text-xs text-muted-foreground">
                     {reviewObjectLabels[row.input.reference.reviewObjectType]}
                   </p>
@@ -149,7 +164,7 @@ export function JournalCandidateBrowser({
                     ? '符合资格'
                     : row.statisticsEligibility.reasons.map(evidenceLabel).join('；')}
                 </TableCell>
-                <TableCell>
+                <StickyTableActionCell className="p-2 text-right align-middle whitespace-nowrap">
                   <Button
                     size="sm"
                     variant="outline"
@@ -157,7 +172,7 @@ export function JournalCandidateBrowser({
                   >
                     选择对象
                   </Button>
-                </TableCell>
+                </StickyTableActionCell>
               </TableRow>
             ))}
           </TableBody>
@@ -172,12 +187,14 @@ export function JournalCandidateBrowser({
           读取下一页
         </Button>
       )}
+      {rows.length > 0 && !query.isError && !query.isPending && selectionPrompt}
       {legacy.length > 0 && (
         <details>
           <summary className="cursor-pointer">旧 Journal 记录待确认（{legacy.length}）</summary>
           {legacy.map((row) => (
             <p className="mt-2 text-sm" key={row.journalEntry.id}>
-              {row.journalEntry.symbol ?? '未知标的'} · 旧记录待确认 ·{' '}
+              {row.journalEntry.symbol ? instrumentLabel(row.journalEntry.symbol) : '未知标的'} ·
+              旧记录待确认 ·{' '}
               {row.reason === 'SELL_MAPPING_AMBIGUOUS' ? '减仓映射存在歧义' : '未找到对应减仓'}
             </p>
           ))}

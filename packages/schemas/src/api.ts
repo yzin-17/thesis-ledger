@@ -148,6 +148,7 @@ export const performanceSummaryResponseSchema = z
     accountId: z.uuid().nullable(),
     snapshots: z.array(z.unknown()),
     ttwror: z.number().finite().nullable(),
+    ttwrorReason: z.string().nullable().optional(),
     xirr: z.number().finite().nullable(),
     xirrReason: z.string().nullable().optional(),
   })

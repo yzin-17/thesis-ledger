@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -38,6 +38,13 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 
 const text = (value: unknown, fallback = '未配置') =>
   typeof value === 'string' && value.trim() ? value : fallback;
+
+const sizingDescriptions: Record<string, string> = {
+  fixedAmount: '按执行标的币种填写投入金额。',
+  percentOfEquity: '按 0–1 的比例填写，例如 0.25 表示 25%。',
+  targetWeight: '按 0–1 的比例填写，例如 0.25 表示 25%。',
+  fixedQuantity: '填写策略定义使用的数量。',
+};
 
 export function StrategyV2Summary({
   schema,
@@ -196,9 +203,13 @@ export function StrategyV2Summary({
               <FieldLabel htmlFor="strategy-v2-sizing">仓位数值</FieldLabel>
               <Input
                 id="strategy-v2-sizing"
+                aria-describedby="strategy-v2-sizing-help"
                 value={text(sizing[sizingKey], '')}
                 onChange={(event) => updateNested('sizing', sizingKey, event.target.value)}
               />
+              <FieldDescription id="strategy-v2-sizing-help">
+                {sizingDescriptions[text(sizing.type, '')] ?? '请先选择仓位规则。'}
+              </FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="strategy-v2-sizing-type">仓位规则</FieldLabel>

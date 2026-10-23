@@ -8,15 +8,16 @@ type CacheInput<T = MarketCacheContextRequestV3> = T extends MarketCacheContextR
 export class MarketCacheControl {
   constructor(private readonly dsa: Pick<DsaClient, 'marketCacheContextV3'>) {}
 
-  async read(input: CacheInput) {
+  async read(input: CacheInput, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     const request = { ...input, contractVersion: 3, consumer: 'thesis-ledger', requestId: crypto.randomUUID() } as MarketCacheContextRequestV3;
-    const context = await this.dsa.marketCacheContextV3(request);
+    const context = await this.dsa.marketCacheContextV3(request, signal);
     if (!context.ready) throw new DsaError('当前功能未启用或来源不可用', 'control-rejected');
     return { input, context };
   }
 
-  async assertCurrent(scope: Awaited<ReturnType<MarketCacheControl['read']>>) {
-    const current = await this.read(scope.input);
+  async assertCurrent(scope: Awaited<ReturnType<MarketCacheControl['read']>>, signal?: AbortSignal) {
+    const current = await this.read(scope.input, signal);
     if (current.context.generation !== scope.context.generation)
       throw new DsaError('当前数据读取期间控制代次已变化', 'stale-revision');
   }

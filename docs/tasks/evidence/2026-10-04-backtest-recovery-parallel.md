@@ -6,7 +6,7 @@
 
 **原 T4 保持未勾选**。本测试入口使用真实 BullMQ Worker 和生产 `backtest.processor.js`，仅添加专属 queue prefix；不把它等同于目标 Compose `backtest-worker.main.js` 的心跳/健康检查。生产 reconciler 在 R1 每15秒显式触发；目标 Server 定时器、目标部署和 Electron 不在本轮覆盖范围。
 
-执行包：[隔离叶 Task](../2026-10-04-backtest-recovery-parallel.md)。权威需求为原主仓 `docs/tasks/2026-09-09-backtest-bullmq-lifecycle.md` 的2026-10-03对账与配对 Spec 的 AC2/AC8/AC9/AC10。Canonical C02 的已归档 Task、当前 owner/执行器/transport 源码及现有测试用于确认当前单一 Run 边界；没有恢复 jobs/V1/V2 旧入口，也没有计入 AI 研究恢复证据。
+执行包：[隔离叶 Task](../../archive/tasks/2026-10-04-backtest-recovery-parallel.md)。权威需求为原主仓 `docs/tasks/2026-09-09-backtest-bullmq-lifecycle.md` 的2026-10-03对账与配对 Spec 的 AC2/AC8/AC9/AC10。Canonical C02 的已归档 Task、当前 owner/执行器/transport 源码及现有测试用于确认当前单一 Run 边界；没有恢复 jobs/V1/V2 旧入口，也没有计入 AI 研究恢复证据。
 
 ## 工作区、依赖和输入基线
 

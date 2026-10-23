@@ -9,7 +9,7 @@ import { journalReviewWindow } from '@thesis-ledger/domain';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import {
   Select,
   SelectContent,
@@ -109,7 +109,7 @@ export function JournalPeriodReview({
         ...window,
         ...(symbol ? { symbol } : {}),
       });
-      if (!request.success) throw new Error('请输入带时区的有效开始和结束时间');
+      if (!request.success) throw new Error('请选择有效的开始和结束时间');
       journalReviewWindow(request.data);
       const data = await getDesktopApiClient().journalReviews.period(request.data);
       return { data, sequence: current };
@@ -148,28 +148,29 @@ export function JournalPeriodReview({
           </Select>
         </Field>
         <Field>
-          <FieldLabel>开始时间（含边界，ISO 8601）</FieldLabel>
-          <Input
+          <FieldLabel>开始时间</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="周期开始时间"
             value={window.start}
-            onChange={(event) => {
+            onValueChange={(start) => {
               setPreset('custom');
-              setWindow({ ...window, start: event.target.value });
+              setWindow({ ...window, start });
             }}
           />
         </Field>
         <Field>
-          <FieldLabel>结束时间（不含边界，ISO 8601）</FieldLabel>
-          <Input
+          <FieldLabel>结束时间</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="周期结束时间"
             value={window.end}
-            onChange={(event) => {
+            onValueChange={(end) => {
               setPreset('custom');
-              setWindow({ ...window, end: event.target.value });
+              setWindow({ ...window, end });
             }}
           />
         </Field>
       </FieldGroup>
+      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">时间范围说明</summary><p className="mt-2">按本机时区输入；开始时刻计入范围，结束时刻不计入。</p></details>
       <Button
         className="self-start"
         disabled={analysis.isPending}

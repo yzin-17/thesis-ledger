@@ -109,6 +109,7 @@ try {
       'run',
       '--no-file-parallelism',
       'test/performance/valuation-postgres.integration.test.ts',
+      'test/performance/fund-valuation-postgres.integration.test.ts',
     ],
     {
       cwd: root,

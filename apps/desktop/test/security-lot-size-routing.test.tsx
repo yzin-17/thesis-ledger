@@ -7,13 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 import { backtestExecutionModelSchemaV3, type BacktestExecutionModelV3 } from '@thesis-ledger/schemas';
 import { BacktestResearchLotSizeEditor } from '../src/features/strategy/BacktestResearchLotSizeEditor.js';
-import { fetchSecurityLotSize } from '../src/features/strategy/security-lot-size.api.js';
+import { fetchSecurityLotSize } from '../src/features/market-data/security-lot-size.api.js';
 import { applyResearchLotSize } from '../src/features/strategy/backtest-research-lot-size.model.js';
 import { researchLotSizeDiagnostic } from '../src/features/strategy/backtest-research-lot-size-diagnostic.js';
 import { marketCapabilityLabel } from '../src/features/market-data/market-data-routes-v3.js';
 import { credentialFieldLabels } from '../src/features/market-data/provider-credentials.js';
 
-vi.mock('../src/features/strategy/security-lot-size.api.js', () => ({ fetchSecurityLotSize: vi.fn() }));
+vi.mock('../src/features/market-data/security-lot-size.api.js', () => ({ fetchSecurityLotSize: vi.fn() }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const reference = { symbol: '00147.HK', sharesPerLot: '1000', historicalChanges: 'unverified' as const,
   source: { provider: 'futu', sourceUrl: 'https://openapi.futunn.com/futu-api-doc/quote/get-static-info.html',

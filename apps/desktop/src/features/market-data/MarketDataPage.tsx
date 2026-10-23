@@ -1,5 +1,8 @@
 import { useMarketProviderDialogs } from './useMarketProviderDialogs.js';
+import { MarketNewsSheet } from './MarketNewsSheet.js';
 import { PageHeader } from '../shared/PageHeader.js';
+import { DataStateBanner } from '../shared/DesktopPrimitives.js';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -72,6 +75,8 @@ export function MarketDataPage() {
   if (policy.isError || providers.isError || catalog.isError) loadState = 'degraded';
   else if (policy.isPending || providers.isPending || catalog.isPending) loadState = 'loading';
   const controlsDisabled = loadState !== 'ready' || busyAction !== null;
+  let policyStatus = routePolicySummaryV3(policy.data);
+  if (policy.isError) policyStatus = policy.data ? '旧数据，刷新失败' : '读取失败';
   const routeProviderSummary = useMemo(() => {
     return {
       total: providerDrafts.length,
@@ -92,7 +97,7 @@ export function MarketDataPage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : '启停保存失败。',
+        text: requestFailureMessage(error, '启停保存失败，请稍后重试。'),
       });
     }
   };
@@ -101,8 +106,8 @@ export function MarketDataPage() {
     if (
       !(await confirm({
         title: `移除 ${provider.displayName}？`,
-        description: '该操作会从所有市场数据路由中移除 Provider，并更新路由策略。',
-        confirmLabel: '移除 Provider',
+        description: '该操作会从所有市场数据路由中移除此提供方，并更新路由策略。',
+        confirmLabel: '移除提供方',
         cancelLabel: '取消',
         variant: 'destructive',
       }))
@@ -123,7 +128,7 @@ export function MarketDataPage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Provider 移除失败。',
+        text: requestFailureMessage(error, '提供方移除失败，请稍后重试。'),
       });
     } finally {
       setBusyAction(null);
@@ -179,6 +184,7 @@ export function MarketDataPage() {
         description="管理行情来源、数据优先级与标的目录。"
         actions={
           <>
+            <MarketNewsSheet />
             <RefreshIconButton
               label="刷新市场数据状态"
               refreshing={marketDataRefreshing}
@@ -204,7 +210,7 @@ export function MarketDataPage() {
       )}
 
       <section className="mt-5 flex flex-wrap items-center gap-2" aria-label="市场数据概况">
-        <Badge variant="outline">路由状态：{routePolicySummaryV3(policy.data)}</Badge>
+        <Badge variant="outline">路由状态：{policyStatus}</Badge>
         <Badge variant="outline">
           {providers.data
             ? `${routeProviderSummary.configured}/${routeProviderSummary.total} 个数据源可用`
@@ -233,7 +239,13 @@ export function MarketDataPage() {
             onRemove={(provider) => void handleRemoveProvider(provider)}
           />
         }
-        policyPanel={
+        policyPanel={policy.isError && !marketPolicy.draft ? (
+          <DataStateBanner
+            state="error"
+            description="路由策略暂时无法读取，请重新加载。"
+            onRetry={() => void policy.refetch()}
+          />
+        ) : (
           <MarketPolicyPanel
             policy={marketPolicy.draft}
             serverPolicy={policy.data ?? null}
@@ -249,7 +261,7 @@ export function MarketDataPage() {
             onSave={() => void marketPolicy.save()}
             onRetry={() => void marketPolicy.retry()}
           />
-        }
+        )}
         catalogPanel={
           <div className="flex flex-col gap-4">
           <SecurityStaticInfoPanel />
@@ -258,6 +270,10 @@ export function MarketDataPage() {
             disabled={controlsDisabled}
             syncing={syncCatalog.isPending || Boolean(catalogJobId)}
             searchBusy={instrumentSearch.isFetching}
+            searchRequested={Boolean(submittedSearch)}
+            searchError={
+              instrumentSearch.isError ? '本地标的目录暂时无法读取，请重试。' : null
+            }
             searchResults={instrumentSearch.data ?? []}
             confirmingId={
               busyAction?.startsWith('instrument-confirm:')
@@ -266,6 +282,7 @@ export function MarketDataPage() {
             }
             onSync={() => void handleSyncCatalog()}
             onSearch={setSubmittedSearch}
+            onRetrySearch={() => void instrumentSearch.refetch()}
             onConfirm={(instrument) => void handleConfirmInstrument(instrument)}
           />
           </div>

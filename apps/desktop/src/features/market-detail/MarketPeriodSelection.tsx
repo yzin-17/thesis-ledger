@@ -5,8 +5,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 
-export type ChartPeriod = Exclude<MarketTimeframe, '1m'>;
+export type ChartPeriod = MarketTimeframe;
 export const marketPeriodLabels: Record<ChartPeriod, string> = {
+  '1m': '1 分钟',
   '1d': '日线', '5d': '5 日线', '1w': '周线', '1mo': '月线', '1y': '年线',
 };
 const periods = Object.keys(marketPeriodLabels) as ChartPeriod[];
@@ -43,22 +44,34 @@ export function MarketPeriodSelection({ symbol, enabled, adjustment, children }:
       getDesktopApiClient().market.getPeriodOptions(symbol, {
         adjustment: adjustment ?? 'qfq', barsLimit, signal,
       }),
-    enabled,
+    enabled: enabled && /\.(SH|SZ|BJ)$/.test(symbol),
     staleTime: 60_000,
     retry: false,
   });
   const standardQuery = useQuery(optionsQuery(90));
   const annualQuery = useQuery(optionsQuery(2));
+  const minuteMarket = /\.(HK|US)$/.test(symbol);
+  const minuteQuery = useQuery({
+    queryKey: ['desktop', 'market-minute-options', symbol, '1m'],
+    queryFn: ({ signal }) => getDesktopApiClient().market.getChartOptions(symbol, signal, undefined, '1m'),
+    enabled: enabled && minuteMarket,
+    staleTime: 15_000,
+    retry: false,
+  });
   const query = selected === '1y' ? annualQuery : standardQuery;
   const available = new Set<ChartPeriod>(['1d']);
+  if (minuteQuery.data?.symbol === symbol && minuteQuery.data.timeframe === '1m' &&
+      minuteQuery.data.options.some((option) => option.adjustment === 'none' && option.available)) available.add('1m');
   for (const option of standardQuery.data?.options ?? []) {
     if (option.timeframe !== '1y' && option.available) available.add(option.timeframe);
   }
   if (annualQuery.data?.options.some((option) => option.timeframe === '1y' && option.available)) {
     available.add('1y');
   }
-  const unavailable = enabled && selected !== '1d' && query.isSuccess && !available.has(selected);
-  const period = enabled && !unavailable ? selected : '1d';
+  const ready = selected === '1m' ? !minuteMarket || minuteQuery.isSuccess : query.isSuccess;
+  const unavailable = enabled && selected !== '1d' && ready && !available.has(selected);
+  const waitingMinute = selected === '1m' && !available.has('1m');
+  const period = enabled && !unavailable && !waitingMinute ? selected : '1d';
   useEffect(() => {
     if (!unavailable) return;
     setNotice({ symbol, text: `${marketPeriodLabels[selected]}当前不可用，已切换为日线。` });

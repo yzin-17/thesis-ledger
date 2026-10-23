@@ -77,7 +77,7 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     const accountSelectorFiles = [
       '../src/features/account-data/AccountDataAccountSelector.tsx',
       '../src/features/account-data/AccountDataCashTransferSheet.tsx',
-      '../src/features/ai/NewResearchSheet.tsx',
+      '../src/features/ai/research-account-scope.ts',
       '../src/features/import/ImportReview.tsx',
       '../src/features/import/ScreenshotImportSections.tsx',
       '../src/features/journal/JournalAccountSelector.tsx',
@@ -524,7 +524,7 @@ describe('Desktop UI contract - providers and primitives', () => {
   it('renders provider settings and data state banners directly from feature module', () => {
     const providerMarkup = renderWithToast(<ProviderSettings />);
     expect(providerMarkup).toContain('数据与自动化');
-    expect(providerMarkup).toContain('新增或更新 Provider');
+    expect(providerMarkup).toContain('新增或更新提供方');
     expect(providerMarkup).toContain('>提供方</th>');
 
     const bannerMarkup = renderToStaticMarkup(

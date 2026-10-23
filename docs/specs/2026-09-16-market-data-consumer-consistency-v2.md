@@ -1,11 +1,11 @@
 # 市场数据消费者一致性 V2 Spec
 
-2026-10-03 适用性对账：保留 acceptance、领域边界和受保护清理原则；旧 V2 创建与存储路径由[Canonical 架构](../architecture/canonical-runtime.md)替代，固定快照与严格历史 PIT 的分界按[现行多源规格](2026-09-25-multi-source-adjustment-aware-backtest.md)。原 G1 尚未覆盖断言见[原 Task](../tasks/2026-09-16-market-data-consumer-consistency-v2.md)；重建后的归零检查不要求每次 smoke 后再清理。
+2026-10-03 适用性对账：保留 acceptance、领域边界和受保护清理原则；旧 V2 创建与存储路径由[Canonical 架构](../architecture/canonical-runtime.md)替代，固定快照按[现行多源规格](2026-09-25-multi-source-adjustment-aware-backtest.md)；S05 严格历史 PIT 已由[10-08 范围决定](2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)取消。原 G1 尚未覆盖断言见[原 Task](../tasks/2026-10-09-unified-data-capability-adapter.md#market-consumer-acceptance)；重建后的归零检查不要求每次 smoke 后再清理。
 
 > 任务标识：market-data-consumer-consistency-v2
 > 日期：2026-09-16
-> 状态：T1–T4 本地实现完成；已授权开发库重建与保留事实恢复，真实运行态门禁未完成
-> 对应任务：[市场数据消费者一致性 V2 实施任务](../tasks/2026-09-16-market-data-consumer-consistency-v2.md)
+> 状态：原本地实现与恢复证据保留；未覆盖的真实消费者/目标运行态由统一适配层 Task 接续
+> 对应任务：[市场数据消费者一致性 V2 实施任务](../tasks/2026-10-09-unified-data-capability-adapter.md#market-consumer-acceptance)
 
 ## 背景与问题
 
@@ -14,6 +14,7 @@ Risk 目前可能直接读取 `MarketBar`，绕过当前路由、完整性和 pr
 ## 目标
 
 - Strategy Risk 只使用 `complete` 的 `MarketBarReader` 结果，缺数据时 fail-closed。
+- 日线价格上下文只请求市场时区下最近已收盘交易日，不固定多取一年；交易日必须由当前有效交易日历判定，未覆盖年份不请求。最长持有期另读取实际开仓日至最近已收盘日的完整区间，不能截断或用部分窗口冒充持有期。两类读取均保留精确路由、原始价格、完整覆盖和来源证明，不使用研究模式或推测上市事实绕过门禁。
 - 绩效预估使用 `interactive`，正式校准使用 `complete`。
 - Backtest V2 使用 `point-in-time`，要求 `availableAt <= asOf`，并冻结实际路由、Provider/source revision 和 fingerprint。V3 按[多源复权感知回测规格](2026-09-25-multi-source-adjustment-aware-backtest.md)显式区分严格历史时点与固定供应商快照：后者保留实际观察时间，不把当前复权历史伪装成历史当时可见数据；冻结后重放及候选切分复用同一事实窗口。
 - Portfolio、Performance、Automation 继续单向消费 Market 模块；Catalog/Asset identity 保持 provider-neutral。
@@ -45,6 +46,8 @@ Market 模块提供深模块 `MarketBarReader.read`，消费者只选择 accepta
 ## 测试策略
 
 覆盖 Risk fail-closed、绩效两种 acceptance、Backtest availableAt/asOf 和冻结重放、跨模块依赖门禁，以及 Portfolio/Automation 不回归。测试 fixture 只证明语义，不证明线上 Provider 和 Docker 版本。
+
+实时策略风险预览以请求时刻选择已收盘交易日，以本次读取完成时刻检查来源 `availableAt`，避免将本次读取才可得的数据永久排除。显式传入历史评价时刻时，仍严格使用该时刻作为可得性上限；不得借实时预览放宽历史评价或回测条件。自动扫描仍保留其显式评价时点约束，实时预览的正向结果不能代替自动扫描验收。
 
 ## 验收标准
 

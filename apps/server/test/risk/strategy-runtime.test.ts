@@ -50,6 +50,77 @@ const marketReader = (rows: ReturnType<typeof storedBar>[]) => ({
 });
 
 describe('统一策略风险运行时', () => {
+  it('实时预览接纳本次读取完成前已可得的日线，指定历史评价仍排除未来数据', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-17T08:00:00Z'));
+      const prisma = {
+        account: { findUnique: vi.fn(async () => ({ active: true })) },
+        position: { findUnique: vi.fn(async () => null) },
+        trade: { findFirst: vi.fn(async () => null) },
+      };
+      const reader = marketReader([]);
+      reader.readV3.mockImplementation(async () => {
+        vi.setSystemTime(new Date('2026-10-17T08:00:01Z'));
+        return marketReader([
+          storedBar('2026-10-16T00:00:00Z', '9.73', '2026-10-17T08:00:00.500Z'),
+        ]).readV3();
+      });
+      const service = new StrategyRiskContextService(prisma as never, reader as never);
+      const target = {
+        executionInstrument: { symbol: '600000.SH', assetType: 'stock', market: 'CN' },
+        primaryTimeframe: '1d',
+      };
+      expect((await service.load(accountId, '600000.SH', target)).context.price).toBe('9.73');
+      expect((await service.load(accountId, '600000.SH', target,
+        new Date('2026-10-17T08:00:00Z'))).context.price).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['2026-10-17T08:00:00Z', '2026-10-16'],
+    ['2026-10-16T06:00:00Z', '2026-10-15'],
+    ['2026-10-07T08:00:00Z', '2026-09-30'],
+  ])('最近收盘价格按实际日历取必要单日：%s', async (at, expectedDate) => {
+    const prisma = {
+      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      position: { findUnique: vi.fn(async () => null) },
+      trade: { findFirst: vi.fn(async () => null) },
+    };
+    const reader = marketReader([storedBar(`${expectedDate}T00:00:00Z`, '10', `${expectedDate}T08:00:00Z`)]);
+    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const actual = await service.load(accountId, '600000.SH', {
+      executionInstrument: { symbol: '600000.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '1d',
+    }, new Date(at!));
+    expect(reader.readV3).toHaveBeenCalledWith(expect.objectContaining({
+      window: { start: expectedDate, end: expectedDate },
+      routeKey: expect.objectContaining({ adjustment: 'none' }),
+    }));
+    expect(actual.context.price).toBe('10');
+  });
+
+  it('持有期仍读完整开仓窗口，日历未知时不发起行情读取', async () => {
+    const prisma = {
+      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      position: { findUnique: vi.fn(async () => null) },
+      trade: { findFirst: vi.fn(async () => ({ id: 'trade', openedAt: new Date('2026-09-01T02:00:00Z') })) },
+    };
+    const reader = marketReader([storedBar('2026-09-11T00:00:00Z', '10', '2026-09-11T08:00:00Z')]);
+    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const target = { executionInstrument: { symbol: '600000.SH', assetType: 'stock', market: 'CN' },
+      primaryTimeframe: '1d', requiresHoldingPeriods: true };
+    await service.load(accountId, '600000.SH', target, evaluatedAt);
+    expect(reader.readV3).toHaveBeenLastCalledWith(expect.objectContaining({
+      window: { start: '2026-09-01', end: '2026-09-11' },
+    }));
+    reader.readV3.mockClear();
+    const unknown = await service.load(accountId, '600000.SH', target, new Date('2027-01-08T08:00:00Z'));
+    expect(unknown.context.price).toBeUndefined();
+    expect(reader.readV3).not.toHaveBeenCalled();
+  });
+
   it('策略规则由 RiskService 分派到 Strategy evaluator，并复用 RiskEvent/Notification 管线', async () => {
     const stored = {
       id: 'rule-strategy',

@@ -4,7 +4,7 @@
 
 用户要求核对能否改造，以及其他来源是否可以适配现有接口。结论是可以：来源的响应格式由 DSA 适配，来源身份、数据口径和缺失能力仍分别表达。此前旧腾讯接口缺成交额的停止点只表示当时无法直接接入，不能外推成腾讯 HFQ 不可实现。
 
-本轮新增验证发现，现有 `newfqkline/get` 已返回带原生成交额的 ETF `hfqday`。选择只扩展腾讯 ETF 精确适配器、能力库存和独立修订，沿用共享 Bar 合同。对应主仓 [Spec §4.1](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 与 [Task 的 M2-tencent-native-hfq-* 叶](../2026-09-25-multi-source-adjustment-aware-backtest.md)。
+本轮新增验证发现，现有 `newfqkline/get` 已返回带原生成交额的 ETF `hfqday`。选择只扩展腾讯 ETF 精确适配器、能力库存和独立修订，沿用共享 Bar 合同。对应主仓 [Spec §4.1](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 与 [Task 的 M2-tencent-native-hfq-* 叶](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 
 ## 接口与消费边界
 

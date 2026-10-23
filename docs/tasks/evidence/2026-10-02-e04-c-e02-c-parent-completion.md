@@ -1,6 +1,6 @@
 # E04-c/E02-c 父项执行与验收
 
-依据[主任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)与对应 Spec，用户本轮要求完成当前父项。范围为已完成的 Policy c1、Catalog c2，以及缓存、精确来源与派生 c3；其他 Canonical 阶段保留原状态。
+依据[主任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)与对应 Spec，用户本轮要求完成当前父项。范围为已完成的 Policy c1、Catalog c2，以及缓存、精确来源与派生 c3；其他 Canonical 阶段保留原状态。
 
 ## 执行边界
 

@@ -1,4 +1,5 @@
 import { validateTargetDraft, type TargetRow } from './performance.target-draft.js';
+import { performanceReturnDisplay } from './performance-return-display.js';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -344,28 +345,8 @@ export function PerformanceMetrics({
     if (currentPnlRate > 0) assetTone = 'up';
     else if (currentPnlRate < 0) assetTone = 'down';
   }
-  const canCalculateTtwror = summary !== null && summary.ttwror !== null && snapshotCount >= 2;
-  let ttwrorValue = '—';
-  if (summary && summary.ttwror !== null && snapshotCount >= 2)
-    ttwrorValue = `${(summary.ttwror * 100).toFixed(2)}%`;
-  let ttwrorDetail = '需要 ≥ 2 个快照';
-  if (summaryError) ttwrorDetail = summaryError;
-  else if (canCalculateTtwror) ttwrorDetail = '不混入外部现金流';
-  else if (summary?.xirrReason) ttwrorDetail = summary.xirrReason;
-  if (resolvedFx?.status === 'stale') ttwrorDetail = '按当前汇率回算 · 估算 · 使用陈旧汇率';
-  if (resolvedFx?.status === 'blocked') ttwrorDetail = '无法获取汇率，暂不可计算合并收益';
-  const canDisplayXirr = summary?.xirr !== null && summary?.xirr !== undefined;
-  let xirrValue = '—';
-  if (summary && summary.xirr !== null && summary.xirr !== undefined) {
-    xirrValue = `${(summary.xirr * 100).toFixed(2)}%`;
-  }
-  let xirrDetail = '现金流不足或无法收敛';
-  if (summaryError) xirrDetail = summaryError;
-  else if (canDisplayXirr) xirrDetail = '基于账本现金流';
-  else if (snapshotCount < 2) xirrDetail = '需要 ≥ 2 个现金流节点';
-  else if (summary?.xirrReason) xirrDetail = summary.xirrReason;
-  if (resolvedFx?.status === 'stale') xirrDetail = '按当前汇率回算 · 估算 · 使用陈旧汇率';
-  if (resolvedFx?.status === 'blocked') xirrDetail = '无法获取汇率，暂不可计算合并收益';
+  const { ttwrorValue, ttwrorDetail, xirrValue, xirrDetail } =
+    performanceReturnDisplay(summary, snapshotCount, summaryError, resolvedFx);
   return (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -800,7 +781,7 @@ export function PerformanceAllocationSection({
             </table>
           </div>
         </div>
-      ) : (
+      ) : ((loadState === 'ready' || loadState === 'empty') && !targetsUnavailable && (
         <Empty
           className="min-h-[120px] rounded-xl border border-border/60 bg-muted/20 px-4 py-6"
           aria-live="polite"
@@ -809,7 +790,7 @@ export function PerformanceAllocationSection({
             {hasTargets ? '当前范围暂无可估值配置。' : '先设置目标配置，保存后可在这里比较。'}
           </EmptyDescription>
         </Empty>
-      )}
+      ))}
       {editingTargets &&
       draftRows.some(
         (draft) =>

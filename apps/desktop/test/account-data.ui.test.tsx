@@ -19,8 +19,9 @@ import {
   instrumentNameLookup,
 } from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
-import { AccountManagementSection } from '../src/features/portfolio/PortfolioManagementSections.js';
+import { AccountManagementSection } from '../src/features/portfolio/PortfolioAccountManagement.js';
 import { shouldAutoOpenEmptyAccountForm } from '../src/features/portfolio/PortfolioManagement.js';
+import { accountTypeLabel } from '../src/features/portfolio/portfolio.types.js';
 import type { PortfolioManagementViewProps } from '../src/features/portfolio/PortfolioManagementView.types.js';
 import { portfolioKeys } from '../src/features/portfolio/portfolio.queries.js';
 import { accountDisplayLabel } from '../src/features/portfolio/portfolio.types.js';
@@ -237,8 +238,10 @@ describe('账户数据页面契约', () => {
     expect(markup).toContain('录入成交');
     expect(markup).not.toMatch(/<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/);
     expect(accountDataSource).toContain('aria-label="更多成交操作"');
-    expect(accountDataSource).toContain('导入草稿（暂未开放）');
-    expect(accountDataSource).toContain('打开对账（暂未开放）');
+    expect(accountDataSource).toContain('导入草稿');
+    expect(accountDataSource).toContain('打开对账');
+    expect(accountDataSource).not.toContain('导入草稿（暂未开放）');
+    expect(accountDataSource).not.toContain('打开对账（暂未开放）');
     expect(accountDataSource).toContain('min-w-[900px] table-fixed');
     expect(accountDataSource).toContain('className="w-auto min-w-0 px-3 py-3 align-top"');
     expect(markup).toContain('实际证券账户 · 证券 · CNY · 实际');
@@ -448,6 +451,7 @@ describe('账户数据页面契约', () => {
     const accountDataSource = [
       'AccountDataPage.tsx',
       'AccountDataExecutionSheet.tsx',
+      'ExecutionRuleReference.tsx',
       'AccountDataAuditSheets.tsx',
       'AccountDataReconciliationSheet.tsx',
     ]
@@ -488,7 +492,7 @@ describe('账户数据页面契约', () => {
     expect(executionSource).not.toContain('DatePickerInput');
     expect(accountDataSource).toContain('费用明细');
     expect(accountDataSource).toContain('交易规则未验证');
-    expect(executionSource).toContain('<Alert variant="subtle">');
+    expect(executionSource).toContain('<ExecutionRuleReference');
     expect(accountDataSource).toContain('重复重放不会重复写入');
     expect(accountDataSource).toContain('账本版本已变化');
     expect(executionSource).toContain('if (submitting) return;');
@@ -508,9 +512,7 @@ describe('账户数据页面契约', () => {
     expect(executionSource).not.toContain('实际成交');
     expect(executionSource).toContain('{accountSummary}');
     expect(executionSource).toContain('accountTypeLabel(account.type)');
-    expect(executionSource).toContain('证券账户');
-    expect(executionSource).toContain('基金账户');
-    expect(executionSource).toContain('现金账户');
+    expect(['securities', 'fund', 'cash'].map(type => `${accountTypeLabel(type as 'securities' | 'fund' | 'cash')}账户`)).toEqual(['证券账户', '基金账户', '现金账户']);
     expect(executionSource).not.toContain('{category}');
     expect(executionSource).not.toContain('<Separator />');
     expect(executionSource).toContain('min-h-0 flex-1 overflow-y-auto');
@@ -542,8 +544,8 @@ describe('账户数据页面契约', () => {
     expect(positionManagementSource).toContain(
       '...(onOpenReconciliation ? { onOpenReconciliation } : {})',
     );
-    expect(positionSource).toContain('导入持仓快照（暂未开放）');
-    expect(positionSource).toContain('对账候选（暂未开放）');
+    expect(positionSource).toContain('导入持仓草稿');
+    expect(positionSource).toContain('对账候选');
     expect(positionSource).toContain('directoryName');
     expect(positionMarkup).not.toMatch(
       /<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/,

@@ -2,7 +2,7 @@
 
 ## 范围与基线
 
-本轮完成[测试后保存 T6.P1](../2026-09-23-ai-provider-auto-test-save.md)与[默认引用 T4.2.P1](../2026-09-21-ai-provider-model-usage-configuration.md)两个独立叶。主仓 HEAD 为 `514abeebfe57bac0c16271439d8b777ff3b02a9f`，在保留上一轮未提交文档改动的工作树验证；本轮实现也未提交。Node 为 `24.18.0`，pnpm 为 `11.9.0`。相邻 DSA/infra 仓保持干净。
+本轮完成[测试后保存 T6.P1](../../archive/tasks/2026-09-23-ai-provider-auto-test-save.md)与[默认引用 T4.2.P1](../2026-09-21-ai-provider-model-usage-configuration.md)两个独立叶。主仓 HEAD 为 `514abeebfe57bac0c16271439d8b777ff3b02a9f`，在保留上一轮未提交文档改动的工作树验证；本轮实现也未提交。Node 为 `24.18.0`，pnpm 为 `11.9.0`。相邻 DSA/infra 仓保持干净。
 
 数据库为独立 `postgres:17-alpine` 临时容器，使用 tmpfs，不挂载业务 volume；仅映射 `127.0.0.1` 随机端口。数据库身份固定为 `ai_provider_concurrency_fixture` / `fixture_owner`，运行入口和夹具均核对身份。按目录排序执行当前全部 26 个 migration SQL，执行后运行测试，结束自动移除本轮容器。未改 Schema、migration、依赖清单或目标容器。
 

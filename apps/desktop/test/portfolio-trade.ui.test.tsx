@@ -90,6 +90,7 @@ describe('Portfolio Trade UI 契约', () => {
           ...trade,
           excludedReasons: ['LIFECYCLE_ACTIVE'],
           issues: ['MISSING_OPENING_BOUNDARY'],
+          costIssues: ['FEE_CURRENCY_MISMATCH'],
           entryLegs: [],
           baselineComponents: [],
           corporateActions: [],
@@ -107,6 +108,7 @@ describe('Portfolio Trade UI 契约', () => {
     expect(markup).toContain('证据与技术信息');
     expect(markup).toContain('交易仍在进行');
     expect(markup).toContain('缺少明确的建仓起点');
+    expect(markup).toContain('费用币种与成交币种不一致，净收益暂不可确认');
     expect(markup).toContain('技术信息');
     expect(markup).not.toContain('Entry Legs');
     expect(markup).not.toContain('Close Slices');

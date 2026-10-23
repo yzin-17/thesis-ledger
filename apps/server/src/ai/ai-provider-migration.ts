@@ -1,4 +1,8 @@
-import type { AiProviderModelPricingInput } from './ai-provider.contracts.js';
+import {
+  aiProviderModelPricingInputSchema,
+  aiProviderModelPricingViewSchema,
+  type AiProviderModelPricingInput,
+} from './ai-provider.contracts.js';
 
 export type AiProviderMigrationRow = {
   name: string;
@@ -63,6 +67,8 @@ const collectLegacyPricing = (record: Record<string, unknown>) => {
     if (pricing.costPer1kInput === undefined) conflicts.push('旧价格缺少输入单价，不补零');
     if (pricing.costPer1kOutput === undefined) conflicts.push('旧价格缺少输出单价，不补零');
     if (pricing.costCurrency === undefined) conflicts.push('旧价格缺少币种，不补默认值');
+    if (!aiProviderModelPricingInputSchema.safeParse(pricing).success)
+      conflicts.push('旧价格不符合当前模型价格合同，保留原值');
   }
 
   return {
@@ -109,11 +115,18 @@ export const planAiProviderMigration = (row: AiProviderMigrationRow): AiProvider
 
   const modelsValue = record.models;
   const models = Array.isArray(modelsValue)
-    ? modelsValue.filter((model): model is string =>
-        typeof model === 'string' && Boolean(model.trim()),
+    ? modelsValue.filter(
+        (model): model is string => typeof model === 'string' && Boolean(model.trim()),
       )
     : [];
-  if (!Array.isArray(modelsValue) || models.length !== modelsValue.length || models.length === 0)
+  if (
+    !Array.isArray(modelsValue) ||
+    models.length !== modelsValue.length ||
+    models.length === 0 ||
+    models.length > 32 ||
+    new Set(models).size !== models.length ||
+    models.some((model) => model !== model.trim() || model.length > 200)
+  )
     conflicts.push('模型列表无效，不能安全迁移价格');
 
   const existingModelPricingValue = record.modelPricing;
@@ -123,12 +136,21 @@ export const planAiProviderMigration = (row: AiProviderMigrationRow): AiProvider
     if (!parsed) conflicts.push('已有 modelPricing 结构无效，保留原值');
     else existingModelPricing = parsed;
   }
+  for (const [model, pricing] of Object.entries(existingModelPricing)) {
+    const fields = asRecord(pricing);
+    if (!fields) {
+      conflicts.push(`模型 ${model} 的已有价格不是对象，保留原值`);
+      continue;
+    }
+    if (!aiProviderModelPricingViewSchema.safeParse(fields).success)
+      conflicts.push(`模型 ${model} 的已有价格字段无效，保留原值`);
+  }
 
   const legacy = collectLegacyPricing(record);
   conflicts.push(...legacy.conflicts);
   conflicts.push(...inspectRoutes(record.executionRoutes));
 
-  const proposedModelPricing: Record<string, AiProviderModelPricingInput> = {};
+  const proposedModelPricing = Object.create(null) as Record<string, AiProviderModelPricingInput>;
   const preservedModels: string[] = [];
   if (legacy.pricing) {
     for (const model of models) {
@@ -142,7 +164,7 @@ export const planAiProviderMigration = (row: AiProviderMigrationRow): AiProvider
 
   let status: AiProviderMigrationStatus = 'noop';
   if (conflicts.length > 0) status = 'conflict';
-  else if (Object.keys(proposedModelPricing).length > 0) status = 'ready';
+  else if (legacy.pricing !== null) status = 'ready';
 
   return {
     name: row.name,

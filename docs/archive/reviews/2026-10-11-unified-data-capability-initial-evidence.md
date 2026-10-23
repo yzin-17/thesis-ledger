@@ -18,7 +18,7 @@
 
 原[共同价格 Task](../tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)保留历史；多源当前范围以[2026-10-08 取消与保留决定](../../specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)为准。S05、旧 HiThink M31 全历史/高级准入追补、M32、专业 Quote 高级资格、指定旧资产追补与复杂回退不恢复，不列为本 Task 的依赖。
 
-[历史数据按需获取](../../tasks/2026-10-09-history-data-on-demand.md)和[富途研究所需能力](../../tasks/2026-10-08-futu-openapi-full-integration.md)继续独立维护业务任务、范围和实际完成状态；本 Task 只跟踪统一适配层。框架未完成不阻塞其既有切片，已完成项不重开。公共 Schema/目录/执行器由实际责任叶串行修改，不让两条工作线重复建设框架。
+[历史数据按需获取](../../tasks/2026-10-09-history-data-on-demand.md)和[富途研究所需能力](../tasks/2026-10-08-futu-openapi-full-integration.md)继续独立维护业务任务、范围和实际完成状态；本 Task 只跟踪统一适配层。框架未完成不阻塞其既有切片，已完成项不重开。公共 Schema/目录/执行器由实际责任叶串行修改，不让两条工作线重复建设框架。
 
 盘口案例只交付标准契约与隔离扩展性测试；真实二级行情、生产推送、逐笔历史、盘口 UI 和专业回测不能通过测试替身宣称完成，也不据此恢复富途范围外接口。
 

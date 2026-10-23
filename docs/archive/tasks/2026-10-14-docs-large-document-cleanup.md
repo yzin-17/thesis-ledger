@@ -1,7 +1,7 @@
 # 巨型文档与重复证据精简实施记录
 
 > 任务标识：`docs-large-document-cleanup`；日期：2026-10-14
-> 状态：第二轮精简、第三轮入口清理及第四轮 Task 承接均完成并归档；T1～T4 与后续整理已闭合，无新增业务验收结论。
+> 状态：第二至第七轮精简、入口清理与 Task 接续均完成并归档；各轮数字及环境结论只属于其记录时点，无新增业务验收结论。
 > [规格](../specs/2026-10-14-docs-large-document-cleanup.md)
 > 第二轮开始基线：`main@3570ab24960da91c7988c195344e7e8ca36eb08a` 与当时远端一致；保留第一轮 64 份跟踪文档修改及 20 份未跟踪归档文档，暂存区为空。未合并 PR #41 为绩效目标合同，#46 为投资复盘，均不是本轮治理 PR。第三轮继续保留前两轮工作，远端前进情况见下文。
 
@@ -102,8 +102,8 @@
 
 | 归档原记录 | 当前责任入口 | 承接范围 |
 | --- | --- | --- |
-| [v1.2 父任务](2026-08-18-market-data-provider-v1-2.md)与 [closure-11 汇总](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md) | [Mobile 原生任务](../../tasks/2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#native-parent-review) | 原 T11 的两项原生叶及原 AC-09/10/11 最终映射继续开放；旧发布/回滚不重跑，退役协议由 Canonical 承接。 |
-| [涨跌配色](2026-09-15-market-color-scheme.md) | [Mobile 配色剩余条件](../../tasks/2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#mobile-color-acceptance) | 原 I1 及未通过的产品门禁逐条保留，Desktop 已通过证据复用，Mobile 配色/持久化/状态边界未通过。 |
+| [v1.2 父任务](2026-08-18-market-data-provider-v1-2.md)与 [closure-11 汇总](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md) | [Mobile 原生任务](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#native-parent-review) | 原 T11 的两项原生叶及原 AC-09/10/11 最终映射继续开放；旧发布/回滚不重跑，退役协议由 Canonical 承接。 |
+| [涨跌配色](2026-09-15-market-color-scheme.md) | [Mobile 配色剩余条件](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#mobile-color-acceptance) | 原 I1 及未通过的产品门禁逐条保留，Desktop 已通过证据复用，Mobile 配色/持久化/状态边界未通过。 |
 | [估值走势](2026-09-07-portfolio-valuation-series.md) | [投资组合的估值验收](../../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-series-acceptance) | T4/T5、T4.I1/I2、AC1–AC9 及原未勾选 Review 条件逐条保留；真实触屏、目标点位与来源条件不改为通过。 |
 | [每日摘要](2026-09-09-portfolio-daily-summary.md) | [投资组合的摘要/窄屏验收](../../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-summary-acceptance) | T3/T4、AC6/AC9 的实际窄屏及原 Review 未通过条件保留。 |
 | [收益指标](2026-09-09-portfolio-pnl-metrics.md) | [投资组合的收益验收](../../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-pnl-acceptance) | G1 的实际收益、无/部分/全部/多次卖出、Trade Close Slice、缺成本/FX 与账户/模式证据保留；原本地 T1–T3 不重做。 |
@@ -119,4 +119,60 @@
 
 第四轮验证通过：七份原文除归档说明与导航外完整保持；估值、摘要、收益与配色的原未勾选定义在当前承接页逐条可定位，T11 的原生叶与 AC 汇总责任保持开放。其他当前 Task 除导航外内容保持。879 份 Markdown、3321 处本地路径/锚点检查无新增失效，595 份原始证据及 2398 份源码/部署输入的聚合 SHA-256 未变，`git diff --check` 通过。未重新执行业务验收；本地 HEAD 仍为 `3570ab24960da91c7988c195344e7e8ca36eb08a`，2026-10-15 只读可见远端仍为 `63c816bc27e86645cf43205dee9f129efa984876`，暂存区为空。
 
+## 第五轮：Task 精简与合并
 
+2026-10-15 按用户授权，先精简三份大 Task，再合并四组同域任务、修正文档导航并清理不必要兼容文件。只读基线为本地与远端 `main@da002744bd317b7754832c6ac41d169bcf005e27`，起始工作树干净。没有创建分支、提交、推送或执行业务验收。
+
+策略风险/AI 优化、交易 follow-up、AI 配置三份当前正文由 161,623 字节降至 25,501 字节；原步骤、AC、完成条件、失败、命令与证据分别完整保留在同名 `-history.md`。AI 的研究提交/冻结三项隔离竞争及本机 HTTP/SSE 生命周期已有 10-04 证据，修正了旧摘要和矩阵仍称未验证的状态；真实目标研究、认证、非零费用和 Electron 未关闭。
+
+四组承接均使用现有 Task，不增加当前任务文件：
+
+- AI 配置承接自动测试保存的 T6 及免费依据移除的条件性验收；原两份 Task 归档，原 Spec 和 AC 保留。
+- AI SDK 承接 JSON Mode/Stream 的兼容、浏览器与真实 API 条件；不把用途探针当成三类完整业务生成。
+- 图表指标 Task 同时精简完成日志，并承接图表更新 T4/G1；设置和导航组件已有实现，完整验证、G2/R2、跨日/双向/重试及截止日期降级保持开放。稳定盘中日线仍为既有 TODO，富途 1m 继续独立实施。
+- 统一适配层承接旧 RouteTarget 的现行延迟缺口和 Market Consumer 的真实消费门禁；旧默认主备/握手、用户跳过来源、严格历史 PIT、清零烟测产物不恢复。RQ/Tushare 原正向义务与账号/权限停止条件继续保留。
+
+六份被承接 Task 以“验收仍开放”归档，指标旧正文另保留为历史记录。原编号、全部完成条件及 AI 完整 AC-01～30 核心断言保持；所有现行合同只调整状态、范围适用性和任务/归档导航，不降低验收标准。
+
+当前正文 26 → 20，总读取量 509,974 → 291,684 字节。顶层 Task Markdown 41 → 27：20 份正文、6 个兼容文件和 README。全目录删除 15 个仅需文档导航的跳转，留下 9 个测试输入、验收脚本或邻仓仍引用的兼容路径；证据 Markdown 的导航可直接指向归档，不为历史路径/哈希表、当时命令或执行清单长期保留无实际读取用途的文件。
+
+[任务索引](../../tasks/README.md)说明每份为何保留及何时接续：默认只读索引和本次 Task 的剩余条件；Spec 在修改合同或确认边界时读取，历史/evidence 在验收和追溯时按需打开。当前停止的来源和摘牌范围不作为立即执行清单。
+
+完整性核对：10 份新归档除归档说明和导航外与基线原文一致；595 份证据中 563 份字节未变，32 份仅调整 Markdown 导航和对应行尾空白，原请求、日志、命令、哈希和冻结输入未变；2399 份非 docs 输入聚合 SHA-256 未变。现行 Spec 的断言正文保持，仅同步状态/适用性与导航。路径/锚点检查保留既有 58 项缺陷，没有新增失效；`git diff --check` 通过，HEAD 与暂存区保持起始状态。
+
+## 第六轮：证据状态纠正与验收接续
+
+2026-10-15 按用户授权只改 docs。起始 `main@da002744bd317b7754832c6ac41d169bcf005e27` 与远端一致，保留前五轮已有的 86 项未提交 docs 修改；未执行新的 Provider、数据库、Docker、浏览器、原生或业务数据操作。
+
+三处旧状态按现有证据纠正：
+
+- 策略风险/AI T17 的探索三字段/约束、候选持久化及正式 v1 采纳已有后继隔离证据：策略中心 T03 的全部 13 条 migration 与 3/3 PostgreSQL 场景，SDK T5 的本机 HTTP/隔离库 discovery 持久化。T17/T18 的自身本地及隔离里程碑收口；T19 真实探索闭环和全部必要产品条件保持开放。
+- Portfolio T4.I1 的粒度保留、SVG 坐标、旧激活清除及宽窄屏鼠标/键盘已在 10-04 验证。本节改为“仅剩真实触屏”，原 T4/T5、正式校准、摘要/收益与外部输入条件未关闭；触屏不再阻塞独立来源/点位对账。
+- 当前源码 CI #38601670572 为成功：quality 的完整 lint/typecheck/test/build、contracts-and-guardrails 和 Android debug 编译通过。源码输入固定为上述 HEAD；desktop-packages 被跳过，本轮未提交 docs 没有宣称远端 CI 已检查。SDK/配置的旧 CI 等待描述及删除账户/Native 的 Android 编译状态同步纠正，iOS、模拟器、安装态和真实 Provider/费用条件仍未通过，原模拟器暂停决定保留。
+
+两个历史 Task 的剩余条件由现有入口接续：
+
+| 原任务 | 当前责任 | 保留的未通过条件 |
+| --- | --- | --- |
+| [目录聚合](2026-09-18-instrument-directory-server-read-aggregation.md) | [交易 follow-up 的目录消费验收](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md#directory-consumer-acceptance) | DIR-AC6：Ledger effective/audit/replay、清仓后名称、Journal cycle/slice/分页、未知/失败回退、无额外目录请求及浏览器/安装态。原 AC1～AC6 与 Spec 全文保留。 |
+| [策略实验一致性](2026-09-08-strategy-lab-execution-parity.md) | [策略风险/AI 的独立承接验收](../../tasks/2026-09-09-strategy-risk-ai-optimization.md#strategy-parity-acceptance) | PARITY-T06：原 AC-01～AC-13 当前适用性与完整覆盖、编辑/历史版本/JSON、单位/区间、结果/1024px、Console 和启动/失败边界；旧 V1 路径按有效后继判断，不恢复旧 jobs 或行情上传。 |
+
+两份 Task 以“被承接、验收仍开放”归档，完整保存原步骤、编号、完成条件、命令和证据；没有新增兼容文件。承接验收与原 T19/T14-R1 各自收口，重合场景可共用有效证据，不将其他验收新增为全部功能的启动前置。
+
+当前正文 20 → 18，合计 277,146 字节。Task 顶层 27 → 25：18 份正文、6 个必要兼容文件及 README。两份现行 Spec 只更新当前责任/导航，断言正文不改；任务入口同步解释剩余条件，未通过验收不迁入 TODO。原取消、来源跳过与暂停决定继续保留。
+
+完整性核对：两份归档除说明和导航外与本轮起始原文一致，两份 Spec 的规范正文/AC 保持；595 份证据与 2399 份非 docs 输入的聚合 SHA-256 均未变，其他既有 docs 修改保留。868 份 Markdown 的路径/锚点检查无新增失效，既有 58 项缺陷保持；`git diff --check` 通过。HEAD 和暂存区未改变，无提交或推送。
+
+## 第七轮：三份大 Task 精简
+
+2026-10-15 按用户“继续”授权，只收敛当前阅读入口。起始 `main@da002744bd317b7754832c6ac41d169bcf005e27`，95 项既有 docs 修改、暂存区与非 docs 输入保留；未执行新的 Provider、数据库、Docker、浏览器或原生验收。
+
+| 当前 Task | 精简前字节 | 精简后字节 | 现在需要打开的原因与历史归属 |
+| --- | ---: | ---: | --- |
+| [统一适配层](../../tasks/2026-10-09-unified-data-capability-adapter.md) | 45,799 | 11,990 | RQ/Tushare 原正向条件、RouteTarget 延迟和真实消费者门禁仍开放。193 条已完成 ID 均已有[完整历史](2026-10-09-unified-data-capability-adapter-history.md)，删除重复完成摘要，仅保留分组证据和有效边界。 |
+| [研究助手](../../tasks/2026-08-25-ai-research-workbench.md) | 32,021 | 4,263 | 保留四类运行验收及已过 R1 的分层说明。T1～T10、23 项 AC 映射、原约束、命令和旧状态完整保存于[历史原文](2026-08-25-ai-research-workbench-history.md)，不作为当前实现计划。 |
+| [历史按需](../../tasks/2026-10-09-history-data-on-demand.md) | 21,510 | 4,907 | 只留 L3 摘牌正向验收和停止/接续条件；旧 L3 父项与“摘牌边界”是同一缺口，不再维护重复 checkbox。原阶段定义、范围和接续原文补入[已有历史](2026-10-09-history-data-on-demand-history.md#2026-10-15-精简前范围阶段与接续原文)，64 条完成摘要的原 ID/执行记录均可追溯，不重复附加摘要表。 |
+
+三份合计 99,330 → 21,160 字节，减少 78,170 字节（78.7%）。当前 Task 正文数量仍为 18，合计 277,146 → 198,976 字节；没有新增当前 Task 或兼容文件。Spec、来源附页与原始证据保持，暂停、取消、预算和未通过条件不变；任务索引及 docs 导航同步说明研究助手独立门禁，不再将全部 AI 验收表述为两个入口。
+
+完整性核对：研究助手历史除说明与相对路径重定位外保留精简前完整原文；历史按需原历史字节前缀不变，补记保留阶段原文。三份原未通过义务可从当前条件与历史逐一对应，原现行合同未改；595 份证据、2399 份非 docs 输入的聚合 SHA-256 不变，其他既有 docs 修改保留。全仓 Markdown 路径/锚点无新增失效，既有 58 项旧缺陷保留；`git diff --check` 通过。HEAD 与暂存区不变，无暂存、提交、推送。

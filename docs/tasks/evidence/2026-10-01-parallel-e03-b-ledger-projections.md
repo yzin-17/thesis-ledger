@@ -3,7 +3,7 @@
 ## 执行边界与状态建议
 
 - 任务：Canonical Task 的 E03-b；执行状态建议为 `worker_done`，仅表示本地命令与投影叶完成。
-- 依据：[Canonical Spec](../../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) 的 Ledger 经济不变量及持久格式判别、[Canonical Task](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md) 的 E03-b 验收断言，以及[当前信封证据](2026-09-29-canonical-ledger-envelope-marker.md)。经济成本和结算口径沿用[Ledger Spec](../../specs/2026-08-26-trade-execution-ledger-system.md)。
+- 依据：[Canonical Spec](../../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) 的 Ledger 经济不变量及持久格式判别、[Canonical Task](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) 的 E03-b 验收断言，以及[当前信封证据](2026-09-29-canonical-ledger-envelope-marker.md)。经济成本和结算口径沿用[Ledger Spec](../../specs/2026-08-26-trade-execution-ledger-system.md)。
 - 前置 Review：E03-a 当前信封和数据库标记已具备隔离数据库证据，叶的本地执行范围就绪。源码沿用已有当前合同，不重新编写合同，不改公共 Schema/Domain。
 - 共享 Spec、两份主 Task、handoff、TODO 和状态勾选本轮只读；仓库按 `handoff` / `HANDOFF` 文件名反查未发现独立交接文件，以任务正文与上述证据为恢复入口。此文件记录供主线合并的状态建议。
 - 初始工作区已有大量未提交改动。本轮未重置、清理、提交或创建子代理，未改 Backtest、Market、DSA、NAV Schema、Worker 入口、Desktop/API Client、数据库 Schema/migration 或 infra。

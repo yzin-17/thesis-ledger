@@ -58,7 +58,6 @@ export const ModelReasoningBadges = ({
 export function AiProviderEditorFields({
   draft,
   credentialInputOpen,
-  takingOverEnvironmentName,
   onUpdateDraft,
   onResetTest,
   onSetCredentialInputOpen,
@@ -74,7 +73,6 @@ export function AiProviderEditorFields({
 }: {
   draft: ProviderDraft;
   credentialInputOpen: boolean;
-  takingOverEnvironmentName: string | null;
   onUpdateDraft: (updater: (current: ProviderDraft) => ProviderDraft) => void;
   onResetTest: () => void;
   onSetCredentialInputOpen: (open: boolean) => void;
@@ -121,14 +119,6 @@ export function AiProviderEditorFields({
     <FieldGroup>
       {showConnection && (
         <>
-          {takingOverEnvironmentName && (
-            <Field>
-              <FieldDescription>
-                正在接管部署配置 {takingOverEnvironmentName}。保存会创建同名数据库记录，必须提供新的
-                API Key。
-              </FieldDescription>
-            </Field>
-          )}
           <AiProviderUpstreamFields draft={draft} onUpdateDraft={onUpdateDraft} />
           <Field>
             <FieldLabel htmlFor="ai-base-url">API Base URL</FieldLabel>
@@ -326,7 +316,6 @@ export function AiProviderEditorFields({
                   onUpdateDraft((current) => ({ ...current, credentialsRef: event.target.value }))
                 }
                 placeholder="输入 API Key"
-                required={Boolean(takingOverEnvironmentName)}
               />
               <FieldDescription>保存后不会回显；编辑时留空会保留已保存的 Key。</FieldDescription>
             </Field>

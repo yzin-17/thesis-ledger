@@ -1,5 +1,7 @@
 # 策略实验执行一致性与体验完善规格
 
+> 2026-10-17 验收已由[策略风险/AI Task 的独立承接节](../tasks/2026-09-09-strategy-risk-ai-optimization.md#strategy-parity-acceptance)按现行链路收口；[原 Task](../archive/tasks/2026-09-08-strategy-lab-execution-parity.md)保留实施和当时证据。本文原 AC-01～AC-13 保留用于追溯，旧运行路径及 trailing/ATR/risk sizing 按有效 Canonical/V2 后继合同判断，不恢复退役能力。当前编辑器、版本、JSON、结果与提交后立即切页的合同仍有效；T19 真实 AI 优化验收独立保留。
+
 ## 背景
 
 策略实验页面已经具备策略配置、版本创建、回测任务和结果查看能力，但部分配置没有进入实际执行链路，部分选项只有界面或 Schema 定义而没有引擎语义。高级 JSON 编辑、历史版本选择、时间范围和结果反馈也存在易误用或信息不足的问题。

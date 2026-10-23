@@ -78,16 +78,14 @@ describe('策略中心界面契约', () => {
     expect(strategyCenterLayout).toContain('<TabsTrigger');
     expect(strategyCenterLayout).toContain('nativeButton={false}');
     expect(strategyCenterLayout).toContain('<PageHeader');
-    expect(strategyCenterLayout).toContain('eyebrow="STRATEGY CENTER"');
-    expect(strategyCenterLayout).toContain('description="管理策略版本、回测任务与 AI 优化实验。"');
+    expect(strategyCenterLayout).not.toContain('eyebrow=');
+    expect(strategyCenterLayout).not.toContain('description=');
     expect(strategyCenterLayout).toContain('value={value}');
-    expect(strategyCenterLayout).toContain('onValueChange={(nextValue)');
-    expect(dashboardSource).toContain('const [centerTab, setCenterTab]');
+    expect(strategyCenterLayout).not.toContain('onValueChange={(nextValue)');
+    expect(dashboardSource).not.toContain('const [centerTab, setCenterTab]');
     expect(dashboardSource).toContain('strategyCenterTabForPath(location.pathname)');
-    expect(backtestDetail).toContain(
-      "identity.sourceKind === 'experiment' ? 'experiments' : 'library'",
-    );
-    expect(backtestDetail).toContain('onSourceTabChange(');
+    expect(backtestDetail).toContain('to={sourcePath}');
+    expect(backtestDetail).not.toContain('onSourceTabChange(');
     expect(strategyCenterLayout).not.toContain('data-icon="inline-start"');
   });
 
@@ -102,7 +100,8 @@ describe('策略中心界面契约', () => {
   it('策略与实验列表优先展示业务信息', () => {
     expect(strategyLibrary).not.toContain('>能力<');
     expect(strategyLibrary).toContain('>最近回测<');
-    expect(strategyLibrary).toContain('onBacktest(strategy, latest)');
+    expect(strategyLibrary).toContain('version={latest}');
+    expect(listPresentation).toContain('onBacktest(strategy, version)');
     expect(experimentList).toContain('experimentSourceLabel(experiment)');
     expect(experimentList).toContain('experimentProgressLabel(experiment)');
     expect(experimentList).not.toMatch(/>\s*\{experiment\.id\}\s*</);
@@ -148,8 +147,7 @@ describe('策略中心界面契约', () => {
     expect(buttonSource).toContain('font-normal hover:bg-primary/80');
     expect(buttonSource).not.toContain('font-semibold hover:bg-primary/80');
     expect(listPresentation).toContain('className={`${buttonVariants()} ml-auto`}');
-    expect(backtestDetail.match(/nativeButton=\{false\}/g)).toHaveLength(2);
-    expect(experimentDetailSource.match(/nativeButton=\{false\}/g)).toHaveLength(3);
+    expect(experimentDetailSource.match(/nativeButton=\{false\}/g)).toHaveLength(4);
     expect(experimentDetailSectionsSource.match(/nativeButton=\{false\}/g)).toHaveLength(1);
   });
 
@@ -162,7 +160,7 @@ describe('策略中心界面契约', () => {
       'md:grid-cols-[minmax(18rem,1fr)_max-content_max-content_auto] md:items-center',
     );
     expect(experimentList.match(/w-auto shrink-0 flex-row items-center gap-2/g)).toHaveLength(2);
-    expect(experimentList.match(/className="w-fit"/g)).toHaveLength(2);
+    expect(experimentList.match(/<SelectTrigger\b[^>]*className="w-fit"/g)).toHaveLength(2);
     expect(
       experimentList.match(/w-max min-w-\(--anchor-width\) max-w-\(--available-width\)/g),
     ).toHaveLength(2);
@@ -172,8 +170,9 @@ describe('策略中心界面契约', () => {
     expect(appSource).toContain('createBrowserRouter');
     expect(appSource).toContain('<RouterProvider router={appRouter} />');
     expect(dashboardSource).toContain('<StrategyCenterErrorBoundary>');
-    expect(editorSource).toContain('useBeforeUnload');
-    expect(experimentCreateSource).toContain('useBeforeUnload');
+    expect(appSource).toContain('<NavigationGuardProvider>');
+    expect(editorSource).toContain('useNavigationGuard');
+    expect(experimentCreateSource).toContain('useNavigationGuard');
   });
 
   it('风险生成使用单层上下文 Drawer 并在固定页脚完成保存', () => {

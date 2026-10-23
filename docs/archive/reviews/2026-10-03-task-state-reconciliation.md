@@ -15,7 +15,7 @@
 | `GET /api/v1/fund-investment-plans` | 200，空列表 | 解除旧 404，不证明创建、Scheduler、成交或幂等 |
 | `GET /api/v1/performance/series?mode=actual` | 200，`availableIntervals=[1d,1w,1mo]`、`points=[]` | 解除旧 404，不证明真实点位或 Tooltip/触屏 |
 | `GET /api/v1/journal/review-snapshots` | 404 | 与 `journal.controller.ts` 只有 Snapshot POST、无列表/详情 GET 一致，原 Spec AC13 尚未交付 |
-| 当前公共 Schema 与可见入口源码 | Bar/RouteTarget `timeframe` 为 1m/1d；账户数据导入草稿、对账入口显示暂未开放 | 不能把收益走势 interval 当行情周期交付，不能把历史截图导入实现当作现行入口开放 |
+| 当前公共 Schema 与可见入口源码 | Bar/RouteTarget `timeframe` 为 1m/1d；账户数据导入草稿、对账入口显示暂未开放 | 不能把收益走势 interval 当行情周期交付 |
 
 没有请求行情、模型或其他真实 Provider，没有创建账户、计划、Run 或 Snapshot，没有写数据库、更新容器或重新执行应用测试。
 
@@ -25,11 +25,11 @@
 
 | 原 Spec 断言 | 现行承接与证据 | 未覆盖或范围替代的处理 |
 | --- | --- | --- |
-| RouteTarget AC1–AC5：字段/目标限制、source pinning、顺序备用、目标健康及 provenance | Canonical E02/E04 的当前 Data/Control 合同；共同价格精确主备、`routeIndex=1`、冻结重放 | 当前原生接口版本已改变；旧 G1 的冷主源 ≤5s、成功备用 ≤10s 没有相同条件的新测量，仍由[原 Task](../../tasks/2026-09-16-market-data-route-target-v2.md)持有 |
+| RouteTarget AC1–AC5：字段/目标限制、source pinning、顺序备用、目标健康及 provenance | Canonical E02/E04 的当前 Data/Control 合同；共同价格精确主备、`routeIndex=1`、冻结重放 | 当前原生接口版本已改变；旧 G1 的冷主源 ≤5s、成功备用 ≤10s 没有相同条件的新测量，仍由[原 Task](../tasks/2026-09-16-market-data-route-target-v2.md)持有 |
 | RouteTarget AC6、AC7：固定 ETF 默认主备、V2 handshake/apply/effective | 多源 Spec §1.1 与 Canonical 替代了固定默认和旧公共路径；当前按三口径显式配置 | 不再要求恢复 `tencent→akshare` 默认或旧握手。AKShare 来源已被用户跳过，属于范围替代，不是旧 AC 成功 |
 | RouteTarget AC8：本地检查、公开 endpoint、Docker 与 deadline | 后继本地回归、P01 当前不可变镜像和 P02 协议/冻结读取 | endpoint/镜像层已有证据；延迟场景保留，健康与 Run 完成时间不替代请求耗时 |
 | 消费者 AC1–AC5：acceptance、冻结、单向边界与禁止旁路 | Canonical E01/U02、消费者目标拒绝/读取脚本与边界门禁；共同价格固定快照及重放 | 新 Run 的严格历史语义明确由多源 S05 与后继 AC04 持有；`strictPit=false` 不取得原历史时点资格 |
-| 消费者 AC6：Risk/Performance/Backtest/Portfolio/Automation 集成 | 当前消费者脚本、真实 Run 与冻结读取覆盖其声明场景 | Risk 来源不可用时的拒绝证据不是正向扫描；各消费者的其他产品/估值/调度断言继续在[原 Task](../../tasks/2026-09-16-market-data-consumer-consistency-v2.md)和所属功能 Task 核对，不整体关闭 G1 |
+| 消费者 AC6：Risk/Performance/Backtest/Portfolio/Automation 集成 | 当前消费者脚本、真实 Run 与冻结读取覆盖其声明场景 | Risk 来源不可用时的拒绝证据不是正向扫描；各消费者的其他产品/估值/调度断言继续在[原 Task](../tasks/2026-09-16-market-data-consumer-consistency-v2.md)和所属功能 Task 核对，不整体关闭 G1 |
 | 消费者 AC7、AC8：精确确认的开发清理、备份/恢复、重建后对象为空 | 原 T4/T5 的受保护入口、dump 校验与恢复计数是当时完成证据；后继 P02/P04 增加同批状态保真恢复 | “重建后为空”是重建检查时点，不要求运行 smoke 后重复清零；当前如另有清理需求，仍须新目标确认。后继恢复不授权真实清理 |
 | BullMQ AC1–AC3、AC10–AC11：durable owner、最多三次、CAS、取消/补投与分页恢复 | Canonical C02 定向状态机、真实隔离 PostgreSQL/Redis/生产 Worker 与目标幂等/旧记录拒绝 | 代码正确性证据可以复用；claimed 后硬杀/运输记录重建与 Redis 短停的完整目标故障场景没有后继证据 |
 | BullMQ AC4、AC5：旧非终态迁移与兼容 jobs API | 原迁移只保留历史事实；Canonical C02/C04/U01 明确拒绝旧 Run，删除 jobs 可达入口 | 当前合同以 Canonical 为准，不恢复旧 API 或改写历史行，不标成旧兼容断言通过 |

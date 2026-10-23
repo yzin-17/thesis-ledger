@@ -3,7 +3,7 @@
 > 任务标识：2026-09-21-remove-ai-free-evidence  
 > 日期：2026-09-21  
 > 状态：已完成本地实现与验证；真实外部 Provider 计费事实与 Electron 实机视觉验收未执行  
-> 对应任务：[实施任务](../tasks/2026-09-21-remove-ai-free-evidence.md)  
+> 对应任务：[实施任务](../tasks/2026-09-21-ai-provider-model-usage-configuration.md#free-evidence-acceptance)
 > 修订：[AI 接入层迁移 Spec](2026-09-19-vercel-ai-sdk-integration.md)、[移除能力声明 Spec](2026-09-21-remove-ai-capability-declaration.md)
 
 ## 背景与问题
@@ -30,7 +30,7 @@ AI 执行路由目前要求额外填写“免费依据”。该信息与 Provide
 
 - `freeEvidence` 同时存在于共享 `AiProviderModelExecution`、Server 执行路由输入、Desktop 草稿/表单和研究/策略优化成本结算路径。
 - readiness 当前允许免费依据绕过 `budget_not_authorized`；移除后应由用户填写的零费用费率承担这一授权语义，其他路由继续使用显式预算授权。
-- 历史数据库设置和 `AI_PROVIDER_CONFIGS_JSON` 可能含有 `freeEvidence`，兼容读取不能因此丢弃整条路由。
+- 历史数据库设置 可能含有 `freeEvidence`，兼容读取不能因此丢弃整条路由。
 - 用户输入的费用来自 Provider 配置，必须进入路由配置指纹；修改费用后旧能力撤销和就绪结果不能继续复用。
 
 ## 设计方案

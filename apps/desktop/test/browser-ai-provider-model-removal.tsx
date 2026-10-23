@@ -34,7 +34,6 @@ function Fixture() {
         draft={draft}
         onUpdateDraft={setDraft}
         credentialInputOpen={false}
-        takingOverEnvironmentName={null}
         onResetTest={() => undefined}
         onSetCredentialInputOpen={() => undefined}
         availableModels={['openrouter/free', 'removed-model']}

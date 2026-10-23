@@ -1,8 +1,6 @@
 import { BadRequestException, Controller, Get, Optional, Param, Query } from '@nestjs/common';
 import {
-  marketChartOptionsWindowV3Schema,
   quoteAssetTypeSchema,
-  marketChartPlanV3Schema,
   indicatorCalculateResponseSchema,
   marketDetailResponseSchema,
   type BarSeries,
@@ -29,7 +27,7 @@ import { MarketPeriodOptionsService } from './market-period-options.service.js';
 import { MarketService } from './market.service.js';
 import { type QuoteAssetType } from './market-quote-reader.js';
 import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
-import { planMarketChartWindow } from './market-chart-window.js';
+import { parseChartOptionsQuery, planChartOptionsRequest } from './market-chart-options-request.js';
 import { indicatorReadInput, indicatorWindows, projectIndicatorResponse, MAX_CHART_V3_INDICATOR_INPUT_POINTS } from './market-indicator-window.js';
 
 type IndicatorName = 'MA' | 'MACD' | 'RSI';
@@ -248,28 +246,13 @@ export class MarketController {
   @Get(':symbol/chart-options') async chartOptions(@Param('symbol') symbol: string,
     @Query('start') start?: string, @Query('end') end?: string,
     @Query('barsLimit') barsLimit?: string, @Query('indicatorParams') indicatorParams?: string,
-    @Query('planEnd') planEnd?: string) {
+    @Query('planEnd') planEnd?: string, @Query('timeframe') timeframe?: string,
+    @Query('assetType') assetType?: string) {
     if (!this.detailService || !this.chartReader) throw new Error('图表能力服务未注入');
-    if (barsLimit !== undefined || indicatorParams !== undefined || planEnd !== undefined) {
-      if (start !== undefined || end !== undefined) throw new BadRequestException('图表规划与显式窗口不能同时传入');
-      let plan;
-      try { plan = marketChartPlanV3Schema.parse({ barsLimit: Number(barsLimit ?? 90),
-        indicatorParams: indicatorParams === undefined ? {} : JSON.parse(indicatorParams) as unknown,
-        ...(planEnd !== undefined ? { end: planEnd } : {}) }); }
-      catch { throw new BadRequestException('图表窗口规划参数无效'); }
-      const identity = await this.detailService.resolveIdentity(symbol);
-      const input = marketChartRequest(identity.symbol, { assetType: identity.assetType, timeframe: '1d',
-        adjustment: 'qfq', limit: String(plan.barsLimit), acceptance: 'interactive',
-        ...(plan.end ? { end: planMarketChartWindow({ end: plan.end }).end } : {}) });
-      const requests = (['MA', 'MACD', 'RSI'] as const).map((name) => ({ name,
-        parameters: selectIndicatorParameters(name, JSON.stringify(plan.indicatorParams)) }));
-      const planned = planMarketChartWindow(indicatorReadInput(input, requests, MAX_CHART_V3_INDICATOR_INPUT_POINTS).window);
-      return { ...await this.chartReader.options(identity, planned), plan };
-    }
-    const window = start !== undefined || end !== undefined
-      ? marketChartOptionsWindowV3Schema.safeParse({ start, end }) : undefined;
-    if (window && !window.success) throw new BadRequestException('图表能力窗口必须提供有效且有序的 start/end');
-    return this.chartReader.options(await this.detailService.resolveIdentity(symbol), window?.data);
+    const query = parseChartOptionsQuery({ start, end, barsLimit, indicatorParams, planEnd, timeframe, assetType });
+    const selected = planChartOptionsRequest(await this.detailService.resolveIdentity(symbol), query);
+    return { ...await this.chartReader.options(selected.identity, selected.window),
+      ...(selected.plan ? { plan: selected.plan } : {}) };
   }
 
   @Get(':symbol/quote') quote(@Param('symbol') symbol: string, @Query('assetType') assetType?: QuoteAssetType) {

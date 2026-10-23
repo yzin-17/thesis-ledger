@@ -1,0 +1,34 @@
+{
+  "experiment": {
+    "id": "00000000-0000-4000-8000-000000000091",
+    "name": "受控异常恢复实验",
+    "nameSource": "stored",
+    "baselineStrategyVersionId": "00000000-0000-4000-8000-000000000092",
+    "status": "awaiting_finalization",
+    "stage": "awaiting_finalization",
+    "objective": {}, "split": {}, "modelConfig": [],
+    "aiCallsUsed": 0, "backtestRunsUsed": 0, "inputTokensUsed": 0, "outputTokensUsed": 0,
+    "costUsed": null,
+    "costSummary": { "status": "unavailable", "currency": null, "knownAmount": null, "knownByCurrency": [], "reason": "unknown_cost" },
+    "tradingCost": { "source": "discovery_seed", "commissionRate": "0", "slippageRate": "0", "isAssumption": true, "zeroDoesNotMeanFree": true },
+    "lockedCandidateIds": ["00000000-0000-4000-8000-000000000093"],
+    "selectedCandidateId": "00000000-0000-4000-8000-000000000093",
+    "readEligibility": { "state": "readable", "code": "READABLE", "scope": "test", "accessedAt": "2026-10-18T00:00:00Z", "revealedAt": "2026-10-18T00:00:00Z" },
+    "createdAt": "2026-10-18T00:00:00Z", "updatedAt": "2026-10-18T00:00:00Z"
+  },
+  "candidate": {
+    "id": "00000000-0000-4000-8000-000000000093",
+    "experimentId": "00000000-0000-4000-8000-000000000091",
+    "candidateNumber": 1, "modelKey": "controlled:fixture",
+    "candidateStrategyVersionId": "00000000-0000-4000-8000-000000000094",
+    "executionHash": "controlled-candidate-hash",
+    "proposal": {}, "diff": [], "validationStatus": "test_valid", "runRefs": {}, "metrics": {},
+    "readEligibility": { "state": "readable", "code": "READABLE", "scope": "test", "accessedAt": "2026-10-18T00:00:00Z", "revealedAt": "2026-10-18T00:00:00Z" }
+  },
+  "account": { "id": "00000000-0000-4000-8000-000000000095", "name": "受控风险账户", "mode": "actual", "type": "securities", "currency": "CNY", "active": true },
+  "riskPreview": {
+    "previewHash": "controlled-preview", "cycleMode": "existingAndFuture",
+    "context": { "positionId": null }, "evaluations": [],
+    "plan": { "semanticVersion": "strategy-monitoring-v1", "strategyHash": "controlled-strategy", "planHash": "controlled-plan", "executionSymbol": "600519.SH", "evaluationTimeframe": "1d", "rules": [], "coverage": { "riskTotal": 0, "riskMapped": 0, "items": [] } }
+  }
+}

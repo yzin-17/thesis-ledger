@@ -22,7 +22,7 @@ const commandBase = {
     quantity: '2',
     price: '200',
     currency: 'USD',
-    capabilityVerification: 'VERIFIED' as const,
+    capabilityVerification: 'UNVERIFIED' as const,
     charges: [],
   },
   source: {
@@ -192,6 +192,89 @@ const errorCode = async (operation: Promise<unknown>) => {
 };
 
 describe('Ledger V2 成交命令', () => {
+  it('客户端自报 VERIFIED 不能追加新成交或推进账本状态', async () => {
+    const repository = new InMemoryLedgerRepository();
+    const service = new LedgerCommandService(repository as never);
+    await expect(
+      errorCode(
+        service.createExecution({
+          command: 'CREATE_EXECUTION',
+          ...commandBase,
+          payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(0);
+    expect(repository.revisions.get(accountA)).toBe(0n);
+    expect(repository.generations.get(accountA)).toBe(0n);
+  });
+
+  it('旧 VERIFIED 命令重放仍返回原事件；新的更正不得继承该标记', async () => {
+    const repository = new InMemoryLedgerRepository();
+    const service = new LedgerCommandService(repository as never);
+    const created = await service.createExecution({ command: 'CREATE_EXECUTION', ...commandBase });
+    const original = repository.events[0]!;
+    if (original.revisionAction === 'VOID' || !('capabilityVerification' in original.payload))
+      throw new Error('测试要求成交事实');
+    original.payload.capabilityVerification = 'VERIFIED'; // 明确模拟既有历史事实。
+    const historicalCommand = {
+      command: 'CREATE_EXECUTION',
+      ...commandBase,
+      payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+    };
+    await expect(service.createExecution(historicalCommand)).resolves.toMatchObject({
+      idempotentReplay: true,
+      eventIds: created.eventIds,
+      ledgerRevisions: { [accountA]: '1' },
+    });
+    await expect(
+      errorCode(
+        service.replaceExecution({
+          ...historicalCommand,
+          command: 'REPLACE_EXECUTION',
+          expectedLedgerRevision: '1',
+          supersedesEventId: created.eventIds[0],
+          reason: '本次必须重新校验',
+          source: { ...commandBase.source, externalId: 'untrusted-verification-replace' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(1);
+    expect(original.payload.capabilityVerification).toBe('VERIFIED');
+    expect(repository.revisions.get(accountA)).toBe(1n);
+  });
+
+  it('带新载荷恢复同样拒绝客户端 VERIFIED，VOID 历史及版本保持原状', async () => {
+    const repository = new InMemoryLedgerRepository();
+    const service = new LedgerCommandService(repository as never);
+    const created = await service.createExecution({ command: 'CREATE_EXECUTION', ...commandBase });
+    const removed = await service.voidExecution({
+      command: 'VOID_EXECUTION',
+      accountId: accountA,
+      expectedLedgerRevision: '1',
+      supersedesEventId: created.eventIds[0],
+      reason: '受控作废',
+      actorId: commandBase.actorId,
+      source: { ...commandBase.source, externalId: 'verification-void' },
+    });
+    await expect(
+      errorCode(
+        service.restoreExecution({
+          command: 'RESTORE_EXECUTION',
+          ...commandBase,
+          expectedLedgerRevision: '2',
+          supersedesEventId: removed.eventIds[0],
+          reason: '受控恢复',
+          source: { ...commandBase.source, externalId: 'untrusted-verification-restore' },
+          payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[1]?.revisionAction).toBe('VOID');
+    expect(repository.revisions.get(accountA)).toBe(2n);
+  });
+
   it('相同幂等命令重放返回原事件且不增加 Revision', async () => {
     const repository = new InMemoryLedgerRepository();
     const service = new LedgerCommandService(repository as never);
@@ -399,6 +482,17 @@ describe('Ledger V2 成交命令', () => {
       reason: '原成交归属账户错误',
     };
 
+    await expect(
+      errorCode(
+        service.moveExecutionAccount({
+          ...moveCommand,
+          payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(1);
+    expect(repository.revisions.get(accountA)).toBe(1n);
+    expect(repository.revisions.get(accountB)).toBe(0n);
     const moved = await service.moveExecutionAccount(moveCommand);
     const replay = await service.moveExecutionAccount(moveCommand);
 

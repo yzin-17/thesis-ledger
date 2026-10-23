@@ -6,6 +6,33 @@ import {
 import { PerformanceSnapshotService } from '../../src/performance/performance-snapshot.service.js';
 
 describe('组合估值走势', () => {
+  it.each([
+    ['actual', '1D', '1min'], ['shadow', '1Y', '1d'],
+  ] as const)('无点位的 %s/%s/%s 保留不可用，不冒充完整或补零', async (mode, range, interval) => {
+    const service = new PerformanceValuationSeriesService(
+      { accountValuationPoint: { findMany: vi.fn(async () => []) } } as never,
+      {} as never, { history: vi.fn(async () => []) } as never, {} as never,
+    );
+    await expect(service.series({ scope: 'account', accountId: 'owned-account',
+      mode, range, interval, baseCurrency: 'CNY' })).resolves.toMatchObject({
+        points: [], historyStart: null, dataQuality: 'UNAVAILABLE',
+      });
+  });
+
+  it('维护采样可限定单一账户，并保留实际模式和活跃范围条件', async () => {
+    const findMany = vi.fn(async () => []);
+    const service = new PerformanceValuationSeriesService(
+      { account: { findMany } } as never, {} as never, {} as never, {} as never,
+    );
+    await service.sample(new Date('2026-10-17T08:00:00Z'), 'actual', 'CNY', {
+      accountId: 'owned-account',
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: 'owned-account', mode: 'actual', active: true }),
+      select: { id: true },
+    });
+  });
+
   it('部分披露持仓不归一放大，无法定价部分按零变动处理', () => {
     const result = estimateFundNavFromHoldings(
       1,

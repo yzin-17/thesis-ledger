@@ -20,6 +20,10 @@ import { LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import type { Account } from '../portfolio/portfolio.types.js';
+import {
+  reconciliationBasisLabels,
+  reconciliationConflictLabels,
+} from './reconciliation.labels.js';
 import { useConfirmBaselineReconciliationMutation } from './account-data.mutations.js';
 import type { useReconciliationCandidatesQuery } from './account-data.queries.js';
 import {
@@ -27,6 +31,8 @@ import {
   createClientCommandId,
   errorCode,
   errorMessage,
+  formatDate,
+  formatDecimal,
   reconciliationBadgeLabel,
   reconciliationBadgeVariant,
 } from './account-data.helpers.js';
@@ -36,32 +42,57 @@ export function ReconciliationSheet({
   open,
   query,
   ledgerRevision,
+  ledgerReady = true,
   onOpenChange,
 }: {
   account: Account;
   open: boolean;
   query: ReturnType<typeof useReconciliationCandidatesQuery>;
   ledgerRevision: string;
+  ledgerReady?: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const toastManager = useToastManager();
   const mutation = useConfirmBaselineReconciliationMutation(account.mode);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [selectedAt, setSelectedAt] = useState<{
+    accountId: string;
+    updatedAt: number;
+    ledgerRevision: string;
+    commandId: string;
+  } | null>(null);
   const [reason, setReason] = useState('确认确定性对账匹配');
   const [error, setError] = useState<string | null>(null);
   const selectedCandidate = query.data?.candidates.find(
     (candidate) => candidate.candidateId === selectedCandidateId,
   );
+  const readable =
+    ledgerReady && !query.isError && !query.isFetching && query.data?.accountId === account.id;
+  const selectionCurrent =
+    readable &&
+    selectedAt?.accountId === account.id &&
+    selectedAt.updatedAt === query.dataUpdatedAt &&
+    selectedAt.ledgerRevision === ledgerRevision;
 
   useEffect(() => {
     if (!open) return;
     setSelectedCandidateId(null);
+    setSelectedAt(null);
     setReason('确认确定性对账匹配');
     setError(null);
-  }, [open]);
+  }, [open, account.id]);
 
   const submit = async () => {
-    if (!selectedCandidate || mutation.isPending) return;
+    const candidateData = query.data;
+    if (
+      !candidateData ||
+      !selectedAt ||
+      !selectedCandidate ||
+      selectedCandidate.status !== 'AVAILABLE' ||
+      !selectionCurrent ||
+      mutation.isPending
+    )
+      return;
     if (!reason.trim()) {
       setError('确认原因必填。');
       return;
@@ -74,12 +105,12 @@ export function ReconciliationSheet({
         executionFactIds: selectedCandidate.executionFactIds,
         coveredQuantity: selectedCandidate.coveredQuantity,
         coveredCost: selectedCandidate.coveredCost,
-        ruleVersion: query.data?.ruleVersion ?? 1,
+        ruleVersion: candidateData.ruleVersion,
         expectedLedgerRevision: ledgerRevision,
         source: {
           category: 'MANUAL',
           channel: 'desktop-account-data-reconciliation',
-          externalId: createClientCommandId(),
+          externalId: selectedAt.commandId,
         },
         actorId: 'desktop-user',
         reason: reason.trim(),
@@ -111,13 +142,20 @@ export function ReconciliationSheet({
         <ReconciliationResults
           query={query}
           selectedCandidateId={selectedCandidateId}
-          selectedCandidate={selectedCandidate}
+          selectedCandidate={selectionCurrent ? selectedCandidate : undefined}
+          canSelect={readable && !mutation.isPending}
           reason={reason}
           error={error}
           mutation={mutation}
           onSelectCandidate={(candidate) => {
-            if (candidate.status === 'AVAILABLE') {
+            if (readable && candidate.status === 'AVAILABLE') {
               setSelectedCandidateId(candidate.candidateId);
+              setSelectedAt({
+                accountId: account.id,
+                updatedAt: query.dataUpdatedAt,
+                ledgerRevision,
+                commandId: createClientCommandId(),
+              });
               setError(null);
             }
           }}
@@ -133,6 +171,7 @@ function ReconciliationResults({
   query,
   selectedCandidateId,
   selectedCandidate,
+  canSelect,
   reason,
   error,
   mutation,
@@ -143,6 +182,7 @@ function ReconciliationResults({
   query: ReturnType<typeof useReconciliationCandidatesQuery>;
   selectedCandidateId: string | null;
   selectedCandidate: BaselineReconciliationCandidate | undefined;
+  canSelect: boolean;
   reason: string;
   error: string | null;
   mutation: ReturnType<typeof useConfirmBaselineReconciliationMutation>;
@@ -158,7 +198,7 @@ function ReconciliationResults({
       </div>
     );
   }
-  if (query.isError && !query.data) {
+  if (query.isError) {
     return (
       <Alert variant="destructive">
         <AlertTitle>对账候选读取失败</AlertTitle>
@@ -172,12 +212,26 @@ function ReconciliationResults({
   const candidates = query.data?.candidates ?? [];
   return (
     <div className="flex flex-col gap-4">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={query.isFetching}
+        onClick={() => void query.refetch()}
+      >
+        重新读取对账候选
+      </Button>
       {candidates.length > 0 ? (
         candidates.map((candidate) => (
           <ReconciliationCandidate
             key={candidate.candidateId}
             candidate={candidate}
+            observedAt={
+              query.data?.checkpoints.find(
+                (checkpoint) => checkpoint.baselineFactId === candidate.baselineFactId,
+              )?.occurredAt ?? null
+            }
             selected={candidate.candidateId === selectedCandidateId}
+            disabled={!canSelect}
             onSelect={() => onSelectCandidate(candidate)}
           />
         ))
@@ -190,9 +244,7 @@ function ReconciliationResults({
         <Card className="shadow-none">
           <CardHeader className="gap-2 border-b">
             <CardTitle>确认写入账本</CardTitle>
-            <CardDescription>
-              确认后会生成 BASELINE_RECONCILIATION 事实，不能通过原地编辑撤回。
-            </CardDescription>
+            <CardDescription>确认后保留新的对账事实及审计记录；撤回需要另建修正。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 p-4">
             <Field>
@@ -232,11 +284,15 @@ function ReconciliationResults({
 
 function ReconciliationCandidate({
   candidate,
+  observedAt,
   selected,
+  disabled,
   onSelect,
 }: {
   candidate: BaselineReconciliationCandidate;
+  observedAt: string | null;
   selected: boolean;
+  disabled: boolean;
   onSelect: () => void;
 }) {
   const conflicted = candidate.status === 'CONFLICTED';
@@ -248,14 +304,16 @@ function ReconciliationCandidate({
         selected && 'border-primary ring-2 ring-primary/20',
         conflicted && 'cursor-not-allowed opacity-70',
       )}
-      disabled={conflicted}
+      disabled={conflicted || disabled}
       onClick={onSelect}
       aria-pressed={selected}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <strong className="font-medium">{candidate.symbol}</strong>
-          <span className="ml-2 text-xs text-muted-foreground">{candidate.candidateId}</span>
+          <span className="ml-2 text-xs text-muted-foreground">
+            快照时间：{formatDate(observedAt)}
+          </span>
         </div>
         <Badge variant={reconciliationBadgeVariant(conflicted, selected)}>
           {reconciliationBadgeLabel(conflicted, selected)}
@@ -265,11 +323,22 @@ function ReconciliationCandidate({
         <span>已观察：{candidate.observedQuantity}</span>
         <span>已覆盖：{candidate.coveredQuantity}</span>
         <span>覆盖后剩余：{candidate.remainingQuantity}</span>
+        <span>观察总成本：{formatDecimal(candidate.observedCost)}</span>
+        <span>覆盖成本：{formatDecimal(candidate.coveredCost)}</span>
+        <span>剩余成本：{formatDecimal(candidate.remainingCost)}</span>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span>匹配依据：{candidate.matchBasis.join('、')}</span>
+        <span>
+          匹配依据：
+          {candidate.matchBasis.map((basis) => reconciliationBasisLabels[basis]).join('、')}
+        </span>
         {candidate.conflictReasons.length > 0 && (
-          <span>冲突：{candidate.conflictReasons.join('、')}</span>
+          <span>
+            冲突：
+            {candidate.conflictReasons
+              .map((reason) => reconciliationConflictLabels[reason])
+              .join('、')}
+          </span>
         )}
       </div>
     </button>

@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 import {
   fetchAccounts,
   fetchManagedAccounts,
@@ -61,7 +62,11 @@ export const usePortfolioShellQueries = (
   let state: LoadState = enableValuation ? 'loading' : 'ready';
   if (accountsQuery.isError || (enableValuation && portfolioQuery.isError)) state = 'error';
   else if (enableValuation && portfolioQuery.isSuccess && accountsQuery.isSuccess && portfolio) {
-    if (portfolio.positions.length === 0) state = 'empty';
+    if (
+      portfolio.positions.length === 0 &&
+      !accounts.some((account) => account.mode === mode && account.active !== false)
+    )
+      state = 'empty';
     else if (portfolio.partial) state = 'stale';
     else state = 'ready';
   }
@@ -98,8 +103,7 @@ export const useAccountValuationQuery = (
   accountId: string,
   mode: PortfolioMode | undefined,
   enabled: boolean,
-) =>
-  useQuery(accountValuationQueryOptions(accountId, mode, enabled));
+) => useQuery(accountValuationQueryOptions(accountId, mode, enabled));
 
 export const useManagedAccountsQuery = (enabled: boolean) =>
   useQuery({
@@ -112,19 +116,20 @@ export const portfolioInstrumentSearchQueryOptions = (
   accountType: string | undefined,
   query: string,
   enabled: boolean,
-  client?: DesktopRequestClient,
+  client?: Pick<ThesisLedgerApiClient, 'market'>,
 ) => ({
-    queryKey: portfolioKeys.instrumentSearch(accountType ?? 'all', query),
-    queryFn: ({ signal }: { signal: AbortSignal }) => searchPortfolioInstruments(query, client, signal),
-    enabled,
-    placeholderData: [],
-    retry: false,
-    retryOnMount: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  });
+  queryKey: portfolioKeys.instrumentSearch(accountType ?? 'all', query),
+  queryFn: ({ signal }: { signal: AbortSignal }) =>
+    searchPortfolioInstruments(query, client, signal),
+  enabled,
+  placeholderData: [],
+  retry: false,
+  retryOnMount: false,
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  refetchOnWindowFocus: false,
+  staleTime: 30_000,
+});
 
 export const usePortfolioInstrumentSearchQuery = (
   accountType: string | undefined,

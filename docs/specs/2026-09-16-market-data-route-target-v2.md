@@ -1,11 +1,11 @@
 # 市场数据 RouteTarget V2 Spec
 
-2026-10-03 适用性对账：本文的 V2 envelope、默认主备及旧握手是历史合同，现行接口与配置以[Canonical 架构](../architecture/canonical-runtime.md)及[共同能力修订](2026-09-25-multi-source-adjustment-aware-backtest.md)为准。原延迟测量等未覆盖断言仍由[原 Task](../tasks/2026-09-16-market-data-route-target-v2.md)持有；替代不等于原 AC 全部通过。
+2026-10-03 适用性对账：本文的 V2 envelope、默认主备及旧握手是历史合同，现行接口与配置以[Canonical 架构](../architecture/canonical-runtime.md)及[共同能力修订](2026-09-25-multi-source-adjustment-aware-backtest.md)为准。原延迟测量等未覆盖断言仍由[原 Task](../tasks/2026-10-09-unified-data-capability-adapter.md#route-target-acceptance)持有；替代不等于原 AC 全部通过。
 
 > 任务标识：market-data-route-target-v2
 > 日期：2026-09-16
-> 状态：Phase 1 实现中
-> 对应任务：[市场数据 RouteTarget V2 实施任务](../tasks/2026-09-16-market-data-route-target-v2.md)
+> 状态：历史实现与接口被现行链路接续；未覆盖的延迟/运行态断言由统一适配层 Task 承接
+> 对应任务：[市场数据 RouteTarget V2 实施任务](../tasks/2026-10-09-unified-data-capability-adapter.md#route-target-acceptance)
 
 ## 背景与问题
 
@@ -62,7 +62,7 @@ Control Policy 的 revision 仍是单调递增并以 SQLite/Server 持久化记�
 
 V2 先以显式分支接入，避免在共享脏工作树中让旧 V1 消费者收到结构化路由。最终公开 endpoint 切换时必须直接使用 V2 wire shape，不增加 V1 wire 兼容层。source-specific adapter 缺失时返回 unsupported_source，不得退回默认 source。
 
-本阶段不宣称 600 秒 Provider request cooldown 是延迟预算。DSA 适配器调用尚未统一具备可取消的 per-target deadline，因此健康主源 5 秒和主源失败后总计 10 秒仍是后续运行态门禁；在实现安全的 adapter-enforced timeout 前，不得勾选该门禁。
+原 V2 阶段的 600 秒 Provider request cooldown 不是延迟预算。当时适配器缺少统一的可取消 per-target deadline；后继统一能力实现已为 HiThink、腾讯及部分来源增加目标超时，不能继续笼统记作“全部未实现”，也不能据某个 `4.5s` 参数推断总请求预算已过。现行来源范围、超时实现和实测门禁由[接续 Task](../tasks/2026-10-09-unified-data-capability-adapter.md#route-target-acceptance)管理；健康主源 5 秒、主源失败后总计 10 秒必须分别有适用运行态证据才关闭。
 
 ## 未决问题
 

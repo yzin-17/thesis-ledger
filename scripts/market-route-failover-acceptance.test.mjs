@@ -112,6 +112,51 @@ test('备用失败也先恢复，不把失败当作验收通过', async () => {
   assert.equal(policyFingerprint(f.policy), plan.baselineFingerprint);
 });
 
+test('分别记录三个实际整窗请求的端到端耗时和完整来源序列', async () => {
+  const f = fixture();
+  const plan = createFailoverPlan(f.policy, f.providers, f.catalog);
+  const { api } = fakeApi(f);
+  const times = [0, 250, 250, 1100, 1100, 1400];
+  const evidence = await executeCase(api, plan, () => {}, () => times.shift());
+  assert.deepEqual([evidence.baseline.elapsedMs, evidence.backup.elapsedMs, evidence.restored.elapsedMs],
+    [250, 850, 300]);
+  assert.equal(evidence.backup.provenance.servedFromCache, false);
+  assert.equal(evidence.backup.dataPoints.length, 5);
+  assert.equal(evidence.backup.coverage.latestCompleteTradingDate, '2024-07-19');
+});
+
+test('备用超过十秒时先恢复并保留失败计时，不记录通过', async () => {
+  const f = fixture();
+  const plan = createFailoverPlan(f.policy, f.providers, f.catalog);
+  const { api } = fakeApi(f);
+  const times = [0, 200, 200, 10201];
+  const phases = [];
+  await assert.rejects(executeCase(api, plan, (record) => phases.push(structuredClone(record)),
+    () => times.shift()), /超过 10000ms/);
+  assert.equal(f.providers[0].enabled, true);
+  assert.equal(policyFingerprint(f.policy), plan.baselineFingerprint);
+  assert.equal(phases.at(-1).phase, 'restored');
+  assert.equal(phases.at(-1).evidence.backup.elapsedMs, 10001);
+});
+
+test('基线慢于五秒或存在未完成交易日时在任何写入前拒绝', async () => {
+  for (const incomplete of [false, true]) {
+    const f = fixture();
+    const plan = createFailoverPlan(f.policy, f.providers, f.catalog);
+    const { api, writes } = fakeApi(f);
+    const original = api.get;
+    api.get = async (path) => {
+      const result = await original(path);
+      if (incomplete && path.includes('/bars?')) result.points[4].completionStatus = 'incomplete';
+      return result;
+    };
+    const times = [0, incomplete ? 100 : 5001];
+    await assert.rejects(executeCase(api, plan, () => {}, () => times.shift()),
+      incomplete ? /完整交易日/ : /超过 5000ms/);
+    assert.equal(writes.length, 0);
+  }
+});
+
 test('来源并行变更不能被恢复覆盖', async () => {
   const f = fixture();
   const plan = createFailoverPlan(f.policy, f.providers, f.catalog);

@@ -112,7 +112,7 @@ export function MarketDetailDialogContent({
             查看按资产能力加载的市场数据和已有持仓信息。
           </DialogDescription>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5">
+        <div className="grid min-h-0 min-w-0 flex-1 auto-rows-max grid-cols-1 gap-4 overflow-y-auto p-5">
           {position.quantity !== undefined && position.costPrice !== undefined && (
             <div
               className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px"

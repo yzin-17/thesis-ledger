@@ -45,6 +45,86 @@ describe('候选、局部状态与工作台隔离', () => {
     api.candidates.mockResolvedValue(page());
     api.history.mockResolvedValue({ items: [], nextCursor: null });
   });
+  it('选择提示只在成功有候选时显示，空集和失败各自只有当前状态', async () => {
+    api.candidates.mockResolvedValueOnce({ ...page(), items: [] });
+    const view = await mountJournal(<JournalCandidateBrowser {...props} selectionPrompt={<p>选择一个复盘对象</p>} />);
+    await journalWait(() => expect(view.host.textContent).toContain('没有可复盘对象'));
+    expect(view.host.textContent).not.toContain('选择一个复盘对象');
+    api.candidates.mockRejectedValueOnce(new Error('503'));
+    await view.client.refetchQueries({ queryKey: ['journal-review-candidates'] });
+    await journalWait(() => expect(view.host.textContent).toContain('候选读取失败'));
+    expect(view.host.textContent).not.toContain('选择一个复盘对象');
+    await journalClick('重新读取');
+    await journalWait(() => expect(view.host.textContent).toContain('选择一个复盘对象'));
+    expect(view.host.textContent).not.toContain('没有可复盘对象');
+  });
+  it('事实摘要与成交表使用可读日期，原始追溯 JSON 保留来源时间', async () => {
+    const candidate = journalMountedCandidate();
+    const view = await mountJournal(<JournalFactSummary candidate={candidate} />);
+    expect(view.host.querySelector('dd')?.textContent).not.toContain('T');
+    expect(view.host.querySelector('dd')?.textContent).toMatch(/2026/);
+    for (const cell of view.host.querySelectorAll('td'))
+      expect(cell.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(view.host.querySelector('pre')?.textContent).toContain(candidate.input.trade.openedAt);
+  });
+  it('当前候选和旧引用使用同一主响应的目录名称，不额外查询目录', async () => {
+    const candidate = journalMountedCandidate();
+    const legacy = browserJournalLegacy(accountId, 'actual');
+    api.candidates.mockResolvedValueOnce({
+      ...page(),
+      items: [candidate],
+      legacyItems: [legacy],
+      instrumentDirectory: {
+        generation: 9,
+        items: [{ symbol: candidate.input.trade.symbol, displayName: '目录证券名称' }],
+        unresolvedSymbols: [],
+      },
+    });
+    const view = await mountJournal(<JournalCandidateBrowser {...props} />);
+    await journalWait(() =>
+      expect(view.host.querySelector('tbody')?.textContent).toContain('目录证券名称'),
+    );
+    expect([...view.host.querySelectorAll('details')].find(row => row.textContent?.includes('旧 Journal'))?.textContent).toContain('目录证券名称');
+    expect(view.host.querySelector('tbody')?.textContent).toContain(candidate.input.trade.symbol);
+    expect(api.candidates).toHaveBeenCalledTimes(1);
+  });
+  it('目录无匹配时保留业务候选和代码回退', async () => {
+    api.candidates.mockResolvedValueOnce({
+      ...page(),
+      instrumentDirectory: { generation: 9, items: [], unresolvedSymbols: ['AAPL.US'] },
+    });
+    const view = await mountJournal(<JournalCandidateBrowser {...props} />);
+    await journalWait(() =>
+      expect(view.host.querySelector('tbody')?.textContent).toContain('AAPL.US'),
+    );
+    expect(view.host.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(journalButton('选择对象').disabled).toBe(false);
+    expect(api.candidates).toHaveBeenCalledTimes(1);
+  });
+  it('追加空的下一页不丢失前页目录名称或候选', async () => {
+    api.candidates.mockResolvedValueOnce({
+      ...page(),
+      nextCursor: 'next-page',
+      instrumentDirectory: {
+        generation: 9,
+        items: [{ symbol: 'AAPL.US', displayName: '前页证券名称' }],
+        unresolvedSymbols: [],
+      },
+    });
+    const view = await mountJournal(<JournalCandidateBrowser {...props} />);
+    await journalWait(() => expect(journalButton('读取下一页').disabled).toBe(false));
+    api.candidates.mockResolvedValueOnce({
+      ...page(),
+      items: [],
+      instrumentDirectory: { generation: 9, items: [], unresolvedSymbols: [] },
+    });
+    await journalClick('读取下一页');
+    await journalWait(() =>
+      expect(view.host.querySelector('tbody')?.textContent).toContain('前页证券名称'),
+    );
+    expect(view.host.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(api.candidates.mock.calls[1]![0].cursor).toBe('next-page');
+  });
   it.each(['active', 'baseline', 'unknown-time', 'close-slice'] as const)(
     '消费服务端 %s 状态并保留未知事实',
     async (state) => {
@@ -116,8 +196,8 @@ describe('候选、局部状态与工作台隔离', () => {
     expect(api.candidates.mock.calls[1]![0]).toMatchObject({
       accountId,
       mode: 'actual',
-      start: '2026-01-04T00:00:00Z',
-      end: '2026-01-05T00:00:00Z',
+      start: '2026-01-04T00:00:00.000Z',
+      end: '2026-01-05T00:00:00.000Z',
     });
     expect(api.candidates.mock.calls[1]![0]).not.toHaveProperty('cursor');
   });

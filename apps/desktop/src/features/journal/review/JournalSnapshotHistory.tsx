@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import { getDesktopApiClient } from '@/shared/api/client';
+import { formatDateTime } from '@/lib/date-display';
 import { JournalDecimalResult } from './JournalMetricTable.js';
 import { JournalEmpty, JournalRequestError } from './JournalReviewFeedback.js';
 import { reviewObjectLabels } from './journal-review-display.js';
@@ -62,7 +63,7 @@ function SnapshotDetail({
         <CardTitle>
           {view.snapshot.status === 'STALE' ? '历史结果 · 证据已变化' : '已保存的复盘结果'}
         </CardTitle>
-        <CardDescription>{view.snapshot.createdAt} · 读取保留保存时的输入与结果</CardDescription>
+        <CardDescription>{formatDateTime(view.snapshot.createdAt)} · 读取保留保存时的输入与结果</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <JournalDecimalResult result={view.snapshot.outputSnapshot} />
@@ -103,9 +104,9 @@ function SnapshotDetail({
   );
 }
 function snapshotLabel(view: JournalStoredSnapshotView) {
-  if (view.compatibility === 'LEGACY_UNSUPPORTED') return `${view.createdAt} · 旧快照待确认`;
+  if (view.compatibility === 'LEGACY_UNSUPPORTED') return `${formatDateTime(view.createdAt)} · 旧快照待确认`;
   const input = view.snapshot.inputSnapshot;
-  return `${view.snapshot.createdAt} · ${input.trade.symbol} · ${reviewObjectLabels[input.reference.reviewObjectType]} · ${view.snapshot.status === 'STALE' ? '证据已变化' : '证据一致'}`;
+  return `${formatDateTime(view.snapshot.createdAt)} · ${input.trade.symbol} · ${reviewObjectLabels[input.reference.reviewObjectType]} · ${view.snapshot.status === 'STALE' ? '证据已变化' : '证据一致'}`;
 }
 export function JournalSnapshotHistory({
   accountId,
@@ -147,23 +148,22 @@ export function JournalSnapshotHistory({
       <FieldGroup className="sm:flex-row">
         <Field className="flex-1">
           <FieldLabel>保存时间起点（可选）</FieldLabel>
-          <Input
+          <JournalWindowTimeInput
             aria-label="快照开始时间"
-            placeholder="带时区的 ISO 8601 时间"
             value={draft.start}
-            onChange={(event) => setDraft({ ...draft, start: event.target.value })}
+            onValueChange={(start) => setDraft({ ...draft, start })}
           />
         </Field>
         <Field className="flex-1">
-          <FieldLabel>保存时间终点（不含，可选）</FieldLabel>
-          <Input
+          <FieldLabel>保存时间终点（可选）</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="快照结束时间"
-            placeholder="带时区的 ISO 8601 时间"
             value={draft.end}
-            onChange={(event) => setDraft({ ...draft, end: event.target.value })}
+            onValueChange={(end) => setDraft({ ...draft, end })}
           />
         </Field>
       </FieldGroup>
+      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">时间范围说明</summary><p className="mt-2">按本机时区输入；开始时刻计入范围，结束时刻不计入。</p></details>
       <Button
         variant="outline"
         className="self-start"

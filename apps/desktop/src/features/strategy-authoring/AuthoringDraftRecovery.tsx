@@ -52,7 +52,7 @@ export function AuthoringDraftRecovery({
       <AlertDialog
         open={confirm !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirm(null);
+          if (!open && !disabled) setConfirm(null);
         }}
       >
         <AlertDialogContent>
@@ -67,11 +67,13 @@ export function AuthoringDraftRecovery({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => setConfirm(null)}>
+            <Button variant="outline" disabled={disabled} onClick={() => setConfirm(null)}>
               继续编辑
             </Button>
             <Button
+              disabled={disabled}
               onClick={() => {
+                if (disabled) return;
                 if (confirm === 'discard') onDiscard?.();
                 else onReadLatest();
                 setConfirm(null);

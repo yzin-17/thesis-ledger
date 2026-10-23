@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { cn } from '@/lib/utils';
@@ -37,14 +38,14 @@ export const StatePanel = ({
   description: string;
   children: ReactNode;
 }) => (
-  <section className="state-panel">
-    <div className="state-graphic" aria-hidden="true">
-      <ChartLineUpIcon size={40} />
-    </div>
-    <h1>{title}</h1>
-    <p>{description}</p>
-    {children}
-  </section>
+  <Empty className="mx-auto max-w-xl px-0 py-8">
+    <EmptyHeader>
+      <EmptyMedia variant="icon" aria-hidden="true"><ChartLineUpIcon /></EmptyMedia>
+      <EmptyTitle role="heading" aria-level={2}>{title}</EmptyTitle>
+      <EmptyDescription>{description}</EmptyDescription>
+    </EmptyHeader>
+    <EmptyContent>{children}</EmptyContent>
+  </Empty>
 );
 
 export const DataStateBanner = ({

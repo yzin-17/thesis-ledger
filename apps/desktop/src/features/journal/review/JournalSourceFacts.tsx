@@ -1,4 +1,5 @@
 import type { JournalReviewEvidenceInput } from '@thesis-ledger/schemas';
+import { formatDateTime } from '@/lib/date-display';
 import {
   Table,
   TableBody,
@@ -40,7 +41,7 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <TableBody>
             {slices.map((row) => (
               <TableRow key={row.id}>
-                <TableCell>{row.occurredAt ?? '未知'}</TableCell>
+                <TableCell>{formatDateTime(row.occurredAt, '未知')}</TableCell>
                 <TableCell className="font-mono">{row.quantity}</TableCell>
                 <TableCell className="font-mono">
                   {row.price ?? '未知'} {row.currency}
@@ -69,7 +70,7 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <TableBody>
             {entries.map((row) => (
               <TableRow key={row.id}>
-                <TableCell>{row.occurredAt ?? '未知'}</TableCell>
+                <TableCell>{formatDateTime(row.occurredAt, '未知')}</TableCell>
                 <TableCell className="font-mono">{row.originalQuantity}</TableCell>
                 <TableCell className="font-mono">
                   {row.price ?? '未知'} {row.currency}
@@ -85,7 +86,8 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <h3 className="text-sm font-medium">基线观察（不是成交）</h3>
           {baselines.map((row) => (
             <p className="break-all text-sm" key={row.id}>
-              观察时间：{row.occurredAt ?? '未知'}；数量：{row.observedQuantity}；参考成本：
+              观察时间：{formatDateTime(row.occurredAt, '未知')}；数量：{row.observedQuantity}
+              ；参考成本：
               {row.averageCost ?? '未知'} {row.currency}；
               {row.rawCostEstimated ? '估算成本' : '已有成本证据'}
             </p>
@@ -126,7 +128,7 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <h3 className="text-sm font-medium">关联 Journal 说明</h3>
           {input.journalEntries.map((row) => (
             <p className="text-sm" key={row.id}>
-              {row.createdAt} · {row.content ?? row.notes ?? row.reason}
+              {formatDateTime(row.createdAt, '未知')} · {row.content ?? row.notes ?? row.reason}
             </p>
           ))}
         </div>

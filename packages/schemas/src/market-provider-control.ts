@@ -5,7 +5,7 @@ import {
 } from './market-route-v3.js';
 import { marketPolicyClientResponseSchema } from './market-client-projections.js';
 import { omitUndefinedDeep } from './exact-optional.js';
-import { marketAccountAccessSchema } from './market-account-access.js';
+import { marketAccountAccessSchema, marketProviderAccountLevelSchema } from './market-account-access.js';
 
 const identity = {
   contractVersion: z.literal(3),
@@ -32,19 +32,29 @@ export const marketProviderProbeRouteSchema = z.strictObject({
   target: marketRouteCapabilityV3Schema.shape.target,
 });
 export type MarketProviderProbeRoute = z.infer<typeof marketProviderProbeRouteSchema>;
+export interface MarketProviderTestOptions {
+  requestId?: string;
+  credentials?: { method: string; values: Record<string, unknown> };
+  route?: MarketProviderProbeRoute;
+  purpose?: 'capability_read' | 'account_access';
+  accountLevel?: z.infer<typeof marketProviderAccountLevelSchema>;
+}
 export const marketProviderAccountAccessReportSchema = z.strictObject({
   scope: z.literal('account_interfaces'),
   credentialContext: z.enum(['draft', 'current']),
   configVersion: z.number().int().nonnegative(),
   checkedAt: z.iso.datetime({ offset: true }),
-  validUntil: z.iso.datetime({ offset: true }),
+  validUntil: z.iso.datetime({ offset: true }).optional(),
+  persisted: z.literal(true).optional(),
+  accountLevel: marketProviderAccountLevelSchema.optional(),
   routes: z.array(marketProviderProbeRouteSchema.extend({ access: marketAccountAccessSchema })).min(1).max(6),
 }).superRefine((value, context) => {
   for (const route of value.routes) {
-    if (route.access.configVersion !== value.configVersion || route.access.checkedAt !== value.checkedAt || route.access.validUntil !== value.validUntil)
+    if (route.access.configVersion !== value.configVersion || route.access.checkedAt !== value.checkedAt || route.access.validUntil !== value.validUntil || route.access.persisted !== value.persisted)
       context.addIssue({ code: 'custom', message: '逐功能访问结论必须绑定同一配置代次和检查时间' });
   }
-}).refine((value) => Date.parse(value.checkedAt) < Date.parse(value.validUntil), '账户检查有效时间必须有序');
+  if (value.persisted && value.credentialContext !== 'current') context.addIssue({ code: 'custom', message: '草稿不能作为本地权限记录' });
+}).refine((value) => value.persisted || !!value.validUntil && Date.parse(value.checkedAt) < Date.parse(value.validUntil), '账户检查有效时间必须有序');
 export type MarketProviderAccountAccessReport = z.infer<typeof marketProviderAccountAccessReportSchema>;
 const probeResult = z
   .strictObject({
@@ -100,7 +110,8 @@ export const marketProviderTestResponseSchema = z
     ) {
       context.addIssue({ code: 'custom', message: '检查成功必须包含非空的通过结果' });
     }
-    if (accountCheck && value.status === 'healthy' && value.accountAccess?.routes.some((route) => route.access.state !== 'allowed'))
+    if (accountCheck && value.status === 'healthy' && (!value.accountAccess?.routes.some((route) => route.access.state === 'allowed') ||
+      value.accountAccess.routes.some((route) => !['allowed', 'not_included'].includes(route.access.state))))
       context.addIssue({ code: 'custom', message: '账户检查通过必须全部接口可访问' });
     const seen = new Set<string>();
     for (const route of [...(value.routeResults ?? []), ...(value.accountAccess?.routes ?? [])]) {

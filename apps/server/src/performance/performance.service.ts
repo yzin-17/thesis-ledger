@@ -77,10 +77,7 @@ export class PerformanceService {
     return this.analysisService.summary(accountId, start, end, mode, options);
   }
 
-  calculate(input: {
-    valuations: { date: string; value: number; externalFlow?: number }[];
-    cashFlows: { date: string; amount: number }[];
-  }) {
+  calculate(input: Parameters<PerformanceAnalysisService['calculate']>[0]) {
     return this.analysisService.calculate(input);
   }
 

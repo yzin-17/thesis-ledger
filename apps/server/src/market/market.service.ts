@@ -51,7 +51,8 @@ export class MarketService {
     return pending;
   }
 
-  private async withDistributedLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+  private async withDistributedLock<T>(key: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted();
     if (!this.redis?.client) return work();
     const client = this.redis.client as unknown as {
       set?: (...args: [string, string, 'PX', number, 'NX']) => Promise<string | null>;
@@ -75,6 +76,7 @@ export class MarketService {
     if (acquired !== 'OK') {
       if (typeof client.get === 'function') {
         for (let attempt = 0; attempt < Math.ceil(leaseMs / 200); attempt += 1) {
+          signal?.throwIfAborted();
           await new Promise((resolve) => setTimeout(resolve, 200));
           if ((await client.get(lockKey)) === null) break;
         }
@@ -124,6 +126,27 @@ export class MarketService {
 
   getFundNav(...args: Parameters<MarketFundReader['getFundNav']>) {
     return this.fundReader.getFundNav(...args);
+  }
+
+  /** 当前净值的原协议没有币种；只接受已确认、未变化的 CNY 基金元数据。 */
+  async getFundNavWithCurrency(instrument: { instrumentId: string; symbol: string }, signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    const proof = await this.fundCurrencyProof(instrument);
+    if (!proof) return { status: 'unavailable' as const, reason: 'fund_currency_unverified' as const };
+    if (proof.currency !== 'CNY') return { status: 'unavailable' as const, reason: 'fund_currency_unsupported' as const };
+    signal?.throwIfAborted();
+    const nav = await this.fundReader.getFundNav(instrument.symbol, { allowStale: false, ...(signal ? { signal } : {}) });
+    signal?.throwIfAborted();
+    const current = await this.fundCurrencyProof(instrument);
+    if (!current || current.currency !== 'CNY' || current.confirmedAt.getTime() !== proof.confirmedAt.getTime() || current.assetUpdatedAt.getTime() !== proof.assetUpdatedAt.getTime()) return { status: 'unavailable' as const, reason: 'fund_currency_changed' as const };
+    return { status: 'available' as const, nav, currency: 'CNY' as const, currencySource: 'confirmed-asset' as const, currencyConfirmedAt: proof.confirmedAt.toISOString() };
+  }
+
+  private async fundCurrencyProof(instrument: { instrumentId: string; symbol: string }) {
+    if (!this.prisma) return null;
+    const association = await this.prisma.instrumentAssetAssociation.findUnique({ where: { symbol: instrument.symbol }, include: { asset: true } });
+    if (!association || association.instrumentId !== instrument.instrumentId || association.status !== 'active' || association.confirmedAt === null || association.asset.identityStatus !== 'confirmed' || association.asset.assetType !== 'fund') return null;
+    return { currency: association.asset.currency, confirmedAt: association.confirmedAt, assetUpdatedAt: association.asset.updatedAt };
   }
 
   getFundNavHistory(...args: Parameters<MarketFundReader['getFundNavHistory']>) {

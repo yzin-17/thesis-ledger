@@ -56,7 +56,7 @@ export function MarketPolicyRoutes({
       {marketPolicyRouteGroupsV3(rows).map((group) => (
         <FieldSet key={group.id}>
           <FieldLegend>{group.label}</FieldLegend>
-          <div className="divide-y rounded-lg border border-border">
+          <div className="divide-y">
             {group.rows.map((row) => {
               const [primary, fallback] = policyRouteTargetsV3(policy, row.key);
               const candidates = readyRouteTargetsV3(catalog, row.key, providers);
@@ -64,7 +64,7 @@ export function MarketPolicyRoutes({
               return (
                 <div
                   key={row.id}
-                  className="grid gap-4 p-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
+                  className="grid gap-4 py-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
                 >
                   <div className="flex flex-col gap-1 self-center">
                     <strong className="block text-sm font-medium">

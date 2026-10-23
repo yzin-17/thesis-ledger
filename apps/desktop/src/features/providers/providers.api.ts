@@ -4,6 +4,7 @@ import {
   normalizeAutomationHistory,
   normalizeProviderHealthHistory,
   PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
+  sortProviderRecords,
 } from './providers.types.js';
 import type {
   AutomationJob,
@@ -31,7 +32,10 @@ export const fetchProviders = async (client?: DesktopRequestClient) => {
     fetchConfiguredProviders(client),
     fetchAiProviders(client),
   ]);
-  return [...configured.filter((provider) => provider.type !== 'ai'), ...aiProviders];
+  return sortProviderRecords([
+    ...configured.filter((provider) => provider.type !== 'ai'),
+    ...aiProviders,
+  ]);
 };
 
 export const fetchProviderIssues = (client?: DesktopRequestClient) =>

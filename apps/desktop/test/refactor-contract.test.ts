@@ -180,14 +180,12 @@ describe('拆分后的领域请求契约', () => {
   });
 
   it('Portfolio 标的搜索保留 TanStack Query 的 AbortSignal', async () => {
-    const { client, request } = makeClient([]);
+    const searchInstruments = vi.fn().mockResolvedValue([]);
+    const client = { market: { searchInstruments } } as unknown as Parameters<typeof searchPortfolioInstruments>[1];
     const controller = new AbortController();
     await searchPortfolioInstruments('600519', client, controller.signal);
 
-    expect(request).toHaveBeenCalledWith(
-      '/api/market-data/instruments/search?q=600519',
-      expect.objectContaining({ signal: controller.signal }),
-    );
+    expect(searchInstruments).toHaveBeenCalledWith({ q: '600519' }, controller.signal);
   });
 
   it('Portfolio valuation 使用可注入请求并隔离 mode/account 参数', async () => {
@@ -255,15 +253,16 @@ describe('拆分后的领域请求契约', () => {
   });
 
   it('截图上传通过领域 Mutation API 保留 multipart body', async () => {
-    const draft = {};
-    const { client, request } = makeClient(draft);
+    const uploadScreenshot = vi.fn().mockResolvedValue({});
+    const client = { imports: { uploadScreenshot } } as unknown as Parameters<typeof uploadScreenshotImport>[1];
     const file = new File(['fixture'], 'fixture.png', { type: 'image/png' });
     await uploadScreenshotImport({ file, accountId: 'account-1', source: 'unknown' }, client);
 
-    const init = request.mock.calls[0]?.[1];
-    expect(request.mock.calls[0]?.[0]).toBe('/imports/screenshot');
-    expect(init?.method).toBe('POST');
-    expect(init?.body).toBeInstanceOf(FormData);
+    const body = uploadScreenshot.mock.calls[0]?.[0] as FormData;
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('file')).toBe(file);
+    expect(body.get('source')).toBe('unknown');
+    expect(uploadScreenshot.mock.calls[0]?.[1]).toBe('account-1');
   });
 });
 

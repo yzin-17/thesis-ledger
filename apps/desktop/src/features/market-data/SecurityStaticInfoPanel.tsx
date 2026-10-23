@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { securityStaticSymbolSchema, type SecurityStaticAssetType } from '@thesis-ledger/schemas';
+import { securityStaticSymbolSchema, type SecurityStaticAssetType, type SecurityStaticInfoResponse } from '@thesis-ledger/schemas';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectI
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { fetchSecurityStaticInfo } from './security-static-info.api.js';
+import { SecurityStaticPriceDialog } from './SecurityStaticPriceDialog.js';
 
 const assetChoices = [{ value: 'STOCK', label: '股票' }, { value: 'ETF', label: 'ETF' }];
 type StaticQuery = { symbol: string; assetType: SecurityStaticAssetType };
@@ -18,6 +19,7 @@ export function SecurityStaticInfoPanel() {
   const [assetType, setAssetType] = useState<SecurityStaticAssetType>('STOCK');
   const [submitted, setSubmitted] = useState<StaticQuery | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [priceSubject, setPriceSubject] = useState<SecurityStaticInfoResponse | null>(null);
   const query = useQuery({
     queryKey: ['market-data', 'security-static-info', submitted?.symbol, submitted?.assetType],
     queryFn: ({ signal }) => {
@@ -93,6 +95,9 @@ export function SecurityStaticInfoPanel() {
       {data?.listingDate && <p className="text-sm text-muted-foreground">
         上市日期来自供应商已废弃字段，仅供参考。
       </p>}
+      {data && <Button variant="outline" onClick={() => setPriceSubject(data)}>查看行情</Button>}
+      {priceSubject && <SecurityStaticPriceDialog key={`${priceSubject.symbol}:${priceSubject.assetType}`}
+        info={priceSubject} onClose={() => setPriceSubject(null)} />}
     </CardContent>
   </Card>;
 }

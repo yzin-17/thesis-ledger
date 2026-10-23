@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,21 +45,32 @@ export function PortfolioTradeView({
   const [symbol, setSymbol] = useState('');
   const [lifecycle, setLifecycle] = useState<PortfolioTradeLifecycle>('ALL');
   const [selectedTrade, setSelectedTrade] = useState<TradeSummaryResponse | null>(null);
+  const selectedAccount = accounts.find(
+    (account) => account.id === accountId && account.mode === mode,
+  );
+  const effectiveAccountId = selectedAccount?.id ?? '';
+  const effectiveSelectedTrade = selectedTrade?.accountMode === mode ? selectedTrade : null;
+  useEffect(() => {
+    if (accountId && !effectiveAccountId) setAccountId('');
+  }, [accountId, effectiveAccountId]);
+  useEffect(() => {
+    if (selectedTrade && !effectiveSelectedTrade) setSelectedTrade(null);
+  }, [effectiveSelectedTrade, selectedTrade]);
+
   const query = usePortfolioTradesQuery({
     mode,
-    ...(accountId ? { accountId } : {}),
+    ...(effectiveAccountId ? { accountId: effectiveAccountId } : {}),
     symbol,
     lifecycle,
   });
   const trades = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
-  const selectedAccount = accounts.find((account) => account.id === accountId);
   const activeCount = trades.filter((trade) => trade.lifecycle === 'ACTIVE').length;
   const endedCount = trades.length - activeCount;
   const reviewCount = trades.filter(
     (trade) =>
       trade.excludedReasons.length > 0 || trade.issues.length > 0 || trade.costIssues.length > 0,
   ).length;
-  const hasFilters = Boolean(accountId || symbol.trim() || lifecycle !== 'ALL');
+  const hasFilters = Boolean(effectiveAccountId || symbol.trim() || lifecycle !== 'ALL');
 
   const clearFilters = () => {
     setAccountId('');
@@ -108,7 +119,7 @@ export function PortfolioTradeView({
         <div className="flex flex-col gap-1 text-xs font-medium">
           账户范围
           <Select
-            value={accountId || 'all'}
+            value={effectiveAccountId || 'all'}
             onValueChange={(value) => setAccountId(value === 'all' ? '' : (value ?? ''))}
           >
             <SelectTrigger aria-label="交易账户范围" className="w-full bg-background">
@@ -271,10 +282,10 @@ export function PortfolioTradeView({
         </div>
       )}
       <PortfolioTradeDetailDialog
-        trade={selectedTrade}
+        trade={effectiveSelectedTrade}
         accounts={accounts}
         mode={mode}
-        open={Boolean(selectedTrade)}
+        open={Boolean(effectiveSelectedTrade)}
         onOpenChange={(open) => !open && setSelectedTrade(null)}
         onReview={onReview}
       />

@@ -1,8 +1,8 @@
 # 交易与成交记录系统实施任务
 
-> 归档说明（2026-10-14）：主实现完成，T14-R1/T18 等后续责任由[follow-up](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)单独拥有；Canonical E03 已接续当前信封和经济命令。原 Spec 保留，截图/导入/对账旧页面记录不是当前已开放入口的证明。
+> 归档说明（2026-10-14）：主实现完成，T14-R1/T18 等后续责任由[follow-up](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)单独拥有；Canonical E03 已接续当前信封和经济命令。原 Spec 保留，导入/对账旧页面记录不是当前已开放入口的证明。
 
-> 状态对账（2026-10-03）：主实现已完成；剩余义务由[follow-up](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)拥有，主表不重复执行 T18。Canonical E03 已完成当前信封、经济命令与目标拒绝/读取；截图导入、导入草稿和对账入口当前暂未开放，历史 Sheet 验收不表示现行入口已开放。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
+> 状态对账（2026-10-03）：主实现已完成；剩余义务由[follow-up](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)拥有，主表不重复执行 T18。Canonical E03 已完成当前信封、经济命令与目标拒绝/读取；导入草稿和对账入口当前暂未开放，历史 Sheet 验收不表示现行入口已开放。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
 
 对应 Spec：[`../specs/2026-08-26-trade-execution-ledger-system.md`](../../specs/2026-08-26-trade-execution-ledger-system.md)
 
@@ -89,7 +89,7 @@
 - [x] T6：实现 Baseline Observation Batch 与 ImportDraft（本地环境已完成）
   - 涉及范围：`FULL / PARTIAL` 观察批次、逐资产 Baseline 事件、业务观察时间、采集时间、原始文件引用与哈希、单账户 Draft Revision 和审核提交。
   - 完成条件：完整快照可表达缺失资产为 0，部分快照不影响其他资产；已提交 Draft 冻结；孤立卖出和内容冲突保留草稿；选中有效项在账户锁内原子提交。
-  - 验证方式：测试覆盖完整/部分批次、多次检查点、历史截图、草稿版本、部分审核、孤立卖出、来源行追溯和提交回滚。
+  - 验证方式：测试覆盖完整/部分批次、多次检查点、历史导入记录、草稿版本、部分审核、孤立卖出、来源行追溯和提交回滚。
   - [x] Review 修复：现有持仓与截图回滚不得继续追加 V1 `ADJUSTMENT`，所有新事实必须进入 V2 账本并推进账户 Revision。
   - [x] Review 修复：截图审核、资产确认、Draft Revision 冻结和选中账本事实必须在账户锁内保持原子提交。
   - [x] Review 修复：提交时基于账户有效事实和选中行的经济时间、数量重新校验孤立或超额 SELL，并把问题保留在 Draft。
@@ -103,7 +103,7 @@
     - 提交校验按经济时间重放账户有效 BUY、SELL、Baseline 和公司行动；新增测试覆盖已有持仓支持 SELL 以及 `BUY 1 + SELL 2` 整体阻断并回写 `ORPHAN_SELL`。
     - ImportDraft Revision 新增 `observedAt`、`capturedAt`、`timePrecision`、`sourceTimezone`；Schema 测试覆盖 `DATE` 精度，截图审核测试验证观察时间与采集时间分离传递。
     - server 类型检查与构建通过，32 个测试文件、262 个测试通过；schemas 92/92、domain 75/75 通过；定向 ESLint、Prisma Schema 校验、32 条迁移矩阵和 `git diff --check` 通过。
-    - Screenshot Import 的数量与成本价输入保持十进制字符串；Vision schema、服务端校验和现金/持仓投影均使用 Decimal，新增大数精度回归测试。
+    - 持仓数量与成本价输入保持十进制字符串；服务端校验和现金/持仓投影均使用 Decimal，新增大数精度回归测试。
     - FULL ImportDraft 提交会将缺失资产的 0 观察写回 Draft、冻结 Revision 和 `submittedRowIds`；旧账本与旧 Position 迁移对没有来源生成时间的事实保留 `UNKNOWN`，不填充 `capturedAt`。
     - 已提交 Revision 的行保持冻结；`partial` 草稿可从未提交行创建后续 Revision，后续 Revision 只保存未提交行，完成判定合并历史 `submittedRowIds`，新增回归测试覆盖冻结与续传边界。
     - 业务时间完全未知的迁移事件使用 `occurredAt: null`、`UNKNOWN` 精度和确定性排序键，不使用 Position 服务端更新时间或 `UTC` 冒充来源信息。

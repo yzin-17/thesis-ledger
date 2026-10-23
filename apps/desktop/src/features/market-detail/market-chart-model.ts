@@ -1,4 +1,5 @@
 import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
+import { chartPointKey } from './market-chart-time.js';
 
 type IndicatorPoint = MarketChartIndicator['points'][number];
 
@@ -20,14 +21,15 @@ const sameInput = (bar: MarketChartBar | undefined, point: IndicatorPoint | unde
 const provenanceCoversDate = (indicator: MarketChartIndicator, date: string) => {
   const range = indicator.inputProvenance?.inputDateRange;
   if (!range) return true;
+  if (indicator.timeframe === '1m') return Date.parse(range.start) <= Date.parse(date) && Date.parse(date) <= Date.parse(range.end);
   return range.start.slice(0, 10) <= date && date <= range.end.slice(0, 10);
 };
 
 export const buildChartPoints = (bars: MarketChartBar[], indicators: MarketChartIndicator[]): ChartPoint[] => {
-  const barByDate = new Map(bars.map((bar) => [day(bar.timestamp), bar]));
+  const barByDate = new Map(bars.map((bar) => [chartPointKey(bar.timestamp, bar.timeframe), bar]));
   const pointsByIndicator = indicators.map((indicator) => ({
     indicator,
-    points: new Map(indicator.points?.map((point) => [day(point.timestamp), point])),
+    points: new Map(indicator.points?.map((point) => [chartPointKey(point.timestamp, indicator.timeframe), point])),
   }));
   const indicatorsByName = new Map<string, typeof pointsByIndicator>();
   pointsByIndicator.forEach((entry) => {

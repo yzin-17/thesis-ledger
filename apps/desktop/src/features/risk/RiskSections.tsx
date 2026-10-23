@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import { isDataLoaded } from '../shared/display.js';
+import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { EmptyListState, EmptyTableRow } from '../shared/EmptyStates.js';
 import type { LoadState } from '../shared/types.js';
 import {
@@ -59,7 +59,7 @@ export function NotificationProviderNotice({
     return (
       <Alert className="mb-[var(--space-group)]">
         <CircleAlert aria-hidden="true" />
-        <AlertTitle>通知 Provider 状态暂不可用</AlertTitle>
+        <AlertTitle>通知提供方状态暂不可用</AlertTitle>
         <AlertDescription>风险规则仍可执行，但暂时无法确认通知投递能力。</AlertDescription>
       </Alert>
     );
@@ -67,16 +67,23 @@ export function NotificationProviderNotice({
   return (
     <Alert className="mb-[var(--space-group)]">
       <BellOff aria-hidden="true" />
-      <AlertTitle>尚未配置可用的通知 Provider</AlertTitle>
+      <AlertTitle>尚未配置可用的通知提供方</AlertTitle>
       <AlertDescription className="flex flex-col items-start gap-2">
         <span>风险规则仍会执行并保留事件，但不会发送外部通知。</span>
         <Button type="button" size="sm" variant="outline" onClick={onConfigure}>
-          配置通知 Provider
+          配置通知提供方
         </Button>
       </AlertDescription>
     </Alert>
   );
 }
+
+const riskReadEmptyLabel = (state: LoadState, subject: string) => {
+  if (state === 'loading') return `正在读取${subject}…`;
+  if (state === 'error') return `${subject}读取失败，请重新读取。`;
+  if (state === 'stale') return `${subject}更新失败，当前没有可显示记录。`;
+  return `暂无${subject}。`;
+};
 
 export function RiskEventTable({
   loadState,
@@ -86,6 +93,7 @@ export function RiskEventTable({
   title = '风险事件',
   description,
   headerAction,
+  onRetry,
 }: {
   loadState: LoadState;
   events: RiskEventRecord[];
@@ -94,11 +102,12 @@ export function RiskEventTable({
   title?: string | undefined;
   description?: string | undefined;
   headerAction?: ReactNode | undefined;
+  onRetry?: (() => void) | undefined;
 }) {
   const visibleEvents = severityFilter
     ? events.filter((event) => event.severity === severityFilter)
     : events;
-  const empty = isDataLoaded(loadState) && visibleEvents.length === 0;
+  const empty = visibleEvents.length === 0;
 
   return (
     <section className="panel mt-0 border-t-0">
@@ -109,6 +118,9 @@ export function RiskEventTable({
         </div>
         {headerAction}
       </div>
+      {(loadState === 'error' || loadState === 'stale') && (
+        <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
+      )}
       <div className="table-wrap">
         <table>
           <thead>
@@ -122,7 +134,7 @@ export function RiskEventTable({
           </thead>
           <tbody>
             {empty ? (
-              <EmptyTableRow colSpan={5} />
+              <EmptyTableRow colSpan={5} label={riskReadEmptyLabel(loadState, '风险事件')} />
             ) : (
               <RiskEventRows events={visibleEvents} limit={limit} />
             )}
@@ -177,23 +189,25 @@ export function RiskNotificationTable({
   statusFilter,
   routes,
   routingState,
+  onRetry,
 }: {
   loadState: LoadState;
   deliveries: NotificationRecord[];
   statusFilter?: string | null;
   routes: NotificationRouteRecord[];
   routingState: 'loading' | 'ready' | 'error';
+  onRetry?: (() => void) | undefined;
 }) {
   const visibleDeliveries = statusFilter
     ? deliveries.filter((delivery) => delivery.status === statusFilter)
     : deliveries;
-  const empty = isDataLoaded(loadState) && visibleDeliveries.length === 0;
-  let routingDescription = '正在确认通知 Provider…';
-  if (routingState === 'error') routingDescription = '暂时无法确认当前通知 Provider。';
+  const empty = visibleDeliveries.length === 0;
+  let routingDescription = '正在确认通知提供方…';
+  if (routingState === 'error') routingDescription = '暂时无法确认当前通知提供方。';
   else if (routes.length > 0) {
-    routingDescription = `当前按 Provider 配置投递到：${routes.map(notificationRouteLabel).join('、')}。`;
+    routingDescription = `当前按提供方配置投递到：${routes.map(notificationRouteLabel).join('、')}。`;
   } else if (routingState === 'ready') {
-    routingDescription = '当前没有可投递的通知 Provider。';
+    routingDescription = '当前没有可投递的通知提供方。';
   }
 
   return (
@@ -206,6 +220,9 @@ export function RiskNotificationTable({
             : `${routingDescription} 通知失败不会回滚已写入的风险事件。`}
         </p>
       </div>
+      {(loadState === 'error' || loadState === 'stale') && (
+        <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
+      )}
       <div className="table-wrap">
         <table>
           <thead>
@@ -219,7 +236,7 @@ export function RiskNotificationTable({
           </thead>
           <tbody>
             {empty ? (
-              <EmptyTableRow colSpan={5} />
+              <EmptyTableRow colSpan={5} label={riskReadEmptyLabel(loadState, '通知记录')} />
             ) : (
               visibleDeliveries.map((delivery) => (
                 <tr key={delivery.id}>
@@ -254,6 +271,16 @@ export function RiskNotificationTable({
   );
 }
 
+const riskAuditActionLabels: Record<string, string> = {
+  create: '创建',
+  update: '修改',
+  enable: '启用',
+  disable: '停用',
+  archive: '归档',
+  restore: '恢复',
+  test: '人工测试',
+};
+
 export function RiskAuditDialog({
   open,
   rule,
@@ -261,6 +288,7 @@ export function RiskAuditDialog({
   audit,
   pending,
   error,
+  onRetry,
   onOpenChange,
 }: {
   open: boolean;
@@ -269,6 +297,7 @@ export function RiskAuditDialog({
   audit: RiskAuditRecord[];
   pending: boolean;
   error: boolean;
+  onRetry?: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
   const auditDescription = rule
@@ -276,7 +305,18 @@ export function RiskAuditDialog({
     : '查看规则版本与操作时间。';
   let content: ReactNode = <EmptyListState />;
   if (pending) content = <p role="status">正在读取审计记录…</p>;
-  else if (error) content = <p role="alert">审计记录读取失败，请稍后重试。</p>;
+  else if (error)
+    content = (
+      <Alert variant="destructive">
+        <AlertTitle>审计记录读取失败</AlertTitle>
+        <AlertDescription>当前规则与输入保留，请重新读取。</AlertDescription>
+        {onRetry && (
+          <Button type="button" variant="outline" onClick={onRetry}>
+            重新读取审计
+          </Button>
+        )}
+      </Alert>
+    );
   else if (audit.length > 0) {
     content = (
       <div className="flex max-h-[min(60dvh,480px)] flex-col gap-3 overflow-auto">
@@ -286,8 +326,8 @@ export function RiskAuditDialog({
           return (
             <div key={item.id} className="rounded-md bg-muted/40 px-3 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  {item.action} · v{item.ruleVersion}
+                <span title={item.action}>
+                  {riskAuditActionLabels[item.action] ?? '其他操作'} · v{item.ruleVersion}
                 </span>
                 <small className="text-muted-foreground">{formatDateTime(item.createdAt)}</small>
               </div>

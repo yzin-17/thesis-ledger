@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import {
   useRetryMarketPolicyMutation,
   useSaveMarketPolicyMutation,
@@ -82,6 +84,16 @@ export function useMarketPolicyWorkflow({
     setDirty(false);
   }, []);
 
+  useNavigationGuard({
+    dirty,
+    busy: saveMutation.isPending || retryMutation.isPending,
+    discard: () => {
+      defaultsInitialized.current = true;
+      setDraft(policy ? toPolicyDraftV3(policy) : null);
+      setDirty(false);
+    },
+  });
+
   const save = async () => {
     if (!draft || !catalogComplete) return;
     setBusyAction('policy-save');
@@ -99,7 +111,7 @@ export function useMarketPolicyWorkflow({
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : '路由策略提交失败。',
+        text: requestFailureMessage(error, '路由策略提交失败，请稍后重试。'),
       });
     } finally {
       setBusyAction(null);
@@ -119,7 +131,7 @@ export function useMarketPolicyWorkflow({
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : '路由策略重试失败。',
+        text: requestFailureMessage(error, '路由策略重试失败，请稍后重试。'),
       });
     } finally {
       setBusyAction(null);

@@ -5,6 +5,7 @@ import type { Account, PortfolioChangeImpact } from './portfolio.types.js';
 import type { SaveAccountInput } from './portfolio.api.js';
 import type { PortfolioActionDependencies } from './portfolio.actions.js';
 import { formText } from '../shared/display.js';
+import { requestFailureMessage } from '@/shared/api/request-error';
 
 export const permanentAccountDeletionErrorMessage = (error: unknown) => {
   if (error instanceof ThesisLedgerApiError && error.status === 409)
@@ -26,6 +27,8 @@ export const createAccountActionHandlers = ({
   setAccountSheetOpen,
   markDirty,
   onSaved,
+  refreshManagedAccounts,
+  accountSaveErrorToastId,
   toastManager,
   confirm,
   mutations,
@@ -35,6 +38,10 @@ export const createAccountActionHandlers = ({
   const submitAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busyAction) return;
+    if (accountSaveErrorToastId?.current) {
+      toastManager.close?.(accountSaveErrorToastId.current);
+      accountSaveErrorToastId.current = null;
+    }
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const isEditing = Boolean(editingAccount);
@@ -51,26 +58,33 @@ export const createAccountActionHandlers = ({
         ...(editingAccount?.id ? { accountId: editingAccount.id } : {}),
         input,
       });
+      const savedImpact = accountChangeImpact(
+        savedAccount.mode ?? input.mode,
+        savedAccount.id ?? editingAccount?.id ?? '',
+      );
+      await Promise.resolve(onSaved(savedImpact)).catch(() => undefined);
+      await refreshManagedAccounts?.().catch(() => undefined);
       formElement.reset();
       setEditingAccount(null);
       markDirty(false);
       setAccountSheetOpen(false);
-      onSaved(accountChangeImpact(savedAccount.mode ?? input.mode, savedAccount.id ?? editingAccount?.id ?? ''));
       toastManager.add({
         title: isEditing ? '账户已更新' : '账户已创建',
         type: 'success',
         timeout: 2800,
       });
-    } catch {
-      toastManager.add({
+    } catch (error) {
+      const unavailable = !(error instanceof ThesisLedgerApiError) || error.status >= 500;
+      const errorToastId = toastManager.add({
         title: isEditing ? '账户更新失败' : '账户创建失败',
-        description: isEditing
-          ? '有 Ledger 历史时类型、模式和币种不可修改。'
-          : '请检查名称、机构和账户类型。',
+        description: unavailable
+          ? '网络或服务暂不可用，输入已保留，请稍后重试。'
+          : error.payload?.message ?? '请检查名称、机构和账户类型；有账本历史时类型、模式和币种不可修改。',
         type: 'error',
         timeout: 0,
         priority: 'high',
       });
+      if (accountSaveErrorToastId) accountSaveErrorToastId.current = errorToastId;
     } finally {
       setBusyAction(null);
     }
@@ -94,16 +108,16 @@ export const createAccountActionHandlers = ({
     try {
       await mutations.toggleAccount.mutateAsync({ accountId: account.id, active });
       markDirty(false);
-      onSaved(accountChangeImpact(account.mode, account.id));
+      await Promise.resolve(onSaved(accountChangeImpact(account.mode, account.id))).catch(() => undefined);
       toastManager.add({
         title: active ? '账户已停用' : '账户已重新启用',
         type: 'success',
         timeout: 2800,
       });
-    } catch {
+    } catch (error) {
       toastManager.add({
         title: active ? '账户停用失败' : '账户重新启用失败',
-        description: active ? '账户仍有余额，需先清空持仓和现金。' : '请稍后重试。',
+        description: requestFailureMessage(error, '请稍后重试。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -129,7 +143,7 @@ export const createAccountActionHandlers = ({
       try {
         await mutations.permanentlyDeleteAccount.mutateAsync(account.id);
         markDirty(false);
-        onSaved(accountChangeImpact(account.mode, account.id));
+        await Promise.resolve(onSaved(accountChangeImpact(account.mode, account.id))).catch(() => undefined);
         toastManager.add({
           title: '账户已永久删除',
           type: 'success',

@@ -4,7 +4,7 @@
 
 ## 范围与资源
 
-依据主 [Task §12.9](../2026-09-25-multi-source-adjustment-aware-backtest.md)，复用 [S05 门禁](2026-09-28-s05-precision-regression-gates.md) 的实际入口与摘要算法，不复用其旧 1747 项测试结果。已读取 RTK、Codex、项目/工作区 AGENTS 与既有实施指导；Context Mode 未暴露，使用 `rtk proxy`、临时完整日志及有界统计。执行前已确认 Server `test=vitest run`、`typecheck=tsc -p tsconfig.json --noEmit`、`build=nest build`，没有误调用工作区全量脚本。
+依据主 [Task §12.9](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)，复用 [S05 门禁](2026-09-28-s05-precision-regression-gates.md) 的实际入口与摘要算法，不复用其旧 1747 项测试结果。已读取 RTK、Codex、项目/工作区 AGENTS 与既有实施指导；Context Mode 未暴露，使用 `rtk proxy`、临时完整日志及有界统计。执行前已确认 Server `test=vitest run`、`typecheck=tsc -p tsconfig.json --noEmit`、`build=nest build`，没有误调用工作区全量脚本。
 
 唯一新增文档为本文；唯一构建资源为 `apps/server/dist`；验证辅助、日志与输入清单位于 `/private/tmp/cont-server-stable-*`。源码、测试、manifest、锁文件与 Schemas dist 始终只读，无源文件格式化、生产修复、暂存、提交、reset、子代理或数据库/Provider/AI/目标请求。相邻 DSA 的 worker 不影响本叶输入。Server build 仅一次；没有 Schemas 或工作区全包 build/test。
 

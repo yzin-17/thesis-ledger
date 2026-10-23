@@ -4,7 +4,7 @@
 
 ## 依据与写入边界
 
-依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 新增的 `tushare-fund-identity`、完整同代码映射、独立分红币种、原字节摘要、准入范围与精确观察截点合同，及 [Task §12.9](../2026-09-25-multi-source-adjustment-aware-backtest.md) 的 Ready 派发。接缝发现见 [前沿证据](2026-09-28-cont-m2-currency-frontier.md)。遵循已读取的 RTK、Codex、两仓 AGENTS 和 spec-driven-workflow；Context Mode 不可调用，输出均限定范围。
+依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 新增的 `tushare-fund-identity`、完整同代码映射、独立分红币种、原字节摘要、准入范围与精确观察截点合同，及 [Task §12.9](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) 的 Ready 派发。接缝发现见 [前沿证据](2026-09-28-cont-m2-currency-frontier.md)。遵循已读取的 RTK、Codex、两仓 AGENTS 和 spec-driven-workflow；Context Mode 不可调用，输出均限定范围。
 
 本次只新建 DSA `src/services/tushare_fund_identity_evidence.py`、`tests/test_tushare_fund_identity_evidence.py` 与本文。既有 RQData/存储/准入原语、主 Spec/Task/CHANGELOG/目录均未修改。脏工作区保留；无暂存、提交、子代理、Provider 请求、凭据读取、数据库或运行态变更。语法检查仅产生可重建的 Python 缓存。
 

@@ -97,9 +97,9 @@ export function JournalObjectReview({
     },
   });
   const { changedFacts, changed } = resultChanges(result, object.data, draftVersion);
-  const busy = analysis.isPending || save.isPending;
+  const busy = analysis.isPending || save.isPending || object.isError;
   if (object.isPending) return <Skeleton className="h-48 w-full" />;
-  if (object.isError)
+  if (!object.data)
     return (
       <JournalRequestError
         title="对象读取失败"
@@ -110,6 +110,13 @@ export function JournalObjectReview({
   const candidate = object.data;
   return (
     <div className="flex flex-col gap-4">
+      {object.isError && (
+        <JournalRequestError
+          title={save.isSuccess ? '快照已保存，当前对象暂未更新' : '当前对象暂未更新'}
+          error={object.error}
+          retry={() => void object.refetch()}
+        />
+      )}
       <JournalFactSummary candidate={candidate} />
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={busy} onClick={() => setOpen(true)}>

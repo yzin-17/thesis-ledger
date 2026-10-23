@@ -1,4 +1,5 @@
 import { StrategyExperimentConfigurationReview } from './StrategyExperimentConfigurationReview.js';
+import { requestFailureMessage } from '@/shared/api/request-error';
 import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
 import {
   experimentPreparationTarget,
@@ -6,27 +7,21 @@ import {
   type PreparedOptimizationConfiguration,
 } from './optimization.preparation.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useBeforeUnload, useBlocker, useNavigate, useSearchParams } from 'react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 import {
   strategySchema,
   type OptimizationExperimentCreate,
   type OptimizationReasoningEffort,
 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DateInput } from '@/components/ui/date-input';
+import { StrategyExperimentDateFields } from './StrategyExperimentDateFields.js';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { useToastManager } from '@/components/ui/toast';
 import {
   Select,
   SelectContent,
@@ -83,6 +78,8 @@ export const experimentCostPolicy = (routes: OptimizationCapabilities['providers
 type FieldErrors = Partial<Record<'source' | 'models' | 'dates' | 'budget' | 'cost', string>>;
 
 export function StrategyExperimentCreatePage({ strategies }: { strategies: StrategyRecord[] }) {
+  const queryClient = useQueryClient();
+  const toast = useToastManager();
   const navigate = useNavigate();
   const allowNavigationRef = useRef(false);
   const [searchParams] = useSearchParams();
@@ -279,25 +276,21 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
       return createOptimizationExperiment(input);
     },
     onSuccess: (experiment) => {
+      toast.add({ title: '实验已创建', description: '已收到创建确认，无需重复提交。', type: 'success' });
+      queryClient.setQueryData([...optimizationKey, 'experiment', experiment.id], {
+        experiment, candidates: [], attempts: [],
+      });
       allowNavigationRef.current = true;
       void navigate(strategyCenterPath.experiment(experiment.id), { replace: true });
     },
     onError: (error) =>
       setFieldErrors((current) => ({
         ...current,
-        budget: error instanceof Error ? error.message : '创建实验失败，请使用同一提交意图重试。',
+        budget: requestFailureMessage(error, '创建实验失败，请使用同一提交意图重试。'),
       })),
   });
-  const blocker = useBlocker(
-    () => touched && !createMutation.isPending && !allowNavigationRef.current,
-  );
-  useBeforeUnload(
-    (event) => {
-      if (!touched || createMutation.isPending || allowNavigationRef.current) return;
-      event.preventDefault();
-    },
-    { capture: true },
-  );
+  useNavigationGuard({ dirty: touched, busy: createMutation.isPending,
+    bypass: () => allowNavigationRef.current });
   const next = () => {
     if (!validateStep(step)) return;
     setStep((current) => Math.min(3, current + 1));
@@ -390,7 +383,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue>{selectedVersion ? `${selectedVersion.strategy.name} · v${selectedVersion.version.version}` : '选择明确版本'}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -535,40 +528,17 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                   <AlertDescription>{fieldErrors.cost}</AlertDescription>
                 </Alert>
               ) : null}
-              <Field invalid={Boolean(fieldErrors.dates)}>
-                <FieldLabel>连续数据区间</FieldLabel>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <DateInput
-                    type="date"
-                    aria-label="开发集开始"
-                    value={startDate}
-                    onChange={(event) => setStartDate(event.target.value)}
-                  />
-                  <DateInput
-                    type="date"
-                    aria-label="开发集结束"
-                    value={developmentEnd}
-                    onChange={(event) => setDevelopmentEnd(event.target.value)}
-                  />
-                  <DateInput
-                    type="date"
-                    aria-label="验证集结束"
-                    value={validationEnd}
-                    onChange={(event) => setValidationEnd(event.target.value)}
-                  />
-                  <DateInput
-                    type="date"
-                    aria-label="封存测试结束"
-                    value={endDate}
-                    onChange={(event) => setEndDate(event.target.value)}
-                  />
-                </div>
-                <FieldDescription>
-                  验证集从 {nextExperimentDay(developmentEnd)} 开始，封存测试从{' '}
-                  {nextExperimentDay(validationEnd)} 开始。
-                </FieldDescription>
-                {fieldErrors.dates ? <FieldError>{fieldErrors.dates}</FieldError> : null}
-              </Field>
+              <StrategyExperimentDateFields
+                values={{ startDate, developmentEnd, validationEnd, endDate }}
+                onChange={(field, value) => {
+                  const setters = { startDate: setStartDate, developmentEnd: setDevelopmentEnd,
+                    validationEnd: setValidationEnd, endDate: setEndDate };
+                  setters[field](value);
+                }}
+                validationStart={nextExperimentDay(developmentEnd)}
+                testStart={nextExperimentDay(validationEnd)}
+                error={fieldErrors.dates}
+              />
             </>
           ) : null}
           {step === 3 ? (
@@ -716,24 +686,6 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
           </div>
         </CardContent>
       </Card>
-      <AlertDialog open={blocker.state === 'blocked'}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>离开新建实验？</AlertDialogTitle>
-            <AlertDialogDescription>
-              当前三步输入尚未提交。继续离开会丢失这些内容。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button variant="outline" onClick={() => blocker.reset?.()}>
-              继续填写
-            </Button>
-            <Button variant="destructive" onClick={() => blocker.proceed?.()}>
-              放弃并离开
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

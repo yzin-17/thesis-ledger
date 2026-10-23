@@ -150,12 +150,18 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(result.payload).toMatchObject({ dataQuality: { partial: false } });
   });
   it('目标配置按版本保存并拒绝总和不为 100%', async () => {
-    const prisma = {
+    const transaction = {
+      $executeRaw: vi.fn(async () => 0),
       targetAllocation: {
         updateMany: vi.fn(async () => ({})),
         findFirst: vi.fn(async () => ({ version: 2 })),
         create: vi.fn(async ({ data }: { data: object }) => ({ id: 'target', ...data })),
       },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
     };
     const service = new PerformanceService(prisma as never, {} as never);
     await expect(service.saveTargets('portfolio', { 股票: 0.6, ETF: 0.4 })).resolves.toMatchObject({

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
-import { readLastAccount } from './account-data.helpers.js';
 import {
   accountSelectionTransition,
   resolveAccountSelection,
@@ -9,9 +8,11 @@ import {
 } from './account-data.selection.js';
 import type { Account } from '../portfolio/portfolio.types.js';
 import type { AccountDataTab } from './account-data.types.js';
+import { useGuardedTransition } from '../shared/navigation-guard.js';
 
 type AccountDataNavigationOptions = {
   accounts: Account[];
+  mode: Account['mode'];
   accountsReady: boolean;
   accountsPending: boolean;
   accountsError: boolean;
@@ -22,8 +23,41 @@ type AccountDataNavigationOptions = {
   resetTabContext: () => void;
 };
 
+const lastAccountStorageKey = (mode: Account['mode']) => `thesis-ledger-last-account:${mode}`;
+
+const readModeLastAccount = (mode: Account['mode']) => {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem(lastAccountStorageKey(mode)) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+const writeModeLastAccount = (mode: Account['mode'], accountId: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(lastAccountStorageKey(mode), accountId);
+  } catch {
+    /* sessionStorage is optional */
+  }
+};
+
+const clearModeLastAccount = (mode: Account['mode']) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(lastAccountStorageKey(mode));
+  } catch {
+    /* sessionStorage is optional */
+  }
+};
+
+const selectionExistsInScope = (accountId: string, accounts: Account[]) =>
+  accountId === 'all' || accounts.some((account) => account.id === accountId);
+
 export function useAccountDataNavigation({
   accounts,
+  mode,
   accountsReady,
   accountsPending,
   accountsError,
@@ -35,6 +69,14 @@ export function useAccountDataNavigation({
 }: AccountDataNavigationOptions) {
   const location = useLocation();
   const navigate = useNavigate();
+  const guard = useGuardedTransition();
+  const request = guard?.request;
+  const transition = useCallback(async (commit: () => void) => {
+    if (request) return request(commit, { title: '放弃未保存的修改？', description: '切换账户或页签后，本次修改将丢失。', confirmLabel: '放弃修改' });
+    if (!(await confirmDiscard())) return false;
+    commit();
+    return true;
+  }, [request, confirmDiscard]);
   const params = new URLSearchParams(location.search);
   const requestedAccountId = params.get('accountId') ?? '';
   const entryRequested = params.get('entry');
@@ -43,24 +85,42 @@ export function useAccountDataNavigation({
     requestedTab === 'positions' || requestedTab === 'cash' || requestedTab === 'transactions'
       ? requestedTab
       : 'transactions';
-  const [accountId, setAccountId] = useState(
-    () => requestedAccountId || readLastAccount() || accounts[0]?.id || '',
-  );
+  const [accountId, setAccountId] = useState(() => {
+    const requestedSelection = selectionExistsInScope(requestedAccountId, accounts)
+      ? requestedAccountId
+      : readModeLastAccount(mode);
+    return resolveAccountSelection({
+      accounts,
+      accountId: '',
+      requestedAccountId: requestedSelection,
+    });
+  });
   const [tab, setTab] = useState<AccountDataTab>(initialTab);
   const [accountManagerOpen, setAccountManagerOpen] = useState(params.get('setup') === '1');
-  const selectedAccount = accounts.find((account) => account.id === accountId);
-  const allAccountsSelected = accountId === 'all';
+  const requestedSelection = selectionExistsInScope(requestedAccountId, accounts)
+    ? requestedAccountId
+    : '';
+  const stateSelection = selectionExistsInScope(accountId, accounts) ? accountId : '';
+  const rememberedSelection = readModeLastAccount(mode);
+  const preferredSelection = requestedSelection || stateSelection || rememberedSelection;
+  const effectiveAccountId = resolveAccountSelection({
+    accounts,
+    accountId: '',
+    requestedAccountId: preferredSelection,
+  });
+  const selectedAccount = accounts.find((account) => account.id === effectiveAccountId);
+  const allAccountsSelected = effectiveAccountId === 'all';
   const isCashAccount = selectedAccount?.type === 'cash';
 
   const updateLocation = useCallback(
-    (updates: Record<string, string | null>) => {
+    (updates: Record<string, string | null>, replace = false) => {
       const next = new URLSearchParams(location.search);
       for (const [key, value] of Object.entries(updates)) {
         if (value === null) next.delete(key);
         else next.set(key, value);
       }
       const search = next.toString();
-      void navigate({ pathname: '/accounts', ...(search ? { search: `?${search}` } : {}) });
+      void navigate({ pathname: '/accounts', search: search ? `?${search}` : '' }, { replace });
     },
     [location.search, navigate],
   );
@@ -70,30 +130,22 @@ export function useAccountDataNavigation({
     // loading (or failed). Preserve deep links and the last selection until a
     // successful, settled response proves that the directory is truly empty.
     if (shouldDeferAccountSelection({ accountsReady, accountsPending, accountsError })) return;
-    const nextAccountId = resolveAccountSelection({ accounts, accountId, requestedAccountId });
-    if (nextAccountId === accountId && requestedAccountId === accountId && accounts.length > 0)
-      return;
+    const nextAccountId = effectiveAccountId;
     if (accounts.length === 0) {
       setAccountId('');
       clearDraft();
       resetEmptyState();
       setAccountManagerOpen(false);
-      try {
-        window.sessionStorage.removeItem('thesis-ledger-last-account');
-      } catch {
-        /* sessionStorage is optional */
-      }
-      updateLocation({ accountId: null, entry: null, tab: null, setup: null });
+      clearModeLastAccount(mode);
+      if (requestedAccountId || requestedTab || entryRequested || params.has('setup'))
+        updateLocation({ accountId: null, entry: null, tab: null, setup: null }, true);
       return;
     }
+    writeModeLastAccount(mode, nextAccountId);
+    if (nextAccountId === accountId && requestedAccountId === nextAccountId) return;
     setAccountId(nextAccountId);
-    try {
-      window.sessionStorage.setItem('thesis-ledger-last-account', nextAccountId);
-    } catch {
-      /* sessionStorage is optional */
-    }
     if (requestedAccountId !== nextAccountId) {
-      updateLocation({ accountId: nextAccountId, entry: null });
+      updateLocation({ accountId: nextAccountId, entry: null }, true);
     }
   }, [
     accountId,
@@ -102,6 +154,8 @@ export function useAccountDataNavigation({
     accountsPending,
     accountsReady,
     clearDraft,
+    effectiveAccountId,
+    mode,
     requestedAccountId,
     resetEmptyState,
     updateLocation,
@@ -114,21 +168,22 @@ export function useAccountDataNavigation({
       closeAccountManager = false,
     ) => {
       if (!nextAccountId) return true;
-      const sameAccount = nextAccountId === accountId && requestedAccountId === nextAccountId;
-      if (sameAccount && !closeAccountManager)
-        return true;
-      if (!(await confirmDiscard())) return false;
-      clearDraft();
-      if (!sameAccount) resetAccountContext();
-      if (closeAccountManager) setAccountManagerOpen(false);
-      const transition = accountSelectionTransition(nextAccountId, extraLocationUpdates);
-      updateLocation(transition.locationUpdates);
-      return true;
+      const sameAccount =
+        nextAccountId === effectiveAccountId && requestedAccountId === nextAccountId;
+      if (sameAccount && !closeAccountManager) return true;
+      return transition(() => {
+        clearDraft();
+        if (!sameAccount) resetAccountContext();
+        if (closeAccountManager) setAccountManagerOpen(false);
+        const selection = accountSelectionTransition(nextAccountId, extraLocationUpdates);
+        updateLocation(selection.locationUpdates);
+      });
     },
     [
       accountId,
       clearDraft,
-      confirmDiscard,
+      transition,
+      effectiveAccountId,
       requestedAccountId,
       resetAccountContext,
       updateLocation,
@@ -136,16 +191,13 @@ export function useAccountDataNavigation({
   );
 
   const selectAccount = useCallback(
-    (
-      nextAccountId: string,
-      extraLocationUpdates: Record<string, string | null> = {},
-    ) => transitionToAccount(nextAccountId, extraLocationUpdates),
+    (nextAccountId: string, extraLocationUpdates: Record<string, string | null> = {}) =>
+      transitionToAccount(nextAccountId, extraLocationUpdates),
     [transitionToAccount],
   );
 
   const selectManagedAccount = useCallback(
-    (nextAccountId: string) =>
-      transitionToAccount(nextAccountId, { setup: null }, true),
+    (nextAccountId: string) => transitionToAccount(nextAccountId, { setup: null }, true),
     [transitionToAccount],
   );
 
@@ -153,20 +205,12 @@ export function useAccountDataNavigation({
     async (nextTab: AccountDataTab) => {
       if (isCashAccount && nextTab !== 'cash') return;
       if (nextTab === tab) return;
-      if (!(await confirmDiscard())) return;
-      clearDraft();
-      resetTabContext();
-      setTab(nextTab);
-      updateLocation({ tab: nextTab, entry: null });
+      await transition(() => {
+        clearDraft(); resetTabContext(); setTab(nextTab);
+        updateLocation({ tab: nextTab, entry: null });
+      });
     },
-    [
-      clearDraft,
-      confirmDiscard,
-      isCashAccount,
-      resetTabContext,
-      tab,
-      updateLocation,
-    ],
+    [clearDraft, transition, isCashAccount, resetTabContext, tab, updateLocation],
   );
 
   const handleAccountManagerOpenChange = useCallback(
@@ -175,12 +219,11 @@ export function useAccountDataNavigation({
         setAccountManagerOpen(true);
         return;
       }
-      if (!(await confirmDiscard())) return;
-      clearDraft();
-      setAccountManagerOpen(false);
-      updateLocation({ setup: null });
+      await transition(() => {
+        clearDraft(); setAccountManagerOpen(false); updateLocation({ setup: null });
+      });
     },
-    [clearDraft, confirmDiscard, updateLocation],
+    [clearDraft, transition, updateLocation],
   );
 
   const openAccountManager = useCallback(() => {
@@ -196,7 +239,7 @@ export function useAccountDataNavigation({
   );
 
   return {
-    accountId,
+    accountId: effectiveAccountId,
     accountManagerOpen,
     allAccountsSelected,
     entryRequested,

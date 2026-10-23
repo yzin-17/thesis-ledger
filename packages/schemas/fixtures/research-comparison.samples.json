@@ -1,0 +1,474 @@
+{
+  "version": "research-comparison-v1",
+  "selection": "explicit",
+  "status": "compared",
+  "current": {
+    "id": "00000000-0000-4000-8000-000000000099",
+    "status": "succeeded",
+    "question": "现有材料是否支持继续观察？",
+    "createdAt": "2026-10-18T08:02:00.000Z",
+    "updatedAt": "2026-10-18T08:03:00.000Z",
+    "historicalScope": {
+      "status": "known",
+      "snapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      }
+    },
+    "resultVersion": 2,
+    "availability": "available",
+    "summary": "受控比较后的研究文字。",
+    "quality": {
+      "status": "complete",
+      "reasons": []
+    },
+    "errorCode": null,
+    "errorSummary": null
+  },
+  "previous": {
+    "id": "00000000-0000-4000-8000-000000000098",
+    "status": "succeeded",
+    "question": "现有材料是否支持继续观察？",
+    "createdAt": "2026-10-18T08:02:00.000Z",
+    "updatedAt": "2026-10-18T08:03:00.000Z",
+    "historicalScope": {
+      "status": "known",
+      "snapshot": {
+        "version": "research-scope-v2",
+        "mode": "shadow",
+        "confirmedAt": "2026-10-18T07:59:00Z",
+        "scope": "instrument",
+        "instrument": {
+          "market": "CN",
+          "assetType": "STOCK",
+          "symbol": "600519.SH",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "currency": "CNY",
+          "catalogGeneration": 1
+        }
+      }
+    },
+    "resultVersion": 2,
+    "availability": "available",
+    "summary": "材料有限，继续观察。",
+    "quality": {
+      "status": "complete",
+      "reasons": []
+    },
+    "errorCode": null,
+    "errorSummary": null
+  },
+  "frozenFingerprints": {
+    "before": "99c13ec17a47417fafba9620223a3498fdfbd31b289ae7a93eff3f8f0ec58576",
+    "after": "1dbd4a5badc546c27f7e2ebb0890f499888420d582469cece355874d893874e9"
+  },
+  "issues": [],
+  "groups": [
+    {
+      "key": "opinion",
+      "label": "观点字段",
+      "status": "changed",
+      "fields": [
+        {
+          "key": "conclusion",
+          "label": "结论",
+          "status": "text_changed",
+          "before": "材料有限，继续观察。",
+          "after": "受控比较后的研究文字。"
+        },
+        {
+          "key": "rationale",
+          "label": "理由",
+          "status": "unchanged",
+          "before": ["合成报价只支持当前数值核对。"],
+          "after": ["合成报价只支持当前数值核对。"]
+        },
+        {
+          "key": "claims",
+          "label": "观点断言的文字与字段",
+          "status": "unchanged",
+          "before": [
+            {
+              "description": "观察价格方向",
+              "kind": "price-direction",
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "direction": "up",
+              "tradingDays": 5,
+              "rationale": "这是待验证推断。"
+            }
+          ],
+          "after": [
+            {
+              "description": "观察价格方向",
+              "kind": "price-direction",
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "direction": "up",
+              "tradingDays": 5,
+              "rationale": "这是待验证推断。"
+            }
+          ]
+        },
+        {
+          "key": "numericClaims",
+          "label": "数值断言",
+          "status": "unchanged",
+          "before": [
+            {
+              "description": "受控报价",
+              "kind": "field",
+              "source": {
+                "fieldPath": "/price",
+                "unit": "price",
+                "currency": "CNY",
+                "value": 100
+              }
+            },
+            {
+              "description": "相同操作数对照",
+              "kind": "derived",
+              "operation": "percentage_change",
+              "operands": [
+                {
+                  "fieldPath": "/price",
+                  "unit": "price",
+                  "currency": "CNY",
+                  "value": 100
+                },
+                {
+                  "fieldPath": "/price",
+                  "unit": "price",
+                  "currency": "CNY",
+                  "value": 100
+                }
+              ],
+              "value": 0,
+              "unit": "ratio",
+              "currency": null,
+              "assumptions": []
+            }
+          ],
+          "after": [
+            {
+              "description": "受控报价",
+              "kind": "field",
+              "source": {
+                "fieldPath": "/price",
+                "unit": "price",
+                "currency": "CNY",
+                "value": 100
+              }
+            },
+            {
+              "description": "相同操作数对照",
+              "kind": "derived",
+              "operation": "percentage_change",
+              "operands": [
+                {
+                  "fieldPath": "/price",
+                  "unit": "price",
+                  "currency": "CNY",
+                  "value": 100
+                },
+                {
+                  "fieldPath": "/price",
+                  "unit": "price",
+                  "currency": "CNY",
+                  "value": 100
+                }
+              ],
+              "value": 0,
+              "unit": "ratio",
+              "currency": null,
+              "assumptions": []
+            }
+          ]
+        },
+        {
+          "key": "confidence",
+          "label": "置信度与依据",
+          "status": "unchanged",
+          "before": {
+            "level": "unassessed",
+            "basis": ["没有真实来源和模型执行。"]
+          },
+          "after": {
+            "level": "unassessed",
+            "basis": ["没有真实来源和模型执行。"]
+          }
+        },
+        {
+          "key": "risks",
+          "label": "风险",
+          "status": "unchanged",
+          "before": ["样例不能代表真实走势。"],
+          "after": ["样例不能代表真实走势。"]
+        },
+        {
+          "key": "unknowns",
+          "label": "未知项",
+          "status": "unchanged",
+          "before": ["未来价格未知。"],
+          "after": ["未来价格未知。"]
+        },
+        {
+          "key": "nextSteps",
+          "label": "下一步",
+          "status": "unchanged",
+          "before": [
+            {
+              "action": "view_evidence",
+              "description": "查看资料"
+            },
+            {
+              "action": "review_due",
+              "description": "到期复核"
+            }
+          ],
+          "after": [
+            {
+              "action": "view_evidence",
+              "description": "查看资料"
+            },
+            {
+              "action": "review_due",
+              "description": "到期复核"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "evidence",
+      "label": "引用证据",
+      "status": "changed",
+      "fields": [
+        {
+          "key": "fingerprints",
+          "label": "引用证据指纹",
+          "status": "value_changed",
+          "before": ["059f5a27684642ec9438e86b99facaff22cbb3b5be7feb7e39ecebc74e2c669b"],
+          "after": ["6afa09748b017c83ec8333e0454f6b7c37bfa5907a2ae62508f2f8dbdf6e166e"]
+        }
+      ]
+    },
+    {
+      "key": "conditions",
+      "label": "失效条件与期限",
+      "status": "unchanged",
+      "fields": [
+        {
+          "key": "invalidationConditions",
+          "label": "失效条件",
+          "status": "unchanged",
+          "before": [
+            {
+              "description": "跌破合成阈值则复核",
+              "kind": "price-threshold",
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "operator": "lt",
+              "value": 90,
+              "unit": "price",
+              "currency": "CNY",
+              "tradingDays": 5
+            }
+          ],
+          "after": [
+            {
+              "description": "跌破合成阈值则复核",
+              "kind": "price-threshold",
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "operator": "lt",
+              "value": 90,
+              "unit": "price",
+              "currency": "CNY",
+              "tradingDays": 5
+            }
+          ]
+        },
+        {
+          "key": "tradingDays",
+          "label": "断言观察期限",
+          "status": "unchanged",
+          "before": [
+            {
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "tradingDays": 5
+            }
+          ],
+          "after": [
+            {
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "tradingDays": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "inputs",
+      "label": "输入质量与路由",
+      "status": "changed",
+      "fields": [
+        {
+          "key": "dataFingerprint",
+          "label": "冻结数据资料版本",
+          "status": "value_changed",
+          "before": "0f78e2c086e67fdc37c66f974b76486a94740b119ec242ef24158501bb984035",
+          "after": "06878f750f5f2d39d24fd3e16fcda6b2af5b3f2962f48ddc4e846ba50b4ea93f"
+        },
+        {
+          "key": "dataCutoffAt",
+          "label": "数据截止时间",
+          "status": "unchanged",
+          "before": "2026-10-18T08:00:30Z",
+          "after": "2026-10-18T08:00:30Z"
+        },
+        {
+          "key": "quality",
+          "label": "输入质量",
+          "status": "unchanged",
+          "before": {
+            "status": "complete",
+            "reasons": []
+          },
+          "after": {
+            "status": "complete",
+            "reasons": []
+          }
+        },
+        {
+          "key": "routes",
+          "label": "来源、合同与路由修订",
+          "status": "value_changed",
+          "before": [
+            {
+              "kind": "quote",
+              "providerId": "controlled-data",
+              "sourceIds": ["600519.SH"],
+              "contractVersion": "controlled-quote-v3",
+              "policyRevision": "policy-1",
+              "routeRevision": "route-1",
+              "credentialRevision": null
+            }
+          ],
+          "after": [
+            {
+              "kind": "quote",
+              "providerId": "controlled-data",
+              "sourceIds": ["600519.SH"],
+              "contractVersion": "controlled-quote-v3",
+              "policyRevision": "policy-1",
+              "routeRevision": "controlled-comparison-route-2",
+              "credentialRevision": null
+            }
+          ]
+        },
+        {
+          "key": "scopeSnapshot",
+          "label": "研究范围资料",
+          "status": "unchanged",
+          "before": {
+            "version": "research-scope-v2",
+            "mode": "shadow",
+            "scope": "instrument",
+            "instrument": {
+              "market": "CN",
+              "assetType": "STOCK",
+              "symbol": "600519.SH",
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "currency": "CNY",
+              "catalogGeneration": 1
+            }
+          },
+          "after": {
+            "version": "research-scope-v2",
+            "mode": "shadow",
+            "scope": "instrument",
+            "instrument": {
+              "market": "CN",
+              "assetType": "STOCK",
+              "symbol": "600519.SH",
+              "instrumentId": "00000000-0000-4000-8000-000000000001",
+              "currency": "CNY",
+              "catalogGeneration": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "model",
+      "label": "Prompt 与模型",
+      "status": "unchanged",
+      "fields": [
+        {
+          "key": "promptVersion",
+          "label": "Prompt 版本",
+          "status": "unchanged",
+          "before": "research-v2",
+          "after": "research-v2"
+        },
+        {
+          "key": "promptFingerprint",
+          "label": "Prompt 指纹",
+          "status": "unchanged",
+          "before": "220ba7ca0b8878de1aae3e6c565a70e946f6dba41522e5eae64f3ae2e5b2c511",
+          "after": "220ba7ca0b8878de1aae3e6c565a70e946f6dba41522e5eae64f3ae2e5b2c511"
+        },
+        {
+          "key": "model",
+          "label": "模型与研究设置修订",
+          "status": "unchanged",
+          "before": {
+            "providerId": "controlled-model",
+            "modelId": "contract-fixture",
+            "researchSettingsRevision": "controlled-settings-1"
+          },
+          "after": {
+            "providerId": "controlled-model",
+            "modelId": "contract-fixture",
+            "researchSettingsRevision": "controlled-settings-1"
+          }
+        }
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "fingerprint": "059f5a27684642ec9438e86b99facaff22cbb3b5be7feb7e39ecebc74e2c669b",
+      "kind": "quote",
+      "status": "removed",
+      "before": [
+        {
+          "evidenceId": "648ccae1-bb2a-43b4-b98b-7c1d8f303092",
+          "providerId": "controlled-data",
+          "sourceIds": ["600519.SH"]
+        }
+      ],
+      "after": []
+    },
+    {
+      "fingerprint": "6afa09748b017c83ec8333e0454f6b7c37bfa5907a2ae62508f2f8dbdf6e166e",
+      "kind": "quote",
+      "status": "added",
+      "before": [],
+      "after": [
+        {
+          "evidenceId": "0e6b3352-9861-4597-b5c4-f90365dc3f10",
+          "providerId": "controlled-data",
+          "sourceIds": ["600519.SH"]
+        }
+      ]
+    }
+  ]
+}

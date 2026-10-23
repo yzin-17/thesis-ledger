@@ -10,6 +10,7 @@ import {
 import { marketTimeframeSchema, type MarketTimeframe } from './market-period.js';
 import { priceAdjustmentSchema } from './market-price-protocol.js';
 import { marketQuoteSymbolSchema } from './market-quote-identity.js';
+import { fundDisclosureEvidenceSchema } from './fund-disclosure-evidence.js';
 
 const isoDate = z.iso.datetime({ offset: true });
 const isoCalendarDate = z.iso.date();
@@ -140,6 +141,7 @@ export const fundHoldingsSchema = z
     fundSymbol: z.string().regex(/^\d{6}\.OF$/),
     reportPeriod: z.string().regex(/^\d{4}-Q[1-4]$/),
     disclosureDate: isoDate.nullable(),
+    disclosureEvidence: fundDisclosureEvidenceSchema.optional(),
     provider: z.string().min(1),
     fetchedAt: isoDate,
     evidenceVersion: z.string().min(1),
@@ -167,6 +169,27 @@ export const fundHoldingsSchema = z
       }
       symbols.add(holding.symbol);
     });
+    const proof = value.disclosureEvidence;
+    if (proof) {
+      if (proof.fundSymbol !== value.fundSymbol || proof.reportPeriod !== value.reportPeriod)
+        context.addIssue({
+          code: 'custom',
+          path: ['disclosureEvidence'],
+          message: '披露证据与基金或报告期不匹配',
+        });
+      if (
+        proof.status === 'matched' &&
+        (value.disclosureDate !== null ||
+          proof.holdingsDigest !== value.evidenceVersion ||
+          proof.matchedCount !== value.holdings.length ||
+          Date.parse(proof.referenceObservedAt) > Date.parse(value.fetchedAt))
+      )
+        context.addIssue({
+          code: 'custom',
+          path: ['disclosureEvidence'],
+          message: '披露证据未绑定本次观察或覆盖精确时间',
+        });
+    }
   })
   .transform((value) => {
     if (value.disclosureDate && Date.parse(value.disclosureDate) === Date.parse(value.fetchedAt)) {
@@ -186,6 +209,7 @@ export const providerManifestSchema = z.object({
   credentialConfigured: z.boolean(),
   requiresCredential: z.boolean().optional(),
   accountAccessSupported: z.boolean().optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
   origin: z.enum(['dsa']).optional(),
   markets: z.array(z.string().min(1)).optional(),
   configurationMode: z.enum(['control', 'built_in', 'dsa_environment']).optional(),

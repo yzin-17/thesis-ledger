@@ -1,6 +1,6 @@
 # C03 合同收敛执行与验收记录
 
-所属：[Canonical Task](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md) C03；依据：[Canonical Spec](../../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) §3。用户于本轮要求完成整个 C03，执行范围扩展至全部合同收敛叶及主 Task 状态同步。
+所属：[Canonical Task](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) C03；依据：[Canonical Spec](../../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) §3。用户于本轮要求完成整个 C03，执行范围扩展至全部合同收敛叶及主 Task 状态同步。
 
 ## 执行边界
 

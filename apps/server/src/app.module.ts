@@ -17,6 +17,7 @@ import { QualityModule } from './quality/quality.module.js';
 import { RiskModule } from './risk/risk.module.js';
 import { StrategyOptimizationModule } from './strategy-optimization/strategy-optimization.module.js';
 import { AuthoringExecutionModule } from './strategy-authoring/authoring-execution.module.js';
+import { ResearchModule } from './research/research.module.js';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AuthoringExecutionModule } from './strategy-authoring/authoring-executi
     AutomationModule,
     StrategyOptimizationModule,
     AuthoringExecutionModule,
+    ResearchModule,
   ],
 })
 export class AppModule {}

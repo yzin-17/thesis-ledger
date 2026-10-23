@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import type { LedgerCommandResponse, LedgerEvent } from '@thesis-ledger/api-client';
 import { LedgerContractFailure, ledgerContractRejected } from './account-data.ledger-contract.js';
 import { useToastManager } from '@/components/ui/toast';
@@ -26,8 +27,10 @@ import {
   createClientCommandId,
   errorCode,
   errorMessage,
+  eventSymbol,
   eventTypeLabel,
   formatDate,
+  instrumentNameLookup,
   isExecutionEvent,
   isVoidEvent,
   revisionBadgeVariant,
@@ -101,7 +104,10 @@ export function AuditSheet({
         {query.isError && query.data && !ledgerContractRejected(query.error) && (
           <Alert>
             <AlertTitle>审计链可能陈旧</AlertTitle>
-            <AlertDescription>当前显示上次成功读取的审计结果。</AlertDescription>
+            <AlertDescription>当前显示上次成功结果。已成功提交的修正无需再次提交，请重新读取。</AlertDescription>
+            <Button type="button" size="sm" variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
+              重新读取修正链
+            </Button>
           </Alert>
         )}
       </SheetContent>
@@ -132,6 +138,7 @@ function AuditResults({
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
   onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
 }) {
+  const resolveInstrumentName = instrumentNameLookup(query.data?.instrumentDirectory);
   if (query.isError && ledgerContractRejected(query.error))
     return <LedgerContractFailure onRetry={query.refetch} />;
   if (query.isPending && !query.data) {
@@ -169,6 +176,8 @@ function AuditResults({
         const source = event.supersedesEventId
           ? chain.find((candidate) => candidate.eventId === event.supersedesEventId)
           : undefined;
+        const symbol = eventSymbol(event) ?? (source ? eventSymbol(source) : null);
+        const name = symbol ? resolveInstrumentName(symbol) : undefined;
         return (
           <div
             key={event.eventId}
@@ -179,9 +188,19 @@ function AuditResults({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="text-sm font-medium">{eventTypeLabel(event)}</strong>
-                  <Badge variant={revisionBadgeVariant(event)}>{revisionLabel(event)}</Badge>
+                  {event.revisionAction !== 'VOID' && (
+                    <Badge variant={revisionBadgeVariant(event)}>
+                      {event.revisionAction === 'CREATE' ? '原始录入' : revisionLabel(event)}
+                    </Badge>
+                  )}
                   {event.revisionAction === 'VOID' && <Badge variant="destructive">已作废</Badge>}
                 </div>
+                {symbol && (
+                  <p className="m-0 mt-2 text-sm">
+                    {name && `${name} · `}
+                    {symbol}
+                  </p>
+                )}
                 <p className="m-0 mt-2 text-xs text-muted-foreground">
                   {formatDate(event.occurredAt)} · {sourceChannelLabel(event.source.channel)}
                 </p>
@@ -199,6 +218,7 @@ function AuditResults({
                       type="button"
                       size="sm"
                       variant="outline"
+                      disabled={query.isError}
                       onClick={() => onCorrect(event)}
                     >
                       更正
@@ -207,6 +227,7 @@ function AuditResults({
                       type="button"
                       size="sm"
                       variant="destructive"
+                      disabled={query.isError}
                       onClick={() => onVoid(event)}
                     >
                       作废
@@ -222,6 +243,7 @@ function AuditResults({
                         type="button"
                         size="sm"
                         variant="outline"
+                        disabled={query.isError}
                         onClick={() => onEditSnapshot?.(event)}
                       >
                         修改
@@ -230,6 +252,7 @@ function AuditResults({
                         type="button"
                         size="sm"
                         variant="destructive"
+                        disabled={query.isError}
                         onClick={() => onRemoveSnapshot?.(event)}
                       >
                         移除
@@ -240,6 +263,7 @@ function AuditResults({
                   event={event}
                   source={source}
                   childExists={childExists}
+                  disabled={query.isError}
                   onRestore={onRestore}
                   onRestoreTransfer={onRestoreTransfer}
                 />
@@ -256,12 +280,14 @@ function RestoreAuditAction({
   event,
   source,
   childExists,
+  disabled,
   onRestore,
   onRestoreTransfer,
 }: {
   event: LedgerEvent;
   source: LedgerEvent | undefined;
   childExists: boolean;
+  disabled: boolean;
   onRestore: (event: VoidEvent, source: ExecutionEvent) => void;
   onRestoreTransfer: (event: VoidEvent, source: CashTransferEvent) => void;
 }) {
@@ -272,6 +298,7 @@ function RestoreAuditAction({
         type="button"
         size="sm"
         variant="outline"
+        disabled={disabled}
         onClick={() => onRestoreTransfer(event, source)}
       >
         恢复划转
@@ -280,7 +307,7 @@ function RestoreAuditAction({
   }
   if (!isExecutionEvent(source)) return null;
   return (
-    <Button type="button" size="sm" variant="outline" onClick={() => onRestore(event, source)}>
+    <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => onRestore(event, source)}>
       恢复
     </Button>
   );
@@ -310,6 +337,7 @@ export function CorrectionReasonSheet({
   const [error, setError] = useState<string | null>(null);
   const open = Boolean(target);
   const pending = voidMutation.isPending || restoreMutation.isPending;
+  const requestClose = useDraftCloseGuard({ open, draft: { reason }, busy: pending, onOpenChange });
 
   useEffect(() => {
     if (!open) return;
@@ -320,6 +348,7 @@ export function CorrectionReasonSheet({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!target || pending) return;
+    setError(null);
     if (!reason.trim()) {
       setError('原因必填。');
       return;
@@ -385,7 +414,7 @@ export function CorrectionReasonSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="p-6">
         <SheetHeader>
           <SheetTitle>{action === 'void' ? '作废成交' : '恢复成交'}</SheetTitle>
@@ -396,7 +425,7 @@ export function CorrectionReasonSheet({
           </SheetDescription>
         </SheetHeader>
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
-          <Field>
+          <Field invalid={Boolean(error)}>
             <FieldLabel htmlFor="correction-reason">原因</FieldLabel>
             <Textarea
               id="correction-reason"
@@ -405,10 +434,10 @@ export function CorrectionReasonSheet({
               placeholder="请填写可审计的原因"
               required
             />
+            {error && <FieldError>{error}</FieldError>}
           </Field>
-          {error && <FieldError>{error}</FieldError>}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={pending} onClick={() => void requestClose(false)}>
               取消
             </Button>
             <Button

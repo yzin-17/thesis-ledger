@@ -62,8 +62,11 @@ export function assertCaseSeries(raw, target, routeIndex, revision) {
   const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' });
   const dates = series.points.map((point) => day.format(new Date(point.timestamp)));
   assert(equal(dates, ['2024-07-15', '2024-07-16', '2024-07-17', '2024-07-18', '2024-07-19']), '需要同口径完整整窗，不能混价或拼补');
+  assert(series.points.every((point) => point.completionStatus === 'complete'), '整窗价格必须均为完整交易日');
   return { providerId: series.provenance.providerId, upstreamSource: series.provenance.upstreamSource,
-    routeIndex, revision, points: series.points.length, dates, acquisitionFingerprint: series.provenance.providerRevision };
+    routeIndex, revision, points: series.points.length, dates, acquisitionFingerprint: series.provenance.providerRevision,
+    provenance: series.provenance, coverage: series.coverage, inputFingerprint: series.inputFingerprint,
+    dataPoints: series.points };
 }
 
 /** 恢复只提交启用标记，原子条件失败时保留并行配置；不读取/复制凭据。 */

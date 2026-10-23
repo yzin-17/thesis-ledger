@@ -5,7 +5,7 @@ import type { CreateTradeOpeningBoundaryAssertionCommand } from '@thesis-ledger/
 
 export const useCreatePortfolioTradeOpeningBoundaryMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: ({
       tradeId,
       command,
@@ -13,8 +13,10 @@ export const useCreatePortfolioTradeOpeningBoundaryMutation = () => {
       tradeId: string;
       command: CreateTradeOpeningBoundaryAssertionCommand;
     }) => createPortfolioTradeOpeningBoundary(tradeId, command),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: portfolioTradeKeys.root });
-    },
   });
+  return {
+    ...mutation,
+    refreshTrades: () =>
+      queryClient.invalidateQueries({ queryKey: portfolioTradeKeys.root }, { throwOnError: true }),
+  };
 };

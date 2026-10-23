@@ -4,7 +4,7 @@
 
 ## 边界与依据
 
-依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)、[Task §12.9](../2026-09-25-multi-source-adjustment-aware-backtest.md) Ready 叶及 [纯解析证据](2026-09-28-cont-m26-identity-resolver.md)。本叶独占新 DSA `src/services/thesis_ledger_tushare_mapped_read.py`、`tests/test_thesis_ledger_tushare_mapped_read.py` 与本文；全部既有 resolver/reader/store/凭据/Fetcher/Spec/台账保持只读。全程 apply_patch 手动编辑，保留脏工作区；无暂存、提交、子代理、生产配置/账号读取或真实 Provider 请求。
+依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)、[Task §12.9](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) Ready 叶及 [纯解析证据](2026-09-28-cont-m26-identity-resolver.md)。本叶独占新 DSA `src/services/thesis_ledger_tushare_mapped_read.py`、`tests/test_thesis_ledger_tushare_mapped_read.py` 与本文；全部既有 resolver/reader/store/凭据/Fetcher/Spec/台账保持只读。全程 apply_patch 手动编辑，保留脏工作区；无暂存、提交、子代理、生产配置/账号读取或真实 Provider 请求。
 
 测试仅使用独立临时 SQLite ControlStore、内容寻址文件、明确 synthetic 环境快照和受控 HTTP 响应；没有操作目标库、目标配置、容器或运行态。没有调用全量测试/构建/部署，也没有申请或重置外部请求预算。
 

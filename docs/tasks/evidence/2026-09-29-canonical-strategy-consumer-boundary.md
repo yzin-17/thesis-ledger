@@ -1,6 +1,6 @@
 # 策略消费者现行合同收敛
 
-> 2026-09-29；对应[单一现行链路替换任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)的 C03、U01、U02。本记录仅覆盖本地源码与测试，未构成整链路验收。
+> 2026-09-29；对应[单一现行链路替换任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)的 C03、U01、U02。本记录仅覆盖本地源码与测试，未构成整链路验收。
 
 ## 修改
 

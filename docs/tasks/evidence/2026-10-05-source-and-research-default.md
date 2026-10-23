@@ -22,7 +22,7 @@
 
 复用标记账户提交单笔真实 Run `a488ce1a-6485-43f6-b165-e56446faffd1`，记录 queued→failed，Provider/Model 确认为所选 OpenRouter。失败码 research_schema_invalid：缺 conclusion、evidence 元素为字符串，并缺 risks 等报告字段。服务端维持失败终态，没有把通用 JSON 当成有效报告或重试旧任务。
 
-代码核对确认文本校验模式未给模型提供实际生成字段结构，只要求合同名称。修复按[输出字段 Spec](../../specs/2026-10-05-research-json-prompt-contract.md)/[Task](../2026-10-05-research-json-prompt-contract.md) 承接，输出和引用校验保持严格。此 Run 不代表 Journal AI 成功验收。实际提交前后，两受保护账户与标记账户的上述语义字段摘要一致；未写交易或保存新复盘快照。日志为 `/tmp/journal-openrouter-target-explanation.log`。
+代码核对确认文本校验模式未给模型提供实际生成字段结构，只要求合同名称。修复按[输出字段 Spec](../../specs/2026-10-05-research-json-prompt-contract.md)/[Task](../../archive/tasks/2026-10-05-research-json-prompt-contract.md) 承接，输出和引用校验保持严格。此 Run 不代表 Journal AI 成功验收。实际提交前后，两受保护账户与标记账户的上述语义字段摘要一致；未写交易或保存新复盘快照。日志为 `/tmp/journal-openrouter-target-explanation.log`。
 
 ## 原生 Schema 与新请求验收
 

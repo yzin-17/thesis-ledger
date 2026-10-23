@@ -1,6 +1,6 @@
 # 行情周期纯装配证据
 
-对应 [Task](../2026-09-16-market-chart-period-aggregation.md) 的 T3.2b1。当前只完成原生日线到显示/计算视图的纯装配；实际基础窗口读取、缓存、公开派生成功响应与 Desktop 验收仍开放。
+对应 [Task](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md) 的 T3.2b1。当前只完成原生日线到显示/计算视图的纯装配；实际基础窗口读取、缓存、公开派生成功响应与 Desktop 验收仍开放。
 
 ## 实现与边界
 

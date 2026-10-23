@@ -50,6 +50,9 @@ describe('保留数据升级计划', () => {
       '20261005140000_authoring_execution_state',
       '20261005143000_authoring_analysis_application',
       '20261006030000_strategy_authoring_save',
+      '20261019010000_research_submission_v2',
+      '20261019020000_research_observation_versions',
+      '20261023010000_report_metadata_snapshots',
     ]);
   });
   it('仅列出当前 head 后的迁移且保留完整链摘要', () => {

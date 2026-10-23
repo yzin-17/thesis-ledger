@@ -12,6 +12,9 @@
 - [DSA Fork 审计](2026-08-18-dsa-fork-delta-audit.md)：跨仓归属、移植及上游合并依据；来源实际实现由 DSA 维护。
 - [来源与功能路由矩阵](2026-10-10-provider-adaptation-and-route-matrix.md)：查阅来源差异与证据映射；设计和当前进度回查原 Spec/Task。
 - [用户体验评审与优化建议](2026-10-14-user-experience-optimization.md)：保留本轮体验问题、实测范围及待处理建议，不自动扩大产品任务。
+- [页面一致性、密度与交互恢复验收](2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)：保留 10-19 状态基线和排查历史，补充 10-20 修复、162 个布局视图、目标 Web 与保留数据核对；任务已完成归档，真实业务门禁维持原归属。
+- [股票收藏项目实现对照](2026-10-18-starred-project-implementation-coverage.md)：逐项记录参考点、源码覆盖与本地问题对账；核查任务见研究增强 T0R，不替代领域实施状态。
+- [a-stock-data 后续模块](2026-10-22-astock-data-module-followups.md)：15 层源码与现行绑定/消费对照，已确认的 7 组后续范围进入 TODO；未验候选不冒充在线资格。
 
 投资复盘的[中间对账](../archive/reviews/2026-10-04-journal-review-consistency.md)与[最终验收](../archive/reviews/2026-10-05-journal-review-completion.md)、统一适配层的[实施日志](../archive/reviews/2026-10-11-unified-data-capability-implementation-log.md)和旧[聚合对账](../archive/reviews/2026-10-04-parallel-task-integration.md)均为历史记录。可由固定脱敏输入重复执行的基准留在 `docs/benchmarks/`。
 

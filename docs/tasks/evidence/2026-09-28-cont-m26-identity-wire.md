@@ -4,7 +4,7 @@
 
 ## 依据与边界
 
-依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 的独立 `tushare-fund-identity` 原字节、完整同代码、独立币种、全部映射范围和精确时间合同，及主 [Task §12.9](../2026-09-25-multi-source-adjustment-aware-backtest.md) 的执行包。上游已完成的 [resolver 证据](2026-09-28-cont-m26-identity-resolver.md) 与 DSA 纯解析模块均已读取，实际源码摘要与其记录一致。
+依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 的独立 `tushare-fund-identity` 原字节、完整同代码、独立币种、全部映射范围和精确时间合同，及主 [Task §12.9](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) 的执行包。上游已完成的 [resolver 证据](2026-09-28-cont-m26-identity-resolver.md) 与 DSA 纯解析模块均已读取，实际源码摘要与其记录一致。
 
 已读取 RTK、Codex、项目 AGENTS 和 `spec-driven-workflow` implementation/review 指导。Context Mode 工具未暴露，使用 RTK、有界文件读取和限定输出。按 `recommend` 核对了实际依赖、安装的 `es-toolkit 1.51.0` 出口与 `isJSON` 声明，及其[官方文档](https://es-toolkit.dev/reference/predicate/isJSON.html)：该函数只判断能否被 `JSON.parse` 解析，不能替代重复字段、原字节或精确瞬时合同；Schemas 未依赖该包，因此保留原生解析及既有瞬时原语，没有新增依赖。
 

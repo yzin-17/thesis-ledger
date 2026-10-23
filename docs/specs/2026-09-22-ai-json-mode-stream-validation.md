@@ -3,8 +3,8 @@
 | 项目 | 内容 |
 | --- | --- |
 | 任务标识 | `2026-09-22-ai-json-mode-stream-validation` |
-| 状态 | 实施中；实现与验证状态见对应 Task |
-| 对应任务 | [实施任务](../tasks/2026-09-22-ai-json-mode-stream-validation.md) |
+| 状态 | 已实现待验收；剩余条件由 AI SDK Task 接续 |
+| 对应任务 | [实施任务](../tasks/2026-09-19-vercel-ai-sdk-integration.md#json-stream-acceptance) |
 | 基线 | `7d9771942a92b744a51a9fb0fa525582dcc45039` 的完整文件，而非该提交的 diff |
 
 ## 1. 目标与现有边界

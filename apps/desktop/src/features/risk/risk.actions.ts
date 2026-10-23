@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import type { useToastManager } from '@/components/ui/toast';
 
 import type { Portfolio } from '../portfolio/portfolio.types.js';
@@ -13,7 +14,7 @@ import type {
   UpdateRiskRuleInput,
 } from './risk.types.js';
 
-type ToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
+type ToastManager = Pick<ReturnType<typeof useToastManager>, 'add' | 'close'>;
 type AsyncMutation<Input, Output> = {
   mutateAsync: (input: Input) => Promise<Output>;
 };
@@ -59,6 +60,7 @@ type Dependencies = {
   busyAction: string | null;
   setBusyAction: Dispatch<SetStateAction<string | null>>;
   toastManager: ToastManager;
+  failureToastRef: { current: string | null };
   createRuleMutation: AsyncMutation<CreateRiskRuleInput, RiskRuleRecord>;
   patchRuleMutation: AsyncMutation<{ ruleId: string; patch: UpdateRiskRuleInput }, RiskRuleRecord>;
   deleteRuleMutation: AsyncMutation<{ ruleId: string }, RiskRuleRecord>;
@@ -85,7 +87,7 @@ export const riskActionFeedback = (
 ) => {
   if (action === 'test') {
     const providerNote =
-      notificationAvailability === 'unconfigured' ? ' 当前未配置通知 Provider。' : '';
+      notificationAvailability === 'unconfigured' ? ' 当前未配置通知提供方。' : '';
     return {
       type: notificationAvailability === 'unconfigured' ? ('warning' as const) : ('info' as const),
       description: `${triggeredCount} 个上下文触发。人工测试只验证规则，不发送通知。${providerNote}`,
@@ -105,18 +107,18 @@ export const riskActionFeedback = (
   if (notificationAvailability === 'unconfigured') {
     return {
       type: 'warning' as const,
-      description: `${eventSummary} 当前未配置通知 Provider，本次未发送通知。`,
+      description: `${eventSummary} 当前未配置通知提供方，本次未发送通知。`,
     };
   }
   if (notificationAvailability === 'unknown') {
     return {
       type: 'warning' as const,
-      description: `${eventSummary} 暂时无法确认通知 Provider 状态，请在“通知”页签核对。`,
+      description: `${eventSummary} 暂时无法确认通知提供方状态，请在“通知”页签核对。`,
     };
   }
   return {
     type: 'success' as const,
-    description: `${eventSummary} 通知已按当前 Provider 配置处理，结果可在“通知”页签查看。`,
+    description: `${eventSummary} 通知已按当前提供方配置处理，结果可在“通知”页签查看。`,
   };
 };
 
@@ -127,6 +129,7 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     busyAction,
     setBusyAction,
     toastManager,
+    failureToastRef,
     createRuleMutation,
     patchRuleMutation,
     deleteRuleMutation,
@@ -139,44 +142,57 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     refetchNotifications,
   } = dependencies;
 
+  let inFlight = false;
+  const claimAction = (action: string) => {
+    if (busyAction || inFlight) return false;
+    inFlight = true;
+    if (failureToastRef.current) toastManager.close(failureToastRef.current);
+    failureToastRef.current = null;
+    setBusyAction(action);
+    return true;
+  };
+  const releaseAction = () => {
+    inFlight = false;
+    setBusyAction(null);
+  };
+  const notifyFailure = (title: string, description: string) => {
+    failureToastRef.current = errorToast(toastManager, title, description);
+  };
+
   const loadRisk = async () => {
     await Promise.all([refetchRules(), refetchEvents(), refetchNotifications()]);
   };
 
   const createRule = async (input: CreateRiskRuleInput) => {
-    if (busyAction) return false;
-    setBusyAction('create-rule');
+    if (!claimAction('create-rule')) return false;
     try {
       await createRuleMutation.mutateAsync(input);
       successToast(toastManager, '规则已创建', '已记录审计。');
-      await refetchRules();
       return true;
-    } catch {
-      errorToast(toastManager, '规则创建失败', '请检查规则目标和阈值。');
+    } catch (error) {
+      notifyFailure('规则创建失败', requestFailureMessage(error));
       return false;
     } finally {
-      setBusyAction(null);
+      releaseAction();
     }
   };
 
   const patchRule = async (ruleId: string, patch: UpdateRiskRuleInput) => {
-    if (busyAction) return false;
-    setBusyAction(`patch:${ruleId}`);
+    if (!claimAction(`patch:${ruleId}`)) return false;
     try {
       await patchRuleMutation.mutateAsync({ ruleId, patch });
       successToast(toastManager, '规则已更新', '已生成新版本并记录审计。');
       return true;
-    } catch {
-      errorToast(toastManager, '规则更新失败', '请稍后重试。');
+    } catch (error) {
+      notifyFailure('规则更新失败', requestFailureMessage(error));
       return false;
     } finally {
-      setBusyAction(null);
+      releaseAction();
     }
   };
 
   const archiveRule = async (rule: RiskRuleRecord) => {
-    if (busyAction) return false;
-    setBusyAction(`archive:${rule.id}`);
+    if (!claimAction(`archive:${rule.id}`)) return false;
     try {
       await deleteRuleMutation.mutateAsync({ ruleId: rule.id });
       successToast(
@@ -185,40 +201,35 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
         '规则已移出列表，历史事件与审计记录保留；可在“显示已归档”中恢复。',
       );
       return true;
-    } catch {
-      errorToast(toastManager, '规则归档失败', '请稍后重试。');
+    } catch (error) {
+      notifyFailure('规则归档失败', requestFailureMessage(error));
       return false;
     } finally {
-      setBusyAction(null);
+      releaseAction();
     }
   };
 
   const restoreRule = async (rule: RiskRuleRecord) => {
-    if (busyAction) return false;
-    setBusyAction(`restore:${rule.id}`);
+    if (!claimAction(`restore:${rule.id}`)) return false;
     try {
       await restoreRuleMutation.mutateAsync({ ruleId: rule.id });
-      successToast(
-        toastManager,
-        '规则已恢复',
-        '规则已回到列表并保持停用，确认无误后可手动启用。',
-      );
+      successToast(toastManager, '规则已恢复', '规则已回到列表并保持停用，确认无误后可手动启用。');
       return true;
-    } catch {
-      errorToast(toastManager, '规则恢复失败', '请稍后重试。');
+    } catch (error) {
+      notifyFailure('规则恢复失败', requestFailureMessage(error));
       return false;
     } finally {
-      setBusyAction(null);
+      releaseAction();
     }
   };
 
   const testRule = async (rule: RiskRuleRecord) => {
     if (busyAction) return null;
     if (rule.needsRepair) {
-      errorToast(toastManager, '规则待修复', '请先补齐账户和标的后再进行测试。');
+      notifyFailure('规则待修复', '请先补齐账户和标的后再进行测试。');
       return null;
     }
-    setBusyAction(`test:${rule.id}`);
+    if (!claimAction(`test:${rule.id}`)) return null;
     try {
       const result = await testRuleMutation.mutateAsync({
         ruleId: rule.id,
@@ -232,17 +243,16 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
       );
       toastManager.add({ title: '人工测试完成', ...feedback, timeout: 7000 });
       return result;
-    } catch {
-      errorToast(toastManager, '人工测试失败', '请确认当前组合有可用数据。');
+    } catch (error) {
+      notifyFailure('人工测试失败', requestFailureMessage(error));
       return null;
     } finally {
-      setBusyAction(null);
+      releaseAction();
     }
   };
 
   const scanRisk = async () => {
-    if (busyAction) return false;
-    setBusyAction('scan-risk');
+    if (!claimAction('scan-risk')) return false;
     try {
       const result = await scanRiskMutation.mutateAsync({
         contexts: buildRiskContexts(portfolio, mode),
@@ -256,11 +266,11 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
       );
       toastManager.add({ title: '风险扫描已完成', ...feedback, timeout: 7000 });
       return true;
-    } catch {
-      errorToast(toastManager, '风险扫描失败', '请确认当前组合有可用数据。');
+    } catch (error) {
+      notifyFailure('风险扫描失败', requestFailureMessage(error));
       return false;
     } finally {
-      setBusyAction(null);
+      releaseAction();
     }
   };
 

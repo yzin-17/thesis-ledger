@@ -2,7 +2,7 @@
 
 ## 已覆盖
 
-- 账户、截图导入、统一行情 Contract、Provider fallback、健康和数据质量：V0.1/V0.2 服务、契约测试和桌面入口。
+- 账户、统一行情 Contract、Provider fallback、健康和数据质量：V0.1/V0.2 服务、契约测试和桌面入口。
 - Ledger 事实源、Position 投影、现金/公司行动、TTWROR/XIRR、三层 Performance：V0.3 服务、迁移命令和 domain 回归。
 - Risk scope/context、规则版本、筹码/组合风险、通知去重与摘要：V0.4 Rule Engine、Audit、Notification 和 Risk Center。
 - Strategy Schema、A 股执行、PIT/bias、Worker、OOS、Benchmark、analytics、复现 metadata：V0.5 domain/server 测试。

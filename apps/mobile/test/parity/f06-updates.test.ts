@@ -1,0 +1,179 @@
+import { createContext, runInContext } from 'node:vm';
+import { describe, expect, it, vi } from 'vitest';
+import { exampleChartWindow } from '../../src/features/settings/chart-preview-data';
+import {
+  chartDocument,
+  chartUpdateScript,
+  type ChartColors,
+  type ChartData,
+  type ChartMessage,
+} from '../../src/platform/charts/chart-document';
+
+const colors: ChartColors = {
+  background: '#fff',
+  text: '#000',
+  up: '#080',
+  down: '#f00',
+  line: '#00f',
+};
+const dataWindow = (first: number, last: number): ChartData => ({
+  candles: Array.from({ length: last - first + 1 }, (_, index) => ({
+    time: `2026-01-${String(first + index).padStart(2, '0')}`,
+    open: 10,
+    high: 12,
+    low: 9,
+    close: 11,
+  })),
+  lines: [],
+});
+
+function runtime(initial: ChartData) {
+  type Range = { from: number; to: number };
+  let range: Range | null = null;
+  let rangeChanged: ((value: Range | null) => void) | undefined;
+  const events = new Map<string, (event?: { buttons: number }) => void>();
+  const lifecycle = new Map<string, () => void>();
+  const messages: ChartMessage[] = [];
+  const series: Array<{
+    data: Array<{ time: string }>;
+    setData: ReturnType<typeof vi.fn>;
+    applyOptions: ReturnType<typeof vi.fn>;
+  }> = [];
+  const scale = {
+    getVisibleLogicalRange: () => range && { ...range },
+    setVisibleLogicalRange: vi.fn((next: Range) => {
+      range = { ...next };
+      rangeChanged?.(range);
+    }),
+    subscribeVisibleLogicalRangeChange: (callback: typeof rangeChanged) => {
+      rangeChanged = callback;
+    },
+    fitContent: vi.fn(() => {
+      const count = series[0]?.data.length ?? 0;
+      range = count ? { from: 0, to: count - 1 } : null;
+      rangeChanged?.(range);
+    }),
+  };
+  const chart = {
+    timeScale: () => scale,
+    applyOptions: vi.fn(),
+    remove: vi.fn(),
+    addSeries: vi.fn(() => {
+      const item = { data: [] as Array<{ time: string }>, setData: vi.fn(), applyOptions: vi.fn() };
+      item.setData.mockImplementation((points: Array<{ time: string }>) => {
+        item.data = points.map((point) => ({ ...point }));
+        if (range) rangeChanged?.(range);
+      });
+      series.push(item);
+      return item;
+    }),
+    removeSeries: vi.fn((item: (typeof series)[number]) => {
+      series.splice(series.indexOf(item), 1);
+    }),
+  };
+  const createChart = vi.fn(() => chart);
+  const web: Record<string, unknown> = {
+    ReactNativeWebView: {
+      postMessage: (raw: string) => messages.push(JSON.parse(raw) as ChartMessage),
+    },
+    addEventListener: (name: string, callback: () => void) => lifecycle.set(name, callback),
+  };
+  const context = createContext({
+    window: web,
+    document: {
+      getElementById: () => ({
+        addEventListener: (name: string, callback: (event?: { buttons: number }) => void) =>
+          events.set(name, callback),
+      }),
+    },
+    LightweightCharts: { createChart, CandlestickSeries: 'candles', LineSeries: 'line' },
+  });
+  const html = chartDocument('', 'chart-test', initial, colors, true);
+  const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)![1];
+  runInContext(script, context);
+  return {
+    chart,
+    scale,
+    series,
+    messages,
+    createChart,
+    web,
+    range: () => range,
+    visible: (next: Range) => scale.setVisibleLogicalRange(next),
+    fire: (name: string) => events.get(name)?.({ buttons: 1 }),
+    leave: () => lifecycle.get('pagehide')?.(),
+    update: (data: ChartData, nextColors = colors, id = 'chart-test') =>
+      runInContext(chartUpdateScript(id, data, nextColors, true), context),
+  };
+}
+
+describe('本地图表窗口增量更新', () => {
+  it('示例扩窗只增加更早日期，重叠蜡烛和指标数值保持不变', () => {
+    const previous = exampleChartWindow(30);
+    const next = exampleChartWindow(40);
+    expect(next.candles[0].time < previous.candles[0].time).toBe(true);
+    expect(next.candles.slice(-30)).toEqual(previous.candles);
+    expect(next.lines[0].values.slice(-30)).toEqual(previous.lines[0].values);
+  });
+
+  it('前插历史和追加日期均保留可视日期与缩放宽度，不重建图表', () => {
+    const view = runtime(dataWindow(3, 6));
+    view.visible({ from: 0.5, to: 2.5 });
+    view.update(dataWindow(1, 6));
+    expect(view.range()).toEqual({ from: 2.5, to: 4.5 });
+    view.update(dataWindow(1, 7));
+    expect(view.range()).toEqual({ from: 2.5, to: 4.5 });
+    expect(view.scale.fitContent).toHaveBeenCalledOnce();
+    expect(view.createChart).toHaveBeenCalledOnce();
+    expect(view.messages.filter((message) => message.kind === 'ready')).toHaveLength(1);
+    expect(view.chart.remove).not.toHaveBeenCalled();
+  });
+
+  it('增量配色和指标数量生效，其他实例和超限数据不能进入当前图表', () => {
+    const initial = dataWindow(3, 6);
+    initial.lines = ['一', '二'].map((name) => ({
+      name,
+      values: [{ time: '2026-01-03', value: 10 }],
+    }));
+    const view = runtime(initial);
+    const dark = { ...colors, background: '#111', up: '#f00' };
+    view.update(dataWindow(1, 6), dark);
+    expect(view.series).toHaveLength(1);
+    expect(view.chart.removeSeries).toHaveBeenCalledTimes(2);
+    expect(view.chart.applyOptions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ layout: { background: { color: '#111' }, textColor: '#000' } }),
+    );
+    const calls = view.series[0].setData.mock.calls.length;
+    view.update(dataWindow(1, 7), colors, 'other-chart');
+    expect(view.series[0].setData).toHaveBeenCalledTimes(calls);
+    expect(() =>
+      chartUpdateScript(
+        'chart-test',
+        { candles: Array(3001).fill(initial.candles[0]), lines: [] },
+        colors,
+      ),
+    ).toThrow('上限');
+  });
+
+  it('扩窗不打断手势结束，程序更新及离页不会额外申请历史', () => {
+    const view = runtime(dataWindow(3, 6));
+    view.fire('touchstart');
+    view.fire('pointerdown');
+    view.visible({ from: 1, to: 2 });
+    expect(view.messages.filter((message) => message.kind === 'older')).toHaveLength(1);
+    view.update(dataWindow(1, 6));
+    view.fire('touchmove');
+    view.fire('pointerup');
+    view.fire('touchend');
+    view.visible({ from: 0, to: 1 });
+    expect(view.messages.filter((message) => message.kind === 'touch')).toHaveLength(1);
+    expect(view.messages.filter((message) => message.kind === 'end')).toHaveLength(1);
+    expect(view.messages.filter((message) => message.kind === 'older')).toHaveLength(1);
+    view.leave();
+    expect(view.chart.remove).toHaveBeenCalledOnce();
+    expect(view.web.__THESIS_LEDGER_CHART_UPDATE__).toBeUndefined();
+    const calls = view.series[0].setData.mock.calls.length;
+    view.update(dataWindow(1, 7));
+    expect(view.series[0].setData).toHaveBeenCalledTimes(calls);
+  });
+});

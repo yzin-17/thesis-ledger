@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Badge } from '@/components/ui/badge';
-import { Switch, SwitchThumb } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 
 export type PortfolioModeValue = 'actual' | 'shadow';
@@ -13,6 +13,8 @@ export function PortfolioModeSwitch({
   actualLabel = '实际',
   shadowLabel = '模拟',
   className,
+  disabled = false,
+  compact = false,
 }: {
   mode: PortfolioModeValue;
   onModeChange: (mode: PortfolioModeValue) => void;
@@ -20,37 +22,40 @@ export function PortfolioModeSwitch({
   actualLabel?: string;
   shadowLabel?: string;
   className?: string;
+  disabled?: boolean;
+  compact?: boolean;
 }) {
   const isActual = mode === 'actual';
   const currentLabel = isActual ? actualLabel : shadowLabel;
   const nextLabel = isActual ? shadowLabel : actualLabel;
-  const modeLabelClass =
-    'pointer-events-none absolute inset-y-0 z-0 flex items-center text-[13px] font-medium leading-none text-[color:var(--color-mode-switch-text)] whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none';
-
   return (
-    <div className={cn('inline-flex items-center', className)}>
-      <Switch
-        variant="mode"
-        checked={isActual}
+    <div className={cn('flex flex-col items-start gap-1.5', compact && 'items-center', className)}>
+      <span className="text-xs text-muted-foreground">{compact ? currentLabel : '账户范围'}</span>
+      <ToggleGroup
+        value={[mode]}
+        disabled={disabled}
+        aria-busy={disabled}
+        className={cn('flex-nowrap gap-0.5 rounded-md bg-muted p-0.5', compact && 'flex-col')}
         data-mode={mode}
         aria-label={`${ariaLabel}：当前${currentLabel}，切换到${nextLabel}`}
-        title={`当前${currentLabel}，切换到${nextLabel}`}
-        onCheckedChange={(checked) => onModeChange(checked ? 'actual' : 'shadow')}
+        onValueChange={(values) => {
+          const next = values[0];
+          if ((next === 'actual' || next === 'shadow') && next !== mode) onModeChange(next);
+        }}
       >
-        <span
-          aria-hidden="true"
-          className={cn(modeLabelClass, 'left-2 px-1', isActual ? 'opacity-100' : 'opacity-0')}
+        <ToggleGroupItem
+          value="actual"
+          className="border-transparent bg-transparent data-pressed:bg-background data-pressed:text-foreground"
         >
           {actualLabel}
-        </span>
-        <span
-          aria-hidden="true"
-          className={cn(modeLabelClass, 'right-2 px-1', isActual ? 'opacity-0' : 'opacity-100')}
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="shadow"
+          className="border-transparent bg-transparent data-pressed:bg-background data-pressed:text-foreground"
         >
           {shadowLabel}
-        </span>
-        <SwitchThumb variant="mode" aria-hidden="true" />
-      </Switch>
+        </ToggleGroupItem>
+      </ToggleGroup>
     </div>
   );
 }

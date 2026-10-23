@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, ChevronLeft, ChevronRight, Expand, X } from 'lucide-react';
 import type { AiRunRecord, AiToolCall } from './ai.types.js';
 import { ResearchReportContent } from './ResearchReportContent.js';
+import { ResearchSavedReport } from './ResearchSavedReport.js';
+import type { ResearchComparisonChoice } from './research-comparison-display.js';
 
 interface ResearchDetailProps {
   selectedRun: AiRunRecord | null;
@@ -19,6 +21,8 @@ interface ResearchDetailProps {
   detailError: boolean;
   toolCalls: AiToolCall[];
   navigationIds: string[];
+  comparisonChoices?: ResearchComparisonChoice[];
+  comparisonContextKey?: string;
   selectedIndex: number;
   previousId?: string;
   nextId?: string;
@@ -27,6 +31,7 @@ interface ResearchDetailProps {
   onSwitch: (id: string) => void;
   onRetry: (run: AiRunRecord) => void;
   onOpenSource: (href: string) => void;
+  onLegacy?: (() => void) | undefined;
 }
 
 function ResearchDetailBody({
@@ -36,11 +41,32 @@ function ResearchDetailBody({
   toolCalls,
   onRetry,
   onOpenSource,
+  onLegacy,
+  comparisonChoices = [],
+  comparisonContextKey = '',
 }: Pick<
   ResearchDetailProps,
-  'selectedRun' | 'detailPending' | 'detailError' | 'toolCalls' | 'onRetry' | 'onOpenSource'
+  | 'selectedRun'
+  | 'detailPending'
+  | 'detailError'
+  | 'toolCalls'
+  | 'onRetry'
+  | 'onOpenSource'
+  | 'onLegacy'
+  | 'comparisonChoices'
+  | 'comparisonContextKey'
 >) {
   if (selectedRun) {
+    if (selectedRun.savedReport)
+      return (
+        <ResearchSavedReport
+          report={selectedRun.savedReport}
+          onRetry={() => onRetry(selectedRun)}
+          onOpenSource={onOpenSource}
+          comparisonChoices={comparisonChoices}
+          comparisonContextKey={comparisonContextKey}
+        />
+      );
     return (
       <ResearchReportContent
         run={selectedRun}
@@ -63,6 +89,11 @@ function ResearchDetailBody({
   return (
     <div className="rounded-md border p-4 text-sm text-muted-foreground">
       研究不存在、已移除或当前账号无权访问。请返回研究列表。
+      {onLegacy && (
+        <Button type="button" variant="link" onClick={onLegacy}>
+          若为旧报告，按历史入口读取
+        </Button>
+      )}
     </div>
   );
 }

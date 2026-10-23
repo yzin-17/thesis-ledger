@@ -379,7 +379,7 @@ const mount = async (
   const opening = deferred<MarketDetailResponse>();
   requestMarketDetailMock.mockImplementationOnce(() => opening.promise);
   useQueryMock.mockImplementation((options: { queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => {
-    if (options.queryKey[1] === 'market-period-options') return { data: { options: [] }, isSuccess: true };
+    if (['market-period-options', 'market-minute-options'].includes(String(options.queryKey[1]))) return { data: { options: [] }, isSuccess: true };
     const [state, setState] = useState({ data: cached, isPending: false, isError: false, isFetching: true });
     useEffect(() => {
       const controller = new AbortController();

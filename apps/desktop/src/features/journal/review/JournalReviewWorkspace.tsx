@@ -17,8 +17,11 @@ import { JournalSnapshotHistory } from './JournalSnapshotHistory.js';
 import { JournalLegacyJsonReview } from './JournalLegacyJsonReview.js';
 import { JournalEmpty, JournalRequestError } from './JournalReviewFeedback.js';
 import { JournalAiTaskHistory } from './JournalAiTaskHistory.js';
+import { useGuardedTransition } from '../../shared/navigation-guard.js';
 
 type WorkspaceProps = {
+  mode?: Account['mode'];
+  onAccountChange?: (accountId: string) => void;
   accounts?: Account[];
   accountsReady?: boolean;
   accountsPending?: boolean;
@@ -107,6 +110,7 @@ function ScopedReview({ account, search }: { account: Account; search: string })
               symbol={symbol}
               onSelect={select}
               onWindowApplied={() => setSelected(null)}
+              selectionPrompt={!selected && <JournalEmpty title="选择一个复盘对象" description="完整交易周期与单次减仓分别分析。先核对事实与计划，再开始复盘。" />}
             />
             {selected ? (
               <JournalObjectReview
@@ -119,12 +123,7 @@ function ScopedReview({ account, search }: { account: Account; search: string })
                   setTab('history');
                 }}
               />
-            ) : (
-              <JournalEmpty
-                title="选择一个复盘对象"
-                description="完整交易周期与单次减仓分别分析。先核对事实与计划，再开始复盘。"
-              />
-            )}
+            ) : null}
           </div>
         </TabsContent>
         <TabsContent
@@ -166,7 +165,9 @@ function ScopedReview({ account, search }: { account: Account; search: string })
   );
 }
 function Workspace({
-  accounts = [],
+  accounts: allAccounts = [],
+  mode,
+  onAccountChange,
   accountsReady = true,
   accountsPending = false,
   accountsError = false,
@@ -175,10 +176,12 @@ function Workspace({
   onNavigatePosition,
   search = '',
 }: WorkspaceProps) {
+  const accounts = mode ? allAccounts.filter((account) => account.mode === mode) : allAccounts;
+  const guard = useGuardedTransition();
   const params = new URLSearchParams(search);
   const [accountId, setAccountId] = useState(params.get('accountId') ?? '');
   const [accountChosen, setAccountChosen] = useState(false);
-  const requestedMode = params.get('mode');
+  const requestedMode = mode ?? params.get('mode');
   const selectedAccount = accountId
     ? accounts.find((row) => row.id === accountId)
     : accounts.find((row) => !requestedMode || row.mode === requestedMode);
@@ -187,8 +190,9 @@ function Workspace({
       ? undefined
       : selectedAccount;
   const chooseAccount = (id: string) => {
-    setAccountChosen(true);
-    setAccountId(id);
+    const commit = () => { setAccountChosen(true); setAccountId(id); onAccountChange?.(id); };
+    if (guard) void guard.request(commit, { title: '放弃未保存的修改？', description: '切换复盘账户后，本次未保存修改将丢失。', confirmLabel: '放弃修改并切换账户' });
+    else commit();
   };
   let content;
   if (accountsError)
@@ -214,7 +218,7 @@ function Workspace({
     content = (
       <JournalEmpty
         title="还没有复盘账户"
-        description="先创建实际或模拟账户，再记录可验证的交易事实。"
+        description={mode ? `当前${mode === 'shadow' ? '模拟' : '实际'}范围还没有账户，请先创建账户并记录可验证的交易事实。` : '先创建实际或模拟账户，再记录可验证的交易事实。'}
         action={
           <div className="flex flex-wrap gap-2">
             <Button onClick={onNavigateAccounts}>管理账户</Button>
@@ -239,8 +243,8 @@ function Workspace({
   return (
     <section className="flex min-w-0 flex-col">
       <PageHeader
-        eyebrow="投资复盘"
-        title="投资复盘工作台"
+        eyebrow="INVESTMENT JOURNAL"
+        title="投资复盘"
         description="以实际成交和计划证据复盘交易。完整周期与减仓分别统计，未知事实保留证据不足。"
       />
       {content}
@@ -248,5 +252,5 @@ function Workspace({
   );
 }
 export function JournalReviewWorkspace(props: WorkspaceProps) {
-  return <Workspace key={props.search ?? ''} {...props} />;
+  return <Workspace key={`${props.mode ?? ''}:${props.search ?? ''}`} {...props} />;
 }

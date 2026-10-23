@@ -227,12 +227,12 @@ export function OptimizationPricePreparation({
       >
         {query.isFetching ? '正在准备实验配置…' : '准备实验配置'}
       </Button>
-      {error && <FieldError>{error}</FieldError>}
-      {stale && <FieldError>路由配置已经改变，请重新准备实验配置。</FieldError>}
+      {error && <Field invalid><FieldError>{error}</FieldError></Field>}
+      {stale && <Field invalid><FieldError>路由配置已经改变，请重新准备实验配置。</FieldError></Field>}
       {query.error && (
-        <FieldError>
+        <Field invalid><FieldError>
           {query.error instanceof Error ? query.error.message : '实验配置准备失败'}
-        </FieldError>
+        </FieldError></Field>
       )}
       <AnnouncementPreparationStatus result={result} />
       {result?.status === 'blocked' && (

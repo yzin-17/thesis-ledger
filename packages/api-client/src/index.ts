@@ -1,25 +1,21 @@
+import { marketChartOptionsClient } from './market-chart-options-client.js';
+import { ThesisLedgerContractError } from './api-error.js';
 import { marketDisplayClient } from './market-display-client.js';
 import { backtestRunClient } from './backtest-run-client.js';
 import { marketControlClient } from './market-control-client.js';
 import { backtestRunConfigClient } from './backtest-run-config-client.js';
 import { backtestNavRunClient } from './backtest-nav-run-client.js';
 import { journalReviewClient } from './journal-review-client.js';
+import { researchClient } from './research-client.js';
 import {
   apiErrorResponseSchema,
-  accountsResponseSchema,
   baselineReconciliationCandidatesResponseSchema,
-  instrumentSearchResponseSchema,
   importDraftCommandResponseSchema,
   importDraftRevisionResponseSchema,
   ledgerCommandResponseSchema,
   ledgerAuditResponseSchema,
   ledgerEventsResponseSchema,
   ledgerReplayResponseSchema,
-  marketChartOptionsV3Schema,
-  marketChartOptionsWindowV3Schema,
-  type MarketChartOptionsWindowV3,
-  marketChartPlanV3Schema,
-  type MarketChartPlanV3,
   performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
   riskEventsResponseSchema,
@@ -36,8 +32,6 @@ import {
   tradeListResponseSchema,
   tradeReferenceResolveResponseSchema,
   type ApiErrorResponse,
-  type AccountResponse,
-  type AccountMode,
   type CreateBaselineObservationBatchCommand,
   type CreateCashFlowCommand,
   type CreateCashTransferCommand,
@@ -222,26 +216,25 @@ const queryString = (params: Record<string, QueryValue>) => {
 };
 
 import { ThesisLedgerApiError, retryAfterMilliseconds } from './api-error.js';
+import { accountManagementClient } from './account-management-client.js';
+import { ledgerImportClient } from './ledger-import-client.js';
+import { instrumentClient } from './instrument-client.js';
+import { positionManagementClient } from './position-management-client.js';
+export type { SaveAccountInput } from './account-management-client.js';
+export { draftIsFrozen, rowCanSubmit, reviewedDraftCommand } from './import-review-policy.js';
 export { ThesisLedgerApiError, retryAfterMilliseconds } from './api-error.js';
 
-export class ThesisLedgerContractError extends Error {
-  constructor(public readonly path: string) {
-    super(`ThesisLedger API 响应契约不匹配: ${path}`);
-  }
-}
+export { ThesisLedgerContractError } from './api-error.js';
 
 export class ThesisLedgerApiClient {
   private readonly baseUrl: string;
   private readonly fetcher: typeof fetch;
 
-  readonly accounts = {
-    list: (
-      params: { includeInactive?: boolean; mode?: AccountMode } = {},
-    ): Promise<AccountResponse[]> =>
-      this.requestParsed(`/accounts${queryString(params)}`, accountsResponseSchema),
-    permanentDelete: (accountId: string): Promise<void> =>
-      this.deleteNoContent(`/accounts/${encodeURIComponent(accountId)}/permanent`),
-  };
+  readonly accounts = accountManagementClient(
+    this.requestParsed.bind(this), this.fetchResponse.bind(this),
+  );
+  readonly imports = ledgerImportClient(this.requestParsed.bind(this));
+  readonly positionManagement = positionManagementClient(this.fetchResponse.bind(this));
 
   readonly portfolio = {
     getValuation: (
@@ -252,10 +245,12 @@ export class ThesisLedgerApiClient {
         baseCurrency?: Currency;
         t?: number;
       } = {},
+      signal?: AbortSignal,
     ) =>
       this.requestParsed(
         `/portfolio/valuation${queryString(params)}`,
         portfolioValuationResponseSchema,
+        signal ? { signal } : undefined,
       ),
     getTrades: (params: Partial<TradeListQuery> = {}): Promise<TradeListResponse> =>
       this.requestParsed(`/portfolio/trades${queryString(params)}`, tradeListResponseSchema),
@@ -454,7 +449,8 @@ export class ThesisLedgerApiClient {
   readonly risk = {
     getEvents: (
       params: { mode?: 'actual' | 'shadow'; cursor?: string; limit?: number; t?: number } = {},
-    ) => this.requestParsed(`/risk/events${queryString(params)}`, riskEventsResponseSchema),
+      signal?: AbortSignal,
+    ) => this.requestParsed(`/risk/events${queryString(params)}`, riskEventsResponseSchema, signal ? { signal } : undefined),
   };
 
   readonly performance = {
@@ -477,66 +473,8 @@ export class ThesisLedgerApiClient {
   readonly market = {
     ...marketControlClient(this.requestParsed.bind(this)),
     ...marketDisplayClient(this.requestParsed.bind(this), queryString),
-    getPlannedChartOptions: async (
-      symbol: string,
-      input: MarketChartPlanV3,
-      signal?: AbortSignal,
-    ) => {
-      const plan = marketChartPlanV3Schema.parse(input);
-      const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString({
-        barsLimit: plan.barsLimit,
-        indicatorParams: JSON.stringify(plan.indicatorParams),
-        planEnd: plan.end,
-      })}`;
-      const response = await this.requestParsed(
-        path,
-        marketChartOptionsV3Schema,
-        signal ? { signal } : undefined,
-      );
-      const actual = response.plan;
-      if (
-        response.symbol !== symbol ||
-        !response.window ||
-        !actual ||
-        actual.barsLimit !== plan.barsLimit ||
-        actual.end !== plan.end ||
-        Object.keys(actual.indicatorParams).length !== Object.keys(plan.indicatorParams).length ||
-        Object.entries(plan.indicatorParams).some(
-          ([key, value]) => actual.indicatorParams[key] !== value,
-        )
-      ) {
-        throw new ThesisLedgerContractError(path);
-      }
-      return response;
-    },
-    getChartOptions: async (
-      symbol: string,
-      signal?: AbortSignal,
-      requestedWindow?: MarketChartOptionsWindowV3,
-    ) => {
-      const window = requestedWindow
-        ? marketChartOptionsWindowV3Schema.parse(requestedWindow)
-        : undefined;
-      const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString(window ?? {})}`;
-      const response = await this.requestParsed(
-        path,
-        marketChartOptionsV3Schema,
-        signal ? { signal } : undefined,
-      );
-      if (
-        response.symbol !== symbol ||
-        response.window?.start !== window?.start ||
-        response.window?.end !== window?.end
-      ) {
-        throw new ThesisLedgerContractError(path);
-      }
-      return response;
-    },
-    searchInstruments: (params: { q: string; limit?: number }) =>
-      this.requestParsed(
-        `/api/market-data/instruments/search${queryString(params)}`,
-        instrumentSearchResponseSchema,
-      ),
+    ...marketChartOptionsClient(this.requestParsed.bind(this), queryString),
+    ...instrumentClient(this.requestParsed.bind(this), this.fetchResponse.bind(this)),
   };
 
   readonly journalReviews = journalReviewClient(
@@ -636,6 +574,8 @@ export class ThesisLedgerApiClient {
       this.postParsed('/ledger/reconciliations/restore', command, ledgerCommandResponseSchema),
   };
 
+  readonly research = researchClient(this.requestParsed.bind(this));
+
   readonly backtests = {
     ...backtestNavRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
     ...backtestRunConfigClient(this.postParsed.bind(this)),
@@ -672,11 +612,6 @@ export class ThesisLedgerApiClient {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
-  }
-
-  private async deleteNoContent(path: string): Promise<void> {
-    const response = await this.fetchResponse(path, { method: 'DELETE' });
-    if (response.status !== 204) throw new ThesisLedgerContractError(path);
   }
 
   private async requestParsed<T>(

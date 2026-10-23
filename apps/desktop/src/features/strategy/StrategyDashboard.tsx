@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import type { LoadState } from '../shared/types.js';
+import { useOptionalPortfolioMode } from '../portfolio/portfolio-mode-context.js';
 import {
   useCancelBacktestMutation,
   useCreateStrategyMutation,
@@ -38,7 +39,6 @@ import {
   legacyStrategyDestination,
   strategyCenterPath,
   strategyCenterTabForPath,
-  type StrategyCenterTab,
 } from './strategy-center.navigation.js';
 import type {
   BacktestJobSummary,
@@ -73,7 +73,8 @@ function StrategyRiskApplicationRoute({
   onTabChange: (state: StrategyVersionTabState) => void;
 }) {
   const { strategyId, versionId } = useParams();
-  const sourceKey = `${strategyId ?? ''}:${versionId ?? ''}`;
+  const accountMode = useOptionalPortfolioMode()?.mode ?? 'actual';
+  const sourceKey = `${strategyId ?? ''}:${versionId ?? ''}:${accountMode}`;
   return (
     <>
       <StrategyVersionPage
@@ -102,7 +103,8 @@ function StrategyEditorRoute({
   onTabChange: (state: StrategyVersionTabState) => void;
 }) {
   const { strategyId, versionId } = useParams();
-  const sourceKey = `${strategyId ?? ''}:${versionId ?? ''}`;
+  const accountMode = useOptionalPortfolioMode()?.mode ?? 'actual';
+  const sourceKey = `${strategyId ?? ''}:${versionId ?? ''}:${accountMode}`;
   return (
     <>
       <StrategyVersionPage
@@ -141,22 +143,19 @@ function NavBacktestSetupRoute({
 }
 
 export function StrategyDashboard() {
+  const accountMode = useOptionalPortfolioMode()?.mode ?? 'actual';
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const toastManager = useToastManager();
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const queueErrorToastId = useRef<string | null>(null);
   const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
   const [versionTabState, setVersionTabState] = useState<StrategyVersionTabState>({
     sourceKey: '',
     value: 'definition',
   });
-  const [centerTab, setCenterTab] = useState<StrategyCenterTab>(() =>
-    strategyCenterTabForPath(location.pathname),
-  );
-  useEffect(() => {
-    setCenterTab(strategyCenterTabForPath(location.pathname));
-  }, [location.pathname]);
+  const centerTab = strategyCenterTabForPath(location.pathname);
   const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
   useBacktestJobEvents();
   const createMutation = useCreateStrategyMutation();
@@ -191,11 +190,13 @@ export function StrategyDashboard() {
     cancelMutation,
     retryMutation,
     onJobQueued: (job) => void navigate(strategyCenterPath.job(job.id)),
+    queueErrorToastId,
     load,
   });
   const startBacktest = async (setup: BacktestSetupInput) => {
     if (!backtestSelection) return false;
     const succeeded = await actions.startBacktest(backtestSelection.version, setup);
+    if (succeeded) void navigate(strategyCenterPath.jobs);
     return succeeded;
   };
   const refreshing = strategiesQuery.isFetching || jobsQuery.isFetching;
@@ -203,7 +204,6 @@ export function StrategyDashboard() {
   return (
     <StrategyCenterLayout
       value={centerTab}
-      onValueChange={setCenterTab}
       actions={
         <RefreshIconButton
           label="刷新策略中心"
@@ -213,7 +213,11 @@ export function StrategyDashboard() {
       }
     >
       <StrategyCenterErrorBoundary>
-        <DataStateBanner state={loadState} onRetry={() => void load()} />
+        <DataStateBanner
+          state={loadState}
+          description={strategiesQuery.isError ? '策略列表暂未更新。已成功保存的策略或新版本无需再次提交，请重新读取列表。' : undefined}
+          onRetry={() => void load()}
+        />
         <Routes>
           <Route index element={<LegacyStrategyRedirect />} />
           <Route
@@ -231,6 +235,7 @@ export function StrategyDashboard() {
             path="library/new"
             element={
               <StrategyEditorPage
+                key={accountMode}
                 strategies={strategies}
                 loading={strategiesQuery.isPending}
                 mode="create"
@@ -298,14 +303,13 @@ export function StrategyDashboard() {
                 onRerun={({ strategy, version, setup }) =>
                   setBacktestSelection({ strategy, version, initialSetup: setup, intent: 'rerun' })
                 }
-                onSourceTabChange={setCenterTab}
               />
             }
           />
           <Route path="experiments" element={<StrategyExperimentListPage />} />
           <Route
             path="experiments/new"
-            element={<StrategyExperimentCreatePage strategies={strategies} />}
+            element={<StrategyExperimentCreatePage key={accountMode} strategies={strategies} />}
           />
           <Route
             path="experiments/:experimentId"

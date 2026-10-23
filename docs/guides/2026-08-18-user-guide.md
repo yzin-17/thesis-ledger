@@ -4,7 +4,7 @@
 
 `/accounts` 用于创建、编辑、停用和重新启用账户；`/position-entry` 用于选择账户后录入当前持仓和现金。账户只描述名称、机构、类型、实际/影子模式、币种和状态，不保存本次录入来源。
 
-手动录入表达“设置当前余额”，不是伪造一笔买入：持仓写入 `POSITION_BASELINE_OBSERVATION`，现金写入 `CASH_BALANCE_OBSERVATION`。数量设为零或执行“清空持仓”会保留可审计的零余额观察。截图导入先生成 Import Draft，经审核、冲突检查和提交后才写入 Ledger；未提交行不改变现有持仓，截图中的现金字段不作为正式现金事实。
+手动录入表达“设置当前余额”，不是伪造一笔买入：持仓写入 `POSITION_BASELINE_OBSERVATION`，现金写入 `CASH_BALANCE_OBSERVATION`。数量设为零或执行“清空持仓”会保留可审计的零余额观察。持仓导入先生成 Import Draft，经审核、冲突检查和提交后才写入 Ledger；未提交行不改变现有持仓。
 
 真实账户与影子账户使用独立 Ledger、投影和估值范围，默认聚合只包含实际账户。完整边界见 [`录入持仓与账户模型重构`](../specs/2026-08-18-position-entry-account-model.md) 和 [`Ledger 与收益计算`](../domain/2026-08-18-ledger-and-performance.md)。
 

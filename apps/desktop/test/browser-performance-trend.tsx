@@ -30,6 +30,7 @@ function Fixture() {
   const [range, setRange] = useState<PerformanceSeriesRange>('1Y');
   const [interval, setInterval] = useState<PerformanceSeriesInterval>('1d');
   const [scenario, setScenario] = useState<'sparse' | 'dense' | 'single' | 'empty'>('sparse');
+  const [pointerType, setPointerType] = useState('尚未交互');
   let points = sparse;
   if (scenario === 'dense') points = dense;
   else if (scenario === 'single') points = sparse.slice(0, 1);
@@ -45,9 +46,13 @@ function Fixture() {
     ALL: ['1mo', '1y'],
   };
   return (
-    <main className="flex flex-col gap-4 p-4">
+    <main
+      className="flex flex-col gap-4 p-4"
+      onPointerDownCapture={(event) => setPointerType(event.pointerType)}
+    >
       <h1>组合走势交互验收</h1>
       <p>本页为固定输入，验证真实组件交互；不请求来源，不生成业务历史。</p>
+      <p>最近指针类型：{pointerType}</p>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setScenario('sparse')}>稀疏跨日点</Button>
         <Button onClick={() => setScenario('dense')}>2000 个分钟点</Button>

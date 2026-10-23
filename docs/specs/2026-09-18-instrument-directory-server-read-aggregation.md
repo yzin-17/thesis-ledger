@@ -3,7 +3,8 @@
 > 任务标识：instrument-directory-server-read-aggregation
 > 日期：2026-09-18
 > 状态：已完成本地实现、分层验证和 Docker 运行态更新；浏览器和安装态门禁未执行
-> 对应任务：[实施任务](../tasks/2026-09-18-instrument-directory-server-read-aggregation.md)
+> 当前验收：[交易 follow-up 的目录消费验收](../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md#directory-consumer-acceptance)
+> 历史实施：[原 Task](../archive/tasks/2026-09-18-instrument-directory-server-read-aggregation.md)；原 AC1～AC6 保留，浏览器和安装态未通过，不因归档补勾。
 
 ## 背景与问题
 

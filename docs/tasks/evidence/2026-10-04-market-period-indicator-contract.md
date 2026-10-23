@@ -2,7 +2,7 @@
 
 ## 完成范围
 
-2026-10-04 父对话在主仓及实际 DSA 原仓串行完成 T1.3 与 T4 的 DSA 计算责任。主仓 HEAD 为 `514abeebfe57bac0c16271439d8b777ff3b02a9f`，DSA HEAD 为 `d40549602d187da7bdd0e8bebb59d2a0fc271919`；本次源码仍为未提交修改。原 Spec/Task 为[行情周期规格](../../specs/2026-09-16-market-chart-period-aggregation.md)与[任务清单](../2026-09-16-market-chart-period-aggregation.md)。
+2026-10-04 父对话在主仓及实际 DSA 原仓串行完成 T1.3 与 T4 的 DSA 计算责任。主仓 HEAD 为 `514abeebfe57bac0c16271439d8b777ff3b02a9f`，DSA HEAD 为 `d40549602d187da7bdd0e8bebb59d2a0fc271919`；本次源码仍为未提交修改。原 Spec/Task 为[行情周期规格](../../specs/2026-09-16-market-chart-period-aggregation.md)与[任务清单](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md)。
 
 新增独立 `market-period-indicator-v1` 请求与能力合同。四周期计算绑定完整聚合摘要、实际计算点摘要和最终输入指纹；DSA 重算点摘要及最终绑定，继续调用原有 pandas 指标公式。能力端点独立于 Data V3 握手，明确 STOCK/ETF、1～3650 点、参数 2～200 及 MA/MACD/RSI 预热规则。原始来源 identity/timeframes 仍为 1m/1d。
 

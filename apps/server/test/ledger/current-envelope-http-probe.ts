@@ -44,7 +44,7 @@ export const probeExecution = (accountId: string, symbol: string, key: string) =
     quantity: '10',
     price: '10',
     currency: 'CNY',
-    capabilityVerification: 'VERIFIED',
+    capabilityVerification: 'UNVERIFIED',
     settledAt: '2026-09-30T02:00:00.000Z',
     charges: [{ category: 'COMMISSION', amount: '2', currency: 'CNY' }],
   },

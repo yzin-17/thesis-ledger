@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { requestFailureMessage } from '@/shared/api/request-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 import {
@@ -69,6 +70,17 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
   const [preselectedCandidateId, setPreselectedCandidateId] = useState<string | null>(null);
   const [reviewCandidate, setReviewCandidate] = useState<OptimizationCandidate | null>(null);
+  const [writeReceipt, setWriteReceipt] = useState<string | null>(null);
+  const [clonedExperimentId, setClonedExperimentId] = useState<string | null>(null);
+  const errorToasts = useRef<Record<string, string>>({});
+  const clearOperationError = (operation: string) => {
+    const id = errorToasts.current[operation];
+    if (id) toast.close?.(id);
+    delete errorToasts.current[operation];
+  };
+  const reportOperationError = (operation: string, title: string, error: unknown) => {
+    errorToasts.current[operation] = toast.add({ title, description: requestFailureMessage(error, '请保留当前配置后重试'), type: 'error' });
+  };
   const [adoptedVersion, setAdoptedVersion] = useState<{
     id: string;
     strategyId: string;
@@ -112,6 +124,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     ]);
   };
   const finalizeMutation = useMutation({
+    onMutate: () => clearOperationError('finalize'),
     mutationFn: () => {
       if (!experimentId || !preselectedCandidateId || lockedCandidateIds.length === 0)
         throw new Error('请选择封存测试候选和预选候选');
@@ -122,41 +135,33 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
       });
     },
     onSuccess: async () => {
-      toast.add({ title: '封存测试已完成', description: '所有测试完成后，服务端已统一揭示结果。' });
+      setWriteReceipt('封存测试请求已确认');
+      toast.add({ title: '封存测试请求已确认', description: '完成与结果揭示以重新读取的服务端状态为准。' });
       await invalidate();
     },
-    onError: (error) =>
-      toast.add({
-        title: '封存测试未完成',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        type: 'error',
-      }),
+    onError: (error) => reportOperationError('finalize', '封存测试未完成', error),
   });
   const cancelMutation = useMutation({
+    onMutate: () => clearOperationError('cancel'),
     mutationFn: () => cancelOptimizationExperiment(experimentId ?? ''),
     onSuccess: async () => {
+      setWriteReceipt('实验已确认取消');
       toast.add({ title: '实验已取消' });
       await invalidate();
     },
-    onError: (error) =>
-      toast.add({
-        title: '取消失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        type: 'error',
-      }),
+    onError: (error) => reportOperationError('cancel', '取消失败', error),
   });
   const cloneMutation = useMutation({
+    onMutate: () => clearOperationError('clone'),
     mutationFn: () => cloneOptimizationExperiment(experimentId ?? ''),
-    onSuccess: async () => {
+    onSuccess: async (created) => {
+      setWriteReceipt('实验已确认克隆');
+      setClonedExperimentId(created.id);
+      queryClient.setQueryData([...optimizationKey, 'experiment', created.id], { experiment: created, candidates: [], attempts: [] });
       toast.add({ title: '实验已克隆' });
       await invalidate();
     },
-    onError: (error) =>
-      toast.add({
-        title: '克隆失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        type: 'error',
-      }),
+    onError: (error) => reportOperationError('clone', '克隆失败', error),
   });
   const adoptionContextQuery = useQuery({
     queryKey: [...optimizationKey, 'adoption-context', experimentId, reviewCandidate?.id],
@@ -165,6 +170,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   });
   const adoptionIntentKey = useMemo(() => crypto.randomUUID(), [experimentId, reviewCandidate?.id]);
   const adoptMutation = useMutation({
+    onMutate: () => clearOperationError('adopt'),
     mutationFn: () => {
       const context = adoptionContextQuery.data;
       if (!experimentId || !reviewCandidate || !context) throw new Error('采纳上下文尚未就绪');
@@ -177,6 +183,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
       });
     },
     onSuccess: async (result) => {
+      setWriteReceipt(`已采纳为正式策略 v${result.strategyVersion.version}`);
       setAdoptedVersion({
         id: result.strategyVersion.id,
         strategyId: result.strategyVersion.strategyId,
@@ -189,14 +196,10 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
       });
       await invalidate();
     },
-    onError: (error) =>
-      toast.add({
-        title: '采纳失败',
-        description: error instanceof Error ? error.message : '请重新审阅当前版本后再试',
-        type: 'error',
-      }),
+    onError: (error) => reportOperationError('adopt', '采纳失败', error),
   });
   const toggleLocked = (candidateId: string) => {
+    if (writesDisabled) return;
     setLockedCandidateIds((current) => {
       if (current.includes(candidateId)) return current.filter((id) => id !== candidateId);
       if (current.length >= 3) return current;
@@ -208,7 +211,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     return (
       <div className="rounded-lg border p-6 text-sm text-muted-foreground">正在读取实验详情…</div>
     );
-  if (!experiment || detailQuery.isError || compareQuery.isError)
+  if (!experiment)
     return (
       <DataStateBanner
         state="error"
@@ -220,6 +223,9 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     );
 
   const retryRequired = experiment.stopReason?.startsWith('final_test_retry_required:') ?? false;
+  const readFailed = detailQuery.isError || compareQuery.isError;
+  const writeBusy = finalizeMutation.isPending || cancelMutation.isPending || cloneMutation.isPending || adoptMutation.isPending;
+  const writesDisabled = readFailed || writeBusy;
   const testRevealed = canRevealTestMetrics(experiment);
   const active = !settledStatuses.has(experiment.status);
   const baselineValidation = metricRecord(compare?.baseline.metrics.validation);
@@ -245,6 +251,10 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
 
   return (
     <div className="space-y-4">
+      {clonedExperimentId ? <Button nativeButton={false} variant="outline" render={<Link to={strategyCenterPath.experiment(clonedExperimentId)}>查看克隆实验</Link>} /> : null}
+      {readFailed ? (
+        <DataStateBanner state="stale" description={`${writeReceipt ? `${writeReceipt}，无需重复提交。` : '显示的是上次读取结果；已确认创建或保存的实验无需重复提交。'}实验详情或对比读取失败，请先重新读取。`} onRetry={() => { void detailQuery.refetch(); void compareQuery.refetch(); }} />
+      ) : null}
       <Button
         nativeButton={false}
         render={
@@ -291,7 +301,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
           />
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              disabled={cloneMutation.isPending}
+              disabled={writesDisabled}
               onClick={() => cloneMutation.mutate()}
             >
               克隆实验
@@ -299,7 +309,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
             {active ? (
               <DropdownMenuItem
                 variant="destructive"
-                disabled={cancelMutation.isPending}
+                disabled={writesDisabled}
                 onClick={() => cancelMutation.mutate()}
               >
                 取消实验
@@ -374,13 +384,13 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  disabled={cancelMutation.isPending}
+                  disabled={writesDisabled}
                   onClick={() => cancelMutation.mutate()}
                 >
                   放弃实验
                 </Button>
                 <Button
-                  disabled={finalizeMutation.isPending}
+                  disabled={writesDisabled}
                   onClick={() => finalizeMutation.mutate()}
                 >
                   <RotateCcw aria-hidden="true" />
@@ -482,7 +492,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                               {adoptionBlock ?? '可采纳'}
                             </Badge>
                           </td>
-                          <td className="px-3 py-3">
+                          <StickyTableActionCell className="px-3 py-3">
                             <div className="flex flex-col items-start gap-2">
                               <ExperimentRunLinks runRefs={candidate.runRefs} />
                               {canSelectCandidateForTest(experiment, candidate, retryRequired) ? (
@@ -538,12 +548,12 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                                 />
                               ) : null}
                               {!adoptionBlock && !candidate.adoptedStrategyVersionId ? (
-                                <Button size="xs" onClick={() => setReviewCandidate(candidate)}>
+                      <Button size="xs" disabled={writesDisabled} onClick={() => setReviewCandidate(candidate)}>
                                   审阅并采纳
                                 </Button>
                               ) : null}
                             </div>
-                          </td>
+                          </StickyTableActionCell>
                         </tr>
                       );
                     })}
@@ -565,7 +575,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                   </div>
                   <Button
                     disabled={
-                      finalizeMutation.isPending ||
+                      writesDisabled ||
                       lockedCandidateIds.length === 0 ||
                       !preselectedCandidateId
                     }
@@ -588,10 +598,10 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
           {reviewCandidate && adoptionContextQuery.data ? (
             <ExperimentAdoptionReview
               context={adoptionContextQuery.data}
-              pending={adoptMutation.isPending}
+              pending={adoptMutation.isPending || readFailed}
               acknowledgeExposure={reviewCandidate.id !== finalizedCandidate?.id}
               onConfirm={() => adoptMutation.mutate()}
-              onCancel={() => setReviewCandidate(null)}
+              onCancel={() => { if (!adoptMutation.isPending) setReviewCandidate(null); }}
             />
           ) : null}
           {testRevealed && baselineTest.totalReturn !== undefined ? (

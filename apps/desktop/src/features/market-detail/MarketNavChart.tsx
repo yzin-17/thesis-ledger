@@ -38,7 +38,11 @@ export const navRangeAvailability = (history: FundNavHistory, months: number) =>
   };
 };
 
-export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
+export function FundNavHistoryChart({ history: sourceHistory }: { history: FundNavHistory }) {
+  const history = useMemo(
+    () => sourceHistory.map((point) => ({ ...point, navDate: point.navDate.slice(0, 10) })),
+    [sourceHistory],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   type ChartApi = ReturnType<typeof createChart>;
   type TimeScaleApi = ReturnType<ChartApi['timeScale']>;

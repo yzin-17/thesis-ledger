@@ -37,7 +37,7 @@ export function journalExecutionFixture(accountId: string, symbol: string, prefi
         quantity,
         price,
         currency: 'USD',
-        capabilityVerification: 'VERIFIED',
+        capabilityVerification: 'UNVERIFIED',
         charges: [
           { category: 'COMMISSION', amount: side === 'BUY' ? '0.2' : '0.1', currency: 'USD' },
         ],

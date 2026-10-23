@@ -36,7 +36,7 @@ export interface AiProviderMetadata {
   capabilities?: readonly string[];
   priority?: number;
   health?: AiProviderHealth;
-  source?: 'database' | 'environment';
+  source?: 'database';
   authMode?: AiAuthMode;
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;

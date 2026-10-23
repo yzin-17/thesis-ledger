@@ -20,7 +20,8 @@ import { createProviderConnectionHandlers } from './providers.connection-actions
 import { createProviderConfigHandlers } from './providers.config-actions.js';
 import { createProviderAutomationHandlers } from './providers.automation-actions.js';
 
-export type ProviderToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
+export type ProviderToastManager = Pick<ReturnType<typeof useToastManager>, 'add'> &
+  Partial<Pick<ReturnType<typeof useToastManager>, 'close'>>;
 export type ProviderAsyncMutation<Input, Output> = {
   mutateAsync: (input: Input) => Promise<Output>;
 };
@@ -56,11 +57,13 @@ export type ProviderActionDependencies = {
   editingAutomationJob: AutomationJob | null;
   savingAutomationDraft: boolean;
   runningJobId: string | null;
+  deletingJobIdRef?: { current: string | null };
   setAutomationSheetOpen: Dispatch<SetStateAction<boolean>>;
   setAutomationDraft: Dispatch<SetStateAction<AutomationJobDraft>>;
   setEditingAutomationJob: Dispatch<SetStateAction<AutomationJob | null>>;
   setSavingAutomationDraft: Dispatch<SetStateAction<boolean>>;
   setRunningJobId: Dispatch<SetStateAction<string | null>>;
+  setDeletingJobId?: Dispatch<SetStateAction<string | null>>;
   createJobMutation: ProviderAsyncMutation<CreateAutomationJobInput, AutomationJob>;
   updateJobMutation: ProviderAsyncMutation<
     { jobId: string; patch: UpdateAutomationJobInput },

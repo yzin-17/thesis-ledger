@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatDateTime } from '@/lib/date-display';
 import {
   backtestRunPreparationRequestV3Schema,
@@ -40,6 +40,7 @@ export function BacktestPricePreparation({
   currency,
   onPrepared,
   initialModel,
+  onDirtyChange,
 }: {
   strategyVersionId: string;
   adjustment: 'none' | 'qfq' | 'hfq';
@@ -48,6 +49,7 @@ export function BacktestPricePreparation({
   currency: 'CNY' | 'HKD' | 'USD';
   onPrepared: (prepared: PreparedBacktest | null) => void;
   initialModel?: BacktestExecutionModelV3;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [text, setText] = useState(() =>
     initialModel ? JSON.stringify(initialModel, null, 2) : '',
@@ -78,6 +80,10 @@ export function BacktestPricePreparation({
     knownCashResearch: cashChoice.fingerprint,
   });
   const query = useBacktestPreparation(key, submitted);
+  const initialKey = useRef(key);
+  useEffect(() => {
+    if (key !== initialKey.current) onDirtyChange?.(true);
+  }, [key, onDirtyChange]);
   const cashResearch =
     adjustment === 'none' &&
     history === 'fixed-provider-snapshot' &&
@@ -240,13 +246,13 @@ export function BacktestPricePreparation({
       >
         {query.isFetching ? '正在准备并预检…' : '准备并核对配置'}
       </Button>
-      {error && <FieldError>{error}</FieldError>}
+      {error && <Field invalid><FieldError>{error}</FieldError></Field>}
       <AnnouncementPreparationStatus result={result} />
-      {query.stale && <FieldError>路由配置已经改变，请重新准备。</FieldError>}
+      {query.stale && <Field invalid><FieldError>路由配置已经改变，请重新准备。</FieldError></Field>}
       {query.error && (
-        <FieldError>
+        <Field invalid><FieldError>
           {query.error instanceof Error ? query.error.message : '配置准备失败，请重试'}
-        </FieldError>
+        </FieldError></Field>
       )}
       {result?.status === 'blocked' && (
         <BacktestPreflightDiagnostics diagnostics={result.diagnostics} />

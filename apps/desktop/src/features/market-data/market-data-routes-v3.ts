@@ -56,6 +56,9 @@ const assetTypeLabel: Record<string, string> = {
 };
 
 const capabilityLabel: Record<string, string> = {
+  NEWS_SEARCH: '新闻检索',
+  RESEARCH_REPORT_METADATA: '研报元数据',
+  NEWS_FEED: '市场快讯',
   DAILY_BAR: '日线行情',
   MINUTE_BAR: '分钟行情',
   REALTIME_QUOTE: '实时行情',
@@ -92,7 +95,9 @@ const targetId = (target: RouteTarget) => routeTargetKey(target);
 export const routeKeyIdV3 = (key: MarketRouteKeyV3) => marketRouteKeyIdV3(key);
 
 export const isIndependentMarketFunctionV3 = (key: MarketRouteKeyV3) =>
-  key.kind === 'data' && statusCapabilityNamesV1.some((name) => name === key.capability);
+  key.kind === 'data' &&
+  (key.capability === 'NEWS_FEED' ||
+    statusCapabilityNamesV1.some((name) => name === key.capability));
 
 export const routeKeyLabelV3 = (key: MarketRouteKeyV3) => {
   const scope = `${marketLabel[key.market] ?? key.market}${assetTypeLabel[key.assetType] ?? key.assetType}`;
@@ -149,8 +154,19 @@ export const readyRouteTargetsV3 = (
 ): MarketPolicyTargetOptionV3[] => {
   if (catalog?.status !== 'complete') return [];
   return catalog.entries
-    .filter((entry) => entryKeyMatches(entry, key) && entry.state === 'ready' &&
-      accountAccessSelectable(entry.accountAccess, Date.now(), providers.find((provider) => provider.providerId === entry.target.providerId)?.configVersion))
+    .filter(
+      (entry) =>
+        entryKeyMatches(entry, key) &&
+        entry.state === 'ready' &&
+        accountAccessSelectable(
+          entry.accountAccess,
+          Date.now(),
+          providers.find((provider) => provider.providerId === entry.target.providerId)
+            ?.configVersion,
+          providers.find((provider) => provider.providerId === entry.target.providerId)
+            ?.accountAccessSupported,
+        ),
+    )
     .map(({ target }) => ({
       key: targetId(target),
       target,
@@ -158,7 +174,7 @@ export const readyRouteTargetsV3 = (
     }));
 };
 
-/** 精确来源保留在选项中；缺少必要凭证时禁选，其余执行状态作说明。 */
+/** 需要账号权限的来源只提供已确认可用功能，其他来源沿用原就绪判断。 */
 export const selectableRouteTargetsV3 = (
   catalog: MarketRouteCatalogReadV3 | undefined,
   key: MarketRouteKeyV3,
@@ -166,19 +182,35 @@ export const selectableRouteTargetsV3 = (
 ): MarketPolicyTargetOptionV3[] => {
   if (catalog?.status !== 'complete') return [];
   return catalog.entries
-    .filter((entry) => entryKeyMatches(entry, key))
+    .filter(
+      (entry) =>
+        entryKeyMatches(entry, key) &&
+        accountAccessSelectable(
+          entry.accountAccess,
+          Date.now(),
+          providers.find((provider) => provider.providerId === entry.target.providerId)
+            ?.configVersion,
+          providers.find((provider) => provider.providerId === entry.target.providerId)
+            ?.accountAccessSupported,
+        ),
+    )
     .map((entry) => {
       const { target, state } = entry;
       let label = dataSourceDisplay(target.providerId, target.upstreamSource, providers);
       const support = statusQuerySupportLabelV1(entry.querySupport);
       if (support) label += ` · ${support}`;
       const provider = providers.find((item) => item.providerId === target.providerId);
-      const accessReady = accountAccessSelectable(entry.accountAccess, Date.now(), provider?.configVersion);
+      const accessReady = accountAccessSelectable(
+        entry.accountAccess,
+        Date.now(),
+        provider?.configVersion,
+      );
       const credentialMissing =
         state === 'credential_missing' ||
         (provider?.requiresCredential === true && !provider.credentialConfigured);
       if (credentialMissing) label += ` · ${routeAvailabilityLabelV3('credential_missing')}`;
-      else if (entry.accountAccess && !accessReady) label += ` · ${accountAccessLabel(entry.accountAccess, Date.now(), provider?.configVersion)}`;
+      else if (entry.accountAccess && !accessReady)
+        label += ` · ${accountAccessLabel(entry.accountAccess, Date.now(), provider?.configVersion)}`;
       else if (provider?.enabled === false) label += ' · 已停用';
       else if (state !== 'ready') label += ` · ${routeAvailabilityLabelV3(state)}`;
       return { key: targetId(target), target, label, disabled: credentialMissing || !accessReady };
@@ -222,10 +254,18 @@ export const policyRouteEnabledV3 = (policy: MarketPolicyDraftV3, key: MarketRou
   return Boolean(route && route.enabled !== false);
 };
 
-export const updatePolicyRouteEnabledV3 = (policy: MarketPolicyDraftV3, key: MarketRouteKeyV3, enabled: boolean) => {
+export const updatePolicyRouteEnabledV3 = (
+  policy: MarketPolicyDraftV3,
+  key: MarketRouteKeyV3,
+  enabled: boolean,
+) => {
   if (!isIndependentMarketFunctionV3(key)) return policy;
-  return { ...policy, routes: policy.routes.map((route) =>
-    routeKeyIdV3(route.key) === routeKeyIdV3(key) ? { ...route, enabled } : route) };
+  return {
+    ...policy,
+    routes: policy.routes.map((route) =>
+      routeKeyIdV3(route.key) === routeKeyIdV3(key) ? { ...route, enabled } : route,
+    ),
+  };
 };
 
 export const routeCatalogMessageV3 = (

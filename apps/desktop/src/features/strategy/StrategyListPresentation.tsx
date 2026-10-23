@@ -1,14 +1,17 @@
 import { Link } from 'react-router';
 import { Plus, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/lib/date-display';
-import { strategyCenterPath } from './strategy-center.navigation.js';
+import {
+  navFundSymbolForStrategyVersion,
+  strategyCenterPath,
+} from './strategy-center.navigation.js';
 import { backtestProgressLabel, backtestResultSummary } from './strategy-list-presentation.js';
 import { jobStatusLabel, jobStatusVariant } from './StrategySections.js';
-import type { BacktestJobSummary } from './strategy.types.js';
+import type { BacktestJobSummary, StrategyRecord, StrategyVersion } from './strategy.types.js';
 
 export function StrategyListSearchField({
   value,
@@ -80,15 +83,53 @@ export function BacktestStatusCell({ job }: { job: BacktestJobSummary }) {
   );
 }
 
+export function StrategyLibraryAction({
+  strategy,
+  version,
+  onBacktest,
+}: {
+  strategy: StrategyRecord;
+  version: StrategyVersion | null;
+  onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
+}) {
+  const className = 'h-auto min-h-8 max-w-full whitespace-normal';
+  if (version && navFundSymbolForStrategyVersion(version)) {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className={className}
+        nativeButton={false}
+        render={
+          <Link to={strategyCenterPath.navBacktestSetup(strategy.id, version.id)}>
+            基金净值回测
+          </Link>
+        }
+      />
+    );
+  }
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className={className}
+      disabled={!version}
+      onClick={() => version && onBacktest(strategy, version)}
+    >
+      回测
+    </Button>
+  );
+}
+
 export function StrategyRecentBacktest({ job }: { job: BacktestJobSummary | null }) {
   if (!job) return <span className="text-muted-foreground">未回测</span>;
   return (
     <Link
-      className="inline-flex flex-col gap-1 hover:underline"
+      className="inline-flex max-w-full flex-col gap-1 whitespace-normal hover:underline"
       to={strategyCenterPath.job(job.id)}
     >
       <Badge variant={jobStatusVariant(job.status)}>{jobStatusLabel(job.status)}</Badge>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
         {formatDateTime(job.updatedAt ?? job.createdAt, '时间未记录')}
       </span>
     </Link>

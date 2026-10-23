@@ -6,10 +6,10 @@ import type {
 import type { Quote } from '@thesis-ledger/schemas';
 import { MarketDetailDialogContent } from './MarketDetailDialogContent.js';
 import { MarketChartAdjustment } from './MarketChartAdjustment.js';
-import { MarketPeriodSelection, useMarketPeriodNotice, type ChartPeriod } from './MarketPeriodSelection.js';
+import { useMarketPeriodNotice, type ChartPeriod } from './MarketPeriodSelection.js';
+import { MarketDetailSelection } from './MarketDetailSelection.js';
 import { clearIndicatorSections } from './market-detail-generation.js';
 export { commitIfCurrentGeneration } from './market-detail-generation.js';
-import { useMarketChartSelection } from './useMarketChartSelection.js';
 import {
   MarketDetailNotice,
   sectionIsVisible,
@@ -39,12 +39,10 @@ const indicatorParamsKey = (params: MarketIndicatorParams) => JSON.stringify(par
 
 type DetailDialogProps = { position: MarketDetailPosition; onClose: () => void; adjustment?: 'none' | 'qfq' | 'hfq' };
 export function MarketDetailDialog(props: DetailDialogProps) {
-  const { adjustment, select } = useMarketChartSelection(props.position.symbol, props.adjustment);
-  return <MarketPeriodSelection symbol={props.position.symbol} {...(adjustment ? { adjustment } : {})}
-    enabled={props.position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ)$/.test(props.position.symbol)}>
-    {(timeframe) => <MarketDetailDialogView position={props.position} onClose={props.onClose}
+  return <MarketDetailSelection position={props.position} initial={props.adjustment}>
+    {({ timeframe, adjustment, select }) => <MarketDetailDialogView position={props.position} onClose={props.onClose}
       {...(adjustment ? { adjustment } : {})} select={select} timeframe={timeframe} key={`${props.position.symbol}:${timeframe}`} />}
-  </MarketPeriodSelection>;
+  </MarketDetailSelection>;
 }
 
 function MarketDetailDialogView({
@@ -310,9 +308,9 @@ function MarketDetailDialogView({
 
   return (
     <MarketDetailDialogContent
-      chartControls={position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ)$/.test(position.symbol)
+      chartControls={position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ|HK|US)$/.test(position.symbol)
         ? <MarketChartAdjustment symbol={position.symbol} value={adjustment} onChange={select}
-          plan={{ barsLimit: chartBarsLimit, indicatorParams }} refreshSequence={refreshSequence} /> : undefined}
+          plan={{ barsLimit: chartBarsLimit, indicatorParams, ...(timeframe === '1m' ? { timeframe } : {}) }} refreshSequence={refreshSequence} /> : undefined}
       position={position}
       unit={unit}
       queryNotice={<>{periodNotice}{queryNotice()}</>}

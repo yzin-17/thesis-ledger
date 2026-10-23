@@ -13,7 +13,7 @@
 - 将当前持仓表达为可审计的业务时点观察，而不伪造成交。
 - 支持完整或部分账户快照、多次检查点和逐步历史补录。
 - 使用确定性建议和用户确认建立覆盖关系。
-- 为截图和现有导入链路提供可回溯、可冻结的 ImportDraft。
+- 为现有导入链路提供可回溯、可冻结的 ImportDraft。
 
 ## 非目标
 
@@ -38,7 +38,7 @@
 - `batchId`、`accountId`。
 - `scope: FULL | PARTIAL`。
 - `observedAt`：余额对应的业务时点；来源时间未知时为 `NULL`，并将时间精度标记为 `UNKNOWN`。
-- `capturedAt`：截图或来源文件生成时间；来源未提供时为 `NULL`，不得使用 `recordedAt` 或 UTC 伪造。
+- `capturedAt`：来源文件生成时间；来源未提供时为 `NULL`，不得使用 `recordedAt` 或 UTC 伪造。
 - `recordedAt`：服务端写入时间。
 - 来源类别、具体渠道、原始证据引用与内容哈希。
 
@@ -104,7 +104,7 @@ remainingCost = observedQuantity * sourceAverageCost - reconciledActualCost
 
 - 新增创建、查看、修正 Baseline Observation Batch 的命令与查询。
 - 新增对账候选查询、确认、作废和恢复命令。
-- 现有截图或导入流程必须先创建 ImportDraft，不直接写 Position 或 BUY/SELL。
+- 现有导入流程必须先创建 ImportDraft，不直接写 Position 或 BUY/SELL。
 - 账户数据提供 Baseline、其他账本事件、Draft 问题和对账冲突入口。
 
 ## 数据、状态或兼容性影响

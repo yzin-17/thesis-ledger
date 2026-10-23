@@ -1,265 +1,119 @@
 # 统一数据能力适配层实施任务
 
-> 任务标识：`unified-data-capability-adapter`；首次日期：2026-10-09
-> 对应规格：[统一数据能力适配层与扩展契约](../specs/2026-10-09-unified-data-capability-adapter.md)
-> 状态核对：2026-10-14；原H07/K38及H08–H12、HiThink K37f-R与东财K37b-R证据复用；K37-C资格v2及当时写集的镜像固化完成。TF-F免费历史三个绑定、沪深六组实源/有限口径核对、正常新Run/快照、页面下载、独立计算和新旧断网重放通过；正式update.sh dsa固化及目标复验现已完成。TA1～TA5账户功能控制、目标API/页面及正式update.sh all镜像固化和运行态复验通过，原空间阻塞解除。RQ/Tushare原实现完成、真实成功受账号/权益外部条件阻塞，K37父项和整个主题保持部分完成。
-> 历史实施基线：当时的本地未提交工作树 `/Users/yzin/code/thesis-ledger-workspace`；各次部署/实读只证明其记录输入。2026-10-14 本轮基于 `main@3570ab2` 只做文档对账，复用已保存验收证据，没有新增实读或部署。
-> 过程与完整证据：[实施日志](../archive/reviews/2026-10-11-unified-data-capability-implementation-log.md)；[全源差异矩阵](../reviews/2026-10-10-provider-adaptation-and-route-matrix.md)。支持记录不维护另一套当前进度。
+<a id="priority"></a>
 
-> 当前接续：先读 §9.5 的剩余条件。RQ 注册/试用已取消且后来仅授权代码层；Tushare 精确现金接口权限未满足。两家迁移与拒绝层完成，正向消费仍未验证；条件未变化时没有开户、采购或重复实读动作，也不重做已完成的 TF-F、TA、K37f-R、K37b-R、K37-C 和 H08～H12。
+> 排期（2026-10-21 接续）：**P1｜核心消费者与来源剩余门禁**。Market Consumer 五类消费与当前精确 RouteTarget G1 已完成，H07 保留 Tushare 原权限条件；RQData 按用户决定延期至 TODO。涉及 IR02/IR03～IR06/IR09/IR10 的消费场景链接对应 [P0 修复](README.md#priority-p0)；外部权限缺口不阻塞无关已授权工作或引发重试。
+> [全局优先级与接续规则](README.md#priority-policy)。原任务编号与验收条件保持，以下状态只按实际证据更新。
 
+> 任务标识：`unified-data-capability-adapter`；首次日期：2026-10-09；文档精简：2026-10-15。
+> 当前状态：框架、迁移、已选切片、Market Consumer 共同消费与当前精确 RouteTarget G1 完成；账号等级与本地权限记录已实现，分层结果见下方 TAP。当前账号 120 分，未包含接口不列为本轮强制实源验收；H07 的历史现金正向消费未通过记录保留，RQData 原实源验收已延期至 TODO。10-21 获准受控切源、恢复与实际 Web 已通过，政策/DSA 166、原路由恢复；独立来源与业务验收不由此代收。
+> [现行 Spec](../specs/2026-10-09-unified-data-capability-adapter.md) · [来源合同](../specs/2026-10-09-unified-data-capability-source-contracts.md) · [来源与路由矩阵](../reviews/2026-10-10-provider-adaptation-and-route-matrix.md) · [完整历史](../archive/tasks/2026-10-09-unified-data-capability-adapter-history.md)
 
-## 当前任务与边界
+## 现在做什么
 
-实现、逐能力检查及 H08～H12 的有界机制已完成，原失败、目标版本与命令只维护在历史/证据报告中。尚未通过的是下面三项；没有新凭据或权限事实时维持停止，不开户、采购、保存/启用账号、改路由或扩搜。真实成功消费与账号可用性分开，不以拒绝路径通过代替正向结果。
+当前执行：按 [账号等级与本地权限保存规格](../specs/2026-10-09-unified-data-capability-adapter.md#account-access-persistence)完成下列独立阶段；[统一证据](evidence/2026-10-21-provider-account-level.md)记录命令、结果与限制。2026-10-22 已使用现有 Key 保存用户确认的120分，实际 daily 检查通过，其余五项零请求跳过，权限记录落盘；随后按用户授权启用，configVersion=3，实际页面仅显示当前可用的股票日线，原路由不变。未包含接口不强制验证；RQData TODO 维持。
+
+| 阶段 | 状态与写入范围 | 完成条件与验证 |
+| --- | --- | --- |
+| TAP1：状态与本地存储 | 完成；DSA 权限记录、来源等级规则及共享 Schema | 26 项定向及 407 项扩展回归通过：等级过滤零请求、配置隔离、事务回滚、坏记录拒绝、预算边界及物理进程重启恢复 |
+| TAP2：配置执行面 | 完成；DSA 配置 API、Server 与客户端合同 | 先检查后保存、同输入结果复用、并发变化拒绝和草稿不发布通过；120 分只检查 daily，其余五项零尝试 |
+| TAP3：功能消费面 | 完成；现有凭证侧栏、功能说明和路由选择 | 前端 25 项及最终构建通过，实际页面保存/重开/重启恢复/重新检查与 390、768、1280 像素检查通过；显示等级、最近检查时间和更新入口 |
+| TAP4：目标与页面验收 | 完成；正式更新与目标 API/页面 | 正式 update.sh all 退出0；新镜像/16文件摘要、API/真实页面、目标隔离权限落盘与双进程恢复通过；六卷及原业务/研究数据留存通过。完整调用参数、首次网络失败及最终结果见统一证据 |
+
+| 范围                                           | 真正剩余工作                                         | 接续条件                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| H07/K37                                        | 保留 Tushare 原正向生产消费未通过记录                | 当前 120 分不要求验证 fund_div；升级后实际权限及原准入条件具备时接续，条件未变时不重复请求 |
+
+[RouteTarget G1](#route-target-acceptance)已完成当前精确窗口的冷主源、成功备用延迟及 AC4/6/8 对应；[Market Consumer G1](#market-consumer-acceptance)已完成五类共同消费。输入未变时复用现有证据，不重复作为待办。
+
+只执行所选范围。H07 的外部阻塞不作为其他消费面的统一前置，其他消费面通过也不关闭原 H07 正向义务。已完成 TF-F、TA、K37f-R、K37b-R、K37-C、K38 和 H08～H12 不重复执行；193 条已完成叶的原编号、条件与证据保留在完整历史，本页不再维护其摘要副本。
 
 ### 9.5 当前未完成执行包与阻塞
 
-H07当前范围实现/逐能力检查、K38代码/合同/正式目标层及H08–H12机制按原断言对账完成，[直接证据与最终Review](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h07-h12-final-obligation-reconcile)。K37原显式正向义务保持未过，主题不归档；未配置来源不构成已验证消费者与冻结的总前置。
+<a id="rqdata-deferred"></a>
 
-| 原责任项 | 当前层级与依据 | 最小解除条件 |
-| --- | --- | --- |
-| K37父项内东财现金b正向层 | 按普通研究合同完成K37b-R1～R6；6次实源、五事件对账、3新Run/重放、真实展示/导出 | 逐窗口项目准入及旧严格live前置已解除。保留缺公告日/状态、历史覆盖未知及未核对事件的显式假设边界；无需追加本轮窗口审批 |
-| K37c-live RQ现金/拆分 | 代码/合同/来源错误及目标credential_missing、零尝试通过；无RQ账号 | 可合法使用的原凭据及精确证据/准入到位后原链路一次正向验证；不要求采购/开户或围绕缺账号新增重构 |
-| K37e-live Tushare现金 | 同凭据daily成功，fund_div HTTP200/40203精确拒绝，fund_daily亦拒绝；目标现金准入缺失 | fund_div权益实际变化/合法权限证据与原准入前置后才复验；不再询问Key、不保存/启源。400/2000门槛冲突未知，rt_k拒绝不外推 |
-| K37f-live HiThink现金 | 普通研究已完成；原值2保留未知、历史覆盖未验证，具体事件核对只覆盖已保存样本 | 不再等待人工scope、全部枚举或旧严格live；未核对事件默认排除或按显式假设模拟，未知与漏报风险继续披露 |
+RQData 原 `H07-K37c-live` 已按用户 2026-10-21 决定延期至 [TODO](../TODO.md#rqdata-live-consumption)，范围依据见 [Spec](../specs/2026-10-09-unified-data-capability-adapter.md#source-scope-20261021)。真实账号消费尚未通过；已过代码、合同、来源错误和目标 `credential_missing`/零尝试层保留。[原执行范围与证据](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md#record-9-71)继续供后续立项追溯。
 
-RQ与Tushare的真实正向条件仍阻止K37父项完成；HiThink与东财普通研究切片已通过，不阻止H08–H12已通过机制。公告a-live、拆分d-live不重复；拆分两事实/真实信封/实际完成截止/离线消费已过，coverage=false/原完整冻结及Runner独立受阻保持。解除完整收益须原窗口覆盖证据，不能买账号、重复两事实、读全页面或改complete代替；不重开已取消全历史任务，不改Spec。
+Tushare 适配实现与账号可用性分开：用户已提供现有 `TUSHARE_API_KEY`，同凭据 `daily` 单日成功；历史 `fund_div` 实际 HTTP200/40203 和 `fund_daily` 明确拒绝。权限采用 [Spec 的指定表格及逐接口规则](../specs/2026-10-09-unified-data-capability-adapter.md#source-scope-20261021)，`fund_div` 文档门槛为至少 400 积分；用户当前明确账号只有 120 分，故该接口不纳入本轮账号配置功能的强制验证。积分由用户填写，不声称从接口查得；有效期与独立权益以官网及范围内实际检查为准。2026-10-22 目标已加密保存凭据、120分与本地权限，daily 实际通过，五项未包含接口跳过；随后按用户授权启用、configVersion=3，实际页面仅显示可用股票日线，未选路由且无现金合法准入。只有 `fund_div` 权益事实变化、合法权限证据与原前置到位后才复验，条件未变时停止，不再询问 Key。
 
-TickFlow原完整服务4绑定保持；免费历史TF-F1～F4完成独立端点/认证/版本接入，沪深三复权有限实源、实际新消费者及断网重放通过。连接/精确库存20/143；免费来源只声明本范围历史日K，单位/锚点和全历史可见性限制保持。最终正式update.sh dsa已完成镜像固化，目标三文件/SDK/绑定及新旧重放复验通过；此前空间阻塞解除，不新增供应商请求或放宽数据语义。
-
-已完成叶的完整执行事实和原路径见历史记录；当前状态以本节、下方未通过项和支持记录的最新锚点为准，不沿用旧政策值、一次预算或下一步。
-
+Tushare 的真实正向条件仍阻止 K37 父项完成；RQData 已转为后续范围。HiThink与东财普通研究切片已通过，不阻止H08–H12已通过机制。公告a-live、拆分d-live不重复；拆分两事实/真实信封/实际完成截止/离线消费已过，coverage=false/原完整冻结及Runner独立受阻保持。解除完整收益须原窗口覆盖证据，不能买账号、重复两事实、读全页面或改complete代替；不重开已取消全历史任务，覆盖与冻结合同保持。
 
 ## 未通过的原责任项
 
-- [ ] H07-K37-event-batches：七事件实现/来源绑定及中央分派退役已齐；公告a-live、拆分d-live及普通研究新合同下的HiThink f-live、东财b正向层已过。RQ c-live、Tushare e-live仍受外部条件阻塞，父项保持开放；不扩为已完成研究切片失败。[东财证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-k37b-research-v2)。
+- [ ] H07-K37-event-batches：七事件实现/来源绑定及中央分派退役已齐；公告a-live、拆分d-live及普通研究新合同下的HiThink f-live、东财b正向层已过。Tushare e-live 仍受外部条件阻塞，父项保持开放；RQ c-live 已延期至 TODO，不记为验收通过。[东财证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-k37b-research-v2)。
   - 证据与原执行范围：[原§9.69](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md#record-9-69)。
-- [ ] H07-K37c-live：RQ真实账号消费，当前未配置/未选路线，不自动创建或启用。
-  - 证据与原执行范围：[原§9.71](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md#record-9-71)。
-- [ ] H07-K37e-live：Tushare真实现金消费；用户已提供现有TUSHARE_API_KEY。本轮独立fund_div实际HTTP200/40203明确该接口无权限；同凭据daily单日成功，fund_daily亦明确拒绝。官方fund_div门槛400/2000冲突仍未知，不依据rt_k推断或要求采购。目标未保存凭据/未启用/未选且无现金合法准入，正向生产消费未过。[精确核查](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-20261012-exact-entitlement-audit)。
+- [ ] H07-K37e-live：Tushare真实现金消费；用户已提供现有 `TUSHARE_API_KEY`。既有独立 `fund_div` 实际 HTTP200/40203 拒绝，同凭据 `daily` 单日成功，`fund_daily` 亦明确拒绝。权限依据和至少 400 积分门槛见 [现行 Spec](../specs/2026-10-09-unified-data-capability-adapter.md#source-scope-20261021)，实际权益变化及原准入条件具备后才接续。目标已加密配置并启用120分账号，daily检查通过，fund_div本轮跳过；未选路由且无现金合法准入，现金正向生产消费未过。[精确核查](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-20261012-exact-entitlement-audit)与[当前启用及页面证据](evidence/2026-10-21-provider-account-level.md#2026-10-22-启用与当前等级页面核对)。
   - 证据与原执行范围：[原§9.73](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md#record-9-73)。
 
-## 1. 后续实施共同约束
+## 后续实施约束
 
-实现前重新读取实际源码、现行任务范围和环境，不把示意方法当作已存在实现。当前能力适配、已支持冻结版本、用户路由、配置和凭据保留；不清库、不改账户 Ledger、不启动已取消申请或旧任务。
+执行前核对实际源码、现行范围与环境，只处理选定的精确切片；保留能力合同、冻结版本、用户路由、配置与凭据，不清库或改账户 Ledger。主仓拥有能力合同、产品读模型及消费者；DSA 拥有来源实现和运行机制；infra 负责必要部署。稳定合同以 Spec 为准，不在此复制。
 
-主仓拥有能力契约、产品 API/读模型和消费者；DSA 拥有来源定义、实现绑定与运行机制；infra 只处理必要运行依赖和部署。先确认所有权，不新增无边界 common/shared 目录，不机械拆文件规避门禁。
+验证按定向 → 受影响包 → 边界/依赖门禁 → 必要真实目标递进。旧命令和工作树数量只是原时点事实；输入未变的有效证据可复用，改造前结果不能冒充改造后通过，拒绝路径不能替代正向消费。没有新输入与明确执行范围时不自动启动来源、部署或已取消任务。
 
-A01 固定本轮精确迁移切片及回归集合，不将所有来源或现行业务任务合并为一次重写。选定切片迁移后，其目录和执行来自同一注册定义；未迁移能力保持原路径，不双重生成同一目标。
+## 已完成范围与证据
 
-验证按定向 → 受影响包 → 边界/依赖门禁 → 必要真实目标递进。低层级失败先修复；输入未变的证据可复用，但改造前结果不能冒充改造后通过。
+| 范围                        | 可复用结果及边界                                                                                                                                                                               | 证据                                                                                                                                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H07 实现、K38、H08～H12     | 原范围实现/逐能力、代码/合同/正式目标及有界机制已完成；不消除上述 K37 正向条件                                                                                                                 | [最终分层对账](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h07-h12-final-obligation-reconcile)                                                                                                                |
+| HiThink K37f-R、东财 K37b-R | 普通现金研究、新 Run/快照、实际展示/导出、独立计算和离线重放已过；不再等待旧严格 live 或窗口人工审批。HiThink 原值 2 未知、东财缺公告日/状态、历史覆盖未知；未核对事件默认排除或按显式假设模拟 | [HiThink 执行包](../archive/tasks/2026-10-09-unified-data-capability-adapter-history.md#k37f-r普通-hithink-分红研究执行包) · [东财证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-k37b-research-v2)         |
+| K37-C / C1～C6              | 新准备采用登记截止成交持有份额 v2，原模型仅供旧冻结重放；真实计算、页面/下载和新旧断网重放已过，正式镜像固化已完成                                                                             | [规则与验收](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-k37-entitlement-v2) · [镜像复验](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-k37-entitlement-image-solidified)  |
+| TickFlow TF-F1～F4          | 免费历史三绑定、沪深六组有限口径、新消费/快照及重放、正式 `update.sh dsa` 与目标复验完成；原完整服务四绑定保持。库存 20/143；仅声明本范围历史日 K，单位/锚点与全历史可见性限制保留             | [实源及消费](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-tickflow-free-history) · [镜像复验](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-tickflow-free-image-solidified) |
+| Tushare TA1～TA5            | 六接口账户功能控制、目标 API/页面、正式 `update.sh all` 和运行态复验通过，原空间阻塞解除；权限提示可用不表示现金接口成功消费                                                                   | [原任务与逐项结果](../archive/tasks/2026-10-09-unified-data-capability-adapter-history.md) · [精确权益核查](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-20261012-exact-entitlement-audit)                     |
 
+AC01～AC20 与来源专属断言由现行 Spec 维护。过程、真实写集/版本、原命令、失败与修正分别查[实施日志](../archive/reviews/2026-10-11-unified-data-capability-implementation-log.md)、[来源迁移证据](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md)及[运行证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md)，不维护第二套当前进度。
 
-## 已完成任务索引
+<a id="route-target-acceptance"></a>
 
-以下仅标记原任务完成态；实际写集、日期、命令、失败与修正见[历史执行包与记录](../archive/tasks/2026-10-09-unified-data-capability-adapter-history.md)，不重复执行。范围内的正向来源、覆盖及客户端边界以当前未完成项为准。
+## RouteTarget：现行路由接续验收
 
-| 原任务 ID | 状态 | 已完成范围摘要 |
-| --- | --- | --- |
-| `TA1` | 完成 | 状态与合同：六个精确功能使用标准访问状态，18秒/六请求预算、5分钟配置绑定内存缓存、草稿隔离和并行变化拒绝发布 |
-| `TA2` | 完成 | 执行面：原HTTP客户端按传输职责小范围提取，Fetcher兼容入口、十进制解析和生产参数保持；来源负责六接口参数及2002/明确 |
-| `TA3` | 完成 | 消费面：新权限侧栏、保存后当前配置检查、禁用候选和原因、中文标签及过期内部目录刷新完成 |
-| `TA4` | 完成 | 目标验收：正式sync-code all退出0，兼容性预检及DSA/Server/Worker健康通过 |
-| `TA5` | 完成 | 镜像固化：用户要求重试后，宿主29386MiB/Docker23947MiB达到原20480/18432MiB门槛；仅为本次命令补 |
-| `TF-F1` | 完成 | 来源接入：免费目标仅沪深A股三日线绑定，原四绑定/Key/报价保持 |
-| `TF-F2` | 完成 | 有限语义核对：沪600519/深000001，2025-06-23～07-04三复权各10条，原价80个OHLC与腾讯一致；量数值 |
-| `TF-F3` | 完成 | 真实消费者：正常新prepare/原策略3笔成交、25冻结价格（含预热）及qfq归一化新快照完成；10研究日期40OHLC等于此前 |
-| `TF-F4` | 完成 | 部署与对账：原330项受影响/末次99项及目标消费证据复用 |
-| `C1` | 完成 | 规则与版本：510300/510050/510880一手公告确认交易结束后的登记份额，沿原policy.entitlement冻结 |
-| `C2` | 完成 | 执行面：quantity为成交记增减总数量、settledQuantity为可卖结算数量；登记截止事件在同刻有效成交之后采集，不依 |
-| `C3` | 完成 | 计算：A～F独立期望与原账本/队列测试相等，Server定向24、Domain受影响27项通过；独立脚本分新/旧版本，真实新29/ |
-| `C4` | 完成 | 来源事实轻量去重：五个事件移入DSA有所有权/版本/引用的共享事实表，两来源各自匹配不扩大，不补字段；112项受影响及能力边界通过 |
-| `C5` | 完成 | 真实消费者：正常新prepare/preflight/create、原引擎登记日实际买100份，资格100/应收8.8，期末现金9 |
-| `C6` | 完成 | 本地固化：2026-10-14用户要求重试后，正式update.sh all退出0，DSA及Server/Worker切换新镜像； |
-| `K37b-R1` | 完成 | 状态机：合同已同步；旧严格入口/旧结果保持，缺公告日和状态分别保存null及明确问题，覆盖未知独立表达 |
-| `K37b-R2` | 完成 | 执行面：既有东财读取模块复用有界传输，注册通用研究协议；配置/前后控制和实际采集时钟保持 |
-| `K37b-R3` | 完成 | 有界对账：实际3样本、51原记录/5目标事件；跨2024～2026金额、每10份单位、三现金日期及窗口合计无差异，5条均缺公告日/ |
-| `K37b-R4` | 完成 | 消费面：3个新快照/Run完成，独立Decimal复算全部74权益点；1091.2元核对事件、未知默认不采用、显式假设2172.6 |
-| `K37b-R5` | 完成 | 展示与导出：3个真实结果页面、2份实际下载通过；采用/未采用计数、缺字段、假设、覆盖、模拟发放和原资料清楚分列，下载逐字段等于持久 |
-| `K37b-R6` | 完成 | 部署验收：正式sync-code all及必要thesis-ledger同步成功；3新快照各两次断网重放校验和一致、网络0 |
-| `D00-local-reconcile` | 完成 | 已连接设备，读取工作区/主仓 Agent 规则、文档指南和本地状态；未发现同主题 Spec/Task |
-| `D01-local-doc-merge` | 完成 | 创建通用 Spec/Task，并在现有按需数据、富途、共同价格文档及两个导航中增量关联；逐文件校验编辑前内容，不覆盖并行修改 |
-| `D02-local-doc-check` | 完成 | 检查本轮增量 diff、相对链接、任务标识/AC 映射、原任务勾选及本轮仅文档写集，区分并行源码变化；只对新文档格式化，不重排原大 |
-| `A01-inventory` | 完成 | 核对当前定义、工厂、能力/修订表和消费者特判；选择已有日线与非 K 线切片，固定精确文件、原行为及测试 |
-| `A02-capability-contract` | 完成 | 定义能力版本、强类型请求/结果关联、query/subscribe 操作及错误约束；保留 V3 路由，不接受任意名称执行 |
-| `A03-registry` | 完成 | 建立静态能力与来源绑定，关联定义/工厂/处理器/修订；拒绝重复、缺处理器和操作不匹配，目录视图由绑定生成 |
-| `A04-first-query-path` | 完成 | 迁移一个现有精确日线目标，保留请求、路由、账号、结果校验和来源记录；复用超时/错误/限流，不加第二层切源 |
-| `B01-bars-adapters` | 完成 | 迁移腾讯/HiThink 选定日线的工厂、精确范围和本地修订；供应商 SDK/字段差异留在来源模块 |
-| `B02-non-bar-adapter` | 完成 | 迁移至少一种现有非 K 线能力，优先选择已稳定的净值、状态或当前资料；保持其原模型，不强制 Quote/K 线字段 |
-| `B03-binding-consolidation` | 完成 | 选定切片中其余绑定采用现行 V3 薄适配收拢，确保同一目标只有一个定义源；未迁移范围记录原有入口，不以重写全部来源作为前置 |
-| `B04-readiness-projection` | 完成 | 静态能力由绑定派生，依赖/账号/权限/配额及启用状态动态判断；未知保持未知，测试能力不注册为生产能力 |
-| `B05-credential-lifecycle` | 完成 | 验证工厂缓存、账号配置代次、停用、在途结果和释放；不复用失效实例，不泄漏凭据 |
-| `C01-basic-price-policy` | 完成 | 收拢 DSA 基础价格放行和 Server supportsBasicPriceFallback() 的名称判断，包括 A01 确 |
-| `C02-consumer-boundaries` | 完成 | 沿用 DsaDataCapabilityReaderV3 和既有 Market Reader；消费标准字段，不增加供应商 DTO  |
-| `C03-cache-and-state` | 完成 | 缓存身份包含必要来源、账号权限、覆盖和参数；来源停用/配置变化正确失效，用户主备顺序不变 |
-| `C04-frozen-regression` | 完成 | 目录与政策身份按现行协议处理，已支持冻结版本及结果不改写；离线重放不依赖在线适配器/当前凭据，不追补已取消缺失旧资产 |
-| `C05-boundary-guard` | 完成 | 固化消费者不得依赖来源实现或新增供应商执行分支的规则；显示标签不误判为执行分支，已有模块方向不反转 |
-| `D10-new-provider-proof` | 完成 | 测试中新 providerId 实现已有能力，记录 changed-files；只允许来源模块、测试和显式注册，公共 Runtim |
-| `D11-order-book-contract` | 完成 | 按 Spec §7 定义盘口、深度、单位、时钟、覆盖与错误；query/subscribe 分开，只进入测试注册表 |
-| `D12-two-adapter-fixtures` | 完成 | 两种不同结构分别适配同一 OrderBook，覆盖已知/未知单位、缺时间、排序、权限失败、深度不足和显式降级；不是复制 JSON  |
-| `D13-subscription-state-model` | 完成 | 用隔离迭代器/回调验证初始状态、取消/释放、失效/重同步；缺口不能继续输出有效盘口，无序列不声称连续性已验证 |
-| `D14-switch-and-backpressure` | 完成 | 验证重连/切源代次、旧消息隔离、有界缓冲溢出；B 增量不作用于 A 盘口，UI 合并完整状态不破坏重建 |
-| `D15-scope-isolation` | 完成 | 验证共享不跨账号权限/来源/不兼容参数；停用或撤权影响已有消费者 |
-| `E01-focused-tests` | 完成 | 执行注册、查询、转换、错误、控制一致性、隔离和生命周期定向测试，记录实际命令与统计 |
-| `E02-packages` | 完成 | 运行受影响 Schemas/Server/Desktop 及 DSA 检查，不触发未改原生客户端的无关编译，也不宣称原生验收通过 |
-| `E03-repository-gates` | 完成 | 按实际 scripts 执行类型、lint、build、边界/依赖/尺寸门禁，不提高阈值或新增 ignore 隐藏问题 |
-| `E04-target-update` | 完成 | 源码稳定且确需目标验收时，从 infra 正式 sync-code.sh/update.sh 选择最小目标并遵守预检；依赖/SDK |
-| `E05-existing-source-runtime` | 完成 | 对已迁移且现行可用的来源做有界真实查询、研究/冻结和必要主备故障验证；需要临时改用户政策时先取得授权并按 CAS 恢复，不自动启用 |
-| `E06-consumer-check` | 完成 | 用当前浏览器入口验证目录、图表与错误，确认测试能力未作为真实能力展示，不新增供应商业务面板 |
-| `F01-onboarding-guide` | 完成 | DSA 给出“已有能力新增来源”的最短流程与真实测试入口，主仓给出“首次新增能力”的契约/消费者边界；不把复制多个中央分支写成规范 |
-| `F02-current-architecture` | 完成 | 实现完成后才同步 Architecture 与兼容说明，不把设计文档写成已实现事实；旧文档仅链接，不重复状态 |
-| `F03-acceptance-reconcile` | 完成 | 核对 AC01–AC12，明确未执行层级；本地盘口测试不称为二级行情已实盘接入，也不改变原业务任务完成或取消状态 |
-| `F04-worktree-summary` | 完成 | 核对实际 diff 与授权范围，保留并行 WIP；不自动提交、推送、发版或清理 |
-| `H01-framework-closeout` | 完成 | 依赖原 A–D 选定闭环及 E/F 记录，核对完整框架验收并完成仍开放的 E05 |
-| `H02-source-inventory` | 完成 | 依赖 H01，固定当前产品所有 Provider、真实 upstreamSource、现有精确能力、旧执行入口和新绑定清单，覆盖内 |
-| `H03-per-capability-audit` | 完成 | 依赖 H02，逐项核对声明/实现/统一迁移/消费者、字段语义、能力参数、错误和依赖；沿已有测试及已授权配置做必要有界验证，来源无权 |
-| `H04-difference-report` | 完成 | 依赖 H03，在主仓 docs/reviews/2026-10-10-provider-adaptation-and-route- |
-| `H05-route-split-plan` | 完成 | 依赖 H04，补齐同报告中的旧路由→独立能力/参数/目标映射；优先拆出历史交易状态、风险警示、价格规则与基础日期，确认上市阶段等实 |
-| `H06-route-contract` | 完成 | 依赖 H05，主仓共享契约和 DSA 对应边界分别建立功能级请求/结果、逐能力覆盖与状态、独立启停及政策迁移合同；沿现行强类型扩展 |
-| `H07-adapter-batches` | 完成 | 依赖 H06，按 H03 缺口将当前范围的既有来源能力逐切片迁入统一定义/执行或补齐准确标准投影，复用原读取器/SDK；每批固定来 |
-| `H08-route-runtime` | 完成 | 依赖 H06/H07，落实 DSA 单目标读取及控制检查、Server 每能力主备选择与停用语义，明确唯一切源责任 |
-| `H09-consumer-and-freeze` | 完成 | 依赖 H08，消费者按本次需求组合各能力的不同来源结果，必需数据缺失只影响对应计算；分别冻结请求、RouteTarget、观察时间 |
-| `H10-route-ui` | 完成 | 依赖 H09，在原功能路由界面按业务组展示独立功能开关、精确主备候选、支持范围与不可用原因；Provider 配置不复制到每功能、 |
-| `H11-target-verification` | 完成 | 依赖 H10，定向→受影响包→边界/依赖/尺寸→必要正式更新→真实功能消费分层验证 |
-| `H12-matrix-reconcile` | 完成 | 依赖 H11，更新同一差异矩阵与接入指南、必要当前架构及新 AC13–AC20 结果 |
-| `H01-K1` | 完成 | 核对并补齐新能力查询的精确请求匹配、结果关联、操作及合同版本约束 |
-| `H01-K2` | 完成 | 固定 E05 的最小真实备用验收方案及可复用入口，先核对现行目标和 CAS |
-| `H01-K3` | 完成 | 在现有 Provider 配置事务补可选期望配置代次，作为受保护恢复前置 |
-| `H06-K1-shared-contract` | 完成 | 只改共享 Schema、导出和跨语言固定样例；证明五项能力参数、单位/时钟/未知/证据/关联边界，不改业务研究语义 |
-| `H06-K2-dsa-contract` | 完成 | 只改 DSA 强类型合同和合同测试；标准化五项能力并接通已有 registry 校验，不加入生产目录 |
-| `H06-K3-policy-compatibility` | 完成 | 串行修改共享 route、DSA 校验/Effective 与 Server 控制合同；旧序列化不注入字段，新功能显式关闭、禁用保 |
-| `H07-K1-status-and-dates` | 完成 | 来源模块拥有 BaoStock 日级状态/粗风险/基础日期与 official-states 事实投影，逐能力准入/覆盖，不回补价 |
-| `H07-K2-efinance-daily` | 完成 | 迁移既有 CN STOCK/ETF、none/qfq/hfq 六个精确日线目标；来源模块拥有定义/工厂/绑定/修订和精确 SDK  |
-| `H08-K1-feature-epoch` | 完成 | 通过现有 Runtime/Reader 的功能启停、目标匹配、代次及缓存检查，证明关闭前后无新增调用和晚到结果隔离 |
-| `H08-K2-server-status-routes` | 完成 | 演进现有 DsaDataCapabilityReaderV3，为五项独立功能增加按当前 Effective Policy 的读取； |
-| `H07-K3-akshare-daily` | 完成 | 完成上述 12 个既有精确日线的来源所有权迁移、原执行入口合同回归与登记等价检查 |
-| `H07-K4-baostock-daily` | 完成 | 完成三个既有价格目标迁移，不将独立状态/日期事实合并为价格完整性证明 |
-| `H09-K1-composition-freeze` | 完成 | 新建普通 STOCK 固定来源快照按当前已选独立能力获取、分别冻结请求/目标/修订/时钟/覆盖/错误和采用事实；只沿原“已知停牌日 |
-| `H07-K5-pytdx-daily` | 完成 | 上述单目标移入来源模块，保留原参数、错误、修订与有效组合，原登记删除，经过原 Runtime 与库存等价验证后勾选代码叶 |
-| `H09-K2-target-composition` | 完成 | 使用真实已选价格及不同来源的独立功能，经原消费入口生成新组合冻结，并证明可选功能失败保留其他事实；不得用测试原文或单独 Schem |
-| `H07-K6-tickflow-daily` | 完成 | 三目标经原 Control/Runtime 走来源绑定，旧登记删除；完整 SDK 参数、日期结构、错误、凭据/配置快照、普通/pr |
-| `H07-K7-alphavantage-daily` | 完成 | 上述单目标实际执行通过来源绑定，删除旧登记，保留原协议/修订、工厂/缓存与错误，完成受影响验证 |
-| `H07-K8-finnhub-daily` | 完成 | 单目标通过原真实执行器及标准结果，保留参数、时钟、原修订、错误和生命周期，删除原双重登记；受影响验证与目标层分别记录 |
-| `H07-K9-tushare-stock-daily` | 完成 | 两个目标沿原 Control/Runtime → 来源绑定 → 原 HTTP client → 标准结果闭环；原工厂预算、凭据/端 |
-| `H07-K10-yahoo-stock-etf-daily` | 完成 | 六目标完成来源绑定与实际执行器闭环，原参数、日期、单位未知、MultiIndex 身份及工厂缓存保持；本叶完成时 US INDEX |
-| `H07-K11-yahoo-us-index-daily` | 完成 | 既有指数单目标通过原执行器与标准结果，原身份/单位/复权/单响应语义保持，旧 Native 单登记删除，股票/ETF 及 Shar |
-| `H07-K12-longbridge-daily` | 完成 | 八目标迁移与原执行器闭环，工厂/OAuth/probe/缓存/SDK 原行为和修订保持，删除旧对应登记，受影响验证及库存等价通过 |
-| `H07-K13-yahoo-share-windows` | 完成 | 两项已有有界参考窗口复用标准合同与原执行器，单一来源登记、原事实与消费边界保持，HTTP/错误/冻结相关回归和库存等价通过 |
-| `H07-K14-futu-daily` | 完成 | 十二目标经原隔离入口与标准处理器完成迁移，完整分页/释放/预算/错误及原工厂缓存保持，精确登记与修订等价；目标与真实来源分层记录 |
-| `H07-K15-retire-native-daily` | 完成 | 空 Native 日线生产分支退役，已迁移非 HiThink 日线检查复用标准处理器，未迁移路径和 HiThink 专有语义保持， |
-| `H07-K16-futu-quote` | 完成 | 四个既有精确报价迁入标准绑定，原 SDK/工厂/投影/错误保持，删除旧对应登记与供应商分支，原检查复用与回归通过 |
-| `H07-K17-futu-static-info` | 完成 | 既有四项当前资料迁入独立强类型合同与标准处理器，原身份/整数/未知/释放/预算/错误保持，原 HTTP/probe 复用，删除旧对 |
-| `H07-K18-security-lot-size` | 完成 | 两来源复用标准当前参考合同，来源专有投影归模块、原工厂/缓存/时钟/摘要/错误与主备保持，旧对应登记删除；目标与真实来源分层记录 |
-| `H07-K19-longbridge-quote` | 完成 | 四既有报价标准绑定与实际投影，原代码/时钟/结果原型/空与错误保持，删除旧对应登记/供应商分支，工厂/OAuth 回归通过 |
-| `H07-K20-yahoo-quote` | 完成 | 七既有报价（含 US INDEX）标准绑定与单响应校验，原代码/quoteType/未知与失败保持，删除旧对应登记/供应商分支，不 |
-| `H07-K21-native-stock-quotes` | 完成 | 三既有单标股票报价来源绑定，原预算/参数/时钟/错误/工厂保持，旧分支/对应登记删除 |
-| `H07-K22-alphavantage-quote` | 完成 | 单标标准投影校验真实身份、缺失与零，预算/错误/原工厂保持，本地适配修订与来源协议分别表达，不改 SDK 或旧冻结 |
-| `H07-K23-efinance-pytdx-quotes` | 完成 | 三既有报价标准绑定，efinance 股票单标失败不走原生全市场，pytdx 校验身份/缺失，缓存/单位未知/错误与原工厂保持 |
-| `H07-K24-akshare-etf-quote` | 完成 | 既有 ETF/eastmoney 单标接口标准绑定，原参数/证券交易所/预算/错误/未知保持，旧对应分支与登记删除 |
-| `H07-K25-akshare-stock-em-tencent` | 完成 | 两既有来源报价标准绑定、源内缓存/有界次数/单位/时钟保持，原登记移除 |
-| `H07-K26-akshare-stock-sina` | 完成 | 响应身份/参数边界收口后迁移，保留原 SDK 原生分析与错误边界，不能把输入代码当上游身份凭据 |
-| `H07-K27-hithink-quotes` | 完成 | 两项标准报价绑定及原工厂/错误/单位/时钟/Guard 快照闭环，移除对应旧登记与 SDK 分发 |
-| `H07-K28-fund-nav` | 完成 | 首次标准化已有最新净值能力，建立强类型请求/结果与 Schema/关联校验、小型处理器和两来源绑定；来源拥有 SDK 列名投影及基 |
-| `H07-K29-fund-nav-history` | 完成 | 依赖 K28 的点模型/日期边界里程碑，建立独立历史请求与序列合同、窗口/limit/单调唯一校验及两绑定；保留完整来源校验后截窗 |
-| `H07-K30-nav-diagnostics` | 完成 | 诊断复用最新/历史合同及同一源绑定，保留原 probe 只读、cache=false、样本窗口/观察与工厂上下文；退役诊断执行对S |
-| `H07-K31-fund-holdings` | 完成 | 单既有能力建立标准请求/持仓结果/Schema/处理器并来源绑定，字段/季度/明确百分比转换归适配器；保留原空年份回看、错误、观察 |
-| `H07-K32-holdings-diagnostics` | 完成 | 诊断消费同一标准合同/绑定，删除 Runtime 原 SDK 持仓方法/列名校验并固化边界；实际工厂、缓存隔离、错误、草稿和无路由 |
-| `H07-K33-chip-summary` | 完成 | 两来源绑定同一强类型估算摘要合同/处理器，来源适配拥有字段、身份、单位与报告日，业务消费删除SDK DTO/比例猜测；保留原SDK |
-| `H07-K34-special-etf-daily` | 完成 | 分开完成Tushare ETF与HiThink ETF来源绑定/工厂/修订事实迁移，保留原分页、范围、单位、原文/计算/准入与交互 |
-| `H07-K34a-tushare-etf` | 完成 | 一精确绑定替换三中央事实，原SDK工厂/基金日线入口、4.5s、完整分段、单位与错误不改；公共执行器删除TushareETF特判， |
-| `H07-K34b-hithink-etf` | 完成 | 一个qfq目标绑定原专用读取，来源拥有工厂/请求元信息/错误，删除中央登记/Runtime特判并保留交互/稀疏/单位/修订/凭据代 |
-| `H07-K35-public-fees` | 完成 | 六目标分子叶迁入费用标准合同/处理器和三来源模块，来源绑定派生原目录/修订，删相应旧登记，原JSON内容/摘要/文档/覆盖/收费政 |
-| `H07-K36-legacy-status` | 完成 | 旧聚合七目标建立强类型请求/结果/Schema及来源绑定，分别保留公告、结构化与盘中原证据/窗口/错误，删除对应旧登记与公共供应商 |
-| `H07-K37a-notice-cash` | 完成 | 公告现金源事件绑定、标准请求/现金结果与类型化事件上下文，复用原执行器；动态修订从来源派生，删旧中央目标/供应商分支/工厂登记，原 |
-| `H07-K37a-live` | 完成 | 2026-10-12原正式入口续期24小时、版本2原scope；原Server真实现金读取、新Run b60471f6 succe |
-| `H07-K37b-eastmoney-cash` | 完成 | 原严格合同/拒绝兼容保持；普通研究正向按K37b-R1～R6新合同通过，真实单基金页面→标准资料→新快照→现金计算→页面/下载→断 |
-| `H07-K37c-rqdata-events` | 完成 | 两事件目标迁入来源定义、原账号工厂、强类型现金/拆分合同与原映射/隔离执行；目录/修订/凭据与当前准入查找派生，退役公共RQ执行特 |
-| `H07-K37d-eastmoney-split` | 完成 | 复用原持久日期映射、原页面/分页/时钟、Split合同，保留原生效日与登记日；本地与目标代码移植完成 |
-| `H07-K37d-live` | 完成 | 原159516映射/证据/版本1准入复用；追加明确一次预算后，原Server单次HTTP200/observed，两条ratio= |
-| `H07-K37e-tushare-cash` | 完成 | 保留原原文先于账号的多重guard、30s总预算、实际Decimal HTTP解析/可见日和原adapter凭据缓存；原精确时钟不 |
-| `H07-K37f-hithink-cash` | 完成 | 最后一个精确目标完成来源绑定，原文先行、全部准入symbol范围、environment/control快照、精确时钟、30s m |
-| `H07-K37f-live` | 完成 | 依据2026-10-13用户产品决定，以普通现金研究的新合同验收；现有合法配置、用户已选来源、未知标准记录、有限具体事件核对、新快 |
-| `H08-K3-cache-control-context` | 完成 | 增加原Data V3的只读缓存上下文（控制事实投影，不执行来源），先用于即时价并迁移其余受影响缓存；fresh/last-vali |
-| `H08-K3a-local-and-projection` | 完成 | 五类缓存本地移植、共享/包级/静态门禁和正式目标只读投影完成；不代表真实切代次/故障或缓存消费验收 |
-| `H08-K3b-live-cache-generation` | 完成 | 目标原Server消费和真实缓存代次、停用/恢复、一次有界错误验收已由quote-generation/four-cache/so |
-| `H10-K1-ui-draft` | 完成 | 原路由界面的五独立功能、精确候选/参数范围、草稿开关和显式保存CAS完成；隔离保存及真实浏览器草稿通过 |
-| `H10-K2-target-save` | 完成 | 原浏览器入口权限当前可用，同一5173开发服务恢复后，真实控件保存五独立功能117→118，原Server五消费全部通过；关闭状态 |
-| `H07-K38-runtime-residue` | 完成 | 继续原Runtime/SourceDefinition接缝收敛公共来源特判 |
-| `H07-K38a-credential-revision` | 完成 | 来源声明拥有准入修订策略及认证载荷，公共层保留用途隔离摘要；新providerId、原三家指纹字节、权限范围、旋转失效和整数版本回 |
-| `H07-K38b-quote-guard` | 完成 | 公共报价执行按有限来源声明准备/复核；原HiThinkGuard实现不改，同次快照、预算与后置拒绝回归通过，正式DSA同步和目标原 |
-| `H07-K38c-retire-implicit-daily` | 完成 | 通用日线SDK/attrs死分支退役，原timeframe/控制拒绝和零执行合同保持；显式V3入口回归与正式目标同步通过 |
-| `H07-K38d-quote-admission-reader` | 完成 | 来源拥有兼容准入reader，全部scope/有效期/同次可选快照及新provider隔离回归通过；正式目标同步/原报价读取通过 |
-| `H07-K38e-revision-view` | 完成 | 修订从唯一DailyBinding派生，未登记报价失败关闭；140项修订/manifest结果逐项相同，本地及目标目录回归通过 |
-| `H08-K3b-quote-generation` | 完成 | 本次精确授权的真实Server报价功能关闭/恢复与缓存代次验收完成；非故障注入，不替代其他Provider配置/来源失败及其余四类 |
-| `H07-K38f-hithink-probe` | 完成 | HiThink三固定诊断由来源策略拥有，原SDK/代表证券/单日qfq/4.5s、安全错误和draft/non-draft生命周期 |
-| `H07-K38g-inventory` | 完成 | 核对通用probe四来源的工厂与参数生命周期，形成可执行迁移边界 |
-| `H07-K38g-quote` | 完成 | 依赖K38g-inventory，承接K38/AC13/14/20，迁移Tushare/TickFlow代表报价的canonica |
-| `H07-K38g-daily` | 完成 | 依赖K38g-quote的有限adapter诊断上下文就绪，承接K38/AC13/14/20，迁移Finnhub/AlphaVan |
-| `H07-K38h-inventory` | 完成 | 依赖K38g，承接既有K38宽manifest兼容缺口及AC13/14/20 |
-| `H07-K38h-manifest` | 完成 | 依赖K38h-inventory，承接原K38/AC13/14/20，迁移HiThink原现金/股票目录兼容与删除对现行绑定无效的 |
-| `H07-K38i-inventory` | 完成 | 依赖K38h，承接原K38公共来源分支缺口与AC13/14/20，限定环境凭据读取/方法推导 |
-| `H07-K38i-environment` | 完成 | 依赖K38i-inventory，承接原K38/AC13/14/20，迁移六来源环境凭据字段/方法及最终快照附加 |
-| `H08-K3b-next-preflight` | 完成 | 依赖H08五缓存本地合同与当前目标代码就绪，承接K3b其余四缓存/配置/来源失败真实门禁 |
-| `H08-K3b-transport-observation` | 完成 | 依赖next-preflight已确认的原入口/计数缺口，承接H08零调用真实门禁的必要证据 |
-| `H08-K3b-source-config-preflight` | 完成 | 依赖五缓存功能代次就绪，承接原Provider配置代次真实门禁，先准备精确案例 |
-| `H08-K3b-source-failure-preflight` | 完成 | 依赖原报价缓存合同及控制代次就绪，承接原一次有界错误目标门禁，先准备隔离HTTP故障案例 |
-| `H08-K3b-source-config-case` | 完成 | 依赖source-config-preflight就绪及本次独立授权，承接原Provider配置代次真实缓存门禁 |
-| `H08-K3b-four-cache-case` | 完成 | 依赖next-preflight的精确方案与transport-observation就绪里程碑，承接其余四缓存真实门禁 |
-| `H09-K2-price-preflight-next` | 完成 | 依赖原K2合法价格要求与当前绑定就绪，承接既有组合消费/新冻结的数据资格缺口 |
-| `H09-K2-research-options-preflight` | 完成 | 依赖两窗预检及原K2读取接缝，修复验收驱动遗漏的既有研究读取选项，承接合格价格必要缺口 |
-| `H09-K2-target-packet` | 完成 | 依赖完整原研究选项价格预检就绪，承接原H09-K2真实业务组合与冻结，准备可审查的精确执行包 |
-| `H09-K2-status-error-envelope` | 完成 | 依赖真实Worker失败证据，承接原标准错误/部分失败合同及新冻结阻断的必要修复 |
-| `H09-K2-new-case-after-error-fix` | 完成 | 依赖status-error-envelope目标核对，承接原K2真实组合/新冻结的修复后验收 |
-| `H09-K2-creation-observation` | 完成 | 依赖本次真实晚到提交证据，承接K2真实新冻结执行包的必要生命周期缺口 |
-| `H09-K2-policy-projection-fence` | 完成 | 依赖101→103真实创建失败，承接原组合控制修订/冻结的必要接缝修复 |
-| `H08-K3b-source-failure-case` | 完成 | 依赖source-failure-preflight、正式目标同步及本次独立故障授权，承接原报价有界错误真实缓存门禁 |
-| `H07-K38aa-quote-public-units` | 完成 | 依赖K38z及API实际接缝审计，承接AC05/14/20单位适配不进入公共业务入口的既有义务 |
-| `H07-K38ab-quote-result-schema` | 完成 | 依赖K38aa的单位合同就绪里程碑，承接原AC01/04/14请求/结果强Schema和标准对象隔离义务 |
-| `H07-K38ac-daily-public-units` | 完成 | 依赖K38ab及实际API调用链审计，承接AC04/05/14/20字段差异由来源拥有的既有义务 |
-| `H07-K38ad-daily-window-plan` | 完成 | 依赖K38ac与原多窗口调用链，承接AC01/04/14/20来源参数差异隔离及原有界查询行为 |
-| `H07-K38ae-query-operation-boundary` | 完成 | 依赖K38ad与AC06/08注册操作审计，修复现有查询绑定误声明订阅的必要缺口 |
-| `H07-K38af-non-bar-key-boundary` | 完成 | 依赖K38ae定向操作边界就绪，承接AC02/06精确身份及能力参数隔离义务 |
-| `H07-K38ag-canonical-capability-contract` | 完成 | 依赖ae/af实际注册边界就绪，承接AC02/03/07同一标准能力复用及新增能力契约义务 |
-| `H07-K38ah-factory-error-boundary` | 完成 | 依赖ag及Runtime实际工厂调用链，承接AC03/04/09新来源复用/标准错误与凭据隔离义务 |
-| `H07-K38ai-local-source-readiness` | 完成 | 依赖ah与目录就绪实际调用链，承接AC02/03/14/20来源拥有实现差异及目录/执行一致性义务 |
-| `H07-K38ab-a-quote-source-aliases` | 完成 | 依赖K38aa及K38ab实际来源库存，承接K38ab标准结果来源前置契约 |
-| `H07-K38z-manifest-source-facts` | 完成 | 依赖K38y及公共构造器实际引用审计，承接AC14/20单一登记事实与公共供应商分支收拢 |
-| `H07-K38y-research-instrument-binding` | 完成 | 依赖K38x，承接AC05/14及原研究身份/单位事实的已定位供应商分派 |
-| `H07-K38x-research-frame-projection` | 完成 | 依赖K38w及零量真实接缝，承接AC05/14来源DTO/attrs不由公共研究消费者解析的必要缺口 |
-| `H07-K38w-research-calendar-binding` | 完成 | 依赖K38v及研究接缝实际调用链，承接AC05/14消费者不识别供应商、旧覆盖保持的必要缺口 |
-| `H07-K38v-policy-admission-guard` | 完成 | 依赖K38t及实际公共接缝审计，承接AC14/20供应商后置准入守卫收拢 |
-| `H08-H09-obligation-reconcile` | 完成 | 依赖已有缓存/功能及组合冻结真实结果，承接H08/H09父项过期摘要与依赖对账 |
-| `H07-K38u-all-provider-check-regression` | 完成 | 依赖K38t扩查，承接原逐来源精确诊断回归义务 |
-| `H07-K38t-exact-dependencies` | 完成 | 依赖K38当前接缝审计，承接AC14/20的新来源不修改公共执行/环境供应商分支 |
-| `H11-target-runtime-recovery` | 完成 | 依赖DSA正式镜像/健康及当前政策111只读复核，承接原Server/Worker目标消费、缓存/冻结/最终门禁 |
-| `H07-K38s-sdk-source-build-gap` | 完成 | 依赖本地诊断源码稳定及正式dsa构建失败，承接必要目标更新门禁，不新增SDK业务能力 |
-| `H07-K38p-hithink-event-probe` | 完成 | HiThink来源旧严格probe_read及前后准入保持兼容；原212定向/2710包级和目标零尝试证据保持 |
-| `H07-K38q-tushare-event-probe` | 完成 | Tushare来源拥有原mapped probe，工厂仍请求绑定cache=false/probe=True，凭据冻结、4.5秒/ |
-| `H07-K38r-eastmoney-event-probe` | 完成 | AK来源现金/拆分两probe已各自声明；现金原fetch_fund_dividend_observations/max_page |
-| `H07-K38o-rqdata-event-probe` | 完成 | 依赖K38官方诊断迁移与K37事件绑定，承接原在线事件精确诊断供应商分派残留 |
-| `H07-K38n-independent-notice-probe` | 完成 | 依赖K38l实际再现的七独立功能诊断缺口，承接原五独立能力/来源检查合同 |
-| `H07-K38m-capability-regression-fixtures` | 完成 | 依赖K38k/l扩大能力回归，承接原迁移回归及H08/H11受影响门禁 |
-| `H07-K38l-notice-exact-probe` | 完成 | 依赖K38j/k本地接缝，承接原K38官方精确诊断残留 |
-| `H07-K38k-hk-us-exact-probe` | 完成 | 依赖K38j本地来源诊断接缝，承接K38/AC14/AC20的公共供应商分派残留 |
-| `H07-K38j-cn-fee-exact-probe` | 完成 | 依赖K38最终公共接缝审计，承接原精确来源检查的供应商残留 |
-| `H07-K38-probe-runtime-qualification` | 完成 | 依赖K38g工厂/参数迁移及当前目录，承接原真实probe层的控制资格核对 |
-| `H09-K2-two-session-result-proof` | 完成 | 依赖实际succeeded Run ff4bbf86…、完整新快照与原Worker断网两次一致重放，承接原K2业务验收驱动的结果层 |
-| `H09-K2-response-diagnostics` | 完成 | 依赖6889043e…明确失败/107恢复，承接原标准错误和真实组合缺口的必要定位 |
-| `H09-K2-response-chain` | 完成 | 依赖已确认失败Run/107恢复及紧接107→109响应案例完整恢复，承接原真实组合执行包的必要证据连续性 |
-| `H09-K2-snapshot-policy-projection` | 完成 | 依赖Market比较修复及实际Snapshot调用链，承接同一政策事实在冻结前后的完整核验 |
-| `H09-K2-baostock-query-isolation` | 完成 | 依赖103→105真实晚到失败与实际调用链，承接原组合不同来源事实/执行生命周期的必要缺口 |
-| `H07-K38aj-rqdata-guard-errors` | 完成 | 承接原AC04/09/11/20与K37c/K38o，2026-10-12用户确认RQ无法申请凭据，先推进代码层；真实账号义务保留 |
+[原 Task 与历史证据](../archive/tasks/2026-09-16-market-data-route-target-v2.md)的 T1～T3、旧 Docker 与当时冷主源结果保留。稳定路由合同以本主题 [Spec](../specs/2026-10-09-unified-data-capability-adapter.md)及 [Canonical](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准；[旧 V2 Spec](../specs/2026-09-16-market-data-route-target-v2.md)保留断言追溯，不恢复默认主备或 handshake。
 
+- [x] G1：真实 Provider 与目标级性能/运行态门禁
+  - 覆盖验收标准：AC4、AC6、AC8
+  - 依赖：T1、T2、T3；需要当前 DSA、Server 源码和目标配置。
+  - 当前适用范围：现行已启用、获准的精确来源路由及主备；旧 Tencent 默认主目标/强制 AkShare/EastMoney 分支已被替代，不恢复用户跳过的来源。
+  - 完成条件：目标级调用、失败回退和真实 provenance 通过；冷主源 ≤5s、主源失败备用成功 ≤10s。
+  - 验证方式：真实 Provider smoke 与目标运行态请求；fixture 不可替代。
 
-## 验收与证据入口
+Canonical E02/E04 和共同价格四条 Run/三口径已有路由、主备与 provenance 的接续证据。10-17 对当前选中绑定强制新鲜读取：`510300.SH` ETF/qfq/1d、`2024-07-15～19`、`refresh=true`，HTTP 200、5 个准确交易日、`servedFromCache=false`，HiThink / `fund-market-historical`、routeIndex 0、policy 154，耗时 370ms，满足该精确窗口主源 ≤5s。原始回执 `.recovery-artifacts/portfolio-pnl-2026-10-17/route-primary-fresh.json`；它不代表新建进程冷启动，也不替代其他绑定或失败回退。
 
-AC01～AC20 及来源专属合同由[原 Spec](../specs/2026-10-09-unified-data-capability-adapter.md)与其来源附页维护；已完成阶段不消除 K37 的真实正向条件，旧完整覆盖/Runner 边界不因少量事件成功而放行。
+10-21 新进程主源冷态已补：同一精确 HiThink ETF/qfq/1d 五日窗口，正式鉴权 ASGI、首次 Runtime/适配器，整个专用进程 1537.267ms、请求 303.489ms，HTTP 200/五日完整/真实来源，原保护不变。[回执](evidence/2026-10-21-route-cold-primary.md)明确不启动额外后台生命周期、不代表正常服务完整停启，也不扩大至其他来源。
 
-- [来源迁移与拒绝证据](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md)
-- [真实运行、普通现金、TickFlow、权限提示及分层对账](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md)
-- [原始阶段记录](../archive/tasks/2026-10-09-unified-data-capability-adapter-history.md)
+10-17 时点剩余独立缺口是失败后成功备用 ≤10s 测量及其原 AC4/6/8 对应；两秒 Run 终态不等于请求延迟。当时维护入口的只读预案通过，ETF qfq 仅选 HiThink，腾讯候选就绪；用户选择“先保留该项未完成”，故未写临时 policy 或停用来源。该暂停记录保留为历史时点。AKShare/EastMoney 用户跳过保持有效，不要求启用、采购或强制恢复该分支。
 
-## 最终一致性 Review
+2026-10-21 用户明确恢复后，正式入口的 16 项定向验证、受控切源、恢复后主源重读与实际 Web/数据保护均通过。三次真实五日非缓存请求分别为 HiThink 401.508041ms、腾讯备用 453.987167ms、恢复后 HiThink 307.090791ms；备用为第二目标，满足 ≤10s，冷主源复用上段 1537.267ms。政策 164→165→166、HiThink 配置 7→8→9，原 16 条路由与启用状态恢复；15 账户/13 表/57 个 V3、草稿/资产摘要相等，模型计数全 0。G1 按当前适用范围关闭，[完整回执及 AC4/6/8 对应](evidence/2026-10-21-route-failover-acceptance.md)保留受控停用与真实网络超时的证据边界。主线程执行、只验 Web、真实模型暂停、DG3 TODO、截图暂缓保持；其余 H07 正向权限条件仍未通过。
 
-代码、拒绝路径、已选来源和已保存窗口按其原范围通过；RQ/Tushare 正向条件仍阻止父项收口。新输入与明确执行指令到位后只复验相应原叶，不重跑未变证据，不以文档精简降低合同。
+<a id="market-consumer-acceptance"></a>
+
+## Market Consumer：真实消费接续验收
+
+[原 Task 与历史证据](../archive/tasks/2026-09-16-market-data-consumer-consistency-v2.md)的 T1～T5、隔离事实读写、Redis 和目标结构结果保留；[原 Spec](../specs/2026-09-16-market-data-consumer-consistency-v2.md)继续提供消费断言。Reader、隔离账本及当前拒绝/读取已有 Canonical E01/U02/D02 和共同价格接续证据。
+
+- [x] G1：消费者集成与当前 Docker 运行态门禁
+  - 覆盖验收标准：AC6
+  - 依赖：T1–T5；Phase 1/2 代码已进入同一运行版本且保留事实已恢复。
+  - 涉及范围：Risk、Performance、Backtest、Portfolio、Automation 真实调用链；不替代单元和边界测试。
+  - 完成条件：目标 Docker 版本、迁移状态、路由和 acceptance 证据一致；未通过项保留阻塞说明。
+  - 验证方式：按验证阶梯匹配定向、包级、仓库与真实消费证据；需要目标更新时按 infra 规则选择最小适用入口，不因旧命令记录默认执行完整更新。
+  - 10-17 当前执行叶已完成：Risk 最近收盘价格只取必要单日，最长持有期仍完整读取真实开仓窗口；修复实时读取的可得性上限和预览漏传持有周期需求。现有 `600000.SH` 已知上市事实/2026 日历/HiThink 主源真实消费通过，三条规则均正常求值。未启用规则、通知或故障切换；显式历史评价和自动扫描不因实时预览而放宽。正式快照冻结输入与幂等修复见 Portfolio R3.I1–I3。
+
+10-17 目标已通过官方完整更新恢复，随后 Web 跳转修复通过正式快更同步；当时政策 revision 154、`applied`、`effectiveStale=false`。10-20 获准临时基金 NAV 接口实读后恢复原全部绑定，现行政策 156、`applied`、`effectiveStale=false`，原 11 张业务保护表与 57 个 V3 结果未变；[本次接口证据](evidence/2026-10-20-fund-nav-source-acceptance.md)不关闭下列业务父门禁。按消费者保留以下边界，不重复适配器探针或已过业务：
+
+10-21 接续：[基金正式校准/Web 日线](evidence/2026-10-21-fund-calibration-acceptance.md)与[真实披露/维护分钟/Web](evidence/2026-10-21-fund-disclosure-acceptance.md)已补齐当前精确基金/季度的消费；后续[复权分钟与误差](evidence/2026-10-21-fund-adjusted-returns.md)补齐当前算法口径，政策 162、`applied`、非 stale，原 16 条路由恢复。三项新专用基金账户结清停用、审计/修订/点位保留，原 13 张表/57 个 V3/旧点位保护通过。原严格收尾的正常目录刷新及验收脚本失败均保留独立复核，不冒称原执行一次无误。
+
+| 消费面      | 可复用的实际证据                                                                                                                                                                                                                                                                                                 | 仍未覆盖的条件                                                                                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backtest    | 自有 `600519.SH` V3 Run `3f3691ae-a025-40a9-8cc6-4ad1ee96ca81` 成功，执行/信号/基准均冻结 HiThink、policy 154；[回执与结果](evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。                                                                                                                     | 该精确前复权固定序列窗口已过；不扩展为全部市场/来源或真实历史规则。其他绑定复用其现有证据。                                                                                                    |
+| Risk        | 自有 100 股持仓、平均成本 10，HiThink 不复权完整日线收盘 9.73；止损/止盈值 -0.027、持有周期 1，三条均 `not_triggered`，价格与可得时点均有值。单日与完整开仓窗口均选中，账户已清仓停用，见[当前回执](evidence/2026-10-17-ui-runtime-closeout.md#股票正式校准与-risk-正向消费)。                                   | 本例已覆盖 Reader 正向消费；未创建风险应用、启用规则、写事件或发通知，不充作这些独立业务验收，也不代表全部市场/来源或历史评价通过。                                                            |
+| Performance | [收益 G1](evidence/2026-10-17-portfolio-pnl-directory-consumers.md)含真实 FX、Trade Close Slice 和缺失降级；股票及[基金正式校准](evidence/2026-10-21-fund-calibration-acceptance.md)验证冻结输入、修订链及幂等；[基金披露和维护分钟](evidence/2026-10-21-fund-disclosure-acceptance.md)已有独立实源及 Web 证据。 | 当前精确基金/季度、qfq 与跨日误差通过；[原组合十九项 AC](evidence/2026-10-21-portfolio-final-acceptance.md)已对账归档。其他主题事实/日历条件继续由各自原任务承担，不扩大为全部基金或历史 PIT。 |
+| Portfolio   | 同一收益记录覆盖真实行情/FX、清仓现金态和降级；Safari 真实触屏、股票点位、基金日线及两个维护分钟均有对应证据。                                                                                                                                                                                                   | [组合原十九项 AC 最终对账](evidence/2026-10-21-portfolio-final-acceptance.md)已通过并归档；维护采样不冒称现场开市调度，其他主题的历史事实仍按原任务保留。                                      |
+| Automation  | Scheduler 真实进程、现金与受管快照证据复用；10-21 正常受管正式校准实际处理唯一自有基金估算，succeeded/attempt1、释放租约、真实 NAV、冻结输入及 Web 扫描1/正式化1/待补齐0通过。[回执](evidence/2026-10-21-automation-market-consumer.md)。                                                                        | 本项真实行情/正式快照组合已补；外部通知、现场开市采样和其他来源性能仍由各自原门禁持有。                                                                                                        |
+
+10-21 共同 G1 收口：五类消费面的真实链均有逐项证据，当前两个容器的全部 Server 649 个及 Schema 164 个 JavaScript 产物与本地一致，边界门禁通过。自有新账户归零停用，原十二账户和业务保护保持，政策 164 恢复原十六条路由；[完整回执](evidence/2026-10-21-automation-market-consumer.md)。本门禁关闭不关闭上方 RouteTarget 的失败备用/冷态范围，也不关闭其他产品独有条件。
+
+对应产品 Task 继续负责本产品独有条件，本节只维护共同消费门禁。没有把 RQ/Tushare 权限条件用作其他消费者统一前置，也没有因为端点成功或服务健康而批量关闭。
+
+S05 严格历史 PIT 已按[10-08 范围决定](../specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)取消，不是本门禁；不要求已跳过的 AKShare 成功，也不为验收再次删除 smoke 新产物。原 [AC 映射和最终条件](../archive/tasks/2026-09-16-market-data-consumer-consistency-v2.md#验收映射)仍有效，删除衍生数据的独立请求不在本轮范围。
+
+下一步只按 H07 未覆盖权限条件接续；条件未变时不重复请求。RouteTarget 与 Market Consumer 的上述已过精确输入复用，AI 真实生成保持停止。

@@ -13,6 +13,12 @@ import { investmentAccountWhere } from '../portfolio/investment-account-scope.js
 import { PerformanceLayerService } from './performance-layer.service.js';
 import { PerformanceSnapshotService } from './performance-snapshot.service.js';
 import { aggregatePerformanceSeriesQuality } from './performance-series-quality.js';
+import { requireFundEstimateAnchor } from './performance-fund-price-evidence.js';
+import { fundDisclosureAvailableAt } from './performance-fund-disclosure.js';
+import {
+  readFundAdjustedHoldingReturn,
+  type FundHoldingPriceEvidence,
+} from './performance-fund-adjusted-return.js';
 import type { Currency, PortfolioMode } from './performance-types.js';
 
 const intervalMatrix: Record<PerformanceSeriesRange, readonly PerformanceSeriesInterval[]> = {
@@ -176,15 +182,18 @@ export class PerformanceValuationSeriesService {
     at = new Date(),
     mode: PortfolioMode = 'actual',
     baseCurrency: Currency = 'CNY',
-    options: { marketGate?: boolean } = {},
+    options: { marketGate?: boolean; accountId?: string } = {},
   ) {
     const sampledAt = new Date(at);
     sampledAt.setUTCSeconds(0, 0);
     const openMarkets = options.marketGate ? this.openAssetMarkets(at) : undefined;
     const accounts = await this.prisma.account.findMany({
-      where: openMarkets
-        ? this.samplingAccountWhere(mode, openMarkets.assetMarkets)
-        : investmentAccountWhere(mode),
+      where: {
+        ...(openMarkets
+          ? this.samplingAccountWhere(mode, openMarkets.assetMarkets)
+          : investmentAccountWhere(mode)),
+        ...(options.accountId ? { id: options.accountId } : {}),
+      },
       select: { id: true },
     });
     const sampled = [];
@@ -415,34 +424,29 @@ export class PerformanceValuationSeriesService {
             this.market.getFundNav(position.symbol, { allowStale: true }),
             this.market.getFundHoldings(position.symbol),
           ]);
-          if (!holdings.disclosureDate || new Date(holdings.disclosureDate) > at)
-            throw new Error('披露时间未知或晚于估值时点');
-          const anchorStart = new Date(nav.navDate);
-          anchorStart.setUTCDate(anchorStart.getUTCDate() - 7);
+          const disclosureAvailableAt = fundDisclosureAvailableAt(holdings, at);
+          requireFundEstimateAnchor(nav);
           const returns = new Map<string, number>();
+          const holdingPrices: FundHoldingPriceEvidence[] = [];
           await Promise.all(
-            holdings.holdings.map(async (holding) => {
-              try {
-                const [quote, bars] = await Promise.all([
-                  this.market.getQuote(holding.symbol, { allowStale: true }),
-                  barsReader.readChartV3({
-                    identity: {
-                      symbol: holding.symbol,
-                      assetType: inferAssetType(holding.symbol) === 'etf' ? 'ETF' : 'STOCK',
-                      timeframe: '1d',
-                      adjustment: 'none',
-                    },
-                    window: { start: anchorStart.toISOString(), end: nav.navDate },
-                    acceptance: 'interactive',
-                  }),
-                ]);
-                const anchor = bars.points.at(-1);
-                if (!anchor || anchor.close <= 0) return;
-                returns.set(holding.symbol, quote.price / anchor.close - 1);
-              } catch {
-                // 未定价持仓按零变动处理，覆盖率由结果显式反映。
-              }
-            }),
+            holdings.holdings
+              .filter((holding) => holding.weight > 0)
+              .map(async (holding) => {
+                try {
+                  const priced = await readFundAdjustedHoldingReturn({
+                    symbol: holding.symbol,
+                    assetType: inferAssetType(holding.symbol) === 'etf' ? 'ETF' : 'STOCK',
+                    navDate: nav.navDate,
+                    at,
+                    market: this.market,
+                    bars: barsReader,
+                  });
+                  holdingPrices.push(priced.evidence);
+                  if (priced.change !== undefined) returns.set(holding.symbol, priced.change);
+                } catch {
+                  // 未定价持仓按零变动处理，覆盖率由结果显式反映。
+                }
+              }),
           );
           const estimate = estimateFundNavFromHoldings(nav.unitNav, holdings.holdings, returns);
           return {
@@ -456,7 +460,10 @@ export class PerformanceValuationSeriesService {
               estimatedNav: estimate.estimatedNav,
               reportPeriod: holdings.reportPeriod,
               disclosureDate: holdings.disclosureDate,
+              disclosureEvidence: holdings.disclosureEvidence ?? null,
+              disclosureAvailableAt,
               evidenceVersion: holdings.evidenceVersion,
+              holdingPrices,
               disclosureCoverage: estimate.disclosureCoverage,
               pricedCoverage: estimate.pricedCoverage,
             },

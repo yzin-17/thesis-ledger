@@ -28,6 +28,7 @@ const fetchMarketDetail: MarketDetailFetcher = async (request, signal) => {
           barsLimit: request.barsLimit ?? 90,
           indicatorParams: { ...request.indicatorParams },
           ...(request.end ? { end: request.end } : {}),
+          ...(request.timeframe === '1m' ? { timeframe: request.timeframe } : {}),
         },
         signal,
       )
@@ -37,12 +38,13 @@ const fetchMarketDetail: MarketDetailFetcher = async (request, signal) => {
     planned &&
     (planned.mode !== 'v3' ||
       !planned.window ||
-      !planned.options.find((option) => option.adjustment === (request.adjustment ?? 'qfq'))
+      !planned.options.find((option) => option.adjustment === (request.adjustment ?? (request.timeframe === '1m' ? 'none' : 'qfq')))
         ?.available)
   ) {
     throw new Error('当前图表窗口的价格口径不可用，请检查来源配置');
   }
   const params = {
+    ...(request.timeframe === '1m' ? { timeframe: request.timeframe } : {}),
     ...(request.adjustment !== undefined ? { adjustment: request.adjustment } : {}),
     chartContractVersion: 3 as const,
     ...(request.include ? { include: request.include } : {}),

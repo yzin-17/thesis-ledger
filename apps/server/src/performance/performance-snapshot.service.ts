@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
-import { projectCashBalances } from '../ledger/cash-projection.js';
 import {
   aggregateCurrencyAmounts,
   supportedCurrency,
@@ -8,10 +7,16 @@ import {
 import { MarketService } from '../market/market.service.js';
 import { MarketBarReader } from '../market/market-bar-reader.js';
 import { PrismaService } from '../platform/prisma.service.js';
-import { performanceRelationWhere, performanceSnapshotWhere } from './performance-account-scope.js';
+import { performanceSnapshotWhere } from './performance-account-scope.js';
 import { PerformanceDataService } from './performance-data.service.js';
 import { PerformanceSnapshotRevisionRepository } from './performance-snapshot-revision.repository.js';
 import { valueSnapshotPosition } from './performance-snapshot-position-valuation.js';
+import {
+  frozenSnapshotInputs,
+  officialSnapshotEvidenceVersion,
+  readCurrentSnapshotInputs,
+  type SnapshotEconomicInputs,
+} from './performance-snapshot-inputs.js';
 import {
   fxResponseFields,
   partialSnapshot,
@@ -57,42 +62,24 @@ export class PerformanceSnapshotService {
     mode: PortfolioMode = 'actual',
     options: PerformanceFxOptions = {},
     context: SnapshotCaptureContext = {},
+    frozenInputs?: SnapshotEconomicInputs,
   ) {
     const captureOptions = { ...options, fxMerge: options.fxMerge ?? true };
     const valuationDate = context.valuationDate ?? dateOnly(capturedAt);
     const valuationDateKey = shanghaiDate(valuationDate);
     await this.assertCurrencyScope(accountId, mode, captureOptions);
-    const accountWhere = performanceRelationWhere(mode, accountId);
-    const [positions, ledger, accountCurrencyMap] = await Promise.all([
-      this.prisma.position.findMany({ where: accountWhere, include: { asset: true } }),
-      this.prisma.ledgerEvent.findMany({
-        where: accountWhere,
-        orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
-      }),
-      this.data.accountCurrencies(accountId, mode),
-    ]);
-    const baseCurrency =
-      captureOptions.baseCurrency ??
-      (accountId ? accountCurrencyMap.get(accountId) : undefined) ??
-      'CNY';
+    const inputs = frozenInputs ?? await readCurrentSnapshotInputs(
+      this.prisma, this.data, accountId, capturedAt, mode, captureOptions.baseCurrency,
+    );
+    const baseCurrency = inputs.baseCurrency;
     const resolvedCaptureOptions = { ...captureOptions, baseCurrency };
     const valued = await Promise.all(
-      positions.map((position) => {
-        const currency =
-          supportedCurrency(position.asset.currency) ??
-          accountCurrencyMap.get(position.accountId) ??
-          baseCurrency;
-        return valueSnapshotPosition(this.market, position, currency, valuationDateKey, context, this.bars);
-      }),
+      inputs.positions.map((position) => valueSnapshotPosition(
+        this.market, { ...position, asset: { assetType: position.assetType } },
+        position.currency, valuationDateKey, context, this.bars,
+      )),
     );
-    const cashBalances = projectCashBalances(ledger, capturedAt);
-    const cashAmounts = [...cashBalances.entries()].flatMap(([id, byCurrency]) =>
-      [...byCurrency.entries()].map(([currency, amount]) => ({
-        accountId: id,
-        currency: supportedCurrency(currency) ?? baseCurrency,
-        amount: amount.toNumber(),
-      })),
-    );
+    const cashAmounts = inputs.cashAmounts;
     const currencies = [
       ...new Set([
         ...valued.map((position) => position.currency),
@@ -165,7 +152,7 @@ export class PerformanceSnapshotService {
     const payload = {
       positions: valued,
       mode,
-      accountScopePolicy: accountId ? 'account-v1' : 'investment-only-v1',
+      accountScopePolicy: inputs.accountScopePolicy,
       currency: baseCurrency,
       knownMarketValue,
       totalMarketValue: partial ? null : knownMarketValue,
@@ -185,17 +172,20 @@ export class PerformanceSnapshotService {
       source === 'DAILY_CLOSE' ? '' : `:${source}:${context.sourceRef ?? capturedAt.toISOString()}`;
     const slotKey = `${scope}:${scopeId}:${mode}:${valuationDateKey}${eventSuffix}`;
     const defaultKeyTime = source === 'DAILY_CLOSE' ? valuationDateKey : capturedAt.toISOString();
+    const evidenceVersion = valuationBasis === 'OFFICIAL'
+      ? officialSnapshotEvidenceVersion(inputs, valued, fx.meta.evidenceVersion) : undefined;
     const idempotencyKey =
       context.idempotencyKey ??
-      `${source.toLowerCase()}:${scope}:${scopeId}:${mode}:${defaultKeyTime}:${valuationBasis.toLowerCase()}`;
+      `${source.toLowerCase()}:${scope}:${scopeId}:${mode}:${defaultKeyTime}:${valuationBasis.toLowerCase()}${evidenceVersion ? `:${evidenceVersion}` : ''}`;
     const pricedCoverage =
       context.pricedCoverage ??
       (valued.length === 0 ? 1 : (valued.length - missingSymbols.length) / valued.length);
-    const disclosureCoverage = context.disclosureCoverage ?? 1;
+    const disclosureCoverage = context.disclosureCoverage ?? inputs.disclosureCoverage;
     let valuationStatus: 'UNAVAILABLE' | 'PARTIAL' | 'COMPLETE' = 'COMPLETE';
     if (pricedCoverage === 0 && valued.length > 0) valuationStatus = 'UNAVAILABLE';
     else if (partial) valuationStatus = 'PARTIAL';
-    if (valuationBasis === 'OFFICIAL' && valuationStatus !== 'COMPLETE') {
+    if (valuationBasis === 'OFFICIAL' && (valuationStatus !== 'COMPLETE' ||
+      !['ready', 'not_needed'].includes(fx.meta.status))) {
       throw new Error('正式估值所需行情、净值或汇率尚未齐备');
     }
     return this.revisions.appendCurrent({
@@ -231,6 +221,7 @@ export class PerformanceSnapshotService {
           valuationBasis,
           disclosureCoverage,
           pricedCoverage,
+          ...(evidenceVersion ? { evidenceVersion } : {}),
         },
       },
     });
@@ -440,8 +431,8 @@ export class PerformanceSnapshotService {
     return this.revisions.detail(id);
   }
 
-  async reconcileOfficial(limit = 100) {
-    const estimates = await this.revisions.pendingEstimates(limit);
+  async reconcileOfficial(limit = 100, accountId?: string) {
+    const estimates = await this.revisions.pendingEstimates(limit, accountId);
     const reconciled: string[] = [];
     const pending: Array<{ snapshotId: string; reason: string }> = [];
     for (const estimate of estimates) {
@@ -457,6 +448,7 @@ export class PerformanceSnapshotService {
             valuationBasis: 'OFFICIAL',
             valuationDate: estimate.valuationDate,
           },
+          frozenSnapshotInputs(estimate),
         );
         reconciled.push(snapshot.id);
       } catch (error) {

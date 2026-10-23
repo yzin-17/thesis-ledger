@@ -191,6 +191,89 @@ describe('Mobile read-only dashboard', () => {
     expect(store.getState().error).toContain('ThesisLedger API 503');
   });
 
+  it.each(['actual', 'shadow'] as const)('切换到 %s 请求失败时不保留另一模式的数据', async (mode) => {
+    const previousMode = mode === 'actual' ? 'shadow' : 'actual';
+    const nextPortfolio = deferred<Response>();
+    const nextRisk = deferred<Response>();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response(portfolio({ mode: previousMode })))
+      .mockResolvedValueOnce(response([{ ...riskEvent, mode: previousMode }]))
+      .mockReturnValueOnce(nextPortfolio.promise)
+      .mockReturnValueOnce(nextRisk.promise);
+    const store = createMobileBootstrap({
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
+      fetcher,
+    }).store;
+    if (previousMode === 'actual') {
+      await store.refresh();
+    } else {
+      store.setMode(previousMode);
+      await vi.waitFor(() => expect(store.getState().status).toBe('ready'));
+    }
+
+    store.setMode(mode);
+    const loading = store.getState();
+    nextPortfolio.reject(new Error('目标模式请求失败'));
+    nextRisk.resolve(response([]));
+    await vi.waitFor(() => expect(store.getState().status).toBe('error'));
+
+    expect(loading).toMatchObject({ mode, status: 'loading', portfolio: null, riskEvents: [] });
+    expect(store.getState()).toMatchObject({
+      mode,
+      status: 'error',
+      portfolio: null,
+      riskEvents: [],
+      error: '目标模式请求失败',
+    });
+  });
+
+  it('同一模式刷新失败时保留该模式上次成功的组合与风险数据', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response(portfolio()))
+      .mockResolvedValueOnce(response([riskEvent]))
+      .mockRejectedValue(new Error('刷新暂时失败'));
+    const store = createMobileBootstrap({
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
+      fetcher,
+    }).store;
+    await store.refresh();
+    const previous = store.getState();
+    await store.refresh();
+
+    expect(store.getState()).toMatchObject({ mode: 'actual', status: 'error' });
+    expect(store.getState().portfolio).toBe(previous.portfolio);
+    expect(store.getState().riskEvents).toBe(previous.riskEvents);
+  });
+
+  it('切换模式后拒绝上一模式的晚到结果', async () => {
+    const olderPortfolio = deferred<Response>();
+    const olderRisk = deferred<Response>();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockReturnValueOnce(olderPortfolio.promise)
+      .mockReturnValueOnce(olderRisk.promise)
+      .mockResolvedValueOnce(response(portfolio({ mode: 'shadow', positions: [] })))
+      .mockResolvedValueOnce(response([]));
+    const store = createMobileBootstrap({
+      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
+      fetcher,
+    }).store;
+    const olderRefresh = store.refresh();
+    store.setMode('shadow');
+    await vi.waitFor(() => expect(store.getState().status).toBe('empty'));
+    olderPortfolio.resolve(response(portfolio()));
+    olderRisk.resolve(response([riskEvent]));
+    await olderRefresh;
+
+    expect(store.getState()).toMatchObject({
+      mode: 'shadow',
+      portfolio: { mode: 'shadow', positions: [] },
+      riskEvents: [],
+    });
+  });
+
   it('does not let an older refresh overwrite a newer response', async () => {
     const firstPortfolio = deferred<Response>();
     const firstRisk = deferred<Response>();

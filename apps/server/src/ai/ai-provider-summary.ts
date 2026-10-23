@@ -1,5 +1,4 @@
 import type { ProviderConfig } from '@prisma/client';
-import type { AiProvider } from './contracts.js';
 import {
   aiLegacyAdapterSchema,
   aiUpstreamSelectionSchema,
@@ -274,53 +273,5 @@ export const aiProviderSummaryFromRow = (
   ...(settings ? {} : { configError: '保存的 AI Provider 配置无效' }),
 });
 
-export const aiProviderSummaryFromProvider = (provider: AiProvider): AiProviderSummary => ({
-  name: provider.id,
-  type: 'ai',
-  source: 'environment',
-  enabled: true,
-  priority: provider.metadata?.priority ?? 100,
-  capabilities: [...(provider.metadata?.capabilities ?? ['chat'])],
-  baseUrl: provider.metadata?.baseURL ?? null,
-  models: [...provider.models],
-  authMode: provider.metadata?.authMode ?? 'api_key',
-  ...(provider.metadata?.upstreamFormat === undefined
-    ? {}
-    : { upstreamFormat: provider.metadata.upstreamFormat }),
-  ...(provider.metadata?.chatImplementation === undefined
-    ? {}
-    : { chatImplementation: provider.metadata.chatImplementation }),
-  ...(provider.metadata?.executionRoutes === undefined
-    ? {}
-    : { executionRouteConfigs: [...provider.metadata.executionRoutes] }),
-  ...(provider.metadata?.modelPricing === undefined
-    ? {}
-    : { modelPricing: provider.metadata.modelPricing }),
-  ...(provider.metadata?.timeoutMs === undefined ? {} : { timeoutMs: provider.metadata.timeoutMs }),
-  ...(provider.metadata?.firstOutputTimeoutMs === undefined
-    ? {}
-    : { firstOutputTimeoutMs: provider.metadata.firstOutputTimeoutMs }),
-  ...(provider.metadata?.outputIdleTimeoutMs === undefined
-    ? {}
-    : { outputIdleTimeoutMs: provider.metadata.outputIdleTimeoutMs }),
-  ...(provider.metadata?.costPer1kInput === undefined
-    ? {}
-    : { costPer1kInput: provider.metadata.costPer1kInput }),
-  ...(provider.metadata?.costPer1kOutput === undefined
-    ? {}
-    : { costPer1kOutput: provider.metadata.costPer1kOutput }),
-  ...(provider.metadata?.costCurrency === undefined
-    ? {}
-    : { costCurrency: provider.metadata.costCurrency }),
-  ...(provider.metadata?.pricingVersion === undefined
-    ? {}
-    : { pricingVersion: provider.metadata.pricingVersion }),
-  credentialConfigured: true,
-  health: provider.metadata?.health ?? 'unknown',
-  updatedAt: null,
-  checkedAt: null,
-  latencyMs: null,
-  errorCode: null,
-});
 
 export { healthValue };

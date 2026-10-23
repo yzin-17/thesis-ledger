@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { useNavBacktestRunsQuery } from './strategy.nav.queries.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { strategyCenterPath } from './strategy-center.navigation.js';
 
 export function NavBacktestJobsPage() {
@@ -98,7 +99,9 @@ export function NavBacktestJobsTable({ runs }: { runs: BacktestNavRunSummaryV3[]
                 <TableHead>回测区间</TableHead>
                 <TableHead>创建时间</TableHead>
                 <TableHead>最近更新</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <StickyTableActionHeader className="h-10 px-2 align-middle font-medium whitespace-nowrap">
+                  操作
+                </StickyTableActionHeader>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -127,13 +130,13 @@ export function NavBacktestJobsTable({ runs }: { runs: BacktestNavRunSummaryV3[]
                   </TableCell>
                   <TableCell>{formatDateTime(run.createdAt)}</TableCell>
                   <TableCell>{formatDateTime(run.updatedAt)}</TableCell>
-                  <TableCell className="text-right">
+                  <StickyTableActionCell className="p-2 text-right align-middle whitespace-nowrap">
                     <Button
                       nativeButton={false}
                       render={<Link to={strategyCenterPath.navBacktestRun(run.id)}>打开任务</Link>}
                       size="sm"
                     />
-                  </TableCell>
+                  </StickyTableActionCell>
                 </TableRow>
               ))}
             </TableBody>

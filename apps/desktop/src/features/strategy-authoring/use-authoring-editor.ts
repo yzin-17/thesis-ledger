@@ -14,6 +14,7 @@ import {
 } from './authoring.api.js';
 import { useAuthoringDraft } from './use-authoring-draft.js';
 import { authoringRequestFailure, submitAuthoringIntent } from './authoring-submission.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 
 function canGenerate(content: AuthoringContent) {
   return Boolean(
@@ -103,6 +104,7 @@ export function useAuthoringEditor({
     },
   });
   const busy = perform.isPending || draft.busy;
+  useNavigationGuard({ dirty: false, busy });
   const editing = draft.query.data?.state === 'editing';
   useEffect(() => {
     onDirtyChange(draft.dirty || draft.busy || perform.isPending);

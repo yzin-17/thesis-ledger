@@ -4,13 +4,13 @@
 | --- | --- |
 | 文档类型 | Spec |
 | 创建日期 | 2026-09-19 |
-| 状态 | 实施中；T0–T13、G0、G0.1 与 G2 已完成，T13 的浏览器/目标运行态重新验收待执行 |
+| 状态 | 现行合同；实施与未完成验收以关联 Task 为准 |
 | 适用仓库 | `yzin-17/thesis-ledger` |
 | 任务标识 | `2026-09-19-vercel-ai-sdk-integration` |
 | 对应任务 | [实施任务](../tasks/2026-09-19-vercel-ai-sdk-integration.md) |
 | 主要执行面 | NestJS Server / 现有后台执行器与 Worker |
 | 关联需求 | 策略中心体验优化、AI 策略生成、研究助手 |
-| 交付边界 | 本文保留已完成实施证据并定义当前纠偏要求；T13 的本地实现与定向验证已记录，历史 G2 证据不自动证明统一流程的浏览器/运行态 |
+| 交付边界 | 本文维护 AI SDK、统一 Provider 编辑、预算与执行合同；历史或只读 UI 证据不自动证明真实生成、转换保存及目标运行态 |
 
 2026-09-21 范围修订：用户确认移除执行路由的“能力声明来源”配置，以及暂不需要的“上游服务限制”配置。相关稳定契约、readiness 门禁和兼容边界分别由[移除 AI 执行路由能力声明 Spec](2026-09-21-remove-ai-capability-declaration.md)与[移除 AI 执行路由上游服务限制 Spec](2026-09-21-remove-ai-upstream-restriction.md)修订；费用依据与授权语义由[移除 AI 执行路由免费依据 Spec](2026-09-21-remove-ai-free-evidence.md)修订。本文其余 AI SDK、adapter、预算和真实验收要求继续有效。
 
@@ -147,9 +147,9 @@ SDK 类型不得扩散到 `packages/domain`、策略 Schema 或公共 API DTO。
 
 新建 AI Provider 默认选择 `chat-completions + compatible`，但 base URL、模型列表与厂商信息为空，不预填 OpenRouter。界面中 Chat Completions 与 Anthropic Messages 的说明使用“需支持对应接口”，表示上游必须提供相应 HTTP endpoint，不表示 ThesisLedger 的执行路由或 Vercel AI SDK 会自动创建网关路由。普通 Provider 与 AI Provider 共用一个编辑器、一个草稿协调器和一个类型选择器；类型可在未提交草稿中双向切换。切换保留名称、启用状态和优先级，清理目标类型不适用的专属字段，并使连接测试、模型目录和最小生成结果失效。保存/测试由协调器按最终类型选择专用接口，不能因 UI 统一而把 AI 字段提交到普通接口。base URL 可用于校验、提示或推荐配置，但不得改变已保存的上游格式、Chat 实现或实际 Provider 包。
 
-数据库来源的 Provider 允许通过该统一编辑器改变最终类型：普通目标类型由普通配置接口保存，AI 目标类型由 AI 配置接口保存；同名记录按目标类型更新并替换不再适用的 `settings`，空凭证继续遵循既有“保留已配置凭证”语义。环境来源配置不得被静默覆盖；切换后接管必须重新提交目标类型凭证，仍保持部署配置只读边界。
+数据库来源的 Provider 允许通过该统一编辑器改变最终类型：普通目标类型由普通配置接口保存，AI 目标类型由 AI 配置接口保存；同名记录按目标类型更新并替换不再适用的 `settings`，空凭证继续遵循既有“保留已配置凭证”语义。配置来源统一为数据库，遵循[统一页面配置规格](2026-10-19-ai-provider-database-only.md)，不再支持环境来源接管。
 
-旧配置中的 `adapter=openrouter` 与 `adapter=openai-compatible` 只在数据库/环境配置读取边界兼容映射为 `chat-completions + compatible`；新建与更新 API 不再接受客户端直接指定 adapter。旧 OpenRouter 配置若实际保存了厂商扩展字段，服务端同时保留只读迁移标记 `compatibilityExtensionProfile=openrouter-v1`，用于约束后述兼容参数转换；该标记不选择 Provider、不对新客户端开放，也不能因编辑名称、地址或模型而丢失。缺少显式新字段的旧配置只按旧 adapter 字段迁移；URL 和显示名称不得参与运行语义推断，不自动改写已保存密钥或模型列表。保留受信代理、本地服务及自定义 baseUrl 访问策略；不接受请求方任意传入目标 URL。
+旧配置中的 `adapter=openrouter` 与 `adapter=openai-compatible` 只在数据库配置读取边界兼容映射为 `chat-completions + compatible`；新建与更新 API 不再接受客户端直接指定 adapter。旧 OpenRouter 配置若实际保存了厂商扩展字段，服务端同时保留只读迁移标记 `compatibilityExtensionProfile=openrouter-v1`，用于约束后述兼容参数转换；该标记不选择 Provider、不对新客户端开放，也不能因编辑名称、地址或模型而丢失。缺少显式新字段的旧配置只按旧 adapter 字段迁移；URL 和显示名称不得参与运行语义推断，不自动改写已保存密钥或模型列表。保留受信代理、本地服务及自定义 baseUrl 访问策略；不接受请求方任意传入目标 URL。
 
 移除 OpenRouter 专用包前，必须逐项处理当前已使用的差异：`reasoningEffort` 通过锁定版本确认的 compatible provider options 映射；仅带受控 `openrouter-v1` 迁移标记的旧配置可将 `provider.require_parameters` 等兼容参数通过 `transformRequestBody` 白名单转换；usage/cost 仅可通过 `metadataExtractor` 归一化为“已报告、估算、未知”。新建通用兼容连接不因 URL 自动获得厂商扩展。无法证明等价的旧配置标记为“待迁移、不可执行”，不得静默放宽请求或把未知费用写为零。迁移只覆盖项目已经使用的必要能力，不复制 OpenRouter adapter 的完整插件、图片、视频或其他厂商能力。
 
@@ -487,7 +487,7 @@ SDK mock 用于确定性结果测试；本地 HTTP/SSE 服务用于真实 Provid
 | AC45 | 分层验证 | 模型目录、最小生成、业务结构化生成分别保存结果；模型目录失败允许手动填写，任一成功不冒充另一类能力通过 |
 | AC46 | 编辑状态与验证竞态 | 切换格式或修改地址、模型时保留名称和不冲突字段、使相关验证过期；旧异步结果不能覆盖新草稿状态 |
 | AC47 | Provider 类型统一编辑流程 | 普通与 AI 共用同一个编辑器、草稿协调器和类型选择器；类型可双向切换；名称、启用状态和优先级保留；类型专属字段不泄漏到目标接口 |
-| AC48 | Provider 类型转换保存 | 数据库来源的同名 Provider 可按最终类型保存并更新；目标类型接口校验自己的字段和凭证；环境来源配置切换后必须重新提交凭证，不静默覆盖部署配置 |
+| AC48 | Provider 类型转换保存 | 数据库来源的同名 Provider 可按最终类型保存并更新；摘要的配置版本贯穿编辑草稿和类型切换，AI 保存继续提交 `expectedRevision` 并拒绝真实版本冲突；目标类型接口校验自己的字段和凭证；配置来源与升级行为遵循 2026-10-19 统一页面配置规格 |
 
 ### 14.2 真实调用验证
 

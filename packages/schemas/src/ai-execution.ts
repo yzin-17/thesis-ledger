@@ -86,7 +86,7 @@ export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
   z
     .object({
       id: z.literal('research'),
-      version: z.literal(AI_RESEARCH_GENERATION_CONTRACT_VERSION),
+      version: z.enum([AI_RESEARCH_GENERATION_CONTRACT_VERSION, 'research-generation-v2']),
     })
     .strict(),
 ]);

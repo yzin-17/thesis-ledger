@@ -28,7 +28,7 @@ const execution = (accountId: string, externalId: string) => ({
     quantity: '10',
     price: '10',
     currency: 'CNY',
-    capabilityVerification: 'VERIFIED',
+    capabilityVerification: 'UNVERIFIED',
     settledAt,
     charges: [{ category: 'COMMISSION', amount: '2', currency: 'CNY' }],
   },

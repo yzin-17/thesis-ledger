@@ -1,9 +1,10 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 import {
   aiProviderDraftError,
-  aiProviderDraftFromRecord,
+  providerDraftFromRecord,
   aiProviderInputFromDraft,
   aiProviderTestPricingState,
   aiProviderTestInputFromDraft,
@@ -57,7 +58,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   const [draft, setDraft] = useState<ProviderDraft>(newProviderDraft);
   const [open, setOpen] = useState(false);
   const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
-  const [takingOverEnvironmentName, setTakingOverEnvironmentName] = useState<string | null>(null);
   const [credentialInputOpen, setCredentialInputOpen] = useState(true);
   const [testState, setTestState] = useState<ProviderTestState>('idle');
   const [testEvidence, setTestEvidence] = useState<ProviderTestEvidence | null>(null);
@@ -131,7 +131,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   const resetEditor = () => {
     setOpen(false);
     setEditingProviderName(null);
-    setTakingOverEnvironmentName(null);
     setCredentialInputOpen(true);
     setDraft(newProviderDraft());
     setAvailableModels([]);
@@ -144,36 +143,16 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     resetEditor();
   };
 
-  const providerDraftFromRecord = (provider: ProviderRecord): ProviderDraft => {
-    if (provider.type === 'ai') return aiProviderDraftFromRecord(provider);
-    return {
-      ...newProviderDraft(),
-      name: provider.name,
-      type: provider.type,
-      capabilities: [...provider.capabilities],
-      priority: provider.priority,
-      enabled: provider.enabled,
-    };
-  };
-
   const openEditor = (provider?: ProviderRecord, initialDraft?: ProviderDraft) => {
     if (!provider) {
       setDraft(initialDraft ?? newProviderDraft());
       setEditingProviderName(null);
-      setTakingOverEnvironmentName(null);
       setCredentialInputOpen(true);
     } else {
       const nextDraft = providerDraftFromRecord(provider);
       setDraft(nextDraft);
-      if (provider.source === 'environment') {
-        setEditingProviderName(null);
-        setTakingOverEnvironmentName(provider.name);
-        setCredentialInputOpen(true);
-      } else {
-        setEditingProviderName(provider.name);
-        setTakingOverEnvironmentName(null);
-        setCredentialInputOpen(!provider.credentialConfigured);
-      }
+      setEditingProviderName(provider.name);
+      setCredentialInputOpen(!provider.credentialConfigured);
     }
     invalidateDraftResults();
     setAvailableModels([]);
@@ -315,7 +294,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       if (!modelRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
         title: '模型目录获取失败',
-        description: error instanceof Error ? error.message : '可继续手动填写模型 ID。',
+        description: requestFailureMessage(error, '可继续手动填写模型 ID。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -362,7 +341,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       setTestState('error');
       toastManager.add({
         title: `${input.name} 连通性测试失败`,
-        description: error instanceof Error ? error.message : '连接测试失败。',
+        description: requestFailureMessage(error, '连接测试失败。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -456,7 +435,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       setTestState('error');
       toastManager.add({
         title: `${input.name} ${testKind === 'generation' ? '生成测试' : '连通性测试'}失败`,
-        description: error instanceof Error ? error.message : '连接测试失败。',
+        description: requestFailureMessage(error, '连接测试失败。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -473,16 +452,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     if (draft.type !== 'ai') {
       const input = providerInputFromDraft();
       if (invalidOrdinaryDraft(input)) return;
-      if (takingOverEnvironmentName && !input.credentialsRef) {
-        toastManager.add({
-          title: '接管部署配置需要凭证',
-          description: '请填写目标类型的 API Key、Token 或 Webhook 后保存。',
-          type: 'error',
-          timeout: 7000,
-          priority: 'high',
-        });
-        return;
-      }
       try {
         await saveProviderMutation.mutateAsync(input);
         toastManager.add({
@@ -495,7 +464,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       } catch (error) {
         toastManager.add({
           title: 'Provider 配置保存失败',
-          description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+          description: requestFailureMessage(error),
           type: 'error',
           timeout: 0,
           priority: 'high',
@@ -506,16 +475,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     const reusableTestToken = testEvidence?.model ? undefined : testEvidence?.token;
     const input = aiProviderInputFromDraft(draft, reusableTestToken);
     if (invalidDraft(input)) return;
-    if (takingOverEnvironmentName && draft.authMode === 'api_key' && !input.apiKey) {
-      toastManager.add({
-        title: '接管部署配置需要 API Key',
-        description: '请填写新的 API Key 后保存。',
-        type: 'error',
-        timeout: 7000,
-        priority: 'high',
-      });
-      return;
-    }
     try {
       await saveMutation.mutateAsync(input);
       toastManager.add({
@@ -528,7 +487,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     } catch (error) {
       toastManager.add({
         title: 'AI Provider 配置保存失败',
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        description: requestFailureMessage(error),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -603,7 +562,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       if (!testRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
         title: `${provider.name} 生成测试失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接。',
+        description: requestFailureMessage(error, '请检查服务连接。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -616,7 +575,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   };
 
   const toggle = async (provider: ProviderRecord) => {
-    if (provider.source === 'environment') return;
     const isResearchDefault = routingSettings?.researchDefault?.providerId === provider.name;
     let lifecycle: AiProviderLifecycleOptions = provider.updatedAt
       ? { expectedRevision: provider.updatedAt }
@@ -651,7 +609,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     } catch (error) {
       toastManager.add({
         title: `${provider.name} 启停失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        description: requestFailureMessage(error, '请检查服务连接后重试。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -687,7 +645,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     } catch (error) {
       toastManager.add({
         title: `${provider.name} 删除失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        description: requestFailureMessage(error, '请检查服务连接后重试。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -714,7 +672,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       editingProviderName,
       providerDraft: draft,
       credentialInputOpen,
-      takingOverEnvironmentName,
       providerTestState: testState,
       savingProviderDraft: saveMutation.isPending || saveProviderMutation.isPending,
       availableModels,

@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, vi } from 'vitest';
 import { journalReviewCandidateContractSchema } from '@thesis-ledger/schemas';
 import { journalUiEvidenceFixture } from './journal-review.fixture.js';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import { journalLocalTime } from '../src/features/journal/review/JournalWindowTimeInput.js';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const mounts: Array<() => Promise<void>> = [];
@@ -31,7 +33,11 @@ export async function mountJournal(node: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const render = (next: ReactNode) =>
     act(async () => {
-      root.render(<QueryClientProvider client={client}>{next}</QueryClientProvider>);
+      root.render(
+        <QueryClientProvider client={client}>
+          <ConfirmDialogProvider>{next}</ConfirmDialogProvider>
+        </QueryClientProvider>,
+      );
     });
   await render(node);
   let disposed = false;
@@ -69,7 +75,8 @@ export async function journalFill(label: string, value: string) {
   const input = document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
   expect(input, `输入 ${label}`).not.toBeNull();
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    const displayed = input!.type === 'datetime-local' && /Z$/.test(value) ? journalLocalTime(value) : value;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, displayed);
     input!.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }

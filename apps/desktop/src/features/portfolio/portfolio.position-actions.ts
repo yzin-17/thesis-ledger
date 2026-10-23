@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 
 import type { SavePositionInput } from './portfolio.api.js';
 import type { PortfolioActionDependencies, PortfolioToastManager } from './portfolio.actions.js';
@@ -32,6 +33,12 @@ const accountDataImpact = (mode: PortfolioMode, accountIds: string[]): Portfolio
   audit: true,
   reconciliation: true,
 });
+
+const clearPositionError = ({ positionSaveErrorToastId, toastManager }: PortfolioActionDependencies) => {
+  if (!positionSaveErrorToastId?.current) return;
+  toastManager.close?.(positionSaveErrorToastId.current);
+  positionSaveErrorToastId.current = null;
+};
 
 export const positionSaveImpact = (
   mode: 'actual' | 'shadow',
@@ -147,6 +154,7 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
     markDirty,
     onSaved,
     toastManager,
+    positionSaveErrorToastId,
   } = dependencies;
 
   return async (event: FormEvent<HTMLFormElement>) => {
@@ -167,6 +175,7 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
       toastManager,
     });
     if (!isValid) return;
+    clearPositionError(dependencies);
     setBusyAction(isCash ? 'cash-save' : 'position-save');
     try {
       if (isCash) {
@@ -180,29 +189,30 @@ const createPositionSubmitHandler = (dependencies: PortfolioActionDependencies) 
           input: buildPositionInput({ form, accountId, selectedInstrument, manualAssetType }),
         });
       }
+      await Promise.resolve(onSaved(
+        isCash
+          ? cashSaveImpact(account?.mode ?? 'actual', accountId)
+          : positionSaveImpact(account?.mode ?? 'actual', accountId, editing?.accountId),
+      )).catch(() => undefined);
       formElement.reset();
       setEditing(null);
       markDirty(false);
       setPositionSheetOpen(false);
-      onSaved(
-        isCash
-          ? cashSaveImpact(account?.mode ?? 'actual', accountId)
-          : positionSaveImpact(account?.mode ?? 'actual', accountId, editing?.accountId),
-      );
       toastManager.add({
         title: positionSuccessTitle(isCash, isEditing, calibrationMode),
         description: isCash ? undefined : '组合将重新估值。',
         type: 'success',
         timeout: 2800,
       });
-    } catch {
-      toastManager.add({
+    } catch (error) {
+      const errorToastId = toastManager.add({
         title: positionFailureTitle(isCash, isEditing, calibrationMode),
-        description: isCash ? '请检查金额。' : '请检查标的、数量和平均成本。',
+        description: requestFailureMessage(error),
         type: 'error',
         timeout: 0,
         priority: 'high',
       });
+      if (positionSaveErrorToastId) positionSaveErrorToastId.current = errorToastId;
     } finally {
       setBusyAction(null);
     }
@@ -224,23 +234,25 @@ const createCashSubmitHandler = (dependencies: PortfolioActionDependencies) => {
   return async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busyAction) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    clearPositionError(dependencies);
     setBusyAction('cash-save');
     try {
       await mutations.saveCash.mutateAsync({
         accountId: entryAccountId,
         amount: formText(form, 'cashAmount'),
       });
-      event.currentTarget.reset();
+      const mode = accounts.find((account) => account.id === entryAccountId)?.mode ?? 'actual';
+      await Promise.resolve(onSaved(cashSaveImpact(mode, entryAccountId))).catch(() => undefined);
+      formElement.reset();
       markDirty(false);
       setPositionSheetOpen(false);
-      const mode = accounts.find((account) => account.id === entryAccountId)?.mode ?? 'actual';
-      onSaved(cashSaveImpact(mode, entryAccountId));
       toastManager.add({ title: '现金余额已保存', type: 'success', timeout: 2800 });
-    } catch {
+    } catch (error) {
       toastManager.add({
         title: '现金余额保存失败',
-        description: '请检查金额。',
+        description: requestFailureMessage(error),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -264,6 +276,7 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
     onSaved,
     toastManager,
     confirm,
+    positionSaveErrorToastId,
   } = dependencies;
   return async () => {
     if (!entryAccountId || positions.length === 0 || busyAction) return;
@@ -277,25 +290,27 @@ const createClearPositionsHandler = (dependencies: PortfolioActionDependencies) 
       }))
     )
       return;
+    clearPositionError(dependencies);
     setBusyAction('clear-positions');
     try {
       await mutations.clearPositions.mutateAsync(entryAccountId);
       markDirty(false);
       const mode = accounts.find((account) => account.id === entryAccountId)?.mode ?? 'actual';
-      onSaved(clearPositionsImpact(mode, entryAccountId));
+      await Promise.resolve(onSaved(clearPositionsImpact(mode, entryAccountId))).catch(() => undefined);
       toastManager.add({
         title: calibrationMode ? '持仓快照已清空' : '持仓已清空',
         type: 'success',
         timeout: 2800,
       });
     } catch {
-      toastManager.add({
+      const errorToastId = toastManager.add({
         title: calibrationMode ? '清空持仓快照失败' : '清空持仓失败',
         description: '请稍后重试。',
         type: 'error',
         timeout: 0,
         priority: 'high',
       });
+      if (positionSaveErrorToastId) positionSaveErrorToastId.current = errorToastId;
     } finally {
       setBusyAction(null);
     }
@@ -313,6 +328,7 @@ const createRemovePositionHandler = (dependencies: PortfolioActionDependencies) 
     toastManager,
     calibrationMode,
     confirm,
+    positionSaveErrorToastId,
   } = dependencies;
   return async (position: Position) => {
     if (busyAction) return;
@@ -327,25 +343,27 @@ const createRemovePositionHandler = (dependencies: PortfolioActionDependencies) 
       }))
     )
       return;
+    clearPositionError(dependencies);
     setBusyAction(`remove:${position.id}`);
     try {
       await mutations.removePosition.mutateAsync(position.id);
       markDirty(false);
       const mode = accounts.find((account) => account.id === position.accountId)?.mode ?? 'actual';
-      onSaved(removePositionImpact(mode, position.accountId));
+      await Promise.resolve(onSaved(removePositionImpact(mode, position.accountId))).catch(() => undefined);
       toastManager.add({
         title: calibrationMode ? '持仓快照已移除' : '持仓已删除',
         type: 'success',
         timeout: 2800,
       });
     } catch {
-      toastManager.add({
+      const errorToastId = toastManager.add({
         title: calibrationMode ? '持仓快照移除失败' : '持仓删除失败',
         description: '请稍后重试。',
         type: 'error',
         timeout: 0,
         priority: 'high',
       });
+      if (positionSaveErrorToastId) positionSaveErrorToastId.current = errorToastId;
     } finally {
       setBusyAction(null);
     }

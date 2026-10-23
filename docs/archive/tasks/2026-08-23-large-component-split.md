@@ -22,7 +22,7 @@
 - [x] T2：拆分 portfolio、import、onboarding 并迁移组合相关请求
   - 涉及范围：portfolio、import、onboarding feature；账户/持仓/现金/标的搜索/导入/onboarding Query 与 Mutation。
   - 完成条件：组合与录入页面可独立导入；表单 dirty/confirmDiscard、标的搜索竞态、导入失败保留草稿、onboarding 状态保持不变。
-  - 验证方式：Portfolio/Instrument/Import/Onboarding UI contract、7 项请求契约测试、desktop typecheck 通过；截图上传保留 multipart body。
+  - 验证方式：Portfolio/Instrument/Import/Onboarding UI contract、7 项请求契约测试、desktop typecheck 通过。
 
 - [x] T3：拆分 providers、risk、performance 并迁移请求状态
   - 涉及范围：Provider 配置/健康历史、RiskCenter、绩效页面及其 API/Query/Mutation。

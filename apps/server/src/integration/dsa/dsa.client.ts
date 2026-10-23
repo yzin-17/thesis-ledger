@@ -2,13 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { DsaDataCapabilityReaderV3 } from './dsa-data-capability-reader-v3.js';
 import type {
   DesiredProviderPolicyV3,
-  MarketProviderProbeRoute,
+  MarketProviderTestOptions,
   MarketRouteCatalogV3,
   MarketControlHandshakeResponseV3,
   MarketControlPolicyApplyResponseV3,
   MarketDataBarSeriesRequestV3,
   MarketEventRequestV3,
   MarketEventResponseV3,
+  MarketNewsRequestV3,
+  MarketNewsResponseV3,
   MarketCacheContextRequestV3,
   MarketCacheContextResponseV3,
   MarketPublicFeesRequestV3,
@@ -43,9 +45,9 @@ import {
   type MarketPeriodIndicatorRequest,
   type MarketPeriodIndicatorCapabilities,
   indicatorCalculateResponseSchema,
+  marketNewsRequestV3Schema,
 } from '@thesis-ledger/schemas';
 import {
-  DsaV3ProtocolError,
   mapControlV3HttpError,
   mapDataV3HttpError,
   parseControlHandshakeResponseV3,
@@ -53,7 +55,6 @@ import {
   parseDataCapabilitiesV3,
   parseEffectivePolicyEnvelopeV3,
   parseMarketRouteCatalogV3,
-  type DsaV3ErrorCode,
   type EffectivePolicyEnvelopeV3,
 } from './dsa-v3-protocol.js';
 import { loadConfig } from '../../platform/config.js';
@@ -72,39 +73,25 @@ import {
 } from './dsa-catalog-v3.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
 import { fetchObservedCacheRequest } from './dsa-cache-request-observation.js';
-
-function controlErrorCode(detailCode: string | undefined, status: number): DsaV3ErrorCode {
-  if (detailCode === 'unauthorized') return 'unauthorized';
-  if (detailCode === 'unsupported_capability') return 'unsupported-capability';
-  if (detailCode === 'STALE_REVISION') return 'stale-revision';
-  if (status === 409 || status === 422) return 'control-rejected';
-  return 'unavailable';
-}
+import {
+  DsaError,
+  controlErrorCode,
+  toDsaError,
+  parseV3Response,
+  type HttpErrorMapper,
+} from './dsa-client-errors.js';
 
 export type { CatalogJob } from './dsa-catalog-v3.js';
+export { DsaError } from './dsa-client-errors.js';
 
-export class DsaError extends DsaV3ProtocolError {}
-
-type HttpErrorMapper = (status: number, payload: unknown) => DsaV3ProtocolError;
-
-const toDsaError = (error: DsaV3ProtocolError) =>
-  new DsaError(error.message, error.code, error.status, error.sourceReason);
-
-const parseV3Response = <T>(parse: () => T): T => {
-  try {
-    return parse();
-  } catch (error) {
-    if (error instanceof DsaV3ProtocolError) throw toDsaError(error);
-    throw error;
-  }
-};
+const requestSignal = (timeoutMs: number, signal?: AbortSignal) => signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
 
 @Injectable()
 export class DsaClient {
   private readonly config = loadConfig();
   get dataCapabilities() {
     return new DsaDataCapabilityReaderV3(
-      (path, request, mapper) => this.post<unknown>(path, request, 1, mapper),
+      (path, request, mapper, budgetMs, signal) => this.post<unknown>(path, request, 1, mapper, budgetMs, signal),
       parseV3Response,
       () => this.marketDataCapabilitiesV3(),
       () => this.effectiveControlPolicyV3().then(result => result.projection?.effective ?? null),
@@ -115,13 +102,13 @@ export class DsaClient {
     return this.config.dsaTimeoutMs;
   }
 
-  async get<T>(path: string, attempts = 2, mapHttpError?: HttpErrorMapper): Promise<T> {
+  async get<T>(path: string, attempts = 2, mapHttpError?: HttpErrorMapper, signal?: AbortSignal): Promise<T> {
     let lastError: unknown;
     const traceId = currentTraceId() ?? crypto.randomUUID();
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const response = await fetchObservedCacheRequest(new URL(path, this.config.dsaBaseUrl), {
-          signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
+          signal: requestSignal(this.config.dsaTimeoutMs, signal),
           headers: {
             authorization: `Bearer ${this.config.dsaToken}`,
             'x-trace-id': traceId,
@@ -169,6 +156,8 @@ export class DsaClient {
     body: unknown,
     attempts = 2,
     mapHttpError?: HttpErrorMapper,
+    timeoutMs = this.config.dsaTimeoutMs,
+    signal?: AbortSignal,
   ): Promise<T> {
     let lastError: unknown;
     const traceId = currentTraceId() ?? crypto.randomUUID();
@@ -176,7 +165,7 @@ export class DsaClient {
       try {
         const response = await fetchObservedCacheRequest(new URL(path, this.config.dsaBaseUrl), {
           method: 'POST',
-          signal: AbortSignal.timeout(this.config.dsaTimeoutMs),
+          signal: requestSignal(Math.min(timeoutMs, this.config.dsaTimeoutMs), signal),
           headers: {
             'content-type': 'application/json',
             authorization: `Bearer ${this.config.dsaToken}`,
@@ -335,8 +324,16 @@ export class DsaClient {
     return this.dataCapabilities.events(input);
   }
 
-  marketCacheContextV3(input: MarketCacheContextRequestV3): Promise<MarketCacheContextResponseV3> {
-    return this.dataCapabilities.cacheContext(input);
+  marketNewsV3(input: MarketNewsRequestV3, signal?: AbortSignal): Promise<MarketNewsResponseV3> {
+    const request = marketNewsRequestV3Schema.parse(input);
+    return this.dataCapabilities.news({
+      ...request,
+      requestBudgetMs: Math.min(request.requestBudgetMs, this.timeoutMs),
+    }, signal);
+  }
+
+  marketCacheContextV3(input: MarketCacheContextRequestV3, signal?: AbortSignal): Promise<MarketCacheContextResponseV3> {
+    return this.dataCapabilities.cacheContext(input, signal);
   }
 
   marketPublicFeesV3(input: MarketPublicFeesRequestV3): Promise<MarketPublicFeesResponseV3> {
@@ -487,12 +484,7 @@ export class DsaClient {
 
   testControlProvider(
     providerId: string,
-    input: {
-      requestId?: string;
-      credentials?: { method: string; values: Record<string, unknown> };
-      route?: MarketProviderProbeRoute;
-      purpose?: 'capability_read' | 'account_access';
-    } = {},
+    input: MarketProviderTestOptions = {},
   ) {
     const requestId = input.requestId ?? crypto.randomUUID();
     const budget: [] | [number, undefined, number] = input.purpose === 'account_access' ? [1, undefined, 22_000] : [];
