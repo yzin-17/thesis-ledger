@@ -62,7 +62,7 @@ describe('M14b 资讯、公告与原文', () => {
         providerId: 'official-states',
         total: 61,
         page: Number(query.get('page')),
-        pageSize: 30,
+        pageSize: 10,
         items: [],
       });
     });
@@ -70,6 +70,7 @@ describe('M14b 资讯、公告与原文', () => {
     await mount(<AnnouncementsScreen />);
     await click(button('下一页公告'));
     expect(new URL(String(fetcher.mock.calls.at(-1)![0])).searchParams.get('page')).toBe('2');
+    expect(new URL(String(fetcher.mock.calls.at(-1)![0])).searchParams.get('pageSize')).toBe('10');
     await input(field('搜索公告标题或标的'), '600519');
     await click(button('查询公告'));
     const query = new URL(String(fetcher.mock.calls.at(-1)![0])).searchParams;

@@ -59,7 +59,7 @@ export type SettingsStackParams = { SettingsHome: undefined; ChartPreview: undef
 export type MarketStackParams = {
   MarketHome: undefined;
   MarketDetail: { instrument: MobileInstrument; accountId?: string; mode?: 'actual' | 'shadow' };
-  MarketStatic: { instrument: MobileInstrument };
+  MarketStatic: { instrument?: MobileInstrument } | undefined;
   MarketNews: { instrument?: MobileInstrument } | undefined;
   MarketAnnouncements: { q?: string } | undefined;
   MarketDocuments: undefined;

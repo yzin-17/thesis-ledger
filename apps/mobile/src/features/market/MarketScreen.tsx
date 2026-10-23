@@ -27,6 +27,7 @@ export function MarketScreen() {
           />
         </Section>
       ) : null}
+      <Action label="港美证券资料" onPress={() => navigation.navigate('MarketStatic')} />
       <Action label="市场快讯" onPress={() => navigation.navigate('MarketNews')} />
       <Action label="公告与已收录原文" onPress={() => navigation.navigate('MarketAnnouncements')} />
       <Action label="已收录规则资料" onPress={() => navigation.navigate('MarketDocuments')} />

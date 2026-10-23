@@ -1,14 +1,74 @@
 import { useState } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
+import { securityStaticSymbolSchema } from '@thesis-ledger/schemas';
 import type { MarketStackParams } from '../../app/navigation-types';
 import { useMobileRuntime } from '../../app/MobileRuntime';
-import { Choices, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import {
+  Action,
+  Choices,
+  Copy,
+  Feedback,
+  Field,
+  Page,
+  QueryStatus,
+  Section,
+} from '../../components/MobilePrimitives';
 import { SourceLink } from '../../components/SourceLink';
+import type { MobileInstrument } from '../market-detail/market-model';
 export function MarketStaticScreen() {
-  const {
-    params: { instrument },
-  } = useRoute<RouteProp<MarketStackParams, 'MarketStatic'>>();
+  const { params } = useRoute<RouteProp<MarketStackParams, 'MarketStatic'>>();
+  const [instrument, setInstrument] = useState<MobileInstrument | undefined>(params?.instrument);
+  const [symbol, setSymbol] = useState('');
+  const [type, setType] = useState<'STOCK' | 'ETF'>('STOCK');
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const read = () => {
+    const parsed = securityStaticSymbolSchema.safeParse(symbol);
+    if (!parsed.success) {
+      setFeedback('请输入港股代码（例如 00700.HK）或美股代码（例如 SPY.US）。');
+      return;
+    }
+    setFeedback(null);
+    setInstrument({
+      symbol: parsed.data,
+      name: parsed.data,
+      market: parsed.data.endsWith('.HK') ? 'HK' : 'US',
+      assetType: type,
+    });
+  };
+  if (instrument)
+    return (
+      <StaticRead
+        key={`${instrument.symbol}:${instrument.assetType}`}
+        instrument={instrument}
+        onOther={() => setInstrument(undefined)}
+      />
+    );
+  return (
+    <Page title="港美证券资料">
+      <Copy muted>输入证券代码，读取港美股票或 ETF 的当前参考资料。</Copy>
+      <Field label="港美证券代码" value={symbol} onChange={setSymbol} />
+      <Choices
+        label="静态资料资产类型"
+        value={type}
+        options={[
+          { value: 'STOCK', label: '股票' },
+          { value: 'ETF', label: 'ETF' },
+        ]}
+        onChange={setType}
+      />
+      <Feedback message={feedback} error />
+      <Action label="读取港美资料" primary onPress={read} />
+    </Page>
+  );
+}
+function StaticRead({
+  instrument,
+  onOther,
+}: {
+  instrument: MobileInstrument;
+  onOther: () => void;
+}) {
   const { api, scope } = useMobileRuntime();
   const [assetType, setAssetType] = useState<'STOCK' | 'ETF'>(
     instrument.assetType === 'ETF' ? 'ETF' : 'STOCK',
@@ -30,6 +90,7 @@ export function MarketStaticScreen() {
   const data = query.data;
   return (
     <Page title="证券资料与交易单位">
+      <Action label="查询其他港美证券" onPress={onOther} />
       <Copy>
         {instrument.name} · {instrument.symbol} · {instrument.market}
       </Copy>

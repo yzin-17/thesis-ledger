@@ -15,7 +15,7 @@ export function AnnouncementsScreen() {
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: [...scope, 'market-announcements', q, page],
-    queryFn: ({ signal }) => api.market.getAnnouncements({ q, page, pageSize: 30 }, signal),
+    queryFn: ({ signal }) => api.market.getAnnouncements({ q, page, pageSize: 10 }, signal),
   });
   return (
     <Page title="公告与已收录原文">
@@ -32,7 +32,7 @@ export function AnnouncementsScreen() {
       {query.data ? (
         <>
           <Copy>
-            匹配 {query.data.total} 份原文 · 第 {query.data.page} 页
+            匹配 {query.data.total} 份原文 · 第 {query.data.page} 页 · 每页 10 份
           </Copy>
           {query.data.total === 0 ? <Copy>当前没有匹配的已收录公告。</Copy> : null}
           {query.data.items.map((item) => (
@@ -55,7 +55,7 @@ export function AnnouncementsScreen() {
           />
           <Action
             label="下一页公告"
-            disabled={page * 30 >= query.data.total || query.isFetching}
+            disabled={page * 10 >= query.data.total || query.isFetching}
             onPress={() => setPage((value) => value + 1)}
           />
         </>
