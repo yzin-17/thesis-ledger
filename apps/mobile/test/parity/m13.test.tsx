@@ -9,6 +9,7 @@ import {
   type MarketChartFilters,
 } from '../../src/features/market-detail/market-model';
 import { MarketChartPanel } from '../../src/features/market-detail/MarketChartPanel';
+import { assertChartData } from '../../src/platform/charts/chart-document';
 const reads = vi.hoisted(() => vi.fn());
 vi.mock('@thesis-ledger/api-client', async (original) => ({
   ...(await original<typeof ApiClient>()),
@@ -115,5 +116,45 @@ describe('M13 行情窗口与指标', () => {
       data: { name: 'MA', parameters: { period: 5 }, inputFingerprint: 'other-window', points: [] },
     };
     expect(() => marketChartData(result, filters)).toThrow('指纹不一致');
+  });
+  it('完整 MA、MACD、RSI 默认配置可同时绘制，超出其十条序列仍拒绝', () => {
+    const base = detail(30);
+    const profiles = [
+      ['MA', ['ma5', 'ma10', 'ma20', 'ma60']],
+      ['MACD', ['dif', 'dea', 'histogram']],
+      ['RSI', ['rsi6', 'rsi12', 'rsi24']],
+    ] as const;
+    const sections = Object.fromEntries(
+      profiles.map(([name, keys]) => [
+        `indicator:${name}`,
+        {
+          capability: `indicator:${name}`,
+          status: 'ready',
+          data: {
+            name,
+            parameters: {},
+            inputFingerprint: base.barSeries!.inputFingerprint,
+            points: base.barSeries!.points.map(({ timestamp }) => ({
+              timestamp,
+              values: Object.fromEntries(keys.map((key) => [key, 1])),
+            })),
+          },
+        },
+      ]),
+    );
+    const chart = marketChartData(
+      marketDisplayDetailResponseSchema.parse({
+        ...base,
+        sections: { ...base.sections, ...sections },
+      }),
+      filters,
+    );
+    expect(chart.lines).toHaveLength(10);
+    expect(chart.lines.filter((line) => line.pane === 1)).toHaveLength(3);
+    expect(chart.lines.filter((line) => line.pane === 2)).toHaveLength(3);
+    expect(() => assertChartData(chart)).not.toThrow();
+    expect(() => assertChartData({ ...chart, lines: [...chart.lines, chart.lines[0]!] })).toThrow(
+      '上限',
+    );
   });
 });

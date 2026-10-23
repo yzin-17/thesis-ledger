@@ -69,7 +69,7 @@ export function parseChartMessage(raw: string, instanceId: string): ChartMessage
   }
 }
 export function assertChartData(data: ChartData) {
-  if (data.candles.length > 3000 || data.lines.length > 8)
+  if (data.candles.length > 3000 || data.lines.length > 10)
     throw new Error('图表数据超过当前窗口上限。');
   if (!orderedChartTimes(data.candles)) throw new Error('图表窗口必须是有序且有效的时间数据。');
   for (const candle of data.candles) {
