@@ -7,5 +7,5 @@ export function canGenerateAuthoringContent(content:AuthoringContent) {
 }
 export function canModifyAuthoringContent(content:AuthoringContent) {
   if(!canGenerateAuthoringContent(content))return false;
-  try{return authoringStrategySchema.safeParse(JSON.parse(content.definitionText)).success;}catch{return false;}
+  return authoringStrategySchema.safeParse(content.definitionText).success;
 }

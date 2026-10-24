@@ -7,9 +7,19 @@ import { mobileEquityChart, mobileEquityCsv } from '../../src/features/backtest-
 import { parseExperimentAction } from '../../src/features/optimization-results/experiment-actions';
 import { riskUpdateSatisfied } from '../../src/features/strategy-risk/risk-application-actions';
 import { riskNotificationBody, emptyRiskNotification } from '../../src/features/strategy-risk/risk-notification-model';
-import { candidateAdoptionEligibility, canRevealTestMetrics } from '@thesis-ledger/schemas';
-import { b4Definition,b4Prepared,b4Strategy,b4StrategyId,b4VersionId,b4Run,b4RunId,b4Risk,fixture } from './batch4-fixture';
+import { candidateAdoptionEligibility, canRevealTestMetrics,canGenerateAuthoringContent,canModifyAuthoringContent,authoringContentSchema } from '@thesis-ledger/schemas';
+import { b4Definition,b4Prepared,b4Strategy,b4StrategyId,b4VersionId,b4Run,b4RunId,b4Risk,b4Draft,fixture } from './batch4-fixture';
 describe('第 4 批冻结、归属与恢复',()=>{
+  it('完整确认的有效定义允许局部修改，损坏文本或未确认内容仍拒绝',()=>{
+    const content=authoringContentSchema.parse({...b4Draft.content,
+      requirements:[{id:'confirmed',quote:'已确认需求',interpretation:'保留定义',state:'understood',definitionPaths:['entry']}],
+      confirmation:{instrumentId:'controlled',instrument:b4Definition.executionInstrument,timeframe:b4Definition.primaryTimeframe,
+        entrySummary:'close > open',exitSummary:'持仓退出',sizing:b4Definition.sizing,risk:b4Definition.risk,
+        noExtraRiskConfirmed:false,execution:b4Definition.execution,cost:b4Definition.cost,periodsAreBarsConfirmed:true}});
+    expect(canGenerateAuthoringContent(content)).toBe(true);expect(canModifyAuthoringContent(content)).toBe(true);
+    expect(canModifyAuthoringContent({...content,definitionText:'{ broken'})).toBe(false);
+    expect(canModifyAuthoringContent({...content,confirmation:undefined})).toBe(false);
+  });
   it('定义完整保留，非法输入不被示例替换；未知提交只认新且唯一的匹配回执',()=>{
     const schema=validatedDefinition(JSON.stringify(b4Definition));expect(schema).toEqual(b4Definition);
     expect(()=>validatedDefinition('{ broken')).toThrow();
