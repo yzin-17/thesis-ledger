@@ -36,6 +36,7 @@ import {
   type PendingBacktest,
 } from './backtest-submission';
 import { BacktestInputFields } from './BacktestInputFields';
+import { BacktestPreparationEvidence } from './BacktestPreparationEvidence';
 type Intent =
   | { kind: 'ordinary'; body: BacktestRunPreparationRequestV3; signature: string }
   | { kind: 'nav'; body: BacktestNavPreparationRequestV3; signature: string };
@@ -219,7 +220,7 @@ export function BacktestSetupScreen() {
             ]
           }
         >
-          <Copy>{JSON.stringify(current, null, 2)}</Copy>
+          <BacktestPreparationEvidence key={current.requestId} value={current} />
         </Section>
       ) : null}
       {pendingQuery.data ? (

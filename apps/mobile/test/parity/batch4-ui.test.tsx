@@ -7,7 +7,8 @@ import { BacktestResultScreen } from '../../src/features/backtest-results/Backte
 import { StrategyRiskCreateScreen } from '../../src/features/strategy-risk/StrategyRiskCreateScreen';
 import { StrategyRiskEditorScreen } from '../../src/features/strategy-risk/StrategyRiskEditorScreen';
 import { OptimizationSetupScreen } from '../../src/features/optimization-setup/OptimizationSetupScreen';
-import { b4Definition,b4Draft,b4Preview,b4Risk,b4Run,b4RunId,b4Strategy,b4VersionId } from './batch4-fixture';
+import { BacktestPreparationEvidence } from '../../src/features/backtest-setup/BacktestPreparationEvidence';
+import { b4Definition,b4Draft,b4Preview,b4Risk,b4Run,b4RunId,b4Strategy,b4VersionId,b4Prepared } from './batch4-fixture';
 import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 import { ledgerAccount } from './ledger-fixture';
 const storage=vi.hoisted(()=>new Map<string,string>());
@@ -18,6 +19,15 @@ vi.mock('../../src/platform/output/export-file',()=>({exportCsv:vi.fn().mockReso
 const respond=(value:unknown,status=200)=>new Response(JSON.stringify(status>=400?{error:'controlled_failure',...(value as object)}:value),{status});
 beforeEach(()=>{storage.clear();view.runtime.baseUrl='https://ledger.test/api/v1';});
 describe('第 4 批手机界面失败恢复',()=>{
+  it('冻结概要保留关键来源与指纹，完整配置只在显式展开后显示',async()=>{
+    const prepared=b4Prepared();if(prepared.status!=='prepared')throw Error('准备夹具无效');
+    await mount(<BacktestPreparationEvidence value={prepared}/>);
+    expect(document.body.textContent).toContain(prepared.runConfig.dataAsOf);
+    expect(document.body.textContent).toContain(prepared.actualSource.provenance.providerId);
+    expect(document.body.textContent).not.toContain('priceInputBindings');
+    await click(button('展开完整准备证据'));expect(document.body.textContent).toContain('priceInputBindings');
+    await click(button('收起完整准备证据'));expect(document.body.textContent).not.toContain('priceInputBindings');
+  });
   it('创建响应丢失后保留完整输入与基线，找回唯一版本且不再次 POST',async()=>{
     let created=false;let saved:unknown;let posts=0;
     setApi(vi.fn<typeof fetch>().mockImplementation(async(url,init)=>{

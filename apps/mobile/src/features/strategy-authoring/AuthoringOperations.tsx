@@ -414,7 +414,6 @@ function AuthoringModelFields({
   } = state;
   return (
     <>
-      {' '}
       <Choices
         label="编写用途"
         value={kind}
