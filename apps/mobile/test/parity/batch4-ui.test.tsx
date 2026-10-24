@@ -56,6 +56,26 @@ describe('第 4 批手机界面失败恢复',()=>{
     expect(document.body.textContent).toContain('读取受限');expect(document.body.textContent).not.toContain('10005.12345678');
     expect(document.body.textContent).not.toContain('should-stay-hidden');expect(button('导出权益 CSV')).toBeUndefined();
   });
+  it('正式保存响应丢失并重启后复用原审核凭据，服务端修订推进不阻断找回',async()=>{
+    const key=JSON.stringify(['mobile-authoring-content-v1',view.runtime.baseUrl,b4RunId]);
+    const pendingSave={expectedRevision:1,name:b4Draft.content.title,reviewedDefinitionHash:'a'.repeat(64)};
+    storage.set(key,JSON.stringify({text:JSON.stringify(b4Draft.content),revision:1,pendingSave}));
+    const posts:unknown[]=[];
+    setApi(vi.fn<typeof fetch>().mockImplementation(async(url,init)=>{
+      const p=String(url);
+      if(p.endsWith(`/drafts/${b4RunId}/save`)){
+        posts.push(JSON.parse(String(init?.body)));
+        return respond({strategyId:b4Strategy.id,versionId:b4VersionId,version:1});
+      }
+      if(p.endsWith(`/drafts/${b4RunId}`))return respond({...b4Draft,state:'saved',revision:2,savedVersionId:b4VersionId});
+      return respond([]);
+    }));
+    await mount(<AuthoringDraftScreen id={b4RunId}/>);
+    expect(button('找回原正式保存').disabled).toBe(false);
+    await click(button('找回原正式保存'));
+    expect(posts).toEqual([pendingSave]);expect(storage.has(key)).toBe(false);
+    expect(button('打开正式策略版本')).toBeTruthy();
+  });
   it('失败重试响应丢失后先读原 Run，轮次已推进时找回并禁止再次投递',async()=>{
     view.params={id:b4RunId,kind:'ordinary'};let retried=false;let posts=0;
     setApi(vi.fn<typeof fetch>().mockImplementation(async(url,init)=>{

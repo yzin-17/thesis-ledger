@@ -149,7 +149,8 @@ function useAuthoringDraftController({
         setMessage('草稿已保存。');
         return;
       }
-      if (dirty) throw Error('请先保存当前草稿，失败时输入仍保留。');
+      if (dirty && (action !== 'save' || !pendingSave))
+        throw Error('请先保存当前草稿，失败时输入仍保留。');
       if (action === 'discard') {
         if (!(await confirmAction('丢弃编写草稿？', '草稿将进入已丢弃状态，请核对当前草稿名称。')))
           return;
@@ -309,7 +310,7 @@ function AuthoringDraftForm({
       <Action
         label={pendingSave ? '找回原正式保存' : '确认保存正式版本'}
         primary
-        disabled={command.isPending || dirty || (!pendingSave && (!review || reviewed !== 'yes'))}
+        disabled={command.isPending || (!pendingSave && (dirty || !review || reviewed !== 'yes'))}
         onPress={() => execute('save')}
       />
       <Action label="丢弃编写草稿" disabled={locked || dirty} onPress={() => execute('discard')} />
