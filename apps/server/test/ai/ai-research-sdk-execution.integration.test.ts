@@ -46,13 +46,13 @@ const researchContent = JSON.stringify({
 /** 慢流每块的间隔；总时长必然超过用例给出的 Provider 级超时。 */
 const SLOW_STREAM_CHUNK_GAP_MS = 400;
 
-const writeSse = (response: ServerResponse) => {
+const writeSse = (response: ServerResponse, model = 'fixture-model') => {
   const content = researchContent;
   const common = {
     id: 'research-fixture',
     object: 'chat.completion.chunk',
     created: 1,
-    model: 'fixture-model',
+    model,
   };
   response.writeHead(200, { 'content-type': 'text/event-stream' });
   response.write(
@@ -165,6 +165,7 @@ const stateStore = (initial: AiExecutionSummary) => {
 describe('Research SDK local HTTP vertical', () => {
   let baseURL = '';
   let requestCount = 0;
+  let returnedModel = 'fixture-model';
   let mode: 'fallback' | 'disconnect' | 'hang' | 'retryAfterDeadline' | 'slowStream' | 'success' =
     'success';
   const server = createServer((request, response) => {
@@ -222,7 +223,7 @@ describe('Research SDK local HTTP vertical', () => {
       }, pieces.length * SLOW_STREAM_CHUNK_GAP_MS);
       return;
     }
-    writeSse(response);
+    writeSse(response, returnedModel);
   });
 
   beforeAll(async () => {
@@ -235,6 +236,7 @@ describe('Research SDK local HTTP vertical', () => {
 
   beforeEach(() => {
     requestCount = 0;
+    returnedModel = 'fixture-model';
     mode = 'success';
   });
 
@@ -288,10 +290,7 @@ describe('Research SDK local HTTP vertical', () => {
     },
   });
 
-  const run = (
-    execution: AiExecutionSummary,
-    frozenPricing?: Record<string, number | string>,
-  ) => ({
+  const run = (execution: AiExecutionSummary, frozenPricing?: Record<string, number | string>) => ({
     provider: 'primary',
     model: 'fixture-model',
     modelMetadata: {
@@ -359,6 +358,17 @@ describe('Research SDK local HTTP vertical', () => {
       error: { code: 'provider_rejected', externalResult: 'rejected_before_generation' },
     });
     expect(state.execution().generationStatus).toBe('complete');
+    expect(state.execution().requests.at(-1)?.outcome?.actualModel).toBe('fixture-model');
+  });
+
+  it('完成事实记录 SDK 实际返回模型，保留预留中的请求模型', async () => {
+    returnedModel = 'resolved/model';
+    const state = await execute(summary());
+    expect(requestCount).toBe(1);
+    expect(state.execution().requests.at(-1)).toMatchObject({
+      reservation: { model: 'fixture-model' },
+      outcome: { status: 'complete', actualModel: 'resolved/model' },
+    });
   });
 
   it('传输结果未知时不 fallback，并保留 unknown 请求事实', async () => {
@@ -374,9 +384,9 @@ describe('Research SDK local HTTP vertical', () => {
 
   it('Retry-After 超过剩余绝对期限时终止，不发送 fallback', async () => {
     mode = 'retryAfterDeadline';
-    await expect(execute(summary(policy, new Date(Date.now() + 1_000).toISOString()))).rejects.toThrow(
-      'Retry-After 超过研究任务剩余期限',
-    );
+    await expect(
+      execute(summary(policy, new Date(Date.now() + 1_000).toISOString())),
+    ).rejects.toThrow('Retry-After 超过研究任务剩余期限');
     expect(requestCount).toBe(1);
   });
 

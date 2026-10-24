@@ -6,6 +6,11 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      package_desktop:
+        description: '构建并上传桌面安装包'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -93,9 +98,18 @@ jobs:
         run: node scripts/test-journal-review-postgres.mjs
       - name: Market reader review regressions
         run: |
-          pnpm --filter @thesis-ledger/server exec vitest run \
-            test/market/market-reader-review-regressions.test.ts \
+          market_regression_tests=(
+            test/market/market-bar-reader-v3.test.ts
+            test/market/market-chart-reader-v3.test.ts
             test/market/market-indicator-window.test.ts
+          )
+          for test_file in "${market_regression_tests[@]}"; do
+            if [ ! -f "apps/server/${test_file}" ]; then
+              printf '缺少市场回归文件：%s\n' "${test_file}" >&2
+              exit 1
+            fi
+          done
+          pnpm --filter @thesis-ledger/server exec vitest run "${market_regression_tests[@]}"
       - name: Contract tests
         run: pnpm contract:test
       - name: 研究离线轨迹确定性门禁
@@ -156,7 +170,7 @@ jobs:
 
   desktop-packages:
     needs: [quality, contracts-and-guardrails]
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'workflow_dispatch' && inputs.package_desktop) || startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
       matrix:

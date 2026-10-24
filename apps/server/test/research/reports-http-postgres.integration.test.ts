@@ -7,6 +7,41 @@ import { useResearchReportFixture, reportScope } from './research-report-postgre
 
 describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保存事实', () => {
   const { ctx, completed, get } = useResearchReportFixture();
+  it('路由实际模型由 SDK 完成事实绑定，篡改为请求模型仍隐藏正文及引用', async () => {
+    ctx.harness.models.setReturnedModel('resolved/model');
+    const { row, result } = await completed();
+    const before = await ctx.prisma.aiRun.findUniqueOrThrow({ where: { id: row.id } });
+    expect(row.model).toBe('controlled-model');
+    expect(result.model.modelId).toBe('resolved/model');
+    expect(row.modelMetadata).toMatchObject({
+      sdkExecution: {
+        requests: [
+          expect.objectContaining({
+            outcome: expect.objectContaining({ actualModel: 'resolved/model' }),
+          }),
+        ],
+      },
+    });
+    const detail = researchReportDetailSchema.parse(await (await get('/' + row.id)).json());
+    expect(detail.availability).toBe('available');
+    expect(detail.result).toEqual(result);
+    expect(await ctx.prisma.aiRun.findUniqueOrThrow({ where: { id: row.id } })).toEqual(before);
+    const requestCount = ctx.harness.models.requests.length;
+    result.model.modelId = row.model!;
+    await ctx.prisma.aiRun.update({
+      where: { id: row.id },
+      data: { result: result as Prisma.InputJsonValue },
+    });
+    expect(researchReportDetailSchema.parse(await (await get('/' + row.id)).json())).toMatchObject({
+      availability: 'invalid',
+      result: null,
+      summary: null,
+    });
+    expect(
+      (await get(`/${row.id}/evidence/${result.evidenceBindings[0]!.audit.evidenceId}`)).status,
+    ).toBe(404);
+    expect(ctx.harness.models.requests).toHaveLength(requestCount);
+  });
   it('列表、详情和引用消费原冻结材料，读取不取数、不运行模型、不改写任务', async () => {
     const { row, result } = await completed();
     const before = await ctx.prisma.aiRun.findUniqueOrThrow({ where: { id: row.id } });

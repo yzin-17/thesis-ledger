@@ -390,6 +390,7 @@ export class AiResearchSdkExecution {
           finishReason: generated.rawFinishReason ?? generated.finishReason,
           contract: contract.ref,
           schemaAccepted: true,
+          actualModel: generated.actualModel ?? model,
         },
         result,
         continuationBlockedReason: blocked,

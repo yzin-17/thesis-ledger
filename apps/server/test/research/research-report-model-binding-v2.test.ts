@@ -48,7 +48,13 @@ function routedReport(change?: (execution: AiExecutionSummary) => void) {
         dispatchingAt: time,
         dispatchExecutionAttempt: 1,
         completedAt: time,
-        outcome: { status: 'complete', contract, finishReason: 'stop', schemaAccepted: true },
+        outcome: {
+          status: 'complete',
+          contract,
+          finishReason: 'stop',
+          schemaAccepted: true,
+          actualModel: 'resolved/model',
+        },
         error: null,
         usageRevisions: [
           {
@@ -81,7 +87,7 @@ describe('V2 研究报告的请求模型与实际模型绑定', () => {
     expect((await read(comparisonReport())).detail.availability).toBe('available');
   });
 
-  it('凭同 Provider、同 attempt、同请求预留的成功 SDK 审计读取路由模型', async () => {
+  it('凭同 Provider、同 attempt、同请求预留及精确实际模型的成功 SDK 审计读取路由模型', async () => {
     const fixture = routedReport();
     const original = structuredClone(fixture.row);
     const projected = await read(fixture);
@@ -96,7 +102,53 @@ describe('V2 研究报告的请求模型与实际模型绑定', () => {
     expect((await read(fixture)).detail.availability).toBe('invalid');
   });
 
+  it('报告模型篡改成任意值或原请求模型时，不以一次成功审计放行', async () => {
+    for (const model of ['forged', 'router/auto']) {
+      const fixture = routedReport();
+      (fixture.row.result as { model: { modelId: string } }).model.modelId = model;
+      const projected = await read(fixture);
+      expect(projected.detail).toMatchObject({
+        availability: 'invalid',
+        result: null,
+        summary: null,
+      });
+      expect(projected.calls).toEqual([]);
+    }
+  });
+
+  it('旧 SDK 完成事实缺少实际模型时，仅兼容请求模型报告', async () => {
+    const fixture = routedReport((execution) => {
+      delete execution.requests[0]!.outcome!.actualModel;
+    });
+    expect((await read(fixture)).detail.availability).toBe('invalid');
+    (fixture.row.result as { model: { modelId: string } }).model.modelId = 'router/auto';
+    expect((await read(fixture)).detail.availability).toBe('available');
+  });
+
+  it('最后请求不匹配时，不借更早成功请求放行', async () => {
+    const fixture = routedReport((execution) => {
+      const latest = structuredClone(execution.requests[0]!);
+      latest.requestId = '10000000-0000-4000-8000-000000000011';
+      latest.sequence = 2;
+      latest.outcome!.actualModel = 'other/model';
+      execution.requests.push(latest);
+    });
+    expect((await read(fixture)).detail.availability).toBe('invalid');
+  });
+
   const invalidAudits: [string, (execution: AiExecutionSummary) => void][] = [
+    [
+      '缺实际模型',
+      (execution) => {
+        delete execution.requests[0]!.outcome!.actualModel;
+      },
+    ],
+    [
+      '错误实际模型',
+      (execution) => {
+        execution.requests[0]!.outcome!.actualModel = 'other/model';
+      },
+    ],
     [
       '尚未完成',
       (execution) => {

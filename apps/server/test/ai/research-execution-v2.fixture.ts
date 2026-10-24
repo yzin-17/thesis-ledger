@@ -43,7 +43,12 @@ function generation(mode: ControlledV2Mode) {
   return output;
 }
 
-function writeSse(response: ServerResponse, mode: ControlledV2Mode, output?: unknown) {
+function writeSse(
+  response: ServerResponse,
+  mode: ControlledV2Mode,
+  output?: unknown,
+  model = 'controlled-model',
+) {
   if (mode === 'disconnect') {
     response.destroy();
     return;
@@ -52,7 +57,7 @@ function writeSse(response: ServerResponse, mode: ControlledV2Mode, output?: unk
     id: 'controlled-research-v2',
     object: 'chat.completion.chunk',
     created: 1,
-    model: 'controlled-model',
+    model,
   };
   response.writeHead(200, { 'content-type': 'text/event-stream' });
   for (const extra of [
@@ -79,6 +84,7 @@ function writeSse(response: ServerResponse, mode: ControlledV2Mode, output?: unk
 export async function createResearchExecutionV2Harness(prisma: PrismaClient) {
   let mode: ControlledV2Mode = 'valid';
   let output: unknown;
+  let returnedModel = 'controlled-model';
   let received = deferred();
   let held: ServerResponse | undefined;
   const requests: Record<string, unknown>[] = [];
@@ -92,7 +98,7 @@ export async function createResearchExecutionV2Harness(prisma: PrismaClient) {
         held = response;
         return;
       }
-      writeSse(response, mode, output);
+      writeSse(response, mode, output, returnedModel);
     })().catch(() => response.destroy());
   });
   server.listen(0, '127.0.0.1');
@@ -156,6 +162,7 @@ export async function createResearchExecutionV2Harness(prisma: PrismaClient) {
     configureDefault,
     setMode(value: ControlledV2Mode) {
       mode = value;
+      returnedModel = 'controlled-model';
       output = undefined;
       received = deferred();
       held = undefined;
@@ -164,10 +171,13 @@ export async function createResearchExecutionV2Harness(prisma: PrismaClient) {
     setGeneration(value: unknown) {
       output = researchGenerationV2Schema.parse(value);
     },
+    setReturnedModel(value: string) {
+      returnedModel = value;
+    },
     received: () => received.promise,
     release() {
       if (held) {
-        writeSse(held, 'valid', output);
+        writeSse(held, 'valid', output, returnedModel);
         held = undefined;
       }
     },

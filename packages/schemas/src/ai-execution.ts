@@ -257,6 +257,7 @@ export const aiGenerationOutcomeSchema = z
     finishReason: z.string().trim().min(1).max(120).nullable(),
     contract: aiGenerationContractRefSchema,
     schemaAccepted: z.boolean(),
+    actualModel: z.string().trim().min(1).max(200).optional(),
   })
   .strict()
   .superRefine((value, context) => {

@@ -32,17 +32,23 @@ export function assertResearchRunBindingV2(run: Binding, frozen: AiFrozenResearc
     throw new AiFrozenResearchError('V2 冻结范围、提交身份或问题与持久任务不一致');
 }
 
-/** 请求路由与 SDK 解析的实际模型可不同，差异必须由同次执行的成功派发审计支撑。 */
+/** SDK 完成事实绑定实际模型，不能以任意一次成功请求放行报告模型。 */
 export function assertResearchResultModelBindingV2(
   run: Pick<AiRun, 'provider' | 'model' | 'modelMetadata' | 'executionAttempt'>,
   model: ResearchResultV2['model'],
 ) {
   if (model.providerId !== run.provider)
     throw new AiFrozenResearchError('V2 结果 Provider 与持久任务不一致');
-  if (model.modelId === run.model) return;
   const metadata = run.modelMetadata;
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata) ||
+    !metadata.sdkExecution
+  ) {
+    if (model.modelId === run.model) return;
     throw new AiFrozenResearchError('V2 实际模型缺少成功请求审计');
+  }
   const parsed = aiExecutionSummarySchema.safeParse(metadata.sdkExecution);
   if (
     !parsed.success ||
@@ -51,20 +57,23 @@ export function assertResearchResultModelBindingV2(
     parsed.data.contract.version !== 'research-generation-v2'
   )
     throw new AiFrozenResearchError('V2 实际模型缺少完整研究执行审计');
-  const matches = parsed.data.requests.some(
-    (request) =>
-      request.state === 'completed' &&
-      request.dispatchingAt !== null &&
-      request.completedAt !== null &&
-      request.dispatchExecutionAttempt === run.executionAttempt &&
-      request.reservation.provider === run.provider &&
-      request.reservation.model === run.model &&
-      Boolean(request.reservation.configurationFingerprint) &&
-      request.error === null &&
-      request.outcome?.status === 'complete' &&
-      request.outcome.schemaAccepted &&
-      request.outcome.contract.id === 'research' &&
-      request.outcome.contract.version === 'research-generation-v2',
-  );
-  if (!matches) throw new AiFrozenResearchError('V2 实际模型缺少匹配的成功请求审计');
+  const request = parsed.data.requests.at(-1);
+  if (
+    !request ||
+    request.state !== 'completed' ||
+    request.dispatchingAt === null ||
+    request.completedAt === null ||
+    request.dispatchExecutionAttempt !== run.executionAttempt ||
+    request.reservation.provider !== run.provider ||
+    request.reservation.model !== run.model ||
+    !request.reservation.configurationFingerprint ||
+    request.error !== null ||
+    request.outcome?.status !== 'complete' ||
+    !request.outcome.schemaAccepted ||
+    request.outcome.contract.id !== 'research' ||
+    request.outcome.contract.version !== 'research-generation-v2'
+  )
+    throw new AiFrozenResearchError('V2 实际模型缺少匹配的最终成功请求审计');
+  if (model.modelId !== (request.outcome.actualModel ?? run.model))
+    throw new AiFrozenResearchError('V2 结果模型与最终成功请求的实际模型不一致');
 }
