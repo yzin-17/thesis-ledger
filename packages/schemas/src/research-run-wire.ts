@@ -17,7 +17,7 @@ export const researchRunRecordSchema = z.object({
   provider: z.string(),
   model: z.string(),
   promptVersion: z.string(),
-  status: aiRunStatusSchema,
+  status: z.string().min(1).max(80),
   question: z.string().nullable().optional(),
   context: aiContextSchema.nullable().default(null),
   result: researchResultSchema.nullable().optional(),
@@ -83,7 +83,8 @@ export const researchRunReceiptSchema = researchRunRecordSchema
     question: true,
     context: true,
   })
-  .partial({ status: true });
+  .partial({ status: true })
+  .extend({ context: aiContextSchema.nullable().optional() });
 export const researchStrategyOptionsSchema = z.array(
   z.object({
     id: z.uuid(),

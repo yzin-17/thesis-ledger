@@ -16,17 +16,31 @@ import {
 } from '@thesis-ledger/schemas';
 import type { ResearchRequestParsed } from './research-client.js';
 
-const suffix = (input: object) =>
-  '?' +
-  new URLSearchParams(
+const suffix = (input: object) => {
+  const query = new URLSearchParams(
     Object.entries(input)
       .filter(([, v]) => v !== undefined && v !== 'all')
       .map(([k, v]) => [k, String(v)]),
   ).toString();
+  return query ? '?' + query : '';
+};
+const readInit = (signal?: AbortSignal): RequestInit | undefined =>
+  signal ? { signal } : undefined;
 export function researchRunClient(request: ResearchRequestParsed) {
   return {
     list: (input: ResearchRunListInput = {}, signal?: AbortSignal) => {
-      const query = researchRunListInputSchema.parse(input);
+      const { view, limit, status, search, source, includeInternal, sort, cursor } =
+        researchRunListInputSchema.parse(input);
+      const query = {
+        view,
+        limit,
+        status,
+        search,
+        source,
+        includeInternal: includeInternal || undefined,
+        sort,
+        cursor,
+      };
       return request(
         '/ai/runs' + suffix(query),
         {
@@ -36,7 +50,7 @@ export function researchRunClient(request: ResearchRequestParsed) {
             );
           },
         },
-        { signal: signal ?? null },
+        readInit(signal),
       );
     },
     detail: (id: string, options: { view?: 'research' } = {}, signal?: AbortSignal) => {
@@ -44,7 +58,7 @@ export function researchRunClient(request: ResearchRequestParsed) {
       return request(
         `/ai/runs/${runId}${suffix(options)}`,
         researchRunRecordSchema.refine((v) => v.id === runId),
-        { signal: signal ?? null },
+        readInit(signal),
       );
     },
     tools: (id: string, filter: { limit?: number; cursor?: string } = {}, signal?: AbortSignal) => {
@@ -55,21 +69,21 @@ export function researchRunClient(request: ResearchRequestParsed) {
       return request(
         `/ai/runs/${runId}/tool-calls${suffix({ limit, cursor })}`,
         aiToolCallsPageSchema,
-        { signal: signal ?? null },
+        readInit(signal),
       );
     },
     capabilities: (signal?: AbortSignal) =>
-      request('/ai/runs/capabilities', aiCapabilitiesResponseSchema, { signal: signal ?? null }),
+      request('/ai/runs/capabilities', aiCapabilitiesResponseSchema, readInit(signal)),
     strategies: (signal?: AbortSignal) =>
-      request('/strategies', researchStrategyOptionsSchema, { signal: signal ?? null }),
+      request('/strategies', researchStrategyOptionsSchema, readInit(signal)),
     settings: (signal?: AbortSignal) =>
-      request('/ai/settings', researchRoutingReadSchema, { signal: signal ?? null }),
+      request('/ai/settings', researchRoutingReadSchema, readInit(signal)),
     retryPrefill: (id: string, signal?: AbortSignal) => {
       const runId = researchReportIdSchema.parse(id);
       return request(
         `/ai/runs/${runId}/retry-prefill`,
         aiResearchRetryPrefillSchema.refine((v) => v.sourceRunId === runId),
-        { signal: signal ?? null },
+        readInit(signal),
       );
     },
     create: (input: unknown, signal?: AbortSignal) => {

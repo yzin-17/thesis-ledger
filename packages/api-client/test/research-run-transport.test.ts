@@ -20,6 +20,15 @@ const setup = (value: unknown) => {
   };
 };
 describe('研究运行共享传输', () => {
+  it('读取保留未知历史状态，创建收据不补写缺失上下文', async () => {
+    await expect(setup({ ...row, status: 'legacy-status' }).api.detail(id)).resolves.toMatchObject({
+      status: 'legacy-status',
+    });
+    const receipt = { id, provider: 'controlled', model: 'fixture', promptVersion: 'v1' };
+    await expect(
+      setup(receipt).api.create({ provider: 'controlled', model: 'fixture', promptVersion: 'v1' }),
+    ).resolves.toEqual(receipt);
+  });
   it('分页筛选与取消信号完整，兼容历史数组响应', async () => {
     const { api, fetcher } = setup([row]);
     const controller = new AbortController();

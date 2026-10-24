@@ -22,10 +22,20 @@ const clientFor = (response: unknown) => {
   });
   return { client: { request } as unknown as DesktopRequestClient, request };
 };
+const runId = '22222222-2222-4222-8222-222222222222';
+const run = {
+  id: runId,
+  provider: 'controlled',
+  model: 'fixture',
+  promptVersion: 'v1',
+  status: 'queued',
+  context: null,
+  createdAt: '2026-10-24T00:00:00Z',
+};
 
 describe('AI 研究工作台数据契约', () => {
   it('创建研究只提交问题、真实上下文、模板和重试关系', async () => {
-    const { client, request } = clientFor({ id: 'run-2', status: 'queued' });
+    const { client, request } = clientFor(run);
     await createAiRun(
       {
         question: '当前组合最主要的风险是什么？',
@@ -60,11 +70,16 @@ describe('AI 研究工作台数据契约', () => {
 
   it('再次生成先读取服务端预填与风险状态', async () => {
     const prefill = clientFor({
-      sourceRunId: '11111111-1111-4111-8111-111111111111',
+      sourceRunId: runId,
+      question: '检查组合风险',
+      context: { scope: 'portfolio' },
+      templateId: null,
+      contextState: 'valid',
+      requiresUnknownOutcomeAcknowledgement: true,
       sourceOutcome: 'unknown',
     });
-    await fetchAiResearchRetryPrefill('run/1', prefill.client);
-    expect(prefill.request).toHaveBeenCalledWith('/ai/runs/run%2F1/retry-prefill', undefined);
+    await fetchAiResearchRetryPrefill(runId, prefill.client);
+    expect(prefill.request).toHaveBeenCalledWith(`/ai/runs/${runId}/retry-prefill`, undefined);
     expect(aiKeys.retryPrefill('run-1')).not.toEqual(aiKeys.run('run-1'));
   });
 
@@ -72,9 +87,9 @@ describe('AI 研究工作台数据契约', () => {
     const list = clientFor([]);
     await fetchAiRuns({ status: 'failed', limit: 20 }, list.client);
     expect(list.request).toHaveBeenCalledWith('/ai/runs?limit=20&status=failed', undefined);
-    const detail = clientFor({ id: 'run-1', toolCalls: [] });
-    await fetchAiRun('run/1', detail.client);
-    expect(detail.request).toHaveBeenCalledWith('/ai/runs/run%2F1', undefined);
+    const detail = clientFor({ ...run, toolCalls: [] });
+    await fetchAiRun(runId, detail.client);
+    expect(detail.request).toHaveBeenCalledWith(`/ai/runs/${runId}`, undefined);
     expect(aiKeys.runs({ status: 'failed' })).not.toEqual(aiKeys.runs({ status: 'succeeded' }));
     expect(aiKeys.run('run-1')).not.toEqual(aiKeys.run('run-2'));
   });
@@ -96,9 +111,9 @@ describe('AI 研究工作台数据契约', () => {
       '/ai/runs?view=research&limit=50&status=succeeded&search=%E7%8E%B0%E9%87%91%E6%B5%81&source=strategy&includeInternal=true&sort=updated_desc',
       undefined,
     );
-    const detail = clientFor({ id: 'run-1' });
-    await fetchAiRun('run/1', { view: 'research' }, detail.client);
-    expect(detail.request).toHaveBeenCalledWith('/ai/runs/run%2F1?view=research', undefined);
+    const detail = clientFor(run);
+    await fetchAiRun(runId, { view: 'research' }, detail.client);
+    expect(detail.request).toHaveBeenCalledWith(`/ai/runs/${runId}?view=research`, undefined);
   });
 
   it('URL 状态可往返恢复查询、选中任务和完整阅读模式', () => {
@@ -150,9 +165,9 @@ describe('AI 研究工作台数据契约', () => {
     await fetchAiCapabilities(capabilities.client);
     expect(capabilities.request).toHaveBeenCalledWith('/ai/runs/capabilities', undefined);
     const tools = clientFor({ items: [], nextCursor: null, hasMore: false });
-    await fetchAiToolCalls('run/1', { limit: 10, cursor: 'tool-cursor' }, tools.client);
+    await fetchAiToolCalls(runId, { limit: 10, cursor: 'tool-cursor' }, tools.client);
     expect(tools.request).toHaveBeenCalledWith(
-      '/ai/runs/run%2F1/tool-calls?limit=10&cursor=tool-cursor',
+      `/ai/runs/${runId}/tool-calls?limit=10&cursor=tool-cursor`,
       undefined,
     );
   });

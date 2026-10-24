@@ -62,6 +62,13 @@ const candidateResponse = {
 const clientFor = (response: unknown) => {
   const request = vi.fn(async <T>(path: string) => {
     if (path.startsWith('/journal/review-candidates')) return response as T;
+    if (path === '/ai/runs')
+      return {
+        id: '33333333-3333-4333-8333-333333333333',
+        provider: 'mock',
+        model: 'behavior-review-default',
+        promptVersion: 'journal-review-v1',
+      } as T;
     return {} as T;
   });
   return { client: { request } as unknown as DesktopRequestClient, request };

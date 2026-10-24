@@ -71,7 +71,7 @@ const makeJournalClient = () => {
     if (path === '/journal/analysis/counterfactual') return { avoidedLoss: 120 } as T;
     if (path === '/journal/analysis/review') return { windowDays: 4 } as T;
     return {
-      id: 'run-journal-1',
+      id: '33333333-3333-4333-8333-333333333333',
       provider: 'mock',
       model: 'behavior-review-default',
       promptVersion: 'journal-review-v1',
@@ -279,7 +279,7 @@ describe('拆分后的领域请求契约', () => {
 describe('AI 与 Journal 行为契约', () => {
   it('Strategy/AI 写请求集中生成既有 payload', async () => {
     const aiResult = {
-      id: 'run-1',
+      id: '22222222-2222-4222-8222-222222222222',
       provider: 'mock',
       model: 'fixture',
       promptVersion: 'v1',
@@ -360,7 +360,7 @@ describe('AI 与 Journal 行为契约', () => {
       behavior: { discipline: 'needs-review' },
       counterfactual: { avoidedLoss: 120 },
       aiRun: {
-        id: 'run-journal-1',
+        id: '33333333-3333-4333-8333-333333333333',
         provider: 'mock',
         model: 'behavior-review-default',
         promptVersion: 'journal-review-v1',
@@ -376,7 +376,7 @@ describe('AI 与 Journal 行为契约', () => {
       metrics: { discipline: 'needs-review' },
       window: { windowDays: 4 },
       aiRun: {
-        id: 'run-journal-1',
+        id: '33333333-3333-4333-8333-333333333333',
         provider: 'mock',
         model: 'behavior-review-default',
         promptVersion: 'journal-review-v1',
