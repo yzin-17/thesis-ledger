@@ -54,7 +54,8 @@ export function StrategyLibraryScreen() {
         onChange={setStatus}
         options={[
           { value: 'all', label: '全部状态' },
-          { value: 'active', label: '启用' },
+          { value: 'draft', label: '草稿' },
+          { value: 'active', label: '使用中' },
           { value: 'archived', label: '已归档' },
         ]}
       />

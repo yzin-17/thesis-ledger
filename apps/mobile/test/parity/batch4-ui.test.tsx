@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { button,click,field,input,mount,setApi,view,flush } from './mobile-view-harness';
 import { StrategyEditorScreen } from '../../src/features/strategy-editor/StrategyEditorScreen';
+import { StrategyLibraryScreen } from '../../src/features/strategy-library/StrategyLibraryScreen';
 import { AuthoringDraftScreen } from '../../src/features/strategy-authoring/AuthoringDraftScreen';
 import { BacktestResultScreen } from '../../src/features/backtest-results/BacktestResultScreen';
 import { StrategyRiskCreateScreen } from '../../src/features/strategy-risk/StrategyRiskCreateScreen';
@@ -19,6 +20,17 @@ vi.mock('../../src/platform/output/export-file',()=>({exportCsv:vi.fn().mockReso
 const respond=(value:unknown,status=200)=>new Response(JSON.stringify(status>=400?{error:'controlled_failure',...(value as object)}:value),{status});
 beforeEach(()=>{storage.clear();view.runtime.baseUrl='https://ledger.test/api/v1';});
 describe('第 4 批手机界面失败恢复',()=>{
+  it('策略库按真实草稿、使用中及归档状态筛选，版本搜索保持身份',async()=>{
+    const rows=[b4Strategy,{...b4Strategy,id:'draft-strategy',name:'本轮草稿',status:'draft',versions:[{...b4Strategy.versions[0],id:'draft-version',strategyId:'draft-strategy'}]},
+      {...b4Strategy,id:'archived-strategy',name:'归档策略',status:'archived',versions:[{...b4Strategy.versions[0],id:'archived-version',strategyId:'archived-strategy'}]}];
+    setApi(vi.fn<typeof fetch>().mockResolvedValue(respond(rows)));
+    await mount(<StrategyLibraryScreen/>);await click(button('草稿'));
+    expect(button('查看 本轮草稿 · 版本 1')).toBeTruthy();expect(button('查看 B4 受控策略 · 版本 1')).toBeUndefined();
+    await input(field('搜索策略或版本'),'draft-version');expect(button('查看 本轮草稿 · 版本 1')).toBeTruthy();
+    await input(field('搜索策略或版本'),'');await click(button('使用中'));
+    expect(button('查看 B4 受控策略 · 版本 1')).toBeTruthy();expect(button('查看 本轮草稿 · 版本 1')).toBeUndefined();
+    await click(button('已归档'));expect(button('查看 归档策略 · 版本 1')).toBeTruthy();expect(button('查看 B4 受控策略 · 版本 1')).toBeUndefined();
+  });
   it('冻结概要保留关键来源与指纹，完整配置只在显式展开后显示',async()=>{
     const prepared=b4Prepared();if(prepared.status!=='prepared')throw Error('准备夹具无效');
     await mount(<BacktestPreparationEvidence value={prepared}/>);
