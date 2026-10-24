@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { JournalReviewAnalysisResponse } from '@thesis-ledger/schemas';
 import { useDirtyForm, useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
-import type { ResearchStackParams } from '../../app/navigation-types';
+import type { ResearchStackParams, RootTabParams } from '../../app/navigation-types';
 import {
   Action,
   Copy,
@@ -26,7 +27,7 @@ import { JournalSourceFacts } from './JournalSourceFacts';
 import { JournalAiPanel } from '../journal-ai/JournalAiPanel';
 export function JournalObjectScreen() {
   const { params } = useRoute<RouteProp<ResearchStackParams, 'JournalObject'>>();
-  const { api, scope, mode } = useMobileRuntime();
+  const { api, scope, mode, transition } = useMobileRuntime();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
   const [draft, setDraft] = useState(emptyJournalDraft);
   const [result, setResult] = useState<{
@@ -85,6 +86,28 @@ export function JournalObjectScreen() {
     <Page title="单笔复盘">
       <QueryStatus query={query} retry={() => void query.refetch()} />
       {query.data ? <JournalFacts candidate={query.data} /> : null}
+      {query.data ? (
+        <Action
+          label="定位原始交易"
+          onPress={() =>
+            void transition(() =>
+              navigation
+                .getParent<BottomTabNavigationProp<RootTabParams>>()
+                ?.navigate('Portfolio', {
+                  screen: 'TradeDetail',
+                  params: {
+                    accountId: params.accountId,
+                    mode,
+                    tradeId: query.data!.input.reference.tradeId,
+                    ...(query.data!.input.reference.reviewObjectType === 'CLOSE_SLICE'
+                      ? { closeSliceId: query.data!.input.reference.closeSliceId }
+                      : {}),
+                  },
+                }),
+            )
+          }
+        />
+      ) : null}
       <Field
         label="计划入场价"
         value={draft.plannedEntry}

@@ -81,6 +81,7 @@ export type ResearchStackParams = {
   JournalPeriod: JournalScope;
   JournalHistory: JournalScope & { reviewObjectId?: string };
   JournalAiHistory: JournalScope;
+  JournalEvidence: JournalScope & { kind: 'object' | 'period'; runId: string; toolCallId: string };
   ResearchReport: ReportScope;
   ResearchEvidence: ReportScope & { referenceId: string };
   ResearchSubmit: { retryRunId?: string } | undefined;

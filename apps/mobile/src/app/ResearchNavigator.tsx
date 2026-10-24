@@ -10,6 +10,7 @@ import { JournalObjectScreen } from '../features/journal-trade/JournalObjectScre
 import { JournalPeriodScreen } from '../features/journal-period/JournalPeriodScreen';
 import { JournalHistoryScreen } from '../features/journal-period/JournalHistoryScreen';
 import { JournalAiHistoryScreen } from '../features/journal-ai/JournalAiHistoryScreen';
+import { JournalEvidenceScreen } from '../features/journal-ai/JournalEvidenceScreen';
 const Stack = createNativeStackNavigator<ResearchStackParams>();
 export function ResearchNavigator() {
   return (
@@ -20,6 +21,7 @@ export function ResearchNavigator() {
       <Stack.Screen name="JournalPeriod" component={JournalPeriodScreen} />
       <Stack.Screen name="JournalHistory" component={JournalHistoryScreen} />
       <Stack.Screen name="JournalAiHistory" component={JournalAiHistoryScreen} />
+      <Stack.Screen name="JournalEvidence" component={JournalEvidenceScreen} />
       <Stack.Screen name="ResearchReport" component={ResearchReportScreen} />
       <Stack.Screen name="ResearchEvidence" component={ResearchEvidenceScreen} />
       <Stack.Screen name="ResearchSubmit" component={ResearchSubmitScreen} />

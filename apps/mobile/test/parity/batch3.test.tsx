@@ -7,6 +7,7 @@ import { JournalObjectScreen } from '../../src/features/journal-trade/JournalObj
 import { ResearchReportScreen } from '../../src/features/research-read/ResearchReportScreen';
 import { ResearchNewScreen } from '../../src/features/research-submit/ResearchSubmitScreen';
 import { journalWindow } from '../../src/features/journal-trade/journal-model';
+import { JournalEvidenceScreen } from '../../src/features/journal-ai/JournalEvidenceScreen';
 const storage = vi.hoisted(() => new Map<string, string>());
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -56,6 +57,22 @@ beforeEach(() => {
   view.runtime.baseUrl = 'https://ledger.test/api/v1';
 });
 describe('第 3 批手机异常保护', () => {
+  it('解读引用必须先核对账户归属，拒绝后不读取工具审计', async () => {
+    view.params = {
+      accountId: '00000000-0000-4000-8000-000000000001',
+      mode: 'shadow',
+      kind: 'object',
+      runId: id,
+      toolCallId: id,
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(respond({ error: 'forbidden', message: '引用不属于当前账户' }, 403));
+    setApi(fetcher);
+    await mount(<JournalEvidenceScreen />);
+    expect(document.body.textContent).toContain('引用不属于当前账户');
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes('tool-calls'))).toBe(false);
+  });
   it('时间带时区且左闭右开，反向窗口拒绝', () => {
     expect(journalWindow('2026-10-01T08:00:00+08:00', '2026-10-02T08:00:00+08:00')).toEqual({
       start: '2026-10-01T00:00:00.000Z',

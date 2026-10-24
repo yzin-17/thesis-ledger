@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { ResearchStackParams } from '../../app/navigation-types';
 import type { JournalAiExplanation, JournalPeriodAiExplanation } from '@thesis-ledger/schemas';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
@@ -38,6 +41,7 @@ export function JournalAiPanel({
   onSelected?: (id: string) => void;
 }) {
   const { api, scope, baseUrl } = useMobileRuntime();
+  const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
   const client = useQueryClient();
   const [runId, setRunId] = useState(existingRunId ?? '');
   const [message, setMessage] = useState<string | null>(null);
@@ -112,10 +116,25 @@ export function JournalAiPanel({
               {query.data.result.evidence.map((entry, i) => (
                 <Section key={i} title={entry.claim}>
                   {entry.citations.map((c, j) => (
-                    <Copy key={j}>
-                      来源 {c.provider} · {c.sourceId} · {c.observedAt} · 工具 {c.tool}
-                      {c.toolCallId ? ` · 调用 ${c.toolCallId}` : ''}
-                    </Copy>
+                    <Section key={j}>
+                      <Copy>
+                        来源 {c.provider} · {c.sourceId} · {c.observedAt} · 工具 {c.tool}
+                      </Copy>
+                      {c.toolCallId ? (
+                        <Action
+                          label={`定位解读引用 ${c.toolCallId}`}
+                          onPress={() =>
+                            navigation.navigate('JournalEvidence', {
+                              accountId,
+                              mode,
+                              kind,
+                              runId,
+                              toolCallId: c.toolCallId!,
+                            })
+                          }
+                        />
+                      ) : null}
+                    </Section>
                   ))}
                 </Section>
               ))}

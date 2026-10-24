@@ -66,7 +66,6 @@ export * from './ai.js';
 export * from './ai-provider.js';
 export * from './ai-execution.js';
 export * from './ai-generation-runtime-diagnostic.js';
-export * from './ai-generation-http-request-diagnostic.js';
 export * from './research.js';
 export * from './research-display.js';
 export * from './risk.js';
