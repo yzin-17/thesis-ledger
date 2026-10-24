@@ -58,6 +58,7 @@ export function ResearchHome() {
   const rows = query.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <Page title="研究与复盘">
+      <Action label="打开策略与回测" onPress={() => navigation.navigate('Strategy')} />
       <Action label="打开复盘工作区" onPress={() => navigation.navigate('Journal')} />
       <Action label="新建研究" onPress={() => navigation.navigate('ResearchSubmit')} />
       <Choices

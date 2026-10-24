@@ -9,6 +9,7 @@ import type {
 } from '../features/recurring-plans/plan-api';
 import type { MobileInstrument } from '../features/market-detail/market-model';
 import type { ResearchReportLocatorInput } from '@thesis-ledger/schemas';
+import type { StrategyStackParams } from './strategy-navigation';
 export type AccountStackParams = {
   AccountsHome: undefined;
   AccountEditor: { account?: AccountResponse };
@@ -76,6 +77,7 @@ type JournalScope = { accountId: string; mode: 'actual' | 'shadow' };
 type ReportScope = { id: string; locator: ResearchReportLocatorInput };
 export type ResearchStackParams = {
   ResearchHome: undefined;
+  Strategy: NavigatorScreenParams<StrategyStackParams> | undefined;
   Journal: MobileObjectTarget | undefined;
   JournalObject: JournalScope & { reviewObjectId: string };
   JournalPeriod: JournalScope;

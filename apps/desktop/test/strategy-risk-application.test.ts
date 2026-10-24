@@ -102,11 +102,16 @@ describe('策略风险应用工作页', () => {
   });
 
   it('预览和保存消费同一明确版本、账户、标的与生效范围', async () => {
-    const request = vi.fn().mockResolvedValue({});
+    const versionId = '00000000-0000-4000-8000-000000000041';
+    const accountId = '00000000-0000-4000-8000-000000000042';
+    const result = application({ id: versionId, strategyVersionId: versionId, accountId });
+    const request = vi.fn()
+      .mockResolvedValueOnce({ previewHash: 'preview-1', plan: result.plan, evaluations: [], cycleMode: result.cycleMode, context: {} })
+      .mockResolvedValueOnce(result);
     const client = { request } as unknown as DesktopRequestClient;
     const identity = {
-      strategyVersionId: 'version-1',
-      accountId: 'account-1',
+      strategyVersionId: versionId,
+      accountId,
       symbol: '510300.SH',
       cycleMode: 'existingAndFuture' as const,
     };
@@ -142,18 +147,20 @@ describe('策略风险应用工作页', () => {
   });
 
   it('风险应用列表隐藏已删除记录，删除请求携带预期修订', async () => {
-    const request = vi.fn().mockResolvedValue({});
+    const id = '00000000-0000-4000-8000-000000000041';
+    const result = application({ id, strategyVersionId: id, accountId: id });
+    const request = vi.fn().mockResolvedValueOnce([result]).mockResolvedValueOnce({ ...result, archivedAt: result.updatedAt });
     const client = { request } as unknown as DesktopRequestClient;
     await fetchStrategyRiskApplications(undefined, undefined, client);
     expect(request).toHaveBeenNthCalledWith(
       1,
       '/strategy-optimization/risk-applications?includeArchived=false',
-      { cache: 'no-store' },
+      expect.objectContaining({ cache: 'no-store' }),
     );
-    await deleteStrategyRiskApplication('application/id', 3, client);
+    await deleteStrategyRiskApplication(id, 3, client);
     expect(request).toHaveBeenNthCalledWith(
       2,
-      '/strategy-optimization/risk-applications/application%2Fid',
+      `/strategy-optimization/risk-applications/${id}`,
       expect.objectContaining({
         method: 'DELETE',
         body: JSON.stringify({ expectedRevision: 3 }),

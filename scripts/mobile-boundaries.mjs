@@ -1,9 +1,18 @@
+import { posix } from 'node:path';
+
 const sharedContracts = [
   'packages/api-client/src/',
   'packages/schemas/src/',
   'packages/domain/src/',
 ];
 export function mobileBoundaryViolation(file, specifier) {
+  const target = specifier.startsWith('.')
+    ? posix.normalize(posix.join(posix.dirname(file), specifier))
+    : specifier;
+  if (file.startsWith('apps/mobile/src/') && /^apps\/(desktop|server)\//u.test(target))
+    return '手机不得通过相对路径依赖 Desktop 或 Server 应用';
+  if (sharedContracts.some((prefix) => file.startsWith(prefix)) && /^apps\//u.test(target))
+    return '共享合同不得通过相对路径反向依赖应用源码';
   if (
     file.startsWith('apps/mobile/src/') &&
     /^@thesis-ledger\/(?:desktop|server)(?:\/|$)/u.test(specifier)

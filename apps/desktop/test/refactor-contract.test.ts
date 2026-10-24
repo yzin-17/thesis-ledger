@@ -461,7 +461,15 @@ describe('Strategy 任务行为契约', () => {
   });
 
   it('Strategy 创建、运行和取消请求保持既有 wire shape', async () => {
-    const strategy = makeClient({ id: 'strategy-1' });
+    const strategy = makeClient({ id: 'strategy-1', name: 'fixture', versions: [] });
+    strategy.request
+      .mockResolvedValueOnce({ id: 'strategy-1', name: 'fixture', versions: [] })
+      .mockResolvedValue({
+        id: 'job/1',
+        strategyVersionId: 'version-1',
+        mode: 'V3',
+        status: 'queued',
+      });
     await createStrategy(
       { name: 'fixture', schema: { version: 1, name: 'fixture' } },
       strategy.client,
@@ -525,7 +533,12 @@ describe('Strategy 任务行为契约', () => {
     await fetchBacktestJobs(summaryClient.client);
     expect(summaryClient.request).toHaveBeenCalledWith('/backtests/runs', undefined);
 
-    const detailClient = makeClient({ id: 'job/1' });
+    const detailClient = makeClient({
+      id: 'job/1',
+      strategyVersionId: 'version-1',
+      mode: 'V3',
+      status: 'queued',
+    });
     await fetchBacktestJob('job/1', detailClient.client);
     expect(detailClient.request).toHaveBeenCalledWith('/backtests/runs/job%2F1', undefined);
 

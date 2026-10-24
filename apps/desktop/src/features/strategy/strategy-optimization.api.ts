@@ -12,7 +12,9 @@ import type {
   ResultReadEligibility,
   StrategyParameterDescriptor,
 } from '@thesis-ledger/schemas';
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import { strategyClients } from '@thesis-ledger/api-client';
+import { omitUndefinedDeep } from '@thesis-ledger/schemas';
+import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
 import type { BacktestJobSummary } from './strategy.types.js';
 
 export type OptimizationCapabilities = {
@@ -227,290 +229,119 @@ export type AdoptionRiskApplicationDiff = {
   diff: RiskRuleDiff[];
 };
 
-const jsonPost = <T>(path: string, body: unknown, client?: DesktopRequestClient) =>
-  requestDesktopJson<T>(
-    path,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-    client,
-  );
-
-export const fetchOptimizationCapabilities = (client?: DesktopRequestClient) =>
-  requestDesktopJson<OptimizationCapabilities>(
-    '/strategy-optimization/capabilities',
-    undefined,
-    client,
-  );
-
+const optimization = (client?: DesktopRequestClient) =>
+  strategyClients(parsedDesktopRequest(client)).optimization;
+const risk = (client?: DesktopRequestClient) => strategyClients(parsedDesktopRequest(client)).risk;
+export const fetchOptimizationCapabilities = (
+  client?: DesktopRequestClient,
+): Promise<OptimizationCapabilities> => optimization(client).capabilities().then(omitUndefinedDeep);
 export const fetchStrategyOptimizationParameters = (
-  strategyVersionId: string,
+  id: string,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<StrategyParameterDescriptor[]>(
-    `/strategy-optimization/strategies/${encodeURIComponent(strategyVersionId)}/parameters`,
-    undefined,
-    client,
-  );
-
-export const fetchMonitoringPlan = (strategyVersionId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<MonitoringPlan>(
-    `/strategy-optimization/strategies/${encodeURIComponent(strategyVersionId)}/monitoring-plan`,
-    undefined,
-    client,
-  );
-
+): Promise<StrategyParameterDescriptor[]> =>
+  optimization(client).parameters(id).then(omitUndefinedDeep);
+export const fetchMonitoringPlan = (
+  id: string,
+  client?: DesktopRequestClient,
+): Promise<MonitoringPlan> => optimization(client).monitoringPlan(id).then(omitUndefinedDeep);
+type ListOptions = Parameters<ReturnType<typeof optimization>['list']>[0];
 export const fetchOptimizationExperiments = (
-  options: {
-    limit?: number;
-    cursor?: string;
-    search?: string;
-    sourceMode?: 'existing' | 'discovery';
-    status?: string;
-    strategyVersionId?: string;
-  } = {},
+  options: ListOptions = {},
   client?: DesktopRequestClient,
-) => {
-  const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
-  for (const [key, value] of Object.entries(options)) {
-    if (key !== 'limit' && typeof value === 'string' && value.length > 0) query.set(key, value);
-  }
-  return requestDesktopJson<OptimizationExperimentPage>(
-    `/strategy-optimization/experiments?${query.toString()}`,
-    { cache: 'no-store' },
-    client,
-  );
-};
-
+): Promise<OptimizationExperimentPage> =>
+  optimization(client).list(options).then(omitUndefinedDeep);
 export const fetchStrategyBacktestGroups = (
-  options: {
-    limit?: number;
-    cursor?: string;
-    jobId?: string;
-    search?: string;
-    sourceMode?: 'existing' | 'discovery';
-    status?: string;
-    strategyVersionId?: string;
-  } = {},
+  options: ListOptions = {},
   client?: DesktopRequestClient,
-) => {
-  const query = new URLSearchParams({ limit: String(options.limit ?? 50) });
-  for (const [key, value] of Object.entries(options)) {
-    if (key !== 'limit' && typeof value === 'string' && value.length > 0) query.set(key, value);
-  }
-  return requestDesktopJson<StrategyBacktestGroupPage>(
-    `/strategy-optimization/backtests/groups?${query.toString()}`,
-    { cache: 'no-store' },
-    client,
-  );
-};
-
-export const fetchOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<{
-    experiment: OptimizationExperimentSummary;
-    candidates: OptimizationCandidate[];
-    attempts: OptimizationAttempt[];
-  }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}`, { cache: 'no-store' }, client);
-
-export const fetchOptimizationCompare = (id: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<OptimizationCompare>(
-    `/strategy-optimization/experiments/${encodeURIComponent(id)}/compare`,
-    { cache: 'no-store' },
-    client,
-  );
-
+): Promise<StrategyBacktestGroupPage> =>
+  optimization(client).groups(options).then(omitUndefinedDeep);
+export const fetchOptimizationExperiment = (
+  id: string,
+  client?: DesktopRequestClient,
+): Promise<{
+  experiment: OptimizationExperimentSummary;
+  candidates: OptimizationCandidate[];
+  attempts: OptimizationAttempt[];
+}> => optimization(client).read(id).then(omitUndefinedDeep);
+export const fetchOptimizationCompare = (
+  id: string,
+  client?: DesktopRequestClient,
+): Promise<OptimizationCompare> => optimization(client).compare(id).then(omitUndefinedDeep);
 export const createOptimizationExperiment = (
   input: OptimizationExperimentCreate,
   client?: DesktopRequestClient,
-) => jsonPost<OptimizationExperimentSummary>('/strategy-optimization/experiments', input, client);
-
+): Promise<OptimizationExperimentSummary> =>
+  optimization(client).create(input).then(omitUndefinedDeep);
 export const cloneOptimizationExperiment = (
   id: string,
   options: { acknowledgeUnknownCost?: boolean; name?: string } = {},
   client?: DesktopRequestClient,
-) =>
-  jsonPost<OptimizationExperimentSummary>(
-    `/strategy-optimization/experiments/${encodeURIComponent(id)}/clone`,
-    { ...options, idempotencyKey: crypto.randomUUID() },
-    client,
-  );
-
+): Promise<OptimizationExperimentSummary> =>
+  optimization(client)
+    .clone(id, { ...options, idempotencyKey: crypto.randomUUID() })
+    .then(omitUndefinedDeep);
 export const renameOptimizationExperiment = (
   id: string,
   name: string,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<OptimizationExperimentSummary>(
-    `/strategy-optimization/experiments/${encodeURIComponent(id)}`,
-    {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    },
-    client,
-  );
-
-export const cancelOptimizationExperiment = (id: string, client?: DesktopRequestClient) =>
-  jsonPost<OptimizationExperimentSummary>(
-    `/strategy-optimization/experiments/${encodeURIComponent(id)}/cancel`,
-    {},
-    client,
-  );
-
+): Promise<OptimizationExperimentSummary> =>
+  optimization(client).rename(id, name).then(omitUndefinedDeep);
+export const cancelOptimizationExperiment = (
+  id: string,
+  client?: DesktopRequestClient,
+): Promise<OptimizationExperimentSummary> =>
+  optimization(client).cancel(id).then(omitUndefinedDeep);
 export const finalizeOptimizationExperiment = (
   id: string,
-  input: {
-    candidateIds: string[];
-    selectedCandidateId: string;
-    expectedStage: 'awaiting_finalization';
-  },
+  input: Parameters<ReturnType<typeof optimization>['finalize']>[1],
   client?: DesktopRequestClient,
-) =>
-  jsonPost<OptimizationCompare>(
-    `/strategy-optimization/experiments/${encodeURIComponent(id)}/finalize`,
-    input,
-    client,
-  );
-
+): Promise<OptimizationCompare> => optimization(client).finalize(id, input).then(omitUndefinedDeep);
 export const adoptOptimizationCandidate = (
   id: string,
-  input: {
-    candidateId: string;
-    candidateHash: string;
-    expectedStrategyVersion: number;
-    idempotencyKey: string;
-    acknowledgeTestExposure?: boolean;
-  },
+  input: Parameters<ReturnType<typeof optimization>['adopt']>[1],
   client?: DesktopRequestClient,
-) =>
-  jsonPost<{
-    strategyVersion: { id: string; strategyId: string; version: number };
-    adoptionContext: OptimizationAdoptionContext;
-    monitoringPlan: MonitoringPlan;
-    monitoringDiff?: {
-      before: MonitoringPlan | null;
-      after: MonitoringPlan;
-    };
-    riskApplicationEnabled: boolean;
-    riskApplicationDiffs: AdoptionRiskApplicationDiff[];
-  }>(`/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt`, input, client);
-
+) => optimization(client).adopt(id, input).then(omitUndefinedDeep);
 export const fetchOptimizationAdoptionContext = (
   id: string,
   candidateId: string,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<OptimizationAdoptionContext>(
-    `/strategy-optimization/experiments/${encodeURIComponent(id)}/adopt-context?candidateId=${encodeURIComponent(candidateId)}`,
-    undefined,
-    client,
-  );
-
+): Promise<OptimizationAdoptionContext> =>
+  optimization(client).adoptionContext(id, candidateId).then(omitUndefinedDeep);
 export const previewStrategyRiskApplication = (
-  input: {
-    strategyVersionId: string;
-    accountId: string;
-    symbol: string;
-    cycleMode: 'existingAndFuture' | 'nextPositionCycle';
-  },
+  input: Parameters<ReturnType<typeof risk>['preview']>[0],
   client?: DesktopRequestClient,
-) =>
-  jsonPost<RiskApplicationPreview>(
-    '/strategy-optimization/risk-applications/preview',
-    input,
-    client,
-  );
-
+): Promise<RiskApplicationPreview> => risk(client).preview(input).then(omitUndefinedDeep);
 export const createStrategyRiskApplication = (
-  input: {
-    strategyVersionId: string;
-    accountId: string;
-    symbol: string;
-    cycleMode: 'existingAndFuture' | 'nextPositionCycle';
-    previewHash: string;
-    idempotencyKey: string;
-    enabled: boolean;
-    notification: StrategyRiskNotification;
-  },
+  input: Parameters<ReturnType<typeof risk>['create']>[0],
   client?: DesktopRequestClient,
-) => jsonPost<StrategyRiskApplication>('/strategy-optimization/risk-applications', input, client);
-
+): Promise<StrategyRiskApplication> => risk(client).create(input).then(omitUndefinedDeep);
 export const fetchStrategyRiskApplications = (
   accountId?: string,
   symbol?: string,
   client?: DesktopRequestClient,
-) => {
-  const query = new URLSearchParams();
-  query.set('includeArchived', 'false');
-  if (accountId) query.set('accountId', accountId);
-  if (symbol) query.set('symbol', symbol);
-  const suffix = query.size > 0 ? `?${query.toString()}` : '';
-  return requestDesktopJson<StrategyRiskApplication[]>(
-    `/strategy-optimization/risk-applications${suffix}`,
-    { cache: 'no-store' },
-    client,
-  );
-};
-
+): Promise<StrategyRiskApplication[]> =>
+  risk(client)
+    .list({ ...(accountId ? { accountId } : {}), ...(symbol ? { symbol } : {}) })
+    .then(omitUndefinedDeep);
 export const updateStrategyRiskApplication = (
   id: string,
-  input: {
-    expectedRevision: number;
-    enabled?: boolean;
-    notification?: StrategyRiskNotification;
-  },
+  input: Parameters<ReturnType<typeof risk>['update']>[1],
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<StrategyRiskApplication>(
-    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}`,
-    {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
-
+): Promise<StrategyRiskApplication> => risk(client).update(id, input).then(omitUndefinedDeep);
 export const deleteStrategyRiskApplication = (
   id: string,
   expectedRevision: number,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<StrategyRiskApplication>(
-    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}`,
-    {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ expectedRevision }),
-    },
-    client,
-  );
-
+): Promise<StrategyRiskApplication> =>
+  risk(client).archive(id, expectedRevision).then(omitUndefinedDeep);
 export const previewStrategyRiskApplicationUpgrade = (
   id: string,
   targetStrategyVersionId: string,
   client?: DesktopRequestClient,
-) =>
-  jsonPost<RiskApplicationUpgradePreview>(
-    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}/upgrade-preview`,
-    { targetStrategyVersionId },
-    client,
-  );
-
+): Promise<RiskApplicationUpgradePreview> =>
+  risk(client).previewUpgrade(id, targetStrategyVersionId).then(omitUndefinedDeep);
 export const upgradeStrategyRiskApplication = (
   id: string,
-  input: {
-    expectedRevision: number;
-    targetStrategyVersionId: string;
-    previewHash: string;
-    idempotencyKey: string;
-  },
+  input: Parameters<ReturnType<typeof risk>['upgrade']>[1],
   client?: DesktopRequestClient,
-) =>
-  jsonPost<StrategyRiskApplication>(
-    `/strategy-optimization/risk-applications/${encodeURIComponent(id)}/upgrade`,
-    input,
-    client,
-  );
+): Promise<StrategyRiskApplication> => risk(client).upgrade(id, input).then(omitUndefinedDeep);

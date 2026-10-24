@@ -11,11 +11,13 @@ import { JournalPeriodScreen } from '../features/journal-period/JournalPeriodScr
 import { JournalHistoryScreen } from '../features/journal-period/JournalHistoryScreen';
 import { JournalAiHistoryScreen } from '../features/journal-ai/JournalAiHistoryScreen';
 import { JournalEvidenceScreen } from '../features/journal-ai/JournalEvidenceScreen';
+import { StrategyNavigator } from './StrategyNavigator';
 const Stack = createNativeStackNavigator<ResearchStackParams>();
 export function ResearchNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerTitle: '', headerBackTitle: '返回' }}>
       <Stack.Screen name="ResearchHome" component={ResearchHome} options={{ headerShown: false }} />
+      <Stack.Screen name="Strategy" component={StrategyNavigator} options={{ headerShown: false }} />
       <Stack.Screen name="Journal" component={JournalScreen} />
       <Stack.Screen name="JournalObject" component={JournalObjectScreen} />
       <Stack.Screen name="JournalPeriod" component={JournalPeriodScreen} />

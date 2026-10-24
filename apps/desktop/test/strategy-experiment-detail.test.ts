@@ -17,6 +17,7 @@ import {
   fetchOptimizationAdoptionContext,
 } from '../src/features/strategy/strategy-optimization.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
+import { createDefaultStrategySchema, setStrategyExecutionSymbol } from '../src/features/strategy/strategy.schema.js';
 
 const experiment = (overrides: Partial<OptimizationExperimentSummary> = {}) =>
   ({
@@ -169,20 +170,32 @@ describe('策略实验详情', () => {
   });
 
   it('使用精确实验和候选标识读取三方差异，并原样提交确认版本与幂等意图', async () => {
-    const request = vi.fn().mockResolvedValue({});
+    const id = '00000000-0000-4000-8000-000000000041';
+    const candidateId = '00000000-0000-4000-8000-000000000042';
+    const version = { id, strategyId: id, version: 7, schemaVersion: 2,
+      schema: setStrategyExecutionSymbol(createDefaultStrategySchema(), '510300.SH') };
+    const context = { experimentId: id, candidateId, expectedStrategyVersion: 7,
+      baseline: version, current: version, candidate: { ...version, candidateId, executionHash: 'hash-1' },
+      candidateVsBaseline: [], candidateVsCurrent: [] };
+    const monitoringPlan = { semanticVersion: 'strategy-monitoring-v1', strategyHash: 'hash-1', planHash: 'plan-1',
+      executionSymbol: '510300.SH', evaluationTimeframe: '1d', rules: [], coverage: { riskTotal: 0, riskMapped: 0, items: [] } };
+    const request = vi.fn().mockResolvedValueOnce(context).mockResolvedValueOnce({
+      strategyVersion: { id, strategyId: id, version: 8 }, adoptionContext: context, monitoringPlan,
+      riskApplicationEnabled: false, riskApplicationDiffs: [],
+    });
     const client = { request } as unknown as DesktopRequestClient;
 
-    await fetchOptimizationAdoptionContext('experiment/id', 'candidate id', client);
+    await fetchOptimizationAdoptionContext(id, candidateId, client);
     expect(request).toHaveBeenNthCalledWith(
       1,
-      '/strategy-optimization/experiments/experiment%2Fid/adopt-context?candidateId=candidate%20id',
-      undefined,
+      `/strategy-optimization/experiments/${id}/adopt-context?candidateId=${candidateId}`,
+      expect.any(Object),
     );
 
     await adoptOptimizationCandidate(
-      'experiment/id',
+      id,
       {
-        candidateId: 'candidate id',
+        candidateId,
         candidateHash: 'hash-1',
         expectedStrategyVersion: 7,
         idempotencyKey: 'intent-1',
@@ -192,11 +205,11 @@ describe('策略实验详情', () => {
     );
     expect(request).toHaveBeenNthCalledWith(
       2,
-      '/strategy-optimization/experiments/experiment%2Fid/adopt',
+      `/strategy-optimization/experiments/${id}/adopt`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          candidateId: 'candidate id',
+          candidateId,
           candidateHash: 'hash-1',
           expectedStrategyVersion: 7,
           idempotencyKey: 'intent-1',

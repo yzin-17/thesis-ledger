@@ -13,14 +13,15 @@ export { performanceClient } from './performance-client.js';
 import { marketChartOptionsClient } from './market-chart-options-client.js';
 import { ThesisLedgerContractError } from './api-error.js';
 import { marketDisplayClient } from './market-display-client.js';
-import { backtestRunClient } from './backtest-run-client.js';
+import { backtestClients } from './backtest-clients.js';
+import { strategyClients } from './strategy-clients.js';
 import { marketControlClient } from './market-control-client.js';
-import { backtestRunConfigClient } from './backtest-run-config-client.js';
-import { backtestNavRunClient } from './backtest-nav-run-client.js';
 import { journalReviewClient } from './journal-review-client.js';
 import { researchClient } from './research-client.js';
 import { researchRunClient } from './research-run-client.js';
 export { researchRunClient } from './research-run-client.js';
+export { strategyClients } from './strategy-clients.js';
+export { backtestClients } from './backtest-clients.js';
 import {
   apiErrorResponseSchema,
   baselineReconciliationCandidatesResponseSchema,
@@ -408,11 +409,8 @@ export class ThesisLedgerApiClient {
   readonly research = researchClient(this.requestParsed.bind(this));
   readonly researchRuns = researchRunClient(this.requestParsed.bind(this));
 
-  readonly backtests = {
-    ...backtestNavRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
-    ...backtestRunConfigClient(this.postParsed.bind(this)),
-    ...backtestRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
-  };
+  readonly strategy = strategyClients(this.requestParsed.bind(this));
+  readonly backtests = backtestClients(this.requestParsed.bind(this));
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
