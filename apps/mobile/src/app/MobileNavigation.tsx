@@ -2,8 +2,6 @@ import {
   NavigationContainer,
   DefaultTheme,
   DarkTheme,
-  useRoute,
-  type RouteProp,
 } from '@react-navigation/native';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -34,9 +32,10 @@ import { TargetsScreen } from '../features/performance-targets/TargetsScreen';
 import { TradesScreen } from '../features/portfolio/TradesScreen';
 import { TradeDetailScreen } from '../features/portfolio/TradeDetailScreen';
 import { MarketNavigator } from './MarketNavigator';
+import { ResearchNavigator } from './ResearchNavigator';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { ChartPreview } from '../features/settings/ChartPreview';
-import { Choices, Copy, Page, Section, ui } from '../components/MobilePrimitives';
+import { Choices, ui } from '../components/MobilePrimitives';
 const Tabs = createBottomTabNavigator<RootTabParams>();
 const Portfolio = createNativeStackNavigator<PortfolioStackParams>();
 const Settings = createNativeStackNavigator<SettingsStackParams>();
@@ -72,22 +71,6 @@ function SettingsNavigator() {
       />
       <Settings.Screen name="ChartPreview" component={ChartPreview} />
     </Settings.Navigator>
-  );
-}
-function ResearchDestination() {
-  const route = useRoute<RouteProp<RootTabParams, 'Research'>>();
-  const { mode } = useMobileRuntime();
-  return (
-    <Page title="研究">
-      {route.params && route.params.mode === mode ? (
-        <Section title="已定位复盘对象">
-          <Copy>账户 {route.params.accountId}</Copy>
-          <Copy>交易 {route.params.tradeId ?? '未指定'}</Copy>
-          {route.params.closeSliceId ? <Copy>平仓片段 {route.params.closeSliceId}</Copy> : null}
-        </Section>
-      ) : null}
-      <Copy muted>研究与完整复盘工作区暂未开放。</Copy>
-    </Page>
   );
 }
 function TabBar({ state, navigation }: BottomTabBarProps) {
@@ -189,7 +172,7 @@ function NavigationFrame() {
                 screens: { AccountsHome: 'accounts', AccountWorkspace: 'accounts/:accountId' },
               },
               Market: 'market',
-              Research: 'review',
+              Research: { screens: { ResearchHome: 'research', Journal: 'review' } },
               Settings: { screens: { SettingsHome: 'settings' } },
             },
           },
@@ -202,7 +185,7 @@ function NavigationFrame() {
           <Tabs.Screen name="Portfolio" component={PortfolioNavigator} />
           <Tabs.Screen name="Accounts" component={AccountNavigator} />
           <Tabs.Screen name="Market" component={MarketNavigator} />
-          <Tabs.Screen name="Research" component={ResearchDestination} />
+          <Tabs.Screen name="Research" component={ResearchNavigator} />
           <Tabs.Screen name="Settings" component={SettingsNavigator} />
         </Tabs.Navigator>
       </NavigationContainer>

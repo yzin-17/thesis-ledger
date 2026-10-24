@@ -19,6 +19,8 @@ import { backtestRunConfigClient } from './backtest-run-config-client.js';
 import { backtestNavRunClient } from './backtest-nav-run-client.js';
 import { journalReviewClient } from './journal-review-client.js';
 import { researchClient } from './research-client.js';
+import { researchRunClient } from './research-run-client.js';
+export { researchRunClient } from './research-run-client.js';
 import {
   apiErrorResponseSchema,
   baselineReconciliationCandidatesResponseSchema,
@@ -404,6 +406,7 @@ export class ThesisLedgerApiClient {
   };
 
   readonly research = researchClient(this.requestParsed.bind(this));
+  readonly researchRuns = researchRunClient(this.requestParsed.bind(this));
 
   readonly backtests = {
     ...backtestNavRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),

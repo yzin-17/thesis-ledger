@@ -1,18 +1,14 @@
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import { researchRunClient } from '@thesis-ledger/api-client';
+import { omitUndefinedDeep } from '@thesis-ledger/schemas';
+import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
 import type {
   AiRunDetail,
   AiRunFilterStatus,
   AiRunSourceFilter,
   AiRunPage,
-  AiRunRecord,
-  AiRunResult,
-  AiResearchRetryPrefill,
-  AiToolCallsPage,
-  AiCapabilitiesResponse,
   CreateAiRunInput,
-  AiRoutingSettings,
+  AiRunResult,
 } from './ai.types.js';
-
 export interface AiRunListFilter {
   view?: 'research';
   status?: Exclude<AiRunFilterStatus, 'all'>;
@@ -23,85 +19,36 @@ export interface AiRunListFilter {
   limit?: number;
   cursor?: string;
 }
-
-const isClient = (value: unknown): value is DesktopRequestClient =>
-  Boolean(value && typeof value === 'object' && 'request' in value);
-
-const listPath = (filter: AiRunListFilter) => {
-  const params = new URLSearchParams();
-  if (filter.view) params.set('view', filter.view);
-  params.set('limit', String(filter.limit ?? 50));
-  if (filter.status) params.set('status', filter.status);
-  if (filter.search) params.set('search', filter.search);
-  if (filter.source && filter.source !== 'all') params.set('source', filter.source);
-  if (filter.includeInternal) params.set('includeInternal', 'true');
-  if (filter.sort) params.set('sort', filter.sort);
-  if (filter.cursor) params.set('cursor', filter.cursor);
-  return `/ai/runs?${params.toString()}`;
-};
-
+const isClient = (v: unknown): v is DesktopRequestClient =>
+  Boolean(v && typeof v === 'object' && 'request' in v);
+const api = (client?: DesktopRequestClient) => researchRunClient(parsedDesktopRequest(client));
 export const fetchAiRuns = (
   filterOrClient?: AiRunListFilter | DesktopRequestClient,
   maybeClient?: DesktopRequestClient,
-) => {
+): Promise<AiRunPage> => {
   const filter = isClient(filterOrClient) ? {} : (filterOrClient ?? {});
-  const client = isClient(filterOrClient) ? filterOrClient : maybeClient;
-  return requestDesktopJson<AiRunPage | AiRunRecord[]>(listPath(filter), undefined, client).then(
-    (payload) =>
-      Array.isArray(payload) ? { items: payload, nextCursor: null, hasMore: false } : payload,
-  );
+  return api(isClient(filterOrClient) ? filterOrClient : maybeClient)
+    .list(filter)
+    .then(omitUndefinedDeep);
 };
-
 export const fetchAiRun = (
   id: string,
   optionsOrClient?: { view?: 'research' } | DesktopRequestClient,
   maybeClient?: DesktopRequestClient,
-) => {
-  const options = isClient(optionsOrClient) ? {} : (optionsOrClient ?? {});
-  const client = isClient(optionsOrClient) ? optionsOrClient : maybeClient;
-  const suffix = options.view === 'research' ? '?view=research' : '';
-  return requestDesktopJson<AiRunDetail>(
-    `/ai/runs/${encodeURIComponent(id)}${suffix}`,
-    undefined,
-    client,
-  );
-};
-
+): Promise<AiRunDetail> =>
+  api(isClient(optionsOrClient) ? optionsOrClient : maybeClient)
+    .detail(id, isClient(optionsOrClient) ? {} : (optionsOrClient ?? {}))
+    .then(omitUndefinedDeep);
 export const fetchAiToolCalls = (
   id: string,
   filter: { limit?: number; cursor?: string } = {},
   client?: DesktopRequestClient,
-) => {
-  const params = new URLSearchParams();
-  params.set('limit', String(filter.limit ?? 50));
-  if (filter.cursor) params.set('cursor', filter.cursor);
-  return requestDesktopJson<AiToolCallsPage>(
-    `/ai/runs/${encodeURIComponent(id)}/tool-calls?${params.toString()}`,
-    undefined,
-    client,
-  );
-};
-
-export const fetchAiCapabilities = (client?: DesktopRequestClient) =>
-  requestDesktopJson<AiCapabilitiesResponse>('/ai/runs/capabilities', undefined, client);
-
-export const fetchAiRoutingSettings = (client?: DesktopRequestClient) =>
-  requestDesktopJson<AiRoutingSettings>('/ai/settings', undefined, client);
-
+) => api(client).tools(id, filter);
+export const fetchAiCapabilities = (client?: DesktopRequestClient) => api(client).capabilities();
+export const fetchAiRoutingSettings = (client?: DesktopRequestClient) => api(client).settings();
 export const fetchAiResearchRetryPrefill = (id: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<AiResearchRetryPrefill>(
-    `/ai/runs/${encodeURIComponent(id)}/retry-prefill`,
-    undefined,
-    client,
-  );
-
-export const createAiRun = (input: CreateAiRunInput, client?: DesktopRequestClient) =>
-  requestDesktopJson<AiRunResult>(
-    '/ai/runs',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
+  api(client).retryPrefill(id);
+export const createAiRun = (
+  input: CreateAiRunInput,
+  client?: DesktopRequestClient,
+): Promise<AiRunResult> => api(client).create(input).then(omitUndefinedDeep);

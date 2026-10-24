@@ -31,12 +31,12 @@ export function TradeDetailScreen() {
   });
   const trade = query.data;
   const review = () =>
-    navigation.getParent<BottomTabNavigationProp<RootTabParams>>()?.navigate('Research', {
+    navigation.getParent<BottomTabNavigationProp<RootTabParams>>()?.navigate('Research', { screen: 'Journal', params: {
       accountId: params.accountId,
       mode,
       tradeId: params.tradeId!,
       ...(sliceId ? { closeSliceId: sliceId } : {}),
-    });
+    } });
   return (
     <Page title="交易详情">
       {mode !== params.mode ? (

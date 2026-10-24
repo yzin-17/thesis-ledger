@@ -8,6 +8,7 @@ import type {
   MonthlyOccurrence,
 } from '../features/recurring-plans/plan-api';
 import type { MobileInstrument } from '../features/market-detail/market-model';
+import type { ResearchReportLocatorInput } from '@thesis-ledger/schemas';
 export type AccountStackParams = {
   AccountsHome: undefined;
   AccountEditor: { account?: AccountResponse };
@@ -68,6 +69,20 @@ export type RootTabParams = {
   Portfolio: NavigatorScreenParams<PortfolioStackParams> | undefined;
   Accounts: NavigatorScreenParams<AccountStackParams> | undefined;
   Market: NavigatorScreenParams<MarketStackParams> | undefined;
-  Research: MobileObjectTarget | undefined;
+  Research: NavigatorScreenParams<ResearchStackParams> | undefined;
   Settings: NavigatorScreenParams<SettingsStackParams> | undefined;
+};
+type JournalScope = { accountId: string; mode: 'actual' | 'shadow' };
+type ReportScope = { id: string; locator: ResearchReportLocatorInput };
+export type ResearchStackParams = {
+  ResearchHome: undefined;
+  Journal: MobileObjectTarget | undefined;
+  JournalObject: JournalScope & { reviewObjectId: string };
+  JournalPeriod: JournalScope;
+  JournalHistory: JournalScope & { reviewObjectId?: string };
+  JournalAiHistory: JournalScope;
+  ResearchReport: ReportScope;
+  ResearchEvidence: ReportScope & { referenceId: string };
+  ResearchSubmit: { retryRunId?: string } | undefined;
+  ResearchReview: ReportScope;
 };
