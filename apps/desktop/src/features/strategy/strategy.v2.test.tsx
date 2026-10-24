@@ -105,14 +105,21 @@ describe('策略工作台当前合同', () => {
   });
 
   it('取消与重试使用独立的现行 Run 入口', async () => {
-    const cancel = makeClient({});
+    const run = { id: 'run/1', strategyVersionId: 'version-1', mode: 'V3' };
+    const cancel = makeClient({ ...run, status: 'cancelled' });
     await cancelBacktest('run/1', cancel.client);
     expect(cancel.request).toHaveBeenCalledWith('/backtests/runs/run%2F1/cancel', {
       method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
     });
-    const retry = makeClient({});
+    const retry = makeClient({ ...run, status: 'queued' });
     await retryBacktest('run/1', retry.client);
-    expect(retry.request).toHaveBeenCalledWith('/backtests/runs/run%2F1/retry', { method: 'POST' });
+    expect(retry.request).toHaveBeenCalledWith('/backtests/runs/run%2F1/retry', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
   });
 });
 // @vitest-environment jsdom

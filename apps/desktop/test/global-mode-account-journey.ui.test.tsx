@@ -88,7 +88,7 @@ beforeEach(() => {
         return json({
           items: [
             {
-              id: 'experiment-1',
+              id: '55555555-5555-4555-8555-555555555555',
               name: '独立实验',
               nameSource: 'stored',
               sourceMode: 'discovery',
@@ -103,8 +103,20 @@ beforeEach(() => {
               inputTokensUsed: 0,
               outputTokensUsed: 0,
               costUsed: null,
-              costSummary: {},
-              tradingCost: {},
+              costSummary: {
+                status: 'unavailable',
+                currency: null,
+                knownAmount: null,
+                knownByCurrency: [],
+                reason: 'historical_missing_metadata',
+              },
+              tradingCost: {
+                source: 'unavailable',
+                commissionRate: null,
+                slippageRate: null,
+                isAssumption: true,
+                zeroDoesNotMeanFree: true,
+              },
               createdAt: '2026-10-18T00:00:00Z',
               updatedAt: '2026-10-18T00:00:00Z',
             },
