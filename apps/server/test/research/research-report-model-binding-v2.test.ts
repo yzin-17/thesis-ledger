@@ -102,6 +102,17 @@ describe('V2 研究报告的请求模型与实际模型绑定', () => {
     expect((await read(fixture)).detail.availability).toBe('invalid');
   });
 
+  it.each([null, false, 0, '', {}])('显式损坏的 SDK 审计 %j 不走历史兼容', async (audit) => {
+    const fixture = routedReport();
+    (fixture.row.result as { model: { modelId: string } }).model.modelId = fixture.row.model!;
+    (fixture.row.modelMetadata as Prisma.JsonObject).sdkExecution = audit;
+    expect((await read(fixture)).detail).toMatchObject({
+      availability: 'invalid',
+      result: null,
+      summary: null,
+    });
+  });
+
   it('报告模型篡改成任意值或原请求模型时，不以一次成功审计放行', async () => {
     for (const model of ['forged', 'router/auto']) {
       const fixture = routedReport();

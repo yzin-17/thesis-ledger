@@ -334,6 +334,6 @@ T4 的 13 项提交测试及 V1/Journal/结构回归、34 项迁移与打包检�
 
 2026-10-24 用户授权修复模型绑定，并将本地 CI 路径修正纳入原隔离分支重验；保留原工作树与其他会话 WIP。范围为完成事实 Schema、研究执行/读取、对应反例和 HTTP 测试；不调用真实模型、不更新业务容器或修改研究配置。规格见[实际模型绑定补验](../specs/2026-10-18-research-evidence-evolution.md#研究报告实际模型绑定补验2026-10-24)。
 
-- [ ] MB1a：完成事实记录 SDK 实际模型，V2 读取精确绑定最后一次成功请求；历史同模型报告兼容，篡改正文/模型/引用继续拒绝。
-- [ ] MB1b：定向 Schema、SDK、报告投影及隔离 PostgreSQL/HTTP 通过，保留失败证据。
-- [ ] MB1c：限定修复和 CI 路径修正进入已授权隔离分支，quality、contracts、Android/iOS Native 分别记录；结果回写[手机迁移 Task](2026-10-22-web-mobile-feature-parity.md)，不替代 G3 的真实研究门禁。
+- [x] MB1a：完成事实记录 SDK 实际模型，V2 读取精确绑定最后一次成功请求；历史同模型报告兼容，篡改正文/模型/引用继续拒绝。
+- [x] MB1b：定向 Schema 11 项、SDK 8 项、报告投影与比较 47 项、隔离 PostgreSQL/HTTP 23 项通过，构建/类型/lint 通过；修复前反例及首轮夹具克隆错误均保留，未改写损坏模型断言。
+- [ ] MB1c：`53dfb60b` 的 quality、contracts、Android/iOS Native 已全过，原失败组 14 文件、106 项通过，无安装包上传；最终 Review 新增五个显式损坏 SDK 审计反例后，只修改绑定与反例两份 Server 文件，正在重验最终源码。原成功保留，当前不勾选；见[手机第 2 批收口](evidence/web-mobile-parity/2026-10-24-batch-2-ci-closeout.md)。G3 真实研究和目标业务镜像的义务保持原状态。

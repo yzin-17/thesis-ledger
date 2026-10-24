@@ -44,7 +44,7 @@ export function assertResearchResultModelBindingV2(
     !metadata ||
     typeof metadata !== 'object' ||
     Array.isArray(metadata) ||
-    !metadata.sdkExecution
+    metadata.sdkExecution === undefined
   ) {
     if (model.modelId === run.model) return;
     throw new AiFrozenResearchError('V2 实际模型缺少成功请求审计');

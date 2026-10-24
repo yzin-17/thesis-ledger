@@ -167,4 +167,4 @@ Provider OAuth 使用系统浏览器打开服务端返回并通过既有白名�
 - [Expo SDK 57 DocumentPicker](https://docs.expo.dev/versions/v57.0.0/sdk/document-picker/) 与 [ImagePicker](https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/)：系统文件/图片选择入口。
 - [Expo SDK 57 的 react-native-webview](https://docs.expo.dev/versions/v57.0.0/sdk/webview/)：本地图表适配的候选原生容器。采用它能否满足本项目图表交互仍由第 0 批设备验证决定。
 
-> 2026-10-24 接续：第 2 批 CI 的研究模型绑定阻塞由[研究规格的模型绑定补验](2026-10-18-research-evidence-evolution.md#研究报告实际模型绑定补验2026-10-24)负责；本地市场回归路径修正一并进入原隔离快照。手动 CI 增加保留原默认值的桌面打包开关，本批关闭打包以遵守安装包不上传的范围，quality、contracts 及两端 Native job 完整执行。
+> 2026-10-24 接续：第 2 批的研究模型绑定合同由[研究规格的模型绑定补验](2026-10-18-research-evidence-evolution.md#研究报告实际模型绑定补验2026-10-24)负责；市场回归路径修正已一并进入隔离快照并通过实际 CI。手动 CI 增加保留原默认值的桌面打包开关，本批关闭打包以遵守安装包不上传的范围，quality、contracts 及两端 Native job 完整执行。
