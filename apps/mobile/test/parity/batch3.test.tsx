@@ -8,6 +8,7 @@ import { ResearchReportScreen } from '../../src/features/research-read/ResearchR
 import { ResearchNewScreen } from '../../src/features/research-submit/ResearchSubmitScreen';
 import { journalWindow } from '../../src/features/journal-trade/journal-model';
 import { JournalEvidenceScreen } from '../../src/features/journal-ai/JournalEvidenceScreen';
+import { ReviewAction } from '../../src/features/research-review/ReviewAction';
 const storage = vi.hoisted(() => new Map<string, string>());
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -57,6 +58,96 @@ beforeEach(() => {
   view.runtime.baseUrl = 'https://ledger.test/api/v1';
 });
 describe('第 3 批手机异常保护', () => {
+  it('复核写入受控时禁用入口，读取本机状态不发送外部请求', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    setApi(fetcher);
+    await mount(
+      <ReviewAction
+        id={id}
+        claimId="controlled-claim"
+        locator={{ view: 'scoped', mode: 'shadow', scope: 'all' }}
+        canCreate={false}
+      />,
+    );
+    expect(button('提交复核').disabled).toBe(true);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('复核拒绝后保留同一提交标识和资料时刻', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        respond({ error: 'RESEARCH_V2_WRITES_DISABLED', message: '复核写入受控' }, 403),
+      );
+    setApi(fetcher);
+    const client = await mount(
+      <ReviewAction
+        id={id}
+        claimId="controlled-claim"
+        locator={{ view: 'scoped', mode: 'shadow', scope: 'all' }}
+        canCreate
+      />,
+    );
+    await click(button('提交复核'));
+    const cached = client
+      .getQueryCache()
+      .findAll({ queryKey: [...(view.runtime.scope as string[]), 'review-pending'] })[0]!.state
+      .data;
+    expect(cached).toMatchObject({
+      claimId: 'controlled-claim',
+      submissionId: expect.any(String),
+      asOf: expect.any(String),
+    });
+    expect([...storage.values()].map((v) => JSON.parse(v))).toContainEqual(cached);
+    expect(document.body.textContent).toContain('复核写入受控');
+  });
+  it('新提交响应丢失后同步保留缓存与本机标识，原样重试复用输入', async () => {
+    const posted: unknown[] = [];
+    setApi(
+      vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+        const p = String(url);
+        if (p.includes('/research/capabilities'))
+          return respond({
+            version: 'research-capabilities-v2',
+            canCreate: true,
+            scopes: ['portfolio'],
+          });
+        if (p.includes('/ai/settings'))
+          return respond({
+            researchDefault: { providerId: 'controlled', model: 'fixture' },
+            revision: 'r1',
+            candidates: [
+              {
+                providerId: 'controlled',
+                providerName: '受控',
+                model: 'fixture',
+                enabled: true,
+                health: 'healthy',
+                authMode: 'none',
+                priceConfigured: true,
+              },
+            ],
+          });
+        if (p.endsWith('/research/submissions')) {
+          posted.push(JSON.parse(String(init?.body)));
+          throw new TypeError('Network connection lost');
+        }
+        return respond([]);
+      }),
+    );
+    const client = await mount(<ResearchNewScreen />);
+    await click(button('全组合'));
+    await input(field('研究问题'), '保留原始问题');
+    await click(button('准备并提交研究'));
+    const cached = client.getQueryData([...(view.runtime.scope as string[]), 'research-pending']);
+    expect(cached).toEqual(posted[0]);
+    expect([...storage.values()].map((v) => JSON.parse(v))).toContainEqual(posted[0]);
+    await click(button('原样重试'));
+    expect(posted).toHaveLength(2);
+    expect(posted[1]).toEqual(posted[0]);
+    expect(client.getQueryData([...(view.runtime.scope as string[]), 'research-pending'])).toEqual(
+      posted[0],
+    );
+  });
   it('解读引用必须先核对账户归属，拒绝后不读取工具审计', async () => {
     view.params = {
       accountId: '00000000-0000-4000-8000-000000000001',

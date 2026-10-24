@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { aiResearchStartInputSchema, type AiResearchRetryPrefill } from '@thesis-ledger/schemas';
+import { researchRetryIssue } from './retry-readiness';
+import { researchScopeLabels } from './ResearchObjects';
 import { useDirtyForm, useMobileRuntime, confirmAction } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
 import type { ResearchStackParams } from '../../app/navigation-types';
@@ -19,6 +22,7 @@ import {
 } from '../../components/MobilePrimitives';
 export function ResearchRetryScreen({ runId }: { runId: string }) {
   const { api, scope, baseUrl, mode } = useMobileRuntime();
+  const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
   const key = JSON.stringify(['mobile-research-retry-v1', baseUrl, mode, runId]);
   const pending = useQuery({
@@ -50,35 +54,36 @@ export function ResearchRetryScreen({ runId }: { runId: string }) {
   const effectiveQuestion = question ?? source?.question ?? '';
   const unknown = uncertain ?? Boolean(pending.data);
   useDirtyForm(Boolean(question), () => setQuestion(undefined));
-  const wrongMode = Boolean(source?.context.mode && source.context.mode !== mode);
+  const revision = settings.data?.revision;
+  const issue = researchRetryIssue({
+    source,
+    mode,
+    confirmed: confirmed === 'yes',
+    acknowledged: acknowledged === 'yes',
+    modelReady: Boolean(settings.data?.researchDefault) && !settings.isError,
+    capabilityReady: capabilities.data?.canStart === true && !capabilities.isError,
+  });
   const command = useMobileCommand(
     async () => {
-      if (
-        !source ||
-        source.contextState !== 'valid' ||
-        wrongMode ||
-        confirmed !== 'yes' ||
-        !settings.data?.researchDefault ||
-        !capabilities.data?.canStart
-      )
-        throw new Error('请重新核对原任务、范围和模型。');
-      if (source.requiresUnknownOutcomeAcknowledgement && acknowledged !== 'yes')
-        throw new Error('请确认原任务结果未知可能造成重复生成。');
-      const input = {
+      if (!source || !revision || issue) throw new Error(issue ?? '请重新核对模型设置。');
+      const input = aiResearchStartInputSchema.parse({
         question: effectiveQuestion,
         context: source.context,
         retryOfRunId: source.sourceRunId,
         ...(source.templateId ? { templateId: source.templateId } : {}),
-        researchSettingsRevision: settings.data.revision,
+        researchSettingsRevision: revision,
         retryConfirmation: {
           contextConfirmed: true as const,
           acknowledgeUnknownOutcomeRisk: acknowledged === 'yes',
         },
-      };
+      });
       await AsyncStorage.setItem(key, JSON.stringify(input));
+      client.setQueryData([...scope, 'research-retry-pending', runId], JSON.stringify(input));
       setUncertain(true);
       const receipt = await api.researchRuns.create(input);
       await AsyncStorage.removeItem(key);
+      client.setQueryData([...scope, 'research-retry-pending', runId], null);
+      void client.invalidateQueries({ queryKey: [...scope, 'research-list'] });
       setUncertain(false);
       navigation.navigate('ResearchReport', { id: receipt.id, locator: { view: 'legacy' } });
     },
@@ -90,18 +95,7 @@ export function ResearchRetryScreen({ runId }: { runId: string }) {
       <QueryStatus query={prefill} retry={() => void prefill.refetch()} />
       <QueryStatus query={settings} retry={() => void settings.refetch()} />
       <QueryStatus query={capabilities} retry={() => void capabilities.refetch()} />
-      {source ? (
-        <Section title="来源任务">
-          <Copy>{source.sourceRunId}</Copy>
-          <Copy>原问题：{source.question}</Copy>
-          <Copy>
-            范围 {source.context.scope} · 账户 {source.context.accountId ?? '全范围'}
-          </Copy>
-          {source.contextState !== 'valid' || wrongMode ? (
-            <Copy>原范围缺失、无权读取或与当前模式不一致，不能再次提交。</Copy>
-          ) : null}
-        </Section>
-      ) : null}
+      <RetrySourceSummary source={source} mode={mode} />
       {unknown ? (
         <Section title="上次请求结果尚未确认">
           <Copy>已保留原输入。请先返回任务历史检查是否已创建，避免自动重复生成。</Copy>
@@ -148,19 +142,7 @@ export function ResearchRetryScreen({ runId }: { runId: string }) {
       <Action
         label="确认并再次生成"
         disabled={
-          command.isPending ||
-          unknown ||
-          !pending.isSuccess ||
-          pending.isError ||
-          !source ||
-          source.contextState !== 'valid' ||
-          wrongMode ||
-          confirmed !== 'yes' ||
-          (source.requiresUnknownOutcomeAcknowledgement && acknowledged !== 'yes') ||
-          !capabilities.data?.canStart ||
-          capabilities.isError ||
-          !settings.data?.researchDefault ||
-          settings.isError
+          command.isPending || unknown || !pending.isSuccess || pending.isError || Boolean(issue)
         }
         onPress={() =>
           void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
@@ -168,5 +150,28 @@ export function ResearchRetryScreen({ runId }: { runId: string }) {
       />
       <Feedback message={message} error />
     </Page>
+  );
+}
+function RetrySourceSummary({
+  source,
+  mode,
+}: {
+  source: AiResearchRetryPrefill | undefined;
+  mode: 'actual' | 'shadow';
+}) {
+  if (!source) return null;
+  const wrongMode = source.context.mode && source.context.mode !== mode;
+  return (
+    <Section title="来源任务">
+      <Copy>{source.sourceRunId}</Copy>
+      <Copy>原问题：{source.question}</Copy>
+      <Copy>
+        范围 {researchScopeLabels[source.context.scope]} · 账户{' '}
+        {source.context.accountId ?? '全范围'}
+      </Copy>
+      {source.contextState !== 'valid' || wrongMode ? (
+        <Copy>原范围缺失、无权读取或与当前模式不一致，不能再次提交。</Copy>
+      ) : null}
+    </Section>
   );
 }

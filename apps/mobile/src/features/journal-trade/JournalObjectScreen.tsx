@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -28,6 +28,7 @@ import { JournalAiPanel } from '../journal-ai/JournalAiPanel';
 export function JournalObjectScreen() {
   const { params } = useRoute<RouteProp<ResearchStackParams, 'JournalObject'>>();
   const { api, scope, mode, transition } = useMobileRuntime();
+  const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
   const [draft, setDraft] = useState(emptyJournalDraft);
   const [result, setResult] = useState<{
@@ -75,6 +76,8 @@ export function JournalObjectScreen() {
         ...(aiRunId ? { aiRunId } : {}),
       });
       setMessage('复盘快照已保存，历史输入与结果保持不变。');
+      void client.invalidateQueries({ queryKey: [...scope, 'journal-history'] });
+      void client.invalidateQueries({ queryKey: [...scope, 'journal-candidates'] });
       return value;
     },
     { refresh: false },
@@ -98,9 +101,9 @@ export function JournalObjectScreen() {
                   params: {
                     accountId: params.accountId,
                     mode,
-                    tradeId: query.data!.input.reference.tradeId,
-                    ...(query.data!.input.reference.reviewObjectType === 'CLOSE_SLICE'
-                      ? { closeSliceId: query.data!.input.reference.closeSliceId }
+                    tradeId: query.data.input.reference.tradeId,
+                    ...(query.data.input.reference.reviewObjectType === 'CLOSE_SLICE'
+                      ? { closeSliceId: query.data.input.reference.closeSliceId }
                       : {}),
                   },
                 }),

@@ -63,3 +63,17 @@ export function journalWindow(start: string, end: string) {
     throw new Error('开始时间须早于结束时间。');
   return { start: new Date(a).toISOString(), end: new Date(b).toISOString() };
 }
+export function journalReference(
+  target: { tradeId?: string; closeSliceId?: string } | undefined,
+  scope: { accountId: string; mode: 'actual' | 'shadow' },
+) {
+  if (!target?.tradeId) return null;
+  if (target.closeSliceId)
+    return {
+      ...scope,
+      tradeId: target.tradeId,
+      reviewObjectType: 'CLOSE_SLICE' as const,
+      closeSliceId: target.closeSliceId,
+    };
+  return { ...scope, tradeId: target.tradeId, reviewObjectType: 'TRADE_CYCLE' as const };
+}

@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useAccounts } from '../../app/query/mobile-queries';
 import type { ResearchStackParams } from '../../app/navigation-types';
+import { journalReference } from './journal-model';
 import {
   Action,
   Choices,
@@ -24,15 +25,7 @@ export function JournalScreen() {
   const [symbol, setSymbol] = useState('');
   const [search, setSearch] = useState('');
   const locator = { accountId, mode };
-  const reference = params?.tradeId
-    ? {
-        ...locator,
-        tradeId: params.tradeId,
-        ...(params.closeSliceId
-          ? { reviewObjectType: 'CLOSE_SLICE' as const, closeSliceId: params.closeSliceId }
-          : { reviewObjectType: 'TRADE_CYCLE' as const }),
-      }
-    : null;
+  const reference = journalReference(params, locator);
   const located = useQuery({
     queryKey: [...scope, 'journal-reference', reference],
     enabled: Boolean(reference && accountId),

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { randomUUID } from 'expo-crypto';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -35,6 +35,7 @@ export function ResearchSubmitScreen() {
 }
 export function ResearchNewScreen() {
   const { api, scope, baseUrl, mode } = useMobileRuntime();
+  const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
   const key = researchPendingKey(baseUrl, mode);
   const restored = useQuery({
@@ -96,10 +97,13 @@ export function ResearchNewScreen() {
           throw new Error('当前研究范围不可用。');
       }
       await saveResearchPending(key, input);
+      client.setQueryData([...scope, 'research-pending'], input);
       setPending(input);
       try {
         const receipt = await api.research[action](input);
         await saveResearchPending(key, null);
+        client.setQueryData([...scope, 'research-pending'], null);
+        void client.invalidateQueries({ queryKey: [...scope, 'research-list'] });
         setPending(null);
         setQuestion('');
         setMessage(`服务端已确认：${receipt.runId}`);
@@ -114,6 +118,7 @@ export function ResearchNewScreen() {
           noRunCodes.get(String(error.payload?.errorCode ?? error.payload?.error)) === error.status
         ) {
           await saveResearchPending(key, null);
+          client.setQueryData([...scope, 'research-pending'], null);
           setPending(null);
         }
         throw error;

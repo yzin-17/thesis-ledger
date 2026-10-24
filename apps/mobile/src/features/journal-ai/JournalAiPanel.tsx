@@ -71,6 +71,7 @@ export function JournalAiPanel({
       onSelected?.(run.id);
       try {
         await rememberJournalTask(journalTaskKey(baseUrl, accountId, mode), { id: run.id, kind });
+        void client.invalidateQueries({ queryKey: [...scope, 'journal-ai-tasks'] });
       } catch {
         setMessage(`任务 ${run.id} 已创建，本机引用保存失败；请保留此编号。`);
       }
