@@ -5,6 +5,12 @@
 
 配套：[目标规格](../specs/2026-10-22-web-mobile-feature-parity.md) · [迁移任务](../tasks/2026-10-22-web-mobile-feature-parity.md)。功能迁移进度只由配套 Task 维护。
 
+2026-10-24 第 2 批增量的源码、独立原生编译/运行与隔离 CI 收口见[当前验收记录](../tasks/evidence/web-mobile-parity/2026-10-24-batch-2-ci-closeout.md)。以下差异矩阵继续作为实施前基线，不用于覆盖配套 Task 的当前勾选状态。
+
+2026-10-25 第 3、4 批增量分别见[复盘研究验收](../tasks/evidence/web-mobile-parity/2026-10-24-batch-3.md)与[策略执行验收](../tasks/evidence/web-mobile-parity/2026-10-24-batch-4.md)。第 0～4 批客户端实现及 Android/iOS 独立运行通过；本批最新隔离提交 `1ea300be` 四项必需 CI 成功，原树 WIP 与原业务实源边界保留。末尾列出当前源码增量，实施前矩阵中的“缺少”保持其历史含义。
+
+2026-10-25 第 5 批配置、来源与自动化增量见[本批验收及 Chrome 接续补验](../tasks/evidence/web-mobile-parity/2026-10-25-batch-5.md)。当前限定源码 `5c67b4fa` 四项必需 CI、双平台原生编译/安装及受控交互通过；Android 条款和官方地址传递、两端受控 OAuth 终态补验通过。有效客户端、真实账号授权/回调以及原模型、来源、调度和外发条件仍未验收，M29b、G5A/G5I 的当前状态由配套 Task 持有。
+
 ## 核心结论
 
 实施前 Web 有 9 个一级业务入口；手机端只有投资组合、风险事件、账户三个简化入口。该基线手机端能读取组合估值和持仓卡片、读取风险事件、切换实际/模拟范围、切换主题与涨跌配色，并列出账户及永久删除满足服务端条件的空账户。
@@ -74,7 +80,7 @@ Web 与 Electron 共用 `apps/desktop`；本次用户已明确选择 Android / i
 
 主要对应的 Web 入口：`features/account-data/AccountDataPage.tsx`、`portfolio/PortfolioDashboard.tsx`、`performance/PerformanceDashboard.tsx`、`risk/RiskCenter.tsx`、`journal/review/JournalReviewWorkspace.tsx`、`ai/AiChat.tsx`、`strategy/StrategyDashboard.tsx`、`providers/ProviderSettings.tsx`、`market-data/MarketDataPage.tsx`。业务细节仍由各领域现行 Spec 拥有，本盘点不重新定义其规则。
 
-## 迁移中的真实复用边界
+## 实施前复用边界（2026-10-22）
 
 1. `api-client` 已覆盖账户查询/永久删除、组合与交易、部分收益、行情读模型、Ledger、定期资金、复盘、研究及回测等能力。先核对每个方法，现成合同直接消费。
 2. 账户管理、收益完整读写、风险规则、AI 运行/配置、策略/实验及部分 Provider 管理仍有 Web 本地 API 包装。应按领域补齐共享 client，并把原 Web 包装接回同一合同，不能让手机 import `apps/desktop`。
@@ -84,9 +90,28 @@ Web 与 Electron 共用 `apps/desktop`；本次用户已明确选择 Android / i
 6. Web 策略进度有事件流消费；手机可用 TanStack Query 的前台条件轮询达到相同状态可见性，后台停止、恢复时立即重读。最终业务状态仍来自 Server 持久化记录。
 7. 当前 CI 有 Android debug 原生编译；未发现独立的 iOS 原生 CI job。iOS 工程已存在，应补稳定构建门禁，不能把过去的 Simulator 报告当成本次通过。
 
-## 当前边界与后续重核
+## 实施前边界与后续重核
 
 - 当前手机“只读为主、账户永久删除例外”是已有范围；新目标由配套 Spec 提案定义，计划形成不等于实施授权或验收完成。
 - 工作树正在变化；开始实施前必须复核新增路由、子页、操作按钮、请求及功能开关，保留已有通过证据的输入范围。矩阵漏项应更新本报告及对应验收责任，不能以一级模块全部出现判定完成。
 - 未完成的实源、模型、通知、历史研究和发布门禁继续由原 Task 持有。本项目负责补齐客户端消费与设备证据；上游阻塞仍需在相应迁移项显式关联。
 - 本轮未检查已部署 API 与手机网络可达性，也未测试 Android/iOS 的当前安装包。缺失这些证据不代表当前功能一定有故障，但无法据此声称端到端可用。
+
+## 当前源码增量（2026-10-25）
+
+| 基线入口 | 当前手机源码 | 共享请求合同 | 独立验收责任 |
+| --- | --- | --- | --- |
+| S01 策略定义与辅助编写 | `features/strategy-library`、`features/strategy-editor`、`features/strategy-authoring` | `strategy-definition-client.ts`、`strategy-authoring-client.ts` | C08a/C08b、M23a/M23b/M23c，分平台 G4 |
+| S02 普通回测 | `features/backtest-setup`、`backtest-jobs`、`backtest-results` | 普通 Run 准备/预检/冻结及生命周期 client | C08c、M24a/M24b/M24c，分平台 G4 |
+| S03 净值回测 | 同一回测工作区按 `kind=nav` 消费净值准备、任务与结果 | NAV V3 准备收据与 Run client | C08c、M25a/M25b，分平台 G4 |
+| S04 优化实验 | `features/optimization-setup`、`optimization-results`、`optimization-adoption` | `strategy-optimization-client.ts` | C09a、M26a/M26b/M26c，分平台 G4 |
+| R03 策略风险应用 | `features/strategy-risk` | `strategy-risk-client.ts` | C09b、M27，分平台 G4；DELETE 沿现行合同为软归档 |
+| D01 AI 配置、模型与用途 | `features/ai-providers` | `ai-provider-client.ts` | C10a/C10b、M28a/M28b/M28c，分平台 G5 |
+| D02 行情账号与 OAuth | `features/market-providers`、`features/provider-oauth` | `market-provider-control-client.ts`、`provider-oauth-client.ts` | C11a/C11b、M29a/M29b；真实授权/回调仍未完成 |
+| D03 行情路由与目录 | `features/market-policy`、`features/market-catalog` | `market-policy-client.ts`、`market-catalog-client.ts` | C11c/C11d、M30a/M30b，分平台 G5 |
+| D06 自动化管理与历史 | `features/automation` | `automation-client.ts` | C12a、M31；真实调度/外发由原执行任务持有 |
+| D07 来源、质量与通知诊断 | `features/diagnostics` | `diagnostics-client.ts` | C12b、M32；查询失败不触发重发 |
+
+以上手机路径以 `apps/mobile/src/` 为根，共享 client 位于 `packages/api-client/src/`。研究页接入独立策略导航，原五入口保留。Android 与 iOS 编译、安装指纹、自动交互、真实 API 恢复和当前 CI 已分别记录；当前 iOS Native CI 位于 `.github/workflows/ci.yml`，实施前“缺少 iOS CI”的记录不再代表当前状态。
+
+普通及净值权益 CSV 在两端分别字节一致，原始金额不经过图表浮点显示取舍。当前产品使用说明已同步到根 README，最终说明与 CI 冻结源码分别交付；第 5 批完整运行验收、第 6 批与完整迁移，以及原 Provider、模型、队列/Worker、通知和预算门禁仍由配套任务持有，未改写成已完成。

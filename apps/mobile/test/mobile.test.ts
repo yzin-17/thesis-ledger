@@ -1,313 +1,127 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMobileBootstrap, mobileStateCopy, resolveMobileApiBaseUrl } from '../src/index.js';
-
-const response = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-
-const deferred = <T>() => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((nextResolve, nextReject) => {
-    resolve = nextResolve;
-    reject = nextReject;
-  });
-  return { promise, resolve, reject };
-};
+import { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
+import { resolveMobileApiBaseUrl } from '../src/index.js';
+import { createMobileQueryClient } from '../src/app/query/query-client';
+import { mobileValuationOptions } from '../src/app/query/valuation-query';
+import { mobileScopeKey } from '../src/app/navigation-state';
+import { valuationLoadState } from '../src/app/query/query-state';
 
 const accountId = '00000000-0000-4000-8000-000000000001';
-const positionId = '00000000-0000-4000-8000-000000000002';
-const ruleId = '00000000-0000-4000-8000-000000000003';
-const eventId = '00000000-0000-4000-8000-000000000004';
-
 const portfolio = (overrides: Record<string, unknown> = {}) => ({
-  positions: [
-    {
-      id: positionId,
-      accountId,
-      symbol: '600519.SH',
-      quantity: 10,
-      costPrice: 1450,
-      marketPrice: 1488,
-      marketValue: 14880,
-      costValue: 14500,
-      pnl: 380,
-      pnlRatio: 380 / 14500,
-      stale: false,
-    },
-  ],
+  positions: [],
   cashValue: 500,
   cashByAccount: [{ accountId, amount: 500 }],
-  totalCost: 14500,
-  totalMarketValue: 15380,
-  totalPnl: 380,
-  unrealizedPnl: 380,
-  unrealizedPnlRatio: 380 / 14500,
+  totalCost: 0,
+  totalMarketValue: 500,
+  totalPnl: 0,
+  unrealizedPnl: 0,
+  unrealizedPnlRatio: null,
   realizedPnl: 0,
   realizedPnlRatio: null,
-  cumulativePnl: 380,
-  cumulativePnlRatio: 380 / 14500,
+  cumulativePnl: 0,
+  cumulativePnlRatio: null,
+  baseCurrency: 'CNY',
+  mode: 'shadow',
   partial: false,
-  mode: 'actual',
-  valuedAt: '2026-08-01T00:00:00.000Z',
+  valuedAt: '2026-10-25T01:00:00.000Z',
   ...overrides,
 });
+const optionsFor = (fetcher: typeof fetch) =>
+  mobileValuationOptions(
+    new ThesisLedgerApiClient('https://ledger.test/api/v1', fetcher),
+    mobileScopeKey('https://ledger.test/api/v1', 'shadow'),
+    accountId,
+  );
 
-const riskEvent = {
-  id: eventId,
-  ruleId,
-  ruleVersion: 1,
-  triggered: true,
-  severity: 'warning',
-  message: '风险事件',
-  mode: 'actual',
-  accountId,
-  symbol: '600519.SH',
-  marketTime: '2026-08-01T00:00:00.000Z',
-  evaluatedAt: '2026-08-01T00:00:01.000Z',
-  context: {},
-};
-
-describe('Mobile read-only dashboard', () => {
-  it('resolves safe development API defaults without overriding explicit environments', () => {
+describe('手机当前 Query 运行路径', () => {
+  it('保留模拟器安全默认地址，显式环境地址优先', () => {
     expect(resolveMobileApiBaseUrl({ platform: 'android' })).toBe('http://10.0.2.2:3000/api/v1');
     expect(resolveMobileApiBaseUrl({ platform: 'ios' })).toBe('http://127.0.0.1:3000/api/v1');
     expect(
       resolveMobileApiBaseUrl({
         platform: 'android',
-        explicitBaseUrl: ' https://thesis-ledger.example/api/v1 ',
+        explicitBaseUrl: ' https://ledger.test/api/v1 ',
       }),
-    ).toBe('https://thesis-ledger.example/api/v1');
+    ).toBe('https://ledger.test/api/v1');
   });
 
-  it('uses typed API responses and preserves server cashValue in mobile state', async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(response(portfolio()))
-      .mockResolvedValueOnce(response([riskEvent]));
-    const bootstrap = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    });
-    const listener = vi.fn();
-    const unsubscribe = bootstrap.store.subscribe(listener);
-
-    await bootstrap.store.refresh();
-
-    expect(bootstrap.platform).toBe('react-native');
-    expect(Object.keys(mobileStateCopy)).toEqual(['loading', 'ready', 'empty', 'error', 'stale']);
-    expect(bootstrap.navigation.map((item) => item.key)).toEqual(['portfolio', 'risk', 'account']);
-    expect(bootstrap.store.getState()).toMatchObject({
-      status: 'ready',
-      portfolio: {
-        totalMarketValue: 15380,
-        cashValue: 500,
-        positions: [{ symbol: '600519.SH', quantity: 10 }],
-      },
-      riskEvents: [{ id: eventId }],
-    });
-    expect(fetcher).toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/api/v1/portfolio/valuation' }),
-      expect.any(Object),
-    );
-    expect(listener).toHaveBeenCalled();
-    unsubscribe();
-  });
-
-  it('keeps stale data visible and marks the state when a quote is stale', async () => {
-    const stalePortfolio = portfolio({
-      partial: true,
-      positions: [
-        {
-          ...(portfolio().positions[0] as object),
-          stale: true,
-        },
-      ],
-    });
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(response(stalePortfolio))
-      .mockResolvedValueOnce(response([]));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-
-    await store.refresh();
-
-    expect(store.getState().status).toBe('stale');
-    expect(store.getState().portfolio?.positions[0]?.stale).toBe(true);
-  });
-
-  it('starts in loading and exposes the empty state when no positions exist', async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(response(portfolio({ positions: [], totalCost: 0, totalPnl: 0 })))
-      .mockResolvedValueOnce(response([]));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-
-    expect(store.getState()).toMatchObject({ status: 'loading', portfolio: null, error: null });
-    await store.refresh();
-
-    expect(store.getState()).toMatchObject({ status: 'empty', portfolio: { positions: [] } });
-  });
-
-  it('treats missing or invalid numeric fields as a contract error instead of zero', async () => {
-    const invalid = portfolio();
-    delete (invalid as { cashValue?: unknown }).cashValue;
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(response(invalid))
-      .mockResolvedValueOnce(response([]));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-
-    await store.refresh();
-
-    expect(store.getState().status).toBe('error');
-    expect(store.getState().portfolio).toBeNull();
-    expect(store.getState().error).toContain('响应契约不匹配');
-  });
-
-  it('surfaces API failures as an error state', async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(response({ error: 'offline', message: 'offline' }, 503));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-
-    await store.refresh();
-
-    expect(store.getState()).toMatchObject({ status: 'error' });
-    expect(store.getState().error).toContain('ThesisLedger API 503');
-  });
-
-  it.each(['actual', 'shadow'] as const)('切换到 %s 请求失败时不保留另一模式的数据', async (mode) => {
-    const previousMode = mode === 'actual' ? 'shadow' : 'actual';
-    const nextPortfolio = deferred<Response>();
-    const nextRisk = deferred<Response>();
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(response(portfolio({ mode: previousMode })))
-      .mockResolvedValueOnce(response([{ ...riskEvent, mode: previousMode }]))
-      .mockReturnValueOnce(nextPortfolio.promise)
-      .mockReturnValueOnce(nextRisk.promise);
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-    if (previousMode === 'actual') {
-      await store.refresh();
-    } else {
-      store.setMode(previousMode);
-      await vi.waitFor(() => expect(store.getState().status).toBe('ready'));
+  it.each([
+    { cashValue: 500, partial: false, status: 'ready' },
+    { cashValue: 0, partial: false, status: 'empty' },
+    { cashValue: 500, partial: true, status: 'stale' },
+  ])('实际查询保留服务端现金 $cashValue，并显示 $status 状态', async (scenario) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(portfolio(scenario)));
+    const client = createMobileQueryClient();
+    try {
+      const options = optionsFor(fetcher);
+      const value = await client.fetchQuery(options);
+      expect(value.cashValue).toBe(scenario.cashValue);
+      expect(valuationLoadState({ data: value, isPending: false, isError: false })).toBe(
+        scenario.status,
+      );
+      const url = new URL(String(fetcher.mock.calls[0]![0]));
+      expect(url.searchParams.get('mode')).toBe('shadow');
+      expect(url.searchParams.get('accountId')).toBe(accountId);
+    } finally {
+      client.clear();
     }
+  });
 
-    store.setMode(mode);
-    const loading = store.getState();
-    nextPortfolio.reject(new Error('目标模式请求失败'));
-    nextRisk.resolve(response([]));
-    await vi.waitFor(() => expect(store.getState().status).toBe('error'));
+  it.each(['invalid', 'unavailable'] as const)(
+    '最新响应 %s 时保留上次现金并显式报错，不补零或显示成功',
+    async (kind) => {
+      const broken =
+        kind === 'invalid'
+          ? Response.json(portfolio({ cashValue: undefined }))
+          : Response.json({ message: '读取暂不可用' }, { status: 503 });
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(Response.json(portfolio()))
+        .mockResolvedValueOnce(broken);
+      const client = createMobileQueryClient();
+      try {
+        const options = { ...optionsFor(fetcher), staleTime: 0 };
+        const previous = await client.fetchQuery(options);
+        await expect(client.fetchQuery(options)).rejects.toThrow();
+        const state = client.getQueryState<typeof previous>(options.queryKey)!;
+        expect(state.status).toBe('error');
+        expect(state.data).toBe(previous);
+        expect(state.data?.cashValue).toBe(500);
+        expect(valuationLoadState({ data: state.data, isPending: false, isError: true })).toBe(
+          'error',
+        );
+        expect(fetcher).toHaveBeenCalledTimes(2);
+      } finally {
+        client.clear();
+      }
+    },
+  );
 
-    expect(loading).toMatchObject({ mode, status: 'loading', portfolio: null, riskEvents: [] });
-    expect(store.getState()).toMatchObject({
-      mode,
-      status: 'error',
-      portfolio: null,
-      riskEvents: [],
-      error: '目标模式请求失败',
+  it('取消会中止真实查询信号，晚到响应不能覆盖后续读取', async () => {
+    let finish!: (value: Response) => void;
+    const late = new Promise<Response>((resolve) => {
+      finish = resolve;
     });
-  });
-
-  it('同一模式刷新失败时保留该模式上次成功的组合与风险数据', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(response(portfolio()))
-      .mockResolvedValueOnce(response([riskEvent]))
-      .mockRejectedValue(new Error('刷新暂时失败'));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-    await store.refresh();
-    const previous = store.getState();
-    await store.refresh();
-
-    expect(store.getState()).toMatchObject({ mode: 'actual', status: 'error' });
-    expect(store.getState().portfolio).toBe(previous.portfolio);
-    expect(store.getState().riskEvents).toBe(previous.riskEvents);
-  });
-
-  it('切换模式后拒绝上一模式的晚到结果', async () => {
-    const olderPortfolio = deferred<Response>();
-    const olderRisk = deferred<Response>();
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockReturnValueOnce(olderPortfolio.promise)
-      .mockReturnValueOnce(olderRisk.promise)
-      .mockResolvedValueOnce(response(portfolio({ mode: 'shadow', positions: [] })))
-      .mockResolvedValueOnce(response([]));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-    const olderRefresh = store.refresh();
-    store.setMode('shadow');
-    await vi.waitFor(() => expect(store.getState().status).toBe('empty'));
-    olderPortfolio.resolve(response(portfolio()));
-    olderRisk.resolve(response([riskEvent]));
-    await olderRefresh;
-
-    expect(store.getState()).toMatchObject({
-      mode: 'shadow',
-      portfolio: { mode: 'shadow', positions: [] },
-      riskEvents: [],
-    });
-  });
-
-  it('does not let an older refresh overwrite a newer response', async () => {
-    const firstPortfolio = deferred<Response>();
-    const firstRisk = deferred<Response>();
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockImplementationOnce(() => firstPortfolio.promise)
-      .mockImplementationOnce(() => firstRisk.promise)
-      .mockResolvedValueOnce(
-        response(
-          portfolio({
-            positions: [
-              {
-                ...(portfolio().positions[0] as object),
-                id: '00000000-0000-4000-8000-000000000005',
-                symbol: '000001.SZ',
-                quantity: 2,
-              },
-            ],
-          }),
-        ),
-      )
-      .mockResolvedValueOnce(response([]));
-    const store = createMobileBootstrap({
-      apiBaseUrl: 'https://thesis-ledger.test/api/v1',
-      fetcher,
-    }).store;
-
-    const olderRefresh = store.refresh();
-    const newerRefresh = store.refresh();
-    await newerRefresh;
-    firstPortfolio.resolve(response(portfolio()));
-    firstRisk.resolve(response([]));
-    await olderRefresh;
-
-    expect(store.getState().portfolio?.positions[0]?.symbol).toBe('000001.SZ');
+      .mockReturnValueOnce(late)
+      .mockResolvedValueOnce(Response.json(portfolio({ cashValue: 800 })));
+    const client = createMobileQueryClient();
+    try {
+      const options = optionsFor(fetcher);
+      const original = client.fetchQuery(options).catch((error: unknown) => error);
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+      const signal = fetcher.mock.calls[0]![1]?.signal;
+      expect(client.getQueryState(options.queryKey)?.status).toBe('pending');
+      await client.cancelQueries({ queryKey: options.queryKey });
+      expect(signal?.aborted).toBe(true);
+      await client.fetchQuery(options);
+      finish(Response.json(portfolio({ cashValue: 100 })));
+      await original;
+      await Promise.resolve();
+      expect(client.getQueryData<{ cashValue: number }>(options.queryKey)?.cashValue).toBe(800);
+    } finally {
+      client.clear();
+    }
   });
 });

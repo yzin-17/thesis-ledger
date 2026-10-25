@@ -8,13 +8,6 @@ import {
   mobileAccountDeletionErrorMessage,
   type MobileConfirmationButton,
 } from '../src/mobile-account.actions.js';
-import {
-  fetchMobileAccounts,
-  mobileAccountKeys,
-  refreshMobileAccountData,
-  refreshMobileAccountDataBestEffort,
-  resolveMobileAccountSelection,
-} from '../src/mobile-account.queries.js';
 
 const account: AccountResponse = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -35,16 +28,6 @@ const deferred = <T>() => {
 };
 
 describe('Mobile 账户永久删除', () => {
-  it('按实际和模拟范围查询，并始终包含停用账户', async () => {
-    const list = vi.fn().mockResolvedValue([account]);
-
-    await fetchMobileAccounts('actual', { list, permanentDelete: vi.fn() });
-    await fetchMobileAccounts('shadow', { list, permanentDelete: vi.fn() });
-
-    expect(list).toHaveBeenNthCalledWith(1, { includeInactive: true, mode: 'actual' });
-    expect(list).toHaveBeenNthCalledWith(2, { includeInactive: true, mode: 'shadow' });
-  });
-
   it('原生确认显示账户名和不可恢复提示，取消或 dismiss 时不删除', async () => {
     let buttons: MobileConfirmationButton[] = [];
     let title = '';
@@ -107,38 +90,6 @@ describe('Mobile 账户永久删除', () => {
     await Promise.all([first, second]);
 
     expect(permanentlyDelete).toHaveBeenCalledOnce();
-  });
-
-  it('成功后失效并重取账户数据，同时刷新既有 Portfolio/Risk store', async () => {
-    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
-    const refetchQueries = vi.fn().mockResolvedValue(undefined);
-    const refresh = vi.fn().mockResolvedValue(undefined);
-
-    await refreshMobileAccountData({ invalidateQueries, refetchQueries }, { refresh });
-
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: mobileAccountKeys.root });
-    expect(refetchQueries).toHaveBeenCalledWith({ queryKey: mobileAccountKeys.root });
-    expect(refresh).toHaveBeenCalledOnce();
-  });
-
-  it('删除成功后的刷新失败不会改写删除成功结果', async () => {
-    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
-    const refetchQueries = vi.fn().mockRejectedValue(new Error('offline'));
-    const refresh = vi.fn().mockResolvedValue(undefined);
-
-    await expect(
-      refreshMobileAccountDataBestEffort({ invalidateQueries, refetchQueries }, { refresh }),
-    ).resolves.toBeUndefined();
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: mobileAccountKeys.root });
-    expect(refetchQueries).toHaveBeenCalledWith({ queryKey: mobileAccountKeys.root });
-    expect(refresh).toHaveBeenCalledOnce();
-  });
-
-  it('删除选择账户后切换到剩余账户，最后账户解析为空', () => {
-    const fallback = { ...account, id: '00000000-0000-4000-8000-000000000002' };
-
-    expect(resolveMobileAccountSelection([fallback], account.id)).toBe(fallback.id);
-    expect(resolveMobileAccountSelection([], account.id)).toBeNull();
   });
 
   it('缓存账户仍可见时，查询错误提供可见重试模型', () => {
