@@ -1,22 +1,11 @@
-import { aiProviderValidationPlanSchema } from '@thesis-ledger/schemas';
 import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
-import { saveAiProvider } from './ai-provider.api.js';
+import { type DesktopRequestClient } from '../shared/request.js';
+import { desktopAiProviderClient, saveAiProvider } from './ai-provider.api.js';
 import type { AiProviderInput } from './ai-provider.actions.js';
 import type { ProviderRecord } from './providers.types.js';
 
-const post = (body: unknown, signal?: AbortSignal): RequestInit => ({
-  method: 'POST',
-  cache: 'no-store',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-  ...(signal ? { signal } : {}),
-});
 export const cancelValidatedSave = (name: string, operationId: string) =>
-  requestDesktopJson(
-    `/ai/providers/${encodeURIComponent(name)}/validation/cancel`,
-    post({ operationId }),
-  );
+  desktopAiProviderClient().cancelValidation(name, operationId);
 
 export const saveWithValidation = async (
   input: AiProviderInput,
@@ -25,9 +14,7 @@ export const saveWithValidation = async (
   signal?: AbortSignal,
   client?: DesktopRequestClient,
 ): Promise<ProviderRecord> => {
-  const plan = aiProviderValidationPlanSchema.parse(
-    await requestDesktopJson<unknown>('/ai/providers/validation-plan', post(input, signal), client),
-  );
+  const plan = await desktopAiProviderClient(client).validationPlan(input, signal);
   if (signal?.aborted) throw new Error('验证已取消，原配置未修改');
   if (plan.pending.length === 0) return saveAiProvider(input, client);
   const costs = plan.estimatedCosts
@@ -39,21 +26,15 @@ export const saveWithValidation = async (
     confirmLabel: '授权测试并保存',
   });
   if (!approved || signal?.aborted) throw new Error('未执行验证，原配置未修改');
-  return requestDesktopJson<ProviderRecord>(
-    '/ai/providers/test-and-save',
-    post(
-      {
-        provider: input,
-        authorization: {
-          operationId,
-          planFingerprint: plan.planFingerprint,
-          maxCalls: plan.maxCalls,
-          authorized: true,
-          allowTextFallback: false,
-        },
-      },
-      signal,
-    ),
-    client,
+  return desktopAiProviderClient(client).testAndSave(
+    input,
+    {
+      operationId,
+      planFingerprint: plan.planFingerprint,
+      maxCalls: plan.maxCalls,
+      authorized: true,
+      allowTextFallback: false,
+    },
+    signal,
   );
 };

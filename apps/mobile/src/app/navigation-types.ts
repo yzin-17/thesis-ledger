@@ -57,7 +57,21 @@ export type PortfolioStackParams = {
   Trades: { accountId: string | null } | undefined;
   TradeDetail: MobileObjectTarget;
 };
-export type SettingsStackParams = { SettingsHome: undefined; ChartPreview: undefined };
+export type SettingsStackParams = {
+  SettingsHome: undefined;
+  ChartPreview: undefined;
+  AiProviders: undefined;
+  AiProviderEditor: { name?: string } | undefined;
+  MarketProviders: undefined;
+  MarketProviderEditor: { providerId: string };
+  ProviderOAuth: undefined;
+  MarketPolicy: undefined;
+  MarketCatalog: undefined;
+  Automations: undefined;
+  AutomationEditor: { id?: string } | undefined;
+  AutomationHistory: { id?: string } | undefined;
+  Diagnostics: undefined;
+};
 export type MarketStackParams = {
   MarketHome: undefined;
   MarketDetail: { instrument: MobileInstrument; accountId?: string; mode?: 'actual' | 'shadow' };

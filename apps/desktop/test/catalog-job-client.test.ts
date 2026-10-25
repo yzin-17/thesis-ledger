@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { marketCatalogClient } from '@thesis-ledger/api-client';
+import { parsedDesktopRequest } from '../src/features/shared/request.js';
 import {
   catalogJobFeedback,
   catalogJobPollingInterval,
@@ -7,7 +9,9 @@ import {
 import { fetchCatalogJob, startCatalogSync } from '../src/features/market-data/market-data.api.js';
 
 const request = vi.hoisted(() => vi.fn());
-vi.mock('../src/shared/api/client.js', () => ({ getDesktopApiClient: () => ({ request }) }));
+vi.mock('../src/shared/api/client.js', () => ({
+  getDesktopApiClient: () => ({ market: marketCatalogClient(parsedDesktopRequest({ request })) }),
+}));
 
 const pending = {
   contractVersion: 3,
@@ -41,10 +45,10 @@ describe('目录任务客户端当前合同', () => {
     expect((await fetchCatalogJob('current-job')).acknowledged).toBe(true);
     expect(request.mock.calls.slice(-2)).toEqual([
       ['/api/market-data/catalog/sync', { method: 'POST' }],
-      ['/api/market-data/catalog/jobs/current-job'],
+      ['/api/market-data/catalog/jobs/current-job', { signal: null }],
     ]);
     request.mockResolvedValueOnce({ ...pending, id: 'different-job' });
-    await expect(fetchCatalogJob('current-job')).rejects.toThrow('当前合同');
+    await expect(fetchCatalogJob('current-job')).rejects.toThrow('契约不匹配');
   });
 
   it.each([

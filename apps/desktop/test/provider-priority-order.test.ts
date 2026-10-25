@@ -31,7 +31,7 @@ describe('提供方列表调用优先级', () => {
       return [
         { name: 'local', type: 'ai', priority: 1 },
         { name: 'cloud', type: 'ai', priority: 100 },
-      ];
+      ].map((row) => ({ ...row, enabled: true, health: 'unknown', capabilities: ['chat'] }));
     });
 
     for (let load = 0; load < 2; load += 1) {

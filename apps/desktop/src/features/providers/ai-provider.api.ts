@@ -1,9 +1,6 @@
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
-import type {
-  AiProviderModelDetail,
-  ProviderConnectionTestResult,
-  ProviderRecord,
-} from './providers.types.js';
+import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
+import { aiProviderClient } from '@thesis-ledger/api-client';
+import type { AiProviderModelDetail, ProviderConnectionTestResult } from './providers.types.js';
 import type { AiProviderInput, AiProviderTestInput } from './ai-provider.actions.js';
 import type {
   AiGenerationContractRef,
@@ -60,14 +57,6 @@ export type AiProviderTestRequestOptions = {
   signal?: AbortSignal;
 };
 
-const noStore = { cache: 'no-store' as const };
-const jsonInit = (method: 'POST' | 'PATCH', body: unknown): RequestInit => ({
-  ...noStore,
-  method,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-});
-
 const isDesktopRequestClient = (value: unknown): value is DesktopRequestClient =>
   Boolean(value && typeof value === 'object' && 'request' in value);
 
@@ -79,113 +68,60 @@ const lifecycleFromArgument = (
   return value ?? {};
 };
 
+export const desktopAiProviderClient = (client?: DesktopRequestClient) =>
+  aiProviderClient(parsedDesktopRequest(client));
+
 export const fetchAiProviders = (client?: DesktopRequestClient) =>
-  requestDesktopJson<ProviderRecord[]>('/ai/providers', noStore, client);
-
+  desktopAiProviderClient(client).list();
 export const fetchAiRoutingSettings = (client?: DesktopRequestClient) =>
-  requestDesktopJson<AiRoutingSettings>('/ai/settings', noStore, client);
-
+  desktopAiProviderClient(client).settings();
 export const updateAiRoutingSettings = (
   input: AiRoutingSettingsUpdate,
   client?: DesktopRequestClient,
-) => requestDesktopJson<AiRoutingSettings>('/ai/settings', jsonInit('PATCH', input), client);
-
+) => desktopAiProviderClient(client).updateSettings(input);
 export const saveAiProvider = (input: AiProviderInput, client?: DesktopRequestClient) =>
-  requestDesktopJson<ProviderRecord>('/ai/providers', jsonInit('POST', input), client);
-
+  desktopAiProviderClient(client).save(input);
 export const testAiProviderDraft = (
   input: AiProviderTestInput,
   client?: DesktopRequestClient,
   signal?: AbortSignal,
-) =>
-  requestDesktopJson<AiProviderTestResult>(
-    '/ai/providers/test',
-    { ...jsonInit('POST', input), ...(signal === undefined ? {} : { signal }) },
-    client,
-  );
-
+) => desktopAiProviderClient(client).testDraft(input, signal);
 export const cancelAiProviderTest = (
   name: string,
   requestId: string,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<{ name: string; requestId: string; cancelled: boolean }>(
-    `/ai/providers/${encodeURIComponent(name)}/test/cancel`,
-    jsonInit('POST', { requestId }),
-    client,
-  );
-
+) => desktopAiProviderClient(client).cancelTest(name, requestId);
 export const fetchAiProviderModels = (
   input: AiProviderModelCatalogInput,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<AiProviderModelCatalogResult>(
-    '/ai/providers/models',
-    jsonInit('POST', input),
-    client,
-  );
-
+) => desktopAiProviderClient(client).models(input);
 export const testSavedAiProvider = (
   name: string,
   optionsOrClient: AiProviderTestRequestOptions | DesktopRequestClient = {},
   client?: DesktopRequestClient,
 ) => {
-  const isClient = (value: typeof optionsOrClient): value is DesktopRequestClient =>
-    'request' in value;
-  const options = isClient(optionsOrClient) ? {} : optionsOrClient;
+  const isClient = isDesktopRequestClient(optionsOrClient);
+  const options = isClient ? {} : optionsOrClient;
   const { signal, ...body } = options;
-  return requestDesktopJson<AiProviderTestResult>(
-    `/ai/providers/${encodeURIComponent(name)}/test`,
-    {
-      ...noStore,
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-      ...(signal === undefined ? {} : { signal }),
-    },
-    isClient(optionsOrClient) ? optionsOrClient : client,
-  );
+  return desktopAiProviderClient(isClient ? optionsOrClient : client).test(name, body, signal);
 };
-
 export const setAiProviderEnabled = (
   name: string,
   enabled: boolean,
-  expectedRevisionOrOptionsOrClient?: string | AiProviderLifecycleOptions | DesktopRequestClient,
+  argument?: string | AiProviderLifecycleOptions | DesktopRequestClient,
   client?: DesktopRequestClient,
-) => {
-  const lifecycle = lifecycleFromArgument(expectedRevisionOrOptionsOrClient);
-  return requestDesktopJson<ProviderRecord>(
-    `/ai/providers/${encodeURIComponent(name)}/enabled`,
-    jsonInit('PATCH', {
-      enabled,
-      ...lifecycle,
-    }),
-    isDesktopRequestClient(expectedRevisionOrOptionsOrClient)
-      ? expectedRevisionOrOptionsOrClient
-      : client,
+) =>
+  desktopAiProviderClient(isDesktopRequestClient(argument) ? argument : client).setEnabled(
+    name,
+    enabled,
+    lifecycleFromArgument(argument),
   );
-};
-
 export const deleteAiProvider = (
   name: string,
-  expectedRevisionOrOptionsOrClient?: string | AiProviderLifecycleOptions | DesktopRequestClient,
+  argument?: string | AiProviderLifecycleOptions | DesktopRequestClient,
   client?: DesktopRequestClient,
-) => {
-  const lifecycle = lifecycleFromArgument(expectedRevisionOrOptionsOrClient);
-  return requestDesktopJson<ProviderRecord>(
-    `/ai/providers/${encodeURIComponent(name)}`,
-    {
-      ...noStore,
-      method: 'DELETE',
-      ...(Object.keys(lifecycle).length === 0
-        ? {}
-        : {
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(lifecycle),
-          }),
-    },
-    isDesktopRequestClient(expectedRevisionOrOptionsOrClient)
-      ? expectedRevisionOrOptionsOrClient
-      : client,
+) =>
+  desktopAiProviderClient(isDesktopRequestClient(argument) ? argument : client).remove(
+    name,
+    lifecycleFromArgument(argument),
   );
-};

@@ -2,56 +2,23 @@ import {
   marketPolicyClientResponseSchema,
   marketProviderRegistrySchema,
   marketCatalogStatusSchema,
-  marketProviderConfigResponseSchema,
-  marketProviderTestResponseSchema,
-  marketProviderRemovalProjectionSchema,
 } from '@thesis-ledger/schemas';
-
-type ParsedSchema<T> = {
-  safeParse(value: unknown): { success: true; data: T } | { success: false };
-};
-type Request = <T>(path: string, schema: ParsedSchema<T>, init?: RequestInit) => Promise<T>;
-
-export function marketControlClient(request: Request) {
-  const providerPath = (id: string, action: string) =>
-    `/api/market-data/providers/${encodeURIComponent(id)}/${action}`;
+import { marketProviderControlClient } from './market-provider-control-client.js';
+import type { ParsedRequest } from './parsed-request.js';
+export function marketControlClient(request: ParsedRequest) {
   return {
-    getPolicy: () => request('/api/market-data/policy', marketPolicyClientResponseSchema),
+    ...marketProviderControlClient(request),
+    getPolicy: (signal?: AbortSignal) =>
+      request('/api/market-data/policy', marketPolicyClientResponseSchema, {
+        signal: signal ?? null,
+      }),
     getProviderRegistry: (signal?: AbortSignal) =>
-      request(
-        '/api/market-data/providers',
-        marketProviderRegistrySchema,
-        signal ? { signal } : undefined,
-      ),
-    getCatalogStatus: () => request('/api/market-data/catalog/status', marketCatalogStatusSchema),
-    configureProvider: (id: string, input: unknown) =>
-      request(
-        providerPath(id, 'config'),
-        marketProviderConfigResponseSchema.refine((response) => response.providerId === id),
-        { method: 'POST', body: JSON.stringify(input) },
-      ),
-    testProvider: (id: string, input: unknown, signal?: AbortSignal) => {
-      const purpose =
-        typeof input === 'object' &&
-        input !== null &&
-        'purpose' in input &&
-        input.purpose === 'account_access'
-          ? 'account_access'
-          : 'capability_read';
-      return request(
-        providerPath(id, 'test'),
-        marketProviderTestResponseSchema.refine(
-          (response) =>
-            response.providerId === id && (response.purpose ?? 'capability_read') === purpose,
-        ),
-        { method: 'POST', body: JSON.stringify(input), signal: signal ?? null },
-      );
-    },
-    removeProvider: (id: string) =>
-      request(
-        providerPath(id, 'remove'),
-        marketProviderRemovalProjectionSchema.refine((response) => response.providerId === id),
-        { method: 'POST' },
-      ),
+      request('/api/market-data/providers', marketProviderRegistrySchema, {
+        signal: signal ?? null,
+      }),
+    getCatalogStatus: (signal?: AbortSignal) =>
+      request('/api/market-data/catalog/status', marketCatalogStatusSchema, {
+        signal: signal ?? null,
+      }),
   };
 }

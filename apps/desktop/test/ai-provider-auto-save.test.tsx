@@ -28,6 +28,14 @@ const plan = (count = 1) => ({
   maxDurationSeconds: 300,
   estimatedCosts: count ? [{ currency: 'USD', amount: '0' }] : [],
 });
+const savedProvider = {
+  name: 'local',
+  type: 'ai',
+  enabled: true,
+  priority: 100,
+  capabilities: ['chat'],
+  health: 'unknown',
+};
 
 describe('automatic generation and test-save UX', () => {
   it.each(['market', 'notification'])('数据库 %s 配置转为 AI 后提交原配置版本', (type) => {
@@ -144,7 +152,7 @@ describe('automatic generation and test-save UX', () => {
   });
   it('confirms costs then calls the server test-and-save once', async () => {
     const request = vi.fn(async (path: string) =>
-      path.endsWith('validation-plan') ? plan() : { name: 'local' },
+      path.endsWith('validation-plan') ? plan() : savedProvider,
     );
     const confirm = vi.fn(async () => true);
     await saveWithValidation(
@@ -164,7 +172,7 @@ describe('automatic generation and test-save UX', () => {
   });
   it('reuses valid evidence without a confirmation or model probe', async () => {
     const request = vi.fn(async (path: string) =>
-      path.endsWith('validation-plan') ? plan(0) : { name: 'local' },
+      path.endsWith('validation-plan') ? plan(0) : savedProvider,
     );
     const confirm = vi.fn(async () => true);
     await saveWithValidation(

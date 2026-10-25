@@ -133,6 +133,7 @@ export function Field({
   keyboardType,
   multiline = false,
   editable = true,
+  secure = false,
 }: {
   label: string;
   value: string;
@@ -140,6 +141,7 @@ export function Field({
   keyboardType?: KeyboardTypeOptions;
   multiline?: boolean;
   editable?: boolean;
+  secure?: boolean;
 }) {
   const { theme } = useMobileRuntime();
   return (
@@ -151,6 +153,8 @@ export function Field({
         onChangeText={onChange}
         autoCapitalize="none"
         autoCorrect={false}
+        secureTextEntry={secure}
+        autoComplete="off"
         keyboardType={keyboardType}
         multiline={multiline}
         editable={editable}

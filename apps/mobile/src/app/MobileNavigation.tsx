@@ -1,8 +1,4 @@
-import {
-  NavigationContainer,
-  DefaultTheme,
-  DarkTheme,
-} from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -18,7 +14,7 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-
 import { AccountNavigator } from './AccountNavigator';
 import { useMobileRuntime } from './MobileRuntime';
 import { mobileDestinations } from './navigation-state';
-import type { PortfolioStackParams, RootTabParams, SettingsStackParams } from './navigation-types';
+import type { PortfolioStackParams, RootTabParams } from './navigation-types';
 import { PortfolioScreen } from '../features/portfolio/PortfolioScreen';
 import { RiskEventsScreen } from '../features/risk-events/RiskEventsScreen';
 import { RiskRulesScreen } from '../features/risk-rules/RiskRulesScreen';
@@ -33,12 +29,10 @@ import { TradesScreen } from '../features/portfolio/TradesScreen';
 import { TradeDetailScreen } from '../features/portfolio/TradeDetailScreen';
 import { MarketNavigator } from './MarketNavigator';
 import { ResearchNavigator } from './ResearchNavigator';
-import { SettingsScreen } from '../features/settings/SettingsScreen';
-import { ChartPreview } from '../features/settings/ChartPreview';
+import { SettingsNavigator } from './SettingsNavigator';
 import { Choices, ui } from '../components/MobilePrimitives';
 const Tabs = createBottomTabNavigator<RootTabParams>();
 const Portfolio = createNativeStackNavigator<PortfolioStackParams>();
-const Settings = createNativeStackNavigator<SettingsStackParams>();
 function PortfolioNavigator() {
   return (
     <Portfolio.Navigator screenOptions={{ headerTitle: '', headerBackTitle: '返回' }}>
@@ -59,18 +53,6 @@ function PortfolioNavigator() {
       <Portfolio.Screen name="Trades" component={TradesScreen} />
       <Portfolio.Screen name="TradeDetail" component={TradeDetailScreen} />
     </Portfolio.Navigator>
-  );
-}
-function SettingsNavigator() {
-  return (
-    <Settings.Navigator screenOptions={{ headerTitle: '', headerBackTitle: '返回' }}>
-      <Settings.Screen
-        name="SettingsHome"
-        component={SettingsScreen}
-        options={{ headerShown: false }}
-      />
-      <Settings.Screen name="ChartPreview" component={ChartPreview} />
-    </Settings.Navigator>
   );
 }
 function TabBar({ state, navigation }: BottomTabBarProps) {

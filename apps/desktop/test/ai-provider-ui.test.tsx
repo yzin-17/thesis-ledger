@@ -127,7 +127,30 @@ describe('AI Provider 专用请求与密钥边界', () => {
       credentialsRef: 'ui-secret',
     };
     const input = aiProviderInputFromDraft(draft);
-    const requestClient = client(aiProvider());
+    const requestClient = client();
+    requestClient.request
+      .mockResolvedValueOnce([aiProvider()])
+      .mockResolvedValueOnce(aiProvider())
+      .mockResolvedValueOnce({
+        name: 'openrouter',
+        status: 'healthy',
+        message: '连接通过',
+        credentialConfigured: true,
+      })
+      .mockResolvedValueOnce({ models: [], modelDetails: [], fetchedAt: '2026-10-25T00:00:00Z' })
+      .mockResolvedValueOnce({
+        name: 'open/router',
+        status: 'healthy',
+        message: '连接通过',
+        credentialConfigured: true,
+      })
+      .mockResolvedValueOnce({
+        name: 'open/router',
+        requestId: '7f8d8c0e-b6b8-4a5f-a2f2-2e1b7d2f6f77',
+        cancelled: true,
+      })
+      .mockResolvedValueOnce(aiProvider({ name: 'open/router' }))
+      .mockResolvedValueOnce(aiProvider({ name: 'open/router' }));
 
     await fetchAiProviders(requestClient);
     await saveAiProvider(input, requestClient);
@@ -179,7 +202,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
   });
 
   it('Provider 生命周期请求携带当前版本，删除请求也不丢失版本条件', async () => {
-    const requestClient = client(aiProvider());
+    const requestClient = client(aiProvider({ name: 'open/router' }));
     const expectedRevision = '2026-09-14T00:00:00.000Z';
 
     await setAiProviderEnabled('open/router', false, expectedRevision, requestClient);
@@ -236,9 +259,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
     });
     expect(editInput).not.toHaveProperty('pricingVersion');
     const versionedInput = aiProviderInputFromDraft(
-      aiProviderDraftFromRecord(
-        aiProvider({ updatedAt: '2026-09-14T00:00:00.000Z' }),
-      ),
+      aiProviderDraftFromRecord(aiProvider({ updatedAt: '2026-09-14T00:00:00.000Z' })),
     );
     expect(versionedInput.expectedRevision).toBe('2026-09-14T00:00:00.000Z');
     expect(aiProviderDraftError({ ...createInput, models: ['same', 'same'] })).toBe(
@@ -331,8 +352,14 @@ describe('AI Provider 专用请求与密钥边界', () => {
   });
 
   it('混合输出方式保持按用途配置，空超时保持继承而不是转换成零', () => {
-    const research = { ...newAiProviderExecutionRouteDraft('model-a'), mode: 'json_validated' as const };
-    const strategy = { ...newAiProviderExecutionRouteDraft('model-a'), mode: 'native_schema' as const };
+    const research = {
+      ...newAiProviderExecutionRouteDraft('model-a'),
+      mode: 'json_validated' as const,
+    };
+    const strategy = {
+      ...newAiProviderExecutionRouteDraft('model-a'),
+      mode: 'native_schema' as const,
+    };
 
     expect(aiProviderExecutionModeState([research])).toEqual({
       kind: 'shared',
@@ -341,15 +368,17 @@ describe('AI Provider 专用请求与密钥边界', () => {
     expect(aiProviderExecutionModeState([research, strategy])).toEqual({ kind: 'mixed' });
     expect(aiProviderExecutionTimeoutLabel('')).toContain('继承 Provider');
     expect(aiProviderExecutionTimeoutLabel('1000')).toBe('当前用途覆盖');
-    expect(aiProviderDraftError({
-      ...aiProviderInputFromDraft({
-        ...newAiProviderDraft(),
-        name: 'local-provider',
-        baseUrl: 'http://127.0.0.1:4318/v1',
-        modelsText: 'model-a',
-        executionRoutes: [{ ...research, firstOutputTimeoutMs: '120.001' }],
+    expect(
+      aiProviderDraftError({
+        ...aiProviderInputFromDraft({
+          ...newAiProviderDraft(),
+          name: 'local-provider',
+          baseUrl: 'http://127.0.0.1:4318/v1',
+          modelsText: 'model-a',
+          executionRoutes: [{ ...research, firstOutputTimeoutMs: '120.001' }],
+        }),
       }),
-    })).toContain('120000');
+    ).toContain('120000');
   });
 
   it('模型默认输出方式与用途覆盖分别保存，移除当前用途会选择相邻用途', () => {
@@ -445,9 +474,7 @@ describe('AI Provider 专用请求与密钥边界', () => {
       new URL('../src/components/ui/button.tsx', import.meta.url),
       'utf8',
     );
-    expect(buttonSource).toContain(
-      'aria-pressed:bg-secondary aria-pressed:text-foreground',
-    );
+    expect(buttonSource).toContain('aria-pressed:bg-secondary aria-pressed:text-foreground');
   });
 
   it('通知 Provider 仍使用通用保存与草稿测试端点', async () => {
@@ -852,11 +879,8 @@ describe('AI Provider 页面操作', () => {
     expect(remove).toHaveBeenCalledWith('openrouter');
 
     const cancel = vi.fn(async () => false);
-    await expect(
-      requestAiProviderDeletion(aiProvider(), cancel, remove),
-    ).resolves.toBe(false);
+    await expect(requestAiProviderDeletion(aiProvider(), cancel, remove)).resolves.toBe(false);
     expect(cancel).toHaveBeenCalledOnce();
     expect(remove).toHaveBeenCalledOnce();
   });
-
 });

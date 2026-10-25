@@ -1,19 +1,15 @@
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import { automationClient, diagnosticsClient } from '@thesis-ledger/api-client';
+import { automationCreateInputSchema } from '@thesis-ledger/schemas';
 import {
-  AUTOMATION_HISTORY_PAGE_SIZE,
-  normalizeAutomationHistory,
-  normalizeProviderHealthHistory,
-  PROVIDER_HEALTH_HISTORY_PAGE_SIZE,
-  sortProviderRecords,
-} from './providers.types.js';
+  parsedDesktopRequest,
+  requestDesktopJson,
+  type DesktopRequestClient,
+} from '../shared/request.js';
+import { sortProviderRecords } from './providers.types.js';
 import type {
-  AutomationJob,
-  AutomationRunNowResult,
   CreateAutomationJobInput,
-  NotificationFailureRecord,
   ProviderConnectionTestResult,
   ProviderDraftTestResult,
-  ProviderIssueRecord,
   ProviderRecord,
   ProviderSaveResult,
   SaveProviderInput,
@@ -38,40 +34,18 @@ export const fetchProviders = async (client?: DesktopRequestClient) => {
   ]);
 };
 
-export const fetchProviderIssues = (client?: DesktopRequestClient) =>
-  requestDesktopJson<ProviderIssueRecord[]>('/data-quality/issues?status=open', noStore, client);
-
-export const fetchAutomationJobs = (client?: DesktopRequestClient) =>
-  requestDesktopJson<AutomationJob[]>('/automations', noStore, client);
-
-export const fetchProviderHealthHistory = async (page: number, client?: DesktopRequestClient) => {
-  const params = new URLSearchParams({
-    page: String(page),
-    pageSize: String(PROVIDER_HEALTH_HISTORY_PAGE_SIZE),
-  });
-  const payload = await requestDesktopJson<unknown>(
-    `/providers/health/history?${params.toString()}`,
-    noStore,
-    client,
-  );
-  return normalizeProviderHealthHistory(payload, page, PROVIDER_HEALTH_HISTORY_PAGE_SIZE);
-};
-
-export const fetchAutomationHistory = async (page: number, client?: DesktopRequestClient) => {
-  const params = new URLSearchParams({
-    page: String(page),
-    pageSize: String(AUTOMATION_HISTORY_PAGE_SIZE),
-  });
-  const payload = await requestDesktopJson<unknown>(
-    `/automations/history?${params.toString()}`,
-    noStore,
-    client,
-  );
-  return normalizeAutomationHistory(payload, page, AUTOMATION_HISTORY_PAGE_SIZE);
-};
-
+const automation = (client?: DesktopRequestClient) =>
+  automationClient(parsedDesktopRequest(client));
+const diagnostics = (client?: DesktopRequestClient) =>
+  diagnosticsClient(parsedDesktopRequest(client));
+export const fetchProviderIssues = (client?: DesktopRequestClient) => diagnostics(client).issues();
+export const fetchAutomationJobs = (client?: DesktopRequestClient) => automation(client).list();
+export const fetchProviderHealthHistory = (page: number, client?: DesktopRequestClient) =>
+  diagnostics(client).healthHistory(page);
+export const fetchAutomationHistory = (page: number, client?: DesktopRequestClient) =>
+  automation(client).history(page);
 export const fetchNotificationFailures = (client?: DesktopRequestClient) =>
-  requestDesktopJson<NotificationFailureRecord[]>('/notifications?status=failed', noStore, client);
+  diagnostics(client).notificationFailures();
 
 export const testProviderConnection = (name: string, client?: DesktopRequestClient) =>
   requestDesktopJson<ProviderConnectionTestResult>(
@@ -104,51 +78,18 @@ export const saveProvider = (input: SaveProviderInput, client?: DesktopRequestCl
     client,
   );
 
-export const toggleAutomation = (jobId: string, enabled: boolean, client?: DesktopRequestClient) =>
-  requestDesktopJson<Partial<AutomationJob>>(
-    `/automations/${encodeURIComponent(jobId)}/enabled`,
-    {
-      ...noStore,
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ enabled }),
-    },
-    client,
-  );
-
-const automationJsonInit = (method: 'POST' | 'PATCH', body: unknown): RequestInit => ({
-  ...noStore,
-  method,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-});
-
+export const toggleAutomation = (id: string, enabled: boolean, client?: DesktopRequestClient) =>
+  automation(client).setEnabled(id, enabled);
 export const createAutomationJob = (
   input: CreateAutomationJobInput,
   client?: DesktopRequestClient,
-) => requestDesktopJson<AutomationJob>('/automations', automationJsonInit('POST', input), client);
-
+) => automation(client).create(automationCreateInputSchema.parse(input));
 export const updateAutomationJob = (
-  jobId: string,
-  patch: UpdateAutomationJobInput,
+  id: string,
+  input: UpdateAutomationJobInput,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<AutomationJob>(
-    `/automations/${encodeURIComponent(jobId)}`,
-    automationJsonInit('PATCH', patch),
-    client,
-  );
-
-export const deleteAutomationJob = (jobId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<AutomationJob>(
-    `/automations/${encodeURIComponent(jobId)}`,
-    { ...noStore, method: 'DELETE' },
-    client,
-  );
-
-export const runAutomationJob = (jobId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<AutomationRunNowResult>(
-    `/automations/${encodeURIComponent(jobId)}/run`,
-    { ...noStore, method: 'POST' },
-    client,
-  );
+) => automation(client).update(id, input);
+export const deleteAutomationJob = (id: string, client?: DesktopRequestClient) =>
+  automation(client).remove(id);
+export const runAutomationJob = (id: string, client?: DesktopRequestClient) =>
+  automation(client).run(id);

@@ -1,3 +1,15 @@
+import { aiProviderClient } from './ai-provider-client.js';
+export { aiProviderClient } from './ai-provider-client.js';
+import { marketPolicyClient } from './market-policy-client.js';
+export { marketPolicyClient } from './market-policy-client.js';
+import { marketCatalogClient } from './market-catalog-client.js';
+export { marketCatalogClient } from './market-catalog-client.js';
+import { providerOAuthClient } from './provider-oauth-client.js';
+export { safeProviderOAuthUrl } from './provider-oauth-client.js';
+import { automationClient } from './automation-client.js';
+export { automationClient } from './automation-client.js';
+import { diagnosticsClient } from './diagnostics-client.js';
+export { diagnosticsClient } from './diagnostics-client.js';
 import { cashManagementClient } from './cash-management-client.js';
 import { performanceClient } from './performance-client.js';
 import { riskManagementClient } from './risk-management-client.js';
@@ -302,6 +314,8 @@ export class ThesisLedgerApiClient {
   readonly performance = performanceClient(this.requestParsed.bind(this));
 
   readonly market = {
+    ...marketPolicyClient(this.requestParsed.bind(this)),
+    ...marketCatalogClient(this.requestParsed.bind(this)),
     ...marketControlClient(this.requestParsed.bind(this)),
     ...marketDisplayClient(this.requestParsed.bind(this), queryString),
     ...marketChartOptionsClient(this.requestParsed.bind(this), queryString),
@@ -411,6 +425,11 @@ export class ThesisLedgerApiClient {
 
   readonly strategy = strategyClients(this.requestParsed.bind(this));
   readonly backtests = backtestClients(this.requestParsed.bind(this));
+
+  readonly aiProviders = aiProviderClient(this.requestParsed.bind(this));
+  readonly providerOAuth = providerOAuthClient(this.requestParsed.bind(this));
+  readonly automations = automationClient(this.requestParsed.bind(this));
+  readonly diagnostics = diagnosticsClient(this.requestParsed.bind(this));
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
