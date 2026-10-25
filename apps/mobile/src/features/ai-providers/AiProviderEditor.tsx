@@ -86,7 +86,7 @@ function EditorForm({
               baseUrl: draft.baseUrl,
               authMode: draft.authMode,
               upstreamFormat: draft.upstreamFormat,
-              ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+              ...(draft.authMode === 'api_key' && apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
             },
             controller.signal,
           );
@@ -159,7 +159,10 @@ function EditorForm({
       <Feedback message={message} />
       <AiProviderFields
         draft={draft}
-        change={(patch) => setDraft((value) => ({ ...value, ...patch }))}
+        change={(patch) => {
+          if (patch.authMode === 'none') setApiKey('');
+          setDraft((value) => ({ ...value, ...patch }));
+        }}
         editing={Boolean(saved)}
         disabled={blocked}
       />

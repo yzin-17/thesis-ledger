@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
+import { onlineManager } from '@tanstack/react-query';
 import { button, click, field, input, mount, setApi, view, flush } from './mobile-view-harness';
 import { AiProviderEditor } from '../../src/features/ai-providers/AiProviderEditor';
 import { MarketProviderEditor } from '../../src/features/market-providers/MarketProviderEditor';
@@ -21,6 +22,56 @@ async function fillAi() {
   await input(field('API Key'), 'fixture-dummy-key');
 }
 describe('第 5 批手机配置交互', () => {
+  it('离线提交零请求且清空凭证，恢复连接后只在用户再次提交时保存', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        response(String(url).endsWith('validation-plan') ? b5Plan() : b5Ai),
+      );
+    setApi(fetcher);
+    await mount(<AiProviderEditor {...props} />);
+    await fillAi();
+    onlineManager.setOnline(false);
+    await click(button('验证并保存配置'));
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(field('API Key').value).toBe('');
+    expect(field('来源名称').value).toBe('B5-fixture');
+    expect(document.body.textContent).toContain('当前离线');
+    onlineManager.setOnline(true);
+    await flush();
+    expect(fetcher).not.toHaveBeenCalled();
+    await input(field('API Key'), 'fixture-dummy-key');
+    await click(button('验证并保存配置'));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(document.body.textContent).toContain('配置已保存');
+  });
+  it('改为无需认证立即清空密钥，保存及目录请求均不携带旧凭证', async () => {
+    const bodies: unknown[] = [];
+    setApi(
+      vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        if (String(url).endsWith('/models')) return response({ models: ['fixture'] });
+        return response(
+          String(url).endsWith('validation-plan')
+            ? b5Plan()
+            : { ...b5Ai, authMode: 'none', credentialConfigured: false },
+        );
+      }),
+    );
+    await mount(<AiProviderEditor {...props} />);
+    await fillAi();
+    await click(button('无需认证'));
+    expect(field('API Key').value).toBe('');
+    expect(field('API Key').disabled).toBe(true);
+    await click(button('读取模型目录'));
+    await click(button('验证并保存配置'));
+    expect(bodies).toHaveLength(3);
+    for (const body of bodies) {
+      expect(body).toMatchObject({ authMode: 'none' });
+      expect(body).not.toHaveProperty('apiKey');
+    }
+    expect(document.body.textContent).toContain('配置已保存');
+  });
   it('凭证提交即清空且不进入查询或 Mutation variables，保存失败保留非敏感输入', async () => {
     const calls: string[] = [];
     setApi(

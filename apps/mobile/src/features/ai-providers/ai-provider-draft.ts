@@ -80,7 +80,7 @@ export function buildAiProviderInput(
     modelPricing: JSON.parse(draft.modelPricing) as unknown,
     modelDefaults: JSON.parse(draft.modelDefaults) as unknown,
     modelReasoning: JSON.parse(draft.modelReasoning) as unknown,
-    ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+    ...(draft.authMode === 'api_key' && apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
     ...(row?.updatedAt ? { expectedRevision: row.updatedAt } : {}),
   };
   return aiProviderInputSchema.parse(input);

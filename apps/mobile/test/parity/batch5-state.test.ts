@@ -4,7 +4,7 @@ import {
   buildAiProviderInput,
   researchCandidateReason,
 } from '../../src/features/ai-providers/ai-provider-draft';
-import { aiProviderRecordSchema } from '@thesis-ledger/schemas';
+import { aiProviderRecordSchema, aiProviderInputSchema } from '@thesis-ledger/schemas';
 import { b5Ai } from './batch5-fixture';
 describe('第 5 批配置语义与秘密边界', () => {
   it('编辑只从安全摘要生成，密钥没有草稿字段，未知费用不会转换为零', () => {
@@ -29,8 +29,11 @@ describe('第 5 批配置语义与秘密边界', () => {
     expect(input.modelPricing?.fixture?.costPer1kOutput).toBeUndefined();
     expect(() => buildAiProviderInput({ ...draft, firstOutputTimeoutMs: '-1' }, '', row)).toThrow();
     expect(() => buildAiProviderInput({ ...draft, modelPricing: '{invalid}' }, '', row)).toThrow();
-    expect(() =>
+    expect(
       buildAiProviderInput({ ...draft, authMode: 'none' }, 'fixture-new', row),
+    ).not.toHaveProperty('apiKey');
+    expect(() =>
+      aiProviderInputSchema.parse({ ...input, authMode: 'none', apiKey: 'fixture-new' }),
     ).toThrow();
   });
   it('健康连接与已填价格不足以开放默认用途', () => {

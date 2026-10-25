@@ -123,9 +123,9 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 | [x] C07    | 研究运行与复盘 AI 请求；AC03/09/10         | 既有 research/journalReviews、`ai.api.ts`、研究演进 Task                        | `research-run-client.ts`、缺失合同 `research-run-wire.ts` 与 AI/复盘对应包装；分页、预检、重试、引用/审计语义，不激活受控写入                                          |
 | [x] C08    | 策略定义/辅助编写与回测操作；AC03/11       | 既有 backtest clients、`strategy.api.ts`、`strategy-authoring/authoring.api.ts` | `strategy-definition-client.ts`、`strategy-authoring-client.ts`、缺失合同 `strategy-definition-wire.ts` 与对应包装；版本、确认、预检/冻结与现行 Run 路径一致           |
 | [x] C09    | 实验与策略风险应用；AC03/08/11             | `strategy-optimization.api.ts`、相关 Schema/Spec                                | `strategy-optimization-client.ts`、`strategy-risk-client.ts`、`strategy-optimization-wire.ts`、`strategy-risk-wire.ts` 与对应包装；预览/采用/升级、冲突、取消/结束和预算边界完整         |
-| [ ] C10    | AI Provider 与用途配置；AC03/12            | `providers/ai-provider.api.ts`、生成/用途配置及模型验证合同                     | `ai-provider-client.ts`、缺失合同 `ai-provider-management-wire.ts` 与对应包装；配置与验证证据分离，不回传敏感值到持久化状态                                            |
-| [ ] C11    | 行情来源、路由、目录与 OAuth；AC03/12      | `market-data.api.ts`、`provider-oauth.api.ts`、路由/准入现行合同                | `market-provider-control-client.ts`、`provider-oauth-client.ts`、缺失合同 `market-control-management-wire.ts` 与对应包装；Desired/Effective、准入、目录/OAuth 状态分开 |
-| [ ] C12    | 自动化与诊断；AC03/12                      | `providers.api.ts` 与 automation Schema                                         | `automation-client.ts`、`diagnostics-client.ts`、缺失合同 `automation-management-wire.ts` 与对应包装；编辑/启停/手动执行及诊断分页行为一致                             |
+| [x] C10    | AI Provider 与用途配置；AC03/12            | `providers/ai-provider.api.ts`、生成/用途配置及模型验证合同                     | `ai-provider-client.ts`、`ai-provider-management-wire.ts` 与对应包装；配置与验证证据分离，不回传敏感值到持久化状态                                            |
+| [x] C11    | 行情来源、路由、目录与 OAuth；AC03/12      | `market-data.api.ts`、`provider-oauth.api.ts`、路由/准入现行合同                | `market-provider-control-client.ts`、`provider-oauth-client.ts`、`market-control-input.ts`、`market-catalog-job.ts` 与对应包装；Desired/Effective、准入、目录/OAuth 状态分开 |
+| [x] C12    | 自动化与诊断；AC03/12                      | `providers.api.ts` 与 automation Schema                                         | `automation-client.ts`、`diagnostics-client.ts`、`automation-management.ts`、`provider-diagnostics.ts` 与对应包装；编辑/启停/手动执行及诊断分页行为一致                             |
 
 首次 C 任务同时给 `scripts/check-boundaries.mjs` 增加跨端依赖约束与对应反例，其余 C 任务维护受影响约束。API/client 源码不能继续无界扩张 `index.ts`；若某 C 任务因协议缺口需修改业务状态机，先拆分，不扩大这行任务。
 
@@ -231,20 +231,20 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ## 第 5 批：配置、来源与自动化
 
-用户已授权继续实施本批及隔离快照的限定公开 CI。C10a～C12b 合同与 Web 包装、M28～M32 手机页面已实现，本地合同、包级和静态检查通过；Android/iOS 业务运行及最终源码 CI 仍在逐项验收，当前 C/M/G5 完成框等待最终证据核对。写集限手机、共享 Schema/client、对应 Web 薄包装和测试说明，不改 Server/DSA 的状态机、数据库、真实配置或预算。原工作树 `main/da002744`，开始时 1449 项未提交条目、索引为空；基线与后续证据见[第 5 批记录](evidence/web-mobile-parity/2026-10-25-batch-5.md)。
+用户已授权继续实施本批及隔离快照的限定公开 CI。C10a～C12b 合同与 Web 包装已通过本地、包级与隔离 CI；M28～M32 手机页面已实现，Android/iOS 业务运行及最终手机修复的 CI 仍在逐项验收，M/G5 完成框等待对应证据。写集限手机、共享 Schema/client、对应 Web 薄包装和测试说明，不改 Server/DSA 的状态机、数据库、真实配置或预算。原工作树 `main/da002744`，开始时 1449 项未提交条目、索引为空；基线与后续证据见[第 5 批记录](evidence/web-mobile-parity/2026-10-25-batch-5.md)。
 
 原 C10～C12 按独立消费合同拆分，父编号仅分组，完成断言不减少：
 
 | 独立合同叶 | 入口及限定写集 | 完成条件及消费方 |
 | --- | --- | --- |
-| [ ] C10a | AI Provider 读取/配置/生命周期/连接测试与模型目录；`ai-provider-management-input.ts`、`ai-provider-management-wire.ts`、`ai-provider-client.ts`、对应 Web 包装与测试 | 合同匹配现行 Controller；非法输入零请求，摘要不携带秘密字段，取消信号与修订保持；供 M28a～M28c |
-| [ ] C10b | 验证保存计划、预算授权、用途证据与研究默认模型；对应 Schema/client 及 `ai-provider-validated-save.ts` 包装 | 计划/执行/配置分离，未知费用、验证指纹和默认引用冲突保持；供 M28a～M28c |
-| [ ] C11a | 行情 Provider 配置、测试及账号能力；`market-provider-control-client.ts` 与读取合同及 Web 包装 | 秘密字段只提交不回显，准入与账号能力分离，配置修订/删除投影保持；供 M29a |
-| [ ] C11b | OAuth 会话合同与 `provider-oauth-client.ts`、Web 包装 | 白名单地址、身份、取消与过期状态严格校验，不将浏览器返回当成功；供 M29b |
-| [ ] C11c | Desired/Effective 路由合同与 `market-policy-client.ts`、Web 包装 | 预期修订、保存/验证/重试状态不混淆；供 M30a |
-| [ ] C11d | 目录同步与标的确认合同、`market-catalog-client.ts`、Web 包装 | 任务身份/终态、分页与失败保持，不因查询错误补投；供 M30b |
-| [ ] C12a | 自动化读写、立即执行与历史合同、`automation-client.ts`、Web 包装 | 托管任务限制、锁/预算及历史分页保持，失败不自动再次执行；供 M31 |
-| [ ] C12b | Provider 健康、数据质量及通知诊断合同、`diagnostics-client.ts`、Web 包装 | 无效响应不转空，分页/筛选/重新读取及详情完整；供 M32 |
+| [x] C10a | AI Provider 读取/配置/生命周期/连接测试与模型目录；`ai-provider-management-input.ts`、`ai-provider-management-wire.ts`、`ai-provider-client.ts`、对应 Web 包装与测试 | 合同匹配现行 Controller；非法输入零请求，摘要不携带秘密字段，取消信号与修订保持；供 M28a～M28c |
+| [x] C10b | 验证保存计划、预算授权、用途证据与研究默认模型；对应 Schema/client 及 `ai-provider-validated-save.ts` 包装 | 计划/执行/配置分离，未知费用、验证指纹和默认引用冲突保持；供 M28a～M28c |
+| [x] C11a | 行情 Provider 配置、测试及账号能力；`market-provider-control-client.ts` 与读取合同及 Web 包装 | 秘密字段只提交不回显，准入与账号能力分离，配置修订/删除投影保持；供 M29a |
+| [x] C11b | OAuth 会话合同与 `provider-oauth-client.ts`、Web 包装 | 白名单地址、身份、取消与过期状态严格校验，不将浏览器返回当成功；供 M29b |
+| [x] C11c | Desired/Effective 路由合同与 `market-policy-client.ts`、Web 包装 | 预期修订、保存/验证/重试状态不混淆；供 M30a |
+| [x] C11d | 目录同步与标的确认合同、`market-catalog-client.ts`、Web 包装 | 任务身份/终态、分页与失败保持，不因查询错误补投；供 M30b |
+| [x] C12a | 自动化读写、立即执行与历史合同、`automation-client.ts`、Web 包装 | 托管任务限制、锁/预算及历史分页保持，失败不自动再次执行；供 M31 |
+| [x] C12b | Provider 健康、数据质量及通知诊断合同、`diagnostics-client.ts`、Web 包装 | 无效响应不转空，分页/筛选/重新读取及详情完整；供 M32 |
 
 本批共同约束：敏感值不持久化，原生正向写入只在受控接收端；真实 API 配置及既有业务数据前后摘要核对。合同通过不替代 G5；用户已授权第 5 批隔离快照及限定必要修复运行 CI，原树不暂存、不提交，临时分支不合并，数据库、原生安装包和验收包不公开上传。
 
