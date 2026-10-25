@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 import { useMobileRuntime, confirmAction } from '../../app/MobileRuntime';
 import {
@@ -48,6 +48,7 @@ function StatusPanel({
 }
 export function MarketCatalogScreen() {
   const { api, scope } = useMobileRuntime();
+  const client = useQueryClient();
   const [queryText, setQueryText] = useState('');
   const [search, setSearch] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -72,6 +73,11 @@ export function MarketCatalogScreen() {
     enabled: Boolean(search),
     queryFn: ({ signal }) => api.market.searchInstruments({ q: search, limit: 50 }, signal),
   });
+  const completedId = job.isSuccess && terminal(job.data.status) ? job.data.id : null;
+  useEffect(() => {
+    if (completedId)
+      void client.invalidateQueries({ queryKey: [...scope, 'configuration', 'catalog-status'] });
+  }, [client, scope, completedId]);
   const start = async () => {
     if (
       !(await confirmAction(
@@ -141,15 +147,12 @@ export function MarketCatalogScreen() {
         {instruments.data?.map((item) => (
           <Section key={item.id} title={item.displayName}>
             <Copy>
-              {item.symbol} · {item.market} ·{' '}
-              {item.confirmable ? '可确认' : '不可确认'}
+              {item.symbol} · {item.market} · {item.confirmable ? '可确认' : '不可确认'}
             </Copy>
             <Copy>{item.disabledReason ?? '目录身份有效，可提交确认。'}</Copy>
             <Action
               label={`确认标的 ${item.symbol}`}
-              disabled={
-                command.pending || instruments.isError || !item.confirmable
-              }
+              disabled={command.pending || instruments.isError || !item.confirmable}
               onPress={() => void confirm(item.id, `${item.displayName} / ${item.symbol}`)}
             />
           </Section>

@@ -85,6 +85,55 @@ describe('第 5 批手机配置交互', () => {
     expect(calls.some((path) => path.endsWith('/test'))).toBe(false);
     expect(calls).toHaveLength(2);
   });
+  it('AI 冲突后只在显式采用最新配置时更新修订与输入', async () => {
+    let version = b5Ai;
+    const saves: unknown[] = [];
+    setApi(
+      vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+        if (String(url).endsWith('validation-plan')) return response(b5Plan());
+        if (init?.method === 'POST') {
+          saves.push(JSON.parse(String(init.body)));
+          version = { ...b5Ai, priority: 20, updatedAt: '2026-10-25T02:00:00.000Z' };
+          return response({}, 409);
+        }
+        return response([version]);
+      }),
+    );
+    await mount(<AiProviderEditor {...({ route: { params: { name: b5Ai.name } } } as never)} />);
+    await input(field('优先级'), '50');
+    await click(button('验证并保存配置'));
+    expect(saves[0]).toMatchObject({ expectedRevision: b5Ai.updatedAt, priority: 50 });
+    expect(field('优先级').value).toBe('50');
+    await click(button('放弃输入并采用服务端 AI 配置'));
+    expect(field('优先级').value).toBe('20');
+    await click(button('验证并保存配置'));
+    expect(saves[1]).toMatchObject({ expectedRevision: version.updatedAt, priority: 20 });
+  });
+  it('取消无待验证计划的保存请求也会中止网络等待且不自动重试', async () => {
+    let savedSignal: AbortSignal | null = null;
+    let saves = 0;
+    setApi(
+      vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+        if (String(url).endsWith('validation-plan')) return response(b5Plan());
+        if (String(url).includes('/cancel')) return response({ cancelled: true });
+        saves++;
+        savedSignal = init?.signal ?? null;
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('', 'AbortError')));
+        });
+      }),
+    );
+    await mount(<AiProviderEditor {...props} />);
+    await fillAi();
+    await click(button('验证并保存配置'));
+    await click(button('取消当前操作'));
+    expect(savedSignal).not.toBeNull();
+    expect((savedSignal as AbortSignal | null)?.aborted).toBe(true);
+    expect(saves).toBe(1);
+    expect(field('API Key').value).toBe('');
+    expect(document.body.textContent).toContain('取消');
+    expect(document.body.textContent).toContain('重新读取服务端状态');
+  });
   it('行情配置冲突清空秘密、保留设置并绑定原配置代次', async () => {
     const posts: unknown[] = [];
     setApi(
@@ -99,10 +148,10 @@ describe('第 5 批手机配置交互', () => {
     await mount(
       <MarketProviderEditor {...({ route: { params: { providerId: 'longbridge' } } } as never)} />,
     );
-    await input(field('凭证 token（必填）'), 'fixture-secret-token');
+    await input(field('访问令牌（必填）'), 'fixture-secret-token');
     await input(field('来源设置（JSON，不填写凭证）'), '{"region":"CN"}');
     await click(button('保存行情凭证与设置'));
-    expect(field('凭证 token（必填）').value).toBe('');
+    expect(field('访问令牌（必填）').value).toBe('');
     expect(field('来源设置（JSON，不填写凭证）').value).toBe('{"region":"CN"}');
     expect(posts).toEqual([
       {
@@ -112,6 +161,34 @@ describe('第 5 批手机配置交互', () => {
       },
     ]);
     expect(document.body.textContent).not.toContain('fixture-secret-token');
+  });
+  it('行情凭证在请求发出时清空，取消等待不重复提交', async () => {
+    let signal: AbortSignal | null = null;
+    let writes = 0;
+    setApi(
+      vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+        if (init?.method === 'POST') {
+          writes++;
+          signal = init.signal ?? null;
+          return new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(new DOMException('', 'AbortError')),
+            );
+          });
+        }
+        return response({ contractVersion: 3, consumer: 'thesis-ledger', providers: [b5Provider] });
+      }),
+    );
+    await mount(
+      <MarketProviderEditor {...({ route: { params: { providerId: 'longbridge' } } } as never)} />,
+    );
+    await input(field('访问令牌（必填）'), 'fixture-secret-token');
+    await click(button('保存行情凭证与设置'));
+    expect(field('访问令牌（必填）').value).toBe('');
+    await click(button('取消等待行情操作'));
+    expect((signal as AbortSignal | null)?.aborted).toBe(true);
+    expect(writes).toBe(1);
+    expect(document.body.textContent).toContain('已取消等待');
   });
   it('OAuth 系统浏览器返回保持等待，取消后以服务端终态为准', async () => {
     let cancelled = false;

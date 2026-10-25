@@ -1,9 +1,9 @@
 import {
   marketPolicyClientResponseSchema,
-  marketRouteCatalogReadClientV3Schema,
   type MarketProviderProbeRoute,
   type MarketProviderAccountLevel,
 } from '@thesis-ledger/schemas';
+import { ThesisLedgerContractError } from '@thesis-ledger/api-client';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import type {
   MarketPolicyDraftV3,
@@ -24,11 +24,11 @@ export const parseMarketPolicyResponse = (value: unknown): MarketPolicyResponse 
 export const fetchMarketPolicy = () => api().market.getPolicy();
 
 export const fetchMarketRouteCapabilitiesV3 = async (): Promise<MarketRouteCatalogReadV3> => {
-  const response = await api().request<unknown>(
-    '/api/market-data/routes/capabilities?contractVersion=3',
-  );
-  const parsed = marketRouteCatalogReadClientV3Schema.safeParse(response);
-  if (parsed.success) return parsed.data;
+  try {
+    return await api().market.routeCapabilities();
+  } catch (error) {
+    if (!(error instanceof ThesisLedgerContractError)) throw error;
+  }
   return {
     contractVersion: 3,
     consumer: 'thesis-ledger',

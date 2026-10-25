@@ -44,9 +44,9 @@ export function aiProviderClient(request: ParsedRequest) {
         cache: 'no-store',
         signal: signal ?? null,
       }),
-    save: (input: ProviderInput) => {
+    save: (input: ProviderInput, signal?: AbortSignal) => {
       aiProviderInputSchema.parse(input);
-      return request('/ai/providers', record(input.name.trim()), json('POST', input));
+      return request('/ai/providers', record(input.name.trim()), json('POST', input, signal));
     },
     testDraft: (input: AiProviderDraftTestInput, signal?: AbortSignal) => {
       aiProviderTestInputSchema.parse(input);

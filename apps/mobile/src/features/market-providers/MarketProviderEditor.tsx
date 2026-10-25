@@ -1,21 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProviderManifest, MarketProviderTestResponse } from '@thesis-ledger/schemas';
 import { useDirtyForm, useMobileRuntime, confirmAction } from '../../app/MobileRuntime';
 import type { SettingsStackParams } from '../../app/navigation-types';
-import {
-  Action,
-  Choices,
-  Copy,
-  Feedback,
-  Field,
-  Page,
-  QueryStatus,
-  Section,
-} from '../../components/MobilePrimitives';
+import { Action, Copy, Feedback, Page, QueryStatus } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
-function ProviderForm({ provider }: { provider: ProviderManifest }) {
+import { MarketProviderCredentials, credentialFields } from './MarketProviderCredentials';
+import { MarketProviderProbe, providerProbeInput } from './MarketProviderProbe';
+function ProviderForm({
+  provider,
+  readable,
+  reload,
+}: {
+  provider: ProviderManifest;
+  readable: boolean;
+  reload: () => Promise<ProviderManifest | undefined>;
+}) {
   const { api } = useMobileRuntime();
   const [method, setMethod] = useState(
     provider.credentialMethod ?? provider.credentialSchema?.methods[0]?.method ?? '',
@@ -26,13 +27,21 @@ function ProviderForm({ provider }: { provider: ProviderManifest }) {
   const [expectedVersion, setExpectedVersion] = useState(provider.configVersion);
   const [message, setMessage] = useState('');
   const [probe, setProbe] = useState<MarketProviderTestResponse | null>(null);
-  const [routeText, setRouteText] = useState('');
-  const [points, setPoints] = useState('');
-  const [hkDaily, setHkDaily] = useState(false);
-  const [realtime, setRealtime] = useState(false);
+  const [probeDraft, setProbeDraft] = useState({
+    route: '',
+    points: '',
+    hkDaily: false,
+    realtime: false,
+  });
   const command = useConfigCommand();
-  const fields =
-    provider.credentialSchema?.methods.find((item) => item.method === method)?.fields ?? [];
+  const operation = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      operation.current?.abort();
+    },
+    [],
+  );
+  const fields = credentialFields(provider, method);
   const clearSensitive = () =>
     setValues((previous) =>
       Object.fromEntries(
@@ -45,6 +54,28 @@ function ProviderForm({ provider }: { provider: ProviderManifest }) {
     setValues({});
     setSettings(baseline);
   });
+  const adoptLatest = async () => {
+    if (
+      !(await confirmAction('采用服务端行情配置？', '未保存输入将被最新配置替换，凭证输入将清空。'))
+    )
+      return;
+    setValues({});
+    try {
+      const latest = await reload();
+      if (!latest) {
+        setMessage('来源已不存在，请返回列表。');
+        return;
+      }
+      const text = JSON.stringify(latest.settings ?? {}, null, 2);
+      setSettings(text);
+      setBaseline(text);
+      setExpectedVersion(latest.configVersion);
+      setMethod(latest.credentialMethod ?? latest.credentialSchema?.methods[0]?.method ?? '');
+      setMessage('已采用服务端最新配置，可重新编辑。');
+    } catch {
+      setMessage('最新配置读取失败，当前非敏感设置仍保留。');
+    }
+  };
   const operate = async (kind: 'save' | 'test' | 'account' | 'clear' | 'toggle' | 'remove') => {
     setMessage('');
     const descriptions = {
@@ -65,27 +96,24 @@ function ProviderForm({ provider }: { provider: ProviderManifest }) {
       clearSensitive();
       return;
     }
+    const controller = new AbortController();
+    operation.current = controller;
+    clearSensitive();
     try {
       await command.submit(async () => {
         const credentials = Object.values(values).some(Boolean) ? { method, values } : undefined;
         if (kind === 'test' || kind === 'account') {
-          const result = await api.market.testProvider(provider.providerId, {
-            ...(credentials ? { credentials } : {}),
-            purpose: kind === 'account' ? 'account_access' : 'capability_read',
-            ...(kind === 'account' && points.trim()
-              ? { accountLevel: { points: Number(points), independentApis: [
-                ...(hkDaily ? ['hk_daily'] : []), ...(realtime ? ['rt_k'] : []),
-              ] } } : {}),
-            ...(routeText.trim() && kind === 'test'
-              ? { route: JSON.parse(routeText) as unknown }
-              : {}),
-          });
+          const result = await api.market.testProvider(
+            provider.providerId,
+            providerProbeInput(kind, probeDraft, credentials),
+            controller.signal,
+          );
           setProbe(result);
           setMessage(`检查结束：${result.status}；不会据此自动启用数据路由。`);
           return;
         }
         if (kind === 'remove') {
-          const result = await api.market.removeProvider(provider.providerId);
+          const result = await api.market.removeProvider(provider.providerId, controller.signal);
           setMessage(
             result.removed
               ? '控制配置已移除，路由已同步。'
@@ -101,106 +129,68 @@ function ProviderForm({ provider }: { provider: ProviderManifest }) {
           ...(kind === 'clear' ? { clearCredentials: true } : {}),
           ...(kind === 'toggle' ? { enabled: !provider.enabled } : {}),
         };
-        const result = await api.market.configureProvider(provider.providerId, input);
+        const result = await api.market.configureProvider(
+          provider.providerId,
+          input,
+          controller.signal,
+        );
         setExpectedVersion(result.configVersion);
         if (kind === 'save') setBaseline(settings);
         setMessage('配置已保存，已重新读取当前代次。');
       });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作未完成。');
+      if (controller.signal.aborted) setMessage('已取消等待，请重新读取服务端状态。');
+      else setMessage(error instanceof Error ? error.message : '操作未完成。');
     } finally {
       clearSensitive();
+      operation.current = null;
     }
   };
-  const editable = provider.configurationMode === 'control' && !command.pending;
+  const editable = provider.configurationMode === 'control' && !command.pending && readable;
   return (
     <>
       <Feedback message={message} />
+      {command.pending ? (
+        <Action
+          label="取消等待行情操作"
+          onPress={() => {
+            operation.current?.abort();
+            clearSensitive();
+          }}
+        />
+      ) : null}
       <Copy>
         配置代次 {provider.configVersion ?? '未提供'}；
         {provider.credentialConfigured ? '已有凭证，留空沿用' : '尚无凭证'}
         。账号权限与数据准入独立。
       </Copy>
-      <Section title="凭证与设置">
-        <Choices
-          label="凭证方式"
-          value={method}
-          options={
-            provider.credentialSchema?.methods.map((item) => ({
-              value: item.method,
-              label: item.method === 'oauth' ? '网页授权' : `凭证方式 ${item.method}`,
-            })) ?? []
-          }
-          onChange={(value) => {
-            setMethod(value);
-            setValues({});
-          }}
-          disabled={!editable}
-        />
-        {fields.map((field) => (
-          <Field
-            key={field.name}
-            label={`凭证 ${field.name}${field.required ? '（必填）' : ''}`}
-            value={values[field.name] ?? ''}
-            onChange={(value) => setValues((previous) => ({ ...previous, [field.name]: value }))}
-            secure={field.secret}
-            editable={editable}
-          />
-        ))}
-        <Field
-          label="来源设置（JSON，不填写凭证）"
-          value={settings}
-          onChange={setSettings}
-          multiline
-          editable={editable}
-        />
-        <Action
-          label="保存行情凭证与设置"
-          disabled={!editable}
-          onPress={() => void operate('save')}
-        />
-        <Action
-          label={provider.enabled ? '停用行情来源' : '启用行情来源'}
-          disabled={!editable}
-          onPress={() => void operate('toggle')}
-        />
-        <Action
-          label="清除行情凭证"
-          disabled={!editable}
-          destructive
-          onPress={() => void operate('clear')}
-        />
-        <Action
-          label="移除行情控制配置"
-          disabled={!editable}
-          destructive
-          onPress={() => void operate('remove')}
-        />
-      </Section>
-      <Section title="能力与账号检查">
-        <Field
-          label="精确能力目标（JSON，可留空）"
-          value={routeText}
-          onChange={setRouteText}
-          multiline
-          editable={!command.pending}
-        />
-        <Action
-          label="检查数据能力"
-          disabled={command.pending}
-          onPress={() => void operate('test')}
-        />
-      <Field label="账号积分（可选）" value={points} onChange={setPoints} keyboardType="number-pad" editable={!command.pending} />
-      <Copy muted>支持积分等级的来源按填写等级检查；留空由服务端决定。独立权限声明不能替代接口实际检查。</Copy>
-      <Choices label="港股日线独立权限" value={String(hkDaily)} options={[{ value: 'false', label: '未开通港股日线' }, { value: 'true', label: '已开通港股日线' }]} onChange={(value) => setHkDaily(value === 'true')} disabled={command.pending} />
-      <Choices label="实时行情独立权限" value={String(realtime)} options={[{ value: 'false', label: '未开通实时行情' }, { value: 'true', label: '已开通实时行情' }]} onChange={(value) => setRealtime(value === 'true')} disabled={command.pending} />
-        <Action
-          label="检查账号访问"
-          disabled={command.pending || !provider.accountAccessSupported}
-          onPress={() => void operate('account')}
-        />
-        {probe ? <Copy>{JSON.stringify(probe, null, 2)}</Copy> : null}
-      </Section>
+      <Action
+        label="放弃输入并采用服务端行情配置"
+        disabled={command.pending}
+        onPress={() => void adoptLatest()}
+      />
+      <MarketProviderCredentials
+        provider={provider}
+        method={method}
+        values={values}
+        settings={settings}
+        editable={editable}
+        onMethod={(value) => {
+          setMethod(value);
+          setValues({});
+        }}
+        onField={(name, value) => setValues((previous) => ({ ...previous, [name]: value }))}
+        onSettings={setSettings}
+        onAction={(kind) => void operate(kind)}
+      />
+      <MarketProviderProbe
+        draft={probeDraft}
+        change={(patch) => setProbeDraft((value) => ({ ...value, ...patch }))}
+        pending={command.pending || !readable}
+        accountSupported={provider.accountAccessSupported === true}
+        run={(kind) => void operate(kind)}
+        result={probe}
+      />
     </>
   );
 }
@@ -223,7 +213,18 @@ export function MarketProviderEditor({
         disabled={query.isFetching}
         onPress={() => void query.refetch()}
       />
-      {provider ? <ProviderForm provider={provider} /> : null}
+      {provider ? (
+        <ProviderForm
+          provider={provider}
+          readable={query.isSuccess}
+          reload={async () => {
+            const result = await query.refetch({ throwOnError: true });
+            return result.data?.providers.find(
+              (item) => item.providerId === route.params.providerId,
+            );
+          }}
+        />
+      ) : null}
     </Page>
   );
 }

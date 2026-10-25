@@ -92,7 +92,9 @@ export function AiProvidersScreen({
           {row.executionRoutes?.map((route) => (
             <Copy key={`${route.model}:${route.contract.id}`}>
               {route.model} · {route.contract.id} · 就绪 {route.readiness.state}；最近验证{' '}
-              {route.liveValidation.status}；阻断原因 {route.readiness.reasons.join('、') || '无'}；配置指纹 {route.readiness.configurationFingerprint}；检查时间 {route.liveValidation.checkedAt ?? '未执行'}
+              {route.liveValidation.status}；阻断原因 {route.readiness.reasons.join('、') || '无'}
+              ；配置指纹 {route.readiness.configurationFingerprint}；检查时间{' '}
+              {route.liveValidation.checkedAt ?? '未执行'}
             </Copy>
           ))}
           <Action

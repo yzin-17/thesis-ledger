@@ -63,9 +63,11 @@ describe('AI Provider 共享管理合同', () => {
       modelPricing: { fixture: { costPer1kInput: 0 } },
       firstOutputTimeoutMs: 120000,
     };
-    await api.save(body);
+    const signal = new AbortController().signal;
+    await api.save(body, signal);
     expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual(body);
     expect(body.modelPricing.fixture).not.toHaveProperty('costPer1kOutput');
+    expect(fetcher.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
   it('草稿测试保持取消信号；保存后测试核对名称和请求身份', async () => {
     const result = {

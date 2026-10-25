@@ -10,12 +10,12 @@ export function marketProviderControlClient(request: ParsedRequest) {
   const path = (id: string, action: string) =>
     `/api/market-data/providers/${encodeURIComponent(id)}/${action}`;
   return {
-    configureProvider: (id: string, input: unknown) => {
+    configureProvider: (id: string, input: unknown, signal?: AbortSignal) => {
       marketProviderSaveInputSchema.parse(input);
       return request(
         path(id, 'config'),
         marketProviderConfigResponseSchema.refine((row) => row.providerId === id),
-        { method: 'POST', body: JSON.stringify(input) },
+        { method: 'POST', body: JSON.stringify(input), signal: signal ?? null },
       );
     },
     testProvider: (id: string, input: unknown, signal?: AbortSignal) => {
@@ -30,11 +30,11 @@ export function marketProviderControlClient(request: ParsedRequest) {
         { method: 'POST', body: JSON.stringify(input), signal: signal ?? null },
       );
     },
-    removeProvider: (id: string) =>
+    removeProvider: (id: string, signal?: AbortSignal) =>
       request(
         path(id, 'remove'),
         marketProviderRemovalProjectionSchema.refine((row) => row.providerId === id),
-        { method: 'POST' },
+        { method: 'POST', signal: signal ?? null },
       ),
   };
 }

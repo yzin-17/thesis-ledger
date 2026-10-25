@@ -18,7 +18,15 @@ import { useConfigCommand } from '../configuration/use-config-command';
 import { aiProviderDraft, buildAiProviderInput } from './ai-provider-draft';
 import { AiProviderFields } from './AiProviderFields';
 
-function EditorForm({ row }: { row?: AiProviderRecord }) {
+function EditorForm({
+  row,
+  readable,
+  reload,
+}: {
+  row?: AiProviderRecord;
+  readable: boolean;
+  reload: (name: string) => Promise<AiProviderRecord | undefined>;
+}) {
   const { api } = useMobileRuntime();
   const [saved, setSaved] = useState(row);
   const [draft, setDraft] = useState(() => aiProviderDraft(row));
@@ -27,6 +35,7 @@ function EditorForm({ row }: { row?: AiProviderRecord }) {
   const [message, setMessage] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const command = useConfigCommand();
+  const blocked = command.pending || !readable;
   const operation = useRef<{ controller: AbortController; id: string } | null>(null);
   useEffect(
     () => () => {
@@ -39,6 +48,27 @@ function EditorForm({ row }: { row?: AiProviderRecord }) {
     setDraft(aiProviderDraft(saved));
     setApiKey('');
     setModels([]);
+  };
+  const adoptLatest = async () => {
+    if (
+      !saved ||
+      !(await confirmAction('采用服务端 AI 配置？', '未保存输入将被最新配置替换，凭证输入将清空。'))
+    )
+      return;
+    setApiKey('');
+    try {
+      const latest = await reload(saved.name);
+      if (!latest) {
+        setMessage('该来源已不存在，请返回列表。');
+        return;
+      }
+      setSaved(latest);
+      setDraft(aiProviderDraft(latest));
+      setBaseline(JSON.stringify(aiProviderDraft(latest)));
+      setMessage('已采用服务端最新配置，可重新编辑。');
+    } catch {
+      setMessage('最新配置读取失败，当前非敏感输入仍保留。');
+    }
   };
   useDirtyForm(Boolean(apiKey) || JSON.stringify(draft) !== baseline, discard);
   const act = async (kind: 'save' | 'test' | 'models') => {
@@ -98,14 +128,15 @@ function EditorForm({ row }: { row?: AiProviderRecord }) {
             },
             controller.signal,
           );
-        } else result = await api.aiProviders.save(input);
+        } else result = await api.aiProviders.save(input, controller.signal);
         setSaved(result);
         setDraft(aiProviderDraft(result));
         setBaseline(JSON.stringify(aiProviderDraft(result)));
         setMessage('配置已保存。用途就绪与实时验证结果请返回列表查看。');
       });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作未完成。');
+      if (controller.signal.aborted) setMessage('已取消等待，请重新读取服务端状态。');
+      else setMessage(error instanceof Error ? error.message : '操作未完成。');
     } finally {
       setApiKey('');
       operation.current = null;
@@ -130,7 +161,7 @@ function EditorForm({ row }: { row?: AiProviderRecord }) {
         draft={draft}
         change={(patch) => setDraft((value) => ({ ...value, ...patch }))}
         editing={Boolean(saved)}
-        disabled={command.pending}
+        disabled={blocked}
       />
       <Section title="凭证与验证">
         <Copy muted>
@@ -144,18 +175,14 @@ function EditorForm({ row }: { row?: AiProviderRecord }) {
           value={apiKey}
           onChange={setApiKey}
           secure
-          editable={!command.pending && draft.authMode === 'api_key'}
+          editable={!blocked && draft.authMode === 'api_key'}
         />
-        <Action
-          label="读取模型目录"
-          disabled={command.pending}
-          onPress={() => void act('models')}
-        />
+        <Action label="读取模型目录" disabled={blocked} onPress={() => void act('models')} />
         {models.map((model) => (
           <Action
             key={model}
             label={`加入模型 ${model}`}
-            disabled={command.pending || draft.models.split('\n').includes(model)}
+            disabled={blocked || draft.models.split('\n').includes(model)}
             onPress={() =>
               setDraft((value) => ({
                 ...value,
@@ -164,15 +191,22 @@ function EditorForm({ row }: { row?: AiProviderRecord }) {
             }
           />
         ))}
-        <Action label="检查连接" disabled={command.pending} onPress={() => void act('test')} />
+        <Action label="检查连接" disabled={blocked} onPress={() => void act('test')} />
         <Action
           label={command.pending ? '正在处理…' : '验证并保存配置'}
           primary
-          disabled={command.pending}
+          disabled={blocked}
           onPress={() => void act('save')}
         />
         {command.pending ? <Action label="取消当前操作" onPress={() => void cancel()} /> : null}
         <Action label="清除未提交的凭证" onPress={() => setApiKey('')} />
+        {saved ? (
+          <Action
+            label="放弃输入并采用服务端 AI 配置"
+            disabled={command.pending}
+            onPress={() => void adoptLatest()}
+          />
+        ) : null}
       </Section>
     </>
   );
@@ -191,7 +225,16 @@ export function AiProviderEditor({
   return (
     <Page title={name ? '编辑 AI 来源' : '新建 AI 来源'}>
       {name ? <QueryStatus query={query} retry={() => void query.refetch()} /> : null}
-      {!name || row ? <EditorForm {...(row ? { row } : {})} /> : null}
+      {!name || row ? (
+        <EditorForm
+          {...(row ? { row } : {})}
+          readable={!name || query.isSuccess}
+          reload={async (target) => {
+            const result = await query.refetch({ throwOnError: true });
+            return result.data?.find((item) => item.name === target);
+          }}
+        />
+      ) : null}
       {name && query.isSuccess && !row ? <Copy>该来源已不存在，请返回列表重新读取。</Copy> : null}
     </Page>
   );
