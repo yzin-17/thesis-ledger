@@ -5,6 +5,7 @@ describe('研究提交控制器的创建与投递', () => {
   const input = { question: '提交验收', context: { scope: 'portfolio' } };
   it.each([
     'sdkExecution',
+    'diagnosticTrace',
     'researchPolicy',
     'researchRoutes',
     'researchDefault',

@@ -7,6 +7,7 @@ import {
   type AiGenerationMode,
   type AiGenerationFailureDiagnostic,
   type AiGenerationRuntimeDiagnostic,
+  type AiGenerationHttpRequestDiagnostic,
   type AiUsageFacts,
 } from '@thesis-ledger/schemas';
 import { generationStructuralPreview as structuralPreview } from './ai-generation-structural-preview.js';
@@ -48,6 +49,7 @@ export const generationFailureDiagnostic = (
   error: unknown,
   mode: AiGenerationMode,
   runtime?: AiGenerationRuntimeDiagnostic,
+  httpRequest?: AiGenerationHttpRequestDiagnostic,
 ): AiGenerationFailureDiagnostic => {
   const source = outputError(error);
   const text = source?.text;
@@ -66,6 +68,7 @@ export const generationFailureDiagnostic = (
   return aiGenerationFailureDiagnosticSchema.parse({
     version: 'ai-failure-diagnostic-v1',
     ...(runtime ? { runtime } : {}),
+    ...(httpRequest ? { httpRequest } : {}),
     errorClass,
     generationMode: mode,
     finishReason: source?.finishReason ?? null,
@@ -83,6 +86,7 @@ export const schemaGenerationFailure = (
   input: { requestId: string; contract: AiGenerationContractRef; mode: AiGenerationMode },
   usage: AiUsageFacts,
   runtime?: AiGenerationRuntimeDiagnostic,
+  httpRequest?: AiGenerationHttpRequestDiagnostic,
 ) => {
   const researchV2 =
     input.contract.id === 'research' && input.contract.version === 'research-generation-v2';
@@ -94,7 +98,7 @@ export const schemaGenerationFailure = (
       requestId: input.requestId,
       summary: researchV2 ? '结构化响应未通过解析或契约校验' : sanitize(error),
       ...(researchV2
-        ? { diagnostic: generationFailureDiagnostic(error, input.mode, runtime) }
+        ? { diagnostic: generationFailureDiagnostic(error, input.mode, runtime, httpRequest) }
         : {}),
     }),
     usage,
@@ -107,14 +111,16 @@ export const withGenerationRuntimeDiagnostic = (
   error: AiSdkGenerationError,
   mode: AiGenerationMode,
   runtime?: AiGenerationRuntimeDiagnostic,
+  httpRequest?: AiGenerationHttpRequestDiagnostic,
 ) => {
-  if (!runtime) return error;
+  if (!runtime && !httpRequest) return error;
   return new AiSdkGenerationError(
     aiGenerationErrorSchema.parse({
       ...error.fact,
       diagnostic: {
         ...(error.fact.diagnostic ?? generationFailureDiagnostic(error, mode)),
-        runtime,
+        ...(runtime ? { runtime } : {}),
+        ...(httpRequest ? { httpRequest } : {}),
       },
     }),
     error.usage,

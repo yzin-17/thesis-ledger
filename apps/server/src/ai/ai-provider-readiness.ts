@@ -18,6 +18,10 @@ import {
   resolveAiSdkProviderImplementation,
   type AiCompatibilityExtensionProfile,
 } from './ai-provider-upstream.js';
+import {
+  researchReasoningFields,
+  researchReasoningSelectionSupported,
+} from './ai-research-reasoning-options.js';
 
 const SDK_VERSION = '7.0.107';
 const ADAPTER_VERSIONS: Record<AiAdapter, string> = {
@@ -166,6 +170,7 @@ export const configurationFingerprint = (snapshot: AiProviderRouteSnapshot) =>
     providerOutputIdleTimeoutMs: snapshot.outputIdleTimeoutMs ?? null,
     credentialFingerprint: snapshot.credentialFingerprint,
     authMode: snapshot.authMode ?? 'api_key',
+    ...researchReasoningFields(snapshot.route),
   });
 
 export const evaluateAiProviderReadiness = (
@@ -181,7 +186,9 @@ export const evaluateAiProviderReadiness = (
     !baseUrl ||
     !snapshot.adapter ||
     !snapshot.models.includes(snapshot.route.model) ||
-    (snapshot.authMode !== 'none' && !snapshot.credentialFingerprint)
+    (snapshot.authMode !== 'none' && !snapshot.credentialFingerprint) ||
+    (snapshot.route.reasoningEnabled !== undefined &&
+      !researchReasoningSelectionSupported(snapshot))
   )
     reasons.push('configuration_invalid');
   if (!snapshot.enabled) reasons.push('provider_disabled');
@@ -212,6 +219,7 @@ export const evaluateAiProviderReadiness = (
     mode: snapshot.route.mode,
     contract: snapshot.route.contract,
     adapterEvidence: evidence,
+    ...researchReasoningFields(snapshot.route),
     readiness: {
       state: uniqueReasons.length === 0 ? 'ready' : 'blocked',
       reasons: uniqueReasons,

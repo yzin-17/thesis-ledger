@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <!-- 仅示例；接续脚本按已校验的配置和描述文件生成本机导出文件。 -->
+  <key>method</key><string>release-testing</string>
+  <key>destination</key><string>export</string>
+  <key>signingStyle</key><string>manual</string>
+  <key>teamID</key><string></string>
+  <key>signingCertificate</key><string></string>
+  <key>provisioningProfiles</key><dict>
+    <key>io.github.yzin17.thesisledger.mobile</key><string></string>
+  </dict>
+  <key>manageAppVersionAndBuildNumber</key><false/>
+  <key>uploadSymbols</key><false/>
+</dict></plist>

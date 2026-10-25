@@ -6,7 +6,9 @@ import {
   type AiAdapter,
   type AiGenerationContractRef,
   type AiGenerationMode,
+  type AiCompatibilityExtensionProfile,
 } from '@thesis-ledger/schemas';
+import { isResearchV2Contract } from './ai-research-reasoning-options.js';
 import { adapterSupportsGenerationMode } from './ai-provider-upstream.js';
 import { AiSdkGenerationError } from './ai-sdk-generation-facts.js';
 
@@ -16,10 +18,14 @@ export const validateGenerationRequest = (input: {
   contract: AiGenerationContractRef;
   mode: AiGenerationMode;
   messages: unknown[];
+  reasoningEnabled?: boolean;
+  reasoningEffort?: string;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
 }) => {
   aiGenerationContractRefSchema.parse(input.contract);
   aiGenerationModeSchema.parse(input.mode);
   const messages = modelMessageSchema.array().parse(input.messages);
+  validateResearchReasoning(input);
   if (!adapterSupportsGenerationMode(input.adapter, input.mode))
     throw new AiSdkGenerationError({
       code: 'capability_unsupported',
@@ -33,6 +39,30 @@ export const validateGenerationRequest = (input: {
     !messages.some((message) => /json/iu.test(JSON.stringify(message.content)))
   )
     throw new Error('API JSON Mode 的提示词必须明确要求 JSON 输出');
+};
+
+const validateResearchReasoning = (input: {
+  requestId: string;
+  adapter: AiAdapter;
+  contract: AiGenerationContractRef;
+  reasoningEnabled?: boolean;
+  reasoningEffort?: string;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
+}) => {
+  if (input.reasoningEnabled === undefined) return;
+  if (
+    !isResearchV2Contract(input.contract) ||
+    input.compatibilityExtensionProfile !== 'openrouter-v1' ||
+    !['openai-compatible', 'openai-compatible-chat'].includes(input.adapter) ||
+    input.reasoningEffort !== undefined
+  )
+    throw new AiSdkGenerationError({
+      code: 'capability_unsupported',
+      phase: 'preflight',
+      summary: '显式推理开关仅支持 OpenRouter 研究 V2，且不得与推理强度同时指定',
+      externalResult: 'not_sent',
+      requestId: input.requestId,
+    });
 };
 
 /** One SDK output strategy for both single and streaming requests. */

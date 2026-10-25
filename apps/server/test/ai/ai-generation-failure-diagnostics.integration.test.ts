@@ -1,8 +1,8 @@
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { researchGenerationV2Contract, type AiExecutionSummary } from '@thesis-ledger/schemas';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { AiExecutionStateStore } from '../../src/ai/ai-execution-state.store.js';
 import {
@@ -10,14 +10,33 @@ import {
   AiSdkGenerationError,
 } from '../../src/ai/ai-sdk-generation.adapter.js';
 
+const assertHttpRequestDiagnostic = (failure: AiSdkGenerationError, actualBody: string) => {
+  expect(failure.fact.diagnostic?.httpRequest).toMatchObject({
+    boundary: 'fetch_dispatch',
+    attempts: 1,
+    omittedRequests: 0,
+    method: 'POST',
+    model: 'fixture/model:free',
+    stream: true,
+    responseFormat: 'json_schema',
+    schemaStrict: true,
+    requireParameters: true,
+    includeUsage: true,
+    bodySha256: createHash('sha256').update(actualBody).digest('hex'),
+  });
+  expect(JSON.parse(actualBody).provider).toEqual({ require_parameters: true });
+};
+
 describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
   it('真实 SDK 解析失败只请求一次，生产结算与读取路径保留脱敏诊断', async () => {
     let calls = 0;
+    let actualBody = '';
     const privateText = '```json\n{"private-holding":"PRIVATE_RESPONSE sk-private-token",';
     const server = createServer(async (request, response) => {
       calls += 1;
-      request.resume();
-      await once(request, 'end');
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      actualBody = Buffer.concat(chunks).toString('utf8');
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       const frame = (choices: unknown[], usage?: unknown) =>
         response.write(
@@ -38,18 +57,27 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
     });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('本地 HTTP fixture 启动失败');
+    const origin = `http://127.0.0.1:${address.port}`;
+    const actualFetch = globalThis.fetch;
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      const url = input instanceof Request ? input.url : input;
+      if (new URL(url).href !== `${origin}/v1/chat/completions`)
+        throw new Error('禁止本地验证访问未匹配地址');
+      return actualFetch(input, init);
+    });
     try {
-      const address = server.address();
-      if (!address || typeof address === 'string') throw new Error('本地 HTTP fixture 启动失败');
       const requestId = randomUUID();
       let failure: AiSdkGenerationError | null = null;
       try {
         await new AiSdkGenerationAdapter().generate({
           requestId,
           adapter: 'openai-compatible',
+          compatibilityExtensionProfile: 'openrouter-v1',
           providerId: 'local-fixture',
           apiKey: 'sk-request-secret',
-          baseURL: `http://127.0.0.1:${address.port}/v1`,
+          baseURL: `${origin}/v1`,
           model: 'fixture/model:free',
           messages: [{ role: 'user', content: 'PRIVATE_PROMPT' }],
           contract: researchGenerationV2Contract.ref,
@@ -64,6 +92,7 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
         failure = error;
       }
       expect(calls).toBe(1);
+      expect(spy).toHaveBeenCalledTimes(1);
       expect(failure).not.toBeNull();
       if (!failure) throw new Error('本地样本应触发解析失败');
       expect(failure.fact).toMatchObject({
@@ -83,7 +112,17 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
         },
       });
       expect(failure.usage).toEqual({ status: 'reported', inputTokens: 7, outputTokens: 3 });
+      assertHttpRequestDiagnostic(failure, actualBody);
       const runtime = failure.fact.diagnostic?.runtime;
+      expect(runtime).toMatchObject({
+        httpResponse: {
+          status: 200,
+          contentType: 'sse',
+          bodyComplete: true,
+          sse: { events: 5, invalidJsonEvents: 0, done: true, incompleteEvent: false },
+          error: null,
+        },
+      });
       expect(runtime?.packages.ai).toMatch(/^\d+\.\d+\.\d+/u);
       expect(runtime?.packages.providerVersion).toMatch(/^\d+\.\d+\.\d+/u);
       expect(runtime?.stream?.provider?.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
@@ -172,6 +211,7 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
       );
       expect(persisted).not.toMatch(/"(?:cause|responseBody|headers|messages|prompt)":/u);
     } finally {
+      spy.mockRestore();
       server.close();
       server.closeAllConnections();
       await once(server, 'close');

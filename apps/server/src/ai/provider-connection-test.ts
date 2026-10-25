@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   aiGenerationContracts,
+  researchGenerationV2Contract,
   type AiAdapter,
   type AiAuthMode,
   type AiGenerationContractRef,
@@ -45,12 +46,25 @@ type ProbeInput = {
   requestId?: string;
   signal?: AbortSignal;
   purpose?: AiGenerationContractRef['id'];
+  contractRef?: AiGenerationContractRef;
+  reasoningEnabled?: boolean;
   mode?: AiGenerationMode;
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;
 };
 
-const contractForPurpose = (purpose: AiGenerationContractRef['id'] | undefined) => {
+const contractForPurpose = (
+  purpose: AiGenerationContractRef['id'] | undefined,
+  reference?: AiGenerationContractRef,
+) => {
+  if (reference !== undefined) {
+    const selected = [...Object.values(aiGenerationContracts), researchGenerationV2Contract].find(
+      (contract) => contract.ref.id === reference.id && contract.ref.version === reference.version,
+    );
+    if (!selected || reference.id !== purpose)
+      throw new Error('用途探针合同必须与所选用途及准确版本一致');
+    return selected;
+  }
   if (purpose === 'strategy_authoring_analysis') return aiGenerationContracts.authoringAnalysis;
   if (purpose === 'strategy_authoring_generation') return aiGenerationContracts.authoringGeneration;
   if (purpose === 'strategy_authoring_modification')
@@ -68,7 +82,11 @@ const contractForPurpose = (purpose: AiGenerationContractRef['id'] | undefined) 
  * 内联契约 JSON Schema 是因为契约带 `superRefine` 语义约束（例如 sizing 金额必须大于 0），
  * 只给 schema 而不给取值要求时模型会输出 0 或占位符而被契约拒绝。
  */
-export const probeMessages = (purpose: AiGenerationContractRef['id'] | undefined) => {
+export const probeMessages = (
+  purpose: AiGenerationContractRef['id'] | undefined,
+  reference?: AiGenerationContractRef,
+) => {
+  const contract = contractForPurpose(purpose, reference);
   if (purpose === undefined)
     return [{ role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' }];
   const example = authoringConnectionProbe(purpose);
@@ -81,7 +99,7 @@ export const probeMessages = (purpose: AiGenerationContractRef['id'] | undefined
       },
       { role: 'user', content: `原样返回这个已满足本用途合同的实例：${JSON.stringify(example)}` },
     ];
-  const schema = z.toJSONSchema(contractForPurpose(purpose).schema, { io: 'output' });
+  const schema = z.toJSONSchema(contract.schema, { io: 'output' });
   return [
     {
       role: 'system',
@@ -116,11 +134,14 @@ export const runProviderConnectionTest = async ({
   requestId,
   signal,
   purpose,
+  contractRef,
+  reasoningEnabled,
   mode = 'json_validated',
   firstOutputTimeoutMs = 30000,
   outputIdleTimeoutMs = 30000,
 }: ProbeInput) => {
   const started = Date.now();
+  const contract = contractForPurpose(purpose, contractRef);
   const streamingProbe = purpose !== undefined;
   const ceilingSignal = AbortSignal.timeout(streamingProbe ? STREAM_PROBE_CEILING_MS : timeoutMs);
   const result = await sdk.generate({
@@ -132,9 +153,10 @@ export const runProviderConnectionTest = async ({
     authMode,
     apiKey,
     model,
-    messages: probeMessages(purpose),
-    contract: purpose ? contractForPurpose(purpose).ref : aiGenerationContracts.research.ref,
-    schema: purpose ? (contractForPurpose(purpose).schema as z.ZodTypeAny) : connectionProbeSchema,
+    messages: probeMessages(purpose, contractRef),
+    contract: contract.ref,
+    schema: purpose ? (contract.schema as z.ZodTypeAny) : connectionProbeSchema,
+    ...(reasoningEnabled === undefined ? {} : { reasoningEnabled }),
     mode,
     transport: purpose ? 'stream' : 'single',
     maxOutputTokens:

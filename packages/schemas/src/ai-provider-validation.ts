@@ -11,6 +11,7 @@ export const aiProviderValidationAuthorizationSchema = z
     authorized: z.literal(true),
     maxCalls: z.number().int().min(0).max(24),
     allowTextFallback: z.boolean().default(false),
+    stopOnFirstFailure: z.boolean().optional(),
   })
   .strict();
 export type AiProviderValidationAuthorization = z.infer<

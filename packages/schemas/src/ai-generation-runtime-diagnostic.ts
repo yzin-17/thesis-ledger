@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiGenerationHttpResponseDiagnosticSchema } from './ai-generation-http-response-diagnostic.js';
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/u);
 const count = z.number().int().nonnegative();
@@ -22,6 +23,7 @@ const sample = z.strictObject({
 export const aiGenerationRuntimeDiagnosticSchema = z
   .strictObject({
     version: z.literal('ai-runtime-diagnostic-v1'),
+    httpResponse: aiGenerationHttpResponseDiagnosticSchema.optional(),
     packages: z.strictObject({
       ai: packageVersion,
       providerPackage: z.enum(['@ai-sdk/openai-compatible', '@ai-sdk/openai', '@ai-sdk/anthropic']),

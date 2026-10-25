@@ -101,7 +101,10 @@ describe('投资复盘工作台 UI 契约', () => {
     expect(markup).toContain('周期复盘');
     expect(markup).toMatch(/<\/header>[\s\S]*复盘账户[\s\S]*role="tablist"/);
     expect(markup).not.toMatch(/<header[\s\S]*复盘账户[\s\S]*<\/header>/);
-    expect(markup).toContain('flex-1 flex-col gap-2 sm:flex-row');
+    const accountFieldClasses = markup.match(/data-slot="field" class="([^"]*)"/)?.[1].split(' ');
+    expect(accountFieldClasses).toEqual(
+      expect.arrayContaining(['flex', 'flex-1', 'flex-col', 'gap-2', 'sm:flex-row']),
+    );
     expect(markup).not.toContain('sm:w-80');
     expect(markup).not.toContain('选择一笔已平仓交易');
     expect(markup).not.toContain('CompletedTrade JSON');

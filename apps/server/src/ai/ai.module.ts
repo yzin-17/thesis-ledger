@@ -17,6 +17,11 @@ import { PromptVersionRegistry } from './prompt-registry.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
 import { researchPromptsV2 } from './ai-research-prompts-v2.js';
 import { AiResearchReportsQuery } from './ai-research-reports.query.js';
+import { PrismaService } from '../platform/prisma.service.js';
+import { AiTraceCaptureService } from './trace/ai-trace-capture.service.js';
+import { RedisService } from '../platform/redis.service.js';
+import { AiAdaptiveExecution } from './adaptive/ai-adaptive-execution.js';
+import { RedisAdaptiveObservationStore } from './adaptive/ai-adaptive-history.store.js';
 
 @Module({
   imports: [ProviderModule],
@@ -27,12 +32,24 @@ import { AiResearchReportsQuery } from './ai-research-reports.query.js';
     AiExecutionStateStore,
     AiInvocationStore,
     AiSdkGenerationAdapter,
+    {
+      provide: AiAdaptiveExecution,
+      inject: [RedisService],
+      useFactory: (redis: RedisService) =>
+        new AiAdaptiveExecution(new RedisAdaptiveObservationStore(redis.client)),
+    },
     AiResearchSdkExecution,
     AiProviderService,
     AiProviderSaveService,
     AiProviderValidationJournal,
     AiRoutingSettingsService,
     AiProviderRegistry,
+    {
+      provide: AiTraceCaptureService,
+      inject: [PrismaService, AiExecutionStateStore],
+      useFactory: (prisma: PrismaService, executions: AiExecutionStateStore) =>
+        new AiTraceCaptureService(prisma, executions),
+    },
     {
       provide: PromptVersionRegistry,
       useFactory: () => {

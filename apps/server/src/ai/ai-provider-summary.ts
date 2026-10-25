@@ -186,6 +186,13 @@ const parseModelReasoning = (
 
 export const aiProviderCapabilities = (value: unknown) => stringArray(value) ?? ['chat'];
 
+export const resolveCompatibilityProfile = (
+  input: { compatibilityExtensionProfile?: AiCompatibilityExtensionProfile | undefined },
+  settings: unknown,
+) =>
+  input.compatibilityExtensionProfile ??
+  parseAiProviderSettings(settings)?.compatibilityExtensionProfile;
+
 type HealthSnapshot = {
   state: string;
   checkedAt?: Date | null;
@@ -272,6 +279,5 @@ export const aiProviderSummaryFromRow = (
   errorCode: health?.errorCode ?? null,
   ...(settings ? {} : { configError: '保存的 AI Provider 配置无效' }),
 });
-
 
 export { healthValue };

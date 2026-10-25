@@ -51,8 +51,8 @@ describe('高级 JSON 兼容分析交互', () => {
     const duplicate = journalDeferred<unknown>();
     api.request.mockReturnValueOnce(pending.promise).mockReturnValue(duplicate.promise);
     const view = await mountJournal(<JournalLegacyJsonReview />);
-    journalButton('高级 JSON 兼容分析');
-    await journalClick('高级 JSON 兼容分析');
+    journalButton('高级分析');
+    await journalClick('高级分析');
     await journalWait(() => expect(legacyTextarea()).toBeDefined());
     await fillLegacyTextarea(input);
     await journalClick('分析兼容输入');
@@ -102,8 +102,8 @@ describe('高级 JSON 兼容分析交互', () => {
       .mockRejectedValueOnce(new Error('受控服务失败'))
       .mockResolvedValueOnce({ status: 'retry succeeded' });
     await mountJournal(<JournalLegacyJsonReview />);
-    journalButton('高级 JSON 兼容分析');
-    await journalClick('高级 JSON 兼容分析');
+    journalButton('高级分析');
+    await journalClick('高级分析');
     await journalWait(() => expect(legacyTextarea()).toBeDefined());
     await fillLegacyTextarea('{');
     await journalClick('分析兼容输入');
@@ -127,6 +127,6 @@ describe('高级 JSON 兼容分析交互', () => {
     await journalWait(() =>
       expect(document.querySelector('textarea[aria-label="旧交易 JSON"]')).toBeNull(),
     );
-    expect(journalButton('高级 JSON 兼容分析').isConnected).toBe(true);
+    expect(journalButton('高级分析').isConnected).toBe(true);
   });
 });

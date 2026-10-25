@@ -29,6 +29,7 @@ import {
   VALIDATION_MAX_CALLS,
   VALIDATION_OUTPUT_TOKENS,
   VALIDATION_DURATION_SECONDS,
+  validationCallAuthorizationMatches,
   type VerifiedRoute,
 } from './ai-provider-validation-policy.js';
 import {
@@ -37,6 +38,10 @@ import {
   validationPricing,
   type ValidationRunContext,
 } from './ai-provider-validation-runner.js';
+import {
+  assertResearchReasoningRoutes,
+  mergeResearchReasoningRoutes,
+} from './ai-research-reasoning-options.js';
 
 @Injectable()
 export class AiProviderSaveService {
@@ -80,13 +85,17 @@ export class AiProviderSaveService {
     if (parsed.authMode === 'api_key' && !credential && parsed.enabled !== false)
       throw new BadRequestException('请填写 API Key');
     const modelDefaults = parsed.modelDefaults ?? stored?.modelDefaults;
+    const profile = parsed.compatibilityExtensionProfile ?? stored?.compatibilityExtensionProfile;
     const input: AiProviderInput = {
       ...parsed,
       enabled: parsed.enabled ?? row?.enabled ?? true,
-      executionRoutes: parsed.executionRoutes ?? stored?.executionRoutes ?? [],
+      executionRoutes:
+        mergeResearchReasoningRoutes(parsed.executionRoutes, stored?.executionRoutes) ?? [],
       ...(modelDefaults ? { modelDefaults } : {}),
+      ...(profile ? { compatibilityExtensionProfile: profile } : {}),
     };
     input.executionRoutes = input.executionRoutes!.map((route) => effectiveRoute(input, route));
+    assertResearchReasoningRoutes(input, input.executionRoutes);
     const enabledRoutes =
       input.enabled === false
         ? []
@@ -98,18 +107,13 @@ export class AiProviderSaveService {
       ...(await this.journal.passed(parsed.name)),
     ];
     const routes = enabledRoutes.map((route) => {
-      const fingerprint = routeValidationFingerprint(
-        input,
-        route,
-        credential,
-        stored?.compatibilityExtensionProfile,
-      );
+      const fingerprint = routeValidationFingerprint(input, route, credential, profile);
       const record =
         verified.find((item) => item.fingerprint === fingerprint) ??
         this.successful.get(fingerprint);
       return { route, fingerprint, record };
     });
-    return { input, row, credential, routes, profile: stored?.compatibilityExtensionProfile };
+    return { input, row, credential, routes, profile };
   }
 
   private planFor(context: Awaited<ReturnType<AiProviderSaveService['context']>>) {
@@ -194,10 +198,7 @@ export class AiProviderSaveService {
   async testAndSave(raw: unknown, authorization: AiProviderValidationAuthorization) {
     const context = await this.context(raw);
     const plan = this.planFor(context);
-    if (
-      authorization.planFingerprint !== plan.planFingerprint ||
-      authorization.maxCalls !== plan.maxCalls
-    )
+    if (!validationCallAuthorizationMatches(plan, authorization))
       throw new ConflictException('测试范围或费用已变化，请重新确认');
     if (this.active.has(context.input.name))
       throw new ConflictException('验证正在进行或该操作已使用，请勿重复请求');
@@ -216,6 +217,7 @@ export class AiProviderSaveService {
       deadline: Date.now() + VALIDATION_DURATION_SECONDS * 1000,
       remainingCalls: authorization.maxCalls,
       allowText: authorization.allowTextFallback,
+      stopOnFirstFailure: authorization.stopOnFirstFailure === true,
       ...(context.profile === undefined ? {} : { profile: context.profile }),
     };
     const records: VerifiedRoute[] = [];

@@ -8,6 +8,7 @@ import {
   type AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
 import { runProviderConnectionTest, probeMessages } from './provider-connection-test.js';
+import { researchReasoningFields } from './ai-research-reasoning-options.js';
 import {
   adapterSupportsGenerationMode,
   type AiCompatibilityExtensionProfile,
@@ -41,7 +42,8 @@ export const validationPricing = (input: AiProviderInput, model: string) => {
   };
 };
 export const validationInputEstimate = (route: AiProviderExecutionRouteInput) =>
-  Buffer.byteLength(JSON.stringify(probeMessages(route.contract.id)), 'utf8') * 2 + 512;
+  Buffer.byteLength(JSON.stringify(probeMessages(route.contract.id, route.contract)), 'utf8') * 2 +
+  512;
 
 export type ValidationRunContext = {
   input: AiProviderInput;
@@ -52,6 +54,7 @@ export type ValidationRunContext = {
   deadline: number;
   remainingCalls: number;
   allowText: boolean;
+  stopOnFirstFailure?: boolean;
 };
 
 const unknownUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
@@ -169,6 +172,8 @@ export const validateProviderRoute = async (
         model: route.model,
         mode,
         purpose: route.contract.id,
+        contractRef: route.contract,
+        ...researchReasoningFields(route),
         requestId,
         signal: context.signal,
         timeoutMs: Math.min(input.timeoutMs ?? 120000, context.deadline - Date.now()),
@@ -228,7 +233,8 @@ export const validateProviderRoute = async (
           cost: observedCost ?? costFacts(input, route.model, usage),
         },
       );
-      if (route.outputPolicy === 'auto' && failure.retryFormat) continue;
+      if (route.outputPolicy === 'auto' && failure.retryFormat && !context.stopOnFirstFailure)
+        continue;
       throw new BadRequestException(
         `${route.model} / ${route.contract.id} 验证未通过：${failure.message}。原配置未修改。`,
       );

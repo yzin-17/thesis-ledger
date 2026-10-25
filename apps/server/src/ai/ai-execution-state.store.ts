@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { traceAiOperation } from './trace/ai-trace-context.js';
 import { Prisma } from '@prisma/client';
 import {
   aiExecutionSummarySchema,
@@ -11,6 +12,10 @@ import {
   type AiRequestAttempt,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import {
+  mergeRequestHttpDiagnostic,
+  parseRequestHttpDiagnostic,
+} from './ai-execution-request-diagnostic.js';
 
 type Database = PrismaService | Prisma.TransactionClient;
 
@@ -27,6 +32,13 @@ export type AiExecutionOwnership = {
   executionAttempt: number;
 };
 
+type AiRunFailure = {
+  errorCode: string;
+  errorSummary: string;
+  durationMs?: number;
+  continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
+};
+
 export type AiRequestPreparation = AiExecutionOwnership & {
   requestId: string;
   reservation: unknown;
@@ -37,6 +49,7 @@ export type AiRequestCompletion = AiExecutionOwnership & {
   requestId: string;
   revision: unknown;
   outcome: unknown;
+  httpRequest?: unknown;
   error?: unknown;
   completedAt?: Date;
   checkpoint?: unknown;
@@ -59,7 +72,9 @@ export type AiExecutionSettlementContext = {
 };
 
 export type AiExecutionSettlementParticipant = {
-  settle(context: AiExecutionSettlementContext): Promise<AiExecutionSummary['continuationBlockedReason']>;
+  settle(
+    context: AiExecutionSettlementContext,
+  ): Promise<AiExecutionSummary['continuationBlockedReason']>;
   commit?(context: AiExecutionSettlementContext): Promise<void>;
 };
 
@@ -190,11 +205,7 @@ export class AiExecutionStateStore {
     });
   }
 
-  async authorizeDispatch(
-    ownership: AiExecutionOwnership,
-    requestId: string,
-    now = new Date(),
-  ) {
+  async authorizeDispatch(ownership: AiExecutionOwnership, requestId: string, now = new Date()) {
     return this.prisma.$transaction(async (transaction) => {
       const run = (await this.lockRun(transaction, ownership.runId))[0];
       if (!run || !activeOwner(run, ownership, now)) return false;
@@ -219,11 +230,7 @@ export class AiExecutionStateStore {
     });
   }
 
-  async renewLease(
-    ownership: AiExecutionOwnership,
-    leaseMs: number,
-    now = new Date(),
-  ) {
+  async renewLease(ownership: AiExecutionOwnership, leaseMs: number, now = new Date()) {
     const result = await this.prisma.aiRun.updateMany({
       where: {
         id: ownership.runId,
@@ -260,9 +267,7 @@ export class AiExecutionStateStore {
         state: 'unknown',
         completedAt: now.toISOString(),
         error,
-        ...(revision === null
-          ? {}
-          : { usageRevisions: [...request.usageRevisions, revision] }),
+        ...(revision === null ? {} : { usageRevisions: [...request.usageRevisions, revision] }),
       };
       const aggregate = aggregateRequestFacts(requests);
       const updated = aiExecutionSummarySchema.parse({
@@ -292,8 +297,20 @@ export class AiExecutionStateStore {
     input: AiRequestCompletion,
     participant?: AiExecutionSettlementParticipant,
   ): Promise<AiRequestSettlementResult | null> {
+    return traceAiOperation(
+      'business.persistence',
+      { operation: 'completeAndSettle', input },
+      () => this.completeObserved(input, participant),
+    );
+  }
+
+  private async completeObserved(
+    input: AiRequestCompletion,
+    participant?: AiExecutionSettlementParticipant,
+  ): Promise<AiRequestSettlementResult | null> {
     const revision = aiUsageRevisionSchema.parse(input.revision);
     const outcome = aiGenerationOutcomeSchema.parse(input.outcome);
+    const httpRequest = parseRequestHttpDiagnostic(input.httpRequest);
     const error: AiGenerationError | null =
       input.error === undefined ? null : aiGenerationErrorSchema.parse(input.error);
     const completedAt = input.completedAt ?? new Date();
@@ -305,6 +322,7 @@ export class AiExecutionStateStore {
       const index = requestIndex(execution, input.requestId);
       const currentRequest = execution.requests[index];
       if (!currentRequest) return null;
+      const httpRequestFields = mergeRequestHttpDiagnostic(currentRequest, httpRequest);
       const existingRevision = currentRequest.usageRevisions[revision.revision - 1];
       if (existingRevision && !sameJson(existingRevision, revision))
         throw new Error('同一计量修订包含冲突事实');
@@ -328,6 +346,7 @@ export class AiExecutionStateStore {
         state: 'completed',
         completedAt: completedAt.toISOString(),
         outcome,
+        ...httpRequestFields,
         error,
         usageRevisions: existingRevision
           ? currentRequest.usageRevisions
@@ -387,14 +406,17 @@ export class AiExecutionStateStore {
 
   async failOwned(
     ownership: AiExecutionOwnership,
-    input: {
-      errorCode: string;
-      errorSummary: string;
-      durationMs?: number;
-      continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
-    },
+    input: AiRunFailure,
     now = new Date(),
   ) {
+    return traceAiOperation(
+      'business.persistence',
+      { operation: 'failOwned', ownership, input, now },
+      () => this.failObserved(ownership, input, now),
+    );
+  }
+
+  private async failObserved(ownership: AiExecutionOwnership, input: AiRunFailure, now: Date) {
     return this.prisma.$transaction(async (transaction) => {
       const run = (await this.lockRun(transaction, ownership.runId))[0];
       if (!run || !activeOwner(run, ownership, now)) return false;

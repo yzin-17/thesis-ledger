@@ -121,8 +121,8 @@ export function JournalPeriodReview({
     result !== undefined &&
     (result.window.start !== window.start || result.window.end !== window.end);
   return (
-    <div className="flex flex-col gap-4">
-      <FieldGroup>
+    <div className="flex flex-col gap-3 pt-3">
+      <FieldGroup className="grid items-end gap-3 md:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
         <Field>
           <FieldLabel>统计窗口</FieldLabel>
           <Select
@@ -133,7 +133,7 @@ export function JournalPeriodReview({
               if (next !== 'custom') setWindow(recentWindow(Number(next)));
             }}
           >
-            <SelectTrigger aria-label="统计窗口">
+            <SelectTrigger aria-label="统计窗口" className="w-full">
               <SelectValue>{presetLabels[preset]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -169,15 +169,15 @@ export function JournalPeriodReview({
             }}
           />
         </Field>
+        <Button
+          className="self-end justify-self-start md:col-span-3 xl:col-span-1"
+          disabled={analysis.isPending}
+          onClick={() => analysis.mutate()}
+        >
+          {analysis.isPending ? '分析中…' : '分析周期'}
+        </Button>
       </FieldGroup>
-      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">时间范围说明</summary><p className="mt-2">按本机时区输入；开始时刻计入范围，结束时刻不计入。</p></details>
-      <Button
-        className="self-start"
-        disabled={analysis.isPending}
-        onClick={() => analysis.mutate()}
-      >
-        {analysis.isPending ? '分析中…' : '分析周期'}
-      </Button>
+      <p className="text-xs text-muted-foreground">按本机时区输入，开始时刻计入、结束时刻不计入。</p>
       {analysis.isError && <JournalRequestError title="周期分析未完成" error={analysis.error} />}
       {result && (
         <>

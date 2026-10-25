@@ -1,0 +1,1028 @@
+{
+  "date": "2026-10-25",
+  "scope": "G3-D22 离线故障特征对照；全部新观测来自合成固定响应",
+  "limits": {
+    "externalModelCalls": 0,
+    "deployments": 0,
+    "targetConfigWrites": 0,
+    "businessWrites": 0,
+    "targetApiReads": 0,
+    "remainingRealCallsFrozen": 8,
+    "productionPatch": false,
+    "formalG3Accepted": false
+  },
+  "d20Reference": {
+    "submissionId": "1ff23ce0-d87f-4c34-97b3-9b7905c7c8bd",
+    "runId": "238c6c7e-54f7-4f46-9fc6-c7ffb0188a81",
+    "requestId": "7c00b7bd-963d-4ef0-8588-22c5d3b49d39",
+    "error": {
+      "code": "transport_unknown",
+      "phase": "stream",
+      "summary": "Provider returned error",
+      "externalResult": "unknown"
+    },
+    "providerFrames": 0,
+    "fetchAttempts": 1,
+    "httpResponse": "历史未观测，不能当作未收到 HTTP 响应",
+    "actualModel": null,
+    "actualCost": null,
+    "request": {
+      "bytes": 22517,
+      "sha256": "0beccf88684d2b4817f3143e0e391815b5936d8627af89cf8169ead3b723fb8b"
+    },
+    "reconstruction": "复用既有完整冻结材料的零网络同体重建证据；本轮未重复重建"
+  },
+  "packages": {
+    "ai": "7.0.107",
+    "@ai-sdk/openai-compatible": "3.0.53",
+    "zod": "4.4.3"
+  },
+  "inputSha256": {
+    "apps/server/src/ai/ai-sdk-generation.adapter.ts": "3f37d6f0fa6696d373a9713a459caf9c13cfd83c4c8ebb69422fc7e58218d352",
+    "apps/server/src/ai/ai-sdk-generation-model.ts": "84b8f502d1ddbe17e5f93bc53bcb69df9de876158f7b7cc77149045893acc7f8",
+    "apps/server/src/ai/ai-sdk-generation-facts.ts": "df437ed91dbc68213e019d81c2980a5fb9f441879cb5d460a875c93a04e16237",
+    "apps/server/src/ai/ai-generation-diagnostics.ts": "1bbc972fdc48cbe8e3d2bf191c4c0b3dc95e2edc82bb0042e2d2e2662eb3bbbc",
+    "apps/server/src/ai/ai-generation-stream-diagnostics.ts": "f751e781e40ad47a0dc28712f96065bc606c8e9170f2c757ea054fb4edaeb16c",
+    "apps/server/src/ai/ai-generation-http-request-diagnostics.ts": "45ed0488846c61e69702335072f5ba51fc32ac88fa083000561453ee0fe3d2e6",
+    "apps/server/src/ai/ai-generation-http-response-diagnostics.ts": "514f226424932b94adcf0946730bae813d2a82d114afbff633bd0a711e54269c",
+    "apps/server/src/ai/ai-generation-http-response-error.ts": "174b3f968f1b59ad530fd89e4def9e1f389c1cf912a4d3960ec9e789a6590dad",
+    "apps/server/src/ai/ai-generation-failure-diagnostics.ts": "4e0df08588a9c814f56178f7a8f89246176394060ac14271e953e2a3223f88d3",
+    "apps/server/test/ai/ai-http-response-diagnostics.integration.test.ts": "cbe67876b0e97ea17bf8c9b8d70b8e1a1d8d6f527c721503234d79ef5134dc13",
+    "apps/server/test/ai/ai-http-response-diagnostics.test.ts": "1d61a7b88b544e5e446ec6d2b7d3fb41b3ee6cb18baac07de5362393565099a8",
+    "apps/server/test/ai/ai-generation-stream-diagnostics.integration.test.ts": "727b25004b2d7026f771c07a78bbc36ddadb395350c6284b1a82bb3ac8be9594",
+    "apps/server/test/ai/ai-generation-stream-diagnostics.test.ts": "44b490470eb03c2bd7987b536f00f7e4b22c00f6aec24b6a1334acf745124099",
+    "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "1d397fa47bc26e1512f43c17aa148343ede615748eec077112c93c92e1dfc98d",
+    "apps/server/test/ai/ai-generation-failure-diagnostics.test.ts": "d4c0caef1f9070038d03c4d0b174d1731f08ecbef73aec8efecb8cad951dde00",
+    "packages/schemas/src/ai-generation-http-response-diagnostic.ts": "d14e0167d468d89a52023962c581b75347a3e0297c4155b43f0e8563a9584126",
+    "packages/schemas/src/ai-generation-runtime-diagnostic.ts": "5ec4735e2dd4d151660620b90fc2d00eda394a526bc577188151160544351a97",
+    "docs/tasks/evidence/2026-10-25-g3-formal-free-sdk-recovery.json": "ebd64330fca663b7a5d32119558991e893a8c550e38980655b2c26a630cbc0aa",
+    "docs/tasks/evidence/2026-10-24-g3-free-finish-diagnostic.json": "901b00b771459ee3a41da94ac226487de1cfc4695e0444d7b1a3ac0e35c87d9f"
+  },
+  "sdkInputSha256": {
+    "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/package.json": "0ea182eed5dc0a057adb0768d02ddaeb29237d91366e94d1c9544eef8ac212d7",
+    "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/dist/index.js": "22d63f281f83c71d443818749076aa3a7f8f07d15a4e83c42df3c751de2fba76",
+    "node_modules/.pnpm/@ai-sdk+openai-compatible@3.0.53_zod@4.4.3/node_modules/@ai-sdk/openai-compatible/package.json": "7da2dc63c865e97f657d0be1c0e99d62fc434845e39dea394b3e365238cf6b3b",
+    "node_modules/.pnpm/@ai-sdk+openai-compatible@3.0.53_zod@4.4.3/node_modules/@ai-sdk/openai-compatible/dist/index.js": "c0583efbc1d4ecf6c6e3b0cbdeae29b15ebc883b41d164425f7916fe2281b078",
+    "node_modules/.pnpm/zod@4.4.3/node_modules/zod/package.json": "c630bd10b52dcf71c112a2bf78dbf2734b9db58d62de663b8d86c2ec2c8cda2e",
+    "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/src/prompt/normalize-stream-provider-error.ts": "a0bffa8dc2680a1ed10f700ec92799fdfc1598578800b4ff33ba41005157d81f",
+    "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/src/generate-text/stream-language-model-call.ts": "5f6784c4728a9627b3c79568e270b43a4c3a55c7a3679b8b81d9ce33fb245b8f",
+    "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/src/generate-text/stream-text.ts": "ca1500d3c63f300d470351931e12b330cbe55fe510d8430e3dc54bdcb0a7882f",
+    "node_modules/.pnpm/@ai-sdk+openai-compatible@3.0.53_zod@4.4.3/node_modules/@ai-sdk/openai-compatible/src/chat/openai-compatible-chat-language-model.ts": "aae6ac88dcc53a34b7bcb554b0c78dc99e019a66b7f06c643d2080aecaf5dfb7",
+    "node_modules/.pnpm/@ai-sdk+provider-utils@5.0.45_zod@4.4.3/node_modules/@ai-sdk/provider-utils/src/post-to-api.ts": "e7a64b7419b3939d881c53f387d3097999ef63a639798621b647f918c661ec38",
+    "node_modules/.pnpm/@ai-sdk+provider-utils@5.0.45_zod@4.4.3/node_modules/@ai-sdk/provider-utils/src/response-handler.ts": "9c8e03499a7ca2688e5dcb8597ec609d152181210d8bb4730f8ec594d32a8b83"
+  },
+  "d21RecordedInputs": {
+    "packages/schemas/src/ai-generation-http-response-diagnostic.ts": {
+      "expected": "d14e0167d468d89a52023962c581b75347a3e0297c4155b43f0e8563a9584126",
+      "current": "d14e0167d468d89a52023962c581b75347a3e0297c4155b43f0e8563a9584126",
+      "matches": true
+    },
+    "packages/schemas/src/ai-generation-runtime-diagnostic.ts": {
+      "expected": "5ec4735e2dd4d151660620b90fc2d00eda394a526bc577188151160544351a97",
+      "current": "5ec4735e2dd4d151660620b90fc2d00eda394a526bc577188151160544351a97",
+      "matches": true
+    },
+    "packages/schemas/test/ai-http-response-diagnostic.test.ts": {
+      "expected": "3330a6632fb0bee16320367fb46effaa10d1baa7e8ff14c44b2a38514d260c37",
+      "current": "3330a6632fb0bee16320367fb46effaa10d1baa7e8ff14c44b2a38514d260c37",
+      "matches": true
+    },
+    "apps/server/src/ai/ai-generation-http-response-error.ts": {
+      "expected": "174b3f968f1b59ad530fd89e4def9e1f389c1cf912a4d3960ec9e789a6590dad",
+      "current": "174b3f968f1b59ad530fd89e4def9e1f389c1cf912a4d3960ec9e789a6590dad",
+      "matches": true
+    },
+    "apps/server/src/ai/ai-generation-http-response-diagnostics.ts": {
+      "expected": "514f226424932b94adcf0946730bae813d2a82d114afbff633bd0a711e54269c",
+      "current": "514f226424932b94adcf0946730bae813d2a82d114afbff633bd0a711e54269c",
+      "matches": true
+    },
+    "apps/server/src/ai/ai-generation-stream-diagnostics.ts": {
+      "expected": "f751e781e40ad47a0dc28712f96065bc606c8e9170f2c757ea054fb4edaeb16c",
+      "current": "f751e781e40ad47a0dc28712f96065bc606c8e9170f2c757ea054fb4edaeb16c",
+      "matches": true
+    },
+    "apps/server/src/ai/ai-generation-http-request-diagnostics.ts": {
+      "expected": "45ed0488846c61e69702335072f5ba51fc32ac88fa083000561453ee0fe3d2e6",
+      "current": "45ed0488846c61e69702335072f5ba51fc32ac88fa083000561453ee0fe3d2e6",
+      "matches": true
+    },
+    "apps/server/src/ai/ai-sdk-generation-model.ts": {
+      "expected": "84b8f502d1ddbe17e5f93bc53bcb69df9de876158f7b7cc77149045893acc7f8",
+      "current": "84b8f502d1ddbe17e5f93bc53bcb69df9de876158f7b7cc77149045893acc7f8",
+      "matches": true
+    },
+    "apps/server/test/ai/ai-http-response-diagnostics.test.ts": {
+      "expected": "1d61a7b88b544e5e446ec6d2b7d3fb41b3ee6cb18baac07de5362393565099a8",
+      "current": "1d61a7b88b544e5e446ec6d2b7d3fb41b3ee6cb18baac07de5362393565099a8",
+      "matches": true
+    },
+    "apps/server/test/ai/ai-http-response-diagnostics.integration.test.ts": {
+      "expected": "8a38df692c9d83414371902dca592998e945eeac4709d859440b35aa6bb88515",
+      "current": "cbe67876b0e97ea17bf8c9b8d70b8e1a1d8d6f527c721503234d79ef5134dc13",
+      "matches": false
+    },
+    "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": {
+      "expected": "97e6cfc68d565ebe4bd68cc7ad9b8be906f827f0dfd96fd81ca402bfe5e8c79b",
+      "current": "1d397fa47bc26e1512f43c17aa148343ede615748eec077112c93c92e1dfc98d",
+      "matches": false
+    },
+    "scripts/check-boundaries.mjs": {
+      "expected": "77aaefb6ec93a195d43541d515e28d7a11c818eba87b19f834d0e20c18d249ba",
+      "current": "77aaefb6ec93a195d43541d515e28d7a11c818eba87b19f834d0e20c18d249ba",
+      "matches": true
+    }
+  },
+  "beforeTestSha256": {
+    "apps/server/test/ai/ai-http-response-diagnostics.integration.test.ts": "8a38df692c9d83414371902dca592998e945eeac4709d859440b35aa6bb88515",
+    "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "97e6cfc68d565ebe4bd68cc7ad9b8be906f827f0dfd96fd81ca402bfe5e8c79b"
+  },
+  "testLineCounts": {
+    "apps/server/test/ai/ai-http-response-diagnostics.integration.test.ts": 349,
+    "apps/server/test/ai/ai-http-response-diagnostics.test.ts": 158,
+    "apps/server/test/ai/ai-generation-stream-diagnostics.integration.test.ts": 161,
+    "apps/server/test/ai/ai-generation-stream-diagnostics.test.ts": 87,
+    "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": 220,
+    "apps/server/test/ai/ai-generation-failure-diagnostics.test.ts": 186
+  },
+  "validation": {
+    "characterization": {
+      "files": 1,
+      "tests": 9,
+      "exitCode": 0,
+      "note": "先观察再固化错误组合，没有预写 D20 对应行"
+    },
+    "regression": {
+      "files": 6,
+      "tests": 40,
+      "exitCode": 0,
+      "note": "原四组指定测试及两组诊断单测；含成功、取消、无重试、脱敏、限长与生产 Store JSON 往返"
+    },
+    "finalChangedFile": {
+      "files": 1,
+      "tests": 9,
+      "exitCode": 0,
+      "note": "增加 SDK 数值码来源断言后复验最终文件；其余五文件 31 项输入未变复用"
+    },
+    "serverTypecheck": {
+      "exitCode": 0,
+      "note": "最终测试输入通过 tsc --noEmit；源码和运行依赖未改，未重建生产包"
+    },
+    "targetedLint": {
+      "exitCode": 0,
+      "newComplexityWarnings": 0,
+      "legacyFailureFixtureComplexity": {
+        "before": 26,
+        "after": 26
+      }
+    },
+    "format": {
+      "exitCode": 0
+    },
+    "finalConsistency": {
+      "inputFingerprintsMatched": 30,
+      "inputDrift": 0,
+      "localFileLinksChecked": 77,
+      "missingLocalFiles": 0,
+      "d20EvidenceAnchorExists": true,
+      "d8D20D21bRemainUnchecked": true,
+      "d22LocalScopeComplete": true
+    },
+    "notRun": [
+      "全仓测试／全仓边界重复检查",
+      "生产构建与镜像",
+      "目标服务／数据库／浏览器／Electron／移动端",
+      "真实模型／Provider 直连／用途验证",
+      "正式 V2 报告、全部引用／历史、发布重建反读与关闭保全"
+    ]
+  },
+  "unexpectedToolFailures": [
+    {
+      "kind": "命令环境",
+      "fact": "Context Mode 子进程不含 rg／pnpm 的可执行搜索路径，分析命令与首次测试命令未启动；未预期测试断言失败为 0",
+      "resolution": "分析改为读取本地文件；测试使用已核实的宿主 Shell 和既有 Volta pnpm／Node；未安装、升级或改包管理配置"
+    },
+    {
+      "kind": "文件路径",
+      "fact": "一次探索误用了 ai-sdk-generation.adapter.test.ts，实际入口为 ai-sdk-generation-adapter.integration.test.ts／ai-sdk-generation-adapter.test.ts",
+      "resolution": "读取目录清单纠正；未重复该错误入口，也未因此扩大验证"
+    }
+  ],
+  "observations": [
+    {
+      "name": "A HTTP502 JSON Provider 错误",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "Provider returned error",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 502,
+        "contentType": "json",
+        "bodyBytes": 137,
+        "bodyComplete": true,
+        "bodyTruncated": false,
+        "bodyJson": "valid",
+        "sse": null,
+        "error": {
+          "code": 502,
+          "category": "provider_error",
+          "messageCharacters": 23,
+          "messageSha256": "5a00c60dc9f26d6179879a0a489c54e7a7f7d91d08094bdabb4f9fce9d444d21",
+          "origin": "http_body",
+          "structuralPreview": "{\"[text]\":{\"[text]\":[value],\"[text]\":\"[text]\",\"[text]\":{\"[text]\":\"[text]\"}}}",
+          "truncated": false,
+          "upstream": {
+            "code": null,
+            "category": "overloaded",
+            "messageCharacters": 27,
+            "messageSha256": "2a1e5354b3769c4e868d2fcceda13a140ebcee32ad05fba85f5858255b49be05"
+          }
+        }
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_APICallError",
+          "status": null,
+          "statusCode": 502,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "summary", "externalResult"],
+        "differentErrorFields": [],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "HTTP 拒绝",
+      "error": {
+        "code": "authentication_failed",
+        "phase": "stream",
+        "summary": "Invalid API key [REDACTED]",
+        "externalResult": "rejected_before_generation"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 401,
+        "contentType": "json",
+        "bodyBytes": 69,
+        "bodyComplete": true,
+        "bodyTruncated": false,
+        "bodyJson": "valid",
+        "sse": null,
+        "error": {
+          "code": 401,
+          "category": "authentication",
+          "messageCharacters": 34,
+          "messageSha256": "05b4663d0cc28b96284cbf30e9a9469953d24cf10a0ca897d7ab472353599542",
+          "origin": "http_body",
+          "structuralPreview": "{\"[text]\":{\"[text]\":[value],\"[text]\":\"[text]\"}}",
+          "truncated": false,
+          "upstream": null
+        }
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_APICallError",
+          "status": null,
+          "statusCode": 401,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["phase"],
+        "differentErrorFields": ["code", "summary", "externalResult"],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "B HTTP200 标准 SSE error 和 DONE",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "Provider returned error",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 1,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 200,
+        "contentType": "sse",
+        "bodyBytes": 159,
+        "bodyComplete": true,
+        "bodyTruncated": false,
+        "bodyJson": null,
+        "sse": {
+          "events": 2,
+          "invalidJsonEvents": 0,
+          "oversizeEvents": 0,
+          "done": true,
+          "incompleteEvent": false
+        },
+        "error": {
+          "code": 502,
+          "category": "provider_error",
+          "messageCharacters": 23,
+          "messageSha256": "5a00c60dc9f26d6179879a0a489c54e7a7f7d91d08094bdabb4f9fce9d444d21",
+          "origin": "sse_error",
+          "structuralPreview": "{\"[text]\":{\"[text]\":[value],\"[text]\":\"[text]\",\"[text]\":{\"[text]\":\"[text]\"}}}",
+          "truncated": false,
+          "upstream": {
+            "code": null,
+            "category": "overloaded",
+            "messageCharacters": 27,
+            "messageSha256": "2a1e5354b3769c4e868d2fcceda13a140ebcee32ad05fba85f5858255b49be05"
+          }
+        }
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_StreamProviderError",
+          "status": null,
+          "statusCode": 502,
+          "code": 502
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "summary", "externalResult"],
+        "differentErrorFields": [],
+        "framesMatch": false,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "C HTTP200 SSE JSON 语法无效",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "JSON parsing failed: Text: {.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 200,
+        "contentType": "sse",
+        "bodyBytes": 23,
+        "bodyComplete": true,
+        "bodyTruncated": false,
+        "bodyJson": null,
+        "sse": {
+          "events": 2,
+          "invalidJsonEvents": 1,
+          "oversizeEvents": 0,
+          "done": true,
+          "incompleteEvent": false
+        },
+        "error": null
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_JSONParseError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "SyntaxError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "externalResult"],
+        "differentErrorFields": ["summary"],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "D HTTP200 SSE JSON 有效但事件合同无效",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "Type validation failed: Value: {\"choices\":\"invalid-shape\"}.\nError message: [\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [\n      [\n        {\n          \"expected\": \"array\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"choices\"\n          ],\n          \"message\": \"Invalid input: expected array, received string\"\n        }\n      ],\n      [\n        {\n          \"expected\": \"object\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"error\"\n          ],",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 200,
+        "contentType": "sse",
+        "bodyBytes": 49,
+        "bodyComplete": true,
+        "bodyTruncated": false,
+        "bodyJson": null,
+        "sse": {
+          "events": 2,
+          "invalidJsonEvents": 0,
+          "oversizeEvents": 0,
+          "done": true,
+          "incompleteEvent": false
+        },
+        "error": null
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_TypeValidationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "ZodError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "externalResult"],
+        "differentErrorFields": ["summary"],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "F2 HTTP200 在 SSE 事件中途正常 EOF",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "Response stream ended without a finish reason.",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 200,
+        "contentType": "sse",
+        "bodyBytes": 17,
+        "bodyComplete": true,
+        "bodyTruncated": false,
+        "bodyJson": null,
+        "sse": {
+          "events": 0,
+          "invalidJsonEvents": 0,
+          "oversizeEvents": 0,
+          "done": false,
+          "incompleteEvent": true
+        },
+        "error": null
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_InvalidResponseDataError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "externalResult"],
+        "differentErrorFields": ["summary"],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "E fetch 拒绝",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "fetch failed",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": null,
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "TypeError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "externalResult"],
+        "differentErrorFields": ["summary"],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "E2 同文案 fetch 拒绝",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "stream",
+        "summary": "Provider returned error",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": null,
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "Error",
+          "status": null,
+          "statusCode": null,
+          "code": 401
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "phase", "summary", "externalResult"],
+        "differentErrorFields": [],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    },
+    {
+      "name": "F1 响应体读取失败",
+      "error": {
+        "code": "transport_unknown",
+        "phase": "request",
+        "summary": "Failed to process successful response",
+        "externalResult": "unknown"
+      },
+      "provider": {
+        "frames": 0,
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "sdk": {
+        "text": {
+          "chunks": 0,
+          "characters": 0
+        },
+        "reasoning": {
+          "chunks": 0,
+          "characters": 0
+        }
+      },
+      "httpResponse": {
+        "version": "ai-http-response-diagnostic-v1",
+        "boundary": "fetch_response",
+        "responses": 1,
+        "omittedResponses": 0,
+        "status": 200,
+        "contentType": "sse",
+        "bodyBytes": 17,
+        "bodyComplete": false,
+        "bodyTruncated": false,
+        "bodyJson": null,
+        "sse": {
+          "events": 0,
+          "invalidJsonEvents": 0,
+          "oversizeEvents": 0,
+          "done": false,
+          "incompleteEvent": true
+        },
+        "error": null
+      },
+      "errorLayers": [
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AiSdkGenerationError",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        },
+        {
+          "name": "AI_APICallError",
+          "status": null,
+          "statusCode": 200,
+          "code": null
+        },
+        {
+          "name": "Error",
+          "status": null,
+          "statusCode": null,
+          "code": null
+        }
+      ],
+      "usage": {
+        "status": "unknown",
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "fetches": 1,
+      "attempts": 1,
+      "packages": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "d20Comparison": {
+        "matchingErrorFields": ["code", "externalResult"],
+        "differentErrorFields": ["phase", "summary"],
+        "framesMatch": true,
+        "contentCountersMatch": true,
+        "fetchAttemptsMatch": true
+      }
+    }
+  ]
+}

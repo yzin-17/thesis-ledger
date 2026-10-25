@@ -122,6 +122,8 @@ jobs:
           GUARDRAIL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
       - name: Mobile import boundary regressions
         run: node --test scripts/test-mobile-boundaries.mjs
+      - name: 手机签名与接续拒绝反例
+        run: node --test scripts/mobile-release/*.test.mjs
 
   mobile-android-native:
     runs-on: ubuntu-latest

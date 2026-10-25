@@ -19,6 +19,7 @@ import { verifyAiFrozenResearchV2 } from './ai-research-frozen-integrity-v2.js';
 import { assertResearchV2WritesEnabled } from './ai-research-v2-write-policy.js';
 import { buildFrozenResearchMessagesV2 } from './ai-research-messages-v2.js';
 import { researchInputTokenEstimate } from './ai-research-sdk-reservation.js';
+import { currentAiTraceReference } from './trace/ai-trace-context.js';
 
 /** V2 的受控创建入口；找回原提交不依赖当前写入开关或重新取数。 */
 export class AiResearchSubmissionV2 {
@@ -93,6 +94,7 @@ export class AiResearchSubmissionV2 {
             researchPolicy: ready.policy,
             researchRoutes: ready.routes.routes,
             researchDefault: ready.routing.researchDefault,
+            ...(currentAiTraceReference() ? { diagnosticTrace: currentAiTraceReference() } : {}),
           },
         };
       },

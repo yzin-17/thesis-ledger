@@ -6,10 +6,13 @@ import {
   researchGenerationV2Schema,
   type AiResearchGeneration,
   type ResearchGenerationV2,
+  type AiProviderModelExecution,
+  type AiAuthMode,
 } from '@thesis-ledger/schemas';
 import type { AiExecutionOwnership } from './ai-execution-state.store.js';
-import type { AiSdkGenerationResult } from './ai-sdk-generation.adapter.js';
+import type { AiSdkGenerationResult, AiSdkGenerationRequest } from './ai-sdk-generation.adapter.js';
 import { verifyAiFrozenResearchV2 } from './ai-research-frozen-integrity-v2.js';
+import { researchReasoningFields } from './ai-research-reasoning-options.js';
 
 type CommonInput = {
   ownership: AiExecutionOwnership;
@@ -30,6 +33,50 @@ export type ResearchExecutionInput = CommonInput &
       }
   );
 export type ResearchSdkOutput = AiResearchGeneration | ResearchGenerationV2;
+
+export function researchSdkAdapterRequest(input: {
+  requestId: string;
+  providerId: string;
+  model: string;
+  runtime: { baseURL: string; apiKey: string; authMode?: AiAuthMode | undefined };
+  route: AiProviderModelExecution;
+  frozen: { reasoningEnabled?: boolean | undefined } | undefined;
+  contract: ReturnType<typeof researchSdkProtocol>['contract'];
+  messages: unknown[];
+  signal: AbortSignal;
+  remainingMs: number;
+  outputTokens: number;
+}): AiSdkGenerationRequest<ResearchSdkOutput> {
+  return {
+    requestId: input.requestId,
+    providerId: input.providerId,
+    adapter: input.route.adapter,
+    ...(input.route.compatibilityExtensionProfile === undefined
+      ? {}
+      : { compatibilityExtensionProfile: input.route.compatibilityExtensionProfile }),
+    baseURL: input.runtime.baseURL,
+    authMode: input.runtime.authMode ?? 'api_key',
+    apiKey: input.runtime.apiKey,
+    model: input.model,
+    messages: input.messages,
+    contract: input.contract.ref,
+    schema: input.contract.schema,
+    mode: input.route.mode,
+    ...researchReasoningFields(input.frozen),
+    transport: 'stream',
+    maxOutputTokens: input.outputTokens,
+    timeout: {
+      totalMs: input.remainingMs,
+      ...(input.route.firstOutputTimeoutMs === undefined
+        ? {}
+        : { firstChunkMs: input.route.firstOutputTimeoutMs }),
+      ...(input.route.outputIdleTimeoutMs === undefined
+        ? {}
+        : { chunkMs: input.route.outputIdleTimeoutMs }),
+    },
+    signal: input.signal,
+  };
+}
 
 export function researchSdkProtocol(input: ResearchExecutionInput) {
   const value = input.run.modelMetadata;

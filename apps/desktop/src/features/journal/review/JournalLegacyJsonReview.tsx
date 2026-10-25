@@ -46,8 +46,8 @@ export function JournalLegacyJsonReview() {
   };
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)}>
-        高级 JSON 兼容分析
+      <Button variant="ghost" size="sm" aria-label="高级 JSON 兼容分析" title="高级 JSON 兼容分析" onClick={() => setOpen(true)}>
+        高级分析
       </Button>
       <Sheet
         open={open}

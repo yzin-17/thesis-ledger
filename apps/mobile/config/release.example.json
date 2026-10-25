@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "bundleId": "io.github.yzin17.thesisledger.mobile",
+  "apiBaseUrl": "https://api.example.invalid/api/v1",
+  "android": {
+    "versionName": "0.1.0",
+    "versionCode": 1,
+    "format": "apk",
+    "certificateSha256": ""
+  },
+  "ios": {
+    "version": "0.1.0",
+    "buildNumber": "1",
+    "distribution": "ad-hoc",
+    "teamId": "",
+    "identitySha1": "",
+    "certificateSha256": ""
+  }
+}

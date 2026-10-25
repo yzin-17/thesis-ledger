@@ -1,0 +1,864 @@
+{
+  "date": "2026-10-25",
+  "phase": "G3-D25",
+  "status": "failed_closed_and_preserved",
+  "conclusion": {
+    "formalG3Passed": false,
+    "providerReturnedErrorReproduced": false,
+    "D20RootCauseResolved": false,
+    "exactInvalidFieldsKnown": false,
+    "message": "本次完整 HTTP 200／SSE 响应的 JSON 未通过 V2 Schema 校验；未产出正式报告，不能据此确定 D20 根因。"
+  },
+  "authorization": {
+    "model": "openrouter/free",
+    "maxCalls": 1,
+    "maxCost": "0",
+    "automaticRetry": false,
+    "extraPurposeValidation": false,
+    "providerDirectCall": false,
+    "normalNewMaterials": true
+  },
+  "budget": {
+    "remainingBefore": 8,
+    "used": 1,
+    "remainingAfter": 7,
+    "remainingFrozen": true,
+    "actualCost": null,
+    "actualCostStatus": "unknown",
+    "estimatedCost": {
+      "amount": "0",
+      "source": "frozen_provider_pricing",
+      "status": "estimated",
+      "currency": "USD",
+      "pricingVersion": "pricing-bd1326cf8cba0366"
+    }
+  },
+  "submission": {
+    "submissionId": "3ee565b3-8a72-465c-8351-128179a58cbe",
+    "runId": "b207e5e5-83d4-4a12-859a-67f7716d648d",
+    "requestId": "2f29bfe0-cc96-4713-91ec-15b7002a975d",
+    "scope": {
+      "scope": "instrument",
+      "instrumentId": "86b1de50-d50d-4007-84c0-918e7e5409ca"
+    },
+    "mode": "shadow",
+    "templateId": "recent-changes",
+    "settingsRevision": "5",
+    "configurationFingerprint": "54af17d91e5d190f7dee514a10f9c42bc70b119356ee79a5965f829f399a7372",
+    "preparedAt": "2026-10-25T06:57:02.700Z",
+    "dispatchingAt": "2026-10-25T06:57:02.710Z",
+    "completedAt": "2026-10-25T06:59:13.418Z"
+  },
+  "result": {
+    "id": "b207e5e5-83d4-4a12-859a-67f7716d648d",
+    "status": "failed",
+    "errorCode": "research_schema_invalid",
+    "model": "openrouter/free",
+    "provider": "openrouter",
+    "rowHash": "5b357954dbe3cf8427f036da3074b7d3",
+    "resultHash": "d41d8cd98f00b204e9800998ecf8427e",
+    "resultPresent": false,
+    "error": {
+      "code": "schema_invalid",
+      "phase": "validation",
+      "summary": "结构化响应未通过解析或契约校验",
+      "requestId": "2f29bfe0-cc96-4713-91ec-15b7002a975d",
+      "diagnostic": {
+        "runtime": {
+          "stream": {
+            "sdk": {
+              "text": {
+                "chunks": 1,
+                "sha256": "15bcea5943f3fcf360b77b97d72ae73fd5688664ba527cca2987c74e9453bd7b",
+                "characters": 5677
+              },
+              "reasoning": {
+                "chunks": 2281,
+                "sha256": "a0fd0bf4d4d9d717a3e66e10cff3ec03807cf66ea4f521674b1b2dad630c9ab3",
+                "characters": 17351
+              }
+            },
+            "provider": {
+              "text": {
+                "chunks": 2284,
+                "sha256": "15bcea5943f3fcf360b77b97d72ae73fd5688664ba527cca2987c74e9453bd7b",
+                "characters": 5677
+              },
+              "frames": 2284,
+              "reasoning": {
+                "chunks": 2281,
+                "sha256": "a0fd0bf4d4d9d717a3e66e10cff3ec03807cf66ea4f521674b1b2dad630c9ab3",
+                "characters": 17351
+              },
+              "finishReasons": [
+                "stop"
+              ],
+              "omittedFrames": 2263,
+              "reportedUsage": {
+                "inputTokens": 5613,
+                "outputTokens": 11349,
+                "reasoningTokens": 7828
+              },
+              "nonTextContentFrames": 0,
+              "unrecognizedDeltaFrames": 2281
+            }
+          },
+          "version": "ai-runtime-diagnostic-v1",
+          "packages": {
+            "ai": "7.0.107",
+            "zod": "4.4.3",
+            "providerPackage": "@ai-sdk/openai-compatible",
+            "providerVersion": "3.0.53"
+          },
+          "httpResponse": {
+            "sse": {
+              "done": true,
+              "events": 2285,
+              "oversizeEvents": 0,
+              "incompleteEvent": false,
+              "invalidJsonEvents": 0
+            },
+            "error": null,
+            "status": 200,
+            "version": "ai-http-response-diagnostic-v1",
+            "bodyJson": null,
+            "boundary": "fetch_response",
+            "bodyBytes": 940128,
+            "responses": 1,
+            "contentType": "sse",
+            "bodyComplete": true,
+            "bodyTruncated": false,
+            "omittedResponses": 0
+          }
+        },
+        "version": "ai-failure-diagnostic-v1",
+        "truncated": true,
+        "errorClass": "no_object",
+        "jsonStatus": "valid",
+        "actualModel": "nvidia/nemotron-3.5-super-vl:free",
+        "httpRequest": {
+          "model": "openrouter/free",
+          "method": "POST",
+          "stream": true,
+          "version": "ai-http-request-diagnostic-v1",
+          "attempts": 1,
+          "boundary": "fetch_dispatch",
+          "endpoint": "chat_completions",
+          "bodyBytes": 22517,
+          "reasoning": null,
+          "toolCount": null,
+          "truncated": false,
+          "bodySha256": "cc8b1df181cbb7966fdae043397589ef7dda764e2d7dd5416f403fb26b446b62",
+          "bodyStatus": "json",
+          "tokenLimits": {
+            "max_tokens": 20000,
+            "max_output_tokens": null,
+            "max_completion_tokens": null
+          },
+          "includeUsage": true,
+          "schemaSha256": "a187946ebc719e5cf3797a2bab282c3564b721a28127bcd6ca3b9aa79b73ec34",
+          "schemaStrict": true,
+          "responseFormat": "json_schema",
+          "omittedRequests": 0,
+          "reasoningEffort": null,
+          "requireParameters": true
+        },
+        "finishReason": "stop",
+        "jsonRootType": "object",
+        "outputSha256": "15bcea5943f3fcf360b77b97d72ae73fd5688664ba527cca2987c74e9453bd7b",
+        "generationMode": "native_schema",
+        "outputCharacters": 5677
+      },
+      "externalResult": "complete",
+      "summaryFacts": {
+        "characters": 15,
+        "sha256": "b23aad2e4fc89d24cdf63fa1189b40c5dc0771a809df43916337e8d5b3aa4035"
+      }
+    },
+    "usage": {
+      "status": "reported",
+      "inputTokens": 5613,
+      "outputTokens": 11349
+    },
+    "reportedProviderUsage": {
+      "inputTokens": 5613,
+      "outputTokens": 11349,
+      "reasoningTokens": 7828
+    },
+    "modelCalls": 1,
+    "fetchAttempts": 1,
+    "retries": 0,
+    "diagnosticBytes": {
+      "failure": 10528,
+      "runtime": 7051,
+      "httpResponse": 329
+    }
+  },
+  "frozenInputProof": {
+    "submissionId": "3ee565b3-8a72-465c-8351-128179a58cbe",
+    "inputFingerprint": "1e1bde4563a8c4bf78470d856db5bdb19e56449eb67bc8ea2becb23af3707748",
+    "preparedAt": "2026-10-25T06:57:02.645Z",
+    "evidenceCount": 11,
+    "evidenceByKind": {
+      "quote": {
+        "total": 1,
+        "usable": 1
+      },
+      "news": {
+        "total": 10,
+        "usable": 10
+      }
+    },
+    "integrityPassed": true,
+    "offlineFetchCount": 1,
+    "realModelCalls": 0,
+    "requestFacts": {
+      "bytes": 22517,
+      "sha256": "cc8b1df181cbb7966fdae043397589ef7dda764e2d7dd5416f403fb26b446b62",
+      "stream": true,
+      "responseFormat": "json_schema",
+      "strict": true,
+      "requireParameters": true,
+      "maxTokens": 20000,
+      "includeUsage": true,
+      "explicitReasoning": false,
+      "explicitReasoningEffort": false
+    },
+    "actualRequestDiagnostics": [
+      {
+        "model": "openrouter/free",
+        "method": "POST",
+        "stream": true,
+        "version": "ai-http-request-diagnostic-v1",
+        "attempts": 1,
+        "boundary": "fetch_dispatch",
+        "endpoint": "chat_completions",
+        "bodyBytes": 22517,
+        "reasoning": null,
+        "toolCount": null,
+        "truncated": false,
+        "bodySha256": "cc8b1df181cbb7966fdae043397589ef7dda764e2d7dd5416f403fb26b446b62",
+        "bodyStatus": "json",
+        "tokenLimits": {
+          "max_tokens": 20000,
+          "max_output_tokens": null,
+          "max_completion_tokens": null
+        },
+        "includeUsage": true,
+        "schemaSha256": "a187946ebc719e5cf3797a2bab282c3564b721a28127bcd6ca3b9aa79b73ec34",
+        "schemaStrict": true,
+        "responseFormat": "json_schema",
+        "omittedRequests": 0,
+        "reasoningEffort": null,
+        "requireParameters": true
+      }
+    ],
+    "actualRequestMatches": true,
+    "rowHash": "5b357954dbe3cf8427f036da3074b7d3"
+  },
+  "deployment": {
+    "entry": "./scripts/update.sh thesis-ledger",
+    "cwd": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra",
+    "databaseMode": "check",
+    "updateSpaceMode": "auto",
+    "open": {
+      "exitCode": 0,
+      "repairBuildCacheOnNoSpace": false,
+      "image": "sha256:f004db633c46313f7bb29e102b6cff6efefa01c8584c65760cd992700441cc8f"
+    },
+    "closeAttempts": [
+      {
+        "repairBuildCacheOnNoSpace": false,
+        "exitCode": 1,
+        "failure": "镜像导出 I/O 错误后实际 ENOSPC，daemon 随后离线"
+      },
+      {
+        "repairBuildCacheOnNoSpace": true,
+        "exitCode": 1,
+        "failure": "daemon 不可连接，正式入口启动前拒绝"
+      },
+      {
+        "repairBuildCacheOnNoSpace": true,
+        "exitCode": 0,
+        "image": "sha256:76f0c84c3db2fb37c413682861b0f71f4789be8c1f7d59fc642229861b1ff382"
+      }
+    ],
+    "environmentRecovery": {
+      "gracefulEntry": "node scripts/docker-desktop-recover.mjs --execute",
+      "gracefulResult": "停止残留后台时超时",
+      "startEntry": "bash scripts/docker-desktop.sh start",
+      "startResult": "提示已运行但 daemon 不可连接",
+      "guardedEntry": "node scripts/docker-desktop-recover.mjs --execute --force-stop",
+      "guardedResult": {
+        "checkedAt": "2026-10-25T07:11:17.143Z",
+        "availableBytes": 9441820672,
+        "action": "无需恢复",
+        "engineReady": true,
+        "restarted": false,
+        "steps": [
+          {
+            "args": [
+              "info",
+              "--format",
+              "{{.ServerVersion}}"
+            ],
+            "code": 0,
+            "stderr": ""
+          }
+        ]
+      },
+      "forcedStopActuallyExercised": false,
+      "unitTestsPassed": 11,
+      "notes": "再次检查时引擎已恢复，显式强制分支未触发；经正式入口自动整备缓存／未引用镜像后完成关闭，全部卷保留。"
+    }
+  },
+  "runtime": {
+    "beforeDatabase": {
+      "database": "thesis_ledger",
+      "owner": "thesis_ledger",
+      "head": "20261023010000_report_metadata_snapshots"
+    },
+    "afterDatabase": {
+      "database": "thesis_ledger",
+      "owner": "thesis_ledger",
+      "head": "20261023010000_report_metadata_snapshots"
+    },
+    "capabilities": {
+      "httpStatus": 200,
+      "body": {
+        "version": "research-capabilities-v2",
+        "canCreate": false,
+        "scopes": [
+          "instrument",
+          "portfolio",
+          "account",
+          "position",
+          "strategy"
+        ]
+      },
+      "sha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20"
+    },
+    "targets": {
+      "server": {
+        "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+        "runtimeHasHttpResponse": true,
+        "node": "v24.21.0",
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        },
+        "flags": {
+          "researchV2": "false",
+          "temporaryPolicyPresent": false
+        },
+        "modules": {
+          "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "apps/server/dist/src/ai/ai-sdk-generation-model.js": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "apps/server/dist/src/ai/ai-generation-http-response-error.js": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "@thesis-ledger/schemas/dist/index.js": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57"
+        }
+      },
+      "worker": {
+        "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+        "runtimeHasHttpResponse": true,
+        "node": "v24.21.0",
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        },
+        "flags": {
+          "researchV2": null,
+          "temporaryPolicyPresent": false
+        },
+        "modules": {
+          "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "apps/server/dist/src/ai/ai-sdk-generation-model.js": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "apps/server/dist/src/ai/ai-generation-http-response-error.js": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "@thesis-ledger/schemas/dist/index.js": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57"
+        }
+      }
+    },
+    "startupLogs": {
+      "thesis-ledger": {
+        "exit": 0,
+        "lines": 201,
+        "errorLevel": 0,
+        "missingModule": 0,
+        "missingRelation": 0
+      },
+      "backtest-worker": {
+        "exit": 0,
+        "lines": 2,
+        "errorLevel": 0,
+        "missingModule": 0,
+        "missingRelation": 0
+      }
+    }
+  },
+  "protection": {
+    "tableComparison": {
+      "Account": {
+        "before": 28,
+        "after": 28,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "AccountLedgerState": {
+        "before": 22,
+        "after": 22,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "LedgerEvent": {
+        "before": 138,
+        "after": 138,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "Asset": {
+        "before": 4,
+        "after": 4,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "Trade": {
+        "before": 20,
+        "after": 20,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "CashBalance": {
+        "before": 18,
+        "after": 18,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "PortfolioSnapshot": {
+        "before": 6,
+        "after": 6,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "Strategy": {
+        "before": 99,
+        "after": 99,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "StrategyVersion": {
+        "before": 108,
+        "after": 108,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "BacktestJob": {
+        "before": 71,
+        "after": 71,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "ResearchObservation": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "ResearchObservationVersion": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "ResearchObservationSubmission": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "JournalEntry": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "JournalReviewSnapshot": {
+        "before": 4,
+        "after": 4,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "ProviderConfig": {
+        "before": 3,
+        "after": 3,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "AiRoutingSettings": {
+        "before": 1,
+        "after": 1,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "AiDecisionLog": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "AiInvocation": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "AiInvocationFact": {
+        "before": 0,
+        "after": 0,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": true
+      },
+      "AiRun": {
+        "before": 7,
+        "after": 8,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": false
+      },
+      "AiToolCall": {
+        "before": 77,
+        "after": 88,
+        "allOriginalRowsPreserved": true,
+        "fullTableUnchanged": false
+      }
+    },
+    "originalAiRows": 7,
+    "allOriginalAiUnchanged": true,
+    "newFailureRowUnchangedAfterRebuild": true,
+    "newFailureRowHash": "5b357954dbe3cf8427f036da3074b7d3",
+    "serverEnvHashDifferences": [],
+    "infraConfigFilesUnchanged": true,
+    "dsaControls": {
+      "thesis_ledger_policy_history": {
+        "count": 172,
+        "hash": "198797cc7405965c61a01015a086a7a2d6ddfe666bbe93f192de74e1f84299fc",
+        "protocol": "sqlite-row-json-sorted-v1"
+      },
+      "thesis_ledger_policy_state": {
+        "count": 1,
+        "hash": "64845d2d21f80b6683fbb15e4b0c7f7f097b1937daf0395198357f233258fe9e",
+        "protocol": "sqlite-row-json-sorted-v1"
+      },
+      "thesis_ledger_provider_config": {
+        "count": 9,
+        "hash": "f02b738e93b9fef5bb25a7c930e95d21892bad40795a18498d3445220461f84b",
+        "protocol": "sqlite-row-json-sorted-v1"
+      },
+      "thesis_ledger_route_admission_v3": {
+        "count": 9,
+        "hash": "00134eeca31af09eb05804262bcf1e65dfb5eedcffd422578d217a263188fdc2",
+        "protocol": "sqlite-row-json-sorted-v1"
+      }
+    },
+    "routeCount": 20,
+    "dsaControlsUnchanged": true,
+    "mountsUnchanged": true,
+    "containers": {
+      "postgres": {
+        "id": "d76d83b6dde32e8578a9c5e8d6b63e4736be6132b66617323a1f742ddaf29c9a",
+        "startedAt": "2026-10-25T07:10:00.919275796Z",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-postgres-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+            "destination": "/var/lib/postgresql/data",
+            "rw": true
+          }
+        ]
+      },
+      "redis": {
+        "id": "47bfd13c1d3835fac033616bd08a2f5e9b4ec32cadf6aa2fdead8ef1aae10fc0",
+        "startedAt": "2026-10-25T07:10:00.752373171Z",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-redis-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+            "destination": "/data",
+            "rw": true
+          }
+        ]
+      },
+      "dsa": {
+        "id": "4405d6171283af3eafae34748f422afb3e23a8848c7ac5dc6d17ff72a0a1eb86",
+        "startedAt": "2026-10-25T07:10:00.436636629Z",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-dsa-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+            "destination": "/app/data",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+            "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+            "destination": "/app/logs",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+            "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+            "destination": "/app/reports",
+            "rw": true
+          }
+        ]
+      },
+      "thesis-ledger": {
+        "id": "0ca919d181085cad3ea7f30b6ac54f63deadfa06a49dcb4f292d851cc6041a4e",
+        "startedAt": "2026-10-25T07:14:36.738144632Z",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:76f0c84c3db2fb37c413682861b0f71f4789be8c1f7d59fc642229861b1ff382",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-backtest-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "destination": "/app/var/backtest",
+            "rw": true
+          }
+        ]
+      },
+      "backtest-worker": {
+        "id": "b9e788cc5feedfed1b2fb960cde44d92be0ca5a6e68180391da3d902d09f23cc",
+        "startedAt": "2026-10-25T07:14:36.628245341Z",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:76f0c84c3db2fb37c413682861b0f71f4789be8c1f7d59fc642229861b1ff382",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-backtest-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "destination": "/app/var/backtest",
+            "rw": true
+          }
+        ]
+      }
+    },
+    "flagsAfter": {
+      "flags": {
+        "AI_RESEARCH_EXECUTION_ENABLED": "true",
+        "AI_RESEARCH_V2_WRITES_ENABLED": "false",
+        "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
+      },
+      "policyPresent": false,
+      "policy": null
+    },
+    "worktree": {
+      "baselineStage": "单次请求期间、正式关闭前",
+      "finalAfterEvidence": {"main":{"HEAD":"da002744bd317b7754832c6ac41d169bcf005e27","statusCount":1218,"indexEmpty":true},"infra":{"HEAD":"3f661df1deb3de894755dcc66e584abb4165d014","statusCount":107,"indexEmpty":true}},
+      "before": {
+        "main": {
+          "HEAD": "da002744bd317b7754832c6ac41d169bcf005e27",
+          "statusCount": 1216,
+          "indexEmpty": true,
+          "otherTrackedDiffSha256": "6683a83c3af44533944203341aa6f80b8389ac5f4964f788dbc1a36ed2e51719"
+        },
+        "infra": {
+          "HEAD": "3f661df1deb3de894755dcc66e584abb4165d014",
+          "statusCount": 105,
+          "indexEmpty": true,
+          "otherTrackedDiffSha256": "7aee289117a4792a575d66476b050ce92e62c48e8eb8c1e8a659d89570f48b9e"
+        },
+        "infraFileHashes": {
+          ".env": "77e8cb903020b8c6afc19dd6908bb08d481f0db45e505f406a287e08ee89efe0",
+          ".env.example": "dff1263a2019a9f4cc3bb28637e50f6acdb8d49d2dc9e8f269f41ba034f33a0b",
+          "compose.yml": "3cbdd9d50609c4986f1626ee195dc1062f47d8c07d14006307b3233c0cab194b",
+          "compose.dev.yml": "1e195168bfad7ea6eadbdc631e931354226e1d6aa60ae3e74379718dae2848ab",
+          "scripts/sync-code.sh": "9e20d978fc894c60d1fcb24e520dbd70baa50f3703248f9649a94879229b9f83",
+          "scripts/update.sh": "72e71291c780fdfd88c59259452d7ab8aff7a5960e6229d49e86b616c46d7514",
+          "scripts/update-lock.sh": "5b2ea3bfdfd36a84bbb387124b28ea49f33cfd53567e7ee729b7f7e373b7eec8"
+        },
+        "capabilities": {
+          "status": 200,
+          "body": {
+            "version": "research-capabilities-v2",
+            "canCreate": true,
+            "scopes": [
+              "instrument",
+              "portfolio",
+              "account",
+              "position",
+              "strategy"
+            ]
+          },
+          "sha256": "17b349a30c33fc27b52eee1c35ff234c7b6f354f224372ef5b3bf388cffd7db4"
+        }
+      },
+      "after": {
+        "main": {
+          "HEAD": "da002744bd317b7754832c6ac41d169bcf005e27",
+          "statusCount": 1216,
+          "indexEmpty": true,
+          "otherTrackedDiffSha256": "6683a83c3af44533944203341aa6f80b8389ac5f4964f788dbc1a36ed2e51719"
+        },
+        "infra": {
+          "HEAD": "3f661df1deb3de894755dcc66e584abb4165d014",
+          "statusCount": 107,
+          "indexEmpty": true,
+          "otherTrackedDiffSha256": "bcc68bfffa18534bd3316189fbbaaf8ecef5f72e966db80848eca35ed038f5e8"
+        },
+        "infraFileHashes": {
+          ".env": "77e8cb903020b8c6afc19dd6908bb08d481f0db45e505f406a287e08ee89efe0",
+          ".env.example": "dff1263a2019a9f4cc3bb28637e50f6acdb8d49d2dc9e8f269f41ba034f33a0b",
+          "compose.yml": "3cbdd9d50609c4986f1626ee195dc1062f47d8c07d14006307b3233c0cab194b",
+          "compose.dev.yml": "1e195168bfad7ea6eadbdc631e931354226e1d6aa60ae3e74379718dae2848ab",
+          "scripts/sync-code.sh": "9e20d978fc894c60d1fcb24e520dbd70baa50f3703248f9649a94879229b9f83",
+          "scripts/update.sh": "72e71291c780fdfd88c59259452d7ab8aff7a5960e6229d49e86b616c46d7514",
+          "scripts/update-lock.sh": "5b2ea3bfdfd36a84bbb387124b28ea49f33cfd53567e7ee729b7f7e373b7eec8"
+        },
+        "capabilities": {
+          "status": 200,
+          "body": {
+            "version": "research-capabilities-v2",
+            "canCreate": false,
+            "scopes": [
+              "instrument",
+              "portfolio",
+              "account",
+              "position",
+              "strategy"
+            ]
+          },
+          "sha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20"
+        }
+      },
+      "otherMainTrackedWipUnchanged": true,
+      "otherInfraTrackedWipUnchanged": true,
+      "intentionalInfraChanges": [
+        " M docs/specs/2026-10-05-docker-desktop-start.md",
+        " M docs/tasks/2026-10-05-docker-desktop-start.md",
+        "?? scripts/docker-desktop-recover.mjs",
+        "?? scripts/docker-desktop-recover.test.mjs"
+      ],
+      "indexesEmpty": true,
+      "stagedOrCommitted": false
+    }
+  },
+  "readBack": {
+    "detail": {
+      "httpStatus": 200,
+      "availability": "missing",
+      "resultPresent": false,
+      "bodySha256": "2d2b071a39420a414a87677ffaf081a2ec55f5bea7ab44ffb2f79a82900b1737"
+    },
+    "history": {
+      "httpStatus": 200,
+      "containsRun": true,
+      "entry": {
+        "id": "b207e5e5-83d4-4a12-859a-67f7716d648d",
+        "status": "failed",
+        "availability": "missing",
+        "resultVersion": 2
+      },
+      "bodySha256": "343213f5ce5165c38d192acb820d20cee4a720dbe0c2734fda2491e53e4cec37"
+    },
+    "capabilities": {
+      "httpStatus": 200,
+      "body": {
+        "version": "research-capabilities-v2",
+        "canCreate": false,
+        "scopes": [
+          "instrument",
+          "portfolio",
+          "account",
+          "position",
+          "strategy"
+        ]
+      },
+      "sha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20"
+    }
+  },
+  "validation": {
+    "unchangedInputCount": 30,
+    "changedInputs": [],
+    "sourceHashes": {
+      "apps/server/src/ai/ai-sdk-generation.adapter.ts": "3f37d6f0fa6696d373a9713a459caf9c13cfd83c4c8ebb69422fc7e58218d352",
+      "apps/server/src/ai/ai-sdk-generation-model.ts": "84b8f502d1ddbe17e5f93bc53bcb69df9de876158f7b7cc77149045893acc7f8",
+      "apps/server/src/ai/ai-sdk-generation-facts.ts": "df437ed91dbc68213e019d81c2980a5fb9f441879cb5d460a875c93a04e16237",
+      "apps/server/src/ai/ai-generation-diagnostics.ts": "1bbc972fdc48cbe8e3d2bf191c4c0b3dc95e2edc82bb0042e2d2e2662eb3bbbc",
+      "apps/server/src/ai/ai-generation-stream-diagnostics.ts": "f751e781e40ad47a0dc28712f96065bc606c8e9170f2c757ea054fb4edaeb16c",
+      "apps/server/src/ai/ai-generation-http-request-diagnostics.ts": "45ed0488846c61e69702335072f5ba51fc32ac88fa083000561453ee0fe3d2e6",
+      "apps/server/src/ai/ai-generation-http-response-diagnostics.ts": "514f226424932b94adcf0946730bae813d2a82d114afbff633bd0a711e54269c",
+      "apps/server/src/ai/ai-generation-http-response-error.ts": "174b3f968f1b59ad530fd89e4def9e1f389c1cf912a4d3960ec9e789a6590dad",
+      "apps/server/src/ai/ai-generation-failure-diagnostics.ts": "4e0df08588a9c814f56178f7a8f89246176394060ac14271e953e2a3223f88d3",
+      "apps/server/test/ai/ai-http-response-diagnostics.integration.test.ts": "cbe67876b0e97ea17bf8c9b8d70b8e1a1d8d6f527c721503234d79ef5134dc13",
+      "apps/server/test/ai/ai-http-response-diagnostics.test.ts": "1d61a7b88b544e5e446ec6d2b7d3fb41b3ee6cb18baac07de5362393565099a8",
+      "apps/server/test/ai/ai-generation-stream-diagnostics.integration.test.ts": "727b25004b2d7026f771c07a78bbc36ddadb395350c6284b1a82bb3ac8be9594",
+      "apps/server/test/ai/ai-generation-stream-diagnostics.test.ts": "44b490470eb03c2bd7987b536f00f7e4b22c00f6aec24b6a1334acf745124099",
+      "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "1d397fa47bc26e1512f43c17aa148343ede615748eec077112c93c92e1dfc98d",
+      "apps/server/test/ai/ai-generation-failure-diagnostics.test.ts": "d4c0caef1f9070038d03c4d0b174d1731f08ecbef73aec8efecb8cad951dde00",
+      "packages/schemas/src/ai-generation-http-response-diagnostic.ts": "d14e0167d468d89a52023962c581b75347a3e0297c4155b43f0e8563a9584126",
+      "packages/schemas/src/ai-generation-runtime-diagnostic.ts": "5ec4735e2dd4d151660620b90fc2d00eda394a526bc577188151160544351a97",
+      "docs/tasks/evidence/2026-10-25-g3-formal-free-sdk-recovery.json": "ebd64330fca663b7a5d32119558991e893a8c550e38980655b2c26a630cbc0aa",
+      "docs/tasks/evidence/2026-10-24-g3-free-finish-diagnostic.json": "901b00b771459ee3a41da94ac226487de1cfc4695e0444d7b1a3ac0e35c87d9f",
+      "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/package.json": "0ea182eed5dc0a057adb0768d02ddaeb29237d91366e94d1c9544eef8ac212d7",
+      "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/dist/index.js": "22d63f281f83c71d443818749076aa3a7f8f07d15a4e83c42df3c751de2fba76",
+      "node_modules/.pnpm/@ai-sdk+openai-compatible@3.0.53_zod@4.4.3/node_modules/@ai-sdk/openai-compatible/package.json": "7da2dc63c865e97f657d0be1c0e99d62fc434845e39dea394b3e365238cf6b3b",
+      "node_modules/.pnpm/@ai-sdk+openai-compatible@3.0.53_zod@4.4.3/node_modules/@ai-sdk/openai-compatible/dist/index.js": "c0583efbc1d4ecf6c6e3b0cbdeae29b15ebc883b41d164425f7916fe2281b078",
+      "node_modules/.pnpm/zod@4.4.3/node_modules/zod/package.json": "c630bd10b52dcf71c112a2bf78dbf2734b9db58d62de663b8d86c2ec2c8cda2e",
+      "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/src/prompt/normalize-stream-provider-error.ts": "a0bffa8dc2680a1ed10f700ec92799fdfc1598578800b4ff33ba41005157d81f",
+      "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/src/generate-text/stream-language-model-call.ts": "5f6784c4728a9627b3c79568e270b43a4c3a55c7a3679b8b81d9ce33fb245b8f",
+      "node_modules/.pnpm/ai@7.0.107_zod@4.4.3/node_modules/ai/src/generate-text/stream-text.ts": "ca1500d3c63f300d470351931e12b330cbe55fe510d8430e3dc54bdcb0a7882f",
+      "node_modules/.pnpm/@ai-sdk+openai-compatible@3.0.53_zod@4.4.3/node_modules/@ai-sdk/openai-compatible/src/chat/openai-compatible-chat-language-model.ts": "aae6ac88dcc53a34b7bcb554b0c78dc99e019a66b7f06c643d2080aecaf5dfb7",
+      "node_modules/.pnpm/@ai-sdk+provider-utils@5.0.45_zod@4.4.3/node_modules/@ai-sdk/provider-utils/src/post-to-api.ts": "e7a64b7419b3939d881c53f387d3097999ef63a639798621b647f918c661ec38",
+      "node_modules/.pnpm/@ai-sdk+provider-utils@5.0.45_zod@4.4.3/node_modules/@ai-sdk/provider-utils/src/response-handler.ts": "9c8e03499a7ca2688e5dcb8597ec609d152181210d8bb4730f8ec594d32a8b83"
+    },
+    "offlineFrozenRequestProofPassed": true,
+    "serverAndWorkerEach15ModulesMatched": true,
+    "realForcedStopAcceptance": false,
+    "priorChecksReused": "D22 定向诊断测试与 D23 移动边界证据按未变化输入复用，本轮未重复全量测试。"
+  },
+  "remaining": [
+    "G3-D8 的新正式 V2 报告、全部引用归属、成功历史与发布反读尚未通过。",
+    "D20 原 HTTP／SSE、实际模型、结束原因、用量与费用仍未知，不能由 D25 回填。",
+    "D25 具体字段级校验事实未留存，无法重放本次模型原始输出或作字段修补结论。",
+    "剩余 7 次冻结；不得自动重试、修改默认／Schema／推理参数或另发用途／直连调用。"
+  ]
+}

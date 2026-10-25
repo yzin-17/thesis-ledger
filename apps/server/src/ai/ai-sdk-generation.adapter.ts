@@ -13,11 +13,19 @@ import {
   type AiGenerationMode,
   type AiUsageFacts,
   type AiAuthMode,
+  type AiGenerationHttpRequestDiagnostic,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
+import type { AdaptiveTimeoutDecision } from './adaptive/ai-adaptive-policy.js';
+import { traceSdkGeneration } from './trace/ai-trace-sdk.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 import { createGenerationModel } from './ai-sdk-generation-model.js';
-import { AiGenerationStreamDiagnostics } from './ai-generation-stream-diagnostics.js';
+import {
+  createGenerationDiagnostics,
+  generationDiagnosticSnapshots,
+  generationHttpRequestFields,
+  type AiGenerationDiagnostics,
+} from './ai-generation-diagnostics.js';
 import {
   generationOutput,
   parseGenerationOutput,
@@ -61,6 +69,7 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   transport: 'single' | 'stream';
   maxOutputTokens?: number;
   reasoningEffort?: ReasoningEffort;
+  reasoningEnabled?: boolean;
   timeout: {
     /** 总时长上限；流式请求可以不设，此时由 firstChunkMs / chunkMs 判活。 */
     totalMs?: number;
@@ -69,6 +78,9 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   };
   signal: AbortSignal;
   onProgress?: (progress: AiSdkProgress) => void;
+  /** 传输边界可注入原生 HTTP 或受控响应适配器；SDK 解析逻辑保持一致。 */
+  httpClient?: typeof fetch;
+  adaptiveExecution?: AdaptiveTimeoutDecision;
 };
 
 export type AiSdkGenerationResult<OUTPUT> = {
@@ -81,6 +93,7 @@ export type AiSdkGenerationResult<OUTPUT> = {
   providerCostCurrency: string | null;
   timeToFirstEventMs: number | null;
   timeToFirstTextMs: number | null;
+  httpRequest?: AiGenerationHttpRequestDiagnostic;
 };
 
 const telemetry = { isEnabled: false, recordInputs: false, recordOutputs: false } as const;
@@ -140,9 +153,9 @@ const sdkPrompt = (messages: unknown[]) => {
 const commonOptions = <OUTPUT>(
   input: AiSdkGenerationRequest<OUTPUT>,
   onUsage: (usage: LanguageModelUsage) => void,
-  diagnostics?: AiGenerationStreamDiagnostics,
+  diagnostics?: AiGenerationDiagnostics,
 ) => ({
-  model: createGenerationModel(input, diagnostics),
+  model: createGenerationModel(input, diagnostics?.stream, diagnostics?.http),
   ...sdkPrompt(input.messages),
   maxRetries: 0,
   abortSignal: input.signal,
@@ -157,6 +170,12 @@ export class AiSdkGenerationAdapter {
   async generate<OUTPUT>(
     input: AiSdkGenerationRequest<OUTPUT>,
   ): Promise<AiSdkGenerationResult<OUTPUT>> {
+    return traceSdkGeneration(input, () => this.generateObserved(input));
+  }
+
+  private async generateObserved<OUTPUT>(
+    input: AiSdkGenerationRequest<OUTPUT>,
+  ): Promise<AiSdkGenerationResult<OUTPUT>> {
     try {
       validateGenerationRequest(input);
     } catch (error) {
@@ -167,10 +186,7 @@ export class AiSdkGenerationAdapter {
         { cause: error },
       );
     }
-    const diagnostics =
-      input.contract.id === 'research' && input.contract.version === 'research-generation-v2'
-        ? new AiGenerationStreamDiagnostics(input.adapter, input.transport)
-        : undefined;
+    const diagnostics = createGenerationDiagnostics(input);
     const startedAt = Date.now();
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
     const captureUsage = (usage: LanguageModelUsage) => {
@@ -187,6 +203,7 @@ export class AiSdkGenerationAdapter {
       assertFinishReason(result.finishReason, input.requestId, observedUsage);
       return {
         output: parseGenerationOutput(input.mode, input.schema, result.output),
+        ...generationHttpRequestFields(diagnostics),
         ...resultMetadata(
           result.usage,
           result.finishReason,
@@ -211,11 +228,15 @@ export class AiSdkGenerationAdapter {
             { cause: error },
           ),
           input.mode,
-          diagnostics?.snapshot(),
+          ...generationDiagnosticSnapshots(diagnostics),
         );
       }
       if (error instanceof AiSdkGenerationError)
-        throw withGenerationRuntimeDiagnostic(error, input.mode, diagnostics?.snapshot());
+        throw withGenerationRuntimeDiagnostic(
+          error,
+          input.mode,
+          ...generationDiagnosticSnapshots(diagnostics),
+        );
       const name = error instanceof Error ? error.name : asRecord(error)?.name;
       const summary = sanitize(error);
       if (
@@ -224,7 +245,12 @@ export class AiSdkGenerationAdapter {
         (typeof name === 'string' && name.includes('NoOutputGeneratedError')) ||
         summary.startsWith('No object generated')
       ) {
-        throw schemaGenerationFailure(error, input, observedUsage, diagnostics?.snapshot());
+        throw schemaGenerationFailure(
+          error,
+          input,
+          observedUsage,
+          ...generationDiagnosticSnapshots(diagnostics),
+        );
       }
       throw withGenerationRuntimeDiagnostic(
         new AiSdkGenerationError(
@@ -233,7 +259,7 @@ export class AiSdkGenerationAdapter {
           { cause: error },
         ),
         input.mode,
-        diagnostics?.snapshot(),
+        ...generationDiagnosticSnapshots(diagnostics),
       );
     }
   }
@@ -242,7 +268,7 @@ export class AiSdkGenerationAdapter {
     input: AiSdkGenerationRequest<OUTPUT>,
     startedAt: number,
     onUsage: (usage: LanguageModelUsage) => void,
-    diagnostics?: AiGenerationStreamDiagnostics,
+    diagnostics?: AiGenerationDiagnostics,
   ): Promise<AiSdkGenerationResult<OUTPUT>> {
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
     const captureUsage = (usage: LanguageModelUsage) => {
@@ -267,11 +293,11 @@ export class AiSdkGenerationAdapter {
     for await (const part of result.stream as AsyncIterable<
       TextStreamPart<Record<string, never>>
     >) {
-      diagnostics?.observeSdkPart(part);
+      diagnostics?.stream.observeSdkPart(part);
       if (part.type === 'error') streamError = part.error;
       if (part.type === 'abort')
         throw new DOMException(part.reason ?? 'Provider stream aborted', 'AbortError');
-      if (part.type === 'reasoning-delta' || part.type === 'text-delta') {
+      if ((part.type === 'reasoning-delta' || part.type === 'text-delta') && part.text.length > 0) {
         const elapsed = Date.now() - startedAt;
         firstEvent ??= elapsed;
         input.onProgress?.({
@@ -300,6 +326,7 @@ export class AiSdkGenerationAdapter {
     if (!complete.ok) throw complete.error;
     return {
       output: parseGenerationOutput(input.mode, input.schema, complete.value),
+      ...generationHttpRequestFields(diagnostics),
       ...resultMetadata(usage, finishReason, rawFinishReason, response, providerMetadata, {
         firstEvent,
         firstText,

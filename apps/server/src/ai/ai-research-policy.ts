@@ -7,6 +7,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { AiProviderRegistry } from './provider-registry.js';
 import { aiProviderPricingForModel } from './ai-provider-pricing.js';
+import { researchReasoningFields } from './ai-research-reasoning-options.js';
 
 export const parseAiResearchPolicy = (value: string | undefined): AiResearchPolicyV1 => {
   if (!value) return DEFAULT_AI_RESEARCH_POLICY_V1;
@@ -81,6 +82,7 @@ export const freezeAiResearchRoutes = (
         adapter: candidate.execution.adapter,
         mode: candidate.execution.mode,
         configurationFingerprint: candidate.execution.readiness.configurationFingerprint,
+        ...researchReasoningFields(candidate.execution),
         pricing: {
           ...(pricing.costPer1kInput === undefined
             ? {}

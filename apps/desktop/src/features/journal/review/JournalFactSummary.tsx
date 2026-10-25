@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { JournalReviewCandidateContract } from '@thesis-ledger/schemas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -5,7 +6,13 @@ import { formatDateTime } from '@/lib/date-display';
 import { evidenceLabel, reviewObjectLabels, reviewStatusLabels } from './journal-review-display.js';
 import { JournalSourceFacts } from './JournalSourceFacts.js';
 
-export function JournalFactSummary({ candidate }: { candidate: JournalReviewCandidateContract }) {
+export function JournalFactSummary({
+  candidate,
+  actions,
+}: {
+  candidate: JournalReviewCandidateContract;
+  actions?: ReactNode;
+}) {
   const { input } = candidate;
   const trade = input.trade;
   const reference = input.reference;
@@ -17,11 +24,14 @@ export function JournalFactSummary({ candidate }: { candidate: JournalReviewCand
   const netPnl = slice ? slice.netRealizedPnl : trade.netRealizedPnl;
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>
-          {trade.symbol} · {reviewObjectLabels[input.reference.reviewObjectType]}
-        </CardTitle>
-        <CardDescription>实际事实来自账户交易投影；基线观察与真实成交分开呈现。</CardDescription>
+      <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <CardTitle className="break-words">
+            {trade.symbol} · {reviewObjectLabels[input.reference.reviewObjectType]}
+          </CardTitle>
+          <CardDescription>先核对事实与计划，再开始复盘。</CardDescription>
+        </div>
+        {actions}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2">
@@ -60,9 +70,14 @@ export function JournalFactSummary({ candidate }: { candidate: JournalReviewCand
               .join('；')}
           </p>
         )}
-        <JournalSourceFacts input={input} />
+        <details className="border-t pt-3">
+          <summary className="cursor-pointer text-sm font-medium">成交与计划来源</summary>
+          <div className="mt-4">
+            <JournalSourceFacts input={input} />
+          </div>
+        </details>
         <details>
-          <summary className="cursor-pointer text-sm">查看原始计划与事实来源</summary>
+          <summary className="cursor-pointer text-sm">原始证据数据</summary>
           <div className="mt-3 flex flex-col gap-3">
             <p className="text-sm">
               {input.plan

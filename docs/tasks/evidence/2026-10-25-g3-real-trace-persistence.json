@@ -1,0 +1,149 @@
+{
+  "version": "g3-real-trace-persistence-v1",
+  "date": "2026-10-25",
+  "task": "G3-D29",
+  "outcome": {
+    "failureTraceCapture": "passed",
+    "sameImageRecreationPersistence": "passed",
+    "realUpstreamResponseAcceptance": "blocked_before_tls",
+    "researchReportSucceeded": false,
+    "g3Complete": false
+  },
+  "identity": {
+    "submissionId": "d9a1bfe1-08fe-4739-83f7-21c5aed2e4ab",
+    "runId": "b0ce2e5e-6cb6-4cef-8160-42221b875d47",
+    "traceId": "ba68ab6e-6b05-4bad-be33-f2338925a718",
+    "requestId": "46ae3809-6e30-4805-8520-6bfe2c01fe57",
+    "executionAttempt": 1
+  },
+  "budget": {
+    "remainingBefore": 7,
+    "authorizedHttpAttempts": 1,
+    "nativeFetches": 1,
+    "automaticRetries": 0,
+    "remainingFrozen": 6,
+    "maxCost": "0",
+    "actualCostStatus": "unknown",
+    "actualCostSource": "provider_cost_unavailable",
+    "inputTokens": null,
+    "outputTokens": null
+  },
+  "http": {
+    "origin": "https://openrouter.ai",
+    "path": "/api/v1/chat/completions",
+    "method": "POST",
+    "requestedModel": "openrouter/free",
+    "actualModel": null,
+    "stream": true,
+    "generationMode": "native_schema",
+    "requestBodyBytes": 22517,
+    "requestBodySha256": "a43b685c039543cd71c48f017ee77e15605ff4c1915a221c84ad4177ca49355a",
+    "savedBodyBytes": 37774,
+    "savedBodySha256": "7c4d41fa245f738cb0f76bc13f68dc78922f8b0c28e69abb62f6f4eee4363701",
+    "canonicalSavedBodyEqualsWire": true,
+    "upstreamHttpStatus": null,
+    "upstreamBodyReceived": false,
+    "sseFrames": 0,
+    "sdkTextCharacters": 0,
+    "nativeFetchError": "TypeError: fetch failed",
+    "sdkError": "Cannot connect to API: Client network socket disconnected before secure TLS connection was established",
+    "causeClasses": ["AiSdkGenerationError", "AiSdkGenerationError", "AI_APICallError", "Error"],
+    "sdkErrorCode": "transport_unknown"
+  },
+  "business": {
+    "status": "failed",
+    "errorCode": "research_unknown_outcome",
+    "result": null,
+    "detailHttpStatus": 200,
+    "detailAvailability": "missing",
+    "historyHttpStatus": 200,
+    "historyContainsSameFailedRun": true
+  },
+  "trace": {
+    "captureStatus": "complete",
+    "manifestStatus": "failed",
+    "issues": [],
+    "fileCountIncludingManifest": 12,
+    "totalBytes": 123169,
+    "fileSetSha256": "acdf2f227002592a8614b86d0b0cfa6ff83e6bb9eeff5716e80c47e9c6416515",
+    "manifestSha256": "b3f12f0d932b168eb127a03bcdd2487acd1ccadb31e0b3d1138a1a7ff013e3a6",
+    "upstreamResponseStage": {"status": "skipped", "reason": "not_reached"},
+    "businessResultStage": {"status": "skipped", "reason": "not_reached"},
+    "directoryMode": "0700",
+    "fileMode": "0600",
+    "uid": 100,
+    "gid": 101,
+    "volume": "thesis-ledger-backtest-data",
+    "root": "/app/var/backtest/ai-traces",
+    "privateHostRoot": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/.recovery-artifacts/g3-d29-20261025",
+    "bothRolesReadableBeforeAndAfter": true,
+    "allFileBytesMetadataAndManifestUnchanged": true
+  },
+  "deployment": {
+    "entry": "thesis-ledger-infra/scripts/update.sh thesis-ledger",
+    "databaseMode": "check",
+    "openExitCode": 0,
+    "closeExitCode": 0,
+    "applicationImageBuildCount": 1,
+    "acceptedImage": "sha256:d1e5369eefa33638b2847dc30563c84e41a1511e836a11200bd25a5467c738de",
+    "closeReusedExactImage": true,
+    "server": {
+      "captureContainer": "5da35f138e932b9dc627f856f76b47f4802d74ad71c9c10de164b7c7eb793098",
+      "recreatedContainer": "a2e2fb04dd2f8cf6c30fe26304525fc44f650f1766c8ea17a0978a1bab0e7b6c"
+    },
+    "worker": {
+      "captureContainer": "7b11031be665250f1dc5522dd93d0554fc9fd6df8b1f7242b8ce443cfb1ba46c",
+      "recreatedContainer": "fd0f5c41c059a7521bc38d21103bbf26b74bf86dab50fa79be2f219498aa89e9"
+    },
+    "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+    "inventories": {
+      "server": {"files": 2037, "sha256": "03c0f35f4f40adba2520df4fac725e7fcbe10412291937a3fe1c895bbd258771"},
+      "schemas": {"files": 561, "sha256": "4943fad2c97c363cb3457014514fdce2073ba0cc64652a2140ea3d6fbf642291"},
+      "domain": {"files": 228, "sha256": "02a450e61d87c1eabc207f93047aaff12643b2370e157a2f29b275e232aee89c"},
+      "shared": {"files": 3, "sha256": "7bbf347ce70d9a9a9a8292bf1d8de53227aad692939da2a0be3f77d0ba292a93"}
+    },
+    "obsoleteHostArtifactsWithoutSource": {"schemas": 18, "domain": 15},
+    "serverWorkerCurrentSourceAgree": true
+  },
+  "protection": {
+    "database": "thesis_ledger",
+    "owner": "thesis_ledger",
+    "schemaHead": "20261023010000_report_metadata_snapshots",
+    "protectedTables": 22,
+    "allOldRowsUnchanged": true,
+    "aiRunCounts": [8, 9],
+    "aiToolCallCounts": [88, 99],
+    "allNewToolCallsBelongToSelectedRun": true,
+    "dsaControlsAdmissionsAnd20RoutesUnchanged": true,
+    "originalEnvironmentRestored": true,
+    "allMountsUnchanged": true,
+    "nonConsumerContainerIdsUnchanged": true,
+    "healthyServices": 5,
+    "pendingResearch": 0,
+    "v2Enabled": false,
+    "temporaryPolicyPresent": false,
+    "capabilitiesHttpStatus": 200,
+    "canCreate": false,
+    "stagedOrCommitted": false,
+    "acceptancePackage": {
+      "originalFiles": 22452,
+      "currentFiles": 24105,
+      "concurrentAdditionsPreserved": 1653,
+      "originalSourceFiles": 359,
+      "originalSourceContentSha256": "9ff1e5de84db45d90a9befa35b31e7cd019bfe088087531fb43b5a30c4580a8e",
+      "originalSourceContentUnchanged": true,
+      "existingLiveMetroLogAppendedBytes": 761,
+      "originalWholeDirectoryMetadataUnchanged": false,
+      "explanation": "并行移动端运行追加既有Metro实时日志；原验收源码及并行新增文件保留，未截断或回滚。"
+    }
+  },
+  "laterTlsOnlyProbe": {
+    "capturedAt": "2026-10-25T10:38:27.490Z",
+    "hostTrustedTls13": true,
+    "serverTrustedTls13": true,
+    "applicationHttpRequests": 0,
+    "authorizationSent": false,
+    "modelCalls": 0,
+    "explanation": "随后TLS握手成功，未持续复现断链；不能据此确认原断链节点或补作真实模型响应验收。"
+  }
+}

@@ -7,6 +7,10 @@ import { AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 } from './ai-provider-
 import { AiSdkGenerationError } from './ai-sdk-generation-facts.js';
 import type { AiSdkGenerationRequest } from './ai-sdk-generation.adapter.js';
 import type { AiGenerationStreamDiagnostics } from './ai-generation-stream-diagnostics.js';
+import {
+  generationFetchOptions,
+  type AiGenerationHttpRequestDiagnostics,
+} from './ai-generation-http-request-diagnostics.js';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -71,23 +75,19 @@ const openRouterTransform = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
   if (compatibilityProfile(input) !== AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1)
     return undefined;
   return (body: Record<string, unknown>) => {
-    if (input.mode !== 'native_schema') return body;
-    return { ...body, provider: { require_parameters: true } };
+    const explicit =
+      input.reasoningEnabled === undefined
+        ? body
+        : { ...body, reasoning: { enabled: input.reasoningEnabled } };
+    if (input.mode !== 'native_schema') return explicit;
+    return { ...explicit, provider: { require_parameters: true } };
   };
-};
-
-const noAuthFetch = async (
-  input: Parameters<typeof fetch>[0],
-  init?: Parameters<typeof fetch>[1],
-) => {
-  const headers = new Headers(init?.headers);
-  for (const header of ['authorization', 'x-api-key', 'api-key']) headers.delete(header);
-  return globalThis.fetch(input, { ...init, headers });
 };
 
 export const createGenerationModel = <OUTPUT>(
   input: AiSdkGenerationRequest<OUTPUT>,
   diagnostics?: AiGenerationStreamDiagnostics,
+  httpDiagnostics?: AiGenerationHttpRequestDiagnostics,
 ): LanguageModel => {
   if (
     compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 &&
@@ -103,19 +103,24 @@ export const createGenerationModel = <OUTPUT>(
       }),
       { status: 'unknown', inputTokens: null, outputTokens: null },
     );
-  const noAuth = input.authMode === 'none' ? { fetch: noAuthFetch } : {};
+  const transport = generationFetchOptions(
+    input.authMode,
+    httpDiagnostics,
+    diagnostics?.observeHttpResponse,
+    input.httpClient,
+  );
   if (input.adapter === 'openai-chat') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).chat(
+    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...transport }).chat(
       input.model,
     );
   }
   if (input.adapter === 'openai-responses') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).responses(
+    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...transport }).responses(
       input.model,
     );
   }
   if (input.adapter === 'anthropic-messages') {
-    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).messages(
+    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey, ...transport }).messages(
       input.model,
     );
   }
@@ -124,7 +129,7 @@ export const createGenerationModel = <OUTPUT>(
     name: 'compatible',
     baseURL: input.baseURL,
     apiKey: input.apiKey,
-    ...noAuth,
+    ...transport,
     includeUsage: true,
     supportsStructuredOutputs: input.mode === 'native_schema',
     convertUsage: convertCompatibleUsage,

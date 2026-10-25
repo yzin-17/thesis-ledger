@@ -21,6 +21,8 @@ import { missingResearchEvidence, newsResearchEvidence } from './research-public
 import { finalizeResearchMaterials } from './research-material-preparation.js';
 import { readResearchPrice } from './research-price-material.js';
 import { researchV2WritesEnabled } from '../ai/ai-research-v2-write-policy.js';
+import { withAiTraceReference } from '../ai/trace/ai-trace-context.js';
+import type { AiTraceReference } from '../ai/trace/ai-trace-contract.js';
 
 type Run = NonNullable<Awaited<ReturnType<AiRunService['findResearchSubmissionV2']>>>;
 const receipt = (run: Run, reused: boolean) =>
@@ -51,11 +53,12 @@ export class ResearchSubmissionService {
     });
   }
 
-  async submit(ownerId: string, raw: unknown, signal?: AbortSignal) {
+  async submit(ownerId: string, raw: unknown, signal?: AbortSignal, trace?: AiTraceReference) {
     const input = normalizeResearchSubmissionV2(raw);
     const budget = new ResearchPreparationBudget(signal);
     try {
-      return await budget.run(() => this.prepareAndSubmit(ownerId, input, budget));
+      const prepare = () => budget.run(() => this.prepareAndSubmit(ownerId, input, budget));
+      return await (trace ? withAiTraceReference(trace, prepare) : prepare());
     } finally {
       budget.close();
     }

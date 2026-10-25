@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   aiOutputPolicySchema,
   aiChatImplementationSchema,
+  aiCompatibilityExtensionProfileSchema,
   aiAuthModeSchema,
   aiProviderTestKindSchema,
   aiGenerationContractRefSchema,
@@ -14,6 +15,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { AiAuthMode, AiProviderTestKind } from '@thesis-ledger/schemas';
 import type { ProviderState } from '../providers/provider-health.service.js';
+import { isResearchV2Contract } from './ai-research-reasoning-options.js';
 
 export const httpUrl = z.url().refine((value) => {
   try {
@@ -131,8 +133,13 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
       contract: aiGenerationContractRefSchema,
       firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
       outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+      reasoningEnabled: z.boolean().optional(),
     })
-    .strict(),
+    .strict()
+    .refine(
+      (route) => route.reasoningEnabled === undefined || isResearchV2Contract(route.contract),
+      { path: ['reasoningEnabled'], message: '显式推理开关仅适用于研究 V2' },
+    ),
 );
 
 export type AiProviderExecutionRouteInput = z.infer<typeof aiProviderExecutionRouteInputSchema>;
@@ -158,6 +165,7 @@ export const aiProviderInputSchema = z
     authMode: aiAuthModeSchema.default('api_key'),
     upstreamFormat: aiUpstreamFormatSchema.default('chat-completions'),
     chatImplementation: aiChatImplementationSchema.optional(),
+    compatibilityExtensionProfile: aiCompatibilityExtensionProfileSchema.optional(),
     executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
     modelDefaults: modelDefaultsSchema,
     modelPricing: modelPricingSchema.optional(),
@@ -178,6 +186,16 @@ export const aiProviderInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (
+      value.compatibilityExtensionProfile &&
+      (value.upstreamFormat !== 'chat-completions' ||
+        (value.chatImplementation ?? 'compatible') !== 'compatible')
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['compatibilityExtensionProfile'],
+        message: 'OpenRouter 兼容扩展仅适用于兼容 Chat Completions 实现',
+      });
     const selection = aiUpstreamSelectionSchema.safeParse({
       upstreamFormat: value.upstreamFormat,
       ...(value.chatImplementation === undefined

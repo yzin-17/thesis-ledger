@@ -10,6 +10,8 @@ import { PromptVersionRegistry } from '../../src/ai/prompt-registry.js';
 import { researchPromptsV2 } from '../../src/ai/ai-research-prompts-v2.js';
 import { verifyAiFrozenResearchV2 } from '../../src/ai/ai-research-frozen-integrity-v2.js';
 import { submissionV2Fixture } from '../ai/research-submission-v2.fixture.js';
+import { createAiTraceReference } from '../../src/ai/trace/ai-trace-contract.js';
+import { currentAiTraceReference } from '../../src/ai/trace/ai-trace-context.js';
 
 function fixture() {
   const { input, frozen } = submissionV2Fixture();
@@ -75,6 +77,18 @@ function fixture() {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('研究准备到提交的有界行为', () => {
+  it('可选 trace 引用穿过异步材料准备，只影响本次创建上下文', async () => {
+    const f = fixture();
+    const reference = createAiTraceReference();
+    let seen: unknown;
+    f.runs.startResearchV2.mockImplementation(() => {
+      seen = currentAiTraceReference();
+      return Promise.resolve({ run: f.run, reused: false });
+    });
+    await f.service.submit(f.owner, f.input, undefined, reference);
+    expect(seen).toEqual(reference);
+    expect(currentAiTraceReference()).toBeUndefined();
+  });
   it('默认模型未就绪时不获取材料或投递执行', async () => {
     const f = fixture();
     f.runs.researchV2Default.mockRejectedValue(new Error('默认模型未就绪'));

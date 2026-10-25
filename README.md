@@ -6,7 +6,7 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 
 - `apps/server`：NestJS API，拥有用户事实和业务编排。
 - `apps/desktop`：React 桌面 Web 界面，只访问 ThesisLedger API。
-- `apps/mobile`：React Native 客户端边界，目前为只读能力入口。
+- `apps/mobile`：Android / iOS React Native 客户端，提供账户、账本、市场、复盘研究及策略回测入口。
 - `packages/domain`：无基础设施依赖的确定性计算。
 - `packages/schemas`：跨模块版本化契约。
 - `services/dsa-adapter`：可替换行情 Provider、路由、健康和凭证类型。
@@ -263,7 +263,7 @@ Mobile 使用“组合、账户、市场、研究、更多”五个入口，支�
 - 配置与运行：AI 模型/用途、行情凭证/账号与 OAuth、路由与目录、自动化管理及来源/质量/通知诊断；保存、验证、启用和实际执行分别反馈。
 - 连接与主题：服务地址验证，系统、浅色和深色主题。页面保留加载、空数据、读取失败和陈旧状态。
 
-在“研究 → 打开策略与回测”进入策略工作区；保存定义、采用建议、冻结回测及升级风险应用均需明确确认。未知模型费用与服务端能力状态按现行合同提示，手机不会自动启用模型、来源或通知。操作入口、凭证与错误恢复见[Android / iOS 使用说明](docs/guides/2026-10-25-mobile-client.md)；分批范围及 Android/iOS 独立验收结果见[手机迁移任务](docs/tasks/2026-10-22-web-mobile-feature-parity.md)。本机受控运行与真实 Provider、模型、OAuth、Worker 和签名分发分别记录，未通过条件继续保留。
+在“研究 → 打开策略与回测”进入策略工作区；保存定义、采用建议、冻结回测及升级风险应用均需明确确认。未知模型费用与服务端能力状态按现行合同提示，手机不会自动启用模型、来源或通知。操作入口、凭证与错误恢复见[Android / iOS 使用说明](docs/guides/2026-10-25-mobile-client.md)；分批范围及 Android/iOS 独立验收结果见[手机迁移任务](docs/tasks/2026-10-22-web-mobile-feature-parity.md)。原生编译、双端模拟器、当前源码 CI 与真实 Provider、模型、OAuth、Worker 分层记录，未通过条件继续保留。
 
 移动端默认连接本机 API：iOS/Web 使用 `http://127.0.0.1:3000/api/v1`，Android 模拟器使用 `http://10.0.2.2:3000/api/v1`；也可以通过 `EXPO_PUBLIC_API_BASE_URL` 指定地址。移动端同样会显示加载、空数据、读取失败和陈旧状态。
 

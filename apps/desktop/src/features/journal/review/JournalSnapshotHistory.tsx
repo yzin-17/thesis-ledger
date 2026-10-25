@@ -141,13 +141,16 @@ export function JournalSnapshotHistory({
   });
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        按保存时间查询历史。{reviewObjectId ? '当前仅显示所选对象。' : '当前显示此账户全部对象。'}
-      </p>
-      <FieldGroup className="sm:flex-row">
+    <div className="flex flex-col gap-3 pt-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-medium">复盘快照</h2>
+        <p className="text-xs text-muted-foreground">
+          按保存时间查询历史。{reviewObjectId ? '当前仅显示所选对象。' : '当前显示此账户全部对象。'}
+        </p>
+      </div>
+      <FieldGroup className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <Field className="flex-1">
-          <FieldLabel>保存时间起点（可选）</FieldLabel>
+          <FieldLabel>开始时间（可选）</FieldLabel>
           <JournalWindowTimeInput
             aria-label="快照开始时间"
             value={draft.start}
@@ -155,25 +158,24 @@ export function JournalSnapshotHistory({
           />
         </Field>
         <Field className="flex-1">
-          <FieldLabel>保存时间终点（可选）</FieldLabel>
+          <FieldLabel>结束时间（可选）</FieldLabel>
           <JournalWindowTimeInput
             aria-label="快照结束时间"
             value={draft.end}
             onValueChange={(end) => setDraft({ ...draft, end })}
           />
         </Field>
+        <Button
+          className="self-end justify-self-start sm:col-span-2 lg:col-span-1"
+          onClick={() => {
+            setId(null);
+            setWindow({ ...draft });
+          }}
+        >
+          查询历史
+        </Button>
       </FieldGroup>
-      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">时间范围说明</summary><p className="mt-2">按本机时区输入；开始时刻计入范围，结束时刻不计入。</p></details>
-      <Button
-        variant="outline"
-        className="self-start"
-        onClick={() => {
-          setId(null);
-          setWindow({ ...draft });
-        }}
-      >
-        查询历史
-      </Button>
+      <p className="text-xs text-muted-foreground">按本机时区输入，开始时刻计入、结束时刻不计入；留空表示不限。</p>
       {query.isPending && <Skeleton className="h-20 w-full" />}
       {query.isError && (
         <JournalRequestError

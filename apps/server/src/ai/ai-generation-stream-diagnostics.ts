@@ -6,6 +6,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { generationStructuralPreview } from './ai-generation-structural-preview.js';
 import { sdkRuntimeVersions } from './ai-sdk-runtime-versions.js';
+import { AiGenerationHttpResponseDiagnostics } from './ai-generation-http-response-diagnostics.js';
 
 type Stream = NonNullable<AiGenerationRuntimeDiagnostic['stream']>;
 type Provider = NonNullable<Stream['provider']>;
@@ -60,6 +61,7 @@ export class AiGenerationStreamDiagnostics {
   private readonly providerReasoning = metric();
   private readonly sdkText = metric();
   private readonly sdkReasoning = metric();
+  private readonly httpResponse = new AiGenerationHttpResponseDiagnostics();
   private frames = 0;
   private nonTextContentFrames = 0;
   private unrecognizedDeltaFrames = 0;
@@ -124,6 +126,8 @@ export class AiGenerationStreamDiagnostics {
     else if (part.type === 'reasoning-delta') this.sdkReasoning.add(part.text);
   }
 
+  observeHttpResponse = (response: Response): Response => this.httpResponse.observe(response);
+
   snapshot(): AiGenerationRuntimeDiagnostic {
     const provider: Stream['provider'] = this.providerAvailable
       ? {
@@ -140,6 +144,7 @@ export class AiGenerationStreamDiagnostics {
       : null;
     const result: AiGenerationRuntimeDiagnostic = {
       version: 'ai-runtime-diagnostic-v1',
+      ...(this.httpResponse.snapshot() ? { httpResponse: this.httpResponse.snapshot() } : {}),
       packages: this.packages,
       stream: this.streaming
         ? {

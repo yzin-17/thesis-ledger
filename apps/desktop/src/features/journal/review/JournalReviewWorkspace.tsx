@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { journalReviewReferenceLocatorSchema } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '@/shared/api/client';
@@ -31,7 +31,7 @@ type WorkspaceProps = {
   onNavigatePosition?: () => void;
   search?: string;
 };
-function ScopedReview({ account, search }: { account: Account; search: string }) {
+function ScopedReview({ account, search, accountSelector }: { account: Account; search: string; accountSelector: ReactNode }) {
   const params = new URLSearchParams(search);
   const matchesAccount =
     params.get('accountId') === account.id &&
@@ -63,38 +63,47 @@ function ScopedReview({ account, search }: { account: Account; search: string })
   const selected =
     choice === undefined ? (resolved.data?.input.reference.reviewObjectId ?? null) : choice;
   const [historyObject, setHistoryObject] = useState<string | null>(null);
+  const candidateList = useRef<HTMLDivElement>(null);
+  const [focusRequest, setFocusRequest] = useState(1);
   const select = (id: string) => {
     setSelected(id);
     setTab('single');
+    setFocusRequest((value) => value + 1);
   };
   return (
     <div className="flex flex-col gap-4">
-      <FieldGroup className="sm:flex-row sm:items-end">
-        <Field className="flex-1">
+      <FieldGroup className="rounded-lg border bg-muted/10 p-4 md:grid md:grid-cols-2">
+        {accountSelector}
+        <Field className="min-w-0">
           <FieldLabel>标的筛选（可选）</FieldLabel>
-          <Input
-            aria-label="复盘标的筛选"
-            placeholder="例如 AAPL.US"
-            value={symbolDraft}
-            onChange={(event) => setSymbolDraft(event.target.value)}
-          />
+          <div className="flex min-w-0 items-center gap-2">
+            <Input
+              aria-label="复盘标的筛选"
+              placeholder="例如 AAPL.US"
+              value={symbolDraft}
+              onChange={(event) => setSymbolDraft(event.target.value)}
+            />
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSymbol(symbolDraft.trim());
+                setSelected(null);
+              }}
+            >
+              应用筛选
+            </Button>
+          </div>
         </Field>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSymbol(symbolDraft.trim());
-            setSelected(null);
-          }}
-        >
-          应用筛选
-        </Button>
       </FieldGroup>
       <Tabs value={tab} onValueChange={(value) => typeof value === 'string' && setTab(value)}>
-        <TabsList variant="line">
-          <TabsTrigger value="single">单笔复盘</TabsTrigger>
-          <TabsTrigger value="period">周期复盘</TabsTrigger>
-          <TabsTrigger value="history">历史快照</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b pb-2">
+          <TabsList variant="line" className="w-auto">
+            <TabsTrigger value="single">单笔复盘</TabsTrigger>
+            <TabsTrigger value="period">周期复盘</TabsTrigger>
+            <TabsTrigger value="history">历史快照</TabsTrigger>
+          </TabsList>
+          <JournalLegacyJsonReview />
+        </div>
         <TabsContent
           value="single"
           keepMounted
@@ -104,20 +113,28 @@ function ScopedReview({ account, search }: { account: Account; search: string })
             {resolved.isError && (
               <JournalRequestError title="复盘深链无法定位" error={resolved.error} />
             )}
-            <JournalCandidateBrowser
-              accountId={account.id}
-              mode={account.mode}
-              symbol={symbol}
-              onSelect={select}
-              onWindowApplied={() => setSelected(null)}
-              selectionPrompt={!selected && <JournalEmpty title="选择一个复盘对象" description="完整交易周期与单次减仓分别分析。先核对事实与计划，再开始复盘。" />}
-            />
+            <div ref={candidateList} tabIndex={-1} aria-label="复盘对象列表" className="scroll-mt-4 rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
+              <JournalCandidateBrowser
+                accountId={account.id}
+                mode={account.mode}
+                symbol={symbol}
+                selectedId={selected}
+                onSelect={select}
+                onWindowApplied={() => setSelected(null)}
+                selectionPrompt={!selected && <JournalEmpty title="选择一个复盘对象" description="完整交易周期与单次减仓分别分析。先核对事实与计划，再开始复盘。" />}
+              />
+            </div>
             {selected ? (
               <JournalObjectReview
                 key={selected}
                 accountId={account.id}
                 mode={account.mode}
                 reviewObjectId={selected}
+                focusRequest={focusRequest}
+                onReturnToCandidates={() => {
+                  candidateList.current?.focus({ preventScroll: true });
+                  candidateList.current?.scrollIntoView?.({ block: 'start' });
+                }}
                 onHistory={() => {
                   setHistoryObject(selected);
                   setTab('history');
@@ -160,7 +177,6 @@ function ScopedReview({ account, search }: { account: Account; search: string })
         </TabsContent>
       </Tabs>
       <JournalAiTaskHistory accountId={account.id} mode={account.mode} />
-      <JournalLegacyJsonReview />
     </div>
   );
 }
@@ -231,19 +247,23 @@ function Workspace({
     );
   else
     content = (
-      <div className="flex flex-col gap-4">
-        <JournalAccountSelector
-          accounts={accounts}
-          value={account.id}
-          onValueChange={chooseAccount}
-        />
-        <ScopedReview key={`${account.id}:${account.mode}`} account={account} search={search} />
-      </div>
+      <ScopedReview
+        key={`${account.id}:${account.mode}`}
+        account={account}
+        search={search}
+        accountSelector={
+          <JournalAccountSelector
+            accounts={accounts}
+            value={account.id}
+            onValueChange={chooseAccount}
+            layout="stacked"
+          />
+        }
+      />
     );
   return (
     <section className="flex min-w-0 flex-col">
       <PageHeader
-        eyebrow="INVESTMENT JOURNAL"
         title="投资复盘"
         description="以实际成交和计划证据复盘交易。完整周期与减仓分别统计，未知事实保留证据不足。"
       />

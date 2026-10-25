@@ -15,6 +15,7 @@ import type { Request, Response } from 'express';
 import type { IdentityPrincipal } from '@thesis-ledger/schemas';
 import { CurrentIdentity, IdentityGuard } from '../identity/identity.guard.js';
 import { ResearchSubmissionService } from './research-submission.service.js';
+import { createAiTraceReference } from '../ai/trace/ai-trace-contract.js';
 
 @Controller('research')
 @UseGuards(IdentityGuard)
@@ -39,6 +40,10 @@ export class ResearchController {
     @Res({ passthrough: true }) response: Response,
   ) {
     this.assertNoQuery(request);
+    const requestedTrace = request.headers?.['x-thesis-ai-trace'];
+    if (requestedTrace !== undefined && requestedTrace !== 'capture-v1')
+      throw new BadRequestException('研究 trace 请求头无效');
+    const trace = requestedTrace === 'capture-v1' ? createAiTraceReference() : undefined;
     const controller = new AbortController();
     const aborted = () => controller.abort('client_disconnected');
     const closed = () => {
@@ -48,7 +53,11 @@ export class ResearchController {
     response.once('close', closed);
     if (request.aborted || response.destroyed) aborted();
     try {
-      return await this.submissions.submit(principal.id, input, controller.signal);
+      const result = trace
+        ? await this.submissions.submit(principal.id, input, controller.signal, trace)
+        : await this.submissions.submit(principal.id, input, controller.signal);
+      if (trace && !result.reused) response.setHeader('X-Thesis-AI-Trace-Id', trace.traceId);
+      return result;
     } finally {
       request.off('aborted', aborted);
       response.off('close', closed);

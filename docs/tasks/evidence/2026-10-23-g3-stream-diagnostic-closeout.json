@@ -1,11 +1,11 @@
 {
   "version": "g3-stream-diagnostic-closeout-v1",
-  "status": "blocked_report_read_invalid",
+  "status": "report_repair_passed_failure_trace_unexercised",
   "authorization": {
     "provider": "openrouter",
     "model": "openrouter/free",
     "maxCalls": 3,
-    "usedCalls": 0,
+    "usedCalls": 1,
     "maxCost": "0",
     "perRunMaxCalls": 1,
     "automaticRetry": false
@@ -38,28 +38,228 @@
     "entry": "thesis-ledger-infra/scripts/update.sh",
     "target": "thesis-ledger",
     "databaseMode": "check",
-    "defaultSandboxExit": 1,
-    "defaultSandboxReason": "ps 权限预检拒绝，Docker 尚未变更",
-    "elevatedAttemptExit": 143,
-    "stoppedProcessGroup": 83648,
-    "groupMembersAfterStop": [],
-    "blocker": "gcc-15.2.0-r5 failed to extract usr/libexec/gcc/aarch64-alpine-linux-musl/15.2.0/plugin/gengtype: I/O error",
-    "imageUpdated": false
+    "status": "passed",
+    "exitCode": 0,
+    "imageUpdated": true,
+    "image": "sha256:021685e98bbaae40dfca50ae82f7fe1ad442a510578e0646da6e82d51003169f",
+    "log": "/tmp/thesis-ledger-g3-stream-diagnostic-g3-d7-final-image-update-20261024.log",
+    "automaticRetry": false
   },
   "finalChecks": {
     "canCreate": false,
     "V2WritesEnabled": false,
     "protection": {
-      "protectedRows": true,
-      "oldAiRuns": true,
-      "counters": true,
-      "dsaControl": true,
-      "flags": true,
-      "mounts": true,
-      "images": true,
-      "serverEnvHashes": true
+      "at": "2026-10-23T16:40:09.578Z",
+      "tables": {
+        "Account": {
+          "allowed": true,
+          "policy": "original_rows_retained",
+          "beforeCount": 24,
+          "afterCount": 24
+        },
+        "AccountLedgerState": {
+          "allowed": true,
+          "policy": "approved_business_projection_updates",
+          "beforeCount": 20,
+          "afterCount": 20
+        },
+        "AiRoutingSettings": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 1
+        },
+        "Asset": {
+          "allowed": true,
+          "policy": "approved_000001.OF_update",
+          "beforeCount": 4,
+          "afterCount": 4,
+          "missing": 1,
+          "added": 1
+        },
+        "BacktestJob": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 71
+        },
+        "CashBalance": {
+          "allowed": true,
+          "policy": "approved_business_projection_updates",
+          "beforeCount": 16,
+          "afterCount": 16
+        },
+        "JournalEntry": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "JournalReviewSnapshot": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 2
+        },
+        "LedgerEvent": {
+          "allowed": true,
+          "policy": "original_rows_retained",
+          "beforeCount": 125,
+          "afterCount": 128
+        },
+        "PortfolioSnapshot": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 6
+        },
+        "ProviderConfig": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 3
+        },
+        "ResearchObservation": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "ResearchObservationSubmission": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "ResearchObservationVersion": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "Strategy": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 91
+        },
+        "StrategyVersion": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 92
+        },
+        "Trade": {
+          "allowed": true,
+          "policy": "approved_business_projection_updates",
+          "beforeCount": 18,
+          "afterCount": 18
+        }
+      },
+      "allTablesAllowed": true,
+      "oldAiRowsPreserved": true,
+      "storedReportRowHashUnchanged": true,
+      "dsaControlUnchanged": true,
+      "mountsUnchanged": true,
+      "flagsRestored": true,
+      "nonV2EnvironmentRestored": true,
+      "policyRestoredUnset": true,
+      "headUnchanged": true,
+      "counters": {
+        "runs": 3,
+        "tools": 33,
+        "observations": 0,
+        "invocations": 0,
+        "invocationFacts": 0
+      },
+      "imageChangedFromFastSync": true
     },
-    "allServicesHealthy": true
+    "allServicesHealthy": true,
+    "sdkAndCompiledModules": {
+      "versions": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "modules": {
+        "ai-sdk-runtime-versions.js": {
+          "matchesHostBuild": true,
+          "hash": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd"
+        },
+        "ai-generation-stream-diagnostics.js": {
+          "matchesHostBuild": true,
+          "hash": "b86735d99bf59abd694dfad51ae5ee59568344d221946a926695b945865cf288"
+        },
+        "ai-generation-structural-preview.js": {
+          "matchesHostBuild": true,
+          "hash": "d1e1ad4045871d1b97d9839ac2fcf83cc4fd68bf209d721ef703d7e813a361f7"
+        },
+        "ai-sdk-generation-model.js": {
+          "matchesHostBuild": true,
+          "hash": "61ccdd19de548fd69d81d87e8929fe8e5625944e41cd39fd7188a2171353b585"
+        },
+        "ai-sdk-generation.adapter.js": {
+          "matchesHostBuild": true,
+          "hash": "48df0d0293682ee21811a4e21cf30dfacd6416a6e8553457f004460a31b85edf"
+        },
+        "ai-generation-failure-diagnostics.js": {
+          "matchesHostBuild": true,
+          "hash": "4f5922a828c319cbf5f6a62704a9f0df2f970547e6907bc8fdb91e92b062dea2"
+        },
+        "ai-research-run-binding-v2.js": {
+          "matchesHostBuild": true,
+          "hash": "c5a58c6716c5d8a50876a6d4a9808e330bbc143b0a62c766831128767e3ef602"
+        },
+        "ai-research-report-projection.js": {
+          "matchesHostBuild": true,
+          "hash": "a8283459e1c1f627b98308c94f1ced2e99e0a5e1d79944343fc43af37b029158"
+        }
+      }
+    },
+    "publicRead": {
+      "at": "2026-10-23T16:42:19.962Z",
+      "report": {
+        "httpStatus": 200,
+        "id": "805cc84a-2333-4695-8aac-217ef57e7ac8",
+        "status": "succeeded",
+        "availability": "available",
+        "resultVersion": 2,
+        "model": {
+          "providerId": "openrouter",
+          "modelId": "nvidia/nemotron-3.5-lightning:free",
+          "researchSettingsRevision": "5"
+        },
+        "bindings": 11
+      },
+      "history": {
+        "httpStatus": 200,
+        "items": [
+          {
+            "id": "805cc84a-2333-4695-8aac-217ef57e7ac8",
+            "status": "succeeded",
+            "availability": "available"
+          },
+          {
+            "id": "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea",
+            "status": "failed",
+            "availability": "missing"
+          },
+          {
+            "id": "18d76166-84d8-4fcf-9b03-c5a5fb33d068",
+            "status": "failed",
+            "availability": "missing"
+          }
+        ]
+      },
+      "citations": {
+        "count": 11,
+        "allStatus200": true,
+        "ownedToolsAndFingerprintsMatch": true,
+        "unknownReferenceStatus": 404
+      },
+      "canCreate": false,
+      "settings": {
+        "revision": "5",
+        "researchDefault": {
+          "providerId": "openrouter",
+          "model": "openrouter/free"
+        }
+      },
+      "readOnly": true,
+      "additionalModelCalls": 0
+    },
+    "reportReadAcceptancePassed": true,
+    "realFailureTracePersistenceCovered": false
   },
   "before": {
     "time": "2026-10-23T14:00:58.542Z",
@@ -269,96 +469,851 @@
     }
   },
   "after": {
-    "time": "2026-10-23T14:20:21.547Z",
-    "head": "20261023010000_report_metadata_snapshots",
+    "time": "2026-10-23T16:40:09.578Z",
+    "protection": {
+      "database": "thesis_ledger",
+      "owner": "thesis_ledger",
+      "head": "20261023010000_report_metadata_snapshots",
+      "activeBacktests": 0,
+      "tables": {
+        "Account": "40fadec15a4c5b04aec17e1be73788f2",
+        "AccountLedgerState": "15899a394b8152e69676297e8e854e02",
+        "LedgerEvent": "2e3737c61742b68e3b8e02a2b887b5a5",
+        "PortfolioSnapshot": "63efc13403e64634b9e1d25cdf5eefcd",
+        "Strategy": "66ade0ae52be341c2c369ec7805e4d1d",
+        "StrategyVersion": "f8f8fbea51ec1a77eb6d45193df78b50",
+        "BacktestJob": "84a9c65fe08a12c1d2dfac9e7c3379b6"
+      },
+      "runs": [
+        {
+          "id": "00386c4b-8e1f-4ce6-9c3f-826446f5feae",
+          "checksum": "d18633131c68d86f"
+        },
+        {
+          "id": "1aed7e64-a408-4cab-90f5-9c6193f0a73a",
+          "checksum": "624f21d1b8a06af3"
+        },
+        {
+          "id": "1eac4850-39b5-47aa-b6b4-3098bee72a26",
+          "checksum": "0e1382b3b7059adf"
+        },
+        {
+          "id": "1ec5077b-5f3c-4a01-b827-b1953c477ae5",
+          "checksum": "39457c7e7b347067"
+        },
+        {
+          "id": "2a8fcb3a-e1b8-4017-94df-53f09f70dd6d",
+          "checksum": "f2d1fe04027e435f"
+        },
+        {
+          "id": "2f530d2c-f983-43ec-8097-1a909d7e22c6",
+          "checksum": "9175c7d24721f625"
+        },
+        {
+          "id": "2fdcbddc-092e-4c88-bb5c-28166849a4ca",
+          "checksum": "745734da7523ddce"
+        },
+        {
+          "id": "333472ae-e20e-43e7-8c91-97f0003ff611",
+          "checksum": "367cabb4354f1470"
+        },
+        {
+          "id": "34a21cda-54bd-48fb-ba13-3e085c3dad74",
+          "checksum": "60bb63adc67db115"
+        },
+        {
+          "id": "38ee3c6a-cdb0-4432-8313-86bb6466d8bb",
+          "checksum": "d89b0082bfed48af"
+        },
+        {
+          "id": "3b6018e8-506c-4846-bb59-66e3ee0f40ea",
+          "checksum": "02b2247f066b4d07"
+        },
+        {
+          "id": "3f3691ae-a025-40a9-8cc6-4ad1ee96ca81",
+          "checksum": "ff5b3e5ac1c2bff2"
+        },
+        {
+          "id": "42a02e02-2573-4157-8d38-eb3d75433a28",
+          "checksum": "44da59ef1eeb3912"
+        },
+        {
+          "id": "4343dc8b-0ffa-4fe8-82ec-86158aa4b2b1",
+          "checksum": "a2616f9a089915ac"
+        },
+        {
+          "id": "491d536b-6fc7-4fca-a43f-88d3a1b9f19e",
+          "checksum": "908cd21c50fed7e6"
+        },
+        {
+          "id": "4d50132c-39e8-4d73-840c-40011edcc7d2",
+          "checksum": "31e6fff394d9634d"
+        },
+        {
+          "id": "51c0025f-ebbd-4838-929c-3b492141b481",
+          "checksum": "10f4830b6918653b"
+        },
+        {
+          "id": "57def779-97d0-4562-9fe0-b613fe90269e",
+          "checksum": "ae94a77d4d9cc8ef"
+        },
+        {
+          "id": "5b2bb1c9-5fbc-4f71-a4a2-08657fbad72f",
+          "checksum": "f3692c2f4b88182c"
+        },
+        {
+          "id": "5bfdc5da-e5b2-4241-a22c-f397d5fcbe39",
+          "checksum": "43ef084dd249aa65"
+        },
+        {
+          "id": "6344d8ea-df8b-4f8d-b8d4-373509609ca5",
+          "checksum": "68d906df4d244a88"
+        },
+        {
+          "id": "66c783b4-bd9c-40b1-b9ad-cba7731d533d",
+          "checksum": "e3da5f14382141cc"
+        },
+        {
+          "id": "677da4a6-6a1c-4eff-a7ef-f3cf64e8f1e7",
+          "checksum": "aaccaddb45d93597"
+        },
+        {
+          "id": "693bc8bf-236b-43bc-bbb7-2208a316526f",
+          "checksum": "762d38c3c1b8bb66"
+        },
+        {
+          "id": "6ae73b70-bfce-4db2-9059-5ac35f9921bc",
+          "checksum": "cfcd9b4024f51730"
+        },
+        {
+          "id": "6c2e3330-8f24-4c6e-8729-b436ce62985a",
+          "checksum": "0adc95e58ac8300b"
+        },
+        {
+          "id": "6efb203b-c55f-4a40-a2ef-2887c9670a81",
+          "checksum": "0a9dd9a1d40e38e6"
+        },
+        {
+          "id": "70eda2d7-ab50-4c67-9ba4-a23ad874bfe1",
+          "checksum": "a8069a8e8cd3c551"
+        },
+        {
+          "id": "73f625c0-5844-429d-9c9b-80fd2fe857ba",
+          "checksum": "0d290d5fcff7c910"
+        },
+        {
+          "id": "80c7c941-8821-4bf4-8b4c-eabb4169b6d2",
+          "checksum": "ecd5b0ad20f65def"
+        },
+        {
+          "id": "8db8879d-e27d-4d8b-8df2-96eba083fee6",
+          "checksum": "a180c8307c637ac3"
+        },
+        {
+          "id": "9b088131-3874-4d32-940d-1884be271110",
+          "checksum": "8d8c305cdb65aac5"
+        },
+        {
+          "id": "9f2cfeaa-b8dc-4ba0-8b5f-2c275a04696c",
+          "checksum": "09741358529bd3a8"
+        },
+        {
+          "id": "a2274899-2d16-4a46-9b17-ad78c59c5f9a",
+          "checksum": "5d1a7d83d42a4004"
+        },
+        {
+          "id": "af19148a-5239-4165-91e5-08a6ee0cc73c",
+          "checksum": "304fe998eec9d148"
+        },
+        {
+          "id": "b049cd97-5404-49c2-85a8-c1de695afc65",
+          "checksum": "58b993fdf96df42d"
+        },
+        {
+          "id": "b1e13fab-9c74-48f7-9c7f-d65315fc7714",
+          "checksum": "5c50fb8ef59ca82f"
+        },
+        {
+          "id": "b60471f6-ec27-4a87-ac33-9652d35a9db4",
+          "checksum": "6b1d7a3a972e7951"
+        },
+        {
+          "id": "b655854d-fbb1-464d-bf7d-9bb69eb2728f",
+          "checksum": "7c41ca54ec1c7521"
+        },
+        {
+          "id": "b706a643-54bc-4ff2-b971-9f6552fbb5bf",
+          "checksum": "47c15656dffc1c5f"
+        },
+        {
+          "id": "b7fdb041-7951-4bb7-bc82-305ee5dd66fc",
+          "checksum": "3185f18aa41c7bcd"
+        },
+        {
+          "id": "b8de7bc7-cb62-41d8-8681-a2e1b0184462",
+          "checksum": "981757d2b91e80a1"
+        },
+        {
+          "id": "c1a51028-7117-4863-a307-ce523f5f494c",
+          "checksum": "2c730d72e0adb7c4"
+        },
+        {
+          "id": "cb8c5fdb-b16b-4d2b-aba7-3e9567446930",
+          "checksum": "62957fa06013f9a3"
+        },
+        {
+          "id": "d555954d-a545-4845-aaf6-e5be5cf245a3",
+          "checksum": "767245e2c4ddc33b"
+        },
+        {
+          "id": "d713d4da-646e-478b-ace1-d5564dcae835",
+          "checksum": "5e4ebbc2bceeb496"
+        },
+        {
+          "id": "d9ca0350-2438-4508-b126-d74339f47ed4",
+          "checksum": "ae439e55ec2e4a3c"
+        },
+        {
+          "id": "dc9feef7-ee5d-4da8-b093-13583f1825e2",
+          "checksum": "90d8cc1637c3921c"
+        },
+        {
+          "id": "e409bd5e-ee42-419a-8f53-168fcaf226b4",
+          "checksum": "32ce8f183091c25e"
+        },
+        {
+          "id": "e629fe80-56b6-4455-a82f-2ba5f73ddc2d",
+          "checksum": "3d4783e0265bd671"
+        },
+        {
+          "id": "e8816b1f-ad96-47b4-8ce3-e09fcd0fb5cc",
+          "checksum": "2125edb5b3f650cb"
+        },
+        {
+          "id": "ee7361da-a46a-4ac7-be93-895e6eff2ef5",
+          "checksum": "b4fa70fe6a43f74e"
+        },
+        {
+          "id": "ee7f16e7-8f60-4c8a-b072-5582af834f14",
+          "checksum": "6ba85b84d7de68df"
+        },
+        {
+          "id": "f5a2ca38-ae0c-410d-bf77-99bc005b8926",
+          "checksum": "2f862e941076cedb"
+        },
+        {
+          "id": "fc8bbae5-7fa1-42ad-a582-b15b9a80d116",
+          "checksum": "db476a5b951ceada"
+        },
+        {
+          "id": "ff4bbf86-2603-4a38-91ea-f4faf04e7846",
+          "checksum": "d8a77ac3a7259b2e"
+        },
+        {
+          "id": "fffda419-dd1d-447e-8191-e62e1aa0a4f2",
+          "checksum": "621aeeb4302d85f5"
+        }
+      ]
+    },
+    "counters": {
+      "runs": 3,
+      "tools": 33,
+      "observations": 0,
+      "invocations": 0,
+      "invocationFacts": 0
+    },
     "protectedRows": {
       "Account": {
-        "count": 18,
-        "hash": "eaaab141dcbfd5ac3f97cb1ce307fbbd"
+        "count": 24,
+        "hash": "40fadec15a4c5b04aec17e1be73788f2",
+        "rowHashes": [
+          "04f23fbde34a35563260694fe6ca6410",
+          "0533d128e61493600d06eb4858aeea95",
+          "0ae90a842450c7afbbf87f7997bf520c",
+          "11168a2661de236abcd76abc5f3ad987",
+          "15279b5c6e4fb07d7d6843bc4a502891",
+          "24ebe39b1e8799f756375244505b7262",
+          "2e7ba75f4544e323d2997ed2c1bd846e",
+          "35c3b56f829e89f5a78f5eb14575b02b",
+          "41b40d00ccdac06c5f00980f747c847c",
+          "5410553e10ceb52d3cde93044aca74cf",
+          "6bb25145ea1b9918a6606cd3cec5ce69",
+          "9dd2f68c7b86e53f57dc97e6cdab863e",
+          "a40ea6de359c8ba07367c7f46e532fa1",
+          "a6b77ab262a4fa80148bc75813adef4c",
+          "ab1f0b941efdd1721275d8108fd66b4f",
+          "ab3db8867dae6c4a8ae714445575d223",
+          "b298ebcdec27f530f213d81b1855c6be",
+          "b38c3e9cffee8943e142bc7eb9c42d59",
+          "b842acb813e9922ee65afd128b7d6d83",
+          "c47db7c9437e8eb5f725c320448b2847",
+          "c4d3ecf9e1725d0e323a4fd6620d262c",
+          "cab5ff7643170cdcf6510ac99536b027",
+          "dfb28a62f8a60b83918e98180769dc90",
+          "eb5cfc35b182613baa906d2a6cf6e861"
+        ]
       },
       "AccountLedgerState": {
-        "count": 16,
-        "hash": "e60f6361946f121b6d1ebeda616d6e5c"
+        "count": 20,
+        "hash": "15899a394b8152e69676297e8e854e02",
+        "rowHashes": [
+          "016f55553c7a3107f1e2d24152467699",
+          "03a1420cdaa25e938ff510203d0d1117",
+          "13a3d8c644301f1bc2ec6bf15e4d1796",
+          "1e1da6ac4c046fb556fb62ebcf463f20",
+          "3395390accd6372f011e30568e13a2d6",
+          "37654cacd3bac0594e68b0bcc85bf2b8",
+          "4bf12643ecefa75ffc55b1fe8bad44d5",
+          "4e83cbd893cf04950151f84da45a1cc1",
+          "6b2dd5df7795a4503757c8feabd9101c",
+          "700b80199984b81b0badca6191e98d89",
+          "976e3f2daf677720b41d3446c704019c",
+          "9fd11c465d5f895964e89c218698bb02",
+          "afecc29fe4a2e29a93d5fa2025c1a3e0",
+          "b0bf190b42af8b91f75e39ebedbf97db",
+          "b6a281231e8b14ceed29b9f9c4b041cc",
+          "bf14c05e668d00a5d13763e4db753838",
+          "c4ab823c3472b6aeb840482de171b44f",
+          "e5956dab10e9e4087da4cd5d68779d9f",
+          "ecb043d83fc9313d196853427d456d59",
+          "f45705810ffa11af5015860d68d2035e"
+        ]
       },
       "AiRoutingSettings": {
         "count": 1,
-        "hash": "8506e6f2661ac7b526406b8fdea08a5d"
+        "hash": "8506e6f2661ac7b526406b8fdea08a5d",
+        "rowHashes": [
+          "8506e6f2661ac7b526406b8fdea08a5d"
+        ]
       },
       "Asset": {
         "count": 4,
-        "hash": "d2f6ec42ea8e6bc29fb97c6ab261e216"
+        "hash": "009d73f092136fcb8aee829731db555e",
+        "rowHashes": [
+          "49da6e3d813e0df3bf348bdec418ae34",
+          "6e5371ff425650accc5ad4b91d445eff",
+          "9578564fba671d1405f707844bbc73ef",
+          "fb16a48817e45359841cdec48aaaf865"
+        ]
       },
       "BacktestJob": {
         "count": 71,
-        "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6"
+        "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6",
+        "rowHashes": [
+          "0038b1d9f8be57fe22c3dcb12776bcf6",
+          "01ddb010fd97c3a844610dc315262292",
+          "020d45f0ce73a3f60c80dfb29c9e9d16",
+          "02f354f8710800792d1bb4a8b9b0d3a2",
+          "04398a06cc6357fd5cf89a6190c7c64f",
+          "0980da8ea1026e3fe093058502b37f63",
+          "0d786446880ca3868718b9fcb53df542",
+          "0d8efa29d5b2b1a834fe3774d5d89ff3",
+          "157e94cd03d2577dcbd5f2043458354b",
+          "174e5a436b00f40eb9312445c4f26dc4",
+          "187e566363ad2809d138b74ca5a1485c",
+          "1997f141f62bd337460c6e57201f0929",
+          "210124356fc3ce51308e276ad5f9a0a6",
+          "24e0194f0a5b1d436b75030e23921afc",
+          "27f823f919c7ccf5f02a7bed866f132c",
+          "3047dd431deaa472594a4271d7e4be3d",
+          "3784a5e677e872da634e4ac25c724c0f",
+          "384ecb9e6651bf920ce6cd4c07eb6098",
+          "3a132edef6288094c4f85b38948c3b2f",
+          "3e3b2b3de4bfe667d70777b35874b943",
+          "41b01a354ea6ed3bfdfd9f9ad36a21a5",
+          "429a57ad0d726a35113c746ec5566b2d",
+          "43226b72f16b3d3ae7b8813217b80f7d",
+          "46a11cb15576d1234e50c83e6a9ab81f",
+          "48c4ed967d5dae57668b7f70091dda84",
+          "4ab5c2f440a74f4fb5fbd06ca698b6bf",
+          "54a88a04c3d46847429ffe659213a2ad",
+          "55a3d41ddc1b95814262075cf5722489",
+          "56e99ca44b2ceaec7dad390a71b9e077",
+          "5842b16b7a1618917def615da99deea2",
+          "59dca295d24f54a75f0c4d61da377d2f",
+          "5b7c1822bda824f733bcc854eb4f983f",
+          "5d89362e50817e79fda48ba2e7aeb114",
+          "5f15cdc52753d66935d2d966fc28d917",
+          "64649b1ad35b3530c720c0cbf7b3097e",
+          "72695f438bab2912471b762ca54cc8e7",
+          "772307911b26551faa1a6b6a3c5f032b",
+          "779610261a57ec7267ba7dd624b01ef2",
+          "7a5af954f73388c3996b38eefb63a70c",
+          "7f91899e5a8863302297dc53ff081db6",
+          "8308c9d264671421ab9f0297f4b10b3d",
+          "8384d544d78097043920d50c9c04d6ad",
+          "8a0b847cfd3bb0e4409ee3e4a88dc3b9",
+          "8d5bd2ab1c183b1ad064420dabfee115",
+          "8e8c3c90d19c3dba153e20982d341f01",
+          "90316c06a987df729508002ccca962ca",
+          "9038c44f09020ac8517c25eb9f0232b8",
+          "9b1754c1a6f7cbafea93e34a232f8747",
+          "9dbbb28de174c041bcf5b29b336a0ecc",
+          "9e0cf0640380613c87940205e593cf06",
+          "a138ab6c8146c8b45b1e90289f83d115",
+          "a827f99546c5575b00da1528129189fc",
+          "a9e04b641cf36225c0119133bf31ed97",
+          "aa4cd72029e2fa7886359f15bd57ca17",
+          "ae6a2d73ac4cad1e3eae31d878546054",
+          "b71005723c8a4e9263b8aa8bf2d8466d",
+          "bd2d8f2220de168b6a2563177b328ca1",
+          "c76f1ca085c1261dbc2d1ea2cee8bded",
+          "c8bc653b48b2f582b01ae9991fc4718b",
+          "ced88d10bf50768496cf3eaa2d3503da",
+          "d0b1fd4e1ffcc3cce7f1290cfcef2265",
+          "d14aff98eff08ac5170b613f4053d738",
+          "d404ac569c473d5ad29a6d30eb485055",
+          "deca814b80d6e26cde18161509968835",
+          "df1698fac2c889970113ba29b0546dbe",
+          "df99b0b45ae0a74d71b17228e5d53c50",
+          "e5628ac79b2440be630c4d5fc5edff1c",
+          "e57870344f47c94b4b12181edad00a42",
+          "ef0dba23810360af16c7722d0106e804",
+          "f32913eedc146971f4ac94deff35eec8",
+          "ffbf4d2d0aaa071230a5ac6aa7d762d3"
+        ]
       },
       "CashBalance": {
-        "count": 12,
-        "hash": "5f898e10455137793db93cc63756414a"
+        "count": 16,
+        "hash": "edd0317602b7556db5d338f229703237",
+        "rowHashes": [
+          "2c4803fc1c4d7d50d57e48e203706d46",
+          "7142af4044b09b7ba7fbd6f659927f82",
+          "7511f8ea6a81a9fe4e9ce8d2b53fc918",
+          "8555d87771e9efbda64b4b64ca0f5a45",
+          "9d3bcda1443705e3a610c46c87bd6128",
+          "9d7a47d725a9a8f0738906250a253448",
+          "a2c30848ec4be7542b220bf091ac31e5",
+          "a4c31fbed12f3fb8135a953940ecf30b",
+          "ad68c4a377401ac6ee3277553670fa13",
+          "b45a69bbf381f8f4e9091acb26135be5",
+          "bf5afd8c6f23e66c771b5ea341998a86",
+          "c6db27c46b35a8932b2b2ae321f76902",
+          "c8141269adbef201c6ebea86af599d6d",
+          "cb726ec6d984419e1a4fcd1a7c3b14dc",
+          "d3c48181975b89f83e3c6363d7490538",
+          "e025f3aaa665d0769dd66c4971f384bd"
+        ]
       },
       "JournalEntry": {
         "count": 0,
-        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
       },
       "JournalReviewSnapshot": {
         "count": 2,
-        "hash": "dcc6f904862d199d0ec56994af8d27d8"
+        "hash": "dcc6f904862d199d0ec56994af8d27d8",
+        "rowHashes": [
+          "1d164c70222fee97f81fb8ae753be997",
+          "36137e2c62fcb9b65216203ddbdcf2bb"
+        ]
       },
       "LedgerEvent": {
-        "count": 103,
-        "hash": "fc2bdb641956793d10ac76b6a6facc2a"
+        "count": 128,
+        "hash": "2e3737c61742b68e3b8e02a2b887b5a5",
+        "rowHashes": [
+          "03d843a3fc0a97cfc64a893906650fc9",
+          "05bed812e6c052724b08ce4a04405953",
+          "0d9a054f90964353264f472d04d38232",
+          "10ae2ab86c0c245a140a6be3046fd627",
+          "11e49a21eeab92ad0c265f87c24e8fdf",
+          "1947093cd0514f8da95faa491a45f924",
+          "1c8539aa545e282d676efca1da9502d2",
+          "2026498b28059250527efa0143b18d76",
+          "2328d67dc376a14532691b0b5f48a5a4",
+          "238d73bd70cfc9dd6564fd8cc8e01d63",
+          "23af7aea2d0ace5644177fa7e6861dec",
+          "25bcf1ca0f05c6a2e747d585714d2579",
+          "2627ea717ff3aefcbd7ea6d2ebc9cce5",
+          "2d817feb6437d5efa43827bc4190073d",
+          "30f5c0d63b7bb97db5d3295334e117a8",
+          "3223ac4b88ddb2316fbae8f81fc85fea",
+          "3265eae24e34de70b5198ea9faa54937",
+          "32f8b2d6109030805f27e029f2725b15",
+          "344f50690b914287f8685f52e268a914",
+          "345360eeca3f145eb5ae354b202d6932",
+          "3499b4c41f169ed645c941222ebf031c",
+          "38320144ae811ae19c3a53d7b09d3334",
+          "38a97a667a6639fc9c9916d2d42b2553",
+          "39d60982869cbf68adcadd655716ee65",
+          "3b5dddb28dd85e443d39ab2381a41c52",
+          "3c6c9c0af48fce843777a5dc04c14590",
+          "3d6c799426b70dafc6875ef50df33814",
+          "3e207980833eb156eaaefd092e7a698d",
+          "3fa3148ade4f9dc3b89aeeadb03a70ae",
+          "40d721b38c3efca34e37f1f4f18c9226",
+          "41c540b525e0515b12d4f1925736436e",
+          "4321b7905eaadea4f08523a5ea75d61b",
+          "4602f60bfc974b3dbc251324dafc88c0",
+          "487d7000d1f4c2801765db1a63672611",
+          "4a0363e6d9e9b59f1903cc6e7f1e0734",
+          "50ec2cc09368de11bf1f942d5e34a621",
+          "57b44b0a7c0a3f102d7d4339fb2f1f39",
+          "5c6970f32fd6b71630c3c2633ebb5a4e",
+          "5d69e3054330b2b5153ebc16d4af14a1",
+          "5d99f752f816fc21cebbfc5116e1bc12",
+          "5ea7ef15d19f22d987701a820ef3378d",
+          "5f60a753dfd679044533c4ab128507b1",
+          "5fdc9ef2b74fa746d7a5f1abb153fce2",
+          "6015233004fae870c817c8bc7398d9a8",
+          "662da211dbb03851ecf11bad4912f4cc",
+          "67ff91ef301fa060bbd03c6a0facb507",
+          "692c823d4f59e6b8c1a8bd38e85f69ad",
+          "6c7ee2b170a88cd9c05eeda68c2d6b22",
+          "6f463373c695f55cc4f7a5d558f537da",
+          "7294080247f5fa345d583469c18b2b83",
+          "7380f39d2d20036f462b9b0b9bbc3a48",
+          "753b37e13502438ff3f1ce0b7e45c07c",
+          "75bcec9b0755c9f562686446fe3ede3d",
+          "7887213ef99ce17b543a99035ecb4e59",
+          "7b105bbc269a065683dc3922681b27e4",
+          "7be0d657abeb447388bb334f7e59160d",
+          "7c6741d69ce34f8d27df9b530f41f1eb",
+          "7cd370e1b94d5cfd24393c850bd6c030",
+          "7d43b71c614c89847f244f0907164a87",
+          "7e5606c6fe7cd6bc6e46611747530b1f",
+          "809c5101e69e7e246ac4c4c1e22c6d09",
+          "817de905973a46a34e4ff71d2b9252a8",
+          "81e49b8597bd9b283f40ef923442cb1a",
+          "8350a66ae26d19f948e5b5ab6e28a847",
+          "83fc84eb0e502d7f6bf77afe2965d04b",
+          "860bfb6e4b358e15ba53c09da5bbfd13",
+          "895e84792c9c35476c12ea205741e1aa",
+          "8aeb7502284af9741360d719dfd2118d",
+          "8e2e83b0ac628f503c25afe9a3543961",
+          "8e3a1b4189d68d6620b600930ee2ceb4",
+          "8e756804c166e171ebc4519d1ad468f1",
+          "8ff69ee3a64ddb10dfc7c5e8fb5498b7",
+          "9c065c7649335fd577d792f5e90394b3",
+          "a0599ed61b6c277a1980ffc2f2d8c7e7",
+          "a2000ea9e03cdb13e3be6fac04d4d84d",
+          "a3d02470748da87f352147baeac76099",
+          "a6ca465ebe8c9a634190e8092f338550",
+          "a6fa0dc98551cccddd70f003a0668bd8",
+          "a831c0c670febebd58b97eaa4b1e7ba2",
+          "a88de1d4348f14c4f436da9c2ff28482",
+          "a8911b6a8d2c454b2dc826920b8a3d58",
+          "aa65f0faf6e82721019f66bbb9bf86b0",
+          "aa88ef9917fb3a5a3acba6f9823034dd",
+          "b156d3ef3774bef4a25448215471a796",
+          "b37ce6e24e39c37923a906444ea62702",
+          "b62649f9422d85d4dab19bbcf8ed57f9",
+          "b76d18b51ddd84852fde263cef092a7d",
+          "b8884f4abfb18fd12fddea255885017c",
+          "b92eeac35dae366edafb5525e52a7e12",
+          "b9cbee4b027d7e82061eb71e27da0055",
+          "bd2a0e08dcb6700e21abe57d9411b5ac",
+          "c13b90994f9a519760455f25f6fe24b5",
+          "c1dabad524d5c24bf56c99f5877c31d3",
+          "c2d1e386a72eb17eaa28501d784defb4",
+          "c733ad5bd5d75e2d2ff13da3abbe0e21",
+          "c7cfdad3255380c5bd8a8601b2aa2477",
+          "c9b0c952edda63929c14cd58067f50c4",
+          "ca0345810e4cf6df3a8181662146b3ec",
+          "cd4b9a20bf4c0f182f595f567ee436b7",
+          "cdcecd7fc10b01b78cba8c352a68b2c6",
+          "ce6f5548168c3827bc46873d9f864062",
+          "d02e88d57b7f1148cf188fe2088372d6",
+          "d16b1e7bcd3139897eb98ce38191c52b",
+          "d7499e387517b459bca41dbbf70151b0",
+          "dd2353fdb9294a0bc03b2efdfe8d25fc",
+          "ddaa82aea398f6184004579d173c3a41",
+          "df4866a8eadfb0a5277c7e24230a45a0",
+          "e0a783f64647f969008c27c555e25072",
+          "e152fcaa31645af1545023c2e9857978",
+          "e1a2e47d18f48eb76c739a9df43a169b",
+          "e25432f19f6bd096cee9c627ba09a7be",
+          "e2933b1d56372896766f8ad4620ac6df",
+          "e4b83bccf6f83f131e024da91c7281af",
+          "e51c4b830ad807dfc83bd20779703d86",
+          "e8123845042e844acd76bcca3983fbab",
+          "e8eca27bdce4aabc4402b528b40d29bf",
+          "e935a71c89e260ee9b83d5bcc150e16a",
+          "ea11fe8eacb18462f817c43d3637e6ae",
+          "eade17fc8342b10e8b9e05cf26b8a614",
+          "eb3b614c1b4587abbb3aac93be30895f",
+          "ecdf0b0e5b136e4abdbbb104b770ddd2",
+          "ef42bbf44014c0a52f613f2fb348fd27",
+          "f0c92df11211468df69c267d970e46b4",
+          "f411cb26c316eee6f30e6dd36b59f81b",
+          "f5ac7933099077474f7b3df73bc4308c",
+          "f71276c26af7161179aff79d9973c0e0",
+          "f8f8f241b6f050aadb40256c99649120",
+          "fef7c4cedd6e0f67a11039f43999e041"
+        ]
       },
       "PortfolioSnapshot": {
         "count": 6,
-        "hash": "63efc13403e64634b9e1d25cdf5eefcd"
+        "hash": "63efc13403e64634b9e1d25cdf5eefcd",
+        "rowHashes": [
+          "54e6cb19172464c6ad19009c81a887e0",
+          "556bc428848265d46b36ea35799ab1ad",
+          "b03199c09a2e6d3c9ffb24471b3d64f8",
+          "d619a8a652d96e58005af3d8672f0293",
+          "d66fec580ce14d624bb0be36d7a5c644",
+          "db333be9d76aacd5935b7ce459808eb9"
+        ]
       },
       "ProviderConfig": {
         "count": 3,
-        "hash": "576ceb2ffddeea856430d2711a7a00ea"
+        "hash": "576ceb2ffddeea856430d2711a7a00ea",
+        "rowHashes": [
+          "3a4a726677cfaa7bb4930faca1d04064",
+          "49694c4509f82224fc6adfd786ea95dc",
+          "b6624da14b6078b01737d48aee3c3c86"
+        ]
       },
       "ResearchObservation": {
         "count": 0,
-        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
       },
       "ResearchObservationSubmission": {
         "count": 0,
-        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
       },
       "ResearchObservationVersion": {
         "count": 0,
-        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
       },
       "Strategy": {
         "count": 91,
-        "hash": "66ade0ae52be341c2c369ec7805e4d1d"
+        "hash": "66ade0ae52be341c2c369ec7805e4d1d",
+        "rowHashes": [
+          "00fe0f10fe2bd91da2a935cb623f6020",
+          "032a4707055880deeb79d75f459516ac",
+          "04800f77f0a62b102c8670ad4a070c7b",
+          "055661aad0d56206e293be697e082b42",
+          "057e7a44a868604d85accb00c435b4fd",
+          "060254a7ebd9283dc7cc35890541ed89",
+          "0aa21d62c3c6d50be2973ff606f1153d",
+          "115f4543d3e0635543a90673aba7595a",
+          "1941c287745b6c97928509143c35a150",
+          "21519ef89d3704b71d8a28ad42923075",
+          "22179bb4780ac6d01e346e6e8dfe9911",
+          "22d062f9eb3b9c14afdd07f91432bfec",
+          "26432f30850bc965adfcefc882c0ba3a",
+          "271a3029b6d1215ebc5c3cfcbecb1153",
+          "2f96e44169002be135f35d354b66f279",
+          "2fd631378521d258dea3bee90dd9e639",
+          "32dd514cd7d2a51ea7e130bb033cd274",
+          "39d8c0370c44f5b98db69cb8816e30f2",
+          "3b8d5fbfeff46d967e19259b4d4bb2db",
+          "3cc0d26b1055989894677bf2ab3ade23",
+          "4121fb3d99b6b943aa8db036bfec20bc",
+          "4792a240246899b9c50049d9038ed272",
+          "497909874cba3a795f95c1ca8d37edf3",
+          "49ea5b76e22440ac9b51fd8484132ce7",
+          "4b8d0e840e82f3400e02aec38545842e",
+          "59c89b41cddb9b0536963164a5a3de09",
+          "622ced42228b21ee22c79397353f9875",
+          "65e5e8740cba87da777a13da2ad0d047",
+          "6664c0071e6bd81787694caff3a1e3e8",
+          "7029acf8eb6b9cde9bdd017f22f33ede",
+          "71c371b48aa9973d545decb95504a635",
+          "78509620b1b3a29e780a95aa4bd1dce9",
+          "78e79a7648ba3dc95fb1d54e4443a9b1",
+          "7f5c54c9d0d0f550e6f6b53070bdd58f",
+          "823c99df9141ef80eb0bf52cc0f7eee6",
+          "8291e76dacdc34bd2a6402f252386867",
+          "85a0d421c1f20eec56010546fcebc28a",
+          "865c9a35ace137cae20ee4a70232c3fb",
+          "891c3a4fd9555fb3a71b9a9e3d554c72",
+          "8bb97a274b85cd67051302c1107a7fbb",
+          "8c6891d350cc983117bdace575ce96f1",
+          "8c76e28f438beb92fc6e4b0bfe1b0903",
+          "8e3905a18bfc773c6ecfb0a3cc50c754",
+          "97f4fdb5f8722bbbadfa3f7fb062d4c8",
+          "997cf7d63ddfa07aa865f9262456848d",
+          "99e497851ac8a845fb9aecc28604e11d",
+          "9c50e252983e2c89fafb05089340a6a4",
+          "9cfad9211fe229a4e0461ab9883dbad0",
+          "9fa40a766bf94e8f566a82afc66c4d5d",
+          "a60aa7020b9a19fdf52c827e0c5d9888",
+          "a696b39325c91ac7229d488fdb7d9f3d",
+          "a7694b8033f5b0dd2311d015e35e76b0",
+          "aa54d940d64e360af831c58452eb20e8",
+          "aabb1b77e6745f174395c6310043ac49",
+          "aacef2ac59ce552d7d085fbefb7034c3",
+          "ac9fd6601bbb7d38b0c120ae3359b391",
+          "b287807995b2e1cd02299a196115ea1c",
+          "b3064638042310787607cfbf41380a6e",
+          "b3476c1ec0413e91c9cae0bf0ac3b49d",
+          "b3bde09d1c2753f17d691287b1722e97",
+          "b504b23dc326af67fb147a0f2a9dcf8a",
+          "b735693202565cf38741e7f25adbebec",
+          "bb0fe529563c393109845ae5fec90ac1",
+          "bdf050af860ea41bfd1125995b89005d",
+          "c2703a121a01bb3b8b1638ef0aac8b16",
+          "c6a4308f8d0c3f11821a979f2f5c7c6f",
+          "ce9926a5b54a02f405b41f2ef5461f7e",
+          "ced82a651f92c5950381ecaa6c938e4c",
+          "d25295f40af9fb431e8f1e6a5dd218a3",
+          "d456380def1d87058037da35416f0f0e",
+          "d7bfc5a0ae545805bb8e27660d5f2f6c",
+          "da2ec1f069245f22e31d6f142f60c94f",
+          "da3543ee8c0149ec467524d8b83fa910",
+          "db841555128a062102b84cec6c2a1fd1",
+          "dc599969cbdd110c63017331dd77bff5",
+          "dda20fc420275c91fc729491d19b1a04",
+          "e04b89733f85d235d13180b37c80cb94",
+          "e0b7758985599e64caf38c9e67dac8ed",
+          "e1a3094df62b65cbef445248841c7b2f",
+          "e23eed3d4fc7041a482c3a4c8f595d61",
+          "e40fc2a07f2345634d341d11572135aa",
+          "e4e010ad06bd302b0e229196ff5cdc85",
+          "e8c8bd3639ac50426370f3351f0fdd4f",
+          "eccc14b419fe706d6fd6e53d2bb34f3e",
+          "ee87f52b13e364cb6e69f86547f9067b",
+          "f450164b784ffc9655e31fe26e4f8f48",
+          "f757a89d27c0750ee6119d34f65424db",
+          "f9cec735d8f49216f1931e75ddcbad29",
+          "fb37533668d3a38003947ca18f6ce142",
+          "fd71ca3b7d68e2a494574d9fe5e3270c",
+          "fda3b90e26a76fdf39afbfb924541443"
+        ]
       },
       "StrategyVersion": {
         "count": 92,
-        "hash": "f8f8fbea51ec1a77eb6d45193df78b50"
+        "hash": "f8f8fbea51ec1a77eb6d45193df78b50",
+        "rowHashes": [
+          "00475fa256313f4ffe89c253be4c0f6e",
+          "0167496722cbd5b7bab0267450f3731c",
+          "04a07b7220ccd9cebf31cdc94caaf87f",
+          "1547cb5bd3d1dac692c9763f99795cef",
+          "15c7a22293c8c0ce2284c4535308b94e",
+          "16e0ff0aab4f26ce187314b15ae56bd5",
+          "1969bc652376b307b2d3a56966f12058",
+          "28dcbb12c5aa9caf3bdd9f79e926fb68",
+          "2addabd42e6268902a0437c85992ab79",
+          "2e84eb3054fc8489a6773007c3fcf813",
+          "2f40cbf17515194b88a919ae7df390b1",
+          "2f668abd3b6202e5147d33185abdd0f4",
+          "2fa6e5aea833d325db3c3a8b510e4f5c",
+          "338a24e30e3d29969ace182c66d32274",
+          "395ba69bc290b2b7669abd8978383900",
+          "3baad83b1868d10426870e96fba80036",
+          "3cf393ebad0214ed6ef4a0dcf0cf8e0c",
+          "3f5aec21a1ae0cae736a35b1047aa5c1",
+          "408f5937491583ae3cf6441e816e3de2",
+          "4175cfeaefbccf349d1d9e7d18298a47",
+          "45e1c3503e416f2745a630298dd2b40f",
+          "481d5e9fc8807715a4435ffa046f138a",
+          "48786e9f15050c83fe091500cbbc9b00",
+          "4a6e23114e8412bee1e13f1b8db9bc44",
+          "4cf7379f9becabb525b46858c335c27a",
+          "4d5c616b027453a98677c6715fb655ac",
+          "5291652449cabaaf036924be876eeeb9",
+          "535ab3a17a2f6ffd1ca74dd232146877",
+          "53de00c8d772c770202650da41bfbb7a",
+          "560d2e6dd36053f8deb7a7bbc6cd8c68",
+          "5b71905160b05769459fc79457537dc2",
+          "5c263c6fcf9f94ac9a90a55b44bcfaa8",
+          "5c34ef80df1a665596a714ce6168d85b",
+          "5da182fadacc2beeaeb531c4ae7d11fa",
+          "6025a21d69a027e59aa35ec7f569000a",
+          "6665367201bbbf1e5e13619cdf4c418f",
+          "6affe7f6c4a84e12fa4fd78ef907de55",
+          "6d37b99c1e4f43b0d507d13806f7d592",
+          "6debd59f6c95a0ff66c529aacfdf2ceb",
+          "6e497301008eecc700d6ce79cd4606f9",
+          "6e9d929cae0c5f8808fd26405b3384bf",
+          "6f8d3e98b57e5158e128d096ec807991",
+          "73c97afdcd438f2e7538685543beea3d",
+          "7423d0e8db3559caa02eed04ad282751",
+          "7669ac2265c309a33cc68d481a0c1bb3",
+          "79d0cb8e753297585c41cc21e3016e78",
+          "7e85514843a9a674c74b74296083d57c",
+          "80f7bd44020b9cd93b76da55dd699d88",
+          "81bb4b9d885d5879693f529ac62abff7",
+          "825f67b93f64c2074ddbacc7cfe2d325",
+          "8394bb78ff213447e7fa358d54918936",
+          "84cfa4370c1a7902387831f79df2212e",
+          "8b5424c7eaa89c6db8262af25f100903",
+          "8dd5d4f10154792de9c33f0cb86b7fbe",
+          "900e6b128c941ef2bc10b47f8a89ba96",
+          "90160429a7401da2bb977916211daeca",
+          "929915a15862a977572487fde704b6c4",
+          "93d4d36367e151245629d279e175cae8",
+          "9deb94bf16534c78f5fa909e43a97240",
+          "a58ef0bf6e1b299a0afe447c37484076",
+          "b32d76a27e0cd6c16228997449ee8156",
+          "b355ec6af0cb6318da8b696ce5c666de",
+          "b3613255f6875d171df046c303996a60",
+          "b621e1ea2957dc0edb1dcbda83a22b1d",
+          "b6545116d423466564c13c88f7fe92de",
+          "b806e2758ddf6aeb3e9bb37d46ad74e4",
+          "b9149e542158900b5d82821d9c011de6",
+          "bcc0d535544ec4963bb23500fd2e0c3f",
+          "bf428453774a70425e79e20932960e95",
+          "c12064c6c2cf7d13c839a0bed6bfae47",
+          "c74eb7017787e35d85f5fa9d38aabff5",
+          "d0765f6147e5199b421ef9c385762d36",
+          "d2ed54e7cfe3f9746f40717c8fdd2727",
+          "d5418fe97c72e4933d5bfe030658c27e",
+          "d86349c0cddcfc8a13b5c079d7f3bc8a",
+          "db5a5ab1ae62b71fd2e38579a15f11c9",
+          "dd680befa0f7e776f6f24cb1aa4920c0",
+          "ddcb4aa87ceaf20ecf058aaecea5a542",
+          "ddf3566cad2c8cbf7a3512ab071a12d2",
+          "e45c266939e90e16eca38d46b46b5963",
+          "e54cf6b0ac591f4d29290b931b26bca5",
+          "e75c5461c7fb98899a6346b3c93d656f",
+          "e82897fe4f3b905b00d2ba552683a6c2",
+          "eac20b6104b0c4fa9277f987b76f13ae",
+          "f4b8de20b935d244ad68c3a75c90cddb",
+          "f7045bdf8952c0ca71f88eb050d05435",
+          "f89025717b7af1a20ec1cdb57054933a",
+          "fae755f74f36bdff4a6fceaf3f816379",
+          "fb0b5f06778a5495da11d503f4e9a2da",
+          "fb8dd48f9e9be18bc4af78f2047cfaea",
+          "ff44af5072a12286050cb28a4f1137be",
+          "ff7d15b68d5df1257bccbf2bac416b14"
+        ]
       },
       "Trade": {
-        "count": 16,
-        "hash": "8252a84288a022256bc409abb1fa1a2e"
+        "count": 18,
+        "hash": "236447278cf1188b3dc0bb37af29437f",
+        "rowHashes": [
+          "0bc145f8c9316494050bed475aa8247a",
+          "0c0ca1d063da8a87ae98343eea5a96e9",
+          "0ef5868bfc3a8418c18bdf8af4288d6a",
+          "2baba59ea8f3da64dc3bfda9cdf413ad",
+          "4029d16b8bf1c9efc948eeff9c03d74f",
+          "467f098357b124b092d6d5a095fb3550",
+          "4681199dcfa4080b819dfad7e48f0daf",
+          "5dd360273767773c1b38cee57a051444",
+          "726bd4154396ac1256d8cf2b65c58ef5",
+          "7eb44a5fb47f72189cf5e7952294c654",
+          "9553db73bde42de3da80ee9f25585765",
+          "add1a806716d45ed25a46babe725d6e8",
+          "b906c51a8242b2b942640ea6be8f1f7b",
+          "c089bbcd57c158070f36f992c14b7ec2",
+          "cc056222f6378597fd48b577dce431dd",
+          "d00cc499f356da1c5008a90af5720321",
+          "db45413fac0870219524ec196dcfa47d",
+          "e291d352e0f4150675cf81d3475cc6a3"
+        ]
       }
     },
     "oldAiRuns": {
       "rows": {
         "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
-        "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc"
+        "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc",
+        "805cc84a-2333-4695-8aac-217ef57e7ac8": "e8bed09ac6ff9160460bbd7caee87c5a"
       },
       "statuses": [
         {
           "status": "failed",
           "count": 2
+        },
+        {
+          "status": "succeeded",
+          "count": 1
         }
       ]
-    },
-    "counters": {
-      "runs": 2,
-      "tools": 22,
-      "observations": 0,
-      "invocations": 0,
-      "invocationFacts": 0
     },
     "flags": {
       "AI_RESEARCH_EXECUTION_ENABLED": "true",
@@ -386,8 +1341,8 @@
     "images": {
       "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
       "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
-      "thesis-ledger": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
-      "backtest-worker": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+      "thesis-ledger": "sha256:021685e98bbaae40dfca50ae82f7fe1ad442a510578e0646da6e82d51003169f",
+      "backtest-worker": "sha256:021685e98bbaae40dfca50ae82f7fe1ad442a510578e0646da6e82d51003169f",
       "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
     },
     "mounts": {
@@ -452,28 +1407,29 @@
       ]
     },
     "serverEnvHashes": {
-      "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
-      "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
-      "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
-      "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-      "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
-      "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
-      "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-      "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
-      "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
-      "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
-      "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-      "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
-      "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
-      "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
-      "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
+      "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
       "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+      "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+      "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+      "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+      "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+      "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+      "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
+      "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+      "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+      "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
       "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+      "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
+      "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+      "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
       "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
       "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
-    }
+    },
+    "policyMetadata": null
   },
   "currentSourceReview": {
     "status": "revalidated",
@@ -491,467 +1447,15 @@
     }
   },
   "latestAttempt": {
-    "status": "blocked_by_owned_stale_update_lock",
+    "status": "passed",
     "entry": "./scripts/update.sh thesis-ledger",
-    "workingDirectory": "thesis-ledger-infra",
-    "exitCode": 1,
-    "processGroup": 1112,
-    "dockerBuildStarted": false,
-    "modelCalls": 0,
-    "log": "/tmp/thesis-ledger-g3-stream-diagnostic-v2-retry1-update-20261023.log",
-    "lock": {
-      "path": "/var/folders/t6/qhk7wqzd07g25xwy7mr46gb00000gn/T/thesis-ledger-update-501-2842842147.lock",
-      "ownerPid": 83652,
-      "ownerMatchesPreviousStoppedUpdate": true,
-      "ownerPresent": false,
-      "checkedProcessGroups": [
-        83648,
-        1112
-      ],
-      "remainingProcesses": [],
-      "removed": false
-    },
-    "sourceSha256": {
-      "packages/schemas/src/ai-generation-runtime-diagnostic.ts": "b93a5f7a688700dc313c52b62d91eecb8900dbf8c7151c5af32036caf0e38893",
-      "packages/schemas/src/ai-generation-error.ts": "a66aabb616bbededa86b399846ba91cb0e99d40608f4edec36827bd8dc56a4a9",
-      "packages/schemas/src/index.ts": "dce1beff1c8cdf5ccb4ccfbd6259aa6c8c782c699c572b7e36ed037729286cfe",
-      "packages/schemas/test/ai-generation-error.test.ts": "5ecf3730578011386e538273153de32d377ba15b3d3affd0c77a75b1d8ebd586",
-      "apps/server/src/ai/ai-sdk-runtime-versions.ts": "f3c4f9732476673f09ef94112068a5ffbe012dbac8021dd7e7739112aa2a494d",
-      "apps/server/src/ai/ai-generation-structural-preview.ts": "2f62e317dd1339295f47546d5290accf8b51c78b872a82b204caadd101746db5",
-      "apps/server/src/ai/ai-generation-stream-diagnostics.ts": "3b6efff67e8397cd65d75c7d2434a30497731686b1c7f7dd58264a8f779e8980",
-      "apps/server/src/ai/ai-sdk-generation-model.ts": "cdd9d7f383ae2b89fb17be9059dc78b99552530c037ea1932aca2eb8ab02f412",
-      "apps/server/src/ai/ai-sdk-generation.adapter.ts": "ea641322736501bfd8b81230ab6856171754d1027d6ab9b8c8f407c5543f2bf1",
-      "apps/server/src/ai/ai-generation-failure-diagnostics.ts": "04dde220327aa9fb071ce36a1caa9b643e28a956cb82db9260bf68aeb3f0b7a7",
-      "apps/server/test/ai/ai-generation-stream-diagnostics.test.ts": "44b490470eb03c2bd7987b536f00f7e4b22c00f6aec24b6a1334acf745124099",
-      "apps/server/test/ai/ai-generation-stream-diagnostics.integration.test.ts": "727b25004b2d7026f771c07a78bbc36ddadb395350c6284b1a82bb3ac8be9594",
-      "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "f80b2966063ad11b3173d25c33718adf9805abadd3b59d3f95dfbf7ea01be367"
-    },
-    "protection": {
-      "protectedRows": true,
-      "oldAiRuns": true,
-      "counters": true,
-      "dsaControl": true,
-      "flags": true,
-      "mounts": true,
-      "images": true,
-      "serverEnvHashes": true,
-      "otherAiRunsAndCore": true
-    },
-    "before": {
-      "time": "2026-10-23T14:46:11.391Z",
-      "head": "20261023010000_report_metadata_snapshots",
-      "protectedRows": {
-        "Account": {
-          "count": 18,
-          "hash": "eaaab141dcbfd5ac3f97cb1ce307fbbd"
-        },
-        "AccountLedgerState": {
-          "count": 16,
-          "hash": "e60f6361946f121b6d1ebeda616d6e5c"
-        },
-        "AiRoutingSettings": {
-          "count": 1,
-          "hash": "8506e6f2661ac7b526406b8fdea08a5d"
-        },
-        "Asset": {
-          "count": 4,
-          "hash": "d2f6ec42ea8e6bc29fb97c6ab261e216"
-        },
-        "BacktestJob": {
-          "count": 71,
-          "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6"
-        },
-        "CashBalance": {
-          "count": 12,
-          "hash": "5f898e10455137793db93cc63756414a"
-        },
-        "JournalEntry": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "JournalReviewSnapshot": {
-          "count": 2,
-          "hash": "dcc6f904862d199d0ec56994af8d27d8"
-        },
-        "LedgerEvent": {
-          "count": 103,
-          "hash": "fc2bdb641956793d10ac76b6a6facc2a"
-        },
-        "PortfolioSnapshot": {
-          "count": 6,
-          "hash": "63efc13403e64634b9e1d25cdf5eefcd"
-        },
-        "ProviderConfig": {
-          "count": 3,
-          "hash": "576ceb2ffddeea856430d2711a7a00ea"
-        },
-        "ResearchObservation": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "ResearchObservationSubmission": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "ResearchObservationVersion": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "Strategy": {
-          "count": 91,
-          "hash": "66ade0ae52be341c2c369ec7805e4d1d"
-        },
-        "StrategyVersion": {
-          "count": 92,
-          "hash": "f8f8fbea51ec1a77eb6d45193df78b50"
-        },
-        "Trade": {
-          "count": 16,
-          "hash": "8252a84288a022256bc409abb1fa1a2e"
-        }
-      },
-      "oldAiRuns": {
-        "rows": {
-          "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
-          "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc"
-        },
-        "statuses": [
-          {
-            "status": "failed",
-            "count": 2
-          }
-        ]
-      },
-      "counters": {
-        "runs": 2,
-        "tools": 22,
-        "observations": 0,
-        "invocations": 0,
-        "invocationFacts": 0
-      },
-      "flags": {
-        "AI_RESEARCH_EXECUTION_ENABLED": "true",
-        "AI_RESEARCH_V2_WRITES_ENABLED": "false",
-        "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
-      },
-      "dsaControl": {
-        "thesis_ledger_policy_history": {
-          "count": 172,
-          "hash": "198797cc7405965c61a01015a086a7a2d6ddfe666bbe93f192de74e1f84299fc"
-        },
-        "thesis_ledger_policy_state": {
-          "count": 1,
-          "hash": "64845d2d21f80b6683fbb15e4b0c7f7f097b1937daf0395198357f233258fe9e"
-        },
-        "thesis_ledger_provider_config": {
-          "count": 9,
-          "hash": "f02b738e93b9fef5bb25a7c930e95d21892bad40795a18498d3445220461f84b"
-        },
-        "thesis_ledger_route_admission_v3": {
-          "count": 9,
-          "hash": "00134eeca31af09eb05804262bcf1e65dfb5eedcffd422578d217a263188fdc2"
-        }
-      },
-      "images": {
-        "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
-        "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
-        "thesis-ledger": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
-        "backtest-worker": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
-        "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
-      },
-      "mounts": {
-        "postgres": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-postgres-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
-            "destination": "/var/lib/postgresql/data",
-            "rw": true
-          }
-        ],
-        "redis": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-redis-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
-            "destination": "/data",
-            "rw": true
-          }
-        ],
-        "thesis-ledger": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-backtest-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
-            "destination": "/app/var/backtest",
-            "rw": true
-          }
-        ],
-        "backtest-worker": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-backtest-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
-            "destination": "/app/var/backtest",
-            "rw": true
-          }
-        ],
-        "dsa": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-dsa-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
-            "destination": "/app/data",
-            "rw": true
-          },
-          {
-            "type": "volume",
-            "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
-            "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
-            "destination": "/app/logs",
-            "rw": true
-          },
-          {
-            "type": "volume",
-            "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
-            "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
-            "destination": "/app/reports",
-            "rw": true
-          }
-        ]
-      },
-      "serverEnvHashes": {
-        "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
-        "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
-        "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
-        "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-        "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
-        "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
-        "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-        "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
-        "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
-        "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
-        "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-        "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
-        "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
-        "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
-        "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
-        "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
-        "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
-        "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
-        "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
-        "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
-      }
-    },
-    "after": {
-      "time": "2026-10-23T14:51:04.257Z",
-      "head": "20261023010000_report_metadata_snapshots",
-      "protectedRows": {
-        "Account": {
-          "count": 18,
-          "hash": "eaaab141dcbfd5ac3f97cb1ce307fbbd"
-        },
-        "AccountLedgerState": {
-          "count": 16,
-          "hash": "e60f6361946f121b6d1ebeda616d6e5c"
-        },
-        "AiRoutingSettings": {
-          "count": 1,
-          "hash": "8506e6f2661ac7b526406b8fdea08a5d"
-        },
-        "Asset": {
-          "count": 4,
-          "hash": "d2f6ec42ea8e6bc29fb97c6ab261e216"
-        },
-        "BacktestJob": {
-          "count": 71,
-          "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6"
-        },
-        "CashBalance": {
-          "count": 12,
-          "hash": "5f898e10455137793db93cc63756414a"
-        },
-        "JournalEntry": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "JournalReviewSnapshot": {
-          "count": 2,
-          "hash": "dcc6f904862d199d0ec56994af8d27d8"
-        },
-        "LedgerEvent": {
-          "count": 103,
-          "hash": "fc2bdb641956793d10ac76b6a6facc2a"
-        },
-        "PortfolioSnapshot": {
-          "count": 6,
-          "hash": "63efc13403e64634b9e1d25cdf5eefcd"
-        },
-        "ProviderConfig": {
-          "count": 3,
-          "hash": "576ceb2ffddeea856430d2711a7a00ea"
-        },
-        "ResearchObservation": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "ResearchObservationSubmission": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "ResearchObservationVersion": {
-          "count": 0,
-          "hash": "d41d8cd98f00b204e9800998ecf8427e"
-        },
-        "Strategy": {
-          "count": 91,
-          "hash": "66ade0ae52be341c2c369ec7805e4d1d"
-        },
-        "StrategyVersion": {
-          "count": 92,
-          "hash": "f8f8fbea51ec1a77eb6d45193df78b50"
-        },
-        "Trade": {
-          "count": 16,
-          "hash": "8252a84288a022256bc409abb1fa1a2e"
-        }
-      },
-      "oldAiRuns": {
-        "rows": {
-          "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
-          "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc"
-        },
-        "statuses": [
-          {
-            "status": "failed",
-            "count": 2
-          }
-        ]
-      },
-      "counters": {
-        "runs": 2,
-        "tools": 22,
-        "observations": 0,
-        "invocations": 0,
-        "invocationFacts": 0
-      },
-      "flags": {
-        "AI_RESEARCH_EXECUTION_ENABLED": "true",
-        "AI_RESEARCH_V2_WRITES_ENABLED": "false",
-        "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
-      },
-      "dsaControl": {
-        "thesis_ledger_policy_history": {
-          "count": 172,
-          "hash": "198797cc7405965c61a01015a086a7a2d6ddfe666bbe93f192de74e1f84299fc"
-        },
-        "thesis_ledger_policy_state": {
-          "count": 1,
-          "hash": "64845d2d21f80b6683fbb15e4b0c7f7f097b1937daf0395198357f233258fe9e"
-        },
-        "thesis_ledger_provider_config": {
-          "count": 9,
-          "hash": "f02b738e93b9fef5bb25a7c930e95d21892bad40795a18498d3445220461f84b"
-        },
-        "thesis_ledger_route_admission_v3": {
-          "count": 9,
-          "hash": "00134eeca31af09eb05804262bcf1e65dfb5eedcffd422578d217a263188fdc2"
-        }
-      },
-      "images": {
-        "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
-        "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
-        "thesis-ledger": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
-        "backtest-worker": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
-        "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
-      },
-      "mounts": {
-        "postgres": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-postgres-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
-            "destination": "/var/lib/postgresql/data",
-            "rw": true
-          }
-        ],
-        "redis": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-redis-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
-            "destination": "/data",
-            "rw": true
-          }
-        ],
-        "thesis-ledger": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-backtest-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
-            "destination": "/app/var/backtest",
-            "rw": true
-          }
-        ],
-        "backtest-worker": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-backtest-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
-            "destination": "/app/var/backtest",
-            "rw": true
-          }
-        ],
-        "dsa": [
-          {
-            "type": "volume",
-            "name": "thesis-ledger-dsa-data",
-            "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
-            "destination": "/app/data",
-            "rw": true
-          },
-          {
-            "type": "volume",
-            "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
-            "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
-            "destination": "/app/logs",
-            "rw": true
-          },
-          {
-            "type": "volume",
-            "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
-            "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
-            "destination": "/app/reports",
-            "rw": true
-          }
-        ]
-      },
-      "serverEnvHashes": {
-        "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
-        "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
-        "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
-        "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-        "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
-        "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
-        "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-        "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
-        "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
-        "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
-        "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-        "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
-        "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
-        "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
-        "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
-        "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
-        "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
-        "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
-        "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
-        "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
-      }
-    },
-    "nextActionRequiresConfirmation": "仅清理重新核对后仍失效的本次更新锁，再通过原维护入口继续"
+    "processGroup": 56985,
+    "exitCode": 0,
+    "stoppedOnFirstError": false,
+    "firstError": null,
+    "log": "/tmp/thesis-ledger-g3-stream-diagnostic-g3-d7-final-image-update-20261024.log",
+    "v2WritesRequested": false,
+    "additionalModelCalls": 0
   },
   "resumedUpdate": {
     "status": "passed",
@@ -3143,7 +3647,21 @@
     "originalLedgerEventRowsMustRemainUnchanged": true,
     "otherProtectedTablesStrict": true,
     "oldAiRunsStrict": true,
-    "sourceEnablementRoutesAdmissionsStrict": true
+    "sourceEnablementRoutesAdmissionsStrict": true,
+    "confirmedAssetUpdates": {
+      "authorization": "是预期修改，保留并继续",
+      "symbol": "000001.OF",
+      "count": 4,
+      "otherOriginalAssetRowsPreserved": true,
+      "observed": [
+        {
+          "symbol": "000001.OF",
+          "name": "000001.OF",
+          "updatedAt": "2026-10-23T15:59:24.077",
+          "hash": "9578564fba671d1405f707844bbc73ef"
+        }
+      ]
+    }
   },
   "samplingProtectionBaseline": {
     "time": "2026-10-23T15:31:49.386Z",
@@ -4191,9 +4709,9 @@
     "requests": [
       {
         "requestId": "40d3c31d-f65e-42f2-9777-58ad89494692",
-        "state": "dispatching",
+        "state": "completed",
         "dispatchingAt": "2026-10-23T15:35:10.100Z",
-        "completedAt": null
+        "completedAt": "2026-10-23T15:36:51.306Z"
       }
     ],
     "automaticRetry": false,
@@ -4281,25 +4799,1007 @@
     "publicReportRead": {
       "httpStatus": 200,
       "status": "succeeded",
-      "availability": "invalid",
-      "resultVersion": 2
+      "availability": "available",
+      "resultVersion": 2,
+      "afterFullImageUpdate": true
     },
     "persistedResultSchemaAccepted": true,
     "originalInvalidJsonReproduced": false,
     "realFailureDiagnosticCaptured": false,
-    "remainingCallsNotDispatched": 2
+    "remainingCallsNotDispatched": 2,
+    "publicReportReadBeforeRepair": {
+      "httpStatus": 200,
+      "status": "succeeded",
+      "availability": "invalid",
+      "resultVersion": 2
+    },
+    "automaticFurtherSampling": false,
+    "additionalCallsDuringRepair": 0
   },
   "finalClosingUpdate": {
-    "status": "running",
+    "status": "passed",
     "processGroup": 29472,
     "entry": "./scripts/update.sh thesis-ledger",
     "log": "/tmp/thesis-ledger-g3-stream-diagnostic-v2-sampling-close-update-20261023.log",
     "v2WritesRequested": false,
-    "restoreOriginalUnsetPolicy": true
+    "restoreOriginalUnsetPolicy": true,
+    "exitCode": 0,
+    "v2WritesConfirmed": false,
+    "originalUnsetPolicyRestored": true
   },
   "currentBlocker": {
-    "code": "report_read_invalid",
-    "description": "模型 JSON／V2 输出结构和已存结果 Schema 均通过，但正式报告反读 availability=invalid",
-    "nextAction": "待用户确认仅定位并最小修复反读问题，复用原结果验收，不新增模型调用"
+    "code": "original_invalid_json_not_reproduced",
+    "description": "反读修复及 G3 主路径通过；原无效 JSON 本次未复现，真实失败流分片落盘仍缺样本。",
+    "nextAction": "当前停止调用；如需继续真实失败采样，须用户明确恢复采样范围。剩余 2 次不自动执行。",
+    "reportRepairBlocked": false,
+    "newDeploymentOrProtectionBlocker": false
+  },
+  "closedAtUtc": "2026-10-23T16:42:19.962Z",
+  "reportReadAcceptancePassed": true,
+  "originalInvalidJsonReproduced": false,
+  "realFailureDiagnosticCaptured": false,
+  "firstBuildFailureAfter": {
+    "time": "2026-10-23T14:20:21.547Z",
+    "head": "20261023010000_report_metadata_snapshots",
+    "protectedRows": {
+      "Account": {
+        "count": 18,
+        "hash": "eaaab141dcbfd5ac3f97cb1ce307fbbd"
+      },
+      "AccountLedgerState": {
+        "count": 16,
+        "hash": "e60f6361946f121b6d1ebeda616d6e5c"
+      },
+      "AiRoutingSettings": {
+        "count": 1,
+        "hash": "8506e6f2661ac7b526406b8fdea08a5d"
+      },
+      "Asset": {
+        "count": 4,
+        "hash": "d2f6ec42ea8e6bc29fb97c6ab261e216"
+      },
+      "BacktestJob": {
+        "count": 71,
+        "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6"
+      },
+      "CashBalance": {
+        "count": 12,
+        "hash": "5f898e10455137793db93cc63756414a"
+      },
+      "JournalEntry": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "JournalReviewSnapshot": {
+        "count": 2,
+        "hash": "dcc6f904862d199d0ec56994af8d27d8"
+      },
+      "LedgerEvent": {
+        "count": 103,
+        "hash": "fc2bdb641956793d10ac76b6a6facc2a"
+      },
+      "PortfolioSnapshot": {
+        "count": 6,
+        "hash": "63efc13403e64634b9e1d25cdf5eefcd"
+      },
+      "ProviderConfig": {
+        "count": 3,
+        "hash": "576ceb2ffddeea856430d2711a7a00ea"
+      },
+      "ResearchObservation": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "ResearchObservationSubmission": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "ResearchObservationVersion": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Strategy": {
+        "count": 91,
+        "hash": "66ade0ae52be341c2c369ec7805e4d1d"
+      },
+      "StrategyVersion": {
+        "count": 92,
+        "hash": "f8f8fbea51ec1a77eb6d45193df78b50"
+      },
+      "Trade": {
+        "count": 16,
+        "hash": "8252a84288a022256bc409abb1fa1a2e"
+      }
+    },
+    "oldAiRuns": {
+      "rows": {
+        "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
+        "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc"
+      },
+      "statuses": [
+        {
+          "status": "failed",
+          "count": 2
+        }
+      ]
+    },
+    "counters": {
+      "runs": 2,
+      "tools": 22,
+      "observations": 0,
+      "invocations": 0,
+      "invocationFacts": 0
+    },
+    "flags": {
+      "AI_RESEARCH_EXECUTION_ENABLED": "true",
+      "AI_RESEARCH_V2_WRITES_ENABLED": "false",
+      "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
+    },
+    "dsaControl": {
+      "thesis_ledger_policy_history": {
+        "count": 172,
+        "hash": "198797cc7405965c61a01015a086a7a2d6ddfe666bbe93f192de74e1f84299fc"
+      },
+      "thesis_ledger_policy_state": {
+        "count": 1,
+        "hash": "64845d2d21f80b6683fbb15e4b0c7f7f097b1937daf0395198357f233258fe9e"
+      },
+      "thesis_ledger_provider_config": {
+        "count": 9,
+        "hash": "f02b738e93b9fef5bb25a7c930e95d21892bad40795a18498d3445220461f84b"
+      },
+      "thesis_ledger_route_admission_v3": {
+        "count": 9,
+        "hash": "00134eeca31af09eb05804262bcf1e65dfb5eedcffd422578d217a263188fdc2"
+      }
+    },
+    "images": {
+      "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+      "thesis-ledger": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+      "backtest-worker": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+      "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
+    },
+    "mounts": {
+      "postgres": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-postgres-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+          "destination": "/var/lib/postgresql/data",
+          "rw": true
+        }
+      ],
+      "redis": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-redis-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+          "destination": "/data",
+          "rw": true
+        }
+      ],
+      "thesis-ledger": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-backtest-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+          "destination": "/app/var/backtest",
+          "rw": true
+        }
+      ],
+      "backtest-worker": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-backtest-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+          "destination": "/app/var/backtest",
+          "rw": true
+        }
+      ],
+      "dsa": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-dsa-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+          "destination": "/app/data",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+          "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+          "destination": "/app/logs",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+          "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+          "destination": "/app/reports",
+          "rw": true
+        }
+      ]
+    },
+    "serverEnvHashes": {
+      "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+      "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+      "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+      "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+      "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+      "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+      "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
+      "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+      "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
+      "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+      "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+      "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
+      "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+      "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+      "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+      "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+      "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+    }
+  },
+  "initialDeploymentAttempt": {
+    "entry": "thesis-ledger-infra/scripts/update.sh",
+    "target": "thesis-ledger",
+    "databaseMode": "check",
+    "defaultSandboxExit": 1,
+    "defaultSandboxReason": "ps 权限预检拒绝，Docker 尚未变更",
+    "elevatedAttemptExit": 143,
+    "stoppedProcessGroup": 83648,
+    "groupMembersAfterStop": [],
+    "blocker": "gcc-15.2.0-r5 failed to extract usr/libexec/gcc/aarch64-alpine-linux-musl/15.2.0/plugin/gengtype: I/O error",
+    "imageUpdated": false
+  },
+  "ownedStaleLockAttempt": {
+    "status": "blocked_by_owned_stale_update_lock",
+    "entry": "./scripts/update.sh thesis-ledger",
+    "workingDirectory": "thesis-ledger-infra",
+    "exitCode": 1,
+    "processGroup": 1112,
+    "dockerBuildStarted": false,
+    "modelCalls": 0,
+    "log": "/tmp/thesis-ledger-g3-stream-diagnostic-v2-retry1-update-20261023.log",
+    "lock": {
+      "path": "/var/folders/t6/qhk7wqzd07g25xwy7mr46gb00000gn/T/thesis-ledger-update-501-2842842147.lock",
+      "ownerPid": 83652,
+      "ownerMatchesPreviousStoppedUpdate": true,
+      "ownerPresent": false,
+      "checkedProcessGroups": [
+        83648,
+        1112
+      ],
+      "remainingProcesses": [],
+      "removed": false
+    },
+    "sourceSha256": {
+      "packages/schemas/src/ai-generation-runtime-diagnostic.ts": "b93a5f7a688700dc313c52b62d91eecb8900dbf8c7151c5af32036caf0e38893",
+      "packages/schemas/src/ai-generation-error.ts": "a66aabb616bbededa86b399846ba91cb0e99d40608f4edec36827bd8dc56a4a9",
+      "packages/schemas/src/index.ts": "dce1beff1c8cdf5ccb4ccfbd6259aa6c8c782c699c572b7e36ed037729286cfe",
+      "packages/schemas/test/ai-generation-error.test.ts": "5ecf3730578011386e538273153de32d377ba15b3d3affd0c77a75b1d8ebd586",
+      "apps/server/src/ai/ai-sdk-runtime-versions.ts": "f3c4f9732476673f09ef94112068a5ffbe012dbac8021dd7e7739112aa2a494d",
+      "apps/server/src/ai/ai-generation-structural-preview.ts": "2f62e317dd1339295f47546d5290accf8b51c78b872a82b204caadd101746db5",
+      "apps/server/src/ai/ai-generation-stream-diagnostics.ts": "3b6efff67e8397cd65d75c7d2434a30497731686b1c7f7dd58264a8f779e8980",
+      "apps/server/src/ai/ai-sdk-generation-model.ts": "cdd9d7f383ae2b89fb17be9059dc78b99552530c037ea1932aca2eb8ab02f412",
+      "apps/server/src/ai/ai-sdk-generation.adapter.ts": "ea641322736501bfd8b81230ab6856171754d1027d6ab9b8c8f407c5543f2bf1",
+      "apps/server/src/ai/ai-generation-failure-diagnostics.ts": "04dde220327aa9fb071ce36a1caa9b643e28a956cb82db9260bf68aeb3f0b7a7",
+      "apps/server/test/ai/ai-generation-stream-diagnostics.test.ts": "44b490470eb03c2bd7987b536f00f7e4b22c00f6aec24b6a1334acf745124099",
+      "apps/server/test/ai/ai-generation-stream-diagnostics.integration.test.ts": "727b25004b2d7026f771c07a78bbc36ddadb395350c6284b1a82bb3ac8be9594",
+      "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "f80b2966063ad11b3173d25c33718adf9805abadd3b59d3f95dfbf7ea01be367"
+    },
+    "protection": {
+      "protectedRows": true,
+      "oldAiRuns": true,
+      "counters": true,
+      "dsaControl": true,
+      "flags": true,
+      "mounts": true,
+      "images": true,
+      "serverEnvHashes": true,
+      "otherAiRunsAndCore": true
+    },
+    "before": {
+      "time": "2026-10-23T14:46:11.391Z",
+      "head": "20261023010000_report_metadata_snapshots",
+      "protectedRows": {
+        "Account": {
+          "count": 18,
+          "hash": "eaaab141dcbfd5ac3f97cb1ce307fbbd"
+        },
+        "AccountLedgerState": {
+          "count": 16,
+          "hash": "e60f6361946f121b6d1ebeda616d6e5c"
+        },
+        "AiRoutingSettings": {
+          "count": 1,
+          "hash": "8506e6f2661ac7b526406b8fdea08a5d"
+        },
+        "Asset": {
+          "count": 4,
+          "hash": "d2f6ec42ea8e6bc29fb97c6ab261e216"
+        },
+        "BacktestJob": {
+          "count": 71,
+          "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6"
+        },
+        "CashBalance": {
+          "count": 12,
+          "hash": "5f898e10455137793db93cc63756414a"
+        },
+        "JournalEntry": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "JournalReviewSnapshot": {
+          "count": 2,
+          "hash": "dcc6f904862d199d0ec56994af8d27d8"
+        },
+        "LedgerEvent": {
+          "count": 103,
+          "hash": "fc2bdb641956793d10ac76b6a6facc2a"
+        },
+        "PortfolioSnapshot": {
+          "count": 6,
+          "hash": "63efc13403e64634b9e1d25cdf5eefcd"
+        },
+        "ProviderConfig": {
+          "count": 3,
+          "hash": "576ceb2ffddeea856430d2711a7a00ea"
+        },
+        "ResearchObservation": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationSubmission": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationVersion": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "Strategy": {
+          "count": 91,
+          "hash": "66ade0ae52be341c2c369ec7805e4d1d"
+        },
+        "StrategyVersion": {
+          "count": 92,
+          "hash": "f8f8fbea51ec1a77eb6d45193df78b50"
+        },
+        "Trade": {
+          "count": 16,
+          "hash": "8252a84288a022256bc409abb1fa1a2e"
+        }
+      },
+      "oldAiRuns": {
+        "rows": {
+          "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
+          "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc"
+        },
+        "statuses": [
+          {
+            "status": "failed",
+            "count": 2
+          }
+        ]
+      },
+      "counters": {
+        "runs": 2,
+        "tools": 22,
+        "observations": 0,
+        "invocations": 0,
+        "invocationFacts": 0
+      },
+      "flags": {
+        "AI_RESEARCH_EXECUTION_ENABLED": "true",
+        "AI_RESEARCH_V2_WRITES_ENABLED": "false",
+        "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
+      },
+      "dsaControl": {
+        "thesis_ledger_policy_history": {
+          "count": 172,
+          "hash": "198797cc7405965c61a01015a086a7a2d6ddfe666bbe93f192de74e1f84299fc"
+        },
+        "thesis_ledger_policy_state": {
+          "count": 1,
+          "hash": "64845d2d21f80b6683fbb15e4b0c7f7f097b1937daf0395198357f233258fe9e"
+        },
+        "thesis_ledger_provider_config": {
+          "count": 9,
+          "hash": "f02b738e93b9fef5bb25a7c930e95d21892bad40795a18498d3445220461f84b"
+        },
+        "thesis_ledger_route_admission_v3": {
+          "count": 9,
+          "hash": "00134eeca31af09eb05804262bcf1e65dfb5eedcffd422578d217a263188fdc2"
+        }
+      },
+      "images": {
+        "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+        "thesis-ledger": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+        "backtest-worker": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+        "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
+      },
+      "mounts": {
+        "postgres": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-postgres-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+            "destination": "/var/lib/postgresql/data",
+            "rw": true
+          }
+        ],
+        "redis": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-redis-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+            "destination": "/data",
+            "rw": true
+          }
+        ],
+        "thesis-ledger": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-backtest-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "destination": "/app/var/backtest",
+            "rw": true
+          }
+        ],
+        "backtest-worker": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-backtest-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "destination": "/app/var/backtest",
+            "rw": true
+          }
+        ],
+        "dsa": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-dsa-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+            "destination": "/app/data",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+            "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+            "destination": "/app/logs",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+            "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+            "destination": "/app/reports",
+            "rw": true
+          }
+        ]
+      },
+      "serverEnvHashes": {
+        "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+        "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+        "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+        "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+        "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+        "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+        "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+        "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
+        "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+        "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+        "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
+        "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+        "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+        "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
+        "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+        "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+        "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+        "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+        "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+      }
+    },
+    "after": {
+      "time": "2026-10-23T14:51:04.257Z",
+      "head": "20261023010000_report_metadata_snapshots",
+      "protectedRows": {
+        "Account": {
+          "count": 18,
+          "hash": "eaaab141dcbfd5ac3f97cb1ce307fbbd"
+        },
+        "AccountLedgerState": {
+          "count": 16,
+          "hash": "e60f6361946f121b6d1ebeda616d6e5c"
+        },
+        "AiRoutingSettings": {
+          "count": 1,
+          "hash": "8506e6f2661ac7b526406b8fdea08a5d"
+        },
+        "Asset": {
+          "count": 4,
+          "hash": "d2f6ec42ea8e6bc29fb97c6ab261e216"
+        },
+        "BacktestJob": {
+          "count": 71,
+          "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6"
+        },
+        "CashBalance": {
+          "count": 12,
+          "hash": "5f898e10455137793db93cc63756414a"
+        },
+        "JournalEntry": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "JournalReviewSnapshot": {
+          "count": 2,
+          "hash": "dcc6f904862d199d0ec56994af8d27d8"
+        },
+        "LedgerEvent": {
+          "count": 103,
+          "hash": "fc2bdb641956793d10ac76b6a6facc2a"
+        },
+        "PortfolioSnapshot": {
+          "count": 6,
+          "hash": "63efc13403e64634b9e1d25cdf5eefcd"
+        },
+        "ProviderConfig": {
+          "count": 3,
+          "hash": "576ceb2ffddeea856430d2711a7a00ea"
+        },
+        "ResearchObservation": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationSubmission": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationVersion": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "Strategy": {
+          "count": 91,
+          "hash": "66ade0ae52be341c2c369ec7805e4d1d"
+        },
+        "StrategyVersion": {
+          "count": 92,
+          "hash": "f8f8fbea51ec1a77eb6d45193df78b50"
+        },
+        "Trade": {
+          "count": 16,
+          "hash": "8252a84288a022256bc409abb1fa1a2e"
+        }
+      },
+      "oldAiRuns": {
+        "rows": {
+          "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
+          "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc"
+        },
+        "statuses": [
+          {
+            "status": "failed",
+            "count": 2
+          }
+        ]
+      },
+      "counters": {
+        "runs": 2,
+        "tools": 22,
+        "observations": 0,
+        "invocations": 0,
+        "invocationFacts": 0
+      },
+      "flags": {
+        "AI_RESEARCH_EXECUTION_ENABLED": "true",
+        "AI_RESEARCH_V2_WRITES_ENABLED": "false",
+        "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
+      },
+      "dsaControl": {
+        "thesis_ledger_policy_history": {
+          "count": 172,
+          "hash": "198797cc7405965c61a01015a086a7a2d6ddfe666bbe93f192de74e1f84299fc"
+        },
+        "thesis_ledger_policy_state": {
+          "count": 1,
+          "hash": "64845d2d21f80b6683fbb15e4b0c7f7f097b1937daf0395198357f233258fe9e"
+        },
+        "thesis_ledger_provider_config": {
+          "count": 9,
+          "hash": "f02b738e93b9fef5bb25a7c930e95d21892bad40795a18498d3445220461f84b"
+        },
+        "thesis_ledger_route_admission_v3": {
+          "count": 9,
+          "hash": "00134eeca31af09eb05804262bcf1e65dfb5eedcffd422578d217a263188fdc2"
+        }
+      },
+      "images": {
+        "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+        "thesis-ledger": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+        "backtest-worker": "sha256:feead8440044280078b128d08b56cf0f3960334991983ab5a86d8fc3758119f0",
+        "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
+      },
+      "mounts": {
+        "postgres": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-postgres-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+            "destination": "/var/lib/postgresql/data",
+            "rw": true
+          }
+        ],
+        "redis": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-redis-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+            "destination": "/data",
+            "rw": true
+          }
+        ],
+        "thesis-ledger": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-backtest-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "destination": "/app/var/backtest",
+            "rw": true
+          }
+        ],
+        "backtest-worker": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-backtest-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "destination": "/app/var/backtest",
+            "rw": true
+          }
+        ],
+        "dsa": [
+          {
+            "type": "volume",
+            "name": "thesis-ledger-dsa-data",
+            "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+            "destination": "/app/data",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+            "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+            "destination": "/app/logs",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+            "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+            "destination": "/app/reports",
+            "rw": true
+          }
+        ]
+      },
+      "serverEnvHashes": {
+        "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+        "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+        "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+        "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+        "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+        "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+        "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+        "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
+        "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+        "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+        "AI_TIMEOUT_M": "0c2b3ff36e530e53447012933b079c5dd837629d3752651bf68e282c7edfc88d",
+        "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+        "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+        "AI_RESEARCH_POLICY_JSO": "1731e29db15abab4e6b625a33383a8f8b41146b0149bad010dda3a0827d06675",
+        "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+        "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+        "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+        "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+        "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+      }
+    },
+    "nextActionRequiresConfirmation": "仅清理重新核对后仍失效的本次更新锁，再通过原维护入口继续"
+  },
+  "reportReadRepair": {
+    "status": "passed",
+    "rootCause": "根任务保存请求模型 openrouter/free，结果保存实际路由模型；旧反读直接比较名称导致误判。",
+    "bindingRule": "同 Provider 的路由模型差异必须有严格有效、同 attempt、同请求预留及配置摘要的完成 V2 SDK 审计；冻结、归属、数值及引用检查保持。",
+    "writeFiles": [
+      "apps/server/src/ai/ai-research-run-binding-v2.ts",
+      "apps/server/src/ai/ai-research-report-projection.ts",
+      "apps/server/test/research/research-report-model-binding-v2.test.ts"
+    ],
+    "sourceSha256": {
+      "packages/schemas/src/ai-generation-runtime-diagnostic.ts": "b93a5f7a688700dc313c52b62d91eecb8900dbf8c7151c5af32036caf0e38893",
+      "packages/schemas/src/ai-generation-error.ts": "a66aabb616bbededa86b399846ba91cb0e99d40608f4edec36827bd8dc56a4a9",
+      "packages/schemas/src/index.ts": "dce1beff1c8cdf5ccb4ccfbd6259aa6c8c782c699c572b7e36ed037729286cfe",
+      "packages/schemas/test/ai-generation-error.test.ts": "5ecf3730578011386e538273153de32d377ba15b3d3affd0c77a75b1d8ebd586",
+      "apps/server/src/ai/ai-sdk-runtime-versions.ts": "f3c4f9732476673f09ef94112068a5ffbe012dbac8021dd7e7739112aa2a494d",
+      "apps/server/src/ai/ai-generation-structural-preview.ts": "2f62e317dd1339295f47546d5290accf8b51c78b872a82b204caadd101746db5",
+      "apps/server/src/ai/ai-generation-stream-diagnostics.ts": "3b6efff67e8397cd65d75c7d2434a30497731686b1c7f7dd58264a8f779e8980",
+      "apps/server/src/ai/ai-sdk-generation-model.ts": "cdd9d7f383ae2b89fb17be9059dc78b99552530c037ea1932aca2eb8ab02f412",
+      "apps/server/src/ai/ai-sdk-generation.adapter.ts": "ea641322736501bfd8b81230ab6856171754d1027d6ab9b8c8f407c5543f2bf1",
+      "apps/server/src/ai/ai-generation-failure-diagnostics.ts": "04dde220327aa9fb071ce36a1caa9b643e28a956cb82db9260bf68aeb3f0b7a7",
+      "apps/server/test/ai/ai-generation-stream-diagnostics.test.ts": "44b490470eb03c2bd7987b536f00f7e4b22c00f6aec24b6a1334acf745124099",
+      "apps/server/test/ai/ai-generation-stream-diagnostics.integration.test.ts": "727b25004b2d7026f771c07a78bbc36ddadb395350c6284b1a82bb3ac8be9594",
+      "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "f80b2966063ad11b3173d25c33718adf9805abadd3b59d3f95dfbf7ea01be367",
+      "apps/server/src/ai/ai-research-run-binding-v2.ts": "aeb12c9e962c9ff5bee45688cff9a9f1c159b200a9282fb577f2ecd491040b3d",
+      "apps/server/src/ai/ai-research-report-projection.ts": "10f92eb99b92398522264a312f983dc174d4bb460c28c9d8b9c944c396cf49b2",
+      "apps/server/test/research/research-report-model-binding-v2.test.ts": "c29c043ac15ee558a1968387bd1653d172b241a7269fb8219647632b46c8e4bd"
+    },
+    "localChecks": {
+      "newTestsPassed": 14,
+      "affectedTestsPassed": 155,
+      "testsSkippedWithoutDatabase": 79,
+      "serverBuild": "passed",
+      "serverTypecheck": "passed",
+      "lintAndPrettier": "passed",
+      "boundaries": "passed",
+      "workspaceDependencies": "passed",
+      "sizeGate": "passed",
+      "sizeLegacyWarnings": 8,
+      "focusedComplexity": "passed"
+    },
+    "storedResultReplay": {
+      "status": "available",
+      "evidenceBindings": 11,
+      "runRowMd5": "e8bed09ac6ff9160460bbd7caee87c5a",
+      "resultMd5": "969bd932a8c5e1cb227c177da14ad412",
+      "storedRowUnchanged": true
+    },
+    "fastSync": {
+      "entry": "./scripts/sync-code.sh thesis-ledger",
+      "exitCode": 0,
+      "log": "/tmp/thesis-ledger-g3-d7-model-binding-sync-20261024.log",
+      "provesImageUpdated": false
+    },
+    "finalImageUpdate": {
+      "status": "passed",
+      "entry": "./scripts/update.sh thesis-ledger",
+      "processGroup": 56985,
+      "exitCode": 0,
+      "stoppedOnFirstError": false,
+      "firstError": null,
+      "log": "/tmp/thesis-ledger-g3-stream-diagnostic-g3-d7-final-image-update-20261024.log",
+      "v2WritesRequested": false,
+      "additionalModelCalls": 0
+    },
+    "runtimeProof": {
+      "versions": {
+        "ai": "7.0.107",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53",
+        "zod": "4.4.3"
+      },
+      "modules": {
+        "ai-sdk-runtime-versions.js": {
+          "matchesHostBuild": true,
+          "hash": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd"
+        },
+        "ai-generation-stream-diagnostics.js": {
+          "matchesHostBuild": true,
+          "hash": "b86735d99bf59abd694dfad51ae5ee59568344d221946a926695b945865cf288"
+        },
+        "ai-generation-structural-preview.js": {
+          "matchesHostBuild": true,
+          "hash": "d1e1ad4045871d1b97d9839ac2fcf83cc4fd68bf209d721ef703d7e813a361f7"
+        },
+        "ai-sdk-generation-model.js": {
+          "matchesHostBuild": true,
+          "hash": "61ccdd19de548fd69d81d87e8929fe8e5625944e41cd39fd7188a2171353b585"
+        },
+        "ai-sdk-generation.adapter.js": {
+          "matchesHostBuild": true,
+          "hash": "48df0d0293682ee21811a4e21cf30dfacd6416a6e8553457f004460a31b85edf"
+        },
+        "ai-generation-failure-diagnostics.js": {
+          "matchesHostBuild": true,
+          "hash": "4f5922a828c319cbf5f6a62704a9f0df2f970547e6907bc8fdb91e92b062dea2"
+        },
+        "ai-research-run-binding-v2.js": {
+          "matchesHostBuild": true,
+          "hash": "c5a58c6716c5d8a50876a6d4a9808e330bbc143b0a62c766831128767e3ef602"
+        },
+        "ai-research-report-projection.js": {
+          "matchesHostBuild": true,
+          "hash": "a8283459e1c1f627b98308c94f1ced2e99e0a5e1d79944343fc43af37b029158"
+        }
+      }
+    },
+    "publicRead": {
+      "at": "2026-10-23T16:42:19.962Z",
+      "report": {
+        "httpStatus": 200,
+        "id": "805cc84a-2333-4695-8aac-217ef57e7ac8",
+        "status": "succeeded",
+        "availability": "available",
+        "resultVersion": 2,
+        "model": {
+          "providerId": "openrouter",
+          "modelId": "nvidia/nemotron-3.5-lightning:free",
+          "researchSettingsRevision": "5"
+        },
+        "bindings": 11
+      },
+      "history": {
+        "httpStatus": 200,
+        "items": [
+          {
+            "id": "805cc84a-2333-4695-8aac-217ef57e7ac8",
+            "status": "succeeded",
+            "availability": "available"
+          },
+          {
+            "id": "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea",
+            "status": "failed",
+            "availability": "missing"
+          },
+          {
+            "id": "18d76166-84d8-4fcf-9b03-c5a5fb33d068",
+            "status": "failed",
+            "availability": "missing"
+          }
+        ]
+      },
+      "citations": {
+        "count": 11,
+        "allStatus200": true,
+        "ownedToolsAndFingerprintsMatch": true,
+        "unknownReferenceStatus": 404
+      },
+      "canCreate": false,
+      "settings": {
+        "revision": "5",
+        "researchDefault": {
+          "providerId": "openrouter",
+          "model": "openrouter/free"
+        }
+      },
+      "readOnly": true,
+      "additionalModelCalls": 0
+    },
+    "web": {
+      "passed": true,
+      "reportUrl": "http://127.0.0.1:5173/ai-chat?run=805cc84a-2333-4695-8aac-217ef57e7ac8&mode=drawer",
+      "screenshot": "/tmp/g3-d7-report-read-20261024.png",
+      "quoteAndNewsReferencesExpanded": true,
+      "newGenerationTriggered": false,
+      "externalLinkOpened": false
+    },
+    "protection": {
+      "at": "2026-10-23T16:40:09.578Z",
+      "tables": {
+        "Account": {
+          "allowed": true,
+          "policy": "original_rows_retained",
+          "beforeCount": 24,
+          "afterCount": 24
+        },
+        "AccountLedgerState": {
+          "allowed": true,
+          "policy": "approved_business_projection_updates",
+          "beforeCount": 20,
+          "afterCount": 20
+        },
+        "AiRoutingSettings": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 1
+        },
+        "Asset": {
+          "allowed": true,
+          "policy": "approved_000001.OF_update",
+          "beforeCount": 4,
+          "afterCount": 4,
+          "missing": 1,
+          "added": 1
+        },
+        "BacktestJob": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 71
+        },
+        "CashBalance": {
+          "allowed": true,
+          "policy": "approved_business_projection_updates",
+          "beforeCount": 16,
+          "afterCount": 16
+        },
+        "JournalEntry": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "JournalReviewSnapshot": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 2
+        },
+        "LedgerEvent": {
+          "allowed": true,
+          "policy": "original_rows_retained",
+          "beforeCount": 125,
+          "afterCount": 128
+        },
+        "PortfolioSnapshot": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 6
+        },
+        "ProviderConfig": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 3
+        },
+        "ResearchObservation": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "ResearchObservationSubmission": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "ResearchObservationVersion": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 0
+        },
+        "Strategy": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 91
+        },
+        "StrategyVersion": {
+          "allowed": true,
+          "policy": "unchanged",
+          "count": 92
+        },
+        "Trade": {
+          "allowed": true,
+          "policy": "approved_business_projection_updates",
+          "beforeCount": 18,
+          "afterCount": 18
+        }
+      },
+      "allTablesAllowed": true,
+      "oldAiRowsPreserved": true,
+      "storedReportRowHashUnchanged": true,
+      "dsaControlUnchanged": true,
+      "mountsUnchanged": true,
+      "flagsRestored": true,
+      "nonV2EnvironmentRestored": true,
+      "policyRestoredUnset": true,
+      "headUnchanged": true,
+      "counters": {
+        "runs": 3,
+        "tools": 33,
+        "observations": 0,
+        "invocations": 0,
+        "invocationFacts": 0
+      },
+      "imageChangedFromFastSync": true
+    }
   }
 }

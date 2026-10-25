@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { JournalAnalysisDraft, JournalReviewCandidateContract } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
@@ -32,11 +32,15 @@ export function JournalObjectReview({
   mode,
   reviewObjectId,
   onHistory,
+  focusRequest = 0,
+  onReturnToCandidates,
 }: {
   accountId: string;
   mode: 'actual' | 'shadow';
   reviewObjectId: string;
   onHistory: () => void;
+  focusRequest?: number;
+  onReturnToCandidates?: () => void;
 }) {
   const queryClient = useQueryClient();
   const api = getDesktopApiClient().journalReviews;
@@ -97,6 +101,13 @@ export function JournalObjectReview({
     },
   });
   const { changedFacts, changed } = resultChanges(result, object.data, draftVersion);
+  const reviewRegion = useRef<HTMLElement>(null);
+  const hasCandidate = Boolean(object.data);
+  useEffect(() => {
+    if (!focusRequest || !hasCandidate) return;
+    reviewRegion.current?.focus({ preventScroll: true });
+    reviewRegion.current?.scrollIntoView?.({ block: 'start' });
+  }, [focusRequest, hasCandidate]);
   const busy = analysis.isPending || save.isPending || object.isError;
   if (object.isPending) return <Skeleton className="h-48 w-full" />;
   if (!object.data)
@@ -109,7 +120,8 @@ export function JournalObjectReview({
     );
   const candidate = object.data;
   return (
-    <div className="flex flex-col gap-4">
+    <section ref={reviewRegion} tabIndex={-1} aria-label="当前复盘对象" className="flex scroll-mt-4 flex-col gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
+      {onReturnToCandidates && <Button variant="ghost" size="sm" className="self-start" onClick={onReturnToCandidates}>返回对象列表</Button>}
       {object.isError && (
         <JournalRequestError
           title={save.isSuccess ? '快照已保存，当前对象暂未更新' : '当前对象暂未更新'}
@@ -117,8 +129,7 @@ export function JournalObjectReview({
           retry={() => void object.refetch()}
         />
       )}
-      <JournalFactSummary candidate={candidate} />
-      <div className="flex flex-wrap gap-2">
+      <JournalFactSummary candidate={candidate} actions={<div className="flex shrink-0 flex-wrap gap-2">
         <Button variant="outline" disabled={busy} onClick={() => setOpen(true)}>
           核对与补充本次草稿
         </Button>
@@ -148,7 +159,7 @@ export function JournalObjectReview({
         <Button variant="ghost" onClick={onHistory}>
           查看历史快照
         </Button>
-      </div>
+      </div>} />
       {analysis.isError && <JournalRequestError title="分析未完成" error={analysis.error} />}
       {changed && (
         <Alert>
@@ -204,6 +215,6 @@ export function JournalObjectReview({
           }}
         />
       )}
-    </div>
+    </section>
   );
 }

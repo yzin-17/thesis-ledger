@@ -22,6 +22,7 @@ const clientAuditMetadataFields = new Set([
   'toolCalls',
   'fallbackErrors',
   'frozenResearch',
+  'diagnosticTrace',
   'sdkExecution',
   'researchPolicy',
   'researchRoutes',

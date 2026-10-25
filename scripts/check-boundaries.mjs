@@ -11,6 +11,19 @@ const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
+  ...['research', 'providers', 'ledger', 'backtest'].map((feature) => [
+    'apps/server/src/ai/adaptive/',
+    `apps/server/src/${feature}/`,
+    'AI 自适应策略只消费固定请求与执行预算，不得反向读取业务编排或 Provider 配置',
+  ]),
+  ['apps/server/src/ai/adaptive/', 'apps/server/src/platform/prisma', 'AI 自适应缓存不得操作业务数据库或自行扩大请求授权'],
+  ['apps/server/src/ai/adaptive/', 'apps/server/src/ai/provider-registry', 'AI 自适应策略不得自行重新选择Provider或模型'],
+  ['apps/server/src/ai/adaptive/', 'apps/server/src/ai/ai-execution-state.store', 'AI 自适应策略不得直接改写业务执行账本'],
+  ...['research', 'ledger', 'market', 'backtest', 'providers', 'notifications'].map((feature) => [
+    'apps/server/src/ai/trace/',
+    `apps/server/src/${feature}/`,
+    'AI trace 只观察执行边界，不得反向依赖业务编排或 Provider 配置层',
+  ]),
   [
     'apps/desktop/src/features/portfolio/portfolio-mode-context.tsx',
     'apps/desktop/src/app/',

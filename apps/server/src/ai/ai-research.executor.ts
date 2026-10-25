@@ -1,4 +1,5 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { AiTraceCaptureService } from './trace/ai-trace-capture.service.js';
 import {
   aiExecutionSummarySchema,
   aiResearchContextSchema,
@@ -68,6 +69,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     private readonly prompts: PromptVersionRegistry,
     private readonly executions: AiExecutionStateStore,
     private readonly sdkExecution: AiResearchSdkExecution,
+    @Optional() private readonly traceCapture?: AiTraceCaptureService,
   ) {}
 
   onModuleInit() {
@@ -395,6 +397,16 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     const startedAt = Date.now();
     const run = await this.runs.claim(id);
     if (!run) return;
+    const execute = () => this.executeClaimed(run, startedAt);
+    if (this.traceCapture) return this.traceCapture.runClaimed(run, execute);
+    return execute();
+  }
+
+  private async executeClaimed(
+    run: NonNullable<Awaited<ReturnType<AiRunService['claim']>>>,
+    startedAt: number,
+  ) {
+    const id = run.id;
     const ownership = { runId: id, executionAttempt: run.executionAttempt };
     const execution = aiExecutionSummarySchema.safeParse(asRecord(run.modelMetadata)?.sdkExecution);
     if (!execution.success || !execution.data.deadlineAt) {

@@ -8,10 +8,13 @@ def releaseSigningFile = rootProject.file('keystore.properties')
 if (releaseSigningFile.exists()) {
     releaseSigningFile.withInputStream { releaseSigningProperties.load(it) }
 }
-def releaseStoreFile = releaseSigningProperties.getProperty('storeFile') ?: System.getenv('ANDROID_KEYSTORE_FILE')
-def releaseStorePassword = releaseSigningProperties.getProperty('storePassword') ?: System.getenv('ANDROID_KEYSTORE_PASSWORD')
-def releaseKeyAlias = releaseSigningProperties.getProperty('keyAlias') ?: System.getenv('ANDROID_KEY_ALIAS')
-def releaseKeyPassword = releaseSigningProperties.getProperty('keyPassword') ?: System.getenv('ANDROID_KEY_PASSWORD')
+def releaseStoreFile = System.getenv('ANDROID_KEYSTORE_FILE') ?: releaseSigningProperties.getProperty('storeFile')
+def releaseStorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: releaseSigningProperties.getProperty('storePassword')
+def releaseKeyAlias = System.getenv('ANDROID_KEY_ALIAS') ?: releaseSigningProperties.getProperty('keyAlias')
+def releaseKeyPassword = System.getenv('ANDROID_KEY_PASSWORD') ?: releaseSigningProperties.getProperty('keyPassword')
+def unsignedRelease = (findProperty('mobileReleaseUnsigned') ?: 'false').toBoolean()
+def configuredVersionCode = (findProperty('mobileReleaseVersionCode') ?: '1').toInteger()
+def configuredVersionName = findProperty('mobileReleaseVersionName') ?: '0.1.0'
 def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every {
     it != null && !it.trim().isEmpty()
 }
@@ -104,8 +107,8 @@ android {
         applicationId 'io.github.yzin17.thesisledger.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.1.0"
+        versionCode configuredVersionCode
+        versionName configuredVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -130,9 +133,9 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Local builds keep the debug key as an explicit fallback; release CI
-            // must provide keystore.properties or the ANDROID_* signing variables.
-            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
+            if (!unsignedRelease && hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -149,6 +152,15 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseArtifactRequested = graph.allTasks.any { task ->
+        task.project == project && task.name ==~ /(?i)(assemble|bundle|package|validateSigning).*Release/
+    }
+    if (releaseArtifactRequested && !unsignedRelease && !hasReleaseSigning) {
+        throw new GradleException('正式 Release 缺少完整签名输入；仅编译候选时显式使用 -PmobileReleaseUnsigned=true，候选不可分发。')
     }
 }
 

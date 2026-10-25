@@ -44,8 +44,8 @@ export function JournalEmpty({
   action?: React.ReactNode;
 }) {
   return (
-    <Empty>
-      <EmptyHeader>
+    <Empty className="flex-none items-start gap-3 rounded-lg border bg-muted/10 p-5 text-left">
+      <EmptyHeader className="max-w-2xl items-start text-left">
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>

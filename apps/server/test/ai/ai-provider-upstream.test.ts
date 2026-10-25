@@ -64,7 +64,7 @@ describe('AI Provider 上游格式路由', () => {
     );
   });
 
-  it('管理输入拒绝内部 adapter 和只读扩展标记', () => {
+  it('管理输入允许显式兼容扩展并拒绝内部 adapter 和定价版本', () => {
     const base = {
       name: 'provider-a',
       baseUrl: 'https://provider.example/v1',
@@ -82,7 +82,7 @@ describe('AI Provider 上游格式路由', () => {
         ...base,
         compatibilityExtensionProfile: 'openrouter-v1',
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(aiProviderInputSchema.safeParse({ ...base, upstreamFormat: 'responses' }).success).toBe(
       true,
     );

@@ -1,0 +1,86 @@
+{
+  "version": "g3-d28-trace-deployment-v1",
+  "date": "2026-10-25",
+  "status": "authorized_deployment_verified_without_models",
+  "gates": {
+    "sourceInventoryTests": 6,
+    "complexity": { "exit": 0, "groups": 8, "files": 2665 },
+    "lint": { "exit": 0, "groups": 9, "files": 2672 },
+    "boundariesExit": 0,
+    "workspaceDependenciesExit": 0,
+    "fileSizeExit": 0,
+    "gitIgnoreChanged": false,
+    "eslintRulesOrThresholdsChanged": false,
+    "projectServiceAllowancesChanged": false
+  },
+  "deployment": {
+    "workingDirectory": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra",
+    "entry": "./scripts/sync-code.sh thesis-ledger",
+    "exit": 0,
+    "compatibilityPassed": true,
+    "target": "thesis-ledger",
+    "restartedServices": ["thesis-ledger", "backtest-worker"],
+    "image": "sha256:76f0c84c3db2fb37c413682861b0f71f4789be8c1f7d59fc642229861b1ff382",
+    "imageChanged": false,
+    "containerIdsChanged": false,
+    "databaseStructureChanged": false,
+    "scope": "container_writable_layer"
+  },
+  "runtime": {
+    "bothTargetsMatchHost": true,
+    "filesPerTarget": { "server": 2037, "schemas": 579, "domain": 243, "shared": 3 },
+    "actualSchemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+    "memoryProbePerTarget": {
+      "controlledTransportCalls": 1,
+      "externalNetworkAttempts": 0,
+      "businessDatabaseWrites": 0,
+      "captureStatus": "complete",
+      "sdkError": "schema_invalid",
+      "upstreamTextEqualsSdk": true,
+      "runtimeHttpResponse": true
+    },
+    "healthyContainers": 5,
+    "capabilities": { "status": 200, "version": "research-capabilities-v2", "canCreate": false },
+    "pendingResearch": 0,
+    "privateStorage": {
+      "root": "/app/var/backtest/ai-traces",
+      "rootExists": false,
+      "parent": "/app/var/backtest",
+      "parentWritableByBoth": true,
+      "parentMode": "0755",
+      "uid": 100,
+      "gid": 101,
+      "sharedRwVolume": "thesis-ledger-backtest-data",
+      "actualFileCaptureTested": false
+    }
+  },
+  "protection": {
+    "database": "thesis_ledger",
+    "databaseOwner": "thesis_ledger",
+    "schemaHead": "20261023010000_report_metadata_snapshots",
+    "unchangedProtectedTables": 22,
+    "unchangedAiRuns": 8,
+    "unchangedAiToolCalls": 88,
+    "dsaControlTablesUnchanged": 4,
+    "routesUnchanged": 20,
+    "environmentsUnchanged": true,
+    "mountsUnchanged": true,
+    "originalAcceptanceFiles": 22452,
+    "originalAcceptanceBytes": 4709504479,
+    "originalAcceptanceMetadataMatches": true,
+    "originalTsCopies": 359,
+    "originalTsContentMatches": true,
+    "concurrentAcceptanceAdditionsPreserved": true,
+    "otherWipPreserved": true,
+    "stageOrCommitPerformed": false
+  },
+  "limits": {
+    "realModelCalls": 0,
+    "v2Enabled": false,
+    "remainingCallsFrozen": 7,
+    "actualSelectedBusinessTraceTested": false,
+    "historicalD25TextRecovered": false,
+    "recreationPersistenceTested": false,
+    "g3Complete": false
+  }
+}

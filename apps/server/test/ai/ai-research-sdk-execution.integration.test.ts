@@ -1,357 +1,21 @@
-import { createServer, type ServerResponse } from 'node:http';
-import { once } from 'node:events';
-import {
-  aiGenerationContracts,
-  type AiExecutionSummary,
-  type AiResearchPolicyV1,
-} from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AiResearchSdkExecution } from '../../src/ai/ai-research-sdk-execution.js';
-import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
-
-const policy: AiResearchPolicyV1 = {
-  version: 'research-policy-v1' as const,
-  maxAiCalls: 2,
-  maxInputTokens: 100_000,
-  maxOutputTokens: 20_000,
-  maxDurationSeconds: 300,
-  maxCost: '0',
-  costCurrency: null,
-  paidRoutes: [],
-};
-
-const summary = (
-  frozenPolicy = policy,
-  deadlineAt = new Date(Date.now() + 60_000).toISOString(),
-): AiExecutionSummary => ({
-  version: 'sdk-execution-v1',
-  contract: aiGenerationContracts.research.ref,
-  frozenPolicy,
-  deadlineAt,
-  generationStatus: 'pending',
-  usageCompleteness: 'unknown',
-  requests: [],
-  continuationBlockedReason: null,
-});
-
-const researchContent = JSON.stringify({
-  conclusion: '本地研究结果',
-  evidence: [],
-  risks: [],
-  unknowns: [],
-  disclaimer: 'test',
-  signals: [],
-});
-
-/** 慢流每块的间隔；总时长必然超过用例给出的 Provider 级超时。 */
-const SLOW_STREAM_CHUNK_GAP_MS = 400;
-
-const writeSse = (response: ServerResponse, model = 'fixture-model') => {
-  const content = researchContent;
-  const common = {
-    id: 'research-fixture',
-    object: 'chat.completion.chunk',
-    created: 1,
-    model,
-  };
-  response.writeHead(200, { 'content-type': 'text/event-stream' });
-  response.write(
-    `data: ${JSON.stringify({
-      ...common,
-      choices: [{ index: 0, delta: { content }, finish_reason: null }],
-    })}\n\n`,
-  );
-  response.write(
-    `data: ${JSON.stringify({
-      ...common,
-      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-    })}\n\n`,
-  );
-  response.write(
-    `data: ${JSON.stringify({
-      ...common,
-      choices: [],
-      usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-    })}\n\n`,
-  );
-  response.end('data: [DONE]\n\n');
-};
-
-const stateStore = (initial: AiExecutionSummary) => {
-  let execution = structuredClone(initial);
-  const failOwned = vi.fn(async () => true);
-  const prepareRequest = vi.fn(async (input: { requestId: string; reservation: never }) => {
-    const request = {
-      requestId: input.requestId,
-      sequence: execution.requests.length + 1,
-      state: 'prepared' as const,
-      reservation: input.reservation,
-      dispatchExecutionAttempt: null,
-      preparedAt: new Date().toISOString(),
-      dispatchingAt: null,
-      completedAt: null,
-      outcome: null,
-      error: null,
-      usageRevisions: [],
-      settledRevision: 0,
-    };
-    execution = { ...execution, requests: [...execution.requests, request] };
-    return request;
-  });
-  const authorizeDispatch = vi.fn(async (_owner: unknown, requestId: string) => {
-    execution = {
-      ...execution,
-      requests: execution.requests.map((request) =>
-        request.requestId === requestId
-          ? {
-              ...request,
-              state: 'dispatching' as const,
-              dispatchExecutionAttempt: 1,
-              dispatchingAt: new Date().toISOString(),
-            }
-          : request,
-      ),
-    };
-    return true;
-  });
-  const completeAndSettle = vi.fn(
-    async (input: {
-      requestId: string;
-      revision: AiExecutionSummary['requests'][number]['usageRevisions'][number];
-      outcome: AiExecutionSummary['requests'][number]['outcome'];
-      error?: AiExecutionSummary['requests'][number]['error'];
-      continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
-    }) => {
-      execution = {
-        ...execution,
-        generationStatus: input.outcome?.status ?? 'incomplete',
-        usageCompleteness: input.revision.usage.status,
-        continuationBlockedReason:
-          input.continuationBlockedReason ?? execution.continuationBlockedReason,
-        requests: execution.requests.map((request) =>
-          request.requestId === input.requestId
-            ? {
-                ...request,
-                state: 'completed' as const,
-                completedAt: new Date().toISOString(),
-                outcome: input.outcome,
-                error: input.error ?? null,
-                usageRevisions: [input.revision],
-                settledRevision: 1,
-              }
-            : request,
-        ),
-      };
-      return {
-        applied: true,
-        idempotent: false,
-        continuationBlockedReason: execution.continuationBlockedReason,
-        execution,
-      };
-    },
-  );
-  const markUnknown = vi.fn(async () => {
-    execution = { ...execution, generationStatus: 'unknown' };
-    return true;
-  });
-  return {
-    store: { prepareRequest, authorizeDispatch, completeAndSettle, markUnknown, failOwned },
-    execution: () => execution,
-    failOwned,
-    markUnknown,
-  };
-};
+import { ResearchSdkHttpFixture, policy, summary } from './research-sdk-http.fixture.js';
 
 describe('Research SDK local HTTP vertical', () => {
-  let baseURL = '';
-  let requestCount = 0;
-  let returnedModel = 'fixture-model';
-  let mode: 'fallback' | 'disconnect' | 'hang' | 'retryAfterDeadline' | 'slowStream' | 'success' =
-    'success';
-  const server = createServer((request, response) => {
-    requestCount += 1;
-    if (
-      request.url?.startsWith('/primary/') &&
-      (mode === 'fallback' || mode === 'retryAfterDeadline')
-    ) {
-      response.writeHead(429, {
-        'content-type': 'application/json',
-        'retry-after': mode === 'fallback' ? '0' : '120',
-      });
-      response.end(JSON.stringify({ error: { message: 'capacity rejected' } }));
-      return;
-    }
-    if (request.url?.startsWith('/primary/') && mode === 'disconnect') {
-      response.destroy();
-      return;
-    }
-    if (request.url?.startsWith('/primary/') && mode === 'hang') {
-      response.writeHead(200, { 'content-type': 'text/event-stream' });
-      response.write(': waiting\n\n');
-      return;
-    }
-    // 一直在出字、但总时长必然超过 Provider 级「超时（毫秒）」的慢流：
-    // 用来证明判活看的是“还在不在产出”，不是固定总时长。
-    if (request.url?.startsWith('/primary/') && mode === 'slowStream') {
-      response.on('error', () => undefined);
-      const common = {
-        id: 'slow-stream',
-        object: 'chat.completion.chunk',
-        created: 1,
-        model: 'fixture-model',
-      };
-      const pieces = researchContent.match(/.{1,24}/gu) ?? [];
-      response.writeHead(200, { 'content-type': 'text/event-stream' });
-      pieces.forEach((piece, index) => {
-        setTimeout(() => {
-          response.write(
-            `data: ${JSON.stringify({
-              ...common,
-              choices: [{ index: 0, delta: { content: piece }, finish_reason: null }],
-            })}\n\n`,
-          );
-        }, index * SLOW_STREAM_CHUNK_GAP_MS);
-      });
-      setTimeout(() => {
-        response.write(
-          `data: ${JSON.stringify({
-            ...common,
-            choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-          })}\n\n`,
-        );
-        response.end('data: [DONE]\n\n');
-      }, pieces.length * SLOW_STREAM_CHUNK_GAP_MS);
-      return;
-    }
-    writeSse(response, returnedModel);
-  });
+  const fixture = new ResearchSdkHttpFixture();
+  const execute = fixture.execute;
+  beforeAll(() => fixture.start());
+  beforeEach(() => fixture.reset());
+  afterAll(() => fixture.stop());
 
-  beforeAll(async () => {
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('本地研究 Provider 启动失败');
-    baseURL = `http://127.0.0.1:${address.port}`;
-  });
-
-  beforeEach(() => {
-    requestCount = 0;
-    returnedModel = 'fixture-model';
-    mode = 'success';
-  });
-
-  afterAll(async () => {
-    server.close();
-    await once(server, 'close');
-  });
-
-  type RouteTimeouts = {
-    providerTimeoutMs?: number;
-    firstOutputTimeoutMs?: number;
-    outputIdleTimeoutMs?: number;
-  };
-
-  const provider = (
-    id: string,
-    path: string,
-    pricing = { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
-    timeouts: RouteTimeouts = {},
-  ) => ({
-    id,
-    models: ['fixture-model'],
-    metadata: {
-      health: 'healthy' as const,
-      ...pricing,
-    },
-    sdkRuntime: () => ({
-      baseURL: `${baseURL}/${path}/v1`,
-      apiKey: 'secret',
-      timeoutMs: timeouts.providerTimeoutMs ?? 2_000,
-    }),
-  });
-
-  const route = (
-    id: string,
-    path: string,
-    pricing = { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
-    timeouts: RouteTimeouts = {},
-  ) => ({
-    provider: provider(id, path, pricing, timeouts),
-    execution: {
-      adapter: 'openai-compatible' as const,
-      mode: 'json_validated' as const,
-      readiness: { configurationFingerprint: `${id}-fingerprint` },
-      ...(timeouts.firstOutputTimeoutMs === undefined
-        ? {}
-        : { firstOutputTimeoutMs: timeouts.firstOutputTimeoutMs }),
-      ...(timeouts.outputIdleTimeoutMs === undefined
-        ? {}
-        : { outputIdleTimeoutMs: timeouts.outputIdleTimeoutMs }),
-    },
-  });
-
-  const run = (execution: AiExecutionSummary, frozenPricing?: Record<string, number | string>) => ({
-    provider: 'primary',
-    model: 'fixture-model',
-    modelMetadata: {
-      sdkExecution: execution,
-      researchRoutes: [
-        {
-          provider: 'primary',
-          model: 'fixture-model',
-          configurationFingerprint: 'primary-fingerprint',
-          ...(frozenPricing === undefined ? {} : { pricing: frozenPricing }),
-        },
-        {
-          provider: 'fallback',
-          model: 'fixture-model',
-          configurationFingerprint: 'fallback-fingerprint',
-        },
-      ],
-    },
-  });
-
-  const execute = async (
-    execution: AiExecutionSummary,
-    signal = new AbortController().signal,
-    options: {
-      currentPricing?: { costPer1kInput: number; costPer1kOutput: number; costCurrency: string };
-      frozenPricing?: Record<string, number | string>;
-      timeouts?: RouteTimeouts;
-    } = {},
-  ) => {
-    const state = stateStore(execution);
-    const registry = {
-      defaultModel: () => 'fixture-model',
-      readyContractCandidates: () => [
-        route('primary', 'primary', options.currentPricing, options.timeouts),
-        route('fallback', 'fallback', options.currentPricing, options.timeouts),
-      ],
-    };
-    const service = new AiResearchSdkExecution(
-      registry as never,
-      new AiSdkGenerationAdapter(),
-      state.store as never,
-    );
-    await service.execute({
-      ownership: { runId: '11111111-1111-4111-8111-111111111111', executionAttempt: 1 },
-      run: run(execution, options.frozenPricing),
-      messages: [{ role: 'user', content: 'Return research JSON.' }],
-      startedAt: Date.now(),
-      signal,
-      buildResult: (output, selectedProvider) => ({ ...output, provider: selectedProvider }),
-    });
-    return state;
-  };
-
-  it('仅对明确的生成前拒绝执行一次同模型 fallback，并分别留痕', async () => {
-    mode = 'fallback';
+  it('明确生成前拒绝仅向同Provider／模型重试，分别预留和留痕', async () => {
+    fixture.mode = 'retryOnce';
     const state = await execute(summary());
-    expect(requestCount).toBe(2);
+    expect(fixture.requestCount).toBe(2);
     expect(state.execution().requests).toHaveLength(2);
     expect(state.execution().requests.map((request) => request.reservation.provider)).toEqual([
       'primary',
-      'fallback',
+      'primary',
     ]);
     expect(state.execution().requests[0]).toMatchObject({
       state: 'completed',
@@ -362,9 +26,9 @@ describe('Research SDK local HTTP vertical', () => {
   });
 
   it('完成事实记录 SDK 实际返回模型，保留预留中的请求模型', async () => {
-    returnedModel = 'resolved/model';
+    fixture.returnedModel = 'resolved/model';
     const state = await execute(summary());
-    expect(requestCount).toBe(1);
+    expect(fixture.requestCount).toBe(1);
     expect(state.execution().requests.at(-1)).toMatchObject({
       reservation: { model: 'fixture-model' },
       outcome: { status: 'complete', actualModel: 'resolved/model' },
@@ -372,9 +36,9 @@ describe('Research SDK local HTTP vertical', () => {
   });
 
   it('传输结果未知时不 fallback，并保留 unknown 请求事实', async () => {
-    mode = 'disconnect';
+    fixture.mode = 'disconnect';
     const state = await execute(summary());
-    expect(requestCount).toBe(1);
+    expect(fixture.requestCount).toBe(1);
     expect(state.markUnknown).toHaveBeenCalledOnce();
     expect(state.failOwned).toHaveBeenCalledWith(
       expect.anything(),
@@ -382,17 +46,106 @@ describe('Research SDK local HTTP vertical', () => {
     );
   });
 
-  it('Retry-After 超过剩余绝对期限时终止，不发送 fallback', async () => {
-    mode = 'retryAfterDeadline';
-    await expect(
-      execute(summary(policy, new Date(Date.now() + 1_000).toISOString())),
-    ).rejects.toThrow('Retry-After 超过研究任务剩余期限');
-    expect(requestCount).toBe(1);
+  it('Retry-After 超过剩余期限时收敛失败，不重试或切换Provider', async () => {
+    fixture.mode = 'retryAfterDeadline';
+    const state = await execute(summary(policy, new Date(Date.now() + 1_000).toISOString()));
+    expect(fixture.requestCount).toBe(1);
+    expect(state.failOwned).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ errorCode: 'research_provider_rejected' }),
+    );
+  });
+
+  it('只授权一次时，明确拒绝也不增加发送次数', async () => {
+    fixture.mode = 'retryOnce';
+    const state = await execute(summary({ ...policy, maxAiCalls: 1 }));
+    expect(fixture.requestCount).toBe(1);
+    expect(state.execution().requests).toHaveLength(1);
+    expect(state.failOwned).toHaveBeenCalledOnce();
+  });
+
+  it('预算预留不足时零次派发且明确收敛失败', async () => {
+    const state = await execute(summary({ ...policy, maxInputTokens: 1 }));
+    expect(fixture.requestCount).toBe(0);
+    expect(state.failOwned).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        errorCode: 'research_budget_exhausted',
+        continuationBlockedReason: 'budget_exceeded',
+      }),
+    );
+  });
+
+  it('Worker恢复时已有dispatching／unknown请求，不再发新的请求', async () => {
+    for (const state of ['dispatching', 'unknown'] as const) {
+      const execution = summary();
+      execution.requests = [
+        {
+          requestId: '00000000-0000-4000-8000-000000000099',
+          sequence: 1,
+          state,
+          reservation: {
+            aiCalls: 1,
+            inputTokens: 1,
+            outputTokens: 1,
+            cost: {
+              status: 'estimated',
+              amount: '0',
+              currency: 'USD',
+              source: 'fixture',
+              pricingVersion: 'v1',
+            },
+          },
+          dispatchExecutionAttempt: 1,
+          preparedAt: new Date().toISOString(),
+          dispatchingAt: new Date().toISOString(),
+          completedAt: null,
+          outcome: null,
+          error: null,
+          usageRevisions: [],
+          settledRevision: 0,
+        },
+      ];
+      const result = await execute(execution);
+      expect(result.failOwned).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ errorCode: 'research_unknown_outcome' }),
+      );
+    }
+    expect(fixture.requestCount).toBe(0);
+  });
+
+  it('迟到的首正文超过系统默认仍可在原任务期限内完成', async () => {
+    fixture.mode = 'lateFirst';
+    const state = await execute(
+      summary(policy, new Date(Date.now() + 1500).toISOString()),
+      new AbortController().signal,
+      {
+        timeouts: {
+          firstOutputTimeoutMs: 30,
+          outputIdleTimeoutMs: 30,
+          firstOutputTimeoutSource: 'system',
+          outputIdleTimeoutSource: 'system',
+        },
+      },
+    );
+    expect(fixture.requestCount).toBe(1);
+    expect(state.execution().generationStatus).toBe('complete');
+    expect(state.markUnknown).not.toHaveBeenCalled();
+  });
+
+  it('显式用途首输出限额仍执行，超时记未知且不重试', async () => {
+    fixture.mode = 'lateFirst';
+    const state = await execute(summary(), new AbortController().signal, {
+      timeouts: { firstOutputTimeoutMs: 30, firstOutputTimeoutSource: 'route' },
+    });
+    expect(fixture.requestCount).toBe(1);
+    expect(state.markUnknown).toHaveBeenCalledOnce();
   });
 
   it('创建起绝对期限已过时零 Provider 请求', async () => {
     const state = await execute(summary(policy, new Date(Date.now() - 1_000).toISOString()));
-    expect(requestCount).toBe(0);
+    expect(fixture.requestCount).toBe(0);
     expect(state.failOwned).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -403,13 +156,13 @@ describe('Research SDK local HTTP vertical', () => {
   });
 
   it('用户取消在途流时不 fallback，并释放为 cancelled/unknown 终态', async () => {
-    mode = 'hang';
+    fixture.mode = 'hang';
     const controller = new AbortController();
     const pending = execute(summary(), controller.signal);
-    await vi.waitFor(() => expect(requestCount).toBe(1));
+    await vi.waitFor(() => expect(fixture.requestCount).toBe(1));
     controller.abort('user_cancelled');
     const state = await pending;
-    expect(requestCount).toBe(1);
+    expect(fixture.requestCount).toBe(1);
     expect(state.markUnknown).toHaveBeenCalledOnce();
     expect(state.failOwned).toHaveBeenCalledWith(
       expect.anything(),
@@ -418,7 +171,7 @@ describe('Research SDK local HTTP vertical', () => {
   });
 
   it('一直在出字的长流不会被 Provider 级「超时（毫秒）」掐断', async () => {
-    mode = 'slowStream';
+    fixture.mode = 'slowStream';
     const state = await execute(summary(), new AbortController().signal, {
       // 现场复现：本地推理模型 research 探针实测 43～103 秒，而 Provider「超时（毫秒）」是 30 秒。
       // 这里把两个量按比例缩小——Provider 超时 900 ms，慢流总时长约 1.6 s，块间隔 400 ms。
@@ -428,7 +181,7 @@ describe('Research SDK local HTTP vertical', () => {
         outputIdleTimeoutMs: 900,
       },
     });
-    expect(requestCount).toBe(1);
+    expect(fixture.requestCount).toBe(1);
     expect(state.markUnknown).not.toHaveBeenCalled();
     expect(state.execution().requests[0]).toMatchObject({ state: 'completed' });
     expect(state.execution().generationStatus).toBe('complete');

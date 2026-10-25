@@ -50,6 +50,24 @@ describe('单笔复盘交互', () => {
     await journalWait(() => expect(view.host.textContent).toContain('真实退出成交'));
     return view;
   };
+  it('主要操作位于摘要标题区，成交来源默认收起且可展开，返回不重建结果', async () => {
+    const onReturnToCandidates = vi.fn();
+    const view = await mountJournal(<JournalObjectReview {...props} onReturnToCandidates={onReturnToCandidates} />);
+    await journalWait(() => expect(view.host.textContent).toContain('成交与计划来源'));
+    expect(journalButton('开始复盘').closest('[data-slot="card-header"]')).not.toBeNull();
+    const source = [...view.host.querySelectorAll('details')].find(row => row.querySelector('summary')?.textContent === '成交与计划来源')!;
+    expect(source.open).toBe(false);
+    await act(async () => source.querySelector('summary')!.click());
+    expect(source.open).toBe(true);
+    await journalClick('开始复盘');
+    await journalWait(() => expect(journalButton('保存复盘快照').disabled).toBe(false));
+    await journalClick('返回对象列表');
+    expect(onReturnToCandidates).toHaveBeenCalledOnce();
+    expect(view.host.textContent).toContain('确定性复盘结果');
+    expect(source.open).toBe(true);
+    expect(api.analyze).toHaveBeenCalledTimes(1);
+    expect(api.save).not.toHaveBeenCalled();
+  });
   it('读取失败只有局部错误，重试后读取事实，未分析不能保存或触发 AI', async () => {
     api.object.mockRejectedValueOnce(new Error('服务暂不可用'));
     const view = await mountJournal(<JournalObjectReview {...props} />);

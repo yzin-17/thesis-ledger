@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { aiGenerationModeSchema, type AiGenerationMode } from '@thesis-ledger/schemas';
+import {
+  aiGenerationModeSchema,
+  type AiGenerationMode,
+  type AiProviderValidationPlan,
+  type AiProviderValidationAuthorization,
+} from '@thesis-ledger/schemas';
+import { researchReasoningFields } from './ai-research-reasoning-options.js';
 import type { AiProviderInput, AiProviderExecutionRouteInput } from './ai-provider.contracts.js';
 import { adapterSupportsGenerationMode } from './ai-provider-upstream.js';
 import type { AiAdapter } from '@thesis-ledger/schemas';
@@ -63,7 +69,18 @@ export const routeValidationFingerprint = (
     firstOutputTimeoutMs: route.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs ?? 30000,
     outputIdleTimeoutMs: route.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs ?? 30000,
     transport: 'stream',
+    ...researchReasoningFields(route),
   });
+
+export const validationCallAuthorizationMatches = (
+  plan: AiProviderValidationPlan,
+  authorization: AiProviderValidationAuthorization,
+) =>
+  authorization.planFingerprint === plan.planFingerprint &&
+  (authorization.maxCalls === plan.maxCalls ||
+    (authorization.stopOnFirstFailure === true &&
+      authorization.maxCalls >= plan.pending.length &&
+      authorization.maxCalls <= plan.maxCalls));
 
 export const validationModes = (
   route: AiProviderExecutionRouteInput,

@@ -45,6 +45,7 @@ import {
   aiProviderCapabilities,
   aiProviderSummaryFromRow,
   parseAiProviderSettings,
+  resolveCompatibilityProfile,
 } from './ai-provider-summary.js';
 import { evaluateAiProviderReadiness } from './ai-provider-readiness.js';
 import {
@@ -82,7 +83,10 @@ import type {
   AiRoutingSettingsUpdate,
 } from './ai-routing-settings.contracts.js';
 
-import { VALIDATION_DURATION_SECONDS, type VerifiedRoute } from './ai-provider-validation-policy.js';
+import {
+  VALIDATION_DURATION_SECONDS,
+  type VerifiedRoute,
+} from './ai-provider-validation-policy.js';
 
 export { aiProviderInputSchema, sanitizeAiProviderError } from './ai-provider.contracts.js';
 
@@ -130,7 +134,6 @@ export interface AiTestRuntimeInput {
   adapter: AiAdapter;
   executionRoutes?: AiProviderExecutionRouteInput[];
 }
-
 
 type AiTestModelPricing = {
   costPer1kInput?: number | undefined;
@@ -242,8 +245,11 @@ export class AiProviderService implements OnModuleInit {
       if (input.researchDefault) {
         const candidate = (await this.list(transaction))
           .flatMap((provider) => this.researchCandidatesFromSummary(provider))
-          .find((item) => item.providerId === input.researchDefault?.providerId &&
-            item.model === input.researchDefault?.model);
+          .find(
+            (item) =>
+              item.providerId === input.researchDefault?.providerId &&
+              item.model === input.researchDefault?.model,
+          );
         if (!candidate) throw new BadRequestException('研究默认模型必须配置研究报告用途');
         if (!candidate.enabled) throw new BadRequestException('研究默认模型所属 Provider 已停用');
         if (candidate.health === 'down')
@@ -298,7 +304,9 @@ export class AiProviderService implements OnModuleInit {
             ...settingsFromAiProviderInput(input, existing?.settings),
             ...(verifiedRoutes === undefined ? {} : { generationValidation: verifiedRoutes }),
           },
-          ...(input.expectedRevision === undefined ? {} : { expectedRevision: input.expectedRevision }),
+          ...(input.expectedRevision === undefined
+            ? {}
+            : { expectedRevision: input.expectedRevision }),
         },
         transaction,
       );
@@ -948,8 +956,7 @@ export class AiProviderService implements OnModuleInit {
         ? {}
         : { chatImplementation: input.chatImplementation }),
     });
-    const existingSettings = existing ? parseAiProviderSettings(existing.settings) : null;
-    const compatibilityExtensionProfile = existingSettings?.compatibilityExtensionProfile;
+    const compatibilityExtensionProfile = resolveCompatibilityProfile(input, existing?.settings);
     const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
     return {
       name: input.name,

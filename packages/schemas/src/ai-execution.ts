@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiGenerationHttpRequestDiagnosticSchema } from './ai-generation-http-request-diagnostic.js';
 import {
   aiGenerationErrorSchema,
   aiGenerationErrorCodeSchema,
@@ -302,6 +303,7 @@ export const aiRequestAttemptSchema = z
     dispatchingAt: z.iso.datetime({ offset: true }).nullable(),
     completedAt: z.iso.datetime({ offset: true }).nullable(),
     outcome: aiGenerationOutcomeSchema.nullable(),
+    httpRequest: aiGenerationHttpRequestDiagnosticSchema.optional(),
     error: aiGenerationErrorSchema.nullable(),
     usageRevisions: z.array(aiUsageRevisionSchema).max(16),
     settledRevision: z.number().int().nonnegative(),
@@ -458,6 +460,7 @@ export const aiProviderModelExecutionSchema = z
     model: z.string().trim().min(1).max(200),
     adapter: aiAdapterSchema,
     compatibilityExtensionProfile: z.literal('openrouter-v1').optional(),
+    reasoningEnabled: z.boolean().optional(),
     mode: aiGenerationModeSchema,
     contract: aiGenerationContractRefSchema,
     adapterEvidence: aiAdapterContractEvidenceSchema.nullable(),
@@ -470,6 +473,15 @@ export const aiProviderModelExecutionSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (
+      value.reasoningEnabled !== undefined &&
+      (value.contract.id !== 'research' || value.contract.version !== 'research-generation-v2')
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['reasoningEnabled'],
+        message: '显式推理开关仅适用于研究 V2',
+      });
     if (
       value.adapterEvidence &&
       (value.adapterEvidence.adapter !== value.adapter ||

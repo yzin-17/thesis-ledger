@@ -16,6 +16,10 @@ import {
   type AiProviderModelPricingView,
 } from './ai-provider.contracts.js';
 import { configurationFingerprint, type AiProviderRouteSnapshot } from './ai-provider-readiness.js';
+import {
+  assertResearchReasoningRoutes,
+  mergeResearchReasoningRoutes,
+} from './ai-research-reasoning-options.js';
 
 const pricingVersionFor = (model: string, pricing: AiProviderModelPricingInput) =>
   `pricing-${createHash('sha256')
@@ -94,9 +98,17 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
       ? {}
       : { chatImplementation: input.chatImplementation }),
   });
-  const executionRoutes =
-    input.executionRoutes !== undefined ? input.executionRoutes : existing?.executionRoutes;
+  const executionRoutes = mergeResearchReasoningRoutes(
+    input.executionRoutes,
+    existing?.executionRoutes,
+  );
   const modelDefaults = input.modelDefaults ?? existing?.modelDefaults;
+  const compatibilityExtensionProfile =
+    input.compatibilityExtensionProfile ?? existing?.compatibilityExtensionProfile;
+  assertResearchReasoningRoutes(
+    { ...selection, compatibilityExtensionProfile },
+    executionRoutes ?? [],
+  );
   const models = [...new Set(input.models.map((model) => model.trim()))];
   const modelPricing = modelPricingFromInput(input, models, existing);
   const legacySettingsFields =
@@ -117,9 +129,7 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
     ...(selection.upstreamFormat === 'chat-completions'
       ? { chatImplementation: selection.chatImplementation }
       : {}),
-    ...(existing?.compatibilityExtensionProfile
-      ? { compatibilityExtensionProfile: existing.compatibilityExtensionProfile }
-      : {}),
+    ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
     ...(executionRoutes === undefined ? {} : { executionRoutes }),
     ...(modelDefaults === undefined ? {} : { modelDefaults }),
     modelPricing,
