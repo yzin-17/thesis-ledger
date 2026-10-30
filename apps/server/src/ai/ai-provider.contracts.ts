@@ -374,6 +374,7 @@ export interface AiProviderTestResult {
   mode?: z.infer<typeof aiGenerationModeSchema>;
   model?: string;
   latencyMs?: number;
+  actualModel?: string | null;
   usage?: AiUsageFacts;
   cost?: AiCostFacts;
   errorCode?: string;

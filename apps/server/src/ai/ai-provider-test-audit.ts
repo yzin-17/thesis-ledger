@@ -10,7 +10,7 @@ import type { AiTestRuntimeInput } from './ai-provider-test-runtime.js';
 export function aiProviderTestAuditDetails(
   input: AiTestRuntimeInput,
   model: string,
-  facts: { usage: AiUsageFacts; cost: AiCostFacts },
+  facts: { usage: AiUsageFacts; cost: AiCostFacts; actualModel?: string | null },
   errorCode?: string,
   status?: AiProviderTestStatus,
 ): Prisma.InputJsonValue {
@@ -32,6 +32,7 @@ export function aiProviderTestAuditDetails(
     kind: 'ai_provider_test',
     testKind: input.testKind,
     model,
+    ...(facts.actualModel === undefined ? {} : { actualModel: facts.actualModel }),
     adapter: input.adapter,
     mode,
     ...(input.testKind === 'generation' && input.purpose !== undefined

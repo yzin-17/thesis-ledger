@@ -8,6 +8,11 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const container = `ledger-ai-provider-test-${randomUUID().slice(0, 8)}`;
 const database = 'ai_provider_concurrency_fixture';
 const owner = 'fixture_owner';
+const testTimeoutMs = Number(process.env.AI_PROVIDER_TEST_TIMEOUT_MS ?? 120_000);
+if (!Number.isSafeInteger(testTimeoutMs) || testTimeoutMs < 120_000 || testTimeoutMs > 900_000)
+  throw new Error(
+    'AI_PROVIDER_TEST_TIMEOUT_MS 必须是 120000～900000 的整数，仅控制隔离测试进程等待',
+  );
 const run = (command, args, options = {}) => {
   const result = spawnSync(command, args, {
     cwd: root,
@@ -202,7 +207,7 @@ try {
     {
       cwd: root,
       stdio: 'inherit',
-      timeout: 120_000,
+      timeout: testTimeoutMs,
       env: {
         ...process.env,
         DATABASE_URL: url,

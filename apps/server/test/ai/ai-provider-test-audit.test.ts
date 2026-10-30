@@ -48,6 +48,7 @@ describe('AI Provider 测试审计归因', () => {
           if (outcome !== 'success') throw new Error('controlled test failure');
           return {
             output: { ok: true },
+            actualModel: 'reported-model',
             usage,
             providerCost: '0',
             providerCostCurrency: 'USD',
@@ -75,6 +76,7 @@ describe('AI Provider 测试审计归因', () => {
         transport: 'single',
       });
       expect(result).toMatchObject({ testKind: 'connection', mode: 'json_validated', model });
+      expect(result.actualModel).toBe(outcome === 'success' ? 'reported-model' : null);
       const records = outcome === 'cancelled' ? health.recordHistory : health.record;
       expect(records).toHaveBeenCalledOnce();
       const details = records.mock.calls[0]?.[6];
@@ -83,6 +85,7 @@ describe('AI Provider 测试审计归因', () => {
         testKind: 'connection',
         mode: 'json_validated',
         model,
+        actualModel: outcome === 'success' ? 'reported-model' : null,
       });
       expect(details).not.toHaveProperty('contract');
       expect(details).not.toHaveProperty('purpose');
@@ -122,6 +125,7 @@ describe('AI Provider 测试审计归因', () => {
         purpose: 'research',
       });
       expect(result.status).toBe('healthy');
+      expect(result.actualModel).toBeNull();
 
       expect(sdk.generate).toHaveBeenCalledOnce();
       expect(sdk.generate.mock.calls[0]?.[0]).toMatchObject({

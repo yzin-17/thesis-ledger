@@ -1,5 +1,6 @@
-import { readFile, readdir } from 'node:fs/promises';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { dirname, relative, resolve } from 'node:path';
+import { boundarySourceFiles } from './boundary-source-inventory.mjs';
 import { mobileBoundaryViolation } from './mobile-boundaries.mjs';
 import { aiCatalogBoundaryViolation } from './ai-catalog-boundaries.mjs';
 
@@ -360,15 +361,6 @@ const forbiddenFeatureDependencies = [
   ],
 ];
 
-async function walk(directory) {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (['node_modules', 'dist', 'coverage'].includes(entry.name)) continue;
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) await walk(path);
-    else if (['.ts', '.tsx'].includes(extname(entry.name))) await inspect(path);
-  }
-}
-
 async function inspect(path) {
   const source = await readFile(path, 'utf8');
   const imports = [
@@ -514,9 +506,7 @@ async function inspect(path) {
   }
 }
 
-await walk(join(root, 'apps'));
-await walk(join(root, 'packages'));
-await walk(join(root, 'services'));
+for (const path of await boundarySourceFiles(root)) await inspect(path);
 if (violations.length > 0) {
   console.error(`发现跨层非法导入:\n${violations.join('\n')}`);
   process.exitCode = 1;

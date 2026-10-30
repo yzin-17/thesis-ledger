@@ -13,6 +13,7 @@ import { AiProviderController } from '../../src/ai/ai-provider.controller.js';
 import { AiSettingsController } from '../../src/ai/ai-settings.controller.js';
 import { AiController } from '../../src/ai/ai.controller.js';
 import { AiRunService } from '../../src/ai/ai-run.service.js';
+import type { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { ProviderConfigService } from '../../src/providers/provider-config.service.js';
 import { ProviderHealthService } from '../../src/providers/provider-health.service.js';
 import { ApiExceptionFilter } from '../../src/platform/api-exception.filter.js';
@@ -55,7 +56,7 @@ export const assertIsolated = async (prisma: PrismaClient) => {
     SELECT current_database() AS name, current_user AS owner`;
   expect(rows).toEqual([{ name: 'ai_provider_concurrency_fixture', owner: 'fixture_owner' }]);
 };
-export const createStack = async () => {
+export const createStack = async (sdkOverride?: AiSdkGenerationAdapter) => {
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
   await assertIsolated(prisma);
   const health = new ProviderHealthService(prisma as never, {} as never);
@@ -69,17 +70,18 @@ export const createStack = async () => {
       providerCostCurrency: null,
     })),
   };
+  const generation = sdkOverride ?? sdk;
   const registry = new AiProviderRegistry();
   const providers = new AiProviderService(
     configs,
     health,
     registry,
-    sdk as never,
+    generation as never,
     routing,
     prisma as never,
   );
   const journal = new AiProviderValidationJournal(prisma as never);
-  const save = new AiProviderSaveService(providers, configs, sdk as never, health, journal);
+  const save = new AiProviderSaveService(providers, configs, generation as never, health, journal);
   const runs = new AiRunService(prisma as never, registry, routing);
   Reflect.defineMetadata(
     'design:paramtypes',
@@ -111,6 +113,7 @@ export const createStack = async () => {
     return { status: response.status, body: await response.json() };
   };
   return {
+    origin,
     prisma,
     health,
     configs,

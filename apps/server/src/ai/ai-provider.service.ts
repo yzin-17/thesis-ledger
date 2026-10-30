@@ -4,6 +4,10 @@ import { modelRequestOptionsFields } from './ai-model-request-options.js';
 import { aiTestRuntimeFingerprint } from './ai-provider-test-fingerprint.js';
 import { aiProviderTestAuditDetails } from './ai-provider-test-audit.js';
 import {
+  aiProviderTestSuccessFacts,
+  aiProviderTestFailureFacts,
+} from './ai-provider-test-facts.js';
+import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -21,11 +25,7 @@ import { ProviderHealthService, type ProviderState } from '../providers/provider
 import { AiProviderRegistry } from './provider-registry.js';
 import { runProviderConnectionTest } from './provider-connection-test.js';
 import { probeTimeoutOverrides } from './ai-provider-probe-timeout.js';
-import {
-  AiSdkGenerationAdapter,
-  AiSdkGenerationError,
-  type AiSdkGenerationResult,
-} from './ai-sdk-generation.adapter.js';
+import { AiSdkGenerationAdapter, AiSdkGenerationError } from './ai-sdk-generation.adapter.js';
 import type { AiProvider } from './contracts.js';
 import {
   aiProviderInputSchema,
@@ -49,12 +49,7 @@ import {
   parseAiProviderSettings,
 } from './ai-provider-summary.js';
 import { evaluateAiProviderReadiness } from './ai-provider-readiness.js';
-import {
-  aiCostFactsSchema,
-  type AiCostFacts,
-  type AiUsageFacts,
-  type AiGenerationMode,
-} from '@thesis-ledger/schemas';
+import type { AiGenerationMode } from '@thesis-ledger/schemas';
 import {
   persistAiCapabilityRevocation,
   routeSnapshotsFromProviderRow,
@@ -62,7 +57,7 @@ import {
   type AiCapabilityRevocationInput,
 } from './ai-provider-readiness.persistence.js';
 import { createStoredAiProvider } from './ai-provider-runtime.js';
-import { generationPricingError, testPricingForModel } from './ai-provider-test-pricing.js';
+import { generationPricingError } from './ai-provider-test-pricing.js';
 import {
   withAiProviderConfigurationTransaction,
   mutateAiProviderLifecycle,
@@ -105,22 +100,6 @@ const DRAFT_TTL_MS = 5 * 60 * 1000;
  * 这里按授权给验证的总时长判慢：跑超授权预算的请求根本不可能成功返回。
  */
 export const AI_GENERATION_SLOW_AFTER_MS = VALIDATION_DURATION_SECONDS * 1_000;
-
-const unknownTestUsage = (): AiUsageFacts => ({
-  status: 'unknown',
-  inputTokens: null,
-  outputTokens: null,
-});
-
-const unknownTestCost = (source: string | null = null): AiCostFacts => ({
-  status: 'unknown',
-  amount: null,
-  currency: null,
-  source,
-  pricingVersion: null,
-});
-
-const decimalTestCost = (value: number) => value.toFixed(8).replace(/\.?0+$/u, '') || '0';
 
 const configuredTimeout = () => {
   try {
@@ -614,7 +593,7 @@ export class AiProviderService implements OnModuleInit {
         ...probeTimeoutOverrides(input, purposeRoute),
       });
       if (controller.signal.aborted) throw new Error('AI provider test cancelled');
-      const facts = this.testFacts(input, model, result);
+      const facts = aiProviderTestSuccessFacts(input, model, result);
       if (!persist) {
         const testToken = randomUUID();
         this.drafts.set(testToken, {
@@ -671,7 +650,7 @@ export class AiProviderService implements OnModuleInit {
       };
     } catch (error) {
       const latencyMs = Date.now() - started;
-      const facts = this.testFailureFacts(error);
+      const facts = aiProviderTestFailureFacts(error);
       if (
         controller.signal.aborted &&
         ((error instanceof AiSdkGenerationError && error.fact.code === 'cancelled') ||
@@ -879,54 +858,6 @@ export class AiProviderService implements OnModuleInit {
       mode,
       requestId,
     );
-  }
-
-  private testFacts(
-    input: AiTestRuntimeInput,
-    model: string,
-    result: Pick<AiSdkGenerationResult<unknown>, 'usage' | 'providerCost' | 'providerCostCurrency'>,
-  ): { usage: AiUsageFacts; cost: AiCostFacts } {
-    const usage = result.usage ?? unknownTestUsage();
-    const pricing = testPricingForModel(input, model);
-    const providerCurrency = result.providerCostCurrency?.trim().toUpperCase();
-    if (typeof result.providerCost === 'string' && /^[A-Z]{3}$/u.test(providerCurrency ?? '')) {
-      const reported = aiCostFactsSchema.safeParse({
-        status: 'known',
-        amount: result.providerCost,
-        currency: providerCurrency,
-        source: 'provider_reported',
-        pricingVersion: pricing.pricingVersion ?? null,
-      });
-      if (reported.success) return { usage, cost: reported.data };
-    }
-    const currency = pricing.costCurrency?.trim().toUpperCase();
-    if (
-      usage.inputTokens === null ||
-      usage.outputTokens === null ||
-      pricing.costPer1kInput === undefined ||
-      pricing.costPer1kOutput === undefined ||
-      !/^[A-Z]{3}$/u.test(currency ?? '')
-    )
-      return { usage, cost: unknownTestCost() };
-    const estimated = aiCostFactsSchema.safeParse({
-      status: 'estimated',
-      amount: decimalTestCost(
-        (usage.inputTokens * pricing.costPer1kInput +
-          usage.outputTokens * pricing.costPer1kOutput) /
-          1_000,
-      ),
-      currency,
-      source: 'configured_model_pricing',
-      pricingVersion: pricing.pricingVersion ?? null,
-    });
-    return { usage, cost: estimated.success ? estimated.data : unknownTestCost() };
-  }
-
-  private testFailureFacts(error: unknown): { usage: AiUsageFacts; cost: AiCostFacts } {
-    return {
-      usage: error instanceof AiSdkGenerationError ? error.usage : unknownTestUsage(),
-      cost: unknownTestCost('provider_cost_unavailable'),
-    };
   }
 
   private credentialHash(credential: string) {

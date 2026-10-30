@@ -229,6 +229,7 @@ export interface ProviderConnectionTestResult {
   purpose?: AiGenerationContractRef['id'];
   mode?: AiGenerationMode;
   model?: string;
+  actualModel?: string | null;
   usage?: AiUsageFacts;
   cost?: AiCostFacts;
   requestId?: string;
