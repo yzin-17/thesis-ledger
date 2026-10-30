@@ -56,10 +56,8 @@ export const createDiscoverySeed = (scope: OptimizationDiscoveryScope): Backtest
     executionInstrument: scope.executionInstrument,
     primaryTimeframe: scope.primaryTimeframe,
     entry: {
-      type: 'compare',
-      operator: 'gt',
-      left: { type: 'series', sourceId, field: isFund ? 'nav' : 'close' },
-      right: { type: 'constant', value: '0' },
+      type: 'not',
+      expression: { type: 'positionState', field: 'isOpen' },
     },
     exit: { type: 'positionState', field: 'isOpen' },
     sizing: { type: 'percentOfEquity', percent: '0.5' },
@@ -278,7 +276,7 @@ export const discoveryGenerationPrompt = (
   {
     role: 'system' as const,
     content:
-      '你是策略探索器。只输出精简 JSON：strategy 仅允许 name、description、series、entry、exit、sizing、risk；envelope 仅允许 strategy、reason、evidenceRefs。不得输出 schemaVersion、signalSources、executionInstrument、primaryTimeframe、execution、cost、benchmark 或外部标的。entry/exit 只能引用冻结 SignalSource ID 及 strategy.series 中声明的字段；不得生成代码或声称未经回测的绩效。',
+      '你是策略探索器。只输出精简 JSON：strategy 仅允许 name、description、series、entry、exit、sizing、risk；envelope 仅允许 strategy、reason、evidenceRefs。先核对 outputExample 的嵌套层级：series、entry、exit、sizing、risk 是 strategy 的平级字段，不得将 sizing/risk 放入 entry/exit 表达式中。不得输出 schemaVersion、signalSources、executionInstrument、primaryTimeframe、execution、cost、benchmark 或外部标的。entry/exit 只能引用冻结 SignalSource ID 及 strategy.series 中声明的字段；不得生成代码或声称未经回测的绩效。',
   },
   {
     role: 'user' as const,
@@ -290,6 +288,21 @@ export const discoveryGenerationPrompt = (
         id: seed.signalSources[0]?.id,
         asset: seed.signalSources[0]?.asset,
         timeframe: seed.signalSources[0]?.timeframe,
+      },
+      outputExample: {
+        strategy: {
+          name: '单标的状态规则候选',
+          series: seed.signalSources[0]!.series,
+          entry: seed.entry,
+          exit: seed.exit,
+          sizing: seed.sizing,
+          risk: [
+            { type: 'fixedStop', percent: '0.05' },
+            { type: 'maxHoldingPeriod', periods: 5 },
+          ],
+        },
+        reason: '说明规则假设，绩效由服务端实际回测核对。',
+        evidenceRefs: [],
       },
       objective: experiment.objective,
       round,

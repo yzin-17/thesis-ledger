@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 import {
+  aiGenerationContracts,
   optimizationObjectiveSchema,
   optimizationDiscoveryScopeSchema,
   type StrategyParameterDescriptor,
@@ -13,6 +15,19 @@ import {
   optimizationModelMetrics,
   optimizationModelResearchNotice,
 } from './strategy-optimization-model-feedback.js';
+
+const outputInstructions = (sourceMode: ExperimentRow['sourceMode'], useSdkContract: boolean) => {
+  if (!useSdkContract) return '';
+  const contract =
+    sourceMode === 'discovery'
+      ? aiGenerationContracts.strategyDiscovery
+      : aiGenerationContracts.parameterOptimization;
+  return (
+    '\n只输出满足以下合同的 JSON，不添加合同外字段或 Markdown。' +
+    `\nOUTPUT_CONTRACT:${contract.ref.id}/${contract.ref.version}` +
+    `\nOUTPUT_JSON_SCHEMA:${JSON.stringify(z.toJSONSchema(contract.schema))}`
+  );
+};
 
 const priorFeedback = async (prisma: PrismaService, experimentId: string, modelKey: string) => {
   const rows = await prisma.$queryRaw<Array<{ diff: unknown; metrics: unknown }>>(Prisma.sql`
@@ -40,6 +55,10 @@ export const strategyOptimizationPrompt = async (input: {
     metrics: optimizationModelMetrics(row.metrics),
   }));
   const notice = optimizationModelResearchNotice(input.experiment.runConfig);
+  const contractInstructions = outputInstructions(
+    input.experiment.sourceMode,
+    input.useSdkContract,
+  );
   const objective = optimizationObjectiveSchema.parse(input.experiment.objective);
   if (input.experiment.sourceMode === 'discovery')
     return (
@@ -69,14 +88,17 @@ export const strategyOptimizationPrompt = async (input: {
             priorCandidates,
           )
     ).map((message, index) =>
-      index === 0 ? { ...message, content: `${message.content}\n${notice}` } : message,
+      index === 0
+        ? { ...message, content: `${message.content}\n${notice}${contractInstructions}` }
+        : message,
     );
   return [
     {
       role: 'system' as const,
       content:
         '你是策略参数优化器。只能修改允许的 parameterId；不得修改数据、执行语义或生成代码。只输出 OptimizationProposal JSON。不得声明收益率或回测结果，真实结果以服务端回测为准。' +
-        notice,
+        notice +
+        contractInstructions,
     },
     {
       role: 'user' as const,
