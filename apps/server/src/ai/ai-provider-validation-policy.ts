@@ -7,14 +7,22 @@ import {
   type AiProviderValidationAuthorization,
 } from '@thesis-ledger/schemas';
 import { researchReasoningFields } from './ai-research-reasoning-options.js';
+import { modelRequestOptionsFields } from './ai-model-request-options.js';
 import type { AiProviderInput, AiProviderExecutionRouteInput } from './ai-provider.contracts.js';
 import { adapterSupportsGenerationMode } from './ai-provider-upstream.js';
 import type { AiAdapter } from '@thesis-ledger/schemas';
+import { aiTimeoutProfileFor, createAiTimeoutPolicy } from './timeout/ai-timeout-policy.js';
 
 export const VALIDATION_VERSION = 'provider-validation-v1-sdk-7.0.107';
 export const VALIDATION_OUTPUT_TOKENS = 8192;
 export const VALIDATION_MAX_CALLS = 24;
 export const VALIDATION_DURATION_SECONDS = 300;
+export const validationTimeoutPolicy = (routes: readonly AiProviderExecutionRouteInput[]) =>
+  createAiTimeoutPolicy(
+    routes.some((route) => aiTimeoutProfileFor(researchReasoningFields(route)) === 'deep_research')
+      ? 'deep_research'
+      : 'research',
+  );
 export const verifiedRouteSchema = z
   .object({
     fingerprint: z.string(),
@@ -65,11 +73,13 @@ export const routeValidationFingerprint = (
     policy: route.outputPolicy ?? 'manual',
     mode: route.outputPolicy === 'auto' ? null : route.mode,
     reasoning: input.modelReasoning?.[route.model] ?? null,
-    timeoutMs: input.timeoutMs ?? 120000,
-    firstOutputTimeoutMs: route.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs ?? 30000,
-    outputIdleTimeoutMs: route.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs ?? 30000,
+    timeoutPolicy: validationTimeoutPolicy([route]),
+    timeoutMs: input.timeoutMs ?? null,
+    firstOutputTimeoutMs: route.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs ?? null,
+    outputIdleTimeoutMs: route.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs ?? null,
     transport: 'stream',
     ...researchReasoningFields(route),
+    ...modelRequestOptionsFields(input.modelDefaults, route.model),
   });
 
 export const validationCallAuthorizationMatches = (

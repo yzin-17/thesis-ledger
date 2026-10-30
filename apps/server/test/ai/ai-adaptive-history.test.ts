@@ -44,7 +44,7 @@ describe('运行观测与重试配额', () => {
   it('观测有长度与时间边界，返回值不能修改内部状态', async () => {
     let now = Date.now();
     const store = new MemoryAdaptiveObservationStore(() => now);
-    for (let i = 0; i < 520; i++) await store.record(profile, sample(String(i)));
+    for (let i = 0; i < 520; i++) await store.record(profile, { ...sample(String(i)), at: now });
     const history = await store.read(profile);
     expect(history.observations).toHaveLength(ADAPTIVE_RULE.maxObservations);
     history.observations.length = 0;
@@ -80,8 +80,8 @@ describe('运行观测与重试配额', () => {
     expect(args[0]).toBe(ADAPTIVE_HISTORY_MUTATION);
     expect(args.slice(1, 6)).toEqual([
       2,
-      `thesis-ledger:cache:v1:ai-adaptive:v1:${profile}`,
-      'thesis-ledger:cache:v1:ai-adaptive:v1:profiles',
+      `thesis-ledger:cache:v1:ai-adaptive:v2:${profile}`,
+      'thesis-ledger:cache:v1:ai-adaptive:v2:profiles',
       'retry',
       'r',
     ]);

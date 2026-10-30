@@ -1,6 +1,8 @@
+import type { AiModelRequestOptions } from '@thesis-ledger/schemas';
+import { applyGenerationRequestOptions } from './ai-generation-request-options.js';
 import { createHash } from 'node:crypto';
 import { fetchWithAiTrace } from './trace/ai-trace-http.js';
-import { currentAiTrace } from './trace/ai-trace-context.js';
+import { aiPolicyFetch } from './timeout/ai-policy-fetch.js';
 import {
   aiGenerationHttpRequestDiagnosticSchema,
   type AiAuthMode,
@@ -182,19 +184,20 @@ export const generationFetchOptions = (
   diagnostics?: AiGenerationHttpRequestDiagnostics,
   observeResponse?: (response: Response) => Response,
   client?: typeof fetch,
+  requestOptions?: AiModelRequestOptions,
 ) => {
-  if (authMode !== 'none' && !diagnostics && !observeResponse && !client && !currentAiTrace()) return {};
   return {
     fetch: (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-      let actual = init;
+      let actual = applyGenerationRequestOptions(init, requestOptions);
       if (authMode === 'none') {
-        const headers = new Headers(init?.headers);
+        const headers = new Headers(actual?.headers);
         for (const header of ['authorization', 'x-api-key', 'api-key']) headers.delete(header);
-        actual = { ...init, headers };
+        actual = { ...actual, headers };
       }
       diagnostics?.observe(input, actual);
-      return fetchWithAiTrace(input, actual, client ?? globalThis.fetch)
-        .then((response) => observeResponse?.(response) ?? response);
+      return fetchWithAiTrace(input, actual, client ?? aiPolicyFetch).then(
+        (response) => observeResponse?.(response) ?? response,
+      );
     },
   };
 };

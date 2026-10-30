@@ -12,6 +12,10 @@ import {
   type AiRequestAttempt,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { aiExecutionPublication } from './ai-execution-publication.js';
+import { failedAiExecution } from './ai-execution-failure.js';
+import { researchExecutionDeadline } from './timeout/ai-execution-clock.js';
+import { recordAiTimeoutDecision } from './timeout/ai-timeout-receipt.js';
 import {
   mergeRequestHttpDiagnostic,
   parseRequestHttpDiagnostic,
@@ -37,6 +41,7 @@ type AiRunFailure = {
   errorSummary: string;
   durationMs?: number;
   continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
+  requestError?: AiGenerationError;
 };
 
 export type AiRequestPreparation = AiExecutionOwnership & {
@@ -59,6 +64,7 @@ export type AiRequestCompletion = AiExecutionOwnership & {
     provider: string;
     model: string;
     durationMs?: number;
+    receivedAt?: Date;
   };
 };
 
@@ -205,12 +211,22 @@ export class AiExecutionStateStore {
     });
   }
 
+  recordTimeoutDecision(ownership: AiExecutionOwnership, requestId: string, decision: unknown) {
+    return recordAiTimeoutDecision(this.prisma, ownership, requestId, decision);
+  }
+
   async authorizeDispatch(ownership: AiExecutionOwnership, requestId: string, now = new Date()) {
     return this.prisma.$transaction(async (transaction) => {
       const run = (await this.lockRun(transaction, ownership.runId))[0];
-      if (!run || !activeOwner(run, ownership, now)) return false;
+      const authorizedAt = new Date(Math.max(now.getTime(), Date.now()));
+      if (!run || !activeOwner(run, ownership, authorizedAt)) return false;
       const execution = executionFrom(run.modelMetadata);
       if (!execution) return false;
+      if (
+        execution.contract.id === 'research' &&
+        (!execution.deadlineAt || researchExecutionDeadline(execution) <= authorizedAt.getTime())
+      )
+        return false;
       const index = requestIndex(execution, requestId);
       const request = execution.requests[index];
       if (!request || request.state !== 'prepared') return false;
@@ -219,7 +235,7 @@ export class AiExecutionStateStore {
         ...request,
         state: 'dispatching',
         dispatchExecutionAttempt: ownership.executionAttempt,
-        dispatchingAt: now.toISOString(),
+        dispatchingAt: authorizedAt.toISOString(),
       };
       const updated = aiExecutionSummarySchema.parse({ ...execution, requests });
       await transaction.aiRun.update({
@@ -335,7 +351,7 @@ export class AiExecutionStateStore {
         };
       }
       if (
-        !activeOwner(run, input, completedAt) ||
+        !activeOwner(run, input, new Date()) ||
         !['dispatching', 'completed'].includes(currentRequest.state)
       )
         return null;
@@ -362,6 +378,8 @@ export class AiExecutionStateStore {
         execution,
       } satisfies AiExecutionSettlementContext;
       if (participant) blocked = (await participant.settle(settlementContext)) ?? blocked;
+      const publication = aiExecutionPublication(execution, input, completedAt);
+      blocked = publication.blocked ?? blocked;
       request = { ...request, settledRevision: revision.revision };
       const requests = [...execution.requests];
       requests[index] = request;
@@ -378,21 +396,9 @@ export class AiExecutionStateStore {
         inputTokens: aggregate.inputTokens,
         outputTokens: aggregate.outputTokens,
         cost: aggregate.cost,
+        ...publication.data,
         ...(input.checkpoint === undefined ? {} : { checkpoint: asJson(input.checkpoint) }),
       };
-      if (input.result !== undefined) {
-        data.status = 'succeeded';
-        data.result = asJson(input.result);
-        data.completedAt = completedAt;
-        data.claimedAt = null;
-        data.leaseUntil = null;
-      }
-      if (input.finalization) {
-        data.provider = input.finalization.provider;
-        data.model = input.finalization.model;
-        if (input.finalization.durationMs !== undefined)
-          data.durationMs = input.finalization.durationMs;
-      }
       await transaction.aiRun.update({ where: { id: input.runId }, data });
       if (participant?.commit) await participant.commit(settlementContext);
       return {
@@ -421,15 +427,7 @@ export class AiExecutionStateStore {
       const run = (await this.lockRun(transaction, ownership.runId))[0];
       if (!run || !activeOwner(run, ownership, now)) return false;
       const execution = executionFrom(run.modelMetadata);
-      const updated = execution
-        ? aiExecutionSummarySchema.parse({
-            ...execution,
-            generationStatus:
-              execution.generationStatus === 'pending' ? 'incomplete' : execution.generationStatus,
-            continuationBlockedReason:
-              input.continuationBlockedReason ?? execution.continuationBlockedReason,
-          })
-        : null;
+      const updated = execution ? failedAiExecution(execution, input, now) : null;
       await transaction.aiRun.update({
         where: { id: ownership.runId },
         data: {

@@ -29,6 +29,46 @@ function setup(value: unknown = record) {
   };
 }
 describe('AI Provider 共享管理合同', () => {
+  it('通用目录配置经过保存、回显和目录请求不丢字段', async () => {
+    const modelCatalog = {
+      url: 'http://127.0.0.1:3336/catalog',
+      itemsPath: '/result',
+      idPath: '/name',
+      pagination: {
+        pageParam: 'page',
+        pageSize: 100,
+        startPage: 1,
+        stopWhen: 'empty-page' as const,
+      },
+    };
+    const { api, fetcher } = setup({ ...record, modelCatalog });
+    await expect(api.save({ ...input, modelCatalog })).resolves.toEqual({
+      ...record,
+      modelCatalog,
+    });
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({ modelCatalog });
+    const catalog = setup({
+      models: ['fixture'],
+      modelDetails: [{ id: 'fixture' }],
+      fetchedAt: revision,
+    });
+    await catalog.api.models({ baseUrl: input.baseUrl, authMode: 'none', modelCatalog });
+    expect(JSON.parse(String(catalog.fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      modelCatalog,
+    });
+  });
+  it('非法目录规则在 HTTP 前拒绝，默认清除明确发送 null', async () => {
+    const { api, fetcher } = setup();
+    expect(() =>
+      api.save({
+        ...input,
+        modelCatalog: { url: 'http://127.0.0.1:3336/catalog', itemsPath: 'invalid', idPath: '/id' },
+      }),
+    ).toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+    await api.save({ ...input, modelCatalog: null });
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)).modelCatalog).toBeNull();
+  });
   it('保存与列表只返回白名单投影，凭证不能进入读取缓存', async () => {
     const value = {
       ...record,

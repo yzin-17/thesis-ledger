@@ -1,4 +1,5 @@
 import type { AiExecutionReadModel, AiUsageCompleteness } from '@thesis-ledger/schemas';
+import { aiTimeoutPolicyLines } from './ai-timeout-display.js';
 
 type CurrencyTotals = Map<string, number>;
 
@@ -140,10 +141,11 @@ export const aiExecutionDisplay = (
     policyLines.push(
       `最多 ${policy.maxAiCalls} 次请求，输入 / 输出上限 ${policy.maxInputTokens.toLocaleString('zh-CN')} / ${policy.maxOutputTokens.toLocaleString('zh-CN')} Token`,
     );
-    policyLines.push(`总期限 ${policy.maxDurationSeconds} 秒，排队与恢复不会重置`);
+    policyLines.push(`最长执行 ${policy.maxDurationSeconds} 秒，首次领取开始，恢复不会重置`);
     if (Number(policy.maxCost) === 0) policyLines.push('费用上限 0，仅允许用户填写为零费用的路由');
     else policyLines.push(`费用上限 ${policy.costCurrency ?? '币种未知'} ${policy.maxCost}`);
   } else policyLines.push('该流程没有研究策略预算，费用边界由实验策略管理');
+  policyLines.unshift(...aiTimeoutPolicyLines(execution.timing));
 
   const generationStatusLabels: Record<AiExecutionReadModel['generationStatus'], string> = {
     pending: '等待生成',

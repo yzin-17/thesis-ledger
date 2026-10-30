@@ -11,7 +11,6 @@ import { AiExecutionStateStore } from './ai-execution-state.store.js';
 import { requestHttpDiagnosticFields } from './ai-execution-request-diagnostic.js';
 import {
   frozenResearchRouteMatches,
-  readFrozenResearchReasoning,
   researchReasoningFields,
 } from './ai-research-reasoning-options.js';
 import {
@@ -19,7 +18,7 @@ import {
   AiSdkGenerationError,
   type AiSdkGenerationResult,
 } from './ai-sdk-generation.adapter.js';
-import { researchRoutePaidAuthorized } from './ai-research-policy.js';
+import { readFrozenAiResearchRoutes, researchRoutePaidAuthorized } from './ai-research-policy.js';
 import { withGenerationRuntimeDiagnostic } from './ai-generation-failure-diagnostics.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { aiProviderPricingForModel, type AiProviderPricing } from './ai-provider-pricing.js';
@@ -37,21 +36,25 @@ import {
   researchBlockAfter as blockAfter,
 } from './ai-research-sdk-accounting.js';
 import { AiAdaptiveExecution } from './adaptive/ai-adaptive-execution.js';
+import { researchExecutionDeadline, researchTimeoutPolicy } from './timeout/ai-execution-clock.js';
+import { researchFailureCode, researchStopReason } from './timeout/ai-research-lifecycle.js';
+import {
+  assertResearchResultArrival,
+  researchFailureOutcome,
+} from './timeout/ai-research-arrival.js';
 
 type ResearchSdkResponseFacts = Pick<
   AiSdkGenerationResult<unknown>,
-  'usage' | 'providerCost' | 'providerCostCurrency' | 'httpRequest'
+  | 'usage'
+  | 'providerCost'
+  | 'providerCostCurrency'
+  | 'httpRequest'
+  | 'finishReason'
+  | 'rawFinishReason'
+  | 'actualModel'
 >;
 
-type FrozenRoute = {
-  provider: string;
-  model: string;
-  configurationFingerprint: string;
-  adapter?: string;
-  mode?: string;
-  pricing?: AiProviderPricing;
-  reasoningEnabled?: boolean;
-};
+type FrozenRoute = ReturnType<typeof readFrozenAiResearchRoutes>[number];
 
 type ResearchAttemptContext = {
   execution: AiExecutionSummary;
@@ -61,52 +64,6 @@ type ResearchAttemptContext = {
   frozen: FrozenRoute[];
   route: ReturnType<AiProviderRegistry['readyContractCandidates']>[number];
   contract: ReturnType<typeof researchSdkProtocol>['contract'];
-};
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-
-const pricingSnapshot = (value: unknown): AiProviderPricing | undefined => {
-  const pricing = asRecord(value);
-  if (!pricing) return undefined;
-  return {
-    ...(typeof pricing.costPer1kInput === 'number'
-      ? { costPer1kInput: pricing.costPer1kInput }
-      : {}),
-    ...(typeof pricing.costPer1kOutput === 'number'
-      ? { costPer1kOutput: pricing.costPer1kOutput }
-      : {}),
-    ...(typeof pricing.costCurrency === 'string' ? { costCurrency: pricing.costCurrency } : {}),
-    ...(typeof pricing.pricingVersion === 'string'
-      ? { pricingVersion: pricing.pricingVersion }
-      : {}),
-  };
-};
-
-const frozenRoutes = (metadata: unknown): FrozenRoute[] => {
-  const value = asRecord(metadata)?.researchRoutes;
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((candidate) => {
-    const route = asRecord(candidate);
-    const pricing = pricingSnapshot(route?.pricing);
-    return typeof route?.provider === 'string' &&
-      typeof route.model === 'string' &&
-      typeof route.configurationFingerprint === 'string'
-      ? [
-          {
-            provider: route.provider,
-            model: route.model,
-            configurationFingerprint: route.configurationFingerprint,
-            ...readFrozenResearchReasoning(route),
-            ...(typeof route.adapter === 'string' ? { adapter: route.adapter } : {}),
-            ...(typeof route.mode === 'string' ? { mode: route.mode } : {}),
-            ...(pricing === undefined ? {} : { pricing }),
-          },
-        ]
-      : [];
-  });
 };
 
 @Injectable()
@@ -139,10 +96,10 @@ export class AiResearchSdkExecution {
     }
     if (execution.continuationBlockedReason !== null || execution.generationStatus === 'complete')
       return;
-    if (Date.now() >= deadline) {
+    if (Date.now() >= researchExecutionDeadline(execution)) {
       await this.executions.failOwned(input.ownership, {
         errorCode: 'research_deadline_expired',
-        errorSummary: '研究任务已超过创建时冻结的绝对期限，未发送 Provider 请求',
+        errorSummary: '研究任务执行预算已耗尽，未发送 Provider 请求',
         durationMs: Date.now() - input.startedAt,
         continuationBlockedReason: 'expired',
       });
@@ -151,7 +108,7 @@ export class AiResearchSdkExecution {
     const model = input.run.model;
     if (!model || model === 'pending') throw new Error('研究任务未冻结可执行的 Provider/Model');
     if (input.run.provider === 'pending') throw new Error('研究任务未冻结可执行的Provider');
-    const frozen = frozenRoutes(input.run.modelMetadata);
+    const frozen = readFrozenAiResearchRoutes(input.run.modelMetadata);
     const routes = this.providers
       .readyContractCandidates({
         model,
@@ -223,7 +180,7 @@ export class AiResearchSdkExecution {
   private async executeAttempt(input: ResearchExecutionInput, context: ResearchAttemptContext) {
     const { execution, policy, deadline, model, frozen, route, contract } = context;
     if (input.signal.aborted) throw new DOMException('研究任务已取消', 'AbortError');
-    const remainingMs = deadline - Date.now();
+    const remainingMs = researchExecutionDeadline(execution) - Date.now();
     if (remainingMs <= 0) throw new Error('研究任务已超过创建时冻结的绝对期限');
     const frozenRoute = frozen.find((candidate) =>
       frozenResearchRouteMatches(candidate, route.provider.id, model, route.execution),
@@ -286,16 +243,28 @@ export class AiResearchSdkExecution {
           signal: input.signal,
           remainingMs,
           outputTokens,
+          executionIdentity: input.ownership,
         }),
         {
           ...route.execution,
+          executionPolicy: researchTimeoutPolicy(execution),
           configurationFingerprint: route.execution.readiness.configurationFingerprint,
         },
         deadline,
         () => this.executions.authorizeDispatch(input.ownership, requestId),
+        (decision) => this.executions.recordTimeoutDecision(input.ownership, requestId, decision),
       );
       if (generated === null) return { kind: 'stop' as const };
       receivedFacts = generated;
+      const receivedAt = new Date();
+      assertResearchResultArrival({
+        execution,
+        requestId,
+        receivedAt,
+        signal: input.signal,
+        usage: generated.usage,
+        ownership: input.ownership,
+      });
       let result: unknown;
       try {
         result = await traceAiOperation(
@@ -344,6 +313,7 @@ export class AiResearchSdkExecution {
         result,
         continuationBlockedReason: blocked,
         finalization: {
+          receivedAt,
           provider: route.provider.id,
           model,
           durationMs: Date.now() - input.startedAt,
@@ -417,10 +387,18 @@ export class AiResearchSdkExecution {
         usage: observedUsage,
       },
     );
+    if (sdkError.fact.externalResult === 'not_sent') {
+      await this.executions.failOwned(input.ownership, {
+        errorCode: researchFailureCode(sdkError.fact),
+        errorSummary: sdkError.fact.summary,
+        requestError: sdkError.fact,
+        durationMs: Date.now() - input.startedAt,
+        continuationBlockedReason: researchStopReason(sdkError.fact) ?? null,
+      });
+      return null;
+    }
     if (sdkError.fact.externalResult === 'unknown') {
-      let continuationBlockedReason: 'expired' | 'cancelled' | undefined;
-      if (Date.now() >= deadline) continuationBlockedReason = 'expired';
-      else if (sdkError.fact.code === 'cancelled') continuationBlockedReason = 'cancelled';
+      const continuationBlockedReason = researchStopReason(sdkError.fact);
       await this.executions.markUnknown(
         input.ownership,
         requestId,
@@ -429,7 +407,7 @@ export class AiResearchSdkExecution {
         revision(observedUsage, cost),
       );
       await this.executions.failOwned(input.ownership, {
-        errorCode: 'research_unknown_outcome',
+        errorCode: researchFailureCode(sdkError.fact),
         errorSummary: sdkError.fact.summary,
         durationMs: Date.now() - input.startedAt,
         ...(continuationBlockedReason ? { continuationBlockedReason } : {}),
@@ -440,12 +418,7 @@ export class AiResearchSdkExecution {
       ...input.ownership,
       requestId,
       revision: revision(observedUsage, cost),
-      outcome: {
-        status: 'incomplete',
-        finishReason: sdkError.fact.code,
-        contract,
-        schemaAccepted: false,
-      },
+      outcome: researchFailureOutcome(sdkError.fact, receivedFacts, contract, context.model),
       error: sdkError.fact,
     });
     if (!settled) return null;
@@ -460,12 +433,9 @@ export class AiResearchSdkExecution {
       context.frozen,
     );
     if (decision.retry) return { execution: settled.execution, delayMs: decision.delayMs };
-    let stopped: 'expired' | 'cancelled' | undefined;
-    if (sdkError.fact.externalResult === 'not_sent' && Date.now() >= deadline) stopped = 'expired';
-    else if (input.signal.aborted) stopped = 'cancelled';
+    const stopped = researchStopReason(sdkError.fact);
     await this.executions.failOwned(input.ownership, {
-      errorCode:
-        stopped === 'expired' ? 'research_deadline_expired' : `research_${sdkError.fact.code}`,
+      errorCode: researchFailureCode(sdkError.fact),
       errorSummary: sdkError.fact.summary,
       durationMs: Date.now() - input.startedAt,
       ...(stopped === undefined ? {} : { continuationBlockedReason: stopped }),

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
-import type { AiCostFacts, AiUsageFacts } from '@thesis-ledger/schemas';
+import type { AiCostFacts, AiUsageFacts, AiExecutionTimeoutPolicy } from '@thesis-ledger/schemas';
+import { validationProbeTimeouts } from './ai-provider-probe-timeout.js';
 import { AiSdkGenerationError, type AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
 import {
   sanitizeAiProviderError,
@@ -9,6 +10,7 @@ import {
 } from './ai-provider.contracts.js';
 import { runProviderConnectionTest, probeMessages } from './provider-connection-test.js';
 import { researchReasoningFields } from './ai-research-reasoning-options.js';
+import { modelRequestOptionsFields } from './ai-model-request-options.js';
 import {
   adapterSupportsGenerationMode,
   type AiCompatibilityExtensionProfile,
@@ -52,6 +54,8 @@ export type ValidationRunContext = {
   profile?: AiCompatibilityExtensionProfile;
   signal: AbortSignal;
   deadline: number;
+  taskDeadlineAt?: number;
+  policy?: AiExecutionTimeoutPolicy;
   remainingCalls: number;
   allowText: boolean;
   stopOnFirstFailure?: boolean;
@@ -96,13 +100,12 @@ const costFacts = (
   };
 };
 
-const validationFailure = (
-  context: ValidationRunContext,
-  error: unknown,
-  firstOutputTimeoutMs: number,
-  outputIdleTimeoutMs: number,
-) => {
-  const interruption = validationInterruption(context.signal, context.deadline);
+const validationFailure = (context: ValidationRunContext, error: unknown) => {
+  const fact = error instanceof AiSdkGenerationError ? error.fact : undefined;
+  const interruption =
+    fact && fact.code !== 'cancelled'
+      ? undefined
+      : validationInterruption(context.signal, context.deadline);
   const unsupported = explicitlyUnsupportedFormat(error);
   let code = 'validation_failed';
   let message = sanitizeAiProviderError(error, context.credential);
@@ -113,9 +116,11 @@ const validationFailure = (
     code = 'format_unsupported';
   } else if (error instanceof AiSdkGenerationError && error.fact.code === 'schema_invalid') {
     code = 'schema_mismatch';
-  } else if (error instanceof AiSdkGenerationError && error.fact.code === 'cancelled') {
-    code = 'provider_timeout';
-    message = `Provider 在限时内没有继续产出（首块 ${firstOutputTimeoutMs} ms / 间隔 ${outputIdleTimeoutMs} ms），已按超时中断`;
+  } else if (fact) {
+    code = fact.code;
+    if (fact.code === 'task_budget_exhausted') message = '任务总预算已耗尽，已停止后续验证';
+    else if (fact.timeout)
+      message = `${fact.code}：超时，阶段等待 ${fact.timeout.limitMs ?? '未知'} ms`;
   }
   return { code, message, retryFormat: unsupported && !interruption };
 };
@@ -159,8 +164,6 @@ export const validateProviderRoute = async (
     });
     let observedUsage = unknownUsage;
     let observedCost: AiCostFacts | undefined;
-    const firstOutputTimeoutMs = route.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs ?? 30000;
-    const outputIdleTimeoutMs = route.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs ?? 30000;
     try {
       const { result, latencyMs } = await runProviderConnectionTest({
         sdk,
@@ -174,11 +177,10 @@ export const validateProviderRoute = async (
         purpose: route.contract.id,
         contractRef: route.contract,
         ...researchReasoningFields(route),
+        ...modelRequestOptionsFields(input.modelDefaults, route.model),
         requestId,
         signal: context.signal,
-        timeoutMs: Math.min(input.timeoutMs ?? 120000, context.deadline - Date.now()),
-        firstOutputTimeoutMs,
-        outputIdleTimeoutMs,
+        ...validationProbeTimeouts(input, route, context),
         ...(context.profile === undefined
           ? {}
           : { compatibilityExtensionProfile: context.profile }),
@@ -218,7 +220,7 @@ export const validateProviderRoute = async (
       };
     } catch (error) {
       const usage = error instanceof AiSdkGenerationError ? error.usage : observedUsage;
-      const failure = validationFailure(context, error, firstOutputTimeoutMs, outputIdleTimeoutMs);
+      const failure = validationFailure(context, error);
       await health.recordHistory(
         input.name,
         'degraded',

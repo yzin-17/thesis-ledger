@@ -6,13 +6,13 @@ import {
 } from '../../src/ai/ai-research-policy.js';
 
 describe('AI research policy', () => {
-  it('未配置时使用从创建起计时的免费默认策略', () => {
+  it('未配置时冻结普通研究600秒免费策略，领取起计时', () => {
     expect(parseAiResearchPolicy(undefined)).toEqual({
       version: 'research-policy-v1',
       maxAiCalls: 2,
       maxInputTokens: 100_000,
       maxOutputTokens: 20_000,
-      maxDurationSeconds: 300,
+      maxDurationSeconds: 600,
       maxCost: '0',
       costCurrency: null,
       paidRoutes: [],

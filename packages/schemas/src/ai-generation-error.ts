@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiTimeoutDiagnosticSchema } from './ai-execution-timeout.js';
 import { aiGenerationRuntimeDiagnosticSchema } from './ai-generation-runtime-diagnostic.js';
 import { aiGenerationHttpRequestDiagnosticSchema } from './ai-generation-http-request-diagnostic.js';
 
@@ -9,6 +10,14 @@ export const aiGenerationErrorCodeSchema = z.enum([
   'permission_denied',
   'payment_required',
   'provider_rejected',
+  'provider_connect_timeout',
+  'provider_first_output_timeout',
+  'provider_output_idle_timeout',
+  'provider_completion_timeout',
+  'tool_timeout',
+  'task_budget_exhausted',
+  'execution_lease_lost',
+  'upstream_timeout',
   'transport_unknown',
   'provider_stream_error',
   'output_truncated',
@@ -72,5 +81,7 @@ export const aiGenerationErrorSchema = z.strictObject({
   requestId: z.uuid().nullable().default(null),
   retryAfterMs: z.number().int().nonnegative().max(86_400_000).optional(),
   diagnostic: aiGenerationFailureDiagnosticSchema.optional(),
+  timeout: aiTimeoutDiagnosticSchema.optional(),
+  upstreamStatus: z.number().int().min(100).max(599).optional(),
 });
 export type AiGenerationError = z.infer<typeof aiGenerationErrorSchema>;

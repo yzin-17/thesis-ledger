@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { AI_MAX_TIMEOUT_MS } from '@thesis-ledger/schemas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
@@ -8,6 +9,8 @@ import { modelsFromText } from './ai-provider.actions.js';
 import { aiContractOptions, newAiProviderExecutionRouteDraft } from './ai-provider-execution.js';
 import { aiOutputModeLabel } from './ai-output-mode-options.js';
 import { AiGenerationSettings } from './AiGenerationSettings.js';
+import { AiProviderRequestOptionsFields } from './AiProviderRequestOptionsFields.js';
+import { AiProviderResearchVersionField } from './AiProviderResearchVersionField.js';
 import type { AiProviderExecutionRouteDraft, ProviderDraft } from './providers.types.js';
 
 const seconds = (value: string) => (value.trim() ? String(Number(value) / 1000) : '');
@@ -116,7 +119,10 @@ export function AiProviderExecutionFields({
                   onChange={(selection) =>
                     onUpdateDraft((current) => ({
                       ...current,
-                      modelDefaults: { ...current.modelDefaults, [model]: selection },
+                      modelDefaults: {
+                        ...current.modelDefaults,
+                        [model]: { ...current.modelDefaults[model], ...selection },
+                      },
                       executionRoutes: current.executionRoutes.map((route) =>
                         route.model === model && !route.modeOverridden
                           ? { ...route, ...selection }
@@ -124,6 +130,11 @@ export function AiProviderExecutionFields({
                       ),
                     }))
                   }
+                />
+                <AiProviderRequestOptionsFields
+                  draft={draft}
+                  model={model}
+                  onUpdateDraft={onUpdateDraft}
                 />
                 {routes.some((route) => route.enabled && route.modeOverridden) ? (
                   <p className="text-xs text-muted-foreground">
@@ -154,6 +165,10 @@ export function AiProviderExecutionFields({
                     </div>
                     {selected ? (
                       <>
+                        <AiProviderResearchVersionField
+                          route={selected}
+                          onChange={(update) => updateRoute(selected.key, update)}
+                        />
                         <Field>
                           <FieldLabel className="flex w-fit items-center gap-2 text-sm font-normal">
                             <Checkbox
@@ -211,7 +226,7 @@ export function AiProviderExecutionFields({
                               aria-label={`${model} ${title}${label}`}
                               type="number"
                               min={1}
-                              max={120}
+                              max={AI_MAX_TIMEOUT_MS / 1000}
                               value={seconds(selected[key])}
                               onChange={(event) =>
                                 updateRoute(selected.key, {

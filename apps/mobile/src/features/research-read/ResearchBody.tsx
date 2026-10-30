@@ -65,6 +65,15 @@ export function ResearchBody({
           ))}
         </Section>
       ))}
+      <Section title="研究材料">
+        {result.evidenceBindings.map(({ audit }) => (
+          <Action
+            key={audit.evidenceId}
+            label={`打开材料 ${audit.evidenceId}`}
+            onPress={() => evidence(audit.evidenceId)}
+          />
+        ))}
+      </Section>
       <Section title="数值与失效条件">
         {value.numericClaims.map((c, i) => (
           <Copy key={i}>

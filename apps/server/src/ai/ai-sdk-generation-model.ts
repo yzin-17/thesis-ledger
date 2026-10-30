@@ -108,6 +108,7 @@ export const createGenerationModel = <OUTPUT>(
     httpDiagnostics,
     diagnostics?.observeHttpResponse,
     input.httpClient,
+    input.requestOptions,
   );
   if (input.adapter === 'openai-chat') {
     return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...transport }).chat(

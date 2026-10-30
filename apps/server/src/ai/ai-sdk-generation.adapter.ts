@@ -14,9 +14,13 @@ import {
   type AiUsageFacts,
   type AiAuthMode,
   type AiGenerationHttpRequestDiagnostic,
+  type AiModelRequestOptions,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
+import { sdkSemanticProgress, sdkStreamAbortError } from './ai-sdk-stream-lifecycle.js';
 import type { AdaptiveTimeoutDecision } from './adaptive/ai-adaptive-policy.js';
+import type { AiExecutionTimeoutDecision } from './timeout/ai-timeout-policy.js';
+import { AiGenerationTiming } from './timeout/ai-generation-timing.js';
 import { traceSdkGeneration } from './trace/ai-trace-sdk.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 import { createGenerationModel } from './ai-sdk-generation-model.js';
@@ -49,7 +53,7 @@ export { AiSdkGenerationError } from './ai-sdk-generation-facts.js';
 type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export type AiSdkProgress = {
-  type: 'reasoning' | 'text' | 'heartbeat';
+  type: 'reasoning' | 'text' | 'tool' | 'heartbeat';
   at: string;
 };
 
@@ -68,6 +72,7 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   mode: AiGenerationMode;
   transport: 'single' | 'stream';
   maxOutputTokens?: number;
+  requestOptions?: AiModelRequestOptions;
   reasoningEffort?: ReasoningEffort;
   reasoningEnabled?: boolean;
   timeout: {
@@ -81,6 +86,8 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   /** 传输边界可注入原生 HTTP 或受控响应适配器；SDK 解析逻辑保持一致。 */
   httpClient?: typeof fetch;
   adaptiveExecution?: AdaptiveTimeoutDecision;
+  timeoutDecision?: AiExecutionTimeoutDecision;
+  executionIdentity?: { runId: string; executionAttempt: number };
 };
 
 export type AiSdkGenerationResult<OUTPUT> = {
@@ -94,6 +101,7 @@ export type AiSdkGenerationResult<OUTPUT> = {
   timeToFirstEventMs: number | null;
   timeToFirstTextMs: number | null;
   httpRequest?: AiGenerationHttpRequestDiagnostic;
+  timing?: ReturnType<AiGenerationTiming['snapshot']>;
 };
 
 const telemetry = { isEnabled: false, recordInputs: false, recordOutputs: false } as const;
@@ -163,7 +171,9 @@ const commonOptions = <OUTPUT>(
   telemetry,
   ...providerOptionsFor(input),
   onLanguageModelCallEnd: ({ usage }: { usage: LanguageModelUsage }) => onUsage(usage),
-  ...(input.maxOutputTokens === undefined ? {} : { maxOutputTokens: input.maxOutputTokens }),
+  ...(input.maxOutputTokens === undefined || input.requestOptions?.outputTokenLimit === 'upstream'
+    ? {}
+    : { maxOutputTokens: input.maxOutputTokens }),
 });
 
 export class AiSdkGenerationAdapter {
@@ -187,14 +197,25 @@ export class AiSdkGenerationAdapter {
       );
     }
     const diagnostics = createGenerationDiagnostics(input);
-    const startedAt = Date.now();
+    const startedAt = performance.now();
+    const timing = new AiGenerationTiming(input);
+    const onProgress = input.onProgress;
+    input = {
+      ...input,
+      onProgress: (progress) => {
+        if (progress.type !== 'heartbeat') timing.progress();
+        onProgress?.(progress);
+      },
+    };
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
     const captureUsage = (usage: LanguageModelUsage) => {
       observedUsage = usageFacts(usage);
     };
     try {
-      if (input.transport === 'stream')
-        return await this.stream(input, startedAt, captureUsage, diagnostics);
+      if (input.transport === 'stream') {
+        const result = await this.stream(input, startedAt, captureUsage, diagnostics);
+        return { ...result, ...(input.timeoutDecision ? { timing: timing.snapshot(true) } : {}) };
+      }
       const result = await generateText({
         ...commonOptions(input, captureUsage, diagnostics),
         output: generationOutput(input.mode, input.schema),
@@ -203,6 +224,7 @@ export class AiSdkGenerationAdapter {
       assertFinishReason(result.finishReason, input.requestId, observedUsage);
       return {
         output: parseGenerationOutput(input.mode, input.schema, result.output),
+        ...(input.timeoutDecision ? { timing: timing.snapshot(true) } : {}),
         ...generationHttpRequestFields(diagnostics),
         ...resultMetadata(
           result.usage,
@@ -214,16 +236,11 @@ export class AiSdkGenerationAdapter {
         ),
       };
     } catch (error) {
-      if (input.signal.aborted) {
+      const interruption = timing.interruption(error);
+      if (interruption) {
         throw withGenerationRuntimeDiagnostic(
           new AiSdkGenerationError(
-            aiGenerationErrorSchema.parse({
-              code: 'cancelled',
-              phase: 'cancellation',
-              summary: '生成请求已取消',
-              externalResult: 'unknown',
-              requestId: input.requestId,
-            }),
+            interruption,
             error instanceof AiSdkGenerationError ? error.usage : observedUsage,
             { cause: error },
           ),
@@ -231,12 +248,19 @@ export class AiSdkGenerationAdapter {
           ...generationDiagnosticSnapshots(diagnostics),
         );
       }
-      if (error instanceof AiSdkGenerationError)
+      if (error instanceof AiSdkGenerationError) {
+        const observed =
+          timing.hasProgress() && error.fact.externalResult === 'rejected_before_generation'
+            ? new AiSdkGenerationError({ ...error.fact, externalResult: 'unknown' }, error.usage, {
+                cause: error,
+              })
+            : error;
         throw withGenerationRuntimeDiagnostic(
-          error,
+          observed,
           input.mode,
           ...generationDiagnosticSnapshots(diagnostics),
         );
+      }
       const name = error instanceof Error ? error.name : asRecord(error)?.name;
       const summary = sanitize(error);
       if (
@@ -282,7 +306,7 @@ export class AiSdkGenerationAdapter {
       ...commonOptions(input, captureUsage, diagnostics),
       output: generationOutput(input.mode, input.schema),
       onError: ({ error }) => {
-        streamError = error;
+        streamError ??= error;
       },
     });
     // Consume rejection immediately; await the value only after terminal facts are captured.
@@ -294,17 +318,16 @@ export class AiSdkGenerationAdapter {
       TextStreamPart<Record<string, never>>
     >) {
       diagnostics?.stream.observeSdkPart(part);
-      if (part.type === 'error') streamError = part.error;
-      if (part.type === 'abort')
-        throw new DOMException(part.reason ?? 'Provider stream aborted', 'AbortError');
-      if ((part.type === 'reasoning-delta' || part.type === 'text-delta') && part.text.length > 0) {
-        const elapsed = Date.now() - startedAt;
+      if (part.type === 'error') streamError ??= part.error;
+      if (part.type === 'abort') {
+        throw sdkStreamAbortError(streamError, part.reason, input.signal);
+      }
+      const progress = sdkSemanticProgress(part);
+      if (progress !== null) {
+        const elapsed = performance.now() - startedAt;
         firstEvent ??= elapsed;
-        input.onProgress?.({
-          type: part.type === 'reasoning-delta' ? 'reasoning' : 'text',
-          at: new Date().toISOString(),
-        });
-        if (part.type === 'text-delta') firstText ??= elapsed;
+        input.onProgress?.({ type: progress, at: new Date().toISOString() });
+        if (progress === 'text') firstText ??= elapsed;
       }
     }
     if (streamError)

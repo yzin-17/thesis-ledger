@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createExperimentTimeout } from './timeout/ai-experiment-timeout.js';
 import { Prisma } from '@prisma/client';
 import {
   correlateResearchResultV2,
@@ -39,6 +40,8 @@ export interface ExperimentBinding {
   generate: ExperimentGenerate;
   signal?: AbortSignal;
   now?: () => number;
+  /** 仅供受控离线毫秒夹具缩尺，真实维护默认保留5秒。 */
+  cleanupReserveMs?: 0;
 }
 type ArmStatus = 'complete' | 'blocked' | 'failed' | 'cancelled' | 'timeout';
 interface ArmResult {
@@ -165,7 +168,7 @@ interface ArmState {
   entry: ResearchExperimentCase;
   arm: 'single' | 'staged';
   binding: ExperimentBinding;
-  controller: AbortController;
+  controller: ReturnType<typeof createExperimentTimeout>;
   started: number;
   now: () => number;
   previous: ResearchGenerationV2[];
@@ -255,7 +258,7 @@ async function executeStage(state: ArmState, stage: ResearchExperimentStage, ind
     reservation,
     facts: [experimentFact('dispatching')],
   };
-  if (now() - state.started >= protocol.budget.maxDurationMs) {
+  if (controller.remaining() <= 0) {
     result.status = 'timeout';
     result.reason = 'timeout';
     return false;
@@ -277,7 +280,7 @@ async function executeStage(state: ArmState, stage: ResearchExperimentStage, ind
       mode: 'native_schema',
       transport: 'single',
       maxOutputTokens: reservation.outputTokens,
-      timeout: { totalMs: Math.max(1, protocol.budget.maxDurationMs - (now() - state.started)) },
+      ...controller.request(),
       signal: controller.signal,
     });
   } catch (error) {
@@ -315,7 +318,7 @@ async function executeStage(state: ArmState, stage: ResearchExperimentStage, ind
     result.reason = failure;
     return false;
   }
-  if (controller.signal.aborted || now() - state.started >= protocol.budget.maxDurationMs) {
+  if (controller.signal.aborted || controller.remaining() <= 0) {
     result.status = binding.signal?.aborted ? 'cancelled' : 'timeout';
     result.reason = result.status;
     return false;
@@ -333,10 +336,13 @@ async function runArm(
 ): Promise<ArmResult> {
   const now = binding.now ?? Date.now,
     started = now();
-  const controller = new AbortController();
-  const cancelled = () => controller.abort();
-  binding.signal?.addEventListener('abort', cancelled, { once: true });
-  const timer = setTimeout(() => controller.abort(), protocol.budget.maxDurationMs);
+  const controller = createExperimentTimeout({
+    budgetMs: protocol.budget.maxDurationMs,
+    startedAt: started,
+    now,
+    signal: binding.signal,
+    cleanupReserveMs: binding.cleanupReserveMs,
+  });
   const stages: ResearchExperimentStage[] =
     arm === 'single' ? ['single'] : [...RESEARCH_EXPERIMENT_STAGES];
   const result: ArmResult = {
@@ -376,8 +382,7 @@ async function runArm(
       if (!(await executeStage(state, stage, index))) break;
     }
   } finally {
-    clearTimeout(timer);
-    binding.signal?.removeEventListener('abort', cancelled);
+    controller.close();
     const elapsed = now() - started;
     result.durationMs = elapsed >= 0 ? elapsed : null;
     if (elapsed < 0) {

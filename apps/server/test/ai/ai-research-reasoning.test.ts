@@ -148,7 +148,8 @@ describe('研究用途显式推理参数接线', () => {
     });
     const probe = request as { schema: unknown; messages: Array<{ content: string }> };
     expect(probe.schema).toBe(researchGenerationV2Schema);
-    expect(probe.messages.at(-1)?.content).toContain('"const":2');
+    const example = probe.messages.at(-1)!.content.split('实例：')[1]!;
+    expect(researchGenerationV2Schema.safeParse(JSON.parse(example)).success).toBe(true);
     expect(
       f.providers.save.mock.calls
         .at(-1)![1]

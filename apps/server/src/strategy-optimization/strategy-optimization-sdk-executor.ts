@@ -213,10 +213,7 @@ export class StrategyOptimizationSdkExecutor {
         aiCalls: 1,
         inputTokens: input.inputTokenReservation,
         outputTokens: input.outputTokenReservation,
-        cost: reservationCost(
-          input.estimatedCost,
-          this.pricing(input),
-        ),
+        cost: reservationCost(input.estimatedCost, this.pricing(input)),
       },
     });
     if (!reservation) throw new Error('优化请求事实预留失败');
@@ -257,12 +254,7 @@ export class StrategyOptimizationSdkExecutor {
       attemptId: input.step.id,
       revision: this.revision({
         usage: error.usage,
-        cost: completedCost(
-          null,
-          null,
-          error.usage,
-          this.pricing(input),
-        ),
+        cost: completedCost(null, null, error.usage, this.pricing(input)),
       }),
       outcome: {
         status: 'incomplete',
@@ -303,6 +295,9 @@ export class StrategyOptimizationSdkExecutor {
           contract: input.resolved.execution.contract,
           schema: contractFor(input.experiment).schema as z.ZodType<unknown>,
           mode: input.resolved.execution.mode,
+          ...(input.resolved.execution.requestOptions
+            ? { requestOptions: input.resolved.execution.requestOptions }
+            : {}),
           transport: 'stream',
           maxOutputTokens: input.outputTokenReservation,
           ...(input.route.reasoningEffort === undefined

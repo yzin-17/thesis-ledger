@@ -1,4 +1,10 @@
 import { readVerifiedRoutes } from './ai-provider-validation-policy.js';
+import {
+  assertModelRequestOptions,
+  mergeModelRequestOptionsDefaults,
+  modelRequestOptionsFields,
+} from './ai-model-request-options.js';
+import { runtimeAdapterForSelection } from './ai-provider-upstream.js';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ProviderConfig } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -59,7 +65,7 @@ const legacyPricing = (
   };
 };
 
-const modelPricingFromInput = (
+export const modelPricingFromInput = (
   input: AiProviderInput,
   models: readonly string[],
   existing: ReturnType<typeof parseAiProviderSettings>,
@@ -102,7 +108,13 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
     input.executionRoutes,
     existing?.executionRoutes,
   );
-  const modelDefaults = input.modelDefaults ?? existing?.modelDefaults;
+  const modelDefaults = mergeModelRequestOptionsDefaults(
+    input.modelDefaults,
+    existing?.modelDefaults,
+    input.models,
+  );
+  const modelCatalog =
+    input.modelCatalog === undefined ? existing?.modelCatalog : input.modelCatalog;
   const compatibilityExtensionProfile =
     input.compatibilityExtensionProfile ?? existing?.compatibilityExtensionProfile;
   assertResearchReasoningRoutes(
@@ -111,6 +123,10 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
   );
   const models = [...new Set(input.models.map((model) => model.trim()))];
   const modelPricing = modelPricingFromInput(input, models, existing);
+  assertModelRequestOptions(
+    { ...input, ...(modelDefaults ? { modelDefaults } : {}), modelPricing },
+    runtimeAdapterForSelection(selection, compatibilityExtensionProfile),
+  );
   const legacySettingsFields =
     input.modelPricing === undefined
       ? {
@@ -124,6 +140,7 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
   return {
     baseUrl: input.baseUrl,
     models,
+    ...(modelCatalog ? { modelCatalog } : {}),
     authMode: input.authMode,
     upstreamFormat: selection.upstreamFormat,
     ...(selection.upstreamFormat === 'chat-completions'
@@ -214,6 +231,7 @@ export const routeSnapshotsFromProviderRow = (
         adapter: settings.adapter ?? null,
         models: settings.models,
         route,
+        ...modelRequestOptionsFields(settings.modelDefaults, route.model),
         ...(settings.firstOutputTimeoutMs === undefined
           ? {}
           : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),

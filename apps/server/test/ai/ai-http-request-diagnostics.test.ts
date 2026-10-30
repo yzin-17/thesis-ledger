@@ -127,7 +127,7 @@ describe('HTTP 请求诊断白名单', () => {
     );
     vi.stubGlobal('fetch', fetch);
     try {
-      expect(generationFetchOptions('api_key')).toEqual({});
+      expect(generationFetchOptions('api_key')).toEqual({ fetch: expect.any(Function) });
       const d = new AiGenerationHttpRequestDiagnostics();
       const init = {
         method: 'POST',
@@ -138,7 +138,8 @@ describe('HTTP 请求诊断白名单', () => {
       if (!authenticated) throw new Error('应启用观察器');
       await authenticated('https://example.test/chat/completions', init);
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0]?.[1]).toBe(init);
+      expect(fetch.mock.calls[0]?.[1]).toMatchObject(init);
+      expect(init).not.toHaveProperty('dispatcher');
       const anonymous = generationFetchOptions('none', d).fetch;
       if (!anonymous) throw new Error('应保持无需认证入口');
       await anonymous('https://example.test/chat/completions', init);

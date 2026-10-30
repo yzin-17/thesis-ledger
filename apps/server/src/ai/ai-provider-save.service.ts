@@ -1,4 +1,4 @@
-import { DEFAULT_AI_TIMEOUT_MS, loadConfig } from '../platform/config.js';
+import { createAiTimeoutScope } from './timeout/ai-timeout-scope.js';
 import { AiProviderValidationJournal } from './ai-provider-validation-journal.js';
 import { assertValidationActive } from './ai-provider-validation-interruption.js';
 import {
@@ -22,13 +22,19 @@ import {
 } from './ai-provider.contracts.js';
 import { parseAiProviderSettings } from './ai-provider-summary.js';
 import {
+  assertModelRequestOptions,
+  mergeModelRequestOptionsDefaults,
+} from './ai-model-request-options.js';
+import { modelPricingFromInput } from './ai-provider-readiness.persistence.js';
+import { runtimeAdapterForSelection } from './ai-provider-upstream.js';
+import {
   readVerifiedRoutes,
   effectiveRoute,
   routeValidationFingerprint,
   validationHash,
   VALIDATION_MAX_CALLS,
   VALIDATION_OUTPUT_TOKENS,
-  VALIDATION_DURATION_SECONDS,
+  validationTimeoutPolicy,
   validationCallAuthorizationMatches,
   type VerifiedRoute,
 } from './ai-provider-validation-policy.js';
@@ -58,14 +64,6 @@ export class AiProviderSaveService {
 
   private async context(raw: unknown) {
     const parsed = aiProviderInputSchema.parse(raw);
-    // Resolve the deployed default once; test and saved runtime must use the same limit.
-    if (parsed.timeoutMs === undefined) {
-      try {
-        parsed.timeoutMs = Math.min(loadConfig().aiTimeoutMs, 120000);
-      } catch {
-        parsed.timeoutMs = DEFAULT_AI_TIMEOUT_MS;
-      }
-    }
     const row = await this.configs.findStored(parsed.name);
     if (row && parsed.expectedRevision !== row.updatedAt.toISOString())
       throw new ConflictException('配置版本已变化，请刷新后再验证');
@@ -84,7 +82,11 @@ export class AiProviderSaveService {
         : (credentialSupplied ?? (row ? await this.configs.readCredential(row) : ''));
     if (parsed.authMode === 'api_key' && !credential && parsed.enabled !== false)
       throw new BadRequestException('请填写 API Key');
-    const modelDefaults = parsed.modelDefaults ?? stored?.modelDefaults;
+    const modelDefaults = mergeModelRequestOptionsDefaults(
+      parsed.modelDefaults,
+      stored?.modelDefaults,
+      parsed.models,
+    );
     const profile = parsed.compatibilityExtensionProfile ?? stored?.compatibilityExtensionProfile;
     const input: AiProviderInput = {
       ...parsed,
@@ -96,6 +98,16 @@ export class AiProviderSaveService {
     };
     input.executionRoutes = input.executionRoutes!.map((route) => effectiveRoute(input, route));
     assertResearchReasoningRoutes(input, input.executionRoutes);
+    assertModelRequestOptions(
+      { ...input, modelPricing: modelPricingFromInput(input, input.models, stored) },
+      runtimeAdapterForSelection(
+        {
+          upstreamFormat: input.upstreamFormat,
+          ...(input.chatImplementation ? { chatImplementation: input.chatImplementation } : {}),
+        },
+        profile,
+      ),
+    );
     const enabledRoutes =
       input.enabled === false
         ? []
@@ -157,7 +169,8 @@ export class AiProviderSaveService {
       })),
       maxCalls,
       maxOutputTokensPerCall: VALIDATION_OUTPUT_TOKENS,
-      maxDurationSeconds: VALIDATION_DURATION_SECONDS,
+      maxDurationSeconds:
+        validationTimeoutPolicy(context.routes.map(({ route }) => route)).taskBudgetMs / 1000,
       estimatedCosts: [...costs].map(([currency, amount]) => ({
         currency,
         amount: String(amount),
@@ -205,16 +218,18 @@ export class AiProviderSaveService {
     await this.journal.begin(context.input.name, authorization.operationId, plan.planFingerprint);
     const controller = new AbortController();
     this.active.set(context.input.name, { operationId: authorization.operationId, controller });
-    const signal = AbortSignal.any([
-      controller.signal,
-      AbortSignal.timeout(VALIDATION_DURATION_SECONDS * 1000),
-    ]);
+    const policy = validationTimeoutPolicy(context.routes.map(({ route }) => route));
+    const taskDeadlineAt = Date.now() + plan.maxDurationSeconds * 1000;
+    const scope = createAiTimeoutScope({ policy, taskDeadlineAt, signal: controller.signal });
+    const signal = scope.signal;
     const run: ValidationRunContext = {
       input: context.input,
       credential: context.credential,
       operationId: authorization.operationId,
       signal,
-      deadline: Date.now() + VALIDATION_DURATION_SECONDS * 1000,
+      deadline: taskDeadlineAt - policy.cleanupReserveMs,
+      policy,
+      taskDeadlineAt,
       remainingCalls: authorization.maxCalls,
       allowText: authorization.allowTextFallback,
       stopOnFirstFailure: authorization.stopOnFirstFailure === true,
@@ -248,6 +263,7 @@ export class AiProviderSaveService {
       // save() re-reads the revision, then persistence applies its existing CAS fence.
       return await this.persist(context, records);
     } finally {
+      scope.close();
       this.active.delete(context.input.name);
     }
   }

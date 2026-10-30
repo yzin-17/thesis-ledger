@@ -1,17 +1,18 @@
 import { createHash } from 'node:crypto';
-import type { AiGenerationError } from '@thesis-ledger/schemas';
+import type { AiGenerationError, AiExecutionTimeoutPolicy } from '@thesis-ledger/schemas';
 import type { AiSdkGenerationRequest } from '../ai-sdk-generation.adapter.js';
+import { createAiTimeoutPolicy, resolveAiExecutionTimeout } from '../timeout/ai-timeout-policy.js';
 
 export const ADAPTIVE_RULE = {
-  version: 'ai-adaptive-v1',
-  coverage: 0.99,
-  confidence: 0.95,
-  windowMs: 86_400_000,
+  version: 'ai-adaptive-v2-shadow',
+  mode: 'shadow',
+  windowMs: 14 * 86_400_000,
   maxObservations: 512,
   maxProfiles: 256,
 } as const;
 
 export type AdaptiveObservation = {
+  actualModel?: string | null | undefined;
   requestId: string;
   at: number;
   firstMs: number | null;
@@ -20,12 +21,14 @@ export type AdaptiveObservation = {
   gapCensored: boolean;
   firstLowerBoundMs?: number | undefined;
   gapLowerBoundMs?: number | undefined;
+  completionMs?: number | null | undefined;
+  completionCensored?: boolean | undefined;
+  completionLowerBoundMs?: number | undefined;
+  toolMs?: number | null | undefined;
+  toolCensored?: boolean | undefined;
   outcome: 'success' | 'rejected' | 'invalid' | 'unknown';
 };
-export type AdaptiveHistory = {
-  available: boolean;
-  observations: AdaptiveObservation[];
-};
+export type AdaptiveHistory = { available: boolean; observations: AdaptiveObservation[] };
 export interface AdaptiveObservationStore {
   read(profile: string): Promise<AdaptiveHistory>;
   record(profile: string, observation: AdaptiveObservation): Promise<void>;
@@ -33,32 +36,10 @@ export interface AdaptiveObservationStore {
 }
 export type TimeoutSource = 'route' | 'provider' | 'system';
 export type AdaptiveTimeoutSources = {
+  executionPolicy?: AiExecutionTimeoutPolicy | undefined;
   firstOutputTimeoutSource?: TimeoutSource | undefined;
   outputIdleTimeoutSource?: TimeoutSource | undefined;
   configurationFingerprint: string;
-};
-type OutputSource = 'explicit' | 'cold_start' | 'tolerance_bound' | 'censored' | 'unavailable';
-export type AdaptiveTimeoutDecision = {
-  version: typeof ADAPTIVE_RULE.version;
-  profile: string;
-  coverage: number;
-  confidence: number;
-  minimumSamples: number;
-  first: {
-    source: OutputSource;
-    samples: number;
-    censored: number;
-    deadlineLimited: boolean;
-    requestedMs: number;
-  };
-  gap: {
-    source: OutputSource;
-    samples: number;
-    censored: number;
-    deadlineLimited: boolean;
-    requestedMs: number;
-  };
-  timeout: { totalMs: number; firstChunkMs: number; chunkMs: number };
 };
 
 export const adaptiveProfile = (
@@ -79,17 +60,15 @@ export const adaptiveProfile = (
   createHash('sha256')
     .update(
       JSON.stringify({
+        version: ADAPTIVE_RULE.version,
         provider: request.providerId,
         destination: request.baseURL,
         model: request.model,
-        contract: request.contract,
+        purpose: request.contract.id,
         mode: request.mode,
         transport: request.transport,
         reasoning: request.reasoningEnabled ?? 'default',
         effort: request.reasoningEffort ?? 'default',
-        inputBucket: Math.ceil(
-          Math.log2(Math.max(1, Buffer.byteLength(JSON.stringify(request.messages)))),
-        ),
         fingerprint,
       }),
     )
@@ -98,57 +77,7 @@ export const adaptiveProfile = (
 export const adaptiveModelIsFixed = (model: string) =>
   model !== 'openrouter/free' && model !== 'openrouter/auto';
 
-export const adaptiveMinimumSamples = (
-  coverage = ADAPTIVE_RULE.coverage,
-  confidence = ADAPTIVE_RULE.confidence,
-) => Math.ceil(Math.log(1 - confidence) / Math.log(coverage));
-
-const explicit = (value: number | undefined, source: TimeoutSource | undefined) =>
-  value !== undefined && source !== 'system';
-
-function outputBudget(input: {
-  history: AdaptiveHistory;
-  dimension: 'first' | 'gap';
-  value?: number | undefined;
-  source?: TimeoutSource | undefined;
-  remainingMs: number;
-  now: number;
-  fixed: boolean;
-}) {
-  const recent = input.history.observations.filter(
-    (item) => item.at <= input.now && item.at >= input.now - ADAPTIVE_RULE.windowMs,
-  );
-  const values = recent.flatMap((item) => {
-    if (input.dimension === 'first' ? item.firstCensored : item.gapCensored) return [];
-    const value = input.dimension === 'first' ? item.firstMs : item.maxGapMs;
-    return value !== null && Number.isFinite(value) && value >= 0 ? [value] : [];
-  });
-  const censored = recent.filter((item) =>
-    input.dimension === 'first' ? item.firstCensored : item.gapCensored,
-  ).length;
-  let source: OutputSource = 'cold_start';
-  let budget = input.remainingMs;
-  if (explicit(input.value, input.source)) {
-    source = 'explicit';
-    budget = input.value!;
-  } else if (!input.history.available) source = 'unavailable';
-  else if (censored > 0) source = 'censored';
-  else if (input.fixed && values.length >= adaptiveMinimumSamples()) {
-    source = 'tolerance_bound';
-    budget = Math.max(...values) + 1;
-  }
-  return {
-    milliseconds: Math.max(1, Math.ceil(Math.min(budget, input.remainingMs))),
-    facts: {
-      source,
-      samples: values.length,
-      censored,
-      deadlineLimited: budget > input.remainingMs,
-      requestedMs: budget,
-    },
-  };
-}
-
+/** 影子计算只展示观测最大值和截尾，不估计P99，也不改变执行阈值。 */
 export function adaptiveTimeoutDecision(input: {
   profile: string;
   history: AdaptiveHistory;
@@ -157,42 +86,56 @@ export function adaptiveTimeoutDecision(input: {
   sources: AdaptiveTimeoutSources;
   fixed: boolean;
   now: number;
-}): AdaptiveTimeoutDecision {
+}) {
   if (!Number.isFinite(input.remainingMs) || input.remainingMs <= 0)
-    throw new Error('自适应执行缺少有效剩余期限');
-  const common = {
-    history: input.history,
-    remainingMs: input.remainingMs,
+    throw new Error('影子计算缺少有效剩余期限');
+  const policy = input.sources.executionPolicy ?? createAiTimeoutPolicy('research');
+  const decision = resolveAiExecutionTimeout({
+    policy,
     now: input.now,
-    fixed: input.fixed,
+    transport: 'stream',
+    taskDeadlineAt: input.now + input.remainingMs + policy.cleanupReserveMs,
+    firstOutput: {
+      value: input.configured.firstChunkMs,
+      source: input.sources.firstOutputTimeoutSource,
+    },
+    outputIdle: { value: input.configured.chunkMs, source: input.sources.outputIdleTimeoutSource },
+  });
+  const recent = input.history.observations.filter(
+    (item) => item.at <= input.now && item.at >= input.now - ADAPTIVE_RULE.windowMs,
+  );
+  const dimension = (kind: 'first' | 'gap', baselineMs: number) => {
+    const complete = recent.filter(
+      (item) => !(kind === 'first' ? item.firstCensored : item.gapCensored),
+    );
+    const values = complete.flatMap((item) => {
+      const value = kind === 'first' ? item.firstMs : item.maxGapMs;
+      return value !== null && Number.isFinite(value) && value >= 0 ? [value] : [];
+    });
+    const censored = recent.filter((item) =>
+      kind === 'first' ? item.firstCensored : item.gapCensored,
+    ).length;
+    const observedMaxMs = values.length ? Math.max(...values) : null;
+    return {
+      samples: values.length,
+      censored,
+      observedMaxMs,
+      candidateMs: Math.min(input.remainingMs, Math.max(baselineMs, observedMaxMs ?? 0)),
+      applied: false as const,
+      available: input.history.available,
+    };
   };
-  const first = outputBudget({
-    ...common,
-    dimension: 'first',
-    value: input.configured.firstChunkMs,
-    source: input.sources.firstOutputTimeoutSource,
-  });
-  const gap = outputBudget({
-    ...common,
-    dimension: 'gap',
-    value: input.configured.chunkMs,
-    source: input.sources.outputIdleTimeoutSource,
-  });
   return {
     version: ADAPTIVE_RULE.version,
+    mode: ADAPTIVE_RULE.mode,
     profile: input.profile,
-    coverage: ADAPTIVE_RULE.coverage,
-    confidence: ADAPTIVE_RULE.confidence,
-    minimumSamples: adaptiveMinimumSamples(),
-    first: first.facts,
-    gap: gap.facts,
-    timeout: {
-      totalMs: Math.ceil(input.remainingMs),
-      firstChunkMs: first.milliseconds,
-      chunkMs: gap.milliseconds,
-    },
+    first: dimension('first', policy.firstOutputTimeoutMs),
+    gap: dimension('gap', policy.outputIdleTimeoutMs),
+    timeout: decision.sdkTimeout,
+    applied: false as const,
   };
 }
+export type AdaptiveTimeoutDecision = ReturnType<typeof adaptiveTimeoutDecision>;
 
 export function adaptiveRetryDecision(input: {
   error: AiGenerationError;

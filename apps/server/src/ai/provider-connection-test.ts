@@ -6,12 +6,27 @@ import {
   type AiAuthMode,
   type AiGenerationContractRef,
   type AiGenerationMode,
+  type AiExecutionTimeoutPolicy,
+  type AiModelRequestOptions,
 } from '@thesis-ledger/schemas';
 import { z } from 'zod';
-import type { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
+import {
+  AiSdkGenerationError,
+  type AiSdkGenerationAdapter,
+  type AiSdkGenerationRequest,
+  type AiSdkGenerationResult,
+} from './ai-sdk-generation.adapter.js';
+import { AiGenerationTiming } from './timeout/ai-generation-timing.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
-import { VALIDATION_DURATION_SECONDS } from './ai-provider-validation-policy.js';
+import {
+  aiTimeoutProfileFor,
+  createAiTimeoutPolicy,
+  resolveAiExecutionTimeout,
+  type AiTimeoutSource,
+} from './timeout/ai-timeout-policy.js';
+import { createAiTimeoutScope } from './timeout/ai-timeout-scope.js';
 import { authoringConnectionProbe } from './authoring-connection-probe.js';
+import { researchConnectionProbe } from './research-connection-probe.js';
 
 const connectionProbeSchema = z.object({ ok: z.literal(true) }).strict();
 const CONNECTION_PROBE_MAX_OUTPUT_TOKENS = 1_024;
@@ -24,16 +39,8 @@ const CONNECTION_PROBE_MAX_OUTPUT_TOKENS = 1_024;
  */
 const PURPOSE_PROBE_MAX_OUTPUT_TOKENS = 8_192;
 
-/**
- * 流式用途探针的总时长兜底：与授权页公示的 `maxDurationSeconds` 同源，而不是 Provider 的
- * 「超时（毫秒）」。用途探针是流式的，判活应该看“还在不在出字”：只要还在产出就不该被掐断
- * （本地推理模型 research 探针实测 63～103 秒，thinking token 与正文共用输出预算，
- * 用 30 秒总时长当墙必然把正常的慢生成误杀成失败）。
- * 「卡住」由 firstChunkMs / outputIdleTimeoutMs 负责，这里的兜底只防“一直在出字却不收敛”。
- */
-const STREAM_PROBE_CEILING_MS = VALIDATION_DURATION_SECONDS * 1_000;
-
 type ProbeInput = {
+  requestOptions?: AiModelRequestOptions;
   sdk: AiSdkGenerationAdapter;
   adapter: AiAdapter;
   compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
@@ -42,15 +49,20 @@ type ProbeInput = {
   authMode: AiAuthMode;
   apiKey: string;
   model: string;
-  timeoutMs: number;
+  timeoutMs?: number | undefined;
   requestId?: string;
   signal?: AbortSignal;
   purpose?: AiGenerationContractRef['id'];
   contractRef?: AiGenerationContractRef;
   reasoningEnabled?: boolean;
+  reasoningEffort?: string | undefined;
+  policy?: AiExecutionTimeoutPolicy | undefined;
+  taskDeadlineAt?: number | undefined;
   mode?: AiGenerationMode;
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;
+  firstOutputTimeoutSource?: AiTimeoutSource;
+  outputIdleTimeoutSource?: AiTimeoutSource;
 };
 
 const contractForPurpose = (
@@ -89,7 +101,7 @@ export const probeMessages = (
   const contract = contractForPurpose(purpose, reference);
   if (purpose === undefined)
     return [{ role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' }];
-  const example = authoringConnectionProbe(purpose);
+  const example = authoringConnectionProbe(purpose) ?? researchConnectionProbe(contract.ref);
   if (example)
     return [
       {
@@ -136,39 +148,88 @@ export const runProviderConnectionTest = async ({
   purpose,
   contractRef,
   reasoningEnabled,
+  reasoningEffort,
+  requestOptions,
+  policy: suppliedPolicy,
+  taskDeadlineAt: suppliedDeadline,
   mode = 'json_validated',
-  firstOutputTimeoutMs = 30000,
-  outputIdleTimeoutMs = 30000,
+  firstOutputTimeoutMs,
+  outputIdleTimeoutMs,
+  firstOutputTimeoutSource,
+  outputIdleTimeoutSource,
 }: ProbeInput) => {
   const started = Date.now();
   const contract = contractForPurpose(purpose, contractRef);
   const streamingProbe = purpose !== undefined;
-  const ceilingSignal = AbortSignal.timeout(streamingProbe ? STREAM_PROBE_CEILING_MS : timeoutMs);
-  const result = await sdk.generate({
-    requestId: requestId ?? randomUUID(),
-    adapter,
-    ...(compatibilityExtensionProfile === undefined ? {} : { compatibilityExtensionProfile }),
-    providerId,
-    baseURL,
-    authMode,
-    apiKey,
-    model,
-    messages: probeMessages(purpose, contractRef),
-    contract: contract.ref,
-    schema: purpose ? (contract.schema as z.ZodTypeAny) : connectionProbeSchema,
-    ...(reasoningEnabled === undefined ? {} : { reasoningEnabled }),
-    mode,
-    transport: purpose ? 'stream' : 'single',
-    maxOutputTokens:
-      purpose === undefined ? CONNECTION_PROBE_MAX_OUTPUT_TOKENS : PURPOSE_PROBE_MAX_OUTPUT_TOKENS,
-    timeout: {
-      // 一次性返回的连接探针仍以 Provider 超时为总时长上限；流式用途探针不设总时长墙。
-      ...(streamingProbe ? {} : { totalMs: timeoutMs }),
-      ...(streamingProbe
-        ? { firstChunkMs: firstOutputTimeoutMs, chunkMs: outputIdleTimeoutMs }
-        : {}),
-    },
-    signal: signal ? AbortSignal.any([signal, ceilingSignal]) : ceilingSignal,
+  const policy =
+    suppliedPolicy ??
+    createAiTimeoutPolicy(
+      aiTimeoutProfileFor({
+        connectionProbe: !streamingProbe,
+        reasoningEnabled,
+        reasoningEffort,
+      }),
+    );
+  const taskDeadlineAt = suppliedDeadline ?? started + policy.taskBudgetMs;
+  const timeoutDecision = resolveAiExecutionTimeout({
+    policy,
+    taskDeadlineAt,
+    transport: streamingProbe ? 'stream' : 'single',
+    firstOutput: { value: firstOutputTimeoutMs, source: firstOutputTimeoutSource },
+    outputIdle: { value: outputIdleTimeoutMs, source: outputIdleTimeoutSource },
+    completion: { value: timeoutMs },
   });
-  return { result, latencyMs: Date.now() - started };
+  const scope = createAiTimeoutScope({ policy, taskDeadlineAt, signal });
+  try {
+    scope.assertActive();
+    const request: AiSdkGenerationRequest<unknown> = {
+      requestId: requestId ?? randomUUID(),
+      adapter,
+      ...(compatibilityExtensionProfile === undefined ? {} : { compatibilityExtensionProfile }),
+      providerId,
+      baseURL,
+      authMode,
+      apiKey,
+      model,
+      messages: probeMessages(purpose, contractRef),
+      contract: contract.ref,
+      schema: purpose ? (contract.schema as z.ZodTypeAny) : connectionProbeSchema,
+      ...(reasoningEnabled === undefined ? {} : { reasoningEnabled }),
+      ...(requestOptions === undefined ? {} : { requestOptions }),
+      mode,
+      transport: purpose ? 'stream' : 'single',
+      ...(requestOptions?.outputTokenLimit === 'upstream'
+        ? {}
+        : {
+            maxOutputTokens:
+              purpose === undefined
+                ? CONNECTION_PROBE_MAX_OUTPUT_TOKENS
+                : PURPOSE_PROBE_MAX_OUTPUT_TOKENS,
+          }),
+      timeout: timeoutDecision.sdkTimeout,
+      timeoutDecision,
+      signal: scope.signal,
+    };
+    const result = await sdk.generate(request);
+    assertProbeArrival(scope, request, result);
+    return { result, latencyMs: Date.now() - started, timeoutDecision };
+  } finally {
+    scope.close();
+  }
 };
+
+function assertProbeArrival(
+  scope: ReturnType<typeof createAiTimeoutScope>,
+  request: AiSdkGenerationRequest<unknown>,
+  result: AiSdkGenerationResult<unknown>,
+) {
+  try {
+    scope.assertActive();
+  } catch (error) {
+    const fact = new AiGenerationTiming(request).interruption(error);
+    if (!fact) throw error instanceof Error ? error : new Error('探针调用中止', { cause: error });
+    throw new AiSdkGenerationError({ ...fact, externalResult: 'complete' }, result.usage, {
+      cause: error,
+    });
+  }
+}

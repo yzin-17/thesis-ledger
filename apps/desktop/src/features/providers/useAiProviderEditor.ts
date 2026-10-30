@@ -3,7 +3,6 @@ import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 import {
-  aiProviderDraftError,
   providerDraftFromRecord,
   aiProviderInputFromDraft,
   aiProviderTestPricingState,
@@ -34,6 +33,11 @@ import {
   type ProviderTestState,
 } from './providers.types.js';
 import { createLatestRequestGate, createSingleFlightGate } from './ai-provider-editor-async.js';
+import { validatedAiProviderInput } from './ai-provider-draft-validation.js';
+import {
+  modelCatalogInputError,
+  modelCatalogRequestFromDraft,
+} from './ai-provider-model-catalog.js';
 import {
   cancelAiProviderTest,
   type AiProviderLifecycleOptions,
@@ -195,19 +199,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     invalidateDraftResults();
   };
 
-  const invalidDraft = (input: ReturnType<typeof aiProviderInputFromDraft>) => {
-    const error = aiProviderDraftError(input);
-    if (!error) return false;
-    toastManager.add({
-      title: 'AI Provider 配置不完整',
-      description: error,
-      type: 'error',
-      timeout: 7000,
-      priority: 'high',
-    });
-    return true;
-  };
-
   const providerInputFromDraft = () => {
     const credentialsRef = credentialInputOpen
       ? providerCredentialForSave(draft.credentialsRef, testEvidence)
@@ -245,30 +236,21 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   };
 
   const fetchModels = async () => {
-    const baseUrl = draft.baseUrl.trim();
-    if (!baseUrl) {
+    const input = modelCatalogRequestFromDraft(draft);
+    const catalogError = modelCatalogInputError({ ...input, authMode: draft.authMode });
+    if (catalogError) {
       toastManager.add({
         title: '无法获取模型目录',
-        description: '请先填写 API Base URL。',
+        description: catalogError,
         type: 'error',
         timeout: 7000,
         priority: 'high',
       });
       return;
     }
-    const name = draft.name.trim();
-    const apiKey = draft.authMode === 'api_key' ? draft.credentialsRef.trim() : '';
-    const timeoutMs = Number(draft.timeoutMs);
     const requestSequence = modelRequestGate.begin();
     try {
-      const result = await modelCatalogMutation.mutateAsync({
-        ...(name ? { name } : {}),
-        baseUrl,
-        authMode: draft.authMode,
-        upstreamFormat: draft.upstreamFormat,
-        ...(apiKey ? { apiKey } : {}),
-        ...(Number.isInteger(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : {}),
-      });
+      const result = await modelCatalogMutation.mutateAsync(input);
       if (!modelRequestGate.isCurrent(requestSequence)) return;
       const nextModelDetails = modelDetailsFromCatalog(result.modelDetails);
       setAvailableModels(result.models);
@@ -294,7 +276,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       if (!modelRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
         title: '模型目录获取失败',
-        description: requestFailureMessage(error, '可继续手动填写模型 ID。'),
+        description: `${requestFailureMessage(error, '目录请求失败。')} 请在连接配置中检查模型目录规则，或手动填写模型 ID。`,
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -377,15 +359,19 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
         return;
       }
     }
-    const input = aiProviderTestInputFromDraft(
-      draft,
-      model,
-      testKind,
-      pricingState === 'paid' ? true : undefined,
-      purpose,
-      mode,
+    const input = validatedAiProviderInput(
+      () =>
+        aiProviderTestInputFromDraft(
+          draft,
+          model,
+          testKind,
+          pricingState === 'paid' ? true : undefined,
+          purpose,
+          mode,
+        ),
+      toastManager,
     );
-    if (invalidDraft(input)) {
+    if (!input) {
       testFlight.end();
       return;
     }
@@ -473,8 +459,11 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       return;
     }
     const reusableTestToken = testEvidence?.model ? undefined : testEvidence?.token;
-    const input = aiProviderInputFromDraft(draft, reusableTestToken);
-    if (invalidDraft(input)) return;
+    const input = validatedAiProviderInput(
+      () => aiProviderInputFromDraft(draft, reusableTestToken),
+      toastManager,
+    );
+    if (!input) return;
     try {
       await saveMutation.mutateAsync(input);
       toastManager.add({

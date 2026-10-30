@@ -38,6 +38,24 @@ const setup = (response: unknown) => {
 };
 const scoped = { view: 'scoped' as const, mode: result.scopeSnapshot.mode };
 
+it('工具审计携带正文 locator 和取消信号，拒绝其他报告及分页坏响应', async () => {
+  const value = { runId: id, items: [], hasMore: false, nextCursor: null };
+  const { api, fetcher } = setup(value);
+  const abort = new AbortController();
+  await expect(api.tools(id, { ...scoped, limit: 1 }, abort.signal)).resolves.toEqual(value);
+  const url = new URL(String(fetcher.mock.calls[0]![0]));
+  expect(url.pathname).toBe(`/api/v1/research/reports/${id}/tool-calls`);
+  expect(url.searchParams.get('mode')).toBe(scoped.mode);
+  expect(url.searchParams.get('scope')).toBe('all');
+  expect(fetcher.mock.calls[0]![1]?.signal).toBe(abort.signal);
+  await expect(
+    setup({ ...value, runId: '00000000-0000-4000-8000-000000000098' }).api.tools(id, scoped),
+  ).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  await expect(setup({ ...value, hasMore: true }).api.tools(id, scoped)).rejects.toBeInstanceOf(
+    ThesisLedgerContractError,
+  );
+});
+
 const comparison = () =>
   researchReportComparisonSchema.parse(
     JSON.parse(

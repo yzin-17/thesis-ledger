@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { modelRequestOptionsFields } from './ai-model-request-options.js';
 import type { AiGenerationContractRef, AiGenerationMode } from '@thesis-ledger/schemas';
 import type { AiProvider } from './contracts.js';
 import {
@@ -258,6 +259,7 @@ export const routeSnapshotsFromProvider = (provider: AiProvider): AiProviderRout
       adapter: metadata?.adapter ?? null,
       models: provider.models,
       route,
+      ...modelRequestOptionsFields(metadata?.modelDefaults, route.model),
       ...(metadata?.firstOutputTimeoutMs === undefined
         ? {}
         : { firstOutputTimeoutMs: metadata.firstOutputTimeoutMs }),

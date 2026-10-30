@@ -38,6 +38,15 @@ export class ResearchReportsController {
   ) {
     return this.reports.evidence(principal.id, id, referenceId, query, this.access);
   }
+  @Get(':id/tool-calls')
+  @Header('Cache-Control', 'no-store')
+  tools(
+    @CurrentIdentity() principal: IdentityPrincipal,
+    @Param('id') id: string,
+    @Query() query: unknown,
+  ) {
+    return this.reports.tools(principal.id, id, query, this.access);
+  }
   @Get(':id')
   @Header('Cache-Control', 'no-store')
   detail(

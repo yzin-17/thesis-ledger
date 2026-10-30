@@ -11,6 +11,8 @@ import type { AiRoutingSettingsService } from './ai-routing-settings.service.js'
 import { freezeAiResearchRoutes, loadAiResearchPolicy } from './ai-research-policy.js';
 import { withAiProviderConfigurationTransaction } from './ai-provider-configuration-transaction.js';
 import { aiFrozenResearchSchema, type AiFrozenResearch } from './ai-frozen-research.js';
+import { queuedResearchClock } from './timeout/ai-execution-clock.js';
+import { aiTimeoutProfileFor } from './timeout/ai-timeout-policy.js';
 
 function assertRoutingSettings(
   configured: boolean,
@@ -42,19 +44,6 @@ export class AiResearchSubmission {
         : (JSON.parse(JSON.stringify(frozen)) as Prisma.InputJsonValue);
     const policy = loadAiResearchPolicy();
     const createdAt = new Date();
-    const deadlineAt = new Date(
-      createdAt.getTime() + policy.maxDurationSeconds * 1_000,
-    ).toISOString();
-    const sdkExecution = aiExecutionSummarySchema.parse({
-      version: 'sdk-execution-v1',
-      contract: aiGenerationContracts.research.ref,
-      frozenPolicy: policy,
-      deadlineAt,
-      generationStatus: 'pending',
-      usageCompleteness: 'unknown',
-      requests: [],
-      continuationBlockedReason: null,
-    });
     const persist = async (transaction?: Prisma.TransactionClient) => {
       const routing = this.routingSettings ? await this.routingSettings.read(transaction) : null;
       assertRoutingSettings(this.routingSettings !== undefined, routing, parsed);
@@ -67,6 +56,20 @@ export class AiResearchSubmission {
         throw new BadRequestException(
           '研究默认模型当前不可执行，请检查 Provider、模型和研究用途配置',
         );
+      const effectivePolicy = loadAiResearchPolicy(
+        aiTimeoutProfileFor(routeSnapshot.routes[0] ?? {}),
+      );
+      const sdkExecution = aiExecutionSummarySchema.parse({
+        version: 'sdk-execution-v1',
+        contract: aiGenerationContracts.research.ref,
+        frozenPolicy: effectivePolicy,
+        deadlineAt: null,
+        timing: queuedResearchClock(effectivePolicy, routeSnapshot.routes[0], createdAt.getTime()),
+        generationStatus: 'pending',
+        usageCompleteness: 'unknown',
+        requests: [],
+        continuationBlockedReason: null,
+      });
       return (transaction ?? this.prisma).aiRun.create({
         data: {
           provider: routeSnapshot.provider,
@@ -78,7 +81,7 @@ export class AiResearchSubmission {
           createdAt,
           modelMetadata: {
             ...(parsed.templateId === undefined ? {} : { templateId: parsed.templateId }),
-            researchPolicy: policy,
+            researchPolicy: effectivePolicy,
             researchRoutes: routeSnapshot.routes,
             ...(routing?.researchDefault === undefined
               ? {}

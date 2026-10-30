@@ -92,6 +92,6 @@ Ad Hoc 对应 `distribution=ad-hoc` 和 `release-testing`，需要已登记设�
 
 `.github/workflows/mobile-release-prepare.yml` 在相关 PR 及隔离分支 `codex/mobile-parity-ci-20261023` 的 push 执行配置/拒绝反例；手动运行默认也只检查，只有显式选择 `prepare_unsigned=true` 才进行对应平台的未签名编译。隔离分支的检查触发按[GitHub 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore)配置。工作流没有 Secret、artifact 上传、应用商店发布或分发步骤。原 CI 增加专属反例测试，Android/iOS 原生 job 保留。
 
-本轮不推送分支或触发远端运行；本机等价命令结果与远端状态分别记录。原 `.github/workflows/release.yml` 的桌面发布行为保持；本说明中的本机工具不执行渠道上传或分发。
+工具准备阶段只记录本机等价命令；2026-10-26 经用户授权，隔离提交 `feea66c1` 已运行[主 CI](https://github.com/yzin-17/thesis-ledger/actions/runs/40216679258)和[默认工具检查](https://github.com/yzin-17/thesis-ledger/actions/runs/40216678626)，quality、contracts、Android/iOS Native 及默认 `check` 全部成功。桌面打包和未选择的候选 job 按预期跳过，两个运行均无 artifact；原树未暂存/提交，分支未合并。原 `.github/workflows/release.yml` 桌面发布行为保持，本机工具不执行渠道上传或分发。
 
-G6RA/G6RI/G6RC 保存已交付工具的本机结果。当前迁移仍需补齐远端 CI、M29b/G5A/G5I 业务实源、G6A/G6I 模拟器集成与 G7 最终核对；实际状态以[迁移 Task](../tasks/2026-10-22-web-mobile-feature-parity.md)为准，[当次工具记录](../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)保留历史输入与结果。
+G6RA/G6RI/G6RC 保存已交付工具的本机结果；当前源码远端 CI、停用任务真实手动历史与双端独立模拟器差集已由[接续记录](../tasks/evidence/web-mobile-parity/2026-10-26-continuation.md)补齐。M29b/G5A/G5I 业务实源及依赖它们的完整 G6A/G6I、G7 继续未完成。实际勾选以[迁移 Task](../tasks/2026-10-22-web-mobile-feature-parity.md)为准，[当次工具记录](../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)保留历史输入与结果。

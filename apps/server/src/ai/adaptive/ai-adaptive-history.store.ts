@@ -8,6 +8,7 @@ import {
 } from './ai-adaptive-policy.js';
 
 const observationSchema = z.strictObject({
+  actualModel: z.string().min(1).max(200).nullable().optional(),
   requestId: z.string().min(1).max(120),
   at: z.number().finite().nonnegative(),
   firstMs: z.number().finite().nonnegative().nullable(),
@@ -16,6 +17,11 @@ const observationSchema = z.strictObject({
   gapCensored: z.boolean(),
   firstLowerBoundMs: z.number().finite().nonnegative().optional(),
   gapLowerBoundMs: z.number().finite().nonnegative().optional(),
+  completionMs: z.number().finite().nonnegative().nullable().optional(),
+  completionCensored: z.boolean().optional(),
+  completionLowerBoundMs: z.number().finite().nonnegative().optional(),
+  toolMs: z.number().finite().nonnegative().nullable().optional(),
+  toolCensored: z.boolean().optional(),
   outcome: z.enum(['success', 'rejected', 'invalid', 'unknown']),
 });
 const stateSchema = z.strictObject({
@@ -44,7 +50,11 @@ export class MemoryAdaptiveObservationStore implements AdaptiveObservationStore 
     const value = this.state(profile);
     return Promise.resolve({
       available: true,
-      observations: structuredClone(value.state.observations),
+      observations: structuredClone(
+        value.state.observations.filter(
+          (item) => item.at <= this.now() && item.at >= this.now() - ADAPTIVE_RULE.windowMs,
+        ),
+      ),
     });
   }
   record(profile: string, observation: AdaptiveObservation) {
@@ -54,10 +64,10 @@ export class MemoryAdaptiveObservationStore implements AdaptiveObservationStore 
     if (value.state.observations.some((item) => item.requestId === observation.requestId))
       return Promise.resolve();
     value.at = this.now();
-    value.state.observations = [parsed.data, ...value.state.observations].slice(
-      0,
-      ADAPTIVE_RULE.maxObservations,
-    );
+    value.state.observations = [
+      parsed.data,
+      ...value.state.observations.filter((item) => item.at >= this.now() - ADAPTIVE_RULE.windowMs),
+    ].slice(0, ADAPTIVE_RULE.maxObservations);
     if (observation.outcome === 'success') value.state.credit = 1;
     return Promise.resolve();
   }
@@ -88,6 +98,9 @@ if operation == 'record' then
     if item.requestId == observation.requestId then return 0 end
   end
   table.insert(s.observations, 1, observation)
+  for i = #s.observations, 1, -1 do
+    if s.observations[i].at < tonumber(ARGV[3]) - tonumber(ARGV[4]) then table.remove(s.observations, i) end
+  end
   while #s.observations > tonumber(ARGV[5]) do table.remove(s.observations) end
   if observation.outcome == 'success' then s.credit = 1 end
   changed = 1
@@ -118,7 +131,7 @@ export class RedisAdaptiveObservationStore implements AdaptiveObservationStore {
   constructor(private readonly client: Client) {}
   private key(profile: string) {
     if (!/^[a-f0-9]{64}$/u.test(profile)) throw new Error('自适应profile必须是摘要');
-    return redisKey('cache', `ai-adaptive:v1:${profile}`);
+    return redisKey('cache', `ai-adaptive:v2:${profile}`);
   }
   private async bounded<T>(work: Promise<T>): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -139,7 +152,12 @@ export class RedisAdaptiveObservationStore implements AdaptiveObservationStore {
       if (raw === null) return { available: true, observations: [] };
       if (Buffer.byteLength(raw) > 512 * 1024) throw new Error('运行缓存超限');
       const state = stateSchema.parse(JSON.parse(raw));
-      return { available: true, observations: state.observations };
+      return {
+        available: true,
+        observations: state.observations.filter(
+          (item) => item.at <= Date.now() && item.at >= Date.now() - ADAPTIVE_RULE.windowMs,
+        ),
+      };
     } catch {
       return { available: false, observations: [] };
     }
@@ -152,7 +170,7 @@ export class RedisAdaptiveObservationStore implements AdaptiveObservationStore {
             ADAPTIVE_HISTORY_MUTATION,
             2,
             this.key(profile),
-            redisKey('cache', 'ai-adaptive:v1:profiles'),
+            redisKey('cache', 'ai-adaptive:v2:profiles'),
             operation,
             value,
             String(Date.now()),

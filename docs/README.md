@@ -28,6 +28,7 @@
 
 实施 Task 归档后，仍有效的产品 Spec 继续保留：
 
+- AI 模型目录：[通用模型发现](specs/2026-09-15-ai-provider-model-discovery.md) · [用户手动目录配置](specs/2026-10-26-provider-model-catalog-configuration.md)；实现状态与分层验收从对应 Spec 的任务进入。
 - 手机端：[Android / iOS 使用说明](guides/2026-10-25-mobile-client.md) · [Web 至手机迁移 Spec](specs/2026-10-22-web-mobile-feature-parity.md) · [分批实施与平台验收](tasks/2026-10-22-web-mobile-feature-parity.md)。
 - 当前运行链、API 与所有权：[Canonical](architecture/canonical-runtime.md) · [版本矩阵](architecture/version-matrix.md) · [Server 模块边界](architecture/2026-09-02-server-module-boundaries.md)。
 - 价格/数量/复权与冻结研究：[经济模型与价格 Spec](specs/2026-09-25-multi-source-adjustment-aware-backtest.md)；取消与保留范围以[10-08 决定](specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)为准。

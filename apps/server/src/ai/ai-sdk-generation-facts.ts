@@ -5,6 +5,7 @@ import {
   type AiGenerationError,
   type AiUsageFacts,
 } from '@thesis-ledger/schemas';
+import { generationHttpErrorStatus } from './timeout/ai-generation-timing.js';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -20,10 +21,7 @@ export const sanitize = (error: unknown) => {
 };
 
 const statusCode = (error: unknown) => {
-  const record = asRecord(error);
-  if (typeof record?.statusCode === 'number') return record.statusCode;
-  if (typeof record?.status === 'number') return record.status;
-  return null;
+  return generationHttpErrorStatus(error) ?? null;
 };
 
 const retryAfterMs = (error: unknown) => {
@@ -60,6 +58,13 @@ export const errorFact = (
   } else if (status === 429) {
     code = 'provider_rejected';
     externalResult = 'rejected_before_generation';
+  } else if (status === 408 || status === 504) {
+    code = 'upstream_timeout';
+  } else if (status !== null && [400, 404, 405, 422].includes(status)) {
+    code = 'configuration_invalid';
+    externalResult = 'rejected_before_generation';
+  } else if (status !== null && status >= 500) {
+    code = 'provider_stream_error';
   } else if (error instanceof DOMException && error.name === 'AbortError') {
     code = 'cancelled';
   }
@@ -69,6 +74,7 @@ export const errorFact = (
     summary: sanitize(error),
     externalResult,
     requestId,
+    ...(status === null ? {} : { upstreamStatus: status }),
     ...(code === 'provider_rejected' && retryAfterMs(error) !== undefined
       ? { retryAfterMs: retryAfterMs(error) }
       : {}),

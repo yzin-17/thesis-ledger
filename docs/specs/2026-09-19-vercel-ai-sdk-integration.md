@@ -199,7 +199,7 @@ Provider 验证结果拆分保存为“模型目录获取”“最小生成”�
 | --- | --- |
 | 参数优化 | 保留现有 changes、reason、evidenceRefs；继续校验授权参数、范围及最终策略 |
 | 策略探索 | 精简 DTO：`{ strategy: { name, description?, series, entry, exit, sizing, risk }, reason, evidenceRefs }`；由服务端装配完整 discovery proposal |
-| 研究助手 | 从 ResearchResult V1 提取模型负责的正文、证据、风险、未知项等字段；可信 Provider、context、版本与审计时间由服务端装配 |
+| 研究助手 | V1 保持原正文、证据、风险、未知项提取；现行新功能的 V2 按[研究后继规格 §5.3](2026-10-18-research-evidence-evolution.md)消费。可信 Provider、context、版本与审计时间均由服务端装配，旧 Prompt/记录不重生成 |
 
 探索装配使用实验创建时已有隐藏 seed 的冻结快照：固定 schemaVersion、执行标的、主周期、execution、cost，以及唯一信号源的 ID/asset/timeframe；模型仅提供该信号源的 series。entry/exit 中的引用必须指向固定 ID 及已声明 series。名称和说明继续由模型生成；不得新增外部标的、信号源或突破现有 AST/策略空间约束。
 
@@ -210,6 +210,12 @@ Provider 验证结果拆分保存为“模型目录获取”“最小生成”�
 研究传输 Schema 保留既有确定性引用补全所需的可选字段；只能用本次真实工具结果补全缺失引用，不能替换模型伪造的 ID。最终校验及来源归属检查在装配后执行。
 
 `Output.object({ schema })` 校验生成形状，不能代替上述业务校验。[S4] 传输 Schema 和领域 Schema 的差异、转换版本与测试样例一同登记。
+
+2020-12条件候选由[研究规格D41](2026-10-18-research-evidence-evolution.md#d412020-12-候选与条件迁移)承接：先在隔离验收目录验证通用wire转换及原Zod委托，再对固定Qwen／GLM做受控验证。两者及本地语义检查均通过前，应用默认序列化不变；通过后仅由AI接入层推广相同候选，不更改领域Zod或存储形状，并使native_schema就绪证明包含新的转换版本。其他模式不因候选试验失效；实际输入／输出及业务验收边界保持。
+
+2026-10-27候选验证结果：本地语义与受控出站通过；真实Qwen约300秒超时，GLM按失败停止边界未派发，应用序列化及就绪指纹未迁移。完整响应与双模型条件保持未满足，见[实际回执](../tasks/evidence/2026-10-27-g3-schema-2020-candidate.md)。
+
+2026-10-29 的 V2 研究完整 Schema 提示与数值纪律由 [JSON Mode 规格第 2.1 节](2026-09-22-ai-json-mode-stream-validation.md#21-预算前的完整-schema-提示)维护；提示在预算预留之前由业务构建器生成，不改 native_schema wire 方言或已保存模式，不新增 Provider 专属适配。
 
 ### 7.2 窄归一化
 

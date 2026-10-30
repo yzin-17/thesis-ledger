@@ -73,9 +73,10 @@ it('自适应决策可从真实SDK trace反读，策略字段不进入上游JSON
     const sdk = found.manifest.nodes.find((node) => node.stage === 'sdk.generate')!;
     expect(found.artifacts[sdk.input!.file]!.value).toMatchObject({
       adaptiveExecution: {
-        version: 'ai-adaptive-v1',
-        minimumSamples: 299,
-        first: { source: 'cold_start', samples: 0 },
+        version: 'ai-adaptive-v2-shadow',
+        mode: 'shadow',
+        applied: false,
+        first: { samples: 0, applied: false },
       },
       maxRetries: 0,
     });

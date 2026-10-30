@@ -1,7 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
-import type { AiGenerationContractRef } from '@thesis-ledger/schemas';
+import type { AiGenerationContractRef, AiModelRequestOptions } from '@thesis-ledger/schemas';
 
 type ReasoningOption = { reasoningEnabled?: boolean | undefined };
+type RequestOptions = {
+  requestOptions?: AiModelRequestOptions | undefined;
+};
 type Route = ReasoningOption & { model: string; contract: AiGenerationContractRef };
 type Selection = {
   upstreamFormat: string;
@@ -49,18 +52,20 @@ export const mergeResearchReasoningRoutes = <T extends Route>(
   });
 };
 
-type FrozenRoute = ReasoningOption & {
-  provider: string;
-  model: string;
-  adapter?: string;
-  mode?: string;
-  configurationFingerprint: string;
-};
-type Execution = ReasoningOption & {
-  adapter: string;
-  mode: string;
-  readiness: { configurationFingerprint: string };
-};
+type FrozenRoute = ReasoningOption &
+  RequestOptions & {
+    provider: string;
+    model: string;
+    adapter?: string;
+    mode?: string;
+    configurationFingerprint: string;
+  };
+type Execution = ReasoningOption &
+  RequestOptions & {
+    adapter: string;
+    mode: string;
+    readiness: { configurationFingerprint: string };
+  };
 
 export const frozenResearchRouteMatches = (
   frozen: FrozenRoute,
@@ -73,7 +78,9 @@ export const frozenResearchRouteMatches = (
   (frozen.adapter === undefined || frozen.adapter === execution.adapter) &&
   (frozen.mode === undefined || frozen.mode === execution.mode) &&
   frozen.configurationFingerprint === execution.readiness.configurationFingerprint &&
-  frozen.reasoningEnabled === execution.reasoningEnabled;
+  frozen.reasoningEnabled === execution.reasoningEnabled &&
+  JSON.stringify(frozen.requestOptions ?? null) ===
+    JSON.stringify(execution.requestOptions ?? null);
 
 export const readFrozenResearchReasoning = (
   value: Record<string, unknown>,

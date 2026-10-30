@@ -186,6 +186,7 @@ export class AuthoringAttemptRunner {
       contract: contract.ref,
       schema: contract.schema,
       mode: route.execution.mode,
+      ...(route.execution.requestOptions ? { requestOptions: route.execution.requestOptions } : {}),
       transport: 'stream',
       maxOutputTokens: AUTHORING_LIMITS.outputTokens,
       timeout: {

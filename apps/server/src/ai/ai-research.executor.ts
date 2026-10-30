@@ -4,6 +4,7 @@ import {
   aiExecutionSummarySchema,
   aiResearchContextSchema,
   researchResultSchema,
+  type AiExecutionSummary,
   type AiResearchGeneration,
   type AiResearchStartInput,
 } from '@thesis-ledger/schemas';
@@ -14,7 +15,7 @@ import { evidenceCitation } from './grounding.js';
 import { executeAuditedTool } from './tool-runtime.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { PromptVersionRegistry } from './prompt-registry.js';
-import { AiExecutionStateStore, type AiExecutionOwnership } from './ai-execution-state.store.js';
+import { AiExecutionStateStore } from './ai-execution-state.store.js';
 import { AiResearchSdkExecution } from './ai-research-sdk-execution.js';
 import {
   AiFrozenResearchError,
@@ -24,6 +25,13 @@ import {
 import type { AiTool } from './contracts.js';
 import { researchOutputInstructions } from './ai-research-output-prompt.js';
 import { executeFrozenResearchV2 } from './ai-research-execution-v2.js';
+import { researchExecutionDeadline, researchTimeoutPolicy } from './timeout/ai-execution-clock.js';
+import {
+  createResearchLifecycle,
+  researchLifecycleFailure,
+} from './timeout/ai-research-lifecycle.js';
+import { AiExecutionTimeoutError } from './timeout/ai-timeout-scope.js';
+import { AiAdaptiveExecution } from './adaptive/ai-adaptive-execution.js';
 
 const allowedPermissions = new Set([
   'market:read',
@@ -59,7 +67,7 @@ const decimalValue = (value: unknown) => {
 @Injectable()
 export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
   private readonly active = new Set<string>();
-  private readonly cancellations = new Map<string, () => void>();
+  private readonly cancellations = new Map<string, (reason?: unknown) => void>();
   private timer: ReturnType<typeof setInterval> | undefined;
 
   constructor(
@@ -70,6 +78,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     private readonly executions: AiExecutionStateStore,
     private readonly sdkExecution: AiResearchSdkExecution,
     @Optional() private readonly traceCapture?: AiTraceCaptureService,
+    @Optional() private readonly adaptive?: AiAdaptiveExecution,
   ) {}
 
   onModuleInit() {
@@ -81,6 +90,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    for (const cancel of this.cancellations.values()) cancel('worker_shutdown');
   }
 
   dispatch(id: string) {
@@ -322,32 +332,6 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     return tools;
   }
 
-  private startLeaseHeartbeat(ownership: AiExecutionOwnership, deadlineAt: number) {
-    const controller = new AbortController();
-    const heartbeat = setInterval(() => {
-      void this.executions
-        .renewLease(ownership, 60_000)
-        .then((renewed) => {
-          if (!renewed) controller.abort('lease_lost');
-        })
-        .catch(() => controller.abort('lease_renewal_failed'));
-    }, 20_000);
-    heartbeat.unref?.();
-    const deadline = setTimeout(
-      () => controller.abort('deadline_expired'),
-      Math.min(2_147_483_647, Math.max(0, deadlineAt - Date.now())),
-    );
-    deadline.unref?.();
-    return {
-      signal: controller.signal,
-      cancel: () => controller.abort('cancelled'),
-      close: () => {
-        clearInterval(heartbeat);
-        clearTimeout(deadline);
-      },
-    };
-  }
-
   private sourcesForRun(
     run: NonNullable<Awaited<ReturnType<AiRunService['claim']>>>,
     scope: string,
@@ -365,8 +349,10 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     context: ReturnType<typeof asContext>,
     tools: AiTool[],
     signal: AbortSignal,
-    deadlineAt: number,
+    execution: AiExecutionSummary,
   ) {
+    const policy = researchTimeoutPolicy(execution);
+    const deadlineAt = researchExecutionDeadline(execution);
     const evidence: Array<{ claim: string; citations: ReturnType<typeof evidenceCitation>[] }> = [];
     const successfulCalls: Array<{ tool: string; data: unknown; toolCallId?: string }> = [];
     for (const tool of tools) {
@@ -377,8 +363,19 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
         tool,
         { ...context },
         allowedPermissions,
+        undefined,
+        {
+          signal,
+          policy,
+          taskDeadlineAt: Date.parse(execution.deadlineAt!),
+          onObservation: (value) => this.adaptive?.observeTool(tool.name, value),
+        },
       );
-      if (result.status !== 'ok') continue;
+      if (result.status !== 'ok') {
+        if (result.timeout) throw new AiExecutionTimeoutError(result.timeout);
+        signal.throwIfAborted();
+        continue;
+      }
       successfulCalls.push({
         tool: tool.name,
         data: result.data,
@@ -409,18 +406,18 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
     const id = run.id;
     const ownership = { runId: id, executionAttempt: run.executionAttempt };
     const execution = aiExecutionSummarySchema.safeParse(asRecord(run.modelMetadata)?.sdkExecution);
-    if (!execution.success || !execution.data.deadlineAt) {
+    if (!execution.success || !execution.data.frozenPolicy || !execution.data.deadlineAt) {
       await this.executions.failOwned(ownership, {
         errorCode: 'research_policy_missing',
         errorSummary: '研究任务缺少创建时冻结的 SDK 执行策略',
       });
       return;
     }
-    const deadlineAt = new Date(execution.data.deadlineAt).getTime();
-    const lifecycle = this.startLeaseHeartbeat(ownership, deadlineAt);
+    const deadlineAt = researchExecutionDeadline(execution.data);
+    const lifecycle = createResearchLifecycle(this.executions, ownership, execution.data);
     this.cancellations.set(id, lifecycle.cancel);
     try {
-      if (Date.now() >= deadlineAt) throw new Error('研究任务已超过创建时冻结的绝对期限');
+      lifecycle.assertActive();
       const frozen = asRecord(run.modelMetadata)?.frozenResearch;
       if (asRecord(frozen)?.version === 'frozen-research-v2') {
         await executeFrozenResearchV2({ run, raw: frozen, ownership, runs: this.runs, sdk: this.sdkExecution, signal: lifecycle.signal, deadlineAt, startedAt });
@@ -434,7 +431,7 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
         context,
         tools,
         lifecycle.signal,
-        deadlineAt,
+        execution.data,
       );
       const messages = [
         { role: 'system', content: prompt.template },
@@ -490,26 +487,9 @@ export class AiResearchExecutor implements OnModuleInit, OnModuleDestroy {
         buildResult,
       });
     } catch (error) {
-      const summary = error instanceof Error ? error.message : '研究执行失败';
-      const expired = Date.now() >= deadlineAt;
-      const cancelled = error instanceof DOMException && error.name === 'AbortError';
-      let errorCode = this.providers.hasProviders()
-        ? 'research_execution_failed'
-        : 'provider_unavailable';
-      if (error instanceof AiFrozenResearchError) errorCode = error.errorCode;
-      let continuationBlockedReason: 'expired' | 'cancelled' | undefined;
-      if (expired) {
-        errorCode = 'research_deadline_expired';
-        continuationBlockedReason = 'expired';
-      } else if (cancelled) {
-        errorCode = 'research_cancelled';
-        continuationBlockedReason = 'cancelled';
-      }
       await this.executions.failOwned(ownership, {
-        errorCode,
-        errorSummary: summary,
+        ...researchLifecycleFailure(error, lifecycle.signal, this.providers.hasProviders()),
         durationMs: Date.now() - startedAt,
-        ...(continuationBlockedReason ? { continuationBlockedReason } : {}),
       });
     } finally {
       this.cancellations.delete(id);

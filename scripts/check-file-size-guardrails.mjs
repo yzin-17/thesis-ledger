@@ -1,23 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { readdir, readFile } from 'node:fs/promises';
-import { extname, join, relative, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { extname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { workspaceFileSizeSources } from './file-size-sources.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const baseRef = process.env.GUARDRAIL_BASE_REF?.trim();
-
-const walk = async (directory) => {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (['node_modules', 'dist', 'coverage', 'generated', 'third_party'].includes(entry.name))
-      continue;
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...(await walk(path)));
-    else files.push(path);
-  }
-  return files;
-};
 
 const rules = [
   {
@@ -76,13 +64,9 @@ const baseLinesFor = (file) => {
 
 const warnings = [];
 const violations = [];
+const sourceFiles = (await workspaceFileSizeSources(root)).map((file) => resolve(root, file));
 for (const rule of rules) {
-  let files = [];
-  try {
-    files = await walk(rule.root);
-  } catch {
-    continue;
-  }
+  const files = sourceFiles.filter((file) => file.startsWith(rule.root + sep));
   for (const path of files) {
     if (!rule.match(path)) continue;
     const text = await readFile(path, 'utf8');
@@ -101,7 +85,8 @@ for (const rule of rules) {
 
     let reason;
     if (baseLines === null) reason = 'new file exceeds the threshold';
-    else if (baseLines <= rule.maxLines) reason = `crossed the ${rule.maxLines}-line threshold from ${baseLines} lines`;
+    else if (baseLines <= rule.maxLines)
+      reason = `crossed the ${rule.maxLines}-line threshold from ${baseLines} lines`;
     else if (lines > baseLines) reason = `grew from the oversized baseline of ${baseLines} lines`;
 
     if (reason) {

@@ -97,7 +97,7 @@ describe('AI 生成与执行共享契约', () => {
       maxAiCalls: 2,
       maxInputTokens: 100_000,
       maxOutputTokens: 20_000,
-      maxDurationSeconds: 300,
+      maxDurationSeconds: 600,
       maxCost: '0',
       costCurrency: null,
       paidRoutes: [],

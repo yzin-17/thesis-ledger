@@ -1,5 +1,9 @@
 # 历史文档归档
 
+- 2026-10-26 [Provider 模型目录通用配置](tasks/2026-10-26-provider-model-catalog-configuration.md)完成共享合同、通用执行器、前端手动规则及正式快更；实际前端临时规则读取 39 个模型，取消后未保存，Server／Worker 及 188 个实际 Schema 模块一致。配置及原数据保持，既有定时作业独立新增 3 条快照的关联证据保留。[现行 Spec](../specs/2026-10-26-provider-model-catalog-configuration.md)与[完整证据](../tasks/evidence/2026-10-26-provider-model-catalog-configuration.md)保留，模型调用为 0，目标规则由用户在前端手动保存。
+
+- 2026-10-26 [Cloudflare 模型目录适配](tasks/2026-10-26-cloudflare-model-catalog.md)完成当时的原生目录、正式快更、目标 API 与实际前端验收；39 个 Workers AI 文本候选、三个原选择及配置数据保全通过。[历史 Spec](specs/2026-10-26-cloudflare-model-catalog.md)与[完整证据](../tasks/evidence/2026-10-26-cloudflare-model-catalog.md)保留，模型调用为 0，研究 G3 仍按原边界处理。现行实现与验收见[通用目录配置任务](tasks/2026-10-26-provider-model-catalog-configuration.md)。
+
 - 2026-10-23 [研报长期按需读取](tasks/2026-10-23-research-report-on-demand.md)完成日期可选的 v2 合同、标准错误投影与来源空日期字段兼容、保留数据完整更新及目标无日期单页验收；采集 201、2 条/来源总数 772，新旧历史 200，旧快照摘要不变。原来源启停、20 条路由、11 张受保护业务表与挂载保持，用户确认的预期修改保留。[现行 Spec](../specs/2026-10-23-research-report-on-demand.md)与[完整证据](../tasks/evidence/2026-10-23-research-report-on-demand.md)保留，当前按需读取不再依赖首次 24 小时验收记录。
 
 - 2026-10-23 [研报最小元数据](tasks/2026-10-23-research-report-metadata.md)完成单标单页采证、限定范围首次准入、单条路由、真实采集、引用/本地历史及同一 Server 重启留存；用户确认的并发账户新增保留，原数据、凭据及原路由保护通过。[现行 Spec](../specs/2026-10-23-research-report-metadata.md)与[完整证据](../tasks/evidence/2026-10-23-research-report-metadata.md)保留，模型研究与全历史边界保持。

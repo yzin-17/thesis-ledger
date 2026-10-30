@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { aiProviderInputFromDraft } from '../src/features/providers/ai-provider.actions.js';
 import { useAiProviderEditor } from '../src/features/providers/useAiProviderEditor.js';
+import { modelCatalogDraftFromConfig } from '../src/features/providers/ai-provider-model-catalog.js';
 import type { ProviderRecord } from '../src/features/providers/providers.types.js';
 
 const editorMocks = vi.hoisted(() => ({
@@ -141,13 +142,18 @@ describe('AI Provider 目录刷新兼容边界', () => {
     await act(async () => currentEditor().openEditor());
     expect(currentEditor().editor.editingProviderName).toBeNull();
     expect(currentEditor().editor.credentialInputOpen).toBe(true);
-    const provider = { ...legacyMixedProvider(), authMode: 'api_key' as const, credentialConfigured: true };
+    const provider = {
+      ...legacyMixedProvider(),
+      authMode: 'api_key' as const,
+      credentialConfigured: true,
+    };
     await act(async () => currentEditor().openEditor(provider));
     expect(currentEditor().editor.editingProviderName).toBe(provider.name);
     expect(currentEditor().editor.credentialInputOpen).toBe(false);
     expect(currentEditor().editor.providerDraft.credentialsRef).toBe('');
     expect(aiProviderInputFromDraft(currentEditor().editor.providerDraft)).toMatchObject({
-      name: provider.name, expectedRevision: provider.updatedAt,
+      name: provider.name,
+      expectedRevision: provider.updatedAt,
     });
     expect(editorMocks.mutate).not.toHaveBeenCalled();
   });
@@ -263,5 +269,138 @@ describe('AI Provider 目录刷新兼容边界', () => {
       },
     ]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('通用目录规则草稿', () => {
+  const modelCatalog = {
+    url: 'https://provider.invalid/catalog',
+    itemsPath: '/items',
+    idPath: '/code',
+  };
+  const configured = () => ({ ...legacyMixedProvider(), modelCatalog });
+
+  it('回显规则并把当前草稿用于获取，不自动保存或修改选择', async () => {
+    editorMocks.fetchModels.mockResolvedValue({ models: ['candidate'], modelDetails: [] });
+    await mountEditor();
+    await act(async () => currentEditor().openEditor(configured()));
+    expect(currentEditor().editor.providerDraft.modelCatalog?.itemsPath).toBe('/items');
+    await act(async () =>
+      currentEditor().updateDraft((draft) => ({
+        ...draft,
+        modelCatalog: modelCatalogDraftFromConfig({ ...modelCatalog, itemsPath: '/updated' }),
+      })),
+    );
+    await act(async () => currentEditor().fetchModels());
+    expect(editorMocks.fetchModels).toHaveBeenCalledWith(
+      expect.objectContaining({ modelCatalog: { ...modelCatalog, itemsPath: '/updated' } }),
+    );
+    expect(currentEditor().editor.providerDraft.modelsText).toBe('legacy-model');
+    expect(editorMocks.mutate).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('用户保存时提交目录规则及原有模型、价格和修订', async () => {
+    const provider = { ...configured(), enabled: false };
+    editorMocks.mutate.mockResolvedValue(provider);
+    await mountEditor();
+    await act(async () => currentEditor().openEditor(provider));
+    await act(async () => currentEditor().saveDraft({ preventDefault: () => undefined } as never));
+    expect(editorMocks.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelCatalog,
+        models: ['legacy-model'],
+        expectedRevision: provider.updatedAt,
+        enabled: false,
+        modelPricing: {
+          'legacy-model': { costPer1kInput: 0.25, costPer1kOutput: 0.75, costCurrency: 'USD' },
+        },
+      }),
+    );
+  });
+
+  it('切回默认规则显式传 null，普通旧草稿仍省略新字段', async () => {
+    editorMocks.fetchModels.mockResolvedValue({ models: ['candidate'], modelDetails: [] });
+    await mountEditor();
+    await act(async () => currentEditor().openEditor(configured()));
+    await act(async () =>
+      currentEditor().updateDraft((draft) => ({ ...draft, modelCatalog: null })),
+    );
+    await act(async () => currentEditor().fetchModels());
+    expect(editorMocks.fetchModels).toHaveBeenCalledWith(
+      expect.objectContaining({ modelCatalog: null }),
+    );
+    expect(aiProviderInputFromDraft(currentEditor().editor.providerDraft).modelCatalog).toBeNull();
+    await act(async () => currentEditor().openEditor(legacyMixedProvider()));
+    expect(aiProviderInputFromDraft(currentEditor().editor.providerDraft)).not.toHaveProperty(
+      'modelCatalog',
+    );
+  });
+
+  it('修改目录规则使在途旧回包失效', async () => {
+    let complete!: (value: { models: string[]; modelDetails: [] }) => void;
+    editorMocks.fetchModels.mockReturnValue(
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+    );
+    await mountEditor();
+    await act(async () => currentEditor().openEditor(configured()));
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = currentEditor().fetchModels();
+    });
+    await act(async () =>
+      currentEditor().updateDraft((draft) => ({
+        ...draft,
+        modelCatalog: modelCatalogDraftFromConfig({ ...modelCatalog, idPath: '/new-code' }),
+      })),
+    );
+    complete({ models: ['stale-model'], modelDetails: [] });
+    await act(async () => pending);
+    expect(currentEditor().editor.availableModels).toEqual([]);
+    expect(currentEditor().editor.providerDraft.modelCatalog?.idPath).toBe('/new-code');
+    expect(currentEditor().editor.providerDraft.modelsText).toBe('legacy-model');
+  });
+
+  it('非法路径在本地拦截，保留已选模型和用途', async () => {
+    await mountEditor();
+    await act(async () => currentEditor().openEditor(configured()));
+    const routes = currentEditor().editor.providerDraft.executionRoutes;
+    await act(async () =>
+      currentEditor().updateDraft((draft) => ({
+        ...draft,
+        modelCatalog: modelCatalogDraftFromConfig({ ...modelCatalog, itemsPath: 'invalid' }),
+      })),
+    );
+    await act(async () => currentEditor().fetchModels());
+    expect(editorMocks.fetchModels).not.toHaveBeenCalled();
+    expect(editorMocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '无法获取模型目录',
+        description: expect.stringContaining('JSON Pointer'),
+      }),
+    );
+    expect(currentEditor().editor.providerDraft.executionRoutes).toEqual(routes);
+    expect(currentEditor().editor.providerDraft.modelsText).toBe('legacy-model');
+  });
+
+  it('获取失败及关闭不保存手动规则，再打开读取原记录', async () => {
+    editorMocks.fetchModels.mockRejectedValue(new Error('catalog failed'));
+    await mountEditor();
+    await act(async () => currentEditor().openEditor(configured()));
+    await act(async () =>
+      currentEditor().updateDraft((draft) => ({
+        ...draft,
+        modelCatalog: modelCatalogDraftFromConfig({ ...modelCatalog, itemsPath: '/draft' }),
+      })),
+    );
+    await act(async () => currentEditor().fetchModels());
+    expect(currentEditor().editor.providerDraft.modelCatalog?.itemsPath).toBe('/draft');
+    expect(currentEditor().editor.providerDraft.modelsText).toBe('legacy-model');
+    await act(async () => currentEditor().close());
+    await act(async () => currentEditor().openEditor(configured()));
+    expect(currentEditor().editor.providerDraft.modelCatalog?.itemsPath).toBe('/items');
+    expect(editorMocks.mutate).not.toHaveBeenCalled();
   });
 });

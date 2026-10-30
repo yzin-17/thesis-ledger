@@ -1,5 +1,11 @@
 import { z } from 'zod';
+import { aiTimeoutDurationSchema } from './ai-execution-timeout.js';
 import { aiOutputPolicySchema } from './ai-provider-validation.js';
+import { aiModelRequestOptionsSchema } from './ai-model-request-options.js';
+import {
+  aiProviderModelCatalogConfigSchema,
+  refineAiProviderModelCatalogOrigin,
+} from './ai-provider-model-catalog.js';
 import {
   aiChatImplementationSchema,
   aiCompatibilityExtensionProfileSchema,
@@ -65,7 +71,11 @@ export const aiProviderModelPricingInputSchema = z
 export type AiProviderModelPricingInput = z.infer<typeof aiProviderModelPricingInputSchema>;
 
 export const aiProviderModelDefaultConfigSchema = z
-  .object({ mode: aiGenerationModeSchema, outputPolicy: aiOutputPolicySchema.optional() })
+  .object({
+    mode: aiGenerationModeSchema,
+    outputPolicy: aiOutputPolicySchema.optional(),
+    requestOptions: aiModelRequestOptionsSchema.optional(),
+  })
   .strict();
 export type AiProviderModelDefaultConfig = z.infer<typeof aiProviderModelDefaultConfigSchema>;
 
@@ -108,8 +118,8 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
       enabled: z.boolean().optional(),
       modeOverridden: z.boolean().optional(),
       contract: aiGenerationContractRefSchema,
-      firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
-      outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+      firstOutputTimeoutMs: aiTimeoutDurationSchema.optional(),
+      outputIdleTimeoutMs: aiTimeoutDurationSchema.optional(),
       reasoningEnabled: z.boolean().optional(),
     })
     .strict()
@@ -128,6 +138,7 @@ export const aiProviderInputSchema = z
     name: z.string().trim().min(1).max(120),
     baseUrl: httpUrl,
     models: z.array(z.string().trim().min(1).max(200)).min(1).max(32),
+    modelCatalog: aiProviderModelCatalogConfigSchema.nullable().optional(),
     authMode: aiAuthModeSchema.default('api_key'),
     upstreamFormat: aiUpstreamFormatSchema.default('chat-completions'),
     chatImplementation: aiChatImplementationSchema.optional(),
@@ -141,9 +152,9 @@ export const aiProviderInputSchema = z
     enabled: z.boolean().optional(),
     priority: z.number().int().nonnegative().optional().default(100),
     capabilities: z.array(z.string().trim().min(1).max(80)).min(1).max(32).optional(),
-    timeoutMs: z.number().int().positive().max(120_000).optional(),
-    firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
-    outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+    timeoutMs: aiTimeoutDurationSchema.optional(),
+    firstOutputTimeoutMs: aiTimeoutDurationSchema.optional(),
+    outputIdleTimeoutMs: aiTimeoutDurationSchema.optional(),
     costPer1kInput: z.number().nonnegative().optional(),
     costPer1kOutput: z.number().nonnegative().optional(),
     costCurrency: z.string().trim().min(1).max(16).optional(),
@@ -152,6 +163,7 @@ export const aiProviderInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    refineAiProviderModelCatalogOrigin(value, context);
     if (
       value.compatibilityExtensionProfile &&
       (value.upstreamFormat !== 'chat-completions' ||
@@ -276,12 +288,14 @@ export const aiProviderModelCatalogInputSchema = z
     baseUrl: httpUrl,
     authMode: aiAuthModeSchema.default('api_key'),
     upstreamFormat: aiUpstreamFormatSchema.optional(),
+    modelCatalog: aiProviderModelCatalogConfigSchema.nullable().optional(),
     apiKey: z.string().trim().min(1).max(10_000).optional(),
     credentialsRef: z.string().trim().min(1).max(10_000).optional(),
-    timeoutMs: z.number().int().positive().max(120_000).optional(),
+    timeoutMs: aiTimeoutDurationSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
+    refineAiProviderModelCatalogOrigin(value, context);
     if (value.apiKey && value.credentialsRef)
       context.addIssue({ code: 'custom', path: ['apiKey'], message: 'API Key 只能填写一个字段' });
   });

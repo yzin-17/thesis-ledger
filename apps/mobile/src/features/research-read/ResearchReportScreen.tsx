@@ -22,9 +22,9 @@ export function ResearchReportScreen() {
     initialPageParam: undefined as string | undefined,
     enabled: Boolean(query.data),
     queryFn: ({ pageParam, signal }) =>
-      api.researchRuns.tools(
+      api.research.tools(
         params.id,
-        { limit: 20, ...(pageParam ? { cursor: pageParam } : {}) },
+        { ...params.locator, limit: 20, ...(pageParam ? { cursor: pageParam } : {}) },
         signal,
       ),
     getNextPageParam: (p) => p.nextCursor ?? undefined,

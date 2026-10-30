@@ -20,6 +20,8 @@ import { assertResearchV2WritesEnabled } from './ai-research-v2-write-policy.js'
 import { buildFrozenResearchMessagesV2 } from './ai-research-messages-v2.js';
 import { researchInputTokenEstimate } from './ai-research-sdk-reservation.js';
 import { currentAiTraceReference } from './trace/ai-trace-context.js';
+import { queuedResearchClock } from './timeout/ai-execution-clock.js';
+import { aiTimeoutProfileFor } from './timeout/ai-timeout-policy.js';
 
 /** V2 的受控创建入口；找回原提交不依赖当前写入开关或重新取数。 */
 export class AiResearchSubmissionV2 {
@@ -80,7 +82,8 @@ export class AiResearchSubmissionV2 {
           version: 'sdk-execution-v1',
           contract: researchGenerationV2Contract.ref,
           frozenPolicy: ready.policy,
-          deadlineAt: new Date(Date.now() + ready.policy.maxDurationSeconds * 1000).toISOString(),
+          deadlineAt: null,
+          timing: queuedResearchClock(ready.policy, ready.routes.routes[0]),
           generationStatus: 'pending',
           usageCompleteness: 'unknown',
           requests: [],
@@ -120,6 +123,10 @@ export class AiResearchSubmissionV2 {
     );
     if (routes.provider === 'pending' || routes.routes.length === 0)
       throw new BadRequestException('研究默认模型尚无可执行的 V2 合同路由');
-    return { routing, policy, routes };
+    return {
+      routing,
+      policy: loadAiResearchPolicy(aiTimeoutProfileFor(routes.routes[0] ?? {})),
+      routes,
+    };
   }
 }

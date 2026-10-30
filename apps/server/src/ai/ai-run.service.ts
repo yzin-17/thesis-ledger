@@ -20,6 +20,7 @@ import {
   safeFallbackSummary,
 } from './ai-execution-read-model.js';
 import { recoverStaleAiRuns } from './ai-run-recovery.js';
+import { claimAiRun } from './ai-run-claim.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
@@ -251,28 +252,7 @@ export class AiRunService {
 
   /** Atomically claims one queued run and assigns a short lease to the worker. */
   async claim(id: string, leaseMs = 60_000) {
-    const now = new Date();
-    const leaseUntil = new Date(now.getTime() + leaseMs);
-    const updateMany = (
-      this.prisma.aiRun as unknown as {
-        updateMany?: (args: unknown) => Promise<{ count: number }>;
-      }
-    ).updateMany;
-    if (!updateMany) return null;
-    const result = await updateMany({
-      where: { id, status: 'queued' },
-      data: {
-        status: 'running',
-        startedAt: now,
-        claimedAt: now,
-        leaseUntil,
-        executionAttempt: { increment: 1 },
-        errorCode: null,
-        errorSummary: null,
-      },
-    });
-    if (result.count !== 1) return null;
-    return this.prisma.aiRun.findUnique({ where: { id } });
+    return claimAiRun(this.prisma, id, leaseMs);
   }
 
   async fail(id: string, errorCode: string, errorSummary: string, durationMs?: number) {

@@ -1,5 +1,15 @@
 import type { ConfirmDialogOptions } from '@/components/ui/confirm-dialog';
+import { AI_MAX_TIMEOUT_MS, aiTimeoutDurationSchema } from '@thesis-ledger/schemas';
 import { newProviderDraft } from './providers.types.js';
+import {
+  modelDefaultsFromDraft,
+  requestOptionsDraftFromRecord,
+} from './ai-provider-request-options.js';
+import {
+  modelCatalogConfigFromDraft,
+  modelCatalogDraftFromConfig,
+  modelCatalogInputError,
+} from './ai-provider-model-catalog.js';
 
 import type {
   AiProviderExecutionRouteConfig,
@@ -21,17 +31,20 @@ import type {
   AiGenerationMode,
   AiProviderTestKind,
   AiUpstreamFormat,
+  AiProviderModelCatalogConfig,
+  AiProviderModelDefaultConfig,
 } from '@thesis-ledger/schemas';
 
 export type AiProviderInput = {
   name: string;
   baseUrl: string;
   models: string[];
+  modelCatalog?: AiProviderModelCatalogConfig | null;
   authMode: AiAuthMode;
   upstreamFormat: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   executionRoutes?: AiProviderExecutionRouteConfig[];
-  modelDefaults?: Record<string, { mode: AiGenerationMode; outputPolicy?: 'auto' | 'manual' }>;
+  modelDefaults?: Record<string, AiProviderModelDefaultConfig>;
   modelPricing?: Record<
     string,
     {
@@ -220,14 +233,10 @@ export const aiProviderInputFromDraft = (
   const costPer1kOutput = optionalNumber(draft.costPer1kOutput);
   const costCurrency = draft.costCurrency.trim();
   const models = modelsFromText(draft.modelsText);
+  const modelCatalog = modelCatalogConfigFromDraft(draft.modelCatalog);
   const modelReasoning = selectedModelReasoning(models, draft.modelReasoning);
   const executionRoutes = draft.executionRoutes.map(aiProviderExecutionRouteInputFromDraft);
-  const modelDefaults = Object.fromEntries(
-    models.flatMap((model) => {
-      const defaults = draft.modelDefaults[model];
-      return defaults ? [[model, { ...defaults }] as const] : [];
-    }),
-  );
+  const modelDefaults = modelDefaultsFromDraft(draft, models);
   const expectedRevision = draft.updatedAt.trim();
   const modelPricing = Object.fromEntries(
     models.flatMap((model) => {
@@ -258,6 +267,7 @@ export const aiProviderInputFromDraft = (
     name: draft.name.trim(),
     baseUrl: draft.baseUrl.trim(),
     models,
+    ...(modelCatalog === undefined ? {} : { modelCatalog }),
     authMode: draft.authMode,
     enabled: draft.enabled,
     priority: Number(draft.priority),
@@ -335,6 +345,9 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
   baseUrl: provider.baseUrl ?? '',
   authMode: provider.authMode ?? 'api_key',
   modelsText: (provider.models ?? []).join('\n'),
+  modelCatalog: provider.modelCatalog
+    ? modelCatalogDraftFromConfig(provider.modelCatalog)
+    : undefined,
   modelReasoning: selectedModelReasoning(provider.models ?? [], provider.modelReasoning ?? {}),
   upstreamFormat: provider.upstreamFormat ?? 'chat-completions',
   chatImplementation:
@@ -345,6 +358,7 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
     aiProviderExecutionRouteDraftFromConfig,
   ),
   modelDefaults: provider.modelDefaults ?? {},
+  modelRequestOptionsText: requestOptionsDraftFromRecord(provider),
   modelPricing: Object.fromEntries(
     (provider.models ?? []).flatMap((model) => {
       const pricing = modelPricingDraftFromRecord(provider, model);
@@ -378,6 +392,8 @@ export const providerDraftFromRecord = (provider: ProviderRecord): ProviderDraft
 export const aiProviderDraftError = (input: AiProviderInput) => {
   if (!input.name) return '请填写 Provider 名称。';
   if (!input.baseUrl) return '请填写 API Base URL。';
+  const catalogError = modelCatalogInputError(input);
+  if (catalogError) return catalogError;
   if (input.models.length === 0) return '请至少填写一个模型。';
   if (new Set(input.models).size !== input.models.length) return '模型不得重复。';
   if (input.capabilities.length === 0) return '请至少选择一项能力。';
@@ -390,39 +406,28 @@ export const aiProviderDraftError = (input: AiProviderInput) => {
     routeKeys.add(routeKey);
     if (
       route.firstOutputTimeoutMs !== undefined &&
-      (!Number.isInteger(route.firstOutputTimeoutMs) ||
-        route.firstOutputTimeoutMs <= 0 ||
-        route.firstOutputTimeoutMs > 120_000)
+      !aiTimeoutDurationSchema.safeParse(route.firstOutputTimeoutMs).success
     )
-      return '首输出超时必须是 1 到 120000 毫秒的整数。';
+      return `首输出超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
     if (
       route.outputIdleTimeoutMs !== undefined &&
-      (!Number.isInteger(route.outputIdleTimeoutMs) ||
-        route.outputIdleTimeoutMs <= 0 ||
-        route.outputIdleTimeoutMs > 120_000)
+      !aiTimeoutDurationSchema.safeParse(route.outputIdleTimeoutMs).success
     )
-      return '输出空闲超时必须是 1 到 120000 毫秒的整数。';
+      return `输出空闲超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
   }
   if (!Number.isInteger(input.priority) || input.priority < 0) return '优先级必须是非负整数。';
-  if (
-    input.timeoutMs !== undefined &&
-    (!Number.isInteger(input.timeoutMs) || input.timeoutMs <= 0 || input.timeoutMs > 120_000)
-  )
-    return '超时必须是 1 到 120000 毫秒的整数。';
+  if (input.timeoutMs !== undefined && !aiTimeoutDurationSchema.safeParse(input.timeoutMs).success)
+    return `完成等待必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
   if (
     input.firstOutputTimeoutMs !== undefined &&
-    (!Number.isInteger(input.firstOutputTimeoutMs) ||
-      input.firstOutputTimeoutMs <= 0 ||
-      input.firstOutputTimeoutMs > 120_000)
+    !aiTimeoutDurationSchema.safeParse(input.firstOutputTimeoutMs).success
   )
-    return '首输出默认超时必须是 1 到 120000 毫秒的整数。';
+    return `首输出默认超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
   if (
     input.outputIdleTimeoutMs !== undefined &&
-    (!Number.isInteger(input.outputIdleTimeoutMs) ||
-      input.outputIdleTimeoutMs <= 0 ||
-      input.outputIdleTimeoutMs > 120_000)
+    !aiTimeoutDurationSchema.safeParse(input.outputIdleTimeoutMs).success
   )
-    return '输出空闲默认超时必须是 1 到 120000 毫秒的整数。';
+    return `输出空闲默认超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
   if (input.costPer1kInput !== undefined && input.costPer1kInput < 0) return '输入费用不能为负数。';
   if (input.costPer1kOutput !== undefined && input.costPer1kOutput < 0)
     return '输出费用不能为负数。';

@@ -1,5 +1,6 @@
 import { createServer, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   aiGenerationContracts,
   type AiExecutionSummary,
@@ -8,6 +9,8 @@ import {
 import { vi } from 'vitest';
 import { AiResearchSdkExecution } from '../../src/ai/ai-research-sdk-execution.js';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
+import { createAiTimeoutPolicy } from '../../src/ai/timeout/ai-timeout-policy.js';
+import { researchExecutionDeadline } from '../../src/ai/timeout/ai-execution-clock.js';
 
 export const policy: AiResearchPolicyV1 = {
   version: 'research-policy-v1' as const,
@@ -28,6 +31,19 @@ export const summary = (
   contract: aiGenerationContracts.research.ref,
   frozenPolicy,
   deadlineAt,
+  // 本地HTTP时序按毫秒缩尺；生产初值另由策略合同测试验证。
+  timing: {
+    policy: {
+      ...createAiTimeoutPolicy('research', frozenPolicy.maxDurationSeconds * 1_000),
+      cleanupReserveMs: 10,
+      firstOutputTimeoutMs: 300,
+      outputIdleTimeoutMs: 900,
+    },
+    queueExpiresAt: deadlineAt,
+    firstStartedAt: null,
+    taskDeadlineAt: deadlineAt,
+    origin: 'legacy_deadline',
+  },
   generationStatus: 'pending',
   usageCompleteness: 'unknown',
   requests: [],
@@ -154,8 +170,30 @@ const stateStore = (initial: AiExecutionSummary) => {
     execution = { ...execution, generationStatus: 'unknown' };
     return true;
   });
+  const recordTimeoutDecision = vi.fn(
+    async (
+      _owner: unknown,
+      requestId: string,
+      decision: AiExecutionSummary['requests'][number]['timeoutDecision'],
+    ) => {
+      execution = {
+        ...execution,
+        requests: execution.requests.map((request) =>
+          request.requestId === requestId ? { ...request, timeoutDecision: decision! } : request,
+        ),
+      };
+      return researchExecutionDeadline(execution) > Date.now();
+    },
+  );
   return {
-    store: { prepareRequest, authorizeDispatch, completeAndSettle, markUnknown, failOwned },
+    store: {
+      prepareRequest,
+      authorizeDispatch,
+      recordTimeoutDecision,
+      completeAndSettle,
+      markUnknown,
+      failOwned,
+    },
     execution: () => execution,
     failOwned,
     markUnknown,
@@ -342,9 +380,19 @@ export class ResearchSdkHttpFixture {
       currentPricing?: { costPer1kInput: number; costPer1kOutput: number; costCurrency: string };
       frozenPricing?: Record<string, number | string>;
       timeouts?: RouteTimeouts;
+      adapter?: AiSdkGenerationAdapter;
+      authorizeDelayMs?: number;
     } = {},
   ) => {
     const state = stateStore(execution);
+    if (options.authorizeDelayMs) {
+      const authorize = state.store.authorizeDispatch.getMockImplementation()!;
+      state.store.authorizeDispatch.mockImplementation(async (...args) => {
+        await delay(options.authorizeDelayMs);
+        if (Date.now() >= researchExecutionDeadline(state.execution())) return false;
+        return authorize(...args);
+      });
+    }
     const registry = {
       defaultModel: () => 'fixture-model',
       readyContractCandidates: () => [
@@ -354,7 +402,7 @@ export class ResearchSdkHttpFixture {
     };
     const service = new AiResearchSdkExecution(
       registry as never,
-      new AiSdkGenerationAdapter(),
+      options.adapter ?? new AiSdkGenerationAdapter(),
       state.store as never,
     );
     await service.execute({

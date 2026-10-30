@@ -16,6 +16,11 @@ export const withAiProviderModels = (
   return {
     ...draft,
     modelsText,
+    modelRequestOptionsText: Object.fromEntries(
+      Object.entries(draft.modelRequestOptionsText ?? {}).filter(([model]) =>
+        selectedModelSet.has(model),
+      ),
+    ),
     executionRoutes: draft.executionRoutes.filter((route) => selectedModelSet.has(route.model)),
     modelDefaults: Object.fromEntries(
       Object.entries(draft.modelDefaults).filter(([model]) => selectedModelSet.has(model)),

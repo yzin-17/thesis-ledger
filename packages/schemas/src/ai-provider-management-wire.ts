@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { omitUndefinedDeep } from './exact-optional.js';
+import { aiProviderModelCatalogConfigSchema } from './ai-provider-model-catalog.js';
 import {
   aiAuthModeSchema,
   aiProviderTestKindSchema,
@@ -38,6 +39,7 @@ export const aiProviderRecordSchema = z
     credentialConfigured: z.boolean().optional(),
     baseUrl: z.string().nullable().optional(),
     models: z.array(z.string()).optional(),
+    modelCatalog: aiProviderModelCatalogConfigSchema.optional(),
     authMode: aiAuthModeSchema.optional(),
     upstreamFormat: aiUpstreamFormatSchema.optional(),
     chatImplementation: aiChatImplementationSchema.optional(),

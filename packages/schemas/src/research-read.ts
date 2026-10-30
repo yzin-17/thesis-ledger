@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { aiRunStatusSchema } from './ai.js';
+import { aiRunStatusSchema, aiToolCallsPageSchema } from './ai.js';
 import { researchResultSchema } from './research.js';
 import { researchResultV2Schema } from './research-result-v2.js';
 import { researchObservationCutoffInputSchema } from './research-observation.js';
@@ -67,6 +67,13 @@ const paging = {
 export const researchReportListQuerySchema = z
   .discriminatedUnion('view', [scoped.extend(paging), legacy.extend(paging)])
   .superRefine(checkSelection);
+const toolPaging = { limit: paging.limit, cursor: paging.cursor };
+export const researchReportToolsQuerySchema = z
+  .discriminatedUnion('view', [scoped.extend(toolPaging), legacy.extend(toolPaging)])
+  .superRefine(checkSelection);
+export const researchReportToolsPageSchema = aiToolCallsPageSchema
+  .extend({ runId: researchReportIdSchema })
+  .refine((value) => value.hasMore === (value.nextCursor !== null), '工具分页状态不一致');
 export const researchReportComparisonQuerySchema = z
   .discriminatedUnion('view', [
     scoped.extend({ beforeId: researchReportIdSchema.optional() }),
@@ -83,6 +90,8 @@ export type ResearchReportLocator = z.infer<typeof researchReportLocatorSchema>;
 export type ResearchReportListQuery = z.infer<typeof researchReportListQuerySchema>;
 export type ResearchReportLocatorInput = z.input<typeof researchReportLocatorSchema>;
 export type ResearchReportListInput = z.input<typeof researchReportListQuerySchema>;
+export type ResearchReportToolsQuery = z.infer<typeof researchReportToolsQuerySchema>;
+export type ResearchReportToolsInput = z.input<typeof researchReportToolsQuerySchema>;
 export type ResearchReportComparisonQuery = z.infer<typeof researchReportComparisonQuerySchema>;
 export type ResearchReportComparisonInput = z.input<typeof researchReportComparisonQuerySchema>;
 export type ResearchObservationReadInput = z.input<typeof researchObservationReadQuerySchema>;

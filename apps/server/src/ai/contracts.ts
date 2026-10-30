@@ -3,6 +3,7 @@ import type {
   AiAuthMode,
   AiProviderCapabilityRevocation,
   AiProviderModelPricingView,
+  AiProviderModelDefaultConfig,
   AiProviderExecutionRouteInput,
 } from './ai-provider.contracts.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
@@ -45,6 +46,7 @@ export interface AiProviderMetadata {
   costCurrency?: string;
   pricingVersion?: string;
   modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
+  modelDefaults?: Readonly<Record<string, AiProviderModelDefaultConfig>>;
   modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
   upstreamFormat?: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
@@ -59,6 +61,7 @@ export interface AiTool {
   readonly name: string;
   readonly permission: ToolPermission;
   readonly description?: string;
+  readonly timeoutMs?: number;
   execute(input: unknown, signal: AbortSignal): Promise<unknown>;
 }
 

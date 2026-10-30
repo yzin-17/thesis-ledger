@@ -50,7 +50,7 @@ function fixture(firstOnly = false) {
     contexts,
     messages,
     generate,
-    binding: { baseURL: 'http://127.0.0.1:1/v1', generate },
+    binding: { baseURL: 'http://127.0.0.1:1/v1', generate, cleanupReserveMs: 0 as const },
   };
 }
 it('两个固定模式均运行单链与三阶段，冻结输入、资金假设及模型一致，生产调用上限不变', async () => {

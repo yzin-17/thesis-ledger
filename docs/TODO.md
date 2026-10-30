@@ -13,6 +13,7 @@
 
 | ID | 延期范围 | 来源 | 重新立项前置条件 / 触发条件 |
 | --- | --- | --- | --- |
+| <a id="longbridge-oauth-live-acceptance"></a>`longbridge-oauth-live-acceptance` | Longbridge 真实账号授权、行情权限与令牌刷新恢复，以及 Android/iPhone Air 的真实 OAuth 闭环验收 | [来源凭据 Spec](specs/2026-09-14-market-provider-credentials.md) AC6/AC7、[原 T5b-LB](tasks/2026-09-14-market-provider-credentials.md#t5b-lb)、[手机迁移范围](specs/2026-10-22-web-mobile-feature-parity.md#longbridge-oauth-followup)及[原 M29b](tasks/2026-10-22-web-mobile-feature-parity.md#m29b) | 用户明确恢复后单独立项；准备有效 OAuth 配置、获准测试账号/权限、可达回调及凭据安全写入范围。按 2026-10-26 用户确认延期，当前迁移剩余清单和 G5/G6/G7 均不依赖此项；该项尚未通过验收 |
 | `astock-research-consensus` | 研报一致预期与 EPS 的独立数据合同；最小列表、稳定引用、历史及日期可选的[长期按需读取](archive/tasks/2026-10-23-research-report-on-demand.md)已完成归档 | [模块盘点](reviews/2026-10-22-astock-data-module-followups.md) | 真实消费目标、预测期间、币种/单位、来源使用范围及历史可见性明确后单独立项，不并入已验收的最小元数据合同 |
 | `astock-financial-index-reference` | P2：新浪三表、估值历史、申万行业变更及中证/国证成分权重，分能力实施 | [模块盘点](reviews/2026-10-22-astock-data-module-followups.md) | 真实消费者、会计单位、报告期与披露/生效时间明确；复用旧解析，禁止当前成分或数据期反填历史可见性 |
 | `astock-macro-rates-calendar` | P2：官方宏观、收益率/FR/FDR/LPR 与宏观日历 | [模块盘点](reviews/2026-10-22-astock-data-module-followups.md) | 选定首个指标及消费者，核实发布时区、频率、修订和请求预算后独立立项 |

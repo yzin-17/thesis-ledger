@@ -8,11 +8,13 @@ import {
   type ResearchGenerationV2,
   type AiProviderModelExecution,
   type AiAuthMode,
+  type AiModelRequestOptions,
 } from '@thesis-ledger/schemas';
 import type { AiExecutionOwnership } from './ai-execution-state.store.js';
 import type { AiSdkGenerationResult, AiSdkGenerationRequest } from './ai-sdk-generation.adapter.js';
 import { verifyAiFrozenResearchV2 } from './ai-research-frozen-integrity-v2.js';
 import { researchReasoningFields } from './ai-research-reasoning-options.js';
+import { aiRequestOptionsFields } from './ai-model-request-options.js';
 
 type CommonInput = {
   ownership: AiExecutionOwnership;
@@ -40,12 +42,18 @@ export function researchSdkAdapterRequest(input: {
   model: string;
   runtime: { baseURL: string; apiKey: string; authMode?: AiAuthMode | undefined };
   route: AiProviderModelExecution;
-  frozen: { reasoningEnabled?: boolean | undefined } | undefined;
+  frozen:
+    | {
+        reasoningEnabled?: boolean | undefined;
+        requestOptions?: AiModelRequestOptions;
+      }
+    | undefined;
   contract: ReturnType<typeof researchSdkProtocol>['contract'];
   messages: unknown[];
   signal: AbortSignal;
   remainingMs: number;
   outputTokens: number;
+  executionIdentity?: AiExecutionOwnership;
 }): AiSdkGenerationRequest<ResearchSdkOutput> {
   return {
     requestId: input.requestId,
@@ -63,8 +71,11 @@ export function researchSdkAdapterRequest(input: {
     schema: input.contract.schema,
     mode: input.route.mode,
     ...researchReasoningFields(input.frozen),
+    ...aiRequestOptionsFields(input.frozen),
     transport: 'stream',
-    maxOutputTokens: input.outputTokens,
+    ...(input.frozen?.requestOptions?.outputTokenLimit === 'upstream'
+      ? {}
+      : { maxOutputTokens: input.outputTokens }),
     timeout: {
       totalMs: input.remainingMs,
       ...(input.route.firstOutputTimeoutMs === undefined
@@ -75,6 +86,7 @@ export function researchSdkAdapterRequest(input: {
         : { chunkMs: input.route.outputIdleTimeoutMs }),
     },
     signal: input.signal,
+    ...(input.executionIdentity ? { executionIdentity: input.executionIdentity } : {}),
   };
 }
 

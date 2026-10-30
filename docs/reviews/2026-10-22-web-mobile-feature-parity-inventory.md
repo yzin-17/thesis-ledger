@@ -15,9 +15,18 @@
 
 2026-10-25 工具准备增量见[当次记录](../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)及[工具说明](../guides/2026-10-25-mobile-release-preparation.md)。新增配置模板、签名/产物校验、本机接续与无上传工作流；Android Gradle、iOS Info.plist 与 Xcode 工程三份原生输入已变化，Android Debug/未签名 Release、iOS Simulator Debug/iPhoneOS 未签名 archive 分别通过。旧 64 输入一致性及 `e8a258d6` CI 保留为该增量之前的事实，不能替代当前源码的远端 CI。本机准备叶 G6RA/G6RI/G6RC 通过；当前验收按[范围调整](../tasks/evidence/web-mobile-parity/2026-10-25-acceptance-scope.md)维护原生编译、双端模拟器、当前源码 CI 和业务实源，状态以配套 Task 为准。
 
+
+2026-10-30 接续：H01 原有报告/引用/工具审计义务补齐 C07T/M20T 的所属范围审计接口与全部冻结材料入口；35 项/193 个业务子动作的范围不变。D59 真实报告的 Android 消费 G5RPA 已通过；iPhone Air 等待兼容 Runtime，新源码远端 CI 及其他实源门禁继续由原 Task 持有。新边界和当前证据见[本轮接续](../tasks/evidence/web-mobile-parity/2026-10-30-resume.md)，不将 2026-10-26 的“手机源码未变”外推到此次增量。
+
 ## 核心结论
 
-剩余门禁的最新只读清点与接续步骤见[2026-10-25 核对](../tasks/evidence/web-mobile-parity/2026-10-25-remaining-gates.md)。本轮没有手机业务源码变化；历史矩阵与当前验收缺口继续分别解释，不由文档准备勾选 M29b/G5、完整 G6 或 G7。
+2026-10-26 接续已完成停用测试任务的一次真实手动执行和双端历史消费、两端 1000 条受控分页/离页取消及三轮图表卸载，139 个动作映射输入无变化。4407 文件及一处 Web 测试兼容修复已授权运行隔离 CI；提交 `feea66c1` 的 quality、contracts、Android/iOS Native 四项主 CI 及默认工具检查全部成功，桌面打包跳过、无 artifact。当前结果与剩余条件见[接续记录](../tasks/evidence/web-mobile-parity/2026-10-26-continuation.md)；[2026-10-25 核对](../tasks/evidence/web-mobile-parity/2026-10-25-remaining-gates.md)保留历史含义。手机业务源码未改变，M29b/G5、完整 G6/G7 的实源依赖仍未通过。
+
+同日[剩余项逐项核对](../tasks/evidence/web-mobile-parity/2026-10-26-remaining-gates.md)再次读取真实依赖状态，双端对目录第 18 代/35459 标的的读取、重读及原 API/模式保持通过，G5CA/G5CI 独立核销。现有 scheduled 成功只读核对后确认早于当前容器启动，通知可投递路由为 0；没有把旧调度、ready 目录或配置验证证明扩展为当前实源整批通过。当前下一步和所需条件按 G5 子项及完整 G6/G7 分别列明，父门禁保持未勾选。
+
+随后获准的[单次 Scheduler 验收](../tasks/evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)已取得新运行态事实：唯一新任务自然调度一次、领取一次并成功后停用，Android 与用户指定的 iPhone Air 独立消费通过；原六任务配置摘要保持，无模型/行情调用或本任务通知。G5SA/G5SI 已核销，此前样本不足的判断保留历史含义；其他实源及完整父门禁继续未通过。
+
+2026-10-26 用户明确将 Longbridge 真实授权、回调及行情/刷新后续范围交由 [TODO](../TODO.md#longbridge-oauth-live-acceptance)承接，不列入当前剩余清单或 G5/G6/G7 依赖。此前按日期记录的未验事实保留历史含义，通用 OAuth 已交付能力和受控验收不变。
 
 实施前 Web 有 9 个一级业务入口；手机端只有投资组合、风险事件、账户三个简化入口。该基线手机端能读取组合估值和持仓卡片、读取风险事件、切换实际/模拟范围、切换主题与涨跌配色，并列出账户及永久删除满足服务端条件的空账户。
 
@@ -113,7 +122,7 @@ Web 与 Electron 共用 `apps/desktop`；本次用户已明确选择 Android / i
 | S04 优化实验 | `features/optimization-setup`、`optimization-results`、`optimization-adoption` | `strategy-optimization-client.ts` | C09a、M26a/M26b/M26c，分平台 G4 |
 | R03 策略风险应用 | `features/strategy-risk` | `strategy-risk-client.ts` | C09b、M27，分平台 G4；DELETE 沿现行合同为软归档 |
 | D01 AI 配置、模型与用途 | `features/ai-providers` | `ai-provider-client.ts` | C10a/C10b、M28a/M28b/M28c，分平台 G5 |
-| D02 行情账号与 OAuth | `features/market-providers`、`features/provider-oauth` | `market-provider-control-client.ts`、`provider-oauth-client.ts` | C11a/C11b、M29a/M29b；真实授权/回调仍未完成 |
+| D02 行情账号与 OAuth | `features/market-providers`、`features/provider-oauth` | `market-provider-control-client.ts`、`provider-oauth-client.ts` | C11a/C11b、M29a；已交付通用 OAuth 适配与受控状态消费，延期范围由 TODO 承接 |
 | D03 行情路由与目录 | `features/market-policy`、`features/market-catalog` | `market-policy-client.ts`、`market-catalog-client.ts` | C11c/C11d、M30a/M30b，分平台 G5 |
 | D06 自动化管理与历史 | `features/automation` | `automation-client.ts` | C12a、M31；真实调度/外发由原执行任务持有 |
 | D07 来源、质量与通知诊断 | `features/diagnostics` | `diagnostics-client.ts` | C12b、M32；查询失败不触发重发 |

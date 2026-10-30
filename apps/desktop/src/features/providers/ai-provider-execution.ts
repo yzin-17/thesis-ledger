@@ -3,6 +3,7 @@ import {
   AI_RESEARCH_GENERATION_CONTRACT_VERSION,
   AI_STRATEGY_DISCOVERY_CONTRACT_VERSION,
   aiGenerationContracts,
+  aiGenerationContractRefSchema,
   type AiGenerationContractRef,
   type AiProviderModelExecution,
 } from '@thesis-ledger/schemas';
@@ -73,6 +74,7 @@ export const aiProviderExecutionRouteDraftFromConfig = (
   enabled: route.enabled !== false,
   modeOverridden: route.modeOverridden ?? true,
   contractId: route.contract.id,
+  contractVersion: route.contract.version,
   firstOutputTimeoutMs: route.firstOutputTimeoutMs?.toString() ?? '',
   outputIdleTimeoutMs: route.outputIdleTimeoutMs?.toString() ?? '',
 });
@@ -88,7 +90,13 @@ export const aiProviderExecutionRouteInputFromDraft = (
     outputPolicy: draft.outputPolicy ?? 'manual',
     ...(draft.enabled ? {} : { enabled: false }),
     modeOverridden: draft.modeOverridden,
-    contract: contractRefs[draft.contractId],
+    contract:
+      draft.contractVersion === undefined
+        ? contractRefs[draft.contractId]
+        : aiGenerationContractRefSchema.parse({
+            id: draft.contractId,
+            version: draft.contractVersion,
+          }),
     ...(firstOutputTimeoutMs === undefined ? {} : { firstOutputTimeoutMs }),
     ...(outputIdleTimeoutMs === undefined ? {} : { outputIdleTimeoutMs }),
   };

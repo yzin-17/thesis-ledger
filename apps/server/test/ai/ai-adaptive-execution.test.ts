@@ -59,7 +59,25 @@ describe('自适应执行反馈', () => {
       }),
     };
     await expect(
-      new AiAdaptiveExecution().generate(adapter as never, request(), sources, Date.now() + 30),
+      new AiAdaptiveExecution().generate(
+        adapter as never,
+        request(),
+        {
+          ...sources,
+          executionPolicy: {
+            version: 'ai-timeout-v2',
+            profile: 'research',
+            taskBudgetMs: 600000,
+            cleanupReserveMs: 0,
+            connectionTimeoutMs: 15000,
+            connectionCapability: 'unavailable',
+            firstOutputTimeoutMs: 120000,
+            outputIdleTimeoutMs: 60000,
+            toolTimeoutMs: 20000,
+          },
+        },
+        Date.now() + 30,
+      ),
     ).rejects.toThrow();
     expect(adapter.generate).toHaveBeenCalledOnce();
     expect(adapter.generate.mock.calls[0]![0].signal.aborted).toBe(true);
@@ -79,8 +97,8 @@ describe('自适应执行反馈', () => {
       schema: input.schema,
       contract: input.contract,
     });
-    expect(sent.timeout.firstChunkMs).toBeGreaterThan(120_000);
-    expect(sent.adaptiveExecution.first.source).toBe('cold_start');
+    expect(sent.timeout.firstChunkMs).toBe(120_000);
+    expect(sent.adaptiveExecution.applied).toBe(false);
     expect((await store.read(adaptiveProfile(input, 'fp'))).observations[0]).toMatchObject({
       firstMs: 45_000,
       firstCensored: false,
@@ -183,7 +201,7 @@ describe('自适应执行反馈', () => {
         adapter as never,
         input,
         sources,
-        Date.now() + 1000,
+        Date.now() + 10000,
         async () => false,
       ),
     ).toBeNull();
@@ -206,7 +224,7 @@ describe('自适应执行反馈', () => {
     expect(
       await service.generate(adapter as never, request(), sources, Date.now() + 300_000),
     ).toEqual(result);
-    expect(adapter.generate.mock.calls[0]![0].adaptiveExecution.first.source).toBe('unavailable');
+    expect(adapter.generate.mock.calls[0]![0].adaptiveExecution.first.available).toBe(false);
   });
 });
 

@@ -1,10 +1,14 @@
 import type { ProviderConfig } from '@prisma/client';
+import { invalidStoredModelRequestOptions } from './ai-model-request-options.js';
 import {
   aiLegacyAdapterSchema,
+  aiProviderModelCatalogConfigSchema,
+  aiProviderModelCatalogOriginAllowed,
   aiUpstreamSelectionSchema,
   type AiAdapter,
   type AiChatImplementation,
   type AiUpstreamFormat,
+  type AiProviderModelCatalogConfig,
 } from '@thesis-ledger/schemas';
 import {
   AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
@@ -35,6 +39,7 @@ import type { AiAuthMode } from '@thesis-ledger/schemas';
 export interface ParsedAiProviderSettings {
   baseUrl: string;
   models: string[];
+  modelCatalog?: AiProviderModelCatalogConfig;
   authMode: AiAuthMode;
   upstreamFormat: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
@@ -60,8 +65,15 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   const baseUrl = record.baseUrl;
   const models = stringArray(record.models);
   if (typeof baseUrl !== 'string' || !httpUrl.safeParse(baseUrl).success || !models) return null;
+  if (invalidStoredModelRequestOptions(record.modelDefaults, models)) return null;
   const authMode = aiAuthModeSchema.safeParse(record.authMode ?? 'api_key');
   if (!authMode.success) return null;
+  const modelCatalog = aiProviderModelCatalogConfigSchema.nullish().safeParse(record.modelCatalog);
+  if (
+    !modelCatalog.success ||
+    !aiProviderModelCatalogOriginAllowed(baseUrl, modelCatalog.data, authMode.data)
+  )
+    return null;
   const modelReasoning = parseModelReasoning(record.modelReasoning, models);
   const modelPricing = parseAiProviderModelPricing(record.modelPricing, models);
   const legacyAdapter = aiLegacyAdapterSchema.safeParse(record.adapter);
@@ -99,6 +111,7 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   return {
     baseUrl,
     models,
+    ...(modelCatalog.data ? { modelCatalog: modelCatalog.data } : {}),
     authMode: authMode.data,
     upstreamFormat: selection.upstreamFormat,
     ...(selection.upstreamFormat === 'chat-completions'
@@ -204,6 +217,7 @@ const settingsSummary = (settings: ParsedAiProviderSettings | null) => {
   const modelPricing = settings?.modelPricing;
   return {
     authMode: settings?.authMode ?? 'api_key',
+    ...(settings?.modelCatalog ? { modelCatalog: settings.modelCatalog } : {}),
     ...(settings?.upstreamFormat === undefined ? {} : { upstreamFormat: settings.upstreamFormat }),
     ...(settings?.chatImplementation === undefined
       ? {}

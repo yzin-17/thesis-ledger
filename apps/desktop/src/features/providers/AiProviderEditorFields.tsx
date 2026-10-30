@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { AiProviderTimeoutFields } from './AiProviderTimeoutFields.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -33,6 +34,7 @@ import { withAiProviderModels } from './ai-provider-model-selection.js';
 import { AiProviderExecutionFields } from './AiProviderExecutionFields.js';
 import { AiProviderModelPricingFields } from './AiProviderModelPricingFields.js';
 import { AiProviderUpstreamFields } from './AiProviderUpstreamFields.js';
+import { AiProviderModelCatalogFields } from './AiProviderModelCatalogFields.js';
 import type {
   AiAuthMode,
   AiProviderModelDetail,
@@ -134,6 +136,7 @@ export function AiProviderEditorFields({
               required
             />
           </Field>
+          <AiProviderModelCatalogFields draft={draft} onUpdateDraft={onUpdateDraft} />
         </>
       )}
       {showModel && (
@@ -335,61 +338,7 @@ export function AiProviderEditorFields({
               </Button>
             </Field>
           )}
-          <Field>
-            <FieldLabel htmlFor="ai-timeout">超时（毫秒）</FieldLabel>
-            <Input
-              id="ai-timeout"
-              aria-label="超时（毫秒）"
-              type="number"
-              min={1}
-              max={120000}
-              step={1}
-              value={draft.timeoutMs}
-              onChange={(event) =>
-                onUpdateDraft((current) => ({ ...current, timeoutMs: event.target.value }))
-              }
-            />
-          </Field>
-          <FieldGroup className="sm:grid sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="ai-first-output-timeout">首输出等待默认（毫秒）</FieldLabel>
-              <Input
-                id="ai-first-output-timeout"
-                aria-label="首输出等待默认（毫秒）"
-                type="number"
-                min={1}
-                max={120000}
-                step={1}
-                value={draft.firstOutputTimeoutMs}
-                onChange={(event) =>
-                  onUpdateDraft((current) => ({
-                    ...current,
-                    firstOutputTimeoutMs: event.target.value,
-                  }))
-                }
-              />
-              <FieldDescription>用途未覆盖时生效；清空表示使用系统默认。</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="ai-output-idle-timeout">输出空闲等待默认（毫秒）</FieldLabel>
-              <Input
-                id="ai-output-idle-timeout"
-                aria-label="输出空闲等待默认（毫秒）"
-                type="number"
-                min={1}
-                max={120000}
-                step={1}
-                value={draft.outputIdleTimeoutMs}
-                onChange={(event) =>
-                  onUpdateDraft((current) => ({
-                    ...current,
-                    outputIdleTimeoutMs: event.target.value,
-                  }))
-                }
-              />
-              <FieldDescription>用途未覆盖时生效；清空表示使用系统默认。</FieldDescription>
-            </Field>
-          </FieldGroup>
+          <AiProviderTimeoutFields draft={draft} onUpdateDraft={onUpdateDraft} />
         </>
       )}
     </FieldGroup>

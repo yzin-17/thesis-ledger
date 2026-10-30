@@ -16,6 +16,7 @@ import {
   researchScopeSnapshotV2Schema,
   researchReportMatchesLocator,
   researchReportComparisonQuerySchema,
+  researchReportToolsQuerySchema,
   researchComparisonIdentity,
   type ResearchReportLocator,
   type ResearchReportDetail,
@@ -24,6 +25,7 @@ import { researchReportIdSchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import type { AiResearchSubmissionV2Access } from './ai-research-submission-v2.store.js';
 import { researchReportWhere } from './ai-research-report-where.js';
+import { readResearchReportTools } from './ai-research-report-tools.js';
 import {
   decodeResearchReportCursor,
   encodeResearchReportCursor,
@@ -276,6 +278,17 @@ export class AiResearchReportsQuery {
     const locator = researchReportLocatorSchema.parse(raw);
     return this.prisma.$transaction(
       async (transaction) => (await this.read(transaction, ownerId, id, locator, access)).detail,
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+  tools(ownerId: string, rawId: unknown, raw: unknown, access: AiResearchReportAccess) {
+    const id = researchReportIdSchema.parse(rawId);
+    const query = researchReportToolsQuerySchema.parse(raw);
+    return this.prisma.$transaction(
+      async (transaction) => {
+        await this.read(transaction, ownerId, id, query, access);
+        return readResearchReportTools(transaction, ownerId, id, query);
+      },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }

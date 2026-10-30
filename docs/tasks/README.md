@@ -1,5 +1,7 @@
 # 当前实施任务
 
+> 2026-10-30 D60：研究P1／G3及当前超时治理阶段通过。研究Task转入既有P2及条件性P3；超时治理[已归档](../archive/tasks/2026-10-25-ai-adaptive-execution.md)，稳定Spec保留。V2开启、默认OpenRouter/free；新闻准入已到期，未自动续验。见[收口回执](evidence/2026-10-30-g3-frontend-closeout.md)。
+
 当前任务按下列唯一正文入口维护；已完成的 P0、账户与持仓录入、组合快照、AI 统一页面配置、DSA 纯数据服务、免费新闻 DG3、AKShare/HiThink/Yahoo 新闻、财联社/华尔街见闻快讯、研报元数据及长期按需读取任务已归档。DSA 与 infra 的活动任务从下方跨仓入口接续，进度仍由各仓原 Task 维护。此页只维护处理顺序、阅读入口与接续条件，不复制 checkbox、完成比例或运行日志。
 
 <a id="priority-policy"></a>
@@ -40,7 +42,6 @@ IR01 已由原快照修复及证据承接，不重开；IR07 是批次费用模�
 | 任务入口                                                                                   | 本阶段范围                                                           | 下一步与边界                                                                                                                                                                 |
 | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [DSA 纯数据服务](../../../daily-stock-analysis/docs/archive/tasks/2026-10-18-data-only-service.md) | 独立配置/FX/存储、新闻、数据剥离与受保护交付 | DG1、DG2a/b/c 及 DG3 已通过；新增财联社全市场电报/见闻 A 股频道的 DSA、Docker、Market/Web 与保全通过，见[最新复核](../reviews/2026-10-22-market-flash-news-dg3-final-review.md)及[已完成任务](../archive/tasks/2026-10-22-market-flash-news-dg3.md)。原四家个股/发行方新闻证据复用。市场快讯不伪造证券关联，研究 G3 原前置保持；a-stock-data 其他模块见 [后续范围](../TODO.md)。 |
-| [数据供给与研究增强](2026-10-18-research-evidence-evolution.md) | T0/T3/T4 基础；T1/T2/T5～T9、G1～G3 最小链与发布 | D21a本地实现及独立检查完成，嵌套断言复杂度27恢复基线26，存量告警保留；AI33／420项证据复用、76项DB集成跳过。D21b全仓边界沿用移动端夹具3条非法引用失败，须原任务修复后复验，不豁免。不部署／新增调用，V2未改、余8次冻结，G3未过。[当前证据](evidence/2026-10-25-g3-http-response-local.md)。 |
 
 D0/T0 的只读盘点可与 P0 准备并行，产出准确写集后再安排实现。P1-a/b/c 是增强主题内部的工作分组，不改变下列已有核心验收的优先级，也不替代任何叶的真实依赖。
 
@@ -49,11 +50,11 @@ D0/T0 的只读盘点可与 P0 准备并行，产出准确写集后再安排实�
 | 唯一任务入口                                                               | 仍需处理的范围                                   | 接续状态与下一步                                                                                                                                                                                                                    |
 | -------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [统一数据能力适配层](2026-10-09-unified-data-capability-adapter.md)        | TAP1～4 完成；RQData 延期 TODO   | 账号等级、范围内检查、本地记录与功能筛选、正式 update.sh all 和目标 API/页面/进程恢复、原数据留存全部通过，见 [TAP 证据](evidence/2026-10-21-provider-account-level.md)。10-22现有Key已加密配置并启用120分，daily通过、五项跳过并落盘，实际页面仅显示可用股票日线、原路由保持；未包含的fund_div不强验，K37历史正向缺口保留。五类共同消费G1、Automation正式校准及 [RouteTarget切源/恢复/Web](evidence/2026-10-21-route-failover-acceptance.md)已通过；RQData见 [TODO](../TODO.md#rqdata-live-consumption)。 |
-| [来源凭据](2026-09-14-market-provider-credentials.md)                      | 当前获准范围已验收；T5b-LB 暂缓                     | Finnhub [现有免费报价范围验收通过](evidence/2026-10-22-finnhub-free-scope-acceptance.md)，股票日线明确受限，不再列为待修复阻塞。TickFlow 日线/报价、Alpha Vantage [免费近期日线与报价](../archive/tasks/2026-10-22-alphavantage-free-recent-daily.md)及[首存状态修复](../archive/tasks/2026-10-22-provider-first-credential-state.md)复用。三家仍停用、版本 3/1/1；Tushare 原积分与 ETF 跳过范围保持。父项仅保留 Longbridge 真实授权/行情/刷新恢复暂缓，暂缓不计通过。 |
+| [来源凭据](2026-09-14-market-provider-credentials.md)                      | 当前获准范围已验收；后续事项见 TODO                | Finnhub [现有免费报价范围验收通过](evidence/2026-10-22-finnhub-free-scope-acceptance.md)，股票日线明确受限。TickFlow 日线/报价、Alpha Vantage [免费近期日线与报价](../archive/tasks/2026-10-22-alphavantage-free-recent-daily.md)及[首存状态修复](../archive/tasks/2026-10-22-provider-first-credential-state.md)复用。三家仍停用、版本 3/1/1；Tushare 原积分与 ETF 跳过范围保持。已确认延期项由 [TODO](../TODO.md#longbridge-oauth-live-acceptance)承接。 |
 | [历史数据按需获取](2026-10-09-history-data-on-demand.md)                   | L3-V 摘牌正向消费                                | 等待新的合格窗口/身份输入及明确接续指令；已停止扩搜，不为排期重做普通窗口或适配改造。                                                                                                                                               |
-| [AI 配置与测试后保存](2026-09-21-ai-provider-model-usage-configuration.md) | T2.5/T5.2、完整 AC、T6/费用的未过条件            | 配置、价格迁移/历史保留、目标默认并发/原子清除恢复、混合配置/认证方式及凭证类型转换证据复用。G3 专项已完成研究默认 openrouter/free 的 1 次生成、估算零费用与结果读取；不代收此项全部认证/费用条件，其他真实业务继续暂停，原设置/Key 保留。 |
-| [AI SDK 与输出模式](2026-09-19-vercel-ai-sdk-integration.md) | G1 三类真实业务、目标兼容及完整流未过条件 | D21a响应诊断本地通过、独立检查完成，断言复杂度已恢复。D21b全仓边界仍受移动端夹具失败阻塞，待原任务修复后复验。未部署／新增调用，V2未改、余8次冻结；D20实际费用仍未知，G3／SDK G1未完成。[当前证据](evidence/2026-10-25-g3-http-response-local.md)。 |
-| [研究工作台](2026-08-25-ai-research-workbench.md)                          | 目标在途重启、外部来源长任务及真实研究精确差集 | G3 同一样本的真实新闻/生成/报告/引用/历史/Web 证据已通过，可按输入复用；不代收在途重启或长任务场景。其余真实调用仍需原接续条件，隔离 R1、视觉与模式证据不重做。 |
+| [AI 配置与测试后保存](2026-09-21-ai-provider-model-usage-configuration.md) | T5.2、完整 AC 与 T6/费用差集；T2.5 已完成 | 研究用途、默认报告/Web 证据已映射；本次单次非流式认证连接成功、实际费用 0。审计归因与准确合同透传已本地修复并通过 93 项回归，目标同步待授权；其他用途、费用和完整期限仍由原 Task 持有。 |
+| [AI SDK 与输出模式](2026-09-19-vercel-ai-sdk-integration.md) | G1 参数优化/discovery、协议与费用独立验收 | 研究助手按现行 V2 合同复用 D58～D60；Chat 原生结构化/JSON Mode 已验流式子场景通过。Responses 等未过条件保持，旧预算不恢复。见[本次对账](evidence/2026-10-30-nonmobile-evidence-reconciliation.md)。 |
+| [研究工作台](2026-08-25-ai-research-workbench.md) | 目标在途重启、外部来源长任务 | 当前默认 Provider 的真实研究 smoke 已由 D59/D60 关闭，剩余两项需准确的故障/重启、目标/来源和当次调用授权；R1、视觉与模式证据不重做。 |
 | [策略风险与 AI 优化](2026-09-09-strategy-risk-ai-optimization.md)          | T19 真实探索到采纳的闭环                         | 当前真实生成暂停；涉及新指标/风险缺陷的场景先有对应修复证据，不以原 PARITY-T06 关闭整个 T19。                                                                                                                                       |
 
 <a id="priority-p2"></a>
@@ -63,8 +64,8 @@ D0/T0 的只读盘点可与 P0 准备并行，产出准确写集后再安排实�
 | 任务入口                                                                                        | 排期范围                                | 接续条件                                                                                                                                                                   |
 | ----------------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [研究历史比较与复核](2026-10-18-research-evidence-evolution.md#p2历史比较与结论复核)            | T13c、G4b；T10～T14 本地交付与 G4a 复用 | T10～T12、T13a/T13b、T14 本地交付及 G4a 目标保留/非空观察恢复已完成，当前兼容镜像与恢复副本已归档。仅接合格日历/经济价格实源消费及 G4b 用户路径；原报告与 Journal 不改写。 |
-| [全站 UI 与交互](2026-09-08-ui-interaction-consistency.md)                                      | T2～T6/T8 的父项及真实业务收口          | 已过视觉、异常恢复与 Docker API 读取不重跑；G3 的报告、报价/新闻引用和历史 Web 展示证据可复用，其余按领域结果的精确差集收口。严重正确性修复不因 UI 排 P2 被拖后。 |
-| [Web 至 Android / iOS 功能迁移](2026-10-22-web-mobile-feature-parity.md) | 第 0～4 批实现与验收通过 | 第 4 批 C08/C09、M23～M27、G4A/G4I 分别通过；手机 142 项及 `1ea300be` 四项必需 CI 成功，两端恢复真实 API。验收包内容、CRC 和自身指纹由本机清单记录。原账本、策略与 WIP 保留，受控模型/行情不替代实源验收；第 5～6 批及完整迁移门禁保持规划。 |
+| [全站 UI 与交互](2026-09-08-ui-interaction-consistency.md) | T2～T6/T8 的父项及真实业务收口 | T4 已补 D58～D60 真实研究/Web，仍缺研究的在途重启、外部长任务及 T2/T19；其他父项按原依赖开放，已过视觉、键盘与恢复继续复用。 |
+| [Web 至 Android / iOS 功能迁移](2026-10-22-web-mobile-feature-parity.md) | 第 0～4 批通过；第 5～6 批父门禁待实源闭环 | 单次 Scheduler 及 Android/iPhone Air 消费已通过；当前剩余模型/来源、路由/目录写入、通知及完整 G5/G6/G7，详见[剩余清单](evidence/web-mobile-parity/2026-10-26-remaining-gates.md)。编译、CI 与历史运行按匹配输入复用；原账本、策略与 WIP 保留，已确认延期项由 TODO 承接。 |
 | [现金资金与定期入账](2026-08-30-cash-account-funding-and-transfer.md#recurring-cash-acceptance) | 仅外部补期汇总通知                      | 资金与 Scheduler 恢复已过；等待明确渠道/收件范围及发送授权，不自行配置或发送，未过条件不迁入 TODO。                                                                        |
 
 <a id="priority-p3"></a>
@@ -85,7 +86,7 @@ infra 的 [Docker 容量旧任务 V3](../../../thesis-ledger-infra/docs/tasks/20
 
 三份 P0 Task 的目标门禁均已完成；P1 的 DSA DG2a/DG2b/DG2c、研究 G2a/G2b 及 infra V3 已通过。G2b 的 9 个场景、22 个独立进程、4 次强制结束已完成，不再列为下一步。[AI 数据库配置实施记录](../archive/tasks/2026-10-19-ai-provider-database-only.md)在 T5-R1/R2 与获准 T5-W 实际 Web 保存/还原通过后归档，不再列当前待办；[现行 Spec](../specs/2026-10-19-ai-provider-database-only.md)保留。
 
-其余 P1 依赖前沿已按原 Task 核对：基金 NAV、披露、正式校准、复权分钟及误差已完成，组合十九项 AC 通过并归档，见[最终对账](evidence/2026-10-21-portfolio-final-acceptance.md)；获准恢复的故障切源与原状态恢复已通过。Tushare 精确权限、摘牌合格窗口仍保留未通过条件；RQData 已按用户决定延期至 [TODO](../TODO.md#rqdata-live-consumption)。G3 专项的研究默认、1 次零费用生成及报告/引用/历史/Web 已通过；AI 配置、SDK、工作台和策略的其余真实连接/用途/费用/业务仍按各自暂停条件管理，不追加探针。DG3 免费新闻证据复用；G3 真实失败诊断缺口及采样边界由原 Task 持有。客户端本轮只验 Web，不将 Electron 验证列为本轮阻塞。
+其余 P1 依赖前沿已按原 Task 核对：基金 NAV、披露、正式校准、复权分钟及误差已完成，组合十九项 AC 通过并归档，见[最终对账](evidence/2026-10-21-portfolio-final-acceptance.md)；获准恢复的故障切源与原状态恢复已通过。Tushare 精确权限、摘牌合格窗口仍保留未通过条件；RQData 已按用户决定延期至 [TODO](../TODO.md#rqdata-live-consumption)。G3 专项的研究默认、1 次零费用生成及报告/引用/历史/Web 已通过；AI 配置、SDK、工作台和策略的其余真实连接/用途/费用/业务仍按各自暂停条件管理，不追加探针。DG3 免费新闻证据复用；G3历史失败的内部原因及采样边界保留在历史记录，当前D58～D60成功链路已通过，不把旧失败实验列为待重跑任务。客户端本轮只验 Web，不将 Electron 验证列为本轮阻塞。
 
 各叶保留独立证据，不由主仓目标更新代收；真实模型及来源准入不因持续执行自动启用。已完成的富途、图表、Scheduler、DSA 周期/历史交付及其他 infra 完成项不重新加入队列。
 
@@ -97,7 +98,7 @@ infra 的 [Docker 容量旧任务 V3](../../../thesis-ledger-infra/docs/tasks/20
 
 T18 已按用户明确选择的[基本校验与规则参考范围](evidence/2026-10-21-trade-rule-source-contract.md#trade-rule-compromise)完成：55 项、类型/构建、8 组/2282 文件门禁、正式恢复、真实 Web 保存/更正/作废、三宽度、幂等与数据保护均通过，[原 Task 已归档](../archive/tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)，[完整证据](evidence/2026-10-21-trade-rule-reference-acceptance.md)保留原完整规则分支未通过、准备金拒绝及恢复过程。专用第十四账户归零停用，三条审计保留；原十三账户/十三表与 57 个 V3 结果保持，仅目录确认三时间正常刷新并精确归因。政策/DSA 164、16 路由及凭据保持，模型计数全 0。
 
-随后用户选择的无模型草稿/对账及乱序投影修复已完成：真实 Web、Domain 全量 455 项、Server 定向 43 项、客户端定向及最终 8 组/2301 文件门禁通过；第十五账户结清停用，三份草稿修订及 11 条审计保留，原十四账户完整哈希与来源配置保持。[本次完整验收](evidence/2026-10-21-account-draft-reconciliation-acceptance.md)保留失败、回滚保护及清理过程。剩余回查[原条件前沿](evidence/2026-10-21-continuation-frontier.md)，真实模型继续暂停；DG3 新闻实源已通过，研究 G3 与总目标仍未完成。
+随后用户选择的无模型草稿/对账及乱序投影修复已完成：真实 Web、Domain 全量 455 项、Server 定向 43 项、客户端定向及最终 8 组/2301 文件门禁通过；第十五账户结清停用，三份草稿修订及 11 条审计保留，原十四账户完整哈希与来源配置保持。[本次完整验收](evidence/2026-10-21-account-draft-reconciliation-acceptance.md)保留失败、回滚保护及清理过程。剩余回查[原条件前沿](evidence/2026-10-21-continuation-frontier.md)，该10-21检查点真实模型仍暂停、研究G3与总目标尚未完成；当前G3已由D60收口，总目标的其他责任项仍按原Task保持。
 
 <a id="应该打开哪些文档"></a>
 <a id="仍需实现或核对实现"></a>

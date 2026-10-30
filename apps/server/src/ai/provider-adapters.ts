@@ -7,6 +7,7 @@ import type {
 import type {
   AiProviderExecutionRouteInput,
   AiProviderModelPricingView,
+  AiProviderModelDefaultConfig,
 } from './ai-provider.contracts.js';
 import type {
   AiAdapter,
@@ -59,6 +60,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
       firstOutputTimeoutMs?: number;
       outputIdleTimeoutMs?: number;
       modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
+      modelDefaults?: Readonly<Record<string, AiProviderModelDefaultConfig>>;
       credentialFingerprint?: string;
     },
   ) {
@@ -85,6 +87,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         : { outputIdleTimeoutMs: options.outputIdleTimeoutMs }),
       ...(options?.executionRoutes ? { executionRoutes: options.executionRoutes } : {}),
       ...(options?.modelPricing ? { modelPricing: options.modelPricing } : {}),
+      ...(options?.modelDefaults ? { modelDefaults: options.modelDefaults } : {}),
       ...(options?.credentialFingerprint
         ? { credentialFingerprint: options.credentialFingerprint }
         : {}),

@@ -5,19 +5,12 @@ import type { AiProviderInput, AiProviderTestInput } from './ai-provider.actions
 import type {
   AiGenerationContractRef,
   AiGenerationMode,
-  AiUpstreamFormat,
+  AiProviderModelCatalogRequest,
 } from '@thesis-ledger/schemas';
 import type { AiAuthMode } from '@thesis-ledger/schemas';
 
 export type AiProviderTestResult = ProviderConnectionTestResult & { testToken?: string };
-export type AiProviderModelCatalogInput = {
-  name?: string;
-  baseUrl: string;
-  authMode?: AiAuthMode;
-  upstreamFormat?: AiUpstreamFormat;
-  apiKey?: string;
-  timeoutMs?: number;
-};
+export type AiProviderModelCatalogInput = AiProviderModelCatalogRequest;
 export type AiProviderModelCatalogResult = {
   models: string[];
   modelDetails: AiProviderModelDetail[];

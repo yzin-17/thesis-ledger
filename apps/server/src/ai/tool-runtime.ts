@@ -1,5 +1,10 @@
 import { explicitlyAllowsStale, hasStaleMarketData } from '../market/freshness.js';
 import type { AiTool, ToolPermission } from './contracts.js';
+import {
+  invokeAiTool,
+  toolFailureFacts,
+  type AiToolExecutionContext,
+} from './timeout/ai-tool-invocation.js';
 
 export interface AiToolCallAuditInput {
   runId: string;
@@ -29,12 +34,13 @@ export const executeToolSafely = async (
   tool: AiTool,
   input: unknown,
   allowed: ReadonlySet<ToolPermission>,
-  timeoutMs = 10_000,
+  timeoutMs?: number,
+  context?: AiToolExecutionContext,
 ) => {
   assertToolPermission(tool, allowed);
   const startedAt = Date.now();
   try {
-    const data = await tool.execute(input, AbortSignal.timeout(timeoutMs));
+    const data = await invokeAiTool(tool, input, timeoutMs, context);
     if (hasStaleMarketData(data) && !explicitlyAllowsStale(input))
       throw new Error('AI 默认拒绝陈旧或部分市场数据');
     return {
@@ -47,7 +53,8 @@ export const executeToolSafely = async (
       status: 'unavailable' as const,
       data: null,
       error: error instanceof Error ? error.message : 'Tool 调用失败',
-      durationMs: timeoutMs,
+      durationMs: Date.now() - startedAt,
+      ...toolFailureFacts(error),
     };
   }
 };
@@ -80,27 +87,31 @@ export const executeAuditedTool = async (
   tool: AiTool,
   input: unknown,
   allowed: ReadonlySet<ToolPermission>,
-  timeoutMs = 10_000,
+  timeoutMs?: number,
+  context?: AiToolExecutionContext,
 ) => {
   const startedAt = Date.now();
   let status: AiToolCallAuditInput['status'] = 'ok';
   let data: unknown = null;
   let errorMessage: string | undefined;
+  let failure: ReturnType<typeof toolFailureFacts> | undefined;
 
   try {
     assertToolPermission(tool, allowed);
-    data = await tool.execute(input, AbortSignal.timeout(timeoutMs));
+    data = await invokeAiTool(tool, input, timeoutMs, context);
     if (hasStaleMarketData(data) && !explicitlyAllowsStale(input))
       throw new Error('AI 默认拒绝陈旧或部分市场数据');
   } catch (error) {
     status = error instanceof ToolPermissionError ? 'denied' : 'unavailable';
+    failure = toolFailureFacts(error);
     errorMessage = error instanceof Error ? error.message : 'Tool 调用失败';
   }
 
   const durationMs = Date.now() - startedAt;
   const observed = provenance(data);
   const completedAt = new Date().toISOString();
-  const outputSummary = status === 'ok' ? summarize(data) : errorMessage;
+  const outputSummary =
+    status === 'ok' ? summarize(data) : JSON.stringify({ ...failure, summary: errorMessage });
   const audit = await recorder.recordToolCall({
     runId,
     tool: tool.name,
@@ -124,6 +135,7 @@ export const executeAuditedTool = async (
         data: null,
         error: errorMessage ?? 'Tool 调用失败',
         durationMs,
+        ...failure,
         ...(toolCallId ? { toolCallId } : {}),
       };
 };

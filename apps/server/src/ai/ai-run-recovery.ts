@@ -10,13 +10,21 @@ const researchRecovery = (metadata: unknown) => {
   const parsed = aiExecutionSummarySchema.safeParse(asRecord(metadata)?.sdkExecution);
   if (!parsed.success || parsed.data.contract.id !== 'research') return 'unknown' as const;
   const requests = parsed.data.requests;
-  if (requests.every((request) => request.state === 'prepared')) return 'requeue' as const;
+  if (requests.every((request) => request.state === 'prepared' && !request.error))
+    return 'requeue' as const;
   const last = requests.at(-1);
   if (
-    last?.state === 'completed' &&
-    last.error?.code === 'provider_rejected' &&
-    last.error.externalResult === 'rejected_before_generation' &&
-    requests.length < (parsed.data.frozenPolicy?.maxAiCalls ?? 0)
+    last?.state === 'prepared' &&
+    !last.error &&
+    requests
+      .slice(0, -1)
+      .every(
+        (request) =>
+          request.state === 'completed' &&
+          request.error?.code === 'provider_rejected' &&
+          request.error.externalResult === 'rejected_before_generation' &&
+          request.error.retryAfterMs !== undefined,
+      )
   )
     return 'requeue' as const;
   return 'unknown' as const;
@@ -68,6 +76,8 @@ export async function recoverStaleAiRuns(prisma: PrismaService, now: Date, maxAt
   let researchUnknown = 0;
   for (const run of researchRuns) {
     const recovery = researchRecovery(run.modelMetadata);
+    const facts = aiExecutionSummarySchema.safeParse(asRecord(run.modelMetadata)?.sdkExecution);
+    const firstCause = facts.success ? facts.data.requests.at(-1)?.error : null;
     const result = await prisma.aiRun.updateMany({
       where: {
         id: run.id,
@@ -88,8 +98,9 @@ export async function recoverStaleAiRuns(prisma: PrismaService, now: Date, maxAt
               status: 'failed',
               claimedAt: null,
               leaseUntil: null,
-              errorCode: 'research_unknown_outcome',
-              errorSummary: '研究任务租约过期且发送结果未知；禁止自动重放 Provider',
+              errorCode: firstCause ? `research_${firstCause.code}` : 'research_unknown_outcome',
+              errorSummary:
+                firstCause?.summary ?? '研究任务租约过期且发送结果未知；禁止自动重放 Provider',
               completedAt: now,
             },
     });

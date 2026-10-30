@@ -2,14 +2,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { button, click, field, flush, input, mount, setApi, view } from './mobile-view-harness';
 import { journalEvidenceFixture } from '../../../../packages/schemas/test/fixtures/journal-review.fixture';
-import { journalReviewCandidateContractSchema } from '@thesis-ledger/schemas';
+import {
+  journalReviewCandidateContractSchema,
+  researchReportDetailSchema,
+  researchResultV2Schema,
+} from '@thesis-ledger/schemas';
+import { readFileSync } from 'node:fs';
+import { URL as NodeURL } from 'node:url';
 import { JournalObjectScreen } from '../../src/features/journal-trade/JournalObjectScreen';
 import { ResearchReportScreen } from '../../src/features/research-read/ResearchReportScreen';
+import { ResearchBody } from '../../src/features/research-read/ResearchBody';
 import { ResearchNewScreen } from '../../src/features/research-submit/ResearchSubmitScreen';
 import { journalWindow } from '../../src/features/journal-trade/journal-model';
 import { JournalEvidenceScreen } from '../../src/features/journal-ai/JournalEvidenceScreen';
 import { ReviewAction } from '../../src/features/research-review/ReviewAction';
 const storage = vi.hoisted(() => new Map<string, string>());
+const researchSample = JSON.parse(
+  readFileSync(
+    new NodeURL('../../../../packages/schemas/fixtures/research-v2.samples.json', import.meta.url),
+    'utf8',
+  ),
+) as { result: unknown };
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: vi.fn(async (k: string) => storage.get(k) ?? null),
@@ -234,13 +247,36 @@ describe('第 3 批手机异常保护', () => {
     expect(button('保存复盘快照').disabled).toBe(true);
     expect(saves).toBe(0);
   });
+  it('全部冻结材料可打开，包括未出现在文字论据中的材料', async () => {
+    const result = researchResultV2Schema.parse(researchSample.result);
+    const extraId = '20000000-0000-4000-8000-000000000001';
+    const binding = result.evidenceBindings[0]!;
+    result.evidenceBindings.push({ ...binding, audit: { ...binding.audit, evidenceId: extraId } });
+    const detail = researchReportDetailSchema.parse({
+      ...report,
+      resultVersion: 2,
+      availability: 'available',
+      historicalScope: { status: 'known', snapshot: result.scopeSnapshot },
+      result,
+      quality: result.quality,
+      submission: null,
+    });
+    const evidence = vi.fn();
+    await mount(<ResearchBody report={detail} evidence={evidence} />);
+    await click(button(`打开材料 ${extraId}`));
+    expect(evidence).toHaveBeenCalledWith(extraId);
+  });
   it('报告刷新失败保留已经读取的正文与来源范围', async () => {
     view.params = { id, locator: { view: 'legacy' } };
     let fail = false;
     setApi(
       vi.fn<typeof fetch>().mockImplementation(async (url) => {
-        if (String(url).includes('/tool-calls'))
-          return respond({ items: [], nextCursor: null, hasMore: false });
+        if (String(url).includes('/tool-calls')) {
+          const endpoint = new URL(String(url));
+          expect(endpoint.pathname).toBe(`/api/v1/research/reports/${id}/tool-calls`);
+          expect(endpoint.searchParams.get('view')).toBe('legacy');
+          return respond({ runId: id, items: [], nextCursor: null, hasMore: false });
+        }
         if (fail) return respond({ message: '暂时断线' }, 503);
         return respond(report);
       }),

@@ -9,6 +9,8 @@ import {
   researchHistoricalScopeMatchesLocator,
   researchReportComparisonQuerySchema,
   researchReportComparisonSchema,
+  researchReportToolsQuerySchema,
+  researchReportToolsPageSchema,
   normalizeResearchSubmissionV2,
   researchSubmissionReceiptV2Schema,
   researchScopeMatchesSubmissionV2,
@@ -20,6 +22,7 @@ import {
   type ResearchReportListInput,
   type ResearchReportLocatorInput,
   type ResearchReportComparisonInput,
+  type ResearchReportToolsInput,
 } from '@thesis-ledger/schemas';
 
 type Parsed<T> = { safeParse(value: unknown): { success: true; data: T } | { success: false } };
@@ -84,6 +87,15 @@ export function researchClient(request: ResearchRequestParsed) {
         researchReportDetailSchema.refine(
           (value) => value.id === runId && belongs(value.historicalScope, query),
         ),
+        signal ? { signal } : undefined,
+      );
+    },
+    tools: (id: string, input: ResearchReportToolsInput, signal?: AbortSignal) => {
+      const runId = uuid(id);
+      const query = researchReportToolsQuerySchema.parse(input);
+      return request(
+        `/research/reports/${runId}/tool-calls${suffix(query)}`,
+        researchReportToolsPageSchema.refine((value) => value.runId === runId),
         signal ? { signal } : undefined,
       );
     },

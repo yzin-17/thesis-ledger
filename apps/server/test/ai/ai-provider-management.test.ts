@@ -156,20 +156,20 @@ describe('AI Provider 持久化管理', () => {
     expect(generated?.messages).toEqual([
       { role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' },
     ]);
-    expect(generated).toMatchObject({ maxOutputTokens: 1_024, timeout: { totalMs: 30_000 } });
+    expect(generated).toMatchObject({ maxOutputTokens: 1_024 });
     expect(generated).not.toHaveProperty('reasoningEffort');
   });
 
-  it('探针超时报 provider_timeout，不冒充用户取消', async () => {
+  it('探针保留SDK完成等待超时，不冒充用户取消', async () => {
     const configs = createConfigStub();
     const sdk = {
       generate: vi.fn(async () =>
         Promise.reject(
           new AiSdkGenerationError(
             aiGenerationErrorSchema.parse({
-              code: 'cancelled',
-              phase: 'cancellation',
-              summary: '生成请求已取消',
+              code: 'provider_completion_timeout',
+              phase: 'request',
+              summary: '非流式完成等待超时',
               externalResult: 'unknown',
               requestId: '3f2f9f7e-8f2f-4f2f-9f2f-2f9f7e8f2f4f',
             }),
@@ -196,8 +196,8 @@ describe('AI Provider 持久化管理', () => {
 
     expect(result).toMatchObject({
       status: 'down',
-      errorCode: 'provider_timeout',
-      message: 'Provider 未在 1500 ms 内返回结果，已按超时中断',
+      errorCode: 'provider_completion_timeout',
+      message: '非流式完成等待超时',
     });
   });
 
@@ -467,7 +467,7 @@ describe('AI Provider 持久化管理', () => {
       generate: vi.fn(
         (input: { signal: AbortSignal }) =>
           new Promise((_resolve, reject) => {
-            input.signal.addEventListener('abort', () => reject(new Error('aborted')), {
+            input.signal.addEventListener('abort', () => reject(input.signal.reason), {
               once: true,
             });
           }),

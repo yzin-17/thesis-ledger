@@ -23,7 +23,7 @@ const scenarios = [
     mime: 'application/json',
     wire: providerError,
     frames: 0,
-    code: 'transport_unknown',
+    code: 'provider_stream_error',
     summary: /^Provider returned error$/u,
     layer: { name: 'AI_APICallError', statusCode: 502, code: null },
     expected: {
@@ -49,7 +49,7 @@ const scenarios = [
     mime: 'text/event-stream',
     wire: `data: ${providerError}\n\ndata: [DONE]\n\n`,
     frames: 1,
-    code: 'transport_unknown',
+    code: 'provider_stream_error',
     summary: /^Provider returned error$/u,
     layer: { name: 'AI_StreamProviderError', statusCode: 502, code: 502 },
     expected: {

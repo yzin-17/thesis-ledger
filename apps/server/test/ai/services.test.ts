@@ -98,7 +98,12 @@ describe('AI 运行审计', () => {
             researchPolicy: expect.objectContaining({ maxAiCalls: 2, maxCost: '0' }),
             sdkExecution: expect.objectContaining({
               version: 'sdk-execution-v1',
-              deadlineAt: expect.any(String),
+              deadlineAt: null,
+              timing: expect.objectContaining({
+                firstStartedAt: null,
+                taskDeadlineAt: null,
+                queueExpiresAt: expect.any(String),
+              }),
               requests: [],
             }),
           }),

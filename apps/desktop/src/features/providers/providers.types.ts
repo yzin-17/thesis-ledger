@@ -7,7 +7,10 @@ import type {
   AiProviderModelExecution,
   AiUsageFacts,
   AiUpstreamFormat,
+  AiProviderModelCatalogConfig,
+  AiProviderModelDefaultConfig,
 } from '@thesis-ledger/schemas';
+import type { ModelCatalogDraft } from './ai-provider-model-catalog.js';
 
 export type AiProviderExecutionRouteConfig = {
   model: string;
@@ -29,14 +32,12 @@ export type AiProviderExecutionRouteDraft = {
   enabled: boolean;
   modeOverridden: boolean;
   contractId: AiGenerationContractRef['id'];
+  contractVersion?: AiGenerationContractRef['version'];
   firstOutputTimeoutMs: string;
   outputIdleTimeoutMs: string;
 };
 
-export type AiProviderModelDefaultConfig = {
-  mode: AiGenerationMode;
-  outputPolicy?: 'auto' | 'manual';
-};
+export type { AiProviderModelDefaultConfig } from '@thesis-ledger/schemas';
 
 export type ProviderHealthHistoryRecord = {
   provider: string;
@@ -112,6 +113,7 @@ export interface ProviderRecord {
   baseUrl?: string | null;
   authMode?: AiAuthMode;
   models?: string[];
+  modelCatalog?: AiProviderModelCatalogConfig;
   upstreamFormat?: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   executionRouteConfigs?: AiProviderExecutionRouteConfig[];
@@ -494,7 +496,8 @@ export const newProviderDraft = () => ({
   baseUrl: '',
   authMode: 'api_key' as AiAuthMode,
   modelsText: '',
-  timeoutMs: '30000',
+  modelCatalog: undefined as ModelCatalogDraft | null | undefined,
+  timeoutMs: '',
   firstOutputTimeoutMs: '',
   outputIdleTimeoutMs: '',
   costPer1kInput: '',
@@ -507,6 +510,7 @@ export const newProviderDraft = () => ({
   chatImplementation: 'compatible' as AiChatImplementation | undefined,
   executionRoutes: [] as AiProviderExecutionRouteDraft[],
   modelDefaults: {} as Record<string, AiProviderModelDefaultConfig>,
+  modelRequestOptionsText: {} as Record<string, string>,
   updatedAt: '',
 });
 

@@ -3,6 +3,8 @@ import type { z } from 'zod';
 import {
   aiGenerationContractRefSchema,
   aiGenerationModeSchema,
+  aiModelRequestOptionsSchema,
+  type AiModelRequestOptions,
   type AiAdapter,
   type AiGenerationContractRef,
   type AiGenerationMode,
@@ -21,11 +23,24 @@ export const validateGenerationRequest = (input: {
   reasoningEnabled?: boolean;
   reasoningEffort?: string;
   compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
+  requestOptions?: AiModelRequestOptions;
 }) => {
   aiGenerationContractRefSchema.parse(input.contract);
   aiGenerationModeSchema.parse(input.mode);
   const messages = modelMessageSchema.array().parse(input.messages);
   validateResearchReasoning(input);
+  if (input.requestOptions !== undefined) aiModelRequestOptionsSchema.parse(input.requestOptions);
+  if (
+    input.adapter === 'anthropic-messages' &&
+    input.requestOptions?.outputTokenLimit === 'upstream'
+  )
+    throw new AiSdkGenerationError({
+      code: 'capability_unsupported',
+      phase: 'preflight',
+      summary: 'Anthropic Messages 必须指定输出上限',
+      externalResult: 'not_sent',
+      requestId: input.requestId,
+    });
   if (!adapterSupportsGenerationMode(input.adapter, input.mode))
     throw new AiSdkGenerationError({
       code: 'capability_unsupported',
