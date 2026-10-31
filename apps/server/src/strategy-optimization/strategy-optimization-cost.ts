@@ -7,11 +7,11 @@ import {
 } from '@thesis-ledger/schemas';
 import {
   optimizationSha256,
-  toRecord,
   type AttemptRow,
   type ExperimentRow,
 } from './strategy-optimization-common.js';
 import type { AiProviderModelPricingView } from '../ai/ai-provider.contracts.js';
+import { optimizationAttemptCostParts } from './strategy-optimization-attempt-cost.js';
 
 export type OptimizationCostFacts = {
   costStatus: 'known' | 'unknown';
@@ -34,13 +34,12 @@ export const optimizationPricingForModel = (
   metadata: ProviderMetadata | undefined,
   model?: string,
 ): OptimizationPricing | undefined => {
-  const pricing = model && metadata?.modelPricing?.[model] ? metadata.modelPricing[model] : metadata;
+  const pricing =
+    model && metadata?.modelPricing?.[model] ? metadata.modelPricing[model] : metadata;
   if (!pricing) return undefined;
   return {
     ...(pricing.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
-    ...(pricing.costPer1kOutput === undefined
-      ? {}
-      : { costPer1kOutput: pricing.costPer1kOutput }),
+    ...(pricing.costPer1kOutput === undefined ? {} : { costPer1kOutput: pricing.costPer1kOutput }),
     ...(pricing.costCurrency === undefined ? {} : { costCurrency: pricing.costCurrency }),
     ...(pricing.pricingVersion === undefined ? {} : { pricingVersion: pricing.pricingVersion }),
   };
@@ -119,29 +118,21 @@ export const optimizationPricingForExperimentRoute = (
   if (!route) return optimizationPricingForModel(fallback, model);
   if (route.costStatus === 'unknown')
     return {
-      ...(typeof route.costPer1kInput === 'number'
-        ? { costPer1kInput: route.costPer1kInput }
-        : {}),
+      ...(typeof route.costPer1kInput === 'number' ? { costPer1kInput: route.costPer1kInput } : {}),
       ...(typeof route.costPer1kOutput === 'number'
         ? { costPer1kOutput: route.costPer1kOutput }
         : {}),
       ...(typeof route.costCurrency === 'string' ? { costCurrency: route.costCurrency } : {}),
-      ...(typeof route.pricingVersion === 'string'
-        ? { pricingVersion: route.pricingVersion }
-        : {}),
+      ...(typeof route.pricingVersion === 'string' ? { pricingVersion: route.pricingVersion } : {}),
     };
   if (typeof route.costPer1kInput === 'number' || typeof route.costPer1kOutput === 'number')
     return {
-      ...(typeof route.costPer1kInput === 'number'
-        ? { costPer1kInput: route.costPer1kInput }
-        : {}),
+      ...(typeof route.costPer1kInput === 'number' ? { costPer1kInput: route.costPer1kInput } : {}),
       ...(typeof route.costPer1kOutput === 'number'
         ? { costPer1kOutput: route.costPer1kOutput }
         : {}),
       ...(typeof route.costCurrency === 'string' ? { costCurrency: route.costCurrency } : {}),
-      ...(typeof route.pricingVersion === 'string'
-        ? { pricingVersion: route.pricingVersion }
-        : {}),
+      ...(typeof route.pricingVersion === 'string' ? { pricingVersion: route.pricingVersion } : {}),
     };
   return optimizationPricingForModel(fallback, model);
 };
@@ -246,30 +237,31 @@ export const optimizationCostSummary = (
   if (attempts) {
     for (const attempt of attempts) {
       const route = routeByKey.get(attempt.modelKey);
-      const metadata = toRecord(attempt.modelMetadata);
-      const attemptStatus = metadata.costStatus;
-      const attemptCurrency = normalizeCostCurrency(metadata.costCurrency);
       if (!route) unknownReason = 'historical_missing_metadata';
-      if (attemptStatus !== 'known') {
-        if (attemptStatus === 'unknown')
-          unknownReason = attemptCurrency ? 'unknown_cost' : 'unknown_currency';
-        else unknownReason = 'historical_missing_metadata';
-        continue;
+      for (const part of optimizationAttemptCostParts(attempt)) {
+        const attemptStatus = part.costStatus;
+        const attemptCurrency = normalizeCostCurrency(part.costCurrency);
+        if (attemptStatus !== 'known') {
+          if (attemptStatus === 'unknown')
+            unknownReason = attemptCurrency ? 'unknown_cost' : 'unknown_currency';
+          else unknownReason = 'historical_missing_metadata';
+          continue;
+        }
+        if (!attemptCurrency) {
+          unknownReason = 'unknown_currency';
+          continue;
+        }
+        observedCurrencies.add(attemptCurrency);
+        const routeCurrency = route ? normalizeCostCurrency(route.costCurrency) : null;
+        if (route?.costStatus === 'known' && routeCurrency && routeCurrency !== attemptCurrency)
+          unknownReason = 'mixed_currency';
+        const amount = normalizeCostAmountText(part.cost);
+        if (amount === null) {
+          unknownReason = 'unknown_cost';
+          continue;
+        }
+        amounts.set(attemptCurrency, addAmount(amounts.get(attemptCurrency) ?? '0', amount));
       }
-      if (!attemptCurrency) {
-        unknownReason = 'unknown_currency';
-        continue;
-      }
-      observedCurrencies.add(attemptCurrency);
-      const routeCurrency = route ? normalizeCostCurrency(route.costCurrency) : null;
-      if (route?.costStatus === 'known' && routeCurrency && routeCurrency !== attemptCurrency)
-        unknownReason = 'mixed_currency';
-      const amount = normalizeCostAmountText(attempt.cost);
-      if (amount === null) {
-        unknownReason = 'unknown_cost';
-        continue;
-      }
-      amounts.set(attemptCurrency, addAmount(amounts.get(attemptCurrency) ?? '0', amount));
     }
   }
 

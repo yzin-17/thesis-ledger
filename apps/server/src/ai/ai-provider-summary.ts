@@ -200,11 +200,22 @@ const parseModelReasoning = (
 export const aiProviderCapabilities = (value: unknown) => stringArray(value) ?? ['chat'];
 
 export const resolveCompatibilityProfile = (
-  input: { compatibilityExtensionProfile?: AiCompatibilityExtensionProfile | undefined },
+  input: {
+    compatibilityExtensionProfile?: AiCompatibilityExtensionProfile | undefined;
+    upstreamFormat?: AiUpstreamFormat | undefined;
+    chatImplementation?: AiChatImplementation | undefined;
+  },
   settings: unknown,
-) =>
-  input.compatibilityExtensionProfile ??
-  parseAiProviderSettings(settings)?.compatibilityExtensionProfile;
+) => {
+  if (input.compatibilityExtensionProfile !== undefined) return input.compatibilityExtensionProfile;
+  const stored = parseAiProviderSettings(settings);
+  const format = input.upstreamFormat ?? stored?.upstreamFormat;
+  let implementation = input.chatImplementation;
+  if (implementation === undefined && input.upstreamFormat === undefined)
+    implementation = stored?.chatImplementation;
+  if (format !== 'chat-completions' || implementation === 'openai-native') return undefined;
+  return stored?.compatibilityExtensionProfile;
+};
 
 type HealthSnapshot = {
   state: string;

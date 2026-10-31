@@ -14,7 +14,11 @@ import {
   type AiGenerationMode,
 } from '@thesis-ledger/schemas';
 import type { ProviderConfigService } from '../providers/provider-config.service.js';
-import { aiProviderCapabilities, parseAiProviderSettings } from './ai-provider-summary.js';
+import {
+  aiProviderCapabilities,
+  parseAiProviderSettings,
+  resolveCompatibilityProfile,
+} from './ai-provider-summary.js';
 import {
   asRecord,
   type AiProviderInput,
@@ -115,8 +119,7 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
   );
   const modelCatalog =
     input.modelCatalog === undefined ? existing?.modelCatalog : input.modelCatalog;
-  const compatibilityExtensionProfile =
-    input.compatibilityExtensionProfile ?? existing?.compatibilityExtensionProfile;
+  const compatibilityExtensionProfile = resolveCompatibilityProfile(input, existingSettings);
   assertResearchReasoningRoutes(
     { ...selection, compatibilityExtensionProfile },
     executionRoutes ?? [],

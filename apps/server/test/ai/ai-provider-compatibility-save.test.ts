@@ -9,6 +9,7 @@ import { AiSdkGenerationError } from '../../src/ai/ai-sdk-generation.adapter.js'
 import { aiProviderInputSchema, type AiProviderInput } from '../../src/ai/ai-provider.contracts.js';
 import { resolveCompatibilityProfile } from '../../src/ai/ai-provider-summary.js';
 import { settingsFromAiProviderInput } from '../../src/ai/ai-provider-readiness.persistence.js';
+import { buildAiProviderTestRuntime } from '../../src/ai/ai-provider-test-runtime.js';
 import type { VerifiedRoute } from '../../src/ai/ai-provider-validation-policy.js';
 
 const input = (): AiProviderInput =>
@@ -179,6 +180,55 @@ describe('显式兼容扩展保存', () => {
     expect(f.providers.save.mock.calls.at(-1)?.[0].compatibilityExtensionProfile).toBe(
       'openrouter-v1',
     );
+  });
+
+  it.each([
+    { upstreamFormat: 'responses', adapter: 'openai-responses' },
+    {
+      upstreamFormat: 'chat-completions',
+      chatImplementation: 'openai-native',
+      adapter: 'openai-chat',
+    },
+    { upstreamFormat: 'anthropic-messages', adapter: 'anthropic-messages' },
+  ] as const)('切换至 $adapter 不继承旧兼容扩展且必须重新验证', async (selection) => {
+    const f = fixture();
+    const original: AiProviderInput = {
+      ...f.draft(),
+      compatibilityExtensionProfile: 'openrouter-v1',
+    };
+    await f.service.testAndSave(original, await f.authorize(original));
+    f.sdk.generate.mockClear();
+    const { adapter, ...upstream } = selection;
+    const changed = aiProviderInputSchema.parse({
+      ...f.draft(),
+      chatImplementation: undefined,
+      ...upstream,
+    });
+    const stored = settingsFromAiProviderInput(original);
+    const runtime = buildAiProviderTestRuntime(
+      changed,
+      { enabled: true, settings: stored },
+      'secret',
+    );
+    expect(runtime.adapter).toBe(adapter);
+    expect(runtime.compatibilityExtensionProfile).toBeUndefined();
+    expect(settingsFromAiProviderInput(changed, stored)).not.toHaveProperty(
+      'compatibilityExtensionProfile',
+    );
+    const plan = await f.service.plan(changed);
+    expect(plan.pending).toHaveLength(2);
+    await expect(f.service.save(changed)).rejects.toThrow('测试并保存');
+    await f.service.testAndSave(changed, await f.authorize(changed));
+    expect(f.sdk.generate).toHaveBeenCalledTimes(2);
+    for (const [request] of f.sdk.generate.mock.calls) {
+      expect(request).toMatchObject({ adapter, apiKey: 'stored-secret' });
+      expect(request).not.toHaveProperty('compatibilityExtensionProfile');
+    }
+    expect(f.providers.save.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      'compatibilityExtensionProfile',
+    );
+    expect((await f.service.plan(f.draft())).pending).toHaveLength(2);
+    expect(f.configs.readCredential).toHaveBeenCalled();
   });
 
   it('明确的格式不支持也在首次失败停止，不保存或继续下一用途', async () => {

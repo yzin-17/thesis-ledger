@@ -20,7 +20,7 @@ import {
   type AiProviderInput,
   type AiProviderLifecycleOptions,
 } from './ai-provider.contracts.js';
-import { parseAiProviderSettings } from './ai-provider-summary.js';
+import { parseAiProviderSettings, resolveCompatibilityProfile } from './ai-provider-summary.js';
 import {
   assertModelRequestOptions,
   mergeModelRequestOptionsDefaults,
@@ -87,7 +87,7 @@ export class AiProviderSaveService {
       stored?.modelDefaults,
       parsed.models,
     );
-    const profile = parsed.compatibilityExtensionProfile ?? stored?.compatibilityExtensionProfile;
+    const profile = resolveCompatibilityProfile(parsed, row?.settings);
     const input: AiProviderInput = {
       ...parsed,
       enabled: parsed.enabled ?? row?.enabled ?? true,
