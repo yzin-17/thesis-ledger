@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   aggregateMinuteBars,
   tradingCalendars,
@@ -11,6 +11,7 @@ import type { BarPoint } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
 import { currentFundRiskContext } from './strategy-risk-nav-context.js';
+import { assertStrategyRiskTargetAccount } from './strategy-risk-target-account.js';
 import {
   isMarketBarTemporarilyUnavailable,
   MarketBarReader,
@@ -112,12 +113,9 @@ export class StrategyRiskContextService {
   private async assertTarget(accountId: string, symbol: string, target: StrategyRiskTarget) {
     const account = await this.prisma.account.findUnique({
       where: { id: accountId },
-      select: { active: true },
+      select: { active: true, mode: true, type: true },
     });
-    if (!account) throw new NotFoundException('账户不存在');
-    if (!account.active) throw new BadRequestException('账户已停用');
-    if (target.executionInstrument.symbol !== symbol)
-      throw new BadRequestException('风险应用标的必须与策略执行标的一致');
+    assertStrategyRiskTargetAccount(account, symbol, target.executionInstrument.symbol);
   }
 
   private loadPositionTrade(accountId: string, symbol: string) {

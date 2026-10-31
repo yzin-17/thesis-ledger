@@ -55,7 +55,7 @@ describe('统一策略风险运行时', () => {
     try {
       vi.setSystemTime(new Date('2026-10-17T08:00:00Z'));
       const prisma = {
-        account: { findUnique: vi.fn(async () => ({ active: true })) },
+        account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
         position: { findUnique: vi.fn(async () => null) },
         trade: { findFirst: vi.fn(async () => null) },
       };
@@ -85,7 +85,7 @@ describe('统一策略风险运行时', () => {
     ['2026-10-07T08:00:00Z', '2026-09-30'],
   ])('最近收盘价格按实际日历取必要单日：%s', async (at, expectedDate) => {
     const prisma = {
-      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
       position: { findUnique: vi.fn(async () => null) },
       trade: { findFirst: vi.fn(async () => null) },
     };
@@ -103,7 +103,7 @@ describe('统一策略风险运行时', () => {
 
   it('持有期仍读完整开仓窗口，日历未知时不发起行情读取', async () => {
     const prisma = {
-      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
       position: { findUnique: vi.fn(async () => null) },
       trade: { findFirst: vi.fn(async () => ({ id: 'trade', openedAt: new Date('2026-09-01T02:00:00Z') })) },
     };
@@ -249,7 +249,7 @@ describe('统一策略风险运行时', () => {
 
   it('策略上下文只读取已在评价时点闭合且可用的 MarketBar，不依赖实时 quote', async () => {
     const prisma = {
-      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
       position: {
         findUnique: vi.fn(async () => ({
           id: 'position-1',
@@ -286,7 +286,7 @@ describe('统一策略风险运行时', () => {
     'MarketBar %s 时保留持仓事实并将行情相关字段交给四态判断标记为 unavailable',
     async (code) => {
       const prisma = {
-        account: { findUnique: vi.fn(async () => ({ active: true })) },
+        account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
         position: {
           findUnique: vi.fn(async () => ({
             id: 'position-1',
@@ -319,7 +319,7 @@ describe('统一策略风险运行时', () => {
 
   it('MarketBar 契约错误不降级为行情不可用', async () => {
     const prisma = {
-      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
       position: { findUnique: vi.fn(async () => null) },
       trade: { findFirst: vi.fn(async () => null) },
     };
@@ -346,7 +346,7 @@ describe('统一策略风险运行时', () => {
   it('日线盘中已有当日数据时仍回退到上一根已闭合日线', async () => {
     const intraday = new Date('2026-09-11T06:00:00.000Z');
     const prisma = {
-      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
       position: {
         findUnique: vi.fn(async () => ({
           id: 'position-1',
@@ -385,7 +385,7 @@ describe('统一策略风险运行时', () => {
       ['2026-09-11T01:34:00.000Z', '104'],
     ].map(([timestamp, close]) => storedBar(timestamp!, close!, '2026-09-11T01:35:00.000Z'));
     const prisma = {
-      account: { findUnique: vi.fn(async () => ({ active: true })) },
+      account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
       position: {
         findUnique: vi.fn(async () => ({
           id: 'position-1',
